@@ -120,15 +120,15 @@ export default function UsersPage() {
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div>
-          <h1 className="text-2xl font-bold text-gray-900">Kullanıcılar</h1>
-          <p className="text-gray-500 mt-1">Toplam {total} kullanıcı</p>
+          <h1 className="text-2xl font-bold text-heading">Kullanıcılar</h1>
+          <p className="text-muted mt-1">Toplam {total} kullanıcı</p>
         </div>
       </div>
 
       {/* Filters */}
       <div className="flex flex-col sm:flex-row gap-4">
         <div className="relative flex-1 flex gap-2">
-          <MagnifyingGlassIcon className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-gray-500 pointer-events-none" />
+          <MagnifyingGlassIcon className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-muted pointer-events-none" />
           <Input
             type="text"
             placeholder="E-posta veya isim ara..."
@@ -182,7 +182,7 @@ export default function UsersPage() {
                 </tr>
               ) : filteredUsers.length === 0 ? (
                 <tr>
-                  <td colSpan={8} className="text-center py-8 text-gray-500">
+                  <td colSpan={8} className="text-center py-8 text-muted">
                     Kullanıcı bulunamadı
                   </td>
                 </tr>
@@ -197,10 +197,10 @@ export default function UsersPage() {
                           </span>
                         </div>
                         <div>
-                          <p className="font-medium text-gray-900">
+                          <p className="font-medium text-heading">
                             {user.displayName}
                           </p>
-                          <p className="text-sm text-gray-500">{user.email}</p>
+                          <p className="text-sm text-muted">{user.email}</p>
                         </div>
                       </div>
                     </td>
@@ -237,7 +237,7 @@ export default function UsersPage() {
                     </td>
                     <td className="whitespace-nowrap">
                       {user.lastLoginAt ? (
-                        <span className="text-gray-600">
+                        <span className="text-muted">
                           {new Date(user.lastLoginAt).toLocaleDateString(
                             "tr-TR",
                             {
@@ -250,14 +250,14 @@ export default function UsersPage() {
                           )}
                         </span>
                       ) : (
-                        <span className="text-gray-500">Hiç giriş yapmadı</span>
+                        <span className="text-muted">Hiç giriş yapmadı</span>
                       )}
                     </td>
                     <td className="whitespace-nowrap">
                       <div className="flex items-center gap-2">
                         <Link
                           href={`/users/${user.id}`}
-                          className="p-2 text-gray-500 hover:text-gray-900 hover:bg-gray-100 rounded-lg"
+                          className="p-2 text-muted hover:text-heading hover:bg-surface-alt rounded-lg"
                           title="Detay"
                         >
                           <EyeIcon className="h-5 w-5" />
@@ -267,8 +267,8 @@ export default function UsersPage() {
                           onClick={() => handleBanUser(user.id, user.isBanned)}
                           className={`p-2 rounded-lg ${
                             user.isBanned
-                              ? "text-green-700 hover:bg-green-500/10"
-                              : "text-red-600 hover:bg-red-500/10"
+                              ? "text-success-700 hover:bg-success-500/10"
+                              : "text-danger-600 hover:bg-danger-500/10"
                           }`}
                           title={user.isBanned ? "Engeli Kaldır" : "Engelle"}
                         >
@@ -290,7 +290,7 @@ export default function UsersPage() {
 
       {/* Pagination */}
       <div className="flex items-center justify-between">
-        <p className="text-sm text-gray-500">
+        <p className="text-sm text-muted">
           Sayfa {page} / {Math.ceil(total / 20)}
         </p>
         <div className="flex gap-2">

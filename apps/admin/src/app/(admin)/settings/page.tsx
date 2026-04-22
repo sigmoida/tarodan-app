@@ -315,12 +315,12 @@ export default function SettingsPage() {
   return (
     <div className="space-y-6">
       <div>
-        <h1 className="text-2xl font-bold text-gray-900">Platform Ayarları</h1>
-        <p className="text-gray-500 mt-1">Sistem yapılandırmasını yönetin</p>
+        <h1 className="text-2xl font-bold text-heading">Platform Ayarları</h1>
+        <p className="text-muted mt-1">Sistem yapılandırmasını yönetin</p>
       </div>
 
       {/* Tabs */}
-      <div className="flex gap-2 border-b border-gray-200 pb-2">
+      <div className="flex gap-2 border-b border-border pb-2">
         {[
           { id: "general", label: "Genel" },
           { id: "listing", label: "İlan" },
@@ -335,8 +335,8 @@ export default function SettingsPage() {
             onClick={() => setActiveTab(tab.id as any)}
             className={`px-4 py-2 rounded-t-lg transition-colors ${
               activeTab === tab.id
-                ? "bg-gray-100 text-gray-900"
-                : "text-gray-500 hover:text-gray-900"
+                ? "bg-surface-alt text-heading"
+                : "text-muted hover:text-heading"
             }`}
           >
             {tab.label}
@@ -347,12 +347,12 @@ export default function SettingsPage() {
       {/* General Settings */}
       {activeTab === "general" && (
         <div className="admin-card">
-          <h2 className="text-lg font-semibold text-gray-900 mb-4">
+          <h2 className="text-lg font-semibold text-heading mb-4">
             Genel Ayarlar
           </h2>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
             <div>
-              <label className="block text-sm text-gray-500 mb-2">
+              <label className="block text-sm text-muted mb-2">
                 Site Adı
               </label>
               <Input
@@ -364,7 +364,7 @@ export default function SettingsPage() {
               />
             </div>
             <div>
-              <label className="block text-sm text-gray-500 mb-2">
+              <label className="block text-sm text-muted mb-2">
                 Destek E-posta
               </label>
               <Input
@@ -376,7 +376,7 @@ export default function SettingsPage() {
               />
             </div>
             <div>
-              <label className="block text-sm text-gray-500 mb-2">
+              <label className="block text-sm text-muted mb-2">
                 Logo URL
               </label>
               <Input
@@ -387,12 +387,12 @@ export default function SettingsPage() {
                 }
                 placeholder="https://..."
               />
-              <p className="text-xs text-gray-500 mt-1">
+              <p className="text-xs text-muted mt-1">
                 Logo görseli için doğrudan URL
               </p>
             </div>
             <div>
-              <label className="block text-sm text-gray-500 mb-2">
+              <label className="block text-sm text-muted mb-2">
                 Saat Dilimi
               </label>
               <Select
@@ -410,7 +410,7 @@ export default function SettingsPage() {
               </Select>
             </div>
             <div>
-              <label className="block text-sm text-gray-500 mb-2">
+              <label className="block text-sm text-muted mb-2">
                 Para Birimi
               </label>
               <Select
@@ -425,7 +425,7 @@ export default function SettingsPage() {
               </Select>
             </div>
             <div>
-              <label className="block text-sm text-gray-500 mb-2">Dil</label>
+              <label className="block text-sm text-muted mb-2">Dil</label>
               <Select
                 value={settings.language}
                 onChange={(e) =>
@@ -443,12 +443,12 @@ export default function SettingsPage() {
       {/* Listing Settings */}
       {activeTab === "listing" && (
         <div className="admin-card">
-          <h2 className="text-lg font-semibold text-gray-900 mb-4">
+          <h2 className="text-lg font-semibold text-heading mb-4">
             İlan Ayarları
           </h2>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
             <div>
-              <label className="block text-sm text-gray-500 mb-2">
+              <label className="block text-sm text-muted mb-2">
                 Ücretsiz İlan Limiti
               </label>
               <Input
@@ -462,12 +462,12 @@ export default function SettingsPage() {
                   })
                 }
               />
-              <p className="text-xs text-gray-500 mt-1">
+              <p className="text-xs text-muted mt-1">
                 Ücretsiz üyelerin ilan limiti
               </p>
             </div>
             <div>
-              <label className="block text-sm text-gray-500 mb-2">
+              <label className="block text-sm text-muted mb-2">
                 Temel İlan Limiti
               </label>
               <Input
@@ -481,12 +481,12 @@ export default function SettingsPage() {
                   })
                 }
               />
-              <p className="text-xs text-gray-500 mt-1">
+              <p className="text-xs text-muted mt-1">
                 Temel üyelerin ilan limiti (-1 = sınırsız)
               </p>
             </div>
             <div>
-              <label className="block text-sm text-gray-500 mb-2">
+              <label className="block text-sm text-muted mb-2">
                 Premium İlan Limiti
               </label>
               <Input
@@ -500,12 +500,12 @@ export default function SettingsPage() {
                   })
                 }
               />
-              <p className="text-xs text-gray-500 mt-1">
+              <p className="text-xs text-muted mt-1">
                 Premium üyelerin ilan limiti (-1 = sınırsız)
               </p>
             </div>
             <div>
-              <label className="block text-sm text-gray-500 mb-2">
+              <label className="block text-sm text-muted mb-2">
                 Business İlan Limiti
               </label>
               <Input
@@ -519,12 +519,12 @@ export default function SettingsPage() {
                   })
                 }
               />
-              <p className="text-xs text-gray-500 mt-1">
+              <p className="text-xs text-muted mt-1">
                 Business üyelerin ilan limiti (-1 = sınırsız)
               </p>
             </div>
             <div>
-              <label className="block text-sm text-gray-500 mb-2">
+              <label className="block text-sm text-muted mb-2">
                 Minimum Ürün Fiyatı (₺)
               </label>
               <Input
@@ -539,12 +539,12 @@ export default function SettingsPage() {
                   })
                 }
               />
-              <p className="text-xs text-gray-500 mt-1">
+              <p className="text-xs text-muted mt-1">
                 Yeni ilanlar için minimum fiyat (mevcut ilanlar etkilenmez)
               </p>
             </div>
             <div>
-              <label className="block text-sm text-gray-500 mb-2">
+              <label className="block text-sm text-muted mb-2">
                 Maksimum Ürün Fiyatı (₺)
               </label>
               <Input
@@ -559,7 +559,7 @@ export default function SettingsPage() {
                   })
                 }
               />
-              <p className="text-xs text-gray-500 mt-1">
+              <p className="text-xs text-muted mt-1">
                 Yeni ilanlar için maksimum fiyat (mevcut ilanlar etkilenmez)
               </p>
             </div>
@@ -570,12 +570,12 @@ export default function SettingsPage() {
       {/* Trade Settings */}
       {activeTab === "trade" && (
         <div className="admin-card">
-          <h2 className="text-lg font-semibold text-gray-900 mb-4">
+          <h2 className="text-lg font-semibold text-heading mb-4">
             Takas Ayarları
           </h2>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
             <div>
-              <label className="block text-sm text-gray-500 mb-2">
+              <label className="block text-sm text-muted mb-2">
                 Yanıt Süresi (Saat)
               </label>
               <Input
@@ -588,12 +588,12 @@ export default function SettingsPage() {
                   })
                 }
               />
-              <p className="text-xs text-gray-500 mt-1">
+              <p className="text-xs text-muted mt-1">
                 Takas teklifine yanıt süresi
               </p>
             </div>
             <div>
-              <label className="block text-sm text-gray-500 mb-2">
+              <label className="block text-sm text-muted mb-2">
                 Ödeme Süresi (Saat)
               </label>
               <Input
@@ -606,12 +606,12 @@ export default function SettingsPage() {
                   })
                 }
               />
-              <p className="text-xs text-gray-500 mt-1">
+              <p className="text-xs text-muted mt-1">
                 Kabul sonrası ödeme süresi (nakit takaslar için)
               </p>
             </div>
             <div>
-              <label className="block text-sm text-gray-500 mb-2">
+              <label className="block text-sm text-muted mb-2">
                 Kargo Süresi (Gün)
               </label>
               <Input
@@ -624,12 +624,12 @@ export default function SettingsPage() {
                   })
                 }
               />
-              <p className="text-xs text-gray-500 mt-1">
+              <p className="text-xs text-muted mt-1">
                 Kabul sonrası kargo gönderim süresi
               </p>
             </div>
             <div>
-              <label className="block text-sm text-gray-500 mb-2">
+              <label className="block text-sm text-muted mb-2">
                 Onay Süresi (Gün)
               </label>
               <Input
@@ -642,7 +642,7 @@ export default function SettingsPage() {
                   })
                 }
               />
-              <p className="text-xs text-gray-500 mt-1">
+              <p className="text-xs text-muted mt-1">
                 Teslim sonrası onay süresi
               </p>
             </div>
@@ -653,12 +653,12 @@ export default function SettingsPage() {
       {/* Message Settings */}
       {activeTab === "message" && (
         <div className="admin-card">
-          <h2 className="text-lg font-semibold text-gray-900 mb-4">
+          <h2 className="text-lg font-semibold text-heading mb-4">
             Mesaj Ayarları
           </h2>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
             <div>
-              <label className="block text-sm text-gray-500 mb-2">
+              <label className="block text-sm text-muted mb-2">
                 Maksimum Mesaj Uzunluğu
               </label>
               <Input
@@ -672,7 +672,7 @@ export default function SettingsPage() {
                   })
                 }
               />
-              <p className="text-xs text-gray-500 mt-1">
+              <p className="text-xs text-muted mt-1">
                 Bir mesajın maksimum karakter uzunluğu
               </p>
             </div>
@@ -683,18 +683,18 @@ export default function SettingsPage() {
       {/* Membership Settings */}
       {activeTab === "membership" && (
         <div className="admin-card">
-          <h2 className="text-lg font-semibold text-gray-900 mb-4">
+          <h2 className="text-lg font-semibold text-heading mb-4">
             Üyelik Fiyatları
           </h2>
           <div className="space-y-6">
             {/* Discount Percentage */}
-            <div className="border border-gray-200 rounded-lg p-4">
-              <h3 className="text-md font-semibold text-gray-900 mb-4">
+            <div className="border border-border rounded-lg p-4">
+              <h3 className="text-md font-semibold text-heading mb-4">
                 Yıllık İndirim Oranı
               </h3>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                 <div>
-                  <label className="block text-sm text-gray-500 mb-2">
+                  <label className="block text-sm text-muted mb-2">
                     İndirim Yüzdesi (%)
                   </label>
                   <Input
@@ -710,7 +710,7 @@ export default function SettingsPage() {
                       })
                     }
                   />
-                  <p className="text-xs text-gray-500 mt-1">
+                  <p className="text-xs text-muted mt-1">
                     Yıllık üyelik için uygulanacak indirim yüzdesi
                   </p>
                   <p className="text-xs text-info-700 mt-2">
@@ -721,13 +721,13 @@ export default function SettingsPage() {
             </div>
 
             {/* Basic Tier */}
-            <div className="border border-gray-200 rounded-lg p-4">
-              <h3 className="text-md font-semibold text-gray-900 mb-4">
+            <div className="border border-border rounded-lg p-4">
+              <h3 className="text-md font-semibold text-heading mb-4">
                 Temel Üyelik
               </h3>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                 <div>
-                  <label className="block text-sm text-gray-500 mb-2">
+                  <label className="block text-sm text-muted mb-2">
                     Aylık Fiyat (₺)
                   </label>
                   <Input
@@ -742,18 +742,18 @@ export default function SettingsPage() {
                       })
                     }
                   />
-                  <p className="text-xs text-gray-500 mt-1">
+                  <p className="text-xs text-muted mt-1">
                     Temel üyeliğin aylık fiyatı
                   </p>
                 </div>
                 <div>
-                  <label className="block text-sm text-gray-500 mb-2">
+                  <label className="block text-sm text-muted mb-2">
                     Yıllık Fiyat (₺){" "}
-                    <span className="text-xs text-gray-500">
+                    <span className="text-xs text-muted">
                       (Otomatik Hesaplanır)
                     </span>
                   </label>
-                  <div className="text-gray-500 cursor-not-allowed">
+                  <div className="text-muted cursor-not-allowed">
                     {Math.round(
                       settings.basicMonthlyPrice *
                         12 *
@@ -761,7 +761,7 @@ export default function SettingsPage() {
                         100,
                     ) / 100}
                   </div>
-                  <p className="text-xs text-gray-500 mt-1">
+                  <p className="text-xs text-muted mt-1">
                     Yıllık fiyat otomatik hesaplanır:{" "}
                     {settings.basicMonthlyPrice} × 12 × (1 -{" "}
                     {settings.yearlyDiscountPercentage}%)
@@ -771,13 +771,13 @@ export default function SettingsPage() {
             </div>
 
             {/* Premium Tier */}
-            <div className="border border-gray-200 rounded-lg p-4">
-              <h3 className="text-md font-semibold text-gray-900 mb-4">
+            <div className="border border-border rounded-lg p-4">
+              <h3 className="text-md font-semibold text-heading mb-4">
                 Premium Üyelik
               </h3>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                 <div>
-                  <label className="block text-sm text-gray-500 mb-2">
+                  <label className="block text-sm text-muted mb-2">
                     Aylık Fiyat (₺)
                   </label>
                   <Input
@@ -792,18 +792,18 @@ export default function SettingsPage() {
                       })
                     }
                   />
-                  <p className="text-xs text-gray-500 mt-1">
+                  <p className="text-xs text-muted mt-1">
                     Premium üyeliğin aylık fiyatı
                   </p>
                 </div>
                 <div>
-                  <label className="block text-sm text-gray-500 mb-2">
+                  <label className="block text-sm text-muted mb-2">
                     Yıllık Fiyat (₺){" "}
-                    <span className="text-xs text-gray-500">
+                    <span className="text-xs text-muted">
                       (Otomatik Hesaplanır)
                     </span>
                   </label>
-                  <div className="text-gray-500 cursor-not-allowed">
+                  <div className="text-muted cursor-not-allowed">
                     {Math.round(
                       settings.premiumMonthlyPrice *
                         12 *
@@ -811,7 +811,7 @@ export default function SettingsPage() {
                         100,
                     ) / 100}
                   </div>
-                  <p className="text-xs text-gray-500 mt-1">
+                  <p className="text-xs text-muted mt-1">
                     Yıllık fiyat otomatik hesaplanır:{" "}
                     {settings.premiumMonthlyPrice} × 12 × (1 -{" "}
                     {settings.yearlyDiscountPercentage}%)
@@ -821,13 +821,13 @@ export default function SettingsPage() {
             </div>
 
             {/* Business Tier */}
-            <div className="border border-gray-200 rounded-lg p-4">
-              <h3 className="text-md font-semibold text-gray-900 mb-4">
+            <div className="border border-border rounded-lg p-4">
+              <h3 className="text-md font-semibold text-heading mb-4">
                 Business Üyelik
               </h3>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                 <div>
-                  <label className="block text-sm text-gray-500 mb-2">
+                  <label className="block text-sm text-muted mb-2">
                     Aylık Fiyat (₺)
                   </label>
                   <Input
@@ -842,18 +842,18 @@ export default function SettingsPage() {
                       })
                     }
                   />
-                  <p className="text-xs text-gray-500 mt-1">
+                  <p className="text-xs text-muted mt-1">
                     Business üyeliğin aylık fiyatı
                   </p>
                 </div>
                 <div>
-                  <label className="block text-sm text-gray-500 mb-2">
+                  <label className="block text-sm text-muted mb-2">
                     Yıllık Fiyat (₺){" "}
-                    <span className="text-xs text-gray-500">
+                    <span className="text-xs text-muted">
                       (Otomatik Hesaplanır)
                     </span>
                   </label>
-                  <div className="text-gray-500 cursor-not-allowed">
+                  <div className="text-muted cursor-not-allowed">
                     {Math.round(
                       settings.businessMonthlyPrice *
                         12 *
@@ -861,7 +861,7 @@ export default function SettingsPage() {
                         100,
                     ) / 100}
                   </div>
-                  <p className="text-xs text-gray-500 mt-1">
+                  <p className="text-xs text-muted mt-1">
                     Yıllık fiyat otomatik hesaplanır:{" "}
                     {settings.businessMonthlyPrice} × 12 × (1 -{" "}
                     {settings.yearlyDiscountPercentage}%)

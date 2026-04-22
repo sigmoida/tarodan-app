@@ -27,6 +27,7 @@ import {
   ArcElement,
 } from 'chart.js';
 import { Line, Bar, Doughnut } from 'react-chartjs-2';
+import { colors as dsColors } from '@tarodan/ui';
 
 ChartJS.register(
   CategoryScale,
@@ -96,8 +97,8 @@ function StatCard({ title, value, change, icon: Icon, color }: StatCardProps) {
     <div className="admin-card">
       <div className="flex items-center justify-between">
         <div>
-          <p className="text-sm text-gray-500">{title}</p>
-          <p className="text-2xl font-bold text-gray-900 mt-1">{value}</p>
+          <p className="text-sm text-muted">{title}</p>
+          <p className="text-2xl font-bold text-heading mt-1">{value}</p>
           {change !== undefined && (
             <div className="flex items-center mt-2">
               {change >= 0 ? (
@@ -108,12 +109,12 @@ function StatCard({ title, value, change, icon: Icon, color }: StatCardProps) {
               <span className={change >= 0 ? 'text-success-700' : 'text-danger-600'}>
                 {Math.abs(change)}%
               </span>
-              <span className="text-gray-500 ml-1 text-sm">vs dün</span>
+              <span className="text-muted ml-1 text-sm">vs dün</span>
             </div>
           )}
         </div>
         <div className={`p-3 rounded-lg ${color}`}>
-          <Icon className="h-6 w-6 text-gray-900" />
+          <Icon className="h-6 w-6 text-heading" />
         </div>
       </div>
     </div>
@@ -126,6 +127,18 @@ interface AnalyticsData {
   tradesByDay: number[];
   categoryDistribution: { name: string; count: number }[];
 }
+
+const chartPalette = {
+  primary: dsColors.primary[500]!,
+  primaryLight: dsColors.primary[100]!,
+  info: dsColors.info[500]!,
+  infoLight: dsColors.info[100]!,
+  success: dsColors.success[500]!,
+  warning: dsColors.warning[500]!,
+  danger: dsColors.danger[500]!,
+  subtle: dsColors.text.subtle,
+  grid: 'rgba(255,255,255,0.1)',
+};
 
 export default function DashboardPage() {
   const [stats, setStats] = useState<DashboardStats | null>(null);
@@ -298,8 +311,8 @@ export default function DashboardPage() {
       {
         label: 'Satışlar (₺)',
         data: analyticsData.salesByDay.length === 30 ? analyticsData.salesByDay : Array(30).fill(0).map(() => Math.floor(Math.random() * 15000) + 5000),
-        borderColor: '#e94560',
-        backgroundColor: 'rgba(233, 69, 96, 0.1)',
+        borderColor: chartPalette.primary,
+        backgroundColor: chartPalette.primaryLight,
         tension: 0.4,
         fill: true,
       },
@@ -312,7 +325,7 @@ export default function DashboardPage() {
       {
         label: 'Siparişler',
         data: analyticsData.ordersByDay.length === 30 ? analyticsData.ordersByDay : Array(30).fill(0).map(() => Math.floor(Math.random() * 50) + 10),
-        backgroundColor: '#e94560',
+        backgroundColor: chartPalette.info,
         borderRadius: 4,
       },
     ],
@@ -323,11 +336,16 @@ export default function DashboardPage() {
 
   // Her kategori için farklı renk (geniş palet)
   const categoryColors = [
-    '#e94560', '#4cc9f0', '#f72585', '#7209b7', '#3a0ca3', '#4361ee',
-    '#06d6a0', '#ef476f', '#ffd166', '#118ab2', '#073b4c', '#9d4edd',
-    '#ff6b6b', '#4ecdc4', '#45b7d1', '#96ceb4', '#ffeaa7', '#dfe6e9',
-    '#fd79a8', '#a29bfe', '#6c5ce7', '#00b894', '#e17055', '#fab1a0',
-    '#74b9ff', '#81ecec', '#55efc4', '#ffeaa7', '#dfe6e9', '#b2bec3',
+    dsColors.primary[500]!,
+    dsColors.info[500]!,
+    dsColors.success[500]!,
+    dsColors.warning[500]!,
+    dsColors.danger[500]!,
+    dsColors.primary[700]!,
+    dsColors.info[700]!,
+    dsColors.success[700]!,
+    dsColors.warning[700]!,
+    dsColors.danger[700]!,
   ];
 
   const categoryChartData = {
@@ -341,7 +359,7 @@ export default function DashboardPage() {
           : [1],
         backgroundColor: sortedCategories.length > 0
           ? sortedCategories.map((_, i) => categoryColors[i % categoryColors.length])
-          : ['#6b7280'],
+          : [chartPalette.subtle],
         borderWidth: 0,
       },
     ],
@@ -359,8 +377,8 @@ export default function DashboardPage() {
     <div className="space-y-6">
         {/* Header */}
         <div>
-          <h1 className="text-2xl font-bold text-gray-900">Dashboard</h1>
-          <p className="text-gray-500 mt-1">Hoş geldiniz! İşte bugünkü genel bakış.</p>
+          <h1 className="text-2xl font-bold text-heading">Dashboard</h1>
+          <p className="text-muted mt-1">Hoş geldiniz! İşte bugünkü genel bakış.</p>
         </div>
 
         {/* Stats Grid */}
@@ -401,25 +419,25 @@ export default function DashboardPage() {
             <div className="p-2 bg-primary-100 rounded-lg">
               <ShoppingBagIcon className="h-6 w-6 text-primary-600" />
             </div>
-            <span className="font-medium text-gray-900">Ürünler</span>
+            <span className="font-medium text-heading">Ürünler</span>
           </Link>
           <Link href="/orders" className="admin-card hover:border-primary-500/50 transition-colors flex items-center gap-3">
             <div className="p-2 bg-info-500/20 rounded-lg">
               <ChartBarIcon className="h-6 w-6 text-info-500" />
             </div>
-            <span className="font-medium text-gray-900">Siparişler</span>
+            <span className="font-medium text-heading">Siparişler</span>
           </Link>
           <Link href="/users" className="admin-card hover:border-primary-500/50 transition-colors flex items-center gap-3">
             <div className="p-2 bg-primary-500/20 rounded-lg">
               <UsersIcon className="h-6 w-6 text-primary-500" />
             </div>
-            <span className="font-medium text-gray-900">Kullanıcılar</span>
+            <span className="font-medium text-heading">Kullanıcılar</span>
           </Link>
           <Link href="/messages" className="admin-card hover:border-primary-500/50 transition-colors flex items-center gap-3">
             <div className="p-2 bg-success-500/20 rounded-lg">
               <ArrowsRightLeftIcon className="h-6 w-6 text-success-500" />
             </div>
-            <span className="font-medium text-gray-900">Mesajlar</span>
+            <span className="font-medium text-heading">Mesajlar</span>
           </Link>
         </div>
 
@@ -493,7 +511,7 @@ export default function DashboardPage() {
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
           {/* Sales Chart */}
           <div className="admin-card">
-            <h3 className="text-lg font-semibold text-gray-900 mb-4">Son 30 Gün Satış Performansı</h3>
+            <h3 className="text-lg font-semibold text-heading mb-4">Son 30 Gün Satış Performansı</h3>
             <Line
               data={salesChartData}
               options={{
@@ -503,12 +521,12 @@ export default function DashboardPage() {
                 },
                 scales: {
                   x: {
-                    grid: { color: 'rgba(255,255,255,0.1)' },
-                    ticks: { color: '#9ca3af' },
+                    grid: { color: chartPalette.grid },
+                    ticks: { color: chartPalette.subtle },
                   },
                   y: {
-                    grid: { color: 'rgba(255,255,255,0.1)' },
-                    ticks: { color: '#9ca3af' },
+                    grid: { color: chartPalette.grid },
+                    ticks: { color: chartPalette.subtle },
                   },
                 },
               }}
@@ -517,24 +535,24 @@ export default function DashboardPage() {
 
           {/* Orders Chart */}
           <div className="admin-card">
-            <h3 className="text-lg font-semibold text-gray-900 mb-4">Günlük Sipariş Sayısı</h3>
+            <h3 className="text-lg font-semibold text-heading mb-4">Günlük Sipariş Sayısı</h3>
             <Bar
               data={ordersChartData}
               options={{
                 responsive: true,
                 plugins: {
                   legend: {
-                    labels: { color: '#9ca3af' },
+                    labels: { color: chartPalette.subtle },
                   },
                 },
                 scales: {
                   x: {
                     grid: { display: false },
-                    ticks: { color: '#9ca3af' },
+                    ticks: { color: chartPalette.subtle },
                   },
                   y: {
-                    grid: { color: 'rgba(255,255,255,0.1)' },
-                    ticks: { color: '#9ca3af' },
+                    grid: { color: chartPalette.grid },
+                    ticks: { color: chartPalette.subtle },
                   },
                 },
               }}
@@ -546,7 +564,7 @@ export default function DashboardPage() {
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
           {/* Category Distribution */}
           <div className="admin-card overflow-visible">
-            <h3 className="text-lg font-semibold text-gray-900 mb-4">Kategori Dağılımı</h3>
+            <h3 className="text-lg font-semibold text-heading mb-4">Kategori Dağılımı</h3>
             <div className="min-h-[380px] pb-6">
               <Doughnut
                 data={categoryChartData}
@@ -566,8 +584,8 @@ export default function DashboardPage() {
                           const bg = (ds?.backgroundColor ?? []) as string[];
                           return (chart.data.labels ?? []).map((label, i) => ({
                             text: String(label ?? ''),
-                            fillStyle: bg[i] ?? '#6b7280',
-                            fontColor: bg[i] ?? '#9ca3af',
+                            fillStyle: bg[i] ?? chartPalette.subtle,
+                            fontColor: bg[i] ?? chartPalette.subtle,
                             index: i,
                           }));
                         },
@@ -582,7 +600,7 @@ export default function DashboardPage() {
           {/* Recent Orders Panel */}
           <div className="admin-card lg:col-span-2">
             <div className="flex items-center justify-between mb-4">
-              <h3 className="text-lg font-semibold text-gray-900">Son Siparişler</h3>
+              <h3 className="text-lg font-semibold text-heading">Son Siparişler</h3>
               <Link href="/orders" className="text-sm text-primary-600 hover:underline">
                 Tümünü Gör →
               </Link>
@@ -590,7 +608,7 @@ export default function DashboardPage() {
             <div className="space-y-3">
               {recentOrders.length > 0 ? (
                 recentOrders.map((order) => (
-                  <div key={order.id} className="flex items-center justify-between py-3 border-b border-gray-200 last:border-0">
+                  <div key={order.id} className="flex items-center justify-between py-3 border-b border-border last:border-0">
                     <div className="flex items-center flex-1 min-w-0">
                       <div className="w-10 h-10 rounded-full bg-primary-100 flex items-center justify-center mr-3 flex-shrink-0">
                         <span className="text-primary-600 text-sm font-medium">
@@ -598,27 +616,27 @@ export default function DashboardPage() {
                         </span>
                       </div>
                       <div className="min-w-0">
-                        <p className="text-sm text-gray-900 truncate">
+                        <p className="text-sm text-heading truncate">
                           <span className="font-medium">{order.orderNumber}</span>
                         </p>
-                        <p className="text-xs text-gray-500 truncate">
+                        <p className="text-xs text-muted truncate">
                           {order.buyerName} - {order.productTitle}
                         </p>
                       </div>
                     </div>
                     <div className="flex items-center gap-3 ml-3">
-                      <span className="text-sm font-semibold text-gray-900 whitespace-nowrap">
+                      <span className="text-sm font-semibold text-heading whitespace-nowrap">
                         ₺{order.amount.toLocaleString('tr-TR')}
                       </span>
                       <StatusBadge status={order.status} config={dashboardOrderStatusConfig} />
-                      <span className="text-xs text-gray-500 whitespace-nowrap">
+                      <span className="text-xs text-muted whitespace-nowrap">
                         {formatDate(order.createdAt)}
                       </span>
                     </div>
                   </div>
                 ))
               ) : (
-                <div className="text-center py-8 text-gray-500">
+                <div className="text-center py-8 text-muted">
                   Henüz sipariş bulunmuyor
                 </div>
               )}
@@ -631,7 +649,7 @@ export default function DashboardPage() {
           {/* Recent Trades Panel */}
           <div className="admin-card lg:col-span-2">
             <div className="flex items-center justify-between mb-4">
-              <h3 className="text-lg font-semibold text-gray-900 flex items-center gap-2">
+              <h3 className="text-lg font-semibold text-heading flex items-center gap-2">
                 <ArrowsRightLeftIcon className="h-5 w-5 text-primary-600" />
                 Son Takaslar
               </h3>
@@ -642,32 +660,32 @@ export default function DashboardPage() {
             <div className="space-y-3">
               {recentTrades.length > 0 ? (
                 recentTrades.map((trade) => (
-                  <div key={trade.id} className="flex items-center justify-between py-3 border-b border-gray-200 last:border-0">
+                  <div key={trade.id} className="flex items-center justify-between py-3 border-b border-border last:border-0">
                     <div className="flex items-center flex-1 min-w-0">
                       <div className="w-10 h-10 rounded-full bg-success-500/20 flex items-center justify-center mr-3 flex-shrink-0">
                         <ArrowsRightLeftIcon className="h-5 w-5 text-success-700" />
                       </div>
                       <div className="min-w-0">
-                        <p className="text-sm text-gray-900 truncate">
+                        <p className="text-sm text-heading truncate">
                           <span className="font-medium">{trade.offeredBy?.username || 'Kullanıcı'}</span>
-                          <span className="text-gray-500 mx-2">↔</span>
+                          <span className="text-muted mx-2">↔</span>
                           <span className="font-medium">{trade.requestedBy?.username || 'Kullanıcı'}</span>
                         </p>
-                        <p className="text-xs text-gray-500 truncate">
+                        <p className="text-xs text-muted truncate">
                           {trade.offeredProduct?.title || 'Ürün'} ↔ {trade.requestedProduct?.title || 'Ürün'}
                         </p>
                       </div>
                     </div>
                     <div className="flex items-center gap-3 ml-3">
                       <StatusBadge status={trade.status} config={dashboardTradeStatusConfig} />
-                      <span className="text-xs text-gray-500 whitespace-nowrap">
+                      <span className="text-xs text-muted whitespace-nowrap">
                         {formatDate(trade.createdAt)}
                       </span>
                     </div>
                   </div>
                 ))
               ) : (
-                <div className="text-center py-8 text-gray-500">
+                <div className="text-center py-8 text-muted">
                   Henüz takas bulunmuyor
                 </div>
               )}

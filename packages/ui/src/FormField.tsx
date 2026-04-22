@@ -45,7 +45,7 @@ export const FormField: React.FC<FormFieldProps> = ({
       )}
       {children}
       {(error || helperText) && (
-        <p className={cn('mt-1 text-sm', error ? 'text-danger-600' : 'text-gray-500')}>
+        <p className={cn('mt-1 text-sm', error ? 'text-danger-600' : 'text-muted')}>
           {error || helperText}
         </p>
       )}

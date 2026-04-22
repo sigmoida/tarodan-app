@@ -502,6 +502,28 @@ export default function TradeDetailPage() {
       const res = await paymentsApi.initiateTradeCash(trade.id);
       const data = res.data?.data ?? res.data;
 
+      if (data?.useBypass && data?.paymentId) {
+        try {
+          const bypassRes = await paymentsApi.bypassComplete(data.paymentId as string);
+          if (bypassRes.data?.success) {
+            toast.success(
+              locale === "en" ? "Payment successful" : "Ödeme başarılı",
+            );
+            await invalidateTrade();
+            router.push(`/payment/success?paymentId=${data.paymentId}`);
+            return;
+          }
+        } catch {
+          toast.error(
+            locale === "en"
+              ? "Bypass payment failed"
+              : "Test ödemesi tamamlanamadı",
+          );
+        }
+        setCashPaymentLoading(false);
+        return;
+      }
+
       if (data?.paymentUrl) {
         if (saveCard && useNewCard && cardNumber && cardExpiry) {
           try {
@@ -1084,12 +1106,12 @@ export default function TradeDetailPage() {
 
   if (isLoading) {
     return (
-      <div className="min-h-screen bg-gray-50 py-8">
+      <div className="min-h-screen bg-surface py-8">
         <div className="max-w-4xl mx-auto px-4">
           <div className="animate-pulse space-y-6">
-            <div className="h-8 bg-gray-200 rounded w-1/3" />
+            <div className="h-8 bg-border-subtle rounded w-1/3" />
             <div className="card p-6">
-              <div className="h-64 bg-gray-200 rounded-lg" />
+              <div className="h-64 bg-border-subtle rounded-lg" />
             </div>
           </div>
         </div>
@@ -1099,10 +1121,10 @@ export default function TradeDetailPage() {
 
   if (!trade) {
     return (
-      <div className="min-h-screen bg-gray-50 py-8">
+      <div className="min-h-screen bg-surface py-8">
         <div className="max-w-4xl mx-auto px-4">
           <div className="card p-6 text-center">
-            <p className="text-gray-600">Takas bulunamadı</p>
+            <p className="text-muted">Takas bulunamadı</p>
             <ButtonLink href="/trades" className="mt-4 inline-block">
               Takaslara Dön
             </ButtonLink>
@@ -1163,7 +1185,7 @@ export default function TradeDetailPage() {
   // Counter-offer edit mode
   if (isCounterMode) {
     return (
-      <div className="min-h-screen bg-gray-50 py-8">
+      <div className="min-h-screen bg-surface py-8">
         <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8">
           {/* Header */}
           <div className="mb-6">
@@ -1174,11 +1196,11 @@ export default function TradeDetailPage() {
             >
               ← {locale === "en" ? "Back to Trade" : "Takasa Dön"}
             </Button>
-            <h1 className="text-3xl font-bold text-gray-900 flex items-center gap-3">
+            <h1 className="text-3xl font-bold text-heading flex items-center gap-3">
               <ArrowsRightLeftIcon className="w-8 h-8 text-primary-500" />
               {locale === "en" ? "Counter Offer" : "Karşı Teklif"}
             </h1>
-            <p className="text-gray-600 mt-2">
+            <p className="text-muted mt-2">
               {locale === "en"
                 ? "Modify the trade offer"
                 : "Takas teklifini değiştirin"}
@@ -1192,7 +1214,7 @@ export default function TradeDetailPage() {
                 color="border-primary-500 border-t-transparent"
                 className="mx-auto mb-4"
               />
-              <p className="text-gray-600">
+              <p className="text-muted">
                 {locale === "en"
                   ? "Loading products..."
                   : "Ürünler yükleniyor..."}
@@ -1203,15 +1225,15 @@ export default function TradeDetailPage() {
               {/* Products Comparison - Side by Side */}
               <div className="flex flex-col lg:flex-row items-stretch gap-6 mb-6">
                 {/* SOL - İstenilen Ürünler */}
-                <div className="bg-white rounded-xl p-6 shadow-sm border border-gray-200 flex-1">
-                  <h2 className="text-lg font-semibold text-gray-900 mb-4">
+                <div className="bg-surface-elevated rounded-xl p-6 shadow-sm border border-border flex-1">
+                  <h2 className="text-lg font-semibold text-heading mb-4">
                     {locale === "en"
                       ? "Products You Want"
                       : "İstediğiniz Ürünler"}
                   </h2>
                   {counterTargetProducts.length === 0 ? (
                     <div className="text-center py-8">
-                      <p className="text-gray-600">
+                      <p className="text-muted">
                         {locale === "en"
                           ? "No products available from this seller"
                           : "Bu satıcıdan kullanılabilir ürün yok"}
@@ -1232,15 +1254,15 @@ export default function TradeDetailPage() {
                             className={`relative rounded-xl overflow-hidden border-2 transition-all ${
                               isSelected
                                 ? "border-primary-500 ring-2 ring-primary-200"
-                                : "border-gray-200 hover:border-gray-300"
+                                : "border-border hover:border-border"
                             }`}
                           >
                             {isSelected && (
                               <div className="absolute top-2 right-2 z-10 w-6 h-6 bg-primary-500 rounded-full flex items-center justify-center">
-                                <CheckIcon className="w-4 h-4 text-white" />
+                                <CheckIcon className="w-4 h-4 text-inverted" />
                               </div>
                             )}
-                            <div className="aspect-square relative bg-gray-100">
+                            <div className="aspect-square relative bg-surface-alt">
                               <OptimizedImage
                                 src={getProductImage(product)}
                                 alt={product.title}
@@ -1253,7 +1275,7 @@ export default function TradeDetailPage() {
                               />
                             </div>
                             <div className="p-2 text-left">
-                              <p className="text-xs font-medium text-gray-900 line-clamp-1">
+                              <p className="text-xs font-medium text-heading line-clamp-1">
                                 {product.title}
                               </p>
                               <p className="text-xs font-bold text-primary-500">
@@ -1281,15 +1303,15 @@ export default function TradeDetailPage() {
                 </div>
 
                 {/* SAĞ - Benim Ürünlerim */}
-                <div className="bg-white rounded-xl p-6 shadow-sm border border-gray-200 flex-1">
-                  <h2 className="text-lg font-semibold text-gray-900 mb-4">
+                <div className="bg-surface-elevated rounded-xl p-6 shadow-sm border border-border flex-1">
+                  <h2 className="text-lg font-semibold text-heading mb-4">
                     {locale === "en"
                       ? "Products You Offer"
                       : "Teklif Edeceğiniz Ürünler"}
                   </h2>
                   {counterProducts.length === 0 ? (
                     <div className="text-center py-8">
-                      <p className="text-gray-600 mb-4">
+                      <p className="text-muted mb-4">
                         {locale === "en"
                           ? "No products available"
                           : "Kullanılabilir ürün yok"}
@@ -1317,15 +1339,15 @@ export default function TradeDetailPage() {
                             className={`relative rounded-xl overflow-hidden border-2 transition-all ${
                               isSelected
                                 ? "border-primary-500 ring-2 ring-primary-200"
-                                : "border-gray-200 hover:border-gray-300"
+                                : "border-border hover:border-border"
                             }`}
                           >
                             {isSelected && (
                               <div className="absolute top-2 right-2 z-10 w-6 h-6 bg-primary-500 rounded-full flex items-center justify-center">
-                                <CheckIcon className="w-4 h-4 text-white" />
+                                <CheckIcon className="w-4 h-4 text-inverted" />
                               </div>
                             )}
-                            <div className="aspect-square relative bg-gray-100">
+                            <div className="aspect-square relative bg-surface-alt">
                               <OptimizedImage
                                 src={getProductImage(product)}
                                 alt={product.title}
@@ -1338,7 +1360,7 @@ export default function TradeDetailPage() {
                               />
                             </div>
                             <div className="p-2 text-left">
-                              <p className="text-xs font-medium text-gray-900 line-clamp-1">
+                              <p className="text-xs font-medium text-heading line-clamp-1">
                                 {product.title}
                               </p>
                               <p className="text-xs font-bold text-primary-500">
@@ -1360,18 +1382,18 @@ export default function TradeDetailPage() {
               </div>
 
               {/* Cash Amount */}
-              <div className="bg-white rounded-xl p-6 shadow-sm border border-gray-200 mb-6">
-                <h2 className="text-lg font-semibold text-gray-900 mb-4">
+              <div className="bg-surface-elevated rounded-xl p-6 shadow-sm border border-border mb-6">
+                <h2 className="text-lg font-semibold text-heading mb-4">
                   {t("trade.cashDifference")} ({t("common.optional")})
                 </h2>
-                <p className="text-gray-600 text-sm mb-4">
+                <p className="text-muted text-sm mb-4">
                   {locale === "en"
                     ? "You can add cash to balance the trade value."
                     : "Takas değerini dengelemek için nakit fark ekleyebilirsiniz."}
                 </p>
                 <div className="space-y-4">
                   <div className="relative max-w-xs">
-                    <span className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-500">
+                    <span className="absolute left-4 top-1/2 -translate-y-1/2 text-muted">
                       ₺
                     </span>
                     <Input
@@ -1386,7 +1408,7 @@ export default function TradeDetailPage() {
                   </div>
                   {parseFloat(counterCashAmount) > 0 && (
                     <div className="space-y-2">
-                      <p className="text-sm font-medium text-gray-700">
+                      <p className="text-sm font-medium text-body">
                         {locale === "en"
                           ? "Who will pay the cash difference?"
                           : "Nakit farkı kim ödeyecek?"}
@@ -1423,8 +1445,8 @@ export default function TradeDetailPage() {
               </div>
 
               {/* Message */}
-              <div className="bg-white rounded-xl p-6 shadow-sm border border-gray-200 mb-6">
-                <h2 className="text-lg font-semibold text-gray-900 mb-4">
+              <div className="bg-surface-elevated rounded-xl p-6 shadow-sm border border-border mb-6">
+                <h2 className="text-lg font-semibold text-heading mb-4">
                   {t("trade.message")} ({t("common.optional")})
                 </h2>
                 <Textarea
@@ -1437,7 +1459,7 @@ export default function TradeDetailPage() {
                   maxLength={500}
                   className="px-4 py-3 rounded-xl resize-none"
                 />
-                <p className="text-sm text-gray-500 mt-2 text-right">
+                <p className="text-sm text-muted mt-2 text-right">
                   {counterMessage.length}/500
                 </p>
               </div>
@@ -1467,7 +1489,7 @@ export default function TradeDetailPage() {
                     <>
                       <Spinner
                         size="sm"
-                        color="border-white border-t-transparent"
+                        color="border-surface-elevated border-t-transparent"
                       />
                       {locale === "en" ? "Sending..." : "Gönderiliyor..."}
                     </>
@@ -1489,7 +1511,7 @@ export default function TradeDetailPage() {
   }
 
   return (
-    <div className="min-h-screen bg-gray-50 py-8">
+    <div className="min-h-screen bg-surface py-8">
       <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8">
         {/* Header */}
         <div className="mb-6">
@@ -1501,9 +1523,9 @@ export default function TradeDetailPage() {
           </Link>
           <div className="flex items-center justify-between">
             <div>
-              <h1 className="text-3xl font-bold text-gray-900">Takas Detayı</h1>
+              <h1 className="text-3xl font-bold text-heading">Takas Detayı</h1>
               <div className="flex items-center gap-4 mt-1">
-                <p className="text-gray-600">Takas No: {trade.tradeNumber}</p>
+                <p className="text-muted">Takas No: {trade.tradeNumber}</p>
                 {trade.version && trade.version > 1 && (
                   <span className="px-2 py-1 bg-primary-100 text-primary-700 text-xs font-medium rounded">
                     {locale === "en"
@@ -1526,7 +1548,7 @@ export default function TradeDetailPage() {
           <p className="text-sm text-primary-800">{statusMeta.description}</p>
           {(trade.status === "cancelled" || trade.status === "rejected") &&
             trade.cancelReason && (
-              <p className="text-sm text-gray-600 mt-2">
+              <p className="text-sm text-muted mt-2">
                 <span className="font-medium">
                   {locale === "en" ? "Reason: " : "Sebep: "}
                 </span>
@@ -1540,7 +1562,7 @@ export default function TradeDetailPage() {
           <div className="card p-6 mb-6 bg-success-50 border-2 border-success-200 rounded-xl">
             <div className="flex items-start gap-4">
               <div className="flex-shrink-0 w-12 h-12 rounded-full bg-success-500 flex items-center justify-center">
-                <CheckCircleIcon className="w-7 h-7 text-white" />
+                <CheckCircleIcon className="w-7 h-7 text-inverted" />
               </div>
               <div className="flex-1 min-w-0">
                 <h2 className="text-xl font-bold text-success-800 mb-1">
@@ -1550,11 +1572,11 @@ export default function TradeDetailPage() {
                   {t("trade.completedSummaryDesc")}
                 </p>
                 <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 mb-4">
-                  <div className="bg-white/60 rounded-lg px-3 py-2">
+                  <div className="bg-surface-elevated/60 rounded-lg px-3 py-2">
                     <p className="text-xs font-medium text-success-700 uppercase tracking-wide">
                       {t("trade.createdAt")}
                     </p>
-                    <p className="text-sm font-semibold text-gray-900">
+                    <p className="text-sm font-semibold text-heading">
                       {trade.createdAt
                         ? new Date(trade.createdAt).toLocaleDateString(
                             locale === "en" ? "en-US" : "tr-TR",
@@ -1564,11 +1586,11 @@ export default function TradeDetailPage() {
                     </p>
                   </div>
                   {trade.acceptedAt && (
-                    <div className="bg-white/60 rounded-lg px-3 py-2">
+                    <div className="bg-surface-elevated/60 rounded-lg px-3 py-2">
                       <p className="text-xs font-medium text-success-700 uppercase tracking-wide">
                         {t("trade.acceptedAt")}
                       </p>
-                      <p className="text-sm font-semibold text-gray-900">
+                      <p className="text-sm font-semibold text-heading">
                         {new Date(trade.acceptedAt).toLocaleDateString(
                           locale === "en" ? "en-US" : "tr-TR",
                           { dateStyle: "medium" },
@@ -1577,11 +1599,11 @@ export default function TradeDetailPage() {
                     </div>
                   )}
                   {trade.completedAt && (
-                    <div className="bg-white/60 rounded-lg px-3 py-2">
+                    <div className="bg-surface-elevated/60 rounded-lg px-3 py-2">
                       <p className="text-xs font-medium text-success-700 uppercase tracking-wide">
                         {t("trade.completedAt")}
                       </p>
-                      <p className="text-sm font-semibold text-gray-900">
+                      <p className="text-sm font-semibold text-heading">
                         {new Date(trade.completedAt).toLocaleDateString(
                           locale === "en" ? "en-US" : "tr-TR",
                           { dateStyle: "medium" },
@@ -1593,13 +1615,13 @@ export default function TradeDetailPage() {
                 <div className="flex flex-wrap gap-3">
                   <Link
                     href="/trades"
-                    className="inline-flex items-center gap-2 px-4 py-2 bg-success-600 hover:bg-success-700 text-white rounded-lg font-medium transition-colors text-sm"
+                    className="inline-flex items-center gap-2 px-4 py-2 bg-success-600 hover:bg-success-700 text-inverted rounded-lg font-medium transition-colors text-sm"
                   >
                     {t("trade.backToTrades")}
                   </Link>
                   <Link
                     href="/listings"
-                    className="inline-flex items-center gap-2 px-4 py-2 bg-white hover:bg-success-100 text-success-800 border border-success-300 rounded-lg font-medium transition-colors text-sm"
+                    className="inline-flex items-center gap-2 px-4 py-2 bg-surface-elevated hover:bg-success-100 text-success-800 border border-success-300 rounded-lg font-medium transition-colors text-sm"
                   >
                     {t("trade.browseListings")}
                   </Link>
@@ -1645,7 +1667,7 @@ export default function TradeDetailPage() {
           <div className="card p-6 mb-6 bg-info-50 border-2 border-info-200">
             <div className="flex items-start gap-4">
               <div className="flex-shrink-0 w-12 h-12 rounded-full bg-info-500 flex items-center justify-center">
-                <ShieldCheckIcon className="w-7 h-7 text-white" />
+                <ShieldCheckIcon className="w-7 h-7 text-inverted" />
               </div>
               <div className="flex-1">
                 <h2 className="text-xl font-bold text-info-900 mb-1">
@@ -1668,7 +1690,7 @@ export default function TradeDetailPage() {
           <div className="card p-6 mb-6 bg-warning-50 border-2 border-warning-200">
             <div className="flex items-start gap-4">
               <div className="flex-shrink-0 w-12 h-12 rounded-full bg-warning-500 flex items-center justify-center">
-                <XCircleIcon className="w-7 h-7 text-white" />
+                <XCircleIcon className="w-7 h-7 text-inverted" />
               </div>
               <div className="flex-1">
                 <h2 className="text-xl font-bold text-warning-900 mb-1">
@@ -1711,9 +1733,9 @@ export default function TradeDetailPage() {
                 <Link
                   key={item.id}
                   href={`/listings/${item.productId}`}
-                  className="flex items-center gap-3 p-3 bg-gray-50 rounded-lg hover:bg-gray-100 transition-colors"
+                  className="flex items-center gap-3 p-3 bg-surface rounded-lg hover:bg-surface-alt transition-colors"
                 >
-                  <div className="relative w-16 h-16 rounded-lg overflow-hidden bg-gray-200 flex-shrink-0">
+                  <div className="relative w-16 h-16 rounded-lg overflow-hidden bg-border-subtle flex-shrink-0">
                     <OptimizedImage
                       src={getItemImage(item)}
                       alt={item.productTitle}
@@ -1729,10 +1751,10 @@ export default function TradeDetailPage() {
                     />
                   </div>
                   <div className="flex-1 min-w-0">
-                    <p className="font-medium text-gray-900 truncate">
+                    <p className="font-medium text-heading truncate">
                       {item.productTitle}
                     </p>
-                    <p className="text-sm text-gray-500">
+                    <p className="text-sm text-muted">
                       {item.quantity}x •{" "}
                       {item.valueAtTrade.toLocaleString("tr-TR", {
                         minimumFractionDigits: 2,
@@ -1745,8 +1767,8 @@ export default function TradeDetailPage() {
               ))}
             </div>
             <div className="pt-4 border-t">
-              <p className="text-sm text-gray-600">Toplam Değer</p>
-              <p className="text-2xl font-bold text-gray-900">
+              <p className="text-sm text-muted">Toplam Değer</p>
+              <p className="text-2xl font-bold text-heading">
                 {theirTotal.toLocaleString("tr-TR", {
                   minimumFractionDigits: 2,
                   maximumFractionDigits: 2,
@@ -1771,9 +1793,9 @@ export default function TradeDetailPage() {
                 <Link
                   key={item.id}
                   href={`/listings/${item.productId}`}
-                  className="flex items-center gap-3 p-3 bg-gray-50 rounded-lg hover:bg-gray-100 transition-colors"
+                  className="flex items-center gap-3 p-3 bg-surface rounded-lg hover:bg-surface-alt transition-colors"
                 >
-                  <div className="relative w-16 h-16 rounded-lg overflow-hidden bg-gray-200 flex-shrink-0">
+                  <div className="relative w-16 h-16 rounded-lg overflow-hidden bg-border-subtle flex-shrink-0">
                     <OptimizedImage
                       src={getItemImage(item)}
                       alt={item.productTitle}
@@ -1789,10 +1811,10 @@ export default function TradeDetailPage() {
                     />
                   </div>
                   <div className="flex-1 min-w-0">
-                    <p className="font-medium text-gray-900 truncate">
+                    <p className="font-medium text-heading truncate">
                       {item.productTitle}
                     </p>
-                    <p className="text-sm text-gray-500">
+                    <p className="text-sm text-muted">
                       {item.quantity}x •{" "}
                       {item.valueAtTrade.toLocaleString("tr-TR", {
                         minimumFractionDigits: 2,
@@ -1805,8 +1827,8 @@ export default function TradeDetailPage() {
               ))}
             </div>
             <div className="pt-4 border-t">
-              <p className="text-sm text-gray-600">Toplam Değer</p>
-              <p className="text-2xl font-bold text-gray-900">
+              <p className="text-sm text-muted">Toplam Değer</p>
+              <p className="text-2xl font-bold text-heading">
                 {myTotal.toLocaleString("tr-TR", {
                   minimumFractionDigits: 2,
                   maximumFractionDigits: 2,
@@ -1822,7 +1844,7 @@ export default function TradeDetailPage() {
           <div className="card p-6 mb-6 bg-success-50 border-success-200">
             <div className="flex items-center justify-between mb-3">
               <div>
-                <p className="text-sm text-gray-600">
+                <p className="text-sm text-muted">
                   {locale === "en" ? "Cash Difference" : "Nakit Fark"}
                 </p>
                 <p className="text-2xl font-bold text-success-700">
@@ -1833,7 +1855,7 @@ export default function TradeDetailPage() {
                   TL
                 </p>
                 {trade.cashPayment && trade.cashPayment.commission > 0 && (
-                  <p className="text-xs text-gray-500 mt-1">
+                  <p className="text-xs text-muted mt-1">
                     {locale === "en"
                       ? "Total with commission:"
                       : "Komisyon dahil toplam:"}{" "}
@@ -1846,7 +1868,7 @@ export default function TradeDetailPage() {
                 )}
               </div>
               <div className="text-right">
-                <p className="text-sm text-gray-600">
+                <p className="text-sm text-muted">
                   {trade.cashPayerId === trade.initiatorId
                     ? `${trade.initiatorName} ${locale === "en" ? "will pay" : "ödeyecek"}`
                     : `${trade.receiverName} ${locale === "en" ? "will pay" : "ödeyecek"}`}
@@ -1866,9 +1888,9 @@ export default function TradeDetailPage() {
               trade.cashPayerId !== user.id &&
               trade.cashPayment?.status !== "completed" && (
                 <div className="pt-4 border-t border-success-200">
-                  <div className="flex items-center gap-3 px-4 py-3 bg-white/70 rounded-lg">
+                  <div className="flex items-center gap-3 px-4 py-3 bg-surface-elevated/70 rounded-lg">
                     <ClockIcon className="w-5 h-5 text-success-700" />
-                    <p className="text-sm text-gray-700">
+                    <p className="text-sm text-body">
                       {locale === "en"
                         ? "Waiting for the other party to complete payment."
                         : "Karşı tarafın ödemeyi tamamlaması bekleniyor."}
@@ -1885,7 +1907,7 @@ export default function TradeDetailPage() {
               trade.cashPayment?.status !== "completed" && (
                 <div className="pt-4 border-t border-success-200 space-y-5">
                   <div className="bg-gradient-to-r from-primary-500 to-primary-600 px-5 py-3 rounded-lg -mx-1">
-                    <h3 className="text-base font-semibold text-white flex items-center gap-2">
+                    <h3 className="text-base font-semibold text-inverted flex items-center gap-2">
                       <CreditCardIcon className="w-5 h-5" />
                       {locale === "en"
                         ? "Complete Your Payment"
@@ -1911,7 +1933,7 @@ export default function TradeDetailPage() {
                       <span className="flex items-center justify-center w-6 h-6 rounded-full bg-primary-100 text-primary-700 text-xs font-bold">
                         1
                       </span>
-                      <h4 className="font-semibold text-gray-900 flex items-center gap-2">
+                      <h4 className="font-semibold text-heading flex items-center gap-2">
                         <CreditCardIcon className="w-5 h-5 text-primary-500" />
                         {locale === "en"
                           ? "Card Information"
@@ -1919,10 +1941,10 @@ export default function TradeDetailPage() {
                       </h4>
                     </div>
 
-                    <div className="p-4 bg-gray-50 border border-gray-200 rounded-lg">
+                    <div className="p-4 bg-surface border border-border rounded-lg">
                       {savedCards.length > 0 && (
                         <div className="mb-4">
-                          <p className="text-sm font-medium text-gray-700 mb-3">
+                          <p className="text-sm font-medium text-body mb-3">
                             {locale === "en"
                               ? "My Saved Cards"
                               : "Kayıtlı Kartlarım"}
@@ -1934,7 +1956,7 @@ export default function TradeDetailPage() {
                                 className={`flex items-center gap-3 p-3 border-2 rounded-lg cursor-pointer transition-all ${
                                   !useNewCard && selectedSavedCard === card.id
                                     ? "border-primary-500 bg-primary-50"
-                                    : "border-gray-200 hover:border-gray-300"
+                                    : "border-border hover:border-border"
                                 }`}
                               >
                                 <Radio
@@ -1949,10 +1971,10 @@ export default function TradeDetailPage() {
                                   className="text-primary-500"
                                 />
                                 <div className="flex-1">
-                                  <p className="font-medium text-gray-900">
+                                  <p className="font-medium text-heading">
                                     {card.cardBrand} •••• {card.lastFour}
                                   </p>
-                                  <p className="text-sm text-gray-500">
+                                  <p className="text-sm text-muted">
                                     {card.expiryMonth
                                       .toString()
                                       .padStart(2, "0")}
@@ -1970,7 +1992,7 @@ export default function TradeDetailPage() {
                               className={`flex items-center gap-3 p-3 border-2 rounded-lg cursor-pointer transition-all ${
                                 useNewCard
                                   ? "border-primary-500 bg-primary-50"
-                                  : "border-gray-200 hover:border-gray-300"
+                                  : "border-border hover:border-border"
                               }`}
                             >
                               <Radio
@@ -1980,8 +2002,8 @@ export default function TradeDetailPage() {
                                 className="text-primary-500"
                               />
                               <div className="flex items-center gap-2">
-                                <PlusIcon className="w-5 h-5 text-gray-500" />
-                                <span className="font-medium text-gray-900">
+                                <PlusIcon className="w-5 h-5 text-muted" />
+                                <span className="font-medium text-heading">
                                   {locale === "en"
                                     ? "Pay with New Card"
                                     : "Yeni Kart ile Öde"}
@@ -1995,7 +2017,7 @@ export default function TradeDetailPage() {
                       {(savedCards.length === 0 || useNewCard) && (
                         <div className="space-y-4">
                           <div>
-                            <label className="block text-sm font-medium text-gray-700 mb-1">
+                            <label className="block text-sm font-medium text-body mb-1">
                               {locale === "en"
                                 ? "Name on Card"
                                 : "Kart Üzerindeki İsim"}
@@ -2011,7 +2033,7 @@ export default function TradeDetailPage() {
                             />
                           </div>
                           <div>
-                            <label className="block text-sm font-medium text-gray-700 mb-1">
+                            <label className="block text-sm font-medium text-body mb-1">
                               {locale === "en"
                                 ? "Card Number"
                                 : "Kart Numarası"}
@@ -2036,7 +2058,7 @@ export default function TradeDetailPage() {
                           </div>
                           <div className="grid grid-cols-2 gap-4">
                             <div>
-                              <label className="block text-sm font-medium text-gray-700 mb-1">
+                              <label className="block text-sm font-medium text-body mb-1">
                                 {locale === "en"
                                   ? "Expiry Date"
                                   : "Son Kullanma Tarihi"}
@@ -2062,7 +2084,7 @@ export default function TradeDetailPage() {
                               />
                             </div>
                             <div>
-                              <label className="block text-sm font-medium text-gray-700 mb-1">
+                              <label className="block text-sm font-medium text-body mb-1">
                                 CVV/CVC
                               </label>
                               <Input
@@ -2095,7 +2117,7 @@ export default function TradeDetailPage() {
 
                       {!useNewCard && selectedSavedCard && (
                         <div className="mt-4">
-                          <label className="block text-sm font-medium text-gray-700 mb-1">
+                          <label className="block text-sm font-medium text-body mb-1">
                             CVV/CVC (
                             {locale === "en"
                               ? "Re-enter for security"
@@ -2117,7 +2139,7 @@ export default function TradeDetailPage() {
                         </div>
                       )}
 
-                      <div className="mt-4 flex items-center gap-2 text-xs text-gray-500">
+                      <div className="mt-4 flex items-center gap-2 text-xs text-muted">
                         <ShieldCheckIcon className="w-4 h-4 text-success-500" />
                         {locale === "en"
                           ? "256-bit SSL encrypted secure payment"
@@ -2149,18 +2171,18 @@ export default function TradeDetailPage() {
         {/* Kargo Bilgisi Gir - adres ve kargo firması seçimi */}
         {needToShip && (
           <div className="card p-6 mb-6 bg-primary-50 border-primary-200">
-            <h2 className="text-lg font-semibold text-gray-900 mb-4 flex items-center gap-2">
+            <h2 className="text-lg font-semibold text-heading mb-4 flex items-center gap-2">
               <TruckIcon className="w-5 h-5 text-primary-600" />
               {locale === "en" ? "Enter Shipping Info" : "Kargo Bilgisi Gir"}
             </h2>
-            <p className="text-gray-600 text-sm mb-4">
+            <p className="text-muted text-sm mb-4">
               {locale === "en"
                 ? "Select the address you will ship from and the carrier."
                 : "Gönderim yapacağınız adresi ve kargo firmasını seçin."}
             </p>
             <div className="space-y-4">
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
+                <label className="block text-sm font-medium text-body mb-2">
                   {locale === "en" ? "Shipping address" : "Gönderim adresi"}
                 </label>
                 <Select
@@ -2202,7 +2224,7 @@ export default function TradeDetailPage() {
                 )}
               </div>
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
+                <label className="block text-sm font-medium text-body mb-2">
                   {locale === "en" ? "Carrier" : "Kargo firması"}
                 </label>
                 <Select
@@ -2228,7 +2250,7 @@ export default function TradeDetailPage() {
                   <>
                     <Spinner
                       size="sm"
-                      color="border-white border-t-transparent"
+                      color="border-surface-elevated border-t-transparent"
                     />
                     {locale === "en" ? "Submitting..." : "Gönderiliyor..."}
                   </>
@@ -2250,7 +2272,7 @@ export default function TradeDetailPage() {
           user &&
           (user.id === trade.initiatorId || user.id === trade.receiverId) && (
             <div className="card p-6 mb-6 bg-primary-50 border-primary-200">
-              <h2 className="text-lg font-semibold text-gray-900 mb-4 flex items-center gap-2">
+              <h2 className="text-lg font-semibold text-heading mb-4 flex items-center gap-2">
                 <TruckIcon className="w-5 h-5 text-primary-600" />
                 {locale === "en"
                   ? "Ship to Tarodan Warehouse"
@@ -2258,7 +2280,7 @@ export default function TradeDetailPage() {
               </h2>
 
               {/* Both parties shipment status */}
-              <div className="mb-4 p-3 bg-white/70 rounded-lg text-sm text-gray-700">
+              <div className="mb-4 p-3 bg-surface-elevated/70 rounded-lg text-sm text-body">
                 <p>
                   <span className="font-medium">
                     {locale === "en" ? "You: " : "Siz: "}
@@ -2289,9 +2311,9 @@ export default function TradeDetailPage() {
               </div>
 
               {myWarehouseShipped ? (
-                <div className="flex items-center gap-3 p-3 bg-white rounded-lg border border-primary-200">
+                <div className="flex items-center gap-3 p-3 bg-surface-elevated rounded-lg border border-primary-200">
                   <CheckCircleIcon className="w-5 h-5 text-success-600" />
-                  <div className="text-sm text-gray-700">
+                  <div className="text-sm text-body">
                     <p className="font-medium">
                       {locale === "en"
                         ? "Your shipping info is saved"
@@ -2301,7 +2323,7 @@ export default function TradeDetailPage() {
                       fallbackMyWarehouseShipment?.carrier) ||
                       (myToWarehouseShipment?.trackingNumber ||
                         fallbackMyWarehouseShipment?.trackingNumber)) && (
-                      <p className="text-xs text-gray-500 mt-1">
+                      <p className="text-xs text-muted mt-1">
                         {myToWarehouseShipment?.carrier ||
                           fallbackMyWarehouseShipment?.carrier}
                         {(myToWarehouseShipment?.trackingNumber ||
@@ -2317,14 +2339,14 @@ export default function TradeDetailPage() {
                 </div>
               ) : (
                 <>
-                  <p className="text-gray-600 text-sm mb-4">
+                  <p className="text-muted text-sm mb-4">
                     {locale === "en"
                       ? "Select the address you will ship from and the carrier. Items will be reviewed at our warehouse."
                       : "Gönderim yapacağınız adresi ve kargo firmasını seçin. Ürünler depomuzda incelenecek."}
                   </p>
                   <div className="space-y-4">
                     <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-2">
+                      <label className="block text-sm font-medium text-body mb-2">
                         {locale === "en"
                           ? "Shipping address"
                           : "Gönderim adresi"}
@@ -2371,7 +2393,7 @@ export default function TradeDetailPage() {
                       )}
                     </div>
                     <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-2">
+                      <label className="block text-sm font-medium text-body mb-2">
                         {locale === "en" ? "Carrier" : "Kargo firması"}
                       </label>
                       <Select
@@ -2385,7 +2407,7 @@ export default function TradeDetailPage() {
                       </Select>
                     </div>
                     <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-2">
+                      <label className="block text-sm font-medium text-body mb-2">
                         {locale === "en"
                           ? "Tracking number (optional)"
                           : "Takip numarası (opsiyonel)"}
@@ -2417,7 +2439,7 @@ export default function TradeDetailPage() {
                         <>
                           <Spinner
                             size="sm"
-                            color="border-white border-t-transparent"
+                            color="border-surface-elevated border-t-transparent"
                           />
                           {locale === "en"
                             ? "Submitting..."
@@ -2443,7 +2465,7 @@ export default function TradeDetailPage() {
           user &&
           (user.id === trade.initiatorId || user.id === trade.receiverId) && (
             <div className="card p-6 mb-6 bg-info-50 border-info-200">
-              <h2 className="text-lg font-semibold text-gray-900 mb-4 flex items-center gap-2">
+              <h2 className="text-lg font-semibold text-heading mb-4 flex items-center gap-2">
                 <TruckIcon className="w-5 h-5 text-info-600" />
                 {locale === "en"
                   ? "Your Shipment is on the Way"
@@ -2451,13 +2473,13 @@ export default function TradeDetailPage() {
               </h2>
 
               {myFromWarehouseShipment ? (
-                <div className="p-4 bg-white rounded-lg border border-info-200 mb-4">
-                  <p className="text-sm text-gray-600 mb-1">
+                <div className="p-4 bg-surface-elevated rounded-lg border border-info-200 mb-4">
+                  <p className="text-sm text-muted mb-1">
                     {locale === "en"
                       ? "Shipped to you"
                       : "Size gönderilen kargo"}
                   </p>
-                  <p className="font-medium text-gray-900">
+                  <p className="font-medium text-heading">
                     {myFromWarehouseShipment.carrier || "—"}
                     {myFromWarehouseShipment.trackingNumber
                       ? ` · ${myFromWarehouseShipment.trackingNumber}`
@@ -2465,8 +2487,8 @@ export default function TradeDetailPage() {
                   </p>
                 </div>
               ) : (
-                <div className="p-4 bg-white rounded-lg border border-info-200 mb-4">
-                  <p className="text-sm text-gray-600">
+                <div className="p-4 bg-surface-elevated rounded-lg border border-info-200 mb-4">
+                  <p className="text-sm text-muted">
                     {locale === "en"
                       ? "Tracking info will be available shortly."
                       : "Takip bilgileri kısa süre içinde görünecek."}
@@ -2475,8 +2497,8 @@ export default function TradeDetailPage() {
               )}
 
               {otherFromWarehouseShipment && (
-                <div className="p-3 bg-white/70 rounded-lg border border-info-100 mb-4 text-sm text-gray-600">
-                  <p className="font-medium text-gray-700 mb-0.5">
+                <div className="p-3 bg-surface-elevated/70 rounded-lg border border-info-100 mb-4 text-sm text-muted">
+                  <p className="font-medium text-body mb-0.5">
                     {locale === "en"
                       ? "Other party's shipment"
                       : "Karşı tarafın kargosu"}
@@ -2501,7 +2523,7 @@ export default function TradeDetailPage() {
                   <>
                     <Spinner
                       size="sm"
-                      color="border-white border-t-transparent"
+                      color="border-surface-elevated border-t-transparent"
                     />
                     {locale === "en" ? "Processing..." : "İşleniyor..."}
                   </>
@@ -2522,7 +2544,7 @@ export default function TradeDetailPage() {
               <TruckIcon className="w-5 h-5" />
               {locale === "en" ? "Return Shipment" : "İade Kargosu"}
             </h3>
-            <p className="text-sm text-gray-700">
+            <p className="text-sm text-body">
               {myReturnShipment.carrier || "—"}
               {myReturnShipment.trackingNumber
                 ? ` · ${myReturnShipment.trackingNumber}`
@@ -2541,18 +2563,18 @@ export default function TradeDetailPage() {
             <div className="space-y-4">
               {trade.initiatorMessage && (
                 <div>
-                  <p className="text-sm font-medium text-gray-700 mb-1">
+                  <p className="text-sm font-medium text-body mb-1">
                     {trade.initiatorName}:
                   </p>
-                  <p className="text-gray-600">{trade.initiatorMessage}</p>
+                  <p className="text-muted">{trade.initiatorMessage}</p>
                 </div>
               )}
               {trade.receiverMessage && (
                 <div>
-                  <p className="text-sm font-medium text-gray-700 mb-1">
+                  <p className="text-sm font-medium text-body mb-1">
                     {trade.receiverName}:
                   </p>
-                  <p className="text-gray-600">{trade.receiverMessage}</p>
+                  <p className="text-muted">{trade.receiverMessage}</p>
                 </div>
               )}
             </div>
@@ -2569,10 +2591,10 @@ export default function TradeDetailPage() {
             <div className="space-y-4">
               {trade.initiatorShipment && (
                 <div>
-                  <p className="text-sm font-medium text-gray-700 mb-1">
+                  <p className="text-sm font-medium text-body mb-1">
                     {trade.initiatorName}:
                   </p>
-                  <p className="text-gray-600">
+                  <p className="text-muted">
                     {trade.initiatorShipment.carrier} -{" "}
                     {trade.initiatorShipment.trackingNumber}
                   </p>
@@ -2580,10 +2602,10 @@ export default function TradeDetailPage() {
               )}
               {trade.receiverShipment && (
                 <div>
-                  <p className="text-sm font-medium text-gray-700 mb-1">
+                  <p className="text-sm font-medium text-body mb-1">
                     {trade.receiverName}:
                   </p>
-                  <p className="text-gray-600">
+                  <p className="text-muted">
                     {trade.receiverShipment.carrier} -{" "}
                     {trade.receiverShipment.trackingNumber}
                   </p>

@@ -134,8 +134,8 @@ export default function PaymentSettingsPage() {
     <div className="space-y-6">
       <div className="flex justify-between items-center">
         <div>
-          <h1 className="text-2xl font-bold text-gray-900">Ödeme Ayarları</h1>
-          <p className="text-gray-500 mt-1">
+          <h1 className="text-2xl font-bold text-heading">Ödeme Ayarları</h1>
+          <p className="text-muted mt-1">
             Ödeme geçitlerini ve API anahtarlarını yapılandırın
           </p>
         </div>
@@ -146,7 +146,7 @@ export default function PaymentSettingsPage() {
         >
           {saving ? (
             <>
-              <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+              <div className="w-4 h-4 border-2 border-surface-elevated/30 border-t-white rounded-full animate-spin" />
               Kaydediliyor...
             </>
           ) : (
@@ -162,24 +162,24 @@ export default function PaymentSettingsPage() {
         {gateways.map((gateway) => (
           <div
             key={gateway.id}
-            className={`admin-card border-2 transition-colors ${gateway.enabled ? "border-primary-500/30" : "border-gray-200"}`}
+            className={`admin-card border-2 transition-colors ${gateway.enabled ? "border-primary-500/30" : "border-border"}`}
           >
             <div className="flex justify-between items-start mb-6">
               <div className="flex items-center gap-3">
                 <div
-                  className={`p-3 rounded-lg ${gateway.enabled ? "bg-primary-100 text-primary-400" : "bg-gray-100 text-gray-500"}`}
+                  className={`p-3 rounded-lg ${gateway.enabled ? "bg-primary-100 text-primary-400" : "bg-surface-alt text-muted"}`}
                 >
                   <CreditCardIcon className="w-6 h-6" />
                 </div>
                 <div>
-                  <h3 className="text-lg font-bold text-gray-900">
+                  <h3 className="text-lg font-bold text-heading">
                     {gateway.name}
                   </h3>
                   <div className="flex items-center gap-2 mt-1">
                     <span
-                      className={`w-2 h-2 rounded-full ${gateway.enabled ? "bg-success-500" : "bg-gray-500"}`}
+                      className={`w-2 h-2 rounded-full ${gateway.enabled ? "bg-success-500" : "bg-muted"}`}
                     />
-                    <span className="text-xs text-gray-500">
+                    <span className="text-xs text-muted">
                       {gateway.enabled ? "Aktif" : "Pasif"}
                     </span>
                   </div>
@@ -195,29 +195,29 @@ export default function PaymentSettingsPage() {
                     }
                     className="sr-only peer"
                   />
-                  <div className="w-11 h-6 bg-gray-700 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-primary-600"></div>
+                  <div className="w-11 h-6 bg-body peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-surface-elevated after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-surface-elevated after:border-border after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-primary-600"></div>
                 </label>
               </div>
             </div>
 
             <div className="space-y-4">
               {/* Mode Selection */}
-              <div className="bg-gray-100/50 p-4 rounded-lg">
-                <label className="text-sm font-medium text-gray-500 block mb-2">
+              <div className="bg-surface-alt/50 p-4 rounded-lg">
+                <label className="text-sm font-medium text-muted block mb-2">
                   Çalışma Modu
                 </label>
-                <div className="flex bg-white rounded-lg p-1">
+                <div className="flex bg-surface-elevated rounded-lg p-1">
                   <Button
                     variant="secondary"
                     onClick={() => updateGateway(gateway.id, { mode: "test" })}
-                    className={`flex-1 py-1.5 px-3 rounded text-sm font-medium transition-colors ${gateway.mode === "test" ? "bg-gray-100 text-gray-900 shadow" : "text-gray-500 hover:text-gray-600"}`}
+                    className={`flex-1 py-1.5 px-3 rounded text-sm font-medium transition-colors ${gateway.mode === "test" ? "bg-surface-alt text-heading shadow" : "text-muted hover:text-muted"}`}
                   >
                     Test (Sandbox)
                   </Button>
                   <Button
                     variant="secondary"
                     onClick={() => updateGateway(gateway.id, { mode: "live" })}
-                    className={`flex-1 py-1.5 px-3 rounded text-sm font-medium transition-colors ${gateway.mode === "live" ? "bg-danger-50 text-danger-200 shadow" : "text-gray-500 hover:text-gray-600"}`}
+                    className={`flex-1 py-1.5 px-3 rounded text-sm font-medium transition-colors ${gateway.mode === "live" ? "bg-danger-50 text-danger-200 shadow" : "text-muted hover:text-muted"}`}
                   >
                     Canlı (Live)
                   </Button>
@@ -227,7 +227,7 @@ export default function PaymentSettingsPage() {
               {/* Config Fields */}
               {Object.keys(gateway.config).map((key) => (
                 <div key={key}>
-                  <label className="block text-sm font-medium text-gray-500 mb-1 capitalize">
+                  <label className="block text-sm font-medium text-muted mb-1 capitalize">
                     {key.replace(/([A-Z])/g, " $1").trim()}
                   </label>
                   <div className="relative">
@@ -244,7 +244,7 @@ export default function PaymentSettingsPage() {
                       className="pl-10"
                       placeholder={`${gateway.name} ${key}...`}
                     />
-                    <div className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500">
+                    <div className="absolute left-3 top-1/2 -translate-y-1/2 text-muted">
                       {key.toLowerCase().includes("key") ? (
                         <KeyIcon className="w-4 h-4" />
                       ) : (

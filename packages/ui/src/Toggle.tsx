@@ -32,14 +32,14 @@ export const Toggle = React.forwardRef<HTMLButtonElement, ToggleProps>(
         className={cn(
           'relative inline-flex shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-600 focus-visible:ring-offset-2',
           s.track,
-          checked ? 'bg-primary-600' : 'bg-gray-300',
+          checked ? 'bg-primary-600' : 'bg-border-strong',
           disabled && 'cursor-not-allowed opacity-50',
           className,
         )}
       >
         <span
           className={cn(
-            'pointer-events-none inline-block rounded-full bg-white shadow-sm ring-0 transition duration-200 ease-in-out',
+            'pointer-events-none inline-block rounded-full bg-surface-elevated shadow-sm ring-0 transition duration-200 ease-in-out',
             s.thumb,
             checked ? s.translate : 'translate-x-0',
           )}

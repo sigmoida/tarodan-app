@@ -145,8 +145,8 @@ export default function MessagesPage() {
     <>
       <div className="space-y-6">
         <div>
-          <h1 className="text-2xl font-bold text-gray-900">Mesaj Moderation</h1>
-          <p className="text-gray-500 mt-1">
+          <h1 className="text-2xl font-bold text-heading">Mesaj Moderation</h1>
+          <p className="text-muted mt-1">
             {filter === "all"
               ? `Toplam ${total} mesaj`
               : filter === "pending"
@@ -165,8 +165,8 @@ export default function MessagesPage() {
               onClick={() => setFilter(f)}
               className={`px-4 py-2 rounded-lg transition-colors ${
                 filter === f
-                  ? "bg-primary-500 text-gray-900"
-                  : "bg-gray-100 text-gray-500 hover:text-gray-900"
+                  ? "bg-primary-500 text-heading"
+                  : "bg-surface-alt text-muted hover:text-heading"
               }`}
             >
               {f === "all"
@@ -203,7 +203,7 @@ export default function MessagesPage() {
                   </tr>
                 ) : messages.length === 0 ? (
                   <tr>
-                    <td colSpan={7} className="text-center py-8 text-gray-500">
+                    <td colSpan={7} className="text-center py-8 text-muted">
                       Mesaj bulunamadı
                     </td>
                   </tr>
@@ -212,26 +212,26 @@ export default function MessagesPage() {
                     <tr key={message.id}>
                       <td>
                         <div>
-                          <p className="font-medium text-gray-900">
+                          <p className="font-medium text-heading">
                             {message.sender.displayName}
                           </p>
-                          <p className="text-xs text-gray-500">
+                          <p className="text-xs text-muted">
                             {message.sender.email}
                           </p>
                         </div>
                       </td>
                       <td>
                         <div>
-                          <p className="font-medium text-gray-900">
+                          <p className="font-medium text-heading">
                             {message.receiver.displayName}
                           </p>
-                          <p className="text-xs text-gray-500">
+                          <p className="text-xs text-muted">
                             {message.receiver.email}
                           </p>
                         </div>
                       </td>
                       <td>
-                        <p className="text-sm text-gray-600 line-clamp-2 max-w-md">
+                        <p className="text-sm text-muted line-clamp-2 max-w-md">
                           {message.originalContent || message.content}
                         </p>
                       </td>
@@ -241,7 +241,7 @@ export default function MessagesPage() {
                             {message.flaggedReason}
                           </span>
                         ) : (
-                          <span className="text-gray-500">-</span>
+                          <span className="text-muted">-</span>
                         )}
                       </td>
                       <td>
@@ -250,7 +250,7 @@ export default function MessagesPage() {
                           config={messageStatusConfig}
                         />
                       </td>
-                      <td className="text-sm text-gray-500">
+                      <td className="text-sm text-muted">
                         {new Date(message.createdAt).toLocaleDateString(
                           "tr-TR",
                         )}
@@ -289,7 +289,7 @@ export default function MessagesPage() {
                           )}
                           <Button
                             variant="secondary"
-                            className="p-2 text-gray-500 hover:text-gray-900 hover:bg-gray-100 rounded-lg"
+                            className="p-2 text-muted hover:text-heading hover:bg-surface-alt rounded-lg"
                             title="Detay"
                           >
                             <EyeIcon className="h-5 w-5" />
@@ -305,7 +305,7 @@ export default function MessagesPage() {
         </div>
 
         <div className="flex items-center justify-between">
-          <p className="text-sm text-gray-500">
+          <p className="text-sm text-muted">
             Sayfa {page} / {Math.ceil(total / 20)}
           </p>
           <div className="flex gap-2">

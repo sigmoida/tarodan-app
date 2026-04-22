@@ -264,7 +264,7 @@ export default function TradeDetailPage() {
       <div className="flex items-center justify-center min-h-screen">
         <div className="text-center">
           <Spinner size="xl" color="border-primary-600 border-t-transparent" className="mx-auto" />
-          <p className="mt-4 text-gray-600">Yükleniyor...</p>
+          <p className="mt-4 text-muted">Yükleniyor...</p>
         </div>
       </div>
     );
@@ -273,7 +273,7 @@ export default function TradeDetailPage() {
   if (!trade) {
     return (
       <div className="text-center py-12">
-        <p className="text-gray-600">Takas bulunamadı</p>
+        <p className="text-muted">Takas bulunamadı</p>
       </div>
     );
   }
@@ -292,24 +292,24 @@ export default function TradeDetailPage() {
   const isReturning = trade.status === 'returning';
 
   return (
-    <div className="min-h-screen bg-gray-50">
+    <div className="min-h-screen bg-surface">
       <main className="max-w-6xl mx-auto px-4 py-8 space-y-6">
         {/* Header */}
         <div className="flex items-center gap-4">
           <Link
             href="/trades"
-            className="p-2 hover:bg-gray-200 rounded-lg transition-colors"
+            className="p-2 hover:bg-border-subtle rounded-lg transition-colors"
           >
-            <ArrowLeftIcon className="w-6 h-6 text-gray-600" />
+            <ArrowLeftIcon className="w-6 h-6 text-muted" />
           </Link>
           <div className="flex-1">
-            <h1 className="text-3xl font-bold text-gray-900">
+            <h1 className="text-3xl font-bold text-heading">
               Takas Detayı
               {trade.tradeNumber && (
-                <span className="ml-3 text-base font-mono text-gray-500">{trade.tradeNumber}</span>
+                <span className="ml-3 text-base font-mono text-muted">{trade.tradeNumber}</span>
               )}
             </h1>
-            <p className="text-sm text-gray-500">
+            <p className="text-sm text-muted">
               Oluşturulma: {new Date(trade.createdAt).toLocaleString('tr-TR')}
             </p>
           </div>
@@ -355,8 +355,8 @@ export default function TradeDetailPage() {
 
         {/* Cash amount indicator */}
         {trade.cashAmount && trade.cashAmount > 0 && (
-          <div className="bg-white rounded-xl shadow-sm p-4 flex items-center justify-between">
-            <span className="font-medium text-gray-900">Nakit Fark</span>
+          <div className="bg-surface-elevated rounded-xl shadow-sm p-4 flex items-center justify-between">
+            <span className="font-medium text-heading">Nakit Fark</span>
             <span className="text-lg font-semibold text-primary-600">
               +₺{Number(trade.cashAmount).toLocaleString('tr-TR', { minimumFractionDigits: 2 })}
             </span>
@@ -366,8 +366,8 @@ export default function TradeDetailPage() {
         {/* Parties and items */}
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
           {/* Initiator */}
-          <div className="bg-white rounded-xl shadow-sm p-6">
-            <h2 className="text-lg font-semibold text-gray-900 mb-4 flex items-center gap-2">
+          <div className="bg-surface-elevated rounded-xl shadow-sm p-6">
+            <h2 className="text-lg font-semibold text-heading mb-4 flex items-center gap-2">
               <UserIcon className="w-5 h-5" />
               Teklif Veren
             </h2>
@@ -378,14 +378,14 @@ export default function TradeDetailPage() {
               >
                 {trade.initiator.displayName}
               </Link>
-              <p className="text-sm text-gray-600">{trade.initiator.email}</p>
+              <p className="text-sm text-muted">{trade.initiator.email}</p>
             </div>
             <div className="space-y-3">
-              <h3 className="font-medium text-gray-900">Teklif Edilen Ürünler:</h3>
+              <h3 className="font-medium text-heading">Teklif Edilen Ürünler:</h3>
               {initiatorItems.map((item) => (
-                <div key={item.id} className="flex gap-3 p-3 bg-gray-50 rounded-lg">
+                <div key={item.id} className="flex gap-3 p-3 bg-surface rounded-lg">
                   {item.product.images && item.product.images.length > 0 && (
-                    <div className="w-16 h-16 rounded-lg overflow-hidden bg-gray-100 flex-shrink-0">
+                    <div className="w-16 h-16 rounded-lg overflow-hidden bg-surface-alt flex-shrink-0">
                       {/* eslint-disable-next-line @next/next/no-img-element */}
                       <img
                         src={item.product.images[0].url}
@@ -401,7 +401,7 @@ export default function TradeDetailPage() {
                     >
                       {item.product.title}
                     </Link>
-                    <p className="text-xs text-gray-600">
+                    <p className="text-xs text-muted">
                       ₺{getProductEffectivePrice(item.product).toLocaleString('tr-TR', { minimumFractionDigits: 2 })}
                     </p>
                   </div>
@@ -411,8 +411,8 @@ export default function TradeDetailPage() {
           </div>
 
           {/* Receiver */}
-          <div className="bg-white rounded-xl shadow-sm p-6">
-            <h2 className="text-lg font-semibold text-gray-900 mb-4 flex items-center gap-2">
+          <div className="bg-surface-elevated rounded-xl shadow-sm p-6">
+            <h2 className="text-lg font-semibold text-heading mb-4 flex items-center gap-2">
               <UserIcon className="w-5 h-5" />
               Teklif Alan
             </h2>
@@ -423,14 +423,14 @@ export default function TradeDetailPage() {
               >
                 {trade.receiver.displayName}
               </Link>
-              <p className="text-sm text-gray-600">{trade.receiver.email}</p>
+              <p className="text-sm text-muted">{trade.receiver.email}</p>
             </div>
             <div className="space-y-3">
-              <h3 className="font-medium text-gray-900">Karşılık Verilen Ürünler:</h3>
+              <h3 className="font-medium text-heading">Karşılık Verilen Ürünler:</h3>
               {receiverItems.map((item) => (
-                <div key={item.id} className="flex gap-3 p-3 bg-gray-50 rounded-lg">
+                <div key={item.id} className="flex gap-3 p-3 bg-surface rounded-lg">
                   {item.product.images && item.product.images.length > 0 && (
-                    <div className="w-16 h-16 rounded-lg overflow-hidden bg-gray-100 flex-shrink-0">
+                    <div className="w-16 h-16 rounded-lg overflow-hidden bg-surface-alt flex-shrink-0">
                       {/* eslint-disable-next-line @next/next/no-img-element */}
                       <img
                         src={item.product.images[0].url}
@@ -446,7 +446,7 @@ export default function TradeDetailPage() {
                     >
                       {item.product.title}
                     </Link>
-                    <p className="text-xs text-gray-600">
+                    <p className="text-xs text-muted">
                       ₺{getProductEffectivePrice(item.product).toLocaleString('tr-TR', { minimumFractionDigits: 2 })}
                     </p>
                   </div>
@@ -525,8 +525,8 @@ export default function TradeDetailPage() {
 
         {/* Legacy dispute */}
         {trade.dispute && (
-          <div className="bg-white rounded-xl shadow-sm p-6">
-            <h2 className="text-lg font-semibold text-gray-900 mb-4 flex items-center gap-2">
+          <div className="bg-surface-elevated rounded-xl shadow-sm p-6">
+            <h2 className="text-lg font-semibold text-heading mb-4 flex items-center gap-2">
               <ExclamationTriangleIcon className="w-5 h-5 text-primary-600" />
               İtiraz
             </h2>
@@ -551,8 +551,8 @@ export default function TradeDetailPage() {
         )}
 
         {/* Timeline */}
-        <div className="bg-white rounded-xl shadow-sm p-6">
-          <h2 className="text-lg font-semibold text-gray-900 mb-4 flex items-center gap-2">
+        <div className="bg-surface-elevated rounded-xl shadow-sm p-6">
+          <h2 className="text-lg font-semibold text-heading mb-4 flex items-center gap-2">
             <ClockIcon className="w-5 h-5" />
             Zaman Çizelgesi
           </h2>
@@ -577,12 +577,12 @@ export default function TradeDetailPage() {
         title="Takası Onayla"
       >
         <div className="space-y-4">
-          <p className="text-sm text-gray-700">
+          <p className="text-sm text-body">
             Takas onaylandığında, her iki ürün de depodan alıcılara gönderilecek ve nakit fark
             alıcıya aktarılacaktır.
           </p>
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">
+            <label className="block text-sm font-medium text-body mb-2">
               Not (Opsiyonel)
             </label>
             <Textarea value={approveNotes}
@@ -619,12 +619,12 @@ export default function TradeDetailPage() {
         title="Takası Reddet"
       >
         <div className="space-y-4">
-          <p className="text-sm text-gray-700">
+          <p className="text-sm text-body">
             Takas reddedildiğinde, her iki ürün de sahiplerine iade edilecek ve alıcının ödediği
             nakit geri iade edilecektir.
           </p>
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">
+            <label className="block text-sm font-medium text-body mb-2">
               Red Sebebi <span className="text-danger-600">*</span>
             </label>
             <Textarea
@@ -639,7 +639,7 @@ export default function TradeDetailPage() {
               placeholder="Lütfen en az 10 karakter ile red sebebini belirtin..."
               disabled={processingReject}
             />
-            <p className="mt-1 text-xs text-gray-500">
+            <p className="mt-1 text-xs text-muted">
               {rejectReason.trim().length}/10 karakter minimum
             </p>
           </div>
@@ -673,7 +673,7 @@ export default function TradeDetailPage() {
       >
         <div className="space-y-4">
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">Çözüm</label>
+            <label className="block text-sm font-medium text-body mb-2">Çözüm</label>
             <Select
               value={resolution}
               onChange={(e) => setResolution(e.target.value)}
@@ -686,7 +686,7 @@ export default function TradeDetailPage() {
             </Select>
           </div>
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">
+            <label className="block text-sm font-medium text-body mb-2">
               Not (Opsiyonel)
             </label>
             <Textarea value={resolveNote}
@@ -740,11 +740,11 @@ function ShipmentLegCard({
   infoMessage,
 }: ShipmentLegCardProps) {
   return (
-    <div className="bg-white rounded-xl shadow-sm p-6">
-      <h2 className="text-lg font-semibold text-gray-900 mb-4 flex items-center gap-2">
+    <div className="bg-surface-elevated rounded-xl shadow-sm p-6">
+      <h2 className="text-lg font-semibold text-heading mb-4 flex items-center gap-2">
         {icon}
         {title}
-        <span className="text-sm font-normal text-gray-500">({shipments.length})</span>
+        <span className="text-sm font-normal text-muted">({shipments.length})</span>
       </h2>
       {infoMessage && (
         <p className="text-sm text-info-700 bg-info-50 border border-info-200 rounded p-3 mb-4">
@@ -760,14 +760,14 @@ function ShipmentLegCard({
               key={s.id}
               className={cn(
                 'p-4 rounded-lg border',
-                delivered ? 'bg-success-50 border-success-200' : 'bg-gray-50 border-gray-200',
+                delivered ? 'bg-success-50 border-success-200' : 'bg-surface border-border',
               )}
             >
               <div className="flex items-start justify-between gap-4">
                 <div className="flex-1 space-y-1 text-sm">
                   {s.sender && (
                     <p>
-                      <span className="font-medium text-gray-700">Gönderen:</span>{' '}
+                      <span className="font-medium text-body">Gönderen:</span>{' '}
                       <Link
                         href={`/users/${s.sender.id}`}
                         className="text-primary-600 hover:underline"
@@ -778,7 +778,7 @@ function ShipmentLegCard({
                   )}
                   {s.recipient && (
                     <p>
-                      <span className="font-medium text-gray-700">Alıcı:</span>{' '}
+                      <span className="font-medium text-body">Alıcı:</span>{' '}
                       <Link
                         href={`/users/${s.recipient.id}`}
                         className="text-primary-600 hover:underline"
@@ -786,28 +786,28 @@ function ShipmentLegCard({
                         {s.recipient.displayName}
                       </Link>
                       {s.recipientType && (
-                        <span className="text-xs text-gray-500 ml-1">({s.recipientType})</span>
+                        <span className="text-xs text-muted ml-1">({s.recipientType})</span>
                       )}
                     </p>
                   )}
                   {s.trackingNumber && (
                     <p>
-                      <span className="font-medium text-gray-700">Takip No:</span>{' '}
+                      <span className="font-medium text-body">Takip No:</span>{' '}
                       <span className="font-mono">{s.trackingNumber}</span>
                     </p>
                   )}
                   {s.carrier && (
                     <p>
-                      <span className="font-medium text-gray-700">Firma:</span> {s.carrier}
+                      <span className="font-medium text-body">Firma:</span> {s.carrier}
                     </p>
                   )}
                   {s.status && (
                     <p>
-                      <span className="font-medium text-gray-700">Durum:</span> {s.status}
+                      <span className="font-medium text-body">Durum:</span> {s.status}
                     </p>
                   )}
                   {s.shippedAt && (
-                    <p className="text-xs text-gray-500">
+                    <p className="text-xs text-muted">
                       Gönderim: {new Date(s.shippedAt).toLocaleString('tr-TR')}
                     </p>
                   )}
@@ -833,7 +833,7 @@ function ShipmentLegCard({
                       {actionLabel}
                     </Button>
                   ) : (
-                    <span className="text-xs text-gray-500">Beklemede</span>
+                    <span className="text-xs text-muted">Beklemede</span>
                   )}
                 </div>
               </div>
@@ -849,7 +849,7 @@ function TimelineItem({ label, date }: { label: string; date: string }) {
   return (
     <div>
       <p className="text-sm font-medium">{label}</p>
-      <p className="text-xs text-gray-500">{new Date(date).toLocaleString('tr-TR')}</p>
+      <p className="text-xs text-muted">{new Date(date).toLocaleString('tr-TR')}</p>
     </div>
   );
 }

@@ -137,26 +137,26 @@ export default function SecuritySettingsPage() {
 
   if (isLoading && !setupData) {
     return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+      <div className="min-h-screen bg-surface flex items-center justify-center">
         <Spinner size="xl" color="border-danger-500 border-t-transparent" />
       </div>
     );
   }
 
   return (
-    <div className="min-h-screen bg-gray-50">
+    <div className="min-h-screen bg-surface">
       {/* Header */}
-      <div className="bg-white shadow">
+      <div className="bg-surface-elevated shadow">
         <div className="max-w-3xl mx-auto px-4 py-6">
           <div className="flex items-center">
-            <Link href="/profile" className="text-gray-500 hover:text-gray-700 mr-4">
+            <Link href="/profile" className="text-muted hover:text-body mr-4">
               <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
               </svg>
             </Link>
             <div>
-              <h1 className="text-2xl font-bold text-gray-900">Güvenlik Ayarları</h1>
-              <p className="text-gray-600 mt-1">İki faktörlü kimlik doğrulama (2FA)</p>
+              <h1 className="text-2xl font-bold text-heading">Güvenlik Ayarları</h1>
+              <p className="text-muted mt-1">İki faktörlü kimlik doğrulama (2FA)</p>
             </div>
           </div>
         </div>
@@ -171,14 +171,14 @@ export default function SecuritySettingsPage() {
         )}
 
         {/* 2FA Status Card */}
-        <div className="bg-white rounded-xl shadow-sm p-6 mb-6">
+        <div className="bg-surface-elevated rounded-xl shadow-sm p-6 mb-6">
           <div className="flex items-center justify-between">
             <div className="flex items-center">
               <div className={`w-12 h-12 rounded-full flex items-center justify-center ${
-                status.isEnabled ? 'bg-success-100' : 'bg-gray-100'
+                status.isEnabled ? 'bg-success-100' : 'bg-surface-alt'
               }`}>
                 <svg 
-                  className={`w-6 h-6 ${status.isEnabled ? 'text-success-600' : 'text-gray-400'}`}
+                  className={`w-6 h-6 ${status.isEnabled ? 'text-success-600' : 'text-subtle'}`}
                   fill="none" 
                   stroke="currentColor" 
                   viewBox="0 0 24 24"
@@ -192,10 +192,10 @@ export default function SecuritySettingsPage() {
                 </svg>
               </div>
               <div className="ml-4">
-                <h2 className="text-lg font-semibold text-gray-900">
+                <h2 className="text-lg font-semibold text-heading">
                   İki Faktörlü Kimlik Doğrulama
                 </h2>
-                <p className="text-sm text-gray-600">
+                <p className="text-sm text-muted">
                   {status.isEnabled 
                     ? 'Hesabınız 2FA ile korunuyor' 
                     : 'Hesabınızı daha güvenli hale getirin'}
@@ -208,7 +208,7 @@ export default function SecuritySettingsPage() {
                   Aktif
                 </span>
               ) : (
-                <span className="inline-flex items-center px-3 py-1 rounded-full text-sm font-medium bg-gray-100 text-gray-600">
+                <span className="inline-flex items-center px-3 py-1 rounded-full text-sm font-medium bg-surface-alt text-muted">
                   Pasif
                 </span>
               )}
@@ -218,9 +218,9 @@ export default function SecuritySettingsPage() {
 
         {/* Setup Section (when not enabled) */}
         {!status.isEnabled && !setupData && (
-          <div className="bg-white rounded-xl shadow-sm p-6">
-            <h3 className="text-lg font-medium text-gray-900 mb-4">2FA'yı Etkinleştir</h3>
-            <p className="text-gray-600 mb-6">
+          <div className="bg-surface-elevated rounded-xl shadow-sm p-6">
+            <h3 className="text-lg font-medium text-heading mb-4">2FA'yı Etkinleştir</h3>
+            <p className="text-muted mb-6">
               İki faktörlü kimlik doğrulama, hesabınıza giriş yaparken şifrenizin yanı sıra 
               telefonunuzdaki bir uygulama tarafından oluşturulan bir kod girmenizi gerektirir.
             </p>
@@ -257,22 +257,22 @@ export default function SecuritySettingsPage() {
 
         {/* Setup Flow (QR Code) */}
         {setupData && (
-          <div className="bg-white rounded-xl shadow-sm p-6">
-            <h3 className="text-lg font-medium text-gray-900 mb-4">2FA Kurulumu</h3>
+          <div className="bg-surface-elevated rounded-xl shadow-sm p-6">
+            <h3 className="text-lg font-medium text-heading mb-4">2FA Kurulumu</h3>
             
             {/* Step 1: Scan QR */}
             <div className="mb-6">
               <div className="flex items-center mb-3">
-                <span className="w-6 h-6 bg-danger-500 text-white rounded-full flex items-center justify-center text-sm font-medium mr-2">
+                <span className="w-6 h-6 bg-danger-500 text-inverted rounded-full flex items-center justify-center text-sm font-medium mr-2">
                   1
                 </span>
-                <span className="font-medium text-gray-900">QR Kodu Tarayın</span>
+                <span className="font-medium text-heading">QR Kodu Tarayın</span>
               </div>
-              <p className="text-sm text-gray-600 mb-4 ml-8">
+              <p className="text-sm text-muted mb-4 ml-8">
                 Google Authenticator veya benzer bir uygulama ile aşağıdaki QR kodunu tarayın.
               </p>
               <div className="flex justify-center mb-4">
-                <div className="p-4 bg-white border-2 border-gray-200 rounded-lg">
+                <div className="p-4 bg-surface-elevated border-2 border-border rounded-lg">
                   {setupData.qrCodeUrl ? (
                     <Image
                       src={setupData.qrCodeUrl}
@@ -281,22 +281,22 @@ export default function SecuritySettingsPage() {
                       height={200}
                     />
                   ) : (
-                    <div className="w-[200px] h-[200px] bg-gray-100 flex items-center justify-center text-gray-400">
+                    <div className="w-[200px] h-[200px] bg-surface-alt flex items-center justify-center text-subtle">
                       QR Kod Yüklenemedi
                     </div>
                   )}
                 </div>
               </div>
               <div className="ml-8">
-                <p className="text-sm text-gray-600 mb-2">
+                <p className="text-sm text-muted mb-2">
                   QR kodu tarayamıyorsanız, bu kodu manuel olarak girin:
                 </p>
                 <div className="flex items-center">
-                  <code className="bg-gray-100 px-3 py-2 rounded text-sm font-mono flex-1">
+                  <code className="bg-surface-alt px-3 py-2 rounded text-sm font-mono flex-1">
                     {setupData.secret}
                   </code>
                   <Button variant="secondary" onClick={() => copyToClipboard(setupData.secret)}
-                    className="ml-2 p-2 text-gray-500 hover:text-gray-700"
+                    className="ml-2 p-2 text-muted hover:text-body"
                     title="Kopyala">
                     <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" />
@@ -309,12 +309,12 @@ export default function SecuritySettingsPage() {
             {/* Step 2: Verify */}
             <div className="mb-6">
               <div className="flex items-center mb-3">
-                <span className="w-6 h-6 bg-danger-500 text-white rounded-full flex items-center justify-center text-sm font-medium mr-2">
+                <span className="w-6 h-6 bg-danger-500 text-inverted rounded-full flex items-center justify-center text-sm font-medium mr-2">
                   2
                 </span>
-                <span className="font-medium text-gray-900">Doğrulama Kodunu Girin</span>
+                <span className="font-medium text-heading">Doğrulama Kodunu Girin</span>
               </div>
-              <p className="text-sm text-gray-600 mb-4 ml-8">
+              <p className="text-sm text-muted mb-4 ml-8">
                 Uygulamanızda görünen 6 haneli kodu girin.
               </p>
               <div className="ml-8">
@@ -357,7 +357,7 @@ export default function SecuritySettingsPage() {
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
                   </svg>
                 </div>
-                <p className="text-sm text-gray-600 mt-1">
+                <p className="text-sm text-muted mt-1">
                   Aşağıdaki yedek kodları güvenli bir yere kaydedin.
                 </p>
               </div>
@@ -372,7 +372,7 @@ export default function SecuritySettingsPage() {
                 {backupCodes.map((code, index) => (
                   <code
                     key={index}
-                    className="bg-gray-100 px-3 py-2 rounded text-sm font-mono text-center"
+                    className="bg-surface-alt px-3 py-2 rounded text-sm font-mono text-center"
                   >
                     {code}
                   </code>
@@ -405,9 +405,9 @@ export default function SecuritySettingsPage() {
         {status.isEnabled && (
           <div className="space-y-4">
             {/* Backup Codes */}
-            <div className="bg-white rounded-xl shadow-sm p-6">
-              <h3 className="text-lg font-medium text-gray-900 mb-2">Yedek Kodlar</h3>
-              <p className="text-sm text-gray-600 mb-4">
+            <div className="bg-surface-elevated rounded-xl shadow-sm p-6">
+              <h3 className="text-lg font-medium text-heading mb-2">Yedek Kodlar</h3>
+              <p className="text-sm text-muted mb-4">
                 Telefonunuza erişiminizi kaybederseniz yedek kodları kullanarak giriş yapabilirsiniz.
               </p>
               <Button
@@ -422,9 +422,9 @@ export default function SecuritySettingsPage() {
             </div>
 
             {/* Disable 2FA */}
-            <div className="bg-white rounded-xl shadow-sm p-6">
-              <h3 className="text-lg font-medium text-gray-900 mb-2">2FA'yı Devre Dışı Bırak</h3>
-              <p className="text-sm text-gray-600 mb-4">
+            <div className="bg-surface-elevated rounded-xl shadow-sm p-6">
+              <h3 className="text-lg font-medium text-heading mb-2">2FA'yı Devre Dışı Bırak</h3>
+              <p className="text-sm text-muted mb-4">
                 2FA'yı devre dışı bırakmak hesabınızın güvenliğini azaltır.
               </p>
               
@@ -478,9 +478,9 @@ export default function SecuritySettingsPage() {
         )}
 
         {/* Info Section */}
-        <div className="mt-8 bg-gray-100 rounded-xl p-6">
-          <h3 className="font-medium text-gray-900 mb-3">2FA Neden Önemli?</h3>
-          <ul className="text-sm text-gray-600 space-y-2">
+        <div className="mt-8 bg-surface-alt rounded-xl p-6">
+          <h3 className="font-medium text-heading mb-3">2FA Neden Önemli?</h3>
+          <ul className="text-sm text-muted space-y-2">
             <li className="flex items-start">
               <svg className="w-5 h-5 text-success-500 mr-2 mt-0.5 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">
                 <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />

@@ -5,7 +5,7 @@ import { cn } from './utils';
 const alertVariants = cva('relative w-full rounded-lg border p-4', {
   variants: {
     variant: {
-      default: 'bg-white border-gray-200 text-gray-900',
+      default: 'bg-surface-elevated border-border text-heading',
       info: 'bg-info-50 border-info-200 text-info-800',
       success: 'bg-success-50 border-success-200 text-success-800',
       warning: 'bg-warning-50 border-warning-200 text-warning-800',
@@ -49,7 +49,7 @@ export const Alert = React.forwardRef<HTMLDivElement, AlertProps>(
               type="button"
               onClick={onClose}
               aria-label="Close"
-              className="shrink-0 rounded-lg p-1 hover:bg-black/5 transition-colors"
+              className="shrink-0 rounded-lg p-1 hover:bg-heading/5 transition-colors"
             >
               <svg
                 className="h-4 w-4"

@@ -168,8 +168,8 @@ export default function ManufacturersPage() {
       <div className="space-y-6">
         <div className="flex justify-between items-center">
           <div>
-            <h1 className="text-2xl font-bold text-gray-900">Üretici Yönetimi</h1>
-            <p className="mt-1 text-sm text-gray-500">
+            <h1 className="text-2xl font-bold text-heading">Üretici Yönetimi</h1>
+            <p className="mt-1 text-sm text-muted">
               Diecast model üreticilerini (Hot Wheels, Matchbox vb.) buradan yönetebilirsiniz
             </p>
           </div>
@@ -179,49 +179,49 @@ export default function ManufacturersPage() {
           </Button>
         </div>
 
-        <div className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
+        <div className="bg-surface-elevated rounded-xl shadow-sm border border-border-subtle overflow-hidden">
           {loading ? (
             <div className="p-8 text-center">
               <Spinner size="lg" color="border-primary-500 border-t-transparent" className="mx-auto" />
-              <p className="mt-2 text-gray-500">Yükleniyor...</p>
+              <p className="mt-2 text-muted">Yükleniyor...</p>
             </div>
           ) : manufacturers.length === 0 ? (
             <div className="p-8 text-center">
-              <p className="text-gray-500">Henüz üretici eklenmemiş</p>
+              <p className="text-muted">Henüz üretici eklenmemiş</p>
               <Button variant="secondary" onClick={openCreateModal} className="mt-4 text-primary-500 hover:text-primary-600 font-medium">
                 İlk üreticiyi ekle
               </Button>
             </div>
           ) : (
-            <table className="min-w-full divide-y divide-gray-200">
-              <thead className="bg-gray-50">
+            <table className="min-w-full divide-y divide-border">
+              <thead className="bg-surface">
                 <tr>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Üretici</th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Ülke</th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Website</th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Durum</th>
-                  <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">İşlemler</th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-muted uppercase tracking-wider">Üretici</th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-muted uppercase tracking-wider">Ülke</th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-muted uppercase tracking-wider">Website</th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-muted uppercase tracking-wider">Durum</th>
+                  <th className="px-6 py-3 text-right text-xs font-medium text-muted uppercase tracking-wider">İşlemler</th>
                 </tr>
               </thead>
-              <tbody className="bg-white divide-y divide-gray-200">
+              <tbody className="bg-surface-elevated divide-y divide-border">
                 {manufacturers.map((m) => (
-                  <tr key={m.id} className="hover:bg-gray-50">
+                  <tr key={m.id} className="hover:bg-surface">
                     <td className="px-6 py-4 whitespace-nowrap">
                       <div className="flex items-center gap-3">
                         {m.logo ? (
-                          <img src={m.logo} alt={m.name} className="w-10 h-10 rounded-lg object-contain bg-gray-100" />
+                          <img src={m.logo} alt={m.name} className="w-10 h-10 rounded-lg object-contain bg-surface-alt" />
                         ) : (
-                          <div className="w-10 h-10 rounded-lg bg-gray-200 flex items-center justify-center text-gray-500 font-bold">
+                          <div className="w-10 h-10 rounded-lg bg-border-subtle flex items-center justify-center text-muted font-bold">
                             {m.name.charAt(0).toUpperCase()}
                           </div>
                         )}
                         <div>
-                          <p className="font-medium text-gray-900">{m.name}</p>
-                          <p className="text-sm text-gray-500">{m.slug}</p>
+                          <p className="font-medium text-heading">{m.name}</p>
+                          <p className="text-sm text-muted">{m.slug}</p>
                         </div>
                       </div>
                     </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{m.country || '-'}</td>
+                    <td className="px-6 py-4 whitespace-nowrap text-sm text-muted">{m.country || '-'}</td>
                     <td className="px-6 py-4 whitespace-nowrap">
                       {m.website ? (
                         <a href={m.website} target="_blank" rel="noopener noreferrer" className="text-sm text-info-600 hover:text-info-800 flex items-center gap-1">
@@ -229,21 +229,21 @@ export default function ManufacturersPage() {
                           Ziyaret Et
                         </a>
                       ) : (
-                        <span className="text-gray-500 text-sm">-</span>
+                        <span className="text-muted text-sm">-</span>
                       )}
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap">
                       <Button variant="secondary" onClick={() => toggleStatus(m)}
-                        className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-medium ${m.isActive ? 'bg-success-100 text-success-800' : 'bg-gray-100 text-gray-800'}`}>
+                        className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-medium ${m.isActive ? 'bg-success-100 text-success-800' : 'bg-surface-alt text-body'}`}>
                         {m.isActive ? <><CheckCircleIcon className="w-4 h-4" />Aktif</> : <><XCircleIcon className="w-4 h-4" />Pasif</>}
                       </Button>
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
                       <div className="flex items-center justify-end gap-2">
-                        <Button variant="secondary" onClick={() => openEditModal(m)} className="p-2 text-gray-500 hover:text-gray-600 hover:bg-gray-100 rounded-lg" title="Düzenle">
+                        <Button variant="secondary" onClick={() => openEditModal(m)} className="p-2 text-muted hover:text-muted hover:bg-surface-alt rounded-lg" title="Düzenle">
                           <PencilIcon className="w-4 h-4" />
                         </Button>
-                        <Button variant="secondary" onClick={() => setDeleteConfirm(m.id)} className="p-2 text-gray-500 hover:text-danger-600 hover:bg-danger-50 rounded-lg" title="Sil">
+                        <Button variant="secondary" onClick={() => setDeleteConfirm(m.id)} className="p-2 text-muted hover:text-danger-600 hover:bg-danger-50 rounded-lg" title="Sil">
                           <TrashIcon className="w-4 h-4" />
                         </Button>
                       </div>
@@ -258,14 +258,14 @@ export default function ManufacturersPage() {
         {showModal && (
           <div className="fixed inset-0 z-50 overflow-y-auto">
             <div className="flex min-h-full items-center justify-center p-4">
-              <div className="fixed inset-0 bg-black/50" onClick={() => setShowModal(false)} />
-              <div className="relative bg-white rounded-xl shadow-xl w-full max-w-md p-6">
-                <h3 className="text-lg font-semibold text-gray-900 mb-4">
+              <div className="fixed inset-0 bg-heading/50" onClick={() => setShowModal(false)} />
+              <div className="relative bg-surface-elevated rounded-xl shadow-xl w-full max-w-md p-6">
+                <h3 className="text-lg font-semibold text-heading mb-4">
                   {editingManufacturer ? 'Üreticiyi Düzenle' : 'Yeni Üretici Ekle'}
                 </h3>
                 <form onSubmit={handleSubmit} className="space-y-4">
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">Üretici Adı *</label>
+                    <label className="block text-sm font-medium text-body mb-1">Üretici Adı *</label>
                     <Input
                       type="text"
                       value={formData.name}
@@ -275,7 +275,7 @@ export default function ManufacturersPage() {
                     />
                   </div>
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">Logo</label>
+                    <label className="block text-sm font-medium text-body mb-1">Logo</label>
                     <Input ref={fileInputRef}
                       type="file"
                       accept="image/jpeg,image/png,image/webp"
@@ -286,17 +286,17 @@ export default function ManufacturersPage() {
                         <img
                           src={logoPreview || formData.logo}
                           alt="Logo"
-                          className="w-16 h-16 rounded-lg object-contain bg-gray-100 border border-gray-200"
+                          className="w-16 h-16 rounded-lg object-contain bg-surface-alt border border-border"
                         />
                       ) : (
-                        <div className="w-16 h-16 rounded-lg bg-gray-100 border border-gray-200 flex items-center justify-center">
-                          <PhotoIcon className="w-6 h-6 text-gray-400" />
+                        <div className="w-16 h-16 rounded-lg bg-surface-alt border border-border flex items-center justify-center">
+                          <PhotoIcon className="w-6 h-6 text-subtle" />
                         </div>
                       )}
                       <Button variant="secondary" type="button"
                         onClick={() => fileInputRef.current?.click()}
                         disabled={uploadingLogo}
-                        className="hover:bg-gray-50 disabled:opacity-50">
+                        className="hover:bg-surface disabled:opacity-50">
                         {uploadingLogo ? 'Yükleniyor...' : (logoPreview || formData.logo) ? 'Değiştir' : 'Logo Yükle'}
                       </Button>
                       {formData.logo && (
@@ -309,7 +309,7 @@ export default function ManufacturersPage() {
                     </div>
                   </div>
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">Website</label>
+                    <label className="block text-sm font-medium text-body mb-1">Website</label>
                     <Input
                       type="url"
                       value={formData.website}
@@ -318,7 +318,7 @@ export default function ManufacturersPage() {
                     />
                   </div>
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">Ülke</label>
+                    <label className="block text-sm font-medium text-body mb-1">Ülke</label>
                     <Input
                       type="text"
                       value={formData.country}
@@ -327,14 +327,14 @@ export default function ManufacturersPage() {
                     />
                   </div>
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">Açıklama</label>
+                    <label className="block text-sm font-medium text-body mb-1">Açıklama</label>
                     <Textarea value={formData.description}
                       onChange={(e) => setFormData({ ...formData, description: e.target.value })}
                       rows={2}
                       placeholder="Üretici hakkında kısa açıklama" />
                   </div>
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">Durum</label>
+                    <label className="block text-sm font-medium text-body mb-1">Durum</label>
                     <Select
                       value={formData.isActive ? 'true' : 'false'}
                       onChange={(e) => setFormData({ ...formData, isActive: e.target.value === 'true' })}
@@ -360,10 +360,10 @@ export default function ManufacturersPage() {
         {deleteConfirm && (
           <div className="fixed inset-0 z-50 overflow-y-auto">
             <div className="flex min-h-full items-center justify-center p-4">
-              <div className="fixed inset-0 bg-black/50" onClick={() => setDeleteConfirm(null)} />
-              <div className="relative bg-white rounded-xl shadow-xl w-full max-w-sm p-6">
-                <h3 className="text-lg font-semibold text-gray-900 mb-2">Üreticiyi Sil</h3>
-                <p className="text-gray-600 mb-4">Bu üreticiyi silmek istediğinizden emin misiniz? Bu işlem geri alınamaz.</p>
+              <div className="fixed inset-0 bg-heading/50" onClick={() => setDeleteConfirm(null)} />
+              <div className="relative bg-surface-elevated rounded-xl shadow-xl w-full max-w-sm p-6">
+                <h3 className="text-lg font-semibold text-heading mb-2">Üreticiyi Sil</h3>
+                <p className="text-muted mb-4">Bu üreticiyi silmek istediğinizden emin misiniz? Bu işlem geri alınamaz.</p>
                 <div className="flex justify-end gap-3">
                   <Button variant="secondary" size="md" onClick={() => setDeleteConfirm(null)}>
                     İptal

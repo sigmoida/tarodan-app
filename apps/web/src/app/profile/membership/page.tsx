@@ -329,12 +329,12 @@ export default function MembershipPage() {
   }
 
   return (
-    <div className="min-h-screen bg-gray-50">
+    <div className="min-h-screen bg-surface">
       <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
         {!isRequired && (
           <Link
             href="/profile"
-            className="inline-flex items-center gap-2 text-gray-600 hover:text-gray-900 mb-8"
+            className="inline-flex items-center gap-2 text-muted hover:text-heading mb-8"
           >
             <ArrowLeftIcon className="w-5 h-5" />
             {locale === 'en' ? 'Back to Profile' : 'Profile Dön'}
@@ -371,8 +371,8 @@ export default function MembershipPage() {
         )}
 
         <div className="text-center mb-12">
-          <h1 className="text-2xl sm:text-3xl lg:text-4xl font-bold text-gray-900 mb-4">{t('membership.title')}</h1>
-          <p className="text-base sm:text-lg lg:text-xl text-gray-600 max-w-2xl mx-auto">
+          <h1 className="text-2xl sm:text-3xl lg:text-4xl font-bold text-heading mb-4">{t('membership.title')}</h1>
+          <p className="text-base sm:text-lg lg:text-xl text-muted max-w-2xl mx-auto">
             {t('membership.subtitle')}
           </p>
           
@@ -394,8 +394,8 @@ export default function MembershipPage() {
 
         {/* Membership Details Card for Premium/Business Users */}
         {membershipDetails && (membershipDetails.tier === 'premium' || membershipDetails.tier === 'business') && (
-          <div className="max-w-4xl mx-auto mb-12 bg-white rounded-xl shadow-lg p-6 border border-gray-200">
-            <h2 className="text-2xl font-bold text-gray-900 mb-6">Mevcut Üyelik Bilgileri</h2>
+          <div className="max-w-4xl mx-auto mb-12 bg-surface-elevated rounded-xl shadow-lg p-6 border border-border">
+            <h2 className="text-2xl font-bold text-heading mb-6">Mevcut Üyelik Bilgileri</h2>
             
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
               <div className="flex items-start gap-4">
@@ -403,8 +403,8 @@ export default function MembershipPage() {
                   <CalendarIcon className="w-6 h-6 text-info-600" />
                 </div>
                 <div>
-                  <p className="text-sm text-gray-500 mb-1">Üyelik Başlangıç Tarihi</p>
-                  <p className="text-lg font-semibold text-gray-900">
+                  <p className="text-sm text-muted mb-1">Üyelik Başlangıç Tarihi</p>
+                  <p className="text-lg font-semibold text-heading">
                     {membershipDetails.currentPeriodStart 
                       ? new Date(membershipDetails.currentPeriodStart).toLocaleDateString('tr-TR', { 
                           year: 'numeric', 
@@ -421,8 +421,8 @@ export default function MembershipPage() {
                   <CalendarIcon className="w-6 h-6 text-success-600" />
                 </div>
                 <div>
-                  <p className="text-sm text-gray-500 mb-1">Yenilenme Tarihi</p>
-                  <p className="text-lg font-semibold text-gray-900">
+                  <p className="text-sm text-muted mb-1">Yenilenme Tarihi</p>
+                  <p className="text-lg font-semibold text-heading">
                     {membershipDetails.currentPeriodEnd 
                       ? new Date(membershipDetails.currentPeriodEnd).toLocaleDateString('tr-TR', { 
                           year: 'numeric', 
@@ -435,9 +435,9 @@ export default function MembershipPage() {
               </div>
             </div>
 
-            <div className="border-t border-gray-200 pt-6">
+            <div className="border-t border-border pt-6">
               <div className="flex items-center justify-between mb-4">
-                <h3 className="text-lg font-semibold text-gray-900 flex items-center gap-2">
+                <h3 className="text-lg font-semibold text-heading flex items-center gap-2">
                   <CreditCardIcon className="w-5 h-5" />
                   Kayıtlı Kartlar
                 </h3>
@@ -454,17 +454,17 @@ export default function MembershipPage() {
                   {paymentMethods.map((method) => (
                     <div
                       key={method.id}
-                      className="flex items-center justify-between p-4 bg-gray-50 rounded-lg border border-gray-200"
+                      className="flex items-center justify-between p-4 bg-surface rounded-lg border border-border"
                     >
                       <div className="flex items-center gap-4">
                         <div className="w-10 h-10 bg-primary-100 rounded-lg flex items-center justify-center">
                           <CreditCardIcon className="w-6 h-6 text-primary-600" />
                         </div>
                         <div>
-                          <p className="font-semibold text-gray-900">
+                          <p className="font-semibold text-heading">
                             {method.cardBrand} •••• {method.lastFour}
                           </p>
-                          <p className="text-sm text-gray-500">
+                          <p className="text-sm text-muted">
                             Son kullanma: {String(method.expiryMonth).padStart(2, '0')}/{method.expiryYear}
                           </p>
                         </div>
@@ -485,7 +485,7 @@ export default function MembershipPage() {
                   </p>
                   <Link
                     href="/profile/payments"
-                    className="inline-block px-4 py-2 bg-primary-500 text-white rounded-lg hover:bg-primary-600 transition-colors text-sm font-medium"
+                    className="inline-block px-4 py-2 bg-primary-500 text-inverted rounded-lg hover:bg-primary-600 transition-colors text-sm font-medium"
                   >
                     Kart Ekle
                   </Link>
@@ -496,20 +496,20 @@ export default function MembershipPage() {
         )}
 
         <div className="flex justify-center mb-8">
-          <div className="inline-flex bg-white rounded-lg p-1 shadow-sm border border-gray-200">
+          <div className="inline-flex bg-surface-elevated rounded-lg p-1 shadow-sm border border-border">
             <Button variant="secondary" onClick={() => setSelectedPeriod('monthly')}
               className={`px-6 py-2 rounded-md font-medium transition-colors ${
                 selectedPeriod === 'monthly'
-                  ? 'bg-primary-500 text-white'
-                  : 'text-gray-600 hover:text-gray-900'
+                  ? 'bg-primary-500 text-inverted'
+                  : 'text-muted hover:text-heading'
               }`}>
               {t('membership.monthly')}
             </Button>
             <Button variant="secondary" onClick={() => setSelectedPeriod('yearly')}
               className={`px-6 py-2 rounded-md font-medium transition-colors ${
                 selectedPeriod === 'yearly'
-                  ? 'bg-primary-500 text-white'
-                  : 'text-gray-600 hover:text-gray-900'
+                  ? 'bg-primary-500 text-inverted'
+                  : 'text-muted hover:text-heading'
               }`}>
               {t('membership.yearly')}
               <span className="ml-2 text-xs bg-success-100 text-success-700 px-2 py-0.5 rounded-full">
@@ -561,58 +561,58 @@ export default function MembershipPage() {
                     handleSelectTier(tier.id);
                   }
                 }}
-                className={`relative bg-white rounded-xl shadow-lg border-2 overflow-hidden transition-all cursor-pointer ${
+                className={`relative bg-surface-elevated rounded-xl shadow-lg border-2 overflow-hidden transition-all cursor-pointer ${
                   isSelected
                     ? 'border-primary-500 ring-2 ring-primary-500 scale-105'
                     : tier.popular
                     ? 'border-primary-300 hover:border-primary-400'
-                    : 'border-gray-200 hover:border-gray-300'
+                    : 'border-border hover:border-border'
                 } ${tier.price === 0 && isAuthenticated ? 'opacity-60 cursor-not-allowed' : ''}`}
               >
                 {tier.popular && !isSelected && (
-                  <div className="absolute top-0 right-0 bg-primary-500 text-white px-4 py-1 text-sm font-semibold rounded-bl-lg">
+                  <div className="absolute top-0 right-0 bg-primary-500 text-inverted px-4 py-1 text-sm font-semibold rounded-bl-lg">
                     {t('membership.mostPopular')}
                   </div>
                 )}
                 {isSelected && (
-                  <div className="absolute top-0 right-0 bg-success-500 text-white px-4 py-1 text-sm font-semibold rounded-bl-lg flex items-center gap-1">
+                  <div className="absolute top-0 right-0 bg-success-500 text-inverted px-4 py-1 text-sm font-semibold rounded-bl-lg flex items-center gap-1">
                     <CheckIcon className="w-4 h-4" />
                     {t('common.selected')}
                   </div>
                 )}
                 {isCurrent && !isSelected && (
-                  <div className="absolute top-0 left-0 bg-info-500 text-white px-4 py-1 text-sm font-semibold rounded-br-lg">
+                  <div className="absolute top-0 left-0 bg-info-500 text-inverted px-4 py-1 text-sm font-semibold rounded-br-lg">
                     {t('membership.currentPlan')}
                   </div>
                 )}
 
                 <div className="p-6">
                   <div className="mb-6">
-                    <h3 className="text-2xl font-bold text-gray-900 mb-2">{tier.name}</h3>
-                    <p className="text-gray-600 text-sm">{tier.description}</p>
+                    <h3 className="text-2xl font-bold text-heading mb-2">{tier.name}</h3>
+                    <p className="text-muted text-sm">{tier.description}</p>
                   </div>
 
                   <div className="mb-6">
                     <div className="flex items-baseline">
-                      <span className="text-4xl font-bold text-gray-900">
+                      <span className="text-4xl font-bold text-heading">
                         {tier.price === 0 ? 'Ücretsiz' : `${displayPrice.toLocaleString('tr-TR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} TL`}
                       </span>
                       {tier.price > 0 && (
-                        <span className="ml-2 text-gray-500">
+                        <span className="ml-2 text-muted">
                           /{selectedPeriod === 'yearly' ? 'yıl' : 'ay'}
                         </span>
                       )}
                     </div>
                     {selectedPeriod === 'yearly' && tier.price > 0 && (
-                      <p className="text-sm text-gray-500 mt-1">
+                      <p className="text-sm text-muted mt-1">
                         Ayda {Math.round(displayPrice / 12).toLocaleString('tr-TR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} TL
                         {tier.id === 'premium' && membershipPrices.premium_monthly_price && (
-                          <span className="text-xs text-gray-400 ml-1">
+                          <span className="text-xs text-subtle ml-1">
                             (Normal: {membershipPrices.premium_monthly_price.toLocaleString('tr-TR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} TL)
                           </span>
                         )}
                         {tier.id === 'business' && membershipPrices.business_monthly_price && (
-                          <span className="text-xs text-gray-400 ml-1">
+                          <span className="text-xs text-subtle ml-1">
                             (Normal: {membershipPrices.business_monthly_price.toLocaleString('tr-TR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} TL)
                           </span>
                         )}
@@ -631,9 +631,9 @@ export default function MembershipPage() {
                         {feature.included ? (
                           <CheckIcon className="w-5 h-5 text-success-500 mr-2 flex-shrink-0 mt-0.5" />
                         ) : (
-                          <XMarkIcon className="w-5 h-5 text-gray-300 mr-2 flex-shrink-0 mt-0.5" />
+                          <XMarkIcon className="w-5 h-5 text-border-strong mr-2 flex-shrink-0 mt-0.5" />
                         )}
-                        <span className={`text-sm ${feature.included ? 'text-gray-700' : 'text-gray-400'}`}>
+                        <span className={`text-sm ${feature.included ? 'text-body' : 'text-subtle'}`}>
                           {feature.text}
                         </span>
                       </li>
@@ -642,12 +642,12 @@ export default function MembershipPage() {
 
                   <div className={`w-full py-3 rounded-lg font-semibold text-center transition-colors ${
                     isSelected
-                      ? 'bg-primary-500 text-white'
+                      ? 'bg-primary-500 text-inverted'
                       : isCurrent
                       ? 'bg-info-100 text-info-700'
                       : tier.price === 0
-                      ? 'bg-gray-100 text-gray-400'
-                      : 'bg-gray-100 text-gray-700 group-hover:bg-gray-200'
+                      ? 'bg-surface-alt text-subtle'
+                      : 'bg-surface-alt text-body group-hover:bg-border-subtle'
                   }`}>
                     {isCurrent ? t('membership.currentPlan') : tier.price === 0 ? t('membership.free') : isSelected ? t('common.selected') : t('common.select')}
                   </div>
@@ -665,30 +665,30 @@ export default function MembershipPage() {
             className="flex justify-center mb-12"
           >
             <Button variant="secondary" onClick={handleContinue}
-              className="px-12 py-4 bg-primary-500 text-white text-lg font-semibold rounded-xl hover:bg-primary-600 transition-colors shadow-lg hover:shadow-xl">
+              className="px-12 py-4 bg-primary-500 text-inverted text-lg font-semibold rounded-xl hover:bg-primary-600 transition-colors shadow-lg hover:shadow-xl">
               {t('common.continue')}
             </Button>
           </motion.div>
         )}
 
         <div className="max-w-3xl mx-auto mt-16">
-          <h2 className="text-2xl font-bold text-gray-900 text-center mb-8">{t('nav.faq')}</h2>
+          <h2 className="text-2xl font-bold text-heading text-center mb-8">{t('nav.faq')}</h2>
           <div className="space-y-4">
-            <div className="bg-white rounded-lg p-6 shadow-sm">
-              <h3 className="font-semibold text-gray-900 mb-2">{t('membership.upgrade')}?</h3>
-              <p className="text-gray-600">
+            <div className="bg-surface-elevated rounded-lg p-6 shadow-sm">
+              <h3 className="font-semibold text-heading mb-2">{t('membership.upgrade')}?</h3>
+              <p className="text-muted">
                 {t('membership.subtitle')}
               </p>
             </div>
-            <div className="bg-white rounded-lg p-6 shadow-sm">
-              <h3 className="font-semibold text-gray-900 mb-2">{t('membership.listingsLimit')}?</h3>
-              <p className="text-gray-600">
+            <div className="bg-surface-elevated rounded-lg p-6 shadow-sm">
+              <h3 className="font-semibold text-heading mb-2">{t('membership.listingsLimit')}?</h3>
+              <p className="text-muted">
                 {t('membership.features')}
               </p>
             </div>
-            <div className="bg-white rounded-lg p-6 shadow-sm">
-              <h3 className="font-semibold text-gray-900 mb-2">{t('nav.trades')}?</h3>
-              <p className="text-gray-600">
+            <div className="bg-surface-elevated rounded-lg p-6 shadow-sm">
+              <h3 className="font-semibold text-heading mb-2">{t('nav.trades')}?</h3>
+              <p className="text-muted">
                 {t('trade.tradeRequiresLogin')}
               </p>
             </div>

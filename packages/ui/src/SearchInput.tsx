@@ -40,7 +40,7 @@ export const SearchInput = React.forwardRef<HTMLInputElement, SearchInputProps>(
               type="button"
               onClick={onClear}
               aria-label="Clear search"
-              className="rounded p-0.5 hover:bg-gray-100 transition-colors"
+              className="rounded p-0.5 hover:bg-surface-alt transition-colors"
             >
               <XMarkIcon className="h-4 w-4" />
             </button>

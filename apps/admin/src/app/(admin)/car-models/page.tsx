@@ -152,8 +152,8 @@ export default function CarModelsPage() {
       <div className="space-y-6">
         <div className="flex justify-between items-center">
           <div>
-            <h1 className="text-2xl font-bold text-gray-900">Model Yönetimi</h1>
-            <p className="mt-1 text-sm text-gray-500">Marka bazlı araç modellerini (örn. BMW M4, Porsche 911) buradan yönetebilirsiniz</p>
+            <h1 className="text-2xl font-bold text-heading">Model Yönetimi</h1>
+            <p className="mt-1 text-sm text-muted">Marka bazlı araç modellerini (örn. BMW M4, Porsche 911) buradan yönetebilirsiniz</p>
           </div>
           <Button variant="primary" size="md" onClick={openCreateModal}>
             <PlusIcon className="w-5 h-5" />
@@ -162,7 +162,7 @@ export default function CarModelsPage() {
         </div>
 
         <div className="flex gap-4 items-center">
-          <label className="text-sm font-medium text-gray-700">Marka:</label>
+          <label className="text-sm font-medium text-body">Marka:</label>
           <Select
             value={selectedBrandId}
             onChange={(e) => setSelectedBrandId(e.target.value)}
@@ -175,55 +175,55 @@ export default function CarModelsPage() {
           </Select>
         </div>
 
-        <div className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
+        <div className="bg-surface-elevated rounded-xl shadow-sm border border-border-subtle overflow-hidden">
           {loading ? (
             <div className="p-8 text-center">
               <Spinner size="lg" color="border-primary-500 border-t-transparent" className="mx-auto" />
-              <p className="mt-2 text-gray-500">Yükleniyor...</p>
+              <p className="mt-2 text-muted">Yükleniyor...</p>
             </div>
           ) : models.length === 0 ? (
             <div className="p-8 text-center">
-              <p className="text-gray-500">Bu marka için henüz model eklenmemiş</p>
+              <p className="text-muted">Bu marka için henüz model eklenmemiş</p>
               <Button variant="secondary" onClick={openCreateModal} className="mt-4 text-primary-500 hover:text-primary-600 font-medium">
                 İlk modeli ekle
               </Button>
             </div>
           ) : (
-            <table className="min-w-full divide-y divide-gray-200">
-              <thead className="bg-gray-50">
+            <table className="min-w-full divide-y divide-border">
+              <thead className="bg-surface">
                 <tr>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Model</th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Marka</th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Yıl</th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Durum</th>
-                  <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">İşlemler</th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-muted uppercase tracking-wider">Model</th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-muted uppercase tracking-wider">Marka</th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-muted uppercase tracking-wider">Yıl</th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-muted uppercase tracking-wider">Durum</th>
+                  <th className="px-6 py-3 text-right text-xs font-medium text-muted uppercase tracking-wider">İşlemler</th>
                 </tr>
               </thead>
-              <tbody className="bg-white divide-y divide-gray-200">
+              <tbody className="bg-surface-elevated divide-y divide-border">
                 {models.map((m) => (
-                  <tr key={m.id} className="hover:bg-gray-50">
+                  <tr key={m.id} className="hover:bg-surface">
                     <td className="px-6 py-4 whitespace-nowrap">
                       <div>
-                        <p className="font-medium text-gray-900">{m.name}</p>
-                        <p className="text-sm text-gray-500">{m.slug}</p>
+                        <p className="font-medium text-heading">{m.name}</p>
+                        <p className="text-sm text-muted">{m.slug}</p>
                       </div>
                     </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{m.brand?.name || '-'}</td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                    <td className="px-6 py-4 whitespace-nowrap text-sm text-muted">{m.brand?.name || '-'}</td>
+                    <td className="px-6 py-4 whitespace-nowrap text-sm text-muted">
                       {m.yearStart || m.yearEnd ? `${m.yearStart ?? '?'} - ${m.yearEnd ?? '?'}` : '-'}
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap">
                       <Button variant="secondary" onClick={() => toggleStatus(m)}
-                        className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-medium ${m.isActive ? 'bg-success-100 text-success-800' : 'bg-gray-100 text-gray-800'}`}>
+                        className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-medium ${m.isActive ? 'bg-success-100 text-success-800' : 'bg-surface-alt text-body'}`}>
                         {m.isActive ? <><CheckCircleIcon className="w-4 h-4" />Aktif</> : <><XCircleIcon className="w-4 h-4" />Pasif</>}
                       </Button>
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
                       <div className="flex items-center justify-end gap-2">
-                        <Button variant="secondary" onClick={() => openEditModal(m)} className="p-2 text-gray-500 hover:text-gray-600 hover:bg-gray-100 rounded-lg" title="Düzenle">
+                        <Button variant="secondary" onClick={() => openEditModal(m)} className="p-2 text-muted hover:text-muted hover:bg-surface-alt rounded-lg" title="Düzenle">
                           <PencilIcon className="w-4 h-4" />
                         </Button>
-                        <Button variant="secondary" onClick={() => setDeleteConfirm(m.id)} className="p-2 text-gray-500 hover:text-danger-600 hover:bg-danger-50 rounded-lg" title="Sil">
+                        <Button variant="secondary" onClick={() => setDeleteConfirm(m.id)} className="p-2 text-muted hover:text-danger-600 hover:bg-danger-50 rounded-lg" title="Sil">
                           <TrashIcon className="w-4 h-4" />
                         </Button>
                       </div>
@@ -238,12 +238,12 @@ export default function CarModelsPage() {
         {showModal && (
           <div className="fixed inset-0 z-50 overflow-y-auto">
             <div className="flex min-h-full items-center justify-center p-4">
-              <div className="fixed inset-0 bg-black/50" onClick={() => setShowModal(false)} />
-              <div className="relative bg-white rounded-xl shadow-xl w-full max-w-md p-6">
-                <h3 className="text-lg font-semibold text-gray-900 mb-4">{editingModel ? 'Modeli Düzenle' : 'Yeni Model Ekle'}</h3>
+              <div className="fixed inset-0 bg-heading/50" onClick={() => setShowModal(false)} />
+              <div className="relative bg-surface-elevated rounded-xl shadow-xl w-full max-w-md p-6">
+                <h3 className="text-lg font-semibold text-heading mb-4">{editingModel ? 'Modeli Düzenle' : 'Yeni Model Ekle'}</h3>
                 <form onSubmit={handleSubmit} className="space-y-4">
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">Marka *</label>
+                    <label className="block text-sm font-medium text-body mb-1">Marka *</label>
                     <Select
                       value={formData.brandId}
                       onChange={(e) => setFormData({ ...formData, brandId: e.target.value })}
@@ -257,7 +257,7 @@ export default function CarModelsPage() {
                     </Select>
                   </div>
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">Model Adı *</label>
+                    <label className="block text-sm font-medium text-body mb-1">Model Adı *</label>
                     <Input type="text"
                       value={formData.name}
                       onChange={(e) => setFormData({ ...formData, name: e.target.value })}
@@ -266,7 +266,7 @@ export default function CarModelsPage() {
                   </div>
                   <div className="flex gap-4">
                     <div className="flex-1">
-                      <label className="block text-sm font-medium text-gray-700 mb-1">Başlangıç Yılı</label>
+                      <label className="block text-sm font-medium text-body mb-1">Başlangıç Yılı</label>
                       <Input type="number"
                         value={formData.yearStart}
                         onChange={(e) => setFormData({ ...formData, yearStart: e.target.value ? parseInt(e.target.value) : '' })}
@@ -275,7 +275,7 @@ export default function CarModelsPage() {
                         placeholder="2014" />
                     </div>
                     <div className="flex-1">
-                      <label className="block text-sm font-medium text-gray-700 mb-1">Bitiş Yılı</label>
+                      <label className="block text-sm font-medium text-body mb-1">Bitiş Yılı</label>
                       <Input type="number"
                         value={formData.yearEnd}
                         onChange={(e) => setFormData({ ...formData, yearEnd: e.target.value ? parseInt(e.target.value) : '' })}
@@ -285,7 +285,7 @@ export default function CarModelsPage() {
                     </div>
                   </div>
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">Durum</label>
+                    <label className="block text-sm font-medium text-body mb-1">Durum</label>
                     <Select
                       value={formData.isActive ? 'true' : 'false'}
                       onChange={(e) => setFormData({ ...formData, isActive: e.target.value === 'true' })}
@@ -311,10 +311,10 @@ export default function CarModelsPage() {
         {deleteConfirm && (
           <div className="fixed inset-0 z-50 overflow-y-auto">
             <div className="flex min-h-full items-center justify-center p-4">
-              <div className="fixed inset-0 bg-black/50" onClick={() => setDeleteConfirm(null)} />
-              <div className="relative bg-white rounded-xl shadow-xl w-full max-w-sm p-6">
-                <h3 className="text-lg font-semibold text-gray-900 mb-2">Modeli Sil</h3>
-                <p className="text-gray-600 mb-4">Bu modeli silmek istediğinizden emin misiniz? Bu işlem geri alınamaz.</p>
+              <div className="fixed inset-0 bg-heading/50" onClick={() => setDeleteConfirm(null)} />
+              <div className="relative bg-surface-elevated rounded-xl shadow-xl w-full max-w-sm p-6">
+                <h3 className="text-lg font-semibold text-heading mb-2">Modeli Sil</h3>
+                <p className="text-muted mb-4">Bu modeli silmek istediğinizden emin misiniz? Bu işlem geri alınamaz.</p>
                 <div className="flex justify-end gap-3">
                   <Button variant="secondary" size="md" onClick={() => setDeleteConfirm(null)}>
                     İptal

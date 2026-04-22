@@ -410,13 +410,13 @@ export default function TaxSettingsPage() {
     <>
       <div className="space-y-6">
         <div>
-          <h1 className="text-2xl font-bold text-gray-900">Vergi Ayarları</h1>
-          <p className="text-gray-500 mt-1">
+          <h1 className="text-2xl font-bold text-heading">Vergi Ayarları</h1>
+          <p className="text-muted mt-1">
             Bölge bazlı vergi oranları, kurallar ve raporlama
           </p>
         </div>
 
-        <div className="border-b border-gray-200">
+        <div className="border-b border-border">
           <nav className="flex gap-6">
             {tabs.map(({ id, label, icon: Icon }) => (
               <Button
@@ -426,7 +426,7 @@ export default function TaxSettingsPage() {
                 className={`flex items-center gap-2 py-4 px-1 border-b-2 font-medium text-sm transition-colors ${
                   activeTab === id
                     ? "border-primary-500 text-primary-600"
-                    : "border-transparent text-gray-500 hover:text-gray-600 hover:border-gray-600"
+                    : "border-transparent text-muted hover:text-muted hover:border-border-strong"
                 }`}
               >
                 <Icon className="h-5 w-5" />
@@ -438,8 +438,8 @@ export default function TaxSettingsPage() {
 
         {activeTab === "regions" && (
           <div className="admin-card overflow-hidden">
-            <div className="flex justify-between items-center p-4 border-b border-gray-200">
-              <h2 className="text-lg font-semibold text-gray-900">
+            <div className="flex justify-between items-center p-4 border-b border-border">
+              <h2 className="text-lg font-semibold text-heading">
                 Vergi Bölgeleri
               </h2>
               <Button
@@ -453,34 +453,34 @@ export default function TaxSettingsPage() {
             </div>
             <div className="overflow-x-auto">
               <table className="w-full">
-                <thead className="bg-gray-100">
+                <thead className="bg-surface-alt">
                   <tr>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    <th className="px-6 py-3 text-left text-xs font-medium text-muted uppercase tracking-wider">
                       Bölge
                     </th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    <th className="px-6 py-3 text-left text-xs font-medium text-muted uppercase tracking-wider">
                       Ülke / Bölge Kodu
                     </th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    <th className="px-6 py-3 text-left text-xs font-medium text-muted uppercase tracking-wider">
                       Varsayılan
                     </th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    <th className="px-6 py-3 text-left text-xs font-medium text-muted uppercase tracking-wider">
                       Oran / Kural
                     </th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    <th className="px-6 py-3 text-left text-xs font-medium text-muted uppercase tracking-wider">
                       Durum
                     </th>
-                    <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    <th className="px-6 py-3 text-right text-xs font-medium text-muted uppercase tracking-wider">
                       İşlem
                     </th>
                   </tr>
                 </thead>
-                <tbody className="divide-y divide-gray-200">
+                <tbody className="divide-y divide-border">
                   {regions.length === 0 ? (
                     <tr>
                       <td
                         colSpan={6}
-                        className="px-6 py-8 text-center text-gray-500"
+                        className="px-6 py-8 text-center text-muted"
                       >
                         Henüz vergi bölgesi yok. &quot;Yeni Bölge&quot; ile
                         ekleyin.
@@ -488,23 +488,23 @@ export default function TaxSettingsPage() {
                     </tr>
                   ) : (
                     regions.map((r) => (
-                      <tr key={r.id} className="hover:bg-gray-50/50">
-                        <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
+                      <tr key={r.id} className="hover:bg-surface/50">
+                        <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-heading">
                           {r.name}
                         </td>
-                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                        <td className="px-6 py-4 whitespace-nowrap text-sm text-muted">
                           {r.countryCode}
                           {r.regionCode ? ` / ${r.regionCode}` : ""}
                         </td>
-                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                        <td className="px-6 py-4 whitespace-nowrap text-sm text-muted">
                           {r.isDefault ? "Evet" : "Hayır"}
                         </td>
-                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                        <td className="px-6 py-4 whitespace-nowrap text-sm text-muted">
                           {r.ratesCount} oran, {r.rulesCount} kural
                         </td>
                         <td className="px-6 py-4 whitespace-nowrap">
                           <span
-                            className={`inline-flex px-2 py-1 text-xs rounded-full ${r.isActive ? "bg-success-50 text-success-700" : "bg-gray-700 text-gray-500"}`}
+                            className={`inline-flex px-2 py-1 text-xs rounded-full ${r.isActive ? "bg-success-50 text-success-700" : "bg-body text-muted"}`}
                           >
                             {r.isActive ? "Aktif" : "Pasif"}
                           </span>
@@ -540,8 +540,8 @@ export default function TaxSettingsPage() {
 
         {activeTab === "rates" && (
           <div className="admin-card overflow-hidden">
-            <div className="flex justify-between items-center p-4 border-b border-gray-200">
-              <h2 className="text-lg font-semibold text-gray-900">
+            <div className="flex justify-between items-center p-4 border-b border-border">
+              <h2 className="text-lg font-semibold text-heading">
                 Vergi Oranları
               </h2>
               <Button
@@ -556,34 +556,34 @@ export default function TaxSettingsPage() {
             </div>
             <div className="overflow-x-auto">
               <table className="w-full">
-                <thead className="bg-gray-100">
+                <thead className="bg-surface-alt">
                   <tr>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    <th className="px-6 py-3 text-left text-xs font-medium text-muted uppercase tracking-wider">
                       Bölge
                     </th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    <th className="px-6 py-3 text-left text-xs font-medium text-muted uppercase tracking-wider">
                       Oran Adı
                     </th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    <th className="px-6 py-3 text-left text-xs font-medium text-muted uppercase tracking-wider">
                       Oran %
                     </th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    <th className="px-6 py-3 text-left text-xs font-medium text-muted uppercase tracking-wider">
                       Varsayılan
                     </th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    <th className="px-6 py-3 text-left text-xs font-medium text-muted uppercase tracking-wider">
                       Geçerlilik
                     </th>
-                    <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    <th className="px-6 py-3 text-right text-xs font-medium text-muted uppercase tracking-wider">
                       İşlem
                     </th>
                   </tr>
                 </thead>
-                <tbody className="divide-y divide-gray-200">
+                <tbody className="divide-y divide-border">
                   {rates.length === 0 ? (
                     <tr>
                       <td
                         colSpan={6}
-                        className="px-6 py-8 text-center text-gray-500"
+                        className="px-6 py-8 text-center text-muted"
                       >
                         Henüz vergi oranı yok. Önce bölge ekleyin, sonra
                         &quot;Yeni Oran&quot; ile ekleyin.
@@ -591,20 +591,20 @@ export default function TaxSettingsPage() {
                     </tr>
                   ) : (
                     rates.map((r) => (
-                      <tr key={r.id} className="hover:bg-gray-50/50">
-                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-600">
+                      <tr key={r.id} className="hover:bg-surface/50">
+                        <td className="px-6 py-4 whitespace-nowrap text-sm text-muted">
                           {r.taxRegionName} ({r.countryCode})
                         </td>
-                        <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
+                        <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-heading">
                           {r.name}
                         </td>
-                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                        <td className="px-6 py-4 whitespace-nowrap text-sm text-muted">
                           %{r.rate}
                         </td>
-                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                        <td className="px-6 py-4 whitespace-nowrap text-sm text-muted">
                           {r.isDefault ? "Evet" : "Hayır"}
                         </td>
-                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                        <td className="px-6 py-4 whitespace-nowrap text-sm text-muted">
                           {r.effectiveFrom || r.effectiveTo
                             ? `${r.effectiveFrom ? new Date(r.effectiveFrom).toLocaleDateString("tr-TR") : "–"} / ${r.effectiveTo ? new Date(r.effectiveTo).toLocaleDateString("tr-TR") : "–"}`
                             : "–"}
@@ -638,8 +638,8 @@ export default function TaxSettingsPage() {
 
         {activeTab === "rules" && (
           <div className="admin-card overflow-hidden">
-            <div className="flex justify-between items-center p-4 border-b border-gray-200">
-              <h2 className="text-lg font-semibold text-gray-900">
+            <div className="flex justify-between items-center p-4 border-b border-border">
+              <h2 className="text-lg font-semibold text-heading">
                 Vergi Kuralları
               </h2>
               <Button
@@ -654,34 +654,34 @@ export default function TaxSettingsPage() {
             </div>
             <div className="overflow-x-auto">
               <table className="w-full">
-                <thead className="bg-gray-100">
+                <thead className="bg-surface-alt">
                   <tr>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    <th className="px-6 py-3 text-left text-xs font-medium text-muted uppercase tracking-wider">
                       Bölge
                     </th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    <th className="px-6 py-3 text-left text-xs font-medium text-muted uppercase tracking-wider">
                       Oran
                     </th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    <th className="px-6 py-3 text-left text-xs font-medium text-muted uppercase tracking-wider">
                       Kapsam
                     </th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    <th className="px-6 py-3 text-left text-xs font-medium text-muted uppercase tracking-wider">
                       Kategori
                     </th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    <th className="px-6 py-3 text-left text-xs font-medium text-muted uppercase tracking-wider">
                       Öncelik
                     </th>
-                    <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    <th className="px-6 py-3 text-right text-xs font-medium text-muted uppercase tracking-wider">
                       İşlem
                     </th>
                   </tr>
                 </thead>
-                <tbody className="divide-y divide-gray-200">
+                <tbody className="divide-y divide-border">
                   {rules.length === 0 ? (
                     <tr>
                       <td
                         colSpan={6}
-                        className="px-6 py-8 text-center text-gray-500"
+                        className="px-6 py-8 text-center text-muted"
                       >
                         Henüz vergi kuralı yok. Önce bölge ve oran ekleyin,
                         sonra &quot;Yeni Kural&quot; ile ekleyin.
@@ -689,20 +689,20 @@ export default function TaxSettingsPage() {
                     </tr>
                   ) : (
                     rules.map((r) => (
-                      <tr key={r.id} className="hover:bg-gray-50/50">
-                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-600">
+                      <tr key={r.id} className="hover:bg-surface/50">
+                        <td className="px-6 py-4 whitespace-nowrap text-sm text-muted">
                           {r.taxRegionName}
                         </td>
-                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                        <td className="px-6 py-4 whitespace-nowrap text-sm text-muted">
                           {r.taxRateName} (%{r.taxRateValue})
                         </td>
-                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                        <td className="px-6 py-4 whitespace-nowrap text-sm text-muted">
                           {SCOPE_LABELS[r.scope] || r.scope}
                         </td>
-                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                        <td className="px-6 py-4 whitespace-nowrap text-sm text-muted">
                           {r.categoryName || "–"}
                         </td>
-                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                        <td className="px-6 py-4 whitespace-nowrap text-sm text-muted">
                           {r.priority}
                         </td>
                         <td className="px-6 py-4 whitespace-nowrap text-right text-sm">
@@ -736,7 +736,7 @@ export default function TaxSettingsPage() {
           <div className="space-y-6">
             <div className="admin-card p-4 flex flex-wrap items-end gap-4">
               <div>
-                <label className="block text-xs font-medium text-gray-500 mb-1">
+                <label className="block text-xs font-medium text-muted mb-1">
                   Başlangıç
                 </label>
                 <Input
@@ -746,7 +746,7 @@ export default function TaxSettingsPage() {
                 />
               </div>
               <div>
-                <label className="block text-xs font-medium text-gray-500 mb-1">
+                <label className="block text-xs font-medium text-muted mb-1">
                   Bitiş
                 </label>
                 <Input
@@ -756,7 +756,7 @@ export default function TaxSettingsPage() {
                 />
               </div>
               <div>
-                <label className="block text-xs font-medium text-gray-500 mb-1">
+                <label className="block text-xs font-medium text-muted mb-1">
                   Grupla
                 </label>
                 <Select
@@ -780,10 +780,10 @@ export default function TaxSettingsPage() {
               <>
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                   <div className="admin-card p-5">
-                    <p className="text-sm text-gray-500">
+                    <p className="text-sm text-muted">
                       Toplam Tahsil Edilen Vergi
                     </p>
-                    <p className="text-2xl font-bold text-gray-900 mt-1">
+                    <p className="text-2xl font-bold text-heading mt-1">
                       ₺
                       {report.summary.totalTaxCollected.toLocaleString(
                         "tr-TR",
@@ -792,8 +792,8 @@ export default function TaxSettingsPage() {
                     </p>
                   </div>
                   <div className="admin-card p-5">
-                    <p className="text-sm text-gray-500">Toplam Ciro</p>
-                    <p className="text-2xl font-bold text-gray-900 mt-1">
+                    <p className="text-sm text-muted">Toplam Ciro</p>
+                    <p className="text-2xl font-bold text-heading mt-1">
                       ₺
                       {report.summary.totalRevenue.toLocaleString("tr-TR", {
                         minimumFractionDigits: 2,
@@ -801,42 +801,42 @@ export default function TaxSettingsPage() {
                     </p>
                   </div>
                   <div className="admin-card p-5">
-                    <p className="text-sm text-gray-500">Fatura Sayısı</p>
-                    <p className="text-2xl font-bold text-gray-900 mt-1">
+                    <p className="text-sm text-muted">Fatura Sayısı</p>
+                    <p className="text-2xl font-bold text-heading mt-1">
                       {report.summary.invoiceCount}
                     </p>
                   </div>
                 </div>
                 <div className="admin-card overflow-hidden">
-                  <div className="p-4 border-b border-gray-200">
-                    <h2 className="text-lg font-semibold text-gray-900">
+                  <div className="p-4 border-b border-border">
+                    <h2 className="text-lg font-semibold text-heading">
                       Dönem Bazlı Vergi
                     </h2>
                   </div>
                   <div className="overflow-x-auto">
                     <table className="w-full">
-                      <thead className="bg-gray-100">
+                      <thead className="bg-surface-alt">
                         <tr>
-                          <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                          <th className="px-6 py-3 text-left text-xs font-medium text-muted uppercase tracking-wider">
                             Dönem
                           </th>
-                          <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
+                          <th className="px-6 py-3 text-right text-xs font-medium text-muted uppercase tracking-wider">
                             Vergi (₺)
                           </th>
-                          <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
+                          <th className="px-6 py-3 text-right text-xs font-medium text-muted uppercase tracking-wider">
                             Ciro (₺)
                           </th>
-                          <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
+                          <th className="px-6 py-3 text-right text-xs font-medium text-muted uppercase tracking-wider">
                             Adet
                           </th>
                         </tr>
                       </thead>
-                      <tbody className="divide-y divide-gray-200">
+                      <tbody className="divide-y divide-border">
                         {report.breakdown.length === 0 ? (
                           <tr>
                             <td
                               colSpan={4}
-                              className="px-6 py-8 text-center text-gray-500"
+                              className="px-6 py-8 text-center text-muted"
                             >
                               Bu dönemde fatura yok.
                             </td>
@@ -845,22 +845,22 @@ export default function TaxSettingsPage() {
                           report.breakdown.map((row) => (
                             <tr
                               key={row.period}
-                              className="hover:bg-gray-50/50"
+                              className="hover:bg-surface/50"
                             >
-                              <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
+                              <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-heading">
                                 {row.period}
                               </td>
-                              <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 text-right">
+                              <td className="px-6 py-4 whitespace-nowrap text-sm text-muted text-right">
                                 {row.taxCollected.toLocaleString("tr-TR", {
                                   minimumFractionDigits: 2,
                                 })}
                               </td>
-                              <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 text-right">
+                              <td className="px-6 py-4 whitespace-nowrap text-sm text-muted text-right">
                                 {row.revenue.toLocaleString("tr-TR", {
                                   minimumFractionDigits: 2,
                                 })}
                               </td>
-                              <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 text-right">
+                              <td className="px-6 py-4 whitespace-nowrap text-sm text-muted text-right">
                                 {row.count}
                               </td>
                             </tr>
@@ -878,15 +878,15 @@ export default function TaxSettingsPage() {
         {/* Region modal */}
         {showRegionModal && (
           <div
-            className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60"
+            className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-heading/60"
             onClick={() => setShowRegionModal(false)}
           >
             <div
               className="rounded-xl shadow-xl max-w-md"
               onClick={(e) => e.stopPropagation()}
             >
-              <div className="flex justify-between items-center p-4 border-b border-gray-200">
-                <h3 className="text-lg font-semibold text-gray-900">
+              <div className="flex justify-between items-center p-4 border-b border-border">
+                <h3 className="text-lg font-semibold text-heading">
                   {editingRegion
                     ? "Vergi Bölgesi Düzenle"
                     : "Yeni Vergi Bölgesi"}
@@ -895,14 +895,14 @@ export default function TaxSettingsPage() {
                   variant="secondary"
                   type="button"
                   onClick={() => setShowRegionModal(false)}
-                  className="text-gray-500 hover:text-gray-900"
+                  className="text-muted hover:text-heading"
                 >
                   <XMarkIcon className="h-6 w-6" />
                 </Button>
               </div>
               <form onSubmit={saveRegion} className="p-4 space-y-4">
                 <div>
-                  <label className="block text-sm font-medium text-gray-500 mb-1">
+                  <label className="block text-sm font-medium text-muted mb-1">
                     Bölge Adı *
                   </label>
                   <Input
@@ -917,7 +917,7 @@ export default function TaxSettingsPage() {
                 </div>
                 <div className="grid grid-cols-2 gap-4">
                   <div>
-                    <label className="block text-sm font-medium text-gray-500 mb-1">
+                    <label className="block text-sm font-medium text-muted mb-1">
                       Ülke Kodu *
                     </label>
                     <Input
@@ -935,7 +935,7 @@ export default function TaxSettingsPage() {
                     />
                   </div>
                   <div>
-                    <label className="block text-sm font-medium text-gray-500 mb-1">
+                    <label className="block text-sm font-medium text-muted mb-1">
                       Bölge Kodu (opsiyonel)
                     </label>
                     <Input
@@ -995,22 +995,22 @@ export default function TaxSettingsPage() {
         {/* Rate modal */}
         {showRateModal && (
           <div
-            className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60"
+            className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-heading/60"
             onClick={() => setShowRateModal(false)}
           >
             <div
               className="rounded-xl shadow-xl max-w-md"
               onClick={(e) => e.stopPropagation()}
             >
-              <div className="flex justify-between items-center p-4 border-b border-gray-200">
-                <h3 className="text-lg font-semibold text-gray-900">
+              <div className="flex justify-between items-center p-4 border-b border-border">
+                <h3 className="text-lg font-semibold text-heading">
                   {editingRate ? "Vergi Oranı Düzenle" : "Yeni Vergi Oranı"}
                 </h3>
                 <Button
                   variant="secondary"
                   type="button"
                   onClick={() => setShowRateModal(false)}
-                  className="text-gray-500 hover:text-gray-900"
+                  className="text-muted hover:text-heading"
                 >
                   <XMarkIcon className="h-6 w-6" />
                 </Button>
@@ -1018,7 +1018,7 @@ export default function TaxSettingsPage() {
               <form onSubmit={saveRate} className="p-4 space-y-4">
                 {!editingRate && (
                   <div>
-                    <label className="block text-sm font-medium text-gray-500 mb-1">
+                    <label className="block text-sm font-medium text-muted mb-1">
                       Vergi Bölgesi *
                     </label>
                     <Select
@@ -1040,7 +1040,7 @@ export default function TaxSettingsPage() {
                   </div>
                 )}
                 <div>
-                  <label className="block text-sm font-medium text-gray-500 mb-1">
+                  <label className="block text-sm font-medium text-muted mb-1">
                     Oran Adı *
                   </label>
                   <Input
@@ -1054,7 +1054,7 @@ export default function TaxSettingsPage() {
                   />
                 </div>
                 <div>
-                  <label className="block text-sm font-medium text-gray-500 mb-1">
+                  <label className="block text-sm font-medium text-muted mb-1">
                     Oran (%) *
                   </label>
                   <Input
@@ -1071,7 +1071,7 @@ export default function TaxSettingsPage() {
                 </div>
                 <div className="grid grid-cols-2 gap-4">
                   <div>
-                    <label className="block text-sm font-medium text-gray-500 mb-1">
+                    <label className="block text-sm font-medium text-muted mb-1">
                       Geçerlilik Başlangıç
                     </label>
                     <Input
@@ -1086,7 +1086,7 @@ export default function TaxSettingsPage() {
                     />
                   </div>
                   <div>
-                    <label className="block text-sm font-medium text-gray-500 mb-1">
+                    <label className="block text-sm font-medium text-muted mb-1">
                       Geçerlilik Bitiş
                     </label>
                     <Input
@@ -1142,29 +1142,29 @@ export default function TaxSettingsPage() {
         {/* Rule modal */}
         {showRuleModal && (
           <div
-            className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60"
+            className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-heading/60"
             onClick={() => setShowRuleModal(false)}
           >
             <div
               className="rounded-xl shadow-xl max-w-md"
               onClick={(e) => e.stopPropagation()}
             >
-              <div className="flex justify-between items-center p-4 border-b border-gray-200">
-                <h3 className="text-lg font-semibold text-gray-900">
+              <div className="flex justify-between items-center p-4 border-b border-border">
+                <h3 className="text-lg font-semibold text-heading">
                   {editingRule ? "Vergi Kuralı Düzenle" : "Yeni Vergi Kuralı"}
                 </h3>
                 <Button
                   variant="secondary"
                   type="button"
                   onClick={() => setShowRuleModal(false)}
-                  className="text-gray-500 hover:text-gray-900"
+                  className="text-muted hover:text-heading"
                 >
                   <XMarkIcon className="h-6 w-6" />
                 </Button>
               </div>
               <form onSubmit={saveRule} className="p-4 space-y-4">
                 <div>
-                  <label className="block text-sm font-medium text-gray-500 mb-1">
+                  <label className="block text-sm font-medium text-muted mb-1">
                     Vergi Bölgesi *
                   </label>
                   <Select
@@ -1185,7 +1185,7 @@ export default function TaxSettingsPage() {
                   </Select>
                 </div>
                 <div>
-                  <label className="block text-sm font-medium text-gray-500 mb-1">
+                  <label className="block text-sm font-medium text-muted mb-1">
                     Vergi Oranı *
                   </label>
                   <Select
@@ -1205,7 +1205,7 @@ export default function TaxSettingsPage() {
                   </Select>
                 </div>
                 <div>
-                  <label className="block text-sm font-medium text-gray-500 mb-1">
+                  <label className="block text-sm font-medium text-muted mb-1">
                     Kapsam *
                   </label>
                   <Select
@@ -1223,7 +1223,7 @@ export default function TaxSettingsPage() {
                 </div>
                 {ruleForm.scope === "category" && (
                   <div>
-                    <label className="block text-sm font-medium text-gray-500 mb-1">
+                    <label className="block text-sm font-medium text-muted mb-1">
                       Kategori *
                     </label>
                     <Select
@@ -1246,7 +1246,7 @@ export default function TaxSettingsPage() {
                   </div>
                 )}
                 <div>
-                  <label className="block text-sm font-medium text-gray-500 mb-1">
+                  <label className="block text-sm font-medium text-muted mb-1">
                     Öncelik
                   </label>
                   <Input
@@ -1289,14 +1289,14 @@ export default function TaxSettingsPage() {
         {/* Delete confirmation */}
         {deleteConfirm && (
           <div
-            className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60"
+            className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-heading/60"
             onClick={() => setDeleteConfirm(null)}
           >
             <div
               className="rounded-xl shadow-xl p-6 max-w-sm"
               onClick={(e) => e.stopPropagation()}
             >
-              <p className="text-gray-900 font-medium">
+              <p className="text-heading font-medium">
                 Bu kaydı silmek istediğinize emin misiniz?
               </p>
               <div className="flex justify-end gap-2 mt-4">

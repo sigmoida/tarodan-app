@@ -28,7 +28,7 @@ Raw Tailwind paleti (`bg-red-500`, `text-blue-600` vb.) **kullanılmaz**. Yerine
 | `blue`, `sky`, `indigo`    | `info`              | Bilgilendirme, nötr vurgusu                |
 | `amber`, `yellow`          | `warning`           | Dikkat, pending                            |
 | `orange`, `purple`         | `primary`           | Marka rengi, CTA                           |
-| `gray`                     | `surface`, `muted`  | Nötr arka planlar ve metinler              |
+| `gray`                     | Yasak               | `surface`, `heading`, `body`, `muted`, `subtle`, `border` kullan |
 
 `heading`, `body`, `muted`, `subtle` ve `surface`/`surface-alt`/`surface-elevated`
 tokens'ları metin ve yüzeyler için kullanılmalıdır (bkz. `packages/design-tokens/src/colors.ts`).
@@ -155,7 +155,7 @@ Ekran seti (`LoginScreen`, `HomeScreen`, `ListingsScreen`, `CartScreen`,
    `@tarodan/ui-native` (mobile) kullanın.
 2. Yeni bir primitive ihtiyacı varsa önce paylaşılan pakete ekleyin, sonra
    tüketin.
-3. Tailwind class'larında `primary/danger/success/info/warning/surface/heading/body/muted/subtle`
-   dışında ham renk ismi kullanmayın.
+3. Tailwind class'larında `primary/danger/success/info/warning/surface/heading/body/muted/subtle/border`
+   dışında ham renk ismi kullanmayın (`gray-*` dahil).
 4. Eski `components/ui/*` local wrapper'ları yeniden oluşturmayın —
    `@tarodan/ui` zaten re-export ediyor.

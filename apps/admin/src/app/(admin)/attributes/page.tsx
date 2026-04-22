@@ -3,7 +3,7 @@
 import { useState, useEffect } from 'react';
 import { useSearchParams } from 'next/navigation';
 import { adminApi } from '@/lib/api';
-import { Button, Checkbox, Input, Spinner, Textarea } from '@tarodan/ui';
+import { Button, Checkbox, Input, Spinner, Textarea, colors } from '@tarodan/ui';
 import { PlusIcon, PencilIcon, TrashIcon, Squares2X2Icon, ChevronRightIcon } from '@heroicons/react/24/outline';
 import toast from 'react-hot-toast';
 
@@ -30,6 +30,7 @@ interface Attribute {
 }
 
 export default function AttributesPage() {
+    const defaultAttributeColor = colors.primary[500];
     const searchParams = useSearchParams();
     const groupIdFromUrl = searchParams.get('groupId');
     const [groups, setGroups] = useState<AttributeGroup[]>([]);
@@ -43,7 +44,7 @@ export default function AttributesPage() {
     const [editingAttr, setEditingAttr] = useState<Attribute | null>(null);
     const [deleteConfirm, setDeleteConfirm] = useState<{ type: 'group' | 'attr'; id: string } | null>(null);
     const [groupForm, setGroupForm] = useState({ name: '', description: '', isRequired: false, isActive: true, sortOrder: 0 });
-    const [attrForm, setAttrForm] = useState({ value: '', displayValue: '', color: '', sortOrder: 0, isActive: true });
+    const [attrForm, setAttrForm] = useState({ value: '', displayValue: '', color: defaultAttributeColor, sortOrder: 0, isActive: true });
 
     useEffect(() => { loadGroups(); }, []);
 
@@ -76,8 +77,8 @@ export default function AttributesPage() {
 
     const openGroupCreate = () => { setEditingGroup(null); setGroupForm({ name: '', description: '', isRequired: false, isActive: true, sortOrder: 0 }); setShowGroupModal(true); };
     const openGroupEdit = (g: AttributeGroup) => { setEditingGroup(g); setGroupForm({ name: g.name, description: g.description || '', isRequired: g.isRequired, isActive: g.isActive, sortOrder: g.sortOrder }); setShowGroupModal(true); };
-    const openAttrCreate = () => { setEditingAttr(null); setAttrForm({ value: '', displayValue: '', color: '', sortOrder: 0, isActive: true }); setShowAttrModal(true); };
-    const openAttrEdit = (a: Attribute) => { setEditingAttr(a); setAttrForm({ value: a.value, displayValue: a.displayValue || '', color: a.color || '', sortOrder: a.sortOrder, isActive: a.isActive }); setShowAttrModal(true); };
+    const openAttrCreate = () => { setEditingAttr(null); setAttrForm({ value: '', displayValue: '', color: defaultAttributeColor, sortOrder: 0, isActive: true }); setShowAttrModal(true); };
+    const openAttrEdit = (a: Attribute) => { setEditingAttr(a); setAttrForm({ value: a.value, displayValue: a.displayValue || '', color: a.color || defaultAttributeColor, sortOrder: a.sortOrder, isActive: a.isActive }); setShowAttrModal(true); };
 
     const handleGroupSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
@@ -111,40 +112,40 @@ export default function AttributesPage() {
         <>
             <div className="space-y-6">
                 <div className="flex items-center justify-between">
-                    <div><h1 className="text-2xl font-bold text-gray-900">Ürün Özellikleri</h1><p className="text-gray-500">Özellik grupları ve değerleri</p></div>
+                    <div><h1 className="text-2xl font-bold text-heading">Ürün Özellikleri</h1><p className="text-muted">Özellik grupları ve değerleri</p></div>
                     <Button variant="primary" size="md" onClick={openGroupCreate}><PlusIcon className="w-5 h-5" />Yeni Grup</Button>
                 </div>
                 <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
                     {/* Groups Panel */}
                     <div className="admin-card p-4">
-                        <h3 className="text-lg font-medium text-gray-900 mb-4">Gruplar</h3>
+                        <h3 className="text-lg font-medium text-heading mb-4">Gruplar</h3>
                         {loading ? <div className="text-center py-8"><Spinner size="md" className="mx-auto" /></div>
-                            : groups.filter((g) => g.slug !== 'vehicle_type').length === 0 ? <div className="text-center py-8 text-gray-500">Grup yok</div>
+                            : groups.filter((g) => g.slug !== 'vehicle_type').length === 0 ? <div className="text-center py-8 text-muted">Grup yok</div>
                                 : <div className="space-y-2">{groups.filter((g) => g.slug !== 'vehicle_type').map((g) => (
-                                    <div key={g.id} onClick={() => selectGroup(g)} className={`p-3 rounded-lg cursor-pointer flex items-center justify-between ${selectedGroup?.id === g.id ? 'bg-primary-50 border border-primary-600' : 'bg-gray-100 hover:bg-gray-100'}`}>
-                                        <div className="flex items-center gap-2"><Squares2X2Icon className="h-5 w-5 text-gray-500" /><span className="text-gray-900">{g.name}</span>{!g.isActive && <span className="px-1.5 text-xs bg-gray-600 text-gray-600 rounded">Pasif</span>}</div>
+                                    <div key={g.id} onClick={() => selectGroup(g)} className={`p-3 rounded-lg cursor-pointer flex items-center justify-between ${selectedGroup?.id === g.id ? 'bg-primary-50 border border-primary-600' : 'bg-surface-alt hover:bg-surface-alt'}`}>
+                                        <div className="flex items-center gap-2"><Squares2X2Icon className="h-5 w-5 text-muted" /><span className="text-heading">{g.name}</span>{!g.isActive && <span className="px-1.5 text-xs bg-body text-muted rounded">Pasif</span>}</div>
                                         <div className="flex items-center gap-1">
-                                            <Button variant="secondary" onClick={(e) => { e.stopPropagation(); openGroupEdit(g); }} className="p-1 text-gray-500 hover:text-gray-900"><PencilIcon className="h-4 w-4" /></Button>
+                                            <Button variant="secondary" onClick={(e) => { e.stopPropagation(); openGroupEdit(g); }} className="p-1 text-muted hover:text-heading"><PencilIcon className="h-4 w-4" /></Button>
                                             <Button variant="secondary" onClick={(e) => { e.stopPropagation(); setDeleteConfirm({ type: 'group', id: g.id }); }} className="p-1 text-danger-600 hover:text-danger-300"><TrashIcon className="h-4 w-4" /></Button>
-                                            <ChevronRightIcon className="h-4 w-4 text-gray-500" />
+                                            <ChevronRightIcon className="h-4 w-4 text-muted" />
                                         </div>
                                     </div>
                                 ))}</div>}
                     </div>
                     {/* Attributes Panel */}
                     <div className="admin-card p-4 lg:col-span-2">
-                        {!selectedGroup ? <div className="text-center py-12 text-gray-500">Değerleri görmek için bir grup seçin</div>
+                        {!selectedGroup ? <div className="text-center py-12 text-muted">Değerleri görmek için bir grup seçin</div>
                             : (<>
                                 <div className="flex items-center justify-between mb-4">
-                                    <h3 className="text-lg font-medium text-gray-900">{selectedGroup.name} Değerleri</h3>
+                                    <h3 className="text-lg font-medium text-heading">{selectedGroup.name} Değerleri</h3>
                                     <Button variant="primary" size="sm" onClick={openAttrCreate}><PlusIcon className="w-4 h-4" />Değer Ekle</Button>
                                 </div>
                                 {loadingAttrs ? <div className="text-center py-8"><Spinner size="md" className="mx-auto" /></div>
-                                    : attributes.length === 0 ? <div className="text-center py-8 text-gray-500">Değer yok</div>
+                                    : attributes.length === 0 ? <div className="text-center py-8 text-muted">Değer yok</div>
                                         : <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">{attributes.map((a) => (
-                                            <div key={a.id} className="p-3 rounded-lg bg-gray-100 flex items-center justify-between">
-                                                <div className="flex items-center gap-2">{a.color && <div className="w-4 h-4 rounded-full" style={{ backgroundColor: a.color }}></div>}<span className="text-gray-900">{a.displayValue || a.value}</span>{!a.isActive && <span className="px-1.5 text-xs bg-gray-600 text-gray-600 rounded">Pasif</span>}</div>
-                                                <div className="flex gap-1"><Button variant="secondary" onClick={() => openAttrEdit(a)} className="p-1 text-gray-500 hover:text-gray-900"><PencilIcon className="h-4 w-4" /></Button><Button variant="secondary" onClick={() => setDeleteConfirm({ type: 'attr', id: a.id })} className="p-1 text-danger-600 hover:text-danger-300"><TrashIcon className="h-4 w-4" /></Button></div>
+                                            <div key={a.id} className="p-3 rounded-lg bg-surface-alt flex items-center justify-between">
+                                                <div className="flex items-center gap-2">{a.color && <div className="w-4 h-4 rounded-full" style={{ backgroundColor: a.color }}></div>}<span className="text-heading">{a.displayValue || a.value}</span>{!a.isActive && <span className="px-1.5 text-xs bg-body text-muted rounded">Pasif</span>}</div>
+                                                <div className="flex gap-1"><Button variant="secondary" onClick={() => openAttrEdit(a)} className="p-1 text-muted hover:text-heading"><PencilIcon className="h-4 w-4" /></Button><Button variant="secondary" onClick={() => setDeleteConfirm({ type: 'attr', id: a.id })} className="p-1 text-danger-600 hover:text-danger-300"><TrashIcon className="h-4 w-4" /></Button></div>
                                             </div>
                                         ))}</div>}
                             </>)}
@@ -152,32 +153,32 @@ export default function AttributesPage() {
                 </div>
             </div>
             {/* Group Modal */}
-            {showGroupModal && (<div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50"><div className="bg-white rounded-xl p-6 max-w-md w-full mx-4 border border-gray-200">
-                <h2 className="text-xl font-semibold text-gray-900 mb-4">{editingGroup ? 'Grubu Düzenle' : 'Yeni Grup'}</h2>
+            {showGroupModal && (<div className="fixed inset-0 bg-heading bg-opacity-50 flex items-center justify-center z-50"><div className="bg-surface-elevated rounded-xl p-6 max-w-md w-full mx-4 border border-border">
+                <h2 className="text-xl font-semibold text-heading mb-4">{editingGroup ? 'Grubu Düzenle' : 'Yeni Grup'}</h2>
                 <form onSubmit={handleGroupSubmit} className="space-y-4">
-                    <div><label className="block text-sm text-gray-600 mb-2">Ad *</label><Input type="text" value={groupForm.name} onChange={(e) => setGroupForm({ ...groupForm, name: e.target.value })} required /></div>
-                    <div><label className="block text-sm text-gray-600 mb-2">Açıklama</label><Textarea value={groupForm.description} onChange={(e) => setGroupForm({ ...groupForm, description: e.target.value })} rows={2} /></div>
-                    <div><label className="block text-sm text-gray-600 mb-2">Sıra</label><Input type="number" value={groupForm.sortOrder} onChange={(e) => setGroupForm({ ...groupForm, sortOrder: parseInt(e.target.value) || 0 })} className="w-24" /></div>
+                    <div><label className="block text-sm text-muted mb-2">Ad *</label><Input type="text" value={groupForm.name} onChange={(e) => setGroupForm({ ...groupForm, name: e.target.value })} required /></div>
+                    <div><label className="block text-sm text-muted mb-2">Açıklama</label><Textarea value={groupForm.description} onChange={(e) => setGroupForm({ ...groupForm, description: e.target.value })} rows={2} /></div>
+                    <div><label className="block text-sm text-muted mb-2">Sıra</label><Input type="number" value={groupForm.sortOrder} onChange={(e) => setGroupForm({ ...groupForm, sortOrder: parseInt(e.target.value) || 0 })} className="w-24" /></div>
                     <div className="flex gap-4"><Checkbox checked={groupForm.isRequired} onChange={(e) => setGroupForm({ ...groupForm, isRequired: e.target.checked })} label="Zorunlu" />
                         <Checkbox checked={groupForm.isActive} onChange={(e) => setGroupForm({ ...groupForm, isActive: e.target.checked })} label="Aktif" /></div>
                     <div className="flex gap-3 pt-4"><Button variant="secondary" size="md" type="button" onClick={() => setShowGroupModal(false)} className="flex-1">İptal</Button><Button variant="primary" size="md" type="submit" className="flex-1">{editingGroup ? 'Güncelle' : 'Oluştur'}</Button></div>
                 </form>
             </div></div>)}
             {/* Attribute Modal */}
-            {showAttrModal && (<div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50"><div className="bg-white rounded-xl p-6 max-w-md w-full mx-4 border border-gray-200">
-                <h2 className="text-xl font-semibold text-gray-900 mb-4">{editingAttr ? 'Değeri Düzenle' : 'Yeni Değer'}</h2>
+            {showAttrModal && (<div className="fixed inset-0 bg-heading bg-opacity-50 flex items-center justify-center z-50"><div className="bg-surface-elevated rounded-xl p-6 max-w-md w-full mx-4 border border-border">
+                <h2 className="text-xl font-semibold text-heading mb-4">{editingAttr ? 'Değeri Düzenle' : 'Yeni Değer'}</h2>
                 <form onSubmit={handleAttrSubmit} className="space-y-4">
-                    <div><label className="block text-sm text-gray-600 mb-2">Değer *</label><Input type="text" value={attrForm.value} onChange={(e) => setAttrForm({ ...attrForm, value: e.target.value })} required /></div>
-                    <div><label className="block text-sm text-gray-600 mb-2">Görüntülenen Değer</label><Input type="text" value={attrForm.displayValue} onChange={(e) => setAttrForm({ ...attrForm, displayValue: e.target.value })} /></div>
-                    <div className="flex gap-4"><div><label className="block text-sm text-gray-600 mb-2">Renk</label><Input type="color" value={attrForm.color || '#6366f1'} onChange={(e) => setAttrForm({ ...attrForm, color: e.target.value })} className="w-10 h-10 rounded" /></div>
-                        <div><label className="block text-sm text-gray-600 mb-2">Sıra</label><Input type="number" value={attrForm.sortOrder} onChange={(e) => setAttrForm({ ...attrForm, sortOrder: parseInt(e.target.value) || 0 })} className="w-20" /></div></div>
+                    <div><label className="block text-sm text-muted mb-2">Değer *</label><Input type="text" value={attrForm.value} onChange={(e) => setAttrForm({ ...attrForm, value: e.target.value })} required /></div>
+                    <div><label className="block text-sm text-muted mb-2">Görüntülenen Değer</label><Input type="text" value={attrForm.displayValue} onChange={(e) => setAttrForm({ ...attrForm, displayValue: e.target.value })} /></div>
+                    <div className="flex gap-4"><div><label className="block text-sm text-muted mb-2">Renk</label><Input type="color" value={attrForm.color || defaultAttributeColor} onChange={(e) => setAttrForm({ ...attrForm, color: e.target.value })} className="w-10 h-10 rounded" /></div>
+                        <div><label className="block text-sm text-muted mb-2">Sıra</label><Input type="number" value={attrForm.sortOrder} onChange={(e) => setAttrForm({ ...attrForm, sortOrder: parseInt(e.target.value) || 0 })} className="w-20" /></div></div>
                     <Checkbox checked={attrForm.isActive} onChange={(e) => setAttrForm({ ...attrForm, isActive: e.target.checked })} label="Aktif" />
                     <div className="flex gap-3 pt-4"><Button variant="secondary" size="md" type="button" onClick={() => setShowAttrModal(false)} className="flex-1">İptal</Button><Button variant="primary" size="md" type="submit" className="flex-1">{editingAttr ? 'Güncelle' : 'Oluştur'}</Button></div>
                 </form>
             </div></div>)}
             {/* Delete Confirm */}
-            {deleteConfirm && (<div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50"><div className="bg-white rounded-xl p-6 max-w-md w-full mx-4 border border-gray-200">
-                <h3 className="text-lg font-semibold text-gray-900 mb-4">{deleteConfirm.type === 'group' ? 'Grubu Sil' : 'Değeri Sil'}</h3><p className="text-gray-500 mb-6">Silmek istediğinizden emin misiniz?</p>
+            {deleteConfirm && (<div className="fixed inset-0 bg-heading bg-opacity-50 flex items-center justify-center z-50"><div className="bg-surface-elevated rounded-xl p-6 max-w-md w-full mx-4 border border-border">
+                <h3 className="text-lg font-semibold text-heading mb-4">{deleteConfirm.type === 'group' ? 'Grubu Sil' : 'Değeri Sil'}</h3><p className="text-muted mb-6">Silmek istediğinizden emin misiniz?</p>
                 <div className="flex gap-3"><Button variant="secondary" size="md" onClick={() => setDeleteConfirm(null)} className="flex-1">İptal</Button><Button variant="danger" size="md" onClick={handleDelete} className="flex-1">Sil</Button></div>
             </div></div>)}
         </>

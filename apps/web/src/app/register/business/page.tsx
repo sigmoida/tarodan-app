@@ -151,7 +151,7 @@ export default function BusinessRegisterPage() {
 
   if (authLoading) {
     return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+      <div className="min-h-screen bg-surface flex items-center justify-center">
         <Spinner size="xl" />
       </div>
     );
@@ -159,9 +159,9 @@ export default function BusinessRegisterPage() {
 
   if (isAuthenticated) {
     return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+      <div className="min-h-screen bg-surface flex items-center justify-center">
         <div className="text-center">
-          <p className="text-gray-600 mb-4">
+          <p className="text-muted mb-4">
             {locale === "en"
               ? "You are already logged in."
               : "Zaten giriş yapmışsınız."}
@@ -177,11 +177,11 @@ export default function BusinessRegisterPage() {
   // Registration success screen
   if (registrationSuccess) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-primary-50 via-white to-warning-50 flex flex-col">
+      <div className="min-h-screen bg-gradient-to-br from-primary-50 via-surface-elevated to-warning-50 flex flex-col">
         <header className="p-6">
           <Link href="/" className="inline-flex items-center gap-2">
             <div className="w-10 h-10 bg-gradient-to-br from-primary-500 to-warning-500 rounded-xl flex items-center justify-center">
-              <span className="text-white font-bold text-lg">T</span>
+              <span className="text-inverted font-bold text-lg">T</span>
             </div>
             <span className="text-xl font-bold bg-gradient-to-r from-primary-600 to-warning-600 bg-clip-text text-transparent">
               Tarodan
@@ -193,7 +193,7 @@ export default function BusinessRegisterPage() {
           <motion.div
             initial={{ opacity: 0, scale: 0.95 }}
             animate={{ opacity: 1, scale: 1 }}
-            className="w-full max-w-md bg-white rounded-3xl shadow-xl shadow-success-500/10 p-8 md:p-10 border border-gray-100 text-center"
+            className="w-full max-w-md bg-surface-elevated rounded-3xl shadow-xl shadow-success-500/10 p-8 md:p-10 border border-border-subtle text-center"
           >
             <div className="flex justify-center mb-6">
               <motion.div
@@ -206,19 +206,19 @@ export default function BusinessRegisterPage() {
               </motion.div>
             </div>
 
-            <h2 className="text-2xl font-bold text-gray-900 mb-3">
+            <h2 className="text-2xl font-bold text-heading mb-3">
               {locale === "en"
                 ? "Check Your Email! 📬"
                 : "E-postanızı Kontrol Edin! 📬"}
             </h2>
 
-            <p className="text-gray-500 mb-2">
+            <p className="text-muted mb-2">
               {locale === "en"
                 ? "We have sent a verification link to:"
                 : "Doğrulama linki gönderildi:"}
             </p>
 
-            <p className="font-semibold text-gray-800 mb-6">
+            <p className="font-semibold text-body mb-6">
               {registeredEmail}
             </p>
 
@@ -253,7 +253,7 @@ export default function BusinessRegisterPage() {
             <div className="space-y-3">
               <Link
                 href="/login"
-                className="block w-full py-3 bg-gradient-to-r from-primary-500 to-warning-500 text-white font-semibold rounded-xl hover:from-primary-600 hover:to-warning-600 transition-all"
+                className="block w-full py-3 bg-gradient-to-r from-primary-500 to-warning-500 text-inverted font-semibold rounded-xl hover:from-primary-600 hover:to-warning-600 transition-all"
               >
                 {locale === "en" ? "Go to Login" : "Giriş Sayfasına Git"}
               </Link>
@@ -278,7 +278,7 @@ export default function BusinessRegisterPage() {
                     );
                   }
                 }}
-                className="block w-full py-3 bg-gray-100 text-gray-700 font-medium rounded-xl hover:bg-gray-200 transition-colors"
+                className="block w-full py-3 bg-surface-alt text-body font-medium rounded-xl hover:bg-border-subtle transition-colors"
               >
                 {locale === "en"
                   ? "Resend Verification Email"
@@ -289,7 +289,7 @@ export default function BusinessRegisterPage() {
         </main>
 
         <footer className="p-6 text-center">
-          <p className="text-sm text-gray-400">
+          <p className="text-sm text-subtle">
             © {new Date().getFullYear()} Tarodan.{" "}
             {locale === "en" ? "All rights reserved." : "Tüm hakları saklıdır."}
           </p>
@@ -383,10 +383,10 @@ export default function BusinessRegisterPage() {
   };
 
   return (
-    <div className="min-h-screen bg-gray-50 flex">
+    <div className="min-h-screen bg-surface flex">
       {/* Left - Hero */}
       <div className="hidden lg:flex flex-1 hero-gradient items-center justify-center p-12">
-        <div className="max-w-lg text-white text-center">
+        <div className="max-w-lg text-inverted text-center">
           <motion.div
             initial={{ opacity: 0, scale: 0.9 }}
             animate={{ opacity: 1, scale: 1 }}
@@ -396,7 +396,7 @@ export default function BusinessRegisterPage() {
             <h2 className="text-3xl font-bold mb-4">
               {locale === "en" ? "Business Account" : "Şirket Hesabı"}
             </h2>
-            <p className="text-gray-300 text-lg">
+            <p className="text-border-strong text-lg">
               {locale === "en"
                 ? "Create a business account to access advanced features and manage your company listings."
                 : "Gelişmiş özelliklere erişmek ve şirket ilanlarınızı yönetmek için şirket hesabı oluşturun."}
@@ -415,16 +415,16 @@ export default function BusinessRegisterPage() {
           <div className="text-center mb-8">
             <Link href="/" className="inline-flex items-center gap-2 mb-8">
               <div className="w-12 h-12 bg-primary-500 rounded-xl flex items-center justify-center">
-                <span className="text-white text-2xl">🏢</span>
+                <span className="text-inverted text-2xl">🏢</span>
               </div>
               <span className="font-display font-bold text-2xl">TARODAN</span>
             </Link>
-            <h1 className="text-3xl font-bold text-gray-900 mb-2">
+            <h1 className="text-3xl font-bold text-heading mb-2">
               {locale === "en"
                 ? "Business Account Registration"
                 : "Şirket Hesabı Kaydı"}
             </h1>
-            <p className="text-gray-600">
+            <p className="text-muted">
               {locale === "en"
                 ? "Create your business account"
                 : "Şirket hesabınızı oluşturun"}
@@ -433,15 +433,15 @@ export default function BusinessRegisterPage() {
 
           <form
             onSubmit={handleSubmit}
-            className="space-y-5 bg-white rounded-xl shadow-lg p-6 md:p-8"
+            className="space-y-5 bg-surface-elevated rounded-xl shadow-lg p-6 md:p-8"
           >
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
+              <label className="block text-sm font-medium text-body mb-2">
                 {locale === "en" ? "Company Name" : "Şirket İsmi"}{" "}
                 <span className="text-danger-500">*</span>
               </label>
               <div className="relative">
-                <BuildingOfficeIcon className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
+                <BuildingOfficeIcon className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-subtle" />
                 <Input
                   type="text"
                   value={companyName}
@@ -455,11 +455,11 @@ export default function BusinessRegisterPage() {
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
+                <label className="block text-sm font-medium text-body mb-2">
                   {t("auth.email")} <span className="text-danger-500">*</span>
                 </label>
                 <div className="relative">
-                  <EnvelopeIcon className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
+                  <EnvelopeIcon className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-subtle" />
                   <Input
                     type="email"
                     value={email}
@@ -474,11 +474,11 @@ export default function BusinessRegisterPage() {
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
+                <label className="block text-sm font-medium text-body mb-2">
                   {t("auth.phone")} <span className="text-danger-500">*</span>
                 </label>
                 <div className="relative flex">
-                  <span className="inline-flex items-center bg-gray-100 border-r-0 rounded-l-xl text-gray-500 font-medium">
+                  <span className="inline-flex items-center bg-surface-alt border-r-0 rounded-l-xl text-muted font-medium">
                     +90
                   </span>
                   <Input
@@ -496,12 +496,12 @@ export default function BusinessRegisterPage() {
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
+                <label className="block text-sm font-medium text-body mb-2">
                   {locale === "en" ? "Company Type" : "Şirket Türü"}{" "}
                   <span className="text-danger-500">*</span>
                 </label>
                 <div className="relative">
-                  <BuildingOfficeIcon className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400 pointer-events-none z-10" />
+                  <BuildingOfficeIcon className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-subtle pointer-events-none z-10" />
                   <Select
                     value={companyType}
                     onChange={(e) => setCompanyType(e.target.value)}
@@ -523,12 +523,12 @@ export default function BusinessRegisterPage() {
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
+                <label className="block text-sm font-medium text-body mb-2">
                   {locale === "en" ? "Tax ID Number" : "Vergi Kimlik Numarası"}{" "}
                   <span className="text-danger-500">*</span>
                 </label>
                 <div className="relative">
-                  <HashtagIcon className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
+                  <HashtagIcon className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-subtle" />
                   <Input
                     type="text"
                     value={taxId}
@@ -548,12 +548,12 @@ export default function BusinessRegisterPage() {
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
+                <label className="block text-sm font-medium text-body mb-2">
                   {locale === "en" ? "City" : "İl"}{" "}
                   <span className="text-danger-500">*</span>
                 </label>
                 <div className="relative">
-                  <MapPinIcon className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400 pointer-events-none z-10" />
+                  <MapPinIcon className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-subtle pointer-events-none z-10" />
                   <Select
                     value={city}
                     onChange={(e) => {
@@ -576,12 +576,12 @@ export default function BusinessRegisterPage() {
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
+                <label className="block text-sm font-medium text-body mb-2">
                   {locale === "en" ? "District" : "İlçe"}{" "}
                   <span className="text-danger-500">*</span>
                 </label>
                 <div className="relative">
-                  <MapPinIcon className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
+                  <MapPinIcon className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-subtle" />
                   <Input
                     type="text"
                     value={district}
@@ -596,12 +596,12 @@ export default function BusinessRegisterPage() {
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
+                <label className="block text-sm font-medium text-body mb-2">
                   {t("auth.password")}{" "}
                   <span className="text-danger-500">*</span>
                 </label>
                 <div className="relative">
-                  <LockClosedIcon className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
+                  <LockClosedIcon className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-subtle" />
                   <Input
                     type={showPassword ? "text" : "password"}
                     value={password}
@@ -617,21 +617,21 @@ export default function BusinessRegisterPage() {
                     className="absolute right-4 top-1/2 -translate-y-1/2"
                   >
                     {showPassword ? (
-                      <EyeSlashIcon className="w-5 h-5 text-gray-400" />
+                      <EyeSlashIcon className="w-5 h-5 text-subtle" />
                     ) : (
-                      <EyeIcon className="w-5 h-5 text-gray-400" />
+                      <EyeIcon className="w-5 h-5 text-subtle" />
                     )}
                   </Button>
                 </div>
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
+                <label className="block text-sm font-medium text-body mb-2">
                   {t("auth.confirmPassword")}{" "}
                   <span className="text-danger-500">*</span>
                 </label>
                 <div className="relative">
-                  <LockClosedIcon className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
+                  <LockClosedIcon className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-subtle" />
                   <Input
                     type={showPassword ? "text" : "password"}
                     value={confirmPassword}
@@ -651,7 +651,7 @@ export default function BusinessRegisterPage() {
                 className="mt-0.5 h-5 w-5"
                 required
               />
-              <span className="text-sm text-gray-600">
+              <span className="text-sm text-muted">
                 {locale === "en" ? (
                   <>
                     I have read and accept the{" "}
@@ -702,7 +702,7 @@ export default function BusinessRegisterPage() {
             </Button>
           </form>
 
-          <p className="text-center mt-6 text-gray-600">
+          <p className="text-center mt-6 text-muted">
             {locale === "en"
               ? "Already have an account?"
               : "Zaten hesabınız var mı?"}{" "}
@@ -714,7 +714,7 @@ export default function BusinessRegisterPage() {
             </Link>
           </p>
 
-          <p className="text-center mt-4 text-gray-600">
+          <p className="text-center mt-4 text-muted">
             {locale === "en" ? "Not a business?" : "Şirket değil misiniz?"}{" "}
             <Link
               href="/register"

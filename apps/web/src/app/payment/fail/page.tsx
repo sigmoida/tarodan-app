@@ -86,19 +86,19 @@ export default function PaymentFailPage() {
 
   if (isLoading) {
     return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+      <div className="min-h-screen bg-surface flex items-center justify-center">
         <Spinner size="xl" />
       </div>
     );
   }
 
   return (
-    <div className="min-h-screen bg-gray-50 py-12">
+    <div className="min-h-screen bg-surface py-12">
       <div className="max-w-2xl mx-auto px-4 sm:px-6 lg:px-8">
         <motion.div
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
-          className="bg-white rounded-xl shadow-sm p-8 text-center"
+          className="bg-surface-elevated rounded-xl shadow-sm p-8 text-center"
         >
           {/* Error Icon */}
           <div className="mb-6">
@@ -113,10 +113,10 @@ export default function PaymentFailPage() {
           </div>
 
           {/* Error Message */}
-          <h1 className="text-3xl font-bold text-gray-900 mb-2">
+          <h1 className="text-3xl font-bold text-heading mb-2">
             {locale === "en" ? "Payment Failed" : "Ödeme Başarısız Oldu"}
           </h1>
-          <p className="text-gray-600 mb-6">
+          <p className="text-muted mb-6">
             {locale === "en"
               ? "Your payment could not be completed. Please try again or choose a different payment method."
               : "Ödeme işleminiz tamamlanamadı. Lütfen tekrar deneyin veya farklı bir ödeme yöntemi seçin."}
@@ -124,14 +124,14 @@ export default function PaymentFailPage() {
 
           {/* Payment Details */}
           {payment && (
-            <div className="bg-gray-50 rounded-lg p-6 mb-6 text-left">
+            <div className="bg-surface rounded-lg p-6 mb-6 text-left">
               <h2 className="text-lg font-semibold mb-4 flex items-center gap-2">
                 <CreditCardIcon className="w-5 h-5 text-primary-500" />
                 {locale === "en" ? "Payment Details" : "Ödeme Detayları"}
               </h2>
               <div className="space-y-2 text-sm">
                 <div className="flex justify-between">
-                  <span className="text-gray-600">
+                  <span className="text-muted">
                     {locale === "en" ? "Payment Amount:" : "Ödeme Tutarı:"}
                   </span>
                   <span className="font-semibold">
@@ -143,13 +143,13 @@ export default function PaymentFailPage() {
                   </span>
                 </div>
                 <div className="flex justify-between">
-                  <span className="text-gray-600">
+                  <span className="text-muted">
                     {locale === "en" ? "Payment Method:" : "Ödeme Yöntemi:"}
                   </span>
                   <span className="font-semibold">PayTR</span>
                 </div>
                 <div className="flex justify-between">
-                  <span className="text-gray-600">
+                  <span className="text-muted">
                     {locale === "en" ? "Status:" : "Durum:"}
                   </span>
                   <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-danger-100 text-danger-800">
@@ -157,8 +157,8 @@ export default function PaymentFailPage() {
                   </span>
                 </div>
                 {payment.failureReason && (
-                  <div className="mt-3 pt-3 border-t border-gray-200">
-                    <p className="text-gray-600 text-xs">
+                  <div className="mt-3 pt-3 border-t border-border">
+                    <p className="text-muted text-xs">
                       <strong>{locale === "en" ? "Error:" : "Hata:"}</strong>{" "}
                       {payment.failureReason}
                     </p>

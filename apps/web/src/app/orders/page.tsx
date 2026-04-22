@@ -315,9 +315,9 @@ export default function OrdersPage() {
 
   if (!mounted || authLoading || !isAuthenticated) {
     return (
-      <div className="min-h-screen bg-gray-50 text-gray-900 flex flex-col">
+      <div className="min-h-screen bg-surface text-heading flex flex-col">
         <div className="flex-1 flex items-center justify-center py-24">
-          <div className="animate-pulse text-gray-500 text-sm">
+          <div className="animate-pulse text-muted text-sm">
             {locale === 'en' ? 'Loading...' : 'Yükleniyor...'}
           </div>
         </div>
@@ -327,30 +327,30 @@ export default function OrdersPage() {
 
 
   return (
-    <div className="min-h-screen bg-gray-50">
+    <div className="min-h-screen bg-surface">
       <main className="max-w-6xl mx-auto px-4 py-8">
         <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-4 mb-8">
-          <h1 className="text-3xl font-bold text-gray-900">{t('order.myOrders')}</h1>
+          <h1 className="text-3xl font-bold text-heading">{t('order.myOrders')}</h1>
           <div className="flex flex-wrap gap-2 items-center">
             {(['buyer', 'seller', 'all'] as const).map((f) => (
               <Button variant="secondary" key={f}
                 onClick={() => setFilter(f)}
                 className={`px-4 py-2 rounded-lg transition-colors ${filter === f
-                    ? 'bg-primary-500 text-white'
-                    : 'bg-white text-gray-600 hover:bg-gray-100 border border-gray-200'
+                    ? 'bg-primary-500 text-inverted'
+                    : 'bg-surface-elevated text-muted hover:bg-surface-alt border border-border'
                   }`}>
                 {f === 'buyer' ? t('profile.totalPurchases') : f === 'seller' ? t('profile.totalSales') : t('common.all')}
               </Button>
             ))}
-            <span className="text-gray-400 mx-1">|</span>
+            <span className="text-subtle mx-1">|</span>
             <Button variant="secondary" onClick={() => setStatusFilter('active')}
               className={`px-3 py-1.5 rounded-lg text-sm transition-colors ${statusFilter === 'active'
-                ? 'bg-gray-800 text-white' : 'text-gray-600 hover:bg-gray-100'}`}>
+                ? 'bg-heading text-inverted' : 'text-muted hover:bg-surface-alt'}`}>
               {locale === 'en' ? 'Active' : 'Aktif'}
             </Button>
             <Button variant="secondary" onClick={() => setStatusFilter('cancelled')}
               className={`px-3 py-1.5 rounded-lg text-sm transition-colors ${statusFilter === 'cancelled'
-                ? 'bg-gray-800 text-white' : 'text-gray-600 hover:bg-gray-100'}`}>
+                ? 'bg-heading text-inverted' : 'text-muted hover:bg-surface-alt'}`}>
               {locale === 'en' ? 'Cancelled' : 'İptal edilenler'}
             </Button>
           </div>
@@ -361,11 +361,11 @@ export default function OrdersPage() {
             <Spinner size="xl" />
           </div>
         ) : orders.length === 0 ? (
-          <div className="text-center py-12 bg-white rounded-xl">
-            <p className="text-gray-500">{t('order.noOrders')}</p>
+          <div className="text-center py-12 bg-surface-elevated rounded-xl">
+            <p className="text-muted">{t('order.noOrders')}</p>
             <Link
               href="/listings"
-              className="inline-block mt-4 px-6 py-2 bg-primary-500 hover:bg-primary-600 text-white rounded-lg transition-colors"
+              className="inline-block mt-4 px-6 py-2 bg-primary-500 hover:bg-primary-600 text-inverted rounded-lg transition-colors"
             >
               {t('cart.browseListings')}
             </Link>
@@ -374,13 +374,13 @@ export default function OrdersPage() {
           <div className="space-y-4">
             {orders.map((order) => {
               return (
-                <div key={order.id} className="bg-white rounded-xl shadow-sm p-6">
+                <div key={order.id} className="bg-surface-elevated rounded-xl shadow-sm p-6">
                   <div className="flex justify-between items-start mb-4">
                     <div>
-                      <p className="text-sm text-gray-500">
+                      <p className="text-sm text-muted">
                         {t('order.orderNumber')} #{order.orderNumber}
                       </p>
-                      <p className="text-sm text-gray-400">
+                      <p className="text-sm text-subtle">
                         {new Date(order.createdAt).toLocaleDateString('tr-TR')}
                       </p>
                     </div>
@@ -400,7 +400,7 @@ export default function OrdersPage() {
 
                       return productInfo ? (
                         <div className="flex items-center gap-4">
-                          <div className="w-16 h-16 bg-gray-100 rounded-lg overflow-hidden flex-shrink-0">
+                          <div className="w-16 h-16 bg-surface-alt rounded-lg overflow-hidden flex-shrink-0">
                             {productImage ? (
                               <img
                                 src={productImage}
@@ -416,23 +416,23 @@ export default function OrdersPage() {
                           <div className="flex-1">
                             <Link
                               href={`/listings/${productInfo.id}`}
-                              className="font-medium text-gray-900 hover:text-primary-500 transition-colors"
+                              className="font-medium text-heading hover:text-primary-500 transition-colors"
                             >
                               {productInfo.title || (locale === 'en' ? 'Product' : 'Ürün')}
                             </Link>
-                            <p className="text-sm text-gray-500">
+                            <p className="text-sm text-muted">
                               1 {locale === 'en' ? 'x' : 'adet ×'} {orderPrice.toLocaleString('tr-TR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} TL
                             </p>
                           </div>
                         </div>
                       ) : (
-                        <p className="text-gray-500">{locale === 'en' ? 'Product info could not be loaded' : 'Ürün bilgisi yüklenemedi'}</p>
+                        <p className="text-muted">{locale === 'en' ? 'Product info could not be loaded' : 'Ürün bilgisi yüklenemedi'}</p>
                       );
                     })()}
                   </div>
 
-                  <div className="flex justify-between items-center mt-4 pt-4 border-t border-gray-100">
-                    <div className="text-sm text-gray-500">
+                  <div className="flex justify-between items-center mt-4 pt-4 border-t border-border-subtle">
+                    <div className="text-sm text-muted">
                       {order.isSeller ? (
                         <>{locale === 'en' ? 'Buyer' : 'Alıcı'}: {order.buyer?.displayName || '-'}</>
                       ) : (
@@ -452,13 +452,13 @@ export default function OrdersPage() {
                   </div>
 
                   {order.shipment && (
-                    <div className="mt-4 p-3 bg-gray-50 rounded-lg">
+                    <div className="mt-4 p-3 bg-surface rounded-lg">
                       <p className="text-sm">
-                        <span className="text-gray-500">{t('order.shippingCompany')}:</span>{' '}
+                        <span className="text-muted">{t('order.shippingCompany')}:</span>{' '}
                         {order.shipment.carrier || order.shipment.provider}
                       </p>
                       <p className="text-sm">
-                        <span className="text-gray-500">{t('order.trackingNumber')}:</span>{' '}
+                        <span className="text-muted">{t('order.trackingNumber')}:</span>{' '}
                         <span className="font-mono">{order.shipment.trackingNumber}</span>
                       </p>
                     </div>
@@ -467,14 +467,14 @@ export default function OrdersPage() {
                   <div className="flex flex-wrap gap-2 mt-4">
                     <Link
                       href={`/orders/${order.id}`}
-                      className="px-4 py-2 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-lg transition-colors text-sm"
+                      className="px-4 py-2 bg-surface-alt hover:bg-border-subtle text-body rounded-lg transition-colors text-sm"
                     >
                       {t('common.details')}
                     </Link>
                     {order.isBuyer !== false && (order.shipment || ['paid', 'preparing', 'shipped', 'delivered', 'completed'].includes(order.status)) && (
                       <Link
                         href={`/track-order?orderNumber=${encodeURIComponent(order.orderNumber)}&email=${encodeURIComponent(user?.email || '')}`}
-                        className="px-4 py-2 bg-info-600 hover:bg-info-700 text-white rounded-lg transition-colors text-sm"
+                        className="px-4 py-2 bg-info-600 hover:bg-info-700 text-inverted rounded-lg transition-colors text-sm"
                       >
                         {t('order.trackOrder')}
                       </Link>
@@ -547,19 +547,19 @@ export default function OrdersPage() {
 
         {/* Review Modal */}
         {showReviewModal && reviewingOrder && (
-          <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4 overflow-y-auto">
-            <div className="bg-white rounded-2xl max-w-lg w-full p-6 my-8">
-              <h2 className="text-xl font-bold text-gray-900 mb-4">{t('review.reviewOrder')}</h2>
+          <div className="fixed inset-0 bg-heading/50 flex items-center justify-center z-50 p-4 overflow-y-auto">
+            <div className="bg-surface-elevated rounded-2xl max-w-lg w-full p-6 my-8">
+              <h2 className="text-xl font-bold text-heading mb-4">{t('review.reviewOrder')}</h2>
 
               {/* Product Section */}
               <div className="mb-6">
-                <h3 className="text-sm font-semibold text-gray-500 uppercase tracking-wide mb-3 flex items-center gap-2">
+                <h3 className="text-sm font-semibold text-muted uppercase tracking-wide mb-3 flex items-center gap-2">
                   📦 {t('review.productReview')}
                 </h3>
 
                 {(reviewingOrder.product || reviewingOrder.items?.[0]?.product) && (
-                  <div className="flex items-center gap-3 mb-4 p-3 bg-gray-50 rounded-lg">
-                    <div className="w-12 h-12 bg-gray-200 rounded flex items-center justify-center text-2xl overflow-hidden">
+                  <div className="flex items-center gap-3 mb-4 p-3 bg-surface rounded-lg">
+                    <div className="w-12 h-12 bg-border-subtle rounded flex items-center justify-center text-2xl overflow-hidden">
                       {(reviewingOrder.product?.imageUrl || reviewingOrder.items?.[0]?.product?.imageUrl) ? (
                         <img
                           src={reviewingOrder.product?.imageUrl || reviewingOrder.items?.[0]?.product?.imageUrl}
@@ -568,7 +568,7 @@ export default function OrdersPage() {
                         />
                       ) : '🚗'}
                     </div>
-                    <p className="font-medium text-gray-900">
+                    <p className="font-medium text-heading">
                       {reviewingOrder.product?.title || reviewingOrder.items?.[0]?.product?.title}
                     </p>
                   </div>
@@ -576,7 +576,7 @@ export default function OrdersPage() {
 
                 {/* Product Star Rating */}
                 <div className="mb-3">
-                  <label className="block text-sm font-medium text-gray-700 mb-2">{t('review.productScore')}</label>
+                  <label className="block text-sm font-medium text-body mb-2">{t('review.productScore')}</label>
                   <div className="flex gap-1">
                     {[1, 2, 3, 4, 5].map((star) => (
                       <Button variant="secondary" key={star}
@@ -586,7 +586,7 @@ export default function OrdersPage() {
                         {star <= reviewScore ? (
                           <StarIcon className="w-8 h-8 text-warning-400" />
                         ) : (
-                          <StarOutlineIcon className="w-8 h-8 text-gray-300" />
+                          <StarOutlineIcon className="w-8 h-8 text-border-strong" />
                         )}
                       </Button>
                     ))}
@@ -595,7 +595,7 @@ export default function OrdersPage() {
 
                 {/* Title */}
                 <div className="mb-3">
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                  <label className="block text-sm font-medium text-body mb-1">
                     {t('review.titleOptional')}
                   </label>
                   <Input type="text"
@@ -608,7 +608,7 @@ export default function OrdersPage() {
 
                 {/* Review Text */}
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                  <label className="block text-sm font-medium text-body mb-1">
                     {t('review.commentOptional')}
                   </label>
                   <Textarea value={reviewText}
@@ -621,23 +621,23 @@ export default function OrdersPage() {
 
                 {/* Photo Upload */}
                 <div className="mt-3">
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                  <label className="block text-sm font-medium text-body mb-1">
                     {locale === 'en' ? 'Photos (optional, max 5)' : 'Fotoğraflar (opsiyonel, maks 5)'}
                   </label>
                   <div className="flex flex-wrap gap-2">
                     {reviewImagePreviews.map((src, idx) => (
-                      <div key={idx} className="relative w-16 h-16 rounded-lg overflow-hidden border border-gray-200">
+                      <div key={idx} className="relative w-16 h-16 rounded-lg overflow-hidden border border-border">
                         <img src={src} alt="" className="w-full h-full object-cover" />
                         <Button variant="secondary" type="button"
                           onClick={() => removeReviewImage(idx)}
-                          className="absolute top-0 right-0 bg-danger-500 text-white rounded-bl-lg w-5 h-5 flex items-center justify-center text-xs">
+                          className="absolute top-0 right-0 bg-danger-500 text-inverted rounded-bl-lg w-5 h-5 flex items-center justify-center text-xs">
                           ×
                         </Button>
                       </div>
                     ))}
                     {reviewImages.length < 5 && (
                       <label className="w-16 h-16 border-2 border-dashed items-center justify-center cursor-pointer hover:border-primary-400">
-                        <span className="text-2xl text-gray-400">+</span>
+                        <span className="text-2xl text-subtle">+</span>
                         <Input type="file"
                           accept="image/*"
                           onChange={handleReviewImageAdd}
@@ -649,17 +649,17 @@ export default function OrdersPage() {
               </div>
 
               {/* Divider */}
-              <div className="border-t border-gray-200 my-6"></div>
+              <div className="border-t border-border my-6"></div>
 
               {/* Seller Section */}
               <div className="mb-6">
-                <h3 className="text-sm font-semibold text-gray-500 uppercase tracking-wide mb-3 flex items-center gap-2">
+                <h3 className="text-sm font-semibold text-muted uppercase tracking-wide mb-3 flex items-center gap-2">
                   👤 {t('review.sellerReview')}
                 </h3>
 
                 {reviewingOrder.seller && (
-                  <p className="text-sm text-gray-600 mb-4">
-                    {t('product.seller')}: <span className="font-medium text-gray-900">{reviewingOrder.seller.displayName}</span>
+                  <p className="text-sm text-muted mb-4">
+                    {t('product.seller')}: <span className="font-medium text-heading">{reviewingOrder.seller.displayName}</span>
                   </p>
                 )}
 
@@ -667,7 +667,7 @@ export default function OrdersPage() {
                 <div className="space-y-3">
                   {/* Communication */}
                   <div className="flex items-center justify-between">
-                    <span className="text-sm text-gray-700">{t('review.communication')}</span>
+                    <span className="text-sm text-body">{t('review.communication')}</span>
                     <div className="flex gap-0.5">
                       {[1, 2, 3, 4, 5].map((star) => (
                         <Button variant="secondary" key={star}
@@ -677,7 +677,7 @@ export default function OrdersPage() {
                           {star <= sellerCommunication ? (
                             <StarIcon className="w-5 h-5 text-warning-400" />
                           ) : (
-                            <StarOutlineIcon className="w-5 h-5 text-gray-300" />
+                            <StarOutlineIcon className="w-5 h-5 text-border-strong" />
                           )}
                         </Button>
                       ))}
@@ -686,7 +686,7 @@ export default function OrdersPage() {
 
                   {/* Shipping Speed */}
                   <div className="flex items-center justify-between">
-                    <span className="text-sm text-gray-700">{t('review.shippingSpeed')}</span>
+                    <span className="text-sm text-body">{t('review.shippingSpeed')}</span>
                     <div className="flex gap-0.5">
                       {[1, 2, 3, 4, 5].map((star) => (
                         <Button variant="secondary" key={star}
@@ -696,7 +696,7 @@ export default function OrdersPage() {
                           {star <= sellerShipping ? (
                             <StarIcon className="w-5 h-5 text-warning-400" />
                           ) : (
-                            <StarOutlineIcon className="w-5 h-5 text-gray-300" />
+                            <StarOutlineIcon className="w-5 h-5 text-border-strong" />
                           )}
                         </Button>
                       ))}
@@ -705,7 +705,7 @@ export default function OrdersPage() {
 
                   {/* Packaging */}
                   <div className="flex items-center justify-between">
-                    <span className="text-sm text-gray-700">{t('review.packaging')}</span>
+                    <span className="text-sm text-body">{t('review.packaging')}</span>
                     <div className="flex gap-0.5">
                       {[1, 2, 3, 4, 5].map((star) => (
                         <Button variant="secondary" key={star}
@@ -715,7 +715,7 @@ export default function OrdersPage() {
                           {star <= sellerPackaging ? (
                             <StarIcon className="w-5 h-5 text-warning-400" />
                           ) : (
-                            <StarOutlineIcon className="w-5 h-5 text-gray-300" />
+                            <StarOutlineIcon className="w-5 h-5 text-border-strong" />
                           )}
                         </Button>
                       ))}
@@ -724,13 +724,13 @@ export default function OrdersPage() {
 
                   {/* Seller Review Text */}
                   <div className="mt-4">
-                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                    <label className="block text-sm font-medium text-body mb-1">
                       {t('review.sellerComment')}
                     </label>
                     <Textarea value={sellerReviewText}
                       onChange={(e) => setSellerReviewText(e.target.value)}
                       placeholder={t('review.sellerCommentPlaceholder')}
-                      className="border-gray-200 resize-none"
+                      className="border-border resize-none"
                       rows={3} />
                   </div>
                 </div>
@@ -761,16 +761,16 @@ export default function OrdersPage() {
 
         {/* Shipping Modal */}
         {showShippingModal && (
-          <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-            <div className="bg-white rounded-2xl max-w-md w-full p-6">
-              <h2 className="text-xl font-bold text-gray-900 mb-4 flex items-center gap-2">
+          <div className="fixed inset-0 bg-heading/50 flex items-center justify-center z-50 p-4">
+            <div className="bg-surface-elevated rounded-2xl max-w-md w-full p-6">
+              <h2 className="text-xl font-bold text-heading mb-4 flex items-center gap-2">
                 <TruckIcon className="w-6 h-6 text-primary-500" />
                 {locale === 'en' ? 'Add Shipping Info' : 'Kargo Bilgisi Ekle'}
               </h2>
               
               <div className="space-y-4">
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                  <label className="block text-sm font-medium text-body mb-1">
                     {locale === 'en' ? 'Shipping Company' : 'Kargo Firması'}
                   </label>
                   <Select
@@ -792,14 +792,14 @@ export default function OrdersPage() {
                 </div>
 
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                  <label className="block text-sm font-medium text-body mb-1">
                     {locale === 'en' ? 'Tracking Number' : 'Takip Numarası'} *
                   </label>
                   <Input type="text"
                     value={trackingNumber}
                     onChange={(e) => setTrackingNumber(e.target.value)}
                     placeholder={locale === 'en' ? 'Enter tracking number' : 'Kargo takip numarasını girin'}
-                    className="border-gray-200 font-mono" />
+                    className="border-border font-mono" />
                 </div>
               </div>
 

@@ -24,6 +24,11 @@ const tarodanPreset: Partial<Config> = {
         success: colors.success,
         info: colors.info,
         warning: colors.warning,
+        border: {
+          DEFAULT: colors.border.DEFAULT,
+          strong: colors.border.strong,
+          subtle: colors.border.subtle,
+        },
         heading: colors.text.heading,
         body: colors.text.body,
         muted: colors.text.muted,
@@ -33,6 +38,23 @@ const tarodanPreset: Partial<Config> = {
           alt: colors.surface.alt,
           elevated: colors.surface.elevated,
         },
+      },
+      textColor: {
+        heading: colors.text.heading,
+        body: colors.text.body,
+        muted: colors.text.muted,
+        subtle: colors.text.subtle,
+        inverted: colors.text.inverted,
+      },
+      borderColor: {
+        border: colors.border.DEFAULT,
+        'border-strong': colors.border.strong,
+        'border-subtle': colors.border.subtle,
+      },
+      backgroundColor: {
+        'surface': colors.surface.DEFAULT,
+        'surface-alt': colors.surface.alt,
+        'surface-elevated': colors.surface.elevated,
       },
       fontFamily: {
         sans: [...typography.fontFamily.sans],

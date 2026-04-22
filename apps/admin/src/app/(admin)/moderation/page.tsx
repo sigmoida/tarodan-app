@@ -207,11 +207,11 @@ const ModerationPage = () => {
         {/* Header */}
         <div className="flex items-center justify-between">
           <div>
-            <h1 className="text-2xl font-bold text-gray-900">Moderasyon Kuyruğu</h1>
-            <p className="text-gray-500 mt-1">İçerik moderasyonu ve onay işlemleri</p>
+            <h1 className="text-2xl font-bold text-heading">Moderasyon Kuyruğu</h1>
+            <p className="text-muted mt-1">İçerik moderasyonu ve onay işlemleri</p>
           </div>
           <Button variant="secondary" onClick={() => { loadQueue(); loadStats(); }}
-            className="flex items-center px-4 py-2 bg-gray-100 text-gray-600 rounded-lg hover:bg-gray-100 transition-colors">
+            className="flex items-center px-4 py-2 bg-surface-alt text-muted rounded-lg hover:bg-surface-alt transition-colors">
             <ArrowPathIcon className="h-5 w-5 mr-2" />
             Yenile
           </Button>
@@ -222,8 +222,8 @@ const ModerationPage = () => {
           <div className="admin-card">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm text-gray-500">Bekleyen Ürünler</p>
-                <p className="text-2xl font-bold text-gray-900 mt-1">{stats?.pendingProducts || 0}</p>
+                <p className="text-sm text-muted">Bekleyen Ürünler</p>
+                <p className="text-2xl font-bold text-heading mt-1">{stats?.pendingProducts || 0}</p>
               </div>
               <div className="p-3 rounded-lg bg-info-500/20">
                 <CubeIcon className="h-6 w-6 text-info-700" />
@@ -233,8 +233,8 @@ const ModerationPage = () => {
           <div className="admin-card">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm text-gray-500">Raporlanan Mesajlar</p>
-                <p className="text-2xl font-bold text-gray-900 mt-1">{stats?.reportedMessages || 0}</p>
+                <p className="text-sm text-muted">Raporlanan Mesajlar</p>
+                <p className="text-2xl font-bold text-heading mt-1">{stats?.reportedMessages || 0}</p>
               </div>
               <div className="p-3 rounded-lg bg-primary-500/20">
                 <ChatBubbleLeftIcon className="h-6 w-6 text-primary-700" />
@@ -244,8 +244,8 @@ const ModerationPage = () => {
           <div className="admin-card">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm text-gray-500">Son 7 Gün Değerlendirme</p>
-                <p className="text-2xl font-bold text-gray-900 mt-1">{stats?.recentReviews || 0}</p>
+                <p className="text-sm text-muted">Son 7 Gün Değerlendirme</p>
+                <p className="text-2xl font-bold text-heading mt-1">{stats?.recentReviews || 0}</p>
               </div>
               <div className="p-3 rounded-lg bg-warning-500/20">
                 <StarIcon className="h-6 w-6 text-warning-700" />
@@ -255,7 +255,7 @@ const ModerationPage = () => {
           <div className="admin-card">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm text-gray-500">Toplam Bekleyen</p>
+                <p className="text-sm text-muted">Toplam Bekleyen</p>
                 <p className="text-2xl font-bold text-primary-700 mt-1">{stats?.totalPending || 0}</p>
               </div>
               <div className="p-3 rounded-lg bg-primary-500/20">
@@ -267,7 +267,7 @@ const ModerationPage = () => {
 
         {/* Moderation Queue */}
         <div className="admin-card">
-          <h3 className="text-lg font-semibold text-gray-900 mb-4">Moderasyon Kuyruğu</h3>
+          <h3 className="text-lg font-semibold text-heading mb-4">Moderasyon Kuyruğu</h3>
           
           {/* Tabs */}
           <div className="flex space-x-2 mb-6">
@@ -276,8 +276,8 @@ const ModerationPage = () => {
                 onClick={() => { setSelectedTab(tab.id); setPage(1); }}
                 className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
                   selectedTab === tab.id
-                    ? 'bg-primary-500 text-gray-900'
-                    : 'bg-gray-100 text-gray-500 hover:bg-gray-100'
+                    ? 'bg-primary-500 text-heading'
+                    : 'bg-surface-alt text-muted hover:bg-surface-alt'
                 }`}>
                 {tab.name}
               </Button>
@@ -292,15 +292,15 @@ const ModerationPage = () => {
           ) : items.length === 0 ? (
             <div className="flex flex-col items-center justify-center py-12 text-center">
               <CheckCircleIcon className="h-12 w-12 text-success-500 mb-4" />
-              <h3 className="text-lg font-semibold text-gray-900">Kuyruk Boş</h3>
-              <p className="text-gray-500">Şu anda bekleyen moderasyon öğesi bulunmuyor.</p>
+              <h3 className="text-lg font-semibold text-heading">Kuyruk Boş</h3>
+              <p className="text-muted">Şu anda bekleyen moderasyon öğesi bulunmuyor.</p>
             </div>
           ) : (
             <div className="space-y-4">
               {items.map((item) => (
                 <div
                   key={`${item.type}-${item.id}`}
-                  className="flex items-start gap-4 p-4 bg-gray-100 rounded-lg hover:bg-gray-100 transition-colors"
+                  className="flex items-start gap-4 p-4 bg-surface-alt rounded-lg hover:bg-surface-alt transition-colors"
                 >
                   {/* Image/Icon */}
                   <div className="flex-shrink-0">
@@ -315,7 +315,7 @@ const ModerationPage = () => {
                         />
                       </div>
                     ) : (
-                      <div className="w-16 h-16 rounded-lg bg-gray-100 flex items-center justify-center">
+                      <div className="w-16 h-16 rounded-lg bg-surface-alt flex items-center justify-center">
                         {getTypeIcon(item.type)}
                       </div>
                     )}
@@ -328,17 +328,17 @@ const ModerationPage = () => {
                       <span className={`px-2 py-1 rounded text-xs font-medium ${
                         item.status === 'pending' ? 'bg-warning-500/20 text-warning-700' :
                         item.status === 'reported' ? 'bg-danger-500/20 text-danger-600' : 
-                        'bg-gray-500/20 text-gray-500'
+                        'bg-muted/20 text-muted'
                       }`}>
                         {item.status === 'pending' ? 'Bekliyor' :
                          item.status === 'reported' ? 'Raporlandı' : item.status}
                       </span>
                     </div>
                     
-                    <h4 className="font-medium text-gray-900 truncate">{item.title}</h4>
-                    <p className="text-sm text-gray-500 line-clamp-2">{item.description}</p>
+                    <h4 className="font-medium text-heading truncate">{item.title}</h4>
+                    <p className="text-sm text-muted line-clamp-2">{item.description}</p>
 
-                    <div className="flex items-center gap-4 mt-2 text-xs text-gray-500">
+                    <div className="flex items-center gap-4 mt-2 text-xs text-muted">
                       {item.seller && (
                         <span>Satıcı: {item.seller.displayName || item.seller.email}</span>
                       )}
@@ -375,7 +375,7 @@ const ModerationPage = () => {
                       Reddet
                     </Button>
                     <Button variant="secondary" onClick={() => handleFlagClick(item)}
-                      className="flex items-center px-3 py-2 bg-gray-100 text-gray-600 rounded-lg hover:bg-gray-100 transition-colors text-sm">
+                      className="flex items-center px-3 py-2 bg-surface-alt text-muted rounded-lg hover:bg-surface-alt transition-colors text-sm">
                       <FlagIcon className="h-4 w-4 mr-1" />
                       İşaretle
                     </Button>
@@ -386,18 +386,18 @@ const ModerationPage = () => {
               {/* Pagination */}
               {totalPages > 1 && (
                 <div className="flex items-center justify-between pt-4">
-                  <p className="text-sm text-gray-500">
+                  <p className="text-sm text-muted">
                     Toplam {total} öğe, Sayfa {page}/{totalPages}
                   </p>
                   <div className="flex gap-2">
                     <Button variant="secondary" disabled={page === 1}
                       onClick={() => setPage(page - 1)}
-                      className="px-4 py-2 bg-gray-100 text-gray-600 rounded-lg hover:bg-gray-100 disabled:opacity-50 disabled:cursor-not-allowed transition-colors">
+                      className="px-4 py-2 bg-surface-alt text-muted rounded-lg hover:bg-surface-alt disabled:opacity-50 disabled:cursor-not-allowed transition-colors">
                       Önceki
                     </Button>
                     <Button variant="secondary" disabled={page >= totalPages}
                       onClick={() => setPage(page + 1)}
-                      className="px-4 py-2 bg-gray-100 text-gray-600 rounded-lg hover:bg-gray-100 disabled:opacity-50 disabled:cursor-not-allowed transition-colors">
+                      className="px-4 py-2 bg-surface-alt text-muted rounded-lg hover:bg-surface-alt disabled:opacity-50 disabled:cursor-not-allowed transition-colors">
                       Sonraki
                     </Button>
                   </div>
@@ -410,19 +410,19 @@ const ModerationPage = () => {
 
       {/* Reject Modal */}
       {rejectModalOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
-          <div className="bg-white rounded-lg p-6 w-full max-w-md">
-            <h3 className="text-lg font-semibold text-gray-900 mb-2">İçeriği Reddet</h3>
-            <p className="text-gray-500 text-sm mb-4">
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-heading/50">
+          <div className="bg-surface-elevated rounded-lg p-6 w-full max-w-md">
+            <h3 className="text-lg font-semibold text-heading mb-2">İçeriği Reddet</h3>
+            <p className="text-muted text-sm mb-4">
               {selectedItem?.title} içeriğini reddetmek istediğinize emin misiniz?
             </p>
             <div className="space-y-4">
               <div>
-                <label className="block text-sm font-medium text-gray-600 mb-1">Red Sebebi *</label>
+                <label className="block text-sm font-medium text-muted mb-1">Red Sebebi *</label>
                 <Select
                   value={rejectReason}
                   onChange={(e) => setRejectReason(e.target.value)}
-                  className="bg-gray-100"
+                  className="bg-surface-alt"
                 >
                   <option value="">Sebep seçin</option>
                   <option value="inappropriate">Uygunsuz İçerik</option>
@@ -434,12 +434,12 @@ const ModerationPage = () => {
                 </Select>
               </div>
               <div>
-                <label className="block text-sm font-medium text-gray-600 mb-1">Ek Notlar</label>
+                <label className="block text-sm font-medium text-muted mb-1">Ek Notlar</label>
                 <Textarea value={rejectNotes}
                   onChange={(e) => setRejectNotes(e.target.value)}
                   placeholder="İsteğe bağlı ek notlar..."
                   rows={3}
-                  className="bg-gray-100 text-gray-900" />
+                  className="bg-surface-alt text-heading" />
               </div>
             </div>
             <div className="flex justify-end gap-3 mt-6">
@@ -456,27 +456,27 @@ const ModerationPage = () => {
 
       {/* Flag Modal */}
       {flagModalOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
-          <div className="bg-white rounded-lg p-6 w-full max-w-md">
-            <h3 className="text-lg font-semibold text-gray-900 mb-2">İçeriği İşaretle</h3>
-            <p className="text-gray-500 text-sm mb-4">
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-heading/50">
+          <div className="bg-surface-elevated rounded-lg p-6 w-full max-w-md">
+            <h3 className="text-lg font-semibold text-heading mb-2">İçeriği İşaretle</h3>
+            <p className="text-muted text-sm mb-4">
               {selectedItem?.title} içeriğini öncelikli inceleme için işaretleyin.
             </p>
             <div className="space-y-4">
               <div>
-                <label className="block text-sm font-medium text-gray-600 mb-1">İşaretleme Sebebi *</label>
+                <label className="block text-sm font-medium text-muted mb-1">İşaretleme Sebebi *</label>
                 <Textarea value={flagReason}
                   onChange={(e) => setFlagReason(e.target.value)}
                   placeholder="İşaretleme sebebini açıklayın..."
                   rows={3}
-                  className="bg-gray-100 text-gray-900" />
+                  className="bg-surface-alt text-heading" />
               </div>
               <div>
-                <label className="block text-sm font-medium text-gray-600 mb-1">Öncelik</label>
+                <label className="block text-sm font-medium text-muted mb-1">Öncelik</label>
                 <Select
                   value={flagPriority}
                   onChange={(e) => setFlagPriority(e.target.value)}
-                  className="bg-gray-100"
+                  className="bg-surface-alt"
                 >
                   <option value="low">Düşük</option>
                   <option value="normal">Normal</option>

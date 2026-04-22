@@ -44,12 +44,12 @@ export default function NewsletterSignupPage() {
 
   if (success) {
     return (
-      <div className="min-h-screen bg-gray-50">
-        <div className="bg-gradient-to-br from-gray-800 to-gray-900 text-white py-12">
+      <div className="min-h-screen bg-surface">
+        <div className="bg-gradient-to-br from-body to-heading text-inverted py-12">
           <div className="max-w-2xl mx-auto px-4 text-center">
             <CheckCircleIcon className="w-16 h-16 mx-auto text-success-400 mb-4" />
             <h1 className="text-3xl font-bold mb-2">{t('marketing.newsletter.successTitle')}</h1>
-            <p className="text-gray-400">{t('marketing.newsletter.successMessage')}</p>
+            <p className="text-subtle">{t('marketing.newsletter.successMessage')}</p>
           </div>
         </div>
         <div className="max-w-2xl mx-auto px-4 py-12 text-center">
@@ -62,11 +62,11 @@ export default function NewsletterSignupPage() {
   }
 
   return (
-    <div className="min-h-screen bg-gray-50">
-      <div className="bg-gradient-to-br from-gray-800 to-gray-900 text-white py-12">
+    <div className="min-h-screen bg-surface">
+      <div className="bg-gradient-to-br from-body to-heading text-inverted py-12">
         <div className="max-w-2xl mx-auto px-4">
           <h1 className="text-3xl font-bold mb-2">{t('marketing.newsletter.title')}</h1>
-          <p className="text-gray-400">{t('marketing.newsletter.subtitle')}</p>
+          <p className="text-subtle">{t('marketing.newsletter.subtitle')}</p>
         </div>
       </div>
 
@@ -81,12 +81,12 @@ export default function NewsletterSignupPage() {
           </div>
         )}
 
-        <div className="bg-white rounded-2xl shadow-sm p-8">
-          <h2 className="text-lg font-semibold text-gray-900 mb-4 flex items-center gap-2">
+        <div className="bg-surface-elevated rounded-2xl shadow-sm p-8">
+          <h2 className="text-lg font-semibold text-heading mb-4 flex items-center gap-2">
             <MegaphoneIcon className="w-5 h-5 text-primary-500" />
             {t('marketing.newsletter.benefitsTitle')}
           </h2>
-          <ul className="space-y-2 text-gray-600 mb-8">
+          <ul className="space-y-2 text-muted mb-8">
             <li>• {t('marketing.newsletter.benefit1')}</li>
             <li>• {t('marketing.newsletter.benefit2')}</li>
             <li>• {t('marketing.newsletter.benefit3')}</li>
@@ -94,7 +94,7 @@ export default function NewsletterSignupPage() {
 
           <form onSubmit={handleSubmit} className="space-y-6">
             <div>
-              <label htmlFor="newsletter-email" className="block text-sm font-medium text-gray-700 mb-1">
+              <label htmlFor="newsletter-email" className="block text-sm font-medium text-body mb-1">
                 {t('marketing.newsletter.emailLabel')}
               </label>
               <Input id="newsletter-email"
@@ -107,7 +107,7 @@ export default function NewsletterSignupPage() {
             </div>
 
             <div>
-              <p className="block text-sm font-medium text-gray-700 mb-3">{t('marketing.newsletter.preferencesTitle')}</p>
+              <p className="block text-sm font-medium text-body mb-3">{t('marketing.newsletter.preferencesTitle')}</p>
               <div className="mb-2">
                 <Checkbox
                   checked={newsletter}
@@ -124,14 +124,14 @@ export default function NewsletterSignupPage() {
 
             <Button variant="secondary" type="submit"
               disabled={loading}
-              className="w-full flex items-center justify-center gap-2 py-3 px-6 rounded-xl bg-primary-500 text-white font-semibold hover:bg-primary-600 disabled:opacity-50 transition-colors">
+              className="w-full flex items-center justify-center gap-2 py-3 px-6 rounded-xl bg-primary-500 text-inverted font-semibold hover:bg-primary-600 disabled:opacity-50 transition-colors">
               <EnvelopeIcon className="w-5 h-5" />
               {loading ? (locale === 'en' ? 'Subscribing...' : 'Abone olunuyor...') : t('marketing.newsletter.subscribeButton')}
             </Button>
           </form>
         </div>
 
-        <p className="mt-6 text-center text-sm text-gray-500">
+        <p className="mt-6 text-center text-sm text-muted">
           <Link href="/privacy" className="text-primary-500 hover:underline">
             {locale === 'en' ? 'Privacy Policy' : 'Gizlilik Politikası'}
           </Link>

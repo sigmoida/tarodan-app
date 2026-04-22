@@ -73,12 +73,12 @@ function VerifyEmailContent() {
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-primary-50 via-white to-warning-50 flex flex-col">
+    <div className="min-h-screen bg-gradient-to-br from-primary-50 via-surface-elevated to-warning-50 flex flex-col">
       {/* Header */}
       <header className="p-6">
         <Link href="/" className="inline-flex items-center gap-2 group">
           <Image src="/tarodan-logo.jpg" alt="Tarodan" width={36} height={36} className="rounded-lg object-contain" />
-          <span className="text-lg font-bold text-gray-900 group-hover:text-primary-600 transition-colors duration-200">
+          <span className="text-lg font-bold text-heading group-hover:text-primary-600 transition-colors duration-200">
             Tarodan
           </span>
         </Link>
@@ -93,16 +93,16 @@ function VerifyEmailContent() {
           className="w-full max-w-md"
         >
           {status === 'loading' && (
-            <div className="bg-white rounded-3xl shadow-xl shadow-primary-500/10 p-8 md:p-10 border border-gray-100 text-center">
+            <div className="bg-surface-elevated rounded-3xl shadow-xl shadow-primary-500/10 p-8 md:p-10 border border-border-subtle text-center">
               <div className="flex justify-center mb-6">
                 <div className="w-20 h-20 bg-gradient-to-br from-primary-100 to-warning-100 rounded-full flex items-center justify-center">
                   <ArrowPathIcon className="w-10 h-10 text-primary-600 animate-spin" />
                 </div>
               </div>
-              <h2 className="text-2xl font-bold text-gray-900 mb-3">
+              <h2 className="text-2xl font-bold text-heading mb-3">
                 {locale === 'tr' ? 'E-posta Doğrulanıyor...' : 'Verifying Email...'}
               </h2>
-              <p className="text-gray-500">
+              <p className="text-muted">
                 {locale === 'tr' ? 'Lütfen bekleyin...' : 'Please wait...'}
               </p>
             </div>
@@ -113,7 +113,7 @@ function VerifyEmailContent() {
               initial={{ opacity: 0, scale: 0.95 }}
               animate={{ opacity: 1, scale: 1 }}
               transition={{ duration: 0.5, ease: [0.4, 0, 0.2, 1] }}
-              className="bg-white rounded-3xl shadow-xl shadow-success-500/10 p-8 md:p-10 border border-gray-100 text-center"
+              className="bg-surface-elevated rounded-3xl shadow-xl shadow-success-500/10 p-8 md:p-10 border border-border-subtle text-center"
             >
               <div className="flex justify-center mb-6">
                 <motion.div 
@@ -126,11 +126,11 @@ function VerifyEmailContent() {
                 </motion.div>
               </div>
 
-              <h2 className="text-2xl font-bold text-gray-900 mb-3">
+              <h2 className="text-2xl font-bold text-heading mb-3">
                 {locale === 'tr' ? 'E-posta Doğrulandı!' : 'Email Verified!'}
               </h2>
               
-              <p className="text-gray-500 mb-8">
+              <p className="text-muted mb-8">
                 {locale === 'tr' 
                   ? 'E-posta adresiniz başarıyla doğrulandı. Artık hesabınıza giriş yapabilirsiniz.' 
                   : 'Your email has been successfully verified. You can now login to your account.'}
@@ -138,7 +138,7 @@ function VerifyEmailContent() {
 
               <Link
                 href="/login"
-                className="block w-full py-4 bg-primary-500 text-white font-semibold rounded-xl hover:bg-primary-600 transition-all duration-200 ease-premium shadow-lg shadow-primary-500/25 text-center"
+                className="block w-full py-4 bg-primary-500 text-inverted font-semibold rounded-xl hover:bg-primary-600 transition-all duration-200 ease-premium shadow-lg shadow-primary-500/25 text-center"
               >
                 {locale === 'tr' ? 'Giriş Yap' : 'Login Now'}
               </Link>
@@ -150,7 +150,7 @@ function VerifyEmailContent() {
               initial={{ opacity: 0, scale: 0.95 }}
               animate={{ opacity: 1, scale: 1 }}
               transition={{ duration: 0.5, ease: [0.4, 0, 0.2, 1] }}
-              className="bg-white rounded-3xl shadow-xl shadow-danger-500/10 p-8 md:p-10 border border-gray-100 text-center"
+              className="bg-surface-elevated rounded-3xl shadow-xl shadow-danger-500/10 p-8 md:p-10 border border-border-subtle text-center"
             >
               <div className="flex justify-center mb-6">
                 <div className="w-20 h-20 bg-gradient-to-br from-danger-100 to-danger-100 rounded-full flex items-center justify-center">
@@ -158,11 +158,11 @@ function VerifyEmailContent() {
                 </div>
               </div>
 
-              <h2 className="text-2xl font-bold text-gray-900 mb-3">
+              <h2 className="text-2xl font-bold text-heading mb-3">
                 {locale === 'tr' ? 'Doğrulama Başarısız' : 'Verification Failed'}
               </h2>
               
-              <p className="text-gray-500 mb-4">
+              <p className="text-muted mb-4">
                 {errorMessage}
               </p>
 
@@ -179,11 +179,11 @@ function VerifyEmailContent() {
                   value={resendEmail}
                   onChange={(e) => setResendEmail(e.target.value)}
                   placeholder={locale === 'tr' ? 'E-posta adresiniz' : 'Your email'}
-                  className="px-4 py-3 border-gray-200 rounded-xl transition-all duration-200 ease-premium text-gray-900"
+                  className="px-4 py-3 border-border rounded-xl transition-all duration-200 ease-premium text-heading"
                   required />
                 <Button variant="secondary" type="submit"
                   disabled={resendLoading}
-                  className="w-full py-3 bg-primary-500 hover:bg-primary-600 disabled:bg-gray-400 text-white font-semibold rounded-xl transition-all duration-200 ease-premium flex items-center justify-center gap-2">
+                  className="w-full py-3 bg-primary-500 hover:bg-primary-600 disabled:bg-subtle text-inverted font-semibold rounded-xl transition-all duration-200 ease-premium flex items-center justify-center gap-2">
                   {resendLoading ? (
                     <ArrowPathIcon className="w-5 h-5 animate-spin" />
                   ) : (
@@ -200,14 +200,14 @@ function VerifyEmailContent() {
               <div className="space-y-3">
                 <Link
                   href="/login"
-                  className="block w-full py-3 bg-primary-500 text-white font-semibold rounded-xl hover:bg-primary-600 transition-all duration-200 ease-premium text-center"
+                  className="block w-full py-3 bg-primary-500 text-inverted font-semibold rounded-xl hover:bg-primary-600 transition-all duration-200 ease-premium text-center"
                 >
                   {locale === 'tr' ? 'Giriş Sayfasına Git' : 'Go to Login'}
                 </Link>
                 
                 <Link
                   href="/register"
-                  className="block w-full py-3 bg-gray-100 text-gray-700 font-medium rounded-xl hover:bg-gray-200 transition-all duration-200 ease-premium text-center"
+                  className="block w-full py-3 bg-surface-alt text-body font-medium rounded-xl hover:bg-border-subtle transition-all duration-200 ease-premium text-center"
                 >
                   {locale === 'tr' ? 'Yeniden Kayıt Ol' : 'Register Again'}
                 </Link>
@@ -220,7 +220,7 @@ function VerifyEmailContent() {
               initial={{ opacity: 0, scale: 0.95 }}
               animate={{ opacity: 1, scale: 1 }}
               transition={{ duration: 0.5, ease: [0.4, 0, 0.2, 1] }}
-              className="bg-white rounded-3xl shadow-xl shadow-primary-500/10 p-8 md:p-10 border border-gray-100 text-center"
+              className="bg-surface-elevated rounded-3xl shadow-xl shadow-primary-500/10 p-8 md:p-10 border border-border-subtle text-center"
             >
               <div className="flex justify-center mb-6">
                 <div className="w-20 h-20 bg-gradient-to-br from-primary-100 to-warning-100 rounded-2xl flex items-center justify-center">
@@ -228,11 +228,11 @@ function VerifyEmailContent() {
                 </div>
               </div>
 
-              <h2 className="text-2xl font-bold text-gray-900 mb-3">
+              <h2 className="text-2xl font-bold text-heading mb-3">
                 {locale === 'tr' ? 'E-posta Doğrulama' : 'Email Verification'}
               </h2>
               
-              <p className="text-gray-500 mb-8">
+              <p className="text-muted mb-8">
                 {locale === 'tr' 
                   ? 'E-postanızdaki doğrulama linkine tıklayarak hesabınızı aktifleştirin.' 
                   : 'Click the verification link in your email to activate your account.'}
@@ -251,11 +251,11 @@ function VerifyEmailContent() {
                   value={resendEmail}
                   onChange={(e) => setResendEmail(e.target.value)}
                   placeholder={locale === 'tr' ? 'E-posta adresiniz' : 'Your email'}
-                  className="px-4 py-3 border-gray-200 rounded-xl transition-all duration-200 ease-premium text-gray-900"
+                  className="px-4 py-3 border-border rounded-xl transition-all duration-200 ease-premium text-heading"
                   required />
                 <Button variant="secondary" type="submit"
                   disabled={resendLoading}
-                  className="w-full py-3 bg-primary-500 hover:bg-primary-600 disabled:bg-gray-400 text-white font-semibold rounded-xl transition-all duration-200 ease-premium flex items-center justify-center gap-2">
+                  className="w-full py-3 bg-primary-500 hover:bg-primary-600 disabled:bg-subtle text-inverted font-semibold rounded-xl transition-all duration-200 ease-premium flex items-center justify-center gap-2">
                   {resendLoading ? (
                     <ArrowPathIcon className="w-5 h-5 animate-spin" />
                   ) : (
@@ -272,7 +272,7 @@ function VerifyEmailContent() {
               <div className="space-y-3">
                 <Link
                   href="/login"
-                  className="block w-full py-3 bg-primary-500 text-white font-semibold rounded-xl hover:bg-primary-600 transition-all duration-200 ease-premium text-center"
+                  className="block w-full py-3 bg-primary-500 text-inverted font-semibold rounded-xl hover:bg-primary-600 transition-all duration-200 ease-premium text-center"
                 >
                   {locale === 'tr' ? 'Giriş Sayfasına Git' : 'Go to Login'}
                 </Link>
@@ -284,7 +284,7 @@ function VerifyEmailContent() {
 
       {/* Footer */}
       <footer className="p-6 text-center">
-        <p className="text-sm text-gray-400">
+        <p className="text-sm text-subtle">
           © {new Date().getFullYear()} Tarodan. {locale === 'tr' ? 'Tüm hakları saklıdır.' : 'All rights reserved.'}
         </p>
       </footer>
@@ -295,7 +295,7 @@ function VerifyEmailContent() {
 export default function VerifyEmailPage() {
   return (
     <Suspense fallback={
-      <div className="min-h-screen bg-gradient-to-br from-primary-50 via-white to-warning-50 flex items-center justify-center">
+      <div className="min-h-screen bg-gradient-to-br from-primary-50 via-surface-elevated to-warning-50 flex items-center justify-center">
         <Spinner size="xl" />
       </div>
     }>

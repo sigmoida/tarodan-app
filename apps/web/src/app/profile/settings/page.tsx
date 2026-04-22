@@ -132,38 +132,38 @@ export default function SettingsPage() {
     <Button variant="secondary" type="button"
       onClick={onChange}
       className={`relative w-12 h-6 rounded-full transition-colors ${
-        enabled ? 'bg-primary-500' : 'bg-gray-300'
+        enabled ? 'bg-primary-500' : 'bg-border-strong'
       }`}>
       <motion.div
         animate={{ x: enabled ? 24 : 2 }}
         transition={{ type: 'spring', stiffness: 500, damping: 30 }}
-        className="absolute top-1 w-4 h-4 bg-white rounded-full shadow"
+        className="absolute top-1 w-4 h-4 bg-surface-elevated rounded-full shadow"
       />
     </Button>
   );
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-gray-50 via-white to-primary-50">
+    <div className="min-h-screen bg-gradient-to-br from-surface via-surface-elevated to-primary-50">
       {/* Header */}
-      <div className="bg-gradient-to-r from-primary-500 to-warning-500 text-white">
+      <div className="bg-gradient-to-r from-primary-500 to-warning-500 text-inverted">
         <div className="max-w-3xl mx-auto px-4 py-8">
           <Link
             href="/profile"
-            className="inline-flex items-center gap-2 text-white/80 hover:text-white mb-4 transition-colors group"
+            className="inline-flex items-center gap-2 text-inverted/80 hover:text-inverted mb-4 transition-colors group"
           >
             <ArrowLeftIcon className="w-5 h-5 group-hover:-translate-x-1 transition-transform" />
             <span className="font-medium">{locale === 'en' ? 'Back to Profile' : 'Profile Dön'}</span>
           </Link>
           
           <div className="flex items-center gap-4">
-            <div className="w-14 h-14 bg-white/20 rounded-2xl flex items-center justify-center">
+            <div className="w-14 h-14 bg-surface-elevated/20 rounded-2xl flex items-center justify-center">
               <Cog6ToothIcon className="w-8 h-8" />
             </div>
             <div>
               <h1 className="text-2xl md:text-3xl font-bold">
                 {locale === 'en' ? 'Settings' : 'Ayarlar'}
               </h1>
-              <p className="text-white/80 mt-1">
+              <p className="text-inverted/80 mt-1">
                 {locale === 'en' ? 'Manage your preferences' : 'Tercihlerinizi yönetin'}
               </p>
             </div>
@@ -177,16 +177,16 @@ export default function SettingsPage() {
         <motion.div 
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
-          className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden"
+          className="bg-surface-elevated rounded-2xl shadow-sm border border-border-subtle overflow-hidden"
         >
-          <div className="px-6 py-4 border-b border-gray-100 bg-gray-50/50">
-            <h2 className="text-lg font-semibold text-gray-900 flex items-center gap-2">
+          <div className="px-6 py-4 border-b border-border-subtle bg-surface/50">
+            <h2 className="text-lg font-semibold text-heading flex items-center gap-2">
               <BellIcon className="w-5 h-5 text-primary-500" />
               {locale === 'en' ? 'Notification Preferences' : 'Bildirim Tercihleri'}
             </h2>
           </div>
 
-          <div className="divide-y divide-gray-100">
+          <div className="divide-y divide-border-subtle">
             {/* Email Notifications */}
             <div className="flex items-center justify-between p-5">
               <div className="flex items-center gap-4">
@@ -194,10 +194,10 @@ export default function SettingsPage() {
                   <EnvelopeIcon className="w-5 h-5 text-info-600" />
                 </div>
                 <div>
-                  <p className="font-medium text-gray-900">
+                  <p className="font-medium text-heading">
                     {locale === 'en' ? 'Email Notifications' : 'E-posta Bildirimleri'}
                   </p>
-                  <p className="text-sm text-gray-500">
+                  <p className="text-sm text-muted">
                     {locale === 'en' ? 'Receive important updates via email' : 'Önemli güncellemeler için e-posta al'}
                   </p>
                 </div>
@@ -212,10 +212,10 @@ export default function SettingsPage() {
                   <DevicePhoneMobileIcon className="w-5 h-5 text-primary-600" />
                 </div>
                 <div>
-                  <p className="font-medium text-gray-900">
+                  <p className="font-medium text-heading">
                     {locale === 'en' ? 'Push Notifications' : 'Anlık Bildirimler'}
                   </p>
-                  <p className="text-sm text-gray-500">
+                  <p className="text-sm text-muted">
                     {locale === 'en' ? 'Receive browser notifications' : 'Tarayıcı bildirimleri al'}
                   </p>
                 </div>
@@ -230,10 +230,10 @@ export default function SettingsPage() {
                   <ShoppingBagIcon className="w-5 h-5 text-success-600" />
                 </div>
                 <div>
-                  <p className="font-medium text-gray-900">
+                  <p className="font-medium text-heading">
                     {locale === 'en' ? 'Order Updates' : 'Sipariş Güncellemeleri'}
                   </p>
-                  <p className="text-sm text-gray-500">
+                  <p className="text-sm text-muted">
                     {locale === 'en' ? 'Get notified about order status changes' : 'Sipariş durumu değişikliklerinde bildirim al'}
                   </p>
                 </div>
@@ -248,10 +248,10 @@ export default function SettingsPage() {
                   <ChatBubbleLeftRightIcon className="w-5 h-5 text-info-600" />
                 </div>
                 <div>
-                  <p className="font-medium text-gray-900">
+                  <p className="font-medium text-heading">
                     {locale === 'en' ? 'Message Alerts' : 'Mesaj Uyarıları'}
                   </p>
-                  <p className="text-sm text-gray-500">
+                  <p className="text-sm text-muted">
                     {locale === 'en' ? 'Get notified when you receive a new message' : 'Yeni mesaj geldiğinde bildirim al'}
                   </p>
                 </div>
@@ -266,10 +266,10 @@ export default function SettingsPage() {
                   <TagIcon className="w-5 h-5 text-danger-600" />
                 </div>
                 <div>
-                  <p className="font-medium text-gray-900">
+                  <p className="font-medium text-heading">
                     {locale === 'en' ? 'Price Drop Alerts' : 'Fiyat Düşüşü Uyarıları'}
                   </p>
-                  <p className="text-sm text-gray-500">
+                  <p className="text-sm text-muted">
                     {locale === 'en' ? 'Get notified when favorite items go on sale' : 'Favori ürünlerde fiyat düşünce haber ver'}
                   </p>
                 </div>
@@ -284,10 +284,10 @@ export default function SettingsPage() {
                   <MegaphoneIcon className="w-5 h-5 text-warning-600" />
                 </div>
                 <div>
-                  <p className="font-medium text-gray-900">
+                  <p className="font-medium text-heading">
                     {locale === 'en' ? 'Marketing Emails' : 'Pazarlama E-postaları'}
                   </p>
-                  <p className="text-sm text-gray-500">
+                  <p className="text-sm text-muted">
                     {locale === 'en' ? 'Receive promotions and special offers' : 'Kampanya ve fırsatlardan haberdar ol'}
                   </p>
                 </div>
@@ -302,51 +302,51 @@ export default function SettingsPage() {
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ delay: 0.1 }}
-          className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden"
+          className="bg-surface-elevated rounded-2xl shadow-sm border border-border-subtle overflow-hidden"
         >
-          <div className="px-6 py-4 border-b border-gray-100 bg-gray-50/50">
-            <h2 className="text-lg font-semibold text-gray-900 flex items-center gap-2">
+          <div className="px-6 py-4 border-b border-border-subtle bg-surface/50">
+            <h2 className="text-lg font-semibold text-heading flex items-center gap-2">
               <ShieldCheckIcon className="w-5 h-5 text-primary-500" />
               {locale === 'en' ? 'Security' : 'Güvenlik'}
             </h2>
           </div>
 
-          <div className="divide-y divide-gray-100">
+          <div className="divide-y divide-border-subtle">
             <Link
               href="/profile/change-password"
-              className="flex items-center justify-between p-5 hover:bg-gray-50 transition-colors"
+              className="flex items-center justify-between p-5 hover:bg-surface transition-colors"
             >
               <div className="flex items-center gap-4">
                 <div className="w-10 h-10 bg-info-50 rounded-xl flex items-center justify-center">
                   <KeyIcon className="w-5 h-5 text-info-600" />
                 </div>
                 <div>
-                  <p className="font-medium text-gray-900">
+                  <p className="font-medium text-heading">
                     {locale === 'en' ? 'Change Password' : 'Şifre Değiştir'}
                   </p>
-                  <p className="text-sm text-gray-500">
+                  <p className="text-sm text-muted">
                     {locale === 'en' ? 'Update your account password' : 'Hesap şifrenizi güncelleyin'}
                   </p>
                 </div>
               </div>
-              <ArrowLeftIcon className="w-5 h-5 text-gray-400 rotate-180" />
+              <ArrowLeftIcon className="w-5 h-5 text-subtle rotate-180" />
             </Link>
 
             <div className="flex items-center justify-between p-5 opacity-60">
               <div className="flex items-center gap-4">
-                <div className="w-10 h-10 bg-gray-100 rounded-xl flex items-center justify-center">
-                  <FingerPrintIcon className="w-5 h-5 text-gray-500" />
+                <div className="w-10 h-10 bg-surface-alt rounded-xl flex items-center justify-center">
+                  <FingerPrintIcon className="w-5 h-5 text-muted" />
                 </div>
                 <div>
-                  <p className="font-medium text-gray-900">
+                  <p className="font-medium text-heading">
                     {locale === 'en' ? 'Two-Factor Authentication' : 'İki Faktörlü Doğrulama'}
                   </p>
-                  <p className="text-sm text-gray-500">
+                  <p className="text-sm text-muted">
                     {locale === 'en' ? 'Add an extra layer of security' : 'Ekstra güvenlik katmanı ekleyin'}
                   </p>
                 </div>
               </div>
-              <span className="text-xs bg-gray-200 text-gray-600 px-3 py-1 rounded-full font-medium">
+              <span className="text-xs bg-border-subtle text-muted px-3 py-1 rounded-full font-medium">
                 {locale === 'en' ? 'Coming Soon' : 'Yakında'}
               </span>
             </div>
@@ -398,7 +398,7 @@ export default function SettingsPage() {
                 <div className="w-16 h-16 bg-danger-100 rounded-full flex items-center justify-center mx-auto mb-4">
                   <ExclamationTriangleIcon className="w-8 h-8 text-danger-600" />
                 </div>
-                <p className="text-gray-500">
+                <p className="text-muted">
                   {locale === 'en'
                     ? 'This action cannot be undone. All your data, listings, and order history will be permanently deleted.'
                     : 'Bu işlem geri alınamaz. Tüm verileriniz, ilanlarınız ve sipariş geçmişiniz kalıcı olarak silinecektir.'}
@@ -406,7 +406,7 @@ export default function SettingsPage() {
               </div>
               
               <div className="mb-6">
-                <label className="block text-sm font-medium text-gray-700 mb-2">
+                <label className="block text-sm font-medium text-body mb-2">
                   {locale === 'en' ? 'Type SİL to confirm:' : 'Onaylamak için SİL yazın:'}
                 </label>
                 <Input type="text"

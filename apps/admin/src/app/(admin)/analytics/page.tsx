@@ -26,7 +26,7 @@ import {
   Filler,
 } from "chart.js";
 import { Line, Bar, Doughnut } from "react-chartjs-2";
-import { Button, Spinner } from "@tarodan/ui";
+import { Button, Spinner, colors as dsColors } from "@tarodan/ui";
 
 ChartJS.register(
   CategoryScale,
@@ -60,6 +60,18 @@ const ORDER_STATUS_LABELS: Record<string, string> = {
   cancelled: "İptal",
   refund_requested: "İade Talebi",
   refunded: "İade Edildi",
+};
+
+const chartPalette = {
+  primary: dsColors.primary[500]!,
+  primaryLight: dsColors.primary[100]!,
+  info: dsColors.info[500]!,
+  infoLight: dsColors.info[100]!,
+  success: dsColors.success[500]!,
+  warning: dsColors.warning[500]!,
+  danger: dsColors.danger[500]!,
+  subtle: dsColors.text.subtle,
+  grid: "rgba(255,255,255,0.1)",
 };
 
 export default function AnalyticsPage() {
@@ -283,8 +295,8 @@ export default function AnalyticsPage() {
       {
         label: "Satışlar (₺)",
         data: data?.salesReport.dailyData?.map((d: any) => d.revenue) || [],
-        borderColor: "#e94560",
-        backgroundColor: "rgba(233, 69, 96, 0.1)",
+        borderColor: chartPalette.primary,
+        backgroundColor: chartPalette.primaryLight,
         tension: 0.4,
         fill: true,
       },
@@ -297,7 +309,7 @@ export default function AnalyticsPage() {
       {
         label: "Siparişler",
         data: data?.salesReport.dailyData?.map((d: any) => d.orders) || [],
-        backgroundColor: "#4cc9f0",
+        backgroundColor: chartPalette.info,
         borderRadius: 4,
       },
     ],
@@ -309,8 +321,8 @@ export default function AnalyticsPage() {
       {
         label: "Yeni Kullanıcılar",
         data: data?.userReport.userGrowth?.map((d: any) => d.users) || [],
-        borderColor: "#4cc9f0",
-        backgroundColor: "rgba(76, 201, 240, 0.1)",
+        borderColor: chartPalette.info,
+        backgroundColor: chartPalette.infoLight,
         tension: 0.4,
         fill: true,
       },
@@ -327,12 +339,12 @@ export default function AnalyticsPage() {
             (d: any) => d.percentage,
           ) || [],
         backgroundColor: [
-          "#e94560",
-          "#4cc9f0",
-          "#f72585",
-          "#7209b7",
-          "#3a0ca3",
-          "#4361ee",
+          chartPalette.primary,
+          chartPalette.info,
+          chartPalette.success,
+          chartPalette.warning,
+          chartPalette.danger,
+          dsColors.primary[700]!,
         ],
         borderWidth: 0,
       },
@@ -347,12 +359,12 @@ export default function AnalyticsPage() {
     },
     scales: {
       x: {
-        grid: { color: "rgba(255,255,255,0.1)" },
-        ticks: { color: "#9ca3af" },
+        grid: { color: chartPalette.grid },
+        ticks: { color: chartPalette.subtle },
       },
       y: {
-        grid: { color: "rgba(255,255,255,0.1)" },
-        ticks: { color: "#9ca3af" },
+        grid: { color: chartPalette.grid },
+        ticks: { color: chartPalette.subtle },
       },
     },
   };
@@ -370,14 +382,14 @@ export default function AnalyticsPage() {
       {/* Header */}
       <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
         <div>
-          <h1 className="text-2xl font-bold text-gray-900">Analizler</h1>
-          <p className="text-gray-500 mt-1">
+          <h1 className="text-2xl font-bold text-heading">Analizler</h1>
+          <p className="text-muted mt-1">
             Detaylı satış, kullanıcı ve ürün analizleri
           </p>
         </div>
 
         {/* Date Range Selector */}
-        <div className="flex items-center gap-2 bg-white rounded-lg p-1">
+        <div className="flex items-center gap-2 bg-surface-elevated rounded-lg p-1">
           {(["7d", "30d", "90d", "1y"] as DateRange[]).map((range) => (
             <Button
               variant="secondary"
@@ -385,8 +397,8 @@ export default function AnalyticsPage() {
               onClick={() => setDateRange(range)}
               className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
                 dateRange === range
-                  ? "bg-primary-500 text-gray-900"
-                  : "text-gray-500 hover:text-gray-900"
+                  ? "bg-primary-500 text-heading"
+                  : "text-muted hover:text-heading"
               }`}
             >
               {range === "7d"
@@ -402,7 +414,7 @@ export default function AnalyticsPage() {
       </div>
 
       {/* Tabs */}
-      <div className="border-b border-gray-200">
+      <div className="border-b border-border">
         <nav className="flex gap-4">
           {[
             {
@@ -425,7 +437,7 @@ export default function AnalyticsPage() {
               className={`flex items-center gap-2 px-4 py-3 border-b-2 transition-colors ${
                 activeTab === tab.key
                   ? "border-primary-500 text-primary-600"
-                  : "border-transparent text-gray-500 hover:text-gray-900"
+                  : "border-transparent text-muted hover:text-heading"
               }`}
             >
               <tab.icon className="h-5 w-5" />
@@ -469,7 +481,7 @@ export default function AnalyticsPage() {
           {/* Charts */}
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
             <div className="admin-card">
-              <h3 className="text-lg font-semibold text-gray-900 mb-4">
+              <h3 className="text-lg font-semibold text-heading mb-4">
                 Gelir Grafiği
               </h3>
               <div className="h-80">
@@ -477,7 +489,7 @@ export default function AnalyticsPage() {
               </div>
             </div>
             <div className="admin-card">
-              <h3 className="text-lg font-semibold text-gray-900 mb-4">
+              <h3 className="text-lg font-semibold text-heading mb-4">
                 Sipariş Sayısı
               </h3>
               <div className="h-80">
@@ -488,7 +500,7 @@ export default function AnalyticsPage() {
 
           {/* Order Status Distribution */}
           <div className="admin-card">
-            <h3 className="text-lg font-semibold text-gray-900 mb-4">
+            <h3 className="text-lg font-semibold text-heading mb-4">
               Sipariş Durumu Dağılımı
             </h3>
             <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
@@ -496,12 +508,12 @@ export default function AnalyticsPage() {
                 ([status, count]) => (
                   <div
                     key={status}
-                    className="bg-gray-100 rounded-lg p-4 text-center"
+                    className="bg-surface-alt rounded-lg p-4 text-center"
                   >
-                    <p className="text-2xl font-bold text-gray-900">
+                    <p className="text-2xl font-bold text-heading">
                       {String(count)}
                     </p>
-                    <p className="text-sm text-gray-500">
+                    <p className="text-sm text-muted">
                       {ORDER_STATUS_LABELS[status] ?? status}
                     </p>
                   </div>
@@ -543,7 +555,7 @@ export default function AnalyticsPage() {
           </div>
 
           <div className="admin-card">
-            <h3 className="text-lg font-semibold text-gray-900 mb-4">
+            <h3 className="text-lg font-semibold text-heading mb-4">
               Kullanıcı Büyümesi
             </h3>
             <div className="h-80">
@@ -585,7 +597,7 @@ export default function AnalyticsPage() {
 
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
             <div className="admin-card">
-              <h3 className="text-lg font-semibold text-gray-900 mb-4">
+              <h3 className="text-lg font-semibold text-heading mb-4">
                 Kategori Dağılımı
               </h3>
               <div className="h-80">
@@ -597,7 +609,7 @@ export default function AnalyticsPage() {
                     plugins: {
                       legend: {
                         position: "right",
-                        labels: { color: "#9ca3af" },
+                        labels: { color: chartPalette.subtle },
                       },
                     },
                   }}
@@ -605,7 +617,7 @@ export default function AnalyticsPage() {
               </div>
             </div>
             <div className="admin-card">
-              <h3 className="text-lg font-semibold text-gray-900 mb-4">
+              <h3 className="text-lg font-semibold text-heading mb-4">
                 Kategorilere Göre Ürünler
               </h3>
               <div className="space-y-4">
@@ -615,16 +627,16 @@ export default function AnalyticsPage() {
                     className="flex items-center justify-between"
                   >
                     <div className="flex items-center gap-3">
-                      <span className="text-gray-900">{cat.name}</span>
+                      <span className="text-heading">{cat.name}</span>
                     </div>
                     <div className="flex items-center gap-3">
-                      <div className="w-32 bg-gray-100 rounded-full h-2">
+                      <div className="w-32 bg-surface-alt rounded-full h-2">
                         <div
                           className="bg-primary-500 h-2 rounded-full"
                           style={{ width: `${cat.percentage}%` }}
                         />
                       </div>
-                      <span className="text-gray-500 text-sm w-12 text-right">
+                      <span className="text-muted text-sm w-12 text-right">
                         {cat.count}
                       </span>
                     </div>
@@ -667,7 +679,7 @@ export default function AnalyticsPage() {
           </div>
 
           <div className="admin-card">
-            <h3 className="text-lg font-semibold text-gray-900 mb-4">
+            <h3 className="text-lg font-semibold text-heading mb-4">
               Takas İstatistikleri
             </h3>
             <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
@@ -675,19 +687,19 @@ export default function AnalyticsPage() {
                 <p className="text-2xl font-bold text-success-700">
                   {data?.tradeReport.completedTrades || 0}
                 </p>
-                <p className="text-sm text-gray-500">Tamamlanan</p>
+                <p className="text-sm text-muted">Tamamlanan</p>
               </div>
               <div className="bg-warning-900/20 border border-warning-700 rounded-lg p-4 text-center">
                 <p className="text-2xl font-bold text-warning-700">
                   {data?.tradeReport.pendingTrades || 0}
                 </p>
-                <p className="text-sm text-gray-500">Bekleyen</p>
+                <p className="text-sm text-muted">Bekleyen</p>
               </div>
               <div className="bg-danger-900/20 border border-danger-700 rounded-lg p-4 text-center">
                 <p className="text-2xl font-bold text-danger-600">
                   {data?.tradeReport.disputedTrades || 0}
                 </p>
-                <p className="text-sm text-gray-500">Anlaşmazlık</p>
+                <p className="text-sm text-muted">Anlaşmazlık</p>
               </div>
               <div className="bg-info-900/20 border border-info-700 rounded-lg p-4 text-center">
                 <p className="text-2xl font-bold text-info-700">
@@ -701,7 +713,7 @@ export default function AnalyticsPage() {
                     : 0}
                   %
                 </p>
-                <p className="text-sm text-gray-500">Başarı Oranı</p>
+                <p className="text-sm text-muted">Başarı Oranı</p>
               </div>
             </div>
           </div>
@@ -802,11 +814,11 @@ function StatCard({
     <div className="admin-card">
       <div className="flex items-center justify-between">
         <div>
-          <p className="text-sm text-gray-500">{title}</p>
-          <p className="text-2xl font-bold text-gray-900 mt-1">{value}</p>
+          <p className="text-sm text-muted">{title}</p>
+          <p className="text-2xl font-bold text-heading mt-1">{value}</p>
         </div>
         <div className={`p-3 rounded-lg ${color}`}>
-          <Icon className="h-6 w-6 text-gray-900" />
+          <Icon className="h-6 w-6 text-heading" />
         </div>
       </div>
     </div>

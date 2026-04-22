@@ -36,8 +36,8 @@ export default function LanguageSwitcher({ variant = 'dropdown', className = '' 
             onClick={() => setLocale(l)}
             className={`px-2 py-1 text-sm rounded transition-colors ${
               locale === l
-                ? 'bg-primary-500 text-white'
-                : 'text-gray-600 hover:bg-gray-100'
+                ? 'bg-primary-500 text-inverted'
+                : 'text-muted hover:bg-surface-alt'
             }`}>
             {localeFlags[l]} {l.toUpperCase()}
           </Button>
@@ -49,7 +49,7 @@ export default function LanguageSwitcher({ variant = 'dropdown', className = '' 
   if (variant === 'minimal') {
     return (
       <Button variant="secondary" onClick={() => setLocale(locale === 'tr' ? 'en' : 'tr')}
-        className={`flex items-center gap-1 text-sm text-gray-600 hover:text-primary-500 transition-colors ${className}`}
+        className={`flex items-center gap-1 text-sm text-muted hover:text-primary-500 transition-colors ${className}`}
         title={t('language.selectLanguage')}>
         <GlobeAltIcon className="w-5 h-5" />
         <span>{locale.toUpperCase()}</span>
@@ -60,7 +60,7 @@ export default function LanguageSwitcher({ variant = 'dropdown', className = '' 
   return (
     <div ref={dropdownRef} className={`relative ${className}`}>
       <Button variant="secondary" onClick={() => setIsOpen(!isOpen)}
-        className="flex items-center gap-2 px-3 py-2 text-sm text-gray-700 hover:bg-gray-100 rounded-lg transition-colors"
+        className="flex items-center gap-2 px-3 py-2 text-sm text-body hover:bg-surface-alt rounded-lg transition-colors"
         aria-expanded={isOpen}
         aria-haspopup="listbox">
         <GlobeAltIcon className="w-5 h-5" />
@@ -70,8 +70,8 @@ export default function LanguageSwitcher({ variant = 'dropdown', className = '' 
       </Button>
 
       {isOpen && (
-        <div className="absolute right-0 mt-2 w-40 bg-white rounded-lg shadow-lg border border-gray-200 py-1 z-50">
-          <div className="px-3 py-2 text-xs text-gray-500 border-b">
+        <div className="absolute right-0 mt-2 w-40 bg-surface-elevated rounded-lg shadow-lg border border-border py-1 z-50">
+          <div className="px-3 py-2 text-xs text-muted border-b">
             {t('language.selectLanguage')}
           </div>
           {locales.map((l) => (
@@ -83,7 +83,7 @@ export default function LanguageSwitcher({ variant = 'dropdown', className = '' 
               className={`w-full flex items-center gap-3 px-3 py-2 text-sm transition-colors ${
                 locale === l
                   ? 'bg-primary-50 text-primary-600'
-                  : 'text-gray-700 hover:bg-gray-50'
+                  : 'text-body hover:bg-surface'
               }`}
               role="option"
               aria-selected={locale === l}>

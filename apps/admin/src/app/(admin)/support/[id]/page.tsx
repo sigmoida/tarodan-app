@@ -51,11 +51,11 @@ const statusConfig: Record<string, { label: string; color: string; bg: string }>
   in_progress: { label: 'İşlemde', color: 'text-warning-600', bg: 'bg-warning-100' },
   waiting_customer: { label: 'Müşteri Bekleniyor', color: 'text-primary-600', bg: 'bg-primary-100' },
   resolved: { label: 'Çözüldü', color: 'text-success-600', bg: 'bg-success-100' },
-  closed: { label: 'Kapatıldı', color: 'text-gray-600', bg: 'bg-gray-100' },
+  closed: { label: 'Kapatıldı', color: 'text-muted', bg: 'bg-surface-alt' },
 };
 
 const priorityConfig: Record<string, { label: string; color: string; bg: string }> = {
-  low: { label: 'Düşük', color: 'text-gray-600', bg: 'bg-gray-100' },
+  low: { label: 'Düşük', color: 'text-muted', bg: 'bg-surface-alt' },
   medium: { label: 'Orta', color: 'text-warning-600', bg: 'bg-warning-100' },
   high: { label: 'Yüksek', color: 'text-primary-600', bg: 'bg-primary-100' },
   urgent: { label: 'Acil', color: 'text-danger-600', bg: 'bg-danger-100' },
@@ -134,7 +134,7 @@ export default function SupportTicketDetailPage() {
       <div className="flex items-center justify-center min-h-screen">
         <div className="text-center">
           <Spinner size="xl" color="border-primary-600 border-t-transparent" className="mx-auto" />
-          <p className="mt-4 text-gray-600">Yükleniyor...</p>
+          <p className="mt-4 text-muted">Yükleniyor...</p>
         </div>
       </div>
     );
@@ -143,7 +143,7 @@ export default function SupportTicketDetailPage() {
   if (!ticket) {
     return (
       <div className="text-center py-12">
-        <p className="text-gray-600">Destek talebi bulunamadı</p>
+        <p className="text-muted">Destek talebi bulunamadı</p>
       </div>
     );
   }
@@ -152,19 +152,19 @@ export default function SupportTicketDetailPage() {
   const priorityInfo = priorityConfig[ticket.priority] || priorityConfig.medium;
 
   return (
-      <div className="min-h-screen bg-gray-50">
+      <div className="min-h-screen bg-surface">
         <main className="max-w-6xl mx-auto px-4 py-8">
           {/* Header */}
           <div className="flex items-center gap-4 mb-8">
             <Link
               href="/support"
-              className="p-2 hover:bg-gray-200 rounded-lg transition-colors"
+              className="p-2 hover:bg-border-subtle rounded-lg transition-colors"
             >
-              <ArrowLeftIcon className="w-6 h-6 text-gray-600" />
+              <ArrowLeftIcon className="w-6 h-6 text-muted" />
             </Link>
             <div className="flex-1">
-              <h1 className="text-3xl font-bold text-gray-900">{ticket.subject}</h1>
-              <p className="text-sm text-gray-500">#{ticket.ticketNumber}</p>
+              <h1 className="text-3xl font-bold text-heading">{ticket.subject}</h1>
+              <p className="text-sm text-muted">#{ticket.ticketNumber}</p>
             </div>
             <div className="flex items-center gap-2">
               <span className={`px-4 py-2 rounded-full font-medium ${priorityInfo.color} ${priorityInfo.bg}`}>
@@ -180,14 +180,14 @@ export default function SupportTicketDetailPage() {
             {/* Main Content */}
             <div className="lg:col-span-2 space-y-6">
               {/* Messages */}
-              <div className="bg-white rounded-xl shadow-sm p-6">
+              <div className="bg-surface-elevated rounded-xl shadow-sm p-6">
                 <div className="flex items-center justify-between mb-4">
-                  <h2 className="text-lg font-semibold text-gray-900 flex items-center gap-2">
+                  <h2 className="text-lg font-semibold text-heading flex items-center gap-2">
                     <ChatBubbleLeftRightIcon className="w-5 h-5" />
                     Mesajlar
                   </h2>
                   <Button variant="secondary" onClick={() => setShowReplyModal(true)}
-                    className="px-4 py-2 bg-primary-600 text-gray-900 rounded-lg hover:bg-primary-700 transition-colors">
+                    className="px-4 py-2 bg-primary-600 text-heading rounded-lg hover:bg-primary-700 transition-colors">
                     Yanıtla
                   </Button>
                 </div>
@@ -198,7 +198,7 @@ export default function SupportTicketDetailPage() {
                       className={`p-4 rounded-lg ${
                         message.isInternal
                           ? 'bg-warning-50 border border-warning-200'
-                          : 'bg-gray-50'
+                          : 'bg-surface'
                       }`}
                     >
                       <div className="flex items-center justify-between mb-2">
@@ -210,11 +210,11 @@ export default function SupportTicketDetailPage() {
                             </span>
                           )}
                         </div>
-                        <span className="text-xs text-gray-500">
+                        <span className="text-xs text-muted">
                           {new Date(message.createdAt).toLocaleString('tr-TR')}
                         </span>
                       </div>
-                      <p className="text-gray-700 whitespace-pre-wrap">{message.content}</p>
+                      <p className="text-body whitespace-pre-wrap">{message.content}</p>
                     </div>
                   ))}
                 </div>
@@ -224,28 +224,28 @@ export default function SupportTicketDetailPage() {
             {/* Sidebar */}
             <div className="space-y-6">
               {/* Ticket Info */}
-              <div className="bg-white rounded-xl shadow-sm p-6">
-                <h3 className="text-lg font-semibold text-gray-900 mb-4">Talep Bilgileri</h3>
+              <div className="bg-surface-elevated rounded-xl shadow-sm p-6">
+                <h3 className="text-lg font-semibold text-heading mb-4">Talep Bilgileri</h3>
                 <div className="space-y-3">
                   <div>
-                    <span className="text-gray-600 text-sm">Kategori:</span>
+                    <span className="text-muted text-sm">Kategori:</span>
                     <p className="font-medium capitalize">{ticket.category}</p>
                   </div>
                   <div>
-                    <span className="text-gray-600 text-sm">Öncelik:</span>
+                    <span className="text-muted text-sm">Öncelik:</span>
                     <span className={`ml-2 px-2 py-1 rounded text-xs ${priorityInfo.color} ${priorityInfo.bg}`}>
                       {priorityInfo.label}
                     </span>
                   </div>
                   <div>
-                    <span className="text-gray-600 text-sm">Durum:</span>
+                    <span className="text-muted text-sm">Durum:</span>
                     <span className={`ml-2 px-2 py-1 rounded text-xs ${statusInfo.color} ${statusInfo.bg}`}>
                       {statusInfo.label}
                     </span>
                   </div>
                   {ticket.assignee && (
                     <div>
-                      <span className="text-gray-600 text-sm">Atanan:</span>
+                      <span className="text-muted text-sm">Atanan:</span>
                       <p className="font-medium">{ticket.assignee.displayName}</p>
                     </div>
                   )}
@@ -253,8 +253,8 @@ export default function SupportTicketDetailPage() {
               </div>
 
               {/* Creator Info */}
-              <div className="bg-white rounded-xl shadow-sm p-6">
-                <h3 className="text-lg font-semibold text-gray-900 mb-4">Oluşturan</h3>
+              <div className="bg-surface-elevated rounded-xl shadow-sm p-6">
+                <h3 className="text-lg font-semibold text-heading mb-4">Oluşturan</h3>
                 <div className="space-y-2">
                   <Link
                     href={`/users/${ticket.creator.id}`}
@@ -262,44 +262,44 @@ export default function SupportTicketDetailPage() {
                   >
                     {ticket.creator.displayName}
                   </Link>
-                  <p className="text-sm text-gray-600">{ticket.creator.email}</p>
+                  <p className="text-sm text-muted">{ticket.creator.email}</p>
                 </div>
               </div>
 
               {/* Actions */}
-              <div className="bg-white rounded-xl shadow-sm p-6">
-                <h3 className="text-lg font-semibold text-gray-900 mb-4">İşlemler</h3>
+              <div className="bg-surface-elevated rounded-xl shadow-sm p-6">
+                <h3 className="text-lg font-semibold text-heading mb-4">İşlemler</h3>
                 <div className="space-y-2">
                   <Button variant="secondary" onClick={() => setShowStatusModal(true)}
-                    className="w-full px-4 py-2 bg-primary-600 text-gray-900 rounded-lg hover:bg-primary-700 transition-colors">
+                    className="w-full px-4 py-2 bg-primary-600 text-heading rounded-lg hover:bg-primary-700 transition-colors">
                     Durum Güncelle
                   </Button>
                 </div>
               </div>
 
               {/* Timeline */}
-              <div className="bg-white rounded-xl shadow-sm p-6">
-                <h3 className="text-lg font-semibold text-gray-900 mb-4 flex items-center gap-2">
+              <div className="bg-surface-elevated rounded-xl shadow-sm p-6">
+                <h3 className="text-lg font-semibold text-heading mb-4 flex items-center gap-2">
                   <ClockIcon className="w-5 h-5" />
                   Zaman Çizelgesi
                 </h3>
                 <div className="space-y-3">
                   <div>
                     <p className="text-sm font-medium">Oluşturulma</p>
-                    <p className="text-xs text-gray-500">
+                    <p className="text-xs text-muted">
                       {new Date(ticket.createdAt).toLocaleString('tr-TR')}
                     </p>
                   </div>
                   <div>
                     <p className="text-sm font-medium">Son Güncelleme</p>
-                    <p className="text-xs text-gray-500">
+                    <p className="text-xs text-muted">
                       {new Date(ticket.updatedAt).toLocaleString('tr-TR')}
                     </p>
                   </div>
                   {ticket.resolvedAt && (
                     <div>
                       <p className="text-sm font-medium">Çözülme</p>
-                      <p className="text-xs text-gray-500">
+                      <p className="text-xs text-muted">
                         {new Date(ticket.resolvedAt).toLocaleString('tr-TR')}
                       </p>
                     </div>
@@ -312,11 +312,11 @@ export default function SupportTicketDetailPage() {
 
         {/* Reply Modal */}
         {showReplyModal && (
-          <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-            <div className="bg-white rounded-xl p-6 max-w-md w-full mx-4">
-              <h3 className="text-lg font-semibold text-gray-900 mb-4">Yanıt Ver</h3>
+          <div className="fixed inset-0 bg-heading bg-opacity-50 flex items-center justify-center z-50">
+            <div className="bg-surface-elevated rounded-xl p-6 max-w-md w-full mx-4">
+              <h3 className="text-lg font-semibold text-heading mb-4">Yanıt Ver</h3>
               <div className="mb-4">
-                <label className="block text-sm font-medium text-gray-700 mb-2">
+                <label className="block text-sm font-medium text-body mb-2">
                   Mesaj *
                 </label>
                 <Textarea value={replyMessage}
@@ -329,12 +329,12 @@ export default function SupportTicketDetailPage() {
                     setShowReplyModal(false);
                     setReplyMessage('');
                   }}
-                  className="flex-1 px-4 text-gray-700 hover:bg-gray-50"
+                  className="flex-1 px-4 text-body hover:bg-surface"
                   disabled={processing}>
                   İptal
                 </Button>
                 <Button variant="secondary" onClick={handleReply}
-                  className="flex-1 px-4 py-2 bg-primary-600 text-gray-900 rounded-lg hover:bg-primary-700 transition-colors disabled:opacity-50"
+                  className="flex-1 px-4 py-2 bg-primary-600 text-heading rounded-lg hover:bg-primary-700 transition-colors disabled:opacity-50"
                   disabled={processing}>
                   {processing ? 'İşleniyor...' : 'Gönder'}
                 </Button>
@@ -345,11 +345,11 @@ export default function SupportTicketDetailPage() {
 
         {/* Status Update Modal */}
         {showStatusModal && (
-          <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-            <div className="bg-white rounded-xl p-6 max-w-md w-full mx-4">
-              <h3 className="text-lg font-semibold text-gray-900 mb-4">Durum Güncelle</h3>
+          <div className="fixed inset-0 bg-heading bg-opacity-50 flex items-center justify-center z-50">
+            <div className="bg-surface-elevated rounded-xl p-6 max-w-md w-full mx-4">
+              <h3 className="text-lg font-semibold text-heading mb-4">Durum Güncelle</h3>
               <div className="mb-4">
-                <label className="block text-sm font-medium text-gray-700 mb-2">
+                <label className="block text-sm font-medium text-body mb-2">
                   Yeni Durum
                 </label>
                 <Select
@@ -365,12 +365,12 @@ export default function SupportTicketDetailPage() {
               </div>
               <div className="flex gap-3">
                 <Button variant="secondary" onClick={() => setShowStatusModal(false)}
-                  className="flex-1 px-4 text-gray-700 hover:bg-gray-50"
+                  className="flex-1 px-4 text-body hover:bg-surface"
                   disabled={processing}>
                   İptal
                 </Button>
                 <Button variant="secondary" onClick={handleStatusUpdate}
-                  className="flex-1 px-4 py-2 bg-primary-600 text-gray-900 rounded-lg hover:bg-primary-700 transition-colors disabled:opacity-50"
+                  className="flex-1 px-4 py-2 bg-primary-600 text-heading rounded-lg hover:bg-primary-700 transition-colors disabled:opacity-50"
                   disabled={processing}>
                   {processing ? 'İşleniyor...' : 'Güncelle'}
                 </Button>

@@ -206,9 +206,9 @@ export default function GuidesPage() {
   const currentGuide = GUIDES.find((g) => g.id === activeGuide) || GUIDES[0];
 
   return (
-    <div className="min-h-screen bg-gray-50">
+    <div className="min-h-screen bg-surface">
       {/* Hero Section */}
-      <div className="bg-gradient-to-br from-primary-500 to-primary-600 text-white py-16">
+      <div className="bg-gradient-to-br from-primary-500 to-primary-600 text-inverted py-16">
         <div className="max-w-4xl mx-auto px-4 text-center">
           <h1 className="text-4xl font-bold mb-4">{t('guides.title')}</h1>
           <p className="text-lg text-primary-100">
@@ -225,30 +225,30 @@ export default function GuidesPage() {
               onClick={() => setActiveGuide(guide.id)}
               className={`p-4 rounded-xl text-center transition-all ${
                 activeGuide === guide.id
-                  ? 'bg-white shadow-lg ring-2 ring-primary-500'
-                  : 'bg-white shadow-sm hover:shadow-md'
+                  ? 'bg-surface-elevated shadow-lg ring-2 ring-primary-500'
+                  : 'bg-surface-elevated shadow-sm hover:shadow-md'
               }`}>
               <div
                 className={`w-12 h-12 ${guide.bgColor} rounded-xl flex items-center justify-center mx-auto mb-3`}
               >
                 <guide.icon className={`w-6 h-6 ${guide.color}`} />
               </div>
-              <span className="text-sm font-medium text-gray-900">{guide.title.split(' ')[0]}</span>
+              <span className="text-sm font-medium text-heading">{guide.title.split(' ')[0]}</span>
             </Button>
           ))}
         </div>
 
         {/* Active Guide Content */}
-        <div className="bg-white rounded-2xl shadow-sm overflow-hidden">
+        <div className="bg-surface-elevated rounded-2xl shadow-sm overflow-hidden">
           {/* Guide Header */}
           <div className={`${currentGuide.bgColor} p-8`}>
             <div className="flex items-center gap-4 mb-4">
-              <div className="w-16 h-16 bg-white rounded-2xl flex items-center justify-center shadow-sm">
+              <div className="w-16 h-16 bg-surface-elevated rounded-2xl flex items-center justify-center shadow-sm">
                 <currentGuide.icon className={`w-8 h-8 ${currentGuide.color}`} />
               </div>
               <div>
-                <h2 className="text-2xl font-bold text-gray-900">{currentGuide.title}</h2>
-                <p className="text-gray-600">{currentGuide.description}</p>
+                <h2 className="text-2xl font-bold text-heading">{currentGuide.title}</h2>
+                <p className="text-muted">{currentGuide.description}</p>
               </div>
             </div>
           </div>
@@ -259,13 +259,13 @@ export default function GuidesPage() {
               {currentGuide.steps.map((step, index) => (
                 <div key={index} className="flex gap-4">
                   <div className="flex-shrink-0">
-                    <div className="w-10 h-10 bg-primary-500 text-white rounded-full flex items-center justify-center font-bold">
+                    <div className="w-10 h-10 bg-primary-500 text-inverted rounded-full flex items-center justify-center font-bold">
                       {index + 1}
                     </div>
                   </div>
                   <div className="flex-1 pt-1">
-                    <h3 className="font-semibold text-gray-900 mb-2">{step.title}</h3>
-                    <p className="text-gray-600">{step.content}</p>
+                    <h3 className="font-semibold text-heading mb-2">{step.title}</h3>
+                    <p className="text-muted">{step.content}</p>
                   </div>
                 </div>
               ))}
@@ -298,7 +298,7 @@ export default function GuidesPage() {
         </div>
 
         {/* Safety Tips */}
-        <div className="mt-12 bg-gradient-to-r from-success-500 to-success-600 rounded-2xl p-8 text-white">
+        <div className="mt-12 bg-gradient-to-r from-success-500 to-success-600 rounded-2xl p-8 text-inverted">
           <div className="flex items-start gap-4">
             <ShieldCheckIcon className="w-12 h-12 flex-shrink-0" />
             <div>
@@ -324,17 +324,17 @@ export default function GuidesPage() {
 
         {/* Help CTA */}
         <div className="mt-12 text-center">
-          <p className="text-gray-600 mb-4">{t('guides.stillHaveQuestions')}</p>
+          <p className="text-muted mb-4">{t('guides.stillHaveQuestions')}</p>
           <div className="flex flex-wrap justify-center gap-4">
             <Link
               href="/faq"
-              className="px-6 py-3 bg-gray-100 text-gray-700 rounded-xl font-semibold hover:bg-gray-200 transition-colors"
+              className="px-6 py-3 bg-surface-alt text-body rounded-xl font-semibold hover:bg-border-subtle transition-colors"
             >
               {t('guides.faqLink')}
             </Link>
             <Link
               href="/contact"
-              className="px-6 py-3 bg-primary-500 text-white rounded-xl font-semibold hover:bg-primary-600 transition-colors"
+              className="px-6 py-3 bg-primary-500 text-inverted rounded-xl font-semibold hover:bg-primary-600 transition-colors"
             >
               {t('guides.contactLink')}
             </Link>

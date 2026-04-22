@@ -321,7 +321,7 @@ export default function ShippingPage() {
         return (
           <>
             <div>
-              <label className="block text-sm font-medium text-gray-600 mb-2">
+              <label className="block text-sm font-medium text-muted mb-2">
                 Ad *
               </label>
               <Input
@@ -334,7 +334,7 @@ export default function ShippingPage() {
               />
             </div>
             <div>
-              <label className="block text-sm font-medium text-gray-600 mb-2">
+              <label className="block text-sm font-medium text-muted mb-2">
                 Kod *
               </label>
               <Input
@@ -347,7 +347,7 @@ export default function ShippingPage() {
               />
             </div>
             <div>
-              <label className="block text-sm font-medium text-gray-600 mb-2">
+              <label className="block text-sm font-medium text-muted mb-2">
                 Açıklama
               </label>
               <Textarea
@@ -375,7 +375,7 @@ export default function ShippingPage() {
           <>
             <div className="grid grid-cols-2 gap-4">
               <div>
-                <label className="block text-sm font-medium text-gray-600 mb-2">
+                <label className="block text-sm font-medium text-muted mb-2">
                   Ad *
                 </label>
                 <Input
@@ -388,7 +388,7 @@ export default function ShippingPage() {
                 />
               </div>
               <div>
-                <label className="block text-sm font-medium text-gray-600 mb-2">
+                <label className="block text-sm font-medium text-muted mb-2">
                   Kod *
                 </label>
                 <Input
@@ -402,7 +402,7 @@ export default function ShippingPage() {
               </div>
             </div>
             <div>
-              <label className="block text-sm font-medium text-gray-600 mb-2">
+              <label className="block text-sm font-medium text-muted mb-2">
                 Logo URL
               </label>
               <Input
@@ -414,7 +414,7 @@ export default function ShippingPage() {
               />
             </div>
             <div>
-              <label className="block text-sm font-medium text-gray-600 mb-2">
+              <label className="block text-sm font-medium text-muted mb-2">
                 Takip URL
               </label>
               <Input
@@ -428,7 +428,7 @@ export default function ShippingPage() {
             </div>
             <div className="grid grid-cols-2 gap-4">
               <div>
-                <label className="block text-sm font-medium text-gray-600 mb-2">
+                <label className="block text-sm font-medium text-muted mb-2">
                   API Key
                 </label>
                 <Input
@@ -440,7 +440,7 @@ export default function ShippingPage() {
                 />
               </div>
               <div>
-                <label className="block text-sm font-medium text-gray-600 mb-2">
+                <label className="block text-sm font-medium text-muted mb-2">
                   API Secret
                 </label>
                 <Input
@@ -468,7 +468,7 @@ export default function ShippingPage() {
         return (
           <>
             <div>
-              <label className="block text-sm font-medium text-gray-600 mb-2">
+              <label className="block text-sm font-medium text-muted mb-2">
                 Bölge Adı *
               </label>
               <Input
@@ -481,7 +481,7 @@ export default function ShippingPage() {
               />
             </div>
             <div>
-              <label className="block text-sm font-medium text-gray-600 mb-2">
+              <label className="block text-sm font-medium text-muted mb-2">
                 Ülkeler (virgülle ayırın)
               </label>
               <Input
@@ -520,7 +520,7 @@ export default function ShippingPage() {
           <>
             <div className="grid grid-cols-3 gap-4">
               <div>
-                <label className="block text-sm font-medium text-gray-600 mb-2">
+                <label className="block text-sm font-medium text-muted mb-2">
                   Bölge *
                 </label>
                 <Select
@@ -539,7 +539,7 @@ export default function ShippingPage() {
                 </Select>
               </div>
               <div>
-                <label className="block text-sm font-medium text-gray-600 mb-2">
+                <label className="block text-sm font-medium text-muted mb-2">
                   Yöntem *
                 </label>
                 <Select
@@ -558,7 +558,7 @@ export default function ShippingPage() {
                 </Select>
               </div>
               <div>
-                <label className="block text-sm font-medium text-gray-600 mb-2">
+                <label className="block text-sm font-medium text-muted mb-2">
                   Firma *
                 </label>
                 <Select
@@ -579,7 +579,7 @@ export default function ShippingPage() {
             </div>
             <div className="grid grid-cols-2 gap-4">
               <div>
-                <label className="block text-sm font-medium text-gray-600 mb-2">
+                <label className="block text-sm font-medium text-muted mb-2">
                   Baz Fiyat (₺) *
                 </label>
                 <Input
@@ -596,7 +596,7 @@ export default function ShippingPage() {
                 />
               </div>
               <div>
-                <label className="block text-sm font-medium text-gray-600 mb-2">
+                <label className="block text-sm font-medium text-muted mb-2">
                   KG Başı (₺)
                 </label>
                 <Input
@@ -613,7 +613,7 @@ export default function ShippingPage() {
               </div>
             </div>
             <div>
-              <label className="block text-sm font-medium text-gray-600 mb-2">
+              <label className="block text-sm font-medium text-muted mb-2">
                 Ücretsiz Kargo Limiti (₺)
               </label>
               <Input
@@ -633,7 +633,7 @@ export default function ShippingPage() {
             </div>
             <div className="grid grid-cols-2 gap-4">
               <div>
-                <label className="block text-sm font-medium text-gray-600 mb-2">
+                <label className="block text-sm font-medium text-muted mb-2">
                   Min. Teslimat (Gün)
                 </label>
                 <Input
@@ -648,7 +648,7 @@ export default function ShippingPage() {
                 />
               </div>
               <div>
-                <label className="block text-sm font-medium text-gray-600 mb-2">
+                <label className="block text-sm font-medium text-muted mb-2">
                   Max. Teslimat (Gün)
                 </label>
                 <Input
@@ -706,18 +706,18 @@ export default function ShippingPage() {
             <tbody>
               {methods.length === 0 ? (
                 <tr>
-                  <td colSpan={5} className="text-center py-8 text-gray-500">
+                  <td colSpan={5} className="text-center py-8 text-muted">
                     Kayıt bulunamadı
                   </td>
                 </tr>
               ) : (
                 methods.map((item) => (
                   <tr key={item.id}>
-                    <td className="font-medium text-gray-900">{item.name}</td>
+                    <td className="font-medium text-heading">{item.name}</td>
                     <td>
                       <code className="text-primary-400">{item.code}</code>
                     </td>
-                    <td className="text-gray-500 max-w-xs truncate">
+                    <td className="text-muted max-w-xs truncate">
                       {item.description || "-"}
                     </td>
                     <td>
@@ -732,7 +732,7 @@ export default function ShippingPage() {
                         <Button
                           variant="secondary"
                           onClick={() => openModal(item)}
-                          className="p-2 text-gray-500 hover:text-gray-900 hover:bg-gray-100 rounded-lg"
+                          className="p-2 text-muted hover:text-heading hover:bg-surface-alt rounded-lg"
                         >
                           <PencilIcon className="h-4 w-4" />
                         </Button>
@@ -767,7 +767,7 @@ export default function ShippingPage() {
             <tbody>
               {carriers.length === 0 ? (
                 <tr>
-                  <td colSpan={5} className="text-center py-8 text-gray-500">
+                  <td colSpan={5} className="text-center py-8 text-muted">
                     Kayıt bulunamadı
                   </td>
                 </tr>
@@ -783,7 +783,7 @@ export default function ShippingPage() {
                             className="h-8 w-8 object-contain rounded"
                           />
                         )}
-                        <span className="font-medium text-gray-900">
+                        <span className="font-medium text-heading">
                           {item.name}
                         </span>
                       </div>
@@ -791,7 +791,7 @@ export default function ShippingPage() {
                     <td>
                       <code className="text-primary-400">{item.code}</code>
                     </td>
-                    <td className="text-gray-500 max-w-xs truncate">
+                    <td className="text-muted max-w-xs truncate">
                       {item.trackingUrl || "-"}
                     </td>
                     <td>
@@ -806,7 +806,7 @@ export default function ShippingPage() {
                         <Button
                           variant="secondary"
                           onClick={() => openModal(item)}
-                          className="p-2 text-gray-500 hover:text-gray-900 hover:bg-gray-100 rounded-lg"
+                          className="p-2 text-muted hover:text-heading hover:bg-surface-alt rounded-lg"
                         >
                           <PencilIcon className="h-4 w-4" />
                         </Button>
@@ -840,15 +840,15 @@ export default function ShippingPage() {
             <tbody>
               {zones.length === 0 ? (
                 <tr>
-                  <td colSpan={4} className="text-center py-8 text-gray-500">
+                  <td colSpan={4} className="text-center py-8 text-muted">
                     Kayıt bulunamadı
                   </td>
                 </tr>
               ) : (
                 zones.map((item) => (
                   <tr key={item.id}>
-                    <td className="font-medium text-gray-900">{item.name}</td>
-                    <td className="text-gray-500">
+                    <td className="font-medium text-heading">{item.name}</td>
+                    <td className="text-muted">
                       {item.countries?.join(", ") || "-"}
                     </td>
                     <td>
@@ -863,7 +863,7 @@ export default function ShippingPage() {
                         <Button
                           variant="secondary"
                           onClick={() => openModal(item)}
-                          className="p-2 text-gray-500 hover:text-gray-900 hover:bg-gray-100 rounded-lg"
+                          className="p-2 text-muted hover:text-heading hover:bg-surface-alt rounded-lg"
                         >
                           <PencilIcon className="h-4 w-4" />
                         </Button>
@@ -899,20 +899,20 @@ export default function ShippingPage() {
             <tbody>
               {rates.length === 0 ? (
                 <tr>
-                  <td colSpan={6} className="text-center py-8 text-gray-500">
+                  <td colSpan={6} className="text-center py-8 text-muted">
                     Kayıt bulunamadı
                   </td>
                 </tr>
               ) : (
                 rates.map((item) => (
                   <tr key={item.id}>
-                    <td className="font-medium text-gray-900">
+                    <td className="font-medium text-heading">
                       {item.zone?.name || "-"}
                     </td>
-                    <td className="text-gray-500">
+                    <td className="text-muted">
                       {item.method?.name || "-"}
                     </td>
-                    <td className="text-gray-500">
+                    <td className="text-muted">
                       {item.carrier?.name || "-"}
                     </td>
                     <td>
@@ -920,12 +920,12 @@ export default function ShippingPage() {
                         ₺{item.basePrice?.toLocaleString()}
                       </span>
                       {item.pricePerKg > 0 && (
-                        <span className="text-xs text-gray-500 ml-1">
+                        <span className="text-xs text-muted ml-1">
                           (+₺{item.pricePerKg}/kg)
                         </span>
                       )}
                     </td>
-                    <td className="text-gray-500">
+                    <td className="text-muted">
                       {item.minDeliveryDays}-{item.maxDeliveryDays} gün
                     </td>
                     <td>
@@ -933,7 +933,7 @@ export default function ShippingPage() {
                         <Button
                           variant="secondary"
                           onClick={() => openModal(item)}
-                          className="p-2 text-gray-500 hover:text-gray-900 hover:bg-gray-100 rounded-lg"
+                          className="p-2 text-muted hover:text-heading hover:bg-surface-alt rounded-lg"
                         >
                           <PencilIcon className="h-4 w-4" />
                         </Button>
@@ -957,8 +957,8 @@ export default function ShippingPage() {
         return (
           <>
             {selectedIds.length > 0 && (
-              <div className="mb-4 flex items-center gap-4 p-4 bg-gray-100 rounded-lg">
-                <span className="text-gray-600">
+              <div className="mb-4 flex items-center gap-4 p-4 bg-surface-alt rounded-lg">
+                <span className="text-muted">
                   {selectedIds.length} gönderi seçildi
                 </span>
                 <Button onClick={handleBulkGenerateLabels}>
@@ -996,7 +996,7 @@ export default function ShippingPage() {
               <tbody>
                 {shipments.length === 0 ? (
                   <tr>
-                    <td colSpan={7} className="text-center py-8 text-gray-500">
+                    <td colSpan={7} className="text-center py-8 text-muted">
                       Gönderi bulunamadı
                     </td>
                   </tr>
@@ -1020,14 +1020,14 @@ export default function ShippingPage() {
                       <td className="font-medium text-primary-400">
                         #{item.order?.orderNumber || "-"}
                       </td>
-                      <td className="text-gray-900">
+                      <td className="text-heading">
                         {item.order?.buyer?.displayName || "-"}
                       </td>
-                      <td className="text-gray-500">
+                      <td className="text-muted">
                         {item.carrier?.name || "-"}
                       </td>
                       <td>
-                        <code className="text-xs text-gray-500">
+                        <code className="text-xs text-muted">
                           {item.trackingNumber || "-"}
                         </code>
                       </td>
@@ -1076,8 +1076,8 @@ export default function ShippingPage() {
         {/* Header */}
         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
           <div>
-            <h1 className="text-2xl font-bold text-gray-900">Kargo Yönetimi</h1>
-            <p className="text-gray-500 mt-1">
+            <h1 className="text-2xl font-bold text-heading">Kargo Yönetimi</h1>
+            <p className="text-muted mt-1">
               Kargo yöntemleri, firmaları, bölgeleri ve ücretleri yönetin
             </p>
           </div>
@@ -1097,7 +1097,7 @@ export default function ShippingPage() {
         </div>
 
         {/* Tabs */}
-        <div className="flex flex-wrap gap-2 border-b border-gray-200 pb-4">
+        <div className="flex flex-wrap gap-2 border-b border-border pb-4">
           {tabs.map((tab) => (
             <Button
               variant="secondary"
@@ -1105,8 +1105,8 @@ export default function ShippingPage() {
               onClick={() => setActiveTab(tab.key as TabType)}
               className={`flex items-center gap-2 px-4 py-2 rounded-lg transition ${
                 activeTab === tab.key
-                  ? "bg-primary-500 text-gray-900"
-                  : "bg-gray-100 text-gray-500 hover:text-gray-900 hover:bg-gray-100"
+                  ? "bg-primary-500 text-heading"
+                  : "bg-surface-alt text-muted hover:text-heading hover:bg-surface-alt"
               }`}
             >
               <tab.icon className="h-5 w-5" />
@@ -1123,23 +1123,23 @@ export default function ShippingPage() {
 
       {/* Modal */}
       {showModal && activeTab !== "labels" && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60">
-          <div className="bg-white rounded-xl border border-gray-200 w-full max-w-2xl max-h-[90vh] overflow-y-auto">
-            <div className="flex items-center justify-between p-4 border-b border-gray-200">
-              <h2 className="text-lg font-semibold text-gray-900">
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-heading/60">
+          <div className="bg-surface-elevated rounded-xl border border-border w-full max-w-2xl max-h-[90vh] overflow-y-auto">
+            <div className="flex items-center justify-between p-4 border-b border-border">
+              <h2 className="text-lg font-semibold text-heading">
                 {editing ? "Düzenle" : "Yeni Ekle"}
               </h2>
               <Button
                 variant="secondary"
                 onClick={() => setShowModal(false)}
-                className="text-gray-500 hover:text-gray-900"
+                className="text-muted hover:text-heading"
               >
                 <XCircleIcon className="h-6 w-6" />
               </Button>
             </div>
             <form onSubmit={handleSave} className="p-4 space-y-4">
               {renderFormFields()}
-              <div className="flex justify-end gap-3 pt-4 border-t border-gray-200">
+              <div className="flex justify-end gap-3 pt-4 border-t border-border">
                 <Button
                   variant="secondary"
                   type="button"

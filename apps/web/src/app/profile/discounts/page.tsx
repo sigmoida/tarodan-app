@@ -332,24 +332,24 @@ export default function ProfileDiscountsPage() {
 
   if (authLoading) {
     return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+      <div className="min-h-screen bg-surface flex items-center justify-center">
         <Spinner size="xl" color="border-primary-500 border-t-transparent" />
       </div>
     );
   }
 
   return (
-    <div className="min-h-screen bg-gray-50">
+    <div className="min-h-screen bg-surface">
       {/* Header */}
-      <div className="bg-white border-b sticky top-0 z-10">
+      <div className="bg-surface-elevated border-b sticky top-0 z-10">
         <div className="max-w-6xl mx-auto px-4">
           <div className="flex items-center justify-between h-16">
             <div className="flex items-center gap-4">
-              <Link href="/profile" className="p-2 hover:bg-gray-100 rounded-lg transition-colors">
-                <ArrowLeftIcon className="w-5 h-5 text-gray-600" />
+              <Link href="/profile" className="p-2 hover:bg-surface-alt rounded-lg transition-colors">
+                <ArrowLeftIcon className="w-5 h-5 text-muted" />
               </Link>
               <div>
-                <h1 className="text-xl font-bold text-gray-900 flex items-center gap-2">
+                <h1 className="text-xl font-bold text-heading flex items-center gap-2">
                   <ReceiptPercentIcon className="w-6 h-6 text-primary-500" />
                   İndirimlerim
                 </h1>
@@ -371,24 +371,24 @@ export default function ProfileDiscountsPage() {
       <div className="max-w-6xl mx-auto px-4 py-6">
         {/* Stats */}
         <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
-          <div className="bg-white rounded-xl p-4 shadow-sm border border-gray-100">
-            <p className="text-sm text-gray-500">Toplam İndirim</p>
-            <p className="text-2xl font-bold text-gray-900">{discounts.length}</p>
+          <div className="bg-surface-elevated rounded-xl p-4 shadow-sm border border-border-subtle">
+            <p className="text-sm text-muted">Toplam İndirim</p>
+            <p className="text-2xl font-bold text-heading">{discounts.length}</p>
           </div>
-          <div className="bg-white rounded-xl p-4 shadow-sm border border-gray-100">
-            <p className="text-sm text-gray-500">Aktif</p>
+          <div className="bg-surface-elevated rounded-xl p-4 shadow-sm border border-border-subtle">
+            <p className="text-sm text-muted">Aktif</p>
             <p className="text-2xl font-bold text-success-600">
               {discounts.filter(d => d.isActive && d.isCurrentlyValid).length}
             </p>
           </div>
-          <div className="bg-white rounded-xl p-4 shadow-sm border border-gray-100">
-            <p className="text-sm text-gray-500">Toplam Kampanya</p>
+          <div className="bg-surface-elevated rounded-xl p-4 shadow-sm border border-border-subtle">
+            <p className="text-sm text-muted">Toplam Kampanya</p>
             <p className="text-2xl font-bold text-info-600">
               {discounts.length}
             </p>
           </div>
-          <div className="bg-white rounded-xl p-4 shadow-sm border border-gray-100">
-            <p className="text-sm text-gray-500">Toplam Kullanım</p>
+          <div className="bg-surface-elevated rounded-xl p-4 shadow-sm border border-border-subtle">
+            <p className="text-sm text-muted">Toplam Kullanım</p>
             <p className="text-2xl font-bold text-primary-600">
               {discounts.reduce((sum, d) => sum + d.usedCount, 0)}
             </p>
@@ -401,8 +401,8 @@ export default function ProfileDiscountsPage() {
             <Button variant="secondary" key={tab.value}
               onClick={() => setActiveFilter(tab.value)}
               className={`px-4 py-2 rounded-lg font-medium whitespace-nowrap transition-colors ${activeFilter === tab.value
-                ? 'bg-primary-500 text-white'
-                : 'bg-white text-gray-600 hover:bg-gray-100'
+                ? 'bg-primary-500 text-inverted'
+                : 'bg-surface-elevated text-muted hover:bg-surface-alt'
                 }`}>
               {tab.label}
             </Button>
@@ -415,12 +415,12 @@ export default function ProfileDiscountsPage() {
             <Spinner size="xl" color="border-primary-500 border-t-transparent" />
           </div>
         ) : discounts.length === 0 ? (
-          <div className="bg-white rounded-2xl p-12 text-center shadow-sm border border-gray-100">
-            <TagIcon className="w-16 h-16 text-gray-300 mx-auto mb-4" />
-            <h3 className="text-xl font-semibold text-gray-900 mb-2">
+          <div className="bg-surface-elevated rounded-2xl p-12 text-center shadow-sm border border-border-subtle">
+            <TagIcon className="w-16 h-16 text-border-strong mx-auto mb-4" />
+            <h3 className="text-xl font-semibold text-heading mb-2">
               {activeFilter ? 'Bu filtreye uygun indirim yok' : 'Henüz indirim oluşturmadınız'}
             </h3>
-            <p className="text-gray-500 mb-6">
+            <p className="text-muted mb-6">
               Müşterilerinize özel indirimler ve kampanyalar oluşturun
             </p>
             <Button
@@ -439,18 +439,18 @@ export default function ProfileDiscountsPage() {
                 initial={{ opacity: 0, y: 20 }}
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ delay: index * 0.05 }}
-                className="bg-white rounded-xl p-5 shadow-sm border border-gray-100 hover:shadow-md transition-shadow"
+                className="bg-surface-elevated rounded-xl p-5 shadow-sm border border-border-subtle hover:shadow-md transition-shadow"
               >
                 <div className="flex flex-col md:flex-row md:items-center gap-4">
                   {/* Discount Info */}
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-3 mb-2">
-                      <h3 className="font-semibold text-gray-900 truncate">{discount.name}</h3>
+                      <h3 className="font-semibold text-heading truncate">{discount.name}</h3>
                       {getStatusBadge(discount)}
                     </div>
 
                     {discount.description && (
-                      <p className="text-sm text-gray-500 mb-2 truncate">{discount.description}</p>
+                      <p className="text-sm text-muted mb-2 truncate">{discount.description}</p>
                     )}
 
                     <div className="flex flex-wrap gap-3 text-sm">
@@ -476,21 +476,21 @@ export default function ProfileDiscountsPage() {
 
                       {/* Code */}
                       {discount.code ? (
-                        <code className="px-2 py-0.5 bg-gray-100 rounded text-xs font-mono">
+                        <code className="px-2 py-0.5 bg-surface-alt rounded text-xs font-mono">
                           {discount.code}
                         </code>
                       ) : (
-                        <span className="text-xs text-gray-400 italic">Otomatik</span>
+                        <span className="text-xs text-subtle italic">Otomatik</span>
                       )}
 
                       {/* Date Range */}
-                      <span className="flex items-center gap-1 text-gray-500">
+                      <span className="flex items-center gap-1 text-muted">
                         <CalendarIcon className="w-4 h-4" />
                         {formatDate(discount.startDate)} - {formatDate(discount.endDate)}
                       </span>
 
                       {/* Usage */}
-                      <span className="text-gray-500">
+                      <span className="text-muted">
                         Kullanım: {discount.usedCount}
                         {discount.usageLimitTotal && ` / ${discount.usageLimitTotal}`}
                       </span>
@@ -501,7 +501,7 @@ export default function ProfileDiscountsPage() {
                   <div className="flex items-center gap-2 flex-shrink-0">
                     <Button variant="secondary" onClick={() => toggleDiscountStatus(discount)}
                       className={`p-2 rounded-lg transition-colors ${discount.isActive
-                        ? 'text-gray-500 hover:bg-gray-100'
+                        ? 'text-muted hover:bg-surface-alt'
                         : 'text-success-600 hover:bg-success-50'
                         }`}
                       title={discount.isActive ? 'Devre dışı bırak' : 'Aktif et'}>
@@ -527,17 +527,17 @@ export default function ProfileDiscountsPage() {
 
       {/* Create/Edit Modal */}
       {showModal && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-50">
+        <div className="fixed inset-0 bg-heading/50 flex items-center justify-center p-4 z-50">
           <motion.div
             initial={{ opacity: 0, scale: 0.95 }}
             animate={{ opacity: 1, scale: 1 }}
-            className="bg-white rounded-2xl shadow-xl max-w-2xl w-full max-h-[90vh] overflow-y-auto"
+            className="bg-surface-elevated rounded-2xl shadow-xl max-w-2xl w-full max-h-[90vh] overflow-y-auto"
           >
-            <div className="p-6 border-b border-gray-100">
-              <h2 className="text-xl font-bold text-gray-900">
+            <div className="p-6 border-b border-border-subtle">
+              <h2 className="text-xl font-bold text-heading">
                 {editingDiscount ? 'İndirimi Düzenle' : 'Yeni İndirim Oluştur'}
               </h2>
-              <p className="text-sm text-gray-500 mt-1">
+              <p className="text-sm text-muted mt-1">
                 Ürünleriniz için indirim kampanyası oluşturun
               </p>
             </div>
@@ -546,7 +546,7 @@ export default function ProfileDiscountsPage() {
               {/* Basic Info */}
               <div className="grid grid-cols-2 gap-4">
                 <div className="col-span-2 sm:col-span-1">
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                  <label className="block text-sm font-medium text-body mb-1">
                     İndirim Adı *
                   </label>
                   <Input
@@ -560,7 +560,7 @@ export default function ProfileDiscountsPage() {
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
+                <label className="block text-sm font-medium text-body mb-1">
                   Açıklama
                 </label>
                 <Textarea value={formData.description}
@@ -573,7 +573,7 @@ export default function ProfileDiscountsPage() {
               {/* Type & Value */}
               <div className="grid grid-cols-2 gap-4">
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                  <label className="block text-sm font-medium text-body mb-1">
                     İndirim Türü *
                   </label>
                   <Select
@@ -585,7 +585,7 @@ export default function ProfileDiscountsPage() {
                   </Select>
                 </div>
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                  <label className="block text-sm font-medium text-body mb-1">
                     Değer *
                   </label>
                   <Input
@@ -603,7 +603,7 @@ export default function ProfileDiscountsPage() {
               {/* Product Selection - scope is always 'product' */}
               <div>
                 <div className="flex items-center justify-between mb-2">
-                  <label className="block text-sm font-medium text-gray-700">
+                  <label className="block text-sm font-medium text-body">
                     Ürün Seçin *
                   </label>
                   {products.length > 0 && (
@@ -621,30 +621,30 @@ export default function ProfileDiscountsPage() {
                   )}
                 </div>
                 {products.length === 0 ? (
-                  <p className="text-sm text-gray-500 p-4 bg-gray-50 rounded-lg">
+                  <p className="text-sm text-muted p-4 bg-surface rounded-lg">
                     Aktif ürününüz bulunmuyor
                   </p>
                 ) : (
-                  <div className="max-h-48 overflow-y-auto border border-gray-200 rounded-lg divide-y">
+                  <div className="max-h-48 overflow-y-auto border border-border rounded-lg divide-y">
                     {products.map(product => (
                       <label
                         key={product.id}
-                        className="flex items-center gap-3 p-3 hover:bg-gray-50 cursor-pointer"
+                        className="flex items-center gap-3 p-3 hover:bg-surface cursor-pointer"
                       >
                         <Checkbox
                           checked={formData.targetProductIds.includes(product.id)}
                           onChange={() => toggleProductSelection(product.id)}
                         />
                         <div className="flex-1 min-w-0">
-                          <p className="text-sm font-medium text-gray-900 truncate">{product.title}</p>
-                          <p className="text-xs text-gray-500">{getProductEffectivePrice(product).toLocaleString('tr-TR')} TL</p>
+                          <p className="text-sm font-medium text-heading truncate">{product.title}</p>
+                          <p className="text-xs text-muted">{getProductEffectivePrice(product).toLocaleString('tr-TR')} TL</p>
                         </div>
                       </label>
                     ))}
                   </div>
                 )}
                 {formData.targetProductIds.length > 0 && (
-                  <p className="text-xs text-gray-500 mt-1">
+                  <p className="text-xs text-muted mt-1">
                     {formData.targetProductIds.length} ürün seçildi
                   </p>
                 )}
@@ -653,7 +653,7 @@ export default function ProfileDiscountsPage() {
               {/* Limits */}
               <div className="grid grid-cols-2 gap-4">
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                  <label className="block text-sm font-medium text-body mb-1">
                     Min. Sepet Tutarı (TL)
                   </label>
                   <Input
@@ -666,7 +666,7 @@ export default function ProfileDiscountsPage() {
                   />
                 </div>
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                  <label className="block text-sm font-medium text-body mb-1">
                     Max. İndirim Tutarı (TL)
                   </label>
                   <Input
@@ -683,7 +683,7 @@ export default function ProfileDiscountsPage() {
               {/* Usage Limits */}
               <div className="grid grid-cols-2 gap-4">
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                  <label className="block text-sm font-medium text-body mb-1">
                     Toplam Kullanım Limiti
                   </label>
                   <Input
@@ -695,7 +695,7 @@ export default function ProfileDiscountsPage() {
                   />
                 </div>
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                  <label className="block text-sm font-medium text-body mb-1">
                     Kullanıcı Başı Limit
                   </label>
                   <Input
@@ -710,7 +710,7 @@ export default function ProfileDiscountsPage() {
               {/* Dates */}
               <div className="grid grid-cols-2 gap-4">
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                  <label className="block text-sm font-medium text-body mb-1">
                     Başlangıç Tarihi *
                   </label>
                   <Input
@@ -721,7 +721,7 @@ export default function ProfileDiscountsPage() {
                   />
                 </div>
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                  <label className="block text-sm font-medium text-body mb-1">
                     Bitiş Tarihi *
                   </label>
                   <Input
@@ -748,7 +748,7 @@ export default function ProfileDiscountsPage() {
               </div>
 
               {/* Actions */}
-              <div className="flex justify-end gap-3 pt-4 border-t border-gray-100">
+              <div className="flex justify-end gap-3 pt-4 border-t border-border-subtle">
                 <Button
                   type="button"
                   variant="secondary"
@@ -772,14 +772,14 @@ export default function ProfileDiscountsPage() {
 
       {/* Delete Confirmation Modal */}
       {deleteConfirm && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-50">
+        <div className="fixed inset-0 bg-heading/50 flex items-center justify-center p-4 z-50">
           <motion.div
             initial={{ opacity: 0, scale: 0.95 }}
             animate={{ opacity: 1, scale: 1 }}
-            className="bg-white rounded-xl shadow-xl max-w-md w-full p-6"
+            className="bg-surface-elevated rounded-xl shadow-xl max-w-md w-full p-6"
           >
-            <h3 className="text-lg font-bold text-gray-900 mb-2">İndirimi Sil</h3>
-            <p className="text-gray-600 mb-6">
+            <h3 className="text-lg font-bold text-heading mb-2">İndirimi Sil</h3>
+            <p className="text-muted mb-6">
               Bu indirimi silmek istediğinizden emin misiniz? Bu işlem geri alınamaz.
             </p>
             <div className="flex justify-end gap-3">

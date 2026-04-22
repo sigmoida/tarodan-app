@@ -232,10 +232,10 @@ export default function EditCollectionPage() {
   if (!authLoading && (!isAuthenticated || !user)) return null;
   if (isLoading) {
     return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+      <div className="min-h-screen bg-surface flex items-center justify-center">
         <div className="text-center">
           <Spinner size="lg" color="border-primary-500 border-t-transparent" className="mx-auto mb-4" />
-          <p className="text-gray-600">{t('collection.loading')}</p>
+          <p className="text-muted">{t('collection.loading')}</p>
         </div>
       </div>
     );
@@ -243,7 +243,7 @@ export default function EditCollectionPage() {
 
   if (error || !collection) {
     return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+      <div className="min-h-screen bg-surface flex items-center justify-center">
         <div className="text-center">
           <p className="text-danger-600 mb-4">{error || t('collection.collectionNotFound')}</p>
           <Button
@@ -259,13 +259,13 @@ export default function EditCollectionPage() {
   }
 
   return (
-    <div className="min-h-screen bg-gray-50">
-      <div className="bg-white border-b border-gray-200">
+    <div className="min-h-screen bg-surface">
+      <div className="bg-surface-elevated border-b border-border">
         <div className="max-w-3xl mx-auto px-6 sm:px-8 py-4">
-          <Button variant="secondary" onClick={() => router.back()} className="flex items-center gap-2 text-gray-500 hover:text-gray-700 text-sm transition-colors mb-3">
+          <Button variant="secondary" onClick={() => router.back()} className="flex items-center gap-2 text-muted hover:text-body text-sm transition-colors mb-3">
             <ArrowLeftIcon className="w-4 h-4" />{t('common.back')}
           </Button>
-          <h1 className="text-xl font-bold text-gray-900 flex items-center gap-2">
+          <h1 className="text-xl font-bold text-heading flex items-center gap-2">
             <div className="w-1 h-6 bg-primary-500 rounded-sm" />
             {t('collection.editCollectionTitle')}
           </h1>
@@ -274,45 +274,45 @@ export default function EditCollectionPage() {
       <div className="max-w-3xl mx-auto px-6 sm:px-8 py-6">
 
         {/* Form */}
-        <div className="bg-white rounded border border-gray-200 p-6 md:p-8">
+        <div className="bg-surface-elevated rounded border border-border p-6 md:p-8">
           <form onSubmit={handleSubmit} className="space-y-6">
             {/* Name */}
             <div>
-              <label className="block text-xs font-medium text-gray-500 mb-1 uppercase tracking-wide">
+              <label className="block text-xs font-medium text-muted mb-1 uppercase tracking-wide">
                 {t('collection.collectionNameLabel')}
               </label>
               <Input type="text"
                 value={name}
                 onChange={(e) => setName(e.target.value)}
-                className="w-full px-3 py-2.5 border border-gray-200 rounded text-sm text-gray-900 placeholder-gray-400 bg-white focus:outline-none focus:border-primary-400"
+                className="w-full px-3 py-2.5 border border-border rounded text-sm text-heading placeholder-subtle bg-surface-elevated focus:outline-none focus:border-primary-400"
                 placeholder={t('collection.namePlaceholder')}
                 required
                 minLength={3}
                 maxLength={100} />
-              <p className="mt-1 text-sm text-gray-500">
+              <p className="mt-1 text-sm text-muted">
                 {name.length}/100 {t('collection.characters')}
               </p>
             </div>
 
             {/* Description */}
             <div>
-              <label className="block text-xs font-medium text-gray-500 mb-1 uppercase tracking-wide">
+              <label className="block text-xs font-medium text-muted mb-1 uppercase tracking-wide">
                 {t('collection.descriptionLabel')}
               </label>
               <Textarea value={description}
                 onChange={(e) => setDescription(e.target.value)}
-                className="w-full px-3 py-2.5 border border-gray-200 rounded text-sm text-gray-900 placeholder-gray-400 bg-white focus:outline-none focus:border-primary-400"
+                className="w-full px-3 py-2.5 border border-border rounded text-sm text-heading placeholder-subtle bg-surface-elevated focus:outline-none focus:border-primary-400"
                 placeholder={t('collection.descriptionPlaceholder')}
                 rows={5}
                 maxLength={500} />
-              <p className="mt-1 text-sm text-gray-500">
+              <p className="mt-1 text-sm text-muted">
                 {description.length}/500 {t('collection.characters')}
               </p>
             </div>
 
             {/* Category */}
             <div>
-              <label className="block text-xs font-medium text-gray-500 mb-1 uppercase tracking-wide">
+              <label className="block text-xs font-medium text-muted mb-1 uppercase tracking-wide">
                 {t('common.category')}
               </label>
               <Select
@@ -330,12 +330,12 @@ export default function EditCollectionPage() {
 
             {/* Cover Image Upload */}
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
+              <label className="block text-sm font-medium text-body mb-2">
                 Kapak Resmi
               </label>
               <div className="space-y-3">
                 {coverImagePreview && (
-                  <div className="relative w-full h-48 rounded overflow-hidden border border-gray-200">
+                  <div className="relative w-full h-48 rounded overflow-hidden border border-border">
                     <OptimizedImage
                       src={coverImagePreview}
                       alt="Cover preview"
@@ -349,18 +349,18 @@ export default function EditCollectionPage() {
                   accept="image/*"
                   onChange={handleCoverImageChange}
                   disabled={isUploadingCover}
-                  className="w-full px-3 py-2.5 border border-gray-200 rounded text-sm text-gray-900 bg-white focus:outline-none focus:border-primary-400 disabled:opacity-50 disabled:cursor-not-allowed" />
+                  className="w-full px-3 py-2.5 border border-border rounded text-sm text-heading bg-surface-elevated focus:outline-none focus:border-primary-400 disabled:opacity-50 disabled:cursor-not-allowed" />
                 {isUploadingCover && (
-                  <p className="text-sm text-gray-500">Yükleniyor...</p>
+                  <p className="text-sm text-muted">Yükleniyor...</p>
                 )}
-                <p className="text-sm text-gray-500">
+                <p className="text-sm text-muted">
                   Kapak resmi yükleyin (maksimum 10MB). Kapak resmi yoksa otomatik olarak ilk 4 ürünün resimlerinden oluşturulacaktır.
                 </p>
               </div>
             </div>
 
             {/* Public/Private */}
-            <div className="flex items-center gap-3 p-3 bg-gray-50 rounded border border-gray-100">
+            <div className="flex items-center gap-3 p-3 bg-surface rounded border border-border-subtle">
               <Checkbox
                 id="isPublic"
                 checked={isPublic}
@@ -368,14 +368,14 @@ export default function EditCollectionPage() {
                 label={t('collection.publicCollection')}
               />
             </div>
-            <p className="text-sm text-gray-500 -mt-4">
+            <p className="text-sm text-muted -mt-4">
               {isPublic
                 ? t('collection.publicCollectionDesc')
                 : t('collection.privateCollectionDesc')}
             </p>
 
             {/* Actions */}
-            <div className="flex flex-col gap-4 pt-4 border-t border-gray-200">
+            <div className="flex flex-col gap-4 pt-4 border-t border-border">
               <div className="flex gap-4">
                 <Button
                   type="button"
@@ -415,12 +415,12 @@ export default function EditCollectionPage() {
 
       {/* Delete Confirmation Modal */}
       {showDeleteModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
-          <div className="bg-white rounded p-6 w-full max-w-md shadow-xl">
-            <h2 className="text-lg font-bold mb-3 text-gray-900">
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-heading/50">
+          <div className="bg-surface-elevated rounded p-6 w-full max-w-md shadow-xl">
+            <h2 className="text-lg font-bold mb-3 text-heading">
               {t('collection.deleteCollection')}
             </h2>
-            <p className="text-gray-500 text-sm mb-5">
+            <p className="text-muted text-sm mb-5">
               {t('collection.deleteCollectionConfirm')}
             </p>
             <div className="flex gap-3">

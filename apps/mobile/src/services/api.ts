@@ -362,6 +362,8 @@ export const paymentsApi = {
     api.post('/payments/initiate-guest', { orderId, provider }),
   initiateTradeCash: (tradeId: string) =>
     api.post('/payments/initiate-trade-cash', { tradeId }),
+  bypassComplete: (paymentId: string) =>
+    api.post<{ success: boolean }>(`/payments/${paymentId}/bypass-complete`),
   getStatus: (paymentId: string) =>
     api.get(`/payments/${paymentId}`),
   getStatusLight: (paymentId: string) =>

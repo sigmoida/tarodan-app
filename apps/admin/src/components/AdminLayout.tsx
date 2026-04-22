@@ -113,11 +113,11 @@ export default function AdminLayout({ children }: AdminLayoutProps) {
   };
 
   return (
-    <div className="min-h-screen bg-gray-50">
+    <div className="min-h-screen bg-surface">
       {/* Mobile sidebar backdrop */}
       {sidebarOpen && (
         <div
-          className="fixed inset-0 z-40 bg-black/30 lg:hidden"
+          className="fixed inset-0 z-40 bg-heading/30 lg:hidden"
           onClick={() => setSidebarOpen(false)}
         />
       )}
@@ -125,12 +125,12 @@ export default function AdminLayout({ children }: AdminLayoutProps) {
       {/* Sidebar */}
       <aside
         className={clsx(
-          'fixed inset-y-0 left-0 z-50 w-64 bg-white border-r border-gray-200 transform transition-transform duration-300 lg:translate-x-0 flex flex-col shadow-soft',
+          'fixed inset-y-0 left-0 z-50 w-64 bg-surface-elevated border-r border-border transform transition-transform duration-300 lg:translate-x-0 flex flex-col shadow-soft',
           sidebarOpen ? 'translate-x-0' : '-translate-x-full'
         )}
       >
         {/* Logo */}
-        <div className="h-16 flex items-center justify-between px-4 border-b border-gray-200">
+        <div className="h-16 flex items-center justify-between px-4 border-b border-border">
           <Link href="/dashboard" scroll={false} className="flex items-center">
             <Image
               src="/tarodan-logo.jpg"
@@ -141,21 +141,21 @@ export default function AdminLayout({ children }: AdminLayoutProps) {
               style={{ width: 'auto', height: 'auto', maxWidth: '100%', maxHeight: '40px' }}
               priority
             />
-            <span className="ml-2 text-xs text-gray-500 font-medium">Admin</span>
+            <span className="ml-2 text-xs text-muted font-medium">Admin</span>
           </Link>
-          <Button variant="secondary" className="lg:hidden text-gray-400 hover:text-gray-700"
+          <Button variant="secondary" className="lg:hidden text-subtle hover:text-body"
             onClick={() => setSidebarOpen(false)}>
             <XMarkIcon className="h-6 w-6" />
           </Button>
         </div>
 
-        <div className="px-3 pt-3 pb-2 border-b border-gray-100 shrink-0">
+        <div className="px-3 pt-3 pb-2 border-b border-border-subtle shrink-0">
           <Input
             type="search"
             placeholder="Menüde ara…"
             value={navQuery}
             onChange={(e) => setNavQuery(e.target.value)}
-            leftAdornment={<MagnifyingGlassIcon className="h-4 w-4 text-gray-400" aria-hidden />}
+            leftAdornment={<MagnifyingGlassIcon className="h-4 w-4 text-subtle" aria-hidden />}
             inputSize="sm"
             className="text-sm"
             aria-label="Sol menüde başlık ara"
@@ -166,7 +166,7 @@ export default function AdminLayout({ children }: AdminLayoutProps) {
         {/* Navigation */}
         <nav className="flex-1 p-3 pt-2 space-y-1 overflow-y-auto min-h-0">
           {filteredNavigation.length === 0 ? (
-            <p className="px-3 py-4 text-sm text-gray-500 text-center">Eşleşen menü öğesi yok</p>
+            <p className="px-3 py-4 text-sm text-muted text-center">Eşleşen menü öğesi yok</p>
           ) : (
             filteredNavigation.map((item) => {
               const isActive = pathname.startsWith(item.href);
@@ -179,7 +179,7 @@ export default function AdminLayout({ children }: AdminLayoutProps) {
                     'flex items-center px-3 py-2.5 rounded-lg text-sm font-medium transition-colors',
                     isActive
                       ? 'bg-primary-50 text-primary-600'
-                      : 'text-gray-600 hover:bg-gray-100 hover:text-gray-900'
+                      : 'text-muted hover:bg-surface-alt hover:text-heading'
                   )}
                   onClick={() => setSidebarOpen(false)}
                 >
@@ -192,7 +192,7 @@ export default function AdminLayout({ children }: AdminLayoutProps) {
         </nav>
 
         {/* User section */}
-        <div className="p-4 border-t border-gray-200">
+        <div className="p-4 border-t border-border">
           <div className="flex items-center mb-3">
             <div className="w-10 h-10 rounded-full bg-primary-50 flex items-center justify-center">
               <span className="text-primary-600 font-semibold">
@@ -200,12 +200,12 @@ export default function AdminLayout({ children }: AdminLayoutProps) {
               </span>
             </div>
             <div className="ml-3">
-              <p className="text-sm font-medium text-gray-900">{user?.displayName}</p>
-              <p className="text-xs text-gray-500">{user?.role}</p>
+              <p className="text-sm font-medium text-heading">{user?.displayName}</p>
+              <p className="text-xs text-muted">{user?.role}</p>
             </div>
           </div>
           <Button variant="secondary" onClick={handleLogout}
-            className="flex items-center w-full px-3 py-2 rounded-lg text-sm text-gray-500 hover:bg-danger-50 hover:text-danger-600 transition-colors">
+            className="flex items-center w-full px-3 py-2 rounded-lg text-sm text-muted hover:bg-danger-50 hover:text-danger-600 transition-colors">
             <ArrowRightOnRectangleIcon className="h-5 w-5 mr-3" />
             Çıkış Yap
           </Button>
@@ -215,9 +215,9 @@ export default function AdminLayout({ children }: AdminLayoutProps) {
       {/* Main content */}
       <div className="lg:pl-64">
         {/* Top bar */}
-        <header className="sticky top-0 z-30 h-16 bg-white/95 backdrop-blur border-b border-gray-200 flex items-center justify-between px-4 shadow-sm">
+        <header className="sticky top-0 z-30 h-16 bg-surface-elevated/95 backdrop-blur border-b border-border flex items-center justify-between px-4 shadow-sm">
           <div className="flex items-center">
-            <Button variant="secondary" className="lg:hidden text-gray-500 hover:text-gray-700 mr-4"
+            <Button variant="secondary" className="lg:hidden text-muted hover:text-body mr-4"
               onClick={() => setSidebarOpen(true)}>
               <Bars3Icon className="h-6 w-6" />
             </Button>
@@ -230,17 +230,17 @@ export default function AdminLayout({ children }: AdminLayoutProps) {
                 className="object-contain"
                 style={{ width: 'auto', height: 'auto', maxWidth: '100%', maxHeight: '32px' }}
               />
-              <span className="ml-2 text-sm text-gray-500">Admin Panel</span>
+              <span className="ml-2 text-sm text-muted">Admin Panel</span>
             </div>
           </div>
           <div className="flex items-center space-x-4">
             <div className="hidden sm:flex items-center gap-2 text-sm">
-              <span className="text-gray-500">{user?.email}</span>
+              <span className="text-muted">{user?.email}</span>
             </div>
             <Link
               href="/settings"
               scroll={false}
-              className="flex items-center gap-2 px-3 py-2 rounded-lg text-gray-500 hover:text-gray-900 hover:bg-gray-100 transition-colors"
+              className="flex items-center gap-2 px-3 py-2 rounded-lg text-muted hover:text-heading hover:bg-surface-alt transition-colors"
             >
               <UserCircleIcon className="h-5 w-5" />
               <span className="hidden sm:inline text-sm">Profil</span>

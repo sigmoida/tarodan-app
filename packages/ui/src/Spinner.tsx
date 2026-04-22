@@ -6,7 +6,7 @@ export interface SpinnerProps extends React.HTMLAttributes<HTMLDivElement> {
   size?: 'sm' | 'md' | 'lg' | 'xl' | '2xl';
   /** Style variant: 'border' (CSS border circle) or 'svg' (SVG icon) */
   variant?: 'border' | 'svg';
-  /** Color class for the spinner (e.g. 'text-primary-500', 'border-white') */
+  /** Color class for the spinner (e.g. 'text-primary-500', 'border-surface-elevated') */
   color?: string;
 }
 
@@ -34,7 +34,7 @@ const borderWidthClasses = {
  *
  * Color is controlled via className or `color` prop:
  *   <Spinner className="text-primary-500" />        // svg variant uses text-current
- *   <Spinner variant="border" color="border-white border-t-transparent" />
+ *   <Spinner variant="border" color="border-surface-elevated border-t-transparent" />
  *
  * For convenience, the default border variant uses primary-500.
  */

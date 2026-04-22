@@ -18,12 +18,12 @@ export default function RichTextEditor({ value, onChange, placeholder, className
       <div className="flex gap-2 mb-2">
         <Button variant="secondary" type="button"
           onClick={() => setActiveTab('edit')}
-          className={`px-3 py-1.5 rounded text-sm font-medium ${activeTab === 'edit' ? 'bg-primary-500 text-gray-900' : 'bg-gray-100 text-gray-500 hover:text-gray-700'}`}>
+          className={`px-3 py-1.5 rounded text-sm font-medium ${activeTab === 'edit' ? 'bg-primary-500 text-heading' : 'bg-surface-alt text-muted hover:text-body'}`}>
           Düzenle
         </Button>
         <Button variant="secondary" type="button"
           onClick={() => setActiveTab('preview')}
-          className={`px-3 py-1.5 rounded text-sm font-medium ${activeTab === 'preview' ? 'bg-primary-500 text-gray-900' : 'bg-gray-100 text-gray-500 hover:text-gray-700'}`}>
+          className={`px-3 py-1.5 rounded text-sm font-medium ${activeTab === 'preview' ? 'bg-primary-500 text-heading' : 'bg-surface-alt text-muted hover:text-body'}`}>
           Önizleme
         </Button>
       </div>
@@ -32,15 +32,15 @@ export default function RichTextEditor({ value, onChange, placeholder, className
           onChange={(e) => onChange(e.target.value)}
           placeholder={placeholder}
           rows={14}
-          className="bg-gray-100 text-gray-700 font-mono placeholder-gray-500"
+          className="bg-surface-alt text-body font-mono placeholder-muted"
           spellCheck={false} />
       ) : (
         <div
-          className="bg-gray-100 min-h-[200px] text-gray-700 prose prose-sm max-w-none"
-          dangerouslySetInnerHTML={{ __html: value || '<span class="text-gray-500">İçerik yok</span>' }}
+          className="bg-surface-alt min-h-[200px] text-body prose prose-sm max-w-none"
+          dangerouslySetInnerHTML={{ __html: value || '<span class="text-muted">İçerik yok</span>' }}
         />
       )}
-      <p className="text-xs text-gray-500 mt-1">
+      <p className="text-xs text-muted mt-1">
         HTML kullanabilirsiniz: &lt;h1&gt;, &lt;p&gt;, &lt;strong&gt;, &lt;a href=&quot;...&quot;&gt;, &lt;ul&gt;&lt;li&gt;
       </p>
     </div>

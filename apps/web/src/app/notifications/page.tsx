@@ -156,20 +156,20 @@ export default function NotificationsPage() {
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-b from-gray-50 to-gray-100">
+    <div className="min-h-screen bg-gradient-to-b from-surface to-surface-alt">
       {/* Header */}
-      <div className="bg-white border-b border-gray-200 sticky top-0 z-10">
+      <div className="bg-surface-elevated border-b border-border sticky top-0 z-10">
         <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-4">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-3">
               <div className="w-12 h-12 bg-gradient-to-br from-primary-400 to-primary-600 rounded-xl flex items-center justify-center">
-                <BellSolidIcon className="w-6 h-6 text-white" />
+                <BellSolidIcon className="w-6 h-6 text-inverted" />
               </div>
               <div>
-                <h1 className="text-xl font-bold text-gray-900">
+                <h1 className="text-xl font-bold text-heading">
                   {locale === 'en' ? 'Notifications' : 'Bildirimler'}
                 </h1>
-                <p className="text-sm text-gray-500">
+                <p className="text-sm text-muted">
                   {unreadCount > 0
                     ? locale === 'en'
                       ? `${unreadCount} unread`
@@ -193,7 +193,7 @@ export default function NotificationsPage() {
               )}
               <Button variant="secondary" onClick={() => setShowFilters(!showFilters)}
                 className={`p-2 rounded-lg transition-colors ${
-                  showFilters ? 'bg-primary-100 text-primary-600' : 'hover:bg-gray-100 text-gray-600'
+                  showFilters ? 'bg-primary-100 text-primary-600' : 'hover:bg-surface-alt text-muted'
                 }`}>
                 <FunnelIcon className="w-5 h-5" />
               </Button>
@@ -215,12 +215,12 @@ export default function NotificationsPage() {
                       onClick={() => setFilter(filterKey)}
                       className={`px-3 py-1.5 text-sm font-medium rounded-full transition-colors ${
                         filter === filterKey
-                          ? 'bg-primary-500 text-white'
-                          : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+                          ? 'bg-primary-500 text-inverted'
+                          : 'bg-surface-alt text-muted hover:bg-border-subtle'
                       }`}>
                       {FILTER_LABELS[filterKey][locale as 'tr' | 'en']}
                       {filterKey === 'unread' && unreadCount > 0 && (
-                        <span className="ml-1.5 px-1.5 py-0.5 text-xs bg-white/20 rounded-full">
+                        <span className="ml-1.5 px-1.5 py-0.5 text-xs bg-surface-elevated/20 rounded-full">
                           {unreadCount}
                         </span>
                       )}
@@ -238,18 +238,18 @@ export default function NotificationsPage() {
         {loading ? (
           <div className="flex flex-col items-center justify-center py-16">
             <Spinner size="xl" color="border-primary-500 border-t-transparent" className="mb-4" />
-            <p className="text-gray-500">{locale === 'en' ? 'Loading...' : 'Yükleniyor...'}</p>
+            <p className="text-muted">{locale === 'en' ? 'Loading...' : 'Yükleniyor...'}</p>
           </div>
         ) : filteredNotifications.length === 0 ? (
           <motion.div
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
-            className="text-center py-16 bg-white rounded-2xl shadow-sm"
+            className="text-center py-16 bg-surface-elevated rounded-2xl shadow-sm"
           >
-            <div className="w-20 h-20 bg-gray-100 rounded-full flex items-center justify-center mx-auto mb-4">
-              <BellIcon className="w-10 h-10 text-gray-400" />
+            <div className="w-20 h-20 bg-surface-alt rounded-full flex items-center justify-center mx-auto mb-4">
+              <BellIcon className="w-10 h-10 text-subtle" />
             </div>
-            <h3 className="text-lg font-semibold text-gray-900 mb-2">
+            <h3 className="text-lg font-semibold text-heading mb-2">
               {filter === 'unread'
                 ? locale === 'en'
                   ? 'No unread notifications'
@@ -258,7 +258,7 @@ export default function NotificationsPage() {
                 ? 'No notifications yet'
                 : 'Henüz bildirim yok'}
             </h3>
-            <p className="text-gray-500 max-w-sm mx-auto">
+            <p className="text-muted max-w-sm mx-auto">
               {locale === 'en'
                 ? 'When you receive notifications, they will appear here.'
                 : 'Bildirimleriniz burada görünecek.'}
@@ -272,7 +272,7 @@ export default function NotificationsPage() {
                 initial={{ opacity: 0, y: 10 }}
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ delay: index * 0.03 }}
-                className={`relative bg-white rounded-xl shadow-sm overflow-hidden transition-all hover:shadow-md ${
+                className={`relative bg-surface-elevated rounded-xl shadow-sm overflow-hidden transition-all hover:shadow-md ${
                   !notification.isRead ? 'ring-2 ring-primary-200' : ''
                 }`}
               >
@@ -288,7 +288,7 @@ export default function NotificationsPage() {
                       className={`flex-shrink-0 w-10 h-10 rounded-full flex items-center justify-center text-xl ${
                         !notification.isRead
                           ? 'bg-primary-100'
-                          : 'bg-gray-100'
+                          : 'bg-surface-alt'
                       }`}
                     >
                       {notification.icon || notification.data?.icon || '🔔'}
@@ -300,18 +300,18 @@ export default function NotificationsPage() {
                         <div className="flex-1">
                           <h3
                             className={`font-medium ${
-                              !notification.isRead ? 'text-gray-900' : 'text-gray-700'
+                              !notification.isRead ? 'text-heading' : 'text-body'
                             }`}
                           >
                             {notification.title}
                           </h3>
-                          <p className="text-sm text-gray-500 mt-0.5 line-clamp-2">
+                          <p className="text-sm text-muted mt-0.5 line-clamp-2">
                             {notification.message}
                           </p>
                         </div>
 
                         <div className="flex items-center gap-2 flex-shrink-0">
-                          <span className="text-xs text-gray-400 whitespace-nowrap">
+                          <span className="text-xs text-subtle whitespace-nowrap">
                             {getTimeAgo(notification.createdAt)}
                           </span>
                           {!notification.isRead && (
@@ -320,7 +320,7 @@ export default function NotificationsPage() {
                                 e.stopPropagation();
                                 markAsRead(notification.id);
                               }}
-                              className="p-1 text-gray-400 hover:text-primary-500 transition-colors"
+                              className="p-1 text-subtle hover:text-primary-500 transition-colors"
                               title={locale === 'en' ? 'Mark as read' : 'Okundu işaretle'}>
                               <CheckIcon className="w-4 h-4" />
                             </Button>

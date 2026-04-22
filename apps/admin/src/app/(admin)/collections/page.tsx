@@ -151,8 +151,8 @@ export default function CollectionsPage() {
                 {/* Header */}
                 <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
                     <div>
-                        <h1 className="text-2xl font-bold text-gray-900">Koleksiyonlar</h1>
-                        <p className="text-gray-500 mt-1">Koleksiyon yönetimi</p>
+                        <h1 className="text-2xl font-bold text-heading">Koleksiyonlar</h1>
+                        <p className="text-muted mt-1">Koleksiyon yönetimi</p>
                     </div>
                     <Button variant="primary" size="md" onClick={openCreateModal}>
                         <PlusIcon className="w-5 h-5" />
@@ -176,58 +176,58 @@ export default function CollectionsPage() {
                     {loading ? (
                         <div className="text-center py-12">
                             <Spinner size="lg" className="mx-auto" />
-                            <p className="text-gray-500 mt-4">Yükleniyor...</p>
+                            <p className="text-muted mt-4">Yükleniyor...</p>
                         </div>
                     ) : collections.length === 0 ? (
-                        <div className="text-center py-12 text-gray-500">
+                        <div className="text-center py-12 text-muted">
                             Henüz koleksiyon yok
                         </div>
                     ) : (
                         <div className="overflow-x-auto">
                             <table className="w-full">
-                                <thead className="bg-gray-100">
+                                <thead className="bg-surface-alt">
                                     <tr>
-                                        <th className="text-left px-4 py-3 text-sm font-medium text-gray-500">Koleksiyon</th>
-                                        <th className="text-left px-4 py-3 text-sm font-medium text-gray-500">Sahibi</th>
-                                        <th className="text-center px-4 py-3 text-sm font-medium text-gray-500">Ürün</th>
-                                        <th className="text-center px-4 py-3 text-sm font-medium text-gray-500">Görüntüleme</th>
-                                        <th className="text-center px-4 py-3 text-sm font-medium text-gray-500">Beğeni</th>
-                                        <th className="text-center px-4 py-3 text-sm font-medium text-gray-500">Durum</th>
-                                        <th className="text-right px-4 py-3 text-sm font-medium text-gray-500">İşlemler</th>
+                                        <th className="text-left px-4 py-3 text-sm font-medium text-muted">Koleksiyon</th>
+                                        <th className="text-left px-4 py-3 text-sm font-medium text-muted">Sahibi</th>
+                                        <th className="text-center px-4 py-3 text-sm font-medium text-muted">Ürün</th>
+                                        <th className="text-center px-4 py-3 text-sm font-medium text-muted">Görüntüleme</th>
+                                        <th className="text-center px-4 py-3 text-sm font-medium text-muted">Beğeni</th>
+                                        <th className="text-center px-4 py-3 text-sm font-medium text-muted">Durum</th>
+                                        <th className="text-right px-4 py-3 text-sm font-medium text-muted">İşlemler</th>
                                     </tr>
                                 </thead>
-                                <tbody className="divide-y divide-gray-200">
+                                <tbody className="divide-y divide-border">
                                     {collections.map((collection) => (
-                                        <tr key={collection.id} className="hover:bg-gray-100/50">
+                                        <tr key={collection.id} className="hover:bg-surface-alt/50">
                                             <td className="px-4 py-3">
                                                 <div className="flex items-center gap-3">
                                                     {collection.coverImageUrl ? (
                                                         <img src={collection.coverImageUrl} alt="" className="w-10 h-10 rounded object-cover" />
                                                     ) : (
-                                                        <div className="w-10 h-10 rounded bg-gray-100 flex items-center justify-center text-gray-500 text-xs">
+                                                        <div className="w-10 h-10 rounded bg-surface-alt flex items-center justify-center text-muted text-xs">
                                                             N/A
                                                         </div>
                                                     )}
                                                     <div>
-                                                        <div className="font-medium text-gray-900">{collection.name}</div>
+                                                        <div className="font-medium text-heading">{collection.name}</div>
                                                         {collection.description && (
-                                                            <div className="text-sm text-gray-500 truncate max-w-xs">{collection.description}</div>
+                                                            <div className="text-sm text-muted truncate max-w-xs">{collection.description}</div>
                                                         )}
                                                     </div>
                                                 </div>
                                             </td>
                                             <td className="px-4 py-3">
-                                                <span className="text-gray-600">{collection.owner?.displayName || '-'}</span>
+                                                <span className="text-muted">{collection.owner?.displayName || '-'}</span>
                                             </td>
-                                            <td className="px-4 py-3 text-center text-gray-600">{collection.itemCount}</td>
-                                            <td className="px-4 py-3 text-center text-gray-600">{collection.viewCount}</td>
-                                            <td className="px-4 py-3 text-center text-gray-600">{collection.likeCount}</td>
+                                            <td className="px-4 py-3 text-center text-muted">{collection.itemCount}</td>
+                                            <td className="px-4 py-3 text-center text-muted">{collection.viewCount}</td>
+                                            <td className="px-4 py-3 text-center text-muted">{collection.likeCount}</td>
                                             <td className="px-4 py-3">
                                                 <div className="flex items-center justify-center gap-2">
                                                     {collection.isPublic ? (
                                                         <span className="px-2 py-1 text-xs bg-success-50 text-success-700 rounded">Görünür</span>
                                                     ) : (
-                                                        <span className="px-2 py-1 text-xs bg-gray-700 text-gray-500 rounded">Gizli</span>
+                                                        <span className="px-2 py-1 text-xs bg-body text-muted rounded">Gizli</span>
                                                     )}
                                                     {collection.isFeatured && (
                                                         <span className="px-2 py-1 text-xs bg-warning-50 text-warning-700 rounded">Öne Çıkan</span>
@@ -237,17 +237,17 @@ export default function CollectionsPage() {
                                             <td className="px-4 py-3">
                                                 <div className="flex items-center justify-end gap-2">
                                                     <Button variant="secondary" onClick={() => toggleVisibility(collection)}
-                                                        className="p-2 text-gray-500 hover:text-gray-900 hover:bg-gray-100 rounded-lg"
+                                                        className="p-2 text-muted hover:text-heading hover:bg-surface-alt rounded-lg"
                                                         title={collection.isPublic ? 'Gizle' : 'Görünür yap'}>
                                                         {collection.isPublic ? <EyeSlashIcon className="h-5 w-5" /> : <EyeIcon className="h-5 w-5" />}
                                                     </Button>
                                                     <Button variant="secondary" onClick={() => toggleFeatured(collection)}
-                                                        className="p-2 text-gray-500 hover:text-warning-700 hover:bg-gray-100 rounded-lg"
+                                                        className="p-2 text-muted hover:text-warning-700 hover:bg-surface-alt rounded-lg"
                                                         title={collection.isFeatured ? 'Öne çıkarmayı kaldır' : 'Öne çıkar'}>
                                                         {collection.isFeatured ? <StarSolidIcon className="h-5 w-5 text-warning-700" /> : <StarIcon className="h-5 w-5" />}
                                                     </Button>
                                                     <Button variant="secondary" onClick={() => openEditModal(collection)}
-                                                        className="p-2 text-gray-500 hover:text-gray-900 hover:bg-gray-100 rounded-lg"
+                                                        className="p-2 text-muted hover:text-heading hover:bg-surface-alt rounded-lg"
                                                         title="Düzenle">
                                                         <PencilIcon className="h-5 w-5" />
                                                     </Button>
@@ -267,18 +267,18 @@ export default function CollectionsPage() {
 
                     {/* Pagination */}
                     {totalPages > 1 && (
-                        <div className="flex items-center justify-between px-4 py-3 border-t border-gray-200">
+                        <div className="flex items-center justify-between px-4 py-3 border-t border-border">
                             <Button variant="secondary" onClick={() => setPage((p) => Math.max(1, p - 1))}
                                 disabled={page === 1}
-                                className="px-3 py-1 bg-gray-100 text-gray-600 rounded disabled:opacity-50">
+                                className="px-3 py-1 bg-surface-alt text-muted rounded disabled:opacity-50">
                                 Önceki
                             </Button>
-                            <span className="text-gray-500">
+                            <span className="text-muted">
                                 Sayfa {page} / {totalPages}
                             </span>
                             <Button variant="secondary" onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
                                 disabled={page === totalPages}
-                                className="px-3 py-1 bg-gray-100 text-gray-600 rounded disabled:opacity-50">
+                                className="px-3 py-1 bg-surface-alt text-muted rounded disabled:opacity-50">
                                 Sonraki
                             </Button>
                         </div>
@@ -288,14 +288,14 @@ export default function CollectionsPage() {
 
             {/* Create/Edit Modal */}
             {showModal && (
-                <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-                    <div className="bg-white rounded-xl p-6 max-w-md w-full mx-4 border border-gray-200">
-                        <h2 className="text-xl font-semibold text-gray-900 mb-4">
+                <div className="fixed inset-0 bg-heading bg-opacity-50 flex items-center justify-center z-50">
+                    <div className="bg-surface-elevated rounded-xl p-6 max-w-md w-full mx-4 border border-border">
+                        <h2 className="text-xl font-semibold text-heading mb-4">
                             {editingCollection ? 'Koleksiyon Düzenle' : 'Yeni Koleksiyon'}
                         </h2>
                         <form onSubmit={handleSubmit} className="space-y-4">
                             <div>
-                                <label className="block text-sm font-medium text-gray-600 mb-2">Koleksiyon Adı *</label>
+                                <label className="block text-sm font-medium text-muted mb-2">Koleksiyon Adı *</label>
                                 <Input
                                     type="text"
                                     value={formData.name}
@@ -304,13 +304,13 @@ export default function CollectionsPage() {
                                 />
                             </div>
                             <div>
-                                <label className="block text-sm font-medium text-gray-600 mb-2">Açıklama</label>
+                                <label className="block text-sm font-medium text-muted mb-2">Açıklama</label>
                                 <Textarea value={formData.description}
                                     onChange={(e) => setFormData({ ...formData, description: e.target.value })}
                                     rows={3} />
                             </div>
                             <div>
-                                <label className="block text-sm font-medium text-gray-600 mb-2">Kapak Görseli URL</label>
+                                <label className="block text-sm font-medium text-muted mb-2">Kapak Görseli URL</label>
                                 <Input
                                     type="url"
                                     value={formData.coverImageUrl}
@@ -345,10 +345,10 @@ export default function CollectionsPage() {
 
             {/* Delete Confirm Modal */}
             {deleteConfirm && (
-                <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-                    <div className="bg-white rounded-xl p-6 max-w-md w-full mx-4 border border-gray-200">
-                        <h3 className="text-lg font-semibold text-gray-900 mb-4">Koleksiyonu Sil</h3>
-                        <p className="text-gray-500 mb-6">
+                <div className="fixed inset-0 bg-heading bg-opacity-50 flex items-center justify-center z-50">
+                    <div className="bg-surface-elevated rounded-xl p-6 max-w-md w-full mx-4 border border-border">
+                        <h3 className="text-lg font-semibold text-heading mb-4">Koleksiyonu Sil</h3>
+                        <p className="text-muted mb-6">
                             Bu koleksiyonu silmek istediğinizden emin misiniz? Bu işlem geri alınamaz.
                         </p>
                         <div className="flex gap-3">

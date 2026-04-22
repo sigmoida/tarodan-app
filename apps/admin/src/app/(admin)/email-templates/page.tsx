@@ -137,39 +137,39 @@ export default function AdminEmailTemplatesPage() {
   return (
     <>
       <div className="space-y-6">
-        <h1 className="text-2xl font-bold text-gray-900">E-posta Şablonları</h1>
-        <p className="text-gray-500 text-sm">
-          Şablonları düzenleyebilir, önizleyebilir ve test e-postası gönderebilirsiniz. Değişkenler için <code className="bg-gray-100 px-1 rounded">{'{{değişkenAdı}}'}</code> kullanın.
+        <h1 className="text-2xl font-bold text-heading">E-posta Şablonları</h1>
+        <p className="text-muted text-sm">
+          Şablonları düzenleyebilir, önizleyebilir ve test e-postası gönderebilirsiniz. Değişkenler için <code className="bg-surface-alt px-1 rounded">{'{{değişkenAdı}}'}</code> kullanın.
         </p>
 
-        <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
+        <div className="bg-surface-elevated rounded-xl border border-border overflow-hidden">
           {loading ? (
-            <div className="p-8 text-center text-gray-500">Yükleniyor...</div>
+            <div className="p-8 text-center text-muted">Yükleniyor...</div>
           ) : list.length === 0 ? (
-            <div className="p-8 text-center text-gray-500">Şablon bulunamadı</div>
+            <div className="p-8 text-center text-muted">Şablon bulunamadı</div>
           ) : (
             <div className="overflow-x-auto">
-              <table className="min-w-full divide-y divide-gray-200">
+              <table className="min-w-full divide-y divide-border">
                 <thead>
                   <tr>
-                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Anahtar</th>
-                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Ad</th>
-                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Konu</th>
-                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Özel</th>
-                    <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase">İşlem</th>
+                    <th className="px-4 py-3 text-left text-xs font-medium text-muted uppercase">Anahtar</th>
+                    <th className="px-4 py-3 text-left text-xs font-medium text-muted uppercase">Ad</th>
+                    <th className="px-4 py-3 text-left text-xs font-medium text-muted uppercase">Konu</th>
+                    <th className="px-4 py-3 text-left text-xs font-medium text-muted uppercase">Özel</th>
+                    <th className="px-4 py-3 text-right text-xs font-medium text-muted uppercase">İşlem</th>
                   </tr>
                 </thead>
-                <tbody className="divide-y divide-gray-200">
+                <tbody className="divide-y divide-border">
                   {list.map((t) => (
-                    <tr key={t.key} className="text-gray-600">
+                    <tr key={t.key} className="text-muted">
                       <td className="px-4 py-3 text-sm font-mono">{t.key}</td>
                       <td className="px-4 py-3 text-sm">{t.name}</td>
-                      <td className="px-4 py-3 text-sm text-gray-500 max-w-xs truncate">{t.subject || '(varsayılan)'}</td>
+                      <td className="px-4 py-3 text-sm text-muted max-w-xs truncate">{t.subject || '(varsayılan)'}</td>
                       <td className="px-4 py-3">
                         {t.hasCustomBody ? (
                           <span className="text-success-500">Özel</span>
                         ) : (
-                          <span className="text-gray-500">Varsayılan</span>
+                          <span className="text-muted">Varsayılan</span>
                         )}
                       </td>
                       <td className="px-4 py-3 text-right">
@@ -189,11 +189,11 @@ export default function AdminEmailTemplatesPage() {
         </div>
 
         {showModal && selectedKey && (
-          <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60">
-            <div className="bg-white rounded-xl border border-gray-200 w-full max-w-4xl max-h-[90vh] overflow-y-auto">
-              <div className="flex items-center justify-between p-4 border-b border-gray-200">
-                <h2 className="text-lg font-semibold text-gray-900">Şablon: {selectedKey}</h2>
-                <Button variant="secondary" type="button" onClick={() => setShowModal(false)} className="text-gray-500 hover:text-gray-900">
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-heading/60">
+            <div className="bg-surface-elevated rounded-xl border border-border w-full max-w-4xl max-h-[90vh] overflow-y-auto">
+              <div className="flex items-center justify-between p-4 border-b border-border">
+                <h2 className="text-lg font-semibold text-heading">Şablon: {selectedKey}</h2>
+                <Button variant="secondary" type="button" onClick={() => setShowModal(false)} className="text-muted hover:text-heading">
                   <XMarkIcon className="h-6 w-6" />
                 </Button>
               </div>
@@ -210,9 +210,9 @@ export default function AdminEmailTemplatesPage() {
                       })()
                     : Object.keys(SAMPLE_DATA[selectedKey] || {});
                   return vars.length > 0 ? (
-                    <div className="bg-gray-100/50 p-3">
-                      <p className="text-sm font-medium text-gray-500 mb-2">Bu şablonda kullanılabilir değişkenler</p>
-                      <p className="text-xs text-gray-500 font-mono flex flex-wrap gap-x-2 gap-y-1">
+                    <div className="bg-surface-alt/50 p-3">
+                      <p className="text-sm font-medium text-muted mb-2">Bu şablonda kullanılabilir değişkenler</p>
+                      <p className="text-xs text-muted font-mono flex flex-wrap gap-x-2 gap-y-1">
                         {vars.map((v) => (
                           <span key={v} className="text-primary-400">{'{{' + v + '}}'}</span>
                         ))}
@@ -221,20 +221,20 @@ export default function AdminEmailTemplatesPage() {
                   ) : null;
                 })()}
                 <div>
-                  <label className="block text-sm font-medium text-gray-600 mb-1">Görünen ad</label>
+                  <label className="block text-sm font-medium text-muted mb-1">Görünen ad</label>
                   <Input type="text"
                     value={form.name}
                     onChange={(e) => setForm({ ...form, name: e.target.value })} />
                 </div>
                 <div>
-                  <label className="block text-sm font-medium text-gray-600 mb-1">Konu</label>
+                  <label className="block text-sm font-medium text-muted mb-1">Konu</label>
                   <Input type="text"
                     value={form.subject}
                     onChange={(e) => setForm({ ...form, subject: e.target.value })}
                     placeholder="E-posta konusu. {{orderNumber}} gibi değişkenler kullanılabilir." />
                 </div>
                 <div>
-                  <label className="block text-sm font-medium text-gray-600 mb-1">HTML gövde</label>
+                  <label className="block text-sm font-medium text-muted mb-1">HTML gövde</label>
                   <Textarea value={form.bodyHtml}
                     onChange={(e) => setForm({ ...form, bodyHtml: e.target.value })}
                     rows={14}
@@ -244,12 +244,12 @@ export default function AdminEmailTemplatesPage() {
                 <div className="flex flex-wrap gap-2">
                   <Button variant="secondary" type="button"
                     onClick={handleSave}
-                    className="px-4 py-2 rounded-lg bg-primary-500 text-gray-900 hover:bg-primary-600">
+                    className="px-4 py-2 rounded-lg bg-primary-500 text-heading hover:bg-primary-600">
                     Kaydet
                   </Button>
                   <Button variant="secondary" type="button"
                     onClick={handlePreview}
-                    className="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-gray-100 text-gray-900 hover:bg-gray-100">
+                    className="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-surface-alt text-heading hover:bg-surface-alt">
                     <EyeIcon className="h-4 w-4" />
                     Önizleme
                   </Button>
@@ -262,7 +262,7 @@ export default function AdminEmailTemplatesPage() {
                     <Button variant="secondary" type="button"
                       onClick={handleSendTest}
                       disabled={sendingTest}
-                      className="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-gray-100 text-gray-900 hover:bg-gray-100 disabled:opacity-50">
+                      className="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-surface-alt text-heading hover:bg-surface-alt disabled:opacity-50">
                       <PaperAirplaneIcon className="h-4 w-4" />
                       {sendingTest ? 'Gönderiliyor...' : 'Test gönder'}
                     </Button>
@@ -270,10 +270,10 @@ export default function AdminEmailTemplatesPage() {
                 </div>
                 {preview && (
                   <div className="p-4 mt-4">
-                    <p className="text-sm font-medium text-gray-500 mb-2">Önizleme</p>
-                    <p className="text-sm text-gray-600 mb-2">Konu: {preview.subject}</p>
+                    <p className="text-sm font-medium text-muted mb-2">Önizleme</p>
+                    <p className="text-sm text-muted mb-2">Konu: {preview.subject}</p>
                     <div
-                      className="bg-white text-gray-900 rounded p-4 text-sm prose prose-sm max-w-none overflow-auto max-h-96"
+                      className="bg-surface-elevated text-heading rounded p-4 text-sm prose prose-sm max-w-none overflow-auto max-h-96"
                       dangerouslySetInnerHTML={{ __html: preview.html }}
                     />
                   </div>

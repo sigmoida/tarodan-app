@@ -882,16 +882,16 @@ export default function ListingDetailPage() {
 
   if (isLoading) {
     return (
-      <div className="min-h-screen bg-gray-50 py-8">
+      <div className="min-h-screen bg-surface py-8">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="animate-pulse">
             <div className="grid lg:grid-cols-2 gap-8">
-              <div className="aspect-square bg-gray-200 rounded" />
+              <div className="aspect-square bg-border-subtle rounded" />
               <div className="space-y-4">
-                <div className="h-8 bg-gray-200 rounded w-3/4" />
-                <div className="h-6 bg-gray-200 rounded w-1/2" />
-                <div className="h-10 bg-gray-200 rounded w-1/3" />
-                <div className="h-32 bg-gray-200 rounded" />
+                <div className="h-8 bg-border-subtle rounded w-3/4" />
+                <div className="h-6 bg-border-subtle rounded w-1/2" />
+                <div className="h-10 bg-border-subtle rounded w-1/3" />
+                <div className="h-32 bg-border-subtle rounded" />
               </div>
             </div>
           </div>
@@ -902,33 +902,33 @@ export default function ListingDetailPage() {
 
   if (!listing) {
     return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
-        <p className="text-gray-500">{t("product.listingNotFound")}</p>
+      <div className="min-h-screen bg-surface flex items-center justify-center">
+        <p className="text-muted">{t("product.listingNotFound")}</p>
       </div>
     );
   }
 
   return (
-    <div className="min-h-screen bg-gray-50 py-4 sm:py-8">
+    <div className="min-h-screen bg-surface py-4 sm:py-8">
       <div className="max-w-7xl mx-auto px-3 sm:px-4 lg:px-8">
         {/* Breadcrumbs */}
         <nav
           aria-label="Breadcrumb"
-          className="flex items-center flex-wrap gap-y-1 text-sm text-gray-500 mb-6 overflow-x-auto whitespace-nowrap pb-2"
+          className="flex items-center flex-wrap gap-y-1 text-sm text-muted mb-6 overflow-x-auto whitespace-nowrap pb-2"
         >
           <Link
             href="/"
-            className="hover:text-primary-500 transition-colors text-gray-600"
+            className="hover:text-primary-500 transition-colors text-muted"
           >
             {t("common.home")}
           </Link>
           <ChevronRightIcon
-            className="w-4 h-4 mx-1 flex-shrink-0 text-gray-400"
+            className="w-4 h-4 mx-1 flex-shrink-0 text-subtle"
             aria-hidden
           />
           <Link
             href="/listings"
-            className="hover:text-primary-500 transition-colors text-gray-600"
+            className="hover:text-primary-500 transition-colors text-muted"
           >
             {t("common.listings")}
           </Link>
@@ -937,7 +937,7 @@ export default function ListingDetailPage() {
               <ChevronRightIcon className="w-4 h-4 mx-2 flex-shrink-0" />
               <Link
                 href={`/brands/${listing.brand.slug}`}
-                className="hover:text-primary-500 transition-colors font-medium text-gray-900"
+                className="hover:text-primary-500 transition-colors font-medium text-heading"
               >
                 {listing.brand.name}
               </Link>
@@ -955,7 +955,7 @@ export default function ListingDetailPage() {
             </>
           )}
           <ChevronRightIcon className="w-4 h-4 mx-2 flex-shrink-0" />
-          <span className="text-gray-400 truncate max-w-[200px]">
+          <span className="text-subtle truncate max-w-[200px]">
             {listing.title}
           </span>
         </nav>
@@ -983,7 +983,7 @@ export default function ListingDetailPage() {
             {/* Küçük Resim + Büyüteç */}
             <div
               ref={setImageContainerRef}
-              className="relative aspect-square bg-white rounded overflow-visible shadow-sm cursor-zoom-in"
+              className="relative aspect-square bg-surface-elevated rounded overflow-visible shadow-sm cursor-zoom-in"
               onClick={() => openLightbox(activeImageIndex)}
               onMouseMove={handleMagnifierMouseMove}
               onMouseLeave={handleMagnifierMouseLeave}
@@ -1038,9 +1038,9 @@ export default function ListingDetailPage() {
                       );
                     }}
                     onMouseEnter={() => setShowMagnifier(false)}
-                    className="absolute left-4 top-1/2 -translate-y-1/2 w-10 h-10 bg-white/90 rounded-full flex items-center justify-center hover:bg-primary-500 hover:text-white transition-colors z-10 group"
+                    className="absolute left-4 top-1/2 -translate-y-1/2 w-10 h-10 bg-surface-elevated/90 rounded-full flex items-center justify-center hover:bg-primary-500 hover:text-inverted transition-colors z-10 group"
                   >
-                    <ChevronLeftIcon className="w-6 h-6 text-gray-700 group-hover:text-white transition-colors" />
+                    <ChevronLeftIcon className="w-6 h-6 text-body group-hover:text-inverted transition-colors" />
                   </Button>
                   <Button
                     variant="secondary"
@@ -1051,9 +1051,9 @@ export default function ListingDetailPage() {
                       );
                     }}
                     onMouseEnter={() => setShowMagnifier(false)}
-                    className="absolute right-4 top-1/2 -translate-y-1/2 w-10 h-10 bg-white/90 rounded-full flex items-center justify-center hover:bg-primary-500 hover:text-white transition-colors z-10 group"
+                    className="absolute right-4 top-1/2 -translate-y-1/2 w-10 h-10 bg-surface-elevated/90 rounded-full flex items-center justify-center hover:bg-primary-500 hover:text-inverted transition-colors z-10 group"
                   >
-                    <ChevronRightIcon className="w-6 h-6 text-gray-700 group-hover:text-white transition-colors" />
+                    <ChevronRightIcon className="w-6 h-6 text-body group-hover:text-inverted transition-colors" />
                   </Button>
                 </>
               )}
@@ -1066,7 +1066,7 @@ export default function ListingDetailPage() {
                 animate={{ opacity: 1, scale: 1, x: 0 }}
                 exit={{ opacity: 0, scale: 0.95, x: -20 }}
                 transition={{ duration: 0.2 }}
-                className="absolute left-full top-0 ml-4 w-full aspect-square bg-white rounded overflow-hidden shadow-2xl hidden md:block z-50"
+                className="absolute left-full top-0 ml-4 w-full aspect-square bg-surface-elevated rounded overflow-hidden shadow-2xl hidden md:block z-50"
                 style={{ maxWidth: "600px" }}
               >
                 <div
@@ -1093,8 +1093,8 @@ export default function ListingDetailPage() {
                 }}
                 className={`flex-shrink-0 w-20 h-20 rounded flex flex-col items-center justify-center transition-all shadow-md ${
                   images.length > 1
-                    ? "bg-gradient-to-br from-primary-500 to-primary-600 text-white hover:from-primary-600 hover:to-primary-700"
-                    : "bg-gray-200 text-gray-400 cursor-not-allowed"
+                    ? "bg-gradient-to-br from-primary-500 to-primary-600 text-inverted hover:from-primary-600 hover:to-primary-700"
+                    : "bg-border-subtle text-subtle cursor-not-allowed"
                 }`}
                 title={locale === "en" ? "360° View" : "360° Görüntüle"}
                 disabled={images.length <= 1}
@@ -1132,7 +1132,7 @@ export default function ListingDetailPage() {
           {/* Lightbox Modal */}
           {isLightboxOpen && (
             <div
-              className="fixed inset-0 bg-black/90 z-50 flex items-center justify-center p-4"
+              className="fixed inset-0 bg-heading/90 z-50 flex items-center justify-center p-4"
               onClick={closeLightbox}
             >
               <div
@@ -1143,7 +1143,7 @@ export default function ListingDetailPage() {
                 <Button
                   variant="secondary"
                   onClick={closeLightbox}
-                  className="absolute top-4 right-4 z-10 w-10 h-10 bg-white/10 hover:bg-white/20 rounded-full flex items-center justify-center text-white transition-colors"
+                  className="absolute top-4 right-4 z-10 w-10 h-10 bg-surface-elevated/10 hover:bg-surface-elevated/20 rounded-full flex items-center justify-center text-inverted transition-colors"
                 >
                   <XMarkIcon className="w-6 h-6" />
                 </Button>
@@ -1153,7 +1153,7 @@ export default function ListingDetailPage() {
                   <Button
                     variant="secondary"
                     onClick={handleZoomIn}
-                    className="w-10 h-10 bg-white/10 hover:bg-white/20 rounded-full flex items-center justify-center text-white transition-colors"
+                    className="w-10 h-10 bg-surface-elevated/10 hover:bg-surface-elevated/20 rounded-full flex items-center justify-center text-inverted transition-colors"
                     disabled={zoomLevel >= 3}
                   >
                     <MagnifyingGlassPlusIcon className="w-5 h-5" />
@@ -1161,7 +1161,7 @@ export default function ListingDetailPage() {
                   <Button
                     variant="secondary"
                     onClick={handleZoomOut}
-                    className="w-10 h-10 bg-white/10 hover:bg-white/20 rounded-full flex items-center justify-center text-white transition-colors"
+                    className="w-10 h-10 bg-surface-elevated/10 hover:bg-surface-elevated/20 rounded-full flex items-center justify-center text-inverted transition-colors"
                     disabled={zoomLevel <= 1}
                   >
                     <MagnifyingGlassMinusIcon className="w-5 h-5" />
@@ -1221,7 +1221,7 @@ export default function ListingDetailPage() {
                         setZoomLevel(1);
                         setPanPosition({ x: 0, y: 0 });
                       }}
-                      className="absolute left-4 top-1/2 -translate-y-1/2 w-12 h-12 bg-white/10 hover:bg-white/20 rounded-full flex items-center justify-center text-white transition-colors z-10"
+                      className="absolute left-4 top-1/2 -translate-y-1/2 w-12 h-12 bg-surface-elevated/10 hover:bg-surface-elevated/20 rounded-full flex items-center justify-center text-inverted transition-colors z-10"
                     >
                       <ChevronLeftIcon className="w-6 h-6" />
                     </Button>
@@ -1234,7 +1234,7 @@ export default function ListingDetailPage() {
                         setZoomLevel(1);
                         setPanPosition({ x: 0, y: 0 });
                       }}
-                      className="absolute right-4 top-1/2 -translate-y-1/2 w-12 h-12 bg-white/10 hover:bg-white/20 rounded-full flex items-center justify-center text-white transition-colors z-10"
+                      className="absolute right-4 top-1/2 -translate-y-1/2 w-12 h-12 bg-surface-elevated/10 hover:bg-surface-elevated/20 rounded-full flex items-center justify-center text-inverted transition-colors z-10"
                     >
                       <ChevronRightIcon className="w-6 h-6" />
                     </Button>
@@ -1256,7 +1256,7 @@ export default function ListingDetailPage() {
                         className={`relative w-16 h-16 rounded overflow-hidden flex-shrink-0 border-2 transition-colors ${
                           index === lightboxImageIndex
                             ? "border-primary-500"
-                            : "border-white/20 hover:border-white/40"
+                            : "border-surface-elevated/20 hover:border-surface-elevated/40"
                         }`}
                       >
                         <OptimizedImage
@@ -1273,7 +1273,7 @@ export default function ListingDetailPage() {
 
                 {/* Image Counter */}
                 {images.length > 1 && (
-                  <div className="absolute bottom-4 left-1/2 -translate-x-1/2 bg-white/10 backdrop-blur-sm px-4 py-2 rounded text-white text-sm">
+                  <div className="absolute bottom-4 left-1/2 -translate-x-1/2 bg-surface-elevated/10 backdrop-blur-sm px-4 py-2 rounded text-inverted text-sm">
                     {lightboxImageIndex + 1} / {images.length}
                   </div>
                 )}
@@ -1284,7 +1284,7 @@ export default function ListingDetailPage() {
           {/* 360° View Modal */}
           {show360Modal && (
             <div
-              className="fixed inset-0 bg-black/95 z-50 flex items-center justify-center p-4"
+              className="fixed inset-0 bg-heading/95 z-50 flex items-center justify-center p-4"
               onClick={close360View}
             >
               <div
@@ -1296,14 +1296,14 @@ export default function ListingDetailPage() {
                   <div className="flex items-center gap-3">
                     <div className="w-10 h-10 bg-primary-500 rounded-full flex items-center justify-center">
                       <ArrowPathIcon
-                        className={`w-6 h-6 text-white ${is360Playing ? "animate-spin" : ""}`}
+                        className={`w-6 h-6 text-inverted ${is360Playing ? "animate-spin" : ""}`}
                       />
                     </div>
                     <div>
-                      <h3 className="text-white font-semibold text-lg">
+                      <h3 className="text-inverted font-semibold text-lg">
                         {locale === "en" ? "360° View" : "360° Görüntüleme"}
                       </h3>
-                      <p className="text-white/60 text-sm">
+                      <p className="text-inverted/60 text-sm">
                         {locale === "en"
                           ? "Rotate to see from all angles"
                           : "Tüm açılardan görüntüleyin"}
@@ -1313,14 +1313,14 @@ export default function ListingDetailPage() {
                   <Button
                     variant="secondary"
                     onClick={close360View}
-                    className="w-10 h-10 bg-white/10 hover:bg-white/20 rounded-full flex items-center justify-center text-white transition-colors"
+                    className="w-10 h-10 bg-surface-elevated/10 hover:bg-surface-elevated/20 rounded-full flex items-center justify-center text-inverted transition-colors"
                   >
                     <XMarkIcon className="w-6 h-6" />
                   </Button>
                 </div>
 
                 {/* Main Image */}
-                <div className="relative aspect-square bg-gray-900 rounded overflow-hidden mb-4">
+                <div className="relative aspect-square bg-heading rounded overflow-hidden mb-4">
                   <OptimizedImage
                     src={images[view360Index]}
                     alt={`${listing.title} - ${view360Index + 1}`}
@@ -1341,7 +1341,7 @@ export default function ListingDetailPage() {
                         i > 0 ? i - 1 : images.length - 1,
                       )
                     }
-                    className="absolute left-4 top-1/2 -translate-y-1/2 w-12 h-12 bg-white/10 hover:bg-white/20 rounded-full flex items-center justify-center text-white transition-colors"
+                    className="absolute left-4 top-1/2 -translate-y-1/2 w-12 h-12 bg-surface-elevated/10 hover:bg-surface-elevated/20 rounded-full flex items-center justify-center text-inverted transition-colors"
                   >
                     <ChevronLeftIcon className="w-6 h-6" />
                   </Button>
@@ -1352,7 +1352,7 @@ export default function ListingDetailPage() {
                         i < images.length - 1 ? i + 1 : 0,
                       )
                     }
-                    className="absolute right-4 top-1/2 -translate-y-1/2 w-12 h-12 bg-white/10 hover:bg-white/20 rounded-full flex items-center justify-center text-white transition-colors"
+                    className="absolute right-4 top-1/2 -translate-y-1/2 w-12 h-12 bg-surface-elevated/10 hover:bg-surface-elevated/20 rounded-full flex items-center justify-center text-inverted transition-colors"
                   >
                     <ChevronRightIcon className="w-6 h-6" />
                   </Button>
@@ -1368,7 +1368,7 @@ export default function ListingDetailPage() {
                           className={`h-1.5 flex-1 rounded-sm transition-all ${
                             index === view360Index
                               ? "bg-primary-500"
-                              : "bg-white/30 hover:bg-white/50"
+                              : "bg-surface-elevated/30 hover:bg-surface-elevated/50"
                           }`}
                         />
                       ))}
@@ -1381,7 +1381,7 @@ export default function ListingDetailPage() {
                   <Button
                     variant="secondary"
                     onClick={toggle360Play}
-                    className="flex items-center gap-2 px-6 py-3 bg-primary-500 hover:bg-primary-600 text-white rounded font-semibold transition-colors"
+                    className="flex items-center gap-2 px-6 py-3 bg-primary-500 hover:bg-primary-600 text-inverted rounded font-semibold transition-colors"
                   >
                     {is360Playing ? (
                       <>
@@ -1395,7 +1395,7 @@ export default function ListingDetailPage() {
                       </>
                     )}
                   </Button>
-                  <div className="text-white/60 text-sm">
+                  <div className="text-inverted/60 text-sm">
                     {view360Index + 1} / {images.length}
                   </div>
                 </div>
@@ -1436,7 +1436,7 @@ export default function ListingDetailPage() {
 
             <div className="flex items-start justify-between gap-4 mb-4">
               <div className="flex items-center gap-3 flex-wrap">
-                <h1 className="text-2xl lg:text-3xl font-bold text-gray-900">
+                <h1 className="text-2xl lg:text-3xl font-bold text-heading">
                   {listing.title}
                 </h1>
                 {listing.status === "sold" && (
@@ -1449,32 +1449,32 @@ export default function ListingDetailPage() {
                 <Button
                   variant="secondary"
                   onClick={handleToggleFavorite}
-                  className="p-2 rounded hover:bg-gray-100 transition-colors"
+                  className="p-2 rounded hover:bg-surface-alt transition-colors"
                   title="Favorilere Ekle"
                 >
                   {isFavorite ? (
                     <HeartSolidIcon className="w-6 h-6 text-danger-500" />
                   ) : (
-                    <HeartIcon className="w-6 h-6 text-gray-400" />
+                    <HeartIcon className="w-6 h-6 text-subtle" />
                   )}
                 </Button>
                 <div className="relative">
                   <Button
                     variant="secondary"
                     onClick={handleShare}
-                    className="p-2 rounded hover:bg-gray-100 transition-colors"
+                    className="p-2 rounded hover:bg-surface-alt transition-colors"
                     title="Paylaş"
                   >
-                    <ShareIcon className="w-6 h-6 text-gray-400" />
+                    <ShareIcon className="w-6 h-6 text-subtle" />
                   </Button>
 
                   {/* Share Dropdown */}
                   {showShareMenu && (
-                    <div className="absolute right-0 top-full mt-2 w-48 bg-white rounded shadow-lg border border-gray-200 py-2 z-50">
+                    <div className="absolute right-0 top-full mt-2 w-48 bg-surface-elevated rounded shadow-lg border border-border py-2 z-50">
                       <Button
                         variant="secondary"
                         onClick={() => shareToSocial("whatsapp")}
-                        className="w-full px-4 py-2 text-left hover:bg-gray-50 flex items-center gap-3"
+                        className="w-full px-4 py-2 text-left hover:bg-surface flex items-center gap-3"
                       >
                         <span className="text-success-500 text-lg">📱</span>
                         WhatsApp
@@ -1482,7 +1482,7 @@ export default function ListingDetailPage() {
                       <Button
                         variant="secondary"
                         onClick={() => shareToSocial("twitter")}
-                        className="w-full px-4 py-2 text-left hover:bg-gray-50 flex items-center gap-3"
+                        className="w-full px-4 py-2 text-left hover:bg-surface flex items-center gap-3"
                       >
                         <span className="text-primary-400 text-lg">𝕏</span>
                         Twitter / X
@@ -1490,7 +1490,7 @@ export default function ListingDetailPage() {
                       <Button
                         variant="secondary"
                         onClick={() => shareToSocial("facebook")}
-                        className="w-full px-4 py-2 text-left hover:bg-gray-50 flex items-center gap-3"
+                        className="w-full px-4 py-2 text-left hover:bg-surface flex items-center gap-3"
                       >
                         <span className="text-primary-600 text-lg">📘</span>
                         Facebook
@@ -1498,7 +1498,7 @@ export default function ListingDetailPage() {
                       <Button
                         variant="secondary"
                         onClick={() => shareToSocial("telegram")}
-                        className="w-full px-4 py-2 text-left hover:bg-gray-50 flex items-center gap-3"
+                        className="w-full px-4 py-2 text-left hover:bg-surface flex items-center gap-3"
                       >
                         <span className="text-primary-500 text-lg">✈️</span>
                         Telegram
@@ -1507,9 +1507,9 @@ export default function ListingDetailPage() {
                       <Button
                         variant="secondary"
                         onClick={() => shareToSocial("copy")}
-                        className="w-full px-4 py-2 text-left hover:bg-gray-50 flex items-center gap-3"
+                        className="w-full px-4 py-2 text-left hover:bg-surface flex items-center gap-3"
                       >
-                        <span className="text-gray-500 text-lg">📋</span>
+                        <span className="text-muted text-lg">📋</span>
                         Linki Kopyala
                       </Button>
                       {typeof navigator !== "undefined" &&
@@ -1517,9 +1517,9 @@ export default function ListingDetailPage() {
                           <Button
                             variant="secondary"
                             onClick={() => shareToSocial("native")}
-                            className="w-full px-4 py-2 text-left hover:bg-gray-50 flex items-center gap-3"
+                            className="w-full px-4 py-2 text-left hover:bg-surface flex items-center gap-3"
                           >
-                            <span className="text-gray-500 text-lg">🔗</span>
+                            <span className="text-muted text-lg">🔗</span>
                             Diğer...
                           </Button>
                         )}
@@ -1546,7 +1546,7 @@ export default function ListingDetailPage() {
                   className="p-2 rounded hover:bg-danger-50 transition-colors"
                   title={t("product.reportListing")}
                 >
-                  <FlagIcon className="w-6 h-6 text-gray-400 hover:text-danger-500" />
+                  <FlagIcon className="w-6 h-6 text-subtle hover:text-danger-500" />
                 </Button>
               </div>
             </div>
@@ -1554,14 +1554,14 @@ export default function ListingDetailPage() {
             <div className="mb-4">
               {isProductOnSaleDisplay(listing) && (
                 <div className="flex items-center gap-2 mb-1">
-                  <span className="text-xl text-gray-400 line-through">
+                  <span className="text-xl text-subtle line-through">
                     {getProductOriginalPriceForDisplay(listing).toLocaleString(
                       "tr-TR",
                       { minimumFractionDigits: 2, maximumFractionDigits: 2 },
                     )}{" "}
                     TL
                   </span>
-                  <span className="bg-danger-500 text-white text-sm font-bold px-2 py-0.5 rounded">
+                  <span className="bg-danger-500 text-inverted text-sm font-bold px-2 py-0.5 rounded">
                     %
                     {listing.discountPercent ??
                       (listing.oldPrice != null && listing.price
@@ -1586,7 +1586,7 @@ export default function ListingDetailPage() {
             </div>
 
             {/* View & Like Stats */}
-            <div className="flex items-center gap-4 text-sm text-gray-500 mb-6">
+            <div className="flex items-center gap-4 text-sm text-muted mb-6">
               <div className="flex items-center gap-1">
                 <svg
                   className="w-4 h-4"
@@ -1620,25 +1620,25 @@ export default function ListingDetailPage() {
             </div>
 
             {/* Quick Info - Özet özellikler, tekrarsız */}
-            <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-2 p-3 sm:gap-4 sm:p-5 bg-white rounded shadow-sm border border-gray-100 mb-4 sm:mb-6">
+            <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-2 p-3 sm:gap-4 sm:p-5 bg-surface-elevated rounded shadow-sm border border-border-subtle mb-4 sm:mb-6">
               {listing.brand && (
                 <div className="text-center p-2">
-                  <p className="text-xs font-medium text-gray-500 uppercase tracking-wide mb-1">
+                  <p className="text-xs font-medium text-muted uppercase tracking-wide mb-1">
                     {t("product.brand")}
                   </p>
                   <Link
                     href={`/brands/${listing.brand.slug}`}
-                    className="font-semibold text-gray-900 hover:text-primary-500 transition-colors"
+                    className="font-semibold text-heading hover:text-primary-500 transition-colors"
                   >
                     {listing.brand.name}
                   </Link>
                 </div>
               )}
               <div className="text-center p-2">
-                <p className="text-xs font-medium text-gray-500 uppercase tracking-wide mb-1">
+                <p className="text-xs font-medium text-muted uppercase tracking-wide mb-1">
                   {t("product.scale")}
                 </p>
-                <p className="font-semibold text-gray-900">
+                <p className="font-semibold text-heading">
                   {listing.scale ||
                     listing.attributes?.find(
                       (a: any) => a.group === "Ölçek" || a.label === "Ölçek",
@@ -1647,10 +1647,10 @@ export default function ListingDetailPage() {
                 </p>
               </div>
               <div className="text-center p-2">
-                <p className="text-xs font-medium text-gray-500 uppercase tracking-wide mb-1">
+                <p className="text-xs font-medium text-muted uppercase tracking-wide mb-1">
                   {locale === "en" ? "Material" : "Malzeme"}
                 </p>
-                <p className="font-semibold text-gray-900">
+                <p className="font-semibold text-heading">
                   {listing.material ||
                     listing.attributes?.find(
                       (a) => a.group === "material" || a.group === "Malzeme",
@@ -1660,39 +1660,39 @@ export default function ListingDetailPage() {
               </div>
               {listing.manufacturer && (
                 <div className="text-center p-2">
-                  <p className="text-xs font-medium text-gray-500 uppercase tracking-wide mb-1">
+                  <p className="text-xs font-medium text-muted uppercase tracking-wide mb-1">
                     {locale === "en" ? "Manufacturer" : "Üretici"}
                   </p>
-                  <p className="font-semibold text-gray-900">
+                  <p className="font-semibold text-heading">
                     {listing.manufacturer.name}
                   </p>
                 </div>
               )}
               {listing.category && (
                 <div className="text-center p-2">
-                  <p className="text-xs font-medium text-gray-500 uppercase tracking-wide mb-1">
+                  <p className="text-xs font-medium text-muted uppercase tracking-wide mb-1">
                     {t("product.category")}
                   </p>
-                  <p className="font-semibold text-gray-900">
+                  <p className="font-semibold text-heading">
                     {listing.category.name}
                   </p>
                 </div>
               )}
               {listing.condition && (
                 <div className="text-center p-2">
-                  <p className="text-xs font-medium text-gray-500 uppercase tracking-wide mb-1">
+                  <p className="text-xs font-medium text-muted uppercase tracking-wide mb-1">
                     {locale === "en" ? "Condition" : "Durum"}
                   </p>
-                  <p className="font-semibold text-gray-900">
+                  <p className="font-semibold text-heading">
                     {formatCondition(listing.condition, locale)}
                   </p>
                 </div>
               )}
               <div className="text-center p-2">
-                <p className="text-xs font-medium text-gray-500 uppercase tracking-wide mb-1">
+                <p className="text-xs font-medium text-muted uppercase tracking-wide mb-1">
                   {locale === "en" ? "Year" : "Yıl"}
                 </p>
-                <p className="font-semibold text-gray-900">
+                <p className="font-semibold text-heading">
                   {listing.year ?? "—"}
                 </p>
               </div>
@@ -1701,10 +1701,10 @@ export default function ListingDetailPage() {
                 (listing.quantity !== undefined &&
                   listing.quantity !== null)) && (
                 <div className="text-center p-2">
-                  <p className="text-xs font-medium text-gray-500 uppercase tracking-wide mb-1">
+                  <p className="text-xs font-medium text-muted uppercase tracking-wide mb-1">
                     {locale === "en" ? "Stock" : "Stok"}
                   </p>
-                  <p className="font-semibold text-gray-900">
+                  <p className="font-semibold text-heading">
                     {(() => {
                       const available =
                         listing.availableQuantity !== undefined &&
@@ -1723,15 +1723,15 @@ export default function ListingDetailPage() {
             </div>
 
             {/* Description & Details Tabbed Layout would be better, but listing details below description is fine */}
-            <div className="bg-white rounded p-6 shadow-sm border border-gray-100 mb-6">
-              <h2 className="text-base font-semibold text-gray-900 mb-3 flex items-center gap-2">
+            <div className="bg-surface-elevated rounded p-6 shadow-sm border border-border-subtle mb-6">
+              <h2 className="text-base font-semibold text-heading mb-3 flex items-center gap-2">
                 <span
                   className="w-1 h-5 bg-primary-500 rounded-sm"
                   aria-hidden
                 />
                 {t("product.description")}
               </h2>
-              <div className="prose prose-sm max-w-none text-gray-600 whitespace-pre-line leading-relaxed">
+              <div className="prose prose-sm max-w-none text-muted whitespace-pre-line leading-relaxed">
                 {listing.description || t("product.noDescription")}
               </div>
 
@@ -1743,7 +1743,7 @@ export default function ListingDetailPage() {
                   a.group !== "Malzeme",
               )?.length ?? 0) > 0 || listing.carModel ? (
                 <div className="border-t pt-6 mt-6">
-                  <h3 className="text-base font-semibold text-gray-900 mb-3 flex items-center gap-2">
+                  <h3 className="text-base font-semibold text-heading mb-3 flex items-center gap-2">
                     <span
                       className="w-1 h-5 bg-info-500 rounded-sm"
                       aria-hidden
@@ -1755,10 +1755,10 @@ export default function ListingDetailPage() {
                   <dl className="grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-3">
                     {listing.carModel && (
                       <>
-                        <dt className="text-sm text-gray-500">
+                        <dt className="text-sm text-muted">
                           {locale === "en" ? "Model" : "Model"}
                         </dt>
-                        <dd className="text-sm font-medium text-gray-900">
+                        <dd className="text-sm font-medium text-heading">
                           {listing.carModel.name}
                         </dd>
                       </>
@@ -1772,10 +1772,10 @@ export default function ListingDetailPage() {
                       )
                       ?.map((attr) => (
                         <Fragment key={attr.id}>
-                          <dt className="text-sm text-gray-500">
+                          <dt className="text-sm text-muted">
                             {attr.label}
                           </dt>
-                          <dd className="text-sm font-medium text-gray-900">
+                          <dd className="text-sm font-medium text-heading">
                             {attr.value}
                           </dd>
                         </Fragment>
@@ -1787,7 +1787,7 @@ export default function ListingDetailPage() {
 
             {/* Seller Info */}
             {listing.seller && (
-              <div className="bg-white rounded p-4 mb-6">
+              <div className="bg-surface-elevated rounded p-4 mb-6">
                 <div className="flex items-center gap-4">
                   {isAuthenticated ? (
                     <Link
@@ -1809,7 +1809,7 @@ export default function ListingDetailPage() {
                           title: t("product.viewSellerProfile"),
                           message: t("product.viewSellerProfileMsg"),
                           icon: (
-                            <UserIcon className="w-10 h-10 text-gray-400" />
+                            <UserIcon className="w-10 h-10 text-subtle" />
                           ),
                         });
                         setShowAuthModal(true);
@@ -1842,7 +1842,7 @@ export default function ListingDetailPage() {
                             title: t("product.viewSellerProfile"),
                             message: t("product.viewSellerProfileMsg"),
                             icon: (
-                              <UserIcon className="w-10 h-10 text-gray-400" />
+                              <UserIcon className="w-10 h-10 text-subtle" />
                             ),
                           });
                           setShowAuthModal(true);
@@ -1854,7 +1854,7 @@ export default function ListingDetailPage() {
                           t("product.seller")}
                       </Button>
                     )}
-                    <div className="flex items-center gap-2 text-sm text-gray-500">
+                    <div className="flex items-center gap-2 text-sm text-muted">
                       {listing.seller.rating && listing.seller.rating > 0 ? (
                         <div className="flex items-center">
                           <StarIcon className="w-4 h-4 text-warning-400 mr-1" />
@@ -1863,7 +1863,7 @@ export default function ListingDetailPage() {
                             .totalRatings != null &&
                             (listing.seller as { totalRatings?: number })
                               .totalRatings! > 0 && (
-                              <span className="ml-1 text-gray-400">
+                              <span className="ml-1 text-subtle">
                                 (
                                 {
                                   (listing.seller as { totalRatings?: number })
@@ -1874,7 +1874,7 @@ export default function ListingDetailPage() {
                             )}
                         </div>
                       ) : (
-                        <div className="flex items-center text-gray-400">
+                        <div className="flex items-center text-subtle">
                           <StarIcon className="w-4 h-4 mr-1" />
                           <span>
                             {locale === "en"
@@ -1933,7 +1933,7 @@ export default function ListingDetailPage() {
                     ? "bg-warning-50 border border-warning-200"
                     : listing.status === "sold"
                       ? "bg-danger-50 border border-danger-200"
-                      : "bg-gray-50 border border-gray-200"
+                      : "bg-surface border border-border"
                 }`}
               >
                 <div className="flex items-center gap-3">
@@ -1943,7 +1943,7 @@ export default function ListingDetailPage() {
                         ? "text-warning-600"
                         : listing.status === "sold"
                           ? "text-danger-600"
-                          : "text-gray-600"
+                          : "text-muted"
                     }`}
                   />
                   <div>
@@ -1953,7 +1953,7 @@ export default function ListingDetailPage() {
                           ? "text-warning-800"
                           : listing.status === "sold"
                             ? "text-danger-800"
-                            : "text-gray-800"
+                            : "text-body"
                       }`}
                     >
                       {listing.status === "reserved" &&
@@ -1966,7 +1966,7 @@ export default function ListingDetailPage() {
                       {listing.status === "rejected" &&
                         t("product.statusRejected")}
                     </p>
-                    <p className="text-sm text-gray-600">
+                    <p className="text-sm text-muted">
                       {listing.status === "reserved" &&
                         t("product.statusReservedDesc")}
                       {listing.status === "sold" && t("product.statusSoldDesc")}
@@ -2086,7 +2086,7 @@ export default function ListingDetailPage() {
                       className={`flex items-center justify-center gap-1.5 py-2.5 sm:py-3 text-sm ${
                         listing.status === "active"
                           ? "btn-trade"
-                          : "bg-gray-200 text-gray-400 cursor-not-allowed rounded"
+                          : "bg-border-subtle text-subtle cursor-not-allowed rounded"
                       }`}
                     >
                       <ArrowsRightLeftIcon className="w-4 h-4 sm:w-5 sm:h-5" />
@@ -2153,10 +2153,10 @@ export default function ListingDetailPage() {
 
       {/* Product Reviews Section */}
       <div className="max-w-7xl mx-auto px-3 sm:px-4 lg:px-8 py-6 sm:py-12">
-        <div className="bg-white rounded shadow-sm p-4 sm:p-6 md:p-8">
+        <div className="bg-surface-elevated rounded shadow-sm p-4 sm:p-6 md:p-8">
           {/* Header: Title + Average Rating */}
           <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-6">
-            <h2 className="text-2xl font-bold text-gray-900">
+            <h2 className="text-2xl font-bold text-heading">
               {t("product.productReviews")}
             </h2>
             {reviewStats && (
@@ -2168,15 +2168,15 @@ export default function ListingDetailPage() {
                       className={`w-5 h-5 ${
                         star <= (reviewStats.averageRating || 0)
                           ? "text-warning-400 fill-warning-400"
-                          : "text-gray-300"
+                          : "text-border-strong"
                       }`}
                     />
                   ))}
                 </div>
-                <span className="text-lg font-semibold text-gray-900">
+                <span className="text-lg font-semibold text-heading">
                   {(reviewStats.averageRating || 0).toFixed(1)}
                 </span>
-                <span className="text-gray-500">
+                <span className="text-muted">
                   ({reviewStats.totalRatings || 0} {t("review.reviews")})
                 </span>
               </div>
@@ -2187,7 +2187,7 @@ export default function ListingDetailPage() {
           {reviewStats &&
             reviewStats.scoreDistribution &&
             reviewStats.totalRatings > 0 && (
-              <div className="mb-6 p-4 bg-gray-50 rounded-lg">
+              <div className="mb-6 p-4 bg-surface rounded-lg">
                 <div className="flex flex-col sm:flex-row gap-6">
                   {/* Star Distribution Bars */}
                   <div className="flex-1 space-y-1.5">
@@ -2205,19 +2205,19 @@ export default function ListingDetailPage() {
                           onClick={() =>
                             setReviewFilterScore(isActive ? null : star)
                           }
-                          className={`flex items-center gap-2 w-full text-left px-2 py-0.5 rounded transition-colors ${isActive ? "bg-warning-100" : "hover:bg-gray-100"}`}
+                          className={`flex items-center gap-2 w-full text-left px-2 py-0.5 rounded transition-colors ${isActive ? "bg-warning-100" : "hover:bg-surface-alt"}`}
                         >
                           <span className="text-sm font-medium w-3">
                             {star}
                           </span>
                           <StarIcon className="w-4 h-4 text-warning-400 fill-warning-400 flex-shrink-0" />
-                          <div className="flex-1 h-2 bg-gray-200 rounded-full overflow-hidden">
+                          <div className="flex-1 h-2 bg-border-subtle rounded-full overflow-hidden">
                             <div
                               className="h-full bg-warning-400 rounded-full transition-all"
                               style={{ width: `${pct}%` }}
                             />
                           </div>
-                          <span className="text-xs text-gray-500 w-8 text-right">
+                          <span className="text-xs text-muted w-8 text-right">
                             {count}
                           </span>
                         </Button>
@@ -2227,7 +2227,7 @@ export default function ListingDetailPage() {
 
                   {/* Sort Dropdown */}
                   <div className="sm:w-48">
-                    <label className="block text-xs font-medium text-gray-500 mb-1">
+                    <label className="block text-xs font-medium text-muted mb-1">
                       {locale === "en" ? "Sort by" : "Sırala"}
                     </label>
                     <Select
@@ -2272,9 +2272,9 @@ export default function ListingDetailPage() {
               />
             </div>
           ) : reviews.length === 0 ? (
-            <div className="text-center py-12 bg-gray-50 rounded">
-              <ChatBubbleLeftRightIcon className="w-12 h-12 mx-auto mb-4 text-gray-400" />
-              <p className="text-lg font-medium text-gray-900 mb-2">
+            <div className="text-center py-12 bg-surface rounded">
+              <ChatBubbleLeftRightIcon className="w-12 h-12 mx-auto mb-4 text-subtle" />
+              <p className="text-lg font-medium text-heading mb-2">
                 {reviewFilterScore
                   ? locale === "en"
                     ? "No reviews with this rating"
@@ -2282,7 +2282,7 @@ export default function ListingDetailPage() {
                   : t("product.noReviews")}
               </p>
               {!reviewFilterScore && (
-                <p className="text-gray-600">{t("product.beFirstToReview")}</p>
+                <p className="text-muted">{t("product.beFirstToReview")}</p>
               )}
             </div>
           ) : (
@@ -2290,7 +2290,7 @@ export default function ListingDetailPage() {
               {reviews.map((review: any) => (
                 <div
                   key={review.id}
-                  className="border-b border-gray-100 pb-6 last:border-0 last:pb-0"
+                  className="border-b border-border-subtle pb-6 last:border-0 last:pb-0"
                 >
                   <div className="flex items-start gap-4">
                     <UserAvatar
@@ -2300,7 +2300,7 @@ export default function ListingDetailPage() {
                     />
                     <div className="flex-1">
                       <div className="flex items-center flex-wrap gap-2 mb-1">
-                        <span className="font-medium text-gray-900">
+                        <span className="font-medium text-heading">
                           {review.isAnonymous ||
                           (!review.userName && !review.user?.displayName)
                             ? locale === "en"
@@ -2315,7 +2315,7 @@ export default function ListingDetailPage() {
                               className={`w-4 h-4 ${
                                 star <= (review.score || 0)
                                   ? "text-warning-400 fill-warning-400"
-                                  : "text-gray-300"
+                                  : "text-border-strong"
                               }`}
                             />
                           ))}
@@ -2328,19 +2328,19 @@ export default function ListingDetailPage() {
                               : "Doğrulanmış Alıcı"}
                           </span>
                         )}
-                        <span className="text-sm text-gray-500">
+                        <span className="text-sm text-muted">
                           {new Date(review.createdAt).toLocaleDateString(
                             "tr-TR",
                           )}
                         </span>
                       </div>
                       {review.title && (
-                        <h4 className="font-medium text-gray-900 mb-1">
+                        <h4 className="font-medium text-heading mb-1">
                           {review.title}
                         </h4>
                       )}
                       {(review.review || review.comment) && (
-                        <p className="text-gray-700">
+                        <p className="text-body">
                           {review.review || review.comment}
                         </p>
                       )}
@@ -2353,7 +2353,7 @@ export default function ListingDetailPage() {
                               href={img}
                               target="_blank"
                               rel="noopener noreferrer"
-                              className="block w-20 h-20 rounded-lg overflow-hidden border border-gray-200 hover:border-primary-400 transition-colors"
+                              className="block w-20 h-20 rounded-lg overflow-hidden border border-border hover:border-primary-400 transition-colors"
                             >
                               <img
                                 src={img}
@@ -2386,9 +2386,9 @@ export default function ListingDetailPage() {
 
       {/* Add to Collection Modal */}
       {showCollectionModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
-          <div className="bg-white rounded p-6 w-full max-w-md max-h-[80vh] overflow-hidden flex flex-col shadow-xl">
-            <h2 className="text-xl font-semibold mb-4 text-gray-900">
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-heading/50">
+          <div className="bg-surface-elevated rounded p-6 w-full max-w-md max-h-[80vh] overflow-hidden flex flex-col shadow-xl">
+            <h2 className="text-xl font-semibold mb-4 text-heading">
               {t("collection.addToCollection")}
             </h2>
 
@@ -2409,24 +2409,24 @@ export default function ListingDetailPage() {
                         key={collection.id}
                         onClick={() => handleAddToCollection(collection.id)}
                         disabled={addingToCollection}
-                        className="w-full text-left p-4 bg-gray-50 hover:bg-gray-100 rounded transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                        className="w-full text-left p-4 bg-surface hover:bg-surface-alt rounded transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                       >
-                        <h3 className="font-medium text-gray-900">
+                        <h3 className="font-medium text-heading">
                           {collection.name}
                         </h3>
                         {collection.description && (
-                          <p className="text-sm text-gray-600 mt-1 line-clamp-2">
+                          <p className="text-sm text-muted mt-1 line-clamp-2">
                             {collection.description}
                           </p>
                         )}
-                        <p className="text-xs text-gray-500 mt-2">
+                        <p className="text-xs text-muted mt-2">
                           {collection.itemCount || 0}{" "}
                           {locale === "en" ? "products" : "ürün"}
                         </p>
                       </Button>
                     ))
                   ) : (
-                    <p className="text-gray-600 text-center py-8">
+                    <p className="text-muted text-center py-8">
                       {t("collection.noCollections")}
                     </p>
                   )}
@@ -2446,11 +2446,11 @@ export default function ListingDetailPage() {
               </div>
             )}
 
-            <div className="mt-4 pt-4 border-t border-gray-200">
+            <div className="mt-4 pt-4 border-t border-border">
               <Button
                 variant="secondary"
                 onClick={() => setShowCollectionModal(false)}
-                className="w-full px-4 py-2 bg-gray-200 hover:bg-gray-300 text-gray-800 rounded transition-colors font-medium"
+                className="w-full px-4 py-2 bg-border-subtle hover:bg-border-strong text-body rounded transition-colors font-medium"
               >
                 {t("common.cancel")}
               </Button>
@@ -2482,16 +2482,16 @@ export default function ListingDetailPage() {
 
       {/* Offer Modal */}
       {showOfferModal && listing && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
-          <div className="bg-white rounded p-6 w-full max-w-md shadow-xl">
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-heading/50">
+          <div className="bg-surface-elevated rounded p-6 w-full max-w-md shadow-xl">
             <div className="flex items-center justify-between mb-4">
-              <h2 className="text-xl font-semibold text-gray-900">
+              <h2 className="text-xl font-semibold text-heading">
                 {t("product.makeOffer")}
               </h2>
               <Button
                 variant="secondary"
                 onClick={() => setShowOfferModal(false)}
-                className="text-gray-400 hover:text-gray-600"
+                className="text-subtle hover:text-muted"
               >
                 <XMarkIcon className="w-6 h-6" />
               </Button>
@@ -2499,13 +2499,13 @@ export default function ListingDetailPage() {
 
             <div className="space-y-4">
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
+                <label className="block text-sm font-medium text-body mb-2">
                   {t("product.productPrice")}
                 </label>
-                <div className="text-lg font-semibold text-gray-900">
+                <div className="text-lg font-semibold text-heading">
                   {effectivePrice.toLocaleString("tr-TR")} TL
                 </div>
-                <p className="text-xs text-gray-500 mt-1">
+                <p className="text-xs text-muted mt-1">
                   {locale === "en" ? "Minimum offer:" : "Minimum teklif:"}{" "}
                   {Math.round(effectivePrice * 0.5).toLocaleString("tr-TR")} TL
                   (%50)
@@ -2513,7 +2513,7 @@ export default function ListingDetailPage() {
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
+                <label className="block text-sm font-medium text-body mb-2">
                   {locale === "en"
                     ? "Your Offer Amount (TL)"
                     : "Teklif Tutarınız (TL)"}
@@ -2534,7 +2534,7 @@ export default function ListingDetailPage() {
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
+                <label className="block text-sm font-medium text-body mb-2">
                   {locale === "en" ? "Message (Optional)" : "Mesaj (Opsiyonel)"}
                 </label>
                 <Textarea
@@ -2549,7 +2549,7 @@ export default function ListingDetailPage() {
                   maxLength={500}
                   className="px-4 rounded resize-none"
                 />
-                <p className="text-xs text-gray-500 mt-1">
+                <p className="text-xs text-muted mt-1">
                   {offerMessage.length}/500{" "}
                   {locale === "en" ? "characters" : "karakter"}
                 </p>
@@ -2559,7 +2559,7 @@ export default function ListingDetailPage() {
                 <Button
                   variant="secondary"
                   onClick={() => setShowOfferModal(false)}
-                  className="flex-1 px-4 rounded text-gray-700 hover:bg-gray-50"
+                  className="flex-1 px-4 rounded text-body hover:bg-surface"
                 >
                   {t("common.cancel")}
                 </Button>
@@ -2567,7 +2567,7 @@ export default function ListingDetailPage() {
                   variant="secondary"
                   onClick={handleSubmitOffer}
                   disabled={isSubmittingOffer || !offerAmount}
-                  className="flex-1 px-4 py-2 bg-primary-500 text-white rounded hover:bg-primary-600 disabled:bg-gray-300 disabled:cursor-not-allowed"
+                  className="flex-1 px-4 py-2 bg-primary-500 text-inverted rounded hover:bg-primary-600 disabled:bg-border-strong disabled:cursor-not-allowed"
                 >
                   {isSubmittingOffer
                     ? t("common.sending")
@@ -2581,32 +2581,32 @@ export default function ListingDetailPage() {
 
       {/* Trade Premium Required Modal */}
       {showTradeModal && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+        <div className="fixed inset-0 bg-heading/50 flex items-center justify-center z-50 p-4">
           <motion.div
             initial={{ opacity: 0, scale: 0.95 }}
             animate={{ opacity: 1, scale: 1 }}
-            className="bg-white rounded max-w-md w-full p-6 text-center"
+            className="bg-surface-elevated rounded max-w-md w-full p-6 text-center"
           >
             <div className="w-16 h-16 bg-warning-100 rounded-full flex items-center justify-center mx-auto mb-4">
               <ArrowsRightLeftIcon className="w-8 h-8 text-warning-600" />
             </div>
-            <h2 className="text-xl font-bold text-gray-900 mb-2">
+            <h2 className="text-xl font-bold text-heading mb-2">
               {t("trade.premiumRequired")}
             </h2>
-            <p className="text-gray-600 mb-6">
+            <p className="text-muted mb-6">
               {t("trade.premiumRequiredDesc")}
             </p>
             <div className="flex flex-col sm:flex-row gap-3">
               <Button
                 variant="secondary"
                 onClick={() => setShowTradeModal(false)}
-                className="flex-1 px-4 py-3 text-gray-700 rounded font-medium hover:bg-gray-50"
+                className="flex-1 px-4 py-3 text-body rounded font-medium hover:bg-surface"
               >
                 {t("common.cancel")}
               </Button>
               <Link
                 href="/membership"
-                className="flex-1 px-4 py-3 bg-primary-500 text-white rounded font-medium hover:bg-primary-600 transition-colors text-center"
+                className="flex-1 px-4 py-3 bg-primary-500 text-inverted rounded font-medium hover:bg-primary-600 transition-colors text-center"
               >
                 {t("membership.upgrade")}
               </Link>

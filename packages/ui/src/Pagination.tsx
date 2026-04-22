@@ -66,8 +66,8 @@ export const Pagination: React.FC<PaginationProps> = ({
             className={cn(
               'h-8 min-w-[2rem] rounded-md px-2 text-sm font-medium transition-colors',
               p === page
-                ? 'bg-primary-600 text-white hover:bg-primary-700'
-                : 'text-gray-700 hover:bg-gray-100',
+                ? 'bg-primary-600 text-inverted hover:bg-primary-700'
+                : 'text-body hover:bg-surface-alt',
             )}
           >
             {p}
@@ -75,7 +75,7 @@ export const Pagination: React.FC<PaginationProps> = ({
         ) : (
           <span
             key={`${p}-${i}`}
-            className="inline-flex h-8 min-w-[2rem] items-center justify-center text-gray-400"
+            className="inline-flex h-8 min-w-[2rem] items-center justify-center text-subtle"
             aria-hidden="true"
           >
             …

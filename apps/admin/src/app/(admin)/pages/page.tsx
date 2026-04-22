@@ -126,42 +126,42 @@ export default function AdminPagesPage() {
     <>
       <div className="space-y-6">
         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-          <h1 className="text-2xl font-bold text-gray-900">Sayfa Yönetimi</h1>
+          <h1 className="text-2xl font-bold text-heading">Sayfa Yönetimi</h1>
           <Button variant="secondary" type="button"
             onClick={openCreate}
-            className="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-primary-500 text-gray-900 hover:bg-primary-600">
+            className="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-primary-500 text-heading hover:bg-primary-600">
             <PlusIcon className="h-5 w-5" />
             Yeni Sayfa
           </Button>
         </div>
 
-        <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
+        <div className="bg-surface-elevated rounded-xl border border-border overflow-hidden">
           {loading ? (
-            <div className="p-8 text-center text-gray-500">Yükleniyor...</div>
+            <div className="p-8 text-center text-muted">Yükleniyor...</div>
           ) : pages.length === 0 ? (
-            <div className="p-8 text-center text-gray-500">
+            <div className="p-8 text-center text-muted">
               Henüz sayfa yok. &quot;Yeni Sayfa&quot; ile About, FAQ vb. ekleyebilirsiniz.
             </div>
           ) : (
             <div className="overflow-x-auto">
-              <table className="min-w-full divide-y divide-gray-200">
+              <table className="min-w-full divide-y divide-border">
                 <thead>
                   <tr>
-                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Slug</th>
-                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Başlık</th>
-                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">SEO Başlık</th>
-                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Durum</th>
-                    <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase">İşlem</th>
+                    <th className="px-4 py-3 text-left text-xs font-medium text-muted uppercase">Slug</th>
+                    <th className="px-4 py-3 text-left text-xs font-medium text-muted uppercase">Başlık</th>
+                    <th className="px-4 py-3 text-left text-xs font-medium text-muted uppercase">SEO Başlık</th>
+                    <th className="px-4 py-3 text-left text-xs font-medium text-muted uppercase">Durum</th>
+                    <th className="px-4 py-3 text-right text-xs font-medium text-muted uppercase">İşlem</th>
                   </tr>
                 </thead>
-                <tbody className="divide-y divide-gray-200">
+                <tbody className="divide-y divide-border">
                   {pages.map((p) => (
-                    <tr key={p.id} className="text-gray-600">
+                    <tr key={p.id} className="text-muted">
                       <td className="px-4 py-3 text-sm font-mono">{p.slug}</td>
                       <td className="px-4 py-3 text-sm">{p.title}</td>
-                      <td className="px-4 py-3 text-sm text-gray-500">{p.metaTitle || '-'}</td>
+                      <td className="px-4 py-3 text-sm text-muted">{p.metaTitle || '-'}</td>
                       <td className="px-4 py-3">
-                        <span className={p.isPublished ? 'text-success-500' : 'text-gray-500'}>
+                        <span className={p.isPublished ? 'text-success-500' : 'text-muted'}>
                           {p.isPublished ? 'Yayında' : 'Taslak'}
                         </span>
                       </td>
@@ -185,7 +185,7 @@ export default function AdminPagesPage() {
                             </Button>
                             <Button variant="secondary" type="button"
                               onClick={() => setDeleteConfirm(null)}
-                              className="text-xs text-gray-500 ml-2">
+                              className="text-xs text-muted ml-2">
                               İptal
                             </Button>
                           </span>
@@ -200,21 +200,21 @@ export default function AdminPagesPage() {
         </div>
 
         {showModal && (
-          <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60">
-            <div className="bg-white rounded-xl border border-gray-200 w-full max-w-2xl max-h-[90vh] overflow-y-auto">
-              <div className="flex items-center justify-between p-4 border-b border-gray-200">
-                <h2 className="text-lg font-semibold text-gray-900">
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-heading/60">
+            <div className="bg-surface-elevated rounded-xl border border-border w-full max-w-2xl max-h-[90vh] overflow-y-auto">
+              <div className="flex items-center justify-between p-4 border-b border-border">
+                <h2 className="text-lg font-semibold text-heading">
                   {editing ? 'Sayfayı Düzenle' : 'Yeni Sayfa'}
                 </h2>
                 <Button variant="secondary" type="button"
                   onClick={() => setShowModal(false)}
-                  className="text-gray-500 hover:text-gray-900">
+                  className="text-muted hover:text-heading">
                   <XMarkIcon className="h-6 w-6" />
                 </Button>
               </div>
               <form onSubmit={handleSubmit} className="p-4 space-y-4">
                 <div>
-                  <label className="block text-sm font-medium text-gray-600 mb-1">Slug *</label>
+                  <label className="block text-sm font-medium text-muted mb-1">Slug *</label>
                   <Input
                     type="text"
                     required
@@ -223,10 +223,10 @@ export default function AdminPagesPage() {
                     placeholder="about, faq, iletisim"
                     disabled={!!editing}
                   />
-                  <p className="text-xs text-gray-500 mt-1">URL: /sayfa/[slug]. Sadece yeni sayfada düzenlenebilir.</p>
+                  <p className="text-xs text-muted mt-1">URL: /sayfa/[slug]. Sadece yeni sayfada düzenlenebilir.</p>
                 </div>
                 <div>
-                  <label className="block text-sm font-medium text-gray-600 mb-1">Başlık *</label>
+                  <label className="block text-sm font-medium text-muted mb-1">Başlık *</label>
                   <Input
                     type="text"
                     required
@@ -235,7 +235,7 @@ export default function AdminPagesPage() {
                   />
                 </div>
                 <div>
-                  <label className="block text-sm font-medium text-gray-600 mb-1">İçerik (WYSIWYG) *</label>
+                  <label className="block text-sm font-medium text-muted mb-1">İçerik (WYSIWYG) *</label>
                   <RichTextEditor
                     value={form.content}
                     onChange={(v) => setForm({ ...form, content: v })}
@@ -244,7 +244,7 @@ export default function AdminPagesPage() {
                 </div>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <div>
-                    <label className="block text-sm font-medium text-gray-600 mb-1">SEO Başlık</label>
+                    <label className="block text-sm font-medium text-muted mb-1">SEO Başlık</label>
                     <Input
                       type="text"
                       value={form.metaTitle}
@@ -252,7 +252,7 @@ export default function AdminPagesPage() {
                     />
                   </div>
                   <div>
-                    <label className="block text-sm font-medium text-gray-600 mb-1">Sıra</label>
+                    <label className="block text-sm font-medium text-muted mb-1">Sıra</label>
                     <Input
                       type="number"
                       min={0}
@@ -262,13 +262,13 @@ export default function AdminPagesPage() {
                   </div>
                 </div>
                 <div>
-                  <label className="block text-sm font-medium text-gray-600 mb-1">SEO Açıklama</label>
+                  <label className="block text-sm font-medium text-muted mb-1">SEO Açıklama</label>
                   <Textarea value={form.metaDescription}
                     onChange={(e) => setForm({ ...form, metaDescription: e.target.value })}
                     rows={2} />
                 </div>
                 <div>
-                  <label className="block text-sm font-medium text-gray-600 mb-1">SEO Anahtar Kelimeler</label>
+                  <label className="block text-sm font-medium text-muted mb-1">SEO Anahtar Kelimeler</label>
                   <Input
                     type="text"
                     value={form.metaKeywords}
@@ -282,16 +282,16 @@ export default function AdminPagesPage() {
                     checked={form.isPublished}
                     onChange={(e) => setForm({ ...form, isPublished: e.target.checked })}
                   />
-                  <label htmlFor="isPublished" className="text-sm text-gray-600">Yayında</label>
+                  <label htmlFor="isPublished" className="text-sm text-muted">Yayında</label>
                 </div>
                 <div className="flex justify-end gap-2 pt-4">
                   <Button variant="secondary" type="button"
                     onClick={() => setShowModal(false)}
-                    className="px-4 py-2 rounded-lg bg-gray-100 text-gray-900">
+                    className="px-4 py-2 rounded-lg bg-surface-alt text-heading">
                     İptal
                   </Button>
                   <Button variant="secondary" type="submit"
-                    className="px-4 py-2 rounded-lg bg-primary-500 text-gray-900 hover:bg-primary-600">
+                    className="px-4 py-2 rounded-lg bg-primary-500 text-heading hover:bg-primary-600">
                     {editing ? 'Güncelle' : 'Oluştur'}
                   </Button>
                 </div>

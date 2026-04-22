@@ -1345,10 +1345,10 @@ export default function CheckoutPage() {
   // Wait for client mount before rendering dynamic content
   if (!isMounted) {
     return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+      <div className="min-h-screen bg-surface flex items-center justify-center">
         <div className="text-center">
           <Spinner size="xl" className="mx-auto mb-4" />
-          <p className="text-gray-600">Yükleniyor...</p>
+          <p className="text-muted">Yükleniyor...</p>
         </div>
       </div>
     );
@@ -1357,13 +1357,13 @@ export default function CheckoutPage() {
   // orderId ile geldiyse boş sepete atma (sipariş yüklenene kadar bekle); normal checkout’ta sepette ürün yoksa ilanlara yönlendir
   if (checkoutItems.length === 0 && !directProductId && !existingOrderId) {
     return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+      <div className="min-h-screen bg-surface flex items-center justify-center">
         <div className="text-center">
-          <TruckIcon className="w-20 h-20 text-gray-300 mx-auto mb-4" />
-          <h2 className="text-2xl font-bold text-gray-900 mb-2">
+          <TruckIcon className="w-20 h-20 text-border-strong mx-auto mb-4" />
+          <h2 className="text-2xl font-bold text-heading mb-2">
             {t("cart.empty")}
           </h2>
-          <p className="text-gray-600 mb-6">{t("cart.emptyDesc")}</p>
+          <p className="text-muted mb-6">{t("cart.emptyDesc")}</p>
           <ButtonLink href="/listings">{t("cart.browseListings")}</ButtonLink>
         </div>
       </div>
@@ -1372,18 +1372,18 @@ export default function CheckoutPage() {
 
   return (
     <>
-      <div className="min-h-screen bg-gray-50 py-8">
+      <div className="min-h-screen bg-surface py-8">
         <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8">
           {/* Header */}
           <div className="flex items-center gap-4 mb-8">
             <Button
               variant="secondary"
               onClick={() => router.back()}
-              className="p-2 hover:bg-gray-100 rounded-sm transition-colors"
+              className="p-2 hover:bg-surface-alt rounded-sm transition-colors"
             >
               <ArrowLeftIcon className="w-6 h-6" />
             </Button>
-            <h1 className="text-3xl font-bold text-gray-900">
+            <h1 className="text-3xl font-bold text-heading">
               {t("checkout.title")}
             </h1>
           </div>
@@ -1399,8 +1399,8 @@ export default function CheckoutPage() {
                 <div
                   className={`w-10 h-10 rounded-sm flex items-center justify-center font-semibold transition-colors ${
                     step >= s.step
-                      ? "bg-primary-500 text-white"
-                      : "bg-gray-200 text-gray-500"
+                      ? "bg-primary-500 text-inverted"
+                      : "bg-border-subtle text-muted"
                   }`}
                 >
                   {step > s.step ? (
@@ -1410,13 +1410,13 @@ export default function CheckoutPage() {
                   )}
                 </div>
                 <span
-                  className={`ml-2 ${step >= s.step ? "text-gray-900" : "text-gray-500"}`}
+                  className={`ml-2 ${step >= s.step ? "text-heading" : "text-muted"}`}
                 >
                   {s.label}
                 </span>
                 {index < 2 && (
                   <div
-                    className={`w-16 h-1 mx-4 ${step > s.step ? "bg-primary-500" : "bg-gray-200"}`}
+                    className={`w-16 h-1 mx-4 ${step > s.step ? "bg-primary-500" : "bg-border-subtle"}`}
                   />
                 )}
               </div>
@@ -1449,7 +1449,7 @@ export default function CheckoutPage() {
                               className={`block p-4 border-2 rounded cursor-pointer transition-all ${
                                 selectedAddressId === addr.id
                                   ? "border-primary-500 bg-primary-50"
-                                  : "border-gray-200 hover:border-gray-300"
+                                  : "border-border hover:border-border"
                               }`}
                             >
                               <div className="flex items-start gap-3">
@@ -1464,10 +1464,10 @@ export default function CheckoutPage() {
                                   <p className="font-semibold">
                                     {addr.fullName}
                                   </p>
-                                  <p className="text-gray-600 text-sm">
+                                  <p className="text-muted text-sm">
                                     {addr.phone}
                                   </p>
-                                  <p className="text-gray-600 text-sm">
+                                  <p className="text-muted text-sm">
                                     {addr.address}, {addr.district}/{addr.city}
                                   </p>
                                 </div>
@@ -1479,7 +1479,7 @@ export default function CheckoutPage() {
 
                       {/* Add New Address */}
                       {showAddressForm ? (
-                        <div className="border-2 border-dashed border-gray-200 rounded p-4 space-y-4">
+                        <div className="border-2 border-dashed border-border rounded p-4 space-y-4">
                           <Input
                             type="text"
                             placeholder={
@@ -1566,7 +1566,7 @@ export default function CheckoutPage() {
                         <Button
                           variant="secondary"
                           onClick={() => setShowAddressForm(true)}
-                          className="p-4 border-2 border-dashed rounded text-gray-500 hover:border-primary-500 hover:text-primary-500 items-center justify-center gap-2"
+                          className="p-4 border-2 border-dashed rounded text-muted hover:border-primary-500 hover:text-primary-500 items-center justify-center gap-2"
                         >
                           <PlusIcon className="w-5 h-5" />
                           {t("checkout.addNewAddress")}
@@ -1698,8 +1698,8 @@ export default function CheckoutPage() {
                   )}
 
                   {/* Billing address: same as shipping or different */}
-                  <div className="mt-6 pt-6 border-t border-gray-200">
-                    <h3 className="font-semibold text-gray-900 mb-3 flex items-center gap-2">
+                  <div className="mt-6 pt-6 border-t border-border">
+                    <h3 className="font-semibold text-heading mb-3 flex items-center gap-2">
                       <ShieldCheckIcon className="w-5 h-5 text-primary-500" />
                       {t("checkout.billingAddress")}
                     </h3>
@@ -1722,8 +1722,8 @@ export default function CheckoutPage() {
                     />
 
                     {!billingSameAsShipping && (
-                      <div className="mt-4 p-4 bg-gray-50 rounded space-y-4">
-                        <p className="text-sm text-gray-600">
+                      <div className="mt-4 p-4 bg-surface rounded space-y-4">
+                        <p className="text-sm text-muted">
                           {t("checkout.enterBillingAddress")}
                         </p>
                         <div className="grid sm:grid-cols-2 gap-3">
@@ -1845,7 +1845,7 @@ export default function CheckoutPage() {
 
                   {/* Carrier Selection */}
                   <div className="mb-6">
-                    <h3 className="font-medium text-gray-900 mb-3 flex items-center gap-2">
+                    <h3 className="font-medium text-heading mb-3 flex items-center gap-2">
                       <TruckIcon className="w-5 h-5 text-primary-500" />
                       Kargo Firması
                     </h3>
@@ -1854,7 +1854,7 @@ export default function CheckoutPage() {
                         className={`block p-4 border-2 rounded cursor-pointer transition-all ${
                           selectedCarrier === "aras"
                             ? "border-primary-500 bg-primary-50"
-                            : "border-gray-200 hover:border-gray-300"
+                            : "border-border hover:border-border"
                         }`}
                       >
                         <div className="flex items-center gap-2">
@@ -1871,7 +1871,7 @@ export default function CheckoutPage() {
                         className={`block p-4 border-2 rounded cursor-pointer transition-all ${
                           selectedCarrier === "yurtici"
                             ? "border-primary-500 bg-primary-50"
-                            : "border-gray-200 hover:border-gray-300"
+                            : "border-border hover:border-border"
                         }`}
                       >
                         <div className="flex items-center gap-2">
@@ -1886,13 +1886,13 @@ export default function CheckoutPage() {
                       </label>
                     </div>
                     {shippingLoading && (
-                      <p className="text-sm text-gray-500 mt-2">
+                      <p className="text-sm text-muted mt-2">
                         Kargo ücreti hesaplanıyor...
                       </p>
                     )}
                   </div>
 
-                  <h3 className="font-medium text-gray-900 mb-3 flex items-center gap-2">
+                  <h3 className="font-medium text-heading mb-3 flex items-center gap-2">
                     <CreditCardIcon className="w-5 h-5 text-primary-500" />
                     {locale === "en" ? "Payment Method" : "Ödeme Yöntemi"}
                   </h3>
@@ -1902,7 +1902,7 @@ export default function CheckoutPage() {
                         <p className="font-semibold">
                           {locale === "en" ? "Pay with PayTR" : "PayTR ile Öde"}
                         </p>
-                        <p className="text-gray-600 text-sm">
+                        <p className="text-muted text-sm">
                           {locale === "en"
                             ? "Secure payment with credit card"
                             : "Kredi kartı ile güvenli ödeme"}
@@ -1913,8 +1913,8 @@ export default function CheckoutPage() {
                   </div>
 
                   {/* Card Information */}
-                  <div className="mt-6 p-4 bg-white border border-gray-200 rounded">
-                    <h3 className="font-medium text-gray-900 mb-4 flex items-center gap-2">
+                  <div className="mt-6 p-4 bg-surface-elevated border border-border rounded">
+                    <h3 className="font-medium text-heading mb-4 flex items-center gap-2">
                       <CreditCardIcon className="w-5 h-5 text-primary-500" />
                       {locale === "en" ? "Card Information" : "Kart Bilgileri"}
                     </h3>
@@ -1922,7 +1922,7 @@ export default function CheckoutPage() {
                     {/* Saved Cards Section */}
                     {isAuthenticated && savedCards.length > 0 && (
                       <div className="mb-6">
-                        <p className="text-sm font-medium text-gray-700 mb-3">
+                        <p className="text-sm font-medium text-body mb-3">
                           {locale === "en"
                             ? "My Saved Cards"
                             : "Kayıtlı Kartlarım"}
@@ -1934,7 +1934,7 @@ export default function CheckoutPage() {
                               className={`flex items-center gap-3 p-3 border-2 rounded cursor-pointer transition-all ${
                                 !useNewCard && selectedSavedCard === card.id
                                   ? "border-primary-500 bg-primary-50"
-                                  : "border-gray-200 hover:border-gray-300"
+                                  : "border-border hover:border-border"
                               }`}
                             >
                               <Radio
@@ -1949,10 +1949,10 @@ export default function CheckoutPage() {
                                 className="text-primary-500"
                               />
                               <div className="flex-1">
-                                <p className="font-medium text-gray-900">
+                                <p className="font-medium text-heading">
                                   {card.cardBrand} •••• {card.lastFour}
                                 </p>
-                                <p className="text-sm text-gray-500">
+                                <p className="text-sm text-muted">
                                   {card.expiryMonth.toString().padStart(2, "0")}
                                   /{card.expiryYear}
                                 </p>
@@ -1970,7 +1970,7 @@ export default function CheckoutPage() {
                             className={`flex items-center gap-3 p-3 border-2 rounded cursor-pointer transition-all ${
                               useNewCard
                                 ? "border-primary-500 bg-primary-50"
-                                : "border-gray-200 hover:border-gray-300"
+                                : "border-border hover:border-border"
                             }`}
                           >
                             <Radio
@@ -1980,8 +1980,8 @@ export default function CheckoutPage() {
                               className="text-primary-500"
                             />
                             <div className="flex items-center gap-2">
-                              <PlusIcon className="w-5 h-5 text-gray-500" />
-                              <span className="font-medium text-gray-900">
+                              <PlusIcon className="w-5 h-5 text-muted" />
+                              <span className="font-medium text-heading">
                                 Yeni Kart ile Öde
                               </span>
                             </div>
@@ -1994,7 +1994,7 @@ export default function CheckoutPage() {
                     {(savedCards.length === 0 || useNewCard) && (
                       <div className="space-y-4">
                         <div>
-                          <label className="block text-sm font-medium text-gray-700 mb-1">
+                          <label className="block text-sm font-medium text-body mb-1">
                             {locale === "en"
                               ? "Name on Card"
                               : "Kart Üzerindeki İsim"}
@@ -2011,7 +2011,7 @@ export default function CheckoutPage() {
                         </div>
 
                         <div>
-                          <label className="block text-sm font-medium text-gray-700 mb-1">
+                          <label className="block text-sm font-medium text-body mb-1">
                             {locale === "en" ? "Card Number" : "Kart Numarası"}
                           </label>
                           <Input
@@ -2034,7 +2034,7 @@ export default function CheckoutPage() {
 
                         <div className="grid grid-cols-2 gap-4">
                           <div>
-                            <label className="block text-sm font-medium text-gray-700 mb-1">
+                            <label className="block text-sm font-medium text-body mb-1">
                               {locale === "en"
                                 ? "Expiry Date"
                                 : "Son Kullanma Tarihi"}
@@ -2060,7 +2060,7 @@ export default function CheckoutPage() {
                             />
                           </div>
                           <div>
-                            <label className="block text-sm font-medium text-gray-700 mb-1">
+                            <label className="block text-sm font-medium text-body mb-1">
                               CVV/CVC
                             </label>
                             <Input
@@ -2091,7 +2091,7 @@ export default function CheckoutPage() {
                     {/* CVV for saved card */}
                     {!useNewCard && selectedSavedCard && (
                       <div className="mt-4">
-                        <label className="block text-sm font-medium text-gray-700 mb-1">
+                        <label className="block text-sm font-medium text-body mb-1">
                           CVV/CVC (Güvenlik için tekrar girin)
                         </label>
                         <Input
@@ -2109,18 +2109,18 @@ export default function CheckoutPage() {
                       </div>
                     )}
 
-                    <div className="mt-4 flex items-center gap-2 text-xs text-gray-500">
+                    <div className="mt-4 flex items-center gap-2 text-xs text-muted">
                       <ShieldCheckIcon className="w-4 h-4 text-success-500" />
                       256-bit SSL ile şifrelenmiş güvenli ödeme
                     </div>
                   </div>
 
                   {/* Invoice Info */}
-                  <div className="mt-6 p-4 bg-gray-50 rounded">
-                    <h3 className="font-medium text-gray-900 mb-2">
+                  <div className="mt-6 p-4 bg-surface rounded">
+                    <h3 className="font-medium text-heading mb-2">
                       Fatura Bilgisi
                     </h3>
-                    <p className="text-sm text-gray-600">
+                    <p className="text-sm text-muted">
                       Ödeme tamamlandıktan sonra faturanız e-posta adresinize
                       otomatik olarak gönderilecektir. Kurumsal fatura için
                       profil sayfanızdan vergi bilgilerinizi
@@ -2154,9 +2154,9 @@ export default function CheckoutPage() {
                     {checkoutItems.map((item) => (
                       <div
                         key={item.id}
-                        className="flex gap-4 p-4 bg-gray-50 rounded"
+                        className="flex gap-4 p-4 bg-surface rounded"
                       >
-                        <div className="w-16 h-16 rounded overflow-hidden bg-gray-200">
+                        <div className="w-16 h-16 rounded overflow-hidden bg-border-subtle">
                           <Image
                             src={item.imageUrl}
                             alt={item.title}
@@ -2167,14 +2167,14 @@ export default function CheckoutPage() {
                         </div>
                         <div className="flex-1">
                           <p className="font-semibold">{item.title}</p>
-                          <p className="text-sm text-gray-500">
+                          <p className="text-sm text-muted">
                             Satıcı: {item.seller.displayName}
                           </p>
                         </div>
                         <div className="text-right">
                           {item.originalPrice != null &&
                             item.originalPrice > item.price && (
-                              <p className="text-sm text-gray-400 line-through">
+                              <p className="text-sm text-subtle line-through">
                                 {item.originalPrice.toLocaleString("tr-TR", {
                                   minimumFractionDigits: 2,
                                   maximumFractionDigits: 2,
@@ -2196,8 +2196,8 @@ export default function CheckoutPage() {
 
                   {/* Delivery Address */}
                   {isAuthenticated && selectedAddressId && (
-                    <div className="mb-6 p-4 bg-gray-50 rounded">
-                      <p className="text-sm text-gray-500 mb-1">
+                    <div className="mb-6 p-4 bg-surface rounded">
+                      <p className="text-sm text-muted mb-1">
                         {locale === "en"
                           ? "Delivery Address"
                           : "Teslimat Adresi"}
@@ -2217,8 +2217,8 @@ export default function CheckoutPage() {
                   )}
 
                   {/* Payment Method */}
-                  <div className="mb-6 p-4 bg-gray-50 rounded">
-                    <p className="text-sm text-gray-500 mb-1">
+                  <div className="mb-6 p-4 bg-surface rounded">
+                    <p className="text-sm text-muted mb-1">
                       {locale === "en" ? "Payment Method" : "Ödeme Yöntemi"}
                     </p>
                     <p className="font-medium">
@@ -2277,7 +2277,7 @@ export default function CheckoutPage() {
                 <div className="space-y-3 mb-4">
                   {checkoutItems.slice(0, 3).map((item) => (
                     <div key={item.id} className="flex gap-3">
-                      <div className="w-12 h-12 rounded overflow-hidden bg-gray-100">
+                      <div className="w-12 h-12 rounded overflow-hidden bg-surface-alt">
                         <Image
                           src={item.imageUrl}
                           alt={item.title}
@@ -2292,7 +2292,7 @@ export default function CheckoutPage() {
                         </p>
                         {item.originalPrice != null &&
                           item.originalPrice > item.price && (
-                            <p className="text-xs text-gray-400 line-through">
+                            <p className="text-xs text-subtle line-through">
                               {item.originalPrice.toLocaleString("tr-TR", {
                                 minimumFractionDigits: 2,
                                 maximumFractionDigits: 2,
@@ -2300,7 +2300,7 @@ export default function CheckoutPage() {
                               TL
                             </p>
                           )}
-                        <p className="text-sm text-gray-700 font-medium">
+                        <p className="text-sm text-body font-medium">
                           {item.price.toLocaleString("tr-TR", {
                             minimumFractionDigits: 2,
                             maximumFractionDigits: 2,
@@ -2311,7 +2311,7 @@ export default function CheckoutPage() {
                     </div>
                   ))}
                   {checkoutItems.length > 3 && (
-                    <p className="text-sm text-gray-500">
+                    <p className="text-sm text-muted">
                       +{checkoutItems.length - 3} ürün daha
                     </p>
                   )}
@@ -2321,7 +2321,7 @@ export default function CheckoutPage() {
 
                 <div className="space-y-3 text-sm">
                   <div className="flex justify-between">
-                    <span className="text-gray-600">
+                    <span className="text-muted">
                       {locale === "en" ? "Subtotal" : "Ara Toplam"}
                     </span>
                     <span className="font-medium">
@@ -2338,25 +2338,25 @@ export default function CheckoutPage() {
                   </div>
 
                   <div className="flex justify-between">
-                    <span className="text-gray-600">
+                    <span className="text-muted">
                       Kargo ({selectedCarrier === "aras" ? "Aras" : "Yurtiçi"})
                     </span>
                     <span className="font-medium">
                       {quoteLoading || (shippingLoading && !quote) ? (
-                        <span className="text-gray-400">Hesaplanıyor...</span>
+                        <span className="text-subtle">Hesaplanıyor...</span>
                       ) : quote?.pricing?.shippingAmount != null ? (
                         `${Number(quote.pricing.shippingAmount).toFixed(2)} TL`
                       ) : shippingCost > 0 ? (
                         `${shippingCost.toFixed(2)} TL`
                       ) : (
-                        <span className="text-gray-400">Adres seçin</span>
+                        <span className="text-subtle">Adres seçin</span>
                       )}
                     </span>
                   </div>
 
                   {(quote?.pricing?.buyerFeeAmount ?? 0) > 0 && (
                     <div className="flex justify-between">
-                      <span className="text-gray-600">
+                      <span className="text-muted">
                         {locale === "en" ? "Platform fee" : "Platform ücreti"}
                       </span>
                       <span className="font-medium">
@@ -2379,7 +2379,7 @@ export default function CheckoutPage() {
                     </span>
                     <span className="font-bold text-primary-500">
                       {quoteLoading || (shippingLoading && !quote) ? (
-                        <span className="text-gray-400">...</span>
+                        <span className="text-subtle">...</span>
                       ) : (
                         `${grandTotal.toFixed(2)} TL`
                       )}
@@ -2394,7 +2394,7 @@ export default function CheckoutPage() {
 
       {guestOtpModalOpen && !isAuthenticated ? (
         <div
-          className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/50 backdrop-blur-[1px]"
+          className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-heading/50 backdrop-blur-[1px]"
           role="dialog"
           aria-modal="true"
           aria-labelledby="guest-otp-modal-title"
@@ -2403,13 +2403,13 @@ export default function CheckoutPage() {
           }}
         >
           <div
-            className="w-full max-w-md rounded-xl bg-white shadow-xl border border-gray-200 p-6 space-y-4"
+            className="w-full max-w-md rounded-xl bg-surface-elevated shadow-xl border border-border p-6 space-y-4"
             onClick={(e) => e.stopPropagation()}
           >
             <div className="flex items-start justify-between gap-3">
               <h2
                 id="guest-otp-modal-title"
-                className="text-lg font-semibold text-gray-900"
+                className="text-lg font-semibold text-heading"
               >
                 {t("checkout.guestEmailVerifyTitle")}
               </h2>
@@ -2417,13 +2417,13 @@ export default function CheckoutPage() {
                 variant="secondary"
                 type="button"
                 onClick={() => setGuestOtpModalOpen(false)}
-                className="p-1 rounded-lg text-gray-500 hover:bg-gray-100"
+                className="p-1 rounded-lg text-muted hover:bg-surface-alt"
                 aria-label={locale === "en" ? "Close" : "Kapat"}
               >
                 <XMarkIcon className="w-5 h-5" />
               </Button>
             </div>
-            <p className="text-sm text-gray-600">
+            <p className="text-sm text-muted">
               {t("checkout.guestEmailModalBody")}
             </p>
             <p className="text-xs font-medium text-primary-600 break-all">
@@ -2431,7 +2431,7 @@ export default function CheckoutPage() {
             </p>
             {guestOtpSending &&
             guestOtpSentForEmail !== guestEmail.trim().toLowerCase() ? (
-              <p className="text-sm text-gray-500">
+              <p className="text-sm text-muted">
                 {t("checkout.guestEmailModalSending")}
               </p>
             ) : null}
@@ -2480,7 +2480,7 @@ export default function CheckoutPage() {
                 {guestOtpSending ? "…" : t("checkout.guestEmailSendCode")}
               </Button>
             </div>
-            <div className="flex justify-end gap-2 pt-2 border-t border-gray-100">
+            <div className="flex justify-end gap-2 pt-2 border-t border-border-subtle">
               <Button
                 variant="secondary"
                 type="button"

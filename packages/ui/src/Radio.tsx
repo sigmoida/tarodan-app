@@ -24,7 +24,7 @@ export const Radio = React.forwardRef<HTMLInputElement, RadioProps>(
         type="radio"
         id={rId}
         className={cn(
-          'shrink-0 cursor-pointer border-gray-300 text-primary-600',
+          'shrink-0 cursor-pointer border-border text-primary-600',
           'focus:ring-2 focus:ring-primary-500 focus:ring-offset-1',
           'disabled:cursor-not-allowed disabled:opacity-50',
           sizeClasses[size],
@@ -39,7 +39,7 @@ export const Radio = React.forwardRef<HTMLInputElement, RadioProps>(
     return (
       <label
         htmlFor={rId}
-        className="inline-flex cursor-pointer items-center gap-2 text-sm text-gray-700"
+        className="inline-flex cursor-pointer items-center gap-2 text-sm text-body"
       >
         {input}
         <span>{label}</span>

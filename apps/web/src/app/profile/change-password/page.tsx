@@ -23,9 +23,9 @@ import { useTranslation } from '@/i18n/LanguageContext';import { Button, Input }
 
 function PasswordRequirement({ met, text }: { met: boolean; text: string }) {
   return (
-    <div className={`flex items-center gap-2 text-xs ${met ? 'text-success-600' : 'text-gray-400'}`}>
-      <div className={`w-4 h-4 rounded-full flex items-center justify-center ${met ? 'bg-success-100' : 'bg-gray-100'}`}>
-        {met ? <CheckIcon className="w-2.5 h-2.5" /> : <span className="w-1.5 h-1.5 rounded-full bg-gray-300" />}
+    <div className={`flex items-center gap-2 text-xs ${met ? 'text-success-600' : 'text-subtle'}`}>
+      <div className={`w-4 h-4 rounded-full flex items-center justify-center ${met ? 'bg-success-100' : 'bg-surface-alt'}`}>
+        {met ? <CheckIcon className="w-2.5 h-2.5" /> : <span className="w-1.5 h-1.5 rounded-full bg-border-strong" />}
       </div>
       <span>{text}</span>
     </div>
@@ -102,12 +102,12 @@ export default function ChangePasswordPage() {
 
   if (success) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-gray-50 via-white to-primary-50">
-        <div className="bg-gradient-to-r from-primary-500 to-warning-500 text-white">
+      <div className="min-h-screen bg-gradient-to-br from-surface via-surface-elevated to-primary-50">
+        <div className="bg-gradient-to-r from-primary-500 to-warning-500 text-inverted">
           <div className="max-w-4xl mx-auto px-4 py-8">
             <Link
               href="/profile/settings"
-              className="inline-flex items-center gap-2 text-white/80 hover:text-white mb-4 transition-colors group"
+              className="inline-flex items-center gap-2 text-inverted/80 hover:text-inverted mb-4 transition-colors group"
             >
               <ArrowLeftIcon className="w-5 h-5 group-hover:-translate-x-1 transition-transform" />
               <span className="font-medium">{locale === 'en' ? 'Back to Settings' : 'Ayarlara Dön'}</span>
@@ -118,20 +118,20 @@ export default function ChangePasswordPage() {
           <motion.div
             initial={{ opacity: 0, scale: 0.95 }}
             animate={{ opacity: 1, scale: 1 }}
-            className="bg-white rounded-2xl shadow-sm border border-gray-100 p-8 md:p-10 text-center"
+            className="bg-surface-elevated rounded-2xl shadow-sm border border-border-subtle p-8 md:p-10 text-center"
           >
             <div className="w-20 h-20 bg-gradient-to-br from-success-100 to-success-100 rounded-full flex items-center justify-center mx-auto mb-6">
               <CheckCircleIcon className="w-12 h-12 text-success-600" />
             </div>
-            <h2 className="text-2xl font-bold text-gray-900 mb-2">{t('settings.passwordChanged')}</h2>
-            <p className="text-gray-500 mb-8">
+            <h2 className="text-2xl font-bold text-heading mb-2">{t('settings.passwordChanged')}</h2>
+            <p className="text-muted mb-8">
               {locale === 'tr'
                 ? 'Şifreniz güncellendi. Bir sonraki girişte yeni şifrenizi kullanın.'
                 : 'Your password has been updated. Use your new password on next login.'}
             </p>
             <Link
               href="/profile/settings"
-              className="inline-flex items-center gap-2 py-3 px-6 bg-gradient-to-r from-primary-500 to-warning-500 text-white font-semibold rounded-xl hover:from-primary-600 hover:to-warning-600 transition-all"
+              className="inline-flex items-center gap-2 py-3 px-6 bg-gradient-to-r from-primary-500 to-warning-500 text-inverted font-semibold rounded-xl hover:from-primary-600 hover:to-warning-600 transition-all"
             >
               <ArrowLeftIcon className="w-5 h-5" />
               {locale === 'en' ? 'Back to Settings' : 'Ayarlara Dön'}
@@ -143,23 +143,23 @@ export default function ChangePasswordPage() {
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-gray-50 via-white to-primary-50">
-      <div className="bg-gradient-to-r from-primary-500 to-warning-500 text-white">
+    <div className="min-h-screen bg-gradient-to-br from-surface via-surface-elevated to-primary-50">
+      <div className="bg-gradient-to-r from-primary-500 to-warning-500 text-inverted">
         <div className="max-w-4xl mx-auto px-4 py-8">
           <Link
             href="/profile/settings"
-            className="inline-flex items-center gap-2 text-white/80 hover:text-white mb-4 transition-colors group"
+            className="inline-flex items-center gap-2 text-inverted/80 hover:text-inverted mb-4 transition-colors group"
           >
             <ArrowLeftIcon className="w-5 h-5 group-hover:-translate-x-1 transition-transform" />
             <span className="font-medium">{locale === 'en' ? 'Back to Settings' : 'Ayarlara Dön'}</span>
           </Link>
           <div className="flex items-center gap-4">
-            <div className="w-14 h-14 rounded-2xl bg-white/20 flex items-center justify-center">
+            <div className="w-14 h-14 rounded-2xl bg-surface-elevated/20 flex items-center justify-center">
               <KeyIcon className="w-8 h-8" />
             </div>
             <div>
               <h1 className="text-2xl md:text-3xl font-bold">{t('settings.changePassword')}</h1>
-              <p className="text-white/80 mt-1">
+              <p className="text-inverted/80 mt-1">
                 {locale === 'tr' ? 'Mevcut şifrenizi girip yeni şifre belirleyin' : 'Enter your current password and set a new one'}
               </p>
             </div>
@@ -171,21 +171,21 @@ export default function ChangePasswordPage() {
         <motion.div
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
-          className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden"
+          className="bg-surface-elevated rounded-2xl shadow-sm border border-border-subtle overflow-hidden"
         >
-          <div className="px-6 py-4 border-b border-gray-100 bg-gray-50/50">
-            <h2 className="text-lg font-semibold text-gray-900 flex items-center gap-2">
+          <div className="px-6 py-4 border-b border-border-subtle bg-surface/50">
+            <h2 className="text-lg font-semibold text-heading flex items-center gap-2">
               <LockClosedIcon className="w-5 h-5 text-primary-500" />
               {t('settings.changePassword')}
             </h2>
           </div>
           <form onSubmit={handleSubmit} className="p-6 space-y-5">
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
+              <label className="block text-sm font-medium text-body mb-2">
                 {t('settings.currentPassword')}
               </label>
               <div className="relative">
-                <LockClosedIcon className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
+                <LockClosedIcon className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-subtle" />
                 <Input type={showCurrent ? 'text' : 'password'}
                   value={currentPassword}
                   onChange={(e) => {
@@ -193,23 +193,23 @@ export default function ChangePasswordPage() {
                     setError('');
                   }}
                   placeholder="••••••••"
-                  className="w-full pl-12 pr-12 py-3 border-2 border-gray-200 rounded-xl focus:ring-0 focus:border-primary-500 transition-colors text-gray-900"
+                  className="w-full pl-12 pr-12 py-3 border-2 border-border rounded-xl focus:ring-0 focus:border-primary-500 transition-colors text-heading"
                   required
                   autoComplete="current-password" />
                 <Button variant="secondary" type="button"
                   onClick={() => setShowCurrent(!showCurrent)}
-                  className="absolute right-4 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600">
+                  className="absolute right-4 top-1/2 -translate-y-1/2 text-subtle hover:text-muted">
                   {showCurrent ? <EyeSlashIcon className="w-5 h-5" /> : <EyeIcon className="w-5 h-5" />}
                 </Button>
               </div>
             </div>
 
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
+              <label className="block text-sm font-medium text-body mb-2">
                 {t('settings.newPassword')}
               </label>
               <div className="relative">
-                <LockClosedIcon className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
+                <LockClosedIcon className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-subtle" />
                 <Input type={showNew ? 'text' : 'password'}
                   value={newPassword}
                   onChange={(e) => {
@@ -217,19 +217,19 @@ export default function ChangePasswordPage() {
                     setError('');
                   }}
                   placeholder="••••••••"
-                  className="w-full pl-12 pr-12 py-3 border-2 border-gray-200 rounded-xl focus:ring-0 focus:border-primary-500 transition-colors text-gray-900"
+                  className="w-full pl-12 pr-12 py-3 border-2 border-border rounded-xl focus:ring-0 focus:border-primary-500 transition-colors text-heading"
                   required
                   autoComplete="new-password" />
                 <Button variant="secondary" type="button"
                   onClick={() => setShowNew(!showNew)}
-                  className="absolute right-4 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600">
+                  className="absolute right-4 top-1/2 -translate-y-1/2 text-subtle hover:text-muted">
                   {showNew ? <EyeSlashIcon className="w-5 h-5" /> : <EyeIcon className="w-5 h-5" />}
                 </Button>
               </div>
             </div>
 
-            <div className="bg-gray-50 rounded-xl p-4 space-y-2">
-              <p className="text-xs font-medium text-gray-500 mb-2">
+            <div className="bg-surface rounded-xl p-4 space-y-2">
+              <p className="text-xs font-medium text-muted mb-2">
                 {locale === 'tr' ? 'Yeni şifre gereksinimleri:' : 'New password requirements:'}
               </p>
               <div className="grid grid-cols-2 gap-2">
@@ -241,11 +241,11 @@ export default function ChangePasswordPage() {
             </div>
 
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
+              <label className="block text-sm font-medium text-body mb-2">
                 {t('settings.confirmNewPassword')}
               </label>
               <div className="relative">
-                <LockClosedIcon className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
+                <LockClosedIcon className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-subtle" />
                 <Input type={showConfirm ? 'text' : 'password'}
                   value={confirmPassword}
                   onChange={(e) => {
@@ -253,14 +253,14 @@ export default function ChangePasswordPage() {
                     setError('');
                   }}
                   placeholder="••••••••"
-                  className={`w-full pl-12 pr-12 py-3 border-2 rounded-xl focus:ring-0 transition-colors text-gray-900 ${
-                    confirmPassword && !passwordsMatch ? 'border-danger-300 bg-danger-50' : 'border-gray-200 focus:border-primary-500'
+                  className={`w-full pl-12 pr-12 py-3 border-2 rounded-xl focus:ring-0 transition-colors text-heading ${
+                    confirmPassword && !passwordsMatch ? 'border-danger-300 bg-danger-50' : 'border-border focus:border-primary-500'
                   }`}
                   required
                   autoComplete="new-password" />
                 <Button variant="secondary" type="button"
                   onClick={() => setShowConfirm(!showConfirm)}
-                  className="absolute right-4 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600">
+                  className="absolute right-4 top-1/2 -translate-y-1/2 text-subtle hover:text-muted">
                   {showConfirm ? <EyeSlashIcon className="w-5 h-5" /> : <EyeIcon className="w-5 h-5" />}
                 </Button>
               </div>
@@ -293,7 +293,7 @@ export default function ChangePasswordPage() {
 
             <Button variant="secondary" type="submit"
               disabled={loading || !currentPassword.trim() || !isNewPasswordValid || !passwordsMatch}
-              className="w-full py-4 bg-gradient-to-r from-primary-500 to-warning-500 text-white font-semibold rounded-xl hover:from-primary-600 hover:to-warning-600 disabled:from-gray-300 disabled:to-gray-400 disabled:cursor-not-allowed transition-all">
+              className="w-full py-4 bg-gradient-to-r from-primary-500 to-warning-500 text-inverted font-semibold rounded-xl hover:from-primary-600 hover:to-warning-600 disabled:from-border-strong disabled:to-subtle disabled:cursor-not-allowed transition-all">
               {loading ? (
                 <span className="flex items-center justify-center gap-2">
                   <svg className="animate-spin h-5 w-5" viewBox="0 0 24 24">

@@ -239,14 +239,14 @@ export default function SidebarFilters({
             .map(name => ({ id: '', name, slug: name.toLowerCase().replace(/\s+/g, '-') }));
 
     return (
-        <div className="bg-white rounded shadow-sm border border-gray-100 flex flex-col">
+        <div className="bg-surface-elevated rounded shadow-sm border border-border-subtle flex flex-col">
             {/* Header */}
-            <div className="flex items-center justify-between px-4 py-3 bg-gray-50 border-b border-gray-100">
+            <div className="flex items-center justify-between px-4 py-3 bg-surface border-b border-border-subtle">
                 <div className="flex items-center gap-2">
-                    <FunnelIcon className="w-5 h-5 text-gray-600" />
-                    <span className="font-semibold text-gray-900">{t('product.filters')}</span>
+                    <FunnelIcon className="w-5 h-5 text-muted" />
+                    <span className="font-semibold text-heading">{t('product.filters')}</span>
                     {activeFilterCount > 0 && (
-                        <span className="px-2 py-0.5 bg-primary-500 text-white text-xs font-bold rounded-sm">
+                        <span className="px-2 py-0.5 bg-primary-500 text-inverted text-xs font-bold rounded-sm">
                             {activeFilterCount}
                         </span>
                     )}
@@ -254,19 +254,19 @@ export default function SidebarFilters({
             </div>
 
             {/* Filter Sections */}
-            <div className="divide-y divide-gray-100">
+            <div className="divide-y divide-border-subtle">
 
                 {/* Araç Türü (Category) - loaded from API */}
                 <div className="py-3 px-4">
                     <Button variant="secondary" onClick={() => toggleSection('category')}
                         className="flex items-center justify-between w-full text-left">
-                        <span className="font-medium text-gray-900">
+                        <span className="font-medium text-heading">
                             {locale === 'en' ? 'Vehicle Type' : 'Araç Türü'}
                         </span>
                         {collapsedSections.category ? (
-                            <ChevronDownIcon className="w-5 h-5 text-gray-400" />
+                            <ChevronDownIcon className="w-5 h-5 text-subtle" />
                         ) : (
-                            <ChevronUpIcon className="w-5 h-5 text-gray-400" />
+                            <ChevronUpIcon className="w-5 h-5 text-subtle" />
                         )}
                     </Button>
                     {!collapsedSections.category && (
@@ -276,7 +276,7 @@ export default function SidebarFilters({
                                     onClick={() => handleCategoryChange(cat.id, cat.name)}
                                     className={`flex items-center gap-2 w-full px-2 py-1.5 rounded text-sm transition-colors ${filters.categoryId === cat.id
                                         ? 'bg-primary-100 text-primary-700'
-                                        : 'text-gray-700 hover:bg-gray-50'
+                                        : 'text-body hover:bg-surface'
                                         }`}>
                                     <span>{cat.name}</span>
                                 </Button>
@@ -289,13 +289,13 @@ export default function SidebarFilters({
                 <div className="py-3 px-4">
                     <Button variant="secondary" onClick={() => toggleSection('brand')}
                         className="flex items-center justify-between w-full text-left">
-                        <span className="font-medium text-gray-900">
+                        <span className="font-medium text-heading">
                             {locale === 'en' ? 'Brand' : 'Marka'}
                         </span>
                         {collapsedSections.brand ? (
-                            <ChevronDownIcon className="w-5 h-5 text-gray-400" />
+                            <ChevronDownIcon className="w-5 h-5 text-subtle" />
                         ) : (
-                            <ChevronUpIcon className="w-5 h-5 text-gray-400" />
+                            <ChevronUpIcon className="w-5 h-5 text-subtle" />
                         )}
                     </Button>
                     {!collapsedSections.brand && (
@@ -306,7 +306,7 @@ export default function SidebarFilters({
                                 value={brandSearch}
                                 onChange={(e) => setBrandSearch(e.target.value)}
                                 inputSize="sm"
-                                className="rounded border-gray-200 focus:border-primary-400 mb-2"
+                                className="rounded border-border focus:border-primary-400 mb-2"
                             />
                             <div className="space-y-1">
                                 {filteredBrands.map((brand) => {
@@ -318,7 +318,7 @@ export default function SidebarFilters({
                                             key={brand.id}
                                             className={`flex items-center gap-2 px-2 py-1.5 rounded cursor-pointer transition-colors ${isSelected
                                                 ? 'bg-primary-100 text-primary-700'
-                                                : 'text-gray-700 hover:bg-gray-50'
+                                                : 'text-body hover:bg-surface'
                                                 }`}
                                         >
                                             <Radio name="brand"
@@ -338,13 +338,13 @@ export default function SidebarFilters({
                 <div className="py-3 px-4">
                     <Button variant="secondary" onClick={() => toggleSection('model')}
                         className="flex items-center justify-between w-full text-left">
-                        <span className="font-medium text-gray-900">
+                        <span className="font-medium text-heading">
                             {locale === 'en' ? 'Model' : 'Model'}
                         </span>
                         {collapsedSections.model ? (
-                            <ChevronDownIcon className="w-5 h-5 text-gray-400" />
+                            <ChevronDownIcon className="w-5 h-5 text-subtle" />
                         ) : (
-                            <ChevronUpIcon className="w-5 h-5 text-gray-400" />
+                            <ChevronUpIcon className="w-5 h-5 text-subtle" />
                         )}
                     </Button>
                     {!collapsedSections.model && (
@@ -355,7 +355,7 @@ export default function SidebarFilters({
                                 value={modelSearch}
                                 onChange={(e) => setModelSearch(e.target.value)}
                                 inputSize="sm"
-                                className="rounded border-gray-200 focus:border-primary-400 mb-2"
+                                className="rounded border-border focus:border-primary-400 mb-2"
                             />
                             <div className="space-y-1 max-h-48 overflow-y-auto">
                                 {modelsForBrand.map((m) => {
@@ -365,7 +365,7 @@ export default function SidebarFilters({
                                             key={m.id}
                                             className={`flex items-center gap-2 px-2 py-1.5 rounded cursor-pointer transition-colors ${isSelected
                                                 ? 'bg-primary-100 text-primary-700'
-                                                : 'text-gray-700 hover:bg-gray-50'
+                                                : 'text-body hover:bg-surface'
                                                 }`}
                                         >
                                             <Radio name="carModel"
@@ -385,13 +385,13 @@ export default function SidebarFilters({
                 <div className="py-3 px-4">
                     <Button variant="secondary" onClick={() => toggleSection('scale')}
                         className="flex items-center justify-between w-full text-left">
-                        <span className="font-medium text-gray-900">
+                        <span className="font-medium text-heading">
                             {locale === 'en' ? 'Scale' : 'Ölçek'}
                         </span>
                         {collapsedSections.scale ? (
-                            <ChevronDownIcon className="w-5 h-5 text-gray-400" />
+                            <ChevronDownIcon className="w-5 h-5 text-subtle" />
                         ) : (
-                            <ChevronUpIcon className="w-5 h-5 text-gray-400" />
+                            <ChevronUpIcon className="w-5 h-5 text-subtle" />
                         )}
                     </Button>
                     {!collapsedSections.scale && (
@@ -400,8 +400,8 @@ export default function SidebarFilters({
                                 <Button variant="secondary" key={scale}
                                     onClick={() => handleScaleChange(scale)}
                                     className={`px-2 py-1.5 text-xs font-medium rounded transition-colors ${filters.scale === scale
-                                        ? 'bg-primary-500 text-white'
-                                        : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                                        ? 'bg-primary-500 text-inverted'
+                                        : 'bg-surface-alt text-body hover:bg-border-subtle'
                                         }`}>
                                     {scale}
                                 </Button>
@@ -414,13 +414,13 @@ export default function SidebarFilters({
                 <div className="py-3 px-4">
                     <Button variant="secondary" onClick={() => toggleSection('material')}
                         className="flex items-center justify-between w-full text-left">
-                        <span className="font-medium text-gray-900">
+                        <span className="font-medium text-heading">
                             {locale === 'en' ? 'Material' : 'Malzeme'}
                         </span>
                         {collapsedSections.material ? (
-                            <ChevronDownIcon className="w-5 h-5 text-gray-400" />
+                            <ChevronDownIcon className="w-5 h-5 text-subtle" />
                         ) : (
-                            <ChevronUpIcon className="w-5 h-5 text-gray-400" />
+                            <ChevronUpIcon className="w-5 h-5 text-subtle" />
                         )}
                     </Button>
                     {!collapsedSections.material && (
@@ -435,7 +435,7 @@ export default function SidebarFilters({
                                     onClick={() => handleMaterialChange(m.slug)}
                                     className={`flex items-center w-full px-2 py-1.5 text-left text-sm rounded transition-colors ${filters.material === m.slug
                                         ? 'bg-primary-100 text-primary-700'
-                                        : 'text-gray-700 hover:bg-gray-50'
+                                        : 'text-body hover:bg-surface'
                                         }`}>
                                     {m.label}
                                 </Button>
@@ -448,13 +448,13 @@ export default function SidebarFilters({
                 <div className="py-3 px-4">
                     <Button variant="secondary" onClick={() => toggleSection('manufacturer')}
                         className="flex items-center justify-between w-full text-left">
-                        <span className="font-medium text-gray-900">
+                        <span className="font-medium text-heading">
                             {locale === 'en' ? 'Manufacturer' : 'Üretici'}
                         </span>
                         {collapsedSections.manufacturer ? (
-                            <ChevronDownIcon className="w-5 h-5 text-gray-400" />
+                            <ChevronDownIcon className="w-5 h-5 text-subtle" />
                         ) : (
-                            <ChevronUpIcon className="w-5 h-5 text-gray-400" />
+                            <ChevronUpIcon className="w-5 h-5 text-subtle" />
                         )}
                     </Button>
                     {!collapsedSections.manufacturer && (
@@ -465,7 +465,7 @@ export default function SidebarFilters({
                                 value={manufacturerSearch}
                                 onChange={(e) => setManufacturerSearch(e.target.value)}
                                 inputSize="sm"
-                                className="rounded border-gray-200 focus:border-primary-400 mb-2"
+                                className="rounded border-border focus:border-primary-400 mb-2"
                             />
                             <div className="space-y-1">
                                 {displayManufacturers.map((m) => {
@@ -477,7 +477,7 @@ export default function SidebarFilters({
                                             key={m.id || m.name}
                                             className={`flex items-center gap-2 px-2 py-1.5 rounded cursor-pointer transition-colors ${isSelected
                                                 ? 'bg-primary-100 text-primary-700'
-                                                : 'text-gray-700 hover:bg-gray-50'
+                                                : 'text-body hover:bg-surface'
                                                 }`}
                                         >
                                             <Radio name="manufacturer"
@@ -497,13 +497,13 @@ export default function SidebarFilters({
                 <div className="py-3 px-4">
                     <Button variant="secondary" onClick={() => toggleSection('condition')}
                         className="flex items-center justify-between w-full text-left">
-                        <span className="font-medium text-gray-900">
+                        <span className="font-medium text-heading">
                             {t('product.condition')}
                         </span>
                         {collapsedSections.condition ? (
-                            <ChevronDownIcon className="w-5 h-5 text-gray-400" />
+                            <ChevronDownIcon className="w-5 h-5 text-subtle" />
                         ) : (
-                            <ChevronUpIcon className="w-5 h-5 text-gray-400" />
+                            <ChevronUpIcon className="w-5 h-5 text-subtle" />
                         )}
                     </Button>
                     {!collapsedSections.condition && (
@@ -513,7 +513,7 @@ export default function SidebarFilters({
                                     key={condition.value}
                                     className={`flex items-center gap-2 px-2 py-1.5 rounded cursor-pointer transition-colors ${filters.condition === condition.value
                                         ? 'bg-primary-100 text-primary-700'
-                                        : 'text-gray-700 hover:bg-gray-50'
+                                        : 'text-body hover:bg-surface'
                                         }`}
                                 >
                                     <Radio name="condition"
@@ -531,13 +531,13 @@ export default function SidebarFilters({
                 <div className="py-3 px-4">
                     <Button variant="secondary" onClick={() => toggleSection('price')}
                         className="flex items-center justify-between w-full text-left">
-                        <span className="font-medium text-gray-900">
+                        <span className="font-medium text-heading">
                             {locale === 'en' ? 'Price' : 'Fiyat'}
                         </span>
                         {collapsedSections.price ? (
-                            <ChevronDownIcon className="w-5 h-5 text-gray-400" />
+                            <ChevronDownIcon className="w-5 h-5 text-subtle" />
                         ) : (
-                            <ChevronUpIcon className="w-5 h-5 text-gray-400" />
+                            <ChevronUpIcon className="w-5 h-5 text-subtle" />
                         )}
                     </Button>
                     {!collapsedSections.price && (
@@ -549,16 +549,16 @@ export default function SidebarFilters({
                                     value={filters.minPrice}
                                     onChange={(e) => onFilterChange({ ...filters, minPrice: e.target.value })}
                                     inputSize="sm"
-                                    className="flex-1 min-w-0 px-2 rounded border-gray-200 focus:border-primary-400"
+                                    className="flex-1 min-w-0 px-2 rounded border-border focus:border-primary-400"
                                 />
-                                <span className="text-gray-400 flex-shrink-0">-</span>
+                                <span className="text-subtle flex-shrink-0">-</span>
                                 <Input
                                     type="number"
                                     placeholder="Max ₺"
                                     value={filters.maxPrice}
                                     onChange={(e) => onFilterChange({ ...filters, maxPrice: e.target.value })}
                                     inputSize="sm"
-                                    className="flex-1 min-w-0 px-2 rounded border-gray-200 focus:border-primary-400"
+                                    className="flex-1 min-w-0 px-2 rounded border-border focus:border-primary-400"
                                 />
                             </div>
                             {/* Quick price buttons */}
@@ -580,8 +580,8 @@ export default function SidebarFilters({
                                                 }
                                             }}
                                             className={`px-2 py-1 text-xs rounded transition-colors ${isActive
-                                                ? 'bg-primary-500 text-white'
-                                                : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+                                                ? 'bg-primary-500 text-inverted'
+                                                : 'bg-surface-alt text-muted hover:bg-border-subtle'
                                                 }`}>
                                             {range === '1000+' ? '₺1000+' : `₺${range}`}
                                         </Button>
@@ -596,26 +596,26 @@ export default function SidebarFilters({
                 <div className="py-3 px-4">
                     <Button variant="secondary" onClick={() => toggleSection('options')}
                         className="flex items-center justify-between w-full text-left">
-                        <span className="font-medium text-gray-900">
+                        <span className="font-medium text-heading">
                             {locale === 'en' ? 'Options' : 'Seçenekler'}
                         </span>
                         {collapsedSections.options ? (
-                            <ChevronDownIcon className="w-5 h-5 text-gray-400" />
+                            <ChevronDownIcon className="w-5 h-5 text-subtle" />
                         ) : (
-                            <ChevronUpIcon className="w-5 h-5 text-gray-400" />
+                            <ChevronUpIcon className="w-5 h-5 text-subtle" />
                         )}
                     </Button>
                     {!collapsedSections.options && (
                         <div className="mt-3">
-                            <label className="flex items-center gap-3 px-2 py-2 rounded cursor-pointer hover:bg-gray-50">
+                            <label className="flex items-center gap-3 px-2 py-2 rounded cursor-pointer hover:bg-surface">
                                 <Checkbox
                                     checked={filters.tradeOnly}
                                     onChange={(e) => onFilterChange({ ...filters, tradeOnly: e.target.checked })}
                                     className="h-5 w-5"
                                 />
                                 <div>
-                                    <span className="text-sm font-medium text-gray-700">{t('product.tradeAvailable')}</span>
-                                    <p className="text-xs text-gray-500">
+                                    <span className="text-sm font-medium text-body">{t('product.tradeAvailable')}</span>
+                                    <p className="text-xs text-muted">
                                         {locale === 'en' ? 'Only show items available for trade' : 'Sadece takas yapılabilir ürünleri göster'}
                                     </p>
                                 </div>

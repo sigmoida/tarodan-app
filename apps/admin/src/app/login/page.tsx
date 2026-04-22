@@ -82,7 +82,7 @@ export default function LoginPage() {
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-gray-50 via-white to-gray-100 px-4">
+    <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-surface via-surface-elevated to-surface-alt px-4">
       <div className="max-w-md w-full">
         {/* Logo */}
         <div className="text-center mb-8">
@@ -100,19 +100,19 @@ export default function LoginPage() {
             }}
             priority
           />
-          <p className="text-gray-500 mt-2">Admin Panel</p>
+          <p className="text-muted mt-2">Admin Panel</p>
         </div>
 
         {/* Login Card */}
-        <div className="bg-white rounded-xl shadow-elevated p-8 border border-gray-200">
-          <h2 className="text-2xl font-semibold text-gray-900 mb-6">
+        <div className="bg-surface-elevated rounded-xl shadow-elevated p-8 border border-border">
+          <h2 className="text-2xl font-semibold text-heading mb-6">
             Giriş Yap
           </h2>
 
           <form onSubmit={handleSubmit(onSubmit)} className="space-y-6">
             {/* Email */}
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
+              <label className="block text-sm font-medium text-body mb-2">
                 E-posta
               </label>
               <Input
@@ -135,7 +135,7 @@ export default function LoginPage() {
 
             {/* Password */}
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
+              <label className="block text-sm font-medium text-body mb-2">
                 Şifre
               </label>
               <Input
@@ -159,7 +159,7 @@ export default function LoginPage() {
             {/* 2FA Code */}
             {requires2FA && (
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
+                <label className="block text-sm font-medium text-body mb-2">
                   Doğrulama Kodu
                 </label>
                 <Input
@@ -191,7 +191,7 @@ export default function LoginPage() {
               {isLoading ? (
                 <span className="flex items-center justify-center">
                   <svg
-                    className="animate-spin -ml-1 mr-3 h-5 w-5 text-white"
+                    className="animate-spin -ml-1 mr-3 h-5 w-5 text-inverted"
                     xmlns="http://www.w3.org/2000/svg"
                     fill="none"
                     viewBox="0 0 24 24"
@@ -220,7 +220,7 @@ export default function LoginPage() {
         </div>
 
         {/* Footer */}
-        <p className="text-center text-gray-500 text-sm mt-6">
+        <p className="text-center text-muted text-sm mt-6">
           © 2026 Tarodan Marketplace. Tüm hakları saklıdır.
         </p>
       </div>

@@ -124,9 +124,9 @@ export default function HelpCenterPage() {
   ] : QUICK_LINKS;
   
   return (
-    <div className="min-h-screen bg-gray-50">
+    <div className="min-h-screen bg-surface">
       {/* Hero Section */}
-      <div className="bg-gradient-to-br from-primary-500 to-primary-600 text-white py-16">
+      <div className="bg-gradient-to-br from-primary-500 to-primary-600 text-inverted py-16">
         <div className="max-w-4xl mx-auto px-4 text-center">
           <h1 className="text-4xl font-bold mb-4">{t('help.title')}</h1>
           <p className="text-lg text-primary-100 mb-8">
@@ -139,7 +139,7 @@ export default function HelpCenterPage() {
               <Link
                 key={link.href}
                 href={link.href}
-                className="flex items-center gap-2 px-5 py-3 bg-white/20 rounded-xl hover:bg-white/30 transition-colors"
+                className="flex items-center gap-2 px-5 py-3 bg-surface-elevated/20 rounded-xl hover:bg-surface-elevated/30 transition-colors"
               >
                 <link.icon className="w-5 h-5" />
                 <span className="font-medium">{link.label}</span>
@@ -155,15 +155,15 @@ export default function HelpCenterPage() {
           {HELP_CATEGORIES.map((category) => (
             <div
               key={category.title}
-              className="bg-white rounded-xl shadow-sm p-6 hover:shadow-md transition-shadow"
+              className="bg-surface-elevated rounded-xl shadow-sm p-6 hover:shadow-md transition-shadow"
             >
               <div
                 className={`w-12 h-12 ${category.color} rounded-xl flex items-center justify-center mb-4`}
               >
-                <category.icon className="w-6 h-6 text-white" />
+                <category.icon className="w-6 h-6 text-inverted" />
               </div>
-              <h3 className="font-semibold text-gray-900 mb-2">{category.title}</h3>
-              <p className="text-sm text-gray-500 mb-4">{category.description}</p>
+              <h3 className="font-semibold text-heading mb-2">{category.title}</h3>
+              <p className="text-sm text-muted mb-4">{category.description}</p>
               <ul className="space-y-2">
                 {category.links.map((link) => (
                   <li key={link.label}>
@@ -181,8 +181,8 @@ export default function HelpCenterPage() {
         </div>
 
         {/* Popular Articles */}
-        <div className="bg-white rounded-xl shadow-sm p-8 mb-12">
-          <h2 className="text-2xl font-bold text-gray-900 mb-6">{t('help.popularTopics')}</h2>
+        <div className="bg-surface-elevated rounded-xl shadow-sm p-8 mb-12">
+          <h2 className="text-2xl font-bold text-heading mb-6">{t('help.popularTopics')}</h2>
           <div className="grid md:grid-cols-2 gap-4">
             {[
               { q: 'İlk satışımı nasıl yaparım?', href: '/guides#selling' },
@@ -195,21 +195,21 @@ export default function HelpCenterPage() {
               <Link
                 key={item.q}
                 href={item.href}
-                className="flex items-center gap-3 p-4 rounded-lg border border-gray-100 hover:border-primary-200 hover:bg-primary-50 transition-colors"
+                className="flex items-center gap-3 p-4 rounded-lg border border-border-subtle hover:border-primary-200 hover:bg-primary-50 transition-colors"
               >
                 <QuestionMarkCircleIcon className="w-5 h-5 text-primary-500 flex-shrink-0" />
-                <span className="text-gray-700">{item.q}</span>
+                <span className="text-body">{item.q}</span>
               </Link>
             ))}
           </div>
         </div>
 
         {/* Contact Section */}
-        <div className="bg-gradient-to-r from-gray-800 to-gray-900 rounded-2xl p-8 text-white">
+        <div className="bg-gradient-to-r from-body to-heading rounded-2xl p-8 text-inverted">
           <div className="grid md:grid-cols-2 gap-8 items-center">
             <div>
               <h2 className="text-2xl font-bold mb-4">{t('help.needMoreHelp')}</h2>
-              <p className="text-gray-300 mb-6">
+              <p className="text-border-strong mb-6">
                 {t('help.supportReady')} {t('help.businessHours')}
               </p>
               <div className="space-y-3">
@@ -226,14 +226,14 @@ export default function HelpCenterPage() {
             <div className="flex flex-col sm:flex-row gap-4">
               <Link
                 href="/contact"
-                className="flex-1 text-center px-6 py-4 bg-primary-500 text-white rounded-xl font-semibold hover:bg-primary-600 transition-colors"
+                className="flex-1 text-center px-6 py-4 bg-primary-500 text-inverted rounded-xl font-semibold hover:bg-primary-600 transition-colors"
               >
                 <ChatBubbleLeftRightIcon className="w-6 h-6 mx-auto mb-2" />
                 {t('help.contactForm')}
               </Link>
               <Link
                 href="/faq"
-                className="flex-1 text-center px-6 py-4 bg-white/10 text-white rounded-xl font-semibold hover:bg-white/20 transition-colors"
+                className="flex-1 text-center px-6 py-4 bg-surface-elevated/10 text-inverted rounded-xl font-semibold hover:bg-surface-elevated/20 transition-colors"
               >
                 <QuestionMarkCircleIcon className="w-6 h-6 mx-auto mb-2" />
                 {t('footer.faq')}

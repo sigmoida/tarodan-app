@@ -92,3 +92,4 @@ export {
 
 // Utilities
 export { cn } from './utils';
+export { colors } from '@tarodan/design-tokens';

@@ -310,9 +310,9 @@ export default function BrandsPage() {
   const totalProducts = BRANDS_DATA.reduce((sum, b) => sum + b.productCount, 0);
 
   return (
-    <div className="min-h-screen bg-gray-50 pb-20">
+    <div className="min-h-screen bg-surface pb-20">
       {/* Hero */}
-      <div className="relative bg-gray-900 overflow-hidden">
+      <div className="relative bg-heading overflow-hidden">
         <div className="absolute inset-0 opacity-20">
           <div className="absolute inset-0" style={{
             backgroundImage: 'repeating-linear-gradient(45deg, transparent, transparent 35px, rgba(255,255,255,0.03) 35px, rgba(255,255,255,0.03) 70px)',
@@ -329,10 +329,10 @@ export default function BrandsPage() {
               <SparklesIcon className="w-3.5 h-3.5" />
               {BRANDS_DATA.length} Marka &middot; {totalProducts.toLocaleString('tr-TR')}+ Ürün
             </div>
-            <h1 className="text-4xl sm:text-5xl font-black text-white mb-4 tracking-tight">
+            <h1 className="text-4xl sm:text-5xl font-black text-inverted mb-4 tracking-tight">
               Diecast Markalar Rehberi
             </h1>
-            <p className="text-gray-400 max-w-2xl mx-auto text-base sm:text-lg leading-relaxed">
+            <p className="text-subtle max-w-2xl mx-auto text-base sm:text-lg leading-relaxed">
               Dünyanın en prestijli diecast model araba üreticilerini keşfedin. Her markanın tarihini, özel serilerini ve popüler modellerini inceleyin.
             </p>
           </motion.div>
@@ -351,8 +351,8 @@ export default function BrandsPage() {
               { value: totalProducts.toLocaleString('tr-TR') + '+', label: 'Model' },
             ].map((stat) => (
               <div key={stat.label} className="text-center">
-                <p className="text-2xl sm:text-3xl font-black text-white">{stat.value}</p>
-                <p className="text-xs text-gray-500 mt-1 uppercase tracking-wider font-medium">{stat.label}</p>
+                <p className="text-2xl sm:text-3xl font-black text-inverted">{stat.value}</p>
+                <p className="text-xs text-muted mt-1 uppercase tracking-wider font-medium">{stat.label}</p>
               </div>
             ))}
           </motion.div>
@@ -360,31 +360,31 @@ export default function BrandsPage() {
       </div>
 
       {/* Filters Bar */}
-      <div className="sticky top-0 z-30 bg-white border-b border-gray-200 shadow-sm">
+      <div className="sticky top-0 z-30 bg-surface-elevated border-b border-border shadow-sm">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 py-3">
           <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3">
             {/* Search */}
             <div className="relative flex-1">
-              <MagnifyingGlassIcon className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+              <MagnifyingGlassIcon className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-subtle" />
               <Input type="text"
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
                 placeholder="Marka ara..."
-                className="w-full bg-gray-50 border border-gray-200 pl-9 pr-4 py-2 text-sm outline-none focus:border-primary-400 focus:ring-1 focus:ring-primary-400 transition-colors"
+                className="w-full bg-surface border border-border pl-9 pr-4 py-2 text-sm outline-none focus:border-primary-400 focus:ring-1 focus:ring-primary-400 transition-colors"
                 style={{ borderRadius: '4px' }} />
             </div>
 
             {/* Scale Filter */}
             <div className="flex items-center gap-1.5 flex-wrap">
               <Button variant="secondary" onClick={() => setSelectedScale(null)}
-                className={`px-3 py-1.5 text-xs font-semibold border transition-colors ${!selectedScale ? 'bg-gray-900 text-white border-gray-900' : 'bg-white text-gray-600 border-gray-200 hover:border-gray-400'}`}
+                className={`px-3 py-1.5 text-xs font-semibold border transition-colors ${!selectedScale ? 'bg-heading text-inverted border-border-strong' : 'bg-surface-elevated text-muted border-border hover:border-border-strong'}`}
                 style={{ borderRadius: '4px' }}>
                 Tümü
               </Button>
               {SCALE_GROUPS.map((sg) => (
                 <Button variant="secondary" key={sg.scale}
                   onClick={() => setSelectedScale(selectedScale === sg.scale ? null : sg.scale)}
-                  className={`px-3 py-1.5 text-xs font-semibold border transition-colors ${selectedScale === sg.scale ? 'bg-primary-500 text-white border-primary-500' : 'bg-white text-gray-600 border-gray-200 hover:border-primary-300'}`}
+                  className={`px-3 py-1.5 text-xs font-semibold border transition-colors ${selectedScale === sg.scale ? 'bg-primary-500 text-inverted border-primary-500' : 'bg-surface-elevated text-muted border-border hover:border-primary-300'}`}
                   style={{ borderRadius: '4px' }}>
                   {sg.scale}
                 </Button>
@@ -402,7 +402,7 @@ export default function BrandsPage() {
               {countries.slice(0, 5).map(([country, info]) => (
                 <Button variant="secondary" key={country}
                   onClick={() => setSelectedCountry(selectedCountry === country ? null : country)}
-                  className={`px-2.5 py-1.5 text-xs font-medium border transition-colors ${selectedCountry === country ? 'bg-primary-50 text-primary-700 border-primary-300' : 'bg-white text-gray-500 border-gray-200 hover:border-gray-300'}`}
+                  className={`px-2.5 py-1.5 text-xs font-medium border transition-colors ${selectedCountry === country ? 'bg-primary-50 text-primary-700 border-primary-300' : 'bg-surface-elevated text-muted border-border hover:border-border'}`}
                   style={{ borderRadius: '4px' }}>
                   {info.flag} {country}
                 </Button>
@@ -420,12 +420,12 @@ export default function BrandsPage() {
             return (
               <Button variant="secondary" key={sg.scale}
                 onClick={() => setSelectedScale(selectedScale === sg.scale ? null : sg.scale)}
-                className={`text-left p-3 sm:p-4 border transition-all ${selectedScale === sg.scale ? 'bg-primary-50 border-primary-300 shadow-sm' : 'bg-white border-gray-200 hover:border-primary-200 hover:shadow-sm'}`}
+                className={`text-left p-3 sm:p-4 border transition-all ${selectedScale === sg.scale ? 'bg-primary-50 border-primary-300 shadow-sm' : 'bg-surface-elevated border-border hover:border-primary-200 hover:shadow-sm'}`}
                 style={{ borderRadius: '4px' }}>
-                <div className="text-lg sm:text-xl font-black text-gray-900">{sg.scale}</div>
+                <div className="text-lg sm:text-xl font-black text-heading">{sg.scale}</div>
                 <div className="text-[11px] font-semibold text-primary-600 mt-0.5">{sg.label}</div>
-                <div className="text-[10px] text-gray-400 mt-1 leading-snug">{sg.desc}</div>
-                <div className="text-[10px] text-gray-500 mt-2 font-medium">{count} marka</div>
+                <div className="text-[10px] text-subtle mt-1 leading-snug">{sg.desc}</div>
+                <div className="text-[10px] text-muted mt-2 font-medium">{count} marka</div>
               </Button>
             );
           })}
@@ -440,13 +440,13 @@ export default function BrandsPage() {
             animate={{ opacity: 1 }}
             className="text-center py-20"
           >
-            <div className="inline-flex items-center justify-center w-16 h-16 bg-gray-100 mb-4" style={{ borderRadius: '4px' }}>
-              <MagnifyingGlassIcon className="w-8 h-8 text-gray-400" />
+            <div className="inline-flex items-center justify-center w-16 h-16 bg-surface-alt mb-4" style={{ borderRadius: '4px' }}>
+              <MagnifyingGlassIcon className="w-8 h-8 text-subtle" />
             </div>
-            <h3 className="text-lg font-bold text-gray-900 mb-1">Sonuç Bulunamadı</h3>
-            <p className="text-sm text-gray-500 mb-4">&quot;{searchQuery}&quot; aramasıyla eşleşen marka yok.</p>
+            <h3 className="text-lg font-bold text-heading mb-1">Sonuç Bulunamadı</h3>
+            <p className="text-sm text-muted mb-4">&quot;{searchQuery}&quot; aramasıyla eşleşen marka yok.</p>
             <Button variant="secondary" onClick={() => { setSearchQuery(''); setSelectedScale(null); setSelectedCountry(null); }}
-              className="px-5 py-2 bg-gray-900 text-white text-sm font-semibold hover:bg-primary-600 transition-colors"
+              className="px-5 py-2 bg-heading text-inverted text-sm font-semibold hover:bg-primary-600 transition-colors"
               style={{ borderRadius: '4px' }}>
               Filtreleri Temizle
             </Button>
@@ -461,13 +461,13 @@ export default function BrandsPage() {
                 transition={{ delay: idx * 0.04, duration: 0.35 }}
               >
                 <div
-                  className={`bg-white border transition-all overflow-hidden ${expandedBrand === brand.slug ? 'border-primary-300 shadow-md' : 'border-gray-200 hover:border-primary-200 hover:shadow-sm'}`}
+                  className={`bg-surface-elevated border transition-all overflow-hidden ${expandedBrand === brand.slug ? 'border-primary-300 shadow-md' : 'border-border hover:border-primary-200 hover:shadow-sm'}`}
                   style={{ borderRadius: '6px' }}
                 >
                   {/* Brand Header - Always visible */}
                   <Button variant="secondary" onClick={() => setExpandedBrand(expandedBrand === brand.slug ? null : brand.slug)}
                     className="w-full text-left p-4 sm:p-5 flex items-center gap-4 sm:gap-5">
-                    <div className="w-16 h-16 sm:w-20 sm:h-20 flex-shrink-0 bg-gray-50 border border-gray-100 flex items-center justify-center p-2 relative" style={{ borderRadius: '6px' }}>
+                    <div className="w-16 h-16 sm:w-20 sm:h-20 flex-shrink-0 bg-surface border border-border-subtle flex items-center justify-center p-2 relative" style={{ borderRadius: '6px' }}>
                       <Image
                         src={brand.logoUrl}
                         alt={brand.name}
@@ -479,14 +479,14 @@ export default function BrandsPage() {
                     </div>
                     <div className="flex-1 min-w-0">
                       <div className="flex items-center gap-2 mb-1">
-                        <h2 className="text-lg sm:text-xl font-bold text-gray-900 truncate">{brand.name}</h2>
+                        <h2 className="text-lg sm:text-xl font-bold text-heading truncate">{brand.name}</h2>
                         <span className="text-sm">{brand.countryFlag}</span>
                         <span className="ml-auto flex-shrink-0 bg-primary-50 text-primary-700 text-[11px] font-bold px-2.5 py-0.5" style={{ borderRadius: '4px' }}>
                           {brand.scale}
                         </span>
                       </div>
-                      <p className="text-sm text-gray-500 line-clamp-1">{brand.description}</p>
-                      <div className="flex items-center gap-4 mt-2 text-xs text-gray-400">
+                      <p className="text-sm text-muted line-clamp-1">{brand.description}</p>
+                      <div className="flex items-center gap-4 mt-2 text-xs text-subtle">
                         <span className="flex items-center gap-1">
                           <CalendarIcon className="w-3.5 h-3.5" />
                           {brand.founded}
@@ -495,10 +495,10 @@ export default function BrandsPage() {
                           <GlobeAltIcon className="w-3.5 h-3.5" />
                           {brand.parent}
                         </span>
-                        <span className="font-medium text-gray-600">{brand.productCount} ürün</span>
+                        <span className="font-medium text-muted">{brand.productCount} ürün</span>
                       </div>
                     </div>
-                    <ChevronRightIcon className={`w-5 h-5 text-gray-400 flex-shrink-0 transition-transform duration-200 ${expandedBrand === brand.slug ? 'rotate-90' : ''}`} />
+                    <ChevronRightIcon className={`w-5 h-5 text-subtle flex-shrink-0 transition-transform duration-200 ${expandedBrand === brand.slug ? 'rotate-90' : ''}`} />
                   </Button>
 
                   {/* Expanded Content */}
@@ -511,15 +511,15 @@ export default function BrandsPage() {
                         transition={{ duration: 0.25 }}
                         className="overflow-hidden"
                       >
-                        <div className="px-4 sm:px-5 pb-5 border-t border-gray-100 pt-4">
+                        <div className="px-4 sm:px-5 pb-5 border-t border-border-subtle pt-4">
                           <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
                             {/* History */}
                             <div className="md:col-span-2">
-                              <h3 className="text-sm font-bold text-gray-900 mb-2 flex items-center gap-1.5">
+                              <h3 className="text-sm font-bold text-heading mb-2 flex items-center gap-1.5">
                                 <CalendarIcon className="w-4 h-4 text-primary-500" />
                                 Marka Tarihi
                               </h3>
-                              <p className="text-sm text-gray-600 leading-relaxed">{brand.history}</p>
+                              <p className="text-sm text-muted leading-relaxed">{brand.history}</p>
                               <div className="mt-4 p-3 bg-primary-50/50 border border-primary-100" style={{ borderRadius: '4px' }}>
                                 <h4 className="text-xs font-bold text-primary-700 mb-1">Uzmanlık Alanı</h4>
                                 <p className="text-xs text-primary-600">{brand.specialty}</p>
@@ -528,7 +528,7 @@ export default function BrandsPage() {
 
                             {/* Popular Models */}
                             <div>
-                              <h3 className="text-sm font-bold text-gray-900 mb-2 flex items-center gap-1.5">
+                              <h3 className="text-sm font-bold text-heading mb-2 flex items-center gap-1.5">
                                 <SparklesIcon className="w-4 h-4 text-primary-500" />
                                 Popüler Modeller
                               </h3>
@@ -537,9 +537,9 @@ export default function BrandsPage() {
                                   <li key={model}>
                                     <Link
                                       href={`/listings?brand=${encodeURIComponent(brand.name)}&q=${encodeURIComponent(model)}`}
-                                      className="flex items-center gap-2 text-sm text-gray-600 hover:text-primary-600 transition-colors group"
+                                      className="flex items-center gap-2 text-sm text-muted hover:text-primary-600 transition-colors group"
                                     >
-                                      <span className="w-1.5 h-1.5 bg-gray-300 group-hover:bg-primary-500 transition-colors flex-shrink-0" style={{ borderRadius: '1px' }} />
+                                      <span className="w-1.5 h-1.5 bg-border-strong group-hover:bg-primary-500 transition-colors flex-shrink-0" style={{ borderRadius: '1px' }} />
                                       {model}
                                       <ChevronRightIcon className="w-3 h-3 ml-auto opacity-0 group-hover:opacity-100 transition-opacity" />
                                     </Link>
@@ -558,21 +558,21 @@ export default function BrandsPage() {
                           </div>
 
                           {/* Quick Info Bar */}
-                          <div className="flex flex-wrap items-center gap-3 mt-5 pt-4 border-t border-gray-100">
-                            <div className="flex items-center gap-2 bg-gray-50 px-3 py-1.5 text-xs" style={{ borderRadius: '4px' }}>
-                              <span className="font-bold text-gray-900">Kuruluş:</span>
-                              <span className="text-gray-600">{brand.founded}, {brand.country}</span>
+                          <div className="flex flex-wrap items-center gap-3 mt-5 pt-4 border-t border-border-subtle">
+                            <div className="flex items-center gap-2 bg-surface px-3 py-1.5 text-xs" style={{ borderRadius: '4px' }}>
+                              <span className="font-bold text-heading">Kuruluş:</span>
+                              <span className="text-muted">{brand.founded}, {brand.country}</span>
                             </div>
-                            <div className="flex items-center gap-2 bg-gray-50 px-3 py-1.5 text-xs" style={{ borderRadius: '4px' }}>
-                              <span className="font-bold text-gray-900">Ana Şirket:</span>
-                              <span className="text-gray-600">{brand.parent}</span>
+                            <div className="flex items-center gap-2 bg-surface px-3 py-1.5 text-xs" style={{ borderRadius: '4px' }}>
+                              <span className="font-bold text-heading">Ana Şirket:</span>
+                              <span className="text-muted">{brand.parent}</span>
                             </div>
-                            <div className="flex items-center gap-2 bg-gray-50 px-3 py-1.5 text-xs" style={{ borderRadius: '4px' }}>
-                              <span className="font-bold text-gray-900">Ölçek:</span>
-                              <span className="text-gray-600">{brand.scale}</span>
+                            <div className="flex items-center gap-2 bg-surface px-3 py-1.5 text-xs" style={{ borderRadius: '4px' }}>
+                              <span className="font-bold text-heading">Ölçek:</span>
+                              <span className="text-muted">{brand.scale}</span>
                             </div>
-                            <div className="flex items-center gap-2 bg-gray-50 px-3 py-1.5 text-xs" style={{ borderRadius: '4px' }}>
-                              <span className="font-bold text-gray-900">Aktif İlan:</span>
+                            <div className="flex items-center gap-2 bg-surface px-3 py-1.5 text-xs" style={{ borderRadius: '4px' }}>
+                              <span className="font-bold text-heading">Aktif İlan:</span>
                               <span className="text-primary-600 font-semibold">{brand.productCount}</span>
                             </div>
                           </div>
@@ -589,12 +589,12 @@ export default function BrandsPage() {
 
       {/* Timeline Section */}
       <div className="max-w-7xl mx-auto px-4 sm:px-6 mt-14">
-        <div className="bg-white border border-gray-200 p-5 sm:p-8" style={{ borderRadius: '6px' }}>
-          <h2 className="text-xl sm:text-2xl font-black text-gray-900 mb-2">Diecast Tarihi</h2>
-          <p className="text-sm text-gray-500 mb-8">Model araba dünyasını şekillendiren kilometre taşları</p>
+        <div className="bg-surface-elevated border border-border p-5 sm:p-8" style={{ borderRadius: '6px' }}>
+          <h2 className="text-xl sm:text-2xl font-black text-heading mb-2">Diecast Tarihi</h2>
+          <p className="text-sm text-muted mb-8">Model araba dünyasını şekillendiren kilometre taşları</p>
 
           <div className="relative">
-            <div className="absolute left-[18px] top-0 bottom-0 w-px bg-gray-200" />
+            <div className="absolute left-[18px] top-0 bottom-0 w-px bg-border-subtle" />
             <div className="space-y-6">
               {[
                 { year: 1912, event: 'Schuco Kuruluş', detail: 'Nürnberg, Almanya\'da Heinrich Müller tarafından kurulan Schuco, dünyanın en eski model araba markalarından biri olarak tarihe geçti.' },
@@ -618,16 +618,16 @@ export default function BrandsPage() {
                   className="flex gap-4 pl-0"
                 >
                   <div className="relative flex-shrink-0">
-                    <div className="w-[37px] h-[37px] bg-white border-2 border-gray-200 flex items-center justify-center z-10 relative" style={{ borderRadius: '4px' }}>
+                    <div className="w-[37px] h-[37px] bg-surface-elevated border-2 border-border flex items-center justify-center z-10 relative" style={{ borderRadius: '4px' }}>
                       <div className="w-2.5 h-2.5 bg-primary-500" style={{ borderRadius: '2px' }} />
                     </div>
                   </div>
                   <div className="pb-1 pt-1">
                     <div className="flex items-center gap-2 mb-1">
                       <span className="text-xs font-black text-primary-600 bg-primary-50 px-2 py-0.5" style={{ borderRadius: '3px' }}>{item.year}</span>
-                      <span className="text-sm font-bold text-gray-900">{item.event}</span>
+                      <span className="text-sm font-bold text-heading">{item.event}</span>
                     </div>
-                    <p className="text-sm text-gray-500 leading-relaxed">{item.detail}</p>
+                    <p className="text-sm text-muted leading-relaxed">{item.detail}</p>
                   </div>
                 </motion.div>
               ))}
@@ -638,26 +638,26 @@ export default function BrandsPage() {
 
       {/* CTA */}
       <div className="max-w-7xl mx-auto px-4 sm:px-6 mt-8">
-        <div className="bg-gray-900 p-6 sm:p-10 text-center relative overflow-hidden" style={{ borderRadius: '6px' }}>
+        <div className="bg-heading p-6 sm:p-10 text-center relative overflow-hidden" style={{ borderRadius: '6px' }}>
           <div className="absolute inset-0 opacity-10" style={{
             backgroundImage: 'repeating-linear-gradient(45deg, transparent, transparent 35px, rgba(255,255,255,0.05) 35px, rgba(255,255,255,0.05) 70px)',
           }} />
           <div className="relative z-10">
-            <h2 className="text-2xl sm:text-3xl font-black text-white mb-3">Koleksiyonunuzu Başlatın</h2>
-            <p className="text-gray-400 mb-6 max-w-lg mx-auto text-sm sm:text-base">
+            <h2 className="text-2xl sm:text-3xl font-black text-inverted mb-3">Koleksiyonunuzu Başlatın</h2>
+            <p className="text-subtle mb-6 max-w-lg mx-auto text-sm sm:text-base">
               Favori markalarınızdan binlerce diecast model arasından seçim yapın. Hemen üye olun ve koleksiyonunuzu oluşturmaya başlayın.
             </p>
             <div className="flex items-center justify-center gap-3">
               <Link
                 href="/listings"
-                className="px-6 py-2.5 bg-primary-500 text-white text-sm font-bold hover:bg-primary-600 transition-colors"
+                className="px-6 py-2.5 bg-primary-500 text-inverted text-sm font-bold hover:bg-primary-600 transition-colors"
                 style={{ borderRadius: '4px' }}
               >
                 İlanları Keşfet
               </Link>
               <Link
                 href="/register"
-                className="px-6 py-2.5 bg-white/10 text-white text-sm font-bold hover:bg-white/20 transition-colors border border-white/20"
+                className="px-6 py-2.5 bg-surface-elevated/10 text-inverted text-sm font-bold hover:bg-surface-elevated/20 transition-colors border border-surface-elevated/20"
                 style={{ borderRadius: '4px' }}
               >
                 Üye Ol

@@ -19,12 +19,12 @@
 }
 
 ::-webkit-scrollbar-thumb {
-  background: theme('colors.gray.300');
+  background: theme('colors.border.DEFAULT');
   border-radius: 4px;
 }
 
 ::-webkit-scrollbar-thumb:hover {
-  background: theme('colors.gray.400');
+  background: theme('colors.subtle');
 }
 
 /* ==========================================================================
@@ -37,17 +37,17 @@
   @apply w-full border-collapse;
 }
 .admin-table th {
-  @apply px-4 py-3 text-left text-xs font-medium text-muted uppercase tracking-wider bg-gray-50;
+  @apply px-4 py-3 text-left text-xs font-medium text-muted uppercase tracking-wider bg-surface;
 }
 .admin-table td {
-  @apply px-4 py-3 text-sm text-heading border-t border-gray-200;
+  @apply px-4 py-3 text-sm text-heading border-t border-border;
 }
 .admin-table tr:hover td {
-  @apply bg-gray-50;
+  @apply bg-surface;
 }
 
 .admin-card {
-  @apply bg-white rounded-lg border border-gray-200 p-6 shadow-sm;
+  @apply bg-surface-elevated rounded-lg border border-border p-6 shadow-sm;
 }
 
 /* Search inputs with left icon: adds extra left padding so the
@@ -77,5 +77,5 @@
   @apply bg-info-50 text-info-700;
 }
 .badge-gray {
-  @apply bg-gray-100 text-gray-700;
+  @apply bg-surface-alt text-body;
 }

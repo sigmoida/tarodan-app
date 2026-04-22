@@ -280,19 +280,19 @@ export default function ProfilePage() {
 
   if (!mounted || authLoading || !isAuthenticated) {
     return (
-      <div className="min-h-screen bg-gray-50">
+      <div className="min-h-screen bg-surface">
         <div className="bg-primary-500 pt-8 pb-24">
           <div className="mx-auto px-6 sm:px-8 lg:px-12 xl:px-16">
             <div className="flex justify-center py-12">
-              <Spinner size="xl" color="border-white border-t-transparent" />
+              <Spinner size="xl" color="border-surface-elevated border-t-transparent" />
             </div>
           </div>
         </div>
         <div className="mx-auto px-6 sm:px-8 lg:px-12 xl:px-16 -mt-16">
           <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
             {[1, 2, 3, 4].map((i) => (
-              <div key={i} className="bg-white rounded p-5 shadow-sm border border-gray-100 animate-pulse">
-                <div className="h-12 bg-gray-200 rounded" />
+              <div key={i} className="bg-surface-elevated rounded p-5 shadow-sm border border-border-subtle animate-pulse">
+                <div className="h-12 bg-border-subtle rounded" />
               </div>
             ))}
           </div>
@@ -302,7 +302,7 @@ export default function ProfilePage() {
   }
 
   const tierColors = {
-    free: { bg: 'bg-gray-100', text: 'text-gray-700', border: 'border-gray-300' },
+    free: { bg: 'bg-surface-alt', text: 'text-body', border: 'border-border' },
     basic: { bg: 'bg-info-50', text: 'text-info-700', border: 'border-info-300' },
     premium: { bg: 'bg-primary-50', text: 'text-primary-700', border: 'border-primary-300' },
     business: { bg: 'bg-warning-50', text: 'text-warning-700', border: 'border-warning-300' },
@@ -361,23 +361,23 @@ export default function ProfilePage() {
   ];
 
   return (
-    <div className="min-h-screen bg-gray-50">
+    <div className="min-h-screen bg-surface">
       {/* Header */}
       <div className="bg-primary-500 pt-8 pb-24">
         <div className="mx-auto px-6 sm:px-8 lg:px-12 xl:px-16">
           {loading ? (
             <div className="flex justify-center py-12">
-              <Spinner size="xl" color="border-white border-t-transparent" />
+              <Spinner size="xl" color="border-surface-elevated border-t-transparent" />
             </div>
           ) : profile && (
             <div className="flex flex-col md:flex-row items-start md:items-center gap-6">
               {/* Avatar: initials only (Trendyol-style) */}
               <div className="relative flex-shrink-0">
-                <UserAvatar displayName={profile.displayName} avatarUrl={profile.avatarUrl} size="xl" ring className="bg-white text-primary-500 shadow-lg" />
+                <UserAvatar displayName={profile.displayName} avatarUrl={profile.avatarUrl} size="xl" ring className="bg-surface-elevated text-primary-500 shadow-lg" />
               </div>
               
               {/* User Info */}
-              <div className="flex-1 text-white min-w-0">
+              <div className="flex-1 text-inverted min-w-0">
                 <div className="flex flex-wrap items-center gap-2 md:gap-3 mb-2">
                   <h1 className="text-2xl md:text-3xl font-bold truncate">{profile.displayName}</h1>
                   {profile.isVerified && (
@@ -392,10 +392,10 @@ export default function ProfilePage() {
                   <div className="mb-3">
                     <span className={`inline-flex items-center px-4 py-1.5 text-sm rounded-sm font-semibold ${
                       profile.membership.tier.type === 'business' 
-                        ? 'bg-gradient-to-r from-warning-400 to-primary-400 text-white shadow-md' 
+                        ? 'bg-gradient-to-r from-warning-400 to-primary-400 text-inverted shadow-md' 
                         : profile.membership.tier.type === 'premium'
-                          ? 'bg-gradient-to-r from-primary-400 to-danger-400 text-white shadow-md'
-                          : 'bg-white/25 backdrop-blur-sm text-white'
+                          ? 'bg-gradient-to-r from-primary-400 to-danger-400 text-inverted shadow-md'
+                          : 'bg-surface-elevated/25 backdrop-blur-sm text-inverted'
                     }`}>
                       {profile.membership.tier.type === 'business' && <span className="mr-1">👑</span>}
                       {profile.membership.tier.type === 'premium' && <span className="mr-1">⭐</span>}
@@ -417,14 +417,14 @@ export default function ProfilePage() {
                       {[1, 2, 3, 4, 5].map((star) => (
                         <svg
                           key={star}
-                          className={`w-4 h-4 ${star <= (profile.stats?.rating ?? 0) ? 'fill-current' : 'text-white/30'}`}
+                          className={`w-4 h-4 ${star <= (profile.stats?.rating ?? 0) ? 'fill-current' : 'text-inverted/30'}`}
                           viewBox="0 0 20 20"
                         >
                           <path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z" />
                         </svg>
                       ))}
                     </div>
-                    <span className="text-white font-medium">{profile.stats.rating.toFixed(1)}</span>
+                    <span className="text-inverted font-medium">{profile.stats.rating.toFixed(1)}</span>
                     <span className="text-primary-200 text-sm">({profile.stats.reviewsCount} değerlendirme)</span>
                   </div>
                 )}
@@ -433,7 +433,7 @@ export default function ProfilePage() {
               {/* Edit Button */}
               <Link
                 href="/profile/edit"
-                className="hidden md:flex items-center gap-2 px-4 py-2 bg-white/20 hover:bg-white/30 rounded text-white text-sm font-medium transition-colors flex-shrink-0"
+                className="hidden md:flex items-center gap-2 px-4 py-2 bg-surface-elevated/20 hover:bg-surface-elevated/30 rounded text-inverted text-sm font-medium transition-colors flex-shrink-0"
               >
                 <PencilSquareIcon className="w-5 h-5" />
                 <span>{t('profile.editProfile')}</span>
@@ -455,20 +455,20 @@ export default function ProfilePage() {
             <Link
               key={action.label}
               href={action.href}
-              className="bg-white rounded p-5 shadow-sm hover:shadow-md transition-all border border-gray-100 group"
+              className="bg-surface-elevated rounded p-5 shadow-sm hover:shadow-md transition-all border border-border-subtle group"
             >
               <div className="flex items-center gap-3">
-                <div className={`p-2 rounded bg-gray-50 group-hover:bg-primary-50 transition-colors`}>
+                <div className={`p-2 rounded bg-surface group-hover:bg-primary-50 transition-colors`}>
                   <action.icon className={`w-6 h-6 ${action.color}`} />
                 </div>
                 <div>
-                  <p className="text-2xl font-bold text-gray-900">
+                  <p className="text-2xl font-bold text-heading">
                     {action.label === t('nav.myListings') && (profile?.stats?.productsCount ?? 0)}
                     {action.label === t('order.myOrders') && (profile?.stats?.ordersCount ?? 0)}
                     {action.label === t('nav.favorites') && wishlistCount}
                     {action.label === t('nav.messages') && '—'}
                   </p>
-                  <p className="text-sm text-gray-500">{action.label}</p>
+                  <p className="text-sm text-muted">{action.label}</p>
                 </div>
               </div>
             </Link>
@@ -486,34 +486,34 @@ export default function ProfilePage() {
                 ? 'bg-gradient-to-br from-warning-50 to-primary-50 border-warning-200' 
                 : profile.membership.tier.type === 'premium'
                   ? 'bg-gradient-to-br from-primary-50 to-danger-50 border-primary-200'
-                  : 'bg-white border-gray-100'
+                  : 'bg-surface-elevated border-border-subtle'
             }`}
           >
             <div className="flex items-center justify-between mb-5">
               <div className="flex items-center gap-3">
                 <div className={`p-3 rounded ${
                   profile.membership.tier.type === 'business'
-                    ? 'bg-gradient-to-br from-warning-400 to-primary-500 text-white'
+                    ? 'bg-gradient-to-br from-warning-400 to-primary-500 text-inverted'
                     : profile.membership.tier.type === 'premium'
-                      ? 'bg-gradient-to-br from-primary-400 to-danger-500 text-white'
-                      : 'bg-gray-100 text-gray-600'
+                      ? 'bg-gradient-to-br from-primary-400 to-danger-500 text-inverted'
+                      : 'bg-surface-alt text-muted'
                 }`}>
                   <SparklesIcon className="w-6 h-6" />
                 </div>
                 <div>
-                  <h3 className="font-bold text-gray-900 text-lg">
+                  <h3 className="font-bold text-heading text-lg">
                     {profile.membership.tier.type === 'business' && '👑 '}
                     {profile.membership.tier.type === 'premium' && '⭐ '}
                     {profile.membership.tier.type === 'free' && '🆓 '}
                     {profile.membership.tier.name}
                   </h3>
-                  <p className="text-sm text-gray-500">Mevcut planınız</p>
+                  <p className="text-sm text-muted">Mevcut planınız</p>
                 </div>
               </div>
               {profile.membership.tier.type === 'free' && (
                 <Link
                   href="/pricing"
-                  className="px-5 py-2.5 bg-primary-500 hover:bg-primary-600 text-white text-sm font-medium rounded transition-colors"
+                  className="px-5 py-2.5 bg-primary-500 hover:bg-primary-600 text-inverted text-sm font-medium rounded transition-colors"
                 >
                   🚀 Premium'a Yükselt
                 </Link>
@@ -523,7 +523,7 @@ export default function ProfilePage() {
             {/* Plan Özellikleri Grid */}
             <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-5">
               <div className={`text-center p-4 rounded ${
-                profile.membership.tier.type === 'free' ? 'bg-gray-50' : 'bg-white/60'
+                profile.membership.tier.type === 'free' ? 'bg-surface' : 'bg-surface-elevated/60'
               }`}>
                 <p className={`text-2xl font-bold ${
                   profile.membership.tier.type === 'business' ? 'text-warning-600' :
@@ -536,33 +536,33 @@ export default function ProfilePage() {
                     return limit === -1 ? '∞' : limit;
                   })()}
                 </p>
-                <p className="text-xs text-gray-600 mt-1 font-medium">{t('membership.listingsLimit')}</p>
+                <p className="text-xs text-muted mt-1 font-medium">{t('membership.listingsLimit')}</p>
               </div>
               <div className={`text-center p-4 rounded ${
-                profile.membership.tier.type === 'free' ? 'bg-gray-50' : 'bg-white/60'
+                profile.membership.tier.type === 'free' ? 'bg-surface' : 'bg-surface-elevated/60'
               }`}>
                 <p className={`text-2xl font-bold ${
                   profile.membership.tier.type === 'business' ? 'text-warning-600' :
                   profile.membership.tier.type === 'premium' ? 'text-primary-600' : 'text-primary-500'
                 }`}>{profile.membership.tier.maxImagesPerListing}</p>
-                <p className="text-xs text-gray-600 mt-1 font-medium">Fotoğraf / İlan</p>
+                <p className="text-xs text-muted mt-1 font-medium">Fotoğraf / İlan</p>
               </div>
               <div className={`text-center p-4 rounded ${
-                profile.membership.tier.type === 'free' ? 'bg-gray-50' : 'bg-white/60'
+                profile.membership.tier.type === 'free' ? 'bg-surface' : 'bg-surface-elevated/60'
               }`}>
                 <p className={`text-2xl font-bold ${
                   profile.membership.tier.type === 'business' ? 'text-warning-600' :
                   profile.membership.tier.type === 'premium' ? 'text-primary-600' : 'text-primary-500'
                 }`}>{profile.membership.tier.featuredListingSlots}</p>
-                <p className="text-xs text-gray-600 mt-1 font-medium">{t('membership.featuredListings')}</p>
+                <p className="text-xs text-muted mt-1 font-medium">{t('membership.featuredListings')}</p>
               </div>
               <div className={`text-center p-4 rounded ${
-                profile.membership.tier.type === 'free' ? 'bg-gray-50' : 'bg-white/60'
+                profile.membership.tier.type === 'free' ? 'bg-surface' : 'bg-surface-elevated/60'
               }`}>
                 <p className="text-2xl font-bold text-success-500">
                   %{(profile.membership.tier.commissionDiscount * 100).toFixed(0)}
                 </p>
-                <p className="text-xs text-gray-600 mt-1 font-medium">Komisyon İndirimi</p>
+                <p className="text-xs text-muted mt-1 font-medium">Komisyon İndirimi</p>
               </div>
             </div>
             
@@ -571,21 +571,21 @@ export default function ProfilePage() {
               <span className={`px-3 py-1.5 rounded-sm text-xs font-medium ${
                 profile.membership.tier.canTrade 
                   ? 'bg-success-100 text-success-700 border border-success-200' 
-                  : 'bg-gray-100 text-gray-500 border border-gray-200'
+                  : 'bg-surface-alt text-muted border border-border'
               }`}>
                 {profile.membership.tier.canTrade ? '✓' : '✗'} Takas
               </span>
               <span className={`px-3 py-1.5 rounded-sm text-xs font-medium ${
                 profile.membership.tier.canCreateCollections 
                   ? 'bg-success-100 text-success-700 border border-success-200' 
-                  : 'bg-gray-100 text-gray-500 border border-gray-200'
+                  : 'bg-surface-alt text-muted border border-border'
               }`}>
                 {profile.membership.tier.canCreateCollections ? '✓' : '✗'} Koleksiyon
               </span>
               <span className={`px-3 py-1.5 rounded-sm text-xs font-medium ${
                 profile.membership.tier.isAdFree 
                   ? 'bg-success-100 text-success-700 border border-success-200' 
-                  : 'bg-gray-100 text-gray-500 border border-gray-200'
+                  : 'bg-surface-alt text-muted border border-border'
               }`}>
                 {profile.membership.tier.isAdFree ? '✓ Reklamsız' : '✗ Reklamsız'}
               </span>
@@ -601,40 +601,40 @@ export default function ProfilePage() {
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ delay: 0.1 + sectionIndex * 0.05 }}
-              className="bg-white rounded shadow-sm border border-gray-100 overflow-hidden"
+              className="bg-surface-elevated rounded shadow-sm border border-border-subtle overflow-hidden"
             >
-              <div className="px-6 py-4 border-b border-gray-100">
-                <h2 className="font-semibold text-gray-900">{section.title}</h2>
+              <div className="px-6 py-4 border-b border-border-subtle">
+                <h2 className="font-semibold text-heading">{section.title}</h2>
               </div>
-              <div className="divide-y divide-gray-50">
+              <div className="divide-y divide-border-subtle">
                 {section.items
                   .filter((item: any) => !item.sellerOnly || profile?.isSeller)
                   .map((item: any) => (
                   <Link
                     key={item.label}
                     href={item.href}
-                    className="flex items-center gap-4 px-6 py-4 hover:bg-gray-50 transition-colors group"
+                    className="flex items-center gap-4 px-6 py-4 hover:bg-surface transition-colors group"
                   >
-                    <div className="relative p-2 rounded bg-gray-100 group-hover:bg-primary-100 transition-colors">
-                      <item.icon className="w-5 h-5 text-gray-600 group-hover:text-primary-600 transition-colors" />
+                    <div className="relative p-2 rounded bg-surface-alt group-hover:bg-primary-100 transition-colors">
+                      <item.icon className="w-5 h-5 text-muted group-hover:text-primary-600 transition-colors" />
                       {item.badge > 0 && (
-                        <span className="absolute -top-1 -right-1 min-w-[18px] h-[18px] px-1 bg-danger-500 text-white text-xs font-bold rounded-sm flex items-center justify-center">
+                        <span className="absolute -top-1 -right-1 min-w-[18px] h-[18px] px-1 bg-danger-500 text-inverted text-xs font-bold rounded-sm flex items-center justify-center">
                           {item.badge > 99 ? '99+' : item.badge}
                         </span>
                       )}
                     </div>
                     <div className="flex-1">
                       <div className="flex items-center gap-2">
-                        <p className="font-medium text-gray-900">{item.label}</p>
+                        <p className="font-medium text-heading">{item.label}</p>
                         {item.badge > 0 && (
                           <span className="px-2 py-0.5 bg-danger-100 text-danger-600 text-xs font-medium rounded-sm">
                             {item.badge} bekliyor
                           </span>
                         )}
                       </div>
-                      <p className="text-sm text-gray-500">{item.desc}</p>
+                      <p className="text-sm text-muted">{item.desc}</p>
                     </div>
-                    <ChevronRightIcon className="w-5 h-5 text-gray-300 group-hover:text-primary-400 transition-colors" />
+                    <ChevronRightIcon className="w-5 h-5 text-border-strong group-hover:text-primary-400 transition-colors" />
                   </Link>
                 ))}
               </div>
@@ -647,7 +647,7 @@ export default function ProfilePage() {
             animate={{ opacity: 1, y: 0 }}
             transition={{ delay: 0.4 }}
             onClick={handleLogout}
-            className="w-full py-4 bg-white border border-danger-200 text-danger-600 font-medium rounded hover:bg-danger-50 transition-colors shadow-sm"
+            className="w-full py-4 bg-surface-elevated border border-danger-200 text-danger-600 font-medium rounded hover:bg-danger-50 transition-colors shadow-sm"
           >
             {t('common.logout')}
           </motion.button>

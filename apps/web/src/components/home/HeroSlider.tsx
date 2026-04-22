@@ -171,7 +171,7 @@ export default function HeroSlider() {
   const slide = slides[currentSlide];
 
   return (
-    <section className="relative overflow-hidden bg-white">
+    <section className="relative overflow-hidden bg-surface-elevated">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-16 md:py-24 lg:py-32 relative z-10">
         <div className="grid md:grid-cols-2 gap-12 items-center">
           <AnimatePresence mode="wait" initial={false}>
@@ -205,7 +205,7 @@ export default function HeroSlider() {
                 animate={{ opacity: 1, scale: 1 }}
                 exit={{ opacity: 0, scale: 0.95 }}
                 transition={{ duration: 0.5 }}
-                className="relative hidden md:block aspect-[4/3] w-full max-w-3xl overflow-hidden border border-gray-200 bg-white"
+                className="relative hidden md:block aspect-[4/3] w-full max-w-3xl overflow-hidden border border-border bg-surface-elevated"
                 style={{ borderRadius: '4px', touchAction: 'pan-y' }}
                 onTouchStart={handleTouchStart}
                 onTouchMove={handleTouchMove}
@@ -232,7 +232,7 @@ export default function HeroSlider() {
                 animate={{ opacity: 1, scale: 1 }}
                 exit={{ opacity: 0, scale: 0.95 }}
                 transition={{ duration: 0.5 }}
-                className="relative hidden md:block aspect-[4/3] w-full max-w-3xl overflow-hidden border border-gray-200 bg-white"
+                className="relative hidden md:block aspect-[4/3] w-full max-w-3xl overflow-hidden border border-border bg-surface-elevated"
                 style={{ borderRadius: '4px', touchAction: 'pan-y' }}
                 onTouchStart={handleTouchStart}
                 onTouchMove={handleTouchMove}
@@ -279,13 +279,13 @@ export default function HeroSlider() {
 
       {/* Navigation Arrows */}
       <Button variant="secondary" onClick={prevSlide}
-        className="absolute left-4 top-1/2 -translate-y-1/2 w-9 h-9 bg-white/90 hover:bg-white shadow-soft flex items-center justify-center transition-all duration-200 z-10 border border-gray-200"
+        className="absolute left-4 top-1/2 -translate-y-1/2 w-9 h-9 bg-surface-elevated/90 hover:bg-surface-elevated shadow-soft flex items-center justify-center transition-all duration-200 z-10 border border-border"
         style={{borderRadius:'4px'}}
         aria-label="Previous slide">
         <ChevronLeftIcon className="w-4 h-4 text-heading" />
       </Button>
       <Button variant="secondary" onClick={nextSlide}
-        className="absolute right-4 top-1/2 -translate-y-1/2 w-9 h-9 bg-white/90 hover:bg-white shadow-soft flex items-center justify-center transition-all duration-200 z-10 border border-gray-200"
+        className="absolute right-4 top-1/2 -translate-y-1/2 w-9 h-9 bg-surface-elevated/90 hover:bg-surface-elevated shadow-soft flex items-center justify-center transition-all duration-200 z-10 border border-border"
         style={{borderRadius:'4px'}}
         aria-label="Next slide">
         <ChevronRightIcon className="w-4 h-4 text-heading" />
@@ -299,7 +299,7 @@ export default function HeroSlider() {
             className={`h-2 rounded-full transition-all duration-300 ease-premium ${
               index === currentSlide
                 ? 'bg-primary-500 w-8'
-                : 'bg-gray-300 w-2 hover:bg-gray-400'
+                : 'bg-border-strong w-2 hover:bg-subtle'
             }`}
             aria-label={`Go to slide ${index + 1}`} />
         ))}

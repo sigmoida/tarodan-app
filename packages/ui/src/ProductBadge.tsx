@@ -14,12 +14,12 @@ export interface ProductBadgeProps extends React.HTMLAttributes<HTMLSpanElement>
 }
 
 const variantClasses: Record<ProductBadgeVariant, string> = {
-  sale: 'bg-danger-600 text-white',
-  new: 'bg-success-600 text-white',
-  rare: 'bg-primary-600 text-white',
-  preorder: 'bg-info-600 text-white',
-  limited: 'bg-warning-500 text-white',
-  default: 'bg-gray-100 text-body border border-gray-200',
+  sale: 'bg-danger-600 text-inverted',
+  new: 'bg-success-600 text-inverted',
+  rare: 'bg-primary-600 text-inverted',
+  preorder: 'bg-info-600 text-inverted',
+  limited: 'bg-warning-500 text-inverted',
+  default: 'bg-surface-alt text-body border border-border',
 };
 
 /**

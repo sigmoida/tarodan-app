@@ -132,7 +132,13 @@ export class PaymentService {
     });
 
     if (!trade) throw new NotFoundException('Takas bulunamadı');
-    if (trade.status !== TradeStatus.accepted) {
+    // Safe-trade akışı: cash trade kabul edildiğinde status 'awaiting_payment' olur.
+    // Legacy akış için 'accepted' da destekleniyor.
+    const payableStatuses: TradeStatus[] = [
+      TradeStatus.accepted,
+      TradeStatus.awaiting_payment,
+    ];
+    if (!payableStatuses.includes(trade.status)) {
       throw new BadRequestException('Takas henüz kabul edilmedi veya uygun durumda değil');
     }
     if (!trade.cashAmount || Number(trade.cashAmount) <= 0) {
@@ -150,35 +156,96 @@ export class PaymentService {
       throw new BadRequestException('Bu takas ödemesi zaten tamamlandı');
     }
 
+    const bypassEnabled = this.configService.get('PAYMENT_BYPASS') === 'true';
+
     // trade_cash_payment_id is unique: only one Payment per TradeCashPayment. Reuse existing if any.
     const existingPayment = await this.prisma.payment.findUnique({
       where: { tradeCashPaymentId: cashPayment.id },
     });
 
+    const provider = PaymentProvider.paytr;
+    const totalAmount = Number(cashPayment.totalAmount);
+
+    // Build a virtual order-like object for PayTR initialization (shared between fresh/retry paths).
+    const payer = trade.cashPayerId === trade.initiatorId ? trade.initiator : trade.receiver;
+    const virtualOrder = {
+      id: tradeId,
+      orderNumber: `TRADE-${trade.tradeNumber}`,
+      totalAmount,
+      buyer: payer,
+      product: {
+        id: `trade-cash-${tradeId}`,
+        title: `Takas #${trade.tradeNumber} Ekstra Ödeme`,
+      },
+      productId: `trade-cash-${tradeId}`,
+      shippingAddress: null,
+    };
+
+    // PAYMENT_BYPASS: dev/test — PayTR token üretmeden; istemci bypass-complete çağırır.
     if (existingPayment) {
       if (existingPayment.status === PaymentStatus.completed) {
         throw new BadRequestException('Bu takas ödemesi zaten tamamlandı');
       }
-      // Pending veya failed: yeniden kullan (failed ise pending yap)
-      if (existingPayment.status === PaymentStatus.failed) {
+      if (bypassEnabled) {
         await this.prisma.payment.update({
           where: { id: existingPayment.id },
-          data: { status: PaymentStatus.pending, failureReason: null },
+          data: {
+            status: PaymentStatus.pending,
+            failureReason: null,
+            providerPaymentId: null,
+          },
         });
+        this.logger.warn(`PAYMENT_BYPASS: trade cash payment ${existingPayment.id} ready for bypass completion`);
+        return {
+          paymentId: existingPayment.id,
+          tradeId,
+          amount: totalAmount,
+          provider: existingPayment.provider,
+          expiresIn: 300,
+          useBypass: true,
+        };
       }
-      const frontendUrl = this.configService.get('FRONTEND_URL') || (this.configService.get('NODE_ENV') === 'production' ? 'https://tarodan.com' : 'http://localhost:3000');
-      return {
-        paymentId: existingPayment.id,
-        paymentUrl: `${frontendUrl}/payment/${existingPayment.id}`,
-        provider: existingPayment.provider,
-        expiresIn: 300,
-        tradeId,
-        amount: Number(cashPayment.totalAmount),
-      };
     }
 
-    const provider = PaymentProvider.paytr;
-    const totalAmount = Number(cashPayment.totalAmount);
+    // Retry path: reuse existing Payment row but generate a fresh PayTR iframe token,
+    // because PayTR iframe tokens are single-use. Returning the old providerPaymentId
+    // leads to "Bu ödeme sayfası artık geçersiz" on the PayTR iframe.
+    if (existingPayment) {
+      await this.prisma.payment.update({
+        where: { id: existingPayment.id },
+        data: {
+          status: PaymentStatus.pending,
+          failureReason: null,
+          providerPaymentId: null,
+        },
+      });
+
+      try {
+        const result = await this.initializePayTRPayment(
+          { ...existingPayment, providerPaymentId: null },
+          virtualOrder,
+          this.getClientIp(req),
+        );
+        return {
+          paymentId: existingPayment.id,
+          paymentUrl: result.paymentUrl,
+          paymentHtml: result.paymentHtml,
+          provider: existingPayment.provider,
+          expiresIn: 300,
+          tradeId,
+          amount: totalAmount,
+        };
+      } catch (error: any) {
+        await this.prisma.payment.update({
+          where: { id: existingPayment.id },
+          data: {
+            status: PaymentStatus.failed,
+            failureReason: error.message || 'PayTR ödeme başlatılamadı',
+          },
+        });
+        throw new BadRequestException(error.message || 'PayTR ödeme başlatılamadı');
+      }
+    }
 
     const payment = await this.prisma.payment.create({
       data: {
@@ -198,20 +265,17 @@ export class PaymentService {
       payerId: userId,
     });
 
-    // Build a virtual order-like object for PayTR initialization
-    const payer = trade.cashPayerId === trade.initiatorId ? trade.initiator : trade.receiver;
-    const virtualOrder = {
-      id: tradeId,
-      orderNumber: `TRADE-${trade.tradeNumber}`,
-      totalAmount,
-      buyer: payer,
-      product: {
-        id: `trade-cash-${tradeId}`,
-        title: `Takas #${trade.tradeNumber} Ekstra Ödeme`,
-      },
-      productId: `trade-cash-${tradeId}`,
-      shippingAddress: null,
-    };
+    if (bypassEnabled) {
+      this.logger.warn(`PAYMENT_BYPASS: trade cash payment ${payment.id} ready for bypass completion`);
+      return {
+        paymentId: payment.id,
+        tradeId,
+        amount: totalAmount,
+        provider,
+        expiresIn: 300,
+        useBypass: true,
+      };
+    }
 
     try {
       const result = await this.initializePayTRPayment(payment, virtualOrder, this.getClientIp(req));
@@ -221,6 +285,8 @@ export class PaymentService {
         paymentHtml: result.paymentHtml,
         provider,
         expiresIn: 300,
+        tradeId,
+        amount: totalAmount,
       };
     } catch (error: any) {
       // Mark payment as failed but don't release products (trade products are managed separately)

@@ -657,7 +657,7 @@ export default function OrderDetailPage() {
 
   if (authLoading || loading) {
     return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+      <div className="min-h-screen bg-surface flex items-center justify-center">
         <Spinner size="xl" />
       </div>
     );
@@ -667,9 +667,9 @@ export default function OrderDetailPage() {
   if (!authLoading && !isAuthenticated) {
     const loginUrl = `/login?redirect=${encodeURIComponent(`/orders/${orderId}`)}`;
     return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+      <div className="min-h-screen bg-surface flex items-center justify-center">
         <div className="text-center max-w-md px-4">
-          <p className="text-gray-600 mb-4">
+          <p className="text-muted mb-4">
             {locale === "en"
               ? "Please log in to view this order."
               : "Bu siparişi görüntülemek için giriş yapın."}
@@ -684,8 +684,8 @@ export default function OrderDetailPage() {
 
   if (!order) {
     return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
-        <p className="text-gray-500">
+      <div className="min-h-screen bg-surface flex items-center justify-center">
+        <p className="text-muted">
           {locale === "en" ? "Order not found" : "Sipariş bulunamadı"}
         </p>
       </div>
@@ -699,21 +699,21 @@ export default function OrderDetailPage() {
     productInfo?.imageUrl || order.items?.[0]?.product?.imageUrl;
 
   return (
-    <div className="min-h-screen bg-gray-50">
+    <div className="min-h-screen bg-surface">
       <main className="max-w-4xl mx-auto px-4 py-8">
         {/* Header */}
         <div className="flex items-center gap-4 mb-8">
           <Link
             href="/orders"
-            className="p-2 hover:bg-gray-200 rounded-lg transition-colors"
+            className="p-2 hover:bg-border-subtle rounded-lg transition-colors"
           >
-            <ArrowLeftIcon className="w-6 h-6 text-gray-600" />
+            <ArrowLeftIcon className="w-6 h-6 text-muted" />
           </Link>
           <div className="flex-1">
-            <h1 className="text-2xl font-bold text-gray-900">
+            <h1 className="text-2xl font-bold text-heading">
               Sipariş #{order.orderNumber}
             </h1>
-            <p className="text-sm text-gray-500">
+            <p className="text-sm text-muted">
               {new Date(order.createdAt).toLocaleDateString("tr-TR", {
                 year: "numeric",
                 month: "long",
@@ -747,7 +747,7 @@ export default function OrderDetailPage() {
               disabled={reactivateLoading}
             >
               {reactivateLoading ? (
-                <Spinner size="sm" color="border-white border-t-transparent" />
+                <Spinner size="sm" color="border-surface-elevated border-t-transparent" />
               ) : (
                 <CreditCardIcon className="w-5 h-5" />
               )}
@@ -760,12 +760,12 @@ export default function OrderDetailPage() {
           {/* Main Content */}
           <div className="lg:col-span-2 space-y-6">
             {/* Product Card */}
-            <div className="bg-white rounded-xl shadow-sm p-6">
-              <h2 className="text-lg font-semibold text-gray-900 mb-4">
+            <div className="bg-surface-elevated rounded-xl shadow-sm p-6">
+              <h2 className="text-lg font-semibold text-heading mb-4">
                 {locale === "en" ? "Product Information" : "Ürün Bilgileri"}
               </h2>
               <div className="flex gap-4">
-                <div className="w-24 h-24 bg-gray-100 rounded-lg overflow-hidden flex-shrink-0">
+                <div className="w-24 h-24 bg-surface-alt rounded-lg overflow-hidden flex-shrink-0">
                   {productImage ? (
                     <img
                       src={productImage}
@@ -776,20 +776,20 @@ export default function OrderDetailPage() {
                       className="w-full h-full object-cover"
                     />
                   ) : (
-                    <div className="w-full h-full flex items-center justify-center bg-gray-50">
-                      <TagIcon className="w-8 h-8 text-gray-300" />
+                    <div className="w-full h-full flex items-center justify-center bg-surface">
+                      <TagIcon className="w-8 h-8 text-border-strong" />
                     </div>
                   )}
                 </div>
                 <div className="flex-1">
                   <Link
                     href={`/listings/${productInfo?.id}`}
-                    className="text-lg font-medium text-gray-900 hover:text-primary-500 transition-colors"
+                    className="text-lg font-medium text-heading hover:text-primary-500 transition-colors"
                   >
                     {productInfo?.title ||
                       (locale === "en" ? "Product" : "Ürün")}
                   </Link>
-                  <p className="text-sm text-gray-500 mt-1">
+                  <p className="text-sm text-muted mt-1">
                     {locale === "en" ? "Quantity: 1" : "Adet: 1"}
                   </p>
                   <p className="text-xl font-bold text-primary-500 mt-2">
@@ -805,14 +805,14 @@ export default function OrderDetailPage() {
 
             {/* Shipping Info */}
             {order.shipment && (
-              <div className="bg-white rounded-xl shadow-sm p-6">
-                <h2 className="text-lg font-semibold text-gray-900 mb-4 flex items-center gap-2">
+              <div className="bg-surface-elevated rounded-xl shadow-sm p-6">
+                <h2 className="text-lg font-semibold text-heading mb-4 flex items-center gap-2">
                   <TruckIcon className="w-5 h-5" />
                   {locale === "en" ? "Shipping Information" : "Kargo Bilgileri"}
                 </h2>
                 <div className="space-y-3">
                   <div className="flex justify-between">
-                    <span className="text-gray-600">
+                    <span className="text-muted">
                       {locale === "en" ? "Carrier:" : "Kargo Firması:"}
                     </span>
                     <span className="font-medium">
@@ -820,15 +820,15 @@ export default function OrderDetailPage() {
                     </span>
                   </div>
                   <div className="flex justify-between">
-                    <span className="text-gray-600">
+                    <span className="text-muted">
                       {locale === "en" ? "Tracking Number:" : "Takip Numarası:"}
                     </span>
-                    <span className="font-mono bg-gray-100 px-2 py-1 rounded">
+                    <span className="font-mono bg-surface-alt px-2 py-1 rounded">
                       {order.shipment.trackingNumber}
                     </span>
                   </div>
                   <div className="flex justify-between">
-                    <span className="text-gray-600">
+                    <span className="text-muted">
                       {locale === "en" ? "Shipping Status:" : "Kargo Durumu:"}
                     </span>
                     <span className="font-medium">{order.shipment.status}</span>
@@ -836,7 +836,7 @@ export default function OrderDetailPage() {
                   {order.isBuyer && (
                     <Link
                       href={`/track-order?orderNumber=${encodeURIComponent(order.orderNumber)}&email=${encodeURIComponent(user?.email || "")}`}
-                      className="inline-flex items-center gap-2 mt-3 px-4 py-2 bg-info-600 hover:bg-info-700 text-white rounded-lg text-sm font-medium transition-colors"
+                      className="inline-flex items-center gap-2 mt-3 px-4 py-2 bg-info-600 hover:bg-info-700 text-inverted rounded-lg text-sm font-medium transition-colors"
                     >
                       <TruckIcon className="w-4 h-4" />
                       {t("order.trackOrder")}
@@ -849,12 +849,12 @@ export default function OrderDetailPage() {
             {/* Shipping Address - sadece ödeme bekleyen alıcı değilse göster (alıcı için adres ödeme kartının içinde) */}
             {order.shippingAddress &&
               !(order.isBuyer && order.status === "pending_payment") && (
-                <div className="bg-white rounded-xl shadow-sm p-6">
-                  <h2 className="text-lg font-semibold text-gray-900 mb-4 flex items-center gap-2">
+                <div className="bg-surface-elevated rounded-xl shadow-sm p-6">
+                  <h2 className="text-lg font-semibold text-heading mb-4 flex items-center gap-2">
                     <MapPinIcon className="w-5 h-5" />
                     Teslimat Adresi
                   </h2>
-                  <div className="text-gray-700">
+                  <div className="text-body">
                     <p className="font-medium">{order.shippingAddress.title}</p>
                     <p>{order.shippingAddress.addressLine1}</p>
                     {order.shippingAddress.addressLine2 && (
@@ -871,8 +871,8 @@ export default function OrderDetailPage() {
 
             {/* Actions for Seller */}
             {order.isSeller && order.status === "paid" && (
-              <div className="bg-white rounded-xl shadow-sm p-6">
-                <h2 className="text-lg font-semibold text-gray-900 mb-4">
+              <div className="bg-surface-elevated rounded-xl shadow-sm p-6">
+                <h2 className="text-lg font-semibold text-heading mb-4">
                   {locale === "en" ? "Seller Actions" : "Satıcı İşlemleri"}
                 </h2>
                 <Button
@@ -889,13 +889,13 @@ export default function OrderDetailPage() {
             )}
 
             {order.isSeller && order.status === "preparing" && (
-              <div className="bg-white rounded-xl shadow-sm p-6">
-                <h2 className="text-lg font-semibold text-gray-900 mb-4">
+              <div className="bg-surface-elevated rounded-xl shadow-sm p-6">
+                <h2 className="text-lg font-semibold text-heading mb-4">
                   {locale === "en"
                     ? "Enter Shipping Info"
                     : "Kargo Bilgisi Gir"}
                 </h2>
-                <p className="text-gray-600 mb-4">
+                <p className="text-muted mb-4">
                   {locale === "en"
                     ? "Please enter tracking number when shipped."
                     : "Kargoya verdiğinizde takip numarasını girmeniz gerekmektedir."}
@@ -921,10 +921,10 @@ export default function OrderDetailPage() {
 
             {/* Pending Payment – Buyer: full checkout (address + card + pay) */}
             {order.isBuyer && order.status === "pending_payment" && (
-              <div className="bg-white rounded-xl shadow-sm overflow-hidden">
+              <div className="bg-surface-elevated rounded-xl shadow-sm overflow-hidden">
                 {/* Header banner */}
                 <div className="bg-gradient-to-r from-primary-500 to-primary-600 px-6 py-4">
-                  <h2 className="text-lg font-semibold text-white flex items-center gap-2">
+                  <h2 className="text-lg font-semibold text-inverted flex items-center gap-2">
                     <CreditCardIcon className="w-5 h-5" />
                     {locale === "en"
                       ? "Complete Your Payment"
@@ -951,7 +951,7 @@ export default function OrderDetailPage() {
                       <span className="flex items-center justify-center w-6 h-6 rounded-full bg-primary-100 text-primary-700 text-xs font-bold">
                         1
                       </span>
-                      <h3 className="font-semibold text-gray-900 flex items-center gap-2">
+                      <h3 className="font-semibold text-heading flex items-center gap-2">
                         <MapPinIcon className="w-5 h-5 text-primary-500" />
                         {locale === "en"
                           ? "Delivery Address"
@@ -960,10 +960,10 @@ export default function OrderDetailPage() {
                     </div>
 
                     {!addressesFetched ? (
-                      <div className="flex items-center gap-2 text-sm text-gray-500 py-4">
+                      <div className="flex items-center gap-2 text-sm text-muted py-4">
                         <Spinner
                           size="sm"
-                          color="border-gray-300 border-t-primary-500"
+                          color="border-border border-t-primary-500"
                         />
                         {locale === "en"
                           ? "Loading addresses..."
@@ -977,7 +977,7 @@ export default function OrderDetailPage() {
                             className={`flex items-center gap-3 p-3.5 border-2 rounded-lg cursor-pointer transition-all ${
                               selectedAddressId === addr.id
                                 ? "border-primary-500 bg-primary-50"
-                                : "border-gray-200 hover:border-gray-300"
+                                : "border-border hover:border-border"
                             }`}
                           >
                             <Radio
@@ -987,10 +987,10 @@ export default function OrderDetailPage() {
                               className="text-primary-500"
                             />
                             <div className="flex-1 min-w-0">
-                              <p className="text-sm font-medium text-gray-900">
+                              <p className="text-sm font-medium text-heading">
                                 {addr.title || addr.fullName}
                               </p>
-                              <p className="text-xs text-gray-500 mt-0.5">
+                              <p className="text-xs text-muted mt-0.5">
                                 {addr.address}, {addr.district}/{addr.city}
                               </p>
                             </div>
@@ -1041,7 +1041,7 @@ export default function OrderDetailPage() {
                         )}
                         <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                           <div>
-                            <label className="block text-sm font-medium text-gray-700 mb-1">
+                            <label className="block text-sm font-medium text-body mb-1">
                               {locale === "en" ? "Full Name" : "Ad Soyad"} *
                             </label>
                             <Input
@@ -1059,7 +1059,7 @@ export default function OrderDetailPage() {
                             />
                           </div>
                           <div>
-                            <label className="block text-sm font-medium text-gray-700 mb-1">
+                            <label className="block text-sm font-medium text-body mb-1">
                               {locale === "en" ? "Phone" : "Telefon"} *
                             </label>
                             <Input
@@ -1086,7 +1086,7 @@ export default function OrderDetailPage() {
                           }
                         />
                         <div>
-                          <label className="block text-sm font-medium text-gray-700 mb-1">
+                          <label className="block text-sm font-medium text-body mb-1">
                             {locale === "en" ? "Address" : "Adres"} *
                           </label>
                           <Textarea
@@ -1107,7 +1107,7 @@ export default function OrderDetailPage() {
                           />
                         </div>
                         <div className="sm:w-1/2">
-                          <label className="block text-sm font-medium text-gray-700 mb-1">
+                          <label className="block text-sm font-medium text-body mb-1">
                             {locale === "en" ? "Postal Code" : "Posta Kodu"}
                           </label>
                           <Input
@@ -1132,7 +1132,7 @@ export default function OrderDetailPage() {
                       <span className="flex items-center justify-center w-6 h-6 rounded-full bg-primary-100 text-primary-700 text-xs font-bold">
                         2
                       </span>
-                      <h3 className="font-semibold text-gray-900 flex items-center gap-2">
+                      <h3 className="font-semibold text-heading flex items-center gap-2">
                         <CreditCardIcon className="w-5 h-5 text-primary-500" />
                         {locale === "en"
                           ? "Card Information"
@@ -1140,11 +1140,11 @@ export default function OrderDetailPage() {
                       </h3>
                     </div>
 
-                    <div className="p-4 bg-gray-50 border border-gray-200 rounded-lg">
+                    <div className="p-4 bg-surface border border-border rounded-lg">
                       {/* Saved Cards */}
                       {savedCards.length > 0 && (
                         <div className="mb-4">
-                          <p className="text-sm font-medium text-gray-700 mb-3">
+                          <p className="text-sm font-medium text-body mb-3">
                             {locale === "en"
                               ? "My Saved Cards"
                               : "Kayıtlı Kartlarım"}
@@ -1156,7 +1156,7 @@ export default function OrderDetailPage() {
                                 className={`flex items-center gap-3 p-3 border-2 rounded-lg cursor-pointer transition-all ${
                                   !useNewCard && selectedSavedCard === card.id
                                     ? "border-primary-500 bg-primary-50"
-                                    : "border-gray-200 hover:border-gray-300"
+                                    : "border-border hover:border-border"
                                 }`}
                               >
                                 <Radio
@@ -1171,10 +1171,10 @@ export default function OrderDetailPage() {
                                   className="text-primary-500"
                                 />
                                 <div className="flex-1">
-                                  <p className="font-medium text-gray-900">
+                                  <p className="font-medium text-heading">
                                     {card.cardBrand} •••• {card.lastFour}
                                   </p>
-                                  <p className="text-sm text-gray-500">
+                                  <p className="text-sm text-muted">
                                     {card.expiryMonth
                                       .toString()
                                       .padStart(2, "0")}
@@ -1194,7 +1194,7 @@ export default function OrderDetailPage() {
                               className={`flex items-center gap-3 p-3 border-2 rounded-lg cursor-pointer transition-all ${
                                 useNewCard
                                   ? "border-primary-500 bg-primary-50"
-                                  : "border-gray-200 hover:border-gray-300"
+                                  : "border-border hover:border-border"
                               }`}
                             >
                               <Radio
@@ -1204,8 +1204,8 @@ export default function OrderDetailPage() {
                                 className="text-primary-500"
                               />
                               <div className="flex items-center gap-2">
-                                <PlusIcon className="w-5 h-5 text-gray-500" />
-                                <span className="font-medium text-gray-900">
+                                <PlusIcon className="w-5 h-5 text-muted" />
+                                <span className="font-medium text-heading">
                                   {locale === "en"
                                     ? "Pay with New Card"
                                     : "Yeni Kart ile Öde"}
@@ -1220,7 +1220,7 @@ export default function OrderDetailPage() {
                       {(savedCards.length === 0 || useNewCard) && (
                         <div className="space-y-4">
                           <div>
-                            <label className="block text-sm font-medium text-gray-700 mb-1">
+                            <label className="block text-sm font-medium text-body mb-1">
                               {locale === "en"
                                 ? "Name on Card"
                                 : "Kart Üzerindeki İsim"}
@@ -1236,7 +1236,7 @@ export default function OrderDetailPage() {
                             />
                           </div>
                           <div>
-                            <label className="block text-sm font-medium text-gray-700 mb-1">
+                            <label className="block text-sm font-medium text-body mb-1">
                               {locale === "en"
                                 ? "Card Number"
                                 : "Kart Numarası"}
@@ -1261,7 +1261,7 @@ export default function OrderDetailPage() {
                           </div>
                           <div className="grid grid-cols-2 gap-4">
                             <div>
-                              <label className="block text-sm font-medium text-gray-700 mb-1">
+                              <label className="block text-sm font-medium text-body mb-1">
                                 {locale === "en"
                                   ? "Expiry Date"
                                   : "Son Kullanma Tarihi"}
@@ -1287,7 +1287,7 @@ export default function OrderDetailPage() {
                               />
                             </div>
                             <div>
-                              <label className="block text-sm font-medium text-gray-700 mb-1">
+                              <label className="block text-sm font-medium text-body mb-1">
                                 CVV/CVC
                               </label>
                               <Input
@@ -1322,7 +1322,7 @@ export default function OrderDetailPage() {
                       {/* CVV for saved card */}
                       {!useNewCard && selectedSavedCard && (
                         <div className="mt-4">
-                          <label className="block text-sm font-medium text-gray-700 mb-1">
+                          <label className="block text-sm font-medium text-body mb-1">
                             CVV/CVC (
                             {locale === "en"
                               ? "Re-enter for security"
@@ -1344,7 +1344,7 @@ export default function OrderDetailPage() {
                         </div>
                       )}
 
-                      <div className="mt-4 flex items-center gap-2 text-xs text-gray-500">
+                      <div className="mt-4 flex items-center gap-2 text-xs text-muted">
                         <ShieldCheckIcon className="w-4 h-4 text-success-500" />
                         {locale === "en"
                           ? "256-bit SSL encrypted secure payment"
@@ -1386,8 +1386,8 @@ export default function OrderDetailPage() {
 
             {/* Actions for Buyer */}
             {order.isBuyer && order.status === "delivered" && (
-              <div className="bg-white rounded-xl shadow-sm p-6">
-                <h2 className="text-lg font-semibold text-gray-900 mb-4">
+              <div className="bg-surface-elevated rounded-xl shadow-sm p-6">
+                <h2 className="text-lg font-semibold text-heading mb-4">
                   {locale === "en" ? "Delivery Confirmation" : "Teslimat Onayı"}
                 </h2>
                 <Button
@@ -1405,11 +1405,11 @@ export default function OrderDetailPage() {
 
             {/* Yorum Yap - Sadece alınan siparişlerde, teslim/tamamlandıktan sonra */}
             {canReview(order) && (
-              <div className="bg-white rounded-xl shadow-sm p-6">
-                <h2 className="text-lg font-semibold text-gray-900 mb-4">
+              <div className="bg-surface-elevated rounded-xl shadow-sm p-6">
+                <h2 className="text-lg font-semibold text-heading mb-4">
                   {t("review.reviewOrder")}
                 </h2>
-                <p className="text-sm text-gray-600 mb-4">
+                <p className="text-sm text-muted mb-4">
                   {locale === "en"
                     ? "Share your experience about the product and seller."
                     : "Ürün ve satıcı hakkında deneyiminizi paylaşın."}
@@ -1430,11 +1430,11 @@ export default function OrderDetailPage() {
             {order.payment &&
               order.payment.status === "completed" &&
               order.isBuyer && (
-                <div className="bg-white rounded-xl shadow-sm p-6">
-                  <h2 className="text-lg font-semibold text-gray-900 mb-4">
+                <div className="bg-surface-elevated rounded-xl shadow-sm p-6">
+                  <h2 className="text-lg font-semibold text-heading mb-4">
                     {locale === "en" ? "Refund" : "İade İşlemi"}
                   </h2>
-                  <p className="text-sm text-gray-600 mb-4">
+                  <p className="text-sm text-muted mb-4">
                     {locale === "en"
                       ? "Payment completed. You can start a refund if needed."
                       : "Ödeme tamamlandı. Gerekirse iade işlemi başlatabilirsiniz."}
@@ -1456,13 +1456,13 @@ export default function OrderDetailPage() {
           {/* Sidebar */}
           <div className="space-y-6">
             {/* Order Summary */}
-            <div className="bg-white rounded-xl shadow-sm p-6">
-              <h2 className="text-lg font-semibold text-gray-900 mb-4 flex items-center gap-2">
+            <div className="bg-surface-elevated rounded-xl shadow-sm p-6">
+              <h2 className="text-lg font-semibold text-heading mb-4 flex items-center gap-2">
                 <CreditCardIcon className="w-5 h-5" />
                 {locale === "en" ? "Order Summary" : "Sipariş Özeti"}
               </h2>
               <div className="space-y-3">
-                <div className="flex justify-between text-gray-600">
+                <div className="flex justify-between text-muted">
                   <span>
                     {locale === "en" ? "Product Amount" : "Ürün Tutarı"}
                   </span>
@@ -1483,7 +1483,7 @@ export default function OrderDetailPage() {
                     })}
                   </span>
                 </div>
-                <div className="flex justify-between text-gray-600">
+                <div className="flex justify-between text-muted">
                   <span>{locale === "en" ? "Shipping" : "Kargo"}</span>
                   <span>
                     {(order.pricing?.shippingAmount ??
@@ -1497,7 +1497,7 @@ export default function OrderDetailPage() {
                 </div>
                 {(order.pricing?.buyerFeeAmount ?? order.buyerFeeAmount ?? 0) >
                   0 && (
-                  <div className="flex justify-between text-gray-600">
+                  <div className="flex justify-between text-muted">
                     <span>
                       {locale === "en" ? "Platform fee" : "Platform ücreti"}
                     </span>
@@ -1520,7 +1520,7 @@ export default function OrderDetailPage() {
                     0) > 0 ||
                     order.pricing?.sellerNetAmount != null) && (
                     <>
-                      <div className="flex justify-between text-gray-600">
+                      <div className="flex justify-between text-muted">
                         <span>
                           {locale === "en"
                             ? "Platform deduction"
@@ -1572,8 +1572,8 @@ export default function OrderDetailPage() {
             </div>
 
             {/* Buyer/Seller Info */}
-            <div className="bg-white rounded-xl shadow-sm p-6">
-              <h2 className="text-lg font-semibold text-gray-900 mb-4">
+            <div className="bg-surface-elevated rounded-xl shadow-sm p-6">
+              <h2 className="text-lg font-semibold text-heading mb-4">
                 {order.isBuyer
                   ? locale === "en"
                     ? "Seller"
@@ -1584,7 +1584,7 @@ export default function OrderDetailPage() {
               </h2>
               <Link
                 href={`/seller/${order.isBuyer ? order.seller.id : order.buyer.id}`}
-                className="flex items-center gap-3 hover:bg-gray-50 -mx-2 px-2 py-2 rounded-lg transition-colors"
+                className="flex items-center gap-3 hover:bg-surface -mx-2 px-2 py-2 rounded-lg transition-colors"
               >
                 <UserAvatar
                   displayName={
@@ -1600,12 +1600,12 @@ export default function OrderDetailPage() {
                   size="md"
                 />
                 <div>
-                  <p className="font-medium text-gray-900">
+                  <p className="font-medium text-heading">
                     {order.isBuyer
                       ? order.seller.displayName
                       : order.buyer.displayName}
                   </p>
-                  <p className="text-sm text-gray-500">
+                  <p className="text-sm text-muted">
                     {locale === "en" ? "View Profile" : "Profili Gör"}
                   </p>
                 </div>
@@ -1615,8 +1615,8 @@ export default function OrderDetailPage() {
             {/* Invoice Section - Show only for paid orders */}
             {order.status !== "pending_payment" &&
               order.status !== "cancelled" && (
-                <div className="bg-white rounded-xl shadow-sm p-6">
-                  <h2 className="text-lg font-semibold text-gray-900 mb-4 flex items-center gap-2">
+                <div className="bg-surface-elevated rounded-xl shadow-sm p-6">
+                  <h2 className="text-lg font-semibold text-heading mb-4 flex items-center gap-2">
                     <svg
                       className="w-5 h-5 text-success-500"
                       fill="none"
@@ -1672,14 +1672,14 @@ export default function OrderDetailPage() {
               )}
 
             {/* Help */}
-            <div className="bg-white rounded-xl shadow-sm p-6">
-              <h2 className="text-lg font-semibold text-gray-900 mb-4">
+            <div className="bg-surface-elevated rounded-xl shadow-sm p-6">
+              <h2 className="text-lg font-semibold text-heading mb-4">
                 {locale === "en" ? "Help" : "Yardım"}
               </h2>
               <div className="space-y-2">
                 <Button
                   variant="secondary"
-                  className="w-full text-left px-4 py-2 text-gray-600 hover:bg-gray-50 rounded-lg transition-colors"
+                  className="w-full text-left px-4 py-2 text-muted hover:bg-surface rounded-lg transition-colors"
                 >
                   {locale === "en"
                     ? "Report Order Issue"
@@ -1688,13 +1688,13 @@ export default function OrderDetailPage() {
                 <Button
                   variant="secondary"
                   onClick={handleRefund}
-                  className="w-full text-left px-4 py-2 text-gray-600 hover:bg-gray-50 rounded-lg transition-colors"
+                  className="w-full text-left px-4 py-2 text-muted hover:bg-surface rounded-lg transition-colors"
                 >
                   {locale === "en" ? "Request Refund" : "İade Talebi Oluştur"}
                 </Button>
                 <Link
                   href="/support"
-                  className="block w-full text-left px-4 py-2 text-gray-600 hover:bg-gray-50 rounded-lg transition-colors"
+                  className="block w-full text-left px-4 py-2 text-muted hover:bg-surface rounded-lg transition-colors"
                 >
                   {locale === "en"
                     ? "Contact Support"
@@ -1714,13 +1714,13 @@ export default function OrderDetailPage() {
         >
           {/* Product Section */}
           <div className="mb-6">
-            <h3 className="text-sm font-semibold text-gray-500 uppercase tracking-wide mb-3 flex items-center gap-2">
+            <h3 className="text-sm font-semibold text-muted uppercase tracking-wide mb-3 flex items-center gap-2">
               📦 {t("review.productReview")}
             </h3>
 
             {(order.product || order.items?.[0]?.product) && (
-              <div className="flex items-center gap-3 mb-4 p-3 bg-gray-50 rounded-lg">
-                <div className="w-12 h-12 bg-gray-200 rounded flex items-center justify-center text-2xl overflow-hidden">
+              <div className="flex items-center gap-3 mb-4 p-3 bg-surface rounded-lg">
+                <div className="w-12 h-12 bg-border-subtle rounded flex items-center justify-center text-2xl overflow-hidden">
                   {order.product?.imageUrl ||
                   order.items?.[0]?.product?.imageUrl ? (
                     <img
@@ -1735,14 +1735,14 @@ export default function OrderDetailPage() {
                     "🚗"
                   )}
                 </div>
-                <p className="font-medium text-gray-900">
+                <p className="font-medium text-heading">
                   {order.product?.title || order.items?.[0]?.product?.title}
                 </p>
               </div>
             )}
 
             <div className="mb-3">
-              <label className="block text-sm font-medium text-gray-700 mb-2">
+              <label className="block text-sm font-medium text-body mb-2">
                 {t("review.productScore")}
               </label>
               <div className="flex gap-1">
@@ -1757,7 +1757,7 @@ export default function OrderDetailPage() {
                     {star <= reviewScore ? (
                       <StarIcon className="w-8 h-8 text-warning-400" />
                     ) : (
-                      <StarOutlineIcon className="w-8 h-8 text-gray-300" />
+                      <StarOutlineIcon className="w-8 h-8 text-border-strong" />
                     )}
                   </Button>
                 ))}
@@ -1765,7 +1765,7 @@ export default function OrderDetailPage() {
             </div>
 
             <div className="mb-3">
-              <label className="block text-sm font-medium text-gray-700 mb-1">
+              <label className="block text-sm font-medium text-body mb-1">
                 {t("review.titleOptional")}
               </label>
               <Input
@@ -1782,7 +1782,7 @@ export default function OrderDetailPage() {
             </div>
 
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
+              <label className="block text-sm font-medium text-body mb-1">
                 {t("review.commentOptional")}
               </label>
               <Textarea
@@ -1801,7 +1801,7 @@ export default function OrderDetailPage() {
 
             {/* Photo Upload */}
             <div className="mt-3">
-              <label className="block text-sm font-medium text-gray-700 mb-1">
+              <label className="block text-sm font-medium text-body mb-1">
                 {locale === "en"
                   ? "Photos (optional, max 5)"
                   : "Fotoğraflar (opsiyonel, maks 5)"}
@@ -1810,7 +1810,7 @@ export default function OrderDetailPage() {
                 {reviewImagePreviews.map((src, idx) => (
                   <div
                     key={idx}
-                    className="relative w-16 h-16 rounded-lg overflow-hidden border border-gray-200"
+                    className="relative w-16 h-16 rounded-lg overflow-hidden border border-border"
                   >
                     <img
                       src={src}
@@ -1821,7 +1821,7 @@ export default function OrderDetailPage() {
                       variant="secondary"
                       type="button"
                       onClick={() => removeReviewImage(idx)}
-                      className="absolute top-0 right-0 bg-danger-500 text-white rounded-bl-lg w-5 h-5 flex items-center justify-center text-xs"
+                      className="absolute top-0 right-0 bg-danger-500 text-inverted rounded-bl-lg w-5 h-5 flex items-center justify-center text-xs"
                     >
                       ×
                     </Button>
@@ -1829,7 +1829,7 @@ export default function OrderDetailPage() {
                 ))}
                 {reviewImages.length < 5 && (
                   <label className="w-16 h-16 border-2 border-dashed items-center justify-center cursor-pointer hover:border-primary-400">
-                    <span className="text-2xl text-gray-400">+</span>
+                    <span className="text-2xl text-subtle">+</span>
                     <Input
                       type="file"
                       accept="image/*"
@@ -1842,18 +1842,18 @@ export default function OrderDetailPage() {
             </div>
           </div>
 
-          <div className="border-t border-gray-200 my-6"></div>
+          <div className="border-t border-border my-6"></div>
 
           {/* Seller Section */}
           <div className="mb-6">
-            <h3 className="text-sm font-semibold text-gray-500 uppercase tracking-wide mb-3 flex items-center gap-2">
+            <h3 className="text-sm font-semibold text-muted uppercase tracking-wide mb-3 flex items-center gap-2">
               👤 {t("review.sellerReview")}
             </h3>
 
             {order.seller && (
-              <p className="text-sm text-gray-600 mb-4">
+              <p className="text-sm text-muted mb-4">
                 {t("product.seller")}:{" "}
-                <span className="font-medium text-gray-900">
+                <span className="font-medium text-heading">
                   {order.seller.displayName}
                 </span>
               </p>
@@ -1861,7 +1861,7 @@ export default function OrderDetailPage() {
 
             <div className="space-y-3">
               <div className="flex items-center justify-between">
-                <span className="text-sm text-gray-700">
+                <span className="text-sm text-body">
                   {t("review.communication")}
                 </span>
                 <div className="flex gap-0.5">
@@ -1876,7 +1876,7 @@ export default function OrderDetailPage() {
                       {star <= sellerCommunication ? (
                         <StarIcon className="w-5 h-5 text-warning-400" />
                       ) : (
-                        <StarOutlineIcon className="w-5 h-5 text-gray-300" />
+                        <StarOutlineIcon className="w-5 h-5 text-border-strong" />
                       )}
                     </Button>
                   ))}
@@ -1884,7 +1884,7 @@ export default function OrderDetailPage() {
               </div>
 
               <div className="flex items-center justify-between">
-                <span className="text-sm text-gray-700">
+                <span className="text-sm text-body">
                   {t("review.shippingSpeed")}
                 </span>
                 <div className="flex gap-0.5">
@@ -1899,7 +1899,7 @@ export default function OrderDetailPage() {
                       {star <= sellerShipping ? (
                         <StarIcon className="w-5 h-5 text-warning-400" />
                       ) : (
-                        <StarOutlineIcon className="w-5 h-5 text-gray-300" />
+                        <StarOutlineIcon className="w-5 h-5 text-border-strong" />
                       )}
                     </Button>
                   ))}
@@ -1907,7 +1907,7 @@ export default function OrderDetailPage() {
               </div>
 
               <div className="flex items-center justify-between">
-                <span className="text-sm text-gray-700">
+                <span className="text-sm text-body">
                   {t("review.packaging")}
                 </span>
                 <div className="flex gap-0.5">
@@ -1922,7 +1922,7 @@ export default function OrderDetailPage() {
                       {star <= sellerPackaging ? (
                         <StarIcon className="w-5 h-5 text-warning-400" />
                       ) : (
-                        <StarOutlineIcon className="w-5 h-5 text-gray-300" />
+                        <StarOutlineIcon className="w-5 h-5 text-border-strong" />
                       )}
                     </Button>
                   ))}
@@ -1930,14 +1930,14 @@ export default function OrderDetailPage() {
               </div>
 
               <div className="mt-4">
-                <label className="block text-sm font-medium text-gray-700 mb-1">
+                <label className="block text-sm font-medium text-body mb-1">
                   {t("review.sellerComment")}
                 </label>
                 <Textarea
                   value={sellerReviewText}
                   onChange={(e) => setSellerReviewText(e.target.value)}
                   placeholder={t("review.sellerCommentPlaceholder")}
-                  className="border-gray-200 resize-none"
+                  className="border-border resize-none"
                   rows={3}
                 />
               </div>

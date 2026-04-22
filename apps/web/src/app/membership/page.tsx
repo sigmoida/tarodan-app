@@ -13,7 +13,7 @@ export default function MembershipPage() {
   }, [router]);
 
   return (
-    <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+    <div className="min-h-screen bg-surface flex items-center justify-center">
       <Spinner size="xl" />
     </div>
   );

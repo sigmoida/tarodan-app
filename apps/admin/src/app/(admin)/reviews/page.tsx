@@ -186,8 +186,8 @@ export default function ReviewsPage() {
                 {/* Header */}
                 <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
                     <div>
-                        <h1 className="text-2xl font-bold text-gray-900">Yorumlar</h1>
-                        <p className="text-gray-500 mt-1">Ürün ve satıcı yorumlarını yönetin</p>
+                        <h1 className="text-2xl font-bold text-heading">Yorumlar</h1>
+                        <p className="text-muted mt-1">Ürün ve satıcı yorumlarını yönetin</p>
                     </div>
 
                     <div className="flex items-center gap-2">
@@ -226,20 +226,20 @@ export default function ReviewsPage() {
                                     value={sellerSearch}
                                     onChange={(e) => { setSellerSearch(e.target.value); setSellerPage(1); }}
                                     placeholder="Kullanıcı ara..."
-                                    className="border-gray-200 text-gray-900" />
+                                    className="border-border text-heading" />
                             </>
                         )}
                     </div>
                 </div>
 
                 {/* Tabs */}
-                <div className="flex gap-1 border-b border-gray-200">
+                <div className="flex gap-1 border-b border-border">
                     <Button variant="secondary" onClick={() => setActiveTab('product')}
-                        className={`px-4 py-2.5 text-sm font-medium border-b-2 transition-colors ${activeTab === 'product' ? 'border-primary-500 text-primary-600' : 'border-transparent text-gray-500 hover:text-gray-700'}`}>
+                        className={`px-4 py-2.5 text-sm font-medium border-b-2 transition-colors ${activeTab === 'product' ? 'border-primary-500 text-primary-600' : 'border-transparent text-muted hover:text-body'}`}>
                         Ürün Yorumları
                     </Button>
                     <Button variant="secondary" onClick={() => setActiveTab('seller')}
-                        className={`px-4 py-2.5 text-sm font-medium border-b-2 transition-colors ${activeTab === 'seller' ? 'border-primary-500 text-primary-600' : 'border-transparent text-gray-500 hover:text-gray-700'}`}>
+                        className={`px-4 py-2.5 text-sm font-medium border-b-2 transition-colors ${activeTab === 'seller' ? 'border-primary-500 text-primary-600' : 'border-transparent text-muted hover:text-body'}`}>
                         Satıcı Yorumları
                     </Button>
                 </div>
@@ -250,10 +250,10 @@ export default function ReviewsPage() {
                     {sellerLoading ? (
                         <div className="text-center py-12">
                             <Spinner size="lg" className="mx-auto" />
-                            <p className="text-gray-500 mt-4">Yükleniyor...</p>
+                            <p className="text-muted mt-4">Yükleniyor...</p>
                         </div>
                     ) : sellerRatings.length === 0 ? (
-                        <div className="text-center py-12 text-gray-500">Satıcı yorumu bulunamadı</div>
+                        <div className="text-center py-12 text-muted">Satıcı yorumu bulunamadı</div>
                     ) : (
                         <div className="overflow-x-auto">
                             <table className="admin-table">
@@ -273,25 +273,25 @@ export default function ReviewsPage() {
                                     {sellerRatings.map((r) => (
                                         <tr key={r.id}>
                                             <td>
-                                                <p className="text-sm text-gray-900">{r.giver.displayName}</p>
-                                                <p className="text-xs text-gray-500">{r.giver.email}</p>
+                                                <p className="text-sm text-heading">{r.giver.displayName}</p>
+                                                <p className="text-xs text-muted">{r.giver.email}</p>
                                             </td>
                                             <td>
-                                                <p className="text-sm text-gray-900">{r.receiver.displayName}</p>
-                                                <p className="text-xs text-gray-500">{r.receiver.email}</p>
+                                                <p className="text-sm text-heading">{r.receiver.displayName}</p>
+                                                <p className="text-xs text-muted">{r.receiver.email}</p>
                                             </td>
                                             <td>{renderStars(r.score)}</td>
                                             <td className="max-w-xs">
-                                                <p className="text-sm text-gray-600 line-clamp-3">{r.comment || '-'}</p>
+                                                <p className="text-sm text-muted line-clamp-3">{r.comment || '-'}</p>
                                             </td>
                                             <td><StatusBadge status={r.status || 'approved'} config={reviewStatusConfig} /></td>
                                             <td>
-                                                <span className="text-xs text-gray-500">
+                                                <span className="text-xs text-muted">
                                                     {r.orderId ? 'Sipariş' : r.tradeId ? 'Takas' : '-'}
                                                 </span>
                                             </td>
                                             <td>
-                                                <span className="text-sm text-gray-500">
+                                                <span className="text-sm text-muted">
                                                     {format(new Date(r.createdAt), 'dd MMM yyyy', { locale: tr })}
                                                 </span>
                                             </td>
@@ -312,7 +312,7 @@ export default function ReviewsPage() {
                                                         </>
                                                     )}
                                                     <Button variant="secondary" onClick={(e) => { e.stopPropagation(); setDeleteSellerConfirm(r.id); }}
-                                                        className="p-1.5 text-gray-500 hover:text-danger-600 hover:bg-danger-400/10 rounded-lg"
+                                                        className="p-1.5 text-muted hover:text-danger-600 hover:bg-danger-400/10 rounded-lg"
                                                         title="Sil">
                                                         <TrashIcon className="w-5 h-5" />
                                                     </Button>
@@ -326,9 +326,9 @@ export default function ReviewsPage() {
                     )}
                     {sellerTotalPages > 1 && (
                         <div className="flex justify-center mt-6 gap-2">
-                            <Button variant="secondary" onClick={() => setSellerPage(p => Math.max(1, p - 1))} disabled={sellerPage === 1} className="px-3 py-1 bg-gray-100 text-gray-900 rounded disabled:opacity-50">Önceki</Button>
-                            <span className="px-3 py-1 text-gray-500">Sayfa {sellerPage} / {sellerTotalPages}</span>
-                            <Button variant="secondary" onClick={() => setSellerPage(p => Math.min(sellerTotalPages, p + 1))} disabled={sellerPage === sellerTotalPages} className="px-3 py-1 bg-gray-100 text-gray-900 rounded disabled:opacity-50">Sonraki</Button>
+                            <Button variant="secondary" onClick={() => setSellerPage(p => Math.max(1, p - 1))} disabled={sellerPage === 1} className="px-3 py-1 bg-surface-alt text-heading rounded disabled:opacity-50">Önceki</Button>
+                            <span className="px-3 py-1 text-muted">Sayfa {sellerPage} / {sellerTotalPages}</span>
+                            <Button variant="secondary" onClick={() => setSellerPage(p => Math.min(sellerTotalPages, p + 1))} disabled={sellerPage === sellerTotalPages} className="px-3 py-1 bg-surface-alt text-heading rounded disabled:opacity-50">Sonraki</Button>
                         </div>
                     )}
                 </div>
@@ -337,10 +337,10 @@ export default function ReviewsPage() {
                     {loading ? (
                         <div className="text-center py-12">
                             <Spinner size="lg" className="mx-auto" />
-                            <p className="text-gray-500 mt-4">Yükleniyor...</p>
+                            <p className="text-muted mt-4">Yükleniyor...</p>
                         </div>
                     ) : reviews.length === 0 ? (
-                        <div className="text-center py-12 text-gray-500">
+                        <div className="text-center py-12 text-muted">
                             Yorum bulunamadı
                         </div>
                     ) : (
@@ -371,10 +371,10 @@ export default function ReviewsPage() {
                                                             />
                                                         </div>
                                                     ) : (
-                                                        <div className="w-10 h-10 bg-gray-100 rounded flex-shrink-0" />
+                                                        <div className="w-10 h-10 bg-surface-alt rounded flex-shrink-0" />
                                                     )}
                                                     <div className="min-w-0">
-                                                        <p className="text-sm font-medium text-gray-900 truncate max-w-[200px]" title={review.product.title}>
+                                                        <p className="text-sm font-medium text-heading truncate max-w-[200px]" title={review.product.title}>
                                                             {review.product.title}
                                                         </p>
                                                     </div>
@@ -386,7 +386,7 @@ export default function ReviewsPage() {
                                                         {review.user.displayName.charAt(0)}
                                                     </div>
                                                     <div>
-                                                        <p className="text-sm text-gray-900">{review.user.displayName}</p>
+                                                        <p className="text-sm text-heading">{review.user.displayName}</p>
                                                         {review.isVerifiedPurchase && (
                                                             <span className="text-[10px] text-success-700 flex items-center gap-1">
                                                                 <CheckCircleIcon className="w-3 h-3" />
@@ -399,19 +399,19 @@ export default function ReviewsPage() {
                                             <td className="max-w-md">
                                                 <div className="space-y-1">
                                                     {renderStars(review.score)}
-                                                    {review.title && <p className="font-medium text-gray-900 text-sm">{review.title}</p>}
-                                                    {review.review && <p className="text-gray-500 text-sm line-clamp-3">{review.review}</p>}
+                                                    {review.title && <p className="font-medium text-heading text-sm">{review.title}</p>}
+                                                    {review.review && <p className="text-muted text-sm line-clamp-3">{review.review}</p>}
                                                     {review.adminReply && (
                                                         <div className="mt-2 pl-3 border-l-2 border-primary-500">
                                                             <p className="text-xs text-primary-400 font-medium">Satıcı Yanıtı:</p>
-                                                            <p className="text-xs text-gray-500">{review.adminReply}</p>
+                                                            <p className="text-xs text-muted">{review.adminReply}</p>
                                                         </div>
                                                     )}
                                                 </div>
                                             </td>
                                             <td><StatusBadge status={review.status} config={reviewStatusConfig} /></td>
                                             <td>
-                                                <span className="text-sm text-gray-500">
+                                                <span className="text-sm text-muted">
                                                     {format(new Date(review.createdAt), 'dd MMM yyyy', { locale: tr })}
                                                 </span>
                                             </td>
@@ -439,7 +439,7 @@ export default function ReviewsPage() {
                                                         </Button>
                                                     )}
                                                     <Button variant="secondary" onClick={() => setDeleteConfirm(review.id)}
-                                                        className="p-1.5 text-gray-500 hover:text-danger-600 hover:bg-danger-400/10 rounded-lg"
+                                                        className="p-1.5 text-muted hover:text-danger-600 hover:bg-danger-400/10 rounded-lg"
                                                         title="Sil">
                                                         <TrashIcon className="w-5 h-5" />
                                                     </Button>
@@ -457,15 +457,15 @@ export default function ReviewsPage() {
                         <div className="flex justify-center mt-6 gap-2">
                             <Button variant="secondary" onClick={() => setPage(p => Math.max(1, p - 1))}
                                 disabled={page === 1}
-                                className="px-3 py-1 bg-gray-100 text-gray-900 rounded disabled:opacity-50">
+                                className="px-3 py-1 bg-surface-alt text-heading rounded disabled:opacity-50">
                                 Önceki
                             </Button>
-                            <span className="px-3 py-1 text-gray-500">
+                            <span className="px-3 py-1 text-muted">
                                 Sayfa {page} / {totalPages}
                             </span>
                             <Button variant="secondary" onClick={() => setPage(p => Math.min(totalPages, p + 1))}
                                 disabled={page === totalPages}
-                                className="px-3 py-1 bg-gray-100 text-gray-900 rounded disabled:opacity-50">
+                                className="px-3 py-1 bg-surface-alt text-heading rounded disabled:opacity-50">
                                 Sonraki
                             </Button>
                         </div>
@@ -476,10 +476,10 @@ export default function ReviewsPage() {
 
             {/* Delete Seller Rating Confirmation */}
             {deleteSellerConfirm && (
-                <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
-                    <div className="bg-white rounded-xl p-6 max-w-md w-full mx-4 border border-gray-200">
-                        <h3 className="text-lg font-semibold text-gray-900 mb-4">Satıcı Yorumunu Sil</h3>
-                        <p className="text-gray-500 mb-6">Bu satıcı yorumunu silmek istediğinizden emin misiniz? Bu işlem geri alınamaz.</p>
+                <div className="fixed inset-0 bg-heading/50 flex items-center justify-center z-50">
+                    <div className="bg-surface-elevated rounded-xl p-6 max-w-md w-full mx-4 border border-border">
+                        <h3 className="text-lg font-semibold text-heading mb-4">Satıcı Yorumunu Sil</h3>
+                        <p className="text-muted mb-6">Bu satıcı yorumunu silmek istediğinizden emin misiniz? Bu işlem geri alınamaz.</p>
                         <div className="flex gap-3">
                             <Button variant="secondary" size="md" onClick={() => setDeleteSellerConfirm(null)} className="flex-1">İptal</Button>
                             <Button variant="danger" size="md" onClick={() => handleDeleteSellerRating(deleteSellerConfirm)} className="flex-1">Sil</Button>
@@ -490,10 +490,10 @@ export default function ReviewsPage() {
 
             {/* Delete Confirmation */}
             {deleteConfirm && (
-                <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
-                    <div className="bg-white rounded-xl p-6 max-w-md w-full mx-4 border border-gray-200">
-                        <h3 className="text-lg font-semibold text-gray-900 mb-4">Yorumu Sil</h3>
-                        <p className="text-gray-500 mb-6">
+                <div className="fixed inset-0 bg-heading/50 flex items-center justify-center z-50">
+                    <div className="bg-surface-elevated rounded-xl p-6 max-w-md w-full mx-4 border border-border">
+                        <h3 className="text-lg font-semibold text-heading mb-4">Yorumu Sil</h3>
+                        <p className="text-muted mb-6">
                             Bu yorumu silmek istediğinizden emin misiniz? Bu işlem geri alınamaz.
                         </p>
                         <div className="flex gap-3">

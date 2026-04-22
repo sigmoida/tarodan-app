@@ -353,8 +353,8 @@ export default function ProductsPage() {
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div className="flex items-center gap-3">
           <div>
-            <h1 className="text-2xl font-bold text-gray-900">Ürünler</h1>
-            <p className="text-gray-500 mt-1">
+            <h1 className="text-2xl font-bold text-heading">Ürünler</h1>
+            <p className="text-muted mt-1">
               {filter === "pending"
                 ? `${products.filter((p) => p.status === "pending").length} ürün onay bekliyor`
                 : `Toplam ${total} ürün`}
@@ -380,7 +380,7 @@ export default function ProductsPage() {
         </div>
         {selectedIds.size > 0 && (
           <div className="flex items-center gap-2">
-            <span className="text-sm text-gray-500">
+            <span className="text-sm text-muted">
               {selectedIds.size} ürün seçili
             </span>
             <Button
@@ -424,7 +424,7 @@ export default function ProductsPage() {
               console.error(e);
             }
           }}
-          className="px-3 py-2 bg-gray-100 hover:bg-gray-100 text-gray-900 rounded-lg text-sm"
+          className="px-3 py-2 bg-surface-alt hover:bg-surface-alt text-heading rounded-lg text-sm"
         >
           CSV İndir
         </Button>
@@ -433,7 +433,7 @@ export default function ProductsPage() {
       {/* Filters */}
       <div className="flex flex-col sm:flex-row gap-4">
         <div className="relative flex-1 flex gap-2">
-          <MagnifyingGlassIcon className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-gray-500 pointer-events-none" />
+          <MagnifyingGlassIcon className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-muted pointer-events-none" />
           <Input
             type="text"
             placeholder="Ürün ara..."
@@ -453,7 +453,7 @@ export default function ProductsPage() {
 
         {/* Seller Filter */}
         <div className="relative w-full sm:w-64">
-          <UserIcon className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-gray-500" />
+          <UserIcon className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-muted" />
           <Input
             type="text"
             placeholder="Satıcı ara..."
@@ -469,30 +469,30 @@ export default function ProductsPage() {
             <Button
               variant="secondary"
               onClick={clearSellerFilter}
-              className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-500 hover:text-gray-900"
+              className="absolute right-3 top-1/2 -translate-y-1/2 text-muted hover:text-heading"
             >
               <XCircleIcon className="h-5 w-5" />
             </Button>
           )}
 
           {showSellerDropdown && sellerSearch.length >= 2 && (
-            <div className="absolute z-50 mt-1 bg-gray-100 shadow-lg max-h-60 overflow-y-auto">
+            <div className="absolute z-50 mt-1 bg-surface-alt shadow-lg max-h-60 overflow-y-auto">
               {loadingUsers ? (
-                <div className="p-3 text-center text-gray-500">Aranıyor...</div>
+                <div className="p-3 text-center text-muted">Aranıyor...</div>
               ) : users.length > 0 ? (
                 users.map((user) => (
                   <Button
                     variant="secondary"
                     key={user.id}
                     onClick={() => handleSelectSeller(user)}
-                    className="w-full px-4 py-2 text-left hover:bg-gray-100 text-gray-900"
+                    className="w-full px-4 py-2 text-left hover:bg-surface-alt text-heading"
                   >
                     <div className="font-medium">{user.displayName}</div>
-                    <div className="text-xs text-gray-500">{user.email}</div>
+                    <div className="text-xs text-muted">{user.email}</div>
                   </Button>
                 ))
               ) : (
-                <div className="p-3 text-center text-gray-500">
+                <div className="p-3 text-center text-muted">
                   Satıcı bulunamadı
                 </div>
               )}
@@ -551,7 +551,7 @@ export default function ProductsPage() {
                 </tr>
               ) : filteredProducts.length === 0 ? (
                 <tr>
-                  <td colSpan={9} className="text-center py-8 text-gray-500">
+                  <td colSpan={9} className="text-center py-8 text-muted">
                     Ürün bulunamadı
                   </td>
                 </tr>
@@ -573,7 +573,7 @@ export default function ProductsPage() {
                     </td>
                     <td>
                       <div className="flex items-center">
-                        <div className="w-12 h-12 bg-gray-100 rounded-lg overflow-hidden mr-3 flex-shrink-0">
+                        <div className="w-12 h-12 bg-surface-alt rounded-lg overflow-hidden mr-3 flex-shrink-0">
                           <Image
                             src={
                               product.imageUrl ||
@@ -590,14 +590,14 @@ export default function ProductsPage() {
                             }}
                           />
                         </div>
-                        <span className="font-medium text-gray-900 line-clamp-2">
+                        <span className="font-medium text-heading line-clamp-2">
                           {product.title}
                         </span>
                       </div>
                     </td>
                     <td className="font-medium text-primary-400">
                       {isProductOnSaleDisplay(product) && (
-                        <span className="text-gray-500 line-through text-sm block">
+                        <span className="text-muted line-through text-sm block">
                           ₺
                           {getProductOriginalPriceForDisplay(
                             product,
@@ -616,14 +616,14 @@ export default function ProductsPage() {
                       />
                     </td>
                     <td>
-                      <span className="text-gray-600">
+                      <span className="text-muted">
                         {getConditionLabel(product.condition)}
                       </span>
                     </td>
                     <td>
                       <Link
                         href={`/users/${product.seller.id}`}
-                        className="text-gray-900 hover:text-primary-600"
+                        className="text-heading hover:text-primary-600"
                       >
                         {product.seller.displayName}
                       </Link>
@@ -636,7 +636,7 @@ export default function ProductsPage() {
                       <div className="flex items-center gap-1">
                         <Link
                           href={`/products/${product.id}`}
-                          className="p-2 text-gray-500 hover:text-gray-900 hover:bg-gray-100 rounded-lg"
+                          className="p-2 text-muted hover:text-heading hover:bg-surface-alt rounded-lg"
                           title="Detay"
                         >
                           <EyeIcon className="h-5 w-5" />
@@ -681,7 +681,7 @@ export default function ProductsPage() {
 
       {/* Pagination */}
       <div className="flex items-center justify-between">
-        <p className="text-sm text-gray-500">
+        <p className="text-sm text-muted">
           Sayfa {page} / {Math.ceil(total / 20)}
         </p>
         <div className="flex gap-2">

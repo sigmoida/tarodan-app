@@ -11,10 +11,10 @@ import { Spinner } from '@tarodan/ui';
  */
 export default function AuthLoadingScreen() {
   return (
-    <div className="min-h-[60vh] flex items-center justify-center bg-gray-50">
+    <div className="min-h-[60vh] flex items-center justify-center bg-surface">
       <div className="flex flex-col items-center gap-4">
         <Spinner size="lg" />
-        <p className="text-sm text-gray-500">Yükleniyor...</p>
+        <p className="text-sm text-muted">Yükleniyor...</p>
       </div>
     </div>
   );

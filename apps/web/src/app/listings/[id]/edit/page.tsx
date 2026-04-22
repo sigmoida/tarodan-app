@@ -774,21 +774,21 @@ export default function EditListingPage() {
   if (!authLoading && !isAuthenticated) return null;
   if (isFetching) {
     return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+      <div className="min-h-screen bg-surface flex items-center justify-center">
         <div className="text-center">
           <Spinner size="xl" className="mx-auto mb-4" />
-          <p className="text-gray-600">Yükleniyor...</p>
+          <p className="text-muted">Yükleniyor...</p>
         </div>
       </div>
     );
   }
 
   return (
-    <div className="min-h-screen bg-gray-50">
+    <div className="min-h-screen bg-surface">
       <main className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         <Link
           href={`/listings/${id}`}
-          className="inline-flex items-center gap-2 text-gray-600 hover:text-gray-900 mb-6"
+          className="inline-flex items-center gap-2 text-muted hover:text-heading mb-6"
         >
           <ArrowLeftIcon className="w-5 h-5" />
           İlana Dön
@@ -797,10 +797,10 @@ export default function EditListingPage() {
         <motion.div
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
-          className="bg-white rounded-2xl shadow-sm p-6 md:p-8"
+          className="bg-surface-elevated rounded-2xl shadow-sm p-6 md:p-8"
         >
           <h1 className="text-3xl font-bold mb-2">İlanı Düzenle</h1>
-          <p className="text-gray-600 mb-6">
+          <p className="text-muted mb-6">
             İlan bilgilerinizi güncelleyin.
           </p>
 
@@ -848,7 +848,7 @@ export default function EditListingPage() {
           <form onSubmit={handleSubmit} className="space-y-6" style={{ display: ['sold', 'reserved', 'inactive'].includes(formData.status) ? 'none' : undefined }}>
             {/* Title */}
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
+              <label className="block text-sm font-medium text-body mb-2">
                 Başlık <span className="text-danger-500">*</span>
               </label>
               <Input
@@ -865,12 +865,12 @@ export default function EditListingPage() {
 
             {/* Description */}
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
+              <label className="block text-sm font-medium text-body mb-2">
                 Açıklama
               </label>
               <Textarea value={formData.description}
                 onChange={(e) => setFormData({ ...formData, description: e.target.value })}
-                className="px-4 py-3 rounded-xl text-gray-900 placeholder-gray-500"
+                className="px-4 py-3 rounded-xl text-heading placeholder-muted"
                 placeholder="Ürün hakkında detaylı bilgi..."
                 rows={5}
                 maxLength={5000} />
@@ -879,7 +879,7 @@ export default function EditListingPage() {
             {/* Category & Condition */}
             <div className="grid md:grid-cols-2 gap-6">
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
+                <label className="block text-sm font-medium text-body mb-2">
                   Kategori <span className="text-danger-500">*</span>
                 </label>
                 <Select
@@ -898,7 +898,7 @@ export default function EditListingPage() {
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
+                <label className="block text-sm font-medium text-body mb-2">
                   Durum <span className="text-danger-500">*</span>
                 </label>
                 <Select
@@ -927,7 +927,7 @@ export default function EditListingPage() {
                 options={brands.map((b) => ({ value: b.id, label: b.name }))}
                 placeholder={brandsLoading ? 'Yükleniyor...' : 'Marka Seçin'}
                 disabled={brandsLoading}
-                triggerClassName="py-3 rounded-xl border-gray-300"
+                triggerClassName="py-3 rounded-xl border-border"
               />
 
               <SimpleDropdown
@@ -945,11 +945,11 @@ export default function EditListingPage() {
                         : 'Model Seçin'
                 }
                 disabled={!formData.brandId || modelsLoading}
-                triggerClassName="py-3 rounded-xl border-gray-300"
+                triggerClassName="py-3 rounded-xl border-border"
               />
 
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
+                <label className="block text-sm font-medium text-body mb-2">
                   Ölçek
                 </label>
                 <Select
@@ -966,7 +966,7 @@ export default function EditListingPage() {
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
+                <label className="block text-sm font-medium text-body mb-2">
                   Malzeme
                 </label>
                 <Select
@@ -989,7 +989,7 @@ export default function EditListingPage() {
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
+                <label className="block text-sm font-medium text-body mb-2">
                   Üretici
                 </label>
                 <Select
@@ -1007,10 +1007,10 @@ export default function EditListingPage() {
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
+                <label className="block text-sm font-medium text-body mb-1">
                   Çıkış yılı
                 </label>
-                <p className="text-xs text-gray-500 mb-2">Modelin çıkış yılı (isteğe bağlı)</p>
+                <p className="text-xs text-muted mb-2">Modelin çıkış yılı (isteğe bağlı)</p>
                 <Select
                   value={formData.year}
                   onChange={(e) => setFormData({ ...formData, year: e.target.value })}
@@ -1029,11 +1029,11 @@ export default function EditListingPage() {
             {/* Trade Toggle */}
             <div className={`flex items-center justify-between p-4 rounded-xl border ${limits?.canTrade
                 ? 'bg-success-50 border-success-200'
-                : 'bg-gray-50 border-gray-200'
+                : 'bg-surface border-border'
               }`}>
               <div>
-                <label className="font-medium text-gray-900">Takas Aktif</label>
-                <p className="text-sm text-gray-600">
+                <label className="font-medium text-heading">Takas Aktif</label>
+                <p className="text-sm text-muted">
                   {limits?.canTrade
                     ? 'Bu ürünü takas için de açık tutar'
                     : 'Takas özelliği Temel veya üstü üyelik gerektirir'}
@@ -1053,35 +1053,35 @@ export default function EditListingPage() {
             </div>
 
             {/* Ön Sipariş */}
-            <div className="flex items-center justify-between p-4 bg-gray-50 rounded-xl border border-gray-200">
+            <div className="flex items-center justify-between p-4 bg-surface rounded-xl border border-border">
               <div>
-                <label className="font-medium text-gray-900">Ön Sipariş</label>
-                <p className="text-sm text-gray-600">Ürün henüz stokta değil; çıkınca gönderilecek</p>
+                <label className="font-medium text-heading">Ön Sipariş</label>
+                <p className="text-sm text-muted">Ürün henüz stokta değil; çıkınca gönderilecek</p>
               </div>
               <Button variant="secondary" type="button"
                 onClick={() => setFormData({ ...formData, isPreorder: !formData.isPreorder })}
-                className={`relative w-14 h-8 rounded-full transition-colors ${formData.isPreorder ? 'bg-primary-500' : 'bg-gray-300'}`}>
-                <span className={`absolute top-1 left-1 w-6 h-6 bg-white rounded-full shadow transition-transform ${formData.isPreorder ? 'translate-x-6' : 'translate-x-0'}`} />
+                className={`relative w-14 h-8 rounded-full transition-colors ${formData.isPreorder ? 'bg-primary-500' : 'bg-border-strong'}`}>
+                <span className={`absolute top-1 left-1 w-6 h-6 bg-surface-elevated rounded-full shadow transition-transform ${formData.isPreorder ? 'translate-x-6' : 'translate-x-0'}`} />
               </Button>
             </div>
 
             {/* Set / Paket */}
-            <div className="flex items-center justify-between p-4 bg-gray-50 rounded-xl border border-gray-200">
+            <div className="flex items-center justify-between p-4 bg-surface rounded-xl border border-border">
               <div>
-                <label className="font-medium text-gray-900">Set / Paket</label>
-                <p className="text-sm text-gray-600">Tek ilanda birden fazla model (örn. 5'li paket, garaj seti)</p>
+                <label className="font-medium text-heading">Set / Paket</label>
+                <p className="text-sm text-muted">Tek ilanda birden fazla model (örn. 5'li paket, garaj seti)</p>
               </div>
               <Button variant="secondary" type="button"
                 onClick={() => setFormData({ ...formData, isSet: !formData.isSet })}
-                className={`relative w-14 h-8 rounded-full transition-colors ${formData.isSet ? 'bg-info-500' : 'bg-gray-300'}`}>
-                <span className={`absolute top-1 left-1 w-6 h-6 bg-white rounded-full shadow transition-transform ${formData.isSet ? 'translate-x-6' : 'translate-x-0'}`} />
+                className={`relative w-14 h-8 rounded-full transition-colors ${formData.isSet ? 'bg-info-500' : 'bg-border-strong'}`}>
+                <span className={`absolute top-1 left-1 w-6 h-6 bg-surface-elevated rounded-full shadow transition-transform ${formData.isSet ? 'translate-x-6' : 'translate-x-0'}`} />
               </Button>
             </div>
 
             {/* Price & Quantity */}
             <div className="grid md:grid-cols-2 gap-6">
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
+                <label className="block text-sm font-medium text-body mb-2">
                   Fiyat (₺) <span className="text-danger-500">*</span>
                 </label>
                 <Input
@@ -1098,10 +1098,10 @@ export default function EditListingPage() {
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
+                <label className="block text-sm font-medium text-body mb-2">
                   Stok Miktarı
                 </label>
-                <p className="text-xs text-gray-500 mb-2">
+                <p className="text-xs text-muted mb-2">
                   Boş bırakırsanız sınırsız stok olur
                 </p>
                 <Input
@@ -1124,13 +1124,13 @@ export default function EditListingPage() {
               </div>
             </div>
             {(commissionPreviewLoading || commissionPreview) && (
-              <div className="p-3 bg-gray-50 rounded-xl border border-gray-100 text-sm">
-                <p className="text-gray-600 font-medium mb-1">{locale === 'en' ? 'Estimated (per sale)' : 'Tahmini (satış başına)'}</p>
+              <div className="p-3 bg-surface rounded-xl border border-border-subtle text-sm">
+                <p className="text-muted font-medium mb-1">{locale === 'en' ? 'Estimated (per sale)' : 'Tahmini (satış başına)'}</p>
                 {commissionPreviewLoading ? (
-                  <span className="text-gray-400">{locale === 'en' ? 'Calculating...' : 'Hesaplanıyor...'}</span>
+                  <span className="text-subtle">{locale === 'en' ? 'Calculating...' : 'Hesaplanıyor...'}</span>
                 ) : commissionPreview ? (
                   <div className="flex flex-wrap gap-x-4 gap-y-1">
-                    <span className="text-gray-600">{locale === 'en' ? 'Platform deduction' : 'Platform kesintisi'}: ₺{commissionPreview.sellerFeeAmount.toLocaleString('tr-TR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+                    <span className="text-muted">{locale === 'en' ? 'Platform deduction' : 'Platform kesintisi'}: ₺{commissionPreview.sellerFeeAmount.toLocaleString('tr-TR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
                     <span className="text-success-700 font-medium">{locale === 'en' ? 'Net to you' : 'Net kazanç'}: ₺{commissionPreview.sellerNetAmount.toLocaleString('tr-TR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
                   </div>
                 ) : null}
@@ -1138,13 +1138,13 @@ export default function EditListingPage() {
             )}
 
             {/* Discount Section */}
-            <div className="border border-gray-200 rounded-xl overflow-hidden">
+            <div className="border border-border rounded-xl overflow-hidden">
               <Button variant="secondary" type="button"
                 onClick={() => setShowDiscountSection(!showDiscountSection)}
                 className="w-full flex items-center justify-between p-4 bg-gradient-to-r from-primary-50 to-warning-50 hover:from-primary-100 hover:to-warning-100 transition-colors">
                 <div className="flex items-center gap-3">
                   <ReceiptPercentIcon className="w-5 h-5 text-primary-600" />
-                  <span className="font-medium text-gray-900">İndirim & Kampanya</span>
+                  <span className="font-medium text-heading">İndirim & Kampanya</span>
                   {productDiscounts.length > 0 && (
                     <span className="px-2 py-0.5 bg-primary-100 text-primary-700 text-xs rounded-full">
                       {productDiscounts.length} aktif
@@ -1152,27 +1152,27 @@ export default function EditListingPage() {
                   )}
                 </div>
                 {showDiscountSection ? (
-                  <ChevronUpIcon className="w-5 h-5 text-gray-500" />
+                  <ChevronUpIcon className="w-5 h-5 text-muted" />
                 ) : (
-                  <ChevronDownIcon className="w-5 h-5 text-gray-500" />
+                  <ChevronDownIcon className="w-5 h-5 text-muted" />
                 )}
               </Button>
 
               {showDiscountSection && (
-                <div className="p-4 space-y-4 bg-white">
+                <div className="p-4 space-y-4 bg-surface-elevated">
                   {/* Quick Sale Price */}
                   <div className="p-4 bg-primary-50 rounded-lg border border-primary-100">
-                    <h4 className="font-medium text-gray-900 mb-3 flex items-center gap-2">
+                    <h4 className="font-medium text-heading mb-3 flex items-center gap-2">
                       <TagIcon className="w-4 h-4 text-primary-600" />
                       Hızlı İndirim
                     </h4>
-                    <p className="text-sm text-gray-600 mb-4">
+                    <p className="text-sm text-muted mb-4">
                       Ürününüz için hızlıca indirimli fiyat belirleyin. Bu, ürün sayfasında üstü çizili fiyat olarak görünecektir.
                     </p>
 
                     <div className="grid md:grid-cols-2 gap-4 mb-4">
                       <div>
-                        <label className="block text-xs font-medium text-gray-700 mb-1">
+                        <label className="block text-xs font-medium text-body mb-1">
                           Orijinal Fiyat (₺)
                         </label>
                         <Input
@@ -1183,7 +1183,7 @@ export default function EditListingPage() {
                         />
                       </div>
                       <div>
-                        <label className="block text-xs font-medium text-gray-700 mb-1">
+                        <label className="block text-xs font-medium text-body mb-1">
                           İndirimli Fiyat (₺)
                         </label>
                         <Input
@@ -1197,7 +1197,7 @@ export default function EditListingPage() {
 
                     <div className="grid md:grid-cols-2 gap-4 mb-4">
                       <div>
-                        <label className="block text-xs font-medium text-gray-700 mb-1">
+                        <label className="block text-xs font-medium text-body mb-1">
                           Başlangıç
                         </label>
                         <Input
@@ -1207,7 +1207,7 @@ export default function EditListingPage() {
                         />
                       </div>
                       <div>
-                        <label className="block text-xs font-medium text-gray-700 mb-1">
+                        <label className="block text-xs font-medium text-body mb-1">
                           Bitiş
                         </label>
                         <Input
@@ -1223,13 +1223,13 @@ export default function EditListingPage() {
                         <span>
                           %{Math.round((1 - Number(saleData.salePrice) / Number(saleData.originalPrice)) * 100)} indirim
                         </span>
-                        <span className="text-gray-500">
+                        <span className="text-muted">
                           ({Number(saleData.originalPrice).toLocaleString('tr-TR')} ₺ → {Number(saleData.salePrice).toLocaleString('tr-TR')} ₺)
                         </span>
                       </div>
                     )}
 
-                    <p className="text-xs text-gray-500">
+                    <p className="text-xs text-muted">
                       * Not: Bu özellik yakında aktif olacaktır. Şimdilik ürün fiyatını doğrudan değiştirebilirsiniz.
                     </p>
                   </div>
@@ -1237,20 +1237,20 @@ export default function EditListingPage() {
                   {/* Existing Discounts */}
                   {productDiscounts.length > 0 && (
                     <div>
-                      <h4 className="font-medium text-gray-900 mb-3">Bu Ürüne Uygulanan İndirimler</h4>
+                      <h4 className="font-medium text-heading mb-3">Bu Ürüne Uygulanan İndirimler</h4>
                       <div className="space-y-2">
                         {productDiscounts.map((discount: any) => (
-                          <div key={discount.id} className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
+                          <div key={discount.id} className="flex items-center justify-between p-3 bg-surface rounded-lg">
                             <div>
-                              <p className="font-medium text-gray-900">{discount.name}</p>
-                              <p className="text-sm text-gray-500">
+                              <p className="font-medium text-heading">{discount.name}</p>
+                              <p className="text-sm text-muted">
                                 {discount.type === 'percentage' ? `%${discount.value}` : `${discount.value} TL`}
                                 {discount.code && <span className="ml-2">Kod: {discount.code}</span>}
                               </p>
                             </div>
                             <span className={`px-2 py-1 text-xs rounded-full ${discount.isCurrentlyValid
                                 ? 'bg-success-100 text-success-700'
-                                : 'bg-gray-100 text-gray-600'
+                                : 'bg-surface-alt text-muted'
                               }`}>
                               {discount.isCurrentlyValid ? 'Aktif' : 'Pasif'}
                             </span>
@@ -1261,7 +1261,7 @@ export default function EditListingPage() {
                   )}
 
                   {/* Link to full discount management */}
-                  <div className="pt-2 border-t border-gray-100">
+                  <div className="pt-2 border-t border-border-subtle">
                     <Link
                       href="/profile/discounts"
                       className="inline-flex items-center gap-2 text-primary-600 hover:text-primary-700 text-sm font-medium"
@@ -1276,7 +1276,7 @@ export default function EditListingPage() {
 
             {/* Images */}
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
+              <label className="block text-sm font-medium text-body mb-2">
                 Ürün Görselleri (En fazla {limits?.maxImagesPerListing || 3})
               </label>
               <div className="space-y-3">
@@ -1286,7 +1286,7 @@ export default function EditListingPage() {
                     multiple
                     onChange={(e) => handleFileUpload(e.target.files)}
                     disabled={uploadingImages || formData.images.length >= (limits?.maxImagesPerListing || 3)}
-                    className="px-4 py-3 rounded-xl text-gray-900 disabled:bg-gray-100 disabled:cursor-not-allowed" />
+                    className="px-4 py-3 rounded-xl text-heading disabled:bg-surface-alt disabled:cursor-not-allowed" />
                   {uploadingImages && (
                     <p className="text-sm text-primary-600 mt-2">Resimler yükleniyor...</p>
                   )}
@@ -1301,14 +1301,14 @@ export default function EditListingPage() {
                           <img
                             src={previewUrl}
                             alt={`Preview ${index + 1}`}
-                            className="w-full h-32 object-cover rounded-lg border border-gray-200"
+                            className="w-full h-32 object-cover rounded-lg border border-border"
                             onError={(e) => {
                               (e.target as HTMLImageElement).src = 'https://placehold.co/200x200/f3f4f6/9ca3af?text=Resim';
                             }}
                           />
                           <Button variant="secondary" type="button"
                             onClick={() => removeImage(index)}
-                            className="absolute top-2 right-2 bg-danger-500 text-white rounded-full p-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                            className="absolute top-2 right-2 bg-danger-500 text-inverted rounded-full p-1 opacity-0 group-hover:opacity-100 transition-opacity">
                             ×
                           </Button>
                         </div>
@@ -1317,7 +1317,7 @@ export default function EditListingPage() {
                   </div>
                 )}
               </div>
-              <p className="text-sm text-gray-500 mt-2">
+              <p className="text-sm text-muted mt-2">
                 {formData.images.length} / {limits?.maxImagesPerListing || 3} resim yüklendi
               </p>
             </div>
@@ -1345,8 +1345,8 @@ export default function EditListingPage() {
             </div>
 
             {/* Status Actions */}
-            <div className="border-t border-gray-200 pt-6 mt-6">
-              <h3 className="text-lg font-semibold text-gray-900 mb-4">İlan Durumu</h3>
+            <div className="border-t border-border pt-6 mt-6">
+              <h3 className="text-lg font-semibold text-heading mb-4">İlan Durumu</h3>
               <div className="flex flex-col sm:flex-row gap-3">
                 {formData.status === 'active' ? (
                   <Button
@@ -1382,7 +1382,7 @@ export default function EditListingPage() {
                   🗑️ İlanı Sil
                 </Button>
               </div>
-              <p className="text-sm text-gray-500 mt-2">
+              <p className="text-sm text-muted mt-2">
                 {formData.status === 'active'
                   ? 'Pasife alınan ilanlar listelemede görünmez ama silinmez.'
                   : 'Aktif ilanlar listelemede görünür.'}
@@ -1393,14 +1393,14 @@ export default function EditListingPage() {
 
         {/* Delete Confirmation Modal */}
         {showDeleteModal && (
-          <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+          <div className="fixed inset-0 bg-heading/50 flex items-center justify-center z-50 p-4">
             <motion.div
               initial={{ opacity: 0, scale: 0.95 }}
               animate={{ opacity: 1, scale: 1 }}
-              className="bg-white rounded-2xl p-6 max-w-md w-full"
+              className="bg-surface-elevated rounded-2xl p-6 max-w-md w-full"
             >
-              <h3 className="text-xl font-bold text-gray-900 mb-4">İlanı Sil</h3>
-              <p className="text-gray-600 mb-6">
+              <h3 className="text-xl font-bold text-heading mb-4">İlanı Sil</h3>
+              <p className="text-muted mb-6">
                 Bu ilanı silmek istediğinizden emin misiniz? Bu işlem geri alınamaz ve ilan kalıcı olarak silinir.
               </p>
               <div className="flex gap-3">

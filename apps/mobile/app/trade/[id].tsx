@@ -450,6 +450,22 @@ export default function TradeDetailScreen() {
       const raw = res.data as Record<string, unknown> | undefined;
       const data = (raw?.data ?? raw) as Record<string, unknown> | undefined;
 
+      if (data?.useBypass && data?.paymentId) {
+        try {
+          const bypassRes = await paymentsApi.bypassComplete(String(data.paymentId));
+          if (bypassRes.data?.success) {
+            invalidateTradeCaches();
+            setCashPaymentLoading(false);
+            router.push(`/payment/success?paymentId=${encodeURIComponent(String(data.paymentId))}`);
+            return;
+          }
+        } catch {
+          setSnackbar({ visible: true, message: 'Test ödemesi tamamlanamadı' });
+        }
+        setCashPaymentLoading(false);
+        return;
+      }
+
       if (data?.paymentUrl) {
         if (saveCard && useNewCard && cardNumber && cardExpiry) {
           try {
@@ -664,7 +680,7 @@ export default function TradeDetailScreen() {
                 </View>
               </View>
 
-              {trade.status === 'accepted' &&
+              {(trade.status === 'accepted' || trade.status === 'awaiting_payment') &&
                 user &&
                 trade.cashPayerId === user.id &&
                 trade.cashPayment?.status !== 'completed' && (

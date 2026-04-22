@@ -127,11 +127,11 @@ export default function LoginPage() {
   return (
     <div className="min-h-screen flex">
       {/* Left - Form */}
-      <div className="flex-1 flex flex-col bg-white">
+      <div className="flex-1 flex flex-col bg-surface-elevated">
         <div className="px-6 pt-6">
           <Link href="/" className="inline-flex items-center gap-2 group">
             <Image src="/tarodan-logo.jpg" alt="Tarodan" width={36} height={36} className="rounded-lg object-contain" />
-            <span className="text-lg font-bold text-gray-900 group-hover:text-primary-600 transition-colors duration-200">
+            <span className="text-lg font-bold text-heading group-hover:text-primary-600 transition-colors duration-200">
               Tarodan
             </span>
           </Link>
@@ -144,10 +144,10 @@ export default function LoginPage() {
           className="w-full max-w-[400px]"
         >
           <div className="mb-8">
-            <h1 className="text-2xl font-bold text-gray-900 tracking-tight">
+            <h1 className="text-2xl font-bold text-heading tracking-tight">
               {t('auth.welcomeBack')}
             </h1>
-            <p className="text-sm text-gray-500 mt-1">
+            <p className="text-sm text-muted mt-1">
               {locale === 'en' ? 'Sign in to your account' : 'Hesabınıza giriş yapın'}
             </p>
           </div>
@@ -186,7 +186,7 @@ export default function LoginPage() {
             </motion.div>
           )}
 
-          <div className="border border-gray-200 bg-white rounded-xl p-7">
+          <div className="border border-border bg-surface-elevated rounded-xl p-7">
             <form
               onSubmit={(e) => {
                 e.preventDefault();
@@ -200,36 +200,36 @@ export default function LoginPage() {
                 className="space-y-5"
               >
                 <motion.div variants={stagger.item}>
-                  <label htmlFor="login-email" className="block text-sm font-medium text-gray-700 mb-1.5">
+                  <label htmlFor="login-email" className="block text-sm font-medium text-body mb-1.5">
                     {t('auth.email')}
                   </label>
                   <div className="relative">
-                    <EnvelopeIcon className="absolute left-3.5 top-1/2 -translate-y-1/2 w-[18px] h-[18px] text-gray-400 pointer-events-none" />
+                    <EnvelopeIcon className="absolute left-3.5 top-1/2 -translate-y-1/2 w-[18px] h-[18px] text-subtle pointer-events-none" />
                     <Input
                       id="login-email"
                       type="email"
                       value={email}
                       onChange={(e) => setEmail(e.target.value)}
                       placeholder={locale === 'en' ? 'example@email.com' : 'ornek@email.com'}
-                      className="pl-10 pr-4 bg-gray-50 focus:bg-white transition-all duration-200 ease-premium"
+                      className="pl-10 pr-4 bg-surface focus:bg-surface-elevated transition-all duration-200 ease-premium"
                       autoComplete="email"
                     />
                   </div>
                 </motion.div>
 
                 <motion.div variants={stagger.item}>
-                  <label htmlFor="login-password" className="block text-sm font-medium text-gray-700 mb-1.5">
+                  <label htmlFor="login-password" className="block text-sm font-medium text-body mb-1.5">
                     {t('auth.password')}
                   </label>
                   <div className="relative">
-                    <LockClosedIcon className="absolute left-3.5 top-1/2 -translate-y-1/2 w-[18px] h-[18px] text-gray-400 pointer-events-none" />
+                    <LockClosedIcon className="absolute left-3.5 top-1/2 -translate-y-1/2 w-[18px] h-[18px] text-subtle pointer-events-none" />
                     <Input
                       id="login-password"
                       type={showPassword ? 'text' : 'password'}
                       value={password}
                       onChange={(e) => setPassword(e.target.value)}
                       placeholder="••••••••"
-                      className="pl-10 pr-10 bg-gray-50 focus:bg-white transition-all duration-200 ease-premium"
+                      className="pl-10 pr-10 bg-surface focus:bg-surface-elevated transition-all duration-200 ease-premium"
                       autoComplete="current-password"
                       onKeyDown={(e) => {
                         if (e.key === 'Enter') {
@@ -240,7 +240,7 @@ export default function LoginPage() {
                     />
                     <Button variant="secondary" type="button"
                       onClick={() => setShowPassword(!showPassword)}
-                      className="absolute right-3.5 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 transition-colors duration-200">
+                      className="absolute right-3.5 top-1/2 -translate-y-1/2 text-subtle hover:text-muted transition-colors duration-200">
                       {showPassword ? (
                         <EyeSlashIcon className="w-[18px] h-[18px]" />
                       ) : (
@@ -264,9 +264,9 @@ export default function LoginPage() {
                 <motion.div variants={stagger.item}>
                   <Button variant="secondary" type="submit"
                     disabled={isLoading}
-                    className="w-full py-2.5 rounded-lg bg-primary-500 text-white font-semibold text-sm hover:bg-primary-600 active:bg-primary-700 transition-all duration-200 ease-premium disabled:opacity-60 disabled:pointer-events-none flex items-center justify-center gap-2">
+                    className="w-full py-2.5 rounded-lg bg-primary-500 text-inverted font-semibold text-sm hover:bg-primary-600 active:bg-primary-700 transition-all duration-200 ease-premium disabled:opacity-60 disabled:pointer-events-none flex items-center justify-center gap-2">
                     {isLoading && (
-                      <svg className="animate-spin h-4 w-4 text-white/80" viewBox="0 0 24 24" fill="none">
+                      <svg className="animate-spin h-4 w-4 text-inverted/80" viewBox="0 0 24 24" fill="none">
                         <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="3" />
                         <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
                       </svg>
@@ -284,7 +284,7 @@ export default function LoginPage() {
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             transition={{ delay: 0.5, duration: 0.4 }}
-            className="text-center mt-6 text-sm text-gray-500"
+            className="text-center mt-6 text-sm text-muted"
           >
             {t('auth.noAccount')}{' '}
             <Link href="/register" className="font-semibold text-primary-600 hover:text-primary-700 transition-colors duration-200">
@@ -304,37 +304,37 @@ export default function LoginPage() {
           className="object-cover"
           priority
         />
-        <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-black/50 to-black/20" />
+        <div className="absolute inset-0 bg-gradient-to-t from-heading/70 via-heading/50 to-heading/20" />
         <div className="absolute inset-0 flex items-center justify-center p-10 z-10">
           <motion.div
             initial={{ opacity: 0, y: 12 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ delay: 0.3, duration: 0.5, ease: [0.4, 0, 0.2, 1] }}
           >
-            <h2 className="text-2xl font-bold text-white mb-2 drop-shadow-lg">
+            <h2 className="text-2xl font-bold text-inverted mb-2 drop-shadow-lg">
               {locale === 'en' 
                 ? 'The Meeting Point for Collectors'
                 : 'Koleksiyonerlerin Buluşma Noktası'}
             </h2>
-            <p className="text-sm text-white/80 max-w-md drop-shadow">
+            <p className="text-sm text-inverted/80 max-w-md drop-shadow">
               {locale === 'en'
                 ? 'Find what you\'re looking for among thousands of diecast models.'
                 : 'Binlerce diecast model arasından aradığınızı bulun.'}
             </p>
             <div className="flex items-center gap-6 mt-5">
               <div>
-                <p className="text-lg font-bold text-white drop-shadow">10K+</p>
-                <p className="text-xs text-white/60">{locale === 'en' ? 'Listings' : 'İlan'}</p>
+                <p className="text-lg font-bold text-inverted drop-shadow">10K+</p>
+                <p className="text-xs text-inverted/60">{locale === 'en' ? 'Listings' : 'İlan'}</p>
               </div>
-              <div className="w-px h-6 bg-white/30" />
+              <div className="w-px h-6 bg-surface-elevated/30" />
               <div>
-                <p className="text-lg font-bold text-white drop-shadow">5K+</p>
-                <p className="text-xs text-white/60">{locale === 'en' ? 'Members' : 'Üye'}</p>
+                <p className="text-lg font-bold text-inverted drop-shadow">5K+</p>
+                <p className="text-xs text-inverted/60">{locale === 'en' ? 'Members' : 'Üye'}</p>
               </div>
-              <div className="w-px h-6 bg-white/30" />
+              <div className="w-px h-6 bg-surface-elevated/30" />
               <div>
-                <p className="text-lg font-bold text-white drop-shadow">2K+</p>
-                <p className="text-xs text-white/60">{locale === 'en' ? 'Trades' : 'Takas'}</p>
+                <p className="text-lg font-bold text-inverted drop-shadow">2K+</p>
+                <p className="text-xs text-inverted/60">{locale === 'en' ? 'Trades' : 'Takas'}</p>
               </div>
             </div>
           </motion.div>

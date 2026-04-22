@@ -118,7 +118,7 @@ export default function ReportModal({
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
             onClick={onClose}
-            className="absolute inset-0 bg-black/50"
+            className="absolute inset-0 bg-heading/50"
           />
           
           {/* Modal - Compact size with max-height and scroll */}
@@ -126,32 +126,32 @@ export default function ReportModal({
             initial={{ opacity: 0, scale: 0.95, y: 20 }}
             animate={{ opacity: 1, scale: 1, y: 0 }}
             exit={{ opacity: 0, scale: 0.95, y: 20 }}
-            className="relative bg-white rounded-xl shadow-xl w-full max-w-sm max-h-[90vh] overflow-hidden flex flex-col"
+            className="relative bg-surface-elevated rounded-xl shadow-xl w-full max-w-sm max-h-[90vh] overflow-hidden flex flex-col"
           >
             {/* Header - Compact */}
-            <div className="flex items-center justify-between px-4 py-3 border-b border-gray-200 flex-shrink-0">
+            <div className="flex items-center justify-between px-4 py-3 border-b border-border flex-shrink-0">
               <div className="flex items-center gap-2">
                 <FlagIcon className="w-5 h-5 text-danger-600" />
-                <h2 className="text-lg font-semibold text-gray-900">{getTitle()}</h2>
+                <h2 className="text-lg font-semibold text-heading">{getTitle()}</h2>
               </div>
               <Button variant="secondary" onClick={onClose}
-                className="p-1.5 rounded-full hover:bg-gray-100 transition-colors">
-                <XMarkIcon className="w-5 h-5 text-gray-500" />
+                className="p-1.5 rounded-full hover:bg-surface-alt transition-colors">
+                <XMarkIcon className="w-5 h-5 text-muted" />
               </Button>
             </div>
 
             {/* Content - Scrollable */}
             <form onSubmit={handleSubmit} className="p-4 space-y-4 overflow-y-auto flex-1">
               {entityName && (
-                <div className="p-2 bg-gray-50 rounded-lg">
-                  <p className="text-xs text-gray-500">{locale === 'en' ? 'Reporting:' : 'Raporlanan:'}</p>
-                  <p className="text-sm font-medium text-gray-900 truncate">{entityName}</p>
+                <div className="p-2 bg-surface rounded-lg">
+                  <p className="text-xs text-muted">{locale === 'en' ? 'Reporting:' : 'Raporlanan:'}</p>
+                  <p className="text-sm font-medium text-heading truncate">{entityName}</p>
                 </div>
               )}
 
               {/* Reason Selection - Compact */}
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
+                <label className="block text-sm font-medium text-body mb-2">
                   {locale === 'en' ? 'Reason' : 'Neden'} <span className="text-danger-500">*</span>
                 </label>
                 <div className="space-y-1.5">
@@ -161,7 +161,7 @@ export default function ReportModal({
                       className={`flex items-center p-2.5 rounded-lg border cursor-pointer transition-all text-sm ${
                         selectedReason === reason.value
                           ? 'border-danger-500 bg-danger-50'
-                          : 'border-gray-200 hover:border-gray-300'
+                          : 'border-border hover:border-border'
                       }`}
                     >
                       <Radio name="reportReason"
@@ -169,7 +169,7 @@ export default function ReportModal({
                         checked={selectedReason === reason.value}
                         onChange={(e) => setSelectedReason(e.target.value as ReportReason)}
                         className="w-3.5 h-3.5 text-danger-600 focus:ring-danger-500" />
-                      <span className="ml-2 text-gray-700">
+                      <span className="ml-2 text-body">
                         {locale === 'en' ? reason.labelEn : reason.labelTr}
                       </span>
                     </label>
@@ -179,7 +179,7 @@ export default function ReportModal({
 
               {/* Description - Compact */}
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1.5">
+                <label className="block text-sm font-medium text-body mb-1.5">
                   {locale === 'en' ? 'Details (optional, min 10 chars)' : 'Detaylar (isteğe bağlı, min 10 karakter)'}
                 </label>
                 <Textarea value={description}
@@ -188,7 +188,7 @@ export default function ReportModal({
                   rows={2}
                   maxLength={500}
                   className="focus:ring-danger-500 focus:border-danger-500 resize-none" />
-                <p className="text-xs text-gray-400 mt-0.5 text-right">{description.length}/500</p>
+                <p className="text-xs text-subtle mt-0.5 text-right">{description.length}/500</p>
               </div>
 
               {/* Actions - Compact */}
@@ -214,7 +214,7 @@ export default function ReportModal({
               </div>
 
               {/* Info - Compact */}
-              <p className="text-xs text-gray-400 text-center">
+              <p className="text-xs text-subtle text-center">
                 {locale === 'en' 
                   ? 'Reports are reviewed within 24-48 hours.'
                   : 'Raporlar 24-48 saat içinde incelenir.'

@@ -67,13 +67,13 @@ export default function RefundsPage() {
       <div className="space-y-6">
         <div className="flex items-center justify-between">
           <div>
-            <h1 className="text-2xl font-bold text-gray-900">İade Geçmişi</h1>
-            <p className="text-gray-500">Tamamlanmış iadeler</p>
+            <h1 className="text-2xl font-bold text-heading">İade Geçmişi</h1>
+            <p className="text-muted">Tamamlanmış iadeler</p>
           </div>
           <Button
             variant="secondary"
             onClick={loadRefunds}
-            className="p-2 text-gray-500 hover:text-gray-900"
+            className="p-2 text-muted hover:text-heading"
           >
             <ArrowPathIcon className="h-5 w-5" />
           </Button>
@@ -81,7 +81,7 @@ export default function RefundsPage() {
 
         <div className="flex flex-col sm:flex-row gap-4">
           <div className="relative flex-1">
-            <MagnifyingGlassIcon className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-gray-500" />
+            <MagnifyingGlassIcon className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-muted" />
             <Input
               type="text"
               placeholder="Alıcı veya satıcı ara..."
@@ -127,7 +127,7 @@ export default function RefundsPage() {
                   </tr>
                 ) : refunds.length === 0 ? (
                   <tr>
-                    <td colSpan={7} className="text-center py-8 text-gray-500">
+                    <td colSpan={7} className="text-center py-8 text-muted">
                       İade bulunamadı
                     </td>
                   </tr>
@@ -144,24 +144,24 @@ export default function RefundsPage() {
                         {r.order?.buyer ? (
                           <Link
                             href={`/users/${r.order.buyer.id}`}
-                            className="text-gray-900 hover:text-primary-400"
+                            className="text-heading hover:text-primary-400"
                           >
                             {r.order.buyer.displayName}
                           </Link>
                         ) : (
-                          <span className="text-gray-500">-</span>
+                          <span className="text-muted">-</span>
                         )}
                       </td>
                       <td>
                         {r.order?.seller ? (
                           <Link
                             href={`/users/${r.order.seller.id}`}
-                            className="text-gray-900 hover:text-primary-400"
+                            className="text-heading hover:text-primary-400"
                           >
                             {r.order.seller.displayName}
                           </Link>
                         ) : (
-                          <span className="text-gray-500">-</span>
+                          <span className="text-muted">-</span>
                         )}
                       </td>
                       <td className="max-w-[200px] truncate">
@@ -174,7 +174,7 @@ export default function RefundsPage() {
                         {r.order && (
                           <Link
                             href={`/orders/${r.order.id}`}
-                            className="p-2 text-gray-500 hover:text-gray-900 inline-block"
+                            className="p-2 text-muted hover:text-heading inline-block"
                           >
                             <EyeIcon className="h-5 w-5" />
                           </Link>
@@ -189,7 +189,7 @@ export default function RefundsPage() {
         </div>
 
         <div className="flex items-center justify-between">
-          <p className="text-sm text-gray-500">Toplam {total} iade</p>
+          <p className="text-sm text-muted">Toplam {total} iade</p>
           <div className="flex gap-2">
             <Button
               variant="secondary"

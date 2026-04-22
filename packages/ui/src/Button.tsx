@@ -8,14 +8,14 @@ const buttonVariants = cva(
   {
     variants: {
       variant: {
-        primary: 'bg-primary-600 text-white hover:bg-primary-700 focus-visible:ring-primary-600',
-        secondary: 'bg-gray-100 text-gray-900 hover:bg-gray-200 focus-visible:ring-gray-400',
-        outline: 'border border-gray-300 bg-transparent hover:bg-gray-50 focus-visible:ring-gray-400',
-        ghost: 'hover:bg-gray-100 hover:text-gray-900',
-        danger: 'bg-danger-600 text-white hover:bg-danger-700 focus-visible:ring-danger-600',
-        success: 'bg-success-600 text-white hover:bg-success-700 focus-visible:ring-success-600',
+        primary: 'bg-primary-600 text-inverted hover:bg-primary-700 focus-visible:ring-primary-600',
+        secondary: 'bg-surface-alt text-heading hover:bg-border-subtle focus-visible:ring-subtle',
+        outline: 'border border-border bg-transparent hover:bg-surface focus-visible:ring-subtle',
+        ghost: 'hover:bg-surface-alt hover:text-heading',
+        danger: 'bg-danger-600 text-inverted hover:bg-danger-700 focus-visible:ring-danger-600',
+        success: 'bg-success-600 text-inverted hover:bg-success-700 focus-visible:ring-success-600',
         link: 'text-primary-600 underline-offset-4 hover:underline p-0 h-auto',
-        nav: 'bg-transparent text-white/90 hover:text-white hover:bg-white/10 focus-visible:ring-white/60 aria-expanded:bg-white/10 aria-expanded:text-white data-[state=open]:bg-white/10 data-[state=open]:text-white',
+        nav: 'bg-transparent text-inverted/90 hover:text-inverted hover:bg-surface-elevated/10 focus-visible:ring-inverted/60 aria-expanded:bg-surface-elevated/10 aria-expanded:text-inverted data-[state=open]:bg-surface-elevated/10 data-[state=open]:text-inverted',
       },
       size: {
         sm: 'h-8 px-3 text-sm',

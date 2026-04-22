@@ -142,7 +142,7 @@ export default function ProductCard({
           />
           <div className="absolute top-3 left-3 flex flex-col items-start gap-1.5">
             {(product.viewCount ?? 0) > 0 && (
-              <div className="flex items-center gap-1 bg-white/90 backdrop-blur-sm px-2 py-1 rounded shadow-soft">
+              <div className="flex items-center gap-1 bg-surface-elevated/90 backdrop-blur-sm px-2 py-1 rounded shadow-soft">
                 <svg className="w-3.5 h-3.5 text-info-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
@@ -152,13 +152,13 @@ export default function ProductCard({
             )}
             {product.isPreorder && (
               <Badge variant="preorder">
-                <span className="w-1.5 h-1.5 bg-white rounded-sm animate-pulse" />
+                <span className="w-1.5 h-1.5 bg-surface-elevated rounded-sm animate-pulse" />
                 {locale === 'en' ? 'PRE-ORDER' : 'ON SIPARIS'}
               </Badge>
             )}
             {product.isLimited && (
               <Badge variant="limited">
-                <StarIcon className="w-3 h-3 text-white" />
+                <StarIcon className="w-3 h-3 text-inverted" />
                 {locale === 'en' ? 'LIMITED' : 'LIMITED'}
               </Badge>
             )}

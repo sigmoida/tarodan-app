@@ -320,10 +320,10 @@ export default function CommissionPage() {
       {/* Header */}
       <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
         <div>
-          <h1 className="text-2xl font-bold text-gray-900">
+          <h1 className="text-2xl font-bold text-heading">
             Komisyon Yönetimi
           </h1>
-          <p className="text-gray-500 mt-1">
+          <p className="text-muted mt-1">
             Platform komisyon oranlarını yönetin
           </p>
         </div>
@@ -339,7 +339,7 @@ export default function CommissionPage() {
           <ExclamationTriangleIcon className="h-5 w-5 text-info-700 flex-shrink-0 mt-0.5" />
           <div>
             <h4 className="text-info-700 font-medium">Komisyon Hesaplama</h4>
-            <p className="text-gray-500 text-sm mt-1">
+            <p className="text-muted text-sm mt-1">
               Komisyon kuralları eşleşme sırasına göre değerlendirilir. Bir
               sipariş için ilk eşleşen kural uygulanır. Eşleşme sırası: Kategori
               + Satıcı Tipi &gt; Kategori + Tümü &gt; Satıcı Tipi &gt;
@@ -374,59 +374,59 @@ export default function CommissionPage() {
       <div className="admin-card overflow-hidden">
         <div className="overflow-x-auto">
           <table className="w-full">
-            <thead className="bg-gray-100">
+            <thead className="bg-surface-alt">
               <tr>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                <th className="px-6 py-3 text-left text-xs font-medium text-muted uppercase tracking-wider">
                   Kural Adı
                 </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                <th className="px-6 py-3 text-left text-xs font-medium text-muted uppercase tracking-wider">
                   Kategori
                 </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                <th className="px-6 py-3 text-left text-xs font-medium text-muted uppercase tracking-wider">
                   Satıcı Tipi
                 </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                <th className="px-6 py-3 text-left text-xs font-medium text-muted uppercase tracking-wider">
                   Uygulanan
                 </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                <th className="px-6 py-3 text-left text-xs font-medium text-muted uppercase tracking-wider">
                   Satıcı Oranı
                 </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                <th className="px-6 py-3 text-left text-xs font-medium text-muted uppercase tracking-wider">
                   Alıcı Oranı
                 </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                <th className="px-6 py-3 text-left text-xs font-medium text-muted uppercase tracking-wider">
                   Durum
                 </th>
-                <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
+                <th className="px-6 py-3 text-right text-xs font-medium text-muted uppercase tracking-wider">
                   İşlemler
                 </th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-gray-200">
+            <tbody className="divide-y divide-border">
               {rules.length === 0 ? (
                 <tr>
                   <td
                     colSpan={8}
-                    className="px-6 py-12 text-center text-gray-500"
+                    className="px-6 py-12 text-center text-muted"
                   >
                     Henüz komisyon kuralı eklenmemiş
                   </td>
                 </tr>
               ) : (
                 rules.map((rule) => (
-                  <tr key={rule.id} className="hover:bg-gray-100/50">
+                  <tr key={rule.id} className="hover:bg-surface-alt/50">
                     <td className="px-6 py-4 whitespace-nowrap">
-                      <span className="text-gray-900 font-medium">
+                      <span className="text-heading font-medium">
                         {rule.name}
                       </span>
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap">
-                      <span className="text-gray-600">
+                      <span className="text-muted">
                         {rule.categoryName || "Tümü"}
                       </span>
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap">
-                      <span className="text-gray-600">
+                      <span className="text-muted">
                         {SELLER_TYPES.find((t) => t.value === rule.sellerType)
                           ?.label ||
                           rule.sellerType ||
@@ -434,7 +434,7 @@ export default function CommissionPage() {
                       </span>
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap">
-                      <span className="text-gray-600">
+                      <span className="text-muted">
                         {APPLIES_TO_OPTIONS.find(
                           (t) => t.value === rule.appliesTo,
                         )?.label || rule.appliesTo}
@@ -461,7 +461,7 @@ export default function CommissionPage() {
                         className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
                           rule.isActive
                             ? "bg-success-50 text-success-700 border border-success-700"
-                            : "bg-gray-50/50 text-gray-500 border border-gray-200"
+                            : "bg-surface/50 text-muted border border-border"
                         }`}
                       >
                         {rule.isActive ? "Aktif" : "Pasif"}
@@ -471,7 +471,7 @@ export default function CommissionPage() {
                       <Button
                         variant="secondary"
                         onClick={() => openEditModal(rule)}
-                        className="text-gray-500 hover:text-gray-900 p-2"
+                        className="text-muted hover:text-heading p-2"
                         title="Düzenle"
                       >
                         <PencilIcon className="h-5 w-5" />
@@ -479,7 +479,7 @@ export default function CommissionPage() {
                       <Button
                         variant="secondary"
                         onClick={() => setDeleteConfirm(rule.id)}
-                        className="text-gray-500 hover:text-danger-600 p-2"
+                        className="text-muted hover:text-danger-600 p-2"
                         title="Sil"
                       >
                         <TrashIcon className="h-5 w-5" />
@@ -495,16 +495,16 @@ export default function CommissionPage() {
 
       {/* Create/Edit Modal */}
       {showModal && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4 overflow-y-auto">
-          <div className="bg-white rounded-lg w-full max-w-2xl my-8">
-            <div className="flex items-center justify-between p-6 border-b border-gray-200">
-              <h2 className="text-lg font-semibold text-gray-900">
+        <div className="fixed inset-0 bg-heading/50 flex items-center justify-center z-50 p-4 overflow-y-auto">
+          <div className="bg-surface-elevated rounded-lg w-full max-w-2xl my-8">
+            <div className="flex items-center justify-between p-6 border-b border-border">
+              <h2 className="text-lg font-semibold text-heading">
                 {editingRule ? "Kuralı Düzenle" : "Yeni Kural Ekle"}
               </h2>
               <Button
                 variant="secondary"
                 onClick={() => setShowModal(false)}
-                className="text-gray-500 hover:text-gray-900"
+                className="text-muted hover:text-heading"
               >
                 <XMarkIcon className="h-6 w-6" />
               </Button>
@@ -515,7 +515,7 @@ export default function CommissionPage() {
               className="p-6 space-y-4 max-h-[calc(100vh-200px)] overflow-y-auto"
             >
               <div>
-                <label className="block text-sm font-medium text-gray-500 mb-1">
+                <label className="block text-sm font-medium text-muted mb-1">
                   Kural Adı *
                 </label>
                 <Input
@@ -524,14 +524,14 @@ export default function CommissionPage() {
                   onChange={(e) =>
                     setFormData({ ...formData, name: e.target.value })
                   }
-                  className="bg-gray-100 px-4 text-gray-900"
+                  className="bg-surface-alt px-4 text-heading"
                   required
                 />
               </div>
 
               <div className="grid grid-cols-2 gap-4">
                 <div>
-                  <label className="block text-sm font-medium text-gray-500 mb-1">
+                  <label className="block text-sm font-medium text-muted mb-1">
                     Kategori
                   </label>
                   <Select
@@ -539,7 +539,7 @@ export default function CommissionPage() {
                     onChange={(e) =>
                       setFormData({ ...formData, categoryId: e.target.value })
                     }
-                    className="bg-gray-100"
+                    className="bg-surface-alt"
                   >
                     <option value="">Tüm Kategoriler</option>
                     {categories.map((cat) => (
@@ -551,7 +551,7 @@ export default function CommissionPage() {
                 </div>
 
                 <div>
-                  <label className="block text-sm font-medium text-gray-500 mb-1">
+                  <label className="block text-sm font-medium text-muted mb-1">
                     Satıcı Tipi *
                   </label>
                   <Select
@@ -562,7 +562,7 @@ export default function CommissionPage() {
                         sellerType: e.target.value as any,
                       })
                     }
-                    className="bg-gray-100"
+                    className="bg-surface-alt"
                     required
                   >
                     {SELLER_TYPES.map((type) => (
@@ -575,7 +575,7 @@ export default function CommissionPage() {
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-gray-500 mb-1">
+                <label className="block text-sm font-medium text-muted mb-1">
                   Komisyon Uygulanan *
                 </label>
                 <RadioGroup
@@ -593,12 +593,12 @@ export default function CommissionPage() {
               {(formData.appliesTo === "SELLER" ||
                 formData.appliesTo === "BOTH") && (
                 <div className="p-4 space-y-4">
-                  <h3 className="text-sm font-medium text-gray-600">
+                  <h3 className="text-sm font-medium text-muted">
                     Satıcı Komisyonu
                   </h3>
                   <div className="grid grid-cols-2 gap-4">
                     <div>
-                      <label className="block text-sm font-medium text-gray-500 mb-1">
+                      <label className="block text-sm font-medium text-muted mb-1">
                         Satıcı Oranı (%) *
                       </label>
                       <Input
@@ -613,7 +613,7 @@ export default function CommissionPage() {
                             sellerRate: e.target.value,
                           })
                         }
-                        className="bg-gray-100 px-4 text-gray-900"
+                        className="bg-surface-alt px-4 text-heading"
                         required={
                           formData.appliesTo === "SELLER" ||
                           formData.appliesTo === "BOTH"
@@ -623,7 +623,7 @@ export default function CommissionPage() {
                   </div>
                   <div className="grid grid-cols-2 gap-4">
                     <div>
-                      <label className="block text-sm font-medium text-gray-500 mb-1">
+                      <label className="block text-sm font-medium text-muted mb-1">
                         Satıcı Minimum (₺)
                       </label>
                       <Input
@@ -637,12 +637,12 @@ export default function CommissionPage() {
                             sellerMin: e.target.value,
                           })
                         }
-                        className="bg-gray-100 px-4 text-gray-900"
+                        className="bg-surface-alt px-4 text-heading"
                         placeholder="Opsiyonel"
                       />
                     </div>
                     <div>
-                      <label className="block text-sm font-medium text-gray-500 mb-1">
+                      <label className="block text-sm font-medium text-muted mb-1">
                         Satıcı Maksimum (₺)
                       </label>
                       <Input
@@ -656,7 +656,7 @@ export default function CommissionPage() {
                             sellerMax: e.target.value,
                           })
                         }
-                        className="bg-gray-100 px-4 text-gray-900"
+                        className="bg-surface-alt px-4 text-heading"
                         placeholder="Opsiyonel"
                       />
                     </div>
@@ -668,11 +668,11 @@ export default function CommissionPage() {
               {(formData.appliesTo === "BUYER" ||
                 formData.appliesTo === "BOTH") && (
                 <div className="p-4 space-y-4">
-                  <h3 className="text-sm font-medium text-gray-600">
+                  <h3 className="text-sm font-medium text-muted">
                     Alıcı Komisyonu
                   </h3>
                   <div>
-                    <label className="block text-sm font-medium text-gray-500 mb-1">
+                    <label className="block text-sm font-medium text-muted mb-1">
                       Alıcı Oranı (%) *
                     </label>
                     <Input
@@ -684,7 +684,7 @@ export default function CommissionPage() {
                       onChange={(e) =>
                         setFormData({ ...formData, buyerRate: e.target.value })
                       }
-                      className="bg-gray-100 px-4 text-gray-900"
+                      className="bg-surface-alt px-4 text-heading"
                       required={
                         formData.appliesTo === "BUYER" ||
                         formData.appliesTo === "BOTH"
@@ -693,7 +693,7 @@ export default function CommissionPage() {
                   </div>
                   <div className="grid grid-cols-2 gap-4">
                     <div>
-                      <label className="block text-sm font-medium text-gray-500 mb-1">
+                      <label className="block text-sm font-medium text-muted mb-1">
                         Alıcı Minimum (₺)
                       </label>
                       <Input
@@ -704,12 +704,12 @@ export default function CommissionPage() {
                         onChange={(e) =>
                           setFormData({ ...formData, buyerMin: e.target.value })
                         }
-                        className="bg-gray-100 px-4 text-gray-900"
+                        className="bg-surface-alt px-4 text-heading"
                         placeholder="Opsiyonel"
                       />
                     </div>
                     <div>
-                      <label className="block text-sm font-medium text-gray-500 mb-1">
+                      <label className="block text-sm font-medium text-muted mb-1">
                         Alıcı Maksimum (₺)
                       </label>
                       <Input
@@ -720,7 +720,7 @@ export default function CommissionPage() {
                         onChange={(e) =>
                           setFormData({ ...formData, buyerMax: e.target.value })
                         }
-                        className="bg-gray-100 px-4 text-gray-900"
+                        className="bg-surface-alt px-4 text-heading"
                         placeholder="Opsiyonel"
                       />
                     </div>
@@ -730,11 +730,11 @@ export default function CommissionPage() {
 
               {/* Preview Calculator */}
               <div className="p-4 space-y-4">
-                <h3 className="text-sm font-medium text-gray-600">
+                <h3 className="text-sm font-medium text-muted">
                   Önizleme Hesaplayıcı
                 </h3>
                 <div>
-                  <label className="block text-sm font-medium text-gray-500 mb-1">
+                  <label className="block text-sm font-medium text-muted mb-1">
                     Örnek Ürün Fiyatı (₺)
                   </label>
                   <Input
@@ -743,26 +743,26 @@ export default function CommissionPage() {
                     min="0"
                     value={previewPrice}
                     onChange={(e) => setPreviewPrice(e.target.value)}
-                    className="bg-gray-100 px-4 text-gray-900"
+                    className="bg-surface-alt px-4 text-heading"
                     placeholder="1000"
                   />
                 </div>
                 {preview && (
-                  <div className="bg-gray-100 rounded-lg p-4 space-y-2">
+                  <div className="bg-surface-alt rounded-lg p-4 space-y-2">
                     <div className="flex justify-between text-sm">
-                      <span className="text-gray-500">Satıcı Komisyonu:</span>
-                      <span className="text-gray-900 font-medium">
+                      <span className="text-muted">Satıcı Komisyonu:</span>
+                      <span className="text-heading font-medium">
                         ₺{preview.sellerFee.toFixed(2)}
                       </span>
                     </div>
                     <div className="flex justify-between text-sm">
-                      <span className="text-gray-500">Alıcı Komisyonu:</span>
-                      <span className="text-gray-900 font-medium">
+                      <span className="text-muted">Alıcı Komisyonu:</span>
+                      <span className="text-heading font-medium">
                         ₺{preview.buyerFee.toFixed(2)}
                       </span>
                     </div>
                     <div className="border-t pt-2 justify-between">
-                      <span className="text-gray-600 font-medium">
+                      <span className="text-muted font-medium">
                         Toplam Komisyon:
                       </span>
                       <span className="text-primary-400 font-bold">
@@ -781,12 +781,12 @@ export default function CommissionPage() {
                     setFormData({ ...formData, isActive: e.target.checked })
                   }
                 />
-                <label htmlFor="isActive" className="text-sm text-gray-500">
+                <label htmlFor="isActive" className="text-sm text-muted">
                   Kural aktif
                 </label>
               </div>
 
-              <div className="flex justify-end gap-3 pt-4 border-t border-gray-200">
+              <div className="flex justify-end gap-3 pt-4 border-t border-border">
                 <Button
                   variant="secondary"
                   type="button"
@@ -805,13 +805,13 @@ export default function CommissionPage() {
 
       {/* Delete Confirmation Modal */}
       {deleteConfirm && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-lg w-full max-w-sm p-6">
+        <div className="fixed inset-0 bg-heading/50 flex items-center justify-center z-50 p-4">
+          <div className="bg-surface-elevated rounded-lg w-full max-w-sm p-6">
             <div className="flex items-center gap-3 text-danger-600 mb-4">
               <ExclamationTriangleIcon className="h-6 w-6" />
               <h3 className="text-lg font-semibold">Kuralı Sil</h3>
             </div>
-            <p className="text-gray-500 mb-6">
+            <p className="text-muted mb-6">
               Bu komisyon kuralını silmek istediğinizden emin misiniz? Bu işlem
               geri alınamaz.
             </p>

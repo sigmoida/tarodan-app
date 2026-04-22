@@ -187,13 +187,13 @@ export default function EditProfilePage() {
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-gray-50 via-white to-primary-50">
+    <div className="min-h-screen bg-gradient-to-br from-surface via-surface-elevated to-primary-50">
       {/* Header */}
-      <div className="bg-gradient-to-r from-primary-500 to-warning-500 text-white">
+      <div className="bg-gradient-to-r from-primary-500 to-warning-500 text-inverted">
         <div className="max-w-4xl mx-auto px-4 py-8">
           <Link
             href="/profile"
-            className="inline-flex items-center gap-2 text-white/80 hover:text-white mb-4 transition-colors group"
+            className="inline-flex items-center gap-2 text-inverted/80 hover:text-inverted mb-4 transition-colors group"
           >
             <ArrowLeftIcon className="w-5 h-5 group-hover:-translate-x-1 transition-transform" />
             <span className="font-medium">{locale === 'en' ? 'Back to Profile' : 'Profile Dön'}</span>
@@ -202,7 +202,7 @@ export default function EditProfilePage() {
           <div className="flex items-center gap-6">
             {/* Profile Photo */}
             <div className="relative">
-              <div className="w-28 h-28 rounded-2xl overflow-hidden bg-white/20 border-4 border-white/30 shadow-lg">
+              <div className="w-28 h-28 rounded-2xl overflow-hidden bg-surface-elevated/20 border-4 border-surface-elevated/30 shadow-lg">
                 {profilePhoto ? (
                   <OptimizedImage
                     src={profilePhoto}
@@ -213,14 +213,14 @@ export default function EditProfilePage() {
                   />
                 ) : (
                   <div className="w-full h-full flex items-center justify-center p-2">
-                    <UserAvatar displayName={user?.displayName} avatarUrl={user?.avatarUrl} size="xl" className="!w-full !h-full !text-4xl text-white/90 bg-white/20" />
+                    <UserAvatar displayName={user?.displayName} avatarUrl={user?.avatarUrl} size="xl" className="!w-full !h-full !text-4xl text-inverted/90 bg-surface-elevated/20" />
                   </div>
                 )}
               </div>
               <Button variant="secondary" type="button"
                 onClick={() => fileInputRef.current?.click()}
                 disabled={uploadingPhoto}
-                className="absolute -bottom-2 -right-2 w-10 h-10 bg-white text-primary-500 hover:bg-primary-50 rounded-xl shadow-lg flex items-center justify-center transition-all disabled:opacity-50">
+                className="absolute -bottom-2 -right-2 w-10 h-10 bg-surface-elevated text-primary-500 hover:bg-primary-50 rounded-xl shadow-lg flex items-center justify-center transition-all disabled:opacity-50">
                 {uploadingPhoto ? (
                   <Spinner size="sm" color="border-primary-500 border-t-transparent" />
                 ) : (
@@ -238,7 +238,7 @@ export default function EditProfilePage() {
               <h1 className="text-2xl md:text-3xl font-bold">
                 {locale === 'en' ? 'Edit Profile' : 'Profili Düzenle'}
               </h1>
-              <p className="text-white/80 mt-1">
+              <p className="text-inverted/80 mt-1">
                 {locale === 'en' ? 'Update your personal information' : 'Kişisel bilgilerinizi güncelleyin'}
               </p>
             </div>
@@ -255,9 +255,9 @@ export default function EditProfilePage() {
           className="space-y-6"
         >
           {/* Personal Information Card */}
-          <div className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
-            <div className="px-6 py-4 border-b border-gray-100 bg-gray-50/50">
-              <h2 className="text-lg font-semibold text-gray-900 flex items-center gap-2">
+          <div className="bg-surface-elevated rounded-2xl shadow-sm border border-border-subtle overflow-hidden">
+            <div className="px-6 py-4 border-b border-border-subtle bg-surface/50">
+              <h2 className="text-lg font-semibold text-heading flex items-center gap-2">
                 <UserIcon className="w-5 h-5 text-primary-500" />
                 {locale === 'en' ? 'Personal Information' : 'Kişisel Bilgiler'}
               </h2>
@@ -266,16 +266,16 @@ export default function EditProfilePage() {
             <div className="p-6 space-y-5">
               {/* Display Name */}
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
+                <label className="block text-sm font-medium text-body mb-2">
                   {locale === 'en' ? 'Display Name' : 'Görünen İsim'} <span className="text-danger-500">*</span>
                 </label>
                 <div className="relative">
-                  <UserIcon className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
+                  <UserIcon className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-subtle" />
                   <Input
                     type="text"
                     value={formData.displayName}
                     onChange={(e) => setFormData({ ...formData, displayName: e.target.value })}
-                    className="pl-12 pr-4 h-12 rounded-xl border-gray-200 transition-all"
+                    className="pl-12 pr-4 h-12 rounded-xl border-border transition-all"
                     placeholder={locale === 'en' ? 'Your name' : 'Adınız'}
                     required
                   />
@@ -284,19 +284,19 @@ export default function EditProfilePage() {
 
               {/* Email */}
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
+                <label className="block text-sm font-medium text-body mb-2">
                   {locale === 'en' ? 'Email Address' : 'E-posta Adresi'}
                 </label>
                 <div className="relative">
-                  <EnvelopeIcon className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
+                  <EnvelopeIcon className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-subtle" />
                   <Input
                     type="email"
                     value={formData.email}
-                    className="pl-12 pr-4 h-12 rounded-xl border-gray-200 bg-gray-50 text-gray-500 cursor-not-allowed"
+                    className="pl-12 pr-4 h-12 rounded-xl border-border bg-surface text-muted cursor-not-allowed"
                     disabled
                   />
                 </div>
-                <p className="text-xs text-gray-500 mt-1.5 flex items-center gap-1">
+                <p className="text-xs text-muted mt-1.5 flex items-center gap-1">
                   <span>🔒</span>
                   {locale === 'en' ? 'Contact support to change email' : 'E-posta değişikliği için destek ile iletişime geçin'}
                 </p>
@@ -305,33 +305,33 @@ export default function EditProfilePage() {
               {/* Phone and Birth Date */}
               <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                  <label className="block text-sm font-medium text-body mb-2">
                     {locale === 'en' ? 'Phone Number' : 'Telefon Numarası'}
                   </label>
                   <div className="relative">
-                    <PhoneIcon className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
+                    <PhoneIcon className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-subtle" />
                     <Input
                       type="tel"
                       value={formData.phone}
                       onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
-                      className="pl-12 pr-4 h-12 rounded-xl border-gray-200 transition-all"
+                      className="pl-12 pr-4 h-12 rounded-xl border-border transition-all"
                       placeholder="+90 555 123 4567"
                     />
                   </div>
                 </div>
 
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                  <label className="block text-sm font-medium text-body mb-2">
                     {locale === 'en' ? 'Birth Date' : 'Doğum Tarihi'}
                   </label>
                   <div className="relative">
-                    <CalendarIcon className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
+                    <CalendarIcon className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-subtle" />
                     <Input
                       type="date"
                       value={formData.birthDate}
                       onChange={(e) => setFormData({ ...formData, birthDate: e.target.value })}
                       max={new Date(new Date().setFullYear(new Date().getFullYear() - 18)).toISOString().split('T')[0]}
-                      className="pl-12 pr-4 h-12 rounded-xl border-gray-200 transition-all"
+                      className="pl-12 pr-4 h-12 rounded-xl border-border transition-all"
                     />
                   </div>
                 </div>
@@ -339,29 +339,29 @@ export default function EditProfilePage() {
 
               {/* Bio */}
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
+                <label className="block text-sm font-medium text-body mb-2">
                   {locale === 'en' ? 'About Me' : 'Hakkımda'}
                 </label>
                 <div className="relative">
-                  <PencilSquareIcon className="absolute left-4 top-4 w-5 h-5 text-gray-400" />
+                  <PencilSquareIcon className="absolute left-4 top-4 w-5 h-5 text-subtle" />
                   <Textarea value={formData.bio}
                     onChange={(e) => setFormData({ ...formData, bio: e.target.value })}
-                    className="pl-12 pr-4 py-3 border-gray-200 rounded-xl transition-all resize-none"
+                    className="pl-12 pr-4 py-3 border-border rounded-xl transition-all resize-none"
                     rows={4}
                     placeholder={locale === 'en' ? 'Tell us about yourself and your collection...' : 'Kendiniz ve koleksiyonunuz hakkında bilgi verin...'}
                     maxLength={500} />
                 </div>
-                <p className="text-xs text-gray-400 mt-1 text-right">{formData.bio.length}/500</p>
+                <p className="text-xs text-subtle mt-1 text-right">{formData.bio.length}/500</p>
               </div>
             </div>
           </div>
 
           {/* Business Information Card - Only visible for business tier users */}
           {isBusinessTier && (
-          <div className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
-            <div className="px-6 py-4 border-b border-gray-100 bg-gray-50/50">
+          <div className="bg-surface-elevated rounded-2xl shadow-sm border border-border-subtle overflow-hidden">
+            <div className="px-6 py-4 border-b border-border-subtle bg-surface/50">
               <div className="flex items-center justify-between">
-                <h2 className="text-lg font-semibold text-gray-900 flex items-center gap-2">
+                <h2 className="text-lg font-semibold text-heading flex items-center gap-2">
                   <BuildingOfficeIcon className="w-5 h-5 text-primary-500" />
                   {locale === 'en' ? 'Business Information' : 'İşletme Bilgileri'}
                 </h2>
@@ -374,17 +374,17 @@ export default function EditProfilePage() {
             <div className="p-6 space-y-5">
               {/* Company Name */}
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
+                <label className="block text-sm font-medium text-body mb-2">
                   {locale === 'en' ? 'Company Name' : 'Şirket / Ticari Unvan'}
                   <span className="text-danger-500"> *</span>
                 </label>
                 <div className="relative">
-                  <BuildingOfficeIcon className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
+                  <BuildingOfficeIcon className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-subtle" />
                   <Input
                     type="text"
                     value={formData.companyName}
                     onChange={(e) => setFormData({ ...formData, companyName: e.target.value })}
-                    className="pl-12 pr-4 h-12 rounded-xl border-gray-200 transition-all"
+                    className="pl-12 pr-4 h-12 rounded-xl border-border transition-all"
                     placeholder="ABC Ltd. Şti."
                     required
                   />
@@ -399,16 +399,16 @@ export default function EditProfilePage() {
               {/* Tax Info */}
               <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                  <label className="block text-sm font-medium text-body mb-2">
                     {locale === 'en' ? 'Tax ID' : 'Vergi Kimlik No'}
                   </label>
                   <div className="relative">
-                    <IdentificationIcon className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
+                    <IdentificationIcon className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-subtle" />
                     <Input
                       type="text"
                       value={formData.taxId}
                       onChange={(e) => setFormData({ ...formData, taxId: e.target.value.replace(/\D/g, '').slice(0, 11) })}
-                      className="pl-12 pr-4 h-12 rounded-xl border-gray-200 transition-all"
+                      className="pl-12 pr-4 h-12 rounded-xl border-border transition-all"
                       placeholder="1234567890"
                       maxLength={11}
                     />
@@ -416,14 +416,14 @@ export default function EditProfilePage() {
                 </div>
 
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                  <label className="block text-sm font-medium text-body mb-2">
                     {locale === 'en' ? 'Tax Office' : 'Vergi Dairesi'}
                   </label>
                   <Input
                     type="text"
                     value={formData.taxOffice}
                     onChange={(e) => setFormData({ ...formData, taxOffice: e.target.value })}
-                    className="h-12 px-4 rounded-xl border-gray-200 transition-all"
+                    className="h-12 px-4 rounded-xl border-border transition-all"
                     placeholder="Kadıköy VD"
                   />
                 </div>
@@ -444,15 +444,15 @@ export default function EditProfilePage() {
           <div className="flex flex-col-reverse sm:flex-row gap-3 pt-4">
             <Button variant="secondary" type="button"
               onClick={() => router.back()}
-              className="flex-1 px-6 py-3.5 bg-gray-100 hover:bg-gray-200 text-gray-700 font-medium rounded-xl transition-colors">
+              className="flex-1 px-6 py-3.5 bg-surface-alt hover:bg-border-subtle text-body font-medium rounded-xl transition-colors">
               {locale === 'en' ? 'Cancel' : 'İptal'}
             </Button>
             <Button variant="secondary" type="submit"
               disabled={loading}
-              className="flex-1 px-6 py-3.5 bg-gradient-to-r from-primary-500 to-warning-500 hover:from-primary-600 hover:to-warning-600 text-white font-semibold rounded-xl transition-all shadow-lg shadow-primary-500/25 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2">
+              className="flex-1 px-6 py-3.5 bg-gradient-to-r from-primary-500 to-warning-500 hover:from-primary-600 hover:to-warning-600 text-inverted font-semibold rounded-xl transition-all shadow-lg shadow-primary-500/25 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2">
               {loading ? (
                 <>
-                  <Spinner size="sm" color="border-white border-t-transparent" />
+                  <Spinner size="sm" color="border-surface-elevated border-t-transparent" />
                   {locale === 'en' ? 'Saving...' : 'Kaydediliyor...'}
                 </>
               ) : saved ? (
@@ -470,7 +470,7 @@ export default function EditProfilePage() {
           <div className="text-center pt-4">
             <Link
               href="/profile/settings"
-              className="text-sm text-gray-500 hover:text-primary-600 transition-colors"
+              className="text-sm text-muted hover:text-primary-600 transition-colors"
             >
               {locale === 'en' ? 'Looking for account settings?' : 'Hesap ayarlarını mı arıyorsunuz?'}{' '}
               <span className="underline">{locale === 'en' ? 'Click here' : 'Tıklayın'}</span>

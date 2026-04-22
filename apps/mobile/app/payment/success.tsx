@@ -57,6 +57,12 @@ export default function PaymentSuccessScreen() {
         router.replace('/membership/success');
         return;
       }
+
+      // Takas nakit farkı ödemesi: siparişlere değil, takas detayına dön.
+      if (data?.tradeId) {
+        router.replace({ pathname: '/trade/[id]', params: { id: data.tradeId, paid: '1' } } as any);
+        return;
+      }
     } catch (error) {
       console.error('Payment details fetch error:', error);
     } finally {

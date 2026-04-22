@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import { adminApi } from '@/lib/api';
-import { Button, Checkbox, Input, Spinner, Textarea } from '@tarodan/ui';
+import { Button, Checkbox, Input, Spinner, Textarea, colors } from '@tarodan/ui';
 import { PlusIcon, PencilIcon, TrashIcon, TagIcon } from '@heroicons/react/24/outline';
 import toast from 'react-hot-toast';
 
@@ -17,13 +17,14 @@ interface Tag {
 }
 
 export default function TagsPage() {
+    const defaultTagColor = colors.primary[500];
     const [tags, setTags] = useState<Tag[]>([]);
     const [loading, setLoading] = useState(true);
     const [showModal, setShowModal] = useState(false);
     const [editingTag, setEditingTag] = useState<Tag | null>(null);
     const [deleteConfirm, setDeleteConfirm] = useState<string | null>(null);
     const [search, setSearch] = useState('');
-    const [formData, setFormData] = useState({ name: '', description: '', color: '#6366f1', isActive: true });
+    const [formData, setFormData] = useState({ name: '', description: '', color: defaultTagColor, isActive: true });
 
     useEffect(() => { loadTags(); }, [search]);
 
@@ -37,8 +38,8 @@ export default function TagsPage() {
         } finally { setLoading(false); }
     };
 
-    const openCreate = () => { setEditingTag(null); setFormData({ name: '', description: '', color: '#6366f1', isActive: true }); setShowModal(true); };
-    const openEdit = (t: Tag) => { setEditingTag(t); setFormData({ name: t.name, description: t.description || '', color: t.color || '#6366f1', isActive: t.isActive }); setShowModal(true); };
+    const openCreate = () => { setEditingTag(null); setFormData({ name: '', description: '', color: defaultTagColor, isActive: true }); setShowModal(true); };
+    const openEdit = (t: Tag) => { setEditingTag(t); setFormData({ name: t.name, description: t.description || '', color: t.color || defaultTagColor, isActive: t.isActive }); setShowModal(true); };
 
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
@@ -58,36 +59,36 @@ export default function TagsPage() {
         <>
             <div className="space-y-6">
                 <div className="flex items-center justify-between">
-                    <div><h1 className="text-2xl font-bold text-gray-900">Etiketler</h1><p className="text-gray-500">Ürün etiketlerini yönetin</p></div>
+                    <div><h1 className="text-2xl font-bold text-heading">Etiketler</h1><p className="text-muted">Ürün etiketlerini yönetin</p></div>
                     <Button variant="primary" size="md" onClick={openCreate}><PlusIcon className="w-5 h-5" />Yeni Etiket</Button>
                 </div>
                 <div className="admin-card p-4"><Input type="text" placeholder="Etiket ara..." value={search} onChange={(e) => setSearch(e.target.value)} className="max-w-md" /></div>
                 <div className="admin-card p-6">
                     {loading ? (<div className="text-center py-12"><Spinner size="lg" className="mx-auto" /></div>)
-                        : tags.length === 0 ? (<div className="text-center py-12 text-gray-500">Etiket yok</div>)
+                        : tags.length === 0 ? (<div className="text-center py-12 text-muted">Etiket yok</div>)
                             : (<div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
-                                {tags.map((t) => (<div key={t.id} className="p-4 rounded-lg border border-gray-200 hover:border-gray-400">
+                                {tags.map((t) => (<div key={t.id} className="p-4 rounded-lg border border-border hover:border-border-strong">
                                     <div className="flex items-center justify-between">
-                                        <div className="flex items-center gap-2"><div className="w-4 h-4 rounded-full" style={{ backgroundColor: t.color || '#6366f1' }}></div><span className="font-medium text-gray-900">{t.name}</span></div>
-                                        <div className="flex gap-1"><Button variant="secondary" onClick={() => openEdit(t)} className="p-1 text-gray-500 hover:text-gray-900"><PencilIcon className="h-4 w-4" /></Button><Button variant="secondary" onClick={() => setDeleteConfirm(t.id)} className="p-1 text-danger-600 hover:text-danger-300" disabled={t.usageCount > 0}><TrashIcon className="h-4 w-4" /></Button></div>
+                                        <div className="flex items-center gap-2"><div className="w-4 h-4 rounded-full" style={{ backgroundColor: t.color || defaultTagColor }}></div><span className="font-medium text-heading">{t.name}</span></div>
+                                        <div className="flex gap-1"><Button variant="secondary" onClick={() => openEdit(t)} className="p-1 text-muted hover:text-heading"><PencilIcon className="h-4 w-4" /></Button><Button variant="secondary" onClick={() => setDeleteConfirm(t.id)} className="p-1 text-danger-600 hover:text-danger-300" disabled={t.usageCount > 0}><TrashIcon className="h-4 w-4" /></Button></div>
                                     </div>
-                                    <div className="mt-2 flex items-center gap-2"><TagIcon className="h-4 w-4 text-gray-500" /><span className="text-sm text-gray-500">{t.usageCount} ürün</span>{!t.isActive && <span className="px-2 text-xs bg-gray-700 text-gray-500 rounded">Pasif</span>}</div>
+                                    <div className="mt-2 flex items-center gap-2"><TagIcon className="h-4 w-4 text-muted" /><span className="text-sm text-muted">{t.usageCount} ürün</span>{!t.isActive && <span className="px-2 text-xs bg-body text-muted rounded">Pasif</span>}</div>
                                 </div>))}
                             </div>)}
                 </div>
             </div>
-            {showModal && (<div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50"><div className="bg-white rounded-xl p-6 max-w-md w-full mx-4 border border-gray-200">
-                <h2 className="text-xl font-semibold text-gray-900 mb-4">{editingTag ? 'Düzenle' : 'Yeni Etiket'}</h2>
+            {showModal && (<div className="fixed inset-0 bg-heading bg-opacity-50 flex items-center justify-center z-50"><div className="bg-surface-elevated rounded-xl p-6 max-w-md w-full mx-4 border border-border">
+                <h2 className="text-xl font-semibold text-heading mb-4">{editingTag ? 'Düzenle' : 'Yeni Etiket'}</h2>
                 <form onSubmit={handleSubmit} className="space-y-4">
-                    <div><label className="block text-sm text-gray-600 mb-2">Ad *</label><Input type="text" value={formData.name} onChange={(e) => setFormData({ ...formData, name: e.target.value })} required /></div>
-                    <div><label className="block text-sm text-gray-600 mb-2">Açıklama</label><Textarea value={formData.description} onChange={(e) => setFormData({ ...formData, description: e.target.value })} rows={2} /></div>
-                    <div><label className="block text-sm text-gray-600 mb-2">Renk</label><Input type="color" value={formData.color} onChange={(e) => setFormData({ ...formData, color: e.target.value })} className="w-10 h-10 rounded" /></div>
+                    <div><label className="block text-sm text-muted mb-2">Ad *</label><Input type="text" value={formData.name} onChange={(e) => setFormData({ ...formData, name: e.target.value })} required /></div>
+                    <div><label className="block text-sm text-muted mb-2">Açıklama</label><Textarea value={formData.description} onChange={(e) => setFormData({ ...formData, description: e.target.value })} rows={2} /></div>
+                    <div><label className="block text-sm text-muted mb-2">Renk</label><Input type="color" value={formData.color} onChange={(e) => setFormData({ ...formData, color: e.target.value })} className="w-10 h-10 rounded" /></div>
                     <Checkbox checked={formData.isActive} onChange={(e) => setFormData({ ...formData, isActive: e.target.checked })} label="Aktif" />
                     <div className="flex gap-3 pt-4"><Button variant="secondary" size="md" type="button" onClick={() => setShowModal(false)} className="flex-1">İptal</Button><Button variant="primary" size="md" type="submit" className="flex-1">{editingTag ? 'Güncelle' : 'Oluştur'}</Button></div>
                 </form>
             </div></div>)}
-            {deleteConfirm && (<div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50"><div className="bg-white rounded-xl p-6 max-w-md w-full mx-4 border border-gray-200">
-                <h3 className="text-lg font-semibold text-gray-900 mb-4">Etiketi Sil</h3><p className="text-gray-500 mb-6">Bu etiketi silmek istediğinizden emin misiniz?</p>
+            {deleteConfirm && (<div className="fixed inset-0 bg-heading bg-opacity-50 flex items-center justify-center z-50"><div className="bg-surface-elevated rounded-xl p-6 max-w-md w-full mx-4 border border-border">
+                <h3 className="text-lg font-semibold text-heading mb-4">Etiketi Sil</h3><p className="text-muted mb-6">Bu etiketi silmek istediğinizden emin misiniz?</p>
                 <div className="flex gap-3"><Button variant="secondary" size="md" onClick={() => setDeleteConfirm(null)} className="flex-1">İptal</Button><Button variant="danger" size="md" onClick={() => handleDelete(deleteConfirm)} className="flex-1">Sil</Button></div>
             </div></div>)}
         </>

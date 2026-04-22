@@ -166,9 +166,9 @@ export default function FavoritesPage() {
     !isSharedView && (!mounted || authLoading || !isAuthenticated);
   if (showPlaceholder) {
     return (
-      <div className="min-h-screen bg-gray-50 text-gray-900 flex flex-col">
+      <div className="min-h-screen bg-surface text-heading flex flex-col">
         <div className="flex-1 flex items-center justify-center py-24">
-          <div className="animate-pulse text-gray-500 text-sm">
+          <div className="animate-pulse text-muted text-sm">
             {locale === "en" ? "Loading..." : "Yükleniyor..."}
           </div>
         </div>
@@ -178,13 +178,13 @@ export default function FavoritesPage() {
 
   if (isLoading) {
     return (
-      <div className="min-h-screen bg-gray-50">
+      <div className="min-h-screen bg-surface">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
           <div className="animate-pulse space-y-6">
-            <div className="h-8 bg-gray-200 rounded w-1/3" />
+            <div className="h-8 bg-border-subtle rounded w-1/3" />
             <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3 sm:gap-4">
               {[...Array(8)].map((_, i) => (
-                <div key={i} className="h-40 sm:h-64 bg-gray-200 rounded" />
+                <div key={i} className="h-40 sm:h-64 bg-border-subtle rounded" />
               ))}
             </div>
           </div>
@@ -194,7 +194,7 @@ export default function FavoritesPage() {
   }
 
   return (
-    <div className="min-h-screen bg-gray-50">
+    <div className="min-h-screen bg-surface">
       <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         <div className="flex items-center justify-between mb-8 flex-wrap gap-4">
           <div>
@@ -203,7 +203,7 @@ export default function FavoritesPage() {
                 ? t("favorites.sharedList")
                 : t("favorites.myFavorites")}
             </h1>
-            <p className="text-gray-600">
+            <p className="text-muted">
               {items.length} {t("favorites.itemsInFavorites")}
             </p>
           </div>
@@ -218,7 +218,7 @@ export default function FavoritesPage() {
                   () => toast.error(t("common.operationFailed")),
                 );
               }}
-              className="inline-flex items-center gap-2 px-4 py-2.5 bg-gray-100 hover:bg-gray-200 text-gray-700 font-medium rounded-xl transition-colors"
+              className="inline-flex items-center gap-2 px-4 py-2.5 bg-surface-alt hover:bg-border-subtle text-body font-medium rounded-xl transition-colors"
             >
               <ShareIcon className="w-5 h-5" />
               {t("favorites.shareList")}
@@ -227,12 +227,12 @@ export default function FavoritesPage() {
         </div>
 
         {items.length === 0 ? (
-          <div className="text-center py-16 bg-white rounded-xl">
-            <HeartIcon className="w-16 h-16 text-gray-300 mx-auto mb-4" />
-            <p className="text-gray-600 text-lg mb-4">{t("favorites.empty")}</p>
+          <div className="text-center py-16 bg-surface-elevated rounded-xl">
+            <HeartIcon className="w-16 h-16 text-border-strong mx-auto mb-4" />
+            <p className="text-muted text-lg mb-4">{t("favorites.empty")}</p>
             <Link
               href="/listings"
-              className="inline-block px-6 py-3 bg-primary-500 text-white rounded-xl hover:bg-primary-600"
+              className="inline-block px-6 py-3 bg-primary-500 text-inverted rounded-xl hover:bg-primary-600"
             >
               {t("favorites.browseProducts")}
             </Link>
@@ -246,10 +246,10 @@ export default function FavoritesPage() {
                   initial={{ opacity: 0, y: 20 }}
                   animate={{ opacity: 1, y: 0 }}
                   transition={{ delay: index * 0.05 }}
-                  className="bg-white rounded-xl overflow-hidden shadow-sm hover:shadow-md transition-shadow"
+                  className="bg-surface-elevated rounded-xl overflow-hidden shadow-sm hover:shadow-md transition-shadow"
                 >
                   <Link href={`/listings/${item.productId}`}>
-                    <div className="relative aspect-square bg-gray-100">
+                    <div className="relative aspect-square bg-surface-alt">
                       <OptimizedImage
                         src={getImageUrl(item.productImage)}
                         alt={item.productTitle || "Product"}
@@ -265,7 +265,7 @@ export default function FavoritesPage() {
                             e.preventDefault();
                             handleRemove(item.productId);
                           }}
-                          className="absolute top-1.5 right-1.5 sm:top-2 sm:right-2 p-1.5 sm:p-2 bg-white rounded-full shadow-md hover:bg-danger-50 transition-colors z-10"
+                          className="absolute top-1.5 right-1.5 sm:top-2 sm:right-2 p-1.5 sm:p-2 bg-surface-elevated rounded-full shadow-md hover:bg-danger-50 transition-colors z-10"
                           title={t("favorites.removeFromFavorites")}
                         >
                           <TrashIcon className="w-4 h-4 sm:w-5 sm:h-5 text-danger-500" />
@@ -275,7 +275,7 @@ export default function FavoritesPage() {
                   </Link>
                   <div className="p-2.5 sm:p-4">
                     <Link href={`/listings/${item.productId}`}>
-                      <h3 className="font-semibold text-gray-900 line-clamp-2 mb-1.5 sm:mb-2 text-xs sm:text-sm hover:text-primary-500">
+                      <h3 className="font-semibold text-heading line-clamp-2 mb-1.5 sm:mb-2 text-xs sm:text-sm hover:text-primary-500">
                         {item.productTitle || "Product"}
                       </h3>
                     </Link>
@@ -284,7 +284,7 @@ export default function FavoritesPage() {
                         {item.productOriginalPrice &&
                           item.productOriginalPrice > item.productPrice && (
                             <div className="flex items-center gap-1 sm:gap-2">
-                              <span className="text-[10px] sm:text-sm text-gray-400 line-through">
+                              <span className="text-[10px] sm:text-sm text-subtle line-through">
                                 {Number(
                                   item.productOriginalPrice,
                                 ).toLocaleString("tr-TR", {
@@ -293,7 +293,7 @@ export default function FavoritesPage() {
                                 })}{" "}
                                 TL
                               </span>
-                              <span className="text-[10px] sm:text-xs font-semibold text-white bg-danger-500 px-1 sm:px-1.5 py-0.5 rounded">
+                              <span className="text-[10px] sm:text-xs font-semibold text-inverted bg-danger-500 px-1 sm:px-1.5 py-0.5 rounded">
                                 %
                                 {Math.round(
                                   ((item.productOriginalPrice -
@@ -316,7 +316,7 @@ export default function FavoritesPage() {
                         </p>
                       </div>
                       {item.productCondition && (
-                        <span className="text-[10px] sm:text-xs text-gray-500 bg-gray-100 px-1.5 sm:px-2 py-0.5 sm:py-1 rounded hidden sm:inline">
+                        <span className="text-[10px] sm:text-xs text-muted bg-surface-alt px-1.5 sm:px-2 py-0.5 sm:py-1 rounded hidden sm:inline">
                           {formatCondition(item.productCondition, locale)}
                         </span>
                       )}

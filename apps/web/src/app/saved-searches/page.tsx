@@ -99,12 +99,12 @@ export default function SavedSearchesPage() {
   }
   if (isLoading) {
     return (
-      <div className="min-h-screen bg-gray-50 py-8">
+      <div className="min-h-screen bg-surface py-8">
         <div className="max-w-4xl mx-auto px-4">
           <div className="animate-pulse space-y-4">
-            <div className="h-8 bg-gray-200 rounded w-1/3" />
+            <div className="h-8 bg-border-subtle rounded w-1/3" />
             {[...Array(3)].map((_, i) => (
-              <div key={i} className="h-24 bg-gray-200 rounded-xl" />
+              <div key={i} className="h-24 bg-border-subtle rounded-xl" />
             ))}
           </div>
         </div>
@@ -113,27 +113,27 @@ export default function SavedSearchesPage() {
   }
 
   return (
-    <div className="min-h-screen bg-gray-50 py-8">
+    <div className="min-h-screen bg-surface py-8">
       <div className="max-w-4xl mx-auto px-4">
         {/* Header */}
         <div className="mb-8">
           <Link
             href="/profile"
-            className="inline-flex items-center gap-2 text-gray-600 hover:text-gray-900 mb-4"
+            className="inline-flex items-center gap-2 text-muted hover:text-heading mb-4"
           >
             <ArrowLeftIcon className="w-5 h-5" />
             Profile Dön
           </Link>
           <div className="flex items-center justify-between">
-            <h1 className="text-3xl font-bold text-gray-900 flex items-center gap-3">
+            <h1 className="text-3xl font-bold text-heading flex items-center gap-3">
               <MagnifyingGlassIcon className="w-8 h-8 text-primary-500" />
               Kayıtlı Aramalarım
             </h1>
-            <span className="text-sm text-gray-500">
+            <span className="text-sm text-muted">
               {savedSearches.length} / {searchLimit} arama
             </span>
           </div>
-          <p className="text-gray-600 mt-2">
+          <p className="text-muted mt-2">
             Kayıtlı aramalarınızı buradan yönetebilir, bildirim tercihlerini değiştirebilirsiniz.
           </p>
         </div>
@@ -147,17 +147,17 @@ export default function SavedSearchesPage() {
 
         {/* Searches List */}
         {savedSearches.length === 0 ? (
-          <div className="bg-white rounded-xl p-12 text-center border border-gray-200">
-            <MagnifyingGlassIcon className="w-16 h-16 mx-auto text-gray-300 mb-4" />
-            <h2 className="text-xl font-semibold text-gray-900 mb-2">
+          <div className="bg-surface-elevated rounded-xl p-12 text-center border border-border">
+            <MagnifyingGlassIcon className="w-16 h-16 mx-auto text-border-strong mb-4" />
+            <h2 className="text-xl font-semibold text-heading mb-2">
               Kayıtlı Arama Yok
             </h2>
-            <p className="text-gray-600 mb-6">
+            <p className="text-muted mb-6">
               Henüz kayıtlı aramanız bulunmuyor. İlanları ararken "Bu aramayı kaydet" butonunu kullanın.
             </p>
             <Link
               href="/listings"
-              className="inline-flex items-center gap-2 px-6 py-3 bg-primary-500 hover:bg-primary-600 text-white rounded-xl font-medium transition-colors"
+              className="inline-flex items-center gap-2 px-6 py-3 bg-primary-500 hover:bg-primary-600 text-inverted rounded-xl font-medium transition-colors"
             >
               <MagnifyingGlassIcon className="w-5 h-5" />
               İlan Ara
@@ -168,38 +168,38 @@ export default function SavedSearchesPage() {
             {savedSearches.map((search) => (
               <div
                 key={search.id}
-                className="bg-white rounded-xl p-6 border border-gray-200 hover:border-gray-300 transition-colors"
+                className="bg-surface-elevated rounded-xl p-6 border border-border hover:border-border transition-colors"
               >
                 <div className="flex items-start justify-between">
                   <div className="flex-1">
-                    <h3 className="font-semibold text-gray-900 text-lg mb-2">
+                    <h3 className="font-semibold text-heading text-lg mb-2">
                       "{search.query || 'Tüm ilanlar'}"
                     </h3>
                     {search.filters && Object.keys(search.filters).length > 0 && (
                       <div className="flex flex-wrap gap-2 mb-3">
                         {search.filters.category && (
-                          <span className="px-2 py-1 bg-gray-100 text-gray-700 text-sm rounded">
+                          <span className="px-2 py-1 bg-surface-alt text-body text-sm rounded">
                             Kategori: {search.filters.category}
                           </span>
                         )}
                         {search.filters.brand && (
-                          <span className="px-2 py-1 bg-gray-100 text-gray-700 text-sm rounded">
+                          <span className="px-2 py-1 bg-surface-alt text-body text-sm rounded">
                             Marka: {search.filters.brand}
                           </span>
                         )}
                         {(search.filters.minPrice || search.filters.maxPrice) && (
-                          <span className="px-2 py-1 bg-gray-100 text-gray-700 text-sm rounded">
+                          <span className="px-2 py-1 bg-surface-alt text-body text-sm rounded">
                             Fiyat: {search.filters.minPrice || 0}₺ - {search.filters.maxPrice || '∞'}₺
                           </span>
                         )}
                         {search.filters.condition && (
-                          <span className="px-2 py-1 bg-gray-100 text-gray-700 text-sm rounded">
+                          <span className="px-2 py-1 bg-surface-alt text-body text-sm rounded">
                             Durum: {search.filters.condition}
                           </span>
                         )}
                       </div>
                     )}
-                    <p className="text-sm text-gray-500">
+                    <p className="text-sm text-muted">
                       Kaydedildi: {new Date(search.createdAt).toLocaleDateString('tr-TR')}
                     </p>
                   </div>
@@ -209,7 +209,7 @@ export default function SavedSearchesPage() {
                       className={`p-2 rounded-lg transition-colors ${
                         search.notifyEnabled
                           ? 'bg-primary-100 text-primary-600'
-                          : 'bg-gray-100 text-gray-500 hover:bg-gray-200'
+                          : 'bg-surface-alt text-muted hover:bg-border-subtle'
                       }`}
                       title={search.notifyEnabled ? 'Bildirimleri kapat' : 'Bildirimleri aç'}>
                       <BellIcon className="w-5 h-5" />
@@ -222,9 +222,9 @@ export default function SavedSearchesPage() {
                   </div>
                 </div>
 
-                <div className="mt-4 pt-4 border-t border-gray-100">
+                <div className="mt-4 pt-4 border-t border-border-subtle">
                   <Button variant="secondary" onClick={() => handleRunSearch(search)}
-                    className="w-full py-2 bg-primary-500 hover:bg-primary-600 text-white rounded-lg font-medium transition-colors flex items-center justify-center gap-2">
+                    className="w-full py-2 bg-primary-500 hover:bg-primary-600 text-inverted rounded-lg font-medium transition-colors flex items-center justify-center gap-2">
                     <MagnifyingGlassIcon className="w-5 h-5" />
                     Bu Aramayı Çalıştır
                   </Button>

@@ -127,32 +127,32 @@ export default function CityDistrictSelector({
             setCityOpen(!cityOpen);
             setDistrictOpen(false);
           }}
-          className={`w-full px-4 py-3 text-left bg-white border rounded-xl flex items-center justify-between transition-all ${
-            cityOpen ? 'border-primary-500 ring-2 ring-primary-100' : 'border-gray-200 hover:border-gray-300'
-          } ${!city ? 'text-gray-400' : 'text-gray-900'}`}>
+          className={`w-full px-4 py-3 text-left bg-surface-elevated border rounded-xl flex items-center justify-between transition-all ${
+            cityOpen ? 'border-primary-500 ring-2 ring-primary-100' : 'border-border hover:border-border'
+          } ${!city ? 'text-subtle' : 'text-heading'}`}>
           <span className="truncate">{city || cityPlaceholder || t('common.selectCity')}</span>
-          <ChevronDownIcon className={`w-5 h-5 text-gray-400 transition-transform ${cityOpen ? 'rotate-180' : ''}`} />
+          <ChevronDownIcon className={`w-5 h-5 text-subtle transition-transform ${cityOpen ? 'rotate-180' : ''}`} />
         </Button>
 
         {cityOpen && (
           <div 
-            className="absolute z-[9999] w-full mt-1 bg-white border border-gray-200 rounded-xl shadow-xl overflow-hidden" 
+            className="absolute z-[9999] w-full mt-1 bg-surface-elevated border border-border rounded-xl shadow-xl overflow-hidden" 
             style={{ maxHeight: '280px' }}
             onClick={(e) => e.stopPropagation()}
           >
-            <div className="p-2 border-b border-gray-100 bg-white sticky top-0">
+            <div className="p-2 border-b border-border-subtle bg-surface-elevated sticky top-0">
               <Input type="text"
                 value={citySearch}
                 onChange={(e) => setCitySearch(e.target.value)}
                 placeholder={t('common.searchCity')}
-                className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:border-primary-500"
+                className="w-full px-3 py-2 text-sm border border-border rounded-lg focus:outline-none focus:border-primary-500"
                 autoFocus
                 onClick={(e) => e.stopPropagation()}
                 onMouseDown={(e) => e.stopPropagation()} />
             </div>
             <ul className="overflow-y-auto" style={{ maxHeight: '220px' }}>
               {filteredCities.length === 0 ? (
-                <li className="px-4 py-3 text-sm text-gray-500 text-center">{t('common.noResults')}</li>
+                <li className="px-4 py-3 text-sm text-muted text-center">{t('common.noResults')}</li>
               ) : (
                 filteredCities.map((c) => (
                   <li
@@ -172,7 +172,7 @@ export default function CityDistrictSelector({
                       e.stopPropagation();
                     }}
                     className={`px-4 py-2.5 text-sm cursor-pointer hover:bg-primary-50 select-none ${
-                      c === city ? 'bg-primary-100 text-primary-700 font-medium' : 'text-gray-700'
+                      c === city ? 'bg-primary-100 text-primary-700 font-medium' : 'text-body'
                     }`}
                   >
                     {c}
@@ -197,32 +197,32 @@ export default function CityDistrictSelector({
             setCityOpen(false);
           }}
           disabled={!city}
-          className={`w-full px-4 py-3 text-left bg-white border rounded-xl flex items-center justify-between transition-all ${
-            districtOpen ? 'border-primary-500 ring-2 ring-primary-100' : 'border-gray-200 hover:border-gray-300'
-          } ${!district ? 'text-gray-400' : 'text-gray-900'} ${!city ? 'opacity-50 cursor-not-allowed' : ''}`}>
+          className={`w-full px-4 py-3 text-left bg-surface-elevated border rounded-xl flex items-center justify-between transition-all ${
+            districtOpen ? 'border-primary-500 ring-2 ring-primary-100' : 'border-border hover:border-border'
+          } ${!district ? 'text-subtle' : 'text-heading'} ${!city ? 'opacity-50 cursor-not-allowed' : ''}`}>
           <span className="truncate">{district || districtPlaceholder || t('common.selectDistrict')}</span>
-          <ChevronDownIcon className={`w-5 h-5 text-gray-400 transition-transform ${districtOpen ? 'rotate-180' : ''}`} />
+          <ChevronDownIcon className={`w-5 h-5 text-subtle transition-transform ${districtOpen ? 'rotate-180' : ''}`} />
         </Button>
 
         {districtOpen && city && (
           <div 
-            className="absolute z-[9999] w-full mt-1 bg-white border border-gray-200 rounded-xl shadow-xl overflow-hidden" 
+            className="absolute z-[9999] w-full mt-1 bg-surface-elevated border border-border rounded-xl shadow-xl overflow-hidden" 
             style={{ maxHeight: '280px' }}
             onClick={(e) => e.stopPropagation()}
           >
-            <div className="p-2 border-b border-gray-100 bg-white sticky top-0">
+            <div className="p-2 border-b border-border-subtle bg-surface-elevated sticky top-0">
               <Input type="text"
                 value={districtSearch}
                 onChange={(e) => setDistrictSearch(e.target.value)}
                 placeholder={t('common.searchDistrict')}
-                className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:border-primary-500"
+                className="w-full px-3 py-2 text-sm border border-border rounded-lg focus:outline-none focus:border-primary-500"
                 autoFocus
                 onClick={(e) => e.stopPropagation()}
                 onMouseDown={(e) => e.stopPropagation()} />
             </div>
             <ul className="overflow-y-auto" style={{ maxHeight: '220px' }}>
               {filteredDistricts.length === 0 ? (
-                <li className="px-4 py-3 text-sm text-gray-500 text-center">{t('common.noResults')}</li>
+                <li className="px-4 py-3 text-sm text-muted text-center">{t('common.noResults')}</li>
               ) : (
                 filteredDistricts.map((d) => (
                   <li
@@ -236,7 +236,7 @@ export default function CityDistrictSelector({
                       e.stopPropagation();
                     }}
                     className={`px-4 py-2.5 text-sm cursor-pointer hover:bg-primary-50 select-none ${
-                      d === district ? 'bg-primary-100 text-primary-700 font-medium' : 'text-gray-700'
+                      d === district ? 'bg-primary-100 text-primary-700 font-medium' : 'text-body'
                     }`}
                   >
                     {d}

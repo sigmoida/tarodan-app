@@ -253,9 +253,9 @@ function OffersPageContent() {
   const showPlaceholder = !mounted || !isAuthenticated;
   if (showPlaceholder) {
     return (
-      <div className="min-h-screen bg-gray-50 text-gray-900 flex flex-col">
+      <div className="min-h-screen bg-surface text-heading flex flex-col">
         <div className="flex-1 flex items-center justify-center py-24">
-          <div className="animate-pulse text-gray-500 text-sm">
+          <div className="animate-pulse text-muted text-sm">
             {locale === 'en' ? 'Loading...' : 'Yükleniyor...'}
           </div>
         </div>
@@ -264,23 +264,23 @@ function OffersPageContent() {
   }
 
   return (
-    <div className="min-h-screen bg-gray-50">
+    <div className="min-h-screen bg-surface">
       {/* Header */}
-      <div className="bg-white border-b border-gray-200">
+      <div className="bg-surface-elevated border-b border-border">
         <div className="mx-auto px-6 sm:px-8 lg:px-12 xl:px-16 py-5">
           <div className="flex items-center justify-between">
             <div>
-              <h1 className="flex items-center gap-2 text-xl font-semibold text-gray-900">
+              <h1 className="flex items-center gap-2 text-xl font-semibold text-heading">
                 <span className="w-1 h-6 bg-primary-500 rounded-sm" />
                 {locale === 'en' ? 'My Offers' : 'Tekliflerim'}
               </h1>
-              <p className="text-sm text-gray-500 mt-1">
+              <p className="text-sm text-muted mt-1">
                 {locale === 'en' ? 'Manage your offers and negotiations' : 'Tekliflerinizi ve pazarlıklarınızı yönetin'}
               </p>
             </div>
             <Link
               href="/profile"
-              className="flex items-center gap-2 text-sm font-medium text-gray-600 hover:text-gray-900 transition-colors"
+              className="flex items-center gap-2 text-sm font-medium text-muted hover:text-heading transition-colors"
             >
               <ArrowLeftIcon className="w-5 h-5" />
               {locale === 'en' ? 'Back to Profile' : 'Profile Dön'}
@@ -288,26 +288,26 @@ function OffersPageContent() {
           </div>
 
           {/* Stats Row */}
-          <div className="mt-4 flex flex-wrap gap-4 bg-white rounded border border-gray-200 p-4">
+          <div className="mt-4 flex flex-wrap gap-4 bg-surface-elevated rounded border border-border p-4">
             <div className="flex items-center gap-3">
               <ClockIcon className="w-5 h-5 text-warning-500" />
               <div>
-                <p className="text-lg font-semibold text-gray-900">{pendingCount}</p>
-                <p className="text-xs text-gray-500">{locale === 'en' ? 'Pending' : 'Bekleyen'}</p>
+                <p className="text-lg font-semibold text-heading">{pendingCount}</p>
+                <p className="text-xs text-muted">{locale === 'en' ? 'Pending' : 'Bekleyen'}</p>
               </div>
             </div>
             <div className="flex items-center gap-3">
               <CheckCircleIcon className="w-5 h-5 text-success-500" />
               <div>
-                <p className="text-lg font-semibold text-gray-900">{acceptedCount}</p>
-                <p className="text-xs text-gray-500">{locale === 'en' ? 'Accepted' : 'Kabul Edilen'}</p>
+                <p className="text-lg font-semibold text-heading">{acceptedCount}</p>
+                <p className="text-xs text-muted">{locale === 'en' ? 'Accepted' : 'Kabul Edilen'}</p>
               </div>
             </div>
             <div className="flex items-center gap-3">
               <TagIcon className="w-5 h-5 text-primary-500" />
               <div>
-                <p className="text-lg font-semibold text-gray-900">₺{totalValue.toLocaleString('tr-TR')}</p>
-                <p className="text-xs text-gray-500">{locale === 'en' ? 'Total Value' : 'Toplam Değer'}</p>
+                <p className="text-lg font-semibold text-heading">₺{totalValue.toLocaleString('tr-TR')}</p>
+                <p className="text-xs text-muted">{locale === 'en' ? 'Total Value' : 'Toplam Değer'}</p>
               </div>
             </div>
           </div>
@@ -317,12 +317,12 @@ function OffersPageContent() {
       {/* Main Content */}
       <div className="mx-auto px-6 sm:px-8 lg:px-12 xl:px-16 py-6">
         {/* Tabs */}
-        <div className="bg-gray-100 rounded p-0.5 mb-6 inline-flex">
+        <div className="bg-surface-alt rounded p-0.5 mb-6 inline-flex">
           <Button variant="secondary" onClick={() => switchTab('received')}
             className={`flex items-center gap-2 px-6 py-3 rounded text-sm font-medium transition-all ${
               activeTab === 'received'
-                ? 'bg-white text-gray-900 shadow-sm'
-                : 'text-gray-600 hover:text-gray-900'
+                ? 'bg-surface-elevated text-heading shadow-sm'
+                : 'text-muted hover:text-heading'
             }`}>
             <InboxArrowDownIcon className="w-5 h-5" />
             {locale === 'en' ? 'Received' : 'Gelen Teklifler'}
@@ -330,8 +330,8 @@ function OffersPageContent() {
           <Button variant="secondary" onClick={() => switchTab('sent')}
             className={`flex items-center gap-2 px-6 py-3 rounded text-sm font-medium transition-all ${
               activeTab === 'sent'
-                ? 'bg-white text-gray-900 shadow-sm'
-                : 'text-gray-600 hover:text-gray-900'
+                ? 'bg-surface-elevated text-heading shadow-sm'
+                : 'text-muted hover:text-heading'
             }`}>
             <PaperAirplaneIcon className="w-5 h-5" />
             {locale === 'en' ? 'Sent' : 'Gönderilen Teklifler'}
@@ -342,13 +342,13 @@ function OffersPageContent() {
         {loading ? (
           <div className="flex flex-col items-center justify-center py-16">
             <Spinner size="xl" color="border-primary-500 border-t-transparent" className="mb-4" />
-            <p className="text-gray-500">{locale === 'en' ? 'Loading offers...' : 'Teklifler yükleniyor...'}</p>
+            <p className="text-muted">{locale === 'en' ? 'Loading offers...' : 'Teklifler yükleniyor...'}</p>
           </div>
         ) : error ? (
           <motion.div
             initial={{ opacity: 0, scale: 0.95 }}
             animate={{ opacity: 1, scale: 1 }}
-            className="text-center py-16 bg-white rounded shadow-sm"
+            className="text-center py-16 bg-surface-elevated rounded shadow-sm"
           >
             <ExclamationCircleIcon className="w-16 h-16 text-danger-400 mx-auto mb-4" />
             <p className="text-danger-500 mb-4">{error}</p>
@@ -364,7 +364,7 @@ function OffersPageContent() {
           <motion.div
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
-            className="text-center py-16 bg-white rounded shadow-sm"
+            className="text-center py-16 bg-surface-elevated rounded shadow-sm"
           >
             <div className="w-20 h-20 bg-primary-100 rounded flex items-center justify-center mx-auto mb-4">
               {activeTab === 'received' ? (
@@ -373,19 +373,19 @@ function OffersPageContent() {
                 <PaperAirplaneIcon className="w-10 h-10 text-primary-500" />
               )}
             </div>
-            <h3 className="text-xl font-semibold text-gray-900 mb-2">
+            <h3 className="text-xl font-semibold text-heading mb-2">
               {activeTab === 'received'
                 ? (locale === 'en' ? 'No offers received yet' : 'Henüz gelen teklif yok')
                 : (locale === 'en' ? 'No offers sent yet' : 'Henüz gönderilen teklif yok')}
             </h3>
-            <p className="text-gray-500 mb-6 max-w-md mx-auto">
+            <p className="text-muted mb-6 max-w-md mx-auto">
               {activeTab === 'received'
                 ? (locale === 'en' ? 'When buyers make offers on your listings, they will appear here.' : 'Alıcılar ilanlarınıza teklif verdiğinde burada görünecek.')
                 : (locale === 'en' ? 'Start browsing listings and make your first offer!' : 'İlanlara göz atın ve ilk teklifinizi yapın!')}
             </p>
             <Link
               href="/listings"
-              className="inline-flex items-center gap-2 px-6 py-3 bg-primary-500 hover:bg-primary-600 text-white rounded text-sm font-medium transition-colors"
+              className="inline-flex items-center gap-2 px-6 py-3 bg-primary-500 hover:bg-primary-600 text-inverted rounded text-sm font-medium transition-colors"
             >
               <TagIcon className="w-5 h-5" />
               {locale === 'en' ? 'Browse Listings' : 'İlanlara Göz At'}
@@ -408,7 +408,7 @@ function OffersPageContent() {
                     animate={{ opacity: 1, y: 0 }}
                     exit={{ opacity: 0, x: -100 }}
                     transition={{ delay: index * 0.05 }}
-                    className="bg-white rounded shadow-sm overflow-hidden hover:shadow-md transition-shadow"
+                    className="bg-surface-elevated rounded shadow-sm overflow-hidden hover:shadow-md transition-shadow"
                   >
                     <div className="flex flex-col md:flex-row">
                       {/* Product Image */}
@@ -440,7 +440,7 @@ function OffersPageContent() {
                         })()}
                         {/* Discount Badge */}
                         {discount > 0 && (
-                          <div className="absolute top-3 left-3 bg-danger-500 text-white px-2 py-1 rounded text-sm font-bold flex items-center gap-1">
+                          <div className="absolute top-3 left-3 bg-danger-500 text-inverted px-2 py-1 rounded text-sm font-bold flex items-center gap-1">
                             <ArrowTrendingDownIcon className="w-4 h-4" />
                             %{discount}
                           </div>
@@ -453,11 +453,11 @@ function OffersPageContent() {
                           <div className="flex-1">
                             <Link
                               href={`/listings/${offer.product.id}`}
-                              className="text-lg font-semibold text-gray-900 hover:text-primary-500 transition-colors line-clamp-1"
+                              className="text-lg font-semibold text-heading hover:text-primary-500 transition-colors line-clamp-1"
                             >
                               {offer.product.title}
                             </Link>
-                            <p className="text-gray-500 text-sm mt-1">
+                            <p className="text-muted text-sm mt-1">
                               {locale === 'en' ? 'Listing Price:' : 'İlan Fiyatı:'} <span className="line-through">₺{listingEffectivePrice.toLocaleString('tr-TR')}</span>
                             </p>
                           </div>
@@ -470,7 +470,7 @@ function OffersPageContent() {
                               label={offerStatusLabel}
                             />
                             {offer.status === 'cancelled' && offer.cancelReason && (
-                              <p className="text-xs text-gray-500">{offer.cancelReason}</p>
+                              <p className="text-xs text-muted">{offer.cancelReason}</p>
                             )}
                           </div>
                         </div>
@@ -478,7 +478,7 @@ function OffersPageContent() {
                         {/* Offer Amount & User */}
                         <div className="flex flex-wrap items-center gap-3 sm:gap-6 mb-4">
                           <div className="bg-primary-50 border border-primary-200 rounded px-3 py-2 sm:px-4 sm:py-3">
-                            <p className="text-[10px] sm:text-xs text-gray-500 mb-0.5 sm:mb-1">{locale === 'en' ? 'Offer Amount' : 'Teklif Tutarı'}</p>
+                            <p className="text-[10px] sm:text-xs text-muted mb-0.5 sm:mb-1">{locale === 'en' ? 'Offer Amount' : 'Teklif Tutarı'}</p>
                             <p className="text-lg sm:text-2xl font-bold text-primary-600">
                               ₺{offer.amount.toLocaleString('tr-TR')}
                             </p>
@@ -497,10 +497,10 @@ function OffersPageContent() {
                                 size="sm"
                               />
                               <div>
-                                <p className="text-[10px] sm:text-xs text-gray-500">
+                                <p className="text-[10px] sm:text-xs text-muted">
                                   {activeTab === 'received' ? (locale === 'en' ? 'From' : 'Teklif Veren') : (locale === 'en' ? 'Seller' : 'Satıcı')}
                                 </p>
-                                <p className="text-sm sm:text-base font-medium text-gray-900">{otherUser.displayName}</p>
+                                <p className="text-sm sm:text-base font-medium text-heading">{otherUser.displayName}</p>
                               </div>
                             </div>
                           )}
@@ -515,15 +515,15 @@ function OffersPageContent() {
 
                         {/* Message */}
                         {offer.message && (
-                          <div className="flex items-start gap-2 bg-gray-50 rounded p-3 mb-4">
-                            <ChatBubbleLeftIcon className="w-5 h-5 text-gray-400 flex-shrink-0 mt-0.5" />
-                            <p className="text-gray-600 text-sm italic">"{offer.message}"</p>
+                          <div className="flex items-start gap-2 bg-surface rounded p-3 mb-4">
+                            <ChatBubbleLeftIcon className="w-5 h-5 text-subtle flex-shrink-0 mt-0.5" />
+                            <p className="text-muted text-sm italic">"{offer.message}"</p>
                           </div>
                         )}
 
                         {/* Footer */}
-                        <div className="flex items-center justify-between pt-3 border-t border-gray-100">
-                          <div className="flex items-center gap-2 text-gray-400 text-sm">
+                        <div className="flex items-center justify-between pt-3 border-t border-border-subtle">
+                          <div className="flex items-center gap-2 text-subtle text-sm">
                             <CalendarIcon className="w-4 h-4" />
                             {new Date(offer.createdAt).toLocaleDateString(locale === 'en' ? 'en-US' : 'tr-TR', {
                               day: 'numeric',
@@ -553,7 +553,7 @@ function OffersPageContent() {
                                     disabled={actionLoading === offer.id}
                                   >
                                     {actionLoading === offer.id ? (
-                                      <Spinner size="sm" color="border-white border-t-transparent" />
+                                      <Spinner size="sm" color="border-surface-elevated border-t-transparent" />
                                     ) : (
                                       <CheckIcon className="w-4 h-4" />
                                     )}
@@ -580,7 +580,7 @@ function OffersPageContent() {
                                     disabled={actionLoading === offer.id}
                                   >
                                     {actionLoading === offer.id ? (
-                                      <Spinner size="sm" color="border-white border-t-transparent" />
+                                      <Spinner size="sm" color="border-surface-elevated border-t-transparent" />
                                     ) : (
                                       <CheckIcon className="w-4 h-4" />
                                     )}
@@ -617,7 +617,7 @@ function OffersPageContent() {
                                   disabled={actionLoading === offer.id}
                                 >
                                   {actionLoading === offer.id ? (
-                                    <Spinner size="sm" color="border-white border-t-transparent" />
+                                    <Spinner size="sm" color="border-surface-elevated border-t-transparent" />
                                   ) : (
                                     <XMarkIcon className="w-4 h-4" />
                                   )}
@@ -636,8 +636,8 @@ function OffersPageContent() {
                                 href={offer.orderId ? `/orders/${offer.orderId}` : '/orders'}
                                 className={`flex items-center gap-2 px-4 py-2 rounded text-sm font-medium transition-colors ${
                                   showPayButton
-                                    ? 'bg-success-600 hover:bg-success-700 text-white'
-                                    : 'bg-primary-500 hover:bg-primary-600 text-white'
+                                    ? 'bg-success-600 hover:bg-success-700 text-inverted'
+                                    : 'bg-primary-500 hover:bg-primary-600 text-inverted'
                                 }`}
                               >
                                 {showPayButton
@@ -658,12 +658,12 @@ function OffersPageContent() {
       </div>
 
       {buyerCounterOpen && buyerCounterOffer && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4" role="dialog" aria-modal="true">
-          <div className="bg-white rounded-xl shadow-xl max-w-md w-full p-6">
-            <h3 className="text-lg font-semibold text-gray-900 mb-2">
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-heading/50 p-4" role="dialog" aria-modal="true">
+          <div className="bg-surface-elevated rounded-xl shadow-xl max-w-md w-full p-6">
+            <h3 className="text-lg font-semibold text-heading mb-2">
               {locale === 'en' ? 'Counter with a lower amount' : 'Daha düşük teklif'}
             </h3>
-            <p className="text-sm text-gray-600 mb-4">
+            <p className="text-sm text-muted mb-4">
               {locale === 'en' ? "Seller's counter:" : 'Satıcının karşı teklifi:'}{' '}
               <strong>₺{Number(buyerCounterOffer.amount).toLocaleString('tr-TR')}</strong>.{' '}
               {locale === 'en'
@@ -707,7 +707,7 @@ function OffersPageContent() {
 
 export default function OffersPage() {
   return (
-    <Suspense fallback={<div className="min-h-screen bg-gray-50 flex items-center justify-center"><Spinner size="lg" color="border-primary-500 border-t-transparent" /></div>}>
+    <Suspense fallback={<div className="min-h-screen bg-surface flex items-center justify-center"><Spinner size="lg" color="border-primary-500 border-t-transparent" /></div>}>
       <OffersPageContent />
     </Suspense>
   );

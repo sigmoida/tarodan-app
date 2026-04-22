@@ -7,10 +7,10 @@ const iconButtonVariants = cva(
   {
     variants: {
       variant: {
-        primary: 'bg-primary-600 text-white hover:bg-primary-700 focus-visible:ring-primary-600',
-        secondary: 'bg-gray-100 text-gray-900 hover:bg-gray-200 focus-visible:ring-gray-400',
-        outline: 'border border-gray-300 bg-transparent text-gray-700 hover:bg-gray-50 focus-visible:ring-gray-400',
-        ghost: 'text-gray-600 hover:bg-gray-100 hover:text-gray-900',
+        primary: 'bg-primary-600 text-inverted hover:bg-primary-700 focus-visible:ring-primary-600',
+        secondary: 'bg-surface-alt text-heading hover:bg-border-subtle focus-visible:ring-subtle',
+        outline: 'border border-border bg-transparent text-body hover:bg-surface focus-visible:ring-subtle',
+        ghost: 'text-muted hover:bg-surface-alt hover:text-heading',
         danger: 'text-danger-600 hover:bg-danger-50 focus-visible:ring-danger-600',
         success: 'text-success-600 hover:bg-success-50 focus-visible:ring-success-600',
       },

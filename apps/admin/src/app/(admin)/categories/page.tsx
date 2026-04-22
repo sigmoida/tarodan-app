@@ -109,22 +109,22 @@ export default function CategoriesPage() {
   };
 
   const renderCategory = (category: Category) => (
-    <div key={category.id} className="flex items-center justify-between p-4 hover:bg-gray-100/50 transition-colors border-b border-gray-200 last:border-b-0">
+    <div key={category.id} className="flex items-center justify-between p-4 hover:bg-surface-alt/50 transition-colors border-b border-border last:border-b-0">
       <div className="flex-1 min-w-0">
           <div className="flex items-center gap-2">
-            <span className="font-medium text-gray-900 truncate">{category.name}</span>
+            <span className="font-medium text-heading truncate">{category.name}</span>
             {!category.isActive && (
-              <span className="px-2 py-0.5 text-xs bg-gray-700 text-gray-500 rounded">Pasif</span>
+              <span className="px-2 py-0.5 text-xs bg-body text-muted rounded">Pasif</span>
             )}
-            <span className="text-xs text-gray-500">({category.productCount} ürün, {category.collectionCount} koleksiyon)</span>
+            <span className="text-xs text-muted">({category.productCount} ürün, {category.collectionCount} koleksiyon)</span>
           </div>
           {category.description && (
-            <p className="text-xs text-gray-500 mt-1 truncate max-w-md">{category.description}</p>
+            <p className="text-xs text-muted mt-1 truncate max-w-md">{category.description}</p>
           )}
       </div>
       <div className="flex items-center gap-2 ml-4 flex-shrink-0">
         <Button variant="secondary" onClick={() => openEditModal(category)}
-          className="p-2 text-gray-500 hover:text-gray-900 hover:bg-gray-100 rounded-lg"
+          className="p-2 text-muted hover:text-heading hover:bg-surface-alt rounded-lg"
           title="Düzenle">
           <PencilIcon className="h-5 w-5" />
         </Button>
@@ -144,8 +144,8 @@ export default function CategoriesPage() {
         {/* Header */}
         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
           <div>
-            <h1 className="text-2xl font-bold text-gray-900">Kategoriler</h1>
-            <p className="text-gray-500 mt-1">Kategori listesi ve yönetimi</p>
+            <h1 className="text-2xl font-bold text-heading">Kategoriler</h1>
+            <p className="text-muted mt-1">Kategori listesi ve yönetimi</p>
           </div>
           <Button variant="primary" size="md" onClick={openCreateModal}>
             <PlusIcon className="w-5 h-5" />
@@ -158,10 +158,10 @@ export default function CategoriesPage() {
           {loading ? (
             <div className="text-center py-12">
               <Spinner size="lg" className="mx-auto" />
-              <p className="text-gray-500 mt-4">Yükleniyor...</p>
+              <p className="text-muted mt-4">Yükleniyor...</p>
             </div>
           ) : categories.length === 0 ? (
-            <div className="text-center py-12 text-gray-500">
+            <div className="text-center py-12 text-muted">
               Henüz kategori yok
             </div>
           ) : (
@@ -174,15 +174,15 @@ export default function CategoriesPage() {
 
       {/* Create/Edit Modal */}
       {showModal && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+        <div className="fixed inset-0 bg-heading bg-opacity-50 flex items-center justify-center z-50 p-4">
           {/* Added max-h and overflow for mobile friendliness */}
-          <div className="bg-white rounded-xl p-6 max-w-md w-full border border-gray-200 max-h-[90vh] overflow-y-auto">
-            <h2 className="text-xl font-semibold text-gray-900 mb-4">
+          <div className="bg-surface-elevated rounded-xl p-6 max-w-md w-full border border-border max-h-[90vh] overflow-y-auto">
+            <h2 className="text-xl font-semibold text-heading mb-4">
               {editingCategory ? 'Kategori Düzenle' : 'Yeni Kategori'}
             </h2>
             <form onSubmit={handleSubmit} className="space-y-4">
               <div>
-                <label className="block text-sm font-medium text-gray-600 mb-2">
+                <label className="block text-sm font-medium text-muted mb-2">
                   Kategori Adı *
                 </label>
                 <Input type="text"
@@ -192,7 +192,7 @@ export default function CategoriesPage() {
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-gray-600 mb-2">
+                <label className="block text-sm font-medium text-muted mb-2">
                   Açıklama
                 </label>
                 <Textarea value={formData.description}
@@ -224,10 +224,10 @@ export default function CategoriesPage() {
 
       {/* Delete Confirm Modal */}
       {deleteConfirm && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-          <div className="bg-white rounded-xl p-6 max-w-md w-full mx-4 border border-gray-200">
-            <h3 className="text-lg font-semibold text-gray-900 mb-4">Kategoriyi Sil</h3>
-            <p className="text-gray-500 mb-6">
+        <div className="fixed inset-0 bg-heading bg-opacity-50 flex items-center justify-center z-50">
+          <div className="bg-surface-elevated rounded-xl p-6 max-w-md w-full mx-4 border border-border">
+            <h3 className="text-lg font-semibold text-heading mb-4">Kategoriyi Sil</h3>
+            <p className="text-muted mb-6">
               Bu kategoriyi silmek istediğinizden emin misiniz? Bu işlem geri alınamaz.
             </p>
             <div className="flex gap-3">

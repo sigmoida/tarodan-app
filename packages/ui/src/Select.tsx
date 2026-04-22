@@ -31,13 +31,13 @@ const sizeClasses = {
 
 const selectClasses = (error?: string, selectSize: 'sm' | 'md' | 'lg' = 'md') =>
   cn(
-    'flex w-full rounded-lg border bg-white transition-colors',
+    'flex w-full rounded-lg border bg-surface-elevated transition-colors text-body',
     sizeClasses[selectSize],
     'focus:outline-none focus:ring-2 focus:ring-offset-1',
     error
       ? 'border-danger-500 focus:border-danger-500 focus:ring-danger-200'
-      : 'border-gray-300 focus:border-primary-500 focus:ring-primary-200',
-    'disabled:cursor-not-allowed disabled:opacity-50 disabled:bg-gray-50',
+      : 'border-border focus:border-primary-500 focus:ring-primary-200',
+    'disabled:cursor-not-allowed disabled:opacity-50 disabled:bg-surface',
   );
 
 export const Select = React.forwardRef<HTMLSelectElement, SelectProps>(
@@ -103,14 +103,14 @@ export const Select = React.forwardRef<HTMLSelectElement, SelectProps>(
         {label && (
           <label
             htmlFor={selectId}
-            className="mb-1.5 block text-sm font-medium text-gray-700"
+            className="mb-1.5 block text-sm font-medium text-body"
           >
             {label}
           </label>
         )}
         {selectEl}
         {(error || helperText) && (
-          <p className={cn('mt-1 text-sm', error ? 'text-danger-600' : 'text-gray-500')}>
+          <p className={cn('mt-1 text-sm', error ? 'text-danger-600' : 'text-muted')}>
             {error || helperText}
           </p>
         )}

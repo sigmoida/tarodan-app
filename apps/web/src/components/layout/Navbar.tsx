@@ -409,11 +409,11 @@ export default function Navbar() {
         <>
           {topAds.length > 0 ? (
             <div
-              className="w-full relative flex items-center overflow-hidden border-b border-gray-700"
+              className="w-full relative flex items-center overflow-hidden border-b border-border-strong"
               style={{
                 height: isMobile ? 40 : 50,
                 maxHeight: 60,
-                backgroundColor: '#1f2937',
+                backgroundColor: 'var(--text-heading)',
               }}
               role="region"
               aria-label="Reklam alanı"
@@ -473,7 +473,7 @@ export default function Navbar() {
               </div>
               {/* Sponsorlu badge - sol üst */}
               <span
-                className="absolute left-2 top-1/2 -translate-y-1/2 z-10 text-[9px] text-gray-500 opacity-60 select-none pointer-events-none"
+                className="absolute left-2 top-1/2 -translate-y-1/2 z-10 text-[9px] text-muted opacity-60 select-none pointer-events-none"
                 aria-hidden
               >
                 Sponsorlu
@@ -512,13 +512,13 @@ export default function Navbar() {
                     onFocus={() => setShowSearchDropdown(true)}
                     onKeyDown={handleSearchKeyDown}
                     placeholder={t('nav.searchPlaceholder')}
-                    className="w-full h-10 pl-10 pr-10 bg-white/95 rounded text-sm text-gray-900 placeholder:text-gray-500 focus:outline-none focus:ring-2 focus:ring-white/50 border-0"
+                    className="w-full h-10 pl-10 pr-10 bg-surface-elevated/95 rounded text-sm text-heading placeholder:text-muted focus:outline-none focus:ring-2 focus:ring-inverted/50 border-0"
                     aria-label={t('nav.searchPlaceholder')}
                     autoComplete="off" />
                   {searchQuery && (
                     <Button variant="secondary" type="button"
                       onClick={() => { setSearchQuery(''); setDebouncedQuery(''); searchInputRef.current?.focus(); }}
-                      className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600">
+                      className="absolute right-3 top-1/2 -translate-y-1/2 text-subtle hover:text-muted">
                       <XMarkIcon className="w-4 h-4" />
                     </Button>
                   )}
@@ -526,7 +526,7 @@ export default function Navbar() {
 
                 {/* Search Dropdown */}
                 {showSearchDropdown && (
-                  <div className="absolute left-0 right-0 mt-1 bg-white rounded-lg shadow-2xl border border-gray-200 z-[100] overflow-hidden">
+                  <div className="absolute left-0 right-0 mt-1 bg-surface-elevated rounded-lg shadow-2xl border border-border z-[100] overflow-hidden">
 
                     {/* === STATE 1: Empty / Focus — Recent searches + Popular === */}
                     {debouncedQuery.length < 2 ? (
@@ -535,7 +535,7 @@ export default function Navbar() {
                         {recentSearches.length > 0 && (
                           <div className="px-4 pt-3 pb-2">
                             <div className="flex items-center justify-between mb-2">
-                              <span className="text-xs font-semibold text-gray-500 uppercase tracking-wide flex items-center gap-1.5">
+                              <span className="text-xs font-semibold text-muted uppercase tracking-wide flex items-center gap-1.5">
                                 <ClockIcon className="w-3.5 h-3.5 shrink-0" />
                                 {locale === 'en' ? 'Recent Searches' : 'Son Aramalar'}
                               </span>
@@ -550,13 +550,13 @@ export default function Navbar() {
                                 <div key={s} className="flex items-center justify-between gap-1 group">
                                   <Button variant="secondary" type="button"
                                     onClick={() => navigateSearch(s)}
-                                    className={`flex-1 min-w-0 flex items-center gap-2.5 px-3 py-2 text-sm rounded-lg transition-colors text-left ${activeIndex === idx ? 'bg-primary-50 text-primary-600' : 'text-gray-700 hover:bg-primary-50 hover:text-primary-600'}`}>
-                                    <ClockIcon className="w-4 h-4 text-gray-400 shrink-0" />
+                                    className={`flex-1 min-w-0 flex items-center gap-2.5 px-3 py-2 text-sm rounded-lg transition-colors text-left ${activeIndex === idx ? 'bg-primary-50 text-primary-600' : 'text-body hover:bg-primary-50 hover:text-primary-600'}`}>
+                                    <ClockIcon className="w-4 h-4 text-subtle shrink-0" />
                                     <span className="truncate">{s}</span>
                                   </Button>
                                   <Button variant="secondary" type="button"
                                     onClick={(e) => { e.stopPropagation(); removeSearch(s); }}
-                                    className="p-1.5 shrink-0 text-gray-400 hover:text-danger-500 rounded transition-opacity opacity-0 group-hover:opacity-100"
+                                    className="p-1.5 shrink-0 text-subtle hover:text-danger-500 rounded transition-opacity opacity-0 group-hover:opacity-100"
                                     aria-label={locale === 'en' ? 'Remove' : 'Kaldır'}>
                                     <XMarkIcon className="w-4 h-4" />
                                   </Button>
@@ -567,8 +567,8 @@ export default function Navbar() {
                         )}
 
                         {/* Popüler Aramalar */}
-                        <div className={`px-4 pb-3 ${recentSearches.length > 0 ? 'pt-2 border-t border-gray-100' : 'pt-3'}`}>
-                          <span className="text-xs font-semibold text-gray-500 uppercase tracking-wide flex items-center gap-1.5 mb-2">
+                        <div className={`px-4 pb-3 ${recentSearches.length > 0 ? 'pt-2 border-t border-border-subtle' : 'pt-3'}`}>
+                          <span className="text-xs font-semibold text-muted uppercase tracking-wide flex items-center gap-1.5 mb-2">
                             <FireIcon className="w-3.5 h-3.5 shrink-0" />
                             {locale === 'en' ? 'Popular Searches' : 'Popüler Aramalar'}
                           </span>
@@ -577,7 +577,7 @@ export default function Navbar() {
                               <Button variant="secondary" key={s}
                                 type="button"
                                 onClick={() => navigateSearch(s)}
-                                className="px-3 py-1.5 text-sm bg-gray-100 hover:bg-primary-100 text-gray-700 hover:text-primary-600 rounded-full transition-colors whitespace-nowrap">
+                                className="px-3 py-1.5 text-sm bg-surface-alt hover:bg-primary-100 text-body hover:text-primary-600 rounded-full transition-colors whitespace-nowrap">
                                 {s}
                               </Button>
                             ))}
@@ -587,7 +587,7 @@ export default function Navbar() {
                         {/* Tüm ilanları gör */}
                         <Link
                           href="/listings"
-                          className="flex items-center justify-between px-4 py-2.5 text-sm text-gray-600 hover:bg-primary-50 hover:text-primary-600 border-t border-gray-100 transition-colors"
+                          className="flex items-center justify-between px-4 py-2.5 text-sm text-muted hover:bg-primary-50 hover:text-primary-600 border-t border-border-subtle transition-colors"
                           onClick={() => setShowSearchDropdown(false)}
                         >
                           <span>{locale === 'en' ? 'Browse all listings' : 'Tüm ilanları gör'}</span>
@@ -605,7 +605,7 @@ export default function Navbar() {
                           <>
                             {/* İlgili Sonuçlar başlığı */}
                             <div className="px-4 pt-3 pb-1">
-                              <span className="text-xs font-semibold text-gray-500 uppercase tracking-wide">
+                              <span className="text-xs font-semibold text-muted uppercase tracking-wide">
                                 {locale === 'en' ? 'Related Results' : 'İlgili Sonuçlar'}
                               </span>
                             </div>
@@ -619,30 +619,30 @@ export default function Navbar() {
                                     <Link
                                       key={product.id}
                                       href={`/listings/${product.id}`}
-                                      className={`flex items-center gap-3 px-4 py-2.5 transition-colors ${activeIndex === itemIdx ? 'bg-primary-50' : 'hover:bg-gray-50'}`}
+                                      className={`flex items-center gap-3 px-4 py-2.5 transition-colors ${activeIndex === itemIdx ? 'bg-primary-50' : 'hover:bg-surface'}`}
                                       onClick={() => setShowSearchDropdown(false)}
                                     >
                                       {product.imageUrl && isValidImageSrc(product.imageUrl) ? (
                                         <img
                                           src={product.imageUrl}
                                           alt={product.title}
-                                          className="w-12 h-12 rounded-lg object-cover bg-gray-100 flex-shrink-0 border border-gray-200"
+                                          className="w-12 h-12 rounded-lg object-cover bg-surface-alt flex-shrink-0 border border-border"
                                           onError={(e) => {
                                             (e.target as HTMLImageElement).style.display = 'none';
                                             (e.target as HTMLImageElement).nextElementSibling?.classList.remove('hidden');
                                           }}
                                         />
                                       ) : null}
-                                      <div className={`w-12 h-12 rounded-lg bg-gray-100 flex-shrink-0 flex items-center justify-center border border-gray-200 ${product.imageUrl && isValidImageSrc(product.imageUrl) ? 'hidden' : ''}`}>
-                                        <ShoppingBagIcon className="w-5 h-5 text-gray-400" />
+                                      <div className={`w-12 h-12 rounded-lg bg-surface-alt flex-shrink-0 flex items-center justify-center border border-border ${product.imageUrl && isValidImageSrc(product.imageUrl) ? 'hidden' : ''}`}>
+                                        <ShoppingBagIcon className="w-5 h-5 text-subtle" />
                                       </div>
                                       <div className="flex-1 min-w-0">
-                                        <p className="text-sm text-gray-900 font-medium truncate">{product.title}</p>
+                                        <p className="text-sm text-heading font-medium truncate">{product.title}</p>
                                         <p className="text-xs text-primary-600 font-semibold">
                                           {product.price.toLocaleString('tr-TR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} TL
                                         </p>
                                       </div>
-                                      <span className="text-[11px] text-gray-400 font-medium px-2 py-0.5 bg-gray-100 rounded-full flex-shrink-0">
+                                      <span className="text-[11px] text-subtle font-medium px-2 py-0.5 bg-surface-alt rounded-full flex-shrink-0">
                                         {locale === 'en' ? 'Product' : 'Ürün'}
                                       </span>
                                     </Link>
@@ -653,28 +653,28 @@ export default function Navbar() {
 
                             {/* Markalar (Car Brands) */}
                             {autoResults?.brands && autoResults.brands.length > 0 && (
-                              <div className={autoResults?.products?.length ? 'border-t border-gray-100' : ''}>
+                              <div className={autoResults?.products?.length ? 'border-t border-border-subtle' : ''}>
                                 {autoResults.brands.map((brand) => {
                                   const itemIdx = (autoResults?.products?.length || 0) + autoResults.brands.indexOf(brand);
                                   return (
                                     <Link
                                       key={brand.id}
                                       href={`/listings?brand=${encodeURIComponent(brand.name)}`}
-                                      className={`flex items-center gap-3 px-4 py-2.5 transition-colors ${activeIndex === itemIdx ? 'bg-primary-50' : 'hover:bg-gray-50'}`}
+                                      className={`flex items-center gap-3 px-4 py-2.5 transition-colors ${activeIndex === itemIdx ? 'bg-primary-50' : 'hover:bg-surface'}`}
                                       onClick={() => setShowSearchDropdown(false)}
                                     >
                                       {brand.logo ? (
                                         <img
                                           src={brand.logo}
                                           alt={brand.name}
-                                          className="w-10 h-10 rounded-full object-contain bg-white flex-shrink-0 border border-gray-200 p-0.5"
+                                          className="w-10 h-10 rounded-full object-contain bg-surface-elevated flex-shrink-0 border border-border p-0.5"
                                         />
                                       ) : (
                                         <div className="w-10 h-10 rounded-full bg-primary-100 flex-shrink-0 flex items-center justify-center text-primary-600 text-sm font-bold">
                                           {brand.name.charAt(0)}
                                         </div>
                                       )}
-                                      <span className="flex-1 text-sm text-gray-900 font-medium truncate">{brand.name}</span>
+                                      <span className="flex-1 text-sm text-heading font-medium truncate">{brand.name}</span>
                                       <span className="text-[11px] text-primary-600 font-medium px-2 py-0.5 bg-primary-50 rounded-full flex-shrink-0">
                                         {locale === 'en' ? 'Brand' : 'Marka'}
                                       </span>
@@ -686,20 +686,20 @@ export default function Navbar() {
 
                             {/* Kategoriler */}
                             {autoResults?.categories && autoResults.categories.length > 0 && (
-                              <div className={(autoResults?.products?.length || autoResults?.brands?.length) ? 'border-t border-gray-100' : ''}>
+                              <div className={(autoResults?.products?.length || autoResults?.brands?.length) ? 'border-t border-border-subtle' : ''}>
                                 {autoResults.categories.map((cat) => {
                                   const itemIdx = (autoResults?.products?.length || 0) + (autoResults?.brands?.length || 0) + autoResults.categories.indexOf(cat);
                                   return (
                                     <Link
                                       key={cat.id}
                                       href={`/listings?categoryId=${cat.id}`}
-                                      className={`flex items-center gap-3 px-4 py-2.5 transition-colors ${activeIndex === itemIdx ? 'bg-primary-50' : 'hover:bg-gray-50'}`}
+                                      className={`flex items-center gap-3 px-4 py-2.5 transition-colors ${activeIndex === itemIdx ? 'bg-primary-50' : 'hover:bg-surface'}`}
                                       onClick={() => setShowSearchDropdown(false)}
                                     >
                                       <div className="w-10 h-10 rounded-full bg-info-50 flex-shrink-0 flex items-center justify-center text-info-500 border border-info-100">
                                         <TagIcon className="w-5 h-5" />
                                       </div>
-                                      <span className="flex-1 text-sm text-gray-900 font-medium truncate">{cat.name}</span>
+                                      <span className="flex-1 text-sm text-heading font-medium truncate">{cat.name}</span>
                                       <span className="text-[11px] text-info-600 font-medium px-2 py-0.5 bg-info-50 rounded-full flex-shrink-0">
                                         {locale === 'en' ? 'Category' : 'Kategori'}
                                       </span>
@@ -711,28 +711,28 @@ export default function Navbar() {
 
                             {/* Üreticiler (Manufacturers) */}
                             {autoResults?.manufacturers && autoResults.manufacturers.length > 0 && (
-                              <div className={(autoResults?.products?.length || autoResults?.brands?.length || autoResults?.categories?.length) ? 'border-t border-gray-100' : ''}>
+                              <div className={(autoResults?.products?.length || autoResults?.brands?.length || autoResults?.categories?.length) ? 'border-t border-border-subtle' : ''}>
                                 {autoResults.manufacturers.map((mfr) => {
                                   const itemIdx = (autoResults?.products?.length || 0) + (autoResults?.brands?.length || 0) + (autoResults?.categories?.length || 0) + autoResults.manufacturers.indexOf(mfr);
                                   return (
                                     <Link
                                       key={mfr.id}
                                       href={`/listings?manufacturer=${encodeURIComponent(mfr.name)}&manufacturerId=${mfr.id}`}
-                                      className={`flex items-center gap-3 px-4 py-2.5 transition-colors ${activeIndex === itemIdx ? 'bg-primary-50' : 'hover:bg-gray-50'}`}
+                                      className={`flex items-center gap-3 px-4 py-2.5 transition-colors ${activeIndex === itemIdx ? 'bg-primary-50' : 'hover:bg-surface'}`}
                                       onClick={() => setShowSearchDropdown(false)}
                                     >
                                       {mfr.logo ? (
                                         <img
                                           src={mfr.logo}
                                           alt={mfr.name}
-                                          className="w-10 h-10 rounded-full object-contain bg-white flex-shrink-0 border border-gray-200 p-0.5"
+                                          className="w-10 h-10 rounded-full object-contain bg-surface-elevated flex-shrink-0 border border-border p-0.5"
                                         />
                                       ) : (
                                         <div className="w-10 h-10 rounded-full bg-primary-50 flex-shrink-0 flex items-center justify-center text-primary-600 text-sm font-bold border border-primary-100">
                                           {mfr.name.charAt(0)}
                                         </div>
                                       )}
-                                      <span className="flex-1 text-sm text-gray-900 font-medium truncate">{mfr.name}</span>
+                                      <span className="flex-1 text-sm text-heading font-medium truncate">{mfr.name}</span>
                                       <span className="text-[11px] text-primary-600 font-medium px-2 py-0.5 bg-primary-50 rounded-full flex-shrink-0">
                                         {locale === 'en' ? 'Manufacturer' : 'Üretici'}
                                       </span>
@@ -744,20 +744,20 @@ export default function Navbar() {
 
                             {/* Modeller (Car Models) */}
                             {autoResults?.carModels && autoResults.carModels.length > 0 && (
-                              <div className={(autoResults?.products?.length || autoResults?.brands?.length || autoResults?.categories?.length || autoResults?.manufacturers?.length) ? 'border-t border-gray-100' : ''}>
+                              <div className={(autoResults?.products?.length || autoResults?.brands?.length || autoResults?.categories?.length || autoResults?.manufacturers?.length) ? 'border-t border-border-subtle' : ''}>
                                 {autoResults.carModels.map((m) => {
                                   const itemIdx = (autoResults?.products?.length || 0) + (autoResults?.brands?.length || 0) + (autoResults?.categories?.length || 0) + (autoResults?.manufacturers?.length || 0) + (autoResults?.carModels ?? []).indexOf(m);
                                   return (
                                     <Link
                                       key={m.id}
                                       href={`/listings?carModelId=${m.id}&carModel=${encodeURIComponent(m.name)}`}
-                                      className={`flex items-center gap-3 px-4 py-2.5 transition-colors ${activeIndex === itemIdx ? 'bg-primary-50' : 'hover:bg-gray-50'}`}
+                                      className={`flex items-center gap-3 px-4 py-2.5 transition-colors ${activeIndex === itemIdx ? 'bg-primary-50' : 'hover:bg-surface'}`}
                                       onClick={() => setShowSearchDropdown(false)}
                                     >
                                       <div className="w-10 h-10 rounded-full bg-success-50 flex-shrink-0 flex items-center justify-center text-success-600 text-sm font-bold border border-success-100">
                                         {m.name.charAt(0)}
                                       </div>
-                                      <span className="flex-1 text-sm text-gray-900 font-medium truncate">{m.name}</span>
+                                      <span className="flex-1 text-sm text-heading font-medium truncate">{m.name}</span>
                                       <span className="text-[11px] text-success-600 font-medium px-2 py-0.5 bg-success-50 rounded-full flex-shrink-0">
                                         {locale === 'en' ? 'Model' : 'Model'}
                                       </span>
@@ -769,20 +769,20 @@ export default function Navbar() {
 
                             {/* Ölçek (Scale) */}
                             {autoResults?.scales && autoResults.scales.length > 0 && (
-                              <div className={(autoResults?.products?.length || autoResults?.brands?.length || autoResults?.categories?.length || autoResults?.manufacturers?.length || autoResults?.carModels?.length) ? 'border-t border-gray-100' : ''}>
+                              <div className={(autoResults?.products?.length || autoResults?.brands?.length || autoResults?.categories?.length || autoResults?.manufacturers?.length || autoResults?.carModels?.length) ? 'border-t border-border-subtle' : ''}>
                                 {autoResults.scales.map((s) => {
                                   const itemIdx = (autoResults?.products?.length || 0) + (autoResults?.brands?.length || 0) + (autoResults?.categories?.length || 0) + (autoResults?.manufacturers?.length || 0) + (autoResults?.carModels?.length || 0) + (autoResults?.scales ?? []).indexOf(s);
                                   return (
                                     <Link
                                       key={s}
                                       href={`/listings?scale=${encodeURIComponent(s)}`}
-                                      className={`flex items-center gap-3 px-4 py-2.5 transition-colors ${activeIndex === itemIdx ? 'bg-primary-50' : 'hover:bg-gray-50'}`}
+                                      className={`flex items-center gap-3 px-4 py-2.5 transition-colors ${activeIndex === itemIdx ? 'bg-primary-50' : 'hover:bg-surface'}`}
                                       onClick={() => setShowSearchDropdown(false)}
                                     >
                                       <div className="w-10 h-10 rounded-full bg-warning-50 flex-shrink-0 flex items-center justify-center text-warning-600 text-xs font-bold border border-warning-100">
                                         {s}
                                       </div>
-                                      <span className="flex-1 text-sm text-gray-900 font-medium truncate">{s}</span>
+                                      <span className="flex-1 text-sm text-heading font-medium truncate">{s}</span>
                                       <span className="text-[11px] text-warning-600 font-medium px-2 py-0.5 bg-warning-50 rounded-full flex-shrink-0">
                                         {locale === 'en' ? 'Scale' : 'Ölçek'}
                                       </span>
@@ -794,21 +794,21 @@ export default function Navbar() {
 
                             {/* Malzeme (Material) */}
                             {autoResults?.materials && autoResults.materials.length > 0 && (
-                              <div className={(autoResults?.products?.length || autoResults?.brands?.length || autoResults?.categories?.length || autoResults?.manufacturers?.length || autoResults?.carModels?.length || autoResults?.scales?.length) ? 'border-t border-gray-100' : ''}>
+                              <div className={(autoResults?.products?.length || autoResults?.brands?.length || autoResults?.categories?.length || autoResults?.manufacturers?.length || autoResults?.carModels?.length || autoResults?.scales?.length) ? 'border-t border-border-subtle' : ''}>
                                 {autoResults.materials.map((mat) => {
                                   const itemIdx = (autoResults?.products?.length || 0) + (autoResults?.brands?.length || 0) + (autoResults?.categories?.length || 0) + (autoResults?.manufacturers?.length || 0) + (autoResults?.carModels?.length || 0) + (autoResults?.scales?.length || 0) + (autoResults?.materials ?? []).indexOf(mat);
                                   return (
                                     <Link
                                       key={mat.slug}
                                       href={`/listings?material=${encodeURIComponent(mat.slug)}`}
-                                      className={`flex items-center gap-3 px-4 py-2.5 transition-colors ${activeIndex === itemIdx ? 'bg-primary-50' : 'hover:bg-gray-50'}`}
+                                      className={`flex items-center gap-3 px-4 py-2.5 transition-colors ${activeIndex === itemIdx ? 'bg-primary-50' : 'hover:bg-surface'}`}
                                       onClick={() => setShowSearchDropdown(false)}
                                     >
-                                      <div className="w-10 h-10 rounded-full bg-slate-50 flex-shrink-0 flex items-center justify-center text-slate-600 text-sm font-bold border border-slate-100">
+                                      <div className="w-10 h-10 rounded-full bg-surface flex-shrink-0 flex items-center justify-center text-muted text-sm font-bold border border-border-subtle">
                                         {mat.label.charAt(0)}
                                       </div>
-                                      <span className="flex-1 text-sm text-gray-900 font-medium truncate">{mat.label}</span>
-                                      <span className="text-[11px] text-slate-600 font-medium px-2 py-0.5 bg-slate-50 rounded-full flex-shrink-0">
+                                      <span className="flex-1 text-sm text-heading font-medium truncate">{mat.label}</span>
+                                      <span className="text-[11px] text-muted font-medium px-2 py-0.5 bg-surface rounded-full flex-shrink-0">
                                         {locale === 'en' ? 'Material' : 'Malzeme'}
                                       </span>
                                     </Link>
@@ -819,20 +819,20 @@ export default function Navbar() {
 
                             {/* Durum (Condition) */}
                             {autoResults?.conditions && autoResults.conditions.length > 0 && (
-                              <div className={(autoResults?.products?.length || autoResults?.brands?.length || autoResults?.categories?.length || autoResults?.manufacturers?.length || autoResults?.carModels?.length || autoResults?.scales?.length || autoResults?.materials?.length) ? 'border-t border-gray-100' : ''}>
+                              <div className={(autoResults?.products?.length || autoResults?.brands?.length || autoResults?.categories?.length || autoResults?.manufacturers?.length || autoResults?.carModels?.length || autoResults?.scales?.length || autoResults?.materials?.length) ? 'border-t border-border-subtle' : ''}>
                                 {autoResults.conditions.map((cond) => {
                                   const itemIdx = (autoResults?.products?.length || 0) + (autoResults?.brands?.length || 0) + (autoResults?.categories?.length || 0) + (autoResults?.manufacturers?.length || 0) + (autoResults?.carModels?.length || 0) + (autoResults?.scales?.length || 0) + (autoResults?.materials?.length || 0) + (autoResults?.conditions ?? []).indexOf(cond);
                                   return (
                                     <Link
                                       key={cond.value}
                                       href={`/listings?condition=${encodeURIComponent(cond.value)}`}
-                                      className={`flex items-center gap-3 px-4 py-2.5 transition-colors ${activeIndex === itemIdx ? 'bg-primary-50' : 'hover:bg-gray-50'}`}
+                                      className={`flex items-center gap-3 px-4 py-2.5 transition-colors ${activeIndex === itemIdx ? 'bg-primary-50' : 'hover:bg-surface'}`}
                                       onClick={() => setShowSearchDropdown(false)}
                                     >
                                       <div className="w-10 h-10 rounded-full bg-success-50 flex-shrink-0 flex items-center justify-center text-success-600 text-sm font-bold border border-success-100">
                                         {cond.label.charAt(0)}
                                       </div>
-                                      <span className="flex-1 text-sm text-gray-900 font-medium truncate">{cond.label}</span>
+                                      <span className="flex-1 text-sm text-heading font-medium truncate">{cond.label}</span>
                                       <span className="text-[11px] text-success-600 font-medium px-2 py-0.5 bg-success-50 rounded-full flex-shrink-0">
                                         {locale === 'en' ? 'Condition' : 'Durum'}
                                       </span>
@@ -844,7 +844,7 @@ export default function Navbar() {
 
                             {/* No results */}
                             {!autoResults?.products?.length && !autoResults?.brands?.length && !autoResults?.categories?.length && !autoResults?.manufacturers?.length && !autoResults?.carModels?.length && !autoResults?.scales?.length && !autoResults?.materials?.length && !autoResults?.conditions?.length && (
-                              <div className="px-4 py-6 text-center text-sm text-gray-500">
+                              <div className="px-4 py-6 text-center text-sm text-muted">
                                 {locale === 'en' ? 'No results found' : 'Sonuç bulunamadı'}
                               </div>
                             )}
@@ -852,7 +852,7 @@ export default function Navbar() {
                             {/* "...ile ara" footer */}
                             <Button variant="secondary" type="button"
                               onClick={() => navigateSearch(debouncedQuery)}
-                              className={`flex items-center justify-between w-full px-4 py-3 text-sm font-medium border-t border-gray-100 transition-colors ${activeIndex === flatItems.length - 1 ? 'bg-primary-50 text-primary-600' : 'text-primary-600 hover:bg-primary-50'}`}>
+                              className={`flex items-center justify-between w-full px-4 py-3 text-sm font-medium border-t border-border-subtle transition-colors ${activeIndex === flatItems.length - 1 ? 'bg-primary-50 text-primary-600' : 'text-primary-600 hover:bg-primary-50'}`}>
                               <span>
                                 &ldquo;{debouncedQuery}&rdquo; {locale === 'en' ? 'search for' : 'ile ara'}
                               </span>
@@ -872,7 +872,7 @@ export default function Navbar() {
               {/* İlan Ver - her zaman görünür */}
               <Link
                 href="/listings/new"
-                className="flex items-center justify-center gap-1.5 h-9 px-4 bg-white text-primary-500 rounded-md text-sm font-medium hover:bg-primary-50 transition-colors"
+                className="flex items-center justify-center gap-1.5 h-9 px-4 bg-surface-elevated text-primary-500 rounded-md text-sm font-medium hover:bg-primary-50 transition-colors"
                 onClick={(e) => { if (!showAuthUI) { e.preventDefault(); setShowAuthModal(true); } }}
               >
                 <PlusIcon className="w-4 h-4" />
@@ -909,7 +909,7 @@ export default function Navbar() {
                 </Button>
 
                 {showAccountDropdown && (
-                  <div className="absolute right-0 mt-1 w-56 bg-white rounded-lg shadow-xl border border-gray-100 py-1 z-[100] overflow-y-auto max-h-[calc(100vh-8rem)]">
+                  <div className="absolute right-0 mt-1 w-56 bg-surface-elevated rounded-lg shadow-xl border border-border-subtle py-1 z-[100] overflow-y-auto max-h-[calc(100vh-8rem)]">
                     {showAuthUI ? (
                       <>
                         {/* Profil - en üstte, profesyonel */}
@@ -922,8 +922,8 @@ export default function Navbar() {
                               className="!w-10 !h-10 flex-shrink-0"
                             />
                             <div className="min-w-0 flex-1">
-                              <p className="text-sm font-semibold text-gray-900 truncate">{user?.displayName}</p>
-                              <p className="text-xs text-gray-500 truncate">{user?.email}</p>
+                              <p className="text-sm font-semibold text-heading truncate">{user?.displayName}</p>
+                              <p className="text-xs text-muted truncate">{user?.email}</p>
                               {membershipTier !== 'free' && (
                                 <span className="inline-block mt-1 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide bg-warning-100 text-warning-700 rounded">
                                   {membershipTier}
@@ -932,8 +932,8 @@ export default function Navbar() {
                             </div>
                           </div>
                         </Link>
-                        <div className="border-t border-gray-100 my-1" />
-                        <Link href="/listings" onClick={() => setShowAccountDropdown(false)} className="flex items-center gap-3 px-4 py-2.5 text-sm text-gray-700 hover:bg-primary-50 hover:text-primary-600">
+                        <div className="border-t border-border-subtle my-1" />
+                        <Link href="/listings" onClick={() => setShowAccountDropdown(false)} className="flex items-center gap-3 px-4 py-2.5 text-sm text-body hover:bg-primary-50 hover:text-primary-600">
                           <MagnifyingGlassIcon className="w-5 h-5" />
                           {locale === 'en' ? 'Search listings' : 'İlanlarda ara'}
                         </Link>
@@ -951,57 +951,57 @@ export default function Navbar() {
                                 }
                                 setShowAccountDropdown(false);
                               }}
-                              className="flex items-center gap-3 px-4 py-2.5 text-sm text-gray-700 hover:bg-primary-50 hover:text-primary-600"
+                              className="flex items-center gap-3 px-4 py-2.5 text-sm text-body hover:bg-primary-50 hover:text-primary-600"
                             >
                               {link.label}
                               {showTradesBadge && (
-                                <span className="ml-auto px-1.5 py-0.5 bg-danger-500 text-white text-[10px] font-bold rounded-full">
+                                <span className="ml-auto px-1.5 py-0.5 bg-danger-500 text-inverted text-[10px] font-bold rounded-full">
                                   {pendingTradesCount > 9 ? '9+' : pendingTradesCount}
                                 </span>
                               )}
                             </Link>
                           );
                         })}
-                        <div className="border-t border-gray-100 my-1" />
-                        <Link href="/messages" onClick={() => setShowAccountDropdown(false)} className="flex items-center gap-3 px-4 py-2.5 text-sm text-gray-700 hover:bg-primary-50 hover:text-primary-600">
+                        <div className="border-t border-border-subtle my-1" />
+                        <Link href="/messages" onClick={() => setShowAccountDropdown(false)} className="flex items-center gap-3 px-4 py-2.5 text-sm text-body hover:bg-primary-50 hover:text-primary-600">
                           <ChatBubbleLeftRightIcon className="w-5 h-5" />
                           {t('nav.messages')}
-                          {unreadMessageCount > 0 && <span className="ml-auto px-1.5 py-0.5 bg-danger-500 text-white text-xs rounded-full">{unreadMessageCount > 9 ? '9+' : unreadMessageCount}</span>}
+                          {unreadMessageCount > 0 && <span className="ml-auto px-1.5 py-0.5 bg-danger-500 text-inverted text-xs rounded-full">{unreadMessageCount > 9 ? '9+' : unreadMessageCount}</span>}
                         </Link>
-                        <Link href="/favorites" onClick={() => setShowAccountDropdown(false)} className="flex items-center gap-3 px-4 py-2.5 text-sm text-gray-700 hover:bg-primary-50 hover:text-primary-600">
+                        <Link href="/favorites" onClick={() => setShowAccountDropdown(false)} className="flex items-center gap-3 px-4 py-2.5 text-sm text-body hover:bg-primary-50 hover:text-primary-600">
                           <HeartIcon className="w-5 h-5" />
                           {t('nav.favorites')}
-                          {wishlistCount > 0 && <span className="ml-auto text-xs text-gray-500">{wishlistCount}</span>}
+                          {wishlistCount > 0 && <span className="ml-auto text-xs text-muted">{wishlistCount}</span>}
                         </Link>
-                        <Link href="/notifications" onClick={() => setShowAccountDropdown(false)} className="flex items-center gap-3 px-4 py-2.5 text-sm text-gray-700 hover:bg-primary-50 hover:text-primary-600">
+                        <Link href="/notifications" onClick={() => setShowAccountDropdown(false)} className="flex items-center gap-3 px-4 py-2.5 text-sm text-body hover:bg-primary-50 hover:text-primary-600">
                           <BellIcon className="w-5 h-5" />
                           {t('nav.notifications')}
                           {unreadNotificationsCount > 0 && (
-                            <span className="ml-auto px-1.5 py-0.5 bg-danger-500 text-white text-xs rounded-full">
+                            <span className="ml-auto px-1.5 py-0.5 bg-danger-500 text-inverted text-xs rounded-full">
                               {unreadNotificationsCount > 99 ? '99+' : unreadNotificationsCount}
                             </span>
                           )}
                         </Link>
 
-                        <div className="border-t border-gray-100 my-1" />
-                        <Link href="/profile" onClick={() => setShowAccountDropdown(false)} className="flex items-center gap-3 px-4 py-2.5 text-sm text-gray-700 hover:bg-primary-50 hover:text-primary-600">
+                        <div className="border-t border-border-subtle my-1" />
+                        <Link href="/profile" onClick={() => setShowAccountDropdown(false)} className="flex items-center gap-3 px-4 py-2.5 text-sm text-body hover:bg-primary-50 hover:text-primary-600">
                           <UserCircleIcon className="w-5 h-5" />
                           {t('profile.myProfile')}
                         </Link>
-                        <Link href="/profile/listings" onClick={() => setShowAccountDropdown(false)} className="flex items-center gap-3 px-4 py-2.5 text-sm text-gray-700 hover:bg-primary-50 hover:text-primary-600">
+                        <Link href="/profile/listings" onClick={() => setShowAccountDropdown(false)} className="flex items-center gap-3 px-4 py-2.5 text-sm text-body hover:bg-primary-50 hover:text-primary-600">
                           <ShoppingBagIcon className="w-5 h-5" />
                           {t('nav.myListings')}
                         </Link>
-                        <Link href="/orders" onClick={() => setShowAccountDropdown(false)} className="flex items-center gap-3 px-4 py-2.5 text-sm text-gray-700 hover:bg-primary-50 hover:text-primary-600">
+                        <Link href="/orders" onClick={() => setShowAccountDropdown(false)} className="flex items-center gap-3 px-4 py-2.5 text-sm text-body hover:bg-primary-50 hover:text-primary-600">
                           <TagIcon className="w-5 h-5" />
                           {t('order.myOrders')}
                         </Link>
-                        <Link href="/offers" onClick={() => setShowAccountDropdown(false)} className="flex items-center gap-3 px-4 py-2.5 text-sm text-gray-700 hover:bg-primary-50 hover:text-primary-600">
+                        <Link href="/offers" onClick={() => setShowAccountDropdown(false)} className="flex items-center gap-3 px-4 py-2.5 text-sm text-body hover:bg-primary-50 hover:text-primary-600">
                           <CurrencyDollarIcon className="w-5 h-5" />
                           {t('offer.myOffers')}
                           {pendingOffersCount > 0 && <span className="ml-auto text-xs text-danger-600">{pendingOffersCount}</span>}
                         </Link>
-                        <div className="border-t border-gray-100 my-1" />
+                        <div className="border-t border-border-subtle my-1" />
                         <div className="px-4 py-2">
                           <LanguageSwitcher variant="minimal" />
                         </div>
@@ -1012,13 +1012,13 @@ export default function Navbar() {
                       </>
                     ) : (
                       <>
-                        <div className="px-4 py-3 border-b border-gray-100">
+                        <div className="px-4 py-3 border-b border-border-subtle">
                           <div className="flex items-center gap-2">
                             <UserCircleIcon className="w-6 h-6 text-primary-500" />
                             <span className="text-sm font-semibold text-primary-500">{t('common.login')}</span>
                           </div>
                         </div>
-                        <Link href="/listings" onClick={() => setShowAccountDropdown(false)} className="flex items-center gap-3 px-4 py-2.5 text-sm text-gray-700 hover:bg-primary-50 hover:text-primary-600">
+                        <Link href="/listings" onClick={() => setShowAccountDropdown(false)} className="flex items-center gap-3 px-4 py-2.5 text-sm text-body hover:bg-primary-50 hover:text-primary-600">
                           <MagnifyingGlassIcon className="w-5 h-5" />
                           {locale === 'en' ? 'Search listings' : 'İlanlarda ara'}
                         </Link>
@@ -1035,25 +1035,25 @@ export default function Navbar() {
                                 }
                                 setShowAccountDropdown(false);
                               }}
-                              className="flex items-center gap-3 px-4 py-2.5 text-sm text-gray-700 hover:bg-primary-50 hover:text-primary-600"
+                              className="flex items-center gap-3 px-4 py-2.5 text-sm text-body hover:bg-primary-50 hover:text-primary-600"
                             >
                               {link.label}
                             </Link>
                           );
                         })}
-                        <div className="border-t border-gray-100 my-1" />
+                        <div className="border-t border-border-subtle my-1" />
                         <div className="p-4 space-y-2">
                           <Link
                             href="/login"
                             onClick={() => setShowAccountDropdown(false)}
-                            className="flex items-center justify-center w-full py-2.5 px-4 bg-primary-500 text-white text-sm font-medium rounded-lg hover:bg-primary-600 transition-colors"
+                            className="flex items-center justify-center w-full py-2.5 px-4 bg-primary-500 text-inverted text-sm font-medium rounded-lg hover:bg-primary-600 transition-colors"
                           >
                             {t('common.login')}
                           </Link>
                           <Link
                             href="/register"
                             onClick={() => setShowAccountDropdown(false)}
-                            className="items-center justify-center py-2.5 px-4 text-gray-700 font-medium hover:bg-gray-50"
+                            className="items-center justify-center py-2.5 px-4 text-body font-medium hover:bg-surface"
                           >
                             {t('common.register')}
                           </Link>
@@ -1067,13 +1067,13 @@ export default function Navbar() {
               {/* Sepet - en sağda, Giriş Yap'ın sağında ikon + yazı */}
               <Link
                 href="/cart"
-                className="flex items-center justify-center gap-1.5 h-9 px-3 text-white hover:text-primary-100 hover:bg-white/10 rounded-md text-sm font-medium transition-colors relative"
+                className="flex items-center justify-center gap-1.5 h-9 px-3 text-inverted hover:text-primary-100 hover:bg-surface-elevated/10 rounded-md text-sm font-medium transition-colors relative"
                 title={t('nav.cart')}
               >
                 <ShoppingCartIcon className="w-5 h-5" />
                 <span className="hidden sm:inline">{t('nav.cart')}</span>
                 {cartCount > 0 && (
-                  <span className="absolute -top-0.5 -right-0.5 min-w-[18px] h-[18px] px-1 bg-white text-primary-500 text-xs rounded-full flex items-center justify-center font-semibold">
+                  <span className="absolute -top-0.5 -right-0.5 min-w-[18px] h-[18px] px-1 bg-surface-elevated text-primary-500 text-xs rounded-full flex items-center justify-center font-semibold">
                     {cartCount > 9 ? '9+' : cartCount}
                   </span>
                 )}

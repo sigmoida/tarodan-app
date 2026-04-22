@@ -172,10 +172,10 @@ export default function PaymentPage() {
 
   if (isLoading) {
     return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+      <div className="min-h-screen bg-surface flex items-center justify-center">
         <div className="text-center">
           <ArrowPathIcon className="w-12 h-12 text-primary-500 animate-spin mx-auto mb-4" />
-          <p className="text-gray-600">Ödeme bilgileri yükleniyor...</p>
+          <p className="text-muted">Ödeme bilgileri yükleniyor...</p>
         </div>
       </div>
     );
@@ -183,10 +183,10 @@ export default function PaymentPage() {
 
   if (!payment) {
     return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+      <div className="min-h-screen bg-surface flex items-center justify-center">
         <div className="text-center">
           <XCircleIcon className="w-12 h-12 text-danger-500 mx-auto mb-4" />
-          <p className="text-gray-600 mb-4">Ödeme bulunamadı</p>
+          <p className="text-muted mb-4">Ödeme bulunamadı</p>
           <Button
             onClick={() =>
               router.push(
@@ -217,20 +217,20 @@ export default function PaymentPage() {
   }
 
   return (
-    <div className="min-h-screen bg-gray-50 py-8">
+    <div className="min-h-screen bg-surface py-8">
       <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8">
         {/* Header */}
         <div className="mb-8">
-          <h1 className="text-3xl font-bold text-gray-900 mb-2">Ödeme</h1>
-          <p className="text-gray-600">PayTR ile güvenli ödeme</p>
+          <h1 className="text-3xl font-bold text-heading mb-2">Ödeme</h1>
+          <p className="text-muted">PayTR ile güvenli ödeme</p>
         </div>
 
         {/* Payment Info Card */}
-        <div className="bg-white rounded-xl shadow-sm p-6 mb-6">
+        <div className="bg-surface-elevated rounded-xl shadow-sm p-6 mb-6">
           <div className="flex items-center justify-between mb-4">
             <div>
-              <p className="text-sm text-gray-500">Ödeme Tutarı</p>
-              <p className="text-2xl font-bold text-gray-900">
+              <p className="text-sm text-muted">Ödeme Tutarı</p>
+              <p className="text-2xl font-bold text-heading">
                 {payment.amount?.toLocaleString("tr-TR", {
                   minimumFractionDigits: 2,
                   maximumFractionDigits: 2,
@@ -239,7 +239,7 @@ export default function PaymentPage() {
               </p>
             </div>
             <div className="text-right">
-              <p className="text-sm text-gray-500">Durum</p>
+              <p className="text-sm text-muted">Durum</p>
               <span
                 className={`inline-flex items-center px-3 py-1 rounded-full text-sm font-medium ${
                   payment.status === "pending"
@@ -256,8 +256,8 @@ export default function PaymentPage() {
             </div>
           </div>
 
-          <div className="border-t border-gray-200 pt-4">
-            <div className="flex items-center gap-2 text-sm text-gray-600">
+          <div className="border-t border-border pt-4">
+            <div className="flex items-center gap-2 text-sm text-muted">
               <ShieldCheckIcon className="w-5 h-5 text-success-500" />
               <span>256-bit SSL ile şifrelenmiş güvenli ödeme</span>
             </div>
@@ -270,7 +270,7 @@ export default function PaymentPage() {
           <motion.div
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
-            className="bg-white rounded-xl shadow-sm p-6"
+            className="bg-surface-elevated rounded-xl shadow-sm p-6"
           >
             <h2 className="text-lg font-semibold mb-4 flex items-center gap-2">
               <CreditCardIcon className="w-6 h-6 text-primary-500" />
@@ -280,7 +280,7 @@ export default function PaymentPage() {
               dangerouslySetInnerHTML={{ __html: paymentHtml }}
               className="payment-iframe-container"
             />
-            <p className="text-sm text-gray-500 mt-4 text-center">
+            <p className="text-sm text-muted mt-4 text-center">
               Ödeme tamamlandıktan sonra otomatik olarak yönlendirileceksiniz.
             </p>
           </motion.div>
@@ -289,13 +289,13 @@ export default function PaymentPage() {
           <motion.div
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
-            className="bg-white rounded-xl shadow-sm p-8 text-center"
+            className="bg-surface-elevated rounded-xl shadow-sm p-8 text-center"
           >
             <CreditCardIcon className="w-16 h-16 text-primary-500 mx-auto mb-4" />
             <h2 className="text-xl font-semibold mb-2">
               Ödeme Sayfasına Yönlendiriliyorsunuz
             </h2>
-            <p className="text-gray-600 mb-6">
+            <p className="text-muted mb-6">
               Güvenli ödeme sayfasına yönlendiriliyorsunuz. Lütfen bekleyin...
             </p>
             <Button onClick={() => (window.location.href = payment.paymentUrl)}>
@@ -303,12 +303,12 @@ export default function PaymentPage() {
             </Button>
           </motion.div>
         ) : (
-          <div className="bg-white rounded-xl shadow-sm p-8 text-center">
+          <div className="bg-surface-elevated rounded-xl shadow-sm p-8 text-center">
             <XCircleIcon className="w-16 h-16 text-danger-500 mx-auto mb-4" />
             <h2 className="text-xl font-semibold mb-2">
               Ödeme Bilgisi Bulunamadı
             </h2>
-            <p className="text-gray-600 mb-6">
+            <p className="text-muted mb-6">
               Ödeme sayfası bilgisi yüklenemedi. Lütfen tekrar deneyin.
             </p>
             <Button onClick={fetchPayment}>Tekrar Dene</Button>

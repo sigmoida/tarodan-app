@@ -277,17 +277,17 @@ export default function SupportPage() {
       <div className="flex h-[calc(100vh-8rem)]">
         {/* Ticket List */}
         <div
-          className={`${selectedTicket ? "w-1/3" : "w-full"} border-r border-gray-200 flex flex-col`}
+          className={`${selectedTicket ? "w-1/3" : "w-full"} border-r border-border flex flex-col`}
         >
           {/* Header */}
-          <div className="p-4 border-b border-gray-200">
-            <h1 className="text-xl font-bold text-gray-900 mb-4">
+          <div className="p-4 border-b border-border">
+            <h1 className="text-xl font-bold text-heading mb-4">
               Destek Talepleri
             </h1>
 
             {/* Search */}
             <div className="relative mb-4">
-              <MagnifyingGlassIcon className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-gray-500" />
+              <MagnifyingGlassIcon className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-muted" />
               <Input
                 type="text"
                 placeholder="Ara..."
@@ -295,7 +295,7 @@ export default function SupportPage() {
                 onChange={(e) =>
                   setFilters({ ...filters, search: e.target.value })
                 }
-                className="bg-gray-100 pl-10 pr-4 text-gray-900"
+                className="bg-surface-alt pl-10 pr-4 text-heading"
               />
             </div>
 
@@ -306,7 +306,7 @@ export default function SupportPage() {
                 onChange={(e) =>
                   setFilters({ ...filters, status: e.target.value })
                 }
-                className="w-auto bg-gray-100"
+                className="w-auto bg-surface-alt"
                 selectSize="sm"
               >
                 {STATUS_OPTIONS.map((opt) => (
@@ -320,7 +320,7 @@ export default function SupportPage() {
                 onChange={(e) =>
                   setFilters({ ...filters, priority: e.target.value })
                 }
-                className="w-auto bg-gray-100"
+                className="w-auto bg-surface-alt"
                 selectSize="sm"
               >
                 {PRIORITY_OPTIONS.map((opt) => (
@@ -334,7 +334,7 @@ export default function SupportPage() {
                 onChange={(e) =>
                   setFilters({ ...filters, category: e.target.value })
                 }
-                className="w-auto bg-gray-100"
+                className="w-auto bg-surface-alt"
                 selectSize="sm"
               >
                 {CATEGORY_OPTIONS.map((opt) => (
@@ -353,7 +353,7 @@ export default function SupportPage() {
                 <Spinner size="lg" />
               </div>
             ) : tickets.length === 0 ? (
-              <div className="flex flex-col items-center justify-center h-32 text-gray-500">
+              <div className="flex flex-col items-center justify-center h-32 text-muted">
                 <ChatBubbleLeftRightIcon className="h-8 w-8 mb-2" />
                 <p>Destek talebi bulunamadı</p>
               </div>
@@ -363,12 +363,12 @@ export default function SupportPage() {
                   variant="secondary"
                   key={ticket.id}
                   onClick={() => loadTicketDetails(ticket.id)}
-                  className={`w-full p-4 border-b border-gray-200 text-left hover:bg-gray-100/50 transition-colors ${
-                    selectedTicket?.id === ticket.id ? "bg-gray-100" : ""
+                  className={`w-full p-4 border-b border-border text-left hover:bg-surface-alt/50 transition-colors ${
+                    selectedTicket?.id === ticket.id ? "bg-surface-alt" : ""
                   }`}
                 >
                   <div className="flex items-start justify-between gap-2 mb-2">
-                    <span className="text-xs text-gray-500">
+                    <span className="text-xs text-muted">
                       {ticket.ticketNumber}
                     </span>
                     <StatusBadge
@@ -376,10 +376,10 @@ export default function SupportPage() {
                       config={supportStatusConfig}
                     />
                   </div>
-                  <h3 className="text-gray-900 font-medium mb-1 line-clamp-1">
+                  <h3 className="text-heading font-medium mb-1 line-clamp-1">
                     {ticket.subject}
                   </h3>
-                  <div className="flex items-center gap-2 text-sm text-gray-500">
+                  <div className="flex items-center gap-2 text-sm text-muted">
                     <UserCircleIcon className="h-4 w-4" />
                     <span>{ticket.creator.displayName}</span>
                     <span>•</span>
@@ -390,7 +390,7 @@ export default function SupportPage() {
                       status={ticket.priority}
                       config={priorityConfig}
                     />
-                    <span className="text-xs text-gray-500">
+                    <span className="text-xs text-muted">
                       {formatTime(ticket.createdAt)}
                     </span>
                   </div>
@@ -404,10 +404,10 @@ export default function SupportPage() {
         {selectedTicket && (
           <div className="flex-1 flex flex-col">
             {/* Detail Header */}
-            <div className="p-4 border-b border-gray-200 flex items-center justify-between">
+            <div className="p-4 border-b border-border flex items-center justify-between">
               <div>
                 <div className="flex items-center gap-3 mb-1">
-                  <span className="text-gray-500">
+                  <span className="text-muted">
                     {selectedTicket.ticketNumber}
                   </span>
                   <StatusBadge
@@ -419,40 +419,40 @@ export default function SupportPage() {
                     config={priorityConfig}
                   />
                 </div>
-                <h2 className="text-lg font-semibold text-gray-900">
+                <h2 className="text-lg font-semibold text-heading">
                   {selectedTicket.subject}
                 </h2>
               </div>
               <Button
                 variant="secondary"
                 onClick={() => setSelectedTicket(null)}
-                className="text-gray-500 hover:text-gray-900 p-2"
+                className="text-muted hover:text-heading p-2"
               >
                 <XMarkIcon className="h-6 w-6" />
               </Button>
             </div>
 
             {/* Ticket Info */}
-            <div className="p-4 border-b border-gray-200 bg-white/50">
+            <div className="p-4 border-b border-border bg-surface-elevated/50">
               <div className="grid grid-cols-3 gap-4 text-sm">
                 <div>
-                  <span className="text-gray-500">Oluşturan</span>
-                  <p className="text-gray-900">
+                  <span className="text-muted">Oluşturan</span>
+                  <p className="text-heading">
                     {selectedTicket.creator.displayName}
                   </p>
-                  <p className="text-gray-500 text-xs">
+                  <p className="text-muted text-xs">
                     {selectedTicket.creator.email}
                   </p>
                 </div>
                 <div>
-                  <span className="text-gray-500">Kategori</span>
-                  <p className="text-gray-900">
+                  <span className="text-muted">Kategori</span>
+                  <p className="text-heading">
                     {getCategoryLabel(selectedTicket.category)}
                   </p>
                 </div>
                 <div>
-                  <span className="text-gray-500">Oluşturulma</span>
-                  <p className="text-gray-900">
+                  <span className="text-muted">Oluşturulma</span>
+                  <p className="text-heading">
                     {new Date(selectedTicket.createdAt).toLocaleString("tr-TR")}
                   </p>
                 </div>
@@ -460,13 +460,13 @@ export default function SupportPage() {
 
               {/* Status Change */}
               <div className="mt-4 flex items-center gap-2">
-                <span className="text-sm text-gray-500">Durum:</span>
+                <span className="text-sm text-muted">Durum:</span>
                 <Select
                   value={selectedTicket.status}
                   onChange={(e) =>
                     handleStatusChange(selectedTicket.id, e.target.value)
                   }
-                  className="w-auto bg-gray-100"
+                  className="w-auto bg-surface-alt"
                   selectSize="sm"
                 >
                   {STATUS_OPTIONS.filter((opt) => opt.value).map((opt) => (
@@ -486,13 +486,13 @@ export default function SupportPage() {
                   className={`rounded-lg p-4 ${
                     message.isInternal
                       ? "bg-warning-900/20 border border-warning-700"
-                      : "bg-gray-100"
+                      : "bg-surface-alt"
                   }`}
                 >
                   <div className="flex items-center justify-between mb-2">
                     <div className="flex items-center gap-2">
-                      <UserCircleIcon className="h-5 w-5 text-gray-500" />
-                      <span className="text-gray-900 font-medium">
+                      <UserCircleIcon className="h-5 w-5 text-muted" />
+                      <span className="text-heading font-medium">
                         {message.sender.displayName}
                       </span>
                       {message.isInternal && (
@@ -501,11 +501,11 @@ export default function SupportPage() {
                         </span>
                       )}
                     </div>
-                    <span className="text-xs text-gray-500">
+                    <span className="text-xs text-muted">
                       {formatTime(message.createdAt)}
                     </span>
                   </div>
-                  <p className="text-gray-600 whitespace-pre-wrap">
+                  <p className="text-muted whitespace-pre-wrap">
                     {message.content}
                   </p>
                 </div>
@@ -513,7 +513,7 @@ export default function SupportPage() {
             </div>
 
             {/* Reply Box */}
-            <div className="p-4 border-t border-gray-200">
+            <div className="p-4 border-t border-border">
               <div className="flex items-center gap-2 mb-2">
                 <Checkbox
                   id="internalNote"
@@ -528,7 +528,7 @@ export default function SupportPage() {
                   onChange={(e) => setReplyContent(e.target.value)}
                   placeholder="Yanıtınızı yazın..."
                   rows={3}
-                  className="flex-1 bg-gray-100 px-4 text-gray-900 resize-none"
+                  className="flex-1 bg-surface-alt px-4 text-heading resize-none"
                 />
                 <Button
                   onClick={handleReply}

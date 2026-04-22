@@ -420,9 +420,9 @@ export default function MessagesPage() {
   const showPlaceholder = !mounted || authLoading || !isAuthenticated;
   if (showPlaceholder) {
     return (
-      <div className="min-h-screen bg-gray-50 text-gray-900 flex flex-col">
+      <div className="min-h-screen bg-surface text-heading flex flex-col">
         <div className="flex-1 flex items-center justify-center">
-          <div className="animate-pulse text-gray-500 text-sm">
+          <div className="animate-pulse text-muted text-sm">
             {locale === 'en' ? 'Loading...' : 'Yükleniyor...'}
           </div>
         </div>
@@ -431,13 +431,13 @@ export default function MessagesPage() {
   }
 
   return (
-    <div className="min-h-screen bg-gray-50 text-gray-900 flex flex-col">
-      <div className="flex-1 flex min-h-0 mx-auto w-full max-w-full lg:max-w-[90%] xl:max-w-[85%] overflow-hidden bg-white border-x border-gray-200 sm:mt-0">
+    <div className="min-h-screen bg-surface text-heading flex flex-col">
+      <div className="flex-1 flex min-h-0 mx-auto w-full max-w-full lg:max-w-[90%] xl:max-w-[85%] overflow-hidden bg-surface-elevated border-x border-border sm:mt-0">
         {/* Sol panel: Konuşma listesi */}
-        <div className={`${selectedThread ? 'hidden sm:flex' : 'flex'} w-full sm:w-80 flex-col min-h-0 bg-white border-r border-gray-200`}>
-          <div className="flex-shrink-0 px-4 py-4 border-b border-gray-200 bg-white">
-            <h1 className="text-lg font-semibold text-gray-900">{t('message.messages')}</h1>
-            <p className="text-xs text-gray-500 mt-0.5">
+        <div className={`${selectedThread ? 'hidden sm:flex' : 'flex'} w-full sm:w-80 flex-col min-h-0 bg-surface-elevated border-r border-border`}>
+          <div className="flex-shrink-0 px-4 py-4 border-b border-border bg-surface-elevated">
+            <h1 className="text-lg font-semibold text-heading">{t('message.messages')}</h1>
+            <p className="text-xs text-muted mt-0.5">
               {locale === 'en' ? 'Select a conversation' : 'Bir sohbet seçin'}
             </p>
           </div>
@@ -447,7 +447,7 @@ export default function MessagesPage() {
               <Spinner size="lg" />
             </div>
           ) : threads.length === 0 ? (
-            <div className="flex-1 flex items-center justify-center text-gray-500 p-6 text-center text-sm">
+            <div className="flex-1 flex items-center justify-center text-muted p-6 text-center text-sm">
               {t('message.noMessages')}
             </div>
           ) : (
@@ -458,21 +458,21 @@ export default function MessagesPage() {
                   <Button variant="secondary" key={thread.id}
                     type="button"
                     onClick={() => setSelectedThread(thread)}
-                    className={`w-full text-left px-4 py-3 transition-colors border-l-4 border-b border-gray-100 last:border-b-0 ${
+                    className={`w-full text-left px-4 py-3 transition-colors border-l-4 border-b border-border-subtle last:border-b-0 ${
                       isSelected
                         ? 'border-l-primary-500 bg-primary-50/60'
-                        : 'border-l-transparent hover:bg-gray-50'
+                        : 'border-l-transparent hover:bg-surface'
                     }`}>
                     <div className="flex items-center gap-3">
                       <div className="relative flex-shrink-0">
                         <UserAvatar displayName={thread.otherUser?.displayName} avatarUrl={thread.otherUser?.avatarUrl} size="sm" className="!w-11 !h-11" />
                         {thread.unreadCount > 0 && (
-                          <span className="absolute -top-0.5 -right-0.5 w-4 h-4 bg-primary-500 rounded-full border-2 border-white" />
+                          <span className="absolute -top-0.5 -right-0.5 w-4 h-4 bg-primary-500 rounded-full border-2 border-surface-elevated" />
                         )}
                       </div>
                       <div className="flex-1 min-w-0">
                         <div className="flex items-center justify-between gap-2">
-                          <span className="font-medium text-gray-900 truncate text-sm">
+                          <span className="font-medium text-heading truncate text-sm">
                             {thread.otherUser?.displayName || 'Kullanıcı'}
                           </span>
                           {thread.unreadCount > 0 && (
@@ -482,7 +482,7 @@ export default function MessagesPage() {
                           )}
                         </div>
                         {thread.lastMessage && (
-                          <p className="text-sm text-gray-500 truncate mt-0.5">
+                          <p className="text-sm text-muted truncate mt-0.5">
                             {thread.lastMessage.isFromMe ? (locale === 'en' ? 'You: ' : 'Sen: ') : ''}
                             {thread.lastMessage.content}
                           </p>
@@ -496,7 +496,7 @@ export default function MessagesPage() {
                 );
               })}
               {hasMoreThreads && (
-                <div className="flex-shrink-0 p-2 border-t border-gray-100">
+                <div className="flex-shrink-0 p-2 border-t border-border-subtle">
                   <Button variant="secondary" type="button"
                     onClick={() => setThreadsExpanded(true)}
                     className="w-full py-2.5 text-sm font-medium text-primary-600 hover:text-primary-700 hover:bg-primary-50 rounded-lg transition-colors">
@@ -509,18 +509,18 @@ export default function MessagesPage() {
         </div>
 
         {/* Sağ panel: Sohbet alanı */}
-        <div className={`${selectedThread ? 'flex' : 'hidden sm:flex'} flex-1 flex-col min-h-0 bg-gray-50 min-w-0`}>
+        <div className={`${selectedThread ? 'flex' : 'hidden sm:flex'} flex-1 flex-col min-h-0 bg-surface min-w-0`}>
           {selectedThread ? (
             <>
               {/* Sohbet başlığı (sabit) */}
-              <div className="flex-shrink-0 px-4 py-3 bg-white border-b border-gray-200 flex items-center gap-3 shadow-sm">
+              <div className="flex-shrink-0 px-4 py-3 bg-surface-elevated border-b border-border flex items-center gap-3 shadow-sm">
                 <Button variant="secondary" onClick={() => setSelectedThread(null)}
-                  className="sm:hidden p-1 -ml-1 mr-1 text-gray-500 hover:text-gray-700">
+                  className="sm:hidden p-1 -ml-1 mr-1 text-muted hover:text-body">
                   <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" /></svg>
                 </Button>
                 <UserAvatar displayName={selectedThread.otherUser?.displayName} avatarUrl={selectedThread.otherUser?.avatarUrl} size="sm" className="flex-shrink-0" />
                 <div className="flex-1 min-w-0">
-                  <p className="font-semibold text-gray-900 text-sm truncate">
+                  <p className="font-semibold text-heading text-sm truncate">
                     {selectedThread.otherUser?.displayName || 'Kullanıcı'}
                   </p>
                   {selectedThread.product && (
@@ -545,8 +545,8 @@ export default function MessagesPage() {
                         <div
                           className={`max-w-[85%] sm:max-w-[75%] px-4 py-2.5 rounded-2xl shadow-sm ${
                             isFromMe
-                              ? 'bg-primary-500 text-white rounded-br-md'
-                              : 'bg-white text-gray-900 border border-gray-200 rounded-bl-md'
+                              ? 'bg-primary-500 text-inverted rounded-br-md'
+                              : 'bg-surface-elevated text-heading border border-border rounded-bl-md'
                           } ${
                             message.status === 'pending'
                               ? 'opacity-60'
@@ -568,7 +568,7 @@ export default function MessagesPage() {
                           </div>
                           <div className="flex items-center justify-end gap-1.5 mt-1">
                             <span
-                              className={`text-xs ${isFromMe ? 'text-white/80' : 'text-gray-400'}`}
+                              className={`text-xs ${isFromMe ? 'text-inverted/80' : 'text-subtle'}`}
                             >
                               {new Date(message.createdAt).toLocaleTimeString('tr-TR', {
                                 hour: '2-digit',
@@ -587,7 +587,7 @@ export default function MessagesPage() {
               </div>
 
               {/* Yazma kutusu - altta sabit */}
-              <div className="flex-shrink-0 p-4 pt-2 bg-white border-t border-gray-200">
+              <div className="flex-shrink-0 p-4 pt-2 bg-surface-elevated border-t border-border">
                   {contentWarning && (
                     <div className="mb-3 px-3 py-2 bg-warning-50 border border-warning-200 rounded-lg text-warning-800 text-xs">
                       ⚠️ {contentWarning}
@@ -597,7 +597,7 @@ export default function MessagesPage() {
                     <div className="flex flex-wrap gap-2 mb-2">
                       {attachedUrls.map((url, i) => (
                         <div key={i} className="relative">
-                          <img src={url} alt="" className="w-14 h-14 object-cover rounded-lg border border-gray-200" />
+                          <img src={url} alt="" className="w-14 h-14 object-cover rounded-lg border border-border" />
                           <Button variant="secondary" type="button"
                             onClick={() => {
                               if (!selectedThread) return;
@@ -609,7 +609,7 @@ export default function MessagesPage() {
                                 },
                               }));
                             }}
-                            className="absolute -top-1 -right-1 w-5 h-5 bg-danger-600 text-white rounded-full flex items-center justify-center text-xs hover:bg-danger-700">
+                            className="absolute -top-1 -right-1 w-5 h-5 bg-danger-600 text-inverted rounded-full flex items-center justify-center text-xs hover:bg-danger-700">
                             ×
                           </Button>
                         </div>
@@ -622,7 +622,7 @@ export default function MessagesPage() {
                       onClick={() => fileInputRef.current?.click()}
                       disabled={attaching}
                       title={locale === 'en' ? 'Attach image' : 'Resim ekle'}
-                      className="flex-shrink-0 p-2.5 rounded-xl border border-gray-200 bg-gray-50 hover:bg-gray-100 text-gray-600 disabled:opacity-50">
+                      className="flex-shrink-0 p-2.5 rounded-xl border border-border bg-surface hover:bg-surface-alt text-muted disabled:opacity-50">
                       {attaching ? (
                         <span className="text-xs">...</span>
                       ) : (
@@ -637,7 +637,7 @@ export default function MessagesPage() {
                       onKeyDown={(e) => e.key === 'Enter' && !e.shiftKey && sendMessage()}
                       placeholder={t('message.typeMessage')}
                       maxLength={maxMessageLength}
-                      className={`flex-1 px-4 py-2.5 text-sm bg-gray-50 border border-gray-200 rounded-xl text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-primary-500 ${
+                      className={`flex-1 px-4 py-2.5 text-sm bg-surface border border-border rounded-xl text-heading placeholder-subtle focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-primary-500 ${
                         contentWarning ? 'border-warning-400 ring-1 ring-warning-200' : ''
                       }`} />
                     <Button
@@ -651,17 +651,17 @@ export default function MessagesPage() {
                       {sending ? '...' : t('common.send')}
                     </Button>
                   </div>
-                  <p className="text-xs text-gray-300 mt-1.5">{newMessage.length}/{maxMessageLength}</p>
+                  <p className="text-xs text-border-strong mt-1.5">{newMessage.length}/{maxMessageLength}</p>
               </div>
             </>
           ) : (
-            <div className="flex-1 hidden sm:flex flex-col items-center justify-center text-gray-500 p-8 text-center">
-              <div className="w-16 h-16 rounded-full bg-gray-200 flex items-center justify-center text-gray-400 mb-4">
+            <div className="flex-1 hidden sm:flex flex-col items-center justify-center text-muted p-8 text-center">
+              <div className="w-16 h-16 rounded-full bg-border-subtle flex items-center justify-center text-subtle mb-4">
                 <svg className="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
                 </svg>
               </div>
-              <p className="font-medium text-gray-600">{t('message.selectConversation')}</p>
+              <p className="font-medium text-muted">{t('message.selectConversation')}</p>
               <p className="text-sm mt-1">{locale === 'en' ? 'Choose a thread from the list' : 'Listeden bir sohbet seçin'}</p>
             </div>
           )}

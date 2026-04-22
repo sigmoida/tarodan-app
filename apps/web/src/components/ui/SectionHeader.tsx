@@ -31,7 +31,7 @@ export default function SectionHeader({
       {viewAllHref && (
         <Link
           href={viewAllHref}
-          className="inline-flex items-center gap-1.5 text-sm font-medium text-gray-500 hover:text-primary-600 px-3 py-1.5 border border-gray-200 hover:border-primary-300 bg-white hover:bg-primary-50 transition-all duration-200 flex-shrink-0"
+          className="inline-flex items-center gap-1.5 text-sm font-medium text-muted hover:text-primary-600 px-3 py-1.5 border border-border hover:border-primary-300 bg-surface-elevated hover:bg-primary-50 transition-all duration-200 flex-shrink-0"
           style={{borderRadius:'4px'}}
         >
           {viewAllLabel}

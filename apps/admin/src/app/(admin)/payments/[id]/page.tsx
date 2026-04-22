@@ -65,7 +65,7 @@ const statusConfig: Record<string, { label: string; color: string; bg: string }>
   processing: { label: 'İşleniyor', color: 'text-info-600', bg: 'bg-info-100' },
   completed: { label: 'Tamamlandı', color: 'text-success-600', bg: 'bg-success-100' },
   failed: { label: 'Başarısız', color: 'text-danger-600', bg: 'bg-danger-100' },
-  refunded: { label: 'İade Edildi', color: 'text-gray-600', bg: 'bg-gray-100' },
+  refunded: { label: 'İade Edildi', color: 'text-muted', bg: 'bg-surface-alt' },
 };
 
 export default function AdminPaymentDetailPage() {
@@ -145,7 +145,7 @@ export default function AdminPaymentDetailPage() {
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+      <div className="min-h-screen bg-surface flex items-center justify-center">
         <Spinner size="xl" />
       </div>
     );
@@ -153,8 +153,8 @@ export default function AdminPaymentDetailPage() {
 
   if (!payment) {
     return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
-        <p className="text-gray-500">Ödeme bulunamadı</p>
+      <div className="min-h-screen bg-surface flex items-center justify-center">
+        <p className="text-muted">Ödeme bulunamadı</p>
       </div>
     );
   }
@@ -162,19 +162,19 @@ export default function AdminPaymentDetailPage() {
   const statusInfo = statusConfig[payment.status] || statusConfig.pending;
 
   return (
-    <div className="min-h-screen bg-gray-50">
+    <div className="min-h-screen bg-surface">
       <main className="max-w-6xl mx-auto px-4 py-8">
         {/* Header */}
         <div className="flex items-center gap-4 mb-8">
           <Link
             href="/admin/payments"
-            className="p-2 hover:bg-gray-200 rounded-lg transition-colors"
+            className="p-2 hover:bg-border-subtle rounded-lg transition-colors"
           >
-            <ArrowLeftIcon className="w-6 h-6 text-gray-600" />
+            <ArrowLeftIcon className="w-6 h-6 text-muted" />
           </Link>
           <div className="flex-1">
-            <h1 className="text-3xl font-bold text-gray-900">Ödeme Detayı</h1>
-            <p className="text-sm text-gray-500">Sipariş #{payment.orderNumber}</p>
+            <h1 className="text-3xl font-bold text-heading">Ödeme Detayı</h1>
+            <p className="text-sm text-muted">Sipariş #{payment.orderNumber}</p>
           </div>
           <span className={`px-4 py-2 rounded-full font-medium ${statusInfo.color} ${statusInfo.bg}`}>
             {statusInfo.label}
@@ -185,32 +185,32 @@ export default function AdminPaymentDetailPage() {
           {/* Main Content */}
           <div className="lg:col-span-2 space-y-6">
             {/* Payment Info */}
-            <div className="bg-white rounded-xl shadow-sm p-6">
-              <h2 className="text-lg font-semibold text-gray-900 mb-4 flex items-center gap-2">
+            <div className="bg-surface-elevated rounded-xl shadow-sm p-6">
+              <h2 className="text-lg font-semibold text-heading mb-4 flex items-center gap-2">
                 <CreditCardIcon className="w-5 h-5" />
                 Ödeme Bilgileri
               </h2>
               <div className="space-y-3">
                 <div className="flex justify-between">
-                  <span className="text-gray-600">Ödeme ID:</span>
+                  <span className="text-muted">Ödeme ID:</span>
                   <span className="font-mono text-sm">{payment.id}</span>
                 </div>
                 <div className="flex justify-between">
-                  <span className="text-gray-600">Tutar:</span>
+                  <span className="text-muted">Tutar:</span>
                   <span className="font-semibold text-lg">
                     ₺{payment.amount.toLocaleString('tr-TR', { minimumFractionDigits: 2 })}
                   </span>
                 </div>
                 <div className="flex justify-between">
-                  <span className="text-gray-600">Para Birimi:</span>
+                  <span className="text-muted">Para Birimi:</span>
                   <span>{payment.currency}</span>
                 </div>
                 <div className="flex justify-between">
-                  <span className="text-gray-600">Ödeme Sağlayıcı:</span>
+                  <span className="text-muted">Ödeme Sağlayıcı:</span>
                   <span className="uppercase">{payment.provider}</span>
                 </div>
                 <div className="flex justify-between">
-                  <span className="text-gray-600">Transaction ID:</span>
+                  <span className="text-muted">Transaction ID:</span>
                   <span className="font-mono text-sm">
                     {payment.providerPaymentId || payment.providerConversationId || 'N/A'}
                   </span>
@@ -223,14 +223,14 @@ export default function AdminPaymentDetailPage() {
                   </div>
                 )}
                 <div className="flex justify-between pt-3 border-t">
-                  <span className="text-gray-600">Oluşturulma:</span>
+                  <span className="text-muted">Oluşturulma:</span>
                   <span className="text-sm">
                     {new Date(payment.createdAt).toLocaleString('tr-TR')}
                   </span>
                 </div>
                 {payment.paidAt && (
                   <div className="flex justify-between">
-                    <span className="text-gray-600">Ödeme Tarihi:</span>
+                    <span className="text-muted">Ödeme Tarihi:</span>
                     <span className="text-sm">
                       {new Date(payment.paidAt).toLocaleString('tr-TR')}
                     </span>
@@ -240,11 +240,11 @@ export default function AdminPaymentDetailPage() {
             </div>
 
             {/* Order Info */}
-            <div className="bg-white rounded-xl shadow-sm p-6">
-              <h2 className="text-lg font-semibold text-gray-900 mb-4">Sipariş Bilgileri</h2>
+            <div className="bg-surface-elevated rounded-xl shadow-sm p-6">
+              <h2 className="text-lg font-semibold text-heading mb-4">Sipariş Bilgileri</h2>
               <div className="space-y-3">
                 <div className="flex justify-between">
-                  <span className="text-gray-600">Sipariş No:</span>
+                  <span className="text-muted">Sipariş No:</span>
                   <Link
                     href={`/orders/${payment.orderId}`}
                     className="text-primary-600 hover:text-primary-700 font-medium"
@@ -253,61 +253,61 @@ export default function AdminPaymentDetailPage() {
                   </Link>
                 </div>
                 <div className="flex justify-between">
-                  <span className="text-gray-600">Ürün:</span>
+                  <span className="text-muted">Ürün:</span>
                   <span>{payment.order.product.title}</span>
                 </div>
                 <div className="flex justify-between">
-                  <span className="text-gray-600">Sipariş Durumu:</span>
+                  <span className="text-muted">Sipariş Durumu:</span>
                   <span>{payment.order.status}</span>
                 </div>
                 <div className="flex justify-between">
-                  <span className="text-gray-600">Toplam Tutar:</span>
+                  <span className="text-muted">Toplam Tutar:</span>
                   <span>₺{payment.order.totalAmount.toLocaleString('tr-TR', { minimumFractionDigits: 2 })}</span>
                 </div>
                 <div className="flex justify-between">
-                  <span className="text-gray-600">Komisyon:</span>
+                  <span className="text-muted">Komisyon:</span>
                   <span>₺{payment.order.commissionAmount.toLocaleString('tr-TR', { minimumFractionDigits: 2 })}</span>
                 </div>
               </div>
             </div>
 
             {/* User Info */}
-            <div className="bg-white rounded-xl shadow-sm p-6">
-              <h2 className="text-lg font-semibold text-gray-900 mb-4">Kullanıcı Bilgileri</h2>
+            <div className="bg-surface-elevated rounded-xl shadow-sm p-6">
+              <h2 className="text-lg font-semibold text-heading mb-4">Kullanıcı Bilgileri</h2>
               <div className="space-y-4">
                 <div>
-                  <p className="text-sm text-gray-600 mb-1">Alıcı</p>
+                  <p className="text-sm text-muted mb-1">Alıcı</p>
                   <p className="font-medium">{payment.order.buyer.displayName}</p>
-                  <p className="text-sm text-gray-500">{payment.order.buyer.email}</p>
+                  <p className="text-sm text-muted">{payment.order.buyer.email}</p>
                 </div>
                 <div>
-                  <p className="text-sm text-gray-600 mb-1">Satıcı</p>
+                  <p className="text-sm text-muted mb-1">Satıcı</p>
                   <p className="font-medium">{payment.order.seller.displayName}</p>
-                  <p className="text-sm text-gray-500">{payment.order.seller.email}</p>
+                  <p className="text-sm text-muted">{payment.order.seller.email}</p>
                 </div>
               </div>
             </div>
 
             {/* Payment Holds */}
             {payment.paymentHolds && payment.paymentHolds.length > 0 && (
-              <div className="bg-white rounded-xl shadow-sm p-6">
-                <h2 className="text-lg font-semibold text-gray-900 mb-4">Ödeme Bekletmeleri</h2>
+              <div className="bg-surface-elevated rounded-xl shadow-sm p-6">
+                <h2 className="text-lg font-semibold text-heading mb-4">Ödeme Bekletmeleri</h2>
                 <div className="space-y-3">
                   {payment.paymentHolds.map((hold) => (
-                    <div key={hold.id} className="p-3 bg-gray-50 rounded-lg">
+                    <div key={hold.id} className="p-3 bg-surface rounded-lg">
                       <div className="flex justify-between">
-                        <span className="text-gray-600">Tutar:</span>
+                        <span className="text-muted">Tutar:</span>
                         <span className="font-semibold">
                           ₺{hold.amount.toLocaleString('tr-TR', { minimumFractionDigits: 2 })}
                         </span>
                       </div>
                       <div className="flex justify-between">
-                        <span className="text-gray-600">Durum:</span>
+                        <span className="text-muted">Durum:</span>
                         <span>{hold.status}</span>
                       </div>
                       {hold.releaseAt && (
                         <div className="flex justify-between">
-                          <span className="text-gray-600">Serbest Bırakma:</span>
+                          <span className="text-muted">Serbest Bırakma:</span>
                           <span className="text-sm">
                             {new Date(hold.releaseAt).toLocaleDateString('tr-TR')}
                           </span>
@@ -323,8 +323,8 @@ export default function AdminPaymentDetailPage() {
           {/* Sidebar */}
           <div className="space-y-6">
             {/* Admin Actions */}
-            <div className="bg-white rounded-xl shadow-sm p-6">
-              <h2 className="text-lg font-semibold text-gray-900 mb-4">Admin İşlemleri</h2>
+            <div className="bg-surface-elevated rounded-xl shadow-sm p-6">
+              <h2 className="text-lg font-semibold text-heading mb-4">Admin İşlemleri</h2>
               <div className="space-y-3">
                 {payment.status === 'completed' && (
                   <Button
@@ -360,9 +360,9 @@ export default function AdminPaymentDetailPage() {
 
             {/* Metadata */}
             {payment.metadata && Object.keys(payment.metadata).length > 0 && (
-              <div className="bg-white rounded-xl shadow-sm p-6">
-                <h2 className="text-lg font-semibold text-gray-900 mb-4">Metadata</h2>
-                <pre className="text-xs bg-gray-50 p-3 rounded-lg overflow-auto">
+              <div className="bg-surface-elevated rounded-xl shadow-sm p-6">
+                <h2 className="text-lg font-semibold text-heading mb-4">Metadata</h2>
+                <pre className="text-xs bg-surface p-3 rounded-lg overflow-auto">
                   {JSON.stringify(payment.metadata, null, 2)}
                 </pre>
               </div>
@@ -372,14 +372,14 @@ export default function AdminPaymentDetailPage() {
 
         {/* Refund Modal */}
         {showRefundModal && (
-          <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-            <div className="bg-white rounded-xl p-6 max-w-md w-full mx-4">
-              <h2 className="text-xl font-bold text-gray-900 mb-4">Manuel İade</h2>
-              <p className="text-gray-600 mb-4">
+          <div className="fixed inset-0 bg-heading bg-opacity-50 flex items-center justify-center z-50">
+            <div className="bg-surface-elevated rounded-xl p-6 max-w-md w-full mx-4">
+              <h2 className="text-xl font-bold text-heading mb-4">Manuel İade</h2>
+              <p className="text-muted mb-4">
                 Toplam ödeme tutarı: ₺{payment.amount.toLocaleString('tr-TR', { minimumFractionDigits: 2 })}
               </p>
               <div className="mb-4">
-                <label className="block text-sm font-medium text-gray-700 mb-2">
+                <label className="block text-sm font-medium text-body mb-2">
                   İade Tutarı (Boş bırakırsanız tam iade yapılır)
                 </label>
                 <Input type="number"
@@ -391,7 +391,7 @@ export default function AdminPaymentDetailPage() {
                   placeholder="İade tutarı (opsiyonel)" />
               </div>
               <div className="mb-4">
-                <label className="block text-sm font-medium text-gray-700 mb-2">
+                <label className="block text-sm font-medium text-body mb-2">
                   İade Nedeni (Opsiyonel)
                 </label>
                 <Textarea value={refundReason}
@@ -430,17 +430,17 @@ export default function AdminPaymentDetailPage() {
 
         {/* Cancel Modal */}
         {showCancelModal && (
-          <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-            <div className="bg-white rounded-xl p-6 max-w-md w-full mx-4">
-              <h2 className="text-xl font-bold text-gray-900 mb-4 flex items-center gap-2">
+          <div className="fixed inset-0 bg-heading bg-opacity-50 flex items-center justify-center z-50">
+            <div className="bg-surface-elevated rounded-xl p-6 max-w-md w-full mx-4">
+              <h2 className="text-xl font-bold text-heading mb-4 flex items-center gap-2">
                 <ExclamationTriangleIcon className="w-6 h-6 text-primary-500" />
                 Zorla İptal
               </h2>
-              <p className="text-gray-600 mb-4">
+              <p className="text-muted mb-4">
                 Bu ödemeyi zorla iptal etmek istediğinizden emin misiniz? Bu işlem geri alınamaz.
               </p>
               <div className="mb-4">
-                <label className="block text-sm font-medium text-gray-700 mb-2">
+                <label className="block text-sm font-medium text-body mb-2">
                   İptal Nedeni <span className="text-danger-500">*</span>
                 </label>
                 <Textarea value={cancelReason}

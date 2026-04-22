@@ -702,7 +702,7 @@ export default function Home() {
   const viewAllLabel = locale === "en" ? "View All" : "Tümünü gör";
 
   return (
-    <div className="min-h-screen bg-gray-50">
+    <div className="min-h-screen bg-surface">
       {/* ── Hero ── */}
       <HeroSlider />
 
@@ -717,7 +717,7 @@ export default function Home() {
                 className="flex-shrink-0 group"
               >
                 <div
-                  className="w-24 h-14 sm:w-28 sm:h-16 bg-white border border-gray-200 hover:border-primary-300 flex items-center justify-center p-2.5 transition-all hover:shadow-sm relative"
+                  className="w-24 h-14 sm:w-28 sm:h-16 bg-surface-elevated border border-border hover:border-primary-300 flex items-center justify-center p-2.5 transition-all hover:shadow-sm relative"
                   style={{ borderRadius: "4px" }}
                 >
                   {brand.logoUrl ? (
@@ -732,7 +732,7 @@ export default function Home() {
                       logContext={{ page: "home-marquee", brand: brand.name }}
                     />
                   ) : (
-                    <span className="text-xs font-semibold text-gray-500 group-hover:text-primary-600 transition-colors text-center leading-tight">
+                    <span className="text-xs font-semibold text-muted group-hover:text-primary-600 transition-colors text-center leading-tight">
                       {brand.name}
                     </span>
                   )}
@@ -747,7 +747,7 @@ export default function Home() {
       <section className="py-3">
         <div className="px-3 sm:px-4 lg:px-6">
           <div
-            className="bg-white border border-gray-200 p-3 md:p-5"
+            className="bg-surface-elevated border border-border p-3 md:p-5"
             style={{ borderRadius: "4px" }}
           >
             <SectionHeader
@@ -807,10 +807,10 @@ export default function Home() {
                       className="block group"
                     >
                       <div
-                        className="overflow-hidden border border-gray-200 hover:border-primary-400 hover:shadow-soft transition-all"
+                        className="overflow-hidden border border-border hover:border-primary-400 hover:shadow-soft transition-all"
                         style={{ borderRadius: "4px" }}
                       >
-                        <div className="relative aspect-[4/3] bg-gray-100">
+                        <div className="relative aspect-[4/3] bg-surface-alt">
                           <OptimizedImage
                             src={getImageUrl(
                               product.images?.[0],
@@ -828,7 +828,7 @@ export default function Home() {
                           />
                           <div className="absolute top-1.5 left-1.5">
                             <span
-                              className="text-[10px] font-bold bg-danger-500 text-white px-1.5 py-0.5"
+                              className="text-[10px] font-bold bg-danger-500 text-inverted px-1.5 py-0.5"
                               style={{ borderRadius: "2px" }}
                             >
                               %{discountPct}
@@ -843,7 +843,7 @@ export default function Home() {
                             <div className="flex items-center gap-1.5 flex-wrap">
                               {isProductOnSaleDisplay(product) ? (
                                 <>
-                                  <span className="text-[10px] text-gray-500 line-through">
+                                  <span className="text-[10px] text-muted line-through">
                                     {getProductOriginalPriceForDisplay(
                                       product,
                                     ).toLocaleString("tr-TR", {
@@ -874,7 +874,7 @@ export default function Home() {
                                 </span>
                               )}
                             </div>
-                            <div className="flex items-center gap-1.5 text-[9px] text-gray-400">
+                            <div className="flex items-center gap-1.5 text-[9px] text-subtle">
                               <span className="flex items-center gap-0.5">
                                 <svg
                                   className="w-2.5 h-2.5"
@@ -960,10 +960,10 @@ export default function Home() {
                     className="block group"
                   >
                     <div
-                      className="overflow-hidden border border-gray-200 hover:border-primary-400 hover:shadow-soft transition-all"
+                      className="overflow-hidden border border-border hover:border-primary-400 hover:shadow-soft transition-all"
                       style={{ borderRadius: "4px" }}
                     >
-                      <div className="relative aspect-[4/3] bg-gray-100">
+                      <div className="relative aspect-[4/3] bg-surface-alt">
                         <OptimizedImage
                           src={getImageUrl(
                             product.images?.[0],
@@ -982,7 +982,7 @@ export default function Home() {
                         {idx < 3 && (
                           <div className="absolute top-1.5 left-1.5">
                             <span
-                              className="text-[10px] font-bold bg-primary-500 text-white px-1.5 py-0.5"
+                              className="text-[10px] font-bold bg-primary-500 text-inverted px-1.5 py-0.5"
                               style={{ borderRadius: "2px" }}
                             >
                               {locale === "en" ? "Popular" : "Popüler"}
@@ -1005,7 +1005,7 @@ export default function Home() {
                             )}{" "}
                             ₺
                           </p>
-                          <div className="flex items-center gap-1.5 text-[9px] text-gray-400">
+                          <div className="flex items-center gap-1.5 text-[9px] text-subtle">
                             <span className="flex items-center gap-0.5">
                               <svg
                                 className="w-2.5 h-2.5"
@@ -1053,7 +1053,7 @@ export default function Home() {
         <section className="py-3">
           <div className="px-3 sm:px-4 lg:px-6">
             <div
-              className="bg-white border border-gray-200 p-3 md:p-5"
+              className="bg-surface-elevated border border-border p-3 md:p-5"
               style={{ borderRadius: "4px" }}
             >
               <SectionHeader
@@ -1077,7 +1077,7 @@ export default function Home() {
                         <Button
                           variant="secondary"
                           onClick={handlePrevCollection}
-                          className="absolute left-0 top-1/2 -translate-y-1/2 z-10 w-10 h-10 rounded bg-white shadow-md flex items-center justify-center transition-all duration-300 hover:shadow-lg text-heading"
+                          className="absolute left-0 top-1/2 -translate-y-1/2 z-10 w-10 h-10 rounded bg-surface-elevated shadow-md flex items-center justify-center transition-all duration-300 hover:shadow-lg text-heading"
                           aria-label="Previous"
                         >
                           <ChevronLeftIcon className="w-4 h-4" />
@@ -1085,7 +1085,7 @@ export default function Home() {
                         <Button
                           variant="secondary"
                           onClick={handleNextCollection}
-                          className="absolute right-0 top-1/2 -translate-y-1/2 z-10 w-10 h-10 rounded bg-white shadow-md flex items-center justify-center transition-all duration-300 hover:shadow-lg text-heading"
+                          className="absolute right-0 top-1/2 -translate-y-1/2 z-10 w-10 h-10 rounded bg-surface-elevated shadow-md flex items-center justify-center transition-all duration-300 hover:shadow-lg text-heading"
                           aria-label="Next"
                         >
                           <ChevronRightIcon className="w-4 h-4" />
@@ -1149,7 +1149,7 @@ export default function Home() {
                                       }
                                       className="block"
                                     >
-                                      <div className="relative aspect-square bg-white rounded overflow-hidden border border-gray-100">
+                                      <div className="relative aspect-square bg-surface-elevated rounded overflow-hidden border border-border-subtle">
                                         <OptimizedImage
                                           src={getImageUrl(item.productImage)}
                                           alt={item.productTitle}
@@ -1185,7 +1185,7 @@ export default function Home() {
                             variant="secondary"
                             key={index}
                             onClick={() => setCurrentCollectionIndex(index)}
-                            className={`h-1.5 rounded-sm transition-all duration-300 ease-premium ${index === currentCollectionIndex ? "bg-primary-500 w-6" : "bg-gray-300 w-1.5"}`}
+                            className={`h-1.5 rounded-sm transition-all duration-300 ease-premium ${index === currentCollectionIndex ? "bg-primary-500 w-6" : "bg-border-strong w-1.5"}`}
                             aria-label={`Go to collection ${index + 1}`}
                           />
                         ))}
@@ -1209,27 +1209,27 @@ export default function Home() {
             <div className="grid gap-4 md:grid-cols-2">
               {isLoadingFeaturedCollector ? (
                 <div
-                  className="bg-white border border-gray-200 p-4"
+                  className="bg-surface-elevated border border-border p-4"
                   style={{ borderRadius: "4px" }}
                 >
                   <div className="animate-pulse space-y-3">
-                    <div className="h-5 bg-gray-200 rounded w-2/3" />
+                    <div className="h-5 bg-border-subtle rounded w-2/3" />
                     <div className="flex items-center gap-3">
-                      <div className="w-14 h-14 bg-gray-200 rounded-full" />
+                      <div className="w-14 h-14 bg-border-subtle rounded-full" />
                       <div className="flex-1 space-y-2">
-                        <div className="h-4 bg-gray-200 rounded w-1/2" />
-                        <div className="h-3 bg-gray-200 rounded w-1/3" />
+                        <div className="h-4 bg-border-subtle rounded w-1/2" />
+                        <div className="h-3 bg-border-subtle rounded w-1/3" />
                       </div>
                     </div>
                     <div className="grid grid-cols-5 gap-2">
                       {[...Array(5)].map((_, i) => (
                         <div
                           key={i}
-                          className="aspect-square bg-gray-200 rounded"
+                          className="aspect-square bg-border-subtle rounded"
                         />
                       ))}
                     </div>
-                    <div className="h-9 bg-gray-200 rounded w-full" />
+                    <div className="h-9 bg-border-subtle rounded w-full" />
                   </div>
                 </div>
               ) : featuredCollectorToShow ? (
@@ -1335,29 +1335,29 @@ export default function Home() {
               ) : null}
               {isLoadingCompany ? (
                 <div
-                  className="bg-white border border-gray-200 p-4"
+                  className="bg-surface-elevated border border-border p-4"
                   style={{ borderRadius: "4px" }}
                 >
                   <div className="animate-pulse space-y-3">
-                    <div className="h-5 bg-gray-200 rounded w-2/3" />
+                    <div className="h-5 bg-border-subtle rounded w-2/3" />
                     <div className="flex items-center gap-3">
-                      <div className="w-14 h-14 bg-gray-200 rounded-full" />
+                      <div className="w-14 h-14 bg-border-subtle rounded-full" />
                       <div className="flex-1 space-y-2">
-                        <div className="h-4 bg-gray-200 rounded w-1/2" />
-                        <div className="h-3 bg-gray-200 rounded w-1/3" />
+                        <div className="h-4 bg-border-subtle rounded w-1/2" />
+                        <div className="h-3 bg-border-subtle rounded w-1/3" />
                       </div>
                     </div>
                     <div className="grid grid-cols-4 gap-2">
                       {[...Array(4)].map((_, i) => (
-                        <div key={i} className="h-12 bg-gray-200 rounded" />
+                        <div key={i} className="h-12 bg-border-subtle rounded" />
                       ))}
                     </div>
-                    <div className="h-9 bg-gray-200 rounded w-full" />
+                    <div className="h-9 bg-border-subtle rounded w-full" />
                   </div>
                 </div>
               ) : companyOfWeek ? (
                 <div
-                  className="bg-white border border-gray-200 p-5 flex flex-col"
+                  className="bg-surface-elevated border border-border p-5 flex flex-col"
                   style={{ borderRadius: "4px" }}
                 >
                   <div className="flex justify-start mb-4">
@@ -1375,7 +1375,7 @@ export default function Home() {
                       companyName={companyOfWeek.companyName}
                       avatarUrl={companyOfWeek.avatarUrl}
                       size="lg"
-                      className="border-2 border-gray-100"
+                      className="border-2 border-border-subtle"
                     />
                     <div className="min-w-0">
                       <h3 className="text-sm font-bold text-heading flex items-center gap-1.5 mb-0.5">

@@ -83,7 +83,7 @@ const STATUS_CONFIG: Record<
   },
   inactive: {
     label: "Pasif",
-    color: "bg-gray-100 text-gray-700",
+    color: "bg-surface-alt text-body",
     icon: XCircleIcon,
   },
 };
@@ -199,7 +199,7 @@ export default function ProfileListingsPage() {
 
   if (authLoading) {
     return (
-      <div className="min-h-screen bg-gray-50">
+      <div className="min-h-screen bg-surface">
         <div className="flex items-center justify-center py-20">
           <Spinner size="xl" />
         </div>
@@ -208,13 +208,13 @@ export default function ProfileListingsPage() {
   }
 
   return (
-    <div className="min-h-screen bg-gray-50">
+    <div className="min-h-screen bg-surface">
       <main className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         {/* Header */}
         <div className="flex items-center justify-between mb-8">
           <div>
-            <h1 className="text-3xl font-bold text-gray-900">İlanlarım</h1>
-            <p className="text-gray-600 mt-1">Tüm ilanlarınızı yönetin</p>
+            <h1 className="text-3xl font-bold text-heading">İlanlarım</h1>
+            <p className="text-muted mt-1">Tüm ilanlarınızı yönetin</p>
           </div>
           <ButtonLink href="/listings/new" className="flex gap-2">
             <PlusIcon className="w-5 h-5" />
@@ -251,14 +251,14 @@ export default function ProfileListingsPage() {
               onClick={() => setActiveFilter(tab.value)}
               className={`px-4 py-2 rounded-sm font-medium transition-colors whitespace-nowrap ${
                 activeFilter === tab.value
-                  ? "bg-primary-500 text-white"
-                  : "bg-white text-gray-600 hover:bg-gray-100 border border-gray-200"
+                  ? "bg-primary-500 text-inverted"
+                  : "bg-surface-elevated text-muted hover:bg-surface-alt border border-border"
               }`}
             >
               {tab.label}
               {tab.value === "pending" &&
                 listings.filter((l) => l.status === "pending").length > 0 && (
-                  <span className="ml-2 bg-warning-500 text-white text-xs px-2 py-0.5 rounded-sm">
+                  <span className="ml-2 bg-warning-500 text-inverted text-xs px-2 py-0.5 rounded-sm">
                     {listings.filter((l) => l.status === "pending").length}
                   </span>
                 )}
@@ -271,23 +271,23 @@ export default function ProfileListingsPage() {
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
             {[...Array(6)].map((_, i) => (
               <div key={i} className="card p-4 animate-pulse">
-                <div className="aspect-square bg-gray-200 rounded mb-4" />
-                <div className="h-5 bg-gray-200 rounded w-3/4 mb-2" />
-                <div className="h-4 bg-gray-200 rounded w-1/2" />
+                <div className="aspect-square bg-border-subtle rounded mb-4" />
+                <div className="h-5 bg-border-subtle rounded w-3/4 mb-2" />
+                <div className="h-4 bg-border-subtle rounded w-1/2" />
               </div>
             ))}
           </div>
         ) : listings.length === 0 ? (
-          <div className="text-center py-16 bg-white rounded">
-            <div className="inline-flex items-center justify-center w-20 h-20 bg-gray-50 rounded-sm mb-4">
-              <ArchiveBoxIcon className="w-8 h-8 text-gray-400" />
+          <div className="text-center py-16 bg-surface-elevated rounded">
+            <div className="inline-flex items-center justify-center w-20 h-20 bg-surface rounded-sm mb-4">
+              <ArchiveBoxIcon className="w-8 h-8 text-subtle" />
             </div>
-            <h3 className="text-xl font-semibold text-gray-900 mb-2">
+            <h3 className="text-xl font-semibold text-heading mb-2">
               {activeFilter
                 ? "Bu filtreye uygun ilan yok"
                 : "Henüz ilanınız yok"}
             </h3>
-            <p className="text-gray-600 mb-6">
+            <p className="text-muted mb-6">
               Koleksiyonunuzdaki ürünleri satışa çıkarın
             </p>
             <ButtonLink href="/listings/new">
@@ -310,7 +310,7 @@ export default function ProfileListingsPage() {
                   className="card overflow-hidden"
                 >
                   <div className="relative">
-                    <div className="aspect-square bg-gray-100">
+                    <div className="aspect-square bg-surface-alt">
                       <OptimizedImage
                         src={getImageUrl(listing)}
                         alt={listing.title}
@@ -334,13 +334,13 @@ export default function ProfileListingsPage() {
                   </div>
 
                   <div className="p-4">
-                    <h3 className="font-semibold text-gray-900 line-clamp-2 mb-2">
+                    <h3 className="font-semibold text-heading line-clamp-2 mb-2">
                       {listing.title}
                     </h3>
                     <div className="mb-3">
                       {isProductOnSaleDisplay(listing) && (
                         <div className="flex items-center gap-2 mb-0.5">
-                          <span className="text-sm text-gray-400 line-through">
+                          <span className="text-sm text-subtle line-through">
                             {getProductOriginalPriceForDisplay(
                               listing,
                             ).toLocaleString("tr-TR", {
@@ -349,7 +349,7 @@ export default function ProfileListingsPage() {
                             })}{" "}
                             TL
                           </span>
-                          <span className="bg-danger-500 text-white text-xs font-bold px-1.5 py-0.5 rounded">
+                          <span className="bg-danger-500 text-inverted text-xs font-bold px-1.5 py-0.5 rounded">
                             İndirim
                           </span>
                         </div>
@@ -378,7 +378,7 @@ export default function ProfileListingsPage() {
                         )}
                     </div>
 
-                    <div className="flex items-center justify-between text-sm text-gray-500 mb-3">
+                    <div className="flex items-center justify-between text-sm text-muted mb-3">
                       <span>
                         {new Date(listing.createdAt).toLocaleDateString(
                           "tr-TR",
@@ -390,10 +390,10 @@ export default function ProfileListingsPage() {
                           listing.rating.count > 0 && (
                             <span className="flex items-center gap-1">
                               <StarIcon className="w-4 h-4 text-warning-400" />
-                              <span className="text-sm font-semibold text-gray-900">
+                              <span className="text-sm font-semibold text-heading">
                                 {listing.rating.average.toFixed(1)}
                               </span>
-                              <span className="text-xs text-gray-400">
+                              <span className="text-xs text-subtle">
                                 ({listing.rating.count})
                               </span>
                             </span>
@@ -410,7 +410,7 @@ export default function ProfileListingsPage() {
                     {listing.status === "sold" && (
                       <div className="bg-primary-50 border border-primary-200 rounded-lg p-3 mb-3 space-y-1.5 text-sm">
                         {listing.soldAt && (
-                          <div className="flex items-center gap-2 text-gray-600">
+                          <div className="flex items-center gap-2 text-muted">
                             <CalendarDaysIcon className="w-4 h-4 text-primary-500" />
                             <span>
                               Satış:{" "}
@@ -421,13 +421,13 @@ export default function ProfileListingsPage() {
                           </div>
                         )}
                         {listing.buyer && (
-                          <div className="flex items-center gap-2 text-gray-600">
+                          <div className="flex items-center gap-2 text-muted">
                             <UserIcon className="w-4 h-4 text-primary-500" />
                             <span>Alıcı: @{listing.buyer.displayName}</span>
                           </div>
                         )}
                         {listing.soldPrice != null && (
-                          <div className="flex items-center gap-2 text-gray-700 font-medium">
+                          <div className="flex items-center gap-2 text-body font-medium">
                             <CurrencyDollarIcon className="w-4 h-4 text-success-600" />
                             <span>
                               {listing.soldPrice.toLocaleString("tr-TR", {
@@ -447,7 +447,7 @@ export default function ProfileListingsPage() {
                       ) && (
                         <Link
                           href={`/listings/${listing.id}`}
-                          className="flex-1 py-2 text-center bg-gray-100 hover:bg-gray-200 rounded text-sm font-medium transition-colors"
+                          className="flex-1 py-2 text-center bg-surface-alt hover:bg-border-subtle rounded text-sm font-medium transition-colors"
                         >
                           Görüntüle
                         </Link>
@@ -457,7 +457,7 @@ export default function ProfileListingsPage() {
                       ) && (
                         <Link
                           href={`/listings/${listing.id}/edit`}
-                          className="flex-1 py-2 text-center bg-primary-500 hover:bg-primary-600 text-white rounded text-sm font-medium transition-colors flex items-center justify-center gap-1"
+                          className="flex-1 py-2 text-center bg-primary-500 hover:bg-primary-600 text-inverted rounded text-sm font-medium transition-colors flex items-center justify-center gap-1"
                         >
                           <PencilIcon className="w-4 h-4" />
                           Düzenle
@@ -466,7 +466,7 @@ export default function ProfileListingsPage() {
                       {listing.status === "sold" && listing.orderId && (
                         <Link
                           href={`/orders?highlight=${listing.orderId}`}
-                          className="flex-1 py-2 text-center bg-primary-500 hover:bg-primary-600 text-white rounded text-sm font-medium transition-colors flex items-center justify-center gap-1"
+                          className="flex-1 py-2 text-center bg-primary-500 hover:bg-primary-600 text-inverted rounded text-sm font-medium transition-colors flex items-center justify-center gap-1"
                         >
                           <TruckIcon className="w-4 h-4" />
                           Sipariş Detayı
@@ -476,7 +476,7 @@ export default function ProfileListingsPage() {
                       listing.status === "inactive" ? (
                         <Link
                           href={`/listings/${listing.id}/edit`}
-                          className="flex-1 py-2 text-center bg-warning-500 hover:bg-warning-600 text-white rounded text-sm font-medium transition-colors flex items-center justify-center gap-1"
+                          className="flex-1 py-2 text-center bg-warning-500 hover:bg-warning-600 text-inverted rounded text-sm font-medium transition-colors flex items-center justify-center gap-1"
                         >
                           Yeniden Satışa Aç
                         </Link>

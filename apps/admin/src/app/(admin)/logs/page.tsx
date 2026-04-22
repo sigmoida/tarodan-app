@@ -174,20 +174,20 @@ export default function LogsPage() {
             <div className="p-6">
                 {/* Header */}
                 <div className="mb-6">
-                    <h1 className="text-2xl font-bold text-gray-900">Sistem Logları</h1>
-                    <p className="text-gray-500 mt-1">Hata, güvenlik ve e-posta loglarını inceleyin</p>
+                    <h1 className="text-2xl font-bold text-heading">Sistem Logları</h1>
+                    <p className="text-muted mt-1">Hata, güvenlik ve e-posta loglarını inceleyin</p>
                 </div>
 
                 {/* Tabs */}
-                <div className="flex space-x-1 mb-6 bg-white p-1 rounded-lg w-fit">
+                <div className="flex space-x-1 mb-6 bg-surface-elevated p-1 rounded-lg w-fit">
                     {tabs.map(tab => (
                         <Button variant="secondary" key={tab.id}
                             onClick={() => handleTabChange(tab.id)}
                             className={clsx(
                                 'flex items-center px-4 py-2 rounded-md text-sm font-medium transition-colors',
                                 activeTab === tab.id
-                                    ? 'bg-primary-500 text-gray-900'
-                                    : 'text-gray-500 hover:text-gray-900 hover:bg-gray-100'
+                                    ? 'bg-primary-500 text-heading'
+                                    : 'text-muted hover:text-heading hover:bg-surface-alt'
                             )}>
                             <tab.icon className="h-4 w-4 mr-2" />
                             {tab.name}
@@ -252,16 +252,16 @@ export default function LogsPage() {
                 {/* Search and Filters */}
                 <div className="flex items-center gap-4 mb-6">
                     <div className="relative flex-1 max-w-md">
-                        <MagnifyingGlassIcon className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-gray-500" />
+                        <MagnifyingGlassIcon className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-muted" />
                         <Input type="text"
                             placeholder="Ara..."
                             value={search}
                             onChange={(e) => setSearch(e.target.value)}
                             onKeyDown={(e) => e.key === 'Enter' && loadLogs()}
-                            className="pl-10 pr-4 border-gray-200 text-gray-900 placeholder-gray-500 focus:ring-1" />
+                            className="pl-10 pr-4 border-border text-heading placeholder-muted focus:ring-1" />
                     </div>
                     <Button variant="secondary" onClick={() => loadLogs()}
-                        className="p-2 bg-white border border-gray-200 rounded-lg text-gray-500 hover:text-gray-900">
+                        className="p-2 bg-surface-elevated border border-border rounded-lg text-muted hover:text-heading">
                         <ArrowPathIcon className={clsx('h-5 w-5', loading && 'animate-spin')} />
                     </Button>
                 </div>
@@ -275,31 +275,31 @@ export default function LogsPage() {
                     <>
                         {/* Error Logs Table */}
                         {activeTab === 'errors' && (
-                            <div className="bg-white rounded-lg border border-gray-200 overflow-hidden">
+                            <div className="bg-surface-elevated rounded-lg border border-border overflow-hidden">
                                 <div className="overflow-x-auto">
                                     <table className="w-full">
-                                        <thead className="bg-gray-100">
+                                        <thead className="bg-surface-alt">
                                             <tr>
-                                                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Seviye</th>
-                                                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Mesaj</th>
-                                                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Kaynak</th>
-                                                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Tarih</th>
+                                                <th className="px-4 py-3 text-left text-xs font-medium text-muted uppercase">Seviye</th>
+                                                <th className="px-4 py-3 text-left text-xs font-medium text-muted uppercase">Mesaj</th>
+                                                <th className="px-4 py-3 text-left text-xs font-medium text-muted uppercase">Kaynak</th>
+                                                <th className="px-4 py-3 text-left text-xs font-medium text-muted uppercase">Tarih</th>
                                             </tr>
                                         </thead>
-                                        <tbody className="divide-y divide-gray-200">
+                                        <tbody className="divide-y divide-border">
                                             {logs.length === 0 ? (
-                                                <tr><td colSpan={4} className="text-center py-8 text-gray-500">Log bulunamadı</td></tr>
+                                                <tr><td colSpan={4} className="text-center py-8 text-muted">Log bulunamadı</td></tr>
                                             ) : (
                                                 logs.map((log: ErrorLog) => (
-                                                    <tr key={log.id} className="hover:bg-gray-100/50">
+                                                    <tr key={log.id} className="hover:bg-surface-alt/50">
                                                         <td className="px-4 py-3">
                                                             <span className={clsx('px-2 py-1 text-xs rounded-full border', severityColors[log.severity])}>
                                                                 {log.severity.toUpperCase()}
                                                             </span>
                                                         </td>
-                                                        <td className="px-4 py-3 text-sm text-gray-900 max-w-md truncate">{log.message}</td>
-                                                        <td className="px-4 py-3 text-sm text-gray-500">{log.source}</td>
-                                                        <td className="px-4 py-3 text-sm text-gray-500 whitespace-nowrap">{formatDate(log.createdAt)}</td>
+                                                        <td className="px-4 py-3 text-sm text-heading max-w-md truncate">{log.message}</td>
+                                                        <td className="px-4 py-3 text-sm text-muted">{log.source}</td>
+                                                        <td className="px-4 py-3 text-sm text-muted whitespace-nowrap">{formatDate(log.createdAt)}</td>
                                                     </tr>
                                                 ))
                                             )}
@@ -311,26 +311,26 @@ export default function LogsPage() {
 
                         {/* Security Logs Table */}
                         {activeTab === 'security' && (
-                            <div className="bg-white rounded-lg border border-gray-200 overflow-hidden">
+                            <div className="bg-surface-elevated rounded-lg border border-border overflow-hidden">
                                 <div className="overflow-x-auto">
                                     <table className="w-full">
-                                        <thead className="bg-gray-100">
+                                        <thead className="bg-surface-alt">
                                             <tr>
-                                                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Olay</th>
-                                                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Seviye</th>
-                                                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">IP / E-posta</th>
-                                                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Durum</th>
-                                                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Tarih</th>
-                                                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">İşlem</th>
+                                                <th className="px-4 py-3 text-left text-xs font-medium text-muted uppercase">Olay</th>
+                                                <th className="px-4 py-3 text-left text-xs font-medium text-muted uppercase">Seviye</th>
+                                                <th className="px-4 py-3 text-left text-xs font-medium text-muted uppercase">IP / E-posta</th>
+                                                <th className="px-4 py-3 text-left text-xs font-medium text-muted uppercase">Durum</th>
+                                                <th className="px-4 py-3 text-left text-xs font-medium text-muted uppercase">Tarih</th>
+                                                <th className="px-4 py-3 text-left text-xs font-medium text-muted uppercase">İşlem</th>
                                             </tr>
                                         </thead>
-                                        <tbody className="divide-y divide-gray-200">
+                                        <tbody className="divide-y divide-border">
                                             {logs.length === 0 ? (
-                                                <tr><td colSpan={6} className="text-center py-8 text-gray-500">Log bulunamadı</td></tr>
+                                                <tr><td colSpan={6} className="text-center py-8 text-muted">Log bulunamadı</td></tr>
                                             ) : (
                                                 logs.map((log: SecurityLog) => (
-                                                    <tr key={log.id} className="hover:bg-gray-100/50">
-                                                        <td className="px-4 py-3 text-sm text-gray-900">
+                                                    <tr key={log.id} className="hover:bg-surface-alt/50">
+                                                        <td className="px-4 py-3 text-sm text-heading">
                                                             {eventTypeLabels[log.eventType] || log.eventType}
                                                         </td>
                                                         <td className="px-4 py-3">
@@ -338,7 +338,7 @@ export default function LogsPage() {
                                                                 {log.severity.toUpperCase()}
                                                             </span>
                                                         </td>
-                                                        <td className="px-4 py-3 text-sm text-gray-500">
+                                                        <td className="px-4 py-3 text-sm text-muted">
                                                             {log.ipAddress || log.email || '-'}
                                                         </td>
                                                         <td className="px-4 py-3">
@@ -352,7 +352,7 @@ export default function LogsPage() {
                                                                 </span>
                                                             )}
                                                         </td>
-                                                        <td className="px-4 py-3 text-sm text-gray-500 whitespace-nowrap">{formatDate(log.createdAt)}</td>
+                                                        <td className="px-4 py-3 text-sm text-muted whitespace-nowrap">{formatDate(log.createdAt)}</td>
                                                         <td className="px-4 py-3">
                                                             {!log.resolved && (
                                                                 <Button variant="secondary" onClick={() => handleResolve(log.id)}
@@ -372,33 +372,33 @@ export default function LogsPage() {
 
                         {/* Email Logs Table */}
                         {activeTab === 'emails' && (
-                            <div className="bg-white rounded-lg border border-gray-200 overflow-hidden">
+                            <div className="bg-surface-elevated rounded-lg border border-border overflow-hidden">
                                 <div className="overflow-x-auto">
                                     <table className="w-full">
-                                        <thead className="bg-gray-100">
+                                        <thead className="bg-surface-alt">
                                             <tr>
-                                                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Alıcı</th>
-                                                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Konu</th>
-                                                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Şablon</th>
-                                                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Durum</th>
-                                                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Tarih</th>
+                                                <th className="px-4 py-3 text-left text-xs font-medium text-muted uppercase">Alıcı</th>
+                                                <th className="px-4 py-3 text-left text-xs font-medium text-muted uppercase">Konu</th>
+                                                <th className="px-4 py-3 text-left text-xs font-medium text-muted uppercase">Şablon</th>
+                                                <th className="px-4 py-3 text-left text-xs font-medium text-muted uppercase">Durum</th>
+                                                <th className="px-4 py-3 text-left text-xs font-medium text-muted uppercase">Tarih</th>
                                             </tr>
                                         </thead>
-                                        <tbody className="divide-y divide-gray-200">
+                                        <tbody className="divide-y divide-border">
                                             {logs.length === 0 ? (
-                                                <tr><td colSpan={5} className="text-center py-8 text-gray-500">Log bulunamadı</td></tr>
+                                                <tr><td colSpan={5} className="text-center py-8 text-muted">Log bulunamadı</td></tr>
                                             ) : (
                                                 logs.map((log: EmailLog) => (
-                                                    <tr key={log.id} className="hover:bg-gray-100/50">
-                                                        <td className="px-4 py-3 text-sm text-gray-900">{log.to}</td>
-                                                        <td className="px-4 py-3 text-sm text-gray-500 max-w-xs truncate">{log.subject}</td>
-                                                        <td className="px-4 py-3 text-sm text-gray-500">{log.template || '-'}</td>
+                                                    <tr key={log.id} className="hover:bg-surface-alt/50">
+                                                        <td className="px-4 py-3 text-sm text-heading">{log.to}</td>
+                                                        <td className="px-4 py-3 text-sm text-muted max-w-xs truncate">{log.subject}</td>
+                                                        <td className="px-4 py-3 text-sm text-muted">{log.template || '-'}</td>
                                                         <td className="px-4 py-3">
                                                             <span className={clsx('px-2 py-1 text-xs rounded-full', statusColors[log.status])}>
                                                                 {log.status.toUpperCase()}
                                                             </span>
                                                         </td>
-                                                        <td className="px-4 py-3 text-sm text-gray-500 whitespace-nowrap">{formatDate(log.createdAt)}</td>
+                                                        <td className="px-4 py-3 text-sm text-muted whitespace-nowrap">{formatDate(log.createdAt)}</td>
                                                     </tr>
                                                 ))
                                             )}
@@ -411,19 +411,19 @@ export default function LogsPage() {
                         {/* Pagination */}
                         {meta && meta.totalPages > 1 && (
                             <div className="flex items-center justify-between mt-4">
-                                <p className="text-sm text-gray-500">
+                                <p className="text-sm text-muted">
                                     Sayfa {page} / {meta.totalPages}
                                     ({meta.total} kayıt)
                                 </p>
                                 <div className="flex space-x-2">
                                     <Button variant="secondary" onClick={() => setPage(p => Math.max(1, p - 1))}
                                         disabled={page === 1}
-                                        className="px-3 py-1 bg-white border border-gray-200 rounded text-sm text-gray-500 hover:text-gray-900 disabled:opacity-50">
+                                        className="px-3 py-1 bg-surface-elevated border border-border rounded text-sm text-muted hover:text-heading disabled:opacity-50">
                                         Önceki
                                     </Button>
                                     <Button variant="secondary" onClick={() => setPage(p => p + 1)}
                                         disabled={page >= meta.totalPages}
-                                        className="px-3 py-1 bg-white border border-gray-200 rounded text-sm text-gray-500 hover:text-gray-900 disabled:opacity-50">
+                                        className="px-3 py-1 bg-surface-elevated border border-border rounded text-sm text-muted hover:text-heading disabled:opacity-50">
                                         Sonraki
                                     </Button>
                                 </div>
@@ -442,7 +442,7 @@ function StatCard({ label, value, color }: { label: string; value: string | numb
         yellow: 'bg-warning-500/10 border-warning-500/20 text-warning-700',
         green: 'bg-success-500/10 border-success-500/20 text-success-700',
         blue: 'bg-info-500/10 border-info-500/20 text-info-700',
-        gray: 'bg-gray-100 border-gray-300 text-gray-500',
+        gray: 'bg-surface-alt border-border text-muted',
     };
 
     return (

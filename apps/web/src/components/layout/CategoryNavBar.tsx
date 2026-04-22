@@ -180,7 +180,7 @@ export default function CategoryNavBar() {
                     animate={{ opacity: 1, y: 0 }}
                     exit={{ opacity: 0, y: -5 }}
                     transition={{ duration: 0.15 }}
-                    className="fixed left-0 right-0 bg-white shadow-xl border-b border-gray-200"
+                    className="fixed left-0 right-0 bg-surface-elevated shadow-xl border-b border-border"
                     style={{ top: navRef.current ? navRef.current.getBoundingClientRect().bottom + 'px' : 'auto', zIndex: 9999 }}
                     onMouseEnter={() => handleMouseEnter('scales')}
                     onMouseLeave={handleMouseLeave}
@@ -194,7 +194,7 @@ export default function CategoryNavBar() {
                                 <Link
                                     key={scale}
                                     href={`/listings?scale=${encodeURIComponent(scale)}`}
-                                    className="px-4 py-2 bg-gray-50 border border-gray-200 hover:bg-primary-50 hover:border-primary-300 text-gray-700 hover:text-primary-600 text-sm font-medium transition-colors"
+                                    className="px-4 py-2 bg-surface border border-border hover:bg-primary-50 hover:border-primary-300 text-body hover:text-primary-600 text-sm font-medium transition-colors"
                                     style={{ borderRadius: '4px' }}
                                 >
                                     {scale}
@@ -211,7 +211,7 @@ export default function CategoryNavBar() {
                     animate={{ opacity: 1, y: 0 }}
                     exit={{ opacity: 0, y: -5 }}
                     transition={{ duration: 0.15 }}
-                    className="fixed left-0 right-0 bg-white shadow-xl border-b border-gray-200"
+                    className="fixed left-0 right-0 bg-surface-elevated shadow-xl border-b border-border"
                     style={{ top: navRef.current ? navRef.current.getBoundingClientRect().bottom + 'px' : 'auto', zIndex: 9999 }}
                     onMouseEnter={() => handleMouseEnter('categories')}
                     onMouseLeave={handleMouseLeave}
@@ -227,7 +227,7 @@ export default function CategoryNavBar() {
                                         <Link
                                             key={type.slug}
                                             href={`/listings?category=${encodeURIComponent(type.slug)}`}
-                                            className="text-sm text-gray-600 hover:text-primary-600 transition-colors py-1"
+                                            className="text-sm text-muted hover:text-primary-600 transition-colors py-1"
                                         >
                                             {type.label}
                                         </Link>
@@ -241,17 +241,17 @@ export default function CategoryNavBar() {
                                 <div className="space-y-2.5">
                                     {manufacturersMenu.groups.map((group) => (
                                         <div key={group.range}>
-                                            <p className="text-[10px] font-bold text-gray-400 uppercase tracking-wider mb-1">{group.range}</p>
+                                            <p className="text-[10px] font-bold text-subtle uppercase tracking-wider mb-1">{group.range}</p>
                                             <div className="flex flex-wrap gap-x-1 gap-y-0.5">
                                                 {group.items.map((item, idx) => (
                                                     <span key={item.id} className="inline-flex">
                                                         <Link
                                                             href={`/listings?manufacturer=${encodeURIComponent(item.name)}&manufacturerId=${encodeURIComponent(item.id)}`}
-                                                            className="text-xs text-gray-600 hover:text-primary-600 transition-colors"
+                                                            className="text-xs text-muted hover:text-primary-600 transition-colors"
                                                         >
                                                             {item.name}
                                                         </Link>
-                                                        {idx < group.items.length - 1 && <span className="text-gray-300 mx-1">·</span>}
+                                                        {idx < group.items.length - 1 && <span className="text-border-strong mx-1">·</span>}
                                                     </span>
                                                 ))}
                                             </div>
@@ -288,7 +288,7 @@ export default function CategoryNavBar() {
                                 {item.href ? (
                                     <Link
                                         href={item.href}
-                                        className="whitespace-nowrap px-3 py-2 text-sm font-medium text-white/90 hover:text-white hover:bg-white/10 transition-colors rounded"
+                                        className="whitespace-nowrap px-3 py-2 text-sm font-medium text-inverted/90 hover:text-inverted hover:bg-surface-elevated/10 transition-colors rounded"
                                     >
                                         {item.label}
                                     </Link>

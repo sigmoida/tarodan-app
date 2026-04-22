@@ -493,7 +493,7 @@ export default function DiscountsPage() {
                       </td>
                       <td>
                         {discount.code ? (
-                          <code className="px-2 py-1 bg-gray-100 rounded text-sm font-mono text-heading">
+                          <code className="px-2 py-1 bg-surface-alt rounded text-sm font-mono text-heading">
                             {discount.code}
                           </code>
                         ) : (
@@ -553,7 +553,7 @@ export default function DiscountsPage() {
                             onClick={() => toggleDiscountStatus(discount)}
                             className={`p-1.5 rounded-lg transition-colors ${
                               discount.isActive
-                                ? "text-muted hover:bg-gray-100"
+                                ? "text-muted hover:bg-surface-alt"
                                 : "text-success-700 hover:bg-success-50"
                             }`}
                             title={
@@ -595,7 +595,7 @@ export default function DiscountsPage() {
 
           {/* Pagination */}
           {pagination.totalPages > 1 && (
-            <div className="px-4 py-3 border-t border-gray-200 flex items-center justify-between">
+            <div className="px-4 py-3 border-t border-border flex items-center justify-between">
               <p className="text-sm text-muted">
                 Toplam {pagination.total} kayıt
               </p>
@@ -606,7 +606,7 @@ export default function DiscountsPage() {
                     setPagination((prev) => ({ ...prev, page: prev.page - 1 }))
                   }
                   disabled={pagination.page === 1}
-                  className="px-3 py-1 border border-gray-200 rounded-lg disabled:opacity-50 disabled:cursor-not-allowed hover:bg-gray-100 text-heading"
+                  className="px-3 py-1 border border-border rounded-lg disabled:opacity-50 disabled:cursor-not-allowed hover:bg-surface-alt text-heading"
                 >
                   Önceki
                 </Button>
@@ -619,7 +619,7 @@ export default function DiscountsPage() {
                     setPagination((prev) => ({ ...prev, page: prev.page + 1 }))
                   }
                   disabled={pagination.page === pagination.totalPages}
-                  className="px-3 py-1 border border-gray-200 rounded-lg disabled:opacity-50 disabled:cursor-not-allowed hover:bg-gray-100 text-heading"
+                  className="px-3 py-1 border border-border rounded-lg disabled:opacity-50 disabled:cursor-not-allowed hover:bg-surface-alt text-heading"
                 >
                   Sonraki
                 </Button>
@@ -630,9 +630,9 @@ export default function DiscountsPage() {
 
         {/* Create/Edit Modal */}
         {showModal && (
-          <div className="fixed inset-0 bg-black/70 flex items-center justify-center p-4 z-50">
-            <div className="bg-white rounded-xl shadow-xl max-w-2xl w-full max-h-[90vh] overflow-y-auto border border-gray-200">
-              <div className="p-6 border-b border-gray-200">
+          <div className="fixed inset-0 bg-heading/70 flex items-center justify-center p-4 z-50">
+            <div className="bg-surface-elevated rounded-xl shadow-xl max-w-2xl w-full max-h-[90vh] overflow-y-auto border border-border">
+              <div className="p-6 border-b border-border">
                 <h2 className="text-xl font-bold text-heading">
                   {editingDiscount
                     ? "İndirimi Düzenle"
@@ -766,7 +766,7 @@ export default function DiscountsPage() {
 
                 {/* Type Specific Fields */}
                 {formData.type === "bogo" && (
-                  <div className="grid grid-cols-2 gap-4 bg-gray-50/60 p-4 rounded-lg border border-gray-200">
+                  <div className="grid grid-cols-2 gap-4 bg-surface/60 p-4 rounded-lg border border-border">
                     <div className="col-span-2">
                       <p className="text-sm font-medium text-primary mb-2">
                         BOGO Ayarları (Buy X Get Y)
@@ -810,7 +810,7 @@ export default function DiscountsPage() {
                 )}
 
                 {formData.type === "bulk_quantity" && (
-                  <div className="bg-gray-50/60 p-4 rounded-lg border border-gray-200">
+                  <div className="bg-surface/60 p-4 rounded-lg border border-border">
                     <p className="text-sm font-medium text-primary mb-2">
                       Çoklu Alım Ayarları
                     </p>
@@ -1032,7 +1032,7 @@ export default function DiscountsPage() {
                 </div>
 
                 {/* Actions */}
-                <div className="flex justify-end gap-3 pt-4 border-t border-gray-200">
+                <div className="flex justify-end gap-3 pt-4 border-t border-border">
                   <Button
                     variant="secondary"
                     type="button"
@@ -1051,8 +1051,8 @@ export default function DiscountsPage() {
 
         {/* Delete Confirmation Modal */}
         {deleteConfirm && (
-          <div className="fixed inset-0 bg-black/70 flex items-center justify-center p-4 z-50">
-            <div className="bg-white rounded-xl shadow-xl max-w-md w-full p-6 border border-gray-200">
+          <div className="fixed inset-0 bg-heading/70 flex items-center justify-center p-4 z-50">
+            <div className="bg-surface-elevated rounded-xl shadow-xl max-w-md w-full p-6 border border-border">
               <h3 className="text-lg font-bold text-heading mb-2">
                 İndirimi Sil
               </h3>

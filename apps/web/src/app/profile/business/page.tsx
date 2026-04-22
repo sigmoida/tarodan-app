@@ -101,7 +101,7 @@ export default function BusinessDashboardPage() {
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-gray-900 text-white">
+      <div className="min-h-screen bg-heading text-inverted">
         <main className="max-w-7xl mx-auto px-4 py-8">
           <div className="flex justify-center py-12">
             <Spinner size="xl" color="border-primary-500 border-t-transparent" />
@@ -113,11 +113,11 @@ export default function BusinessDashboardPage() {
 
   if (error) {
     return (
-      <div className="min-h-screen bg-gray-900 text-white">
+      <div className="min-h-screen bg-heading text-inverted">
         <main className="max-w-7xl mx-auto px-4 py-8">
           <Link
             href="/profile"
-            className="inline-flex items-center gap-2 text-gray-400 hover:text-white mb-8"
+            className="inline-flex items-center gap-2 text-subtle hover:text-inverted mb-8"
           >
             <ArrowLeftIcon className="w-5 h-5" />
             Profile Dön
@@ -128,14 +128,14 @@ export default function BusinessDashboardPage() {
             {error.includes('şirket adı') || error.includes('companyName') || error.includes('Şirket adı') ? (
               <Link
                 href="/profile/edit"
-                className="inline-block px-6 py-3 bg-gradient-to-r from-primary-500 to-warning-500 text-white font-semibold rounded-lg hover:from-primary-600 hover:to-warning-600 transition-all"
+                className="inline-block px-6 py-3 bg-gradient-to-r from-primary-500 to-warning-500 text-inverted font-semibold rounded-lg hover:from-primary-600 hover:to-warning-600 transition-all"
               >
                 Şirket Adı Ekle
               </Link>
             ) : (
               <Link
                 href="/pricing"
-                className="inline-block px-6 py-3 bg-gradient-to-r from-primary-500 to-warning-500 text-white font-semibold rounded-lg hover:from-primary-600 hover:to-warning-600 transition-all"
+                className="inline-block px-6 py-3 bg-gradient-to-r from-primary-500 to-warning-500 text-inverted font-semibold rounded-lg hover:from-primary-600 hover:to-warning-600 transition-all"
               >
                 Üyeliğimi Yükselt
               </Link>
@@ -147,11 +147,11 @@ export default function BusinessDashboardPage() {
   }
 
   return (
-    <div className="min-h-screen bg-gray-900 text-white">
+    <div className="min-h-screen bg-heading text-inverted">
       <main className="max-w-7xl mx-auto px-4 py-8">
         <Link
           href="/profile"
-          className="inline-flex items-center gap-2 text-gray-400 hover:text-white mb-8"
+          className="inline-flex items-center gap-2 text-subtle hover:text-inverted mb-8"
         >
           <ArrowLeftIcon className="w-5 h-5" />
           Profile Dön
@@ -176,7 +176,7 @@ export default function BusinessDashboardPage() {
         </div>
 
         {/* Tabs */}
-        <div className="flex gap-2 mb-8 border-b border-gray-700">
+        <div className="flex gap-2 mb-8 border-b border-border-strong">
           {[
             { id: 'overview', label: 'Genel Bakış', icon: '📈' },
             { id: 'products', label: 'Ürünler', icon: '📦' },
@@ -187,7 +187,7 @@ export default function BusinessDashboardPage() {
               className={`px-6 py-3 font-medium transition-colors relative ${
                 activeTab === tab.id
                   ? 'text-primary-400'
-                  : 'text-gray-400 hover:text-gray-200'
+                  : 'text-subtle hover:text-border-subtle'
               }`}>
               <span className="mr-2">{tab.icon}</span>
               {tab.label}
@@ -238,23 +238,23 @@ export default function BusinessDashboardPage() {
             {/* Revenue Card */}
             <div className="bg-gradient-to-br from-success-900/30 to-success-900/30 border border-success-500/30 rounded-xl p-6">
               <h3 className="text-lg font-semibold text-success-400 mb-2">Toplam Gelir</h3>
-              <p className="text-4xl font-bold text-white">
+              <p className="text-4xl font-bold text-inverted">
                 {stats.overview.totalRevenue.toLocaleString('tr-TR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} TL
               </p>
             </div>
 
             {/* Weekly Stats */}
-            <div className="bg-gray-800 rounded-xl p-6">
+            <div className="bg-heading rounded-xl p-6">
               <h3 className="text-xl font-semibold mb-4">Bu Hafta</h3>
               <div className="grid grid-cols-2 gap-4">
-                <div className="bg-gray-700/50 rounded-lg p-4">
+                <div className="bg-body/50 rounded-lg p-4">
                   <div className="flex items-center gap-2 text-info-400 mb-2">
                     <EyeIcon className="w-5 h-5" />
                     <span>Görüntülenme</span>
                   </div>
                   <p className="text-3xl font-bold">{stats.weekly.views.toLocaleString()}</p>
                 </div>
-                <div className="bg-gray-700/50 rounded-lg p-4">
+                <div className="bg-body/50 rounded-lg p-4">
                   <div className="flex items-center gap-2 text-danger-400 mb-2">
                     <HeartIcon className="w-5 h-5" />
                     <span>Beğeni</span>
@@ -265,15 +265,15 @@ export default function BusinessDashboardPage() {
             </div>
 
             {/* Collection Stats */}
-            <div className="bg-gray-800 rounded-xl p-6">
+            <div className="bg-heading rounded-xl p-6">
               <h3 className="text-xl font-semibold mb-4">Koleksiyon İstatistikleri</h3>
               <div className="grid grid-cols-2 gap-4">
-                <div className="bg-gray-700/50 rounded-lg p-4">
-                  <p className="text-sm text-gray-400">Toplam Görüntülenme</p>
+                <div className="bg-body/50 rounded-lg p-4">
+                  <p className="text-sm text-subtle">Toplam Görüntülenme</p>
                   <p className="text-2xl font-bold text-info-400">{stats.overview.collectionViews.toLocaleString()}</p>
                 </div>
-                <div className="bg-gray-700/50 rounded-lg p-4">
-                  <p className="text-sm text-gray-400">Toplam Beğeni</p>
+                <div className="bg-body/50 rounded-lg p-4">
+                  <p className="text-sm text-subtle">Toplam Beğeni</p>
                   <p className="text-2xl font-bold text-danger-400">{stats.overview.collectionLikes.toLocaleString()}</p>
                 </div>
               </div>
@@ -285,7 +285,7 @@ export default function BusinessDashboardPage() {
         {activeTab === 'products' && stats && (
           <div className="space-y-8">
             {/* Top Products by Views */}
-            <div className="bg-gray-800 rounded-xl p-6">
+            <div className="bg-heading rounded-xl p-6">
               <h3 className="text-xl font-semibold mb-4 flex items-center gap-2">
                 <EyeIcon className="w-6 h-6 text-info-400" />
                 En Çok Görüntülenen Ürünler
@@ -296,13 +296,13 @@ export default function BusinessDashboardPage() {
                     <ProductRow key={product.id} product={product} index={index} metric="views" />
                   ))
                 ) : (
-                  <p className="text-gray-400 text-center py-4">Henüz ürün istatistiği yok</p>
+                  <p className="text-subtle text-center py-4">Henüz ürün istatistiği yok</p>
                 )}
               </div>
             </div>
 
             {/* Top Products by Likes */}
-            <div className="bg-gray-800 rounded-xl p-6">
+            <div className="bg-heading rounded-xl p-6">
               <h3 className="text-xl font-semibold mb-4 flex items-center gap-2">
                 <HeartIcon className="w-6 h-6 text-danger-400" />
                 En Çok Beğenilen Ürünler
@@ -313,7 +313,7 @@ export default function BusinessDashboardPage() {
                     <ProductRow key={product.id} product={product} index={index} metric="likes" />
                   ))
                 ) : (
-                  <p className="text-gray-400 text-center py-4">Henüz ürün istatistiği yok</p>
+                  <p className="text-subtle text-center py-4">Henüz ürün istatistiği yok</p>
                 )}
               </div>
             </div>
@@ -322,7 +322,7 @@ export default function BusinessDashboardPage() {
 
         {/* Collections Tab */}
         {activeTab === 'collections' && stats && (
-          <div className="bg-gray-800 rounded-xl p-6">
+          <div className="bg-heading rounded-xl p-6">
             <h3 className="text-xl font-semibold mb-4 flex items-center gap-2">
               <RectangleStackIcon className="w-6 h-6 text-primary-400" />
               En Popüler Koleksiyonlar
@@ -333,7 +333,7 @@ export default function BusinessDashboardPage() {
                   <CollectionRow key={collection.id} collection={collection} index={index} />
                 ))
               ) : (
-                <p className="text-gray-400 text-center py-4">Henüz koleksiyon istatistiği yok</p>
+                <p className="text-subtle text-center py-4">Henüz koleksiyon istatistiği yok</p>
               )}
             </div>
           </div>
@@ -369,7 +369,7 @@ function StatCard({
         {icon}
         <span className="text-sm">{label}</span>
       </div>
-      <p className="text-3xl font-bold text-white">{value.toLocaleString()}</p>
+      <p className="text-3xl font-bold text-inverted">{value.toLocaleString()}</p>
     </div>
   );
 }
@@ -387,12 +387,12 @@ function ProductRow({
   return (
     <Link
       href={`/listings/${product.id}`}
-      className="flex items-center gap-4 p-3 bg-gray-700/50 rounded-lg hover:bg-gray-700 transition-colors"
+      className="flex items-center gap-4 p-3 bg-body/50 rounded-lg hover:bg-body transition-colors"
     >
-      <div className="w-8 h-8 bg-gray-600 rounded-full flex items-center justify-center text-sm font-bold">
+      <div className="w-8 h-8 bg-body rounded-full flex items-center justify-center text-sm font-bold">
         {index + 1}
       </div>
-      <div className="w-16 h-16 bg-gray-600 rounded-lg overflow-hidden flex-shrink-0">
+      <div className="w-16 h-16 bg-body rounded-lg overflow-hidden flex-shrink-0">
         {product.image ? (
           <img
             src={product.image}
@@ -400,8 +400,8 @@ function ProductRow({
             className="w-full h-full object-cover"
           />
         ) : (
-          <div className="w-full h-full flex items-center justify-center bg-gray-700">
-            <ArchiveBoxIcon className="w-6 h-6 text-gray-500" />
+          <div className="w-full h-full flex items-center justify-center bg-body">
+            <ArchiveBoxIcon className="w-6 h-6 text-muted" />
           </div>
         )}
       </div>
@@ -410,11 +410,11 @@ function ProductRow({
         <p className="text-sm text-primary-400">{getProductEffectivePrice(product).toLocaleString('tr-TR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} TL</p>
       </div>
       <div className="flex items-center gap-4 text-sm">
-        <div className={`flex items-center gap-1 ${metric === 'views' ? 'text-info-400' : 'text-gray-400'}`}>
+        <div className={`flex items-center gap-1 ${metric === 'views' ? 'text-info-400' : 'text-subtle'}`}>
           <EyeIcon className="w-4 h-4" />
           <span>{product.viewCount.toLocaleString()}</span>
         </div>
-        <div className={`flex items-center gap-1 ${metric === 'likes' ? 'text-danger-400' : 'text-gray-400'}`}>
+        <div className={`flex items-center gap-1 ${metric === 'likes' ? 'text-danger-400' : 'text-subtle'}`}>
           <HeartIcon className="w-4 h-4" />
           <span>{product.likeCount.toLocaleString()}</span>
         </div>
@@ -434,12 +434,12 @@ function CollectionRow({
   return (
     <Link
       href={`/collections/${collection.id}`}
-      className="flex items-center gap-4 p-3 bg-gray-700/50 rounded-lg hover:bg-gray-700 transition-colors"
+      className="flex items-center gap-4 p-3 bg-body/50 rounded-lg hover:bg-body transition-colors"
     >
-      <div className="w-8 h-8 bg-gray-600 rounded-full flex items-center justify-center text-sm font-bold">
+      <div className="w-8 h-8 bg-body rounded-full flex items-center justify-center text-sm font-bold">
         {index + 1}
       </div>
-      <div className="w-16 h-16 bg-gray-600 rounded-lg overflow-hidden flex-shrink-0">
+      <div className="w-16 h-16 bg-body rounded-lg overflow-hidden flex-shrink-0">
         {collection.coverImage ? (
           <img
             src={collection.coverImage}
@@ -447,14 +447,14 @@ function CollectionRow({
             className="w-full h-full object-cover"
           />
         ) : (
-          <div className="w-full h-full flex items-center justify-center bg-gray-700">
-            <BookOpenIcon className="w-6 h-6 text-gray-500" />
+          <div className="w-full h-full flex items-center justify-center bg-body">
+            <BookOpenIcon className="w-6 h-6 text-muted" />
           </div>
         )}
       </div>
       <div className="flex-1 min-w-0">
         <p className="font-medium truncate">{collection.name}</p>
-        <p className="text-sm text-gray-400">{collection.itemCount} ürün</p>
+        <p className="text-sm text-subtle">{collection.itemCount} ürün</p>
       </div>
       <div className="flex items-center gap-4 text-sm">
         <div className="flex items-center gap-1 text-info-400">

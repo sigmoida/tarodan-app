@@ -14,7 +14,7 @@ export default function ScaleChip({ label, href, active = false }: ScaleChipProp
         ${
           active
             ? 'border-primary-500 bg-primary-50 text-primary-600'
-            : 'border-gray-200 bg-white text-body hover:border-primary-400 hover:text-primary-600 hover:bg-primary-50 hover:shadow-soft'
+            : 'border-border bg-surface-elevated text-body hover:border-primary-400 hover:text-primary-600 hover:bg-primary-50 hover:shadow-soft'
         }`}
     >
       {label}

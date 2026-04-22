@@ -250,16 +250,16 @@ export default function NotificationsPage() {
     <>
       <div className="space-y-6">
         <div>
-          <h1 className="text-2xl font-bold text-gray-900">
+          <h1 className="text-2xl font-bold text-heading">
             Bildirim Yönetimi
           </h1>
-          <p className="text-gray-500 mt-1">
+          <p className="text-muted mt-1">
             Push, email ve SMS bildirimleri gönderin ve yönetin
           </p>
         </div>
 
         {/* Tabs */}
-        <div className="flex flex-wrap gap-2 border-b border-gray-200 pb-4">
+        <div className="flex flex-wrap gap-2 border-b border-border pb-4">
           {tabs.map((tab) => (
             <Button
               variant="secondary"
@@ -267,8 +267,8 @@ export default function NotificationsPage() {
               onClick={() => setActiveTab(tab.key as TabType)}
               className={`flex items-center gap-2 px-4 py-2 rounded-lg transition ${
                 activeTab === tab.key
-                  ? "bg-primary-500 text-gray-900"
-                  : "bg-gray-100 text-gray-500 hover:text-gray-900 hover:bg-gray-100"
+                  ? "bg-primary-500 text-heading"
+                  : "bg-surface-alt text-muted hover:text-heading hover:bg-surface-alt"
               }`}
             >
               <tab.icon className="h-5 w-5" />
@@ -282,7 +282,7 @@ export default function NotificationsPage() {
           <div className="admin-card p-6 max-w-2xl">
             <div className="space-y-6">
               <div>
-                <label className="block text-sm font-medium text-gray-600 mb-2">
+                <label className="block text-sm font-medium text-muted mb-2">
                   Başlık *
                 </label>
                 <Input
@@ -296,7 +296,7 @@ export default function NotificationsPage() {
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-gray-600 mb-2">
+                <label className="block text-sm font-medium text-muted mb-2">
                   İçerik *
                 </label>
                 <Textarea
@@ -310,7 +310,7 @@ export default function NotificationsPage() {
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-gray-600 mb-2">
+                <label className="block text-sm font-medium text-muted mb-2">
                   Kanallar
                 </label>
                 <div className="flex gap-4">
@@ -326,7 +326,7 @@ export default function NotificationsPage() {
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-gray-600 mb-2">
+                <label className="block text-sm font-medium text-muted mb-2">
                   Hedef
                 </label>
                 <Select
@@ -346,7 +346,7 @@ export default function NotificationsPage() {
 
               {sendForm.targetType === "user_ids" && (
                 <div>
-                  <label className="block text-sm font-medium text-gray-600 mb-2">
+                  <label className="block text-sm font-medium text-muted mb-2">
                     Kullanıcı ID'leri (virgülle ayırın)
                   </label>
                   <Input
@@ -361,9 +361,9 @@ export default function NotificationsPage() {
               )}
 
               {sendForm.targetType === "segment" && (
-                <div className="space-y-4 p-4 bg-gray-100 rounded-lg">
+                <div className="space-y-4 p-4 bg-surface-alt rounded-lg">
                   <div>
-                    <label className="block text-sm font-medium text-gray-600 mb-2">
+                    <label className="block text-sm font-medium text-muted mb-2">
                       Satıcı Durumu
                     </label>
                     <Select
@@ -390,7 +390,7 @@ export default function NotificationsPage() {
                     </Select>
                   </div>
                   <div>
-                    <label className="block text-sm font-medium text-gray-600 mb-2">
+                    <label className="block text-sm font-medium text-muted mb-2">
                       Üyelik Tipi
                     </label>
                     <Select
@@ -455,7 +455,7 @@ export default function NotificationsPage() {
                     <tr>
                       <td
                         colSpan={6}
-                        className="text-center py-8 text-gray-500"
+                        className="text-center py-8 text-muted"
                       >
                         Zamanlanmış bildirim yok
                       </td>
@@ -463,14 +463,14 @@ export default function NotificationsPage() {
                   ) : (
                     scheduled.map((item) => (
                       <tr key={item.id}>
-                        <td className="font-medium text-gray-900">
+                        <td className="font-medium text-heading">
                           {item.title}
                         </td>
-                        <td className="text-gray-500">
+                        <td className="text-muted">
                           {item.channels?.join(", ")}
                         </td>
-                        <td className="text-gray-500">{item.targetType}</td>
-                        <td className="text-gray-500">
+                        <td className="text-muted">{item.targetType}</td>
+                        <td className="text-muted">
                           {new Date(item.scheduledFor).toLocaleString("tr-TR")}
                         </td>
                         <td>
@@ -558,7 +558,7 @@ export default function NotificationsPage() {
                       <tr>
                         <td
                           colSpan={5}
-                          className="text-center py-8 text-gray-500"
+                          className="text-center py-8 text-muted"
                         >
                           Bildirim geçmişi boş
                         </td>
@@ -566,13 +566,13 @@ export default function NotificationsPage() {
                     ) : (
                       history.map((log) => (
                         <tr key={log.id}>
-                          <td className="text-gray-900">
+                          <td className="text-heading">
                             {log.user?.displayName || log.userId}
                           </td>
-                          <td className="text-gray-500 uppercase">
+                          <td className="text-muted uppercase">
                             {log.channel}
                           </td>
-                          <td className="text-gray-900">{log.title}</td>
+                          <td className="text-heading">{log.title}</td>
                           <td>
                             <span
                               className={`badge ${
@@ -587,7 +587,7 @@ export default function NotificationsPage() {
                               {log.status}
                             </span>
                           </td>
-                          <td className="text-gray-500">
+                          <td className="text-muted">
                             {new Date(log.createdAt).toLocaleString("tr-TR")}
                           </td>
                         </tr>
@@ -601,7 +601,7 @@ export default function NotificationsPage() {
             {/* Pagination */}
             {totalHistory > historyFilters.limit && (
               <div className="flex items-center justify-between">
-                <p className="text-sm text-gray-500">
+                <p className="text-sm text-muted">
                   Sayfa {historyFilters.page} /{" "}
                   {Math.ceil(totalHistory / historyFilters.limit)}
                 </p>
@@ -642,14 +642,14 @@ export default function NotificationsPage() {
 
       {/* Schedule Modal */}
       {showScheduleModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60">
-          <div className="bg-white rounded-xl border border-gray-200 w-full max-w-md p-6">
-            <h2 className="text-xl font-bold text-gray-900 mb-4">
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-heading/60">
+          <div className="bg-surface-elevated rounded-xl border border-border w-full max-w-md p-6">
+            <h2 className="text-xl font-bold text-heading mb-4">
               Bildirimi Zamanla
             </h2>
             <div className="space-y-4">
               <div>
-                <label className="block text-sm font-medium text-gray-600 mb-2">
+                <label className="block text-sm font-medium text-muted mb-2">
                   Gönderim Tarihi ve Saati
                 </label>
                 <Input

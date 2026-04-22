@@ -172,28 +172,28 @@ export default function TrackOrderPage() {
   const shipAddr = order?.shippingAddress as Record<string, string> | undefined;
 
   return (
-    <div className="min-h-screen bg-gray-50">
+    <div className="min-h-screen bg-surface">
       <main className="max-w-2xl mx-auto px-4 py-8">
         <div className="flex items-center gap-4 mb-8">
           <Link
             href="/"
-            className="p-2 hover:bg-gray-200 rounded-lg transition-colors"
+            className="p-2 hover:bg-border-subtle rounded-lg transition-colors"
           >
-            <ArrowLeftIcon className="w-6 h-6 text-gray-600" />
+            <ArrowLeftIcon className="w-6 h-6 text-muted" />
           </Link>
-          <h1 className="text-2xl font-bold text-gray-900">
+          <h1 className="text-2xl font-bold text-heading">
             {locale === "en" ? "Track your order" : "Sipariş Takip"}
           </h1>
         </div>
 
         {!order ? (
-          <div className="bg-white rounded-xl shadow-sm p-6">
+          <div className="bg-surface-elevated rounded-xl shadow-sm p-6">
             {loading &&
             searchParams.get("orderNumber") &&
             searchParams.get("email") ? (
               <div className="py-12 flex flex-col items-center justify-center gap-4">
                 <Spinner size="lg" />
-                <p className="text-gray-600">
+                <p className="text-muted">
                   {locale === "en"
                     ? "Loading order details..."
                     : "Sipariş bilgileriniz yükleniyor..."}
@@ -201,14 +201,14 @@ export default function TrackOrderPage() {
               </div>
             ) : (
               <>
-                <p className="text-gray-600 mb-4">
+                <p className="text-muted mb-4">
                   {locale === "en"
                     ? "Enter your order number and the email address you used when placing the order to view status and tracking."
                     : "Sipariş numaranız ve siparişte kullandığınız e-posta adresi ile sipariş durumunu ve kargo bilgisini görebilirsiniz."}
                 </p>
                 <form onSubmit={handleTrack} className="space-y-4">
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                    <label className="block text-sm font-medium text-body mb-1">
                       {locale === "en" ? "Order number" : "Sipariş numarası"} *
                     </label>
                     <Input
@@ -221,7 +221,7 @@ export default function TrackOrderPage() {
                     />
                   </div>
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                    <label className="block text-sm font-medium text-body mb-1">
                       {locale === "en" ? "Email address" : "E-posta adresi"} *
                     </label>
                     <Input
@@ -246,7 +246,7 @@ export default function TrackOrderPage() {
                     {loading ? (
                       <Spinner
                         size="sm"
-                        color="border-white border-t-transparent"
+                        color="border-surface-elevated border-t-transparent"
                       />
                     ) : (
                       <MagnifyingGlassIcon className="w-5 h-5" />
@@ -254,7 +254,7 @@ export default function TrackOrderPage() {
                     {locale === "en" ? "View order" : "Siparişi Görüntüle"}
                   </Button>
                 </form>
-                <p className="text-sm text-gray-500 mt-4">
+                <p className="text-sm text-muted mt-4">
                   {locale === "en"
                     ? "You can find the order number in the confirmation email we sent after your purchase."
                     : "Sipariş numarasını, satın alma sonrası gönderdiğimiz onay e-postasında bulabilirsiniz."}
@@ -266,10 +266,10 @@ export default function TrackOrderPage() {
           <div className="space-y-6">
             <div className="flex items-center justify-between flex-wrap gap-4">
               <div>
-                <h2 className="text-xl font-bold text-gray-900">
+                <h2 className="text-xl font-bold text-heading">
                   {locale === "en" ? "Order" : "Sipariş"} #{order.orderNumber}
                 </h2>
-                <p className="text-sm text-gray-500 mt-1">
+                <p className="text-sm text-muted mt-1">
                   {new Date(order.createdAt).toLocaleDateString(
                     locale === "en" ? "en-US" : "tr-TR",
                     {
@@ -289,12 +289,12 @@ export default function TrackOrderPage() {
               />
             </div>
 
-            <div className="bg-white rounded-xl shadow-sm p-6">
-              <h3 className="font-semibold text-gray-900 mb-3">
+            <div className="bg-surface-elevated rounded-xl shadow-sm p-6">
+              <h3 className="font-semibold text-heading mb-3">
                 {locale === "en" ? "Product" : "Ürün"}
               </h3>
               <div className="flex gap-4">
-                <div className="w-20 h-20 bg-gray-100 rounded-lg overflow-hidden flex-shrink-0">
+                <div className="w-20 h-20 bg-surface-alt rounded-lg overflow-hidden flex-shrink-0">
                   {order.product?.image ? (
                     <Image
                       src={order.product.image}
@@ -304,15 +304,15 @@ export default function TrackOrderPage() {
                       className="w-full h-full object-cover"
                     />
                   ) : (
-                    <div className="w-full h-full flex items-center justify-center bg-gray-50">
-                      <TagIcon className="w-6 h-6 text-gray-300" />
+                    <div className="w-full h-full flex items-center justify-center bg-surface">
+                      <TagIcon className="w-6 h-6 text-border-strong" />
                     </div>
                   )}
                 </div>
                 <div className="flex-1 min-w-0">
                   <Link
                     href={`/listings/${order.product?.id}`}
-                    className="font-medium text-gray-900 hover:text-primary-500 line-clamp-2"
+                    className="font-medium text-heading hover:text-primary-500 line-clamp-2"
                   >
                     {order.product?.title}
                   </Link>
@@ -328,23 +328,23 @@ export default function TrackOrderPage() {
             </div>
 
             {order.shipment && (
-              <div className="bg-white rounded-xl shadow-sm p-6">
-                <h3 className="font-semibold text-gray-900 mb-3 flex items-center gap-2">
+              <div className="bg-surface-elevated rounded-xl shadow-sm p-6">
+                <h3 className="font-semibold text-heading mb-3 flex items-center gap-2">
                   <TruckIcon className="w-5 h-5 text-primary-500" />
                   {locale === "en" ? "Shipping" : "Kargo"}
                 </h3>
-                <div className="space-y-2 text-gray-700">
+                <div className="space-y-2 text-body">
                   <p>
-                    <span className="text-gray-500">
+                    <span className="text-muted">
                       {locale === "en" ? "Carrier:" : "Firma:"}
                     </span>{" "}
                     {order.shipment.provider}
                   </p>
                   <p>
-                    <span className="text-gray-500">
+                    <span className="text-muted">
                       {locale === "en" ? "Tracking number:" : "Takip no:"}
                     </span>{" "}
-                    <span className="font-mono bg-gray-100 px-2 py-1 rounded">
+                    <span className="font-mono bg-surface-alt px-2 py-1 rounded">
                       {order.shipment.trackingNumber}
                     </span>
                   </p>
@@ -364,12 +364,12 @@ export default function TrackOrderPage() {
             )}
 
             {shipAddr && (shipAddr.address || shipAddr.fullName) && (
-              <div className="bg-white rounded-xl shadow-sm p-6">
-                <h3 className="font-semibold text-gray-900 mb-3 flex items-center gap-2">
+              <div className="bg-surface-elevated rounded-xl shadow-sm p-6">
+                <h3 className="font-semibold text-heading mb-3 flex items-center gap-2">
                   <MapPinIcon className="w-5 h-5 text-primary-500" />
                   {locale === "en" ? "Delivery address" : "Teslimat adresi"}
                 </h3>
-                <div className="text-gray-700">
+                <div className="text-body">
                   {shipAddr.fullName && (
                     <p className="font-medium">{shipAddr.fullName}</p>
                   )}

@@ -84,10 +84,10 @@ export default function SellerApplicationsPage() {
     <>
       <div className="space-y-6">
         <div>
-          <h1 className="text-2xl font-bold text-gray-900">
+          <h1 className="text-2xl font-bold text-heading">
             Satıcı Başvuruları
           </h1>
-          <p className="text-gray-500 mt-1">
+          <p className="text-muted mt-1">
             Bekleyen satıcı doğrulama ve onay taleplerini yönetin
           </p>
         </div>
@@ -96,7 +96,7 @@ export default function SellerApplicationsPage() {
           {/* Applications List */}
           <div className="lg:col-span-1 space-y-4">
             {applications.length === 0 ? (
-              <div className="admin-card text-center py-8 text-gray-500">
+              <div className="admin-card text-center py-8 text-muted">
                 Bekleyen başvuru yok
               </div>
             ) : (
@@ -104,7 +104,7 @@ export default function SellerApplicationsPage() {
                 <div
                   key={app.id}
                   onClick={() => setSelectedApplication(app)}
-                  className={`admin-card cursor-pointer transition-all hover:bg-gray-100 ${
+                  className={`admin-card cursor-pointer transition-all hover:bg-surface-alt ${
                     selectedApplication?.id === app.id
                       ? "border-primary-500 ring-1 ring-primary-500"
                       : ""
@@ -126,14 +126,14 @@ export default function SellerApplicationsPage() {
                           ? "Onaylı Satıcı"
                           : "Bireysel"}
                     </span>
-                    <span className="text-xs text-gray-500">
+                    <span className="text-xs text-muted">
                       {new Date(app.appliedAt).toLocaleDateString("tr-TR")}
                     </span>
                   </div>
-                  <h3 className="font-semibold text-gray-900">
+                  <h3 className="font-semibold text-heading">
                     {app.displayName}
                   </h3>
-                  <p className="text-sm text-gray-500">{app.email}</p>
+                  <p className="text-sm text-muted">{app.email}</p>
                 </div>
               ))
             )}
@@ -143,12 +143,12 @@ export default function SellerApplicationsPage() {
           <div className="lg:col-span-2">
             {selectedApplication ? (
               <div className="admin-card h-full">
-                <div className="flex justify-between items-start mb-6 border-b border-gray-200 pb-4">
+                <div className="flex justify-between items-start mb-6 border-b border-border pb-4">
                   <div>
-                    <h2 className="text-xl font-bold text-gray-900">
+                    <h2 className="text-xl font-bold text-heading">
                       {selectedApplication.displayName}
                     </h2>
-                    <p className="text-gray-500">{selectedApplication.email}</p>
+                    <p className="text-muted">{selectedApplication.email}</p>
                   </div>
                   <div className="flex gap-2">
                     <Button
@@ -172,23 +172,23 @@ export default function SellerApplicationsPage() {
 
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                   <div>
-                    <h3 className="text-sm font-medium text-gray-500 uppercase mb-4">
+                    <h3 className="text-sm font-medium text-muted uppercase mb-4">
                       Başvuru Bilgileri
                     </h3>
                     <div className="space-y-4">
                       <div>
-                        <label className="text-xs text-gray-500 block">
+                        <label className="text-xs text-muted block">
                           Başvuru Tipi
                         </label>
-                        <p className="text-gray-900 font-medium capitalize">
+                        <p className="text-heading font-medium capitalize">
                           {selectedApplication.type}
                         </p>
                       </div>
                       <div>
-                        <label className="text-xs text-gray-500 block">
+                        <label className="text-xs text-muted block">
                           Başvuru Tarihi
                         </label>
-                        <p className="text-gray-900 font-medium">
+                        <p className="text-heading font-medium">
                           {new Date(
                             selectedApplication.appliedAt,
                           ).toLocaleString("tr-TR")}
@@ -198,30 +198,30 @@ export default function SellerApplicationsPage() {
                   </div>
 
                   <div>
-                    <h3 className="text-sm font-medium text-gray-500 uppercase mb-4">
+                    <h3 className="text-sm font-medium text-muted uppercase mb-4">
                       Firma Bilgileri
                     </h3>
                     {selectedApplication.companyName ? (
                       <div className="space-y-4">
                         <div>
-                          <label className="text-xs text-gray-500 block flex items-center gap-1">
+                          <label className="text-xs text-muted block flex items-center gap-1">
                             <BuildingOfficeIcon className="w-4 h-4" /> Firma Adı
                           </label>
-                          <p className="text-gray-900 font-medium">
+                          <p className="text-heading font-medium">
                             {selectedApplication.companyName}
                           </p>
                         </div>
                         <div>
-                          <label className="text-xs text-gray-500 block">
+                          <label className="text-xs text-muted block">
                             Vergi Numarası
                           </label>
-                          <p className="text-gray-900 font-medium">
+                          <p className="text-heading font-medium">
                             {selectedApplication.taxId}
                           </p>
                         </div>
                       </div>
                     ) : (
-                      <p className="text-gray-500 italic">
+                      <p className="text-muted italic">
                         Bireysel satıcı başvurusu - firma bilgisi yok.
                       </p>
                     )}
@@ -229,7 +229,7 @@ export default function SellerApplicationsPage() {
                 </div>
 
                 <div className="mt-8">
-                  <h3 className="text-sm font-medium text-gray-500 uppercase mb-4">
+                  <h3 className="text-sm font-medium text-muted uppercase mb-4">
                     Belgeler
                   </h3>
                   {selectedApplication.documents.length > 0 ? (
@@ -239,14 +239,14 @@ export default function SellerApplicationsPage() {
                           <a
                             key={idx}
                             href={doc.url}
-                            className="items-center p-3 bg-gray-100/50 hover:bg-gray-100 group"
+                            className="items-center p-3 bg-surface-alt/50 hover:bg-surface-alt group"
                           >
                             <DocumentTextIcon className="w-8 h-8 text-primary-600 mr-3 group-hover:text-primary-400" />
                             <div>
-                              <p className="text-sm font-medium text-gray-900 group-hover:text-primary-400 transition-colors">
+                              <p className="text-sm font-medium text-heading group-hover:text-primary-400 transition-colors">
                                 {doc.name}
                               </p>
-                              <p className="text-xs text-gray-500">
+                              <p className="text-xs text-muted">
                                 Görüntülemek için tıklayın
                               </p>
                             </div>
@@ -255,7 +255,7 @@ export default function SellerApplicationsPage() {
                       )}
                     </div>
                   ) : (
-                    <p className="text-gray-500 italic">
+                    <p className="text-muted italic">
                       Bu başvuru için yüklenen belge bulunmamaktadır.
                     </p>
                   )}
@@ -263,11 +263,11 @@ export default function SellerApplicationsPage() {
               </div>
             ) : (
               <div className="admin-card h-full flex flex-col items-center justify-center text-center p-12 opacity-50">
-                <UserIcon className="w-16 h-16 text-gray-600 mb-4" />
-                <h3 className="text-xl font-medium text-gray-600">
+                <UserIcon className="w-16 h-16 text-muted mb-4" />
+                <h3 className="text-xl font-medium text-muted">
                   Başvuru Seçin
                 </h3>
-                <p className="text-gray-500">
+                <p className="text-muted">
                   Detayları görüntülemek için soldaki listeden bir başvuru
                   seçin.
                 </p>
@@ -278,15 +278,15 @@ export default function SellerApplicationsPage() {
 
         {/* Reject Modal */}
         {isRejectModalOpen && (
-          <div className="fixed inset-0 bg-black/70 flex items-center justify-center z-50 p-4 backdrop-blur-sm">
-            <div className="bg-white rounded-xl max-w-md w-full border border-gray-200 shadow-2xl">
+          <div className="fixed inset-0 bg-heading/70 flex items-center justify-center z-50 p-4 backdrop-blur-sm">
+            <div className="bg-surface-elevated rounded-xl max-w-md w-full border border-border shadow-2xl">
               <div className="p-6">
-                <h3 className="text-xl font-bold text-gray-900 mb-4">
+                <h3 className="text-xl font-bold text-heading mb-4">
                   Başvuruyu Reddet
                 </h3>
                 <form onSubmit={handleReject}>
                   <div className="mb-6">
-                    <label className="block text-sm font-medium text-gray-500 mb-2">
+                    <label className="block text-sm font-medium text-muted mb-2">
                       Red Nedeni
                     </label>
                     <Textarea

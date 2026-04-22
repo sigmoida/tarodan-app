@@ -48,7 +48,7 @@ export const PhoneInput: React.FC<PhoneInputProps> = ({
         value={countryCode}
         onChange={(e) => onCountryCodeChange(e.target.value)}
         disabled={disabled}
-        className="w-auto bg-gray-100 rounded-r-none border-r-0 cursor-pointer"
+        className="w-auto bg-surface-alt rounded-r-none border-r-0 cursor-pointer"
       >
         {countryCodes.map((cc) => (
           <option key={cc.code} value={cc.code}>

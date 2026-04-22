@@ -58,20 +58,20 @@ function UnsubscribeContent() {
 
   if (tokenProcessed === null) {
     return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center px-4">
-        <p className="text-gray-600">{locale === 'en' ? 'Processing...' : 'İşleniyor...'}</p>
+      <div className="min-h-screen bg-surface flex items-center justify-center px-4">
+        <p className="text-muted">{locale === 'en' ? 'Processing...' : 'İşleniyor...'}</p>
       </div>
     );
   }
 
   if (unsubscribed) {
     return (
-      <div className="min-h-screen bg-gray-50">
-        <div className="bg-gradient-to-br from-gray-800 to-gray-900 text-white py-12">
+      <div className="min-h-screen bg-surface">
+        <div className="bg-gradient-to-br from-body to-heading text-inverted py-12">
           <div className="max-w-2xl mx-auto px-4 text-center">
             <CheckCircleIcon className="w-16 h-16 mx-auto text-success-400 mb-4" />
             <h1 className="text-2xl font-bold mb-2">{t('marketing.newsletter.unsubscribeTokenSuccess')}</h1>
-            <p className="text-gray-400">{t('marketing.newsletter.unsubscribeSuccess')}</p>
+            <p className="text-subtle">{t('marketing.newsletter.unsubscribeSuccess')}</p>
           </div>
         </div>
         <div className="max-w-2xl mx-auto px-4 py-12 text-center">
@@ -84,20 +84,20 @@ function UnsubscribeContent() {
   }
 
   return (
-    <div className="min-h-screen bg-gray-50">
-      <div className="bg-gradient-to-br from-gray-800 to-gray-900 text-white py-12">
+    <div className="min-h-screen bg-surface">
+      <div className="bg-gradient-to-br from-body to-heading text-inverted py-12">
         <div className="max-w-2xl mx-auto px-4">
           <h1 className="text-3xl font-bold mb-2">{t('marketing.newsletter.unsubscribeTitle')}</h1>
-          <p className="text-gray-400">{t('marketing.newsletter.unsubscribeSubtitle')}</p>
+          <p className="text-subtle">{t('marketing.newsletter.unsubscribeSubtitle')}</p>
         </div>
       </div>
 
       <div className="max-w-2xl mx-auto px-4 py-12">
-        <div className="bg-white rounded-2xl shadow-sm p-8">
-          <h2 className="text-lg font-semibold text-gray-900 mb-4">{t('marketing.newsletter.unsubscribeByEmail')}</h2>
+        <div className="bg-surface-elevated rounded-2xl shadow-sm p-8">
+          <h2 className="text-lg font-semibold text-heading mb-4">{t('marketing.newsletter.unsubscribeByEmail')}</h2>
           <form onSubmit={handleEmailUnsubscribe} className="space-y-4">
             <div>
-              <label htmlFor="unsub-email" className="block text-sm font-medium text-gray-700 mb-1">
+              <label htmlFor="unsub-email" className="block text-sm font-medium text-body mb-1">
                 {t('marketing.newsletter.emailLabel')}
               </label>
               <Input id="unsub-email"
@@ -109,7 +109,7 @@ function UnsubscribeContent() {
                 className="px-4 py-3 rounded-xl" />
             </div>
             <div>
-              <label htmlFor="unsub-feedback" className="block text-sm font-medium text-gray-700 mb-1">
+              <label htmlFor="unsub-feedback" className="block text-sm font-medium text-body mb-1">
                 {t('marketing.newsletter.feedbackTitle')}
               </label>
               <Textarea id="unsub-feedback"
@@ -121,7 +121,7 @@ function UnsubscribeContent() {
             </div>
             <Button variant="secondary" type="submit"
               disabled={loading}
-              className="w-full flex items-center justify-center gap-2 py-3 px-6 rounded-xl bg-gray-800 text-white font-semibold hover:bg-gray-900 disabled:opacity-50 transition-colors">
+              className="w-full flex items-center justify-center gap-2 py-3 px-6 rounded-xl bg-heading text-inverted font-semibold hover:bg-heading disabled:opacity-50 transition-colors">
               <EnvelopeIcon className="w-5 h-5" />
               {loading ? (locale === 'en' ? 'Processing...' : 'İşleniyor...') : t('marketing.newsletter.unsubscribeButton')}
             </Button>
@@ -139,7 +139,7 @@ function UnsubscribeContent() {
 
 export default function NewsletterUnsubscribePage() {
   return (
-    <Suspense fallback={<div className="min-h-screen bg-gray-50 flex items-center justify-center">...</div>}>
+    <Suspense fallback={<div className="min-h-screen bg-surface flex items-center justify-center">...</div>}>
       <UnsubscribeContent />
     </Suspense>
   );

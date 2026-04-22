@@ -244,8 +244,8 @@ export default function OrdersPage() {
   return (
     <div className="space-y-6">
       <div>
-        <h1 className="text-2xl font-bold text-gray-900">Siparişler</h1>
-        <p className="text-gray-500 mt-1">
+        <h1 className="text-2xl font-bold text-heading">Siparişler</h1>
+        <p className="text-muted mt-1">
           Toplam {total} sipariş
           {(selectedUserId || productId) && (
             <span className="ml-2">
@@ -267,7 +267,7 @@ export default function OrdersPage() {
         {/* Row 1: Search + Status */}
         <div className="flex flex-col sm:flex-row gap-3">
           <div className="relative flex-1">
-            <MagnifyingGlassIcon className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-gray-400 pointer-events-none shrink-0" />
+            <MagnifyingGlassIcon className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-subtle pointer-events-none shrink-0" />
             <Input
               type="text"
               placeholder="Sipariş no, kullanıcı veya ürün ara..."
@@ -295,7 +295,7 @@ export default function OrdersPage() {
         {/* Row 2: User filter */}
         <div className="flex flex-col sm:flex-row items-start sm:items-center gap-3">
           <div className="relative flex-1 w-full sm:max-w-xs" ref={dropdownRef}>
-            <UserIcon className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400 pointer-events-none shrink-0" />
+            <UserIcon className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-subtle pointer-events-none shrink-0" />
             <Input
               type="text"
               placeholder="Kullanıcı ara..."
@@ -311,16 +311,16 @@ export default function OrdersPage() {
               <Button
                 variant="secondary"
                 onClick={clearUserFilter}
-                className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
+                className="absolute right-3 top-1/2 -translate-y-1/2 text-subtle hover:text-muted"
               >
                 <XCircleIcon className="h-4 w-4" />
               </Button>
             )}
 
             {showUserDropdown && userSearch.length >= 2 && (
-              <div className="absolute z-50 w-full mt-1 bg-white border border-gray-200 rounded-lg shadow-lg max-h-60 overflow-y-auto">
+              <div className="absolute z-50 w-full mt-1 bg-surface-elevated border border-border rounded-lg shadow-lg max-h-60 overflow-y-auto">
                 {loadingUsers ? (
-                  <div className="p-3 text-center text-gray-500 text-sm">
+                  <div className="p-3 text-center text-muted text-sm">
                     Aranıyor...
                   </div>
                 ) : users.length > 0 ? (
@@ -329,16 +329,16 @@ export default function OrdersPage() {
                       variant="secondary"
                       key={user.id}
                       onClick={() => handleSelectUser(user)}
-                      className="w-full px-4 py-2 text-left hover:bg-gray-50 text-gray-900"
+                      className="w-full px-4 py-2 text-left hover:bg-surface text-heading"
                     >
                       <div className="font-medium text-sm">
                         {user.displayName}
                       </div>
-                      <div className="text-xs text-gray-500">{user.email}</div>
+                      <div className="text-xs text-muted">{user.email}</div>
                     </Button>
                   ))
                 ) : (
-                  <div className="p-3 text-center text-gray-500 text-sm">
+                  <div className="p-3 text-center text-muted text-sm">
                     Kullanıcı bulunamadı
                   </div>
                 )}
@@ -374,7 +374,7 @@ export default function OrdersPage() {
                 </tr>
               ) : orders.length === 0 ? (
                 <tr>
-                  <td colSpan={9} className="text-center py-12 text-gray-400">
+                  <td colSpan={9} className="text-center py-12 text-subtle">
                     {debouncedSearch || status !== "all" || selectedUserId
                       ? "Filtreye uygun sipariş bulunamadı"
                       : "Henüz sipariş yok"}
@@ -382,7 +382,7 @@ export default function OrdersPage() {
                 </tr>
               ) : (
                 orders.map((order) => (
-                  <tr key={order.id} className="group hover:bg-gray-50/50">
+                  <tr key={order.id} className="group hover:bg-surface/50">
                     <td>
                       <Link
                         href={`/orders/${order.id}`}
@@ -442,7 +442,7 @@ export default function OrdersPage() {
                     <td>
                       <Link
                         href={`/users/${order.buyer.id}`}
-                        className="text-sm text-gray-900 hover:text-primary-600"
+                        className="text-sm text-heading hover:text-primary-600"
                       >
                         {order.buyer.displayName}
                       </Link>
@@ -450,14 +450,14 @@ export default function OrdersPage() {
                     <td>
                       <Link
                         href={`/users/${order.seller.id}`}
-                        className="text-sm text-gray-900 hover:text-primary-600"
+                        className="text-sm text-heading hover:text-primary-600"
                       >
                         {order.seller.displayName}
                       </Link>
                     </td>
                     <td>
                       <span
-                        className="text-sm text-gray-700 truncate block max-w-[180px]"
+                        className="text-sm text-body truncate block max-w-[180px]"
                         title={order.product?.title}
                       >
                         {order.product?.title || `${order.itemCount} adet`}
@@ -469,7 +469,7 @@ export default function OrdersPage() {
                     <td className="text-right text-success-600 text-sm tabular-nums">
                       ₺{order.commission.toLocaleString("tr-TR")}
                     </td>
-                    <td className="whitespace-nowrap text-sm text-gray-500">
+                    <td className="whitespace-nowrap text-sm text-muted">
                       {new Date(order.createdAt).toLocaleDateString("tr-TR")}
                     </td>
                     <td>
@@ -477,14 +477,14 @@ export default function OrdersPage() {
                         <Button
                           variant="secondary"
                           onClick={() => startEditing(order)}
-                          className="p-1.5 text-gray-400 hover:text-info-600 hover:bg-info-50 rounded-md transition-colors"
+                          className="p-1.5 text-subtle hover:text-info-600 hover:bg-info-50 rounded-md transition-colors"
                           title="Durumu Değiştir"
                         >
                           <PencilIcon className="h-4 w-4" />
                         </Button>
                         <Link
                           href={`/orders/${order.id}`}
-                          className="p-1.5 text-gray-400 hover:text-gray-700 hover:bg-gray-100 rounded-md transition-colors"
+                          className="p-1.5 text-subtle hover:text-body hover:bg-surface-alt rounded-md transition-colors"
                           title="Detay"
                         >
                           <EyeIcon className="h-4 w-4" />
@@ -502,7 +502,7 @@ export default function OrdersPage() {
       {/* Pagination */}
       {total > 0 && (
         <div className="flex items-center justify-between">
-          <p className="text-sm text-gray-500">
+          <p className="text-sm text-muted">
             Sayfa {page} / {totalPages} ({total} sonuç)
           </p>
           <div className="flex gap-2">

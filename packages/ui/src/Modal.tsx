@@ -62,20 +62,20 @@ export const Modal = React.forwardRef<HTMLDivElement, ModalProps>(
       >
         {/* Backdrop */}
         <div
-          className="absolute inset-0 bg-black/50 backdrop-blur-sm"
+          className="absolute inset-0 bg-heading/50 backdrop-blur-sm"
           onClick={closeOnBackdrop ? onClose : undefined}
           aria-hidden="true"
         />
         {/* Content */}
         <div
           className={cn(
-            'relative w-full bg-white rounded-xl shadow-elevated p-6',
+            'relative w-full bg-surface-elevated rounded-xl shadow-elevated p-6',
             maxWidth,
             className,
           )}
         >
           {title && (
-            <h3 className="text-lg font-semibold text-gray-900 mb-4">{title}</h3>
+            <h3 className="text-lg font-semibold text-heading mb-4">{title}</h3>
           )}
           {children}
         </div>

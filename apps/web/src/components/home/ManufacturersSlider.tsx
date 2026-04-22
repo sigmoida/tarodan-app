@@ -82,12 +82,12 @@ export default function ManufacturersSlider() {
     };
 
     return (
-        <section className="py-8 bg-white">
+        <section className="py-8 bg-surface-elevated">
             <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
                 <div className="flex items-center justify-between mb-6">
                     <div className="flex items-center gap-3">
                         <div className="w-1 h-8 bg-primary-500 rounded"></div>
-                        <h2 className="text-xl md:text-2xl font-bold text-gray-900">
+                        <h2 className="text-xl md:text-2xl font-bold text-heading">
                             {locale === 'en' ? 'Diecast Manufacturers' : 'Diecast Üreticileri'}
                         </h2>
                     </div>
@@ -103,9 +103,9 @@ export default function ManufacturersSlider() {
                 <div className="relative">
                     {canScrollLeft && (
                         <Button variant="secondary" onClick={() => scroll('left')}
-                            className="absolute left-0 top-1/2 -translate-y-1/2 z-10 w-10 h-10 bg-white shadow-lg rounded-full flex items-center justify-center hover:bg-primary-50 transition-colors"
+                            className="absolute left-0 top-1/2 -translate-y-1/2 z-10 w-10 h-10 bg-surface-elevated shadow-lg rounded-full flex items-center justify-center hover:bg-primary-50 transition-colors"
                             aria-label="Scroll left">
-                            <ChevronLeftIcon className="w-5 h-5 text-gray-600" />
+                            <ChevronLeftIcon className="w-5 h-5 text-muted" />
                         </Button>
                     )}
 
@@ -124,9 +124,9 @@ export default function ManufacturersSlider() {
                             >
                                 <Link
                                     href={buildHref(manufacturer)}
-                                    className="flex-shrink-0 w-28 h-20 bg-gray-50 border border-gray-200 rounded-lg flex items-center justify-center hover:border-primary-400 hover:bg-primary-50 transition-all group"
+                                    className="flex-shrink-0 w-28 h-20 bg-surface border border-border rounded-lg flex items-center justify-center hover:border-primary-400 hover:bg-primary-50 transition-all group"
                                 >
-                                    <span className="text-sm font-bold text-gray-700 group-hover:text-primary-600 text-center px-2">
+                                    <span className="text-sm font-bold text-body group-hover:text-primary-600 text-center px-2">
                                         {manufacturer.name}
                                     </span>
                                 </Link>
@@ -136,9 +136,9 @@ export default function ManufacturersSlider() {
 
                     {canScrollRight && (
                         <Button variant="secondary" onClick={() => scroll('right')}
-                            className="absolute right-0 top-1/2 -translate-y-1/2 z-10 w-10 h-10 bg-white shadow-lg rounded-full flex items-center justify-center hover:bg-primary-50 transition-colors"
+                            className="absolute right-0 top-1/2 -translate-y-1/2 z-10 w-10 h-10 bg-surface-elevated shadow-lg rounded-full flex items-center justify-center hover:bg-primary-50 transition-colors"
                             aria-label="Scroll right">
-                            <ChevronRightIcon className="w-5 h-5 text-gray-600" />
+                            <ChevronRightIcon className="w-5 h-5 text-muted" />
                         </Button>
                     )}
                 </div>

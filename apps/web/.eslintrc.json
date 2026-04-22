@@ -20,8 +20,12 @@
         "message": "Use <Textarea /> from '@tarodan/ui' instead of raw <textarea>."
       },
       {
-        "selector": "Literal[value=/\\b(bg|text|border|ring|from|to|via|divide|placeholder|outline|accent|caret|decoration|fill|stroke|shadow)-(red|blue|green|yellow|orange|emerald|sky|indigo|violet|purple|pink|rose|amber|lime|teal|cyan)-\\d{2,3}\\b/]",
-        "message": "Use semantic color tokens (primary, danger, success, info, warning, surface, heading, body, muted, subtle) instead of raw Tailwind palette colors."
+        "selector": "Literal[value=/\\b(bg|text|border|ring|from|to|via|divide|placeholder|outline|accent|caret|decoration|fill|stroke|shadow)-(red|blue|green|yellow|orange|emerald|sky|indigo|violet|purple|pink|rose|amber|lime|teal|cyan|gray|slate|zinc|neutral|stone)-\\d{2,3}(?:\\/\\d+)?\\b/]",
+        "message": "Use semantic color tokens (primary, danger, success, info, warning, surface, heading, body, muted, subtle, border) instead of raw Tailwind palette colors."
+      },
+      {
+        "selector": "Literal[value=/\\b(bg|text|border|ring|from|to|via|divide|placeholder|outline|accent|caret|decoration|fill|stroke|shadow)-(white|black)(?:\\/\\d+)?\\b/]",
+        "message": "Use semantic color tokens (surface-elevated, heading, inverted, border, etc.) instead of raw white/black utilities."
       },
       {
         "selector": "JSXOpeningElement[name.name=/^(Input|Textarea|Select)$/] JSXAttribute[name.name='className'] Literal[value=/\\bborder-gray-300\\b/]",

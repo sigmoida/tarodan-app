@@ -178,12 +178,12 @@ export default function AddressesPage() {
 
   if (isLoading) {
     return (
-      <div className="min-h-screen bg-gray-50">
+      <div className="min-h-screen bg-surface">
         <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
           <div className="animate-pulse space-y-4">
-            <div className="h-8 bg-gray-200 rounded w-1/3" />
+            <div className="h-8 bg-border-subtle rounded w-1/3" />
             {[...Array(3)].map((_, i) => (
-              <div key={i} className="h-32 bg-gray-200 rounded" />
+              <div key={i} className="h-32 bg-border-subtle rounded" />
             ))}
           </div>
         </div>
@@ -192,19 +192,19 @@ export default function AddressesPage() {
   }
 
   return (
-    <div className="min-h-screen bg-gray-50">
+    <div className="min-h-screen bg-surface">
       <main className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         <div className="flex items-center justify-between mb-8">
           <div>
             <h1 className="text-3xl font-bold mb-2">{t('address.myAddresses')}</h1>
-            <p className="text-gray-600">{t('address.manageAddresses')}</p>
+            <p className="text-muted">{t('address.manageAddresses')}</p>
           </div>
           {addresses.length >= 3 ? (
             <div className="text-right">
               <p className="text-sm text-primary-600 font-medium mb-1">
                 {locale === 'en' ? 'Address limit reached (3/3)' : 'Adres limiti doldu (3/3)'}
               </p>
-              <p className="text-xs text-gray-500">
+              <p className="text-xs text-muted">
                 {locale === 'en' 
                   ? 'Delete an address to add a new one' 
                   : 'Yeni adres eklemek için bir adres silin'}
@@ -216,10 +216,10 @@ export default function AddressesPage() {
                 setEditingId(null);
                 setShowForm(true);
               }}
-              className="flex items-center gap-2 px-6 py-3 bg-primary-500 text-white rounded hover:bg-primary-600">
+              className="flex items-center gap-2 px-6 py-3 bg-primary-500 text-inverted rounded hover:bg-primary-600">
               <PlusIcon className="w-5 h-5" />
               {t('address.newAddress')}
-              <span className="text-xs bg-white/20 px-2 py-0.5 rounded-sm">
+              <span className="text-xs bg-surface-elevated/20 px-2 py-0.5 rounded-sm">
                 {addresses.length}/3
               </span>
             </Button>
@@ -251,14 +251,14 @@ export default function AddressesPage() {
           <motion.div
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
-            className="bg-white rounded shadow-sm p-6 mb-6"
+            className="bg-surface-elevated rounded shadow-sm p-6 mb-6"
           >
             <h2 className="text-xl font-semibold mb-4">
               {editingId ? t('address.editAddress') : t('address.addNewAddress')}
             </h2>
             <form onSubmit={handleSubmit} className="space-y-4">
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
+                <label className="block text-sm font-medium text-body mb-1">
                   {t('address.addressTitle')}
                 </label>
                 <Input
@@ -272,7 +272,7 @@ export default function AddressesPage() {
 
               <div className="grid md:grid-cols-2 gap-4">
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                  <label className="block text-sm font-medium text-body mb-1">
                     {t('checkout.fullName')} <span className="text-danger-500">*</span>
                   </label>
                   <Input
@@ -285,11 +285,11 @@ export default function AddressesPage() {
                 </div>
 
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                  <label className="block text-sm font-medium text-body mb-1">
                     {t('checkout.phone')} <span className="text-danger-500">*</span>
                   </label>
                   <div className="flex">
-                    <span className="inline-flex items-center bg-gray-100 border-r-0 rounded-l text-gray-500 font-medium">
+                    <span className="inline-flex items-center bg-surface-alt border-r-0 rounded-l text-muted font-medium">
                       +90
                     </span>
                     <Input
@@ -306,14 +306,14 @@ export default function AddressesPage() {
                       required
                     />
                   </div>
-                  <p className="text-xs text-gray-500 mt-1">
+                  <p className="text-xs text-muted mt-1">
                     {locale === 'en' ? '10 digits without country code' : '10 rakam (ülke kodu olmadan)'}
                   </p>
                 </div>
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
+                <label className="block text-sm font-medium text-body mb-1">
                   {t('address.cityDistrict')} <span className="text-danger-500">*</span>
                 </label>
                 <CityDistrictSelector
@@ -327,7 +327,7 @@ export default function AddressesPage() {
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
+                <label className="block text-sm font-medium text-body mb-1">
                   {t('common.address')} <span className="text-danger-500">*</span>
                 </label>
                 <Textarea value={formData.address}
@@ -338,7 +338,7 @@ export default function AddressesPage() {
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
+                <label className="block text-sm font-medium text-body mb-1">
                   {t('checkout.zipCode')}
                 </label>
                 <Input
@@ -365,12 +365,12 @@ export default function AddressesPage() {
                     setEditingId(null);
                     resetForm();
                   }}
-                  className="flex-1 px-4 rounded hover:bg-gray-50">
+                  className="flex-1 px-4 rounded hover:bg-surface">
                   {t('common.cancel')}
                 </Button>
                 <Button variant="secondary" type="submit"
                   disabled={isSaving}
-                  className="flex-1 px-4 py-2 bg-primary-500 text-white rounded hover:bg-primary-600 disabled:opacity-60">
+                  className="flex-1 px-4 py-2 bg-primary-500 text-inverted rounded hover:bg-primary-600 disabled:opacity-60">
                   {isSaving
                     ? (locale === 'en' ? 'Saving...' : 'Kaydediliyor...')
                     : editingId ? t('common.update') : t('common.save')}
@@ -381,10 +381,10 @@ export default function AddressesPage() {
         )}
 
         {addresses.length === 0 && !showForm ? (
-          <div className="text-center py-16 bg-white rounded">
-            <p className="text-gray-600 text-lg mb-4">{t('address.noAddresses')}</p>
+          <div className="text-center py-16 bg-surface-elevated rounded">
+            <p className="text-muted text-lg mb-4">{t('address.noAddresses')}</p>
             <Button variant="secondary" onClick={() => setShowForm(true)}
-              className="px-6 py-3 bg-primary-500 text-white rounded hover:bg-primary-600">
+              className="px-6 py-3 bg-primary-500 text-inverted rounded hover:bg-primary-600">
               {t('address.addFirstAddress')}
             </Button>
           </div>
@@ -395,7 +395,7 @@ export default function AddressesPage() {
                 key={address.id}
                 initial={{ opacity: 0, y: 20 }}
                 animate={{ opacity: 1, y: 0 }}
-                className="bg-white rounded shadow-sm p-6"
+                className="bg-surface-elevated rounded shadow-sm p-6"
               >
                 <div className="flex items-start justify-between">
                   <div className="flex-1">
@@ -407,9 +407,9 @@ export default function AddressesPage() {
                     {address.title && (
                       <h3 className="font-semibold text-lg mb-2">{address.title}</h3>
                     )}
-                    <p className="text-gray-900 font-medium">{address.fullName}</p>
-                    <p className="text-gray-600">{address.phone}</p>
-                    <p className="text-gray-600 mt-2">
+                    <p className="text-heading font-medium">{address.fullName}</p>
+                    <p className="text-muted">{address.phone}</p>
+                    <p className="text-muted mt-2">
                       {address.address}, {address.district}, {address.city}
                       {address.zipCode && ` ${address.zipCode}`}
                     </p>
@@ -423,7 +423,7 @@ export default function AddressesPage() {
                       </Button>
                     )}
                     <Button variant="secondary" onClick={() => handleEdit(address)}
-                      className="p-2 text-gray-600 hover:bg-gray-100 rounded"
+                      className="p-2 text-muted hover:bg-surface-alt rounded"
                       title={t('common.edit')}>
                       <PencilIcon className="w-5 h-5" />
                     </Button>

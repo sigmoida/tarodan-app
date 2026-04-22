@@ -40,7 +40,7 @@ interface PaymentMethod {
 }
 
 const tierColors: Record<string, string> = {
-  free: 'bg-gray-100 text-gray-800',
+  free: 'bg-surface-alt text-body',
   basic: 'bg-info-100 text-info-800',
   premium: 'bg-primary-100 text-primary-800',
   business: 'bg-warning-100 text-warning-800',
@@ -287,11 +287,11 @@ export default function MembershipManagePage() {
 
   if (isLoading) {
     return (
-      <div className="min-h-screen bg-gray-50 py-8">
+      <div className="min-h-screen bg-surface py-8">
         <div className="max-w-2xl mx-auto px-4">
           <div className="animate-pulse space-y-6">
-            <div className="h-8 bg-gray-200 rounded w-1/3" />
-            <div className="h-64 bg-gray-200 rounded-xl" />
+            <div className="h-8 bg-border-subtle rounded w-1/3" />
+            <div className="h-64 bg-border-subtle rounded-xl" />
           </div>
         </div>
       </div>
@@ -302,25 +302,25 @@ export default function MembershipManagePage() {
   const isPaid = tier !== 'free';
 
   return (
-    <div className="min-h-screen bg-gray-50 py-8">
+    <div className="min-h-screen bg-surface py-8">
       <div className="max-w-2xl mx-auto px-4">
         {/* Header */}
         <div className="mb-8">
           <Link
             href="/profile"
-            className="inline-flex items-center gap-2 text-gray-600 hover:text-gray-900 mb-4"
+            className="inline-flex items-center gap-2 text-muted hover:text-heading mb-4"
           >
             <ArrowLeftIcon className="w-5 h-5" />
             Profile Dön
           </Link>
-          <h1 className="text-3xl font-bold text-gray-900 flex items-center gap-3">
+          <h1 className="text-3xl font-bold text-heading flex items-center gap-3">
             <SparklesIcon className="w-8 h-8 text-primary-500" />
             Üyelik Yönetimi
           </h1>
         </div>
 
         {/* Current Plan */}
-        <div className="bg-white rounded-xl p-6 border border-gray-200 mb-6">
+        <div className="bg-surface-elevated rounded-xl p-6 border border-border mb-6">
           <div className="flex items-center justify-between mb-6">
             <div>
               <span className={`inline-flex px-3 py-1 rounded-full text-sm font-medium ${tierColors[tier]}`}>
@@ -336,10 +336,10 @@ export default function MembershipManagePage() {
           </div>
 
           <div className="space-y-4 mb-6">
-            <h3 className="font-semibold text-gray-900">Mevcut Özellikler</h3>
+            <h3 className="font-semibold text-heading">Mevcut Özellikler</h3>
             <ul className="space-y-2">
               {(membership?.features || []).map((feature, idx) => (
-                <li key={idx} className="flex items-center gap-2 text-gray-600">
+                <li key={idx} className="flex items-center gap-2 text-muted">
                   <CheckCircleIcon className="w-5 h-5 text-success-500 flex-shrink-0" />
                   {feature}
                 </li>
@@ -349,17 +349,17 @@ export default function MembershipManagePage() {
 
           {isPaid && (
             <>
-              <div className="border-t border-gray-200 pt-4 mb-4">
+              <div className="border-t border-border pt-4 mb-4">
                 <div className="grid grid-cols-2 gap-4 text-sm">
                   <div>
-                    <p className="text-gray-500">Başlangıç Tarihi</p>
-                    <p className="font-medium text-gray-900">
+                    <p className="text-muted">Başlangıç Tarihi</p>
+                    <p className="font-medium text-heading">
                       {membership?.startDate && new Date(membership.startDate).toLocaleDateString('tr-TR')}
                     </p>
                   </div>
                   <div>
-                    <p className="text-gray-500">Bitiş Tarihi</p>
-                    <p className="font-medium text-gray-900">
+                    <p className="text-muted">Bitiş Tarihi</p>
+                    <p className="font-medium text-heading">
                       {membership?.endDate && new Date(membership.endDate).toLocaleDateString('tr-TR')}
                     </p>
                   </div>
@@ -367,13 +367,13 @@ export default function MembershipManagePage() {
               </div>
 
               {/* Auto Renew Section */}
-              <div className="p-4 bg-gray-50 rounded-lg space-y-3">
+              <div className="p-4 bg-surface rounded-lg space-y-3">
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-3">
-                    <ArrowPathIcon className="w-5 h-5 text-gray-500" />
+                    <ArrowPathIcon className="w-5 h-5 text-muted" />
                     <div>
-                      <p className="font-medium text-gray-900">Otomatik Yenileme</p>
-                      <p className="text-sm text-gray-500">
+                      <p className="font-medium text-heading">Otomatik Yenileme</p>
+                      <p className="text-sm text-muted">
                         {membership?.autoRenew
                           ? `Sonraki ödeme: ${membership.nextBillingDate && new Date(membership.nextBillingDate).toLocaleDateString('tr-TR')} - ${(membership.nextBillingAmount || tierPrices[tier]).toLocaleString('tr-TR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} TL`
                           : 'Kapalı - Dönem sonunda üyeliğiniz sona erecek'}
@@ -383,10 +383,10 @@ export default function MembershipManagePage() {
                   <Button variant="secondary" onClick={handleToggleAutoRenew}
                     disabled={processingAutoRenew}
                     className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors disabled:opacity-50 ${
-                      membership?.autoRenew ? 'bg-primary-500' : 'bg-gray-300'
+                      membership?.autoRenew ? 'bg-primary-500' : 'bg-border-strong'
                     }`}>
                     <span
-                      className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
+                      className={`inline-block h-4 w-4 transform rounded-full bg-surface-elevated transition-transform ${
                         membership?.autoRenew ? 'translate-x-6' : 'translate-x-1'
                       }`}
                     />
@@ -395,9 +395,9 @@ export default function MembershipManagePage() {
 
                 {/* Show selected payment method */}
                 {membership?.autoRenew && getSelectedCard() && (
-                  <div className="flex items-center gap-2 p-2 bg-white rounded-lg border border-gray-200">
-                    <CreditCardIcon className="w-5 h-5 text-gray-400" />
-                    <span className="text-sm text-gray-700">
+                  <div className="flex items-center gap-2 p-2 bg-surface-elevated rounded-lg border border-border">
+                    <CreditCardIcon className="w-5 h-5 text-subtle" />
+                    <span className="text-sm text-body">
                       {getSelectedCard()?.cardBrand} •••• {getSelectedCard()?.lastFour}
                     </span>
                     <Button variant="secondary" onClick={() => setShowPaymentModal(true)}
@@ -416,7 +416,7 @@ export default function MembershipManagePage() {
           {!isPaid ? (
             <Link
               href="/pricing"
-              className="block w-full py-4 bg-primary-500 hover:bg-primary-600 text-white rounded-xl font-semibold text-center transition-colors"
+              className="block w-full py-4 bg-primary-500 hover:bg-primary-600 text-inverted rounded-xl font-semibold text-center transition-colors"
             >
               Üyeliği Yükselt
             </Link>
@@ -424,7 +424,7 @@ export default function MembershipManagePage() {
             <>
               <Link
                 href="/pricing"
-                className="block w-full py-4 bg-primary-500 hover:bg-primary-600 text-white rounded-xl font-semibold text-center transition-colors"
+                className="block w-full py-4 bg-primary-500 hover:bg-primary-600 text-inverted rounded-xl font-semibold text-center transition-colors"
               >
                 Plan Değiştir
               </Link>
@@ -451,12 +451,12 @@ export default function MembershipManagePage() {
 
       {/* Payment Method Selection Modal */}
       {showPaymentModal && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-2xl max-w-md w-full p-6">
+        <div className="fixed inset-0 bg-heading/50 flex items-center justify-center z-50 p-4">
+          <div className="bg-surface-elevated rounded-2xl max-w-md w-full p-6">
             <div className="flex items-center justify-between mb-6">
-              <h2 className="text-xl font-bold text-gray-900">Ödeme Yöntemi Seç</h2>
+              <h2 className="text-xl font-bold text-heading">Ödeme Yöntemi Seç</h2>
               <Button variant="secondary" onClick={() => setShowPaymentModal(false)}
-                className="p-2 hover:bg-gray-100 rounded-lg">
+                className="p-2 hover:bg-surface-alt rounded-lg">
                 <XMarkIcon className="w-5 h-5" />
               </Button>
             </div>
@@ -468,14 +468,14 @@ export default function MembershipManagePage() {
                   className={`w-full p-4 rounded-xl border-2 flex items-center gap-3 transition-colors ${
                     selectedPaymentMethod === method.id
                       ? 'border-primary-500 bg-primary-50'
-                      : 'border-gray-200 hover:border-gray-300'
+                      : 'border-border hover:border-border'
                   }`}>
-                  <CreditCardIcon className="w-6 h-6 text-gray-500" />
+                  <CreditCardIcon className="w-6 h-6 text-muted" />
                   <div className="text-left">
-                    <p className="font-medium text-gray-900">
+                    <p className="font-medium text-heading">
                       {method.cardBrand} •••• {method.lastFour}
                     </p>
-                    <p className="text-sm text-gray-500">
+                    <p className="text-sm text-muted">
                       {method.expiryMonth.toString().padStart(2, '0')}/{method.expiryYear}
                     </p>
                   </div>
@@ -489,7 +489,7 @@ export default function MembershipManagePage() {
                   setShowPaymentModal(false);
                   setShowAddCardModal(true);
                 }}
-                className="p-4 rounded-xl border-2 border-dashed items-center justify-center gap-2 text-gray-600 hover:border-gray-400 hover:text-gray-700">
+                className="p-4 rounded-xl border-2 border-dashed items-center justify-center gap-2 text-muted hover:border-border-strong hover:text-body">
                 <PlusIcon className="w-5 h-5" />
                 Yeni Kart Ekle
               </Button>
@@ -497,12 +497,12 @@ export default function MembershipManagePage() {
 
             <div className="flex gap-3">
               <Button variant="secondary" onClick={() => setShowPaymentModal(false)}
-                className="flex-1 py-3 text-gray-700 rounded-xl font-medium hover:bg-gray-50">
+                className="flex-1 py-3 text-body rounded-xl font-medium hover:bg-surface">
                 İptal
               </Button>
               <Button variant="secondary" onClick={() => selectedPaymentMethod && enableAutoRenew(selectedPaymentMethod)}
                 disabled={!selectedPaymentMethod || processingAutoRenew}
-                className="flex-1 py-3 bg-primary-500 text-white rounded-xl font-medium hover:bg-primary-600 transition-colors disabled:opacity-50">
+                className="flex-1 py-3 bg-primary-500 text-inverted rounded-xl font-medium hover:bg-primary-600 transition-colors disabled:opacity-50">
                 {processingAutoRenew ? 'İşleniyor...' : 'Onayla'}
               </Button>
             </div>
@@ -512,19 +512,19 @@ export default function MembershipManagePage() {
 
       {/* Add New Card Modal */}
       {showAddCardModal && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-2xl max-w-md w-full p-6">
+        <div className="fixed inset-0 bg-heading/50 flex items-center justify-center z-50 p-4">
+          <div className="bg-surface-elevated rounded-2xl max-w-md w-full p-6">
             <div className="flex items-center justify-between mb-6">
-              <h2 className="text-xl font-bold text-gray-900">Yeni Kart Ekle</h2>
+              <h2 className="text-xl font-bold text-heading">Yeni Kart Ekle</h2>
               <Button variant="secondary" onClick={() => setShowAddCardModal(false)}
-                className="p-2 hover:bg-gray-100 rounded-lg">
+                className="p-2 hover:bg-surface-alt rounded-lg">
                 <XMarkIcon className="w-5 h-5" />
               </Button>
             </div>
 
             <form onSubmit={handleAddNewCard} className="space-y-4">
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
+                <label className="block text-sm font-medium text-body mb-1">
                   Kart Numarası
                 </label>
                 <Input type="text"
@@ -536,7 +536,7 @@ export default function MembershipManagePage() {
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
+                <label className="block text-sm font-medium text-body mb-1">
                   Kart Üzerindeki İsim
                 </label>
                 <Input type="text"
@@ -548,7 +548,7 @@ export default function MembershipManagePage() {
 
               <div className="grid grid-cols-3 gap-3">
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                  <label className="block text-sm font-medium text-body mb-1">
                     Ay
                   </label>
                   <Select
@@ -565,7 +565,7 @@ export default function MembershipManagePage() {
                   </Select>
                 </div>
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                  <label className="block text-sm font-medium text-body mb-1">
                     Yıl
                   </label>
                   <Select
@@ -585,7 +585,7 @@ export default function MembershipManagePage() {
                   </Select>
                 </div>
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                  <label className="block text-sm font-medium text-body mb-1">
                     CVV
                   </label>
                   <Input type="text"
@@ -607,19 +607,19 @@ export default function MembershipManagePage() {
 
               </div>
 
-              <div className="p-3 bg-gray-50 rounded-lg text-sm text-gray-600">
+              <div className="p-3 bg-surface rounded-lg text-sm text-muted">
                 🔒 Kart bilgileriniz güvenli bir şekilde işlenmektedir.
               </div>
 
               <div className="flex gap-3 pt-2">
                 <Button variant="secondary" type="button"
                   onClick={() => setShowAddCardModal(false)}
-                  className="flex-1 py-3 text-gray-700 rounded-xl font-medium hover:bg-gray-50">
+                  className="flex-1 py-3 text-body rounded-xl font-medium hover:bg-surface">
                   İptal
                 </Button>
                 <Button variant="secondary" type="submit"
                   disabled={processingAutoRenew}
-                  className="flex-1 py-3 bg-primary-500 text-white rounded-xl font-medium hover:bg-primary-600 transition-colors disabled:opacity-50">
+                  className="flex-1 py-3 bg-primary-500 text-inverted rounded-xl font-medium hover:bg-primary-600 transition-colors disabled:opacity-50">
                   {processingAutoRenew ? 'İşleniyor...' : 'Kartı Ekle ve Aktifleştir'}
                 </Button>
               </div>

@@ -85,13 +85,13 @@ export default function ProductLayoutSelector({
   ];
 
   return (
-    <div className="flex items-center gap-1 bg-gray-100 rounded-lg p-1">
+    <div className="flex items-center gap-1 bg-surface-alt rounded-lg p-1">
       {layouts.map((item) => (
         <Button variant="secondary" key={item.value}
           onClick={() => onLayoutChange(item.value)}
           className={`flex items-center justify-center p-2 rounded-md transition-all ${layout === item.value
-            ? 'bg-white text-primary-500 shadow-sm'
-            : 'text-gray-600 hover:text-gray-900 hover:bg-gray-50'
+            ? 'bg-surface-elevated text-primary-500 shadow-sm'
+            : 'text-muted hover:text-heading hover:bg-surface'
             }`}
           title={item.label}>
           {item.icon}

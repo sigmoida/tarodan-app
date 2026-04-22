@@ -658,7 +658,7 @@ export default function NewListingPage() {
   // Show loading state while auth is being checked
   if (authLoading) {
     return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+      <div className="min-h-screen bg-surface flex items-center justify-center">
         <Spinner size="xl" />
       </div>
     );
@@ -670,11 +670,11 @@ export default function NewListingPage() {
   }
 
   return (
-    <div className="min-h-screen bg-gray-50">
+    <div className="min-h-screen bg-surface">
       <main className="max-w-3xl mx-auto px-3 sm:px-6 lg:px-8 py-4 sm:py-8">
         <Link
           href="/listings"
-          className="inline-flex items-center gap-2 text-gray-500 hover:text-primary-500 transition-colors mb-6 text-sm"
+          className="inline-flex items-center gap-2 text-muted hover:text-primary-500 transition-colors mb-6 text-sm"
         >
           <ArrowLeftIcon className="w-4 h-4" />
           İlanlara Dön
@@ -685,18 +685,18 @@ export default function NewListingPage() {
           animate={{ opacity: 1, y: 0 }}
         >
           <div className="mb-6">
-            <h1 className="text-xl sm:text-2xl font-bold text-gray-900">
+            <h1 className="text-xl sm:text-2xl font-bold text-heading">
               Yeni İlan Oluştur
             </h1>
-            <p className="text-gray-500 text-sm mt-1">
+            <p className="text-muted text-sm mt-1">
               Ürününüzü koleksiyoncularla buluşturun
             </p>
           </div>
 
           {/* Listing Limit Info */}
           {limitsLoading ? (
-            <div className="mb-5 p-3 bg-gray-50 rounded animate-pulse">
-              <div className="h-4 bg-gray-200 rounded w-1/3"></div>
+            <div className="mb-5 p-3 bg-surface rounded animate-pulse">
+              <div className="h-4 bg-border-subtle rounded w-1/3"></div>
             </div>
           ) : (
             listingLimits && (
@@ -725,7 +725,7 @@ export default function NewListingPage() {
                         : `İlan Hakkı: ${listingLimits.currentCount} / ${listingLimits.maxListings}`}
                     </p>
                     {listingLimits.remainingListings !== -1 && (
-                      <p className="text-xs text-gray-500 mt-0.5">
+                      <p className="text-xs text-muted mt-0.5">
                         Kalan: {listingLimits.remainingListings}
                       </p>
                     )}
@@ -740,13 +740,13 @@ export default function NewListingPage() {
 
           <form onSubmit={handleSubmit} className="space-y-5">
             {/* Section: Basic Info */}
-            <div className="bg-white rounded border border-gray-100 p-5">
-              <h2 className="text-sm font-semibold text-gray-900 uppercase tracking-wide mb-4">
+            <div className="bg-surface-elevated rounded border border-border-subtle p-5">
+              <h2 className="text-sm font-semibold text-heading uppercase tracking-wide mb-4">
                 Temel Bilgiler
               </h2>
               <div className="space-y-4">
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1.5">
+                  <label className="block text-sm font-medium text-body mb-1.5">
                     Başlık <span className="text-danger-500">*</span>
                   </label>
                   <Input
@@ -755,7 +755,7 @@ export default function NewListingPage() {
                     onChange={(e) =>
                       setFormData({ ...formData, title: e.target.value })
                     }
-                    className="px-4 py-2.5 border-gray-200 rounded text-gray-900 placeholder-gray-400"
+                    className="px-4 py-2.5 border-border rounded text-heading placeholder-subtle"
                     placeholder="Örn: Hot Wheels '69 Camaro Z28"
                     required
                     minLength={5}
@@ -763,7 +763,7 @@ export default function NewListingPage() {
                   />
                 </div>
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1.5">
+                  <label className="block text-sm font-medium text-body mb-1.5">
                     Açıklama
                   </label>
                   <Textarea
@@ -771,7 +771,7 @@ export default function NewListingPage() {
                     onChange={(e) =>
                       setFormData({ ...formData, description: e.target.value })
                     }
-                    className="px-4 py-2.5 border-gray-200 rounded text-gray-900 placeholder-gray-400"
+                    className="px-4 py-2.5 border-border rounded text-heading placeholder-subtle"
                     placeholder="Ürün hakkında detaylı bilgi..."
                     rows={4}
                     maxLength={5000}
@@ -781,13 +781,13 @@ export default function NewListingPage() {
             </div>
 
             {/* Section: Product Details */}
-            <div className="bg-white rounded border border-gray-100 p-5">
-              <h2 className="text-sm font-semibold text-gray-900 uppercase tracking-wide mb-4">
+            <div className="bg-surface-elevated rounded border border-border-subtle p-5">
+              <h2 className="text-sm font-semibold text-heading uppercase tracking-wide mb-4">
                 Ürün Detayları
               </h2>
               <div className="grid md:grid-cols-2 gap-4">
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                  <label className="block text-sm font-medium text-body mb-1">
                     Ürün Tipi <span className="text-danger-500">*</span>
                   </label>
                   <Select
@@ -807,7 +807,7 @@ export default function NewListingPage() {
                 </div>
 
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                  <label className="block text-sm font-medium text-body mb-1">
                     Ürün Durumu <span className="text-danger-500">*</span>
                   </label>
                   <Select
@@ -862,7 +862,7 @@ export default function NewListingPage() {
                 />
 
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                  <label className="block text-sm font-medium text-body mb-1">
                     Ölçek
                   </label>
                   <Select
@@ -883,7 +883,7 @@ export default function NewListingPage() {
                 </div>
 
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                  <label className="block text-sm font-medium text-body mb-1">
                     {locale === "en" ? "Material" : "Malzeme"}
                   </label>
                   <Select
@@ -912,7 +912,7 @@ export default function NewListingPage() {
                 </div>
 
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                  <label className="block text-sm font-medium text-body mb-1">
                     {locale === "en" ? "Manufacturer" : "Üretici"}
                   </label>
                   <Select
@@ -938,7 +938,7 @@ export default function NewListingPage() {
                 </div>
 
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                  <label className="block text-sm font-medium text-body mb-1">
                     {locale === "en" ? "Release year" : "Çıkış yılı"}
                   </label>
                   <Select
@@ -961,22 +961,22 @@ export default function NewListingPage() {
             </div>
 
             {/* Section: Options */}
-            <div className="bg-white rounded border border-gray-100 p-5">
-              <h2 className="text-sm font-semibold text-gray-900 uppercase tracking-wide mb-4">
+            <div className="bg-surface-elevated rounded border border-border-subtle p-5">
+              <h2 className="text-sm font-semibold text-heading uppercase tracking-wide mb-4">
                 Seçenekler
               </h2>
               <div
                 className={`flex items-center justify-between p-3 rounded border ${
                   limits?.canTrade
                     ? "bg-success-50 border-success-200"
-                    : "bg-gray-50 border-gray-200"
+                    : "bg-surface border-border"
                 }`}
               >
                 <div>
-                  <label className="font-medium text-gray-900">
+                  <label className="font-medium text-heading">
                     Takas Aktif
                   </label>
-                  <p className="text-sm text-gray-600">
+                  <p className="text-sm text-muted">
                     {limits?.canTrade
                       ? locale === "en"
                         ? "Also makes this product available for trade"
@@ -1004,12 +1004,12 @@ export default function NewListingPage() {
                 )}
               </div>
 
-              <div className="flex items-center justify-between p-3 bg-gray-50 rounded border border-gray-200">
+              <div className="flex items-center justify-between p-3 bg-surface rounded border border-border">
                 <div>
-                  <label className="font-medium text-gray-900">
+                  <label className="font-medium text-heading">
                     {locale === "en" ? "Set / Bundle" : "Set / Paket"}
                   </label>
-                  <p className="text-sm text-gray-600">
+                  <p className="text-sm text-muted">
                     {locale === "en"
                       ? "Multiple models in one listing (e.g. 5-pack, garage set)"
                       : "Tek ilanda birden fazla model (örn. 5'li paket, garaj seti)"}
@@ -1021,23 +1021,23 @@ export default function NewListingPage() {
                   onClick={() =>
                     setFormData({ ...formData, isSet: !formData.isSet })
                   }
-                  className={`relative w-14 h-8 rounded-full transition-colors ${formData.isSet ? "bg-info-500" : "bg-gray-300"}`}
+                  className={`relative w-14 h-8 rounded-full transition-colors ${formData.isSet ? "bg-info-500" : "bg-border-strong"}`}
                 >
                   <span
-                    className={`absolute top-1 left-1 w-6 h-6 bg-white rounded-full shadow transition-transform ${formData.isSet ? "translate-x-6" : "translate-x-0"}`}
+                    className={`absolute top-1 left-1 w-6 h-6 bg-surface-elevated rounded-full shadow transition-transform ${formData.isSet ? "translate-x-6" : "translate-x-0"}`}
                   />
                 </Button>
               </div>
             </div>
 
             {/* Section: Price & Quantity */}
-            <div className="bg-white rounded border border-gray-100 p-5">
-              <h2 className="text-sm font-semibold text-gray-900 uppercase tracking-wide mb-4">
+            <div className="bg-surface-elevated rounded border border-border-subtle p-5">
+              <h2 className="text-sm font-semibold text-heading uppercase tracking-wide mb-4">
                 Fiyatlandırma
               </h2>
               <div className="grid md:grid-cols-2 gap-4">
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1.5">
+                  <label className="block text-sm font-medium text-body mb-1.5">
                     Fiyat (₺) <span className="text-danger-500">*</span>
                   </label>
                   <Input
@@ -1046,7 +1046,7 @@ export default function NewListingPage() {
                     onChange={(e) =>
                       setFormData({ ...formData, price: e.target.value })
                     }
-                    className="px-4 py-2.5 border-gray-200 rounded text-gray-900 placeholder-gray-400"
+                    className="px-4 py-2.5 border-border rounded text-heading placeholder-subtle"
                     placeholder="0.00"
                     required
                     min={1}
@@ -1055,7 +1055,7 @@ export default function NewListingPage() {
                   />
                 </div>
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1.5">
+                  <label className="block text-sm font-medium text-body mb-1.5">
                     Stok Miktarı
                   </label>
                   <Input
@@ -1074,11 +1074,11 @@ export default function NewListingPage() {
                         quantity: value === "" ? "" : Number(value),
                       });
                     }}
-                    className="px-4 py-2.5 border-gray-200 rounded text-gray-900 placeholder-gray-400"
+                    className="px-4 py-2.5 border-border rounded text-heading placeholder-subtle"
                     placeholder={locale === "en" ? "Unlimited" : "Sınırsız"}
                     min={1}
                   />
-                  <p className="text-xs text-gray-400 mt-1">
+                  <p className="text-xs text-subtle mt-1">
                     {locale === "en"
                       ? "Leave empty for unlimited stock"
                       : "Boş bırakırsanız sınırsız stok"}
@@ -1086,19 +1086,19 @@ export default function NewListingPage() {
                 </div>
               </div>
               {(commissionPreviewLoading || commissionPreview) && (
-                <div className="mt-4 p-3 bg-gray-50 rounded-lg border border-gray-100 text-sm">
-                  <p className="text-gray-600 font-medium mb-1">
+                <div className="mt-4 p-3 bg-surface rounded-lg border border-border-subtle text-sm">
+                  <p className="text-muted font-medium mb-1">
                     {locale === "en"
                       ? "Estimated (per sale)"
                       : "Tahmini (satış başına)"}
                   </p>
                   {commissionPreviewLoading ? (
-                    <span className="text-gray-400">
+                    <span className="text-subtle">
                       {locale === "en" ? "Calculating..." : "Hesaplanıyor..."}
                     </span>
                   ) : commissionPreview ? (
                     <div className="flex flex-wrap gap-x-4 gap-y-1">
-                      <span className="text-gray-600">
+                      <span className="text-muted">
                         {locale === "en"
                           ? "Platform deduction"
                           : "Platform kesintisi"}
@@ -1128,20 +1128,20 @@ export default function NewListingPage() {
             </div>
 
             {/* Section: Images */}
-            <div className="bg-white rounded border border-gray-100 p-5">
-              <h2 className="text-sm font-semibold text-gray-900 uppercase tracking-wide mb-4">
+            <div className="bg-surface-elevated rounded border border-border-subtle p-5">
+              <h2 className="text-sm font-semibold text-heading uppercase tracking-wide mb-4">
                 Görseller
               </h2>
               <div className="space-y-3">
                 {formData.images.length < (limits?.maxImagesPerListing || 3) ? (
-                  <label className="flex flex-col items-center justify-center gap-2 py-8 border-2 border-dashed border-gray-200 rounded cursor-pointer hover:border-primary-400 hover:bg-primary-50/30 transition-colors">
-                    <PhotoIcon className="w-8 h-8 text-gray-400" />
-                    <span className="text-sm text-gray-500 font-medium">
+                  <label className="flex flex-col items-center justify-center gap-2 py-8 border-2 border-dashed border-border rounded cursor-pointer hover:border-primary-400 hover:bg-primary-50/30 transition-colors">
+                    <PhotoIcon className="w-8 h-8 text-subtle" />
+                    <span className="text-sm text-muted font-medium">
                       {locale === "en"
                         ? "Click to upload images"
                         : "Görsel yüklemek için tıklayın"}
                     </span>
-                    <span className="text-xs text-gray-400">
+                    <span className="text-xs text-subtle">
                       {formData.images.length} /{" "}
                       {limits?.maxImagesPerListing || 3}{" "}
                       {locale === "en" ? "uploaded" : "yüklendi"}
@@ -1179,7 +1179,7 @@ export default function NewListingPage() {
                           <img
                             src={previewUrl}
                             alt={`Preview ${index + 1}`}
-                            className="w-full h-full object-cover rounded border border-gray-200"
+                            className="w-full h-full object-cover rounded border border-border"
                             onError={(e) => {
                               (e.target as HTMLImageElement).src =
                                 "https://placehold.co/200x200/f3f4f6/9ca3af?text=Resim";
@@ -1189,7 +1189,7 @@ export default function NewListingPage() {
                             variant="secondary"
                             type="button"
                             onClick={() => removeImage(index)}
-                            className="absolute top-1 right-1 bg-danger-500 text-white rounded-full w-5 h-5 flex items-center justify-center text-xs opacity-0 group-hover:opacity-100 transition-opacity"
+                            className="absolute top-1 right-1 bg-danger-500 text-inverted rounded-full w-5 h-5 flex items-center justify-center text-xs opacity-0 group-hover:opacity-100 transition-opacity"
                           >
                             ×
                           </Button>

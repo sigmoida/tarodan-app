@@ -204,8 +204,8 @@ export default function TradesPage() {
       <div className="space-y-6">
         <div className="flex justify-between items-start">
           <div>
-            <h1 className="text-2xl font-bold text-gray-900">Takaslar</h1>
-            <p className="text-gray-500 mt-1">
+            <h1 className="text-2xl font-bold text-heading">Takaslar</h1>
+            <p className="text-muted mt-1">
               Toplam {total} takas
               {selectedUserId && (
                 <span className="ml-2">
@@ -231,7 +231,7 @@ export default function TradesPage() {
                 }}
                 className={`flex items-center gap-2 px-4 py-2 rounded-lg border font-medium transition-colors ${
                   status === "at_warehouse"
-                    ? "bg-warning-500 text-white border-warning-600"
+                    ? "bg-warning-500 text-inverted border-warning-600"
                     : "bg-warning-100 text-warning-900 border-warning-400 hover:bg-warning-200"
                 }`}
                 title="İnceleme kuyruğunu filtrele"
@@ -254,7 +254,7 @@ export default function TradesPage() {
         <div className="flex flex-col sm:flex-row gap-4">
           {/* User Filter */}
           <div className="relative w-full sm:w-64">
-            <UserIcon className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-gray-500" />
+            <UserIcon className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-muted" />
             <Input
               type="text"
               placeholder="Kullanıcı ara..."
@@ -270,16 +270,16 @@ export default function TradesPage() {
               <Button
                 variant="secondary"
                 onClick={clearUserFilter}
-                className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-500 hover:text-gray-900"
+                className="absolute right-3 top-1/2 -translate-y-1/2 text-muted hover:text-heading"
               >
                 <XCircleIcon className="h-5 w-5" />
               </Button>
             )}
 
             {showUserDropdown && userSearch.length >= 2 && (
-              <div className="absolute z-50 mt-1 bg-gray-100 shadow-lg max-h-60 overflow-y-auto">
+              <div className="absolute z-50 mt-1 bg-surface-alt shadow-lg max-h-60 overflow-y-auto">
                 {loadingUsers ? (
-                  <div className="p-3 text-center text-gray-500">
+                  <div className="p-3 text-center text-muted">
                     Aranıyor...
                   </div>
                 ) : users.length > 0 ? (
@@ -288,14 +288,14 @@ export default function TradesPage() {
                       variant="secondary"
                       key={user.id}
                       onClick={() => handleSelectUser(user)}
-                      className="w-full px-4 py-2 text-left hover:bg-gray-100 text-gray-900"
+                      className="w-full px-4 py-2 text-left hover:bg-surface-alt text-heading"
                     >
                       <div className="font-medium">{user.displayName}</div>
-                      <div className="text-xs text-gray-500">{user.email}</div>
+                      <div className="text-xs text-muted">{user.email}</div>
                     </Button>
                   ))
                 ) : (
-                  <div className="p-3 text-center text-gray-500">
+                  <div className="p-3 text-center text-muted">
                     Kullanıcı bulunamadı
                   </div>
                 )}
@@ -340,7 +340,7 @@ export default function TradesPage() {
                   </tr>
                 ) : trades.length === 0 ? (
                   <tr>
-                    <td colSpan={8} className="text-center py-8 text-gray-500">
+                    <td colSpan={8} className="text-center py-8 text-muted">
                       Takas bulunamadı
                     </td>
                   </tr>
@@ -368,7 +368,7 @@ export default function TradesPage() {
                       <td>
                         <Link
                           href={`/users/${trade.initiator.id}`}
-                          className="text-gray-900 hover:text-primary-600"
+                          className="text-heading hover:text-primary-600"
                         >
                           {trade.initiator.displayName}
                         </Link>
@@ -376,7 +376,7 @@ export default function TradesPage() {
                       <td>
                         <Link
                           href={`/users/${trade.receiver.id}`}
-                          className="text-gray-900 hover:text-primary-600"
+                          className="text-heading hover:text-primary-600"
                         >
                           {trade.receiver.displayName}
                         </Link>
@@ -391,7 +391,7 @@ export default function TradesPage() {
                             +₺{trade.cashAmount.toLocaleString()}
                           </span>
                         ) : (
-                          <span className="text-gray-500">-</span>
+                          <span className="text-muted">-</span>
                         )}
                       </td>
                       <td className="whitespace-nowrap">
@@ -401,7 +401,7 @@ export default function TradesPage() {
                         <div className="flex gap-1">
                           <Link
                             href={`/trades/${trade.id}`}
-                            className="p-2 text-gray-500 hover:text-gray-900 hover:bg-gray-100 rounded-lg"
+                            className="p-2 text-muted hover:text-heading hover:bg-surface-alt rounded-lg"
                             title="Detay"
                           >
                             <EyeIcon className="h-5 w-5" />
@@ -426,7 +426,7 @@ export default function TradesPage() {
         </div>
 
         <div className="flex items-center justify-between">
-          <p className="text-sm text-gray-500">
+          <p className="text-sm text-muted">
             Sayfa {page} / {Math.ceil(total / 20)}
           </p>
           <div className="flex gap-2">

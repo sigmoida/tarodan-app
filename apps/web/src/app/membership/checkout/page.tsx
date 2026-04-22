@@ -166,9 +166,9 @@ export default function MembershipCheckoutPage() {
   
   if (!tierInfo || !['basic', 'premium', 'business'].includes(tier)) {
     return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+      <div className="min-h-screen bg-surface flex items-center justify-center">
         <div className="text-center">
-          <p className="text-gray-600 mb-4">Geçersiz üyelik planı</p>
+          <p className="text-muted mb-4">Geçersiz üyelik planı</p>
           <Link href={required ? '/profile/membership?required=true' : '/profile/membership'} className="text-primary-500 hover:underline">
             Planlara Dön
           </Link>
@@ -266,26 +266,26 @@ export default function MembershipCheckoutPage() {
   }
   if (!isAuthenticated) {
     return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+      <div className="min-h-screen bg-surface flex items-center justify-center">
         <Spinner size="xl" />
       </div>
     );
   }
 
   return (
-    <div className="min-h-screen bg-gray-50">
+    <div className="min-h-screen bg-surface">
       <main className="max-w-4xl mx-auto px-4 py-8">
         {/* Header */}
         <div className="flex items-center gap-4 mb-8">
           <Link 
             href={required ? '/profile/membership?required=true' : '/profile/membership'} 
-            className="p-2 hover:bg-gray-200 rounded-lg transition-colors"
+            className="p-2 hover:bg-border-subtle rounded-lg transition-colors"
           >
-            <ArrowLeftIcon className="w-6 h-6 text-gray-600" />
+            <ArrowLeftIcon className="w-6 h-6 text-muted" />
           </Link>
           <div>
-            <h1 className="text-2xl font-bold text-gray-900">Üyelik Yükseltme</h1>
-            <p className="text-sm text-gray-500">Güvenli ödeme ile üyeliğinizi yükseltin</p>
+            <h1 className="text-2xl font-bold text-heading">Üyelik Yükseltme</h1>
+            <p className="text-sm text-muted">Güvenli ödeme ile üyeliğinizi yükseltin</p>
           </div>
         </div>
 
@@ -294,15 +294,15 @@ export default function MembershipCheckoutPage() {
           <div className="lg:col-span-2">
             <form onSubmit={handleSubmit} className="space-y-6">
               {/* Payment Method */}
-              <div className="bg-white rounded-xl shadow-sm p-6">
-                <h2 className="text-lg font-semibold text-gray-900 mb-4 flex items-center gap-2">
+              <div className="bg-surface-elevated rounded-xl shadow-sm p-6">
+                <h2 className="text-lg font-semibold text-heading mb-4 flex items-center gap-2">
                   <CreditCardIcon className="w-5 h-5 text-primary-500" />
                   Kart Bilgileri
                 </h2>
                 
                 <div className="space-y-4">
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                    <label className="block text-sm font-medium text-body mb-2">
                       Kart Numarası
                     </label>
                     <Input type="text"
@@ -313,7 +313,7 @@ export default function MembershipCheckoutPage() {
                       maxLength={19} />
                   </div>
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                    <label className="block text-sm font-medium text-body mb-2">
                       Kart Üzerindeki İsim
                     </label>
                     <Input type="text"
@@ -324,7 +324,7 @@ export default function MembershipCheckoutPage() {
                   </div>
                   <div className="grid grid-cols-2 gap-4">
                     <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-2">
+                      <label className="block text-sm font-medium text-body mb-2">
                         Son Kullanma Tarihi
                       </label>
                       <Input type="text"
@@ -335,7 +335,7 @@ export default function MembershipCheckoutPage() {
                         maxLength={5} />
                     </div>
                     <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-2">
+                      <label className="block text-sm font-medium text-body mb-2">
                         CVV
                       </label>
                       <Input type="text"
@@ -350,14 +350,14 @@ export default function MembershipCheckoutPage() {
               </div>
 
               {/* Terms */}
-              <div className="bg-white rounded-xl shadow-sm p-6">
+              <div className="bg-surface-elevated rounded-xl shadow-sm p-6">
                 <label className="flex items-start gap-3 cursor-pointer">
                   <Checkbox
                     checked={agreed}
                     onChange={(e) => setAgreed(e.target.checked)}
                     className="mt-0.5 h-5 w-5"
                   />
-                  <span className="text-sm text-gray-600">
+                  <span className="text-sm text-muted">
                     <Link href="/terms" className="text-primary-500 hover:underline">Kullanım koşullarını</Link> ve{' '}
                     <Link href="/privacy" className="text-primary-500 hover:underline">gizlilik politikasını</Link> okudum, kabul ediyorum.
                     Üyeliğimin {period === 'yearly' ? 'yıllık' : 'aylık'} olarak otomatik yenileneceğini anlıyorum.
@@ -368,10 +368,10 @@ export default function MembershipCheckoutPage() {
               {/* Submit */}
               <Button variant="secondary" type="submit"
                 disabled={isProcessing}
-                className="w-full py-4 bg-primary-500 text-white text-lg font-semibold rounded-xl hover:bg-primary-600 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2">
+                className="w-full py-4 bg-primary-500 text-inverted text-lg font-semibold rounded-xl hover:bg-primary-600 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2">
                 {isProcessing ? (
                   <>
-                    <Spinner size="sm" color="border-white border-t-transparent" />
+                    <Spinner size="sm" color="border-surface-elevated border-t-transparent" />
                     İşleniyor...
                   </>
                 ) : (
@@ -383,7 +383,7 @@ export default function MembershipCheckoutPage() {
               </Button>
 
               {/* Security Note */}
-              <p className="text-center text-sm text-gray-500 flex items-center justify-center gap-2">
+              <p className="text-center text-sm text-muted flex items-center justify-center gap-2">
                 <ShieldCheckIcon className="w-4 h-4" />
                 256-bit SSL ile güvenli ödeme
               </p>
@@ -392,29 +392,29 @@ export default function MembershipCheckoutPage() {
 
           {/* Order Summary */}
           <div className="lg:col-span-1">
-            <div className="bg-white rounded-xl shadow-sm p-6 sticky top-8">
-              <h2 className="text-lg font-semibold text-gray-900 mb-4">Sipariş Özeti</h2>
+            <div className="bg-surface-elevated rounded-xl shadow-sm p-6 sticky top-8">
+              <h2 className="text-lg font-semibold text-heading mb-4">Sipariş Özeti</h2>
               
-              <div className="border-b border-gray-200 pb-4 mb-4">
-                <h3 className="font-semibold text-gray-900">{tierInfo.name}</h3>
-                <p className="text-sm text-gray-500">
+              <div className="border-b border-border pb-4 mb-4">
+                <h3 className="font-semibold text-heading">{tierInfo.name}</h3>
+                <p className="text-sm text-muted">
                   {period === 'yearly' ? 'Yıllık plan' : 'Aylık plan'}
                 </p>
               </div>
 
               <ul className="space-y-2 mb-6">
                 {tierInfo.features.map((feature, idx) => (
-                  <li key={idx} className="flex items-center gap-2 text-sm text-gray-600">
+                  <li key={idx} className="flex items-center gap-2 text-sm text-muted">
                     <CheckIcon className="w-4 h-4 text-success-500 flex-shrink-0" />
                     {feature}
                   </li>
                 ))}
               </ul>
 
-              <div className="border-t border-gray-200 pt-4 space-y-2">
+              <div className="border-t border-border pt-4 space-y-2">
                 {period === 'yearly' && (
                   <>
-                    <div className="flex justify-between text-sm text-gray-500">
+                    <div className="flex justify-between text-sm text-muted">
                       <span>Normal fiyat</span>
                       <span className="line-through">{(basePrice * 12).toLocaleString('tr-TR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} TL</span>
                     </div>
@@ -429,7 +429,7 @@ export default function MembershipCheckoutPage() {
                   <span className="text-primary-500">{finalPrice.toLocaleString('tr-TR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} TL</span>
                 </div>
                 {period === 'yearly' && (
-                  <p className="text-xs text-gray-500 text-right">
+                  <p className="text-xs text-muted text-right">
                     Ayda {monthlyPrice.toLocaleString('tr-TR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} TL
                   </p>
                 )}

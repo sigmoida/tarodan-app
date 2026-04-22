@@ -39,16 +39,16 @@ const sizePaddingY = {
 
 const inputClasses = (error?: string, inputSize: 'sm' | 'md' | 'lg' = 'md') =>
   cn(
-    'flex w-full rounded-lg border bg-white transition-colors',
+    'flex w-full rounded-lg border bg-surface-elevated transition-colors text-body',
     sizeClasses[inputSize],
     sizePaddingX[inputSize],
     sizePaddingY[inputSize],
-    'placeholder:text-gray-400',
+    'placeholder:text-subtle',
     'focus:outline-none focus:ring-2 focus:ring-offset-1',
     error
       ? 'border-danger-500 focus:border-danger-500 focus:ring-danger-200'
-      : 'border-gray-300 focus:border-primary-500 focus:ring-primary-200',
-    'disabled:cursor-not-allowed disabled:opacity-50 disabled:bg-gray-50',
+      : 'border-border focus:border-primary-500 focus:ring-primary-200',
+    'disabled:cursor-not-allowed disabled:opacity-50 disabled:bg-surface',
   );
 
 export const Input = React.forwardRef<HTMLInputElement, InputProps>(
@@ -87,18 +87,18 @@ export const Input = React.forwardRef<HTMLInputElement, InputProps>(
       return (
         <div
           className={cn(
-            'flex w-full items-center rounded-lg border bg-white transition-colors',
+            'flex w-full items-center rounded-lg border bg-surface-elevated transition-colors',
             sizeClasses[inputSize],
             'focus-within:outline-none focus-within:ring-2 focus-within:ring-offset-1',
             error
               ? 'border-danger-500 focus-within:border-danger-500 focus-within:ring-danger-200'
-              : 'border-gray-300 focus-within:border-primary-500 focus-within:ring-primary-200',
-            props.disabled && 'cursor-not-allowed opacity-50 bg-gray-50',
+              : 'border-border focus-within:border-primary-500 focus-within:ring-primary-200',
+            props.disabled && 'cursor-not-allowed opacity-50 bg-surface',
             className,
           )}
         >
           {leftAdornment && (
-            <span className={cn('flex items-center pl-3 text-gray-400', sizePaddingY[inputSize])}>
+            <span className={cn('flex items-center pl-3 text-subtle', sizePaddingY[inputSize])}>
               {leftAdornment}
             </span>
           )}
@@ -106,7 +106,7 @@ export const Input = React.forwardRef<HTMLInputElement, InputProps>(
             type={type}
             id={inputId}
             className={cn(
-              'flex w-full bg-transparent outline-none placeholder:text-gray-400 disabled:cursor-not-allowed',
+              'flex w-full bg-transparent text-body outline-none placeholder:text-subtle disabled:cursor-not-allowed',
               sizePaddingX[inputSize],
               sizePaddingY[inputSize],
               leftAdornment ? 'pl-2' : '',
@@ -116,7 +116,7 @@ export const Input = React.forwardRef<HTMLInputElement, InputProps>(
             {...props}
           />
           {rightAdornment && (
-            <span className={cn('flex items-center pr-3 text-gray-400', sizePaddingY[inputSize])}>
+            <span className={cn('flex items-center pr-3 text-subtle', sizePaddingY[inputSize])}>
               {rightAdornment}
             </span>
           )}
@@ -133,14 +133,14 @@ export const Input = React.forwardRef<HTMLInputElement, InputProps>(
         {label && (
           <label
             htmlFor={inputId}
-            className="mb-1.5 block text-sm font-medium text-gray-700"
+            className="mb-1.5 block text-sm font-medium text-body"
           >
             {label}
           </label>
         )}
         {renderControl()}
         {(error || helperText) && (
-          <p className={cn('mt-1 text-sm', error ? 'text-danger-600' : 'text-gray-500')}>
+          <p className={cn('mt-1 text-sm', error ? 'text-danger-600' : 'text-muted')}>
             {error || helperText}
           </p>
         )}

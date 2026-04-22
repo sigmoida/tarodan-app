@@ -122,6 +122,12 @@ export default function PaymentSuccessPage() {
         return;
       }
 
+      // Takas nakit farkı ödemesi: /orders'a değil, ilgili takas sayfasına dön.
+      if (paymentData?.tradeId) {
+        router.replace(`/trades/${paymentData.tradeId}?paid=1`);
+        return;
+      }
+
       const actualOrderId = paymentData?.orderId || orderIdFromUrl;
 
       // Fetch invoice (with retry because it might be generating)
@@ -200,7 +206,7 @@ export default function PaymentSuccessPage() {
 
   if (!clientReady) {
     return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+      <div className="min-h-screen bg-surface flex items-center justify-center">
         <Spinner size="xl" />
       </div>
     );
@@ -216,19 +222,19 @@ export default function PaymentSuccessPage() {
 
   if (isLoading) {
     return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+      <div className="min-h-screen bg-surface flex items-center justify-center">
         <Spinner size="xl" />
       </div>
     );
   }
 
   return (
-    <div className="min-h-screen bg-gray-50 py-12">
+    <div className="min-h-screen bg-surface py-12">
       <div className="max-w-2xl mx-auto px-4 sm:px-6 lg:px-8">
         <motion.div
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
-          className="bg-white rounded-xl shadow-sm p-8 text-center"
+          className="bg-surface-elevated rounded-xl shadow-sm p-8 text-center"
         >
           {/* Success Icon */}
           <div className="mb-6">
@@ -243,12 +249,12 @@ export default function PaymentSuccessPage() {
           </div>
 
           {/* Success Message */}
-          <h1 className="text-3xl font-bold text-gray-900 mb-2">
+          <h1 className="text-3xl font-bold text-heading mb-2">
             {locale === "en"
               ? "Payment Completed Successfully!"
               : "Ödeme Başarıyla Tamamlandı!"}
           </h1>
-          <p className="text-gray-600 mb-6">
+          <p className="text-muted mb-6">
             {locale === "en"
               ? "Your payment has been received and your order is being prepared."
               : "Ödemeniz alındı ve siparişiniz hazırlanmaya başlandı."}
@@ -256,14 +262,14 @@ export default function PaymentSuccessPage() {
 
           {/* Payment Details */}
           {payment && (
-            <div className="bg-gray-50 rounded-lg p-6 mb-6 text-left">
+            <div className="bg-surface rounded-lg p-6 mb-6 text-left">
               <h2 className="text-lg font-semibold mb-4 flex items-center gap-2">
                 <CreditCardIcon className="w-5 h-5 text-primary-500" />
                 {locale === "en" ? "Payment Details" : "Ödeme Detayları"}
               </h2>
               <div className="space-y-2 text-sm">
                 <div className="flex justify-between">
-                  <span className="text-gray-600">
+                  <span className="text-muted">
                     {locale === "en" ? "Payment Amount:" : "Ödeme Tutarı:"}
                   </span>
                   <span className="font-semibold">
@@ -275,14 +281,14 @@ export default function PaymentSuccessPage() {
                   </span>
                 </div>
                 <div className="flex justify-between">
-                  <span className="text-gray-600">
+                  <span className="text-muted">
                     {locale === "en" ? "Payment Method:" : "Ödeme Yöntemi:"}
                   </span>
                   <span className="font-semibold">PayTR</span>
                 </div>
                 {payment.providerTransactionId && (
                   <div className="flex justify-between">
-                    <span className="text-gray-600">
+                    <span className="text-muted">
                       {locale === "en" ? "Transaction ID:" : "İşlem No:"}
                     </span>
                     <span className="font-mono text-xs">
@@ -291,7 +297,7 @@ export default function PaymentSuccessPage() {
                   </div>
                 )}
                 <div className="flex justify-between">
-                  <span className="text-gray-600">
+                  <span className="text-muted">
                     {locale === "en" ? "Status:" : "Durum:"}
                   </span>
                   <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-success-100 text-success-800">
@@ -318,8 +324,8 @@ export default function PaymentSuccessPage() {
                       : "Faturayı İndir (PDF)"}
                 </Button>
               ) : !invoiceError ? (
-                <div className="mt-4 w-full flex items-center justify-center gap-2 px-4 py-3 bg-gray-50 text-gray-400 text-sm font-medium rounded-lg border border-gray-100 border-dashed">
-                  <div className="animate-spin h-3 w-3 border-2 border-gray-200 border-t-gray-400 rounded-full"></div>
+                <div className="mt-4 w-full flex items-center justify-center gap-2 px-4 py-3 bg-surface text-subtle text-sm font-medium rounded-lg border border-border-subtle border-dashed">
+                  <div className="animate-spin h-3 w-3 border-2 border-border border-t-border-strong rounded-full"></div>
                   {locale === "en"
                     ? "Preparing Invoice..."
                     : "Fatura Hazırlanıyor..."}

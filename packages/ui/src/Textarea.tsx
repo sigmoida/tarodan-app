@@ -11,13 +11,13 @@ export interface TextareaProps extends React.TextareaHTMLAttributes<HTMLTextArea
 
 const textareaClasses = (error?: string) =>
   cn(
-    'flex min-h-[80px] w-full rounded-lg border bg-white px-3 py-2 text-sm transition-colors',
-    'placeholder:text-gray-400',
+    'flex min-h-[80px] w-full rounded-lg border bg-surface-elevated px-3 py-2 text-sm text-body transition-colors',
+    'placeholder:text-subtle',
     'focus:outline-none focus:ring-2 focus:ring-offset-1',
     error
       ? 'border-danger-500 focus:border-danger-500 focus:ring-danger-200'
-      : 'border-gray-300 focus:border-primary-500 focus:ring-primary-200',
-    'disabled:cursor-not-allowed disabled:opacity-50 disabled:bg-gray-50',
+      : 'border-border focus:border-primary-500 focus:ring-primary-200',
+    'disabled:cursor-not-allowed disabled:opacity-50 disabled:bg-surface',
   );
 
 export const Textarea = React.forwardRef<HTMLTextAreaElement, TextareaProps>(
@@ -40,7 +40,7 @@ export const Textarea = React.forwardRef<HTMLTextAreaElement, TextareaProps>(
         {label && (
           <label
             htmlFor={textareaId}
-            className="mb-1.5 block text-sm font-medium text-gray-700"
+            className="mb-1.5 block text-sm font-medium text-body"
           >
             {label}
           </label>
@@ -52,7 +52,7 @@ export const Textarea = React.forwardRef<HTMLTextAreaElement, TextareaProps>(
           {...props}
         />
         {(error || helperText) && (
-          <p className={cn('mt-1 text-sm', error ? 'text-danger-600' : 'text-gray-500')}>
+          <p className={cn('mt-1 text-sm', error ? 'text-danger-600' : 'text-muted')}>
             {error || helperText}
           </p>
         )}

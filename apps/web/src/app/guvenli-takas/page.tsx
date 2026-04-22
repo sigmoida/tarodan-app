@@ -95,18 +95,18 @@ export default function GuvenliTakasPage() {
   const lang = (locale as 'tr' | 'en') || 'tr';
 
   return (
-    <div className="min-h-screen bg-white">
+    <div className="min-h-screen bg-surface-elevated">
       {/* Hero */}
-      <section className="bg-white border-b border-gray-200">
+      <section className="bg-surface-elevated border-b border-border">
         <div className="mx-auto px-6 sm:px-8 lg:px-12 xl:px-16 py-16 md:py-20 text-center">
           <motion.div initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.5 }}>
             <div className="inline-flex items-center justify-center w-16 h-16 bg-primary-50 rounded mb-6">
               <ShieldCheckIcon className="w-8 h-8 text-primary-500" />
             </div>
-            <h1 className="text-3xl md:text-4xl font-bold tracking-tight text-gray-900 mb-4">
+            <h1 className="text-3xl md:text-4xl font-bold tracking-tight text-heading mb-4">
               {lang === 'en' ? 'Secure Trade System' : 'Güvenli Takas Sistemi'}
             </h1>
-            <p className="text-gray-500 text-lg max-w-2xl mx-auto">
+            <p className="text-muted text-lg max-w-2xl mx-auto">
               {lang === 'en'
                 ? 'Trade your collectibles with other collectors safely. Our system protects both parties at every step.'
                 : 'Koleksiyonlarınızı diğer koleksiyonerlerle güvenle takas edin. Sistemimiz her adımda iki tarafı da korur.'}
@@ -131,18 +131,18 @@ export default function GuvenliTakasPage() {
                 initial={{ opacity: 0, y: 16 }}
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ delay: i * 0.1, duration: 0.4 }}
-                className="relative bg-gray-50 border border-gray-100 rounded p-5"
+                className="relative bg-surface border border-border-subtle rounded p-5"
               >
                 <div className="flex items-center gap-3 mb-3">
                   <div className="w-10 h-10 bg-primary-50 rounded flex items-center justify-center flex-shrink-0">
                     <step.icon className="w-5 h-5 text-primary-500" />
                   </div>
-                  <span className="text-xs font-bold text-gray-400 uppercase">
+                  <span className="text-xs font-bold text-subtle uppercase">
                     {lang === 'en' ? `Step ${i + 1}` : `Adım ${i + 1}`}
                   </span>
                 </div>
-                <h3 className="font-semibold text-gray-900 mb-1.5">{step.title}</h3>
-                <p className="text-sm text-gray-500 leading-relaxed">{step.description}</p>
+                <h3 className="font-semibold text-heading mb-1.5">{step.title}</h3>
+                <p className="text-sm text-muted leading-relaxed">{step.description}</p>
               </motion.div>
             ))}
           </div>
@@ -150,7 +150,7 @@ export default function GuvenliTakasPage() {
       </section>
 
       {/* Guarantees */}
-      <section className="py-14 bg-gray-50">
+      <section className="py-14 bg-surface">
         <div className="mx-auto px-6 sm:px-8 lg:px-12 xl:px-16">
           <div className="flex items-center justify-center gap-3 mb-10">
             <div className="w-1 h-6 bg-primary-500 rounded-sm" />
@@ -160,11 +160,11 @@ export default function GuvenliTakasPage() {
           </div>
           <div className="grid sm:grid-cols-2 gap-4">
             {GUARANTEES[lang].map((item, i) => (
-              <div key={i} className="bg-white border border-gray-100 rounded p-5 flex items-start gap-4">
+              <div key={i} className="bg-surface-elevated border border-border-subtle rounded p-5 flex items-start gap-4">
                 <CheckCircleIcon className="w-5 h-5 text-primary-500 flex-shrink-0 mt-0.5" />
                 <div>
-                  <h3 className="font-semibold text-gray-900 mb-1">{item.title}</h3>
-                  <p className="text-sm text-gray-500">{item.description}</p>
+                  <h3 className="font-semibold text-heading mb-1">{item.title}</h3>
+                  <p className="text-sm text-muted">{item.description}</p>
                 </div>
               </div>
             ))}
@@ -183,9 +183,9 @@ export default function GuvenliTakasPage() {
           </div>
           <div className="space-y-4">
             {FAQ[lang].map((item, i) => (
-              <div key={i} className="bg-gray-50 border border-gray-100 rounded p-5">
-                <h3 className="font-semibold text-gray-900 mb-2">{item.q}</h3>
-                <p className="text-sm text-gray-500 leading-relaxed">{item.a}</p>
+              <div key={i} className="bg-surface border border-border-subtle rounded p-5">
+                <h3 className="font-semibold text-heading mb-2">{item.q}</h3>
+                <p className="text-sm text-muted leading-relaxed">{item.a}</p>
               </div>
             ))}
           </div>
@@ -193,7 +193,7 @@ export default function GuvenliTakasPage() {
       </section>
 
       {/* CTA */}
-      <section className="py-14 bg-gray-50">
+      <section className="py-14 bg-surface">
         <div className="mx-auto px-6 sm:px-8 lg:px-12 xl:px-16 max-w-3xl text-center">
           <div className="flex items-center justify-center gap-3 mb-3">
             <div className="w-1 h-6 bg-primary-500 rounded-sm" />
@@ -201,7 +201,7 @@ export default function GuvenliTakasPage() {
               {lang === 'en' ? 'Ready to Start Trading?' : 'Takasa Başlamaya Hazır mısınız?'}
             </h2>
           </div>
-          <p className="text-gray-500 mb-8">
+          <p className="text-muted mb-8">
             {lang === 'en'
               ? 'Browse listings and send your first trade offer today.'
               : 'İlanları inceleyin ve ilk takas teklifinizi bugün gönderin.'}
@@ -209,14 +209,14 @@ export default function GuvenliTakasPage() {
           <div className="flex flex-col sm:flex-row gap-3 justify-center">
             <Link
               href={isAuthenticated ? '/trades' : '/login?redirect=/trades'}
-              className="inline-flex items-center justify-center gap-2 bg-primary-500 hover:bg-primary-600 text-white text-sm font-semibold px-6 py-3 rounded transition-colors"
+              className="inline-flex items-center justify-center gap-2 bg-primary-500 hover:bg-primary-600 text-inverted text-sm font-semibold px-6 py-3 rounded transition-colors"
             >
               <ArrowsRightLeftIcon className="w-5 h-5" />
               {lang === 'en' ? 'Start Trading' : 'Takasa Başla'}
             </Link>
             <Link
               href="/listings"
-              className="inline-flex items-center justify-center gap-2 bg-white border border-gray-200 hover:border-gray-300 text-gray-700 text-sm font-semibold px-6 py-3 rounded transition-colors"
+              className="inline-flex items-center justify-center gap-2 bg-surface-elevated border border-border hover:border-border text-body text-sm font-semibold px-6 py-3 rounded transition-colors"
             >
               {lang === 'en' ? 'Browse Listings' : 'İlanları İncele'}
             </Link>
