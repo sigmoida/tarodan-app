@@ -510,7 +510,8 @@ export default function TradeDetailPage() {
               locale === "en" ? "Payment successful" : "Ödeme başarılı",
             );
             await invalidateTrade();
-            router.push(`/payment/success?paymentId=${data.paymentId}`);
+            // Trade cash payment → direkt takas sayfasına dön, /orders'a uğrama
+            router.push(`/trades/${trade.id}?paid=1`);
             return;
           }
         } catch {

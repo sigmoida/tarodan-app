@@ -371,7 +371,7 @@ export class TradeService {
       throw new ForbiddenException('Bu takası görüntüleme yetkiniz yok');
     }
 
-    return await this.mapToResponseDto(trade);
+    return await this.mapToResponseDto(trade, userId);
   }
 
   // ==========================================================================
@@ -450,7 +450,7 @@ export class TradeService {
     ]);
 
     return {
-      trades: await Promise.all(trades.map((t) => this.mapToResponseDto(t))),
+      trades: await Promise.all(trades.map((t) => this.mapToResponseDto(t, userId))),
       total,
       page,
       pageSize,
@@ -1759,13 +1759,71 @@ export class TradeService {
     };
   }
 
-  private async mapToResponseDto(trade: any): Promise<TradeResponseDto> {
+  private async mapToResponseDto(
+    trade: any,
+    viewerUserId?: string | null,
+  ): Promise<TradeResponseDto> {
     const initiatorShipment = trade.shipments?.find(
       (s: any) => s.shipperId === trade.initiatorId,
     );
     const receiverShipment = trade.shipments?.find(
       (s: any) => s.shipperId === trade.receiverId,
     );
+
+    // ----------------------------------------------------------------------
+    // Shipment privacy (safe-trade escrow leg visibility rules)
+    //
+    // to_warehouse:
+    //   - User sees own tracking always.
+    //   - Counterparty tracking hidden until BOTH parties have shipped.
+    // from_warehouse:
+    //   - Only recipient sees their own incoming shipment.
+    //   - Counterparty's from_warehouse shipment is filtered out entirely.
+    //   - Hidden until BOTH from_warehouse shipments are created.
+    // return:
+    //   - Only recipient sees their own return shipment.
+    //
+    // When viewerUserId is null/undefined (internal / admin context),
+    // no filtering is applied.
+    // ----------------------------------------------------------------------
+    const rawShipments: any[] = trade.shipments || [];
+    const toWarehouseShipments = rawShipments.filter((s) => s.leg === 'to_warehouse');
+    const fromWarehouseShipments = rawShipments.filter((s) => s.leg === 'from_warehouse');
+    const bothToWarehouseShipped =
+      toWarehouseShipments.length >= 2 &&
+      toWarehouseShipments.every((s) => s.shippedAt);
+    const bothFromWarehouseCreated = fromWarehouseShipments.length >= 2;
+
+    const applyShipmentPrivacy = (s: any): any | null => {
+      if (!viewerUserId) return s; // admin/internal view — no filtering
+      const leg = s.leg || 'to_warehouse';
+
+      if (leg === 'to_warehouse') {
+        const isMine = s.shipperId === viewerUserId;
+        if (isMine || bothToWarehouseShipped) return s;
+        // Hide counterparty tracking until both shipped
+        return { ...s, trackingNumber: null };
+      }
+
+      if (leg === 'from_warehouse') {
+        const isForMe = s.recipientUserId === viewerUserId;
+        if (!isForMe) return null; // never see counterparty's incoming leg
+        if (!bothFromWarehouseCreated) return null;
+        return s;
+      }
+
+      if (leg === 'return') {
+        const isForMe = s.recipientUserId === viewerUserId;
+        if (!isForMe) return null;
+        return s;
+      }
+
+      return s;
+    };
+
+    const visibleShipments = rawShipments
+      .map(applyShipmentPrivacy)
+      .filter((s): s is any => s !== null);
 
     return {
       id: trade.id,
@@ -1798,7 +1856,13 @@ export class TradeService {
             shipperId: initiatorShipment.shipperId,
             shipperName: trade.initiator?.displayName || '',
             carrier: initiatorShipment.carrier,
-            trackingNumber: initiatorShipment.trackingNumber,
+            // Hide counterparty tracking until both to_warehouse shipped
+            trackingNumber:
+              !viewerUserId ||
+              viewerUserId === initiatorShipment.shipperId ||
+              bothToWarehouseShipped
+                ? initiatorShipment.trackingNumber
+                : null,
             status: initiatorShipment.status,
             shippedAt: initiatorShipment.shippedAt,
             deliveredAt: initiatorShipment.deliveredAt,
@@ -1811,14 +1875,19 @@ export class TradeService {
             shipperId: receiverShipment.shipperId,
             shipperName: trade.receiver?.displayName || '',
             carrier: receiverShipment.carrier,
-            trackingNumber: receiverShipment.trackingNumber,
+            trackingNumber:
+              !viewerUserId ||
+              viewerUserId === receiverShipment.shipperId ||
+              bothToWarehouseShipped
+                ? receiverShipment.trackingNumber
+                : null,
             status: receiverShipment.status,
             shippedAt: receiverShipment.shippedAt,
             deliveredAt: receiverShipment.deliveredAt,
             confirmedAt: receiverShipment.confirmedAt,
           }
         : undefined,
-      shipments: (trade.shipments || []).map((shipment: any) => ({
+      shipments: visibleShipments.map((shipment: any) => ({
         id: shipment.id,
         direction: shipment.leg || 'to_warehouse',
         senderUserId: shipment.shipperId || undefined,

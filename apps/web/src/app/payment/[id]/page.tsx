@@ -138,6 +138,9 @@ export default function PaymentPage() {
           toast.success("Ödeme başarıyla tamamlandı!");
           if (isMembershipPayment) {
             router.push("/membership/success");
+          } else if (paymentData.tradeId) {
+            // Takas nakit farkı ödemesi → takas sayfasına dön, orders'a gitme
+            router.push(`/trades/${paymentData.tradeId}?paid=1`);
           } else {
             router.push(
               `/payment/success?paymentId=${paymentId}${isGuestCheckout ? "&guest=true" : ""}`,
