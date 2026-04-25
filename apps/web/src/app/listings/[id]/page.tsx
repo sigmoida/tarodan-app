@@ -2123,27 +2123,6 @@ export default function ListingDetailPage() {
                           : t("product.addToCart")}
                     </span>
                   </Button>
-                  <Button
-                    variant="secondary"
-                    onClick={handleToggleFavorite}
-                    className={`gap-1.5 py-2.5 sm:py-3 ${isFavorite ? "bg-danger-50 border-danger-200 text-danger-600" : ""}`}
-                  >
-                    {isFavorite ? (
-                      <>
-                        <HeartSolidIcon className="w-4 h-4 sm:w-5 sm:h-5 text-danger-500" />
-                        <span className="truncate">
-                          {t("product.removeFromFavorites")}
-                        </span>
-                      </>
-                    ) : (
-                      <>
-                        <HeartIcon className="w-4 h-4 sm:w-5 sm:h-5" />
-                        <span className="truncate">
-                          {t("product.addToFavorites")}
-                        </span>
-                      </>
-                    )}
-                  </Button>
                 </div>
               )}
             </div>

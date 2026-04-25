@@ -1,6 +1,6 @@
 'use client';
 
-import { useMemo, useState, type ComponentType } from 'react';
+import { useEffect, useMemo, useState, type ComponentType } from 'react';
 import Link from 'next/link';
 import Image from 'next/image';
 import { usePathname, useRouter } from 'next/navigation';
@@ -35,6 +35,11 @@ import {
   CreditCardIcon,
   ArrowsRightLeftIcon,
   MagnifyingGlassIcon,
+  ChevronDownIcon,
+  ChevronRightIcon,
+  MegaphoneIcon,
+  Squares2X2Icon,
+  ClipboardDocumentIcon,
 } from '@heroicons/react/24/outline';
 
 type NavItem = {
@@ -45,44 +50,104 @@ type NavItem = {
   keywords?: string[];
 };
 
-const navigation: NavItem[] = [
+type NavGroup = {
+  id: string;
+  name: string;
+  icon: ComponentType<{ className?: string }>;
+  items: NavItem[];
+};
+
+const topLevelNav: NavItem[] = [
   { name: 'Dashboard', href: '/dashboard', icon: HomeIcon, keywords: ['ana sayfa', 'home'] },
   { name: 'Analizler', href: '/analytics', icon: ChartBarIcon, keywords: ['istatistik', 'rapor'] },
-  { name: 'Siparişler', href: '/orders', icon: ClipboardDocumentListIcon, keywords: ['order'] },
-  {
-    name: 'Takaslar',
-    href: '/trades',
-    icon: ArrowsRightLeftIcon,
-    keywords: ['takas', 'trade', 'barter', 'değişim', 'safe trade'],
-  },
-  { name: 'Kullanıcılar', href: '/users', icon: UsersIcon, keywords: ['user', 'üye'] },
-  { name: 'Ürünler', href: '/products', icon: ShoppingBagIcon },
-  { name: 'Yorumlar', href: '/reviews', icon: StarIcon },
-  { name: 'Kategoriler', href: '/categories', icon: CubeIcon },
-  { name: 'Markalar', href: '/brands', icon: SwatchIcon },
-  { name: 'Modeller', href: '/car-models', icon: TruckIcon },
-  { name: 'Üreticiler', href: '/manufacturers', icon: BuildingOffice2Icon },
-  { name: 'Ürün Özellikleri', href: '/attributes', icon: ClipboardDocumentListIcon },
-  { name: 'Koleksiyonlar', href: '/collections', icon: ClipboardDocumentCheckIcon },
-  { name: 'Etiketler', href: '/tags', icon: TagIcon },
-  { name: 'İndirimler', href: '/discounts', icon: TicketIcon },
-  { name: 'Mesajlar', href: '/messages', icon: ChatBubbleLeftRightIcon },
-  { name: 'Kargo', href: '/shipping', icon: TruckIcon },
-  { name: 'Bildirimler', href: '/notifications', icon: BellAlertIcon },
-  { name: 'Komisyon', href: '/commission', icon: CurrencyDollarIcon },
-  { name: 'Satıcı Başvuruları', href: '/sellers/applications', icon: ClipboardDocumentCheckIcon },
-  { name: 'Satıcı Performansı', href: '/sellers/performance', icon: ChartBarIcon },
-  { name: 'Satıcı Ödemeleri', href: '/payouts', icon: BanknotesIcon },
-  { name: 'İade Geçmişi', href: '/refunds', icon: BanknotesIcon },
-  { name: 'Vergi Ayarları', href: '/tax', icon: CalculatorIcon },
-
-  { name: 'Sayfalar', href: '/pages', icon: DocumentTextIcon },
-  { name: 'E-posta Şablonları', href: '/email-templates', icon: ChatBubbleLeftRightIcon },
-  { name: 'Sistem Logları', href: '/logs', icon: ClipboardDocumentCheckIcon },
-  { name: 'Rol Yönetimi', href: '/roles', icon: UserCircleIcon },
-  { name: 'Ödeme Ayarları', href: '/settings/payments', icon: CreditCardIcon },
-  { name: 'Sistem Ayarları', href: '/settings', icon: Cog6ToothIcon },
 ];
+
+const navGroups: NavGroup[] = [
+  {
+    id: 'operations',
+    name: 'Operasyon',
+    icon: ClipboardDocumentIcon,
+    items: [
+      { name: 'Siparişler', href: '/orders', icon: ClipboardDocumentListIcon, keywords: ['order'] },
+      {
+        name: 'Takaslar',
+        href: '/trades',
+        icon: ArrowsRightLeftIcon,
+        keywords: ['takas', 'trade', 'barter', 'değişim', 'safe trade'],
+      },
+      { name: 'Kargo', href: '/shipping', icon: TruckIcon },
+      { name: 'İade Geçmişi', href: '/refunds', icon: BanknotesIcon, keywords: ['iade', 'refund'] },
+    ],
+  },
+  {
+    id: 'catalog',
+    name: 'Katalog',
+    icon: Squares2X2Icon,
+    items: [
+      { name: 'Ürünler', href: '/products', icon: ShoppingBagIcon },
+      { name: 'Kategoriler', href: '/categories', icon: CubeIcon },
+      { name: 'Markalar', href: '/brands', icon: SwatchIcon },
+      { name: 'Modeller', href: '/car-models', icon: TruckIcon },
+      { name: 'Üreticiler', href: '/manufacturers', icon: BuildingOffice2Icon },
+      { name: 'Ürün Özellikleri', href: '/attributes', icon: ClipboardDocumentListIcon, keywords: ['attribute', 'özellik'] },
+      { name: 'Koleksiyonlar', href: '/collections', icon: ClipboardDocumentCheckIcon },
+      { name: 'Etiketler', href: '/tags', icon: TagIcon },
+    ],
+  },
+  {
+    id: 'users',
+    name: 'Hesaplar',
+    icon: UsersIcon,
+    items: [
+      { name: 'Kullanıcılar', href: '/users', icon: UsersIcon, keywords: ['user', 'üye'] },
+      { name: 'Satıcı Başvuruları', href: '/sellers/applications', icon: ClipboardDocumentCheckIcon },
+      { name: 'Satıcı Performansı', href: '/sellers/performance', icon: ChartBarIcon },
+      { name: 'Yorumlar', href: '/reviews', icon: StarIcon },
+      { name: 'Rol Yönetimi', href: '/roles', icon: UserCircleIcon },
+    ],
+  },
+  {
+    id: 'marketing',
+    name: 'Pazarlama & İçerik',
+    icon: MegaphoneIcon,
+    items: [
+      { name: 'İndirimler', href: '/discounts', icon: TicketIcon },
+      { name: 'Bildirimler', href: '/notifications', icon: BellAlertIcon },
+      { name: 'E-posta Şablonları', href: '/email-templates', icon: ChatBubbleLeftRightIcon },
+      { name: 'Mesajlar', href: '/messages', icon: ChatBubbleLeftRightIcon },
+      { name: 'Sayfalar', href: '/pages', icon: DocumentTextIcon },
+    ],
+  },
+  {
+    id: 'finance',
+    name: 'Finans',
+    icon: CurrencyDollarIcon,
+    items: [
+      { name: 'Komisyon', href: '/commission', icon: CurrencyDollarIcon },
+      { name: 'Satıcı Ödemeleri', href: '/payouts', icon: BanknotesIcon },
+      { name: 'Vergi Ayarları', href: '/tax', icon: CalculatorIcon },
+      { name: 'Ödeme Ayarları', href: '/settings/payments', icon: CreditCardIcon },
+    ],
+  },
+  {
+    id: 'system',
+    name: 'Sistem',
+    icon: Cog6ToothIcon,
+    items: [
+      { name: 'Sistem Ayarları', href: '/settings', icon: Cog6ToothIcon },
+      { name: 'Sistem Logları', href: '/logs', icon: ClipboardDocumentCheckIcon },
+    ],
+  },
+];
+
+const OPEN_GROUPS_STORAGE_KEY = 'admin-nav-open-groups';
+
+function matchesQuery(item: NavItem, q: string): boolean {
+  const name = item.name.toLocaleLowerCase('tr-TR');
+  const href = item.href.toLowerCase();
+  if (name.includes(q) || href.includes(q)) return true;
+  return (item.keywords ?? []).some((k) => k.toLocaleLowerCase('tr-TR').includes(q));
+}
 
 
 interface AdminLayoutProps {
@@ -96,20 +161,80 @@ export default function AdminLayout({ children }: AdminLayoutProps) {
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [navQuery, setNavQuery] = useState('');
 
-  const filteredNavigation = useMemo(() => {
-    const q = navQuery.trim().toLocaleLowerCase('tr-TR');
-    if (!q) return navigation;
-    return navigation.filter((item) => {
-      const name = item.name.toLocaleLowerCase('tr-TR');
-      const href = item.href.toLowerCase();
-      if (name.includes(q) || href.includes(q)) return true;
-      return (item.keywords ?? []).some((k) => k.toLocaleLowerCase('tr-TR').includes(q));
+  // Aktif route hangi gruptaysa o grup otomatik açılır, son kullanıcı tercihi localStorage'da saklanır
+  const activeGroupId = useMemo(() => {
+    for (const g of navGroups) {
+      if (g.items.some((item) => pathname.startsWith(item.href))) return g.id;
+    }
+    return null;
+  }, [pathname]);
+
+  const [openGroups, setOpenGroups] = useState<Set<string>>(() => {
+    if (typeof window === 'undefined') return new Set();
+    try {
+      const raw = window.localStorage.getItem(OPEN_GROUPS_STORAGE_KEY);
+      if (raw) return new Set(JSON.parse(raw) as string[]);
+    } catch {}
+    return new Set();
+  });
+
+  useEffect(() => {
+    if (activeGroupId && !openGroups.has(activeGroupId)) {
+      setOpenGroups((prev) => new Set(prev).add(activeGroupId));
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [activeGroupId]);
+
+  useEffect(() => {
+    try {
+      window.localStorage.setItem(OPEN_GROUPS_STORAGE_KEY, JSON.stringify(Array.from(openGroups)));
+    } catch {}
+  }, [openGroups]);
+
+  const toggleGroup = (id: string) => {
+    setOpenGroups((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
     });
-  }, [navQuery]);
+  };
+
+  const q = navQuery.trim().toLocaleLowerCase('tr-TR');
+  const isSearching = q.length > 0;
+
+  // Arama aktifken: grupları yok say, tüm eşleşmeleri düz liste olarak göster
+  const searchResults = useMemo(() => {
+    if (!isSearching) return [] as NavItem[];
+    const all = [...topLevelNav, ...navGroups.flatMap((g) => g.items)];
+    return all.filter((item) => matchesQuery(item, q));
+  }, [isSearching, q]);
 
   const handleLogout = () => {
     logout();
     router.push('/login');
+  };
+
+  const renderNavLink = (item: NavItem, opts?: { nested?: boolean }) => {
+    const isActive = pathname.startsWith(item.href);
+    return (
+      <Link
+        key={item.href}
+        href={item.href}
+        scroll={false}
+        className={clsx(
+          'flex items-center rounded-lg text-sm font-medium transition-colors',
+          opts?.nested ? 'pl-9 pr-3 py-2' : 'px-3 py-2.5',
+          isActive
+            ? 'bg-primary-50 text-primary-600'
+            : 'text-muted hover:bg-surface-alt hover:text-heading'
+        )}
+        onClick={() => setSidebarOpen(false)}
+      >
+        <item.icon className={clsx('h-5 w-5 flex-shrink-0', opts?.nested ? 'mr-2.5' : 'mr-3')} />
+        {item.name}
+      </Link>
+    );
   };
 
   return (
@@ -165,29 +290,53 @@ export default function AdminLayout({ children }: AdminLayoutProps) {
 
         {/* Navigation */}
         <nav className="flex-1 p-3 pt-2 space-y-1 overflow-y-auto min-h-0">
-          {filteredNavigation.length === 0 ? (
-            <p className="px-3 py-4 text-sm text-muted text-center">Eşleşen menü öğesi yok</p>
+          {isSearching ? (
+            searchResults.length === 0 ? (
+              <p className="px-3 py-4 text-sm text-muted text-center">Eşleşen menü öğesi yok</p>
+            ) : (
+              searchResults.map((item) => renderNavLink(item))
+            )
           ) : (
-            filteredNavigation.map((item) => {
-              const isActive = pathname.startsWith(item.href);
-              return (
-                <Link
-                  key={item.href}
-                  href={item.href}
-                  scroll={false}
-                  className={clsx(
-                    'flex items-center px-3 py-2.5 rounded-lg text-sm font-medium transition-colors',
-                    isActive
-                      ? 'bg-primary-50 text-primary-600'
-                      : 'text-muted hover:bg-surface-alt hover:text-heading'
-                  )}
-                  onClick={() => setSidebarOpen(false)}
-                >
-                  <item.icon className="h-5 w-5 mr-3 flex-shrink-0" />
-                  {item.name}
-                </Link>
-              );
-            })
+            <>
+              {topLevelNav.map((item) => renderNavLink(item))}
+
+              <div className="h-2" />
+
+              {navGroups.map((group) => {
+                const isOpen = openGroups.has(group.id);
+                const hasActive = group.items.some((item) => pathname.startsWith(item.href));
+                return (
+                  <div key={group.id}>
+                    <button
+                      type="button"
+                      onClick={() => toggleGroup(group.id)}
+                      aria-expanded={isOpen}
+                      className={clsx(
+                        'w-full flex items-center justify-between px-3 py-2 rounded-lg text-xs font-semibold uppercase tracking-wide transition-colors',
+                        hasActive
+                          ? 'text-primary-600'
+                          : 'text-muted hover:bg-surface-alt hover:text-heading'
+                      )}
+                    >
+                      <span className="flex items-center min-w-0 whitespace-nowrap">
+                        <group.icon className="h-4 w-4 mr-2.5 flex-shrink-0" />
+                        <span className="truncate">{group.name}</span>
+                      </span>
+                      {isOpen ? (
+                        <ChevronDownIcon className="h-4 w-4 flex-shrink-0" />
+                      ) : (
+                        <ChevronRightIcon className="h-4 w-4 flex-shrink-0" />
+                      )}
+                    </button>
+                    {isOpen && (
+                      <div className="mt-1 space-y-1">
+                        {group.items.map((item) => renderNavLink(item, { nested: true }))}
+                      </div>
+                    )}
+                  </div>
+                );
+              })}
+            </>
           )}
         </nav>
 

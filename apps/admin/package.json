@@ -33,6 +33,7 @@
     "@tarodan/api-client": "workspace:*",
     "@tarodan/core": "workspace:*",
     "@tarodan/types": "workspace:*",
+    "@tarodan/design-tokens": "workspace:*",
     "@tarodan/ui": "workspace:*",
     "axios": "^1.6.2",
     "chart.js": "^4.4.1",

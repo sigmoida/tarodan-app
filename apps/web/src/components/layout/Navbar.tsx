@@ -1053,7 +1053,7 @@ export default function Navbar() {
                           <Link
                             href="/register"
                             onClick={() => setShowAccountDropdown(false)}
-                            className="items-center justify-center py-2.5 px-4 text-body font-medium hover:bg-surface"
+                            className="flex items-center justify-center w-full py-2.5 px-4 border border-border-subtle text-body text-sm font-medium rounded-lg hover:bg-surface transition-colors"
                           >
                             {t('common.register')}
                           </Link>

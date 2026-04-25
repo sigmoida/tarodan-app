@@ -104,6 +104,9 @@ importers:
       '@tarodan/core':
         specifier: workspace:*
         version: link:../../packages/core
+      '@tarodan/design-tokens':
+        specifier: workspace:*
+        version: link:../../packages/design-tokens
       '@tarodan/types':
         specifier: workspace:*
         version: link:../../packages/types
@@ -620,6 +623,9 @@ importers:
       '@tarodan/core':
         specifier: workspace:*
         version: link:../../packages/core
+      '@tarodan/design-tokens':
+        specifier: workspace:*
+        version: link:../../packages/design-tokens
       '@tarodan/types':
         specifier: workspace:*
         version: link:../../packages/types
