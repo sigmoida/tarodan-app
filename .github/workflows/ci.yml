@@ -37,6 +37,7 @@ jobs:
           node-version: 20
           cache: pnpm
       - run: pnpm install --frozen-lockfile
+      - run: pnpm --filter @tarodan/api prisma:generate
       - run: pnpm typecheck
 
   build:
@@ -52,6 +53,7 @@ jobs:
           node-version: 20
           cache: pnpm
       - run: pnpm install --frozen-lockfile
+      - run: pnpm --filter @tarodan/api prisma:generate
       - run: pnpm build
 
   unit-test:
@@ -67,6 +69,7 @@ jobs:
           node-version: 20
           cache: pnpm
       - run: pnpm install --frozen-lockfile
+      - run: pnpm --filter @tarodan/api prisma:generate
       - run: pnpm --filter @tarodan/api test
 
   e2e-test:
@@ -123,5 +126,6 @@ jobs:
           node-version: 20
           cache: pnpm
       - run: pnpm install --frozen-lockfile
+      - run: pnpm --filter @tarodan/api prisma:generate
       - run: pnpm --filter @tarodan/api test:e2e:setup
       - run: pnpm --filter @tarodan/api test:e2e
