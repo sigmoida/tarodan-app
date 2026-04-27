@@ -113,7 +113,7 @@ export class MembershipService {
     }
 
     // Map tier to DTO first
-    let tierDto = this.mapTierToDto(effectiveTier);
+    const tierDto = this.mapTierToDto(effectiveTier);
     
     // Override listing limits based on tier type if platform setting exists
     // This must be done BEFORE getUserUsageStats so it uses the correct limit

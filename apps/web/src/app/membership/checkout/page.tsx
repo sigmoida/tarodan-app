@@ -163,7 +163,16 @@ export default function MembershipCheckoutPage() {
   };
 
   const tierInfo = getTierInfo();
-  
+
+  useEffect(() => {
+    if (tierInfo && tierInfo.price > 100000) {
+      toast.error(
+        `Fiyat çok yüksek görünüyor (${tierInfo.price.toLocaleString('tr-TR')} TL). Lütfen admin panelinden membership fiyatlarını kontrol edin.`,
+        { duration: 10000 }
+      );
+    }
+  }, [tierInfo]);
+
   if (!tierInfo || !['basic', 'premium', 'business'].includes(tier)) {
     return (
       <div className="min-h-screen bg-surface flex items-center justify-center">
@@ -180,16 +189,6 @@ export default function MembershipCheckoutPage() {
   const finalPrice = tierInfo.price;
   const basePrice = tierInfo.basePrice;
   const monthlyPrice = period === 'yearly' ? Math.round(finalPrice / 12) : finalPrice;
-
-  // Validate price - if it's too high, show warning
-  useEffect(() => {
-    if (finalPrice > 100000) {
-      toast.error(
-        `Fiyat çok yüksek görünüyor (${finalPrice.toLocaleString('tr-TR')} TL). Lütfen admin panelinden membership fiyatlarını kontrol edin.`,
-        { duration: 10000 }
-      );
-    }
-  }, [finalPrice]);
 
   const formatCardNumber = (value: string) => {
     const cleaned = value.replace(/\D/g, '');
