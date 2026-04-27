@@ -78,10 +78,12 @@ interface RecentTrade {
   id: string;
   status: string;
   createdAt: string;
-  offeredBy?: { username: string };
-  requestedBy?: { username: string };
-  offeredProduct?: { title: string };
-  requestedProduct?: { title: string };
+  initiator?: { id: string; displayName?: string | null; email?: string | null };
+  receiver?: { id: string; displayName?: string | null; email?: string | null };
+  items?: Array<{
+    side: string;
+    product?: { id: string; title?: string | null };
+  }>;
 }
 
 interface StatCardProps {
@@ -666,14 +668,32 @@ export default function DashboardPage() {
                         <ArrowsRightLeftIcon className="h-5 w-5 text-success-700" />
                       </div>
                       <div className="min-w-0">
-                        <p className="text-sm text-heading truncate">
-                          <span className="font-medium">{trade.offeredBy?.username || 'Kullanıcı'}</span>
-                          <span className="text-muted mx-2">↔</span>
-                          <span className="font-medium">{trade.requestedBy?.username || 'Kullanıcı'}</span>
-                        </p>
-                        <p className="text-xs text-muted truncate">
-                          {trade.offeredProduct?.title || 'Ürün'} ↔ {trade.requestedProduct?.title || 'Ürün'}
-                        </p>
+                        {(() => {
+                          const initiatorName = trade.initiator?.displayName || trade.initiator?.email || 'Kullanıcı';
+                          const receiverName = trade.receiver?.displayName || trade.receiver?.email || 'Kullanıcı';
+                          const initiatorItems = (trade.items || []).filter(i => i.side === 'initiator');
+                          const receiverItems = (trade.items || []).filter(i => i.side === 'receiver');
+                          const offeredTitle = initiatorItems[0]?.product?.title;
+                          const requestedTitle = receiverItems[0]?.product?.title;
+                          const offeredLabel = offeredTitle
+                            ? offeredTitle + (initiatorItems.length > 1 ? ` (+${initiatorItems.length - 1})` : '')
+                            : '—';
+                          const requestedLabel = requestedTitle
+                            ? requestedTitle + (receiverItems.length > 1 ? ` (+${receiverItems.length - 1})` : '')
+                            : '—';
+                          return (
+                            <>
+                              <p className="text-sm text-heading truncate">
+                                <span className="font-medium">{initiatorName}</span>
+                                <span className="text-muted mx-2">→</span>
+                                <span className="font-medium">{receiverName}</span>
+                              </p>
+                              <p className="text-xs text-muted truncate">
+                                {offeredLabel} → {requestedLabel}
+                              </p>
+                            </>
+                          );
+                        })()}
                       </div>
                     </div>
                     <div className="flex items-center gap-3 ml-3">
