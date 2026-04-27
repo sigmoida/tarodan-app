@@ -1,0 +1,134 @@
+import * as crypto from 'crypto';
+import type {
+  PayTRBuyer,
+  PayTRBasketItem,
+  PayTRCallbackData,
+  PayTRStatusInquiryResult,
+} from '../../src/modules/payment-providers/paytr.service';
+
+/**
+ * In-memory PayTR mock for E2E tests.
+ *
+ * Method signatures match the real PayTRService — when overridden via
+ * Test.overrideProvider(PayTRService).useValue(mock) the rest of the app
+ * sees the same shape.
+ *
+ * verifyCallback() preserves the real hash check (uses the same secret/salt
+ * as .env.test) so callback security paths stay covered. parseCallback() is
+ * delegated to the same logic as production.
+ */
+
+const MERCHANT_KEY = 'test-key';
+const MERCHANT_SALT = 'test-salt';
+
+export class MockPayTRService {
+  public readonly iframeCalls: Array<{ orderId: string; amount: number }> = [];
+  public readonly refundCalls: Array<{ merchantOid: string; refundAmount: number }> = [];
+  public readonly queryResults = new Map<string, PayTRStatusInquiryResult>();
+
+  setQueryResult(merchantOid: string, result: PayTRStatusInquiryResult): void {
+    this.queryResults.set(merchantOid, result);
+  }
+
+  async createIframeToken(
+    orderId: string,
+    amount: number,
+    _buyer: PayTRBuyer,
+    _basketItems: PayTRBasketItem[],
+    _options?: unknown,
+  ): Promise<{ token: string; iframeUrl: string }> {
+    this.iframeCalls.push({ orderId, amount });
+    return {
+      token: `mock-token-${orderId}`,
+      iframeUrl: `https://mock.paytr.test/iframe/${orderId}`,
+    };
+  }
+
+  /** Wrapper that mirrors the real PayTRService.processOrderPayment signature. */
+  async processOrderPayment(
+    orderId: string,
+    amount: number,
+    _buyer: unknown,
+    _basket: unknown,
+    _installmentCount?: number,
+    _successQueryParams?: string,
+  ): Promise<{ token: string; iframeUrl: string }> {
+    return this.createIframeToken(orderId, amount, {} as PayTRBuyer, [] as PayTRBasketItem[]);
+  }
+
+  async queryPaymentStatus(merchantOid: string): Promise<PayTRStatusInquiryResult> {
+    return (
+      this.queryResults.get(merchantOid) ?? {
+        ok: false,
+        errNo: 'mock-not-set',
+        errMsg: 'Test did not set query result for this merchantOid',
+      }
+    );
+  }
+
+  verifyCallback(callback: PayTRCallbackData): boolean {
+    const hashStr = `${callback.merchant_oid}${MERCHANT_SALT}${callback.status}${callback.total_amount}`;
+    const expectedHash = crypto.createHmac('sha256', MERCHANT_KEY).update(hashStr).digest('base64');
+    return callback.hash === expectedHash;
+  }
+
+  parseCallback(callback: PayTRCallbackData): {
+    orderId: string;
+    isSuccess: boolean;
+    amount: number;
+    errorCode?: string;
+    errorMessage?: string;
+    paymentType?: string;
+  } {
+    return {
+      orderId: callback.merchant_oid,
+      isSuccess: callback.status === 'success',
+      amount: parseInt(callback.total_amount, 10) / 100,
+      errorCode: callback.failed_reason_code,
+      errorMessage: callback.failed_reason_msg,
+      paymentType: callback.payment_type,
+    };
+  }
+
+  async createRefund(merchantOid: string, refundAmount: number): Promise<{ status: string; mock: true }> {
+    this.refundCalls.push({ merchantOid, refundAmount });
+    return { status: 'success', mock: true };
+  }
+
+  async createPartialRefund(merchantOid: string, refundAmount: number): Promise<{ status: string; mock: true }> {
+    this.refundCalls.push({ merchantOid, refundAmount });
+    return { status: 'success', mock: true };
+  }
+
+  reset(): void {
+    this.iframeCalls.length = 0;
+    this.refundCalls.length = 0;
+    this.queryResults.clear();
+  }
+}
+
+/**
+ * Build a callback body whose hash will pass `verifyCallback` against the
+ * .env.test merchant key/salt. Use this in tests to simulate PayTR webhook.
+ */
+export function signCallback(input: {
+  merchantOid: string;
+  status: 'success' | 'failed';
+  totalAmount: number; // kuruş
+  paymentAmount?: number;
+}): PayTRCallbackData {
+  const totalAmountStr = String(input.totalAmount);
+  const hashStr = `${input.merchantOid}${MERCHANT_SALT}${input.status}${totalAmountStr}`;
+  const hash = crypto.createHmac('sha256', MERCHANT_KEY).update(hashStr).digest('base64');
+  return {
+    merchant_oid: input.merchantOid,
+    status: input.status,
+    total_amount: totalAmountStr,
+    payment_amount: String(input.paymentAmount ?? input.totalAmount),
+    hash,
+    payment_type: 'card',
+    currency: 'TL',
+    test_mode: '1',
+    merchant_id: 'test-merchant',
+  } as PayTRCallbackData;
+}
