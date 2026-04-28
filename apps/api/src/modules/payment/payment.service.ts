@@ -432,7 +432,9 @@ export class PaymentService {
     this.logger.log(`Initializing PayTR payment for order ${order.id}`);
 
     // PayTR merchant_oid sadece harf ve rakam kabul ediyor (tire vb. kabul etmiyor)
-    const merchantOid = String(order.orderNumber || order.id).replace(/-/g, '');
+    // Test merchant ortamında geçmiş kullanımdan çakışmamak için 6 haneli timestamp suffix
+    const baseOid = String(order.orderNumber || order.id).replace(/-/g, '');
+    const merchantOid = `${baseOid}T${Date.now().toString().slice(-6)}`;
 
     try {
       // Get shipping address from order
