@@ -105,6 +105,14 @@ export default function PaymentSuccessPage() {
 
   const fetchPayment = async () => {
     try {
+      // PayTR callback'i (test modunda) gecikebilir; durum-sorgu ile anında tamamlamayı dene.
+      // Idempotent: zaten completed ise no-op. Başarısız olursa sessiz geç, getStatus zaten doğru durumu çeker.
+      try {
+        await paymentsApi.verify(paymentId!);
+      } catch {
+        // ignore — fetchPayment yine de güncel statüyü gösterir
+      }
+
       const isGuest =
         isGuestCheckout ||
         (typeof window !== "undefined" &&

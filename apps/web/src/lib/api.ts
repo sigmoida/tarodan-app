@@ -315,6 +315,9 @@ export const paymentsApi = {
   /** Fail sayfasından; ödeme hâlâ pending ise rezervasyonu serbest bırakır */
   confirmFailed: (paymentId: string) =>
     api.post<{ released: boolean }>(`/payments/${paymentId}/confirm-failed`),
+  /** Success sayfasından; PayTR durum-sorgu ile ödemeyi anında tamamlar */
+  verify: (paymentId: string) =>
+    api.post<{ completed: boolean; status: string }>(`/payments/${paymentId}/verify`),
   refund: (orderId: string, refundAmount?: number) =>
     api.post('/payments/refund', { orderId, refundAmount }),
   retry: (paymentId: string) =>

@@ -508,13 +508,17 @@ export class PaymentService {
 
       // Membership ödemelerinde başarı sayfası /membership/success olsun (PayTR yönlendirmesi)
       const isMembershipOrder = order.productId?.startsWith?.('membership-');
+      // PayTR success URL'ine paymentId ekle: success sayfası verify endpoint'ini bu ID ile çağırır.
+      const successQueryParams = isMembershipOrder
+        ? `paymentId=${payment.id}&type=membership`
+        : `paymentId=${payment.id}`;
       const result = await this.paytrService.processOrderPayment(
         merchantOid,
         Number(order.totalAmount),
         buyer,
         basketItems,
         1, // installment count
-        isMembershipOrder ? 'type=membership' : undefined,
+        successQueryParams,
       );
 
       // Update payment with provider reference (callback merchant_oid ile eşleşmesi için aynı değer)
@@ -1135,11 +1139,14 @@ export class PaymentService {
               orderId: resultOrder.id,
               provider: 'surat',
               status: 'pending',
+              // Sürat'a OzelKargoTakipNo olarak sipariş numarası gönderiliyor; aynısını
+              // takip numarası olarak DB'ye de yazıyoruz ki UI'da gösterilsin.
+              trackingNumber: resultOrder.orderNumber,
               cost: Number(resultOrder.shippingCost),
               estimatedDelivery,
             },
           });
-          this.logger.log(`Auto-created shipment for order ${resultOrder.orderNumber}`);
+          this.logger.log(`Auto-created shipment for order ${resultOrder.orderNumber} tracking=${resultOrder.orderNumber}`);
         }
       } catch (error) {
         this.logger.error(`Failed to auto-create shipment for order ${resultOrder.orderNumber}: ${error}`);
@@ -1581,6 +1588,74 @@ export class PaymentService {
     }
     await this.processFailedPayment(payment, 'Fail sayfasından onay - rezervasyon serbest bırakıldı');
     return { released: true };
+  }
+
+  /**
+   * Success sayfasından çağrılır: PayTR durum-sorgu API'sini hemen çalıştırır,
+   * ödeme tamamsa siparişi anında tamamlar (callback gelmesini beklemeden).
+   * Public, idempotent: payment zaten completed ise { completed: true } döner.
+   */
+  async verifyPaymentFromClient(
+    paymentId: string,
+  ): Promise<{ completed: boolean; status: string }> {
+    const payment = await this.prisma.payment.findUnique({
+      where: { id: paymentId },
+      include: {
+        order: { include: { buyer: true, seller: true, product: true } },
+        tradeCashPayment: true,
+      },
+    });
+
+    if (!payment) {
+      return { completed: false, status: 'not_found' };
+    }
+
+    if (payment.status === PaymentStatus.completed) {
+      return { completed: true, status: 'already_completed' };
+    }
+
+    if (payment.status !== PaymentStatus.pending) {
+      return { completed: false, status: payment.status };
+    }
+
+    if (payment.provider !== 'paytr') {
+      return { completed: false, status: 'unsupported_provider' };
+    }
+
+    const oid = (payment.providerConversationId || '').trim();
+    if (!oid) {
+      return { completed: false, status: 'no_provider_oid' };
+    }
+
+    let inquiry = await this.paytrService.queryPaymentStatus(oid);
+    if (!inquiry.ok && oid.includes('-')) {
+      inquiry = await this.paytrService.queryPaymentStatus(oid.replace(/-/g, ''));
+    }
+
+    if (!inquiry.ok) {
+      return { completed: false, status: 'paytr_not_found' };
+    }
+
+    const tolerance = 0.01;
+    const ourAmount = Number(payment.amount);
+    if (Math.abs(inquiry.paymentTotalTl - ourAmount) > tolerance) {
+      this.logger.warn(
+        `verifyPaymentFromClient amount mismatch payment=${payment.id} oid=${oid} paytr=${inquiry.paymentTotalTl} ours=${ourAmount}`,
+      );
+      return { completed: false, status: 'amount_mismatch' };
+    }
+
+    const txnRef =
+      inquiry.paymentDate != null && inquiry.paymentDate !== ''
+        ? `paytr:${oid}:${inquiry.paymentDate}`
+        : `paytr:${oid}`;
+
+    const did = await this.processSuccessfulPayment(payment, txnRef);
+    if (did) {
+      this.logger.log(`verifyPaymentFromClient completed payment=${payment.id} oid=${oid}`);
+      return { completed: true, status: 'completed_now' };
+    }
+    return { completed: false, status: 'process_skipped' };
   }
 
   /**
