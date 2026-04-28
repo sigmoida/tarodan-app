@@ -1584,6 +1584,74 @@ export class PaymentService {
   }
 
   /**
+   * Success sayfasından çağrılır: PayTR durum-sorgu API'sini hemen çalıştırır,
+   * ödeme tamamsa siparişi anında tamamlar (callback gelmesini beklemeden).
+   * Public, idempotent: payment zaten completed ise { completed: true } döner.
+   */
+  async verifyPaymentFromClient(
+    paymentId: string,
+  ): Promise<{ completed: boolean; status: string }> {
+    const payment = await this.prisma.payment.findUnique({
+      where: { id: paymentId },
+      include: {
+        order: { include: { buyer: true, seller: true, product: true } },
+        tradeCashPayment: true,
+      },
+    });
+
+    if (!payment) {
+      return { completed: false, status: 'not_found' };
+    }
+
+    if (payment.status === PaymentStatus.completed) {
+      return { completed: true, status: 'already_completed' };
+    }
+
+    if (payment.status !== PaymentStatus.pending) {
+      return { completed: false, status: payment.status };
+    }
+
+    if (payment.provider !== 'paytr') {
+      return { completed: false, status: 'unsupported_provider' };
+    }
+
+    const oid = (payment.providerConversationId || '').trim();
+    if (!oid) {
+      return { completed: false, status: 'no_provider_oid' };
+    }
+
+    let inquiry = await this.paytrService.queryPaymentStatus(oid);
+    if (!inquiry.ok && oid.includes('-')) {
+      inquiry = await this.paytrService.queryPaymentStatus(oid.replace(/-/g, ''));
+    }
+
+    if (!inquiry.ok) {
+      return { completed: false, status: 'paytr_not_found' };
+    }
+
+    const tolerance = 0.01;
+    const ourAmount = Number(payment.amount);
+    if (Math.abs(inquiry.paymentTotalTl - ourAmount) > tolerance) {
+      this.logger.warn(
+        `verifyPaymentFromClient amount mismatch payment=${payment.id} oid=${oid} paytr=${inquiry.paymentTotalTl} ours=${ourAmount}`,
+      );
+      return { completed: false, status: 'amount_mismatch' };
+    }
+
+    const txnRef =
+      inquiry.paymentDate != null && inquiry.paymentDate !== ''
+        ? `paytr:${oid}:${inquiry.paymentDate}`
+        : `paytr:${oid}`;
+
+    const did = await this.processSuccessfulPayment(payment, txnRef);
+    if (did) {
+      this.logger.log(`verifyPaymentFromClient completed payment=${payment.id} oid=${oid}`);
+      return { completed: true, status: 'completed_now' };
+    }
+    return { completed: false, status: 'process_skipped' };
+  }
+
+  /**
    * Process refund
    * Requirement: Refund handling (project.md)
    */
