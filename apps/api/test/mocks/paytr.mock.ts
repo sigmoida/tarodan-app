@@ -24,7 +24,10 @@ const MERCHANT_SALT = 'test-salt';
 export class MockPayTRService {
   public readonly iframeCalls: Array<{ orderId: string; amount: number }> = [];
   public readonly refundCalls: Array<{ merchantOid: string; refundAmount: number }> = [];
+  public readonly transferCalls: Array<{ merchantOid: string; transId: string; submerchantAmount: number; totalAmount: number; transferName: string; transferIban: string }> = [];
   public readonly queryResults = new Map<string, PayTRStatusInquiryResult>();
+  /** Set to true to make next createPlatformTransfer return error */
+  public nextTransferFails = false;
 
   setQueryResult(merchantOid: string, result: PayTRStatusInquiryResult): void {
     this.queryResults.set(merchantOid, result);
@@ -100,10 +103,36 @@ export class MockPayTRService {
     return { status: 'success', mock: true };
   }
 
+  async createPlatformTransfer(params: {
+    merchantOid: string;
+    transId: string;
+    submerchantAmount: number;
+    totalAmount: number;
+    transferName: string;
+    transferIban: string;
+  }): Promise<{ status: string; err_no?: string; err_msg?: string }> {
+    this.transferCalls.push(params);
+    if (this.nextTransferFails) {
+      this.nextTransferFails = false;
+      return { status: 'error', err_no: '099', err_msg: 'Mock transfer failure' };
+    }
+    return { status: 'success' };
+  }
+
+  async getReturnedTransfers(_params: { startDate: string; endDate: string }): Promise<any> {
+    return { status: 'success', data: [] };
+  }
+
+  async resendReturnedTransfers(_params: { transId: string; transfers: any[] }): Promise<any> {
+    return { status: 'success' };
+  }
+
   reset(): void {
     this.iframeCalls.length = 0;
     this.refundCalls.length = 0;
+    this.transferCalls.length = 0;
     this.queryResults.clear();
+    this.nextTransferFails = false;
   }
 }
 

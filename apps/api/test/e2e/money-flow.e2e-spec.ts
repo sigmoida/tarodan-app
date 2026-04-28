@@ -21,6 +21,7 @@ import { createProduct } from '../factories/product.factory';
 import { createAddress } from '../factories/address.factory';
 import { signCallback } from '../mocks/paytr.mock';
 import { PaymentService } from '../../src/modules/payment/payment.service';
+import { PayoutService } from '../../src/modules/payout/payout.service';
 
 async function configureWarehouseAddress(addressId: string): Promise<void> {
   const prisma = getPrisma();
@@ -137,6 +138,18 @@ describe('Money Flow Timeline (E2E)', () => {
       });
       expect(holdReleased?.status).toBe(PaymentHoldStatus.released);
       expect(holdReleased?.releasedAt).toBeTruthy();
+
+      // Verify: PayoutTransfer can be created for the released hold
+      const payoutService = ctx.app.get(PayoutService);
+      const payoutsCreated = await payoutService.createPayoutsForReleasedHolds();
+      expect(payoutsCreated).toBeGreaterThanOrEqual(1);
+
+      const payout = await prisma.payoutTransfer.findFirst({
+        where: { paymentHoldId: hold!.id },
+      });
+      expect(payout).toBeTruthy();
+      expect(payout?.sellerId).toBe(seller.id);
+      expect(Number(payout?.netAmount)).toBeGreaterThan(0);
     });
   });
 
@@ -284,6 +297,17 @@ describe('Money Flow Timeline (E2E)', () => {
 
       cashPayment = await prisma.tradeCashPayment.findUnique({ where: { tradeId } });
       expect(cashPayment?.releasedAt).toBeTruthy();
+
+      // Verify: PayoutTransfer can be created for the released trade cash
+      const payoutService = ctx.app.get(PayoutService);
+      const payoutsCreated = await payoutService.createPayoutsForReleasedHolds();
+      expect(payoutsCreated).toBeGreaterThanOrEqual(1);
+
+      const payout = await prisma.payoutTransfer.findFirst({
+        where: { tradeCashPaymentId: cashPayment!.id },
+      });
+      expect(payout).toBeTruthy();
+      expect(payout?.sellerId).toBe(receiver.id);
     });
   });
 
