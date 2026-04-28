@@ -28,7 +28,7 @@ COPY apps/admin ./apps/admin
 # Switch to production for Next.js build
 ENV NODE_ENV=production
 ENV NEXT_TELEMETRY_DISABLED=1
-RUN pnpm --filter @tarodan/admin build
+RUN pnpm --filter @tarodan/admin... build
 
 # Production stage
 FROM node:20-alpine AS runner
