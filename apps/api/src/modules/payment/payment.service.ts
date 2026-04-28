@@ -1077,6 +1077,32 @@ export class PaymentService {
       }
     }
 
+    // Auto-create Shipment record (Sürat Kargo gönderi kaydı oluşturuldu at order creation)
+    if (!isMembershipOrder) {
+      try {
+        const existingShipment = await this.prisma.shipment.findFirst({
+          where: { orderId: resultOrder.id },
+        });
+        if (!existingShipment) {
+          const estimatedDelivery = new Date();
+          estimatedDelivery.setDate(estimatedDelivery.getDate() + 3);
+
+          await this.prisma.shipment.create({
+            data: {
+              orderId: resultOrder.id,
+              provider: 'surat',
+              status: 'pending',
+              cost: Number(resultOrder.shippingCost),
+              estimatedDelivery,
+            },
+          });
+          this.logger.log(`Auto-created shipment for order ${resultOrder.orderNumber}`);
+        }
+      } catch (error) {
+        this.logger.error(`Failed to auto-create shipment for order ${resultOrder.orderNumber}: ${error}`);
+      }
+    }
+
     return true;
   }
 
