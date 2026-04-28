@@ -1526,6 +1526,17 @@ export class PaymentService {
 
     const amountToRefund = refundAmount || Number(payment.amount);
 
+    // Race condition guard: if a payout transfer is already completed/processing, block refund
+    const existingPayout = await this.prisma.payoutTransfer.findFirst({
+      where: {
+        paymentHold: { orderId },
+        status: { in: ['completed', 'processing'] },
+      },
+    });
+    if (existingPayout) {
+      throw new BadRequestException('Transfer zaten başlatılmış, iade yapılamaz');
+    }
+
     try {
       // Call provider refund API
       let refundResult: any;

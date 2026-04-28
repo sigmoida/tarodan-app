@@ -160,7 +160,8 @@ describe('Seller Bank Account (E2E)', () => {
         .set(authHeader(user))
         .expect(200);
 
-      expect(res.body).toBeFalsy();
+      // Prisma findUnique returns null, but NestJS serializes it as empty object {}
+      expect(res.body.id).toBeUndefined();
     });
 
     it('returns the bank account when it exists', async () => {
