@@ -3,6 +3,16 @@ name: CI
 on:
   push:
     branches: [development]
+  workflow_dispatch:
+    inputs:
+      run_integration:
+        description: 'Run PayTR integration tests (real API calls)'
+        required: false
+        default: 'false'
+        type: choice
+        options:
+          - 'false'
+          - 'true'
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
@@ -129,3 +139,25 @@ jobs:
       - run: pnpm --filter @tarodan/api prisma:generate
       - run: pnpm --filter @tarodan/api test:e2e:setup
       - run: pnpm --filter @tarodan/api test:e2e
+
+  integration-test:
+    name: Integration Tests (PayTR Live API)
+    if: github.event.inputs.run_integration == 'true'
+    needs: [e2e-test]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 8.12.0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm --filter @tarodan/api prisma:generate
+      - run: pnpm --filter @tarodan/api test:integration
+        env:
+          PAYTR_MERCHANT_ID: ${{ secrets.PAYTR_MERCHANT_ID }}
+          PAYTR_MERCHANT_KEY: ${{ secrets.PAYTR_MERCHANT_KEY }}
+          PAYTR_MERCHANT_SALT: ${{ secrets.PAYTR_MERCHANT_SALT }}

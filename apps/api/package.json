@@ -24,6 +24,7 @@
     "test:e2e": "jest --config ./test/jest-e2e.json --runInBand",
     "test:e2e:setup": "dotenv -e .env.test -- prisma migrate deploy",
     "test:e2e:reset": "dotenv -e .env.test -- prisma migrate reset --force --skip-seed",
+    "test:integration": "jest --config ./test/jest-integration.json --runInBand",
     "prisma:generate": "prisma generate",
     "prisma:migrate": "prisma migrate dev",
     "prisma:migrate:deploy": "prisma migrate deploy",
