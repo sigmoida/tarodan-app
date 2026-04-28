@@ -103,7 +103,7 @@ interface OrderDetail {
   shipment?: {
     id: string;
     provider: string;
-    trackingNumber: string;
+    trackingNumber: string | null;
     status: string;
     cost?: number;
   };
@@ -815,32 +815,53 @@ export default function OrderDetailPage() {
                     <span className="text-muted">
                       {locale === "en" ? "Carrier:" : "Kargo Firması:"}
                     </span>
-                    <span className="font-medium">
-                      {order.shipment.provider}
+                    <span className="font-medium capitalize">
+                      {order.shipment.provider === "surat" ? "Sürat Kargo" : order.shipment.provider}
                     </span>
                   </div>
-                  <div className="flex justify-between">
-                    <span className="text-muted">
-                      {locale === "en" ? "Tracking Number:" : "Takip Numarası:"}
-                    </span>
-                    <span className="font-mono bg-surface-alt px-2 py-1 rounded">
-                      {order.shipment.trackingNumber}
-                    </span>
-                  </div>
+                  {order.shipment.trackingNumber ? (
+                    <div className="flex justify-between items-center">
+                      <span className="text-muted">
+                        {locale === "en" ? "Tracking Number:" : "Takip Numarası:"}
+                      </span>
+                      <span className="font-mono bg-surface-alt px-2 py-1 rounded">
+                        {order.shipment.trackingNumber}
+                      </span>
+                    </div>
+                  ) : (
+                    <div className="bg-info-50 border border-info-200 rounded-lg p-3 text-sm text-info-700">
+                      {locale === "en"
+                        ? "The tracking number will appear here once the seller drops the package at the cargo branch."
+                        : "Takip numarası, satıcı paketinizi kargo şubesine teslim ettiğinde burada görünecektir."}
+                    </div>
+                  )}
                   <div className="flex justify-between">
                     <span className="text-muted">
                       {locale === "en" ? "Shipping Status:" : "Kargo Durumu:"}
                     </span>
                     <span className="font-medium">{order.shipment.status}</span>
                   </div>
-                  {order.isBuyer && (
-                    <Link
-                      href={`/track-order?orderNumber=${encodeURIComponent(order.orderNumber)}&email=${encodeURIComponent(user?.email || "")}`}
-                      className="inline-flex items-center gap-2 mt-3 px-4 py-2 bg-info-600 hover:bg-info-700 text-inverted rounded-lg text-sm font-medium transition-colors"
-                    >
-                      <TruckIcon className="w-4 h-4" />
-                      {t("order.trackOrder")}
-                    </Link>
+                  {order.isBuyer && order.shipment.trackingNumber && (
+                    <div className="flex flex-col sm:flex-row gap-2 mt-3">
+                      {order.shipment.provider === "surat" && (
+                        <a
+                          href={`https://www.suratkargo.com.tr/KargoTakip/?kargotakipno=${encodeURIComponent(order.shipment.trackingNumber)}`}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="inline-flex items-center justify-center gap-2 px-4 py-2 bg-primary-600 hover:bg-primary-700 text-inverted rounded-lg text-sm font-medium transition-colors"
+                        >
+                          <TruckIcon className="w-4 h-4" />
+                          {locale === "en" ? "Track on Sürat" : "Sürat'ta Takip Et"}
+                        </a>
+                      )}
+                      <Link
+                        href={`/track-order?orderNumber=${encodeURIComponent(order.orderNumber)}&email=${encodeURIComponent(user?.email || "")}`}
+                        className="inline-flex items-center justify-center gap-2 px-4 py-2 bg-info-600 hover:bg-info-700 text-inverted rounded-lg text-sm font-medium transition-colors"
+                      >
+                        <TruckIcon className="w-4 h-4" />
+                        {locale === "en" ? "Track on Tarodan" : "Tarodan'da Takip Et"}
+                      </Link>
+                    </div>
                   )}
                 </div>
               </div>
@@ -890,32 +911,39 @@ export default function OrderDetailPage() {
 
             {order.isSeller && order.status === "preparing" && (
               <div className="bg-surface-elevated rounded-xl shadow-sm p-6">
-                <h2 className="text-lg font-semibold text-heading mb-4">
-                  {locale === "en"
-                    ? "Enter Shipping Info"
-                    : "Kargo Bilgisi Gir"}
+                <h2 className="text-lg font-semibold text-heading mb-4 flex items-center gap-2">
+                  <TruckIcon className="w-5 h-5" />
+                  {locale === "en" ? "Cargo Reference" : "Kargo Referans Numarası"}
                 </h2>
                 <p className="text-muted mb-4">
                   {locale === "en"
-                    ? "Please enter tracking number when shipped."
-                    : "Kargoya verdiğinizde takip numarasını girmeniz gerekmektedir."}
+                    ? "Hand this number to the Sürat Kargo branch when delivering your package. The shipment is already registered — the branch will retrieve all details automatically."
+                    : "Paketi Sürat Kargo şubesine teslim ederken bu numarayı veriniz. Gönderi zaten sistemde kayıtlıdır — şube tüm bilgileri otomatik olarak alacaktır."}
                 </p>
-                <Button
-                  variant="primary"
-                  size="lg"
-                  className="w-full"
-                  onClick={() =>
-                    toast(
-                      locale === "en"
-                        ? "Shipping info feature is under development..."
-                        : "Kargo bilgisi girme özelliği geliştiriliyor...",
-                    )
-                  }
-                >
+                <div className="flex items-center gap-2 mb-4">
+                  <code className="flex-1 font-mono text-lg bg-surface-alt px-4 py-3 rounded-lg border border-border-default text-center font-semibold tracking-wider">
+                    {order.orderNumber}
+                  </code>
+                  <Button
+                    variant="secondary"
+                    size="md"
+                    onClick={() => {
+                      navigator.clipboard.writeText(order.orderNumber);
+                      toast.success(
+                        locale === "en"
+                          ? "Order number copied"
+                          : "Sipariş numarası kopyalandı",
+                      );
+                    }}
+                  >
+                    {locale === "en" ? "Copy" : "Kopyala"}
+                  </Button>
+                </div>
+                <p className="text-sm text-muted">
                   {locale === "en"
-                    ? "Enter Shipping Info"
-                    : "Kargo Bilgisi Gir"}
-                </Button>
+                    ? "Once the branch receives your package, the Sürat tracking number will appear here automatically (within 30 minutes)."
+                    : "Şube paketinizi aldığında Sürat takip numarası burada otomatik olarak görünecektir (30 dakika içinde)."}
+                </p>
               </div>
             )}
 

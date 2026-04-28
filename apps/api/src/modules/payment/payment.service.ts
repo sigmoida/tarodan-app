@@ -1139,11 +1139,14 @@ export class PaymentService {
               orderId: resultOrder.id,
               provider: 'surat',
               status: 'pending',
+              // Sürat'a OzelKargoTakipNo olarak sipariş numarası gönderiliyor; aynısını
+              // takip numarası olarak DB'ye de yazıyoruz ki UI'da gösterilsin.
+              trackingNumber: resultOrder.orderNumber,
               cost: Number(resultOrder.shippingCost),
               estimatedDelivery,
             },
           });
-          this.logger.log(`Auto-created shipment for order ${resultOrder.orderNumber}`);
+          this.logger.log(`Auto-created shipment for order ${resultOrder.orderNumber} tracking=${resultOrder.orderNumber}`);
         }
       } catch (error) {
         this.logger.error(`Failed to auto-create shipment for order ${resultOrder.orderNumber}: ${error}`);
