@@ -69,6 +69,8 @@ model User {
   followers               UserFollow[]             @relation("Following")
   membership              UserMembership?
   wishlist                Wishlist?
+  bankAccount             SellerBankAccount?
+  payoutTransfers         PayoutTransfer[]         @relation("SellerPayoutTransfers")
 
   @@index([email])
   @@index([isSeller])
@@ -567,8 +569,9 @@ model TradeCashPayment {
   refundedAt        DateTime?     @map("refunded_at")
   createdAt         DateTime      @default(now()) @map("created_at")
   updatedAt         DateTime      @updatedAt @map("updated_at")
-  trade             Trade         @relation(fields: [tradeId], references: [id], onDelete: Cascade)
+  trade             Trade            @relation(fields: [tradeId], references: [id], onDelete: Cascade)
   payment           Payment?
+  payoutTransfers   PayoutTransfer[] @relation("TradeCashPayoutTransfers")
 
   @@map("trade_cash_payments")
 }
@@ -1011,10 +1014,59 @@ model PaymentHold {
   releasedAt DateTime?         @map("released_at")
   createdAt  DateTime          @default(now()) @map("created_at")
   updatedAt  DateTime          @updatedAt @map("updated_at")
-  payment    Payment           @relation(fields: [paymentId], references: [id])
-  seller     User              @relation(fields: [sellerId], references: [id])
+  payment         Payment           @relation(fields: [paymentId], references: [id])
+  seller          User              @relation(fields: [sellerId], references: [id])
+  payoutTransfer  PayoutTransfer?   @relation("HoldPayoutTransfer")
 
   @@map("payment_holds")
+}
+
+model SellerBankAccount {
+  id            String    @id @default(uuid())
+  userId        String    @unique @map("user_id")
+  accountHolder String    @map("account_holder")
+  iban          String
+  tcKimlikNo    String?   @map("tc_kimlik_no")
+  taxId         String?   @map("tax_id")
+  isVerified    Boolean   @default(false) @map("is_verified")
+  verifiedAt    DateTime? @map("verified_at")
+  createdAt     DateTime  @default(now()) @map("created_at")
+  updatedAt     DateTime  @updatedAt @map("updated_at")
+  user          User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("seller_bank_accounts")
+}
+
+model PayoutTransfer {
+  id                 String            @id @default(uuid())
+  paymentHoldId      String?           @unique @map("payment_hold_id")
+  tradeCashPaymentId String?           @map("trade_cash_payment_id")
+  sellerId           String            @map("seller_id")
+  amount             Decimal           @db.Decimal(10, 2)
+  commission         Decimal           @db.Decimal(10, 2)
+  netAmount          Decimal           @map("net_amount") @db.Decimal(10, 2)
+  currency           String            @default("TRY")
+  merchantOid        String            @map("merchant_oid")
+  transId            String            @unique @map("trans_id")
+  transferIban       String            @map("transfer_iban")
+  transferName       String            @map("transfer_name")
+  status             PayoutStatus      @default(pending)
+  providerResponse   Json?             @map("provider_response")
+  failureReason      String?           @map("failure_reason")
+  retryCount         Int               @default(0) @map("retry_count")
+  maxRetries         Int               @default(3) @map("max_retries")
+  nextRetryAt        DateTime?         @map("next_retry_at")
+  processedAt        DateTime?         @map("processed_at")
+  createdAt          DateTime          @default(now()) @map("created_at")
+  updatedAt          DateTime          @updatedAt @map("updated_at")
+  paymentHold        PaymentHold?      @relation("HoldPayoutTransfer", fields: [paymentHoldId], references: [id])
+  tradeCashPayment   TradeCashPayment? @relation("TradeCashPayoutTransfers", fields: [tradeCashPaymentId], references: [id])
+  seller             User              @relation("SellerPayoutTransfers", fields: [sellerId], references: [id])
+
+  @@index([sellerId])
+  @@index([status])
+  @@index([processedAt])
+  @@map("payout_transfers")
 }
 
 model Invoice {
@@ -1680,6 +1732,15 @@ enum PaymentHoldStatus {
   held
   released
   cancelled
+}
+
+enum PayoutStatus {
+  pending
+  processing
+  completed
+  failed
+  returned
+  retry_pending
 }
 
 enum ShipmentStatus {

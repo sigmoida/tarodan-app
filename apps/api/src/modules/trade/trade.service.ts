@@ -1678,6 +1678,144 @@ export class TradeService {
     return cancelledCount;
   }
 
+  /**
+   * Auto-confirm receipt for trades stuck in shipping_to_recipients
+   * when confirmationDeadline has passed.
+   */
+  async autoConfirmExpiredReceipts(): Promise<number> {
+    const now = new Date();
+
+    const expiredTrades = await this.prisma.trade.findMany({
+      where: {
+        status: TradeStatus.shipping_to_recipients,
+        confirmationDeadline: { lt: now },
+      },
+      include: {
+        shipments: {
+          where: { leg: 'from_warehouse' },
+        },
+      },
+    });
+
+    let confirmedCount = 0;
+
+    for (const trade of expiredTrades) {
+      try {
+        await this.prisma.$transaction(async (tx) => {
+          await tx.$queryRaw`SELECT id FROM trades WHERE id = ${trade.id} FOR UPDATE`;
+
+          const freshTrade = await tx.trade.findUnique({
+            where: { id: trade.id },
+            select: { status: true, version: true },
+          });
+          if (!freshTrade || freshTrade.status !== TradeStatus.shipping_to_recipients) {
+            return;
+          }
+
+          // Auto-confirm all unconfirmed from_warehouse shipments
+          const unconfirmedShipments = await tx.tradeShipment.findMany({
+            where: {
+              tradeId: trade.id,
+              leg: 'from_warehouse',
+              confirmedAt: null,
+            },
+          });
+
+          for (const shipment of unconfirmedShipments) {
+            await tx.tradeShipment.update({
+              where: { id: shipment.id },
+              data: {
+                status: ShipmentStatus.delivered,
+                deliveredAt: now,
+                confirmedAt: now,
+              },
+            });
+          }
+
+          // Complete the trade
+          await tx.trade.update({
+            where: { id: trade.id, version: freshTrade.version },
+            data: {
+              status: TradeStatus.completed,
+              completedAt: now,
+              version: { increment: 1 },
+            },
+          });
+
+          // Decrement product quantities (same as confirmReceipt)
+          const allItems = await tx.tradeItem.findMany({ where: { tradeId: trade.id } });
+          const products = await tx.product.findMany({
+            where: { id: { in: allItems.map((i) => i.productId) } },
+          });
+
+          const qtyByProduct = new Map<string, number>();
+          for (const item of allItems) {
+            qtyByProduct.set(item.productId, (qtyByProduct.get(item.productId) ?? 0) + item.quantity);
+          }
+
+          for (const product of products) {
+            const tradedQty = qtyByProduct.get(product.id) ?? 1;
+            let newQuantity: number | null;
+            if (product.quantity !== null && product.quantity > 0) {
+              newQuantity = Math.max(0, product.quantity - tradedQty);
+            } else if (product.quantity === null) {
+              newQuantity = null;
+            } else {
+              newQuantity = 0;
+            }
+
+            const updateData: any = {
+              status: getProductStatusFromQuantity(newQuantity),
+              reservedQuantity: safeDecrementReserved(product.reservedQuantity, tradedQty),
+            };
+            if (product.quantity !== null && product.quantity > 0) {
+              updateData.quantity = newQuantity;
+            }
+
+            await tx.product.update({
+              where: { id: product.id },
+              data: updateData,
+            });
+          }
+
+          // Set escrow hold for cash payment
+          const cashPayment = await tx.tradeCashPayment.findUnique({
+            where: { tradeId: trade.id },
+          });
+          if (cashPayment && cashPayment.status === PaymentStatus.completed) {
+            const holdDaysSetting = await tx.platformSetting.findUnique({
+              where: { settingKey: 'payment_hold_days' },
+            });
+            const holdDays = parseInt(holdDaysSetting?.settingValue ?? '7');
+            const holdReleaseAt = new Date();
+            holdReleaseAt.setDate(holdReleaseAt.getDate() + holdDays);
+
+            await tx.tradeCashPayment.update({
+              where: { tradeId: trade.id },
+              data: { holdReleaseAt },
+            });
+          }
+        });
+
+        await this.invalidateProductCachesForTrade(trade.id);
+        confirmedCount++;
+
+        this.logger.log(
+          `Auto-confirmed receipt for trade ${trade.id} (confirmationDeadline passed)`,
+        );
+      } catch (error: any) {
+        this.logger.error(
+          `Failed to auto-confirm trade ${trade.id}: ${error.message}`,
+        );
+      }
+    }
+
+    if (confirmedCount > 0) {
+      this.logger.log(`Auto-confirmed ${confirmedCount} expired trade receipt(s)`);
+    }
+    return confirmedCount;
+  }
+
   // ==========================================================================
   // HELPER METHODS
   // ==========================================================================

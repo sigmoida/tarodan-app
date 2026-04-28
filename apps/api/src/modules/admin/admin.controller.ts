@@ -774,6 +774,46 @@ export class AdminController {
     return this.adminService.releasePayout(adminId, orderId);
   }
 
+  @Post('payouts/release-trade/:tradeId')
+  @Roles(AdminRole.super_admin, AdminRole.admin)
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({ summary: 'Release trade cash payment hold (manual)' })
+  @ApiParam({ name: 'tradeId', description: 'Trade ID' })
+  @ApiResponse({ status: HttpStatus.OK, description: 'Trade cash hold released' })
+  async releaseTradePaymentHold(
+    @Param('tradeId') tradeId: string,
+    @CurrentUser('id') adminId: string,
+  ) {
+    return this.adminService.releaseTradePaymentHold(adminId, tradeId);
+  }
+
+  @Post('payouts/:transferId/retry')
+  @Roles(AdminRole.super_admin, AdminRole.admin)
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({ summary: 'Retry a failed payout transfer' })
+  @ApiParam({ name: 'transferId', description: 'PayoutTransfer ID' })
+  @ApiResponse({ status: HttpStatus.OK, description: 'Payout retried' })
+  async retryPayoutTransfer(
+    @Param('transferId') transferId: string,
+    @CurrentUser('id') adminId: string,
+  ) {
+    return this.adminService.retryPayoutTransfer(adminId, transferId);
+  }
+
+  @Get('payouts/failed')
+  @Roles(AdminRole.super_admin, AdminRole.admin)
+  @ApiOperation({ summary: 'Get failed/returned payout transfers' })
+  @ApiResponse({ status: HttpStatus.OK, description: 'Failed payouts list' })
+  async getFailedPayouts(
+    @Query('page') page?: string,
+    @Query('limit') limit?: string,
+  ) {
+    return this.adminService.getFailedPayouts(
+      page ? parseInt(page, 10) : 1,
+      limit ? parseInt(limit, 10) : 20,
+    );
+  }
+
   // ==================== STATIC PAGES ====================
 
   @Get('pages')

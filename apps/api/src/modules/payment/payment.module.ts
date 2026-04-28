@@ -13,6 +13,7 @@ import { RawBodyMiddleware } from './middleware/raw-body.middleware';
 import { InvoiceModule } from '../invoice/invoice.module';
 import { ProductModule } from '../product/product.module';
 import { NotificationModule } from '../notification/notification.module';
+import { PayoutModule } from '../payout/payout.module';
 
 @Module({
   imports: [
@@ -24,6 +25,7 @@ import { NotificationModule } from '../notification/notification.module';
     ScheduleModule.forRoot(),
     InvoiceModule,
     NotificationModule,
+    PayoutModule,
     forwardRef(() => ProductModule),
     JwtModule.registerAsync({
       imports: [ConfigModule],

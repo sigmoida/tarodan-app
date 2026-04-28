@@ -3983,6 +3983,59 @@ export class AdminService {
     return { success: true, orderId, message: 'Ödeme satıcıya serbest bırakıldı' };
   }
 
+  /**
+   * Release trade cash payment hold (admin manual release for trade escrow)
+   */
+  async releaseTradePaymentHold(adminId: string, tradeId: string) {
+    const tcp = await this.prisma.tradeCashPayment.findUnique({ where: { tradeId } });
+    if (!tcp) throw new NotFoundException('Trade cash payment bulunamadı');
+    if (tcp.releasedAt) return { success: true, message: 'Zaten serbest bırakılmış' };
+    if (tcp.refundedAt) throw new BadRequestException('İade edilmiş ödeme serbest bırakılamaz');
+
+    await this.prisma.tradeCashPayment.update({
+      where: { tradeId },
+      data: { releasedAt: new Date() },
+    });
+    await this.createAuditLog(adminId, 'trade_cash_hold_release', 'TradeCashPayment', tcp.id, { action: 'manual_release' }, { releasedAt: new Date() });
+    return { success: true, tradeId, message: 'Takas nakit ödemesi serbest bırakıldı' };
+  }
+
+  /**
+   * Retry a failed payout transfer
+   */
+  async retryPayoutTransfer(adminId: string, transferId: string) {
+    const transfer = await this.prisma.payoutTransfer.findUnique({ where: { id: transferId } });
+    if (!transfer) throw new NotFoundException('Payout transfer bulunamadı');
+    if (!['failed', 'returned'].includes(transfer.status)) {
+      throw new BadRequestException(`Transfer durumu '${transfer.status}' tekrar denenebilir değil`);
+    }
+
+    await this.prisma.payoutTransfer.update({
+      where: { id: transferId },
+      data: { status: 'pending', failureReason: null, retryCount: 0, nextRetryAt: null },
+    });
+    await this.createAuditLog(adminId, 'payout_retry', 'PayoutTransfer', transferId, { action: 'admin_retry' }, { status: 'pending' });
+    return { success: true, transferId, message: 'Transfer tekrar denenmek üzere sıraya alındı' };
+  }
+
+  /**
+   * Get failed/returned payout transfers
+   */
+  async getFailedPayouts(page = 1, limit = 20) {
+    const where = { status: { in: ['failed' as const, 'returned' as const] } };
+    const [items, total] = await Promise.all([
+      this.prisma.payoutTransfer.findMany({
+        where,
+        include: { seller: { select: { id: true, displayName: true, email: true } } },
+        orderBy: { createdAt: 'desc' },
+        skip: (page - 1) * limit,
+        take: limit,
+      }),
+      this.prisma.payoutTransfer.count({ where }),
+    ]);
+    return { items, total, page, limit, totalPages: Math.ceil(total / limit) };
+  }
+
   // ==================== TRADE MANAGEMENT ====================
 
   /**

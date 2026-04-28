@@ -1571,14 +1571,22 @@ export class PaymentService {
           },
         });
 
-        // Cancel payment hold
-        await tx.paymentHold.updateMany({
-          where: {
-            orderId,
-            status: PaymentHoldStatus.held,
-          },
-          data: { status: PaymentHoldStatus.cancelled },
+        // Cancel payment hold (only if not already released with a payout)
+        const activeHold = await tx.paymentHold.findFirst({
+          where: { orderId, status: PaymentHoldStatus.held },
         });
+        if (activeHold) {
+          const activePayout = await tx.payoutTransfer.findFirst({
+            where: { paymentHoldId: activeHold.id, status: { in: ['completed', 'processing'] } },
+          });
+          if (activePayout) {
+            throw new BadRequestException('Transfer zaten başlatılmış, iade yapılamaz');
+          }
+          await tx.paymentHold.update({
+            where: { id: activeHold.id },
+            data: { status: PaymentHoldStatus.cancelled },
+          });
+        }
 
         // Update order status if full refund
         if (amountToRefund >= Number(payment.amount)) {
@@ -1679,6 +1687,20 @@ export class PaymentService {
       };
     }
 
+    // Race condition guard: eğer zaten PayoutTransfer oluşturulmuş ve processing/completed ise iade yapma
+    const existingPayout = await this.prisma.payoutTransfer.findFirst({
+      where: {
+        tradeCashPaymentId: payment.tradeCashPaymentId,
+        status: { in: ['completed', 'processing'] },
+      },
+    });
+    if (existingPayout) {
+      return {
+        refunded: false,
+        skippedReason: 'payout_already_in_progress',
+      };
+    }
+
     const oid =
       payment.providerConversationId?.trim() ||
       tradeId.replace(/-/g, '');
@@ -1763,19 +1785,24 @@ export class PaymentService {
   async releaseHoldsDue(): Promise<{ count: number; tradeCashReleased: number }> {
     const now = new Date();
 
-    // 1) Sipariş ödeme bekletmeleri (PaymentHold)
-    const result = await this.prisma.paymentHold.updateMany({
+    // 1) Sipariş ödeme bekletmeleri (PaymentHold) — atomik: sadece held olanları release et
+    const dueHolds = await this.prisma.paymentHold.findMany({
       where: {
         status: PaymentHoldStatus.held,
         releaseAt: { lte: now },
       },
-      data: {
-        status: PaymentHoldStatus.released,
-        releasedAt: now,
-      },
     });
-    if (result.count > 0) {
-      this.logger.log(`Released ${result.count} payment hold(s) (releaseAt <= ${now.toISOString()})`);
+
+    let holdCount = 0;
+    for (const hold of dueHolds) {
+      const updated = await this.prisma.paymentHold.updateMany({
+        where: { id: hold.id, status: PaymentHoldStatus.held },
+        data: { status: PaymentHoldStatus.released, releasedAt: now },
+      });
+      if (updated.count > 0) holdCount++;
+    }
+    if (holdCount > 0) {
+      this.logger.log(`Released ${holdCount} payment hold(s) (releaseAt <= ${now.toISOString()})`);
     }
 
     // 2) Safe-trade nakit ödemeleri: holdReleaseAt süresi geçmiş olanları bırak
@@ -1785,15 +1812,17 @@ export class PaymentService {
         status: PaymentStatus.completed,
         holdReleaseAt: { lte: now },
         releasedAt: null,
+        refundedAt: null,
       },
     });
 
     for (const tcp of dueTradeCash) {
-      await this.prisma.tradeCashPayment.update({
-        where: { id: tcp.id },
+      // Atomik guard: sadece hâlâ released/refunded olmamış olanları güncelle
+      const updated = await this.prisma.tradeCashPayment.updateMany({
+        where: { id: tcp.id, releasedAt: null, refundedAt: null },
         data: { releasedAt: now },
       });
-      tradeCashReleased++;
+      if (updated.count > 0) tradeCashReleased++;
     }
 
     if (tradeCashReleased > 0) {
@@ -1802,7 +1831,7 @@ export class PaymentService {
       );
     }
 
-    return { count: result.count, tradeCashReleased };
+    return { count: holdCount, tradeCashReleased };
   }
 
   /**

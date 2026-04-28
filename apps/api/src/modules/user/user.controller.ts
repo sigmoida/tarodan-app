@@ -19,7 +19,7 @@ import {
 } from '@nestjs/swagger';
 import { UserService } from './user.service';
 import { JwtAuthGuard, CurrentUser, Public } from '../auth';
-import { UpdateProfileDto, CreateAddressDto, UpdateAddressDto } from './dto';
+import { UpdateProfileDto, CreateAddressDto, UpdateAddressDto, UpsertBankAccountDto } from './dto';
 
 @ApiTags('users')
 @Controller('users')
@@ -503,5 +503,37 @@ export class UserController {
   @ApiResponse({ status: 200, description: 'En iyi satıcılar listesi' })
   async getTopSellers(@Query('limit') limit?: string) {
     return this.userService.getTopSellers(limit ? parseInt(limit, 10) : 5);
+  }
+
+  // -------- Seller Bank Account --------
+
+  @Get('me/bank-account')
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth()
+  @ApiOperation({ summary: 'Banka hesap bilgilerini getir' })
+  @ApiResponse({ status: 200, description: 'Banka hesabı bilgileri' })
+  async getBankAccount(@CurrentUser('id') userId: string) {
+    return this.userService.getBankAccount(userId);
+  }
+
+  @Patch('me/bank-account')
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth()
+  @ApiOperation({ summary: 'Banka hesap bilgilerini ekle/güncelle' })
+  @ApiResponse({ status: 200, description: 'Banka hesabı güncellendi' })
+  async upsertBankAccount(
+    @CurrentUser('id') userId: string,
+    @Body() dto: UpsertBankAccountDto,
+  ) {
+    return this.userService.upsertBankAccount(userId, dto);
+  }
+
+  @Delete('me/bank-account')
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth()
+  @ApiOperation({ summary: 'Banka hesap bilgilerini sil' })
+  @ApiResponse({ status: 200, description: 'Banka hesabı silindi' })
+  async deleteBankAccount(@CurrentUser('id') userId: string) {
+    return this.userService.deleteBankAccount(userId);
   }
 }

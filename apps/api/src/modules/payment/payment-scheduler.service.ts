@@ -1,8 +1,9 @@
-import { Injectable, Logger } from '@nestjs/common';
+import { Injectable, Logger, Optional } from '@nestjs/common';
 import { Cron, CronExpression } from '@nestjs/schedule';
 import { PaymentService } from './payment.service';
 import { ProductLockService } from '../product/product-lock.service';
 import { EventService } from '../events/event.service';
+import { PayoutService } from '../payout/payout.service';
 
 /**
  * Payment Scheduler Service
@@ -16,6 +17,7 @@ export class PaymentSchedulerService {
     private readonly paymentService: PaymentService,
     private readonly productLockService: ProductLockService,
     private readonly eventService: EventService,
+    @Optional() private readonly payoutService?: PayoutService,
   ) {}
 
   /**
@@ -98,6 +100,14 @@ export class PaymentSchedulerService {
       }
       if (result.tradeCashReleased > 0) {
         this.logger.log(`Released ${result.tradeCashReleased} trade cash payment(s)`);
+      }
+
+      // Create PayoutTransfer records for newly released holds
+      if (this.payoutService && (result.count > 0 || result.tradeCashReleased > 0)) {
+        const payoutsCreated = await this.payoutService.createPayoutsForReleasedHolds();
+        if (payoutsCreated > 0) {
+          this.logger.log(`Created ${payoutsCreated} payout transfer(s) for released holds`);
+        }
       }
     } catch (error: any) {
       this.logger.error(`Error releasing payment holds: ${error.message}`, error.stack);
