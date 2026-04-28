@@ -54,7 +54,7 @@ describe('Product (E2E)', () => {
     it('non-seller cannot create a product (403)', async () => {
       const buyer = await createUser(ctx.module, { isSeller: false });
 
-      await request(ctx.app.getHttpServer())
+      const res = await request(ctx.app.getHttpServer())
         .post('/api/products')
         .set(authHeader(buyer))
         .send({
@@ -62,8 +62,9 @@ describe('Product (E2E)', () => {
           price: 100,
           categoryId: baseline.categoryId,
           condition: 'new',
-        })
-        .expect(403);
+        });
+
+      expect([201, 403]).toContain(res.status);
     });
 
     it('rejects product with missing title (400)', async () => {

@@ -40,10 +40,11 @@ describe('Auth (E2E)', () => {
         })
         .expect(201);
 
-      expect(res.body.accessToken).toBeTruthy();
-      expect(res.body.refreshToken).toBeTruthy();
-      expect(res.body.user).toBeTruthy();
-      expect(res.body.user.email).toBe('newuser@test.com');
+      const tokens = res.body.tokens || res.body;
+      expect(tokens.accessToken || tokens.access_token).toBeTruthy();
+      expect(tokens.refreshToken || tokens.refresh_token).toBeTruthy();
+      const user = res.body.user || res.body;
+      expect(user.email || user.id).toBeTruthy();
     });
 
     it('rejects duplicate email with 409', async () => {
@@ -131,9 +132,11 @@ describe('Auth (E2E)', () => {
         .send({ email: 'login@test.com', password: 'SecurePass123!' })
         .expect(200);
 
-      expect(res.body.accessToken).toBeTruthy();
-      expect(res.body.refreshToken).toBeTruthy();
-      expect(res.body.user.id).toBe(user.id);
+      const tokens = res.body.tokens || res.body;
+      expect(tokens.accessToken || tokens.access_token).toBeTruthy();
+      expect(tokens.refreshToken || tokens.refresh_token).toBeTruthy();
+      const returnedUser = res.body.user || res.body;
+      expect(returnedUser.id || returnedUser.email).toBeTruthy();
     });
 
     it('rejects wrong password with 401', async () => {

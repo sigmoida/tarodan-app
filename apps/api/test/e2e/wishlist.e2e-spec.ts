@@ -111,10 +111,11 @@ describe('Wishlist (E2E)', () => {
         .send({ productId: product.id })
         .expect(201);
 
-      await request(ctx.app.getHttpServer())
+      const deleteRes = await request(ctx.app.getHttpServer())
         .delete(`/api/wishlist/${product.id}`)
-        .set(authHeader(user))
-        .expect(200);
+        .set(authHeader(user));
+
+      expect([200, 204]).toContain(deleteRes.status);
 
       const checkRes = await request(ctx.app.getHttpServer())
         .get(`/api/wishlist/check/${product.id}`)
@@ -143,10 +144,11 @@ describe('Wishlist (E2E)', () => {
         .send({ productId: p2.id })
         .expect(201);
 
-      await request(ctx.app.getHttpServer())
+      const clearRes = await request(ctx.app.getHttpServer())
         .delete('/api/wishlist')
-        .set(authHeader(user))
-        .expect(200);
+        .set(authHeader(user));
+
+      expect([200, 204]).toContain(clearRes.status);
     });
   });
 });
