@@ -33,7 +33,7 @@ interface GuestOrderDetail {
   shippingAddress?: Record<string, string>;
   shipment?: {
     provider: string;
-    trackingNumber: string;
+    trackingNumber: string | null;
     trackingUrl: string | null;
     status: string;
     estimatedDelivery?: string | null;
@@ -340,24 +340,40 @@ export default function TrackOrderPage() {
                     </span>{" "}
                     {order.shipment.provider}
                   </p>
-                  <p>
-                    <span className="text-muted">
-                      {locale === "en" ? "Tracking number:" : "Takip no:"}
-                    </span>{" "}
-                    <span className="font-mono bg-surface-alt px-2 py-1 rounded">
-                      {order.shipment.trackingNumber}
-                    </span>
-                  </p>
-                  {order.shipment.trackingUrl && (
-                    <a
-                      href={order.shipment.trackingUrl}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="text-primary-500 hover:underline"
-                    >
-                      {locale === "en" ? "Track shipment" : "Kargoyu takip et"}{" "}
-                      →
-                    </a>
+                  {order.shipment.trackingNumber ? (
+                    <>
+                      <p>
+                        <span className="text-muted">
+                          {locale === "en" ? "Tracking number:" : "Takip no:"}
+                        </span>{" "}
+                        <span className="font-mono bg-surface-alt px-2 py-1 rounded">
+                          {order.shipment.trackingNumber}
+                        </span>
+                      </p>
+                      {(order.shipment.trackingUrl ||
+                        order.shipment.provider === "surat") && (
+                        <a
+                          href={
+                            order.shipment.trackingUrl ||
+                            `https://www.suratkargo.com.tr/KargoTakip/?kargotakipno=${encodeURIComponent(order.shipment.trackingNumber)}`
+                          }
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="text-primary-500 hover:underline"
+                        >
+                          {locale === "en"
+                            ? "Track shipment"
+                            : "Kargoyu takip et"}{" "}
+                          →
+                        </a>
+                      )}
+                    </>
+                  ) : (
+                    <p className="text-sm text-muted bg-info-50 border border-info-200 rounded p-2">
+                      {locale === "en"
+                        ? "Tracking number will appear once the seller delivers the package to the cargo branch."
+                        : "Takip numarası, satıcı paketi kargo şubesine teslim ettiğinde görünecektir."}
+                    </p>
                   )}
                 </div>
               </div>
