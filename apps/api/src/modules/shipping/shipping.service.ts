@@ -47,64 +47,6 @@ export class ShippingService {
     return {
       carriers: [
         {
-          id: ShippingProvider.aras,
-          name: 'Aras Kargo',
-          code: 'aras',
-          logo: 'https://www.araskargo.com.tr/images/logo.png',
-          trackingUrl: this.trackingUrls[ShippingProvider.aras],
-          features: [
-            'Standart Teslimat',
-            'Hızlı Teslimat',
-            'Kapıda Ödeme',
-            'Sigortalı Gönderi',
-          ],
-          estimatedDelivery: {
-            sameCity: '1-2 iş günü',
-            interCity: '2-4 iş günü',
-          },
-          isActive: true,
-          supportedRegions: ['Türkiye'],
-        },
-        {
-          id: ShippingProvider.yurtici,
-          name: 'Yurtiçi Kargo',
-          code: 'yurtici',
-          logo: 'https://www.yurticikargo.com/images/logo.png',
-          trackingUrl: this.trackingUrls[ShippingProvider.yurtici],
-          features: [
-            'Standart Teslimat',
-            'Express Teslimat',
-            'Ekonomik Teslimat',
-            'Kapıda Ödeme',
-            'Sigortalı Gönderi',
-            'İade Kargo',
-          ],
-          estimatedDelivery: {
-            sameCity: '1 iş günü',
-            interCity: '2-3 iş günü',
-          },
-          isActive: true,
-          supportedRegions: ['Türkiye'],
-        },
-        {
-          id: ShippingProvider.mng,
-          name: 'MNG Kargo',
-          code: 'mng',
-          logo: 'https://www.mngkargo.com.tr/images/logo.png',
-          trackingUrl: this.trackingUrls[ShippingProvider.mng],
-          features: [
-            'Standart Teslimat',
-            'Hızlı Teslimat',
-            'Kapıda Ödeme',
-          ],
-          estimatedDelivery: {
-            sameCity: '1-2 iş günü',
-            interCity: '2-4 iş günü',
-          },
-          isActive: false, // Not yet implemented
-          supportedRegions: ['Türkiye'],
-        },
-        {
           id: ShippingProvider.surat,
           name: 'Sürat Kargo',
           code: 'surat',
@@ -125,7 +67,7 @@ export class ShippingService {
         },
       ],
       defaultCarrier: ShippingProvider.surat,
-      totalActive: 3,
+      totalActive: 1,
     };
   }
 
@@ -190,12 +132,17 @@ export class ShippingService {
     toCity: string,
     weight: number,
   ) {
-    // Base rates (mock data — will be replaced with contract rates)
+    // Base rate from PlatformSetting or default
+    const baseSetting = await this.prisma.platformSetting.findUnique({
+      where: { settingKey: 'shipping_base_cost' },
+    });
+    const baseRate = baseSetting ? parseFloat(baseSetting.settingValue) : 29.99;
+
     const baseRates: Record<ShippingProvider, number> = {
-      [ShippingProvider.aras]: 29.90,
-      [ShippingProvider.yurtici]: 32.50,
-      [ShippingProvider.mng]: 27.90,
-      [ShippingProvider.surat]: 29.99,
+      [ShippingProvider.aras]: baseRate,
+      [ShippingProvider.yurtici]: baseRate,
+      [ShippingProvider.mng]: baseRate,
+      [ShippingProvider.surat]: baseRate,
     };
 
     // Same city discount

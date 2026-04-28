@@ -9,7 +9,10 @@ import {
   UseGuards,
   HttpCode,
   HttpStatus,
+  Headers,
+  UnauthorizedException,
 } from '@nestjs/common';
+import { ConfigService } from '@nestjs/config';
 import {
   ApiTags,
   ApiOperation,
@@ -32,7 +35,10 @@ import {
 @ApiTags('shipping')
 @Controller('shipping')
 export class ShippingController {
-  constructor(private readonly shippingService: ShippingService) {}
+  constructor(
+    private readonly shippingService: ShippingService,
+    private readonly configService: ConfigService,
+  ) {}
 
   /**
    * GET /shipping/carriers - List available shipping carriers
@@ -134,12 +140,25 @@ export class ShippingController {
   @Post('webhook/:provider')
   @Public()
   @HttpCode(HttpStatus.OK)
-  @ApiOperation({ summary: 'Webhook for cargo provider status updates' })
-  @ApiParam({ name: 'provider', description: 'Provider name (aras, yurtici, mng)' })
+  @ApiOperation({ summary: 'Webhook for cargo provider status updates (requires X-Webhook-Secret header)' })
+  @ApiParam({ name: 'provider', description: 'Provider name (surat)' })
   async providerWebhook(
     @Param('provider') provider: string,
+    @Headers('x-webhook-secret') secretHeader: string | undefined,
     @Body() payload: any,
   ) {
+    // Webhook secret validation (per-provider)
+    const expectedSecret = this.configService.get<string>(
+      `${provider.toUpperCase()}_WEBHOOK_SECRET`,
+    );
+    if (!expectedSecret) {
+      throw new UnauthorizedException(
+        `${provider} webhook secret not configured on server`,
+      );
+    }
+    if (!secretHeader || secretHeader !== expectedSecret) {
+      throw new UnauthorizedException('Invalid or missing webhook secret');
+    }
     return this.shippingService.handleProviderWebhook(provider, payload);
   }
 

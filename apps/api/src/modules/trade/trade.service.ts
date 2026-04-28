@@ -27,6 +27,7 @@ import { getAvailableQuantity, safeDecrementReserved } from '../product/helpers/
 import { getProductStatusFromQuantity } from '../product/helpers/product-status.helper';
 import { PaymentService } from '../payment/payment.service';
 import { ProductLockService } from '../product/product-lock.service';
+import { SuratCargoService } from '../surat-cargo/surat-cargo.service';
 import {
   CreateTradeDto,
   TradeQueryDto,
@@ -58,7 +59,47 @@ export class TradeService {
     private readonly storageService: StorageService,
     @Optional()
     private readonly eventService: EventService,
+    @Optional()
+    private readonly suratCargoService?: SuratCargoService,
   ) {}
+
+  /**
+   * Cancel any Sürat shipments associated with a trade (best-effort).
+   * Used when a trade is cancelled after admin warehouse approval (i.e. there
+   * are from_warehouse shipments already submitted to Sürat).
+   */
+  private async cancelSuratShipmentsForTrade(tradeId: string): Promise<void> {
+    if (!this.suratCargoService || !this.suratCargoService.isIntegrationEnabled()) {
+      return;
+    }
+    try {
+      const shipments = await this.prisma.tradeShipment.findMany({
+        where: {
+          tradeId,
+          carrier: 'surat',
+          status: { notIn: ['delivered', 'returned', 'cancelled', 'failed'] as any },
+          trackingNumber: { not: null },
+        },
+      });
+      for (const shipment of shipments) {
+        if (!shipment.trackingNumber) continue;
+        try {
+          await this.suratCargoService.cancelShipmentByOrderNumber(shipment.trackingNumber);
+          await this.prisma.tradeShipment.update({
+            where: { id: shipment.id },
+            data: { status: 'cancelled' as any },
+          });
+          this.logger.log(`Surat trade shipment cancelled: ${shipment.trackingNumber}`);
+        } catch (err: any) {
+          this.logger.error(
+            `Failed to cancel Surat trade shipment ${shipment.trackingNumber}: ${err.message}`,
+          );
+        }
+      }
+    } catch (error: any) {
+      this.logger.error(`cancelSuratShipmentsForTrade failed for ${tradeId}: ${error.message}`);
+    }
+  }
 
   // ==========================================================================
   // TRADE STATE MACHINE
@@ -1003,6 +1044,9 @@ export class TradeService {
 
     await this.paymentService.refundTradeCashPaymentIfCompleted(tradeId);
 
+    // Cancel Sürat shipments if any (e.g. trades cancelled after admin approval)
+    await this.cancelSuratShipmentsForTrade(tradeId);
+
     await this.invalidateProductCachesForTrade(tradeId);
 
     return this.getTradeById(tradeId, userId);
@@ -1439,6 +1483,8 @@ export class TradeService {
 
     if (newStatus === TradeStatus.cancelled) {
       await this.paymentService.refundTradeCashPaymentIfCompleted(tradeId);
+      // Cancel any active Sürat shipments (from_warehouse legs after admin approval)
+      await this.cancelSuratShipmentsForTrade(tradeId);
     }
 
     await this.prisma.$transaction(async (tx) => {
@@ -1655,6 +1701,10 @@ export class TradeService {
           });
         });
         await this.invalidateProductCachesForTrade(trade.id);
+
+        // Cancel Sürat shipments if any (best-effort)
+        await this.cancelSuratShipmentsForTrade(trade.id);
+
         cancelledCount++;
 
         // Transaction commit sonrası: iptal edilen takas katılımcılarına bildirim

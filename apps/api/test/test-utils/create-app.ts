@@ -6,6 +6,8 @@ import { AppModule } from '../../src/app.module';
 import { PayTRService } from '../../src/modules/payment-providers/paytr.service';
 import { StorageService } from '../../src/modules/storage/storage.service';
 import { MockPayTRService } from '../mocks/paytr.mock';
+import { SURAT_SOAP_CLIENT } from '../../src/modules/surat-cargo/surat-cargo.service';
+import { StubSuratSoapClient } from '../../src/modules/surat-cargo/surat-soap.client';
 
 /**
  * Bootstrap a real NestJS app for E2E tests.
@@ -28,6 +30,7 @@ export interface E2ETestApp {
   app: NestExpressApplication;
   module: TestingModule;
   paytr: MockPayTRService;
+  surat: StubSuratSoapClient;
   close: () => Promise<void>;
 }
 
@@ -68,10 +71,15 @@ export async function createE2ETestApp(): Promise<E2ETestApp> {
 
   await app.init();
 
+  // Sürat SOAP stub is auto-instantiated by SuratCargoModule when SURAT_SOAP_MODE!=live.
+  // We resolve it from the DI container so tests can inspect/clear call history.
+  const surat = module.get<StubSuratSoapClient>(SURAT_SOAP_CLIENT);
+
   return {
     app,
     module,
     paytr,
+    surat,
     close: async () => {
       await app.close();
     },

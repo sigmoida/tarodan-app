@@ -158,4 +158,51 @@ export class SuratCargoService {
       idempotencyKey,
     };
   }
+
+  /**
+   * Cancel a shipment in Sürat by OzelKargoTakipNo (typically order number).
+   * Idempotent: "Pasif Edilecek Gonderi Bulunamadi!" is treated as success
+   * (already cancelled or never existed).
+   *
+   * Returns { ok: true } if Sürat confirms cancellation or shipment doesn't exist.
+   * Returns { ok: false, suratMessage } if Sürat rejects the call for other reasons.
+   * Throws on technical failures (timeout, network).
+   */
+  async cancelShipmentByOrderNumber(
+    ozelKargoTakipNo: string,
+  ): Promise<{ ok: boolean; suratMessage?: string }> {
+    if (!this.isIntegrationEnabled()) {
+      return { ok: true, suratMessage: 'integration_disabled' };
+    }
+
+    const timeoutMs = Number(this.configService.get('SURAT_SOAP_TIMEOUT_MS', '15000')) || 15000;
+
+    try {
+      const raw = await this.soapClient.callGonderiSil(ozelKargoTakipNo, { timeoutMs });
+      const normalized = (raw || '').trim();
+
+      // "Tamam" = cancelled, "Pasif Edilecek Gonderi Bulunamadi!" = already gone (idempotent OK)
+      if (
+        normalized === 'Tamam' ||
+        /pasif edilecek gonderi bulunamadi/i.test(normalized) ||
+        /bulunamadi/i.test(normalized)
+      ) {
+        // Invalidate idempotency cache so a future re-submit goes back to API
+        try {
+          // Cache key uses idempotencyKey (sha256 hash) — we don't have it here.
+          // Best effort: nothing to invalidate. The order number alone won't match.
+        } catch {
+          /* ignore */
+        }
+        this.logger.log(`Surat shipment cancelled (or absent) ref=${ozelKargoTakipNo} result="${normalized}"`);
+        return { ok: true, suratMessage: normalized };
+      }
+
+      this.logger.warn(`Surat cancel failed ref=${ozelKargoTakipNo} result="${normalized}"`);
+      return { ok: false, suratMessage: normalized };
+    } catch (error: any) {
+      this.logger.error(`Surat cancel threw ref=${ozelKargoTakipNo}: ${error.message}`);
+      throw error;
+    }
+  }
 }

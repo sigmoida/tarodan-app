@@ -11,9 +11,10 @@ import { StorageModule } from '../storage/storage.module';
 import { PaymentModule } from '../payment/payment.module';
 import { ProductModule } from '../product/product.module';
 import { EventModule } from '../events';
+import { SuratCargoModule } from '../surat-cargo/surat-cargo.module';
 
 @Module({
-  imports: [ScheduleModule.forRoot(), PrismaModule, CacheModule, MembershipModule, forwardRef(() => NotificationModule), StorageModule, PaymentModule, ProductModule, EventModule],
+  imports: [ScheduleModule.forRoot(), PrismaModule, CacheModule, MembershipModule, forwardRef(() => NotificationModule), StorageModule, PaymentModule, ProductModule, EventModule, SuratCargoModule],
   controllers: [TradeController],
   providers: [TradeService, TradeSchedulerService],
   exports: [TradeService],

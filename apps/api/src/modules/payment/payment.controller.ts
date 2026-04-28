@@ -378,6 +378,22 @@ export class PaymentController {
   }
 
   /**
+   * POST /payments/:id/verify - Success sayfasından çağrılır; PayTR durum-sorgu ile
+   * ödemeyi anında tamamlar (callback gecikmesini bekletmeden). Public, idempotent.
+   */
+  @Post(':id/verify')
+  @Throttle({ default: { limit: 10, ttl: 60000 } })
+  @Public()
+  @ApiOperation({ summary: 'Verify payment from success page (immediate status check)' })
+  @ApiParam({ name: 'id', description: 'Payment ID' })
+  @ApiResponse({ status: HttpStatus.OK, description: 'Verification result' })
+  async verifyPayment(
+    @Param('id') paymentId: string,
+  ): Promise<{ completed: boolean; status: string }> {
+    return this.paymentService.verifyPaymentFromClient(paymentId);
+  }
+
+  /**
    * POST /payments/:id/bypass-complete - Dev/test only: complete payment without PayTR
    */
   @Post(':id/bypass-complete')

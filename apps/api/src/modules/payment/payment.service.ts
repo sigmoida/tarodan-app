@@ -18,6 +18,7 @@ import { InvoiceService } from '../invoice/invoice.service';
 import { ProductLockService } from '../product/product-lock.service';
 import { NotificationService } from '../notification/notification.service';
 import { NotificationType } from '../notification/dto/notification.dto';
+import { SuratCargoService } from '../surat-cargo/surat-cargo.service';
 import { Request } from 'express';
 
 @Injectable()
@@ -34,8 +35,48 @@ export class PaymentService {
     private readonly invoiceService: InvoiceService,
     private readonly productLockService: ProductLockService,
     private readonly notificationService: NotificationService,
+    private readonly suratCargoService: SuratCargoService,
   ) {
     this.holdDays = parseInt(this.configService.get('PAYMENT_HOLD_DAYS') || '7', 10);
+  }
+
+  /**
+   * Cancel any active Surat shipment for an order. Best-effort: errors are logged
+   * but don't block the calling flow. Used when an order is cancelled or refunded.
+   */
+  private async cancelSuratShipmentIfExists(orderId: string, orderNumber: string): Promise<void> {
+    try {
+      const shipment = await this.prisma.shipment.findFirst({
+        where: { orderId, provider: 'surat' },
+      });
+      if (!shipment) return;
+
+      // Skip if shipment is already in a terminal state
+      const terminalStatuses = ['delivered', 'returned', 'cancelled', 'failed'];
+      if (terminalStatuses.includes(shipment.status)) {
+        this.logger.log(
+          `Skip Surat cancel: shipment ${shipment.id} already ${shipment.status}`,
+        );
+        return;
+      }
+
+      const result = await this.suratCargoService.cancelShipmentByOrderNumber(orderNumber);
+      if (result.ok) {
+        await this.prisma.shipment.update({
+          where: { id: shipment.id },
+          data: { status: 'cancelled' as any },
+        });
+        this.logger.log(`Surat shipment cancelled for order ${orderNumber}`);
+      } else {
+        this.logger.warn(
+          `Surat cancel returned non-OK for order ${orderNumber}: ${result.suratMessage}`,
+        );
+      }
+    } catch (error: any) {
+      this.logger.error(
+        `Surat cancel failed for order ${orderNumber}: ${error.message}. Continuing anyway.`,
+      );
+    }
   }
 
   /**
@@ -432,7 +473,9 @@ export class PaymentService {
     this.logger.log(`Initializing PayTR payment for order ${order.id}`);
 
     // PayTR merchant_oid sadece harf ve rakam kabul ediyor (tire vb. kabul etmiyor)
-    const merchantOid = String(order.orderNumber || order.id).replace(/-/g, '');
+    // Test merchant ortamında geçmiş kullanımdan çakışmamak için 6 haneli timestamp suffix
+    const baseOid = String(order.orderNumber || order.id).replace(/-/g, '');
+    const merchantOid = `${baseOid}T${Date.now().toString().slice(-6)}`;
 
     try {
       // Get shipping address from order
@@ -1077,6 +1120,32 @@ export class PaymentService {
       }
     }
 
+    // Auto-create Shipment record (Sürat Kargo gönderi kaydı oluşturuldu at order creation)
+    if (!isMembershipOrder) {
+      try {
+        const existingShipment = await this.prisma.shipment.findFirst({
+          where: { orderId: resultOrder.id },
+        });
+        if (!existingShipment) {
+          const estimatedDelivery = new Date();
+          estimatedDelivery.setDate(estimatedDelivery.getDate() + 3);
+
+          await this.prisma.shipment.create({
+            data: {
+              orderId: resultOrder.id,
+              provider: 'surat',
+              status: 'pending',
+              cost: Number(resultOrder.shippingCost),
+              estimatedDelivery,
+            },
+          });
+          this.logger.log(`Auto-created shipment for order ${resultOrder.orderNumber}`);
+        }
+      } catch (error) {
+        this.logger.error(`Failed to auto-create shipment for order ${resultOrder.orderNumber}: ${error}`);
+      }
+    }
+
     return true;
   }
 
@@ -1158,6 +1227,15 @@ export class PaymentService {
     // Siparişi iptal et ve ürünü tekrar satışa aç (ilanlar listesinde görünsün)
     if (payment.orderId) {
       await this.releaseProductForFailedPayment(payment.orderId);
+
+      // Cancel any auto-created Surat shipment for this failed order
+      const order = await this.prisma.order.findUnique({
+        where: { id: payment.orderId },
+        select: { orderNumber: true },
+      });
+      if (order) {
+        await this.cancelSuratShipmentIfExists(payment.orderId, order.orderNumber);
+      }
     }
 
     // Log payment failure
@@ -1506,6 +1584,74 @@ export class PaymentService {
   }
 
   /**
+   * Success sayfasından çağrılır: PayTR durum-sorgu API'sini hemen çalıştırır,
+   * ödeme tamamsa siparişi anında tamamlar (callback gelmesini beklemeden).
+   * Public, idempotent: payment zaten completed ise { completed: true } döner.
+   */
+  async verifyPaymentFromClient(
+    paymentId: string,
+  ): Promise<{ completed: boolean; status: string }> {
+    const payment = await this.prisma.payment.findUnique({
+      where: { id: paymentId },
+      include: {
+        order: { include: { buyer: true, seller: true, product: true } },
+        tradeCashPayment: true,
+      },
+    });
+
+    if (!payment) {
+      return { completed: false, status: 'not_found' };
+    }
+
+    if (payment.status === PaymentStatus.completed) {
+      return { completed: true, status: 'already_completed' };
+    }
+
+    if (payment.status !== PaymentStatus.pending) {
+      return { completed: false, status: payment.status };
+    }
+
+    if (payment.provider !== 'paytr') {
+      return { completed: false, status: 'unsupported_provider' };
+    }
+
+    const oid = (payment.providerConversationId || '').trim();
+    if (!oid) {
+      return { completed: false, status: 'no_provider_oid' };
+    }
+
+    let inquiry = await this.paytrService.queryPaymentStatus(oid);
+    if (!inquiry.ok && oid.includes('-')) {
+      inquiry = await this.paytrService.queryPaymentStatus(oid.replace(/-/g, ''));
+    }
+
+    if (!inquiry.ok) {
+      return { completed: false, status: 'paytr_not_found' };
+    }
+
+    const tolerance = 0.01;
+    const ourAmount = Number(payment.amount);
+    if (Math.abs(inquiry.paymentTotalTl - ourAmount) > tolerance) {
+      this.logger.warn(
+        `verifyPaymentFromClient amount mismatch payment=${payment.id} oid=${oid} paytr=${inquiry.paymentTotalTl} ours=${ourAmount}`,
+      );
+      return { completed: false, status: 'amount_mismatch' };
+    }
+
+    const txnRef =
+      inquiry.paymentDate != null && inquiry.paymentDate !== ''
+        ? `paytr:${oid}:${inquiry.paymentDate}`
+        : `paytr:${oid}`;
+
+    const did = await this.processSuccessfulPayment(payment, txnRef);
+    if (did) {
+      this.logger.log(`verifyPaymentFromClient completed payment=${payment.id} oid=${oid}`);
+      return { completed: true, status: 'completed_now' };
+    }
+    return { completed: false, status: 'process_skipped' };
+  }
+
+  /**
    * Process refund
    * Requirement: Refund handling (project.md)
    */
@@ -1525,6 +1671,9 @@ export class PaymentService {
     }
 
     const amountToRefund = refundAmount || Number(payment.amount);
+
+    // Cancel any active Surat shipment before processing the refund (best-effort)
+    await this.cancelSuratShipmentIfExists(orderId, payment.order.orderNumber);
 
     // Race condition guard: if a payout transfer is already completed/processing, block refund
     const existingPayout = await this.prisma.payoutTransfer.findFirst({
@@ -2555,6 +2704,9 @@ export class PaymentService {
 
         // Siparişi iptal et ve ürünü tekrar satışa aç
         await this.releaseProductForFailedPayment(payment.orderId);
+
+        // Cancel any auto-created Surat shipment for this expired order
+        await this.cancelSuratShipmentIfExists(payment.orderId, payment.order.orderNumber);
 
         // Emit payment.failed event
         try {

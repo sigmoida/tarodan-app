@@ -73,36 +73,60 @@ export class OrderService {
     private readonly storageService: StorageService,
   ) {}
 
-  // Shipping cost settings
-  private readonly BASE_SHIPPING_COST = 29.99; // Base shipping cost in TL
-  private readonly FREE_SHIPPING_THRESHOLD = 500; // Free shipping threshold in TL
+  // Shipping cost defaults (overridden by PlatformSetting)
+  private readonly DEFAULT_SHIPPING_COST = 29.99;
+  private readonly DEFAULT_FREE_THRESHOLD = 500;
+  private shippingSettingsCache: { baseCost: number; freeThreshold: number; cachedAt: number } | null = null;
 
   /**
-   * Calculate shipping cost based on order amount
-   * Free shipping for orders >= 500 TL
+   * Load shipping cost settings from PlatformSetting (cached for 5 minutes).
    */
-  calculateShippingCost(orderAmount: number): number {
-    if (orderAmount >= this.FREE_SHIPPING_THRESHOLD) {
+  private async getShippingSettings(): Promise<{ baseCost: number; freeThreshold: number }> {
+    const now = Date.now();
+    if (this.shippingSettingsCache && now - this.shippingSettingsCache.cachedAt < 5 * 60 * 1000) {
+      return this.shippingSettingsCache;
+    }
+
+    const [baseSetting, thresholdSetting] = await Promise.all([
+      this.prisma.platformSetting.findUnique({ where: { settingKey: 'shipping_base_cost' } }),
+      this.prisma.platformSetting.findUnique({ where: { settingKey: 'free_shipping_threshold' } }),
+    ]);
+
+    const baseCost = baseSetting ? parseFloat(baseSetting.settingValue) : this.DEFAULT_SHIPPING_COST;
+    const freeThreshold = thresholdSetting ? parseFloat(thresholdSetting.settingValue) : this.DEFAULT_FREE_THRESHOLD;
+
+    this.shippingSettingsCache = { baseCost, freeThreshold, cachedAt: now };
+    return { baseCost, freeThreshold };
+  }
+
+  /**
+   * Calculate shipping cost based on order amount.
+   * Reads from PlatformSetting (admin-configurable), falls back to defaults.
+   */
+  async calculateShippingCost(orderAmount: number): Promise<number> {
+    const { baseCost, freeThreshold } = await this.getShippingSettings();
+    if (orderAmount >= freeThreshold) {
       return 0;
     }
-    return this.BASE_SHIPPING_COST;
+    return baseCost;
   }
 
   /**
    * Get free shipping info for frontend display
    */
-  getFreeShippingInfo(orderAmount: number): {
+  async getFreeShippingInfo(orderAmount: number): Promise<{
     isFreeShipping: boolean;
     shippingCost: number;
     threshold: number;
     amountToFreeShipping: number;
-  } {
-    const shippingCost = this.calculateShippingCost(orderAmount);
+  }> {
+    const { baseCost, freeThreshold } = await this.getShippingSettings();
+    const shippingCost = orderAmount >= freeThreshold ? 0 : baseCost;
     return {
       isFreeShipping: shippingCost === 0,
       shippingCost,
-      threshold: this.FREE_SHIPPING_THRESHOLD,
-      amountToFreeShipping: Math.max(0, this.FREE_SHIPPING_THRESHOLD - orderAmount),
+      threshold: freeThreshold,
+      amountToFreeShipping: Math.max(0, freeThreshold - orderAmount),
     };
   }
 
@@ -216,7 +240,7 @@ export class OrderService {
       });
     }
 
-    const shippingAmount = this.calculateShippingCost(itemsSubtotal);
+    const shippingAmount = await this.calculateShippingCost(itemsSubtotal);
     const commissionAmount = totalBuyerFee + totalSellerFee;
     const totalAmount = itemsSubtotal + shippingAmount + totalBuyerFee;
     const sellerNetAmount = Math.max(0, itemsSubtotal - totalSellerFee);
@@ -322,16 +346,17 @@ export class OrderService {
         TelefonCep: ctx.recipientPhone,
         SahisBirim: ctx.productTitle,
         KargoTuru: SuratKargoTuru.Koli,
-        Odemetipi: SuratOdemeTipi.Pesin,
+        OdemeTipi: SuratOdemeTipi.Pesin,
         OzelKargoTakipNo: ctx.orderNumberPreview,
         Adet: 1,
         BirimDesi: 1,
         BirimKg: 1,
+        KapidanOdemeTahsilatTipi: 1, // Nakit (zorunlu alan)
         TasimaSekli: SuratTasimaSekli.KaraYolu,
         TeslimSekli: SuratTeslimSekli.AdreseTeslim,
         GonderiSekli: SuratGonderiSekli.Standart,
         Pazaryerimi: 0,
-        Iademi: 0,
+        Iademi: false,
       },
     });
 
@@ -880,7 +905,7 @@ export class OrderService {
       );
 
       // Calculate shipping cost (free shipping for orders >= 500 TL)
-      const shippingCost = this.calculateShippingCost(discountedPrice);
+      const shippingCost = await this.calculateShippingCost(discountedPrice);
       // Buyer fee is added to order total
       const totalAmount = discountedPrice + shippingCost + commissionResult.buyerFeeAmount;
 
@@ -1531,7 +1556,7 @@ export class OrderService {
       );
 
       // Calculate shipping cost (free shipping for orders >= 500 TL)
-      const shippingCost = this.calculateShippingCost(finalPrice);
+      const shippingCost = await this.calculateShippingCost(finalPrice);
       // Buyer fee is added to order total
       const totalAmount = finalPrice + shippingCost + commissionResult.buyerFeeAmount;
 
