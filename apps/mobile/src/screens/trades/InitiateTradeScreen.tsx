@@ -42,7 +42,7 @@ const InitiateTradeScreen = ({ route, navigation }: any) => {
       
       // Load my listings
       const myListingsResponse = await api.getListings({ my_listings: true });
-      setMyListings(myListingsResponse.listings.filter((l: any) => l.trade_available));
+      setMyListings((myListingsResponse.listings || []).filter((l: any) => l.trade_available));
       
       setIsLoading(false);
     } catch (error) {

@@ -12,7 +12,8 @@ import {
   Squares2X2Icon,
 } from '@heroicons/react/24/outline';
 import { useTranslation } from '@/i18n/LanguageContext';
-import { manufacturersApi } from '@/lib/api';
+import { manufacturersApi } from '@/lib/api';import { Button } from '@tarodan/ui';
+
 
 const FALLBACK_MANUFACTURERS = [
   'Hot Wheels', 'Matchbox', 'Majorette', 'Tomica', 'Bburago', 'Maisto',
@@ -87,44 +88,42 @@ export default function CategoryMegaMenu() {
       }}
     >
       {/* Kategori Bar - Navbar altında */}
-      <div className="bg-gray-900 border-b border-gray-800">
+      <div className="bg-heading border-b border-border-strong">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex items-center h-12">
             {/* Main Menu Trigger */}
-            <button
-              className="flex items-center gap-2 px-4 py-2 text-white font-medium hover:bg-gray-800 rounded-lg transition-colors"
-              onClick={() => setIsOpen(!isOpen)}
-            >
+            <Button variant="secondary" className="flex items-center gap-2 px-4 py-2 text-inverted font-medium hover:bg-heading rounded-lg transition-colors"
+              onClick={() => setIsOpen(!isOpen)}>
               <Squares2X2Icon className="w-5 h-5" />
               <span>{locale === 'en' ? 'Browse' : 'İlanlara Göz At'}</span>
               <ChevronDownIcon className={`w-4 h-4 transition-transform ${isOpen ? 'rotate-180' : ''}`} />
-            </button>
+            </Button>
 
             {/* Quick Links */}
             <div className="hidden md:flex items-center gap-1 ml-4">
               <Link
                 href={menu.newArrivals.href}
-                className="flex items-center gap-1.5 px-3 py-2 text-sm text-gray-300 hover:text-white hover:bg-gray-800 rounded-lg transition-colors"
+                className="flex items-center gap-1.5 px-3 py-2 text-sm text-border-strong hover:text-inverted hover:bg-heading rounded-lg transition-colors"
               >
-                <SparklesIcon className="w-4 h-4 text-yellow-400" />
+                <SparklesIcon className="w-4 h-4 text-warning-400" />
                 {menu.newArrivals.label}
               </Link>
               <Link
                 href="/listings?sortBy=view_count_desc"
-                className="flex items-center gap-1.5 px-3 py-2 text-sm text-gray-300 hover:text-white hover:bg-gray-800 rounded-lg transition-colors"
+                className="flex items-center gap-1.5 px-3 py-2 text-sm text-border-strong hover:text-inverted hover:bg-heading rounded-lg transition-colors"
               >
-                <FireIcon className="w-4 h-4 text-orange-400" />
+                <FireIcon className="w-4 h-4 text-primary-400" />
                 {locale === 'en' ? 'Popular' : 'Popüler'}
               </Link>
               <Link
                 href="/collections"
-                className="px-3 py-2 text-sm text-gray-300 hover:text-white hover:bg-gray-800 rounded-lg transition-colors"
+                className="px-3 py-2 text-sm text-border-strong hover:text-inverted hover:bg-heading rounded-lg transition-colors"
               >
                 {locale === 'en' ? 'Collections' : 'Koleksiyonlar'}
               </Link>
               <Link
                 href="/trades"
-                className="px-3 py-2 text-sm text-gray-300 hover:text-white hover:bg-gray-800 rounded-lg transition-colors"
+                className="px-3 py-2 text-sm text-border-strong hover:text-inverted hover:bg-heading rounded-lg transition-colors"
               >
                 {locale === 'en' ? 'Trades' : 'Takaslar'}
               </Link>
@@ -141,52 +140,48 @@ export default function CategoryMegaMenu() {
             animate={{ opacity: 1, y: 0 }}
             exit={{ opacity: 0, y: -10 }}
             transition={{ duration: 0.15 }}
-            className="absolute left-0 right-0 bg-white shadow-2xl border-b border-gray-200 z-50"
+            className="absolute left-0 right-0 bg-surface-elevated shadow-2xl border-b border-border z-50"
           >
             <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
               <div className="flex">
                 {/* Left Sidebar - Menu Sections */}
-                <div className="w-56 bg-gray-50 border-r border-gray-200 py-4">
+                <div className="w-56 bg-surface border-r border-border py-4">
                   <Link
                     href="/ureticiler"
-                    className="flex items-center justify-between w-full px-4 py-3 text-left text-sm font-medium text-gray-700 hover:bg-gray-100 hover:text-orange-600 transition-colors"
+                    className="flex items-center justify-between w-full px-4 py-3 text-left text-sm font-medium text-body hover:bg-surface-alt hover:text-primary-600 transition-colors"
                   >
                     <span className="flex items-center gap-2">
-                      <TruckIcon className="w-5 h-5 text-gray-500" />
+                      <TruckIcon className="w-5 h-5 text-muted" />
                       {menu.brands.label}
                     </span>
                     <ChevronRightIcon className="w-4 h-4" />
                   </Link>
 
-                  <button
-                    onMouseEnter={() => setActiveSection('scales')}
-                    className={`flex items-center justify-between w-full px-4 py-3 text-left text-sm font-medium transition-colors ${activeSection === 'scales' ? 'bg-orange-50 text-orange-600' : 'text-gray-700 hover:bg-gray-100'
-                      }`}
-                  >
+                  <Button variant="secondary" onMouseEnter={() => setActiveSection('scales')}
+                    className={`flex items-center justify-between w-full px-4 py-3 text-left text-sm font-medium transition-colors ${activeSection === 'scales' ? 'bg-primary-50 text-primary-600' : 'text-body hover:bg-surface-alt'
+                      }`}>
                     <span className="flex items-center gap-2">
                       <span className="text-lg">📏</span>
                       {menu.scales.label}
                     </span>
                     <ChevronRightIcon className="w-4 h-4" />
-                  </button>
+                  </Button>
 
-                  <button
-                    onMouseEnter={() => setActiveSection('manufacturers')}
-                    className={`flex items-center justify-between w-full px-4 py-3 text-left text-sm font-medium transition-colors ${activeSection === 'manufacturers' ? 'bg-orange-50 text-orange-600' : 'text-gray-700 hover:bg-gray-100'
-                      }`}
-                  >
+                  <Button variant="secondary" onMouseEnter={() => setActiveSection('manufacturers')}
+                    className={`flex items-center justify-between w-full px-4 py-3 text-left text-sm font-medium transition-colors ${activeSection === 'manufacturers' ? 'bg-primary-50 text-primary-600' : 'text-body hover:bg-surface-alt'
+                      }`}>
                     <span className="flex items-center gap-2">
                       <TruckIcon className="w-5 h-5" />
                       {menu.manufacturers.label}
                     </span>
                     <ChevronRightIcon className="w-4 h-4" />
-                  </button>
+                  </Button>
 
                   {/* View All Link */}
                   <div className="mt-4 px-4">
                     <Link
                       href="/listings"
-                      className="block w-full py-2.5 text-center text-sm font-medium text-orange-600 bg-orange-50 hover:bg-orange-100 rounded-lg transition-colors"
+                      className="block w-full py-2.5 text-center text-sm font-medium text-primary-600 bg-primary-50 hover:bg-primary-100 rounded-lg transition-colors"
                     >
                       {locale === 'en' ? 'View All Listings' : 'Tüm İlanları Gör'} →
                     </Link>
@@ -197,13 +192,13 @@ export default function CategoryMegaMenu() {
                 <div className="flex-1 p-6 min-h-[320px]">
                   {activeSection === 'scales' && (
                     <div>
-                      <h3 className="text-lg font-bold text-gray-900 mb-4">{menu.scales.label}</h3>
+                      <h3 className="text-lg font-bold text-heading mb-4">{menu.scales.label}</h3>
                       <div className="grid grid-cols-4 lg:grid-cols-6 gap-2">
                         {menu.scales.items.map((scale) => (
                           <Link
                             key={scale}
                             href={`/listings?scale=${encodeURIComponent(scale)}`}
-                            className="px-4 py-3 text-center text-sm font-bold text-gray-700 bg-gray-100 hover:bg-orange-100 hover:text-orange-600 rounded-lg transition-colors"
+                            className="px-4 py-3 text-center text-sm font-bold text-body bg-surface-alt hover:bg-primary-100 hover:text-primary-600 rounded-lg transition-colors"
                           >
                             {scale}
                           </Link>
@@ -214,13 +209,13 @@ export default function CategoryMegaMenu() {
 
                   {activeSection === 'manufacturers' && (
                     <div>
-                      <h3 className="text-lg font-bold text-gray-900 mb-4">{menu.manufacturers.label}</h3>
+                      <h3 className="text-lg font-bold text-heading mb-4">{menu.manufacturers.label}</h3>
                       <div className="grid grid-cols-3 lg:grid-cols-4 gap-2">
                         {manufacturerNames.map((manufacturer) => (
                           <Link
                             key={manufacturer}
                             href={`/listings?manufacturer=${encodeURIComponent(manufacturer)}`}
-                            className="px-4 py-2.5 text-sm font-medium text-gray-700 hover:text-orange-600 hover:bg-orange-50 rounded-lg transition-colors"
+                            className="px-4 py-2.5 text-sm font-medium text-body hover:text-primary-600 hover:bg-primary-50 rounded-lg transition-colors"
                           >
                             {manufacturer}
                           </Link>
@@ -230,7 +225,7 @@ export default function CategoryMegaMenu() {
                   )}
 
                   {!activeSection && (
-                    <div className="flex items-center justify-center h-full text-gray-400">
+                    <div className="flex items-center justify-center h-full text-subtle">
                       <p>{locale === 'en' ? 'Hover over an option to explore' : 'Keşfetmek için bir seçeneğin üzerine gelin'}</p>
                     </div>
                   )}

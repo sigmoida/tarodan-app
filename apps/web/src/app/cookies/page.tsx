@@ -2,7 +2,8 @@
 
 import Link from 'next/link';
 import { useState } from 'react';
-import { useTranslation } from '@/i18n/LanguageContext';
+import { useTranslation } from '@/i18n/LanguageContext';import { Button, Checkbox } from '@tarodan/ui';
+
 
 const COOKIE_CATEGORIES = [
   {
@@ -72,17 +73,17 @@ export default function CookiesPage() {
   };
 
   return (
-    <div className="min-h-screen bg-gray-50">
+    <div className="min-h-screen bg-surface">
       {/* Hero Section */}
-      <div className="bg-gradient-to-br from-gray-800 to-gray-900 text-white py-12">
+      <div className="bg-gradient-to-br from-body to-heading text-inverted py-12">
         <div className="max-w-4xl mx-auto px-4">
           <h1 className="text-3xl font-bold mb-2">{t('legal.cookiesTitle')}</h1>
-          <p className="text-gray-400">{t('legal.lastUpdated')}: 24 Ocak 2026</p>
+          <p className="text-subtle">{t('legal.lastUpdated')}: 24 Ocak 2026</p>
         </div>
       </div>
 
       <div className="max-w-4xl mx-auto px-4 py-12">
-        <div className="bg-white rounded-2xl shadow-sm p-8 prose prose-gray max-w-none">
+        <div className="bg-surface-elevated rounded-2xl shadow-sm p-8 prose prose-gray max-w-none">
           <h2>1. Çerez Nedir?</h2>
           <p>
             Çerezler, web siteleri tarafından cihazınıza yerleştirilen küçük metin dosyalarıdır. 
@@ -125,48 +126,45 @@ export default function CookiesPage() {
         </div>
 
         {/* Cookie Preferences Panel */}
-        <div className="mt-8 bg-white rounded-2xl shadow-sm p-8">
-          <h2 className="text-2xl font-bold text-gray-900 mb-6">4. Çerez Kategorileri ve Tercihler</h2>
+        <div className="mt-8 bg-surface-elevated rounded-2xl shadow-sm p-8">
+          <h2 className="text-2xl font-bold text-heading mb-6">4. Çerez Kategorileri ve Tercihler</h2>
           
           <div className="space-y-6">
             {COOKIE_CATEGORIES.map((category) => (
               <div
                 key={category.id}
-                className="border border-gray-200 rounded-xl overflow-hidden"
+                className="border border-border rounded-xl overflow-hidden"
               >
-                <div className="p-4 bg-gray-50 flex items-center justify-between">
+                <div className="p-4 bg-surface flex items-center justify-between">
                   <div>
-                    <h3 className="font-semibold text-gray-900">{category.name}</h3>
-                    <p className="text-sm text-gray-600">{category.description}</p>
+                    <h3 className="font-semibold text-heading">{category.name}</h3>
+                    <p className="text-sm text-muted">{category.description}</p>
                   </div>
                   <label className="relative inline-flex items-center cursor-pointer">
-                    <input
-                      type="checkbox"
-                      checked={category.required || preferences[category.id as keyof typeof preferences]}
+                    <Checkbox checked={category.required || preferences[category.id as keyof typeof preferences]}
                       onChange={() => !category.required && handlePreferenceChange(category.id)}
                       disabled={category.required}
-                      className="sr-only peer"
-                    />
+                      className="sr-only peer" />
                     <div className={`w-11 h-6 rounded-full peer ${
                       category.required 
-                        ? 'bg-gray-400 cursor-not-allowed' 
-                        : 'bg-gray-200 peer-checked:bg-primary-500'
-                    } peer-checked:after:translate-x-full after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-5 after:w-5 after:transition-all`}></div>
+                        ? 'bg-subtle cursor-not-allowed' 
+                        : 'bg-border-subtle peer-checked:bg-primary-500'
+                    } peer-checked:after:translate-x-full after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-surface-elevated after:rounded-full after:h-5 after:w-5 after:transition-all`}></div>
                   </label>
                 </div>
                 
                 <div className="p-4">
                   <table className="w-full text-sm">
                     <thead>
-                      <tr className="text-left text-gray-500">
+                      <tr className="text-left text-muted">
                         <th className="pb-2">Çerez Adı</th>
                         <th className="pb-2">Amaç</th>
                         <th className="pb-2">Süre</th>
                       </tr>
                     </thead>
-                    <tbody className="text-gray-700">
+                    <tbody className="text-body">
                       {category.cookies.map((cookie) => (
-                        <tr key={cookie.name} className="border-t border-gray-100">
+                        <tr key={cookie.name} className="border-t border-border-subtle">
                           <td className="py-2 font-mono text-xs">{cookie.name}</td>
                           <td className="py-2">{cookie.purpose}</td>
                           <td className="py-2">{cookie.duration}</td>
@@ -180,22 +178,18 @@ export default function CookiesPage() {
           </div>
 
           <div className="mt-6 flex gap-4">
-            <button
-              onClick={savePreferences}
-              className="px-6 py-3 bg-primary-500 text-white rounded-xl font-semibold hover:bg-primary-600 transition-colors"
-            >
+            <Button variant="secondary" onClick={savePreferences}
+              className="px-6 py-3 bg-primary-500 text-inverted rounded-xl font-semibold hover:bg-primary-600 transition-colors">
               {t('legal.savePreferences')}
-            </button>
-            <button
-              onClick={() => setPreferences({ functional: true, analytics: true, marketing: true })}
-              className="px-6 py-3 bg-gray-100 text-gray-700 rounded-xl font-semibold hover:bg-gray-200 transition-colors"
-            >
+            </Button>
+            <Button variant="secondary" onClick={() => setPreferences({ functional: true, analytics: true, marketing: true })}
+              className="px-6 py-3 bg-surface-alt text-body rounded-xl font-semibold hover:bg-border-subtle transition-colors">
               {t('legal.acceptAll')}
-            </button>
+            </Button>
           </div>
         </div>
 
-        <div className="mt-8 bg-white rounded-2xl shadow-sm p-8 prose prose-gray max-w-none">
+        <div className="mt-8 bg-surface-elevated rounded-2xl shadow-sm p-8 prose prose-gray max-w-none">
           <h2>5. Çerezleri Nasıl Kontrol Edebilirsiniz?</h2>
           
           <h3>5.1 Tarayıcı Ayarları</h3>
@@ -222,8 +216,8 @@ export default function CookiesPage() {
             Mobil cihazlarda çerez ayarlarını tarayıcı veya cihaz ayarlarından yönetebilirsiniz.
           </p>
 
-          <div className="mt-6 p-4 bg-amber-50 rounded-lg border border-amber-200">
-            <p className="text-sm text-amber-800">
+          <div className="mt-6 p-4 bg-warning-50 rounded-lg border border-warning-200">
+            <p className="text-sm text-warning-800">
               <strong>Önemli:</strong> Zorunlu çerezleri devre dışı bırakmanız halinde 
               platformun bazı özellikleri düzgün çalışmayabilir.
             </p>

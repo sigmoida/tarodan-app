@@ -144,6 +144,15 @@ export const adminApi = {
   getTrades: (params?: any) => api.get('/admin/trades', { params }),
   getTrade: (id: string) => api.get(`/admin/trades/${id}`),
   resolveTrade: (id: string, resolution: any) => api.post(`/admin/trades/${id}/resolve`, resolution),
+  // Safe-trade (escrow) admin actions
+  markWarehouseReceived: (tradeId: string, shipmentId: string) =>
+    api.post(`/admin/trades/${tradeId}/mark-warehouse-received`, { shipmentId }),
+  approveTrade: (tradeId: string, notes?: string) =>
+    api.post(`/admin/trades/${tradeId}/approve`, notes ? { notes } : {}),
+  rejectTrade: (tradeId: string, reason: string) =>
+    api.post(`/admin/trades/${tradeId}/reject`, { reason }),
+  markReturnDelivered: (tradeId: string, shipmentId: string) =>
+    api.post(`/admin/trades/${tradeId}/mark-return-delivered`, { shipmentId }),
 
   // Messages
   getMessages: (params?: any) => api.get('/admin/messages', { params }),

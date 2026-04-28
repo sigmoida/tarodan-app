@@ -59,19 +59,19 @@ export default function RootLayout({
               toastOptions={{
                 duration: 2500,
                 style: {
-                  background: '#fff',
-                  color: '#1a1a1a',
+                  background: 'var(--surface)',
+                  color: 'var(--text-heading)',
                   borderRadius: '4px',
                   fontSize: '13px',
                   padding: '10px 14px',
-                  border: '1px solid #e5e7eb',
+                  border: '1px solid var(--border)',
                   boxShadow: '0 4px 12px rgba(0,0,0,0.08)',
                 },
                 success: {
-                  style: { borderLeft: '3px solid #22c55e' },
+                  style: { borderLeft: '3px solid var(--accent-green)' },
                 },
                 error: {
-                  style: { borderLeft: '3px solid #ef4444' },
+                  style: { borderLeft: '3px solid var(--accent-danger)' },
                 },
               }}
             />

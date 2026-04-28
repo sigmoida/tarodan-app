@@ -4,70 +4,38 @@ import {
   BadRequestException,
   ForbiddenException,
   Logger,
-  UnauthorizedException,
 } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { PrismaService } from '../../prisma';
 import { CacheService } from '../cache/cache.service';
-import { InitiatePaymentDto, PaymentProvider, IyzicoCallbackDto, PayTRCallbackDto, DirectPaymentDto, CreditCardDto } from './dto';
-import { PaymentStatus, PaymentHoldStatus, OrderStatus, ProductStatus, SubscriptionStatus, TradeStatus } from '@prisma/client';
+import { InitiatePaymentDto, PaymentProvider, PayTRCallbackDto } from './dto';
+import { PaymentStatus, PaymentHoldStatus, OrderStatus, ProductStatus, SubscriptionStatus, TradeStatus, OfferStatus } from '@prisma/client';
 import { getProductStatusFromQuantity } from '../product/helpers/product-status.helper';
-import { IyzicoService } from '../payment-providers/iyzico.service';
+import { safeDecrementReserved } from '../product/helpers/product-availability.helper';
 import { PayTRService } from '../payment-providers/paytr.service';
 import { EventService } from '../events';
 import { InvoiceService } from '../invoice/invoice.service';
+import { ProductLockService } from '../product/product-lock.service';
+import { NotificationService } from '../notification/notification.service';
+import { NotificationType } from '../notification/dto/notification.dto';
 import { Request } from 'express';
-import * as crypto from 'crypto';
 
 @Injectable()
 export class PaymentService {
   private readonly logger = new Logger(PaymentService.name);
   private readonly holdDays: number;
-  private readonly iyzicoSecretKey: string;
 
   constructor(
     private readonly prisma: PrismaService,
     private readonly cache: CacheService,
     private readonly configService: ConfigService,
-    private readonly iyzicoService: IyzicoService,
     private readonly paytrService: PayTRService,
     private readonly eventService: EventService,
     private readonly invoiceService: InvoiceService,
+    private readonly productLockService: ProductLockService,
+    private readonly notificationService: NotificationService,
   ) {
     this.holdDays = parseInt(this.configService.get('PAYMENT_HOLD_DAYS') || '7', 10);
-    this.iyzicoSecretKey = this.configService.get('IYZICO_SECRET_KEY') || '';
-  }
-
-  /**
-   * Verify iyzico webhook signature
-   * Uses HMAC-SHA256 for signature verification
-   */
-  private verifyIyzicoSignature(payload: string, signature: string): boolean {
-    if (!this.iyzicoSecretKey) {
-      this.logger.warn('IYZICO_SECRET_KEY not configured, skipping signature verification');
-      return true; // Skip verification in development
-    }
-
-    try {
-      const expectedSignature = crypto
-        .createHmac('sha256', this.iyzicoSecretKey)
-        .update(payload)
-        .digest('base64');
-
-      const isValid = crypto.timingSafeEqual(
-        Buffer.from(signature),
-        Buffer.from(expectedSignature),
-      );
-
-      if (!isValid) {
-        this.logger.warn('Invalid iyzico signature');
-      }
-
-      return isValid;
-    } catch (error) {
-      this.logger.error('Signature verification error:', error);
-      return false;
-    }
   }
 
   /**
@@ -167,7 +135,13 @@ export class PaymentService {
     });
 
     if (!trade) throw new NotFoundException('Takas bulunamadı');
-    if (trade.status !== TradeStatus.accepted) {
+    // Safe-trade akışı: cash trade kabul edildiğinde status 'awaiting_payment' olur.
+    // Legacy akış için 'accepted' da destekleniyor.
+    const payableStatuses: TradeStatus[] = [
+      TradeStatus.accepted,
+      TradeStatus.awaiting_payment,
+    ];
+    if (!payableStatuses.includes(trade.status)) {
       throw new BadRequestException('Takas henüz kabul edilmedi veya uygun durumda değil');
     }
     if (!trade.cashAmount || Number(trade.cashAmount) <= 0) {
@@ -185,37 +159,96 @@ export class PaymentService {
       throw new BadRequestException('Bu takas ödemesi zaten tamamlandı');
     }
 
+    const bypassEnabled = this.configService.get('PAYMENT_BYPASS') === 'true';
+
     // trade_cash_payment_id is unique: only one Payment per TradeCashPayment. Reuse existing if any.
     const existingPayment = await this.prisma.payment.findUnique({
       where: { tradeCashPaymentId: cashPayment.id },
     });
 
+    const provider = PaymentProvider.paytr;
+    const totalAmount = Number(cashPayment.totalAmount);
+
+    // Build a virtual order-like object for PayTR initialization (shared between fresh/retry paths).
+    const payer = trade.cashPayerId === trade.initiatorId ? trade.initiator : trade.receiver;
+    const virtualOrder = {
+      id: tradeId,
+      orderNumber: `TRADE-${trade.tradeNumber}`,
+      totalAmount,
+      buyer: payer,
+      product: {
+        id: `trade-cash-${tradeId}`,
+        title: `Takas #${trade.tradeNumber} Ekstra Ödeme`,
+      },
+      productId: `trade-cash-${tradeId}`,
+      shippingAddress: null,
+    };
+
+    // PAYMENT_BYPASS: dev/test — PayTR token üretmeden; istemci bypass-complete çağırır.
     if (existingPayment) {
       if (existingPayment.status === PaymentStatus.completed) {
         throw new BadRequestException('Bu takas ödemesi zaten tamamlandı');
       }
-      // Pending veya failed: yeniden kullan (failed ise pending yap)
-      if (existingPayment.status === PaymentStatus.failed) {
+      if (bypassEnabled) {
         await this.prisma.payment.update({
           where: { id: existingPayment.id },
-          data: { status: PaymentStatus.pending, failureReason: null },
+          data: {
+            status: PaymentStatus.pending,
+            failureReason: null,
+            providerPaymentId: null,
+          },
         });
+        this.logger.warn(`PAYMENT_BYPASS: trade cash payment ${existingPayment.id} ready for bypass completion`);
+        return {
+          paymentId: existingPayment.id,
+          tradeId,
+          amount: totalAmount,
+          provider: existingPayment.provider,
+          expiresIn: 300,
+          useBypass: true,
+        };
       }
-      const frontendUrl = this.configService.get('FRONTEND_URL') || (this.configService.get('NODE_ENV') === 'production' ? 'https://tarodan.com' : 'http://localhost:3000');
-      const paymentBypassExisting = this.configService.get('PAYMENT_BYPASS') === 'true' || this.configService.get('PAYMENT_BYPASS') === '1';
-      return {
-        paymentId: existingPayment.id,
-        paymentUrl: `${frontendUrl}/payment/${existingPayment.id}`,
-        provider: existingPayment.provider,
-        expiresIn: 300,
-        ...(paymentBypassExisting && { useBypass: true }),
-        tradeId,
-        amount: Number(cashPayment.totalAmount),
-      };
     }
 
-    const provider = PaymentProvider.paytr;
-    const totalAmount = Number(cashPayment.totalAmount);
+    // Retry path: reuse existing Payment row but generate a fresh PayTR iframe token,
+    // because PayTR iframe tokens are single-use. Returning the old providerPaymentId
+    // leads to "Bu ödeme sayfası artık geçersiz" on the PayTR iframe.
+    if (existingPayment) {
+      await this.prisma.payment.update({
+        where: { id: existingPayment.id },
+        data: {
+          status: PaymentStatus.pending,
+          failureReason: null,
+          providerPaymentId: null,
+        },
+      });
+
+      try {
+        const result = await this.initializePayTRPayment(
+          { ...existingPayment, providerPaymentId: null },
+          virtualOrder,
+          this.getClientIp(req),
+        );
+        return {
+          paymentId: existingPayment.id,
+          paymentUrl: result.paymentUrl,
+          paymentHtml: result.paymentHtml,
+          provider: existingPayment.provider,
+          expiresIn: 300,
+          tradeId,
+          amount: totalAmount,
+        };
+      } catch (error: any) {
+        await this.prisma.payment.update({
+          where: { id: existingPayment.id },
+          data: {
+            status: PaymentStatus.failed,
+            failureReason: error.message || 'PayTR ödeme başlatılamadı',
+          },
+        });
+        throw new BadRequestException(error.message || 'PayTR ödeme başlatılamadı');
+      }
+    }
 
     const payment = await this.prisma.payment.create({
       data: {
@@ -235,34 +268,17 @@ export class PaymentService {
       payerId: userId,
     });
 
-    const paymentBypass = this.configService.get('PAYMENT_BYPASS') === 'true' || this.configService.get('PAYMENT_BYPASS') === '1';
-    if (paymentBypass) {
+    if (bypassEnabled) {
+      this.logger.warn(`PAYMENT_BYPASS: trade cash payment ${payment.id} ready for bypass completion`);
       return {
         paymentId: payment.id,
         tradeId,
         amount: totalAmount,
-        paymentUrl: undefined,
-        paymentHtml: undefined,
         provider,
         expiresIn: 300,
         useBypass: true,
       };
     }
-
-    // Build a virtual order-like object for PayTR initialization
-    const payer = trade.cashPayerId === trade.initiatorId ? trade.initiator : trade.receiver;
-    const virtualOrder = {
-      id: tradeId,
-      orderNumber: `TRADE-${trade.tradeNumber}`,
-      totalAmount,
-      buyer: payer,
-      product: {
-        id: `trade-cash-${tradeId}`,
-        title: `Takas #${trade.tradeNumber} Ekstra Ödeme`,
-      },
-      productId: `trade-cash-${tradeId}`,
-      shippingAddress: null,
-    };
 
     try {
       const result = await this.initializePayTRPayment(payment, virtualOrder, this.getClientIp(req));
@@ -272,6 +288,8 @@ export class PaymentService {
         paymentHtml: result.paymentHtml,
         provider,
         expiresIn: 300,
+        tradeId,
+        amount: totalAmount,
       };
     } catch (error: any) {
       // Mark payment as failed but don't release products (trade products are managed separately)
@@ -304,26 +322,23 @@ export class PaymentService {
         });
       }
 
-      const paymentBypassExisting = this.configService.get('PAYMENT_BYPASS') === 'true' || this.configService.get('PAYMENT_BYPASS') === '1';
-      if (paymentBypassExisting) {
-        return {
-          paymentId: existingPayment.id,
-          orderId: dto.orderId,
-          amount: Number(order.totalAmount),
-          paymentUrl: undefined,
-          paymentHtml: undefined,
-          provider: existingPayment.provider,
-          expiresIn: 300,
-          useBypass: true,
-        };
-      }
-
+      const bypassEnabled = this.configService.get('PAYMENT_BYPASS') === 'true';
       return {
         paymentId: existingPayment.id,
-        paymentUrl: `${this.configService.get('FRONTEND_URL') || (this.configService.get('NODE_ENV') === 'production' ? 'https://tarodan.com' : 'http://localhost:3000')}/payment/${existingPayment.id}`,
+        paymentUrl: bypassEnabled ? undefined : `${this.configService.get('FRONTEND_URL') || (this.configService.get('NODE_ENV') === 'production' ? 'https://tarodan.com' : 'http://localhost:3000')}/payment/${existingPayment.id}`,
         provider: existingPayment.provider,
         expiresIn: 300,
+        ...(bypassEnabled ? { useBypass: true } : {}),
       };
+    }
+
+    // Offer-based order ise: ödeme başlatılırken stok rezerve et
+    // Direct buy'da reserve zaten createDirectBuyOrder'da yapıldı
+    if (order.offerId) {
+      await this.prisma.$transaction(async (tx) => {
+        await this.productLockService.checkAndReserve(tx, order.productId, 1);
+      });
+      this.logger.log(`Reserved 1 unit for offer-based order ${order.id} (product ${order.productId})`);
     }
 
     // Create payment record
@@ -332,7 +347,7 @@ export class PaymentService {
         orderId: dto.orderId,
         amount: order.totalAmount,
         currency: 'TRY',
-        provider: dto.provider,
+        provider: PaymentProvider.paytr,
         status: PaymentStatus.pending,
       },
     });
@@ -340,193 +355,73 @@ export class PaymentService {
     // Log payment creation
     await this.logPaymentAction('created', payment.id, dto.orderId, undefined, undefined, PaymentStatus.pending, {
       amount: Number(order.totalAmount),
-      provider: dto.provider,
+      provider: PaymentProvider.paytr,
       buyerId: order.buyerId,
     });
 
-    // Generate payment URL based on provider
-    let paymentUrl: string;
-    let paymentHtml: string | undefined;
-    const clientIp = this.getClientIp(req);
-
-    // İyzico kaldırıldı – sadece PayTR kullanılıyor
-    if (dto.provider === PaymentProvider.iyzico) {
-      dto.provider = PaymentProvider.paytr;
-    }
-
-    // Ödeme bypass (test): PayTR çağrılmaz; tek kart başarılı, diğerleri başarısız
-    const paymentBypass = this.configService.get('PAYMENT_BYPASS') === 'true' || this.configService.get('PAYMENT_BYPASS') === '1';
-    if (paymentBypass) {
+    // PAYMENT_BYPASS: dev/test modunda PayTR'ye gitmeden ödemeyi tamamla
+    const bypassEnabled = this.configService.get('PAYMENT_BYPASS') === 'true';
+    if (bypassEnabled) {
+      this.logger.warn(`PAYMENT_BYPASS active: payment ${payment.id} ready for bypass completion`);
       return {
         paymentId: payment.id,
-        orderId: dto.orderId,
+        orderId: order.id,
         amount: Number(order.totalAmount),
-        paymentUrl: undefined,
-        paymentHtml: undefined,
-        provider: dto.provider,
+        provider: PaymentProvider.paytr,
         expiresIn: 300,
         useBypass: true,
       };
     }
 
-    // PayTR flow
-    {
-      const result = await this.initializePayTRPayment(payment, order, clientIp);
-      return {
-        paymentId: payment.id,
-        paymentUrl: result.paymentUrl,
-        paymentHtml: result.paymentHtml,
-        provider: dto.provider,
-        expiresIn: 300, // 5 minutes
-      };
-    }
+    // Generate payment URL based on provider
+    const clientIp = this.getClientIp(req);
+
+    const result = await this.initializePayTRPayment(payment, order, clientIp);
+    return {
+      paymentId: payment.id,
+      paymentUrl: result.paymentUrl,
+      paymentHtml: result.paymentHtml,
+      provider: PaymentProvider.paytr,
+      expiresIn: 300, // 5 minutes
+    };
   }
 
   /**
-   * Initialize Iyzico payment using checkout form
+   * Bypass payment completion (dev/test only)
+   * Directly marks payment as successful without going through PayTR.
    */
-  private async initializeIyzicoPayment(payment: any, order: any, clientIp: string) {
-    try {
-      const baseUrl = this.configService.get('FRONTEND_URL') || (this.configService.get('NODE_ENV') === 'production' ? 'https://tarodan.com' : 'http://localhost:3000');
-      const isMembershipOrder = order.productId?.startsWith?.('membership-');
-      const callbackUrl = `${baseUrl}/api/payment/callback/iyzico?paymentId=${payment.id}${isMembershipOrder ? '&type=membership' : ''}`;
-      const shippingAddress = order.shippingAddress as any;
+  async bypassCompletePayment(paymentId: string): Promise<{ success: boolean }> {
+    const bypassEnabled = this.configService.get('PAYMENT_BYPASS') === 'true';
+    if (!bypassEnabled) {
+      throw new BadRequestException('Payment bypass is not enabled');
+    }
 
-      // Check if this is a guest order
-      const isGuestOrder = shippingAddress?.isGuestOrder === true;
-
-      // Prepare buyer information - handle guest orders
-      let buyerFirstName: string;
-      let buyerLastName: string;
-      let buyerEmail: string;
-      let buyerPhone: string;
-
-      if (isGuestOrder) {
-        // For guest orders, use guest info from shippingAddress
-        const guestName = shippingAddress?.guestName || shippingAddress?.fullName || 'Misafir Müşteri';
-        const nameParts = guestName.split(' ');
-        buyerFirstName = nameParts[0] || 'Misafir';
-        buyerLastName = nameParts.slice(1).join(' ') || 'Müşteri';
-        buyerEmail = shippingAddress?.guestEmail || 'guest@tarodan.com';
-        buyerPhone = shippingAddress?.guestPhone || shippingAddress?.phone || '+905000000000';
-      } else {
-        // For authenticated users
-        const buyerName = order.buyer.displayName?.split(' ') || ['Müşteri', ''];
-        buyerFirstName = buyerName[0] || 'Müşteri';
-        buyerLastName = buyerName.slice(1).join(' ') || 'Müşteri';
-        buyerEmail = order.buyer.email;
-        buyerPhone = order.buyer.phone || '+905000000000';
-      }
-
-      // Ensure names are not empty (iyzico requires non-empty values)
-      if (!buyerFirstName || buyerFirstName.trim() === '') buyerFirstName = 'Müşteri';
-      if (!buyerLastName || buyerLastName.trim() === '') buyerLastName = 'Müşteri';
-
-      // Prepare basket items
-      const basketItems = [{
-        id: order.product.id,
-        name: order.product.title.substring(0, 50), // iyzico has a limit
-        category1: 'Koleksiyon',
-        itemType: 'PHYSICAL' as const,
-        price: Number(order.totalAmount).toFixed(2),
-      }];
-
-      // Prepare shipping address
-      const addressLine = shippingAddress?.address || 'Türkiye';
-      const cityName = shippingAddress?.city || 'İstanbul';
-      const contactName = shippingAddress?.fullName || `${buyerFirstName} ${buyerLastName}`;
-
-      const shippingAddr = {
-        contactName: contactName,
-        city: cityName,
-        country: 'Turkey',
-        address: addressLine.length > 0 ? addressLine : 'Türkiye',
-        zipCode: shippingAddress?.zipCode || '34000',
-      };
-
-      // Billing: use separate billing address when stored, otherwise same as shipping
-      const billingSource = (shippingAddress as any)?.billingAddress || shippingAddress;
-      const billingAddr = {
-        contactName: billingSource?.fullName || contactName,
-        city: billingSource?.city || cityName,
-        country: 'Turkey',
-        address: (billingSource?.address || addressLine).length > 0 ? (billingSource?.address || addressLine) : 'Türkiye',
-        zipCode: billingSource?.zipCode || '34000',
-      };
-
-      // Initialize checkout form
-      const checkoutFormRequest = {
-        locale: 'tr',
-        conversationId: order.id,
-        price: Number(order.totalAmount).toFixed(2),
-        paidPrice: Number(order.totalAmount).toFixed(2),
-        currency: 'TRY',
-        basketId: order.id,
-        paymentGroup: 'PRODUCT',
-        callbackUrl,
-        enabledInstallments: [1, 2, 3, 6, 9],
-        buyer: {
-          id: order.buyer.id,
-          name: buyerFirstName,
-          surname: buyerLastName,
-          gsmNumber: buyerPhone.startsWith('+') ? buyerPhone : `+90${buyerPhone.replace(/^0/, '')}`,
-          email: buyerEmail,
-          identityNumber: '11111111111', // Test TC Kimlik No for sandbox
-          registrationAddress: shippingAddr.address,
-          ip: clientIp || '127.0.0.1',
-          city: shippingAddr.city,
-          country: 'Turkey',
-        },
-        shippingAddress: shippingAddr,
-        billingAddress: billingAddr,
-        basketItems,
-      };
-
-      const result = await this.iyzicoService.initializeCheckoutForm(checkoutFormRequest);
-
-      if (result.status === 'failure') {
-        throw new BadRequestException(
-          result.errorMessage || 'Iyzico ödeme başlatılamadı',
-        );
-      }
-
-      if (!result.checkoutFormContent && !result.paymentPageUrl) {
-        throw new BadRequestException('Iyzico ödeme sayfası oluşturulamadı');
-      }
-
-      // Update payment with provider reference
-      await this.prisma.payment.update({
-        where: { id: payment.id },
-        data: {
-          providerPaymentId: result.token || payment.id,
-          providerConversationId: order.id,
-          metadata: {
-            token: result.token,
-            tokenExpireTime: result.tokenExpireTime,
+    const payment = await this.prisma.payment.findUnique({
+      where: { id: paymentId },
+      include: {
+        order: {
+          include: {
+            buyer: true,
+            seller: true,
+            product: true,
           },
         },
-      });
+        tradeCashPayment: true,
+      },
+    });
 
-      // Return payment page URL or HTML content
-      if (result.paymentPageUrl) {
-        return {
-          paymentUrl: result.paymentPageUrl,
-          paymentHtml: undefined,
-        };
-      } else if (result.checkoutFormContent) {
-        return {
-          paymentUrl: `${this.configService.get('FRONTEND_URL') || (this.configService.get('NODE_ENV') === 'production' ? 'https://tarodan.com' : 'http://localhost:3000')}/payment/iyzico/${payment.id}`,
-          paymentHtml: result.checkoutFormContent,
-        };
-      } else {
-        throw new BadRequestException('Iyzico ödeme sayfası oluşturulamadı');
-      }
-    } catch (error: any) {
-      this.logger.error(`Iyzico initialization error: ${error.message}`, error.stack);
-      throw new BadRequestException(
-        error.message || 'Iyzico ödeme başlatılamadı',
-      );
+    if (!payment) {
+      throw new NotFoundException('Payment not found');
     }
+
+    if (payment.status !== PaymentStatus.pending) {
+      throw new BadRequestException(`Payment already ${payment.status}`);
+    }
+
+    const did = await this.processSuccessfulPayment(payment, `bypass:${paymentId}`);
+    this.logger.warn(`PAYMENT_BYPASS: payment ${paymentId} completed (did=${did})`);
+
+    return { success: did };
   }
 
   /**
@@ -610,632 +505,14 @@ export class PaymentService {
   }
 
   /**
-   * Process Direct Payment (3D Secure via API)
-   * Supports saved cards (cardToken) or new card entry
+   * Resolve payment row for PayTR callback (merchant_oid matches providerConversationId, orderId, or token substring).
    */
-  async processDirectPayment(dto: DirectPaymentDto, userId: string, req?: Request) {
-    // Optional CVV-based bypass for testing:
-    // - CVV "000" => force success (no gateway call)
-    // - CVV "001" => force failure (no gateway call)
-    const cvvBypassFlag = this.configService.get('PAYMENT_CVV_BYPASS_ENABLED');
-    const isCvvBypassEnabled = cvvBypassFlag !== 'false' && cvvBypassFlag !== '0';
-
-    const order = await this.prisma.order.findUnique({
-      where: { id: dto.orderId },
-      include: {
-        buyer: true,
-        product: true,
-      },
-    });
-
-    if (!order) throw new NotFoundException('Sipariş bulunamadı');
-    if (order.status !== OrderStatus.pending_payment) throw new BadRequestException('Sipariş ödeme bekliyor durumunda değil');
-
-    // Guest check
-    if (userId && order.buyerId !== userId) throw new ForbiddenException('Bu sipariş size ait değil');
-
-    // Guest orders can't use saved cards unless we implement guest temporary storage (risky), so block cardToken for guests if strict
-    // but for now assumme cardToken implies auth user.
-
-    const clientIp = this.getClientIp(req);
-    const shippingAddress = order.shippingAddress as any;
-    const isGuestOrder = !userId; // or check shippingAddress.isGuestOrder
-
-    // Create payment record if not exists
+  private async findPaymentForPaytrCallback(merchantOid: string) {
     let payment = await this.prisma.payment.findFirst({
-      where: { orderId: dto.orderId, status: PaymentStatus.pending },
-    });
-
-    if (!payment) {
-      payment = await this.prisma.payment.create({
-        data: {
-          orderId: dto.orderId,
-          amount: order.totalAmount,
-          currency: 'TRY',
-          provider: PaymentProvider.iyzico,
-          status: PaymentStatus.pending,
-        },
-      });
-    }
-
-    // Prepare buyer info
-    let buyerFirstName, buyerLastName, buyerEmail, buyerPhone;
-    if (isGuestOrder) {
-      const guestName = shippingAddress?.guestName || shippingAddress?.fullName || 'Misafir Müşteri';
-      const parts = guestName.split(' ');
-      buyerFirstName = parts[0];
-      buyerLastName = parts.slice(1).join(' ') || 'Müşteri';
-      buyerEmail = shippingAddress?.guestEmail || 'guest@tarodan.com';
-      buyerPhone = shippingAddress?.guestPhone || shippingAddress?.phone || '+905555555555';
-    } else {
-      const parts = order.buyer.displayName?.split(' ') || ['Müşteri'];
-      buyerFirstName = parts[0];
-      buyerLastName = parts.slice(1).join(' ') || 'Müşteri';
-      buyerEmail = order.buyer.email;
-      buyerPhone = order.buyer.phone || '+905555555555';
-    }
-
-    // Address mapping
-    const address = shippingAddress?.address || 'Türkiye';
-    const city = shippingAddress?.city || 'İstanbul';
-    const contactName = shippingAddress?.fullName || `${buyerFirstName} ${buyerLastName}`;
-
-    const iyzicoAddress = {
-      contactName,
-      city,
-      country: 'Turkey',
-      address,
-      zipCode: shippingAddress?.zipCode || '34000',
-    };
-
-    // ==========================================================================
-    // CVV BYPASS (test helper)
-    // ==========================================================================
-    if (isCvvBypassEnabled && dto.card?.cvc) {
-      const cvv = String(dto.card.cvc).trim();
-
-      // Success bypass: CVV === "000"
-      if (cvv === '000') {
-        // Reload payment with order relations required by processSuccessfulPayment
-        const paymentWithOrder = await this.prisma.payment.findUnique({
-          where: { id: payment.id },
-          include: {
-            order: {
-              include: {
-                buyer: true,
-                seller: true,
-                product: true,
-              },
-            },
-          },
-        });
-
-        if (!paymentWithOrder) {
-          throw new NotFoundException('Ödeme bulunamadı');
-        }
-
-        await this.processSuccessfulPayment(paymentWithOrder, 'TEST_CVV_000');
-
-        const frontendUrl =
-          this.configService.get('FRONTEND_URL') ||
-          (this.configService.get('NODE_ENV') === 'production'
-            ? 'https://tarodan.com'
-            : 'http://localhost:3000');
-
-        const guestParam = isGuestOrder ? '&guest=true' : '';
-        const successUrl = `${frontendUrl}/payment/success?orderId=${order.id}&paymentId=${paymentWithOrder.id}${guestParam}&debug=cvv-000-bypass`;
-
-        const html = `
-<!DOCTYPE html>
-<html lang="tr">
-  <head>
-    <meta charset="utf-8" />
-    <meta http-equiv="refresh" content="0;url=${successUrl}" />
-    <title>Ödeme Başarılı</title>
-  </head>
-  <body>
-    <p>Ödemeniz test modu (CVV 000) ile başarılı kabul edildi. Yönlendiriliyorsunuz...</p>
-    <script>window.location.href = ${JSON.stringify(successUrl)};</script>
-  </body>
-</html>`;
-
-        return {
-          status: 'success',
-          htmlContent: Buffer.from(html).toString('base64'),
-          isBase64: true,
-          paymentId: paymentWithOrder.id,
-        };
-      }
-
-      // Failure bypass: CVV === "001"
-      if (cvv === '001') {
-        await this.processFailedPayment(payment, 'TEST_CVV_001');
-
-        const frontendUrl =
-          this.configService.get('FRONTEND_URL') ||
-          (this.configService.get('NODE_ENV') === 'production'
-            ? 'https://tarodan.com'
-            : 'http://localhost:3000');
-
-        const guestParam = isGuestOrder ? '&guest=true' : '';
-        const failUrl = `${frontendUrl}/payment/fail?paymentId=${payment.id}&orderId=${order.id}${guestParam}&error=${encodeURIComponent(
-          'TEST_CVV_001',
-        )}&debug=cvv-001-bypass`;
-
-        const html = `
-<!DOCTYPE html>
-<html lang="tr">
-  <head>
-    <meta charset="utf-8" />
-    <meta http-equiv="refresh" content="0;url=${failUrl}" />
-    <title>Ödeme Başarısız</title>
-  </head>
-  <body>
-    <p>Ödemeniz test modu (CVV 001) ile başarısız kabul edildi. Yönlendiriliyorsunuz...</p>
-    <script>window.location.href = ${JSON.stringify(failUrl)};</script>
-  </body>
-</html>`;
-
-        return {
-          status: 'error',
-          htmlContent: Buffer.from(html).toString('base64'),
-          isBase64: true,
-          paymentId: payment.id,
-          message: 'TEST_CVV_001',
-        };
-      }
-    }
-
-    // Callback URL: bank/iyzico POSTs here after 3DS. Must be backend so we can call complete3DSecure and redirect.
-    const apiBaseUrl = this.configService.get('API_URL') || (this.configService.get('NODE_ENV') === 'production' ? 'https://api.tarodan.com' : 'http://localhost:3001');
-    const callbackUrl = `${apiBaseUrl}/api/payments/callback/iyzico?paymentId=${payment.id}&direct=true`;
-
-    const request: any = {
-      locale: 'tr',
-      conversationId: order.id,
-      price: Number(order.totalAmount).toFixed(2),
-      paidPrice: Number(order.totalAmount).toFixed(2),
-      currency: 'TRY',
-      basketId: order.id,
-      paymentGroup: 'PRODUCT',
-      callbackUrl,
-      buyer: {
-        id: order.buyerId || 'guest',
-        name: buyerFirstName,
-        surname: buyerLastName,
-        gsmNumber: buyerPhone,
-        email: buyerEmail,
-        identityNumber: '11111111111',
-        registrationAddress: address,
-        ip: clientIp,
-        city,
-        country: 'Turkey',
-      },
-      shippingAddress: iyzicoAddress,
-      billingAddress: iyzicoAddress, // Using same for simplicity
-      basketItems: [{
-        id: order.product.id,
-        name: order.product.title.substring(0, 50),
-        category1: 'Koleksiyon',
-        itemType: 'PHYSICAL',
-        price: Number(order.totalAmount).toFixed(2),
-      }],
-      installment: 1, // Default single installment
-    };
-
-    // Card Token Logic
-    if (dto.cardToken && userId) {
-      // Use stored card
-      request.cardUserKey = userId; // Using userId as cardUserKey
-      request.cardToken = dto.cardToken;
-    } else if (dto.card) {
-      // Use new card
-      request.paymentCard = {
-        cardHolderName: dto.card.cardHolderName,
-        cardNumber: dto.card.cardNumber.replace(/\s/g, ''),
-        expireMonth: dto.card.expireMonth,
-        expireYear: dto.card.expireYear,
-        cvc: dto.card.cvc,
-        registerCard: dto.saveCard && userId ? 1 : 0, // Register if requested and user logged in
-      };
-
-      // If saving card, we need cardUserKey (userId)
-      if (dto.saveCard && userId) {
-        request.cardUserKey = userId;
-      }
-    } else {
-      throw new BadRequestException('Kart bilgisi veya kayıtlı kart seçilmeli');
-    }
-
-    // DEBUG: Log card saving parameters
-    this.logger.log(`[ÖDEME] Card Save Debug: saveCard=${dto.saveCard}, userId=${userId}, registerCard=${request.paymentCard?.registerCard}, cardUserKey=${request.cardUserKey}`);
-
-    try {
-      const result = await this.iyzicoService.initialize3DSecure(request);
-
-      const resultKeys = Object.keys(result || {}).join(',');
-      this.logger.log(`[ÖDEME] Iyzico 3DS yanıt keys: ${resultKeys}, status: ${(result as any)?.status}`);
-      Object.keys(result || {}).forEach((k) => {
-        const v = (result as any)[k];
-        if (typeof v === 'string' && v.length > 0 && v.length < 500) this.logger.log(`[ÖDEME] Iyzico.${k} (${v.length} char): ${v.substring(0, 100)}...`);
-        else if (typeof v === 'string') this.logger.log(`[ÖDEME] Iyzico.${k} length=${v.length}, startsWith: ${v.substring(0, 50)}`);
-      });
-
-      // Iyzico SDK can return HTML under different keys (htmlContent, threeDSHtmlContent, etc.)
-      const htmlKey = Object.keys(result || {}).find((k) => k.toLowerCase().includes('html'));
-      const rawHtmlContent =
-        (result as any).htmlContent ||
-        (result as any).threeDSHtmlContent ||
-        (result as any).HTMLContent ||
-        (result as any).three_ds_html_content ||
-        (htmlKey ? (result as any)[htmlKey] : undefined);
-
-      // Store iyzico paymentId for 3DS callback (complete3DSecure needs it)
-      await this.prisma.payment.update({
-        where: { id: payment.id },
-        data: {
-          providerPaymentId: (result as any).paymentId || payment.id,
-          providerConversationId: order.id,
-          metadata: {
-            isDirectApi: true,
-            iyzicoStatus: result.status,
-            iyzicoPaymentId: (result as any).paymentId,
-          }
-        }
-      });
-
-      if (rawHtmlContent) {
-        this.logger.log(`[ÖDEME] 3DS HTML bulundu, length=${rawHtmlContent.length}, ilk 60 char: ${rawHtmlContent.substring(0, 60)}`);
-        return {
-          status: 'success',
-          htmlContent: Buffer.from(rawHtmlContent).toString('base64'),
-          isBase64: true,
-          paymentId: payment.id,
-        };
-      } else {
-        // Init başarılı (status: success) olsa bile HTML yoksa 3DS başlayamaz.
-        // Bu durumda ödeme alınmamıştır, sadece init olmuştur.
-        // Kullanıcıya başarılı demek yanlıştır.
-
-        this.logger.error(`[ÖDEME] Iyzico HTML yok. Keys: ${resultKeys}. Frontend bu mesajı gösterecek.`);
-        throw new BadRequestException(`3D Secure HTML gelmedi. Iyzico dönen alanlar: ${resultKeys}. (Sandbox/API key kontrol et.)`);
-      }
-
-    } catch (e: any) {
-      this.logger.error(`[ÖDEME] processDirect hata: ${e.message}`, e?.stack);
-      throw new BadRequestException(e.message || 'Ödeme başlatılamadı');
-    }
-  }
-
-  /**
-   * Get Stored Cards
-   */
-  async getStoredCards(userId: string) {
-    if (!userId) return [];
-    try {
-      const res = await this.iyzicoService.getCards(userId);
-      return res.cardDetails || [];
-    } catch (e) {
-      // If user has no cards yet, iyzico might throw or return empty. handled in service.
-      return [];
-    }
-  }
-
-  /**
-   * Add Card standalone
-   */
-  async addStoredCard(userId: string, email: string, card: CreditCardDto) {
-    return this.iyzicoService.addCard({
-      email,
-      cardUserKey: userId,
-      card: {
-        cardAlias: card.cardAlias || 'Kartım',
-        cardHolderName: card.cardHolderName,
-        cardNumber: card.cardNumber,
-        expireMonth: card.expireMonth,
-        expireYear: card.expireYear,
-      }
-    });
-  }
-
-  /**
-   * Remove Card
-   */
-  async removeStoredCard(userId: string, cardToken: string) {
-    return this.iyzicoService.deleteCard({
-      cardUserKey: userId,
-      cardToken,
-    });
-  }
-
-  /**
-   * Handle Iyzico callback
-   * POST /payments/callback/iyzico
-   * Requirement: iyzico signature verification (3.1)
-   */
-  async handleIyzicoCallback(dto: IyzicoCallbackDto, rawBody?: string, signature?: string) {
-    // Log only that callback was received — never log token, paymentId, conversationId (PCI/security)
-    this.logger.log('Iyzico callback received');
-
-    // Verify signature if provided (webhook verification)
-    if (rawBody && signature) {
-      const isValid = this.verifyIyzicoSignature(rawBody, signature);
-      if (!isValid) {
-        throw new UnauthorizedException('Invalid iyzico signature');
-      }
-      this.logger.log('Iyzico signature verified successfully');
-    }
-
-    // Find payment by token or conversation ID
-    const payment = await this.prisma.payment.findFirst({
       where: {
         OR: [
-          { providerPaymentId: dto.token },
-          { providerConversationId: dto.conversationId || dto.token },
-          { metadata: { path: ['token'], equals: dto.token } },
-        ],
-      },
-      include: {
-        order: {
-          include: {
-            buyer: true,
-            seller: true,
-            product: true,
-          },
-        },
-      },
-    });
-
-    if (!payment) {
-      this.logger.warn('Payment not found for Iyzico callback');
-      throw new NotFoundException('Payment not found');
-    }
-
-    this.logger.log(`Payment found: internalId=${payment.id}, orderId=${payment.orderId}, status=${payment.status}`);
-
-    if (!dto.token) {
-      throw new BadRequestException('Payment token is required');
-    }
-
-    // Retrieve checkout form result from Iyzico
-    try {
-      const checkoutResult = await this.iyzicoService.retrieveCheckoutForm(dto.token);
-
-      if (checkoutResult.status === 'success' && checkoutResult.paymentId) {
-        // Payment successful
-        await this.processSuccessfulPayment(
-          payment,
-          checkoutResult.paymentId,
-        );
-        return { status: 'ok', paymentId: checkoutResult.paymentId };
-      } else {
-        // Payment failed
-        const errorMessage = checkoutResult.errorMessage || 'Iyzico payment failed';
-        await this.processFailedPayment(payment, errorMessage);
-        return { status: 'error', message: errorMessage };
-      }
-    } catch (error: any) {
-      this.logger.error('Error retrieving Iyzico checkout form (do not log provider details)');
-
-      // Fallback: use status from DTO if available
-      if (dto.status === 'success') {
-        await this.processSuccessfulPayment(payment, dto.paymentId || dto.token);
-        return { status: 'ok' };
-      } else {
-        await this.processFailedPayment(payment, error.message || 'Iyzico payment failed');
-        return { status: 'error', message: error.message };
-      }
-    }
-  }
-
-  /**
-   * Complete Direct 3D Secure Payment
-   */
-  async completeDirect3DSecure(paymentId: string, dto: IyzicoCallbackDto) {
-    this.logger.log(`Completing Direct 3D Secure for payment ${paymentId}`);
-
-    const payment = await this.prisma.payment.findUnique({
-      where: { id: paymentId },
-      include: {
-        order: {
-          include: {
-            buyer: true,
-            product: true,
-          },
-        },
-      },
-    });
-
-    if (!payment) throw new NotFoundException('Payment not found');
-
-    if (payment.status === PaymentStatus.completed) {
-      const isGuest = !(payment.order as any)?.buyerId;
-      return { status: 'success', paymentId: payment.id, orderId: payment.orderId, isGuest };
-    }
-
-    try {
-      // Use iyzico paymentId from init (stored in metadata); callback form may send conversationData only
-      const iyzicoPaymentId = (payment.metadata as any)?.iyzicoPaymentId || dto.paymentId || '';
-      const conversationId = payment.providerConversationId || payment.orderId || (payment.order as any)?.id;
-
-      if (!iyzicoPaymentId) {
-        this.logger.error('Missing iyzico paymentId for 3DS complete');
-        await this.processFailedPayment(payment, '3D Secure doğrulama bilgisi eksik');
-        return { status: 'error', message: '3D Secure doğrulama bilgisi eksik' };
-      }
-
-      // Iyzico/bank may send conversationData or token (Mock bazen token döner)
-      const dtoAny = dto as any;
-      const conversationData =
-        dto.conversationData ||
-        dto.conversation_data ||
-        dtoAny.conversationData ||
-        dtoAny.conversation_data ||
-        dtoAny.threeDSHtmlContent ||
-        '';
-      const token = dto.token || dtoAny.token || '';
-
-      // conversationData yok ama token varsa (Iyzico Mock): retrieveCheckoutForm ile sonucu al
-      if ((!conversationData || String(conversationData).trim() === '') && token) {
-        this.logger.log('[ÖDEME] conversationData yok, token ile retrieveCheckoutForm deneniyor (Mock)');
-        try {
-          const retrieveResult = await this.iyzicoService.retrieveCheckoutForm(token);
-          const isGuest = !(payment.order as any)?.buyerId;
-          if (retrieveResult.status === 'success' && retrieveResult.paymentId) {
-            await this.processSuccessfulPayment(payment, retrieveResult.paymentId);
-            return { status: 'success', paymentId: payment.id, orderId: payment.orderId, isGuest };
-          }
-          const err = retrieveResult.errorMessage || 'Ödeme doğrulanamadı';
-          await this.processFailedPayment(payment, err);
-          return { status: 'failed', message: err, orderId: payment.orderId, isGuest };
-        } catch (e: any) {
-          this.logger.error(`[ÖDEME] retrieveCheckoutForm failed: ${e?.message}`);
-          await this.processFailedPayment(payment, e?.message || 'Token ile doğrulama başarısız');
-          const isGuest = !(payment.order as any)?.buyerId;
-          return { status: 'error', message: e?.message || '3D Secure yanıtı alınamadı', orderId: payment.orderId, isGuest };
-        }
-      }
-
-      // NEW FIX: If mdStatus=1 and status=success, payment is successful even without conversationData
-      // Iyzico sometimes sends empty conversationData but with mdStatus=1 indicating 3DS was successful
-      const mdStatus = dtoAny.mdStatus || '';
-      const iyzicoStatus = dtoAny.status || '';
-      const iyzicoPaymentIdFromCallback = dtoAny.paymentId || '';
-
-      if (mdStatus === '1' && iyzicoStatus === 'success') {
-        this.logger.log(`[ÖDEME] mdStatus=1 ve status=success, ödeme başarılı kabul ediliyor. Iyzico paymentId: ${iyzicoPaymentIdFromCallback}`);
-        const isGuest = !(payment.order as any)?.buyerId;
-        await this.processSuccessfulPayment(payment, iyzicoPaymentIdFromCallback || iyzicoPaymentId);
-        return { status: 'success', paymentId: payment.id, orderId: payment.orderId, isGuest };
-      }
-
-      if (!conversationData || String(conversationData).trim() === '') {
-        this.logger.warn('[ÖDEME] conversationData ve token yok, mdStatus da başarılı değil. Keys: ' + Object.keys(dtoAny).join(','));
-        await this.processFailedPayment(payment, '3D Secure yanıtı alınamadı (conversationData/token eksik)');
-        const isGuest = !(payment.order as any)?.buyerId;
-        return { status: 'error', message: '3D Secure yanıtı alınamadı', orderId: payment.orderId, isGuest };
-      }
-
-      const result = await this.iyzicoService.complete3DSecure({
-        paymentId: iyzicoPaymentId,
-        conversationId: String(conversationId),
-        conversationData: String(conversationData).trim(),
-      });
-
-      const isGuest = !(payment.order as any)?.buyerId;
-      if (result.status === 'success' && (result.paymentStatus === 'SUCCESS' || result.status === 'success')) {
-        await this.processSuccessfulPayment(payment, result.paymentId);
-        return { status: 'success', paymentId: payment.id, orderId: payment.orderId, isGuest };
-      } else {
-        const err = result.errorMessage || '3D Secure Auth failed';
-        await this.processFailedPayment(payment, err);
-        return { status: 'failed', message: err, orderId: payment.orderId, isGuest };
-      }
-    } catch (e: any) {
-      this.logger.error(`3DS Complete error: ${e.message}`);
-      const isGuest = !(payment.order as any)?.buyerId;
-      await this.processFailedPayment(payment, e.message);
-      return { status: 'error', message: e.message, orderId: payment.orderId, isGuest };
-    }
-  }
-
-  /**
-   * Verify Iyzico checkout form result using token
-   * Called by frontend after iyzico redirects back
-   */
-  async verifyIyzicoCheckoutForm(token: string, paymentId?: string) {
-    this.logger.log('Verifying Iyzico checkout form');
-
-    // Find payment by token or paymentId
-    const payment = await this.prisma.payment.findFirst({
-      where: {
-        OR: [
-          { id: paymentId || '' },
-          { providerPaymentId: token },
-          { metadata: { path: ['token'], equals: token } },
-        ],
-      },
-      include: {
-        order: {
-          include: {
-            buyer: true,
-            seller: true,
-            product: true,
-          },
-        },
-      },
-    });
-
-    if (!payment) {
-      this.logger.warn('Payment not found for verify request');
-      return { success: false, status: 'error', message: 'Ödeme bulunamadı' };
-    }
-
-    // If payment is already processed, return its status
-    if (payment.status === PaymentStatus.completed) {
-      return { success: true, status: 'success', paymentId: payment.id, orderId: payment.orderId };
-    }
-
-    if (payment.status === PaymentStatus.failed) {
-      return { success: false, status: 'failed', message: 'Ödeme başarısız oldu' };
-    }
-
-    // Retrieve checkout form result from Iyzico
-    try {
-      const checkoutResult = await this.iyzicoService.retrieveCheckoutForm(token);
-
-      if (checkoutResult.status === 'success' && checkoutResult.paymentId) {
-        // Payment successful - process it
-        await this.processSuccessfulPayment(
-          payment,
-          checkoutResult.paymentId,
-        );
-        return {
-          success: true,
-          status: 'success',
-          paymentId: payment.id,
-          orderId: payment.orderId,
-          iyzicoPaymentId: checkoutResult.paymentId,
-        };
-      } else {
-        // Payment failed
-        const errorMessage = checkoutResult.errorMessage || 'Ödeme başarısız';
-        await this.processFailedPayment(payment, errorMessage);
-        return { success: false, status: 'failed', message: errorMessage };
-      }
-    } catch (error: any) {
-      this.logger.error('Error verifying Iyzico checkout form (do not log provider details)');
-      return { success: false, status: 'error', message: error.message || 'Doğrulama hatası' };
-    }
-  }
-
-  /**
-   * Handle PayTR callback
-   * POST /payments/callback/paytr
-   */
-  async handlePayTRCallback(dto: PayTRCallbackDto) {
-    this.logger.log('PayTR callback received');
-
-    // Verify hash using PayTR service
-    const isValid = this.paytrService.verifyCallback({
-      merchant_oid: dto.merchant_oid,
-      status: dto.status as 'success' | 'failed',
-      total_amount: dto.total_amount,
-      hash: dto.hash,
-      failed_reason_code: dto.failed_reason_code,
-      failed_reason_msg: dto.failed_reason_msg,
-    });
-
-    if (!isValid) {
-      throw new BadRequestException('Invalid hash');
-    }
-
-    // Find payment by order ID or trade reference (merchant_oid is the order ID or trade reference)
-    const payment = await this.prisma.payment.findFirst({
-      where: {
-        OR: [
-          { providerConversationId: dto.merchant_oid },
-          { orderId: dto.merchant_oid },
+          { providerConversationId: merchantOid },
+          { orderId: merchantOid },
         ],
       },
       include: {
@@ -1251,9 +528,8 @@ export class PaymentService {
     });
 
     if (!payment) {
-      // Also try to find by provider payment ID
-      const paymentByToken = await this.prisma.payment.findFirst({
-        where: { providerPaymentId: { contains: dto.merchant_oid } },
+      payment = await this.prisma.payment.findFirst({
+        where: { providerPaymentId: { contains: merchantOid } },
         include: {
           order: {
             include: {
@@ -1265,18 +541,111 @@ export class PaymentService {
           tradeCashPayment: true,
         },
       });
+    }
 
-      if (!paymentByToken) {
-        throw new NotFoundException('Payment not found');
-      }
+    return payment;
+  }
 
-      if (dto.status === 'success') {
-        await this.processSuccessfulPayment(paymentByToken, dto.merchant_oid);
-      } else {
-        await this.processFailedPayment(paymentByToken, dto.failed_reason_msg || 'PayTR payment failed');
-      }
+  /**
+   * Hash mismatch: do not trust callback body; verify via PayTR durum-sorgu when a pending PayTR payment exists.
+   * Returns OK so PayTR stops retrying; logs errors for ops.
+   */
+  private async handlePayTRCallbackHashMismatch(dto: PayTRCallbackDto): Promise<string> {
+    const payment = await this.findPaymentForPaytrCallback(dto.merchant_oid);
 
+    if (!payment) {
+      this.logger.error(
+        `PayTR callback invalid hash and no payment row: merchant_oid=${dto.merchant_oid} status=${dto.status}`,
+      );
+      throw new NotFoundException('Payment not found');
+    }
+
+    if (payment.provider !== PaymentProvider.paytr) {
+      this.logger.error(
+        `PayTR hash mismatch: payment=${payment.id} provider=${payment.provider} merchant_oid=${dto.merchant_oid}`,
+      );
       return 'OK';
+    }
+
+    if (payment.status !== PaymentStatus.pending) {
+      this.logger.error(
+        `PayTR hash mismatch: payment=${payment.id} status=${payment.status} merchant_oid=${dto.merchant_oid}`,
+      );
+      return 'OK';
+    }
+
+    if (payment.orderId && payment.order && payment.order.status !== OrderStatus.pending_payment) {
+      this.logger.error(
+        `PayTR hash mismatch: payment=${payment.id} orderStatus=${payment.order.status} merchant_oid=${dto.merchant_oid}`,
+      );
+      return 'OK';
+    }
+
+    const tolerance = parseFloat(
+      this.configService.get('PAYTR_RECONCILE_AMOUNT_TOLERANCE_TL') || '0.05',
+    );
+    const oid =
+      (payment.providerConversationId || dto.merchant_oid || '').trim() || dto.merchant_oid.trim();
+
+    let inquiry = await this.paytrService.queryPaymentStatus(oid);
+    if (!inquiry.ok && oid.includes('-')) {
+      inquiry = await this.paytrService.queryPaymentStatus(oid.replace(/-/g, ''));
+    }
+
+    if (!inquiry.ok) {
+      const fail = inquiry as { ok: false; errNo?: string; errMsg?: string };
+      this.logger.error(
+        `PayTR hash mismatch: durum-sorgu failed payment=${payment.id} merchant_oid=${dto.merchant_oid} oid=${oid} err=${fail.errMsg ?? fail.errNo ?? 'unknown'} ourAmount=${Number(payment.amount)}`,
+      );
+      return 'OK';
+    }
+
+    const ourAmount = Number(payment.amount);
+    if (Math.abs(inquiry.paymentTotalTl - ourAmount) > tolerance) {
+      this.logger.error(
+        `PayTR hash mismatch: amount mismatch payment=${payment.id} merchant_oid=${dto.merchant_oid} paytr=${inquiry.paymentTotalTl} ours=${ourAmount}`,
+      );
+      return 'OK';
+    }
+
+    const txnRef =
+      inquiry.paymentDate != null && inquiry.paymentDate !== ''
+        ? `paytr:${oid}:${inquiry.paymentDate}`
+        : `paytr:${oid}`;
+
+    const did = await this.processSuccessfulPayment(payment, txnRef);
+    if (did) {
+      this.logger.log(
+        `PayTR hash mismatch recovered via durum-sorgu payment=${payment.id} merchant_oid=${dto.merchant_oid} dtoStatus=${dto.status}`,
+      );
+    }
+    return 'OK';
+  }
+
+  /**
+   * Handle PayTR callback
+   * POST /payments/callback/paytr
+   */
+  async handlePayTRCallback(dto: PayTRCallbackDto) {
+    this.logger.log('PayTR callback received');
+
+    const isValid = this.paytrService.verifyCallback({
+      merchant_oid: dto.merchant_oid,
+      status: dto.status as 'success' | 'failed',
+      total_amount: dto.total_amount,
+      hash: dto.hash,
+      failed_reason_code: dto.failed_reason_code,
+      failed_reason_msg: dto.failed_reason_msg,
+    });
+
+    if (!isValid) {
+      return this.handlePayTRCallbackHashMismatch(dto);
+    }
+
+    const payment = await this.findPaymentForPaytrCallback(dto.merchant_oid);
+
+    if (!payment) {
+      throw new NotFoundException('Payment not found');
     }
 
     if (dto.status === 'success') {
@@ -1377,8 +746,9 @@ export class PaymentService {
   /**
    * Process successful payment
    * Requirement: Queue job publishing after payment (3.1)
+   * @returns true if this invocation completed the payment; false if already completed (idempotent / race with callback).
    */
-  private async processSuccessfulPayment(payment: any, transactionId?: string) {
+  private async processSuccessfulPayment(payment: any, transactionId?: string): Promise<boolean> {
     // Trade cash payment: different flow from order payments
     if (payment.tradeCashPaymentId && !payment.orderId) {
       return this.processSuccessfulTradeCashPayment(payment, transactionId);
@@ -1387,17 +757,6 @@ export class PaymentService {
     const result = await this.prisma.$transaction(async (tx) => {
       const oldStatus = payment.status;
 
-      // Update payment status
-      await tx.payment.update({
-        where: { id: payment.id },
-        data: {
-          status: PaymentStatus.completed,
-          providerPaymentId: transactionId || payment.providerPaymentId,
-        },
-      });
-
-      // Log payment completion (will be done after transaction)
-      // Store in metadata for now, will log to audit after transaction
       const auditHistory = ((payment.metadata as any)?.auditHistory || []).concat({
         action: 'payment.completed',
         timestamp: new Date().toISOString(),
@@ -1406,21 +765,55 @@ export class PaymentService {
         transactionId: transactionId || payment.providerPaymentId,
       });
 
-      await tx.payment.update({
-        where: { id: payment.id },
+      const newMetadata = {
+        ...(payment.metadata as any || {}),
+        auditHistory,
+      };
+
+      const claimed = await tx.payment.updateMany({
+        where: {
+          id: payment.id,
+          status: PaymentStatus.pending,
+        },
         data: {
-          metadata: {
-            ...(payment.metadata as any || {}),
-            auditHistory,
-          },
+          status: PaymentStatus.completed,
+          paidAt: new Date(),
+          providerPaymentId: transactionId || payment.providerPaymentId,
+          metadata: newMetadata as object,
         },
       });
 
-      // Update order status to PREPARING (first state after purchase; seller will then mark shipped when sent)
+      if (claimed.count === 0) {
+        return null;
+      }
+
+      // Verify order is still pending_payment before promoting to preparing.
+      // Race window: cron may have cancelled the order while PayTR callback was in flight.
+      const currentOrder = await tx.order.findUnique({
+        where: { id: payment.orderId },
+        select: { status: true, orderNumber: true },
+      });
+
+      if (currentOrder?.status === OrderStatus.cancelled) {
+        this.logger.warn(
+          `Payment ${payment.id} succeeded but order ${payment.orderId} (${currentOrder.orderNumber}) already cancelled. Auto-refund required.`,
+        );
+        return { autoRefundRequired: true, orderId: payment.orderId, paymentId: payment.id };
+      }
+
+      // Update order status to PREPARING with shipping deadline for the seller
+      const preparingDays = parseInt(
+        this.configService.get('PREPARING_DEADLINE_DAYS') || '3',
+        10,
+      );
+      const preparingDeadline = new Date();
+      preparingDeadline.setDate(preparingDeadline.getDate() + preparingDays);
+
       await tx.order.update({
         where: { id: payment.orderId },
         data: {
           status: OrderStatus.preparing,
+          preparingDeadline,
           version: { increment: 1 },
         },
       });
@@ -1519,7 +912,7 @@ export class PaymentService {
           this.logger.log(`Membership activated for user ${payment.order.buyerId} after payment ${payment.id}`);
         }
       } else {
-        // Regular product order - update product status to SOLD and decrement stock (stock is only decremented on payment success, not at order creation)
+        // Regular product order: ödeme başarılı → quantity--, reservedQuantity--
         productIdsToInvalidate.push(payment.order.productId);
         const product = await tx.product.findUnique({
           where: { id: payment.order.productId },
@@ -1529,12 +922,11 @@ export class PaymentService {
           throw new Error('Product not found');
         }
 
-        // Stok ödeme anında düşer; rezervasyon da kalkar (adet bazlı)
         const newQuantity =
           product.quantity !== null ? product.quantity - 1 : null;
         const updateData: any = {
           status: getProductStatusFromQuantity(newQuantity),
-          reservedQuantity: { decrement: 1 },
+          reservedQuantity: safeDecrementReserved(product.reservedQuantity, 1),
         };
         if (product.quantity !== null) {
           updateData.quantity = { decrement: 1 };
@@ -1545,73 +937,10 @@ export class PaymentService {
           data: updateData,
         });
 
-        // CRITICAL: Cancel all pending/accepted trades that include this product
-        // When a product is sold, any pending or accepted trades involving it should be cancelled
-        const tradesWithThisProduct = await tx.tradeItem.findMany({
-          where: { productId: payment.order.productId },
-          select: { tradeId: true },
-          distinct: ['tradeId'],
-        });
-
-        const tradeIds = tradesWithThisProduct.map((item) => item.tradeId);
-
-        if (tradeIds.length > 0) {
-          // Find trades that are still pending or accepted (can be cancelled)
-          const activeTrades = await tx.trade.findMany({
-            where: {
-              id: { in: tradeIds },
-              status: {
-                in: [TradeStatus.pending, TradeStatus.accepted],
-              },
-            },
-          });
-
-          if (activeTrades.length > 0) {
-            // Cancel these trades
-            await tx.trade.updateMany({
-              where: {
-                id: { in: activeTrades.map((t) => t.id) },
-              },
-              data: {
-                status: TradeStatus.cancelled,
-                cancelledAt: new Date(),
-                cancelReason: 'Ürün satın alındığı için takas iptal edildi',
-                version: { increment: 1 },
-              },
-            });
-
-            // Adet bazlı: iptal edilen takaslardaki ürünlerin reservedQuantity'sini düşür
-            const allTradeItems = await tx.tradeItem.findMany({
-              where: {
-                tradeId: { in: activeTrades.map((t) => t.id) },
-              },
-              select: { productId: true, quantity: true },
-            });
-
-            const restoreByProduct = new Map<string, number>();
-            for (const item of allTradeItems) {
-              if (item.productId === payment.order.productId) continue;
-              restoreByProduct.set(
-                item.productId,
-                (restoreByProduct.get(item.productId) ?? 0) + item.quantity,
-              );
-            }
-            for (const [productId, qty] of restoreByProduct) {
-              productIdsToInvalidate.push(productId);
-              await tx.product.update({
-                where: { id: productId },
-                data: {
-                  reservedQuantity: { decrement: qty },
-                  status: ProductStatus.active,
-                },
-              });
-            }
-
-            this.logger.log(
-              `Cancelled ${activeTrades.length} trade(s) due to product ${payment.order.productId} being sold`,
-            );
-          }
-        }
+        // Invalidation YAPILMIYOR — cron (sweepOutOfStockProducts) halledecek.
+        this.logger.log(
+          `Product ${payment.order.productId} stock updated: quantity=${newQuantity}, reserved=${updateData.reservedQuantity}`,
+        );
       }
 
       // Get full order details for event emission
@@ -1655,6 +984,29 @@ export class PaymentService {
 
       return { order, productIdsToInvalidate };
     });
+
+    if (!result) {
+      this.logger.log(
+        `processSuccessfulPayment: payment ${payment.id} already completed — skipping duplicate success handling`,
+      );
+      return false;
+    }
+
+    // Handle auto-refund: payment succeeded but order was already cancelled (race with cron)
+    if ('autoRefundRequired' in result && result.autoRefundRequired) {
+      const refundOrderId = (result as any).orderId;
+      const refundPaymentId = (result as any).paymentId;
+      this.logger.warn(`Auto-refunding payment ${refundPaymentId} — order ${refundOrderId} was already cancelled`);
+      try {
+        await this.processRefund(refundOrderId);
+        this.logger.log(`Auto-refund completed for order ${refundOrderId}`);
+      } catch (refundError: any) {
+        this.logger.error(
+          `AUTO-REFUND FAILED for order ${refundOrderId}: ${refundError.message}. MANUAL INTERVENTION REQUIRED.`,
+        );
+      }
+      return true;
+    }
 
     const resultOrder = result.order;
     for (const productId of result.productIdsToInvalidate) {
@@ -1724,16 +1076,19 @@ export class PaymentService {
         this.logger.error(`Failed to generate invoice for order ${resultOrder.orderNumber}: ${error}`);
       }
     }
+
+    return true;
   }
 
   /**
-   * Ödeme başarısız/iptal olduğunda rezervasyonu kaldır (adet bazlı), siparişi iptal et.
+   * Ödeme başarısız/iptal olduğunda rezervasyonu kaldır, siparişi iptal et.
+   * Offer-based orderlarda teklif status'u payment_expired yapılır (tekrar ödenebilir).
    */
   private async releaseProductForFailedPayment(orderId: string): Promise<void> {
     try {
       const order = await this.prisma.order.findUnique({
         where: { id: orderId },
-        select: { status: true, productId: true },
+        select: { status: true, productId: true, offerId: true },
       });
       if (!order || order.status !== OrderStatus.pending_payment || !order.productId) return;
 
@@ -1743,9 +1098,9 @@ export class PaymentService {
       });
       const updateData: { reservedQuantity?: number; status?: ProductStatus } = {};
       if (product) {
-        const newReserved = Math.max(0, (product.reservedQuantity ?? 0) - 1);
+        const newReserved = safeDecrementReserved(product.reservedQuantity, 1);
         updateData.reservedQuantity = newReserved;
-        if (product.status === ProductStatus.reserved) {
+        if (product.status === ProductStatus.reserved && newReserved === 0) {
           updateData.status = ProductStatus.active;
         }
       }
@@ -1763,8 +1118,17 @@ export class PaymentService {
               }),
             ]
           : []),
+        // Offer-based ise: payment_expired yap (tekrar ödenebilir)
+        ...(order.offerId
+          ? [
+              this.prisma.offer.update({
+                where: { id: order.offerId },
+                data: { status: OfferStatus.payment_expired },
+              }),
+            ]
+          : []),
       ]);
-      this.logger.log(`Order ${orderId} cancelled and product ${order.productId} released (reservation decremented) after payment failure`);
+      this.logger.log(`Order ${orderId} cancelled and product ${order.productId} reservation released after payment failure`);
       await this.cache.del(`products:detail:${order.productId}`);
     } catch (error: any) {
       this.logger.error(`Failed to release product for order ${orderId}: ${error?.message}`);
@@ -1838,19 +1202,31 @@ export class PaymentService {
   /**
    * Handle successful trade cash payment separately from order payments.
    * Updates TradeCashPayment status to completed; does NOT touch orders/products.
+   *
+   * Safe-trade (escrow) flow: if the associated Trade is in `awaiting_payment`,
+   * transition it to `shipping_to_warehouse` and set the shipping deadline.
    */
-  private async processSuccessfulTradeCashPayment(payment: any, transactionId?: string) {
-    await this.prisma.$transaction(async (tx) => {
-      await tx.payment.update({
-        where: { id: payment.id },
+  private async processSuccessfulTradeCashPayment(payment: any, transactionId?: string): Promise<boolean> {
+    // Platform ayarı: takas kargo süresi (gün). Varsayılan 7 gün.
+    const shippingDaysSetting = await this.prisma.platformSetting.findUnique({
+      where: { settingKey: 'trade_shipping_deadline_days' },
+    });
+    const shippingDays = parseInt(shippingDaysSetting?.settingValue ?? '7', 10) || 7;
+
+    const result = await this.prisma.$transaction(async (tx) => {
+      const claimed = await tx.payment.updateMany({
+        where: { id: payment.id, status: PaymentStatus.pending },
         data: {
           status: PaymentStatus.completed,
           providerPaymentId: transactionId || payment.providerPaymentId,
           paidAt: new Date(),
         },
       });
+      if (claimed.count === 0) {
+        return { didComplete: false } as const;
+      }
 
-      await tx.tradeCashPayment.update({
+      const tcp = await tx.tradeCashPayment.update({
         where: { id: payment.tradeCashPaymentId },
         data: {
           status: PaymentStatus.completed,
@@ -1858,9 +1234,61 @@ export class PaymentService {
           paidAt: new Date(),
         },
       });
+
+      // Safe-trade geçişi: awaiting_payment -> shipping_to_warehouse
+      const trade = await tx.trade.findUnique({ where: { id: tcp.tradeId } });
+      let tradeTransitioned = false;
+      let shippingDeadline: Date | null = null;
+
+      if (trade && trade.status === TradeStatus.awaiting_payment) {
+        const now = new Date();
+        shippingDeadline = new Date(now);
+        shippingDeadline.setDate(shippingDeadline.getDate() + shippingDays);
+
+        await tx.trade.update({
+          where: { id: trade.id, version: trade.version },
+          data: {
+            status: TradeStatus.shipping_to_warehouse,
+            shippingDeadline,
+            version: { increment: 1 },
+          },
+        });
+        tradeTransitioned = true;
+      }
+
+      return {
+        didComplete: true,
+        tradeTransitioned,
+        trade,
+        shippingDeadline,
+      } as const;
     });
 
+    if (!result.didComplete) {
+      return false;
+    }
+
     this.logger.log(`Trade cash payment ${payment.id} completed (tradeCashPaymentId=${payment.tradeCashPaymentId})`);
+
+    // İşlem tamamlandıktan sonra bildirim emit et (her iki tarafa)
+    if (result.tradeTransitioned && result.trade && result.shippingDeadline) {
+      try {
+        await this.eventService.emitTradeReadyForShipping({
+          tradeId: result.trade.id,
+          initiatorId: result.trade.initiatorId,
+          receiverId: result.trade.receiverId,
+          shippingDeadline: result.shippingDeadline,
+        });
+        this.logger.log(
+          `trade.ready-for-shipping event emitted for trade ${result.trade.id}`,
+        );
+      } catch (error) {
+        // Log but don't fail - payment was already completed
+        this.logger.error(`Failed to emit trade.ready-for-shipping event: ${error}`);
+      }
+    }
+
+    return true;
   }
 
   /**
@@ -1958,36 +1386,14 @@ export class PaymentService {
       userId,
     });
 
-    const paymentBypass = this.configService.get('PAYMENT_BYPASS') === 'true' || this.configService.get('PAYMENT_BYPASS') === '1';
-    if (paymentBypass) {
-      this.logger.log(`Payment ${paymentId} retried (bypass), new payment ${newPayment.id}`);
-      return {
-        success: true,
-        paymentId: payment.id,
-        newPaymentId: newPayment.id,
-        orderId: payment.orderId,
-        paymentUrl: undefined,
-        paymentHtml: undefined,
-        provider: payment.provider,
-        expiresIn: 300,
-        useBypass: true,
-      };
-    }
-
     // Generate payment URL based on provider
     let paymentUrl: string;
     let paymentHtml: string | undefined;
     const clientIp = this.getClientIp(req);
 
-    if (payment.provider === PaymentProvider.iyzico) {
-      const result = await this.initializeIyzicoPayment(newPayment, payment.order, clientIp);
-      paymentUrl = result.paymentUrl;
-      paymentHtml = result.paymentHtml;
-    } else {
-      const result = await this.initializePayTRPayment(newPayment, payment.order, clientIp);
-      paymentUrl = result.paymentUrl;
-      paymentHtml = result.paymentHtml;
-    }
+    const result = await this.initializePayTRPayment(newPayment, payment.order, clientIp);
+    paymentUrl = result.paymentUrl;
+    paymentHtml = result.paymentHtml;
 
     this.logger.log(`Payment ${paymentId} retried, new payment ${newPayment.id} created`);
 
@@ -2120,34 +1526,26 @@ export class PaymentService {
 
     const amountToRefund = refundAmount || Number(payment.amount);
 
+    // Race condition guard: if a payout transfer is already completed/processing, block refund
+    const existingPayout = await this.prisma.payoutTransfer.findFirst({
+      where: {
+        paymentHold: { orderId },
+        status: { in: ['completed', 'processing'] },
+      },
+    });
+    if (existingPayout) {
+      throw new BadRequestException('Transfer zaten başlatılmış, iade yapılamaz');
+    }
+
     try {
       // Call provider refund API
       let refundResult: any;
 
-      if (payment.provider === 'iyzico') {
-        // Iyzico refund requires paymentTransactionId
-        // For full refund, we need the transaction ID from the payment
-        if (!payment.providerPaymentId) {
-          throw new BadRequestException('Iyzico ödeme transaction ID bulunamadı');
-        }
-
-        refundResult = await this.iyzicoService.createPartialRefund(
-          payment.providerPaymentId,
-          amountToRefund,
-          '127.0.0.1', // IP not critical for refund, but can be added if needed
-        );
-
-        if (refundResult.status === 'failure') {
-          throw new BadRequestException(
-            refundResult.errorMessage || 'Iyzico iade işlemi başarısız',
-          );
-        }
-      } else if (payment.provider === 'paytr') {
-        // PayTR refund uses merchant_oid (order ID)
-        refundResult = await this.paytrService.createRefund(
-          orderId,
-          amountToRefund,
-        );
+      if (payment.provider === 'paytr') {
+        const paytrOid =
+          payment.providerConversationId?.trim() ||
+          orderId.replace(/-/g, '');
+        refundResult = await this.paytrService.createRefund(paytrOid, amountToRefund);
 
         if (refundResult.status !== 'success') {
           throw new BadRequestException(
@@ -2184,14 +1582,22 @@ export class PaymentService {
           },
         });
 
-        // Cancel payment hold
-        await tx.paymentHold.updateMany({
-          where: {
-            orderId,
-            status: PaymentHoldStatus.held,
-          },
-          data: { status: PaymentHoldStatus.cancelled },
+        // Cancel payment hold (only if not already released with a payout)
+        const activeHold = await tx.paymentHold.findFirst({
+          where: { orderId, status: PaymentHoldStatus.held },
         });
+        if (activeHold) {
+          const activePayout = await tx.payoutTransfer.findFirst({
+            where: { paymentHoldId: activeHold.id, status: { in: ['completed', 'processing'] } },
+          });
+          if (activePayout) {
+            throw new BadRequestException('Transfer zaten başlatılmış, iade yapılamaz');
+          }
+          await tx.paymentHold.update({
+            where: { id: activeHold.id },
+            data: { status: PaymentHoldStatus.cancelled },
+          });
+        }
 
         // Update order status if full refund
         if (amountToRefund >= Number(payment.amount)) {
@@ -2253,6 +1659,105 @@ export class PaymentService {
   }
 
   /**
+   * Takas nakit ödemesi PayTR ile tamamlanmışken iptal: PayTR iade API + payment / trade_cash_payment güncelleme.
+   * Tamamlanmış PayTR trade ödemesi yoksa no-op (refunded: false).
+   */
+  async refundTradeCashPaymentIfCompleted(tradeId: string): Promise<{
+    refunded: boolean;
+    paymentId?: string;
+    skippedReason?: string;
+  }> {
+    const payment = await this.prisma.payment.findFirst({
+      where: {
+        tradeCashPayment: {
+          tradeId,
+          // Escrow: sadece bırakılmamış ve daha önce iade edilmemiş olanlar
+          releasedAt: null,
+          refundedAt: null,
+        },
+        status: PaymentStatus.completed,
+        provider: PaymentProvider.paytr,
+      },
+      include: { tradeCashPayment: true },
+    });
+
+    if (!payment) {
+      return { refunded: false, skippedReason: 'no_completed_paytr_payment' };
+    }
+
+    // Defensive guard: eğer ilişkili tradeCashPayment bırakılmış veya iade edilmişse atla
+    if (
+      payment.tradeCashPayment?.releasedAt ||
+      payment.tradeCashPayment?.refundedAt
+    ) {
+      return {
+        refunded: false,
+        skippedReason: payment.tradeCashPayment.releasedAt
+          ? 'already_released'
+          : 'already_refunded',
+      };
+    }
+
+    // Race condition guard: eğer zaten PayoutTransfer oluşturulmuş ve processing/completed ise iade yapma
+    const existingPayout = await this.prisma.payoutTransfer.findFirst({
+      where: {
+        tradeCashPaymentId: payment.tradeCashPaymentId,
+        status: { in: ['completed', 'processing'] },
+      },
+    });
+    if (existingPayout) {
+      return {
+        refunded: false,
+        skippedReason: 'payout_already_in_progress',
+      };
+    }
+
+    const oid =
+      payment.providerConversationId?.trim() ||
+      tradeId.replace(/-/g, '');
+    const amount = Number(payment.amount);
+
+    try {
+      const refundResult = await this.paytrService.createRefund(oid, amount);
+      if (refundResult.status !== 'success') {
+        throw new BadRequestException(
+          refundResult.err_msg || 'PayTR iade işlemi başarısız',
+        );
+      }
+    } catch (e: any) {
+      this.logger.error(
+        `refundTradeCashPaymentIfCompleted(tradeId=${tradeId}) PayTR error: ${e?.message}`,
+      );
+      throw e;
+    }
+
+    const existingMeta = (payment.metadata as Record<string, unknown>) || {};
+    await this.prisma.$transaction(async (tx) => {
+      await tx.payment.update({
+        where: { id: payment.id },
+        data: {
+          status: PaymentStatus.refunded,
+          metadata: {
+            ...existingMeta,
+            refundAmount: amount,
+            refundedAt: new Date().toISOString(),
+            tradeCashRefund: true,
+          },
+        },
+      });
+      if (payment.tradeCashPaymentId) {
+        await tx.tradeCashPayment.update({
+          where: { id: payment.tradeCashPaymentId },
+          data: { status: PaymentStatus.refunded, refundedAt: new Date() },
+        });
+      }
+    });
+
+    this.logger.log(`Trade cash refunded via PayTR tradeId=${tradeId} paymentId=${payment.id}`);
+    return { refunded: true, paymentId: payment.id };
+  }
+
+  /**
    * Release held payment to seller
    * Called when order is completed
    */
@@ -2284,24 +1789,60 @@ export class PaymentService {
 
   /**
    * Release all payment holds whose releaseAt date has passed (for cron).
-   * Returns the number of holds released.
+   * Also releases TradeCashPayment (safe-trade escrow) records whose
+   * holdReleaseAt has passed.
+   * Returns the number of order holds and trade cash payments released.
    */
-  async releaseHoldsDue(): Promise<{ count: number }> {
+  async releaseHoldsDue(): Promise<{ count: number; tradeCashReleased: number }> {
     const now = new Date();
-    const result = await this.prisma.paymentHold.updateMany({
+
+    // 1) Sipariş ödeme bekletmeleri (PaymentHold) — atomik: sadece held olanları release et
+    const dueHolds = await this.prisma.paymentHold.findMany({
       where: {
         status: PaymentHoldStatus.held,
         releaseAt: { lte: now },
       },
-      data: {
-        status: PaymentHoldStatus.released,
-        releasedAt: now,
+    });
+
+    let holdCount = 0;
+    for (const hold of dueHolds) {
+      const updated = await this.prisma.paymentHold.updateMany({
+        where: { id: hold.id, status: PaymentHoldStatus.held },
+        data: { status: PaymentHoldStatus.released, releasedAt: now },
+      });
+      if (updated.count > 0) holdCount++;
+    }
+    if (holdCount > 0) {
+      this.logger.log(`Released ${holdCount} payment hold(s) (releaseAt <= ${now.toISOString()})`);
+    }
+
+    // 2) Safe-trade nakit ödemeleri: holdReleaseAt süresi geçmiş olanları bırak
+    let tradeCashReleased = 0;
+    const dueTradeCash = await this.prisma.tradeCashPayment.findMany({
+      where: {
+        status: PaymentStatus.completed,
+        holdReleaseAt: { lte: now },
+        releasedAt: null,
+        refundedAt: null,
       },
     });
-    if (result.count > 0) {
-      this.logger.log(`Released ${result.count} payment hold(s) (releaseAt <= ${now.toISOString()})`);
+
+    for (const tcp of dueTradeCash) {
+      // Atomik guard: sadece hâlâ released/refunded olmamış olanları güncelle
+      const updated = await this.prisma.tradeCashPayment.updateMany({
+        where: { id: tcp.id, releasedAt: null, refundedAt: null },
+        data: { releasedAt: now },
+      });
+      if (updated.count > 0) tradeCashReleased++;
     }
-    return { count: result.count };
+
+    if (tradeCashReleased > 0) {
+      this.logger.log(
+        `Released ${tradeCashReleased} trade cash payment(s) (holdReleaseAt <= ${now.toISOString()})`,
+      );
+    }
+
+    return { count: holdCount, tradeCashReleased };
   }
 
   /**
@@ -2354,9 +1895,15 @@ export class PaymentService {
       throw new NotFoundException('Ödeme bulunamadı');
     }
 
-    const useBypass =
-      (this.configService.get('PAYMENT_BYPASS') === 'true' || this.configService.get('PAYMENT_BYPASS') === '1') &&
-      payment.status === PaymentStatus.pending;
+    const pendingPaytrResume =
+      payment.status === PaymentStatus.pending &&
+      payment.provider === PaymentProvider.paytr &&
+      payment.providerPaymentId
+        ? {
+            paymentUrl: `https://www.paytr.com/odeme/guvenli/${payment.providerPaymentId}`,
+            paymentHtml: `<iframe src="https://www.paytr.com/odeme/guvenli/${payment.providerPaymentId}" frameborder="0" style="width:100%;height:600px;border:none;"></iframe>`,
+          }
+        : {};
 
     // Trade cash payment (no order)
     if (!payment.order && payment.tradeCashPayment) {
@@ -2373,7 +1920,7 @@ export class PaymentService {
         provider: payment.provider,
         createdAt: payment.createdAt,
         updatedAt: payment.updatedAt,
-        ...(useBypass && { useBypass: true }),
+        ...pendingPaytrResume,
       };
     }
 
@@ -2392,7 +1939,13 @@ export class PaymentService {
       }
     } else {
       if (!isGuestOrder) {
-        throw new ForbiddenException('Bu ödeme için giriş yapmanız gerekiyor');
+        // Oturum yok veya JWT decode edilemedi (ör. token checkout sırasında temizlendi): yine de
+        // bekleyen/işlenen ödemede durum okunabilsin; ödeme kimliği UUID ile korunur.
+        const canPollWithoutAuth =
+          payment.status === PaymentStatus.pending || payment.status === PaymentStatus.processing;
+        if (!canPollWithoutAuth) {
+          throw new ForbiddenException('Bu ödeme için giriş yapmanız gerekiyor');
+        }
       }
     }
 
@@ -2426,49 +1979,9 @@ export class PaymentService {
       pricing,
       createdAt: payment.createdAt,
       updatedAt: payment.updatedAt,
-      ...(useBypass && { useBypass: true }),
+      ...pendingPaytrResume,
       ...(isMembershipOrder && { isMembershipOrder: true }),
     };
-  }
-
-  /**
-   * Test bypass: belirtilen kart numarası başarılı, diğerleri başarısız (PAYMENT_BYPASS=true iken)
-   */
-  async bypassComplete(paymentId: string, cardNumber: string): Promise<{ success: boolean }> {
-    if (this.configService.get('PAYMENT_BYPASS') !== 'true' && this.configService.get('PAYMENT_BYPASS') !== '1') {
-      throw new BadRequestException('Bypass modu kapalı');
-    }
-
-    const normalized = cardNumber.replace(/\D/g, '');
-    const successCard = (this.configService.get('PAYMENT_BYPASS_SUCCESS_CARD') || '0000000000000000').replace(/\D/g, '');
-
-    const payment = await this.prisma.payment.findUnique({
-      where: { id: paymentId },
-      include: {
-        order: {
-          include: {
-            buyer: true,
-            seller: true,
-            product: true,
-          },
-        },
-        tradeCashPayment: true,
-      },
-    });
-
-    if (!payment) throw new NotFoundException('Ödeme bulunamadı');
-    if (payment.status !== PaymentStatus.pending) {
-      return { success: payment.status === PaymentStatus.completed };
-    }
-
-    if (normalized === successCard) {
-      const transactionRef = payment.order?.orderNumber || payment.orderId || payment.tradeCashPaymentId || payment.id;
-      await this.processSuccessfulPayment(payment, transactionRef);
-      return { success: true };
-    }
-
-    await this.processFailedPayment(payment, 'Test kartı geçersiz (bypass: sadece belirlenen kart başarılı)');
-    return { success: false };
   }
 
   /**
@@ -2644,8 +2157,7 @@ export class PaymentService {
       where: { userId },
     });
 
-    // In real implementation: tokenize card with Iyzico/PayTR
-    // const tokenId = await this.iyzicoService.tokenizeCard(dto);
+    // tokenId: set when integrating PayTR stored card API
 
     const paymentMethod = await this.prisma.paymentMethod.create({
       data: {
@@ -2821,69 +2333,174 @@ export class PaymentService {
   }
 
   /**
-   * Sipariş bazlı zaman aşımı: pending_payment siparişler X dakika (varsayılan 10) içinde ödenmezse
+   * PayTR callback sunucuya ulaşmadan ödeme başarılı olduysa: durum-sorgu ile doğrula ve tamamla (1.4).
+   * PAYTR_RECONCILIATION_ENABLED=false ile kapatılabilir.
+   */
+  async reconcilePendingPaytrPayments(): Promise<{ checked: number; completed: number }> {
+    const enabled = this.configService.get('PAYTR_RECONCILIATION_ENABLED');
+    if (enabled === 'false' || enabled === '0') {
+      return { checked: 0, completed: 0 };
+    }
+
+    const minAgeMin = parseInt(
+      this.configService.get('PAYTR_RECONCILIATION_MIN_AGE_MINUTES') || '3',
+      10,
+    );
+    const batch = parseInt(this.configService.get('PAYTR_RECONCILIATION_BATCH_LIMIT') || '40', 10);
+    const tolerance = parseFloat(this.configService.get('PAYTR_RECONCILE_AMOUNT_TOLERANCE_TL') || '0.05');
+
+    const cutoff = new Date();
+    cutoff.setMinutes(cutoff.getMinutes() - minAgeMin);
+
+    const candidates = await this.prisma.payment.findMany({
+      where: {
+        provider: 'paytr',
+        status: PaymentStatus.pending,
+        providerConversationId: { not: null },
+        order: { status: OrderStatus.pending_payment },
+        createdAt: { lt: cutoff },
+      },
+      include: {
+        order: { select: { id: true, status: true, totalAmount: true } },
+      },
+      take: batch,
+      orderBy: { createdAt: 'asc' },
+    });
+
+    let checked = 0;
+    let completed = 0;
+
+    for (const row of candidates) {
+      checked++;
+      const oid = row.providerConversationId as string;
+      try {
+        const inquiry = await this.paytrService.queryPaymentStatus(oid);
+        if (!inquiry.ok) {
+          continue;
+        }
+
+        const ourAmount = Number(row.amount);
+        if (Math.abs(inquiry.paymentTotalTl - ourAmount) > tolerance) {
+          this.logger.warn(
+            `PayTR reconcile amount mismatch payment=${row.id} oid=${oid} paytr=${inquiry.paymentTotalTl} ours=${ourAmount}`,
+          );
+          continue;
+        }
+
+        const full = await this.prisma.payment.findUnique({
+          where: { id: row.id },
+          include: {
+            order: { include: { buyer: true, seller: true, product: true } },
+            tradeCashPayment: true,
+          },
+        });
+
+        if (
+          !full ||
+          full.status !== PaymentStatus.pending ||
+          full.order?.status !== OrderStatus.pending_payment
+        ) {
+          continue;
+        }
+
+        const txnRef =
+          inquiry.paymentDate != null && inquiry.paymentDate !== ''
+            ? `paytr:${oid}:${inquiry.paymentDate}`
+            : `paytr:${oid}`;
+
+        const did = await this.processSuccessfulPayment(full, txnRef);
+        if (did) {
+          completed++;
+          this.logger.log(`PayTR reconcile completed payment ${row.id} oid=${oid}`);
+        }
+      } catch (error: any) {
+        this.logger.error(`PayTR reconcile failed payment ${row.id}: ${error?.message}`);
+      }
+    }
+
+    return { checked, completed };
+  }
+
+  /**
+   * Sipariş bazlı zaman aşımı: pending_payment siparişler X dakika (varsayılan 30) içinde ödenmezse
    * ürünü tekrar active yapar, siparişi iptal eder. "Öde"ye hiç basılmadan çıkılan siparişler için.
    */
   async releaseExpiredOrderReservations(): Promise<{ count: number }> {
     const timeoutMinutes = parseInt(
-      this.configService.get('PAYMENT_TIMEOUT_MINUTES') || '10',
+      this.configService.get('PAYMENT_TIMEOUT_MINUTES') || '30',
       10,
     );
     const cutoff = new Date();
     cutoff.setMinutes(cutoff.getMinutes() - timeoutMinutes);
 
+    // Include ALL pending_payment orders (both direct-buy and offer-based)
     const expiredOrders = await this.prisma.order.findMany({
       where: {
         status: OrderStatus.pending_payment,
         createdAt: { lt: cutoff },
-        offerId: null, // Tekliften gelen siparişleri otomatik iptal etme; sadece sepetteki ödeme bekleyen siparişler
       },
-      select: { id: true, productId: true, orderNumber: true },
+      select: { id: true, productId: true, orderNumber: true, offerId: true },
     });
 
     let released = 0;
     for (const order of expiredOrders) {
-      if (!order.productId) continue; // productId yoksa atla (Prisma'da not: null hataya yol açıyor)
+      if (!order.productId) continue;
       try {
-        const product = await this.prisma.product.findUnique({
-          where: { id: order.productId },
-          select: { reservedQuantity: true, status: true },
-        });
-        const updateData: { reservedQuantity?: number; status?: ProductStatus } = {};
-        if (product) {
-          const newReserved = Math.max(0, (product.reservedQuantity ?? 0) - 1);
-          updateData.reservedQuantity = newReserved;
-          if (product.status === ProductStatus.reserved) {
-            updateData.status = ProductStatus.active;
+        await this.prisma.$transaction(async (tx) => {
+          // FOR UPDATE: sipariş satırını kilitle — aynı anda ödeme gelmesini engeller
+          await tx.$queryRaw`SELECT id FROM orders WHERE id = ${order.id} FOR UPDATE`;
+
+          // Kilitleme sonrası statüyü tekrar kontrol et
+          const freshOrder = await tx.order.findUnique({
+            where: { id: order.id },
+            select: { status: true },
+          });
+          if (!freshOrder || freshOrder.status !== OrderStatus.pending_payment) {
+            // Başka bir akış (ödeme webhook'u vb.) zaten işledi, atla
+            return;
           }
-        }
-        await this.prisma.$transaction([
-          this.prisma.order.update({
+
+          // Ürün satırını kilitle ve rezervasyonu kaldır
+          await tx.$queryRaw`SELECT id FROM products WHERE id = ${order.productId} FOR UPDATE`;
+          const product = await tx.product.findUnique({
+            where: { id: order.productId },
+            select: { reservedQuantity: true, status: true },
+          });
+
+          if (product) {
+            const newReserved = safeDecrementReserved(product.reservedQuantity, 1);
+            await tx.product.update({
+              where: { id: order.productId },
+              data: {
+                reservedQuantity: newReserved,
+                status: newReserved > 0 ? ProductStatus.reserved : ProductStatus.active,
+              },
+            });
+          }
+
+          await tx.order.update({
             where: { id: order.id },
             data: { status: OrderStatus.cancelled },
-          }),
-          ...(product && Object.keys(updateData).length > 0
-            ? [
-                this.prisma.product.update({
-                  where: { id: order.productId },
-                  data: updateData,
-                }),
-              ]
-            : []),
-        ]);
-        const pendingPayment = await this.prisma.payment.findFirst({
-          where: { orderId: order.id, status: PaymentStatus.pending },
-          select: { id: true },
-        });
-        if (pendingPayment) {
-          await this.prisma.payment.update({
-            where: { id: pendingPayment.id },
+          });
+
+          // Offer-based ise: payment_expired yap (tekrar ödenebilir)
+          if (order.offerId) {
+            await tx.offer.update({
+              where: { id: order.offerId },
+              data: { status: OfferStatus.payment_expired },
+            });
+          }
+
+          // Mark payment as failed INSIDE the transaction to prevent race condition
+          // with PayTR callback arriving between order cancel and payment update.
+          await tx.payment.updateMany({
+            where: { orderId: order.id, status: PaymentStatus.pending },
             data: {
               status: PaymentStatus.failed,
               failureReason: `Ödeme ${timeoutMinutes} dakika içinde tamamlanmadığı için otomatik iptal`,
             },
           });
-        }
+        });
         await this.cache.del(`products:detail:${order.productId}`);
         released++;
         this.logger.log(`Released reservation for order ${order.orderNumber} (product ${order.productId})`);
@@ -2900,7 +2517,7 @@ export class PaymentService {
    */
   async cancelExpiredPayments() {
     const timeoutMinutes = parseInt(
-      this.configService.get('PAYMENT_TIMEOUT_MINUTES') || '10',
+      this.configService.get('PAYMENT_TIMEOUT_MINUTES') || '30',
       10,
     );
     const timeoutDate = new Date();
@@ -2965,5 +2582,133 @@ export class PaymentService {
     }
 
     return { count: cancelledCount };
+  }
+
+  /**
+   * Handle orders stuck in "preparing" status past their deadline.
+   * Two phases:
+   * 1. Warn: Send notification to seller 24h before deadline (once only).
+   * 2. Cancel: Auto-cancel + refund orders past deadline, re-stock product.
+   */
+  async handleExpiredPreparingOrders(): Promise<{ warned: number; cancelled: number }> {
+    const now = new Date();
+    const warningWindow = new Date(now.getTime() + 24 * 60 * 60 * 1000); // 24h from now
+
+    // --- Phase 1: Warn sellers approaching deadline ---
+    const approachingDeadline = await this.prisma.order.findMany({
+      where: {
+        status: OrderStatus.preparing,
+        preparingDeadline: { gt: now, lte: warningWindow },
+        preparingWarningSentAt: null,
+      },
+      include: {
+        seller: { select: { id: true, email: true, displayName: true } },
+        product: { select: { id: true, title: true } },
+      },
+    });
+
+    let warned = 0;
+    for (const order of approachingDeadline) {
+      try {
+        const deadlineStr = order.preparingDeadline
+          ? order.preparingDeadline.toLocaleDateString('tr-TR', { day: 'numeric', month: 'long', year: 'numeric', hour: '2-digit', minute: '2-digit' })
+          : '';
+
+        await this.notificationService.createInAppNotification(
+          order.sellerId,
+          NotificationType.ORDER_PREPARING_DEADLINE_WARNING,
+          { orderId: order.id, orderNumber: order.orderNumber, deadline: deadlineStr, productTitle: order.product.title },
+        );
+
+        await this.prisma.order.update({
+          where: { id: order.id },
+          data: { preparingWarningSentAt: now },
+        });
+
+        warned++;
+        this.logger.log(`Preparing deadline warning sent to seller ${order.sellerId} for order ${order.orderNumber}`);
+      } catch (err: any) {
+        this.logger.error(`Failed to warn seller for order ${order.id}: ${err.message}`);
+      }
+    }
+
+    // --- Phase 2: Auto-cancel orders past deadline ---
+    const expiredOrders = await this.prisma.order.findMany({
+      where: {
+        status: OrderStatus.preparing,
+        preparingDeadline: { lt: now },
+      },
+      include: {
+        buyer: { select: { id: true, email: true, displayName: true } },
+        seller: { select: { id: true, email: true, displayName: true } },
+        product: { select: { id: true, title: true, quantity: true } },
+      },
+    });
+
+    let cancelled = 0;
+    for (const order of expiredOrders) {
+      try {
+        await this.prisma.$transaction(async (tx) => {
+          // Lock the order row to prevent concurrent modifications (e.g., seller shipping at the same time)
+          await tx.$queryRaw`SELECT id FROM orders WHERE id = ${order.id} FOR UPDATE`;
+
+          const freshOrder = await tx.order.findUnique({
+            where: { id: order.id },
+            select: { status: true },
+          });
+          if (!freshOrder || freshOrder.status !== OrderStatus.preparing) {
+            return; // Already shipped or handled by another process
+          }
+
+          // Cancel order
+          await tx.order.update({
+            where: { id: order.id },
+            data: {
+              status: OrderStatus.cancelled,
+              cancelReason: 'Satıcı belirlenen süre içinde kargoya vermediği için otomatik iptal edildi',
+              version: { increment: 1 },
+            },
+          });
+
+          // Cancel the payment hold (escrow)
+          await tx.paymentHold.updateMany({
+            where: { orderId: order.id, status: PaymentHoldStatus.held },
+            data: { status: PaymentHoldStatus.cancelled },
+          });
+
+          // Re-stock: increment quantity and recalculate status
+          const newQuantity = order.product.quantity !== null ? order.product.quantity + 1 : null;
+          await tx.product.update({
+            where: { id: order.product.id },
+            data: {
+              quantity: order.product.quantity !== null ? { increment: 1 } : undefined,
+              status: getProductStatusFromQuantity(newQuantity),
+            },
+          });
+        });
+
+        // Process refund via PayTR (outside transaction — calls external API)
+        try {
+          await this.processRefund(order.id);
+          this.logger.log(`Refund processed for expired preparing order ${order.orderNumber}`);
+        } catch (refundError: any) {
+          this.logger.error(
+            `REFUND FAILED for expired preparing order ${order.orderNumber}: ${refundError.message}. MANUAL INTERVENTION REQUIRED.`,
+          );
+        }
+
+        // Invalidate product cache
+        await this.cache.del(`products:detail:${order.product.id}`);
+
+        cancelled++;
+        this.logger.log(
+          `Auto-cancelled expired preparing order ${order.orderNumber} (seller: ${order.sellerId}, product: ${order.product.id})`,
+        );
+      } catch (err: any) {
+        this.logger.error(`Failed to auto-cancel expired preparing order ${order.id}: ${err.message}`);
+      }
+    }
+
+    return { warned, cancelled };
   }
 }

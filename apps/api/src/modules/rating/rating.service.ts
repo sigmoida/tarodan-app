@@ -335,23 +335,42 @@ export class RatingService {
     productId: string,
     page?: number,
     pageSize?: number,
+    sortBy?: string,
+    score?: number,
   ): Promise<{ ratings: ProductRatingResponseDto[]; total: number; page: number; pageSize: number }> {
     // Ensure valid pagination values
     const safePage = Math.max(1, Number(page) || 1);
     const safePageSize = Math.min(100, Math.max(1, Number(pageSize) || 20));
-    
+
+    // Build orderBy based on sortBy parameter
+    let orderBy: any = { createdAt: 'desc' };
+    switch (sortBy) {
+      case 'oldest': orderBy = { createdAt: 'asc' }; break;
+      case 'highest': orderBy = { score: 'desc' }; break;
+      case 'lowest': orderBy = { score: 'asc' }; break;
+      case 'helpful': orderBy = { helpfulCount: 'desc' }; break;
+      default: orderBy = { createdAt: 'desc' }; break;
+    }
+
+    // Build where clause with optional score filter
+    const where: any = { productId, status: RatingStatus.approved };
+    const safeScore = Number(score);
+    if (safeScore >= 1 && safeScore <= 5) {
+      where.score = safeScore;
+    }
+
     const [ratings, total] = await Promise.all([
       this.prisma.productRating.findMany({
-        where: { productId, status: RatingStatus.approved },
+        where,
         include: {
           product: { select: { id: true, title: true } },
           user: { select: { id: true, displayName: true, avatarUrl: true } },
         },
-        orderBy: { createdAt: 'desc' },
+        orderBy,
         skip: (safePage - 1) * safePageSize,
         take: safePageSize,
       }),
-      this.prisma.productRating.count({ where: { productId, status: RatingStatus.approved } }),
+      this.prisma.productRating.count({ where }),
     ]);
 
     const resolvedRatings = await Promise.all(

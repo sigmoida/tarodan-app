@@ -11,15 +11,13 @@ import {
   HttpCode,
   HttpStatus,
   Req,
-  Headers,
   NotFoundException,
   ForbiddenException,
   UnauthorizedException,
-  Res,
   Logger,
 } from '@nestjs/common';
 import { Throttle } from '@nestjs/throttler';
-import { Request, Response } from 'express';
+import { Request } from 'express';
 import {
   ApiTags,
   ApiOperation,
@@ -27,13 +25,13 @@ import {
   ApiBearerAuth,
   ApiParam,
 } from '@nestjs/swagger';
+import { JwtService } from '@nestjs/jwt';
 import { PaymentService } from './payment.service';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { Public } from '../auth/decorators/public.decorator';
 import { CurrentUser } from '../auth/decorators/current-user.decorator';
 import {
   InitiatePaymentDto,
-  IyzicoCallbackDto,
   PayTRCallbackDto,
   PaymentResponseDto,
   PaymentInitResponseDto,
@@ -42,7 +40,6 @@ import {
   RefundPaymentResponseDto,
   CancelPaymentResponseDto,
   RetryPaymentResponseDto,
-  DirectPaymentDto,
   AddCardDto,
 } from './dto';
 
@@ -51,7 +48,10 @@ import {
 export class PaymentController {
   private readonly logger = new Logger(PaymentController.name);
 
-  constructor(private readonly paymentService: PaymentService) { }
+  constructor(
+    private readonly paymentService: PaymentService,
+    private readonly jwtService: JwtService,
+  ) { }
 
   /**
    * POST /payments/initiate - Initiate payment (works for both authenticated and guest users)
@@ -76,11 +76,9 @@ export class PaymentController {
     if (authHeader && authHeader.startsWith('Bearer ')) {
       try {
         const token = authHeader.substring(7);
-        const jwt = require('jsonwebtoken');
-        const decoded = jwt.verify(token, process.env.JWT_SECRET || 'your-secret-key');
+        const decoded = this.jwtService.verify(token, { ignoreExpiration: true }) as any;
         userId = decoded.sub || decoded.id;
       } catch (e) {
-        // Token invalid or expired - treat as guest
         userId = null;
       }
     }
@@ -126,8 +124,7 @@ export class PaymentController {
     }
     try {
       const token = authHeader.substring(7);
-      const jwt = require('jsonwebtoken');
-      const decoded = jwt.verify(token, process.env.JWT_SECRET || 'your-secret-key');
+      const decoded = this.jwtService.verify(token, { ignoreExpiration: true }) as any;
       const userId = decoded.sub || decoded.id;
       if (!userId) throw new UnauthorizedException('Oturum açmanız gerekiyor');
       return this.paymentService.initiateTradeCashPayment(body.tradeId, userId, req);
@@ -135,128 +132,6 @@ export class PaymentController {
       if (e instanceof UnauthorizedException) throw e;
       throw new UnauthorizedException('Oturum açmanız gerekiyor');
     }
-  }
-
-  /**
-   * GET /payments/callback/iyzico - Iyzico Mock / banka GET redirect (token/conversationData query'de)
-   */
-  @Get('callback/iyzico')
-  @Public()
-  @ApiOperation({ summary: 'Iyzico callback (GET redirect)' })
-  async iyzicoCallbackGet(
-    @Req() req: Request,
-    @Res() res: Response,
-    @Query('paymentId') paymentId?: string,
-    @Query('direct') direct?: string,
-    @Query('token') token?: string,
-    @Query('conversationData') conversationData?: string,
-  ) {
-    const query = (req as any).query || {};
-    this.logger.log(`[CALLBACK GET] Iyzico: queryKeys=${Object.keys(query).join(',')}`);
-    if (direct === 'true' && paymentId) {
-      const mergedDto = { token: token || query['token'], conversationData: conversationData || query['conversationData'] || query['conversation_data'] };
-      const result = await this.paymentService.completeDirect3DSecure(paymentId, mergedDto as any);
-      const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:3000';
-      const orderId = (result as any).orderId;
-      const isGuest = (result as any).isGuest;
-      const guestParam = isGuest ? '&guest=true' : '';
-      if (result.status === 'success') {
-        const successUrl = orderId ? `${frontendUrl}/payment/success?orderId=${orderId}&paymentId=${paymentId}${guestParam}` : `${frontendUrl}/payment/success?paymentId=${paymentId}${guestParam}`;
-        return res.redirect(302, successUrl);
-      }
-      const failUrl = `${frontendUrl}/payment/fail?paymentId=${paymentId}&error=${encodeURIComponent(result.message || 'Ödeme başarısız')}${orderId ? `&orderId=${orderId}` : ''}${guestParam}`;
-      return res.redirect(302, failUrl);
-    }
-    return res.redirect(302, `${process.env.FRONTEND_URL || 'http://localhost:3000'}/payment/fail?error=Geçersiz%20callback`);
-  }
-
-  /**
-   * POST /payments/callback/iyzico - Iyzico webhook
-   */
-  @Post('callback/iyzico')
-  @Public()
-  @HttpCode(HttpStatus.OK)
-  @ApiOperation({ summary: 'Iyzico payment callback (webhook)' })
-  @ApiResponse({ status: HttpStatus.OK, description: 'Callback processed' })
-  async iyzicoCallback(
-    @Body() dto: IyzicoCallbackDto,
-    @Req() req: Request,
-    @Res({ passthrough: true }) res: Response,
-    @Headers('x-iyzico-signature') signature?: string,
-    @Query('paymentId') paymentId?: string,
-    @Query('direct') direct?: string,
-    @Query('token') tokenFromQuery?: string,
-    @Query('conversationData') conversationDataFromQuery?: string,
-  ) {
-    // Iyzico Mock bazen GET ile query'de token/conversationData gönderir – body boşsa query'den al
-    const query = (req as any).query || {};
-    const body = (req as any).body || dto || {};
-
-    // CRITICAL DEBUG: Log EVERYTHING for 3DS callback debugging
-    this.logger.log(`[CALLBACK DEBUG] Full body: ${JSON.stringify(body)}`);
-    this.logger.log(`[CALLBACK DEBUG] Full query: ${JSON.stringify(query)}`);
-    this.logger.log(`[CALLBACK DEBUG] dto object: ${JSON.stringify(dto)}`);
-
-    const mergedDto = {
-      ...body,
-      ...dto,
-      token: dto?.token || body?.token || tokenFromQuery || query['token'],
-      conversationData: (dto as any)?.conversationData || (dto as any)?.conversation_data || body?.conversationData || body?.conversation_data || conversationDataFromQuery || query['conversationData'] || query['conversation_data'],
-      mdStatus: (dto as any)?.mdStatus || body?.mdStatus || query['mdStatus'],
-      paymentId: (dto as any)?.paymentId || body?.paymentId || query['paymentId'],
-      status: (dto as any)?.status || body?.status || query['status'],
-    };
-    const logPayload = { bodyKeys: Object.keys(body), queryKeys: Object.keys(query), hasToken: !!mergedDto.token, hasConversationData: !!mergedDto.conversationData, mdStatus: mergedDto.mdStatus, paymentIdInBody: mergedDto.paymentId };
-    this.logger.log(`[CALLBACK] Iyzico: ${JSON.stringify(logPayload)}`);
-
-    // Get raw body for signature verification
-    const rawBody = (req as any).rawBody || JSON.stringify(dto);
-
-    // DEBUG: Create a debug string to show what we received (will be visible in browser URL)
-    const debugInfo = encodeURIComponent(JSON.stringify({
-      bodyKeys: Object.keys(body),
-      bodyValues: body,
-      queryKeys: Object.keys(query),
-      dtoKeys: Object.keys(dto || {}),
-      hasToken: !!mergedDto.token,
-      hasConversationData: !!mergedDto.conversationData,
-      mdStatus: mergedDto.mdStatus,
-      contentType: req.headers['content-type'],
-    }));
-
-    // Direct 3D Secure: bank POSTs here after user completes SMS; we complete auth and redirect to frontend
-    if (direct === 'true' && paymentId) {
-      const result = await this.paymentService.completeDirect3DSecure(paymentId, mergedDto as any);
-      const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:3000';
-      const orderId = (result as any).orderId;
-      const isGuest = (result as any).isGuest;
-      const guestParam = isGuest ? '&guest=true' : '';
-
-      if (result.status === 'success') {
-        const successUrl = orderId
-          ? `${frontendUrl}/payment/success?orderId=${orderId}&paymentId=${paymentId}${guestParam}&debug=${debugInfo}`
-          : `${frontendUrl}/payment/success?paymentId=${paymentId}${guestParam}&debug=${debugInfo}`;
-        return res.redirect(302, successUrl);
-      } else {
-        const failUrl = `${frontendUrl}/payment/fail?paymentId=${paymentId}&error=${encodeURIComponent(result.message || 'Ödeme başarısız')}${orderId ? `&orderId=${orderId}` : ''}${guestParam}&debug=${debugInfo}`;
-        return res.redirect(302, failUrl);
-      }
-    }
-
-    return this.paymentService.handleIyzicoCallback(dto, rawBody, signature);
-  }
-
-  /**
-   * POST /payments/iyzico/verify - Verify iyzico checkout form result
-   */
-  @Post('iyzico/verify')
-  @Public()
-  @HttpCode(HttpStatus.OK)
-  @ApiOperation({ summary: 'Verify iyzico checkout form result using token' })
-  async verifyIyzicoPayment(
-    @Body() dto: { token: string; paymentId?: string },
-  ) {
-    return this.paymentService.verifyIyzicoCheckoutForm(dto.token, dto.paymentId);
   }
 
   /**
@@ -275,43 +150,22 @@ export class PaymentController {
   // ============================================================
 
   // ============================================================
-  // DIRECT PAYMENT & SAVED CARDS
+  // SAVED CARDS (local records; ödeme PayTR iframe)
   // ============================================================
 
-  @Post('process-direct')
-  @ApiOperation({ summary: 'Process direct payment (3D Secure)' })
-  @Public()
-  async processDirectPayment(
-    @Body() dto: DirectPaymentDto,
-    @Req() req: Request,
-  ) {
-    // Optional Auth Logic
-    const authHeader = req.headers.authorization;
-    let userId: string | null = null;
-    if (authHeader && authHeader.startsWith('Bearer ')) {
-      try {
-        const token = authHeader.substring(7);
-        const jwt = require('jsonwebtoken');
-        const decoded = jwt.verify(token, process.env.JWT_SECRET || 'your-secret-key');
-        userId = decoded.sub || decoded.id;
-      } catch (e) { userId = null; }
-    }
-    return this.paymentService.processDirectPayment(dto, userId || '', req);
-  }
-
   /**
-   * GET /payments/methods - Get user's saved payment methods (Iyzico Stored Cards)
+   * GET /payments/methods - Get user's saved payment method records
    */
   @Get('methods')
   @UseGuards(JwtAuthGuard)
   @ApiBearerAuth()
   @ApiOperation({ summary: 'Get saved payment methods' })
   async getPaymentMethods(@CurrentUser('id') userId: string) {
-    return this.paymentService.getStoredCards(userId);
+    return this.paymentService.getPaymentMethods(userId);
   }
 
   /**
-   * POST /payments/methods - Add new payment method
+   * POST /payments/methods - Add payment method record
    */
   @Post('methods')
   @UseGuards(JwtAuthGuard)
@@ -319,26 +173,32 @@ export class PaymentController {
   @ApiOperation({ summary: 'Add new payment method' })
   async addPaymentMethod(
     @CurrentUser('id') userId: string,
-    @CurrentUser('email') email: string,
     @Body() dto: AddCardDto,
   ) {
-    return this.paymentService.addStoredCard(userId, email, dto.card);
+    const y = dto.card.expireYear.length === 2 ? parseInt(`20${dto.card.expireYear}`, 10) : parseInt(dto.card.expireYear, 10);
+    return this.paymentService.addPaymentMethod(userId, {
+      cardNumber: dto.card.cardNumber,
+      cardHolder: dto.card.cardHolderName,
+      expiryMonth: parseInt(dto.card.expireMonth, 10),
+      expiryYear: y,
+      cvv: dto.card.cvc,
+    });
   }
 
   /**
-   * DELETE /payments/methods/:id - Delete payment method
+   * DELETE /payments/methods/:id - Delete payment method by id
    */
   @Delete('methods/:id')
   @UseGuards(JwtAuthGuard)
   @ApiBearerAuth()
   @HttpCode(HttpStatus.NO_CONTENT)
   @ApiOperation({ summary: 'Delete payment method' })
-  @ApiParam({ name: 'id', description: 'Card Token' })
-  async deletePaymentMethod(
+  @ApiParam({ name: 'id', description: 'Payment method ID' })
+  async deletePaymentMethodRoute(
     @CurrentUser('id') userId: string,
-    @Param('id') cardToken: string,
+    @Param('id') id: string,
   ) {
-    return this.paymentService.removeStoredCard(userId, cardToken);
+    return this.paymentService.deletePaymentMethod(userId, id);
   }
 
   /**
@@ -397,8 +257,7 @@ export class PaymentController {
     if (authHeader && authHeader.startsWith('Bearer ')) {
       try {
         const token = authHeader.substring(7);
-        const jwt = require('jsonwebtoken');
-        const decoded = jwt.verify(token, process.env.JWT_SECRET || 'your-secret-key');
+        const decoded = this.jwtService.verify(token, { ignoreExpiration: true }) as any;
         userId = decoded.sub || decoded.id;
       } catch (e) {
         userId = null;
@@ -519,19 +378,17 @@ export class PaymentController {
   }
 
   /**
-   * POST /payments/:id/bypass-complete - Test bypass: tek kart başarılı, diğerleri başarısız (PAYMENT_BYPASS=true)
+   * POST /payments/:id/bypass-complete - Dev/test only: complete payment without PayTR
    */
   @Post(':id/bypass-complete')
-  @Throttle({ default: { limit: 20, ttl: 60000 } })
   @Public()
-  @ApiOperation({ summary: 'Complete payment with test bypass (one card success, others fail)' })
+  @ApiOperation({ summary: 'Bypass payment (dev/test only)' })
   @ApiParam({ name: 'id', description: 'Payment ID' })
-  @ApiResponse({ status: HttpStatus.OK, description: 'Success or failure based on card number' })
+  @ApiResponse({ status: HttpStatus.OK, description: 'Payment bypassed' })
   async bypassComplete(
     @Param('id') paymentId: string,
-    @Body() body: { cardNumber: string },
   ): Promise<{ success: boolean }> {
-    return this.paymentService.bypassComplete(paymentId, body?.cardNumber ?? '');
+    return this.paymentService.bypassCompletePayment(paymentId);
   }
 
   /**

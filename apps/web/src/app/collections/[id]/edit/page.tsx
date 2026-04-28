@@ -4,8 +4,10 @@ import { useState, useEffect, useMemo } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import { ArrowLeftIcon, TrashIcon } from '@heroicons/react/24/outline';
 import toast from 'react-hot-toast';
+import { Button, Checkbox, Input, Select, Spinner, Textarea } from '@tarodan/ui';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useAuthStore } from '@/stores/authStore';
+import AuthLoadingScreen from '@/components/AuthLoadingScreen';
 import { collectionsApi, categoriesApi } from '@/lib/api';
 import OptimizedImage from '@/components/OptimizedImage';
 import { useTranslation } from '@/i18n/LanguageContext';
@@ -46,7 +48,7 @@ export default function EditCollectionPage() {
   const params = useParams();
   const router = useRouter();
   const queryClient = useQueryClient();
-  const { user, isAuthenticated } = useAuthStore();
+  const { user, isAuthenticated, isLoading: authLoading } = useAuthStore();
   const { t } = useTranslation();
   const collectionIdOrSlug = params.id as string;
 
@@ -80,6 +82,7 @@ export default function EditCollectionPage() {
   );
 
   useEffect(() => {
+    if (authLoading) return;
     if (!isAuthenticated || !user) {
       router.push('/login');
       return;
@@ -88,7 +91,7 @@ export default function EditCollectionPage() {
     if (collectionIdOrSlug) {
       fetchCollection();
     }
-  }, [collectionIdOrSlug, isAuthenticated, user]);
+  }, [collectionIdOrSlug, authLoading, isAuthenticated, user]);
 
   const fetchCollection = async () => {
     if (!collectionIdOrSlug) {
@@ -225,12 +228,14 @@ export default function EditCollectionPage() {
     }
   };
 
+  if (authLoading) return <AuthLoadingScreen />;
+  if (!authLoading && (!isAuthenticated || !user)) return null;
   if (isLoading) {
     return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+      <div className="min-h-screen bg-surface flex items-center justify-center">
         <div className="text-center">
-          <div className="animate-spin rounded-full h-10 w-10 border-t-2 border-b-2 border-orange-500 mx-auto mb-4"></div>
-          <p className="text-gray-600">{t('collection.loading')}</p>
+          <Spinner size="lg" color="border-primary-500 border-t-transparent" className="mx-auto mb-4" />
+          <p className="text-muted">{t('collection.loading')}</p>
         </div>
       </div>
     );
@@ -238,29 +243,30 @@ export default function EditCollectionPage() {
 
   if (error || !collection) {
     return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+      <div className="min-h-screen bg-surface flex items-center justify-center">
         <div className="text-center">
-          <p className="text-red-600 mb-4">{error || t('collection.collectionNotFound')}</p>
-          <button
+          <p className="text-danger-600 mb-4">{error || t('collection.collectionNotFound')}</p>
+          <Button
+            variant="primary"
+            size="md"
             onClick={() => router.push('/collections')}
-            className="px-4 py-2 bg-orange-500 text-white rounded hover:bg-orange-600 text-sm font-medium transition-colors"
           >
             {t('collection.backToCollections')}
-          </button>
+          </Button>
         </div>
       </div>
     );
   }
 
   return (
-    <div className="min-h-screen bg-gray-50">
-      <div className="bg-white border-b border-gray-200">
+    <div className="min-h-screen bg-surface">
+      <div className="bg-surface-elevated border-b border-border">
         <div className="max-w-3xl mx-auto px-6 sm:px-8 py-4">
-          <button onClick={() => router.back()} className="flex items-center gap-2 text-gray-500 hover:text-gray-700 text-sm transition-colors mb-3">
+          <Button variant="secondary" onClick={() => router.back()} className="flex items-center gap-2 text-muted hover:text-body text-sm transition-colors mb-3">
             <ArrowLeftIcon className="w-4 h-4" />{t('common.back')}
-          </button>
-          <h1 className="text-xl font-bold text-gray-900 flex items-center gap-2">
-            <div className="w-1 h-6 bg-orange-500 rounded-sm" />
+          </Button>
+          <h1 className="text-xl font-bold text-heading flex items-center gap-2">
+            <div className="w-1 h-6 bg-primary-500 rounded-sm" />
             {t('collection.editCollectionTitle')}
           </h1>
         </div>
@@ -268,55 +274,50 @@ export default function EditCollectionPage() {
       <div className="max-w-3xl mx-auto px-6 sm:px-8 py-6">
 
         {/* Form */}
-        <div className="bg-white rounded border border-gray-200 p-6 md:p-8">
+        <div className="bg-surface-elevated rounded border border-border p-6 md:p-8">
           <form onSubmit={handleSubmit} className="space-y-6">
             {/* Name */}
             <div>
-              <label className="block text-xs font-medium text-gray-500 mb-1 uppercase tracking-wide">
+              <label className="block text-xs font-medium text-muted mb-1 uppercase tracking-wide">
                 {t('collection.collectionNameLabel')}
               </label>
-              <input
-                type="text"
+              <Input type="text"
                 value={name}
                 onChange={(e) => setName(e.target.value)}
-                className="w-full px-3 py-2.5 border border-gray-200 rounded text-sm text-gray-900 placeholder-gray-400 bg-white focus:outline-none focus:border-orange-400"
+                className="w-full px-3 py-2.5 border border-border rounded text-sm text-heading placeholder-subtle bg-surface-elevated focus:outline-none focus:border-primary-400"
                 placeholder={t('collection.namePlaceholder')}
                 required
                 minLength={3}
-                maxLength={100}
-              />
-              <p className="mt-1 text-sm text-gray-500">
+                maxLength={100} />
+              <p className="mt-1 text-sm text-muted">
                 {name.length}/100 {t('collection.characters')}
               </p>
             </div>
 
             {/* Description */}
             <div>
-              <label className="block text-xs font-medium text-gray-500 mb-1 uppercase tracking-wide">
+              <label className="block text-xs font-medium text-muted mb-1 uppercase tracking-wide">
                 {t('collection.descriptionLabel')}
               </label>
-              <textarea
-                value={description}
+              <Textarea value={description}
                 onChange={(e) => setDescription(e.target.value)}
-                className="w-full px-3 py-2.5 border border-gray-200 rounded text-sm text-gray-900 placeholder-gray-400 bg-white focus:outline-none focus:border-orange-400"
+                className="w-full px-3 py-2.5 border border-border rounded text-sm text-heading placeholder-subtle bg-surface-elevated focus:outline-none focus:border-primary-400"
                 placeholder={t('collection.descriptionPlaceholder')}
                 rows={5}
-                maxLength={500}
-              />
-              <p className="mt-1 text-sm text-gray-500">
+                maxLength={500} />
+              <p className="mt-1 text-sm text-muted">
                 {description.length}/500 {t('collection.characters')}
               </p>
             </div>
 
             {/* Category */}
             <div>
-              <label className="block text-xs font-medium text-gray-500 mb-1 uppercase tracking-wide">
+              <label className="block text-xs font-medium text-muted mb-1 uppercase tracking-wide">
                 {t('common.category')}
               </label>
-              <select
+              <Select
                 value={categoryId}
                 onChange={(e) => setCategoryId(e.target.value)}
-                className="w-full px-3 py-2.5 border border-gray-200 rounded text-sm text-gray-900 bg-white focus:outline-none focus:border-orange-400"
               >
                 <option value="">{t('common.none')}</option>
                 {flatCategories.map((cat) => (
@@ -324,17 +325,17 @@ export default function EditCollectionPage() {
                     {cat.name}
                   </option>
                 ))}
-              </select>
+              </Select>
             </div>
 
             {/* Cover Image Upload */}
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
+              <label className="block text-sm font-medium text-body mb-2">
                 Kapak Resmi
               </label>
               <div className="space-y-3">
                 {coverImagePreview && (
-                  <div className="relative w-full h-48 rounded overflow-hidden border border-gray-200">
+                  <div className="relative w-full h-48 rounded overflow-hidden border border-border">
                     <OptimizedImage
                       src={coverImagePreview}
                       alt="Cover preview"
@@ -344,69 +345,69 @@ export default function EditCollectionPage() {
                     />
                   </div>
                 )}
-                <input
-                  type="file"
+                <Input type="file"
                   accept="image/*"
                   onChange={handleCoverImageChange}
                   disabled={isUploadingCover}
-                  className="w-full px-3 py-2.5 border border-gray-200 rounded text-sm text-gray-900 bg-white focus:outline-none focus:border-orange-400 disabled:opacity-50 disabled:cursor-not-allowed"
-                />
+                  className="w-full px-3 py-2.5 border border-border rounded text-sm text-heading bg-surface-elevated focus:outline-none focus:border-primary-400 disabled:opacity-50 disabled:cursor-not-allowed" />
                 {isUploadingCover && (
-                  <p className="text-sm text-gray-500">Yükleniyor...</p>
+                  <p className="text-sm text-muted">Yükleniyor...</p>
                 )}
-                <p className="text-sm text-gray-500">
+                <p className="text-sm text-muted">
                   Kapak resmi yükleyin (maksimum 10MB). Kapak resmi yoksa otomatik olarak ilk 4 ürünün resimlerinden oluşturulacaktır.
                 </p>
               </div>
             </div>
 
             {/* Public/Private */}
-            <div className="flex items-center gap-3 p-3 bg-gray-50 rounded border border-gray-100">
-              <input
-                type="checkbox"
+            <div className="flex items-center gap-3 p-3 bg-surface rounded border border-border-subtle">
+              <Checkbox
                 id="isPublic"
                 checked={isPublic}
                 onChange={(e) => setIsPublic(e.target.checked)}
-                className="w-4 h-4 text-orange-500 border-gray-300 rounded focus:ring-orange-500"
+                label={t('collection.publicCollection')}
               />
-              <label htmlFor="isPublic" className="text-sm font-medium text-gray-700 cursor-pointer">
-                {t('collection.publicCollection')}
-              </label>
             </div>
-            <p className="text-sm text-gray-500 -mt-4">
+            <p className="text-sm text-muted -mt-4">
               {isPublic
                 ? t('collection.publicCollectionDesc')
                 : t('collection.privateCollectionDesc')}
             </p>
 
             {/* Actions */}
-            <div className="flex flex-col gap-4 pt-4 border-t border-gray-200">
+            <div className="flex flex-col gap-4 pt-4 border-t border-border">
               <div className="flex gap-4">
-                <button
+                <Button
                   type="button"
+                  variant="secondary"
+                  size="md"
+                  className="flex-1"
                   onClick={() => router.back()}
-                  className="flex-1 px-5 py-2.5 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded text-sm font-medium transition-colors"
                 >
                   {t('common.cancel')}
-                </button>
-                <button
+                </Button>
+                <Button
                   type="submit"
+                  variant="primary"
+                  size="md"
+                  className="flex-1"
                   disabled={isSaving || !name.trim()}
-                  className="flex-1 px-5 py-2.5 bg-orange-500 hover:bg-orange-600 text-white rounded text-sm font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                 >
                   {isSaving ? t('collection.saving') : t('collection.saveChanges')}
-                </button>
+                </Button>
               </div>
               
               {/* Delete Button */}
-              <button
+              <Button
                 type="button"
+                variant="danger"
+                size="md"
+                className="flex items-center justify-center gap-2"
                 onClick={() => setShowDeleteModal(true)}
-                className="flex items-center justify-center gap-2 px-5 py-2.5 bg-red-500 hover:bg-red-600 text-white rounded text-sm font-medium transition-colors"
               >
                 <TrashIcon className="w-5 h-5" />
                 {t('collection.deleteCollection')}
-              </button>
+              </Button>
             </div>
           </form>
         </div>
@@ -414,31 +415,35 @@ export default function EditCollectionPage() {
 
       {/* Delete Confirmation Modal */}
       {showDeleteModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
-          <div className="bg-white rounded p-6 w-full max-w-md shadow-xl">
-            <h2 className="text-lg font-bold mb-3 text-gray-900">
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-heading/50">
+          <div className="bg-surface-elevated rounded p-6 w-full max-w-md shadow-xl">
+            <h2 className="text-lg font-bold mb-3 text-heading">
               {t('collection.deleteCollection')}
             </h2>
-            <p className="text-gray-500 text-sm mb-5">
+            <p className="text-muted text-sm mb-5">
               {t('collection.deleteCollectionConfirm')}
             </p>
             <div className="flex gap-3">
-              <button
+              <Button
                 type="button"
+                variant="secondary"
+                size="md"
+                className="flex-1"
                 onClick={() => setShowDeleteModal(false)}
                 disabled={isDeleting}
-                className="flex-1 px-4 py-2.5 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded text-sm font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 {t('common.cancel')}
-              </button>
-              <button
+              </Button>
+              <Button
                 type="button"
+                variant="danger"
+                size="md"
+                className="flex-1"
                 onClick={handleDelete}
                 disabled={isDeleting}
-                className="flex-1 px-4 py-2.5 bg-red-500 hover:bg-red-600 text-white rounded text-sm font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 {isDeleting ? t('collection.deleting') : t('collection.yesDelete')}
-              </button>
+              </Button>
             </div>
           </div>
         </div>

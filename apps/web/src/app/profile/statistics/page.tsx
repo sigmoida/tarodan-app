@@ -28,6 +28,7 @@ import {
 import { StarIcon as StarSolidIcon } from '@heroicons/react/24/solid';
 import { api } from '@/lib/api';
 import { useAuthStore } from '@/stores/authStore';
+import AuthLoadingScreen from '@/components/AuthLoadingScreen';
 import { useTranslation } from '@/i18n';
 
 interface RecentSale {
@@ -62,19 +63,20 @@ interface UserStats {
 export default function StatisticsPage() {
   const router = useRouter();
   const { t } = useTranslation();
-  const { isAuthenticated, user } = useAuthStore();
+  const { isAuthenticated, isLoading: authLoading, user } = useAuthStore();
   const [stats, setStats] = useState<UserStats | null>(null);
   const [recentSales, setRecentSales] = useState<RecentSale[]>([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
+    if (authLoading) return;
     if (!isAuthenticated) {
       router.push('/login');
       return;
     }
     loadStatistics();
     loadRecentSales();
-  }, [isAuthenticated]);
+  }, [authLoading, isAuthenticated]);
 
   const loadStatistics = async () => {
     try {
@@ -196,19 +198,22 @@ export default function StatisticsPage() {
     visible: { opacity: 1, y: 0 }
   };
 
+  if (authLoading) {
+    return <AuthLoadingScreen />;
+  }
   if (!isAuthenticated) {
     return null;
   }
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-gray-50 via-white to-orange-50">
+      <div className="min-h-screen bg-gradient-to-br from-surface via-surface-elevated to-primary-50">
         <div className="max-w-6xl mx-auto px-4 py-8">
           <div className="animate-pulse space-y-6">
-            <div className="h-10 bg-gray-200 rounded-xl w-1/3" />
+            <div className="h-10 bg-border-subtle rounded-xl w-1/3" />
             <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
               {[...Array(8)].map((_, i) => (
-                <div key={i} className="h-32 bg-gray-200 rounded-2xl" />
+                <div key={i} className="h-32 bg-border-subtle rounded-2xl" />
               ))}
             </div>
           </div>
@@ -240,16 +245,16 @@ export default function StatisticsPage() {
   }) => (
     <motion.div 
       variants={itemVariants}
-      className="bg-white rounded-2xl p-5 shadow-sm border border-gray-100 hover:shadow-lg hover:border-orange-200 transition-all duration-300 group"
+      className="bg-surface-elevated rounded-2xl p-5 shadow-sm border border-border-subtle hover:shadow-lg hover:border-primary-200 transition-all duration-300 group"
     >
       <div className="flex items-start gap-4">
         <div className={`p-3 rounded-xl ${gradient} shadow-lg group-hover:scale-110 transition-transform`}>
-          <Icon className="w-6 h-6 text-white" />
+          <Icon className="w-6 h-6 text-inverted" />
         </div>
         <div className="flex-1">
-          <p className="text-2xl font-bold text-gray-900">{value}</p>
-          <p className="text-sm text-gray-500">{title}</p>
-          {subtitle && <p className="text-xs text-gray-400 mt-0.5">{subtitle}</p>}
+          <p className="text-2xl font-bold text-heading">{value}</p>
+          <p className="text-sm text-muted">{title}</p>
+          {subtitle && <p className="text-xs text-subtle mt-0.5">{subtitle}</p>}
         </div>
       </div>
     </motion.div>
@@ -273,24 +278,24 @@ export default function StatisticsPage() {
   }) => (
     <motion.div 
       variants={itemVariants}
-      className="bg-white rounded-2xl p-6 shadow-sm border border-gray-100 hover:shadow-lg transition-all duration-300"
+      className="bg-surface-elevated rounded-2xl p-6 shadow-sm border border-border-subtle hover:shadow-lg transition-all duration-300"
     >
       <div className="flex items-center gap-4 mb-4">
         <div className={`p-3 rounded-xl ${gradient} shadow-lg`}>
-          <Icon className="w-6 h-6 text-white" />
+          <Icon className="w-6 h-6 text-inverted" />
         </div>
         <div>
-          <p className="text-sm text-gray-500">{title}</p>
-          <p className="text-3xl font-bold text-gray-900">{value}</p>
-          {subtitle && <p className="text-xs text-gray-400">{subtitle}</p>}
+          <p className="text-sm text-muted">{title}</p>
+          <p className="text-3xl font-bold text-heading">{value}</p>
+          {subtitle && <p className="text-xs text-subtle">{subtitle}</p>}
         </div>
       </div>
       {extraInfo && (
-        <div className="grid grid-cols-2 gap-3 pt-4 border-t border-gray-100">
+        <div className="grid grid-cols-2 gap-3 pt-4 border-t border-border-subtle">
           {extraInfo.map((info, i) => (
-            <div key={i} className="text-center p-2 bg-gray-50 rounded-lg">
-              <p className="text-lg font-semibold text-gray-900">{info.value}</p>
-              <p className="text-xs text-gray-500">{info.label}</p>
+            <div key={i} className="text-center p-2 bg-surface rounded-lg">
+              <p className="text-lg font-semibold text-heading">{info.value}</p>
+              <p className="text-xs text-muted">{info.label}</p>
             </div>
           ))}
         </div>
@@ -299,13 +304,13 @@ export default function StatisticsPage() {
   );
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-gray-50 via-white to-orange-50">
+    <div className="min-h-screen bg-gradient-to-br from-surface via-surface-elevated to-primary-50">
       {/* Hero Header */}
-      <div className="bg-gradient-to-r from-orange-500 via-orange-600 to-amber-500 text-white">
+      <div className="bg-gradient-to-r from-primary-500 via-primary-600 to-warning-500 text-inverted">
         <div className="max-w-6xl mx-auto px-4 py-8">
           <Link
             href="/profile"
-            className="inline-flex items-center gap-2 text-orange-100 hover:text-white mb-6 transition-colors"
+            className="inline-flex items-center gap-2 text-primary-100 hover:text-inverted mb-6 transition-colors"
           >
             <ArrowLeftIcon className="w-5 h-5" />
             Profile Dön
@@ -313,20 +318,20 @@ export default function StatisticsPage() {
           
           <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
             <div className="flex items-center gap-4">
-              <div className="p-4 bg-white/20 rounded-2xl backdrop-blur-sm">
+              <div className="p-4 bg-surface-elevated/20 rounded-2xl backdrop-blur-sm">
                 <ChartBarIcon className="w-10 h-10" />
               </div>
               <div>
                 <h1 className="text-3xl font-bold">İstatistiklerim</h1>
-                <p className="text-orange-100">Hesap özeti ve performans verileri</p>
+                <p className="text-primary-100">Hesap özeti ve performans verileri</p>
               </div>
             </div>
             
             {/* Membership Badge */}
-            <div className="flex items-center gap-3 bg-white/10 backdrop-blur-sm rounded-xl px-4 py-3">
-              <TrophyIcon className="w-6 h-6 text-amber-300" />
+            <div className="flex items-center gap-3 bg-surface-elevated/10 backdrop-blur-sm rounded-xl px-4 py-3">
+              <TrophyIcon className="w-6 h-6 text-warning-300" />
               <div>
-                <p className="text-sm text-orange-100">Üyelik Süresi</p>
+                <p className="text-sm text-primary-100">Üyelik Süresi</p>
                 <p className="font-semibold">
                   {membershipMonths > 0 ? `${membershipMonths} ay` : `${membershipDays} gün`}
                 </p>
@@ -350,7 +355,7 @@ export default function StatisticsPage() {
                 title="İlanlarım"
                 value={stats.productsCount}
                 icon={TagIcon}
-                gradient="bg-gradient-to-br from-blue-500 to-blue-600"
+                gradient="bg-gradient-to-br from-info-500 to-info-600"
                 extraInfo={[
                   { label: 'Aktif', value: stats.activeProductsCount },
                   { label: 'Satıldı', value: stats.soldProductsCount },
@@ -361,7 +366,7 @@ export default function StatisticsPage() {
                 title="Siparişlerim"
                 value={stats.ordersCount}
                 icon={ShoppingBagIcon}
-                gradient="bg-gradient-to-br from-green-500 to-emerald-500"
+                gradient="bg-gradient-to-br from-success-500 to-success-500"
                 extraInfo={[
                   { label: 'Tamamlanan', value: stats.completedOrdersCount },
                   { label: 'Bekleyen', value: stats.ordersCount - stats.completedOrdersCount },
@@ -372,7 +377,7 @@ export default function StatisticsPage() {
                 title="Takaslarım"
                 value={stats.tradesCount}
                 icon={ArrowsRightLeftIcon}
-                gradient="bg-gradient-to-br from-purple-500 to-violet-500"
+                gradient="bg-gradient-to-br from-primary-500 to-primary-500"
                 extraInfo={[
                   { label: 'Başarılı', value: stats.successfulTradesCount },
                   { label: 'Oran', value: stats.tradesCount > 0 ? `%${Math.round((stats.successfulTradesCount / stats.tradesCount) * 100)}` : '%0' },
@@ -384,18 +389,18 @@ export default function StatisticsPage() {
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
               <motion.div 
                 variants={itemVariants}
-                className="bg-gradient-to-br from-green-500 to-emerald-600 rounded-2xl p-6 text-white shadow-lg"
+                className="bg-gradient-to-br from-success-500 to-success-600 rounded-2xl p-6 text-inverted shadow-lg"
               >
                 <div className="flex items-center gap-4 mb-4">
-                  <div className="p-3 bg-white/20 rounded-xl">
+                  <div className="p-3 bg-surface-elevated/20 rounded-xl">
                     <ArrowTrendingUpIcon className="w-8 h-8" />
                   </div>
                   <div>
-                    <p className="text-green-100">Toplam Kazanç</p>
+                    <p className="text-success-100">Toplam Kazanç</p>
                     <p className="text-4xl font-bold">{stats.totalRevenue.toLocaleString('tr-TR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} TL</p>
                   </div>
                 </div>
-                <div className="flex items-center gap-2 text-green-100 text-sm">
+                <div className="flex items-center gap-2 text-success-100 text-sm">
                   <CheckBadgeIcon className="w-5 h-5" />
                   <span>{stats.soldProductsCount} ürün satışından</span>
                 </div>
@@ -403,18 +408,18 @@ export default function StatisticsPage() {
               
               <motion.div 
                 variants={itemVariants}
-                className="bg-gradient-to-br from-orange-500 to-amber-500 rounded-2xl p-6 text-white shadow-lg"
+                className="bg-gradient-to-br from-primary-500 to-warning-500 rounded-2xl p-6 text-inverted shadow-lg"
               >
                 <div className="flex items-center gap-4 mb-4">
-                  <div className="p-3 bg-white/20 rounded-xl">
+                  <div className="p-3 bg-surface-elevated/20 rounded-xl">
                     <ShoppingCartIcon className="w-8 h-8" />
                   </div>
                   <div>
-                    <p className="text-orange-100">Toplam Harcama</p>
+                    <p className="text-primary-100">Toplam Harcama</p>
                     <p className="text-4xl font-bold">{stats.totalSpent.toLocaleString('tr-TR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} TL</p>
                   </div>
                 </div>
-                <div className="flex items-center gap-2 text-orange-100 text-sm">
+                <div className="flex items-center gap-2 text-primary-100 text-sm">
                   <CheckBadgeIcon className="w-5 h-5" />
                   <span>{stats.completedOrdersCount} sipariş tamamlandı</span>
                 </div>
@@ -425,16 +430,16 @@ export default function StatisticsPage() {
             {recentSales.length > 0 && (
               <motion.div 
                 variants={itemVariants}
-                className="bg-white rounded-2xl p-6 shadow-sm border border-gray-100"
+                className="bg-surface-elevated rounded-2xl p-6 shadow-sm border border-border-subtle"
               >
                 <div className="flex items-center justify-between mb-5">
-                  <h3 className="font-semibold text-gray-900 flex items-center gap-2">
-                    <ShoppingBagIcon className="w-5 h-5 text-green-500" />
+                  <h3 className="font-semibold text-heading flex items-center gap-2">
+                    <ShoppingBagIcon className="w-5 h-5 text-success-500" />
                     Son Satışlar
                   </h3>
                   <Link 
                     href="/orders" 
-                    className="text-sm text-orange-500 hover:text-orange-600 font-medium"
+                    className="text-sm text-primary-500 hover:text-primary-600 font-medium"
                   >
                     Tümünü Gör
                   </Link>
@@ -444,26 +449,26 @@ export default function StatisticsPage() {
                     <Link 
                       key={sale.id}
                       href={`/orders?highlight=${sale.orderId}`}
-                      className="flex items-center gap-4 p-3 rounded-xl hover:bg-gray-50 transition-colors group"
+                      className="flex items-center gap-4 p-3 rounded-xl hover:bg-surface transition-colors group"
                     >
-                      <div className="w-12 h-12 rounded-lg bg-gray-100 overflow-hidden flex-shrink-0">
+                      <div className="w-12 h-12 rounded-lg bg-surface-alt overflow-hidden flex-shrink-0">
                         {sale.productImage ? (
                           <img src={sale.productImage} alt="" className="w-full h-full object-cover" />
                         ) : (
                           <div className="w-full h-full flex items-center justify-center">
-                            <TagIcon className="w-5 h-5 text-gray-400" />
+                            <TagIcon className="w-5 h-5 text-subtle" />
                           </div>
                         )}
                       </div>
                       <div className="flex-1 min-w-0">
-                        <p className="text-sm font-medium text-gray-900 truncate group-hover:text-orange-600">
+                        <p className="text-sm font-medium text-heading truncate group-hover:text-primary-600">
                           {sale.productTitle}
                         </p>
-                        <p className="text-xs text-gray-500">
+                        <p className="text-xs text-muted">
                           @{sale.buyerName} &middot; {new Date(sale.soldAt).toLocaleDateString('tr-TR')}
                         </p>
                       </div>
-                      <span className="text-sm font-bold text-green-600 whitespace-nowrap">
+                      <span className="text-sm font-bold text-success-600 whitespace-nowrap">
                         +{sale.amount.toLocaleString('tr-TR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} TL
                       </span>
                     </Link>
@@ -479,28 +484,28 @@ export default function StatisticsPage() {
                 value={stats.totalViews.toLocaleString('tr-TR')}
                 subtitle="Tüm ilanlar"
                 icon={EyeIcon}
-                gradient="bg-gradient-to-br from-cyan-500 to-blue-500"
+                gradient="bg-gradient-to-br from-info-500 to-info-500"
               />
               <StatCard
                 title="Favori"
                 value={stats.totalFavorites.toLocaleString('tr-TR')}
                 subtitle="Beğeniler"
                 icon={HeartIcon}
-                gradient="bg-gradient-to-br from-red-500 to-pink-500"
+                gradient="bg-gradient-to-br from-danger-500 to-danger-500"
               />
               <StatCard
                 title="Koleksiyon"
                 value={stats.collectionsCount}
                 subtitle="Oluşturulan"
                 icon={RectangleStackIcon}
-                gradient="bg-gradient-to-br from-indigo-500 to-purple-500"
+                gradient="bg-gradient-to-br from-info-500 to-primary-500"
               />
               <StatCard
                 title="Puan"
                 value={stats.rating > 0 ? stats.rating.toFixed(1) : '-'}
                 subtitle={stats.reviewsCount > 0 ? `${stats.reviewsCount} değerlendirme` : 'Henüz yok'}
                 icon={StarIcon}
-                gradient="bg-gradient-to-br from-amber-500 to-yellow-500"
+                gradient="bg-gradient-to-br from-warning-500 to-warning-500"
               />
             </div>
 
@@ -508,16 +513,16 @@ export default function StatisticsPage() {
             {stats.rating > 0 && (
               <motion.div 
                 variants={itemVariants}
-                className="bg-white rounded-2xl p-6 shadow-sm border border-gray-100"
+                className="bg-surface-elevated rounded-2xl p-6 shadow-sm border border-border-subtle"
               >
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-4">
-                    <div className="p-3 bg-gradient-to-br from-amber-400 to-yellow-500 rounded-xl shadow-lg">
-                      <TrophyIcon className="w-6 h-6 text-white" />
+                    <div className="p-3 bg-gradient-to-br from-warning-400 to-warning-500 rounded-xl shadow-lg">
+                      <TrophyIcon className="w-6 h-6 text-inverted" />
                     </div>
                     <div>
-                      <h3 className="font-semibold text-gray-900">Satıcı Puanı</h3>
-                      <p className="text-sm text-gray-500">{stats.reviewsCount} müşteri değerlendirmesi</p>
+                      <h3 className="font-semibold text-heading">Satıcı Puanı</h3>
+                      <p className="text-sm text-muted">{stats.reviewsCount} müşteri değerlendirmesi</p>
                     </div>
                   </div>
                   <div className="flex items-center gap-2">
@@ -525,11 +530,11 @@ export default function StatisticsPage() {
                       {[1, 2, 3, 4, 5].map((star) => (
                         <StarSolidIcon 
                           key={star}
-                          className={`w-8 h-8 ${star <= Math.round(stats.rating) ? 'text-amber-400' : 'text-gray-200'}`}
+                          className={`w-8 h-8 ${star <= Math.round(stats.rating) ? 'text-warning-400' : 'text-border-subtle'}`}
                         />
                       ))}
                     </div>
-                    <span className="text-3xl font-bold text-gray-900 ml-2">{stats.rating.toFixed(1)}</span>
+                    <span className="text-3xl font-bold text-heading ml-2">{stats.rating.toFixed(1)}</span>
                   </div>
                 </div>
               </motion.div>
@@ -538,40 +543,40 @@ export default function StatisticsPage() {
             {/* Quick Links */}
             <motion.div 
               variants={itemVariants}
-              className="bg-white rounded-2xl p-6 shadow-sm border border-gray-100"
+              className="bg-surface-elevated rounded-2xl p-6 shadow-sm border border-border-subtle"
             >
-              <h3 className="font-semibold text-gray-900 mb-4 flex items-center gap-2">
-                <FireIcon className="w-5 h-5 text-orange-500" />
+              <h3 className="font-semibold text-heading mb-4 flex items-center gap-2">
+                <FireIcon className="w-5 h-5 text-primary-500" />
                 Hızlı Erişim
               </h3>
               <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
                 <Link 
                   href="/profile/listings"
-                  className="flex items-center gap-3 p-4 bg-gray-50 rounded-xl hover:bg-orange-50 hover:border-orange-200 border border-transparent transition-all group"
+                  className="flex items-center gap-3 p-4 bg-surface rounded-xl hover:bg-primary-50 hover:border-primary-200 border border-transparent transition-all group"
                 >
-                  <TagIcon className="w-5 h-5 text-gray-500 group-hover:text-orange-500" />
-                  <span className="text-sm font-medium text-gray-700 group-hover:text-orange-600">İlanlarım</span>
+                  <TagIcon className="w-5 h-5 text-muted group-hover:text-primary-500" />
+                  <span className="text-sm font-medium text-body group-hover:text-primary-600">İlanlarım</span>
                 </Link>
                 <Link 
                   href="/orders"
-                  className="flex items-center gap-3 p-4 bg-gray-50 rounded-xl hover:bg-orange-50 hover:border-orange-200 border border-transparent transition-all group"
+                  className="flex items-center gap-3 p-4 bg-surface rounded-xl hover:bg-primary-50 hover:border-primary-200 border border-transparent transition-all group"
                 >
-                  <ShoppingBagIcon className="w-5 h-5 text-gray-500 group-hover:text-orange-500" />
-                  <span className="text-sm font-medium text-gray-700 group-hover:text-orange-600">Siparişlerim</span>
+                  <ShoppingBagIcon className="w-5 h-5 text-muted group-hover:text-primary-500" />
+                  <span className="text-sm font-medium text-body group-hover:text-primary-600">Siparişlerim</span>
                 </Link>
                 <Link 
                   href="/trades"
-                  className="flex items-center gap-3 p-4 bg-gray-50 rounded-xl hover:bg-orange-50 hover:border-orange-200 border border-transparent transition-all group"
+                  className="flex items-center gap-3 p-4 bg-surface rounded-xl hover:bg-primary-50 hover:border-primary-200 border border-transparent transition-all group"
                 >
-                  <ArrowsRightLeftIcon className="w-5 h-5 text-gray-500 group-hover:text-orange-500" />
-                  <span className="text-sm font-medium text-gray-700 group-hover:text-orange-600">Takaslarım</span>
+                  <ArrowsRightLeftIcon className="w-5 h-5 text-muted group-hover:text-primary-500" />
+                  <span className="text-sm font-medium text-body group-hover:text-primary-600">Takaslarım</span>
                 </Link>
                 <Link 
                   href="/collections"
-                  className="flex items-center gap-3 p-4 bg-gray-50 rounded-xl hover:bg-orange-50 hover:border-orange-200 border border-transparent transition-all group"
+                  className="flex items-center gap-3 p-4 bg-surface rounded-xl hover:bg-primary-50 hover:border-primary-200 border border-transparent transition-all group"
                 >
-                  <RectangleStackIcon className="w-5 h-5 text-gray-500 group-hover:text-orange-500" />
-                  <span className="text-sm font-medium text-gray-700 group-hover:text-orange-600">Koleksiyonlarım</span>
+                  <RectangleStackIcon className="w-5 h-5 text-muted group-hover:text-primary-500" />
+                  <span className="text-sm font-medium text-body group-hover:text-primary-600">Koleksiyonlarım</span>
                 </Link>
               </div>
             </motion.div>
@@ -579,15 +584,15 @@ export default function StatisticsPage() {
             {/* Membership Info */}
             <motion.div 
               variants={itemVariants}
-              className="bg-gradient-to-r from-gray-800 via-gray-900 to-gray-800 rounded-2xl p-6 text-white"
+              className="bg-gradient-to-r from-body via-heading to-body rounded-2xl p-6 text-inverted"
             >
               <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
                 <div className="flex items-center gap-4">
-                  <div className="p-3 bg-white/10 rounded-xl">
+                  <div className="p-3 bg-surface-elevated/10 rounded-xl">
                     <CalendarDaysIcon className="w-8 h-8" />
                   </div>
                   <div>
-                    <p className="text-gray-400 text-sm">Üyelik Başlangıcı</p>
+                    <p className="text-subtle text-sm">Üyelik Başlangıcı</p>
                     <p className="text-xl font-semibold">
                       {memberSinceDate.toLocaleDateString('tr-TR', { 
                         year: 'numeric', 
@@ -595,7 +600,7 @@ export default function StatisticsPage() {
                         day: 'numeric' 
                       })}
                     </p>
-                    <p className="text-gray-500 text-sm mt-1">
+                    <p className="text-muted text-sm mt-1">
                       {membershipMonths > 0 
                         ? `${membershipMonths} aydır aramızdasınız` 
                         : `${membershipDays} gündür aramızdasınız`}
@@ -604,7 +609,7 @@ export default function StatisticsPage() {
                 </div>
                 <Link
                   href="/analytics"
-                  className="inline-flex items-center gap-2 px-6 py-3 bg-gradient-to-r from-orange-500 to-amber-500 text-white rounded-xl font-semibold hover:from-orange-600 hover:to-amber-600 transition-all shadow-lg"
+                  className="inline-flex items-center gap-2 px-6 py-3 bg-gradient-to-r from-primary-500 to-warning-500 text-inverted rounded-xl font-semibold hover:from-primary-600 hover:to-warning-600 transition-all shadow-lg"
                 >
                   <SparklesIcon className="w-5 h-5" />
                   Detaylı Analiz

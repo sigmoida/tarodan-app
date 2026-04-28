@@ -17,10 +17,7 @@ import Icon from 'react-native-vector-icons/Ionicons';
 import { useCartStore } from '../../stores/cartStore';
 import api from '../../services/api';
 
-const PAYMENT_METHODS = [
-  { id: 'paytr', name: 'PayTR', icon: 'card' },
-  { id: 'iyzico', name: 'Iyzico', icon: 'wallet' },
-];
+const PAYMENT_METHODS = [{ id: 'paytr', name: 'PayTR', icon: 'card' }];
 
 const CheckoutScreen = ({ navigation }: any) => {
   const { items, total, clearCart } = useCartStore();
@@ -71,7 +68,7 @@ const CheckoutScreen = ({ navigation }: any) => {
       // Initiate payment
       const paymentResponse = await api.initiatePayment(
         orderResponse.order.id,
-        paymentMethod as 'paytr' | 'iyzico'
+        paymentMethod as 'paytr'
       );
 
       // Handle payment redirect or webview

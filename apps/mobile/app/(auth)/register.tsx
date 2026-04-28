@@ -1,16 +1,18 @@
-import { View, ScrollView, KeyboardAvoidingView, Platform } from 'react-native';
+import { View, ScrollView, KeyboardAvoidingView, Platform, TouchableOpacity } from 'react-native';
 import { Text, TextInput, Button, Checkbox, useTheme } from 'react-native-paper';
 import { useForm, Controller } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import { useMutation } from '@tanstack/react-query';
 import { router } from 'expo-router';
+import { Ionicons } from '@expo/vector-icons';
 import { authApi } from '../../src/services/api';
 
 const registerSchema = z.object({
   displayName: z.string().min(2, 'İsim en az 2 karakter olmalı'),
   email: z.string().email('Geçerli email girin'),
-  password: z.string().min(6, 'Şifre en az 6 karakter olmalı'),
+  phone: z.string().optional(),
+  password: z.string().min(8, 'Şifre en az 8 karakter olmalı'),
   confirmPassword: z.string(),
   acceptTerms: z.boolean().refine(val => val, 'Kullanım koşullarını kabul etmelisiniz'),
 }).refine(data => data.password === data.confirmPassword, {
@@ -36,6 +38,7 @@ export default function RegisterScreen() {
       displayName: data.displayName,
       email: data.email,
       password: data.password,
+      phone: data.phone ? `+90${data.phone.replace(/\D/g, '').replace(/^90/, '')}` : undefined,
     }),
     onSuccess: () => {
       router.replace('/(auth)/login');
@@ -52,6 +55,13 @@ export default function RegisterScreen() {
       style={{ flex: 1, backgroundColor: theme.colors.background }}
     >
       <ScrollView contentContainerStyle={{ flexGrow: 1, justifyContent: 'center', padding: 24 }}>
+        <TouchableOpacity
+          onPress={() => router.canGoBack() ? router.back() : router.replace('/')}
+          style={{ position: 'absolute', top: 16, left: 0, zIndex: 10, width: 40, height: 40, borderRadius: 20, backgroundColor: '#f3f4f6', justifyContent: 'center', alignItems: 'center' }}
+        >
+          <Ionicons name="arrow-back" size={22} color="#111827" />
+        </TouchableOpacity>
+
         <Text variant="displaySmall" style={{ textAlign: 'center', marginBottom: 8, color: theme.colors.primary }}>
           Kayıt Ol
         </Text>
@@ -98,6 +108,21 @@ export default function RegisterScreen() {
             {errors.email.message}
           </Text>
         )}
+
+        <Controller
+          control={control}
+          name="phone"
+          render={({ field: { onChange, value } }) => (
+            <TextInput
+              label="Telefon (opsiyonel)"
+              value={value}
+              onChangeText={onChange}
+              keyboardType="phone-pad"
+              left={<TextInput.Affix text="+90" />}
+              style={{ marginBottom: 8 }}
+            />
+          )}
+        />
 
         <Controller
           control={control}

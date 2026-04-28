@@ -74,11 +74,13 @@ const PROMPT_CONFIG = {
 };
 
 export function SignupPrompt({ visible, onDismiss, type }: SignupPromptProps) {
+  if (!visible) return null;
+
   const config = PROMPT_CONFIG[type];
 
   return (
     <Modal
-      visible={visible}
+      visible
       transparent
       animationType="fade"
       onRequestClose={onDismiss}

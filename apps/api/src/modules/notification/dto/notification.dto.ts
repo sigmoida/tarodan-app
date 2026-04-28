@@ -10,12 +10,14 @@ export enum NotificationType {
   ORDER_COMPLETED = 'order_completed',
   ORDER_CANCELLED = 'order_cancelled',
   ORDER_REFUNDED = 'order_refunded',
+  ORDER_PREPARING_DEADLINE_WARNING = 'order_preparing_deadline_warning',
 
   // Offer notifications
   OFFER_RECEIVED = 'offer_received',
   OFFER_ACCEPTED = 'offer_accepted',
   OFFER_REJECTED = 'offer_rejected',
   OFFER_COUNTER = 'offer_counter',
+  OFFER_COUNTER_DECLINED = 'offer_counter_declined',
   OFFER_EXPIRED = 'offer_expired',
 
   // Product notifications
@@ -34,6 +36,11 @@ export enum NotificationType {
   TRADE_COUNTER = 'trade_counter',
   TRADE_SHIPPED = 'trade_shipped',
   TRADE_COMPLETED = 'trade_completed',
+  TRADE_AUTO_CANCELLED = 'trade_auto_cancelled',
+
+  // Cross-flow auto-rejection
+  OFFER_AUTO_REJECTED = 'offer_auto_rejected',
+  RESERVATION_EXPIRED = 'reservation_expired',
 
   // Messaging notifications
   NEW_MESSAGE = 'new_message',

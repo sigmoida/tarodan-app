@@ -71,19 +71,19 @@ const SITEMAP_SECTIONS = [
 export default function SitemapPage() {
   const { t } = useTranslation();
   return (
-    <div className="min-h-screen bg-gray-50">
-      <div className="bg-gradient-to-br from-gray-800 to-gray-900 text-white py-12">
+    <div className="min-h-screen bg-surface">
+      <div className="bg-gradient-to-br from-body to-heading text-inverted py-12">
         <div className="max-w-4xl mx-auto px-4">
           <h1 className="text-3xl font-bold mb-2">{t('utility.sitemap.title')}</h1>
-          <p className="text-gray-400">{t('utility.sitemap.subtitle')}</p>
+          <p className="text-subtle">{t('utility.sitemap.subtitle')}</p>
         </div>
       </div>
 
       <div className="max-w-4xl mx-auto px-4 py-12">
         <div className="grid gap-10 sm:grid-cols-1 md:grid-cols-2">
           {SITEMAP_SECTIONS.map((section) => (
-            <section key={section.titleKey} className="bg-white rounded-2xl shadow-sm p-6">
-              <h2 className="text-lg font-semibold text-gray-900 border-b border-gray-200 pb-2 mb-4">
+            <section key={section.titleKey} className="bg-surface-elevated rounded-2xl shadow-sm p-6">
+              <h2 className="text-lg font-semibold text-heading border-b border-border pb-2 mb-4">
                 {t(section.titleKey)}
               </h2>
               <ul className="space-y-2">
@@ -101,7 +101,7 @@ export default function SitemapPage() {
             </section>
           ))}
         </div>
-        <p className="mt-8 text-sm text-gray-500 text-center">
+        <p className="mt-8 text-sm text-muted text-center">
           <Link href="/" className="text-primary-500 hover:underline">
             {t('nav.home')}
           </Link>

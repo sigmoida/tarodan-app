@@ -21,13 +21,13 @@ export const ProductStatusLabels: Record<ProductStatus, string> = {
 };
 
 export const ProductStatusColors: Record<ProductStatus, string> = {
-  draft: 'bg-gray-100 text-gray-800',
-  pending: 'bg-yellow-100 text-yellow-800',
-  active: 'bg-green-100 text-green-800',
-  reserved: 'bg-blue-100 text-blue-800',
-  sold: 'bg-purple-100 text-purple-800',
-  inactive: 'bg-gray-100 text-gray-600',
-  rejected: 'bg-red-100 text-red-800',
+  draft: 'bg-surface-alt text-body',
+  pending: 'bg-warning-100 text-warning-800',
+  active: 'bg-success-100 text-success-800',
+  reserved: 'bg-info-100 text-info-800',
+  sold: 'bg-primary-100 text-primary-800',
+  inactive: 'bg-surface-alt text-muted',
+  rejected: 'bg-danger-100 text-danger-800',
 };
 
 /**

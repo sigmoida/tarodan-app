@@ -1,14 +1,30 @@
 import { View, ScrollView, StyleSheet, TouchableOpacity, Image, Alert, Linking } from 'react-native';
-import { Text, Button, Card, Chip, Divider, ActivityIndicator, Snackbar, TextInput, Modal, Portal } from 'react-native-paper';
-import { useState } from 'react';
+import {
+  Text,
+  Button,
+  Card,
+  Chip,
+  Divider,
+  ActivityIndicator,
+  Snackbar,
+  TextInput,
+  Modal,
+  Portal,
+  Checkbox,
+  RadioButton,
+} from 'react-native-paper';
+import { LinearGradient } from 'expo-linear-gradient';
+import { useState, useEffect } from 'react';
 import { router, useLocalSearchParams, Stack } from 'expo-router';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 import { format } from 'date-fns';
 import { tr } from 'date-fns/locale';
-import { api } from '../../src/services/api';
+import { tradesApi, addressesApi, paymentsApi, api } from '../../src/services/api';
 import { useAuthStore } from '../../src/stores/authStore';
 import { TarodanColors } from '../../src/theme';
+import { formatApiErrorMessage } from '../../src/utils/formatApiErrorMessage';
+import { transformImageUrl } from '../../src/utils/imageUrl';
 
 const TRADE_STATUSES = {
   pending: { label: 'Bekliyor', color: TarodanColors.warning, icon: 'time-outline' },
@@ -18,6 +34,16 @@ const TRADE_STATUSES = {
   initiator_shipped: { label: 'Kargo Gönderildi', color: TarodanColors.info, icon: 'cube-outline' },
   receiver_shipped: { label: 'Karşı Taraf Gönderdi', color: TarodanColors.info, icon: 'cube-outline' },
   both_shipped: { label: 'Her İki Kargo Yolda', color: TarodanColors.primary, icon: 'airplane-outline' },
+  initiator_received: {
+    label: 'Teslim Alındı',
+    color: TarodanColors.success,
+    icon: 'checkmark-done-circle-outline',
+  },
+  receiver_received: {
+    label: 'Teslim Alındı',
+    color: TarodanColors.success,
+    icon: 'checkmark-done-circle-outline',
+  },
   completed: { label: 'Tamamlandı', color: TarodanColors.success, icon: 'checkmark-done-circle-outline' },
   cancelled: { label: 'İptal Edildi', color: TarodanColors.textSecondary, icon: 'ban-outline' },
   disputed: { label: 'İtiraz Var', color: TarodanColors.error, icon: 'warning-outline' },
@@ -37,6 +63,11 @@ interface TradeItem {
   };
 }
 
+interface TradeShipmentInfo {
+  carrier?: string;
+  trackingNumber?: string;
+}
+
 interface Trade {
   id: string;
   tradeNumber: string;
@@ -52,6 +83,14 @@ interface Trade {
   receiverShippedAt: string | null;
   initiatorTrackingNumber: string | null;
   receiverTrackingNumber: string | null;
+  initiatorShipment?: TradeShipmentInfo | null;
+  receiverShipment?: TradeShipmentInfo | null;
+  cashPayment?: {
+    id?: string;
+    commission?: number;
+    totalAmount?: number;
+    status?: string;
+  } | null;
   completedAt: string | null;
   createdAt: string;
   initiator: { id: string; displayName: string; avatar?: string };
@@ -59,106 +98,281 @@ interface Trade {
   items: TradeItem[];
 }
 
+/**
+ * GET /trades/:id gövdesi TradeResponseDto: initiatorItems/receiverItems, initiatorName…
+ * Ekran: items[] + initiator/receiver { displayName }
+ */
+function normalizeTradeFromApi(raw: Record<string, unknown> | Trade | null | undefined): Trade | null {
+  if (!raw || typeof raw !== 'object') return null;
+  const r = raw as Record<string, any>;
+  if (
+    r.initiator &&
+    r.receiver &&
+    Array.isArray(r.items) &&
+    r.items.length > 0 &&
+    r.items[0]?.product?.title
+  ) {
+    return r as Trade;
+  }
+
+  const initiatorItems = Array.isArray(r.initiatorItems) ? r.initiatorItems : [];
+  const receiverItems = Array.isArray(r.receiverItems) ? r.receiverItems : [];
+
+  const mapItem = (item: any, side: 'initiator' | 'receiver'): TradeItem => {
+    const card =
+      item?.productImage ||
+      item?.productImages?.[0]?.cardUrl ||
+      item?.productImages?.[0]?.detailUrl ||
+      '';
+    const url = card ? transformImageUrl(card) : '';
+    return {
+      id: String(item.id),
+      productId: String(item.productId),
+      side,
+      quantity: Number(item.quantity ?? 1),
+      valueAtTrade: Number(item.valueAtTrade),
+      product: {
+        id: String(item.productId),
+        title: String(item.productTitle ?? 'Ürün'),
+        price: Number(item.valueAtTrade),
+        images: url ? [{ url }] : [],
+      },
+    };
+  };
+
+  const items: TradeItem[] = [
+    ...initiatorItems.map((i: any) => mapItem(i, 'initiator')),
+    ...receiverItems.map((i: any) => mapItem(i, 'receiver')),
+  ];
+
+  return {
+    ...r,
+    initiator: {
+      id: String(r.initiatorId),
+      displayName: String(r.initiatorName ?? 'Kullanıcı'),
+    },
+    receiver: {
+      id: String(r.receiverId),
+      displayName: String(r.receiverName ?? 'Kullanıcı'),
+    },
+    items,
+  } as Trade;
+}
+
+type ShipCarrier = 'aras' | 'yurtici' | 'mng';
+
 export default function TradeDetailScreen() {
-  const { id } = useLocalSearchParams();
+  const { id: idParam } = useLocalSearchParams();
+  const id = Array.isArray(idParam) ? idParam[0] : idParam;
   const { user } = useAuthStore();
   const queryClient = useQueryClient();
   
   const [snackbar, setSnackbar] = useState({ visible: false, message: '' });
   const [counterModalVisible, setCounterModalVisible] = useState(false);
   const [shippingModalVisible, setShippingModalVisible] = useState(false);
-  const [trackingNumber, setTrackingNumber] = useState('');
+  const [shipAddressId, setShipAddressId] = useState('');
+  const [shipCarrier, setShipCarrier] = useState<ShipCarrier>('aras');
   const [counterCashAmount, setCounterCashAmount] = useState('');
   const [counterMessage, setCounterMessage] = useState('');
 
+  const [cashPaymentLoading, setCashPaymentLoading] = useState(false);
+  const [cardError, setCardError] = useState<string | null>(null);
+  const [savedCards, setSavedCards] = useState<
+    Array<{
+      id: string;
+      cardBrand: string;
+      lastFour: string;
+      expiryMonth: number;
+      expiryYear: number;
+      isDefault?: boolean;
+    }>
+  >([]);
+  const [selectedSavedCard, setSelectedSavedCard] = useState<string | null>(null);
+  const [useNewCard, setUseNewCard] = useState(false);
+  const [cardName, setCardName] = useState('');
+  const [cardNumber, setCardNumber] = useState('');
+  const [cardExpiry, setCardExpiry] = useState('');
+  const [cardCvc, setCardCvc] = useState('');
+  const [saveCard, setSaveCard] = useState(false);
+  const [cardsFetched, setCardsFetched] = useState(false);
+
   // Fetch trade details
-  const { data: trade, isLoading, refetch } = useQuery<Trade>({
+  const invalidateTradeCaches = () => {
+    queryClient.invalidateQueries({ queryKey: ['trade', id] });
+    queryClient.invalidateQueries({ queryKey: ['trades'] });
+    queryClient.invalidateQueries({ queryKey: ['products'] });
+    queryClient.invalidateQueries({
+      predicate: (q) => Array.isArray(q.queryKey) && q.queryKey[0] === 'product',
+    });
+    queryClient.invalidateQueries({ queryKey: ['listings'] });
+    queryClient.invalidateQueries({ queryKey: ['my-listings'] });
+    queryClient.invalidateQueries({ queryKey: ['my-tradeable-products'] });
+  };
+
+  const { data: trade, isLoading } = useQuery<Trade | null>({
     queryKey: ['trade', id],
     queryFn: async () => {
-      const response = await api.get(`/trades/${id}`);
-      return response.data;
+      const response = await tradesApi.getOne(String(id));
+      const d = response.data as Record<string, unknown> | undefined;
+      const raw = (d?.trade ?? d?.data ?? d) as Record<string, unknown> | undefined;
+      return normalizeTradeFromApi(raw);
     },
     enabled: !!id,
   });
 
-  // Accept trade mutation
+  /** Web `trades/[id]/page.tsx` ile aynı: nakit ödeme tamamlanmadan kargo adımı yok */
+  const cashPaymentPending = Boolean(
+    trade &&
+      (Number(trade.cashAmount) || 0) > 0 &&
+      trade.cashPayment?.status !== 'completed',
+  );
+  const isCashPayer = Boolean(trade && user && trade.cashPayerId === user.id);
+
+  const needToShip = Boolean(
+    trade &&
+      user &&
+      !cashPaymentPending &&
+      ((user.id === trade.initiatorId &&
+        !trade.initiatorShipment &&
+        !trade.initiatorShippedAt &&
+        (trade.status === 'accepted' || trade.status === 'receiver_shipped')) ||
+        (user.id === trade.receiverId &&
+          !trade.receiverShipment &&
+          !trade.receiverShippedAt &&
+          (trade.status === 'accepted' || trade.status === 'initiator_shipped'))),
+  );
+
+  useEffect(() => {
+    setCardsFetched(false);
+    setSavedCards([]);
+    setSelectedSavedCard(null);
+    setUseNewCard(false);
+    setCardError(null);
+    setCardNumber('');
+    setCardName('');
+    setCardExpiry('');
+    setCardCvc('');
+    setSaveCard(false);
+  }, [id]);
+
+  useEffect(() => {
+    if (!cashPaymentPending || !isCashPayer || cardsFetched) return;
+    api
+      .get('/payments/methods')
+      .then((res) => {
+        const cards = res.data?.methods || res.data || [];
+        const list = Array.isArray(cards) ? cards : [];
+        setSavedCards(list);
+        const defaultCard = list.find((c: { isDefault?: boolean }) => c.isDefault);
+        if (defaultCard) setSelectedSavedCard(defaultCard.id);
+        else if (list.length > 0) setSelectedSavedCard(list[0].id);
+        if (list.length === 0) setUseNewCard(true);
+        setCardsFetched(true);
+      })
+      .catch(() => {
+        setUseNewCard(true);
+        setCardsFetched(true);
+      });
+  }, [cashPaymentPending, isCashPayer, cardsFetched]);
+
+  const { data: shipAddresses = [], isLoading: addressesLoading } = useQuery({
+    queryKey: ['addresses'],
+    queryFn: async () => {
+      const res = await addressesApi.getAll();
+      const list = res.data?.data ?? res.data?.addresses ?? res.data ?? [];
+      return Array.isArray(list) ? list : [];
+    },
+    enabled: !!id && needToShip,
+  });
+
+  useEffect(() => {
+    if (!shippingModalVisible || !shipAddresses.length) return;
+    const valid = shipAddresses.some((a: { id: string }) => a.id === shipAddressId);
+    if (!shipAddressId || !valid) {
+      setShipAddressId((shipAddresses[0] as { id: string }).id);
+    }
+  }, [shippingModalVisible, shipAddresses, shipAddressId]);
+
+  // Accept trade mutation (web ile aynı isteğe bağlı mesaj)
   const acceptMutation = useMutation({
-    mutationFn: () => api.patch(`/trades/${id}/accept`),
+    mutationFn: () =>
+      tradesApi.accept(String(id), 'Takas teklifini kabul ediyorum'),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['trade', id] });
-      queryClient.invalidateQueries({ queryKey: ['trades'] });
+      invalidateTradeCaches();
       setSnackbar({ visible: true, message: 'Takas kabul edildi!' });
     },
-    onError: (error: any) => {
-      setSnackbar({ visible: true, message: error.response?.data?.message || 'İşlem başarısız' });
+    onError: (error: unknown) => {
+      setSnackbar({ visible: true, message: formatApiErrorMessage(error, 'İşlem başarısız') });
     },
   });
 
   // Reject trade mutation
   const rejectMutation = useMutation({
-    mutationFn: () => api.patch(`/trades/${id}/reject`),
+    mutationFn: () => tradesApi.reject(String(id)),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['trade', id] });
-      queryClient.invalidateQueries({ queryKey: ['trades'] });
+      invalidateTradeCaches();
       setSnackbar({ visible: true, message: 'Takas reddedildi' });
     },
-    onError: (error: any) => {
-      setSnackbar({ visible: true, message: error.response?.data?.message || 'İşlem başarısız' });
+    onError: (error: unknown) => {
+      setSnackbar({ visible: true, message: formatApiErrorMessage(error, 'İşlem başarısız') });
     },
   });
 
   // Counter offer mutation
   const counterMutation = useMutation({
-    mutationFn: () => api.patch(`/trades/${id}/counter`, {
-      cashAmount: parseFloat(counterCashAmount) || 0,
-      message: counterMessage,
-    }),
+    mutationFn: () =>
+      tradesApi.counter(String(id), {
+        initiatorItems: [],
+        receiverItems: [],
+        cashAmount: parseFloat(counterCashAmount) || 0,
+        message: counterMessage,
+      }),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['trade', id] });
+      invalidateTradeCaches();
       setCounterModalVisible(false);
       setSnackbar({ visible: true, message: 'Karşı teklif gönderildi!' });
     },
-    onError: (error: any) => {
-      setSnackbar({ visible: true, message: error.response?.data?.message || 'İşlem başarısız' });
+    onError: (error: unknown) => {
+      setSnackbar({ visible: true, message: formatApiErrorMessage(error, 'İşlem başarısız') });
     },
   });
 
-  // Ship trade mutation
+  // Ship trade mutation (API: fromAddressId + carrier — takip no sunucuda üretilir)
   const shipMutation = useMutation({
-    mutationFn: () => api.patch(`/trades/${id}/ship`, { trackingNumber }),
+    mutationFn: () =>
+      tradesApi.ship(String(id), { fromAddressId: shipAddressId, carrier: shipCarrier }),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['trade', id] });
+      invalidateTradeCaches();
+      queryClient.invalidateQueries({ queryKey: ['addresses'] });
       setShippingModalVisible(false);
-      setTrackingNumber('');
       setSnackbar({ visible: true, message: 'Kargo bilgisi kaydedildi!' });
     },
-    onError: (error: any) => {
-      setSnackbar({ visible: true, message: error.response?.data?.message || 'İşlem başarısız' });
+    onError: (error: unknown) => {
+      setSnackbar({ visible: true, message: formatApiErrorMessage(error, 'İşlem başarısız') });
     },
   });
 
   // Confirm receipt mutation
   const confirmMutation = useMutation({
-    mutationFn: () => api.patch(`/trades/${id}/confirm`),
+    mutationFn: () => tradesApi.confirmReceipt(String(id)),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['trade', id] });
+      invalidateTradeCaches();
       setSnackbar({ visible: true, message: 'Takas tamamlandı!' });
     },
-    onError: (error: any) => {
-      setSnackbar({ visible: true, message: error.response?.data?.message || 'İşlem başarısız' });
+    onError: (error: unknown) => {
+      setSnackbar({ visible: true, message: formatApiErrorMessage(error, 'İşlem başarısız') });
     },
   });
 
   // Cancel trade mutation
   const cancelMutation = useMutation({
-    mutationFn: () => api.patch(`/trades/${id}/cancel`),
+    mutationFn: () => tradesApi.cancel(String(id)),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['trade', id] });
-      queryClient.invalidateQueries({ queryKey: ['trades'] });
+      invalidateTradeCaches();
       setSnackbar({ visible: true, message: 'Takas iptal edildi' });
     },
-    onError: (error: any) => {
-      setSnackbar({ visible: true, message: error.response?.data?.message || 'İşlem başarısız' });
+    onError: (error: unknown) => {
+      setSnackbar({ visible: true, message: formatApiErrorMessage(error, 'İşlem başarısız') });
     },
   });
 
@@ -184,8 +398,8 @@ export default function TradeDetailScreen() {
   const otherParty = isInitiator ? trade.receiver : trade.initiator;
   const statusInfo = TRADE_STATUSES[trade.status as keyof typeof TRADE_STATUSES] || TRADE_STATUSES.pending;
 
-  const initiatorItems = trade.items.filter(item => item.side === 'initiator');
-  const receiverItems = trade.items.filter(item => item.side === 'receiver');
+  const initiatorItems = (trade.items || []).filter(item => item.side === 'initiator');
+  const receiverItems = (trade.items || []).filter(item => item.side === 'receiver');
 
   const myItems = isInitiator ? initiatorItems : receiverItems;
   const theirItems = isInitiator ? receiverItems : initiatorItems;
@@ -226,13 +440,87 @@ export default function TradeDetailScreen() {
     );
   };
 
-  const canShip = (trade.status === 'accepted' || trade.status === 'initiator_shipped' || trade.status === 'receiver_shipped') &&
-    ((isInitiator && !trade.initiatorShippedAt) || (isReceiver && !trade.receiverShippedAt));
+  /** Web `trades/[id]/page.tsx` handleCashPayment ile aynı akış */
+  const handleCashPayment = async () => {
+    if (!trade) return;
+    setCashPaymentLoading(true);
+    setCardError(null);
+    try {
+      const res = await paymentsApi.initiateTradeCash(trade.id);
+      const raw = res.data as Record<string, unknown> | undefined;
+      const data = (raw?.data ?? raw) as Record<string, unknown> | undefined;
+
+      if (data?.useBypass && data?.paymentId) {
+        try {
+          const bypassRes = await paymentsApi.bypassComplete(String(data.paymentId));
+          if (bypassRes.data?.success) {
+            invalidateTradeCaches();
+            setCashPaymentLoading(false);
+            router.push(`/payment/success?paymentId=${encodeURIComponent(String(data.paymentId))}`);
+            return;
+          }
+        } catch {
+          setSnackbar({ visible: true, message: 'Test ödemesi tamamlanamadı' });
+        }
+        setCashPaymentLoading(false);
+        return;
+      }
+
+      if (data?.paymentUrl) {
+        if (saveCard && useNewCard && cardNumber && cardExpiry) {
+          try {
+            const [month, year] = cardExpiry.split('/');
+            await api.post('/payments/methods', {
+              cardNumber: cardNumber.replace(/\s/g, ''),
+              cardHolder: cardName,
+              expiryMonth: parseInt(month, 10),
+              expiryYear: parseInt(`20${year}`, 10),
+              cvv: cardCvc,
+            });
+          } catch {
+            /* ignore */
+          }
+        }
+        const url = String(data.paymentUrl);
+        try {
+          const canOpen = await Linking.canOpenURL(url);
+          if (canOpen) await Linking.openURL(url);
+          else
+            setSnackbar({ visible: true, message: 'Ödeme bağlantısı açılamadı' });
+        } catch {
+          setSnackbar({ visible: true, message: 'Ödeme bağlantısı açılamadı' });
+        }
+        setCashPaymentLoading(false);
+        return;
+      }
+
+      if (data?.paymentId) {
+        setCashPaymentLoading(false);
+        router.push(`/payment/${data.paymentId}` as `/payment/${string}`);
+        return;
+      }
+
+      setSnackbar({ visible: true, message: 'Ödeme başlatılamadı' });
+      setCashPaymentLoading(false);
+    } catch (err: unknown) {
+      setSnackbar({
+        visible: true,
+        message: formatApiErrorMessage(err, 'Ödeme başlatılamadı'),
+      });
+      setCashPaymentLoading(false);
+    }
+  };
 
   const canConfirm = trade.status === 'both_shipped';
 
-  const myTrackingNumber = isInitiator ? trade.initiatorTrackingNumber : trade.receiverTrackingNumber;
-  const theirTrackingNumber = isInitiator ? trade.receiverTrackingNumber : trade.initiatorTrackingNumber;
+  const myShipment = isInitiator ? trade.initiatorShipment : trade.receiverShipment;
+  const theirShipment = isInitiator ? trade.receiverShipment : trade.initiatorShipment;
+  const myTrackingNumber =
+    myShipment?.trackingNumber ??
+    (isInitiator ? trade.initiatorTrackingNumber : trade.receiverTrackingNumber);
+  const theirTrackingNumber =
+    theirShipment?.trackingNumber ??
+    (isInitiator ? trade.receiverTrackingNumber : trade.initiatorTrackingNumber);
 
   return (
     <View style={styles.container}>
@@ -348,20 +636,284 @@ export default function TradeDetailScreen() {
           </Card.Content>
         </Card>
 
-        {/* Cash Adjustment */}
-        {trade.cashAmount && trade.cashAmount > 0 && (
-          <Card style={styles.card}>
+        {/* Nakit fark & ödeme — web trades/[id] ile aynı yapı */}
+        {trade.cashAmount != null && Number(trade.cashAmount) > 0 && (
+          <Card style={[styles.card, styles.cashPaymentCard]}>
             <Card.Content>
-              <Text variant="titleSmall" style={styles.sectionTitle}>Nakit Fark</Text>
-              <View style={styles.cashRow}>
-                <MaterialCommunityIcons name="cash" size={24} color={TarodanColors.primary} />
-                <Text variant="bodyMedium" style={styles.cashText}>
-                  {trade.cashPayerId === user?.id ? 'Ödeyeceğiniz' : 'Alacağınız'} tutar:
-                </Text>
-                <Text variant="titleMedium" style={styles.cashAmount}>
-                  ₺{Number(trade.cashAmount).toLocaleString('tr-TR')}
-                </Text>
+              <View style={styles.cashPaymentHeaderRow}>
+                <View style={styles.cashPaymentHeaderLeft}>
+                  <Text variant="bodySmall" style={styles.cashPaymentMuted}>
+                    Nakit Fark
+                  </Text>
+                  <Text variant="headlineSmall" style={styles.cashPaymentBigAmount}>
+                    {Math.abs(Number(trade.cashAmount)).toLocaleString('tr-TR', {
+                      minimumFractionDigits: 2,
+                      maximumFractionDigits: 2,
+                    })}{' '}
+                    TL
+                  </Text>
+                  {trade.cashPayment != null &&
+                    Number(trade.cashPayment.commission) > 0 &&
+                    trade.cashPayment.totalAmount != null && (
+                      <Text variant="bodySmall" style={styles.cashCommissionHint}>
+                        Komisyon dahil toplam:{' '}
+                        {Number(trade.cashPayment.totalAmount).toLocaleString('tr-TR', {
+                          minimumFractionDigits: 2,
+                          maximumFractionDigits: 2,
+                        })}{' '}
+                        TL
+                      </Text>
+                    )}
+                </View>
+                <View style={styles.cashPaymentHeaderRight}>
+                  <Text variant="bodySmall" style={styles.cashPaymentMuted} numberOfLines={2}>
+                    {trade.cashPayerId === trade.initiatorId
+                      ? `${trade.initiator.displayName} ödeyecek`
+                      : `${trade.receiver.displayName} ödeyecek`}
+                  </Text>
+                  {trade.cashPayment?.status === 'completed' && (
+                    <View style={styles.cashPaidBadge}>
+                      <Ionicons name="checkmark-circle" size={14} color="#15803d" />
+                      <Text style={styles.cashPaidBadgeText}>Ödendi</Text>
+                    </View>
+                  )}
+                </View>
               </View>
+
+              {(trade.status === 'accepted' || trade.status === 'awaiting_payment') &&
+                user &&
+                trade.cashPayerId === user.id &&
+                trade.cashPayment?.status !== 'completed' && (
+                  <View style={styles.cashCheckoutSection}>
+                    <LinearGradient
+                      colors={[TarodanColors.primary, '#2563eb']}
+                      start={{ x: 0, y: 0 }}
+                      end={{ x: 1, y: 0 }}
+                      style={styles.cashCheckoutBanner}
+                    >
+                      <View style={styles.cashCheckoutBannerTitleRow}>
+                        <MaterialCommunityIcons name="credit-card-outline" size={20} color="#fff" />
+                        <Text style={styles.cashCheckoutBannerTitle}>Ödemenizi Tamamlayın</Text>
+                      </View>
+                      <Text style={styles.cashCheckoutBannerSub}>
+                        Takas kabul edildi. Devam etmek için nakit fark ödemesini tamamlayın.
+                      </Text>
+                    </LinearGradient>
+
+                    {cardError ? (
+                      <View style={styles.cashCardErrorBox}>
+                        <Text style={styles.cashCardErrorText}>{cardError}</Text>
+                      </View>
+                    ) : null}
+
+                    <View style={styles.cashStepRow}>
+                      <View style={styles.cashStepNum}>
+                        <Text style={styles.cashStepNumText}>1</Text>
+                      </View>
+                      <MaterialCommunityIcons name="credit-card-outline" size={20} color={TarodanColors.primary} />
+                      <Text variant="titleSmall" style={styles.cashStepTitle}>
+                        Kart Bilgileri
+                      </Text>
+                    </View>
+
+                    <View style={styles.cashCardFormWrap}>
+                      {savedCards.length > 0 && (
+                        <View style={styles.savedCardsBlock}>
+                          <Text variant="bodySmall" style={styles.savedCardsLabel}>
+                            Kayıtlı Kartlarım
+                          </Text>
+                          <RadioButton.Group
+                            onValueChange={(v) => {
+                              if (v === '__new__') {
+                                setUseNewCard(true);
+                              } else {
+                                setSelectedSavedCard(v);
+                                setUseNewCard(false);
+                              }
+                            }}
+                            value={useNewCard ? '__new__' : selectedSavedCard ?? '__new__'}
+                          >
+                            {savedCards.map((c) => (
+                              <TouchableOpacity
+                                key={c.id}
+                                style={[
+                                  styles.savedCardOption,
+                                  !useNewCard && selectedSavedCard === c.id && styles.savedCardOptionSelected,
+                                ]}
+                                onPress={() => {
+                                  setSelectedSavedCard(c.id);
+                                  setUseNewCard(false);
+                                }}
+                                activeOpacity={0.7}
+                              >
+                                <RadioButton value={c.id} color={TarodanColors.primary} />
+                                <View style={styles.savedCardOptionText}>
+                                  <Text variant="bodyMedium">
+                                    {c.cardBrand} •••• {c.lastFour}
+                                  </Text>
+                                  <Text variant="bodySmall" style={styles.cashPaymentMuted}>
+                                    {String(c.expiryMonth).padStart(2, '0')}/{c.expiryYear}
+                                  </Text>
+                                </View>
+                                {c.isDefault ? (
+                                  <View style={styles.defaultCardTag}>
+                                    <Text style={styles.defaultCardTagText}>Varsayılan</Text>
+                                  </View>
+                                ) : null}
+                              </TouchableOpacity>
+                            ))}
+                            <TouchableOpacity
+                              style={[styles.savedCardOption, useNewCard && styles.savedCardOptionSelected]}
+                              onPress={() => setUseNewCard(true)}
+                              activeOpacity={0.7}
+                            >
+                              <RadioButton value="__new__" color={TarodanColors.primary} />
+                              <MaterialCommunityIcons name="plus" size={20} color={TarodanColors.textSecondary} />
+                              <Text variant="bodyMedium" style={styles.newCardRadioLabel}>
+                                Yeni Kart ile Öde
+                              </Text>
+                            </TouchableOpacity>
+                          </RadioButton.Group>
+                        </View>
+                      )}
+
+                      {(savedCards.length === 0 || useNewCard) && (
+                        <View style={styles.newCardFields}>
+                          <Text variant="bodySmall" style={styles.inputLabel}>
+                            Kart Üzerindeki İsim
+                          </Text>
+                          <TextInput
+                            mode="outlined"
+                            value={cardName}
+                            onChangeText={(t) => setCardName(t.toUpperCase())}
+                            placeholder="AD SOYAD"
+                            style={styles.cashInput}
+                          />
+                          <Text variant="bodySmall" style={styles.inputLabel}>
+                            Kart Numarası
+                          </Text>
+                          <TextInput
+                            mode="outlined"
+                            value={cardNumber}
+                            onChangeText={(t) => {
+                              setCardError(null);
+                              const digits = t.replace(/\D/g, '').slice(0, 16);
+                              const formatted = digits.replace(/(\d{4})(?=\d)/g, '$1 ');
+                              setCardNumber(formatted);
+                            }}
+                            placeholder="4508 3456 7890 1234"
+                            keyboardType="number-pad"
+                            style={styles.cashInput}
+                          />
+                          <View style={styles.cashExpiryRow}>
+                            <View style={styles.cashExpiryCol}>
+                              <Text variant="bodySmall" style={styles.inputLabel}>
+                                Son Kullanma Tarihi
+                              </Text>
+                              <TextInput
+                                mode="outlined"
+                                value={cardExpiry}
+                                onChangeText={(t) => {
+                                  const v = t.replace(/\D/g, '').slice(0, 4);
+                                  if (v.length >= 2) {
+                                    setCardExpiry(`${v.slice(0, 2)}/${v.slice(2)}`);
+                                  } else {
+                                    setCardExpiry(v);
+                                  }
+                                }}
+                                placeholder="AA/YY"
+                                maxLength={5}
+                                keyboardType="number-pad"
+                                style={styles.cashInput}
+                              />
+                            </View>
+                            <View style={styles.cashExpiryCol}>
+                              <Text variant="bodySmall" style={styles.inputLabel}>
+                                CVV/CVC
+                              </Text>
+                              <TextInput
+                                mode="outlined"
+                                value={cardCvc}
+                                onChangeText={(t) => setCardCvc(t.replace(/\D/g, '').slice(0, 3))}
+                                placeholder="•••"
+                                maxLength={3}
+                                secureTextEntry
+                                keyboardType="number-pad"
+                                style={styles.cashInput}
+                              />
+                            </View>
+                          </View>
+                          <View style={styles.saveCardRow}>
+                            <Checkbox
+                              status={saveCard ? 'checked' : 'unchecked'}
+                              onPress={() => setSaveCard(!saveCard)}
+                              color={TarodanColors.primary}
+                            />
+                            <Text
+                              variant="bodySmall"
+                              style={styles.saveCardLabel}
+                              onPress={() => setSaveCard(!saveCard)}
+                            >
+                              Bu kartı gelecekteki alışverişlerim için kaydet
+                            </Text>
+                          </View>
+                        </View>
+                      )}
+
+                      {!useNewCard && selectedSavedCard ? (
+                        <View style={styles.savedCardCvvBlock}>
+                          <Text variant="bodySmall" style={styles.inputLabel}>
+                            CVV/CVC (Güvenlik için tekrar girin)
+                          </Text>
+                          <TextInput
+                            mode="outlined"
+                            value={cardCvc}
+                            onChangeText={(t) => setCardCvc(t.replace(/\D/g, '').slice(0, 3))}
+                            placeholder="•••"
+                            maxLength={3}
+                            secureTextEntry
+                            keyboardType="number-pad"
+                            style={[styles.cashInput, styles.cashCvvNarrow]}
+                          />
+                        </View>
+                      ) : null}
+
+                      <View style={styles.sslHintRow}>
+                        <MaterialCommunityIcons name="shield-check" size={16} color="#22c55e" />
+                        <Text variant="bodySmall" style={styles.sslHintText}>
+                          256-bit SSL ile şifrelenmiş güvenli ödeme
+                        </Text>
+                      </View>
+                    </View>
+
+                    <Button
+                      mode="contained"
+                      onPress={handleCashPayment}
+                      disabled={cashPaymentLoading}
+                      style={styles.cashPayButton}
+                      contentStyle={styles.cashPayButtonContent}
+                      buttonColor="#16a34a"
+                    >
+                      <View style={styles.cashPayButtonInner}>
+                        {cashPaymentLoading ? (
+                          <ActivityIndicator size="small" color="#fff" />
+                        ) : (
+                          <MaterialCommunityIcons name="shield-check" size={20} color="#fff" />
+                        )}
+                        <Text style={styles.cashPayButtonLabel}>
+                          {cashPaymentLoading
+                            ? 'İşleniyor...'
+                            : `Ödeme Yap – ${Number(
+                                trade.cashPayment?.totalAmount ?? trade.cashAmount,
+                              ).toLocaleString('tr-TR', {
+                                minimumFractionDigits: 2,
+                                maximumFractionDigits: 2,
+                              })} TL`}
+                        </Text>
+                      </View>
+                    </Button>
+                  </View>
+                )}
             </Card.Content>
           </Card>
         )}
@@ -398,36 +950,32 @@ export default function TradeDetailScreen() {
               <Text variant="titleSmall" style={styles.sectionTitle}>Kargo Durumu</Text>
               
               <View style={styles.shippingRow}>
-                <Ionicons 
-                  name={myTrackingNumber ? 'checkmark-circle' : 'ellipse-outline'} 
-                  size={20} 
-                  color={myTrackingNumber ? TarodanColors.success : TarodanColors.textSecondary} 
+                <Ionicons
+                  name={myTrackingNumber ? 'checkmark-circle' : 'ellipse-outline'}
+                  size={20}
+                  color={myTrackingNumber ? TarodanColors.success : TarodanColors.textSecondary}
                 />
                 <Text variant="bodyMedium" style={styles.shippingText}>
-                  Sizin kargonuz: {myTrackingNumber || 'Henüz gönderilmedi'}
-                </Text>
-              </View>
-              
-              <View style={styles.shippingRow}>
-                <Ionicons 
-                  name={theirTrackingNumber ? 'checkmark-circle' : 'ellipse-outline'} 
-                  size={20} 
-                  color={theirTrackingNumber ? TarodanColors.success : TarodanColors.textSecondary} 
-                />
-                <Text variant="bodyMedium" style={styles.shippingText}>
-                  Karşı taraf: {theirTrackingNumber || 'Henüz gönderilmedi'}
+                  Sizin kargonuz:{' '}
+                  {myTrackingNumber
+                    ? `${myShipment?.carrier ? `${myShipment.carrier} · ` : ''}${myTrackingNumber}`
+                    : 'Henüz gönderilmedi'}
                 </Text>
               </View>
 
-              {theirTrackingNumber && (
-                <Button
-                  mode="outlined"
-                  onPress={() => Linking.openURL(`https://www.araskargo.com.tr/ttrweb/takip_sonuc.jsp?kession=&siession=&evession=&action=tr&ara=1&soression=${theirTrackingNumber}`)}
-                  style={styles.trackButton}
-                >
-                  Kargoyu Takip Et
-                </Button>
-              )}
+              <View style={styles.shippingRow}>
+                <Ionicons
+                  name={theirTrackingNumber ? 'checkmark-circle' : 'ellipse-outline'}
+                  size={20}
+                  color={theirTrackingNumber ? TarodanColors.success : TarodanColors.textSecondary}
+                />
+                <Text variant="bodyMedium" style={styles.shippingText}>
+                  Karşı taraf:{' '}
+                  {theirTrackingNumber
+                    ? `${theirShipment?.carrier ? `${theirShipment.carrier} · ` : ''}${theirTrackingNumber}`
+                    : 'Henüz gönderilmedi'}
+                </Text>
+              </View>
             </Card.Content>
           </Card>
         )}
@@ -491,14 +1039,14 @@ export default function TradeDetailScreen() {
           )}
 
           {/* Accepted: Ship button */}
-          {canShip && (
+          {needToShip && (
             <Button
               mode="contained"
               onPress={() => setShippingModalVisible(true)}
               icon="cube-send"
               style={styles.actionButton}
             >
-              Kargo Gönderildi
+              Kargo Bilgisi Gir
             </Button>
           )}
 
@@ -518,7 +1066,7 @@ export default function TradeDetailScreen() {
           {/* Message other party */}
           <Button
             mode="text"
-            onPress={() => router.push(`/messages/new?receiverId=${otherParty.id}`)}
+            onPress={() => router.push(`/messages/new?sellerId=${otherParty.id}`)}
             icon="chatbubble-outline"
           >
             Mesaj Gönder
@@ -568,25 +1116,91 @@ export default function TradeDetailScreen() {
         </Modal>
       </Portal>
 
-      {/* Shipping Modal */}
+      {/* Shipping Modal — web trades/[id] ile aynı: gönderim adresi + kargo firması */}
       <Portal>
         <Modal
           visible={shippingModalVisible}
           onDismiss={() => setShippingModalVisible(false)}
           contentContainerStyle={styles.modal}
         >
-          <Text variant="titleLarge" style={styles.modalTitle}>Kargo Bilgisi</Text>
-          <TextInput
-            label="Takip Numarası"
-            value={trackingNumber}
-            onChangeText={setTrackingNumber}
-            mode="outlined"
-            style={styles.modalInput}
-            placeholder="Kargo takip numaranızı girin"
-          />
-          <Text variant="bodySmall" style={styles.modalNote}>
-            Takip numarası karşı tarafla paylaşılacaktır.
+          <Text variant="titleLarge" style={styles.modalTitle}>
+            Kargo bilgisi
           </Text>
+          <Text variant="bodySmall" style={styles.modalNote}>
+            Gönderim yapacağınız kayıtlı adresi ve kargo firmasını seçin. Takip numarası sistem tarafından oluşturulur.
+          </Text>
+
+          {addressesLoading ? (
+            <ActivityIndicator style={{ marginVertical: 16 }} color={TarodanColors.primary} />
+          ) : shipAddresses.length === 0 ? (
+            <View style={{ marginVertical: 12 }}>
+              <Text variant="bodyMedium" style={{ color: TarodanColors.warning, marginBottom: 12 }}>
+                Kayıtlı adres yok. Profil → Adreslerim bölümünden ekleyin.
+              </Text>
+              <Button mode="contained" onPress={() => router.push('/settings/addresses')}>
+                Adres Ekle
+              </Button>
+            </View>
+          ) : (
+            <ScrollView style={{ maxHeight: 220 }} keyboardShouldPersistTaps="handled">
+              <Text variant="labelLarge" style={{ marginBottom: 8 }}>
+                Gönderim adresi
+              </Text>
+              {(shipAddresses as Array<{ id: string; fullName?: string; title?: string; city: string; district: string; address: string }>).map((addr) => (
+                <TouchableOpacity
+                  key={addr.id}
+                  style={[
+                    styles.shipAddressRow,
+                    shipAddressId === addr.id && styles.shipAddressRowSelected,
+                  ]}
+                  onPress={() => setShipAddressId(addr.id)}
+                >
+                  <Ionicons
+                    name={shipAddressId === addr.id ? 'radio-button-on' : 'radio-button-off'}
+                    size={22}
+                    color={shipAddressId === addr.id ? TarodanColors.primary : TarodanColors.textTertiary}
+                  />
+                  <View style={{ flex: 1, marginLeft: 10 }}>
+                    <Text variant="bodyMedium" numberOfLines={1}>
+                      {addr.fullName || addr.title || 'Adres'}
+                    </Text>
+                    <Text variant="bodySmall" style={{ color: TarodanColors.textSecondary }} numberOfLines={2}>
+                      {addr.district}/{addr.city} — {addr.address}
+                    </Text>
+                  </View>
+                </TouchableOpacity>
+              ))}
+            </ScrollView>
+          )}
+
+          <Text variant="labelLarge" style={{ marginTop: 16, marginBottom: 8 }}>
+            Kargo firması
+          </Text>
+          <View style={styles.carrierRow}>
+            {(
+              [
+                { id: 'aras' as const, label: 'Aras' },
+                { id: 'yurtici' as const, label: 'Yurtiçi' },
+                { id: 'mng' as const, label: 'MNG' },
+              ] as const
+            ).map((c) => (
+              <TouchableOpacity
+                key={c.id}
+                style={[styles.carrierChip, shipCarrier === c.id && styles.carrierChipSelected]}
+                onPress={() => setShipCarrier(c.id)}
+              >
+                <Text
+                  style={{
+                    fontWeight: '600',
+                    color: shipCarrier === c.id ? '#fff' : TarodanColors.textPrimary,
+                  }}
+                >
+                  {c.label}
+                </Text>
+              </TouchableOpacity>
+            ))}
+          </View>
+
           <View style={styles.modalActions}>
             <Button mode="outlined" onPress={() => setShippingModalVisible(false)}>
               İptal
@@ -595,9 +1209,9 @@ export default function TradeDetailScreen() {
               mode="contained"
               onPress={() => shipMutation.mutate()}
               loading={shipMutation.isPending}
-              disabled={!trackingNumber.trim()}
+              disabled={!shipAddressId || shipAddresses.length === 0 || shipMutation.isPending}
             >
-              Kaydet
+              Gönder
             </Button>
           </View>
         </Modal>
@@ -735,6 +1349,229 @@ const styles = StyleSheet.create({
     color: TarodanColors.primary,
     fontWeight: 'bold',
   },
+  cashPaymentCard: {
+    backgroundColor: '#f0fdf4',
+    borderWidth: 1,
+    borderColor: '#bbf7d0',
+  },
+  cashPaymentHeaderRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'flex-start',
+    gap: 12,
+    marginBottom: 4,
+  },
+  cashPaymentHeaderLeft: {
+    flex: 1,
+    minWidth: 0,
+  },
+  cashPaymentHeaderRight: {
+    alignItems: 'flex-end',
+    maxWidth: '46%',
+  },
+  cashPaymentMuted: {
+    color: TarodanColors.textSecondary,
+  },
+  cashPaymentBigAmount: {
+    color: '#15803d',
+    fontWeight: '700',
+    marginTop: 4,
+  },
+  cashCommissionHint: {
+    color: TarodanColors.textSecondary,
+    marginTop: 6,
+  },
+  cashPaidBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    marginTop: 8,
+    alignSelf: 'flex-end',
+    backgroundColor: '#dcfce7',
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 999,
+  },
+  cashPaidBadgeText: {
+    fontSize: 12,
+    fontWeight: '600',
+    color: '#15803d',
+  },
+  cashCheckoutSection: {
+    marginTop: 16,
+    paddingTop: 16,
+    borderTopWidth: 1,
+    borderTopColor: '#bbf7d0',
+    gap: 16,
+  },
+  cashCheckoutBanner: {
+    borderRadius: 10,
+    paddingHorizontal: 16,
+    paddingVertical: 14,
+    marginHorizontal: -4,
+  },
+  cashCheckoutBannerTitleRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  cashCheckoutBannerTitle: {
+    color: '#fff',
+    fontSize: 16,
+    fontWeight: '600',
+  },
+  cashCheckoutBannerSub: {
+    color: 'rgba(255,255,255,0.9)',
+    fontSize: 13,
+    marginTop: 6,
+    lineHeight: 18,
+  },
+  cashCardErrorBox: {
+    backgroundColor: '#fef2f2',
+    borderWidth: 1,
+    borderColor: '#fecaca',
+    borderRadius: 8,
+    padding: 12,
+  },
+  cashCardErrorText: {
+    color: '#b91c1c',
+    fontSize: 14,
+  },
+  cashStepRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    marginTop: 4,
+  },
+  cashStepNum: {
+    width: 24,
+    height: 24,
+    borderRadius: 12,
+    backgroundColor: TarodanColors.primary + '22',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  cashStepNumText: {
+    fontSize: 12,
+    fontWeight: '700',
+    color: TarodanColors.primary,
+  },
+  cashStepTitle: {
+    fontWeight: '600',
+  },
+  cashCardFormWrap: {
+    backgroundColor: TarodanColors.backgroundSecondary,
+    borderWidth: 1,
+    borderColor: TarodanColors.border,
+    borderRadius: 10,
+    padding: 14,
+  },
+  savedCardsBlock: {
+    marginBottom: 12,
+  },
+  savedCardsLabel: {
+    fontWeight: '600',
+    marginBottom: 10,
+    color: TarodanColors.textPrimary,
+  },
+  savedCardOption: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    paddingVertical: 10,
+    paddingHorizontal: 8,
+    borderWidth: 2,
+    borderColor: TarodanColors.border,
+    borderRadius: 10,
+    marginBottom: 8,
+  },
+  savedCardOptionSelected: {
+    borderColor: TarodanColors.primary,
+    backgroundColor: TarodanColors.primary + '12',
+  },
+  savedCardOptionText: {
+    flex: 1,
+    marginLeft: 4,
+  },
+  defaultCardTag: {
+    backgroundColor: TarodanColors.primary + '22',
+    paddingHorizontal: 8,
+    paddingVertical: 2,
+    borderRadius: 4,
+  },
+  defaultCardTagText: {
+    fontSize: 11,
+    fontWeight: '600',
+    color: TarodanColors.primary,
+  },
+  newCardRadioLabel: {
+    marginLeft: 4,
+    flex: 1,
+  },
+  newCardFields: {
+    gap: 4,
+  },
+  inputLabel: {
+    marginTop: 8,
+    marginBottom: 4,
+    color: TarodanColors.textSecondary,
+    fontWeight: '500',
+  },
+  cashInput: {
+    backgroundColor: '#fff',
+  },
+  cashExpiryRow: {
+    flexDirection: 'row',
+    gap: 12,
+  },
+  cashExpiryCol: {
+    flex: 1,
+  },
+  saveCardRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginTop: 8,
+    gap: 4,
+  },
+  saveCardLabel: {
+    flex: 1,
+    color: TarodanColors.textSecondary,
+  },
+  savedCardCvvBlock: {
+    marginTop: 12,
+  },
+  cashCvvNarrow: {
+    maxWidth: 140,
+  },
+  sslHintRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    marginTop: 12,
+  },
+  sslHintText: {
+    flex: 1,
+    color: TarodanColors.textSecondary,
+    fontSize: 12,
+  },
+  cashPayButton: {
+    borderRadius: 10,
+    marginTop: 4,
+  },
+  cashPayButtonContent: {
+    paddingVertical: 6,
+  },
+  cashPayButtonInner: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+  },
+  cashPayButtonLabel: {
+    color: '#fff',
+    fontSize: 16,
+    fontWeight: '600',
+  },
   messageBox: {
     backgroundColor: TarodanColors.backgroundSecondary,
     padding: 12,
@@ -807,5 +1644,37 @@ const styles = StyleSheet.create({
     justifyContent: 'flex-end',
     gap: 12,
     marginTop: 8,
+  },
+  shipAddressRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    padding: 12,
+    borderRadius: 10,
+    borderWidth: 1,
+    borderColor: TarodanColors.border,
+    marginBottom: 8,
+    backgroundColor: TarodanColors.backgroundSecondary,
+  },
+  shipAddressRowSelected: {
+    borderColor: TarodanColors.primary,
+    backgroundColor: TarodanColors.primaryLight,
+  },
+  carrierRow: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 8,
+    marginBottom: 8,
+  },
+  carrierChip: {
+    paddingVertical: 10,
+    paddingHorizontal: 14,
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: TarodanColors.border,
+    backgroundColor: TarodanColors.backgroundSecondary,
+  },
+  carrierChipSelected: {
+    backgroundColor: TarodanColors.primary,
+    borderColor: TarodanColors.primary,
   },
 });

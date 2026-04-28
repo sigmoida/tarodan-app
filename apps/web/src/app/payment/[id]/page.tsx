@@ -1,28 +1,29 @@
-'use client';
+"use client";
 
-import { useState, useEffect } from 'react';
-import { useParams, useRouter, useSearchParams } from 'next/navigation';
-import { motion } from 'framer-motion';
+import { useState, useEffect } from "react";
+import { useParams, useRouter, useSearchParams } from "next/navigation";
+import { motion } from "framer-motion";
 import {
   CreditCardIcon,
   ShieldCheckIcon,
   ArrowPathIcon,
   CheckCircleIcon,
   XCircleIcon,
-} from '@heroicons/react/24/outline';
-import toast from 'react-hot-toast';
-import { paymentsApi } from '@/lib/api';
-import { useAuthStore } from '@/stores/authStore';
-import CreditCardForm from '@/components/payment/CreditCardForm';
+} from "@heroicons/react/24/outline";
+import toast from "react-hot-toast";
+import { paymentsApi } from "@/lib/api";
+import { useAuthStore } from "@/stores/authStore";
+import AuthLoadingScreen from "@/components/AuthLoadingScreen";
+import { Button } from "@tarodan/ui";
 
 export default function PaymentPage() {
   const params = useParams();
   const router = useRouter();
   const searchParams = useSearchParams();
-  const { isAuthenticated } = useAuthStore();
+  const { isAuthenticated, isLoading: authLoading } = useAuthStore();
   const paymentId = params.id as string;
-  const isGuestCheckout = searchParams.get('guest') === 'true';
-  const isMembershipPayment = searchParams.get('type') === 'membership';
+  const isGuestCheckout = searchParams.get("guest") === "true";
+  const isMembershipPayment = searchParams.get("type") === "membership";
 
   const [payment, setPayment] = useState<any>(null);
   const [isLoading, setIsLoading] = useState(true);
@@ -30,19 +31,29 @@ export default function PaymentPage() {
   const [isProcessing, setIsProcessing] = useState(false);
 
   useEffect(() => {
-    const urlGuest = typeof window !== 'undefined' && window.location.search.includes('guest=true');
-    if (!isAuthenticated && !isGuestCheckout && !urlGuest) {
+    if (authLoading) return;
+    const urlGuest =
+      typeof window !== "undefined" &&
+      window.location.search.includes("guest=true");
+    const hasToken =
+      typeof window !== "undefined" && !!localStorage.getItem("auth_token");
+    // Oturum token'ı varken yalnızca isAuthenticated=false ise (ör. ağ hatası) girişe atma;
+    // GET /payments/:id/status zaten isteğe bağlı JWT ile çalışır.
+    if (!isAuthenticated && !isGuestCheckout && !urlGuest && !hasToken) {
       router.push(`/login?redirect=/payment/${paymentId}`);
       return;
     }
 
     fetchPayment();
-  }, [paymentId, isAuthenticated, isGuestCheckout]);
+  }, [paymentId, authLoading, isAuthenticated, isGuestCheckout]);
 
   const fetchPayment = async () => {
     try {
       setIsLoading(true);
-      const isGuest = isGuestCheckout || (typeof window !== 'undefined' && window.location.search.includes('guest=true'));
+      const isGuest =
+        isGuestCheckout ||
+        (typeof window !== "undefined" &&
+          window.location.search.includes("guest=true"));
       const response = isGuest
         ? await paymentsApi.getStatusLightGuest(paymentId)
         : await paymentsApi.getStatusLight(paymentId);
@@ -50,45 +61,62 @@ export default function PaymentPage() {
 
       setPayment(paymentData);
 
-      const isMembership = typeof window !== 'undefined' && window.location.search.includes('type=membership');
+      const isMembership =
+        typeof window !== "undefined" &&
+        window.location.search.includes("type=membership");
       // Üyelik ödemesi zaten başarılıysa başarı sayfasına gönder (aynı sayfaya döngü olmasın)
-      if (isMembership && paymentData.status === 'completed') {
-        router.replace('/membership/success');
+      if (isMembership && paymentData.status === "completed") {
+        router.replace("/membership/success");
         return;
       }
-      // Bypass + üyelik + bekliyor: kart checkout’ta girilsin, bu sayfa gösterilmesin
-      if (paymentData.useBypass && isMembership) {
-        router.replace('/membership/checkout');
-        return;
+
+      // Bypass mode: pending payment without PayTR token — complete instantly
+      if (
+        paymentData.status === "pending" &&
+        !paymentData.paymentHtml &&
+        !paymentData.paymentUrl
+      ) {
+        try {
+          const bypassRes = await paymentsApi.bypassComplete(paymentId);
+          if (bypassRes.data?.success) {
+            toast.success("Ödeme başarılı");
+            const hasSession =
+              isAuthenticated ||
+              (typeof window !== "undefined" &&
+                !!localStorage.getItem("auth_token"));
+            router.push(
+              `/payment/success?paymentId=${paymentId}${!hasSession ? "&guest=true" : ""}`,
+            );
+            return;
+          }
+        } catch {
+          // Not bypass mode or bypass failed — fall through to normal flow
+        }
       }
-      if (paymentData.useBypass && paymentData.orderId) {
-        router.replace(`/checkout?orderId=${paymentData.orderId}`);
-        return;
-      }
-      if (paymentData.useBypass && paymentData.tradeId) {
-        router.replace(`/trades/${paymentData.tradeId}`);
-        return;
-      }
-      if (paymentData.useBypass) {
-        router.replace('/orders');
-        return;
-      }
+
       // If payment has HTML content (PayTR iframe), set it
       if (paymentData.paymentHtml) {
         setPaymentHtml(paymentData.paymentHtml);
-      } else if (paymentData.paymentUrl && !paymentData.useBypass) {
+      } else if (paymentData.paymentUrl) {
         const url = paymentData.paymentUrl;
-        if (url.includes('/payment/') && url.includes(paymentId)) {
-          // Aynı sayfaya yönlendirilmiş (bypass); redirect etme
+        if (url.includes("/payment/") && url.includes(paymentId)) {
+          // Same payment page URL — stay on page
         } else {
           window.location.href = url;
         }
       }
     } catch (error: any) {
-      if (process.env.NODE_ENV === 'development') console.error('Failed to fetch payment:', error);
-      toast.error('Ödeme bilgisi yüklenemedi');
+      if (process.env.NODE_ENV === "development")
+        console.error("Failed to fetch payment:", error);
+      toast.error("Ödeme bilgisi yüklenemedi");
       // Redirect to home for guests, orders page for authenticated users
-      router.push(isGuestCheckout ? '/' : isMembershipPayment ? '/profile/membership' : '/orders');
+      router.push(
+        isGuestCheckout
+          ? "/"
+          : isMembershipPayment
+            ? "/profile/membership"
+            : "/orders",
+      );
     } finally {
       setIsLoading(false);
     }
@@ -105,21 +133,29 @@ export default function PaymentPage() {
           : await paymentsApi.getStatus(paymentId);
         const paymentData = response.data;
 
-        if (paymentData.status === 'completed') {
+        if (paymentData.status === "completed") {
           clearInterval(interval);
-          toast.success('Ödeme başarıyla tamamlandı!');
+          toast.success("Ödeme başarıyla tamamlandı!");
           if (isMembershipPayment) {
-            router.push('/membership/success');
+            router.push("/membership/success");
+          } else if (paymentData.tradeId) {
+            // Takas nakit farkı ödemesi → takas sayfasına dön, orders'a gitme
+            router.push(`/trades/${paymentData.tradeId}?paid=1`);
           } else {
-            router.push(`/payment/success?paymentId=${paymentId}${isGuestCheckout ? '&guest=true' : ''}`);
+            router.push(
+              `/payment/success?paymentId=${paymentId}${isGuestCheckout ? "&guest=true" : ""}`,
+            );
           }
-        } else if (paymentData.status === 'failed') {
+        } else if (paymentData.status === "failed") {
           clearInterval(interval);
-          toast.error('Ödeme başarısız oldu');
-          router.push(`/payment/fail?paymentId=${paymentId}${isGuestCheckout ? '&guest=true' : ''}`);
+          toast.error("Ödeme başarısız oldu");
+          router.push(
+            `/payment/fail?paymentId=${paymentId}${isGuestCheckout ? "&guest=true" : ""}`,
+          );
         }
       } catch (error) {
-        if (process.env.NODE_ENV === 'development') console.error('Failed to check payment status:', error);
+        if (process.env.NODE_ENV === "development")
+          console.error("Failed to check payment status:", error);
       }
     }, 2000);
 
@@ -130,12 +166,19 @@ export default function PaymentPage() {
     }, 300000);
   };
 
+  const urlGuest =
+    typeof window !== "undefined" &&
+    window.location.search.includes("guest=true");
+  if (authLoading && !isGuestCheckout && !urlGuest) {
+    return <AuthLoadingScreen />;
+  }
+
   if (isLoading) {
     return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+      <div className="min-h-screen bg-surface flex items-center justify-center">
         <div className="text-center">
           <ArrowPathIcon className="w-12 h-12 text-primary-500 animate-spin mx-auto mb-4" />
-          <p className="text-gray-600">Ödeme bilgileri yükleniyor...</p>
+          <p className="text-muted">Ödeme bilgileri yükleniyor...</p>
         </div>
       </div>
     );
@@ -143,86 +186,94 @@ export default function PaymentPage() {
 
   if (!payment) {
     return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+      <div className="min-h-screen bg-surface flex items-center justify-center">
         <div className="text-center">
-          <XCircleIcon className="w-12 h-12 text-red-500 mx-auto mb-4" />
-          <p className="text-gray-600 mb-4">Ödeme bulunamadı</p>
-          <button
-            onClick={() => router.push(isMembershipPayment ? '/profile/membership' : '/orders')}
-            className="btn-primary"
+          <XCircleIcon className="w-12 h-12 text-danger-500 mx-auto mb-4" />
+          <p className="text-muted mb-4">Ödeme bulunamadı</p>
+          <Button
+            onClick={() =>
+              router.push(
+                isMembershipPayment ? "/profile/membership" : "/orders",
+              )
+            }
           >
-            {isMembershipPayment ? 'Üyelik Sayfasına Dön' : 'Siparişlerime Dön'}
-          </button>
+            {isMembershipPayment ? "Üyelik Sayfasına Dön" : "Siparişlerime Dön"}
+          </Button>
         </div>
       </div>
     );
   }
 
   // If payment is already completed or failed, redirect
-  if (payment.status === 'completed') {
+  if (payment.status === "completed") {
     if (isMembershipPayment) {
-      router.push('/membership/success');
+      router.push("/membership/success");
     } else {
       router.push(`/payment/success?paymentId=${paymentId}`);
     }
     return null;
   }
 
-  if (payment.status === 'failed') {
+  if (payment.status === "failed") {
     router.push(`/payment/fail?paymentId=${paymentId}`);
     return null;
   }
 
   return (
-    <div className="min-h-screen bg-gray-50 py-8">
+    <div className="min-h-screen bg-surface py-8">
       <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8">
         {/* Header */}
         <div className="mb-8">
-          <h1 className="text-3xl font-bold text-gray-900 mb-2">Ödeme</h1>
-          <p className="text-gray-600">
-            PayTR ile güvenli ödeme
-          </p>
+          <h1 className="text-3xl font-bold text-heading mb-2">Ödeme</h1>
+          <p className="text-muted">PayTR ile güvenli ödeme</p>
         </div>
 
         {/* Payment Info Card */}
-        <div className="bg-white rounded-xl shadow-sm p-6 mb-6">
+        <div className="bg-surface-elevated rounded-xl shadow-sm p-6 mb-6">
           <div className="flex items-center justify-between mb-4">
             <div>
-              <p className="text-sm text-gray-500">Ödeme Tutarı</p>
-              <p className="text-2xl font-bold text-gray-900">
-                {payment.amount?.toLocaleString('tr-TR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} TL
+              <p className="text-sm text-muted">Ödeme Tutarı</p>
+              <p className="text-2xl font-bold text-heading">
+                {payment.amount?.toLocaleString("tr-TR", {
+                  minimumFractionDigits: 2,
+                  maximumFractionDigits: 2,
+                })}{" "}
+                TL
               </p>
             </div>
             <div className="text-right">
-              <p className="text-sm text-gray-500">Durum</p>
-              <span className={`inline-flex items-center px-3 py-1 rounded-full text-sm font-medium ${payment.status === 'pending'
-                  ? 'bg-yellow-100 text-yellow-800'
-                  : payment.status === 'completed'
-                    ? 'bg-green-100 text-green-800'
-                    : 'bg-red-100 text-red-800'
-                }`}>
-                {payment.status === 'pending' && 'Beklemede'}
-                {payment.status === 'completed' && 'Tamamlandı'}
-                {payment.status === 'failed' && 'Başarısız'}
+              <p className="text-sm text-muted">Durum</p>
+              <span
+                className={`inline-flex items-center px-3 py-1 rounded-full text-sm font-medium ${
+                  payment.status === "pending"
+                    ? "bg-warning-100 text-warning-800"
+                    : payment.status === "completed"
+                      ? "bg-success-100 text-success-800"
+                      : "bg-danger-100 text-danger-800"
+                }`}
+              >
+                {payment.status === "pending" && "Beklemede"}
+                {payment.status === "completed" && "Tamamlandı"}
+                {payment.status === "failed" && "Başarısız"}
               </span>
             </div>
           </div>
 
-          <div className="border-t border-gray-200 pt-4">
-            <div className="flex items-center gap-2 text-sm text-gray-600">
-              <ShieldCheckIcon className="w-5 h-5 text-green-500" />
+          <div className="border-t border-border pt-4">
+            <div className="flex items-center gap-2 text-sm text-muted">
+              <ShieldCheckIcon className="w-5 h-5 text-success-500" />
               <span>256-bit SSL ile şifrelenmiş güvenli ödeme</span>
             </div>
           </div>
         </div>
 
-        {/* Payment Content – üyelik bypass checkout’ta yapılıyor, bu sayfada form yok */}
+        {/* PayTR iframe veya yönlendirme linki */}
         {paymentHtml ? (
           // PayTR iframe
           <motion.div
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
-            className="bg-white rounded-xl shadow-sm p-6"
+            className="bg-surface-elevated rounded-xl shadow-sm p-6"
           >
             <h2 className="text-lg font-semibold mb-4 flex items-center gap-2">
               <CreditCardIcon className="w-6 h-6 text-primary-500" />
@@ -232,72 +283,50 @@ export default function PaymentPage() {
               dangerouslySetInnerHTML={{ __html: paymentHtml }}
               className="payment-iframe-container"
             />
-            <p className="text-sm text-gray-500 mt-4 text-center">
+            <p className="text-sm text-muted mt-4 text-center">
               Ödeme tamamlandıktan sonra otomatik olarak yönlendirileceksiniz.
             </p>
-          </motion.div>
-        ) : payment.provider === 'iyzico' ? (
-          <motion.div
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-          >
-            <CreditCardForm
-              orderId={payment.orderId}
-              amount={payment.amount}
-              onSuccess={(html) => {
-                if (html) {
-                  setPaymentHtml(html);
-                } else {
-                  handlePaymentComplete();
-                }
-              }}
-              onCancel={() => router.back()}
-            />
           </motion.div>
         ) : payment.paymentUrl ? (
           // Generic redirect (fallback)
           <motion.div
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
-            className="bg-white rounded-xl shadow-sm p-8 text-center"
+            className="bg-surface-elevated rounded-xl shadow-sm p-8 text-center"
           >
             <CreditCardIcon className="w-16 h-16 text-primary-500 mx-auto mb-4" />
-            <h2 className="text-xl font-semibold mb-2">Ödeme Sayfasına Yönlendiriliyorsunuz</h2>
-            <p className="text-gray-600 mb-6">
+            <h2 className="text-xl font-semibold mb-2">
+              Ödeme Sayfasına Yönlendiriliyorsunuz
+            </h2>
+            <p className="text-muted mb-6">
               Güvenli ödeme sayfasına yönlendiriliyorsunuz. Lütfen bekleyin...
             </p>
-            <button
-              onClick={() => window.location.href = payment.paymentUrl}
-              className="btn-primary"
-            >
+            <Button onClick={() => (window.location.href = payment.paymentUrl)}>
               Ödeme Sayfasına Git
-            </button>
+            </Button>
           </motion.div>
         ) : (
-          <div className="bg-white rounded-xl shadow-sm p-8 text-center">
-            <XCircleIcon className="w-16 h-16 text-red-500 mx-auto mb-4" />
-            <h2 className="text-xl font-semibold mb-2">Ödeme Bilgisi Bulunamadı</h2>
-            <p className="text-gray-600 mb-6">
+          <div className="bg-surface-elevated rounded-xl shadow-sm p-8 text-center">
+            <XCircleIcon className="w-16 h-16 text-danger-500 mx-auto mb-4" />
+            <h2 className="text-xl font-semibold mb-2">
+              Ödeme Bilgisi Bulunamadı
+            </h2>
+            <p className="text-muted mb-6">
               Ödeme sayfası bilgisi yüklenemedi. Lütfen tekrar deneyin.
             </p>
-            <button
-              onClick={fetchPayment}
-              className="btn-primary"
-            >
-              Tekrar Dene
-            </button>
+            <Button onClick={fetchPayment}>Tekrar Dene</Button>
           </div>
         )}
 
         {/* Help Text */}
-        <div className="mt-6 bg-blue-50 border border-blue-200 rounded-xl p-4">
-          <p className="text-sm text-blue-800">
-            <strong>Yardıma mı ihtiyacınız var?</strong> Ödeme sırasında sorun yaşarsanız,
-            lütfen{' '}
+        <div className="mt-6 bg-info-50 border border-info-200 rounded-xl p-4">
+          <p className="text-sm text-info-800">
+            <strong>Yardıma mı ihtiyacınız var?</strong> Ödeme sırasında sorun
+            yaşarsanız, lütfen{" "}
             <a href="/support" className="underline font-medium">
               destek ekibimiz
-            </a>
-            {' '}ile iletişime geçin.
+            </a>{" "}
+            ile iletişime geçin.
           </p>
         </div>
       </div>

@@ -7,7 +7,7 @@ import { useFavoritesStore, WishlistItem } from '../src/stores/favoritesStore';
 import { useAuthStore } from '../src/stores/authStore';
 import { useCartStore } from '../src/stores/cartStore';
 import { TarodanColors } from '../src/theme';
-import { transformImageUrl, getImageUrl as getImageUrlFromUtils } from '../src/utils/imageUrl';
+import { getImageUrl as getImageUrlFromUtils } from '../src/utils/imageUrl';
 
 export default function FavoritesScreen() {
   const { isAuthenticated } = useAuthStore();
@@ -57,7 +57,7 @@ export default function FavoritesScreen() {
   };
 
   const formatPrice = (price: number) => {
-    return `₺${price.toLocaleString('tr-TR')}`;
+    return `₺${(price ?? 0).toLocaleString('tr-TR')}`;
   };
 
   // Not authenticated
@@ -79,12 +79,24 @@ export default function FavoritesScreen() {
     );
   }
 
-  // Loading state
   if (isLoading && items.length === 0) {
     return (
       <View style={styles.centeredContainer}>
         <ActivityIndicator size="large" color={TarodanColors.primary} />
         <Text style={{ marginTop: 16 }}>Favoriler yükleniyor...</Text>
+      </View>
+    );
+  }
+
+  if (error && items.length === 0) {
+    return (
+      <View style={styles.centeredContainer}>
+        <Ionicons name="cloud-offline-outline" size={64} color={TarodanColors.textLight} />
+        <Text style={{ marginTop: 16, fontSize: 16, fontWeight: '600', color: TarodanColors.text }}>Yüklenemedi</Text>
+        <Text style={{ marginTop: 8, color: TarodanColors.textLight, textAlign: 'center' }}>Favorileriniz yüklenirken bir hata oluştu.</Text>
+        <Button mode="contained" onPress={() => fetchFavorites()} style={{ marginTop: 16, backgroundColor: TarodanColors.primary }}>
+          Tekrar Dene
+        </Button>
       </View>
     );
   }

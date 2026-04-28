@@ -112,9 +112,11 @@ export interface CreateOrderDto {
 
 export interface GuestCheckoutDto {
   productId: string;
-  quantity: number;
+  quantity?: number;
   email: string;
   phone: string;
+  guestName?: string;
+  emailVerificationCode: string;
   shippingAddress: Omit<Address, 'id' | 'userId' | 'isDefault'>;
 }
 

@@ -12,7 +12,8 @@ import {
   Bars3Icon as ListIconSolid,
   ViewColumnsIcon as ViewColumnsIconSolid,
   RectangleGroupIcon as RectangleGroupIconSolid,
-} from '@heroicons/react/24/solid';
+} from '@heroicons/react/24/solid';import { Button } from '@tarodan/ui';
+
 
 export type ProductLayout = 'grid-3' | 'grid-4' | 'grid-6' | 'list';
 
@@ -84,19 +85,17 @@ export default function ProductLayoutSelector({
   ];
 
   return (
-    <div className="flex items-center gap-1 bg-gray-100 rounded-lg p-1">
+    <div className="flex items-center gap-1 bg-surface-alt rounded-lg p-1">
       {layouts.map((item) => (
-        <button
-          key={item.value}
+        <Button variant="secondary" key={item.value}
           onClick={() => onLayoutChange(item.value)}
           className={`flex items-center justify-center p-2 rounded-md transition-all ${layout === item.value
-            ? 'bg-white text-orange-500 shadow-sm'
-            : 'text-gray-600 hover:text-gray-900 hover:bg-gray-50'
+            ? 'bg-surface-elevated text-primary-500 shadow-sm'
+            : 'text-muted hover:text-heading hover:bg-surface'
             }`}
-          title={item.label}
-        >
+          title={item.label}>
           {item.icon}
-        </button>
+        </Button>
       ))}
     </div>
   );

@@ -35,6 +35,13 @@ export class OfferResponseDto {
   @ApiProperty({ example: 250.0 })
   amount: number;
 
+  @ApiPropertyOptional({
+    example: false,
+    description:
+      'Satıcı karşı teklifinden sonra true: kabul/red yalnızca alıcıda',
+  })
+  buyerMustAccept?: boolean;
+
   @ApiProperty({ example: 'pending' })
   status: string;
 
@@ -79,6 +86,12 @@ export class OfferResponseDto {
     description: 'Time remaining until expiration',
   })
   timeRemaining?: string;
+
+  @ApiPropertyOptional({
+    example: 'Stok tükendiği için otomatik iptal edildi',
+    description: 'Reason for cancellation (if cancelled)',
+  })
+  cancelReason?: string | null;
 }
 
 export class PaginatedOffersDto {

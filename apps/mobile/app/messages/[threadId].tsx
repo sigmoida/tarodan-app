@@ -1,10 +1,12 @@
-import { View, ScrollView, StyleSheet, TouchableOpacity, KeyboardAvoidingView, Platform, TextInput as RNTextInput } from 'react-native';
+import { View, ScrollView, StyleSheet, TouchableOpacity, KeyboardAvoidingView, Platform, TextInput as RNTextInput, Image, Alert } from 'react-native';
 import { Text, Avatar, IconButton, ActivityIndicator, Banner } from 'react-native-paper';
 import { useState, useRef, useEffect, useCallback } from 'react';
 import { router, useLocalSearchParams, useFocusEffect } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
+import * as ImagePicker from 'expo-image-picker';
 import { useMessagesStore, Message } from '../../src/stores/messagesStore';
 import { useAuthStore } from '../../src/stores/authStore';
+import { mediaApi } from '../../src/services/api';
 import { TarodanColors } from '../../src/theme';
 
 export default function MessageThreadScreen() {
@@ -25,6 +27,8 @@ export default function MessageThreadScreen() {
   
   const [inputText, setInputText] = useState('');
   const [sending, setSending] = useState(false);
+  const [pendingImage, setPendingImage] = useState<string | null>(null);
+  const [imageUploading, setImageUploading] = useState(false);
   const scrollViewRef = useRef<ScrollView>(null);
 
   const messageLimit = limits?.maxMessagesPerDay || 50;
@@ -49,14 +53,55 @@ export default function MessageThreadScreen() {
     }, 100);
   }, [messages]);
 
+  const pickImage = async () => {
+    const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
+    if (status !== 'granted') {
+      Alert.alert('İzin Gerekli', 'Galeri erişimi için izin verin');
+      return;
+    }
+    const result = await ImagePicker.launchImageLibraryAsync({
+      mediaTypes: ImagePicker.MediaTypeOptions.Images,
+      quality: 0.7,
+      allowsEditing: true,
+    });
+    if (!result.canceled && result.assets[0]) {
+      setPendingImage(result.assets[0].uri);
+    }
+  };
+
   const handleSend = async () => {
-    if (!inputText.trim() || !threadId || sending || !canSend) return;
+    if ((!inputText.trim() && !pendingImage) || !threadId || sending || !canSend) return;
 
     setSending(true);
-    const success = await sendMessage(threadId, inputText.trim());
-    if (success) {
-      setInputText('');
-      scrollViewRef.current?.scrollToEnd({ animated: true });
+    let messageContent = inputText.trim();
+
+    if (pendingImage) {
+      setImageUploading(true);
+      try {
+        const formData = new FormData();
+        const ext = pendingImage.split('.').pop() || 'jpg';
+        formData.append('file', { uri: pendingImage, name: `message_image.${ext}`, type: `image/${ext}` } as any);
+        const uploadRes = await mediaApi.uploadMessageImage(formData);
+        const imageUrl = uploadRes.data?.url || uploadRes.data?.data?.url;
+        if (imageUrl) {
+          messageContent = messageContent ? `[IMG:${imageUrl}] ${messageContent}` : `[IMG:${imageUrl}]`;
+        }
+      } catch {
+        Alert.alert('Hata', 'Görsel yüklenemedi');
+        setSending(false);
+        setImageUploading(false);
+        return;
+      }
+      setImageUploading(false);
+    }
+
+    if (messageContent) {
+      const success = await sendMessage(threadId, messageContent);
+      if (success) {
+        setInputText('');
+        setPendingImage(null);
+        scrollViewRef.current?.scrollToEnd({ animated: true });
+      }
     }
     setSending(false);
   };
@@ -224,12 +269,27 @@ export default function MessageThreadScreen() {
                       styles.messageBubble,
                       isOwn ? styles.messageBubbleOwn : styles.messageBubbleOther,
                     ]}>
-                      <Text style={[
-                        styles.messageText,
-                        isOwn ? styles.messageTextOwn : styles.messageTextOther,
-                      ]}>
-                        {message.content}
-                      </Text>
+                      {(() => {
+                        const imgMatch = message.content?.match(/\[IMG:(.*?)\]/);
+                        const textPart = message.content?.replace(/\[IMG:.*?\]\s*/g, '').trim();
+                        return (
+                          <>
+                            {imgMatch && imgMatch[1] && (
+                              <Image
+                                source={{ uri: imgMatch[1] }}
+                                style={{ width: 200, height: 150, borderRadius: 8, marginBottom: textPart ? 6 : 0 }}
+                                resizeMode="cover"
+                              />
+                            )}
+                            {textPart ? (
+                              <Text style={[
+                                styles.messageText,
+                                isOwn ? styles.messageTextOwn : styles.messageTextOther,
+                              ]}>{textPart}</Text>
+                            ) : null}
+                          </>
+                        );
+                      })()}
                       <View style={styles.messageFooter}>
                         <Text style={[
                           styles.messageTime,
@@ -254,8 +314,22 @@ export default function MessageThreadScreen() {
         </ScrollView>
       )}
 
+      {/* Pending Image Preview */}
+      {pendingImage && (
+        <View style={styles.imagePreviewBar}>
+          <Image source={{ uri: pendingImage }} style={styles.imagePreviewThumb} />
+          <Text style={{ flex: 1, fontSize: 12, color: TarodanColors.textSecondary, marginLeft: 8 }}>Görsel eklendi</Text>
+          <TouchableOpacity onPress={() => setPendingImage(null)}>
+            <Ionicons name="close-circle" size={24} color={TarodanColors.error} />
+          </TouchableOpacity>
+        </View>
+      )}
+
       {/* Input */}
       <View style={styles.inputContainer}>
+        <TouchableOpacity style={styles.imagePickButton} onPress={pickImage} disabled={sending || imageUploading}>
+          <Ionicons name="image-outline" size={24} color={canSend ? TarodanColors.primary : TarodanColors.textLight} />
+        </TouchableOpacity>
         <View style={styles.inputWrapper}>
           <RNTextInput
             style={styles.textInput}
@@ -453,5 +527,26 @@ const styles = StyleSheet.create({
   },
   sendButtonDisabled: {
     backgroundColor: TarodanColors.surfaceVariant,
+  },
+  imagePickButton: {
+    width: 40,
+    height: 48,
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginRight: 4,
+  },
+  imagePreviewBar: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    backgroundColor: TarodanColors.surfaceVariant,
+    borderTopWidth: 1,
+    borderTopColor: TarodanColors.border,
+  },
+  imagePreviewThumb: {
+    width: 40,
+    height: 40,
+    borderRadius: 6,
   },
 });

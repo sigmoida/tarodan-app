@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import { adminApi } from '@/lib/api';
+import { Button, Checkbox, Input, Spinner, Textarea } from '@tarodan/ui';
 import {
     PlusIcon,
     PencilIcon,
@@ -150,26 +151,23 @@ export default function CollectionsPage() {
                 {/* Header */}
                 <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
                     <div>
-                        <h1 className="text-2xl font-bold text-gray-900">Koleksiyonlar</h1>
-                        <p className="text-gray-500 mt-1">Koleksiyon yönetimi</p>
+                        <h1 className="text-2xl font-bold text-heading">Koleksiyonlar</h1>
+                        <p className="text-muted mt-1">Koleksiyon yönetimi</p>
                     </div>
-                    <button
-                        onClick={openCreateModal}
-                        className="flex items-center gap-2 px-4 py-2 bg-primary-600 text-gray-900 rounded-lg hover:bg-primary-700 transition-colors"
-                    >
+                    <Button variant="primary" size="md" onClick={openCreateModal}>
                         <PlusIcon className="w-5 h-5" />
                         Yeni Koleksiyon
-                    </button>
+                    </Button>
                 </div>
 
                 {/* Search */}
                 <div className="admin-card p-4">
-                    <input
+                    <Input
                         type="text"
                         placeholder="Koleksiyon ara..."
                         value={search}
                         onChange={(e) => { setSearch(e.target.value); setPage(1); }}
-                        className="admin-input w-full max-w-md"
+                        className="max-w-md"
                     />
                 </div>
 
@@ -177,95 +175,87 @@ export default function CollectionsPage() {
                 <div className="admin-card overflow-hidden">
                     {loading ? (
                         <div className="text-center py-12">
-                            <div className="animate-spin rounded-full h-8 w-8 border-t-2 border-b-2 border-primary-500 mx-auto"></div>
-                            <p className="text-gray-500 mt-4">Yükleniyor...</p>
+                            <Spinner size="lg" className="mx-auto" />
+                            <p className="text-muted mt-4">Yükleniyor...</p>
                         </div>
                     ) : collections.length === 0 ? (
-                        <div className="text-center py-12 text-gray-500">
+                        <div className="text-center py-12 text-muted">
                             Henüz koleksiyon yok
                         </div>
                     ) : (
                         <div className="overflow-x-auto">
                             <table className="w-full">
-                                <thead className="bg-gray-100">
+                                <thead className="bg-surface-alt">
                                     <tr>
-                                        <th className="text-left px-4 py-3 text-sm font-medium text-gray-500">Koleksiyon</th>
-                                        <th className="text-left px-4 py-3 text-sm font-medium text-gray-500">Sahibi</th>
-                                        <th className="text-center px-4 py-3 text-sm font-medium text-gray-500">Ürün</th>
-                                        <th className="text-center px-4 py-3 text-sm font-medium text-gray-500">Görüntüleme</th>
-                                        <th className="text-center px-4 py-3 text-sm font-medium text-gray-500">Beğeni</th>
-                                        <th className="text-center px-4 py-3 text-sm font-medium text-gray-500">Durum</th>
-                                        <th className="text-right px-4 py-3 text-sm font-medium text-gray-500">İşlemler</th>
+                                        <th className="text-left px-4 py-3 text-sm font-medium text-muted">Koleksiyon</th>
+                                        <th className="text-left px-4 py-3 text-sm font-medium text-muted">Sahibi</th>
+                                        <th className="text-center px-4 py-3 text-sm font-medium text-muted">Ürün</th>
+                                        <th className="text-center px-4 py-3 text-sm font-medium text-muted">Görüntüleme</th>
+                                        <th className="text-center px-4 py-3 text-sm font-medium text-muted">Beğeni</th>
+                                        <th className="text-center px-4 py-3 text-sm font-medium text-muted">Durum</th>
+                                        <th className="text-right px-4 py-3 text-sm font-medium text-muted">İşlemler</th>
                                     </tr>
                                 </thead>
-                                <tbody className="divide-y divide-gray-200">
+                                <tbody className="divide-y divide-border">
                                     {collections.map((collection) => (
-                                        <tr key={collection.id} className="hover:bg-gray-100/50">
+                                        <tr key={collection.id} className="hover:bg-surface-alt/50">
                                             <td className="px-4 py-3">
                                                 <div className="flex items-center gap-3">
                                                     {collection.coverImageUrl ? (
                                                         <img src={collection.coverImageUrl} alt="" className="w-10 h-10 rounded object-cover" />
                                                     ) : (
-                                                        <div className="w-10 h-10 rounded bg-gray-100 flex items-center justify-center text-gray-500 text-xs">
+                                                        <div className="w-10 h-10 rounded bg-surface-alt flex items-center justify-center text-muted text-xs">
                                                             N/A
                                                         </div>
                                                     )}
                                                     <div>
-                                                        <div className="font-medium text-gray-900">{collection.name}</div>
+                                                        <div className="font-medium text-heading">{collection.name}</div>
                                                         {collection.description && (
-                                                            <div className="text-sm text-gray-500 truncate max-w-xs">{collection.description}</div>
+                                                            <div className="text-sm text-muted truncate max-w-xs">{collection.description}</div>
                                                         )}
                                                     </div>
                                                 </div>
                                             </td>
                                             <td className="px-4 py-3">
-                                                <span className="text-gray-600">{collection.owner?.displayName || '-'}</span>
+                                                <span className="text-muted">{collection.owner?.displayName || '-'}</span>
                                             </td>
-                                            <td className="px-4 py-3 text-center text-gray-600">{collection.itemCount}</td>
-                                            <td className="px-4 py-3 text-center text-gray-600">{collection.viewCount}</td>
-                                            <td className="px-4 py-3 text-center text-gray-600">{collection.likeCount}</td>
+                                            <td className="px-4 py-3 text-center text-muted">{collection.itemCount}</td>
+                                            <td className="px-4 py-3 text-center text-muted">{collection.viewCount}</td>
+                                            <td className="px-4 py-3 text-center text-muted">{collection.likeCount}</td>
                                             <td className="px-4 py-3">
                                                 <div className="flex items-center justify-center gap-2">
                                                     {collection.isPublic ? (
-                                                        <span className="px-2 py-1 text-xs bg-green-50 text-green-700 rounded">Görünür</span>
+                                                        <span className="px-2 py-1 text-xs bg-success-50 text-success-700 rounded">Görünür</span>
                                                     ) : (
-                                                        <span className="px-2 py-1 text-xs bg-gray-700 text-gray-500 rounded">Gizli</span>
+                                                        <span className="px-2 py-1 text-xs bg-body text-muted rounded">Gizli</span>
                                                     )}
                                                     {collection.isFeatured && (
-                                                        <span className="px-2 py-1 text-xs bg-yellow-50 text-yellow-700 rounded">Öne Çıkan</span>
+                                                        <span className="px-2 py-1 text-xs bg-warning-50 text-warning-700 rounded">Öne Çıkan</span>
                                                     )}
                                                 </div>
                                             </td>
                                             <td className="px-4 py-3">
                                                 <div className="flex items-center justify-end gap-2">
-                                                    <button
-                                                        onClick={() => toggleVisibility(collection)}
-                                                        className="p-2 text-gray-500 hover:text-gray-900 hover:bg-gray-100 rounded-lg"
-                                                        title={collection.isPublic ? 'Gizle' : 'Görünür yap'}
-                                                    >
+                                                    <Button variant="secondary" onClick={() => toggleVisibility(collection)}
+                                                        className="p-2 text-muted hover:text-heading hover:bg-surface-alt rounded-lg"
+                                                        title={collection.isPublic ? 'Gizle' : 'Görünür yap'}>
                                                         {collection.isPublic ? <EyeSlashIcon className="h-5 w-5" /> : <EyeIcon className="h-5 w-5" />}
-                                                    </button>
-                                                    <button
-                                                        onClick={() => toggleFeatured(collection)}
-                                                        className="p-2 text-gray-500 hover:text-yellow-700 hover:bg-gray-100 rounded-lg"
-                                                        title={collection.isFeatured ? 'Öne çıkarmayı kaldır' : 'Öne çıkar'}
-                                                    >
-                                                        {collection.isFeatured ? <StarSolidIcon className="h-5 w-5 text-yellow-700" /> : <StarIcon className="h-5 w-5" />}
-                                                    </button>
-                                                    <button
-                                                        onClick={() => openEditModal(collection)}
-                                                        className="p-2 text-gray-500 hover:text-gray-900 hover:bg-gray-100 rounded-lg"
-                                                        title="Düzenle"
-                                                    >
+                                                    </Button>
+                                                    <Button variant="secondary" onClick={() => toggleFeatured(collection)}
+                                                        className="p-2 text-muted hover:text-warning-700 hover:bg-surface-alt rounded-lg"
+                                                        title={collection.isFeatured ? 'Öne çıkarmayı kaldır' : 'Öne çıkar'}>
+                                                        {collection.isFeatured ? <StarSolidIcon className="h-5 w-5 text-warning-700" /> : <StarIcon className="h-5 w-5" />}
+                                                    </Button>
+                                                    <Button variant="secondary" onClick={() => openEditModal(collection)}
+                                                        className="p-2 text-muted hover:text-heading hover:bg-surface-alt rounded-lg"
+                                                        title="Düzenle">
                                                         <PencilIcon className="h-5 w-5" />
-                                                    </button>
-                                                    <button
-                                                        onClick={() => setDeleteConfirm(collection.id)}
-                                                        className="p-2 text-red-600 hover:text-red-300 hover:bg-red-50 rounded-lg"
-                                                        title="Sil"
-                                                    >
+                                                    </Button>
+                                                    <Button variant="secondary" onClick={() => setDeleteConfirm(collection.id)}
+                                                        className="p-2 text-danger-600 hover:text-danger-300 hover:bg-danger-50 rounded-lg"
+                                                        title="Sil">
                                                         <TrashIcon className="h-5 w-5" />
-                                                    </button>
+                                                    </Button>
                                                 </div>
                                             </td>
                                         </tr>
@@ -277,24 +267,20 @@ export default function CollectionsPage() {
 
                     {/* Pagination */}
                     {totalPages > 1 && (
-                        <div className="flex items-center justify-between px-4 py-3 border-t border-gray-200">
-                            <button
-                                onClick={() => setPage((p) => Math.max(1, p - 1))}
+                        <div className="flex items-center justify-between px-4 py-3 border-t border-border">
+                            <Button variant="secondary" onClick={() => setPage((p) => Math.max(1, p - 1))}
                                 disabled={page === 1}
-                                className="px-3 py-1 bg-gray-100 text-gray-600 rounded disabled:opacity-50"
-                            >
+                                className="px-3 py-1 bg-surface-alt text-muted rounded disabled:opacity-50">
                                 Önceki
-                            </button>
-                            <span className="text-gray-500">
+                            </Button>
+                            <span className="text-muted">
                                 Sayfa {page} / {totalPages}
                             </span>
-                            <button
-                                onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
+                            <Button variant="secondary" onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
                                 disabled={page === totalPages}
-                                className="px-3 py-1 bg-gray-100 text-gray-600 rounded disabled:opacity-50"
-                            >
+                                className="px-3 py-1 bg-surface-alt text-muted rounded disabled:opacity-50">
                                 Sonraki
-                            </button>
+                            </Button>
                         </div>
                     )}
                 </div>
@@ -302,75 +288,55 @@ export default function CollectionsPage() {
 
             {/* Create/Edit Modal */}
             {showModal && (
-                <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-                    <div className="bg-white rounded-xl p-6 max-w-md w-full mx-4 border border-gray-200">
-                        <h2 className="text-xl font-semibold text-gray-900 mb-4">
+                <div className="fixed inset-0 bg-heading bg-opacity-50 flex items-center justify-center z-50">
+                    <div className="bg-surface-elevated rounded-xl p-6 max-w-md w-full mx-4 border border-border">
+                        <h2 className="text-xl font-semibold text-heading mb-4">
                             {editingCollection ? 'Koleksiyon Düzenle' : 'Yeni Koleksiyon'}
                         </h2>
                         <form onSubmit={handleSubmit} className="space-y-4">
                             <div>
-                                <label className="block text-sm font-medium text-gray-600 mb-2">Koleksiyon Adı *</label>
-                                <input
+                                <label className="block text-sm font-medium text-muted mb-2">Koleksiyon Adı *</label>
+                                <Input
                                     type="text"
                                     value={formData.name}
                                     onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-                                    className="admin-input w-full"
                                     required
                                 />
                             </div>
                             <div>
-                                <label className="block text-sm font-medium text-gray-600 mb-2">Açıklama</label>
-                                <textarea
-                                    value={formData.description}
+                                <label className="block text-sm font-medium text-muted mb-2">Açıklama</label>
+                                <Textarea value={formData.description}
                                     onChange={(e) => setFormData({ ...formData, description: e.target.value })}
-                                    className="admin-input w-full"
-                                    rows={3}
-                                />
+                                    rows={3} />
                             </div>
                             <div>
-                                <label className="block text-sm font-medium text-gray-600 mb-2">Kapak Görseli URL</label>
-                                <input
+                                <label className="block text-sm font-medium text-muted mb-2">Kapak Görseli URL</label>
+                                <Input
                                     type="url"
                                     value={formData.coverImageUrl}
                                     onChange={(e) => setFormData({ ...formData, coverImageUrl: e.target.value })}
-                                    className="admin-input w-full"
                                     placeholder="https://..."
                                 />
                             </div>
                             <div className="flex items-center gap-4">
-                                <label className="flex items-center gap-2">
-                                    <input
-                                        type="checkbox"
-                                        checked={formData.isPublic}
-                                        onChange={(e) => setFormData({ ...formData, isPublic: e.target.checked })}
-                                        className="w-4 h-4 rounded border-gray-600 bg-gray-100 text-primary-600"
-                                    />
-                                    <span className="text-sm text-gray-600">Görünür</span>
-                                </label>
-                                <label className="flex items-center gap-2">
-                                    <input
-                                        type="checkbox"
-                                        checked={formData.isFeatured}
-                                        onChange={(e) => setFormData({ ...formData, isFeatured: e.target.checked })}
-                                        className="w-4 h-4 rounded border-gray-600 bg-gray-100 text-primary-600"
-                                    />
-                                    <span className="text-sm text-gray-600">Öne Çıkan</span>
-                                </label>
+                                <Checkbox
+                                    checked={formData.isPublic}
+                                    onChange={(e) => setFormData({ ...formData, isPublic: e.target.checked })}
+                                    label="Görünür"
+                                />
+                                <Checkbox
+                                    checked={formData.isFeatured}
+                                    onChange={(e) => setFormData({ ...formData, isFeatured: e.target.checked })}
+                                    label="Öne Çıkan"
+                                />
                             </div>
                             <div className="flex gap-3 pt-4">
-                                <button
-                                    type="button"
-                                    onClick={() => setShowModal(false)}
-                                    className="flex-1 px-4 py-2 border border-gray-300 text-gray-600 rounded-lg hover:bg-gray-100"
-                                >
+                                <Button variant="secondary" size="md" type="button" onClick={() => setShowModal(false)} className="flex-1">
                                     İptal
-                                </button>
-                                <button
-                                    type="submit"
-                                    className="flex-1 px-4 py-2 bg-primary-600 text-gray-900 rounded-lg hover:bg-primary-700"
-                                >
+                                </Button>
+                                <Button variant="primary" size="md" type="submit" className="flex-1">
                                     {editingCollection ? 'Güncelle' : 'Oluştur'}
-                                </button>
+                                </Button>
                             </div>
                         </form>
                     </div>
@@ -379,25 +345,19 @@ export default function CollectionsPage() {
 
             {/* Delete Confirm Modal */}
             {deleteConfirm && (
-                <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-                    <div className="bg-white rounded-xl p-6 max-w-md w-full mx-4 border border-gray-200">
-                        <h3 className="text-lg font-semibold text-gray-900 mb-4">Koleksiyonu Sil</h3>
-                        <p className="text-gray-500 mb-6">
+                <div className="fixed inset-0 bg-heading bg-opacity-50 flex items-center justify-center z-50">
+                    <div className="bg-surface-elevated rounded-xl p-6 max-w-md w-full mx-4 border border-border">
+                        <h3 className="text-lg font-semibold text-heading mb-4">Koleksiyonu Sil</h3>
+                        <p className="text-muted mb-6">
                             Bu koleksiyonu silmek istediğinizden emin misiniz? Bu işlem geri alınamaz.
                         </p>
                         <div className="flex gap-3">
-                            <button
-                                onClick={() => setDeleteConfirm(null)}
-                                className="flex-1 px-4 py-2 border border-gray-300 text-gray-600 rounded-lg hover:bg-gray-100"
-                            >
+                            <Button variant="secondary" size="md" onClick={() => setDeleteConfirm(null)} className="flex-1">
                                 İptal
-                            </button>
-                            <button
-                                onClick={() => handleDelete(deleteConfirm)}
-                                className="flex-1 px-4 py-2 bg-red-600 text-gray-900 rounded-lg hover:bg-red-700"
-                            >
+                            </Button>
+                            <Button variant="danger" size="md" onClick={() => handleDelete(deleteConfirm)} className="flex-1">
                                 Sil
-                            </button>
+                            </Button>
                         </div>
                     </div>
                 </div>

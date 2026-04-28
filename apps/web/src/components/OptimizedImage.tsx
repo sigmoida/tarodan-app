@@ -3,10 +3,11 @@
 import Image, { ImageProps } from 'next/image';
 import { useState, useCallback, useEffect } from 'react';
 import * as Sentry from '@sentry/nextjs';
+import { colors as dsColors } from '@tarodan/ui';
 
 // Default placeholder for broken images (data URL avoids external SSL / ERR_CERT_AUTHORITY_INVALID)
 const DEFAULT_PLACEHOLDER =
-  'data:image/svg+xml,' + encodeURIComponent('<svg xmlns="http://www.w3.org/2000/svg" width="400" height="400" viewBox="0 0 400 400"><rect fill="#f3f4f6" width="400" height="400"/><text fill="#9ca3af" x="50%" y="50%" dominant-baseline="middle" text-anchor="middle" font-family="sans-serif" font-size="18">Image</text></svg>');
+  'data:image/svg+xml,' + encodeURIComponent(`<svg xmlns="http://www.w3.org/2000/svg" width="400" height="400" viewBox="0 0 400 400"><rect fill="${dsColors.surface.alt}" width="400" height="400"/><text fill="${dsColors.text.muted}" x="50%" y="50%" dominant-baseline="middle" text-anchor="middle" font-family="sans-serif" font-size="18">Image</text></svg>`);
 
 /** Default sizes for fill images: responsive grid (e.g. 3 cols desktop, 2 tablet, 1 mobile) */
 const DEFAULT_FILL_SIZES = '(max-width: 768px) 100vw, (max-width: 1200px) 50vw, 33vw';
@@ -70,7 +71,7 @@ export default function OptimizedImage({
   const replacePicsumWithPlaceholder = (s: string): string => {
     if (typeof s !== 'string' || !s.includes('picsum.photos')) return s;
     const text = (alt && typeof alt === 'string') ? alt.substring(0, 25).trim() : 'Ürün';
-    return `https://placehold.co/800x600/1a1a2e/eee?text=${encodeURIComponent(text)}`;
+    return `https://placehold.co/800x600?text=${encodeURIComponent(text)}`;
   };
   const srcReplaced = typeof src === 'string' ? replacePicsumWithPlaceholder(src) : src;
   // Validate src before passing to Next.js Image — bare S3 keys crash rendering
@@ -206,7 +207,7 @@ export function getOptimizedImageUrl(
     }
   }
   if (raw && raw.includes('picsum.photos') && productTitle) {
-    raw = `https://placehold.co/800x600/1a1a2e/eee?text=${encodeURIComponent(productTitle.substring(0, 25).trim())}`;
+    raw = `https://placehold.co/800x600?text=${encodeURIComponent(productTitle.substring(0, 25).trim())}`;
   }
   if (raw && isValidImageSrc(raw)) return raw;
   return placeholder;

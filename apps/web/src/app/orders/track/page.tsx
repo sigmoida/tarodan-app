@@ -17,8 +17,8 @@ export default function OrdersTrackRedirectPage() {
   }, [router, searchParams]);
 
   return (
-    <div className="min-h-screen bg-gray-50 flex items-center justify-center">
-      <p className="text-gray-600">Yönlendiriliyor...</p>
+    <div className="min-h-screen bg-surface flex items-center justify-center">
+      <p className="text-muted">Yönlendiriliyor...</p>
     </div>
   );
 }

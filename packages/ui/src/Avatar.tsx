@@ -25,7 +25,7 @@ export const Avatar = React.forwardRef<HTMLDivElement, AvatarProps>(
       <div
         ref={ref}
         className={cn(
-          'relative flex shrink-0 overflow-hidden rounded-full bg-gray-100',
+          'relative flex shrink-0 overflow-hidden rounded-full bg-surface-alt',
           sizeClasses[size],
           className
         )}
@@ -39,7 +39,7 @@ export const Avatar = React.forwardRef<HTMLDivElement, AvatarProps>(
             onError={() => setHasError(true)}
           />
         ) : (
-          <span className="flex h-full w-full items-center justify-center bg-gray-200 font-medium text-gray-600">
+          <span className="flex h-full w-full items-center justify-center bg-border-subtle font-medium text-muted">
             {initials}
           </span>
         )}

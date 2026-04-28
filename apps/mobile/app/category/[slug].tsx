@@ -7,6 +7,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { productsApi, categoriesApi } from '../../src/services/api';
 import { TarodanColors, SCALES } from '../../src/theme';
 import { getImageUrl as getImageUrlFromUtils } from '../../src/utils/imageUrl';
+import { safeString } from '../../src/utils/safeString';
 
 const { width } = Dimensions.get('window');
 const CARD_WIDTH = (width - 48) / 2;
@@ -79,8 +80,8 @@ export default function CategoryScreen() {
   };
 
   const renderProductCard = (item: any) => {
-    const isTradeEnabled = item.isTradeEnabled || item.trade_available;
-    
+    const isTradeEnabled = isProductTradeOpen(item);
+
     return (
       <TouchableOpacity
         key={item.id}
@@ -102,7 +103,7 @@ export default function CategoryScreen() {
         </View>
         <View style={styles.productContent}>
           <Text style={styles.productTitle} numberOfLines={2}>{item.title}</Text>
-          <Text style={styles.productMeta}>{item.brand || 'Marka'} • {item.scale || '1:64'}</Text>
+          <Text style={styles.productMeta}>{safeString(item.brand, 'Marka')} • {safeString(item.scale, '1:64')}</Text>
           <Text style={styles.productPrice}>₺{item.price?.toLocaleString('tr-TR')}</Text>
         </View>
       </TouchableOpacity>

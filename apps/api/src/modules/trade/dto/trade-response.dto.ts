@@ -23,6 +23,18 @@ export class TradeShipmentResponseDto {
   confirmedAt?: Date;
 }
 
+export class TradeEscrowShipmentResponseDto {
+  id: string;
+  direction: 'to_warehouse' | 'from_warehouse' | 'return' | string;
+  senderUserId?: string;
+  recipientUserId?: string;
+  carrier?: string;
+  trackingNumber?: string;
+  status?: ShipmentStatus;
+  shippedAt?: Date;
+  deliveredAt?: Date;
+}
+
 export class TradeCashPaymentResponseDto {
   id: string;
   payerId: string;
@@ -71,6 +83,7 @@ export class TradeResponseDto {
   
   initiatorShipment?: TradeShipmentResponseDto;
   receiverShipment?: TradeShipmentResponseDto;
+  shipments?: TradeEscrowShipmentResponseDto[];
   
   cashPayment?: TradeCashPaymentResponseDto;
   dispute?: TradeDisputeResponseDto;

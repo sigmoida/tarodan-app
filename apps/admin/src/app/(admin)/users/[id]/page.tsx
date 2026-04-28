@@ -20,7 +20,10 @@ import {
 } from '@heroicons/react/24/outline';
 import { adminApi } from '@/lib/api';
 import { getProductEffectivePrice } from '@/lib/productPrice';
+import { Button, StatusBadge, Textarea } from '@tarodan/ui';
+import type { StatusConfig } from '@tarodan/ui';
 import toast from 'react-hot-toast';
+import { Spinner } from '@tarodan/ui';
 
 interface Product {
   id: string;
@@ -195,54 +198,30 @@ export default function UserDetailPage() {
     }
   };
 
-  const getStatusBadge = (status: string) => {
-    const colors: Record<string, string> = {
-      pending: 'bg-yellow-100 text-yellow-800',
-      pending_payment: 'bg-yellow-100 text-yellow-800',
-      paid: 'bg-blue-100 text-blue-800',
-      preparing: 'bg-blue-100 text-blue-800',
-      shipped: 'bg-indigo-100 text-indigo-800',
-      delivered: 'bg-green-100 text-green-800',
-      completed: 'bg-green-100 text-green-800',
-      cancelled: 'bg-red-100 text-red-800',
-      rejected: 'bg-red-100 text-red-800',
-      active: 'bg-green-100 text-green-800',
-      inactive: 'bg-gray-100 text-gray-800',
-      sold: 'bg-purple-100 text-purple-800',
-      accepted: 'bg-blue-100 text-blue-800',
-      both_shipped: 'bg-indigo-100 text-indigo-800',
-      disputed: 'bg-red-100 text-red-800',
-    };
-    const labels: Record<string, string> = {
-      pending: 'Bekliyor',
-      pending_payment: 'Ödeme Bekliyor',
-      paid: 'Ödendi',
-      preparing: 'Hazırlanıyor',
-      shipped: 'Kargoda',
-      delivered: 'Teslim Edildi',
-      completed: 'Tamamlandı',
-      cancelled: 'İptal',
-      rejected: 'Reddedildi',
-      active: 'Aktif',
-      inactive: 'Pasif',
-      sold: 'Satıldı',
-      accepted: 'Kabul Edildi',
-      both_shipped: 'Gönderildi',
-      disputed: 'İtirazlı',
-    };
-    return (
-      <span className={`px-2 py-1 rounded-full text-xs font-medium ${colors[status] || 'bg-gray-100 text-gray-800'}`}>
-        {labels[status] || status}
-      </span>
-    );
+  const userStatusConfig: Record<string, StatusConfig> = {
+    pending: { label: 'Bekliyor', variant: 'warning' },
+    pending_payment: { label: 'Ödeme Bekliyor', variant: 'warning' },
+    paid: { label: 'Ödendi', variant: 'info' },
+    preparing: { label: 'Hazırlanıyor', variant: 'info' },
+    shipped: { label: 'Kargoda', variant: 'primary' },
+    delivered: { label: 'Teslim Edildi', variant: 'success' },
+    completed: { label: 'Tamamlandı', variant: 'success' },
+    cancelled: { label: 'İptal', variant: 'danger' },
+    rejected: { label: 'Reddedildi', variant: 'danger' },
+    active: { label: 'Aktif', variant: 'success' },
+    inactive: { label: 'Pasif', variant: 'secondary' },
+    sold: { label: 'Satıldı', variant: 'primary' },
+    accepted: { label: 'Kabul Edildi', variant: 'info' },
+    both_shipped: { label: 'Gönderildi', variant: 'primary' },
+    disputed: { label: 'İtirazlı', variant: 'danger' },
   };
 
   if (loading) {
     return (
       <div className="flex items-center justify-center min-h-screen">
         <div className="text-center">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary-600 mx-auto"></div>
-          <p className="mt-4 text-gray-500">Yükleniyor...</p>
+          <Spinner size="xl" color="border-primary-600 border-t-transparent" className="mx-auto" />
+          <p className="mt-4 text-muted">Yükleniyor...</p>
         </div>
       </div>
     );
@@ -251,7 +230,7 @@ export default function UserDetailPage() {
   if (!user) {
     return (
       <div className="text-center py-12">
-        <p className="text-gray-500">Kullanıcı bulunamadı</p>
+        <p className="text-muted">Kullanıcı bulunamadı</p>
       </div>
     );
   }
@@ -262,9 +241,9 @@ export default function UserDetailPage() {
         <div className="flex items-center gap-4">
           <Link
             href="/users"
-            className="p-2 hover:bg-gray-100 rounded-lg transition-colors"
+            className="p-2 hover:bg-surface-alt rounded-lg transition-colors"
           >
-            <ArrowLeftIcon className="w-6 h-6 text-gray-500" />
+            <ArrowLeftIcon className="w-6 h-6 text-muted" />
           </Link>
           <div className="flex-1 flex items-center gap-4">
             {user.avatarUrl ? (
@@ -283,13 +262,13 @@ export default function UserDetailPage() {
               </div>
             )}
             <div>
-              <h1 className="text-2xl font-bold text-gray-900">{user.displayName}</h1>
-              <p className="text-gray-500">{user.email}</p>
+              <h1 className="text-2xl font-bold text-heading">{user.displayName}</h1>
+              <p className="text-muted">{user.email}</p>
               {user.averageRating && (
                 <div className="flex items-center gap-1 mt-1">
-                  <StarIcon className="w-4 h-4 text-yellow-500 fill-yellow-500" />
-                  <span className="text-yellow-500 font-medium">{user.averageRating}</span>
-                  <span className="text-gray-500 text-sm">({user.stats?.receivedRatingsCount || 0} değerlendirme)</span>
+                  <StarIcon className="w-4 h-4 text-warning-500 fill-warning-500" />
+                  <span className="text-warning-500 font-medium">{user.averageRating}</span>
+                  <span className="text-muted text-sm">({user.stats?.receivedRatingsCount || 0} değerlendirme)</span>
                 </div>
               )}
             </div>
@@ -297,27 +276,21 @@ export default function UserDetailPage() {
           <div className="flex items-center gap-3">
             {user.isBanned ? (
               <>
-                <span className="px-4 py-2 rounded-full font-medium text-red-600 bg-red-500/20">
+                <span className="px-4 py-2 rounded-full font-medium text-danger-600 bg-danger-500/20">
                   Banlı
                 </span>
-                <button
-                  onClick={() => setShowUnbanModal(true)}
-                  className="px-4 py-2 bg-green-600 text-gray-900 rounded-lg hover:bg-green-700 transition-colors"
-                >
+                <Button variant="success" size="md" onClick={() => setShowUnbanModal(true)}>
                   Banı Kaldır
-                </button>
+                </Button>
               </>
             ) : (
               <>
-                <span className="px-4 py-2 rounded-full font-medium text-green-700 bg-green-500/20">
+                <span className="px-4 py-2 rounded-full font-medium text-success-700 bg-success-500/20">
                   Aktif
                 </span>
-                <button
-                  onClick={() => setShowBanModal(true)}
-                  className="px-4 py-2 bg-red-600 text-gray-900 rounded-lg hover:bg-red-700 transition-colors"
-                >
+                <Button variant="danger" size="md" onClick={() => setShowBanModal(true)}>
                   Banla
-                </button>
+                </Button>
               </>
             )}
           </div>
@@ -327,43 +300,43 @@ export default function UserDetailPage() {
         {user.stats && (
           <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-4">
             <div className="admin-card p-4 text-center">
-              <ShoppingBagIcon className="w-8 h-8 text-blue-500 mx-auto mb-2" />
-              <p className="text-2xl font-bold text-gray-900">{user.stats.ordersCount}</p>
-              <p className="text-xs text-gray-500">Toplam Sipariş</p>
-              <p className="text-xs text-gray-500">
+              <ShoppingBagIcon className="w-8 h-8 text-info-500 mx-auto mb-2" />
+              <p className="text-2xl font-bold text-heading">{user.stats.ordersCount}</p>
+              <p className="text-xs text-muted">Toplam Sipariş</p>
+              <p className="text-xs text-muted">
                 {user.stats.buyerOrdersCount} alıcı / {user.stats.sellerOrdersCount} satıcı
               </p>
             </div>
             <div className="admin-card p-4 text-center">
-              <CubeIcon className="w-8 h-8 text-green-500 mx-auto mb-2" />
-              <p className="text-2xl font-bold text-gray-900">{user.stats.productsCount}</p>
-              <p className="text-xs text-gray-500">Ürün</p>
+              <CubeIcon className="w-8 h-8 text-success-500 mx-auto mb-2" />
+              <p className="text-2xl font-bold text-heading">{user.stats.productsCount}</p>
+              <p className="text-xs text-muted">Ürün</p>
             </div>
             <div className="admin-card p-4 text-center">
-              <ArrowPathIcon className="w-8 h-8 text-purple-500 mx-auto mb-2" />
-              <p className="text-2xl font-bold text-gray-900">{user.stats.tradesCount}</p>
-              <p className="text-xs text-gray-500">Takas</p>
-              <p className="text-xs text-gray-500">
+              <ArrowPathIcon className="w-8 h-8 text-primary-500 mx-auto mb-2" />
+              <p className="text-2xl font-bold text-heading">{user.stats.tradesCount}</p>
+              <p className="text-xs text-muted">Takas</p>
+              <p className="text-xs text-muted">
                 {user.stats.initiatedTradesCount} başlatan / {user.stats.receivedTradesCount} alıcı
               </p>
             </div>
             <div className="admin-card p-4 text-center">
-              <ChatBubbleLeftRightIcon className="w-8 h-8 text-orange-500 mx-auto mb-2" />
-              <p className="text-2xl font-bold text-gray-900">{user.stats.messagesCount}</p>
-              <p className="text-xs text-gray-500">Mesaj</p>
-              <p className="text-xs text-gray-500">
+              <ChatBubbleLeftRightIcon className="w-8 h-8 text-primary-500 mx-auto mb-2" />
+              <p className="text-2xl font-bold text-heading">{user.stats.messagesCount}</p>
+              <p className="text-xs text-muted">Mesaj</p>
+              <p className="text-xs text-muted">
                 {user.stats.sentMessagesCount} gönderilen / {user.stats.receivedMessagesCount} alınan
               </p>
             </div>
             <div className="admin-card p-4 text-center">
-              <StarIcon className="w-8 h-8 text-yellow-500 mx-auto mb-2" />
-              <p className="text-2xl font-bold text-gray-900">{user.stats.receivedRatingsCount}</p>
-              <p className="text-xs text-gray-500">Alınan Değerlendirme</p>
+              <StarIcon className="w-8 h-8 text-warning-500 mx-auto mb-2" />
+              <p className="text-2xl font-bold text-heading">{user.stats.receivedRatingsCount}</p>
+              <p className="text-xs text-muted">Alınan Değerlendirme</p>
             </div>
             <div className="admin-card p-4 text-center">
-              <StarIcon className="w-8 h-8 text-cyan-500 mx-auto mb-2" />
-              <p className="text-2xl font-bold text-gray-900">{user.stats.givenRatingsCount}</p>
-              <p className="text-xs text-gray-500">Verilen Değerlendirme</p>
+              <StarIcon className="w-8 h-8 text-info-500 mx-auto mb-2" />
+              <p className="text-2xl font-bold text-heading">{user.stats.givenRatingsCount}</p>
+              <p className="text-xs text-muted">Verilen Değerlendirme</p>
             </div>
           </div>
         )}
@@ -373,72 +346,72 @@ export default function UserDetailPage() {
           <div className="lg:col-span-2 space-y-6">
             {/* User Info Card */}
             <div className="admin-card p-6">
-              <h2 className="text-lg font-semibold text-gray-900 mb-4 flex items-center gap-2">
+              <h2 className="text-lg font-semibold text-heading mb-4 flex items-center gap-2">
                 <UserIcon className="w-5 h-5" />
                 Kullanıcı Bilgileri
               </h2>
               <div className="grid grid-cols-2 gap-6">
                 <div>
-                  <p className="text-gray-500 text-sm">Email</p>
-                  <p className="text-gray-900 font-medium">{user.email}</p>
+                  <p className="text-muted text-sm">Email</p>
+                  <p className="text-heading font-medium">{user.email}</p>
                   {user.isEmailVerified ? (
-                    <span className="text-xs text-green-700 flex items-center gap-1">
+                    <span className="text-xs text-success-700 flex items-center gap-1">
                       <CheckCircleIcon className="w-3 h-3" /> Doğrulanmış
                     </span>
                   ) : (
-                    <span className="text-xs text-gray-500">Doğrulanmamış</span>
+                    <span className="text-xs text-muted">Doğrulanmamış</span>
                   )}
                 </div>
                 <div>
-                  <p className="text-gray-500 text-sm">Telefon</p>
-                  <p className="text-gray-900 font-medium">{user.phone || 'Belirtilmemiş'}</p>
+                  <p className="text-muted text-sm">Telefon</p>
+                  <p className="text-heading font-medium">{user.phone || 'Belirtilmemiş'}</p>
                   {user.phone && (
                     user.isPhoneVerified ? (
-                      <span className="text-xs text-green-700 flex items-center gap-1">
+                      <span className="text-xs text-success-700 flex items-center gap-1">
                         <CheckCircleIcon className="w-3 h-3" /> Doğrulanmış
                       </span>
                     ) : (
-                      <span className="text-xs text-gray-500">Doğrulanmamış</span>
+                      <span className="text-xs text-muted">Doğrulanmamış</span>
                     )
                   )}
                 </div>
                 <div>
-                  <p className="text-gray-500 text-sm">Kayıt Tarihi</p>
-                  <p className="text-gray-900">{new Date(user.createdAt).toLocaleDateString('tr-TR')}</p>
+                  <p className="text-muted text-sm">Kayıt Tarihi</p>
+                  <p className="text-heading">{new Date(user.createdAt).toLocaleDateString('tr-TR')}</p>
                 </div>
                 <div>
-                  <p className="text-gray-500 text-sm">Son Giriş</p>
-                  <p className="text-gray-900">
+                  <p className="text-muted text-sm">Son Giriş</p>
+                  <p className="text-heading">
                     {user.lastLoginAt ? new Date(user.lastLoginAt).toLocaleString('tr-TR') : 'Hiç giriş yapmadı'}
                   </p>
                 </div>
                 {user.bio && (
                   <div className="col-span-2">
-                    <p className="text-gray-500 text-sm">Biyografi</p>
-                    <p className="text-gray-900">{user.bio}</p>
+                    <p className="text-muted text-sm">Biyografi</p>
+                    <p className="text-heading">{user.bio}</p>
                   </div>
                 )}
               </div>
 
               {/* Seller Info */}
               {user.isSeller && (
-                <div className="mt-6 pt-6 border-t border-gray-300">
-                  <h3 className="text-md font-semibold text-gray-900 mb-3">Satıcı Bilgileri</h3>
+                <div className="mt-6 pt-6 border-t">
+                  <h3 className="text-md font-semibold text-heading mb-3">Satıcı Bilgileri</h3>
                   <div className="grid grid-cols-2 gap-4">
                     <div>
-                      <p className="text-gray-500 text-sm">Satıcı Tipi</p>
-                      <p className="text-gray-900">{user.sellerType === 'individual' ? 'Bireysel' : 'Kurumsal'}</p>
+                      <p className="text-muted text-sm">Satıcı Tipi</p>
+                      <p className="text-heading">{user.sellerType === 'individual' ? 'Bireysel' : 'Kurumsal'}</p>
                     </div>
                     {user.companyName && (
                       <div>
-                        <p className="text-gray-500 text-sm">Şirket Adı</p>
-                        <p className="text-gray-900">{user.companyName}</p>
+                        <p className="text-muted text-sm">Şirket Adı</p>
+                        <p className="text-heading">{user.companyName}</p>
                       </div>
                     )}
                     {user.taxId && (
                       <div>
-                        <p className="text-gray-500 text-sm">Vergi No</p>
-                        <p className="text-gray-900">{user.taxId}</p>
+                        <p className="text-muted text-sm">Vergi No</p>
+                        <p className="text-heading">{user.taxId}</p>
                       </div>
                     )}
                   </div>
@@ -447,12 +420,12 @@ export default function UserDetailPage() {
 
               {/* Ban Info */}
               {user.isBanned && (
-                <div className="mt-6 pt-6 border-t border-gray-300">
-                  <div className="p-4 bg-red-500/10 border border-red-500/30 rounded-lg">
-                    <p className="text-red-600 font-medium">Ban Nedeni</p>
-                    <p className="text-gray-900 mt-1">{user.bannedReason || 'Belirtilmemiş'}</p>
+                <div className="mt-6 pt-6 border-t">
+                  <div className="p-4 bg-danger-500/10 border border-danger-500/30 rounded-lg">
+                    <p className="text-danger-600 font-medium">Ban Nedeni</p>
+                    <p className="text-heading mt-1">{user.bannedReason || 'Belirtilmemiş'}</p>
                     {user.bannedAt && (
-                      <p className="text-red-600 text-sm mt-2">
+                      <p className="text-danger-600 text-sm mt-2">
                         Ban Tarihi: {new Date(user.bannedAt).toLocaleString('tr-TR')}
                       </p>
                     )}
@@ -464,26 +437,26 @@ export default function UserDetailPage() {
             {/* Membership Info */}
             {user.membership && (
               <div className="admin-card p-6">
-                <h2 className="text-lg font-semibold text-gray-900 mb-4">Üyelik Bilgileri</h2>
+                <h2 className="text-lg font-semibold text-heading mb-4">Üyelik Bilgileri</h2>
                 <div className="grid grid-cols-2 gap-4">
                   <div>
-                    <p className="text-gray-500 text-sm">Üyelik Seviyesi</p>
-                    <p className="text-gray-900 font-medium">{user.membership.tier.name}</p>
+                    <p className="text-muted text-sm">Üyelik Seviyesi</p>
+                    <p className="text-heading font-medium">{user.membership.tier.name}</p>
                   </div>
                   <div>
-                    <p className="text-gray-500 text-sm">Durum</p>
-                    <p className="text-gray-900">{user.membership.status}</p>
+                    <p className="text-muted text-sm">Durum</p>
+                    <p className="text-heading">{user.membership.status}</p>
                   </div>
                   {user.membership.startDate && (
                     <div>
-                      <p className="text-gray-500 text-sm">Başlangıç</p>
-                      <p className="text-gray-900">{new Date(user.membership.startDate).toLocaleDateString('tr-TR')}</p>
+                      <p className="text-muted text-sm">Başlangıç</p>
+                      <p className="text-heading">{new Date(user.membership.startDate).toLocaleDateString('tr-TR')}</p>
                     </div>
                   )}
                   {user.membership.endDate && (
                     <div>
-                      <p className="text-gray-500 text-sm">Bitiş</p>
-                      <p className="text-gray-900">{new Date(user.membership.endDate).toLocaleDateString('tr-TR')}</p>
+                      <p className="text-muted text-sm">Bitiş</p>
+                      <p className="text-heading">{new Date(user.membership.endDate).toLocaleDateString('tr-TR')}</p>
                     </div>
                   )}
                 </div>
@@ -492,7 +465,7 @@ export default function UserDetailPage() {
 
             {/* Tabs for Orders, Products, Trades, Ratings */}
             <div className="admin-card">
-              <div className="border-b border-gray-300">
+              <div className="border-b">
                 <div className="flex">
                   {[
                     { key: 'orders', label: 'Siparişler', count: user.recentOrders?.length || 0 },
@@ -500,17 +473,15 @@ export default function UserDetailPage() {
                     { key: 'trades', label: 'Takaslar', count: user.recentTrades?.length || 0 },
                     { key: 'ratings', label: 'Değerlendirmeler', count: (user.receivedRatings?.length || 0) },
                   ].map((tab) => (
-                    <button
-                      key={tab.key}
+                    <Button variant="secondary" key={tab.key}
                       onClick={() => setActiveTab(tab.key as any)}
                       className={`px-6 py-4 text-sm font-medium transition-colors ${
                         activeTab === tab.key
                           ? 'text-primary-600 border-b-2 border-primary-500'
-                          : 'text-gray-500 hover:text-gray-900'
-                      }`}
-                    >
+                          : 'text-muted hover:text-heading'
+                      }`}>
                       {tab.label} ({tab.count})
-                    </button>
+                    </Button>
                   ))}
                 </div>
               </div>
@@ -522,27 +493,27 @@ export default function UserDetailPage() {
                     {user.recentOrders && user.recentOrders.length > 0 ? (
                       <>
                         {user.recentOrders.map((order) => (
-                          <div key={order.id} className="flex items-center justify-between p-4 bg-gray-100 rounded-lg">
+                          <div key={order.id} className="flex items-center justify-between p-4 bg-surface-alt rounded-lg">
                             <div className="flex-1">
                               <div className="flex items-center gap-3">
                                 <span className={`px-2 py-1 rounded text-xs font-medium ${
-                                  order.role === 'buyer' ? 'bg-blue-500/20 text-blue-700' : 'bg-green-500/20 text-green-700'
+                                  order.role === 'buyer' ? 'bg-info-500/20 text-info-700' : 'bg-success-500/20 text-success-700'
                                 }`}>
                                   {order.role === 'buyer' ? 'Alıcı' : 'Satıcı'}
                                 </span>
-                                <Link href={`/orders/${order.id}`} className="text-gray-900 font-medium hover:text-primary-600">
+                                <Link href={`/orders/${order.id}`} className="text-heading font-medium hover:text-primary-600">
                                   {order.orderNumber || `#${order.id.slice(0, 8)}`}
                                 </Link>
-                                {getStatusBadge(order.status)}
+                                <StatusBadge status={order.status} config={userStatusConfig} />
                               </div>
-                              <p className="text-sm text-gray-500 mt-1">
+                              <p className="text-sm text-muted mt-1">
                                 {order.role === 'buyer' ? 'Satıcı' : 'Alıcı'}: {order.otherParty?.displayName || 'Bilinmiyor'}
                                 {order.product && ` • ${order.product.title}`}
                               </p>
                             </div>
                             <div className="text-right">
-                              <p className="text-gray-900 font-medium">₺{order.totalAmount.toLocaleString('tr-TR')}</p>
-                              <p className="text-xs text-gray-500">{new Date(order.createdAt).toLocaleDateString('tr-TR')}</p>
+                              <p className="text-heading font-medium">₺{order.totalAmount.toLocaleString('tr-TR')}</p>
+                              <p className="text-xs text-muted">{new Date(order.createdAt).toLocaleDateString('tr-TR')}</p>
                             </div>
                           </div>
                         ))}
@@ -554,7 +525,7 @@ export default function UserDetailPage() {
                         </Link>
                       </>
                     ) : (
-                      <p className="text-gray-500 text-center py-8">Henüz sipariş yok</p>
+                      <p className="text-muted text-center py-8">Henüz sipariş yok</p>
                     )}
                   </div>
                 )}
@@ -565,7 +536,7 @@ export default function UserDetailPage() {
                     {user.products && user.products.length > 0 ? (
                       <>
                         {user.products.map((product) => (
-                          <div key={product.id} className="flex items-center gap-4 p-4 bg-gray-100 rounded-lg">
+                          <div key={product.id} className="flex items-center gap-4 p-4 bg-surface-alt rounded-lg">
                             {product.imageUrl ? (
                               <Image
                                 src={product.imageUrl}
@@ -575,21 +546,21 @@ export default function UserDetailPage() {
                                 className="rounded-lg object-cover"
                               />
                             ) : (
-                              <div className="w-[60px] h-[60px] bg-gray-100 rounded-lg flex items-center justify-center">
-                                <CubeIcon className="w-6 h-6 text-gray-500" />
+                              <div className="w-[60px] h-[60px] bg-surface-alt rounded-lg flex items-center justify-center">
+                                <CubeIcon className="w-6 h-6 text-muted" />
                               </div>
                             )}
                             <div className="flex-1">
-                              <Link href={`/products/${product.id}`} className="text-gray-900 font-medium hover:text-primary-600">
+                              <Link href={`/products/${product.id}`} className="text-heading font-medium hover:text-primary-600">
                                 {product.title}
                               </Link>
                               <div className="flex items-center gap-2 mt-1">
-                                {getStatusBadge(product.status)}
-                                <span className="text-sm text-gray-500">{new Date(product.createdAt).toLocaleDateString('tr-TR')}</span>
+                                <StatusBadge status={product.status} config={userStatusConfig} />
+                                <span className="text-sm text-muted">{new Date(product.createdAt).toLocaleDateString('tr-TR')}</span>
                               </div>
                             </div>
                             <div className="text-right">
-                              <p className="text-gray-900 font-medium">₺{getProductEffectivePrice(product).toLocaleString('tr-TR')}</p>
+                              <p className="text-heading font-medium">₺{getProductEffectivePrice(product).toLocaleString('tr-TR')}</p>
                             </div>
                           </div>
                         ))}
@@ -601,7 +572,7 @@ export default function UserDetailPage() {
                         </Link>
                       </>
                     ) : (
-                      <p className="text-gray-500 text-center py-8">Henüz ürün yok</p>
+                      <p className="text-muted text-center py-8">Henüz ürün yok</p>
                     )}
                   </div>
                 )}
@@ -612,22 +583,22 @@ export default function UserDetailPage() {
                     {user.recentTrades && user.recentTrades.length > 0 ? (
                       <>
                         {user.recentTrades.map((trade) => (
-                          <div key={trade.id} className="p-4 bg-gray-100 rounded-lg">
+                          <div key={trade.id} className="p-4 bg-surface-alt rounded-lg">
                             <div className="flex items-center justify-between mb-2">
                               <div className="flex items-center gap-3">
                                 <span className={`px-2 py-1 rounded text-xs font-medium ${
-                                  trade.role === 'initiator' ? 'bg-purple-500/20 text-purple-700' : 'bg-cyan-500/20 text-cyan-400'
+                                  trade.role === 'initiator' ? 'bg-primary-500/20 text-primary-700' : 'bg-info-500/20 text-info-400'
                                 }`}>
                                   {trade.role === 'initiator' ? 'Başlatan' : 'Alıcı'}
                                 </span>
-                                <Link href={`/trades/${trade.id}`} className="text-gray-900 font-medium hover:text-primary-600">
+                                <Link href={`/trades/${trade.id}`} className="text-heading font-medium hover:text-primary-600">
                                   {trade.tradeNumber || `#${trade.id.slice(0, 8)}`}
                                 </Link>
-                                {getStatusBadge(trade.status)}
+                                <StatusBadge status={trade.status} config={userStatusConfig} />
                               </div>
-                              <span className="text-sm text-gray-500">{new Date(trade.createdAt).toLocaleDateString('tr-TR')}</span>
+                              <span className="text-sm text-muted">{new Date(trade.createdAt).toLocaleDateString('tr-TR')}</span>
                             </div>
-                            <div className="text-sm text-gray-500">
+                            <div className="text-sm text-muted">
                               <p>
                                 Karşı taraf: {trade.role === 'initiator' ? trade.receiver?.displayName : trade.initiator?.displayName}
                               </p>
@@ -646,7 +617,7 @@ export default function UserDetailPage() {
                         </Link>
                       </>
                     ) : (
-                      <p className="text-gray-500 text-center py-8">Henüz takas yok</p>
+                      <p className="text-muted text-center py-8">Henüz takas yok</p>
                     )}
                   </div>
                 )}
@@ -654,60 +625,60 @@ export default function UserDetailPage() {
                 {/* Ratings Tab */}
                 {activeTab === 'ratings' && (
                   <div className="space-y-4">
-                    <h3 className="text-gray-900 font-medium">Alınan Değerlendirmeler</h3>
+                    <h3 className="text-heading font-medium">Alınan Değerlendirmeler</h3>
                     {user.receivedRatings && user.receivedRatings.length > 0 ? (
                       <div className="space-y-3">
                         {user.receivedRatings.map((rating) => (
-                          <div key={rating.id} className="p-4 bg-gray-100 rounded-lg">
+                          <div key={rating.id} className="p-4 bg-surface-alt rounded-lg">
                             <div className="flex items-center justify-between mb-2">
                               <div className="flex items-center gap-2">
                                 {[1, 2, 3, 4, 5].map((star) => (
                                   <StarIcon
                                     key={star}
-                                    className={`w-4 h-4 ${star <= rating.score ? 'text-yellow-500 fill-yellow-500' : 'text-gray-600'}`}
+                                    className={`w-4 h-4 ${star <= rating.score ? 'text-warning-500 fill-warning-500' : 'text-muted'}`}
                                   />
                                 ))}
-                                <span className="text-gray-900 font-medium ml-2">{rating.score}/5</span>
+                                <span className="text-heading font-medium ml-2">{rating.score}/5</span>
                               </div>
-                              <span className="text-sm text-gray-500">{new Date(rating.createdAt).toLocaleDateString('tr-TR')}</span>
+                              <span className="text-sm text-muted">{new Date(rating.createdAt).toLocaleDateString('tr-TR')}</span>
                             </div>
-                            {rating.comment && <p className="text-gray-600">{rating.comment}</p>}
-                            <p className="text-sm text-gray-500 mt-2">
+                            {rating.comment && <p className="text-muted">{rating.comment}</p>}
+                            <p className="text-sm text-muted mt-2">
                               Değerlendiren: {rating.giver?.displayName || 'Anonim'}
                             </p>
                           </div>
                         ))}
                       </div>
                     ) : (
-                      <p className="text-gray-500 py-4">Henüz değerlendirme yok</p>
+                      <p className="text-muted py-4">Henüz değerlendirme yok</p>
                     )}
 
-                    <h3 className="text-gray-900 font-medium mt-6">Verilen Değerlendirmeler</h3>
+                    <h3 className="text-heading font-medium mt-6">Verilen Değerlendirmeler</h3>
                     {user.givenRatings && user.givenRatings.length > 0 ? (
                       <div className="space-y-3">
                         {user.givenRatings.map((rating) => (
-                          <div key={rating.id} className="p-4 bg-gray-100 rounded-lg">
+                          <div key={rating.id} className="p-4 bg-surface-alt rounded-lg">
                             <div className="flex items-center justify-between mb-2">
                               <div className="flex items-center gap-2">
                                 {[1, 2, 3, 4, 5].map((star) => (
                                   <StarIcon
                                     key={star}
-                                    className={`w-4 h-4 ${star <= rating.score ? 'text-yellow-500 fill-yellow-500' : 'text-gray-600'}`}
+                                    className={`w-4 h-4 ${star <= rating.score ? 'text-warning-500 fill-warning-500' : 'text-muted'}`}
                                   />
                                 ))}
-                                <span className="text-gray-900 font-medium ml-2">{rating.score}/5</span>
+                                <span className="text-heading font-medium ml-2">{rating.score}/5</span>
                               </div>
-                              <span className="text-sm text-gray-500">{new Date(rating.createdAt).toLocaleDateString('tr-TR')}</span>
+                              <span className="text-sm text-muted">{new Date(rating.createdAt).toLocaleDateString('tr-TR')}</span>
                             </div>
-                            {rating.comment && <p className="text-gray-600">{rating.comment}</p>}
-                            <p className="text-sm text-gray-500 mt-2">
+                            {rating.comment && <p className="text-muted">{rating.comment}</p>}
+                            <p className="text-sm text-muted mt-2">
                               Değerlendirilen: {rating.receiver?.displayName || 'Bilinmiyor'}
                             </p>
                           </div>
                         ))}
                       </div>
                     ) : (
-                      <p className="text-gray-500 py-4">Henüz değerlendirme vermemiş</p>
+                      <p className="text-muted py-4">Henüz değerlendirme vermemiş</p>
                     )}
                   </div>
                 )}
@@ -719,25 +690,25 @@ export default function UserDetailPage() {
           <div className="space-y-6">
             {/* Quick Actions */}
             <div className="admin-card p-6">
-              <h3 className="text-lg font-semibold text-gray-900 mb-4">Hızlı İşlemler</h3>
+              <h3 className="text-lg font-semibold text-heading mb-4">Hızlı İşlemler</h3>
               <div className="space-y-2">
                 <Link
                   href={`/orders?userId=${user.id}`}
-                  className="flex items-center gap-3 w-full px-4 py-3 text-gray-600 hover:bg-gray-100 rounded-lg transition-colors"
+                  className="flex items-center gap-3 w-full px-4 py-3 text-muted hover:bg-surface-alt rounded-lg transition-colors"
                 >
                   <ShoppingBagIcon className="w-5 h-5" />
                   <span>Tüm Siparişler ({user.stats?.ordersCount || 0})</span>
                 </Link>
                 <Link
                   href={`/products?sellerId=${user.id}`}
-                  className="flex items-center gap-3 w-full px-4 py-3 text-gray-600 hover:bg-gray-100 rounded-lg transition-colors"
+                  className="flex items-center gap-3 w-full px-4 py-3 text-muted hover:bg-surface-alt rounded-lg transition-colors"
                 >
                   <CubeIcon className="w-5 h-5" />
                   <span>Tüm Ürünler ({user.stats?.productsCount || 0})</span>
                 </Link>
                 <Link
                   href={`/trades?userId=${user.id}`}
-                  className="flex items-center gap-3 w-full px-4 py-3 text-gray-600 hover:bg-gray-100 rounded-lg transition-colors"
+                  className="flex items-center gap-3 w-full px-4 py-3 text-muted hover:bg-surface-alt rounded-lg transition-colors"
                 >
                   <ArrowPathIcon className="w-5 h-5" />
                   <span>Tüm Takaslar ({user.stats?.tradesCount || 0})</span>
@@ -747,38 +718,38 @@ export default function UserDetailPage() {
 
             {/* Verification Status */}
             <div className="admin-card p-6">
-              <h3 className="text-lg font-semibold text-gray-900 mb-4">Doğrulama Durumu</h3>
+              <h3 className="text-lg font-semibold text-heading mb-4">Doğrulama Durumu</h3>
               <div className="space-y-3">
                 <div className="flex items-center justify-between">
-                  <span className="text-gray-500">Email</span>
+                  <span className="text-muted">Email</span>
                   {user.isEmailVerified ? (
-                    <CheckCircleIcon className="w-5 h-5 text-green-500" />
+                    <CheckCircleIcon className="w-5 h-5 text-success-500" />
                   ) : (
-                    <XCircleIcon className="w-5 h-5 text-gray-500" />
+                    <XCircleIcon className="w-5 h-5 text-muted" />
                   )}
                 </div>
                 <div className="flex items-center justify-between">
-                  <span className="text-gray-500">Telefon</span>
+                  <span className="text-muted">Telefon</span>
                   {user.isPhoneVerified ? (
-                    <CheckCircleIcon className="w-5 h-5 text-green-500" />
+                    <CheckCircleIcon className="w-5 h-5 text-success-500" />
                   ) : (
-                    <XCircleIcon className="w-5 h-5 text-gray-500" />
+                    <XCircleIcon className="w-5 h-5 text-muted" />
                   )}
                 </div>
                 <div className="flex items-center justify-between">
-                  <span className="text-gray-500">Kimlik</span>
+                  <span className="text-muted">Kimlik</span>
                   {user.isVerified ? (
-                    <CheckCircleIcon className="w-5 h-5 text-green-500" />
+                    <CheckCircleIcon className="w-5 h-5 text-success-500" />
                   ) : (
-                    <XCircleIcon className="w-5 h-5 text-gray-500" />
+                    <XCircleIcon className="w-5 h-5 text-muted" />
                   )}
                 </div>
                 <div className="flex items-center justify-between">
-                  <span className="text-gray-500">Satıcı</span>
+                  <span className="text-muted">Satıcı</span>
                   {user.isSeller ? (
-                    <CheckCircleIcon className="w-5 h-5 text-green-500" />
+                    <CheckCircleIcon className="w-5 h-5 text-success-500" />
                   ) : (
-                    <XCircleIcon className="w-5 h-5 text-gray-500" />
+                    <XCircleIcon className="w-5 h-5 text-muted" />
                   )}
                 </div>
               </div>
@@ -787,21 +758,21 @@ export default function UserDetailPage() {
             {/* Addresses */}
             {user.addresses && user.addresses.length > 0 && (
               <div className="admin-card p-6">
-                <h3 className="text-lg font-semibold text-gray-900 mb-4 flex items-center gap-2">
+                <h3 className="text-lg font-semibold text-heading mb-4 flex items-center gap-2">
                   <MapPinIcon className="w-5 h-5" />
                   Adresler ({user.addresses.length})
                 </h3>
                 <div className="space-y-3">
                   {user.addresses.map((address) => (
-                    <div key={address.id} className="p-3 bg-gray-100 rounded-lg">
+                    <div key={address.id} className="p-3 bg-surface-alt rounded-lg">
                       <div className="flex items-center gap-2 mb-1">
-                        <p className="text-gray-900 font-medium">{address.title}</p>
+                        <p className="text-heading font-medium">{address.title}</p>
                         {address.isDefault && (
                           <span className="px-2 py-0.5 bg-primary-100 text-primary-400 text-xs rounded">Varsayılan</span>
                         )}
                       </div>
-                      <p className="text-sm text-gray-500">{address.fullAddress}</p>
-                      <p className="text-sm text-gray-500">
+                      <p className="text-sm text-muted">{address.fullAddress}</p>
+                      <p className="text-sm text-muted">
                         {address.district}, {address.city}
                         {address.postalCode && ` - ${address.postalCode}`}
                       </p>
@@ -815,39 +786,26 @@ export default function UserDetailPage() {
 
         {/* Ban Modal */}
         {showBanModal && (
-          <div className="fixed inset-0 bg-black/70 flex items-center justify-center z-50">
-            <div className="bg-white rounded-xl p-6 max-w-md w-full mx-4 border border-gray-300">
-              <h3 className="text-lg font-semibold text-gray-900 mb-4">Kullanıcıyı Banla</h3>
+          <div className="fixed inset-0 bg-heading/70 flex items-center justify-center z-50">
+            <div className="rounded-xl p-6 max-w-md mx-4">
+              <h3 className="text-lg font-semibold text-heading mb-4">Kullanıcıyı Banla</h3>
               <div className="mb-4">
-                <label className="block text-sm font-medium text-gray-600 mb-2">
+                <label className="block text-sm font-medium text-muted mb-2">
                   Ban Nedeni *
                 </label>
-                <textarea
-                  value={banReason}
+                <Textarea value={banReason}
                   onChange={(e) => setBanReason(e.target.value)}
-                  className="w-full px-3 py-2 bg-gray-100 border border-gray-300 text-gray-900 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent"
+                  className="bg-surface-alt text-heading"
                   rows={4}
-                  placeholder="Ban nedenini açıklayın..."
-                />
+                  placeholder="Ban nedenini açıklayın..." />
               </div>
               <div className="flex gap-3">
-                <button
-                  onClick={() => {
-                    setShowBanModal(false);
-                    setBanReason('');
-                  }}
-                  className="flex-1 px-4 py-2 border border-gray-300 text-gray-600 rounded-lg hover:bg-gray-100 transition-colors"
-                  disabled={processing}
-                >
+                <Button variant="secondary" size="md" onClick={() => { setShowBanModal(false); setBanReason(''); }} disabled={processing} className="flex-1">
                   İptal
-                </button>
-                <button
-                  onClick={handleBan}
-                  className="flex-1 px-4 py-2 bg-red-600 text-gray-900 rounded-lg hover:bg-red-700 transition-colors disabled:opacity-50"
-                  disabled={processing}
-                >
+                </Button>
+                <Button variant="danger" size="md" onClick={handleBan} disabled={processing} isLoading={processing} className="flex-1">
                   {processing ? 'İşleniyor...' : 'Banla'}
-                </button>
+                </Button>
               </div>
             </div>
           </div>
@@ -855,27 +813,19 @@ export default function UserDetailPage() {
 
         {/* Unban Modal */}
         {showUnbanModal && (
-          <div className="fixed inset-0 bg-black/70 flex items-center justify-center z-50">
-            <div className="bg-white rounded-xl p-6 max-w-md w-full mx-4 border border-gray-300">
-              <h3 className="text-lg font-semibold text-gray-900 mb-4">Banı Kaldır</h3>
-              <p className="text-gray-500 mb-6">
+          <div className="fixed inset-0 bg-heading/70 flex items-center justify-center z-50">
+            <div className="rounded-xl p-6 max-w-md mx-4">
+              <h3 className="text-lg font-semibold text-heading mb-4">Banı Kaldır</h3>
+              <p className="text-muted mb-6">
                 Bu kullanıcının banını kaldırmak istediğinizden emin misiniz?
               </p>
               <div className="flex gap-3">
-                <button
-                  onClick={() => setShowUnbanModal(false)}
-                  className="flex-1 px-4 py-2 border border-gray-300 text-gray-600 rounded-lg hover:bg-gray-100 transition-colors"
-                  disabled={processing}
-                >
+                <Button variant="secondary" size="md" onClick={() => setShowUnbanModal(false)} disabled={processing} className="flex-1">
                   İptal
-                </button>
-                <button
-                  onClick={handleUnban}
-                  className="flex-1 px-4 py-2 bg-green-600 text-gray-900 rounded-lg hover:bg-green-700 transition-colors disabled:opacity-50"
-                  disabled={processing}
-                >
+                </Button>
+                <Button variant="success" size="md" onClick={handleUnban} disabled={processing} isLoading={processing} className="flex-1">
                   {processing ? 'İşleniyor...' : 'Banı Kaldır'}
-                </button>
+                </Button>
               </div>
             </div>
           </div>

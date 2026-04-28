@@ -5,6 +5,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { XMarkIcon, FlagIcon } from '@heroicons/react/24/outline';
 import toast from 'react-hot-toast';
 import { api } from '@/lib/api';
+import { Button, Radio, Textarea } from '@tarodan/ui';
 
 export type ReportEntityType = 'product' | 'user' | 'collection' | 'message';
 
@@ -117,7 +118,7 @@ export default function ReportModal({
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
             onClick={onClose}
-            className="absolute inset-0 bg-black/50"
+            className="absolute inset-0 bg-heading/50"
           />
           
           {/* Modal - Compact size with max-height and scroll */}
@@ -125,35 +126,33 @@ export default function ReportModal({
             initial={{ opacity: 0, scale: 0.95, y: 20 }}
             animate={{ opacity: 1, scale: 1, y: 0 }}
             exit={{ opacity: 0, scale: 0.95, y: 20 }}
-            className="relative bg-white rounded-xl shadow-xl w-full max-w-sm max-h-[90vh] overflow-hidden flex flex-col"
+            className="relative bg-surface-elevated rounded-xl shadow-xl w-full max-w-sm max-h-[90vh] overflow-hidden flex flex-col"
           >
             {/* Header - Compact */}
-            <div className="flex items-center justify-between px-4 py-3 border-b border-gray-200 flex-shrink-0">
+            <div className="flex items-center justify-between px-4 py-3 border-b border-border flex-shrink-0">
               <div className="flex items-center gap-2">
-                <FlagIcon className="w-5 h-5 text-red-600" />
-                <h2 className="text-lg font-semibold text-gray-900">{getTitle()}</h2>
+                <FlagIcon className="w-5 h-5 text-danger-600" />
+                <h2 className="text-lg font-semibold text-heading">{getTitle()}</h2>
               </div>
-              <button
-                onClick={onClose}
-                className="p-1.5 rounded-full hover:bg-gray-100 transition-colors"
-              >
-                <XMarkIcon className="w-5 h-5 text-gray-500" />
-              </button>
+              <Button variant="secondary" onClick={onClose}
+                className="p-1.5 rounded-full hover:bg-surface-alt transition-colors">
+                <XMarkIcon className="w-5 h-5 text-muted" />
+              </Button>
             </div>
 
             {/* Content - Scrollable */}
             <form onSubmit={handleSubmit} className="p-4 space-y-4 overflow-y-auto flex-1">
               {entityName && (
-                <div className="p-2 bg-gray-50 rounded-lg">
-                  <p className="text-xs text-gray-500">{locale === 'en' ? 'Reporting:' : 'Raporlanan:'}</p>
-                  <p className="text-sm font-medium text-gray-900 truncate">{entityName}</p>
+                <div className="p-2 bg-surface rounded-lg">
+                  <p className="text-xs text-muted">{locale === 'en' ? 'Reporting:' : 'Raporlanan:'}</p>
+                  <p className="text-sm font-medium text-heading truncate">{entityName}</p>
                 </div>
               )}
 
               {/* Reason Selection - Compact */}
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  {locale === 'en' ? 'Reason' : 'Neden'} <span className="text-red-500">*</span>
+                <label className="block text-sm font-medium text-body mb-2">
+                  {locale === 'en' ? 'Reason' : 'Neden'} <span className="text-danger-500">*</span>
                 </label>
                 <div className="space-y-1.5">
                   {REPORT_REASONS.map((reason) => (
@@ -161,19 +160,16 @@ export default function ReportModal({
                       key={reason.value}
                       className={`flex items-center p-2.5 rounded-lg border cursor-pointer transition-all text-sm ${
                         selectedReason === reason.value
-                          ? 'border-red-500 bg-red-50'
-                          : 'border-gray-200 hover:border-gray-300'
+                          ? 'border-danger-500 bg-danger-50'
+                          : 'border-border hover:border-border'
                       }`}
                     >
-                      <input
-                        type="radio"
-                        name="reportReason"
+                      <Radio name="reportReason"
                         value={reason.value}
                         checked={selectedReason === reason.value}
                         onChange={(e) => setSelectedReason(e.target.value as ReportReason)}
-                        className="w-3.5 h-3.5 text-red-600 border-gray-300 focus:ring-red-500"
-                      />
-                      <span className="ml-2 text-gray-700">
+                        className="w-3.5 h-3.5 text-danger-600 focus:ring-danger-500" />
+                      <span className="ml-2 text-body">
                         {locale === 'en' ? reason.labelEn : reason.labelTr}
                       </span>
                     </label>
@@ -183,40 +179,42 @@ export default function ReportModal({
 
               {/* Description - Compact */}
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1.5">
+                <label className="block text-sm font-medium text-body mb-1.5">
                   {locale === 'en' ? 'Details (optional, min 10 chars)' : 'Detaylar (isteğe bağlı, min 10 karakter)'}
                 </label>
-                <textarea
-                  value={description}
+                <Textarea value={description}
                   onChange={(e) => setDescription(e.target.value)}
                   placeholder={locale === 'en' ? 'More details...' : 'Daha fazla detay...'}
                   rows={2}
                   maxLength={500}
-                  className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-red-500 focus:border-red-500 resize-none"
-                />
-                <p className="text-xs text-gray-400 mt-0.5 text-right">{description.length}/500</p>
+                  className="focus:ring-danger-500 focus:border-danger-500 resize-none" />
+                <p className="text-xs text-subtle mt-0.5 text-right">{description.length}/500</p>
               </div>
 
               {/* Actions - Compact */}
               <div className="flex gap-2 pt-2">
-                <button
+                <Button
                   type="button"
+                  variant="secondary"
+                  size="sm"
+                  className="flex-1"
                   onClick={onClose}
-                  className="flex-1 px-3 py-2 border border-gray-300 rounded-lg text-sm text-gray-700 font-medium hover:bg-gray-50 transition-colors"
                 >
                   {locale === 'en' ? 'Cancel' : 'İptal'}
-                </button>
-                <button
+                </Button>
+                <Button
                   type="submit"
+                  variant="danger"
+                  size="sm"
+                  className="flex-1"
                   disabled={isSubmitting || !selectedReason}
-                  className="flex-1 px-3 py-2 bg-red-600 text-white rounded-lg text-sm font-medium hover:bg-red-700 disabled:bg-gray-300 disabled:cursor-not-allowed transition-colors"
                 >
                   {isSubmitting ? '...' : (locale === 'en' ? 'Report' : 'Raporu Gönder')}
-                </button>
+                </Button>
               </div>
 
               {/* Info - Compact */}
-              <p className="text-xs text-gray-400 text-center">
+              <p className="text-xs text-subtle text-center">
                 {locale === 'en' 
                   ? 'Reports are reviewed within 24-48 hours.'
                   : 'Raporlar 24-48 saat içinde incelenir.'

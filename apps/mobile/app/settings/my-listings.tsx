@@ -34,60 +34,17 @@ export default function MyListingsScreen() {
   const [deleteDialogVisible, setDeleteDialogVisible] = useState(false);
   const [selectedListing, setSelectedListing] = useState<Listing | null>(null);
 
-  // Web ile aynı endpoint: GET /products/my-listings
-  const { data: listingsData, isLoading, refetch } = useQuery({
+  const { data: listingsData, isLoading, isError, refetch } = useQuery({
     queryKey: ['my-listings', filter],
     queryFn: async () => {
-      try {
-        const params: any = {};
-        if (filter !== 'all') {
-          params.status = filter;
-        }
-        const response = await productsApi.getMyListings(params);
-        return response.data?.data || response.data || [];
-      } catch (error) {
-        console.log('Failed to fetch listings, using mock data');
-        // Return mock data for demo
-        return [
-          {
-            id: '1',
-            title: 'Porsche 911 GT3 RS (Silver)',
-            price: 3200,
-            status: 'active',
-            viewCount: 156,
-            favoriteCount: 12,
-            images: [{ url: 'https://via.placeholder.com/100x100?text=Porsche' }],
-            createdAt: '2024-01-10T00:00:00Z',
-            updatedAt: '2024-01-10T00:00:00Z',
-            condition: 'very_good',
-          },
-          {
-            id: '2',
-            title: 'Ferrari 488 GTB Red',
-            price: 850,
-            status: 'pending',
-            viewCount: 89,
-            favoriteCount: 5,
-            images: [{ url: 'https://via.placeholder.com/100x100?text=Ferrari' }],
-            createdAt: '2024-01-08T00:00:00Z',
-            updatedAt: '2024-01-08T00:00:00Z',
-            condition: 'like_new',
-          },
-          {
-            id: '3',
-            title: 'BMW M3 E30 White',
-            price: 1500,
-            status: 'sold',
-            viewCount: 234,
-            favoriteCount: 18,
-            images: [{ url: 'https://via.placeholder.com/100x100?text=BMW' }],
-            createdAt: '2024-01-05T00:00:00Z',
-            updatedAt: '2024-01-05T00:00:00Z',
-            condition: 'good',
-          },
-        ];
+      const params: any = {};
+      if (filter !== 'all') {
+        params.status = filter;
       }
+      const response = await productsApi.getMyListings(params);
+      return response.data?.data || response.data || [];
     },
+    retry: 1,
   });
 
   const listings: Listing[] = listingsData || [];
@@ -371,6 +328,15 @@ export default function MyListingsScreen() {
         <View style={styles.loadingContainer}>
           <ActivityIndicator size="large" color={TarodanColors.primary} />
         </View>
+      ) : isError ? (
+        <View style={styles.loadingContainer}>
+          <Ionicons name="cloud-offline-outline" size={64} color={TarodanColors.textLight} />
+          <Text style={{ fontSize: 18, fontWeight: '600', marginTop: 16, color: TarodanColors.text }}>Yüklenemedi</Text>
+          <Text style={{ color: TarodanColors.textLight, marginTop: 8, textAlign: 'center' }}>İlanlarınız yüklenirken bir hata oluştu.</Text>
+          <Button mode="contained" onPress={() => refetch()} style={{ marginTop: 16, backgroundColor: TarodanColors.primary }}>
+            Tekrar Dene
+          </Button>
+        </View>
       ) : (
         <ScrollView 
           style={styles.content} 
@@ -441,7 +407,7 @@ export default function MyListingsScreen() {
                       />
                     </Menu>
                   </View>
-                  <Text style={styles.listingPrice}>₺{listing.price.toLocaleString('tr-TR')}</Text>
+                  <Text style={styles.listingPrice}>₺{(listing.price ?? 0).toLocaleString('tr-TR')}</Text>
                   
                   {/* Stats */}
                   <View style={styles.listingStats}>

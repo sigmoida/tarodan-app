@@ -24,11 +24,12 @@ export const createOrderSchema = z.object({
 
 export const guestCheckoutSchema = z.object({
   productId: z.string().min(1, 'Ürün seçimi gereklidir'),
-  quantity: z.number().min(1, 'Miktar en az 1 olmalıdır').max(100),
+  quantity: z.number().min(1, 'Miktar en az 1 olmalıdır').max(100).optional(),
   email: z
     .string()
     .min(1, 'E-posta gereklidir')
     .email('Geçerli bir e-posta adresi giriniz'),
+  emailVerificationCode: z.string().regex(/^\d{6}$/, 'Doğrulama kodu 6 haneli olmalıdır'),
   phone: z
     .string()
     .min(1, 'Telefon numarası gereklidir')

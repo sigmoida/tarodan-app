@@ -10,6 +10,7 @@ import {
   CheckCircleIcon,
 } from '@heroicons/react/24/outline';
 import toast from 'react-hot-toast';
+import { Button, Input, Select } from '@tarodan/ui';
 
 type TabId = 'transactions' | 'schedule';
 
@@ -54,9 +55,9 @@ interface ScheduleItem {
 }
 
 const STATUS_LABELS: Record<string, { label: string; color: string }> = {
-  held: { label: 'Beklemede', color: 'text-amber-600' },
-  released: { label: 'Ödendi', color: 'text-green-600' },
-  cancelled: { label: 'İptal', color: 'text-gray-500' },
+  held: { label: 'Beklemede', color: 'text-warning-600' },
+  released: { label: 'Ödendi', color: 'text-success-600' },
+  cancelled: { label: 'İptal', color: 'text-muted' },
 };
 
 function formatCurrency(amount: number) {
@@ -193,145 +194,132 @@ export default function PayoutsPage() {
     <>
       <div className="space-y-6">
         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-          <h1 className="text-2xl font-bold text-gray-900">Satıcı Ödemeleri</h1>
-          <button
-            type="button"
+          <h1 className="text-2xl font-bold text-heading">Satıcı Ödemeleri</h1>
+          <Button variant="secondary" type="button"
             onClick={handleExport}
             disabled={loadingExport}
-            className="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-gray-100 text-gray-900 hover:bg-gray-100 disabled:opacity-50"
-          >
+            className="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-surface-alt text-heading hover:bg-surface-alt disabled:opacity-50">
             <ArrowDownTrayIcon className="h-5 w-5" />
             {loadingExport ? 'Hazırlanıyor...' : 'Dışa Aktar (CSV)'}
-          </button>
+          </Button>
         </div>
 
         {/* Summary cards */}
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-          <div className="bg-white rounded-xl p-4 border border-gray-200">
-            <p className="text-sm text-gray-500">Bekleyen Toplam</p>
-            <p className="text-2xl font-semibold text-amber-500">
+          <div className="bg-surface-elevated rounded-xl p-4 border border-border">
+            <p className="text-sm text-muted">Bekleyen Toplam</p>
+            <p className="text-2xl font-semibold text-warning-500">
               {summary != null ? formatCurrency(summary.totalPending) : '—'}
             </p>
-            <p className="text-xs text-gray-500 mt-1">{summary?.countHeld ?? 0} işlem</p>
+            <p className="text-xs text-muted mt-1">{summary?.countHeld ?? 0} işlem</p>
           </div>
-          <div className="bg-white rounded-xl p-4 border border-gray-200">
-            <p className="text-sm text-gray-500">Ödenen Toplam</p>
-            <p className="text-2xl font-semibold text-green-500">
+          <div className="bg-surface-elevated rounded-xl p-4 border border-border">
+            <p className="text-sm text-muted">Ödenen Toplam</p>
+            <p className="text-2xl font-semibold text-success-500">
               {summary != null ? formatCurrency(summary.totalReleased) : '—'}
             </p>
-            <p className="text-xs text-gray-500 mt-1">{summary?.countReleased ?? 0} işlem</p>
+            <p className="text-xs text-muted mt-1">{summary?.countReleased ?? 0} işlem</p>
           </div>
-          <div className="bg-white rounded-xl p-4 border border-gray-200 md:col-span-2">
-            <p className="text-sm text-gray-500">Yaklaşan Serbest Bırakmalar</p>
+          <div className="bg-surface-elevated rounded-xl p-4 border border-border md:col-span-2">
+            <p className="text-sm text-muted">Yaklaşan Serbest Bırakmalar</p>
             <ul className="mt-2 space-y-1">
               {summary?.nextReleases?.length
                 ? summary.nextReleases.slice(0, 3).map((r) => (
-                    <li key={r.id} className="text-sm text-gray-600 flex justify-between">
+                    <li key={r.id} className="text-sm text-muted flex justify-between">
                       <span>Sipariş #{r.orderId.slice(0, 8)}...</span>
                       <span>{formatCurrency(r.amount)} — {formatDate(r.releaseAt)}</span>
                     </li>
                   ))
-                : <li className="text-sm text-gray-500">Bekleyen yok</li>}
+                : <li className="text-sm text-muted">Bekleyen yok</li>}
             </ul>
           </div>
         </div>
 
         {/* Tabs */}
-        <div className="border-b border-gray-200">
+        <div className="border-b border-border">
           <nav className="flex gap-4">
-            <button
-              type="button"
+            <Button variant="secondary" type="button"
               onClick={() => setActiveTab('transactions')}
               className={`pb-3 px-1 border-b-2 font-medium text-sm ${
                 activeTab === 'transactions'
                   ? 'border-primary-500 text-primary-600'
-                  : 'border-transparent text-gray-500 hover:text-gray-900'
-              }`}
-            >
+                  : 'border-transparent text-muted hover:text-heading'
+              }`}>
               <span className="flex items-center gap-2">
                 <ListBulletIcon className="h-4 w-4" />
                 İşlem Geçmişi
               </span>
-            </button>
-            <button
-              type="button"
+            </Button>
+            <Button variant="secondary" type="button"
               onClick={() => setActiveTab('schedule')}
               className={`pb-3 px-1 border-b-2 font-medium text-sm ${
                 activeTab === 'schedule'
                   ? 'border-primary-500 text-primary-600'
-                  : 'border-transparent text-gray-500 hover:text-gray-900'
-              }`}
-            >
+                  : 'border-transparent text-muted hover:text-heading'
+              }`}>
               <span className="flex items-center gap-2">
                 <CalendarDaysIcon className="h-4 w-4" />
                 Ödeme Takvimi
               </span>
-            </button>
+            </Button>
           </nav>
         </div>
 
         {activeTab === 'transactions' && (
           <>
             <div className="flex flex-wrap gap-3 items-center">
-              <select
+              <Select
                 value={filters.status}
                 onChange={(e) => setFilters((f) => ({ ...f, status: e.target.value }))}
-                className="input-dark rounded-lg px-3 py-2 text-sm"
+                className="w-auto"
+                selectSize="sm"
               >
                 <option value="">Tüm durumlar</option>
                 <option value="held">Beklemede</option>
                 <option value="released">Ödendi</option>
                 <option value="cancelled">İptal</option>
-              </select>
-              <input
-                type="date"
+              </Select>
+              <Input type="date"
                 value={filters.dateFrom}
-                onChange={(e) => setFilters((f) => ({ ...f, dateFrom: e.target.value }))}
-                className="input-dark rounded-lg px-3 py-2 text-sm"
-              />
-              <input
-                type="date"
+                onChange={(e) => setFilters((f) => ({ ...f, dateFrom: e.target.value }))} />
+              <Input type="date"
                 value={filters.dateTo}
-                onChange={(e) => setFilters((f) => ({ ...f, dateTo: e.target.value }))}
-                className="input-dark rounded-lg px-3 py-2 text-sm"
-              />
-              <button
-                type="button"
+                onChange={(e) => setFilters((f) => ({ ...f, dateTo: e.target.value }))} />
+              <Button variant="secondary" type="button"
                 onClick={() => loadTransactions()}
-                className="p-2 rounded-lg bg-gray-100 text-gray-500 hover:text-gray-900"
-              >
+                className="p-2 rounded-lg bg-surface-alt text-muted hover:text-heading">
                 <ArrowPathIcon className="h-5 w-5" />
-              </button>
+              </Button>
             </div>
-            <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
+            <div className="bg-surface-elevated rounded-xl border border-border overflow-hidden">
               {loading ? (
-                <div className="p-8 text-center text-gray-500">Yükleniyor...</div>
+                <div className="p-8 text-center text-muted">Yükleniyor...</div>
               ) : transactions.length === 0 ? (
-                <div className="p-8 text-center text-gray-500">Kayıt yok</div>
+                <div className="p-8 text-center text-muted">Kayıt yok</div>
               ) : (
                 <div className="overflow-x-auto">
-                  <table className="min-w-full divide-y divide-gray-200">
+                  <table className="min-w-full divide-y divide-border">
                     <thead>
                       <tr>
-                        <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Sipariş</th>
-                        <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Satıcı</th>
-                        <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase">Tutar</th>
-                        <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Durum</th>
-                        <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Serbest Bırakma</th>
-                        <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">İşlem</th>
+                        <th className="px-4 py-3 text-left text-xs font-medium text-muted uppercase">Sipariş</th>
+                        <th className="px-4 py-3 text-left text-xs font-medium text-muted uppercase">Satıcı</th>
+                        <th className="px-4 py-3 text-right text-xs font-medium text-muted uppercase">Tutar</th>
+                        <th className="px-4 py-3 text-left text-xs font-medium text-muted uppercase">Durum</th>
+                        <th className="px-4 py-3 text-left text-xs font-medium text-muted uppercase">Serbest Bırakma</th>
+                        <th className="px-4 py-3 text-left text-xs font-medium text-muted uppercase">İşlem</th>
                       </tr>
                     </thead>
-                    <tbody className="divide-y divide-gray-200">
+                    <tbody className="divide-y divide-border">
                       {transactions.map((t) => (
-                        <tr key={t.id} className="text-gray-600">
+                        <tr key={t.id} className="text-muted">
                           <td className="px-4 py-3 text-sm">{t.orderNumber}</td>
                           <td className="px-4 py-3 text-sm">
                             <div>{t.sellerName}</div>
-                            <div className="text-xs text-gray-500">{t.sellerEmail}</div>
+                            <div className="text-xs text-muted">{t.sellerEmail}</div>
                           </td>
                           <td className="px-4 py-3 text-sm text-right font-medium">{formatCurrency(t.amount)}</td>
                           <td className="px-4 py-3">
-                            <span className={STATUS_LABELS[t.status]?.color ?? 'text-gray-500'}>
+                            <span className={STATUS_LABELS[t.status]?.color ?? 'text-muted'}>
                               {STATUS_LABELS[t.status]?.label ?? t.status}
                             </span>
                           </td>
@@ -340,15 +328,13 @@ export default function PayoutsPage() {
                           </td>
                           <td className="px-4 py-3 whitespace-nowrap">
                             {t.status === 'held' && (
-                              <button
-                                type="button"
+                              <Button variant="secondary" type="button"
                                 onClick={() => handleRelease(t.orderId)}
                                 disabled={releasingOrderId === t.orderId}
-                                className="inline-flex items-center gap-1 text-sm text-primary-600 hover:text-primary-400 disabled:opacity-50"
-                              >
+                                className="inline-flex items-center gap-1 text-sm text-primary-600 hover:text-primary-400 disabled:opacity-50">
                                 <CheckCircleIcon className="h-4 w-4" />
                                 {releasingOrderId === t.orderId ? 'Bırakılıyor...' : 'Serbest Bırak'}
-                              </button>
+                              </Button>
                             )}
                           </td>
                         </tr>
@@ -358,27 +344,23 @@ export default function PayoutsPage() {
                 </div>
               )}
               {pagination.totalPages > 1 && (
-                <div className="px-4 py-3 flex items-center justify-between border-t border-gray-200">
-                  <p className="text-sm text-gray-500">
+                <div className="px-4 py-3 flex items-center justify-between border-t border-border">
+                  <p className="text-sm text-muted">
                     Toplam {pagination.total} kayıt
                   </p>
                   <div className="flex gap-2">
-                    <button
-                      type="button"
+                    <Button variant="secondary" type="button"
                       onClick={() => setPagination((p) => ({ ...p, page: p.page - 1 }))}
                       disabled={pagination.page <= 1}
-                      className="px-3 py-1 rounded bg-gray-100 text-sm disabled:opacity-50"
-                    >
+                      className="px-3 py-1 rounded bg-surface-alt text-sm disabled:opacity-50">
                       Önceki
-                    </button>
-                    <button
-                      type="button"
+                    </Button>
+                    <Button variant="secondary" type="button"
                       onClick={() => setPagination((p) => ({ ...p, page: p.page + 1 }))}
                       disabled={pagination.page >= pagination.totalPages}
-                      className="px-3 py-1 rounded bg-gray-100 text-sm disabled:opacity-50"
-                    >
+                      className="px-3 py-1 rounded bg-surface-alt text-sm disabled:opacity-50">
                       Sonraki
-                    </button>
+                    </Button>
                   </div>
                 </div>
               )}
@@ -387,25 +369,25 @@ export default function PayoutsPage() {
         )}
 
         {activeTab === 'schedule' && (
-          <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
+          <div className="bg-surface-elevated rounded-xl border border-border overflow-hidden">
             {loading ? (
-              <div className="p-8 text-center text-gray-500">Yükleniyor...</div>
+              <div className="p-8 text-center text-muted">Yükleniyor...</div>
             ) : schedule.length === 0 ? (
-              <div className="p-8 text-center text-gray-500">Yaklaşan ödeme yok</div>
+              <div className="p-8 text-center text-muted">Yaklaşan ödeme yok</div>
             ) : (
               <div className="overflow-x-auto">
-                <table className="min-w-full divide-y divide-gray-200">
+                <table className="min-w-full divide-y divide-border">
                   <thead>
                     <tr>
-                      <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Sipariş</th>
-                      <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Satıcı</th>
-                      <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase">Tutar</th>
-                      <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Serbest Bırakma Tarihi</th>
+                      <th className="px-4 py-3 text-left text-xs font-medium text-muted uppercase">Sipariş</th>
+                      <th className="px-4 py-3 text-left text-xs font-medium text-muted uppercase">Satıcı</th>
+                      <th className="px-4 py-3 text-right text-xs font-medium text-muted uppercase">Tutar</th>
+                      <th className="px-4 py-3 text-left text-xs font-medium text-muted uppercase">Serbest Bırakma Tarihi</th>
                     </tr>
                   </thead>
-                  <tbody className="divide-y divide-gray-200">
+                  <tbody className="divide-y divide-border">
                     {schedule.map((s) => (
-                      <tr key={s.id} className="text-gray-600">
+                      <tr key={s.id} className="text-muted">
                         <td className="px-4 py-3 text-sm">{s.orderNumber}</td>
                         <td className="px-4 py-3 text-sm">{s.sellerName}</td>
                         <td className="px-4 py-3 text-sm text-right font-medium">{formatCurrency(s.amount)}</td>

@@ -1,4 +1,4 @@
-import { View, ScrollView, StyleSheet, TouchableOpacity } from 'react-native';
+import { View, ScrollView, StyleSheet, TouchableOpacity, Image } from 'react-native';
 import { Text, Avatar, Button, List, Divider, Card, Badge, Snackbar } from 'react-native-paper';
 import { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
@@ -74,7 +74,9 @@ export default function ProfileScreen() {
       <View style={styles.container}>
         {/* Header */}
         <View style={styles.header}>
-          <Text style={styles.headerTitle}>Profil</Text>
+          <TouchableOpacity onPress={() => router.replace('/(tabs)')}>
+            <Image source={require('../../assets/tarodan-logo.jpg')} style={styles.headerLogo} resizeMode="contain" />
+          </TouchableOpacity>
           <View style={{ width: 24 }} />
         </View>
 
@@ -222,18 +224,14 @@ export default function ProfileScreen() {
             <Text style={styles.premiumDescription}>
               Sınırsız ilan, takas özelliği, Digital Garage ve daha fazlası için Premium üye olun!
             </Text>
-            <View style={styles.premiumPrice}>
-              <Text style={styles.premiumPriceLabel}>Aylık sadece</Text>
-              <Text style={styles.premiumPriceValue}>₺99</Text>
-            </View>
             <Button 
               mode="contained" 
-              onPress={() => router.push('/(auth)/register')}
+              onPress={() => router.push('/membership')}
               buttonColor={TarodanColors.star}
               style={styles.premiumButton}
               icon="crown"
             >
-              Premium Ol
+              Planları İncele
             </Button>
           </View>
 
@@ -248,11 +246,13 @@ export default function ProfileScreen() {
           {snackbarMessage}
         </Snackbar>
 
-        <SignupPrompt
-          visible={showPrompt}
-          onDismiss={() => setShowPrompt(false)}
-          type={promptType}
-        />
+        {showPrompt ? (
+          <SignupPrompt
+            visible
+            onDismiss={() => setShowPrompt(false)}
+            type={promptType}
+          />
+        ) : null}
       </View>
     );
   }
@@ -262,7 +262,9 @@ export default function ProfileScreen() {
     <View style={styles.container}>
       {/* Header */}
       <View style={styles.header}>
-        <Text style={styles.headerTitle}>Profil</Text>
+        <TouchableOpacity onPress={() => router.replace('/(tabs)')}>
+          <Image source={require('../../assets/tarodan-logo.jpg')} style={styles.headerLogo} resizeMode="contain" />
+        </TouchableOpacity>
         <TouchableOpacity onPress={() => router.push('/notifications')}>
           <Ionicons name="notifications-outline" size={24} color={TarodanColors.textOnPrimary} />
         </TouchableOpacity>
@@ -350,6 +352,12 @@ export default function ProfileScreen() {
               </View>
               <Text style={styles.quickActionText}>Siparişlerim</Text>
             </TouchableOpacity>
+            <TouchableOpacity style={styles.quickAction} onPress={() => router.push('/offers')}>
+              <View style={[styles.quickActionIcon, { backgroundColor: '#E8EAF6' }]}>
+                <Ionicons name="pricetag-outline" size={22} color="#5C6BC0" />
+              </View>
+              <Text style={styles.quickActionText}>Tekliflerim</Text>
+            </TouchableOpacity>
             <TouchableOpacity style={styles.quickAction} onPress={() => router.push('/favorites')}>
               <View style={[styles.quickActionIcon, { backgroundColor: '#FCE4EC' }]}>
                 <Ionicons name="heart" size={22} color="#E91E63" />
@@ -395,6 +403,12 @@ export default function ProfileScreen() {
         {/* Menu */}
         <View style={styles.menuSection}>
           <Text style={styles.menuSectionTitle}>Hesap Ayarları</Text>
+
+          <TouchableOpacity style={styles.menuItem} onPress={() => router.push('/offers')}>
+            <Ionicons name="pricetag-outline" size={22} color={TarodanColors.textSecondary} />
+            <Text style={styles.menuItemText}>Tekliflerim</Text>
+            <Ionicons name="chevron-forward" size={20} color={TarodanColors.textLight} />
+          </TouchableOpacity>
           
           <TouchableOpacity style={styles.menuItem} onPress={() => router.push('/settings/addresses')}>
             <Ionicons name="location-outline" size={22} color={TarodanColors.textSecondary} />
@@ -405,7 +419,7 @@ export default function ProfileScreen() {
           <TouchableOpacity style={styles.menuItem} onPress={() => router.push('/membership')}>
             <Ionicons name="diamond-outline" size={22} color={TarodanColors.textSecondary} />
             <Text style={styles.menuItemText}>Üyelik Planı</Text>
-            {user?.membershipTier === 'Premium' && <Badge style={{ backgroundColor: TarodanColors.primary }}>PRO</Badge>}
+            {user?.membershipTier === 'premium' && <Badge style={{ backgroundColor: TarodanColors.primary }}>PRO</Badge>}
             <Ionicons name="chevron-forward" size={20} color={TarodanColors.textLight} />
           </TouchableOpacity>
 
@@ -479,17 +493,16 @@ const styles = StyleSheet.create({
   },
   header: {
     backgroundColor: TarodanColors.primary,
-    paddingTop: 50,
-    paddingBottom: 16,
+    paddingTop: 44,
+    paddingBottom: 14,
     paddingHorizontal: 20,
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
   },
-  headerTitle: {
-    fontSize: 20,
-    fontWeight: 'bold',
-    color: TarodanColors.textOnPrimary,
+  headerLogo: {
+    width: 130,
+    height: 42,
   },
   scrollView: {
     flex: 1,
@@ -499,7 +512,7 @@ const styles = StyleSheet.create({
     backgroundColor: TarodanColors.background,
     margin: 16,
     padding: 24,
-    borderRadius: 16,
+    borderRadius: 0,
     alignItems: 'center',
     elevation: 2,
     shadowColor: '#000',
@@ -522,12 +535,12 @@ const styles = StyleSheet.create({
   },
   loginButton: {
     width: '100%',
-    borderRadius: 12,
+    borderRadius: 0,
     marginBottom: 12,
   },
   registerButton: {
     width: '100%',
-    borderRadius: 12,
+    borderRadius: 0,
   },
   benefitsSection: {
     paddingHorizontal: 16,
@@ -542,7 +555,7 @@ const styles = StyleSheet.create({
   benefitCard: {
     flexDirection: 'row',
     backgroundColor: TarodanColors.background,
-    borderRadius: 12,
+    borderRadius: 0,
     padding: 16,
     marginBottom: 12,
   },
@@ -583,7 +596,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     backgroundColor: TarodanColors.background,
     padding: 16,
-    borderRadius: 12,
+    borderRadius: 0,
     marginBottom: 8,
   },
   quickLinkText: {
@@ -596,7 +609,7 @@ const styles = StyleSheet.create({
     margin: 16,
     padding: 24,
     backgroundColor: TarodanColors.secondary,
-    borderRadius: 16,
+    borderRadius: 0,
   },
   premiumHeader: {
     flexDirection: 'row',
@@ -631,14 +644,14 @@ const styles = StyleSheet.create({
     color: TarodanColors.star,
   },
   premiumButton: {
-    borderRadius: 12,
+    borderRadius: 0,
   },
   // Authenticated styles
   profileCard: {
     backgroundColor: TarodanColors.background,
     margin: 16,
     padding: 20,
-    borderRadius: 16,
+    borderRadius: 0,
     flexDirection: 'row',
     alignItems: 'center',
     elevation: 2,
@@ -667,7 +680,7 @@ const styles = StyleSheet.create({
     backgroundColor: TarodanColors.surfaceVariant,
     paddingHorizontal: 10,
     paddingVertical: 4,
-    borderRadius: 12,
+    borderRadius: 0,
     marginTop: 8,
     alignSelf: 'flex-start',
   },
@@ -684,7 +697,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     marginHorizontal: 16,
     backgroundColor: TarodanColors.background,
-    borderRadius: 16,
+    borderRadius: 0,
     padding: 16,
     elevation: 2,
     shadowColor: '#000',
@@ -737,7 +750,7 @@ const styles = StyleSheet.create({
   },
   garageCard: {
     backgroundColor: TarodanColors.background,
-    borderRadius: 16,
+    borderRadius: 0,
     padding: 24,
     alignItems: 'center',
     borderWidth: 2,
@@ -795,7 +808,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     padding: 16,
-    borderRadius: 12,
+    borderRadius: 0,
     marginBottom: 8,
   },
   menuItemText: {
@@ -811,7 +824,7 @@ const styles = StyleSheet.create({
     marginHorizontal: 16,
     marginTop: 24,
     padding: 16,
-    borderRadius: 12,
+    borderRadius: 0,
     backgroundColor: TarodanColors.background,
     borderWidth: 1,
     borderColor: TarodanColors.error,

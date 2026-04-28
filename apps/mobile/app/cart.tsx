@@ -6,6 +6,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { TarodanColors } from '../src/theme';
 import { useCartStore } from '../src/stores/cartStore';
 import { transformImageUrl } from '../src/utils/imageUrl';
+import { safeString } from '../src/utils/safeString';
 
 export default function CartScreen() {
   const { items, getSubtotal, getItemCount, removeItem, updateQuantity, cleanExpiredItems } = useCartStore();
@@ -94,9 +95,9 @@ export default function CartScreen() {
               <TouchableOpacity onPress={() => router.push(`/product/${item.productId}`)}>
                 <Text style={styles.itemTitle} numberOfLines={2}>{item.title}</Text>
               </TouchableOpacity>
-              <Text style={styles.itemMeta}>{item.brand || 'Marka'} • {item.scale || '1:64'}</Text>
-              <Text style={styles.itemSeller}>Satıcı: {item.seller.displayName}</Text>
-              <Text style={styles.itemPrice}>₺{item.price.toLocaleString('tr-TR')}</Text>
+              <Text style={styles.itemMeta}>{safeString(item.brand, 'Marka')} • {safeString(item.scale, '1:64')}</Text>
+              <Text style={styles.itemSeller}>Satıcı: {item.seller?.displayName || 'Satıcı'}</Text>
+              <Text style={styles.itemPrice}>₺{(item.price ?? 0).toLocaleString('tr-TR')}</Text>
             </View>
             <View style={styles.itemActions}>
               <IconButton

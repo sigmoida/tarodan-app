@@ -6,6 +6,7 @@ export enum ShippingProvider {
   aras = 'aras',
   yurtici = 'yurtici',
   mng = 'mng',
+  surat = 'surat',
 }
 
 export class CreateShipmentDto {

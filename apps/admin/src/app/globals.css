@@ -3,42 +3,8 @@
 @tailwind utilities;
 
 @layer base {
-  :root {
-    --background: 0 0% 97.5%;
-    --foreground: 0 0% 10%;
-    --card: 0 0% 100%;
-    --card-foreground: 0 0% 10%;
-    --popover: 0 0% 100%;
-    --popover-foreground: 0 0% 10%;
-    --primary: 25 95% 53%;
-    --primary-foreground: 0 0% 100%;
-    --secondary: 220 14% 96%;
-    --secondary-foreground: 0 0% 10%;
-    --muted: 220 14% 96%;
-    --muted-foreground: 220 9% 46%;
-    --accent: 220 14% 96%;
-    --accent-foreground: 0 0% 10%;
-    --destructive: 0 84% 60%;
-    --destructive-foreground: 0 0% 100%;
-    --border: 220 13% 91%;
-    --input: 220 13% 91%;
-    --ring: 25 95% 53%;
-    --radius: 0.5rem;
-  }
-
-  :root {
-    --primary-color: #f97316;
-    --light-bg: #f8f8f8;
-    --light-surface: #ffffff;
-  }
-}
-
-@layer base {
-  * {
-    @apply border-border;
-  }
   body {
-    @apply bg-background text-foreground;
+    @apply bg-surface text-heading;
   }
 }
 
@@ -49,59 +15,45 @@
 }
 
 ::-webkit-scrollbar-track {
-  background: hsl(var(--background));
+  background: theme('colors.surface.DEFAULT');
 }
 
 ::-webkit-scrollbar-thumb {
-  background: #d1d5db;
+  background: theme('colors.border.DEFAULT');
   border-radius: 4px;
 }
 
 ::-webkit-scrollbar-thumb:hover {
-  background: #9ca3af;
+  background: theme('colors.subtle');
 }
 
-/* Table styles */
+/* ==========================================================================
+ * Admin helper classes — kept for backwards-compatibility with existing
+ * inline usage. New code should prefer @tarodan/ui components instead.
+ * All colors consumed here come from the shared design-tokens preset.
+ * ========================================================================== */
+
 .admin-table {
   @apply w-full border-collapse;
 }
-
 .admin-table th {
-  @apply px-4 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider bg-muted;
+  @apply px-4 py-3 text-left text-xs font-medium text-muted uppercase tracking-wider bg-surface;
 }
-
 .admin-table td {
-  @apply px-4 py-3 text-sm text-foreground border-t border-border;
+  @apply px-4 py-3 text-sm text-heading border-t border-border;
 }
-
 .admin-table tr:hover td {
-  @apply bg-muted/50;
+  @apply bg-surface;
 }
 
-/* Card styles */
 .admin-card {
-  @apply bg-card rounded-lg border border-border p-6 shadow-sm;
+  @apply bg-surface-elevated rounded-lg border border-border p-6 shadow-sm;
 }
 
-/* Button styles */
-.btn-primary {
-  @apply px-4 py-2 bg-primary text-primary-foreground hover:bg-primary/90 rounded-lg transition-colors font-medium;
-}
-
-.btn-secondary {
-  @apply px-4 py-2 bg-secondary text-secondary-foreground hover:bg-secondary/80 rounded-lg transition-colors font-medium;
-}
-
-.btn-danger {
-  @apply px-4 py-2 bg-destructive text-destructive-foreground hover:bg-destructive/90 rounded-lg transition-colors font-medium;
-}
-
-/* Input styles */
-.admin-input {
-  @apply w-full px-3 py-2 bg-white border border-border rounded-lg text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring focus:border-transparent;
-}
-
-/* Search inputs with left icon: prevent icon overlapping placeholder */
+/* Search inputs with left icon: adds extra left padding so the
+ * absolutely-positioned icon doesn't overlap the placeholder text.
+ * Use with <Input> / <Select> from @tarodan/ui when an icon is rendered
+ * next to the field outside the component. */
 .admin-input-with-icon-left {
   padding-left: 2.75rem !important;
 }
@@ -109,38 +61,21 @@
   padding-left: 2.5rem !important;
 }
 
-/* Light modal inputs */
-.input-dark {
-  @apply w-full px-3 py-2 rounded-lg border border-border bg-white text-foreground focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent;
-}
-.input-dark::placeholder {
-  color: hsl(var(--muted-foreground));
-}
-.input-dark:focus {
-  border-color: hsl(var(--primary));
-}
-
-/* Badge styles */
 .badge {
   @apply inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium;
 }
-
 .badge-success {
-  @apply bg-green-50 text-green-700;
+  @apply bg-success-50 text-success-700;
 }
-
 .badge-warning {
-  @apply bg-yellow-50 text-yellow-700;
+  @apply bg-warning-50 text-warning-700;
 }
-
 .badge-danger {
-  @apply bg-red-50 text-red-700;
+  @apply bg-danger-50 text-danger-700;
 }
-
 .badge-info {
-  @apply bg-blue-50 text-blue-700;
+  @apply bg-info-50 text-info-700;
 }
-
 .badge-gray {
-  @apply bg-muted text-muted-foreground;
+  @apply bg-surface-alt text-body;
 }

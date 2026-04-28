@@ -82,6 +82,15 @@ export class DirectBuyDto {
   @ValidateNested()
   @Type(() => ShippingAddressDto)
   billingAddress?: ShippingAddressDto;
+
+  @ApiPropertyOptional({
+    description:
+      'Idempotency key for carrier shipment (Sürat). Same key retries duplicate Buy Now without duplicate gönderi.',
+  })
+  @IsOptional()
+  @IsString()
+  @Transform(({ value }) => (value === '' || value === null ? undefined : value))
+  idempotencyKey?: string;
 }
 
 /**

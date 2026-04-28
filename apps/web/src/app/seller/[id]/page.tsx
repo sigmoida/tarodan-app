@@ -34,6 +34,7 @@ import { useAuthStore } from '@/stores/authStore';
 import dynamic from 'next/dynamic';
 import { withChunkErrorLogging } from '@/lib/dynamicWithLogging';
 import { useTranslation } from '@/i18n/LanguageContext';
+import { Button } from '@tarodan/ui';
 
 const AuthRequiredModal = dynamic(
   withChunkErrorLogging(() => import('@/components/AuthRequiredModal'), 'AuthRequiredModal'),
@@ -257,13 +258,13 @@ export default function SellerProfilePage() {
 
   if (isLoading) {
     return (
-      <div className="min-h-screen bg-gradient-to-b from-gray-50 to-white flex items-center justify-center">
+      <div className="min-h-screen bg-gradient-to-b from-surface to-surface-elevated flex items-center justify-center">
         <div className="text-center">
           <div className="relative w-16 h-16 mx-auto mb-4">
-            <div className="absolute inset-0 rounded-full border-4 border-orange-200"></div>
-            <div className="absolute inset-0 rounded-full border-4 border-orange-500 border-t-transparent animate-spin"></div>
+            <div className="absolute inset-0 rounded-full border-4 border-primary-200"></div>
+            <div className="absolute inset-0 rounded-full border-4 border-primary-500 border-t-transparent animate-spin"></div>
           </div>
-          <p className="text-gray-500">{locale === 'en' ? 'Loading profile...' : 'Profil yükleniyor...'}</p>
+          <p className="text-muted">{locale === 'en' ? 'Loading profile...' : 'Profil yükleniyor...'}</p>
         </div>
       </div>
     );
@@ -271,20 +272,20 @@ export default function SellerProfilePage() {
 
   if (!seller) {
     return (
-      <div className="min-h-screen bg-gradient-to-b from-gray-50 to-white flex items-center justify-center">
+      <div className="min-h-screen bg-gradient-to-b from-surface to-surface-elevated flex items-center justify-center">
         <div className="text-center max-w-md mx-auto px-4">
-          <div className="w-24 h-24 bg-gray-100 rounded-full flex items-center justify-center mx-auto mb-6">
-            <UserIcon className="w-12 h-12 text-gray-400" />
+          <div className="w-24 h-24 bg-surface-alt rounded-full flex items-center justify-center mx-auto mb-6">
+            <UserIcon className="w-12 h-12 text-subtle" />
           </div>
-          <h2 className="text-2xl font-bold text-gray-900 mb-3">{t('seller.notFound')}</h2>
-          <p className="text-gray-500 mb-6">
+          <h2 className="text-2xl font-bold text-heading mb-3">{t('seller.notFound')}</h2>
+          <p className="text-muted mb-6">
             {locale === 'en' 
               ? 'The seller you are looking for does not exist or has been removed.'
               : 'Aradığınız satıcı bulunamadı veya kaldırılmış olabilir.'}
           </p>
           <Link 
             href="/listings" 
-            className="inline-flex items-center gap-2 bg-orange-500 hover:bg-orange-600 text-white px-6 py-3 rounded-xl font-medium transition-colors"
+            className="inline-flex items-center gap-2 bg-primary-500 hover:bg-primary-600 text-inverted px-6 py-3 rounded-xl font-medium transition-colors"
           >
             {t('seller.backToListings')}
           </Link>
@@ -298,14 +299,14 @@ export default function SellerProfilePage() {
   const averageRating = seller.stats?.averageRating || 0;
 
   return (
-    <div className="min-h-screen bg-gradient-to-b from-gray-50 to-white">
+    <div className="min-h-screen bg-gradient-to-b from-surface to-surface-elevated">
       {/* Hero Section */}
       <div className="relative overflow-hidden">
         {/* Background Pattern */}
-        <div className="absolute inset-0 bg-gradient-to-br from-orange-500 via-orange-600 to-amber-600">
+        <div className="absolute inset-0 bg-gradient-to-br from-primary-500 via-primary-600 to-warning-600">
           <div className="absolute inset-0 opacity-10">
-            <div className="absolute top-0 left-0 w-96 h-96 bg-white rounded-full -translate-x-1/2 -translate-y-1/2"></div>
-            <div className="absolute bottom-0 right-0 w-[500px] h-[500px] bg-white rounded-full translate-x-1/3 translate-y-1/3"></div>
+            <div className="absolute top-0 left-0 w-96 h-96 bg-surface-elevated rounded-full -translate-x-1/2 -translate-y-1/2"></div>
+            <div className="absolute bottom-0 right-0 w-[500px] h-[500px] bg-surface-elevated rounded-full translate-x-1/3 translate-y-1/3"></div>
           </div>
         </div>
 
@@ -318,10 +319,10 @@ export default function SellerProfilePage() {
               className="relative flex-shrink-0"
             >
               <div className="relative">
-                <UserAvatar displayName={seller.displayName} avatarUrl={seller.avatarUrl} size="xl" ring className="!w-36 !h-36 md:!w-40 md:!h-40 !text-5xl rounded-2xl bg-white/20 backdrop-blur-sm text-white shadow-2xl ring-4 ring-white/30" />
+                <UserAvatar displayName={seller.displayName} avatarUrl={seller.avatarUrl} size="xl" ring className="!w-36 !h-36 md:!w-40 md:!h-40 !text-5xl rounded-2xl bg-surface-elevated/20 backdrop-blur-sm text-inverted shadow-2xl ring-4 ring-inverted/30" />
                 {seller.isVerified && (
-                  <div className="absolute -bottom-3 -right-3 bg-white rounded-xl p-2 shadow-lg">
-                    <CheckBadgeSolidIcon className="w-7 h-7 text-green-500" />
+                  <div className="absolute -bottom-3 -right-3 bg-surface-elevated rounded-xl p-2 shadow-lg">
+                    <CheckBadgeSolidIcon className="w-7 h-7 text-success-500" />
                   </div>
                 )}
               </div>
@@ -332,12 +333,12 @@ export default function SellerProfilePage() {
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ delay: 0.1 }}
-              className="flex-1 text-center lg:text-left text-white"
+              className="flex-1 text-center lg:text-left text-inverted"
             >
               <div className="flex flex-col lg:flex-row lg:items-center gap-3 mb-3">
                 <h1 className="text-3xl md:text-4xl font-bold">{seller.displayName}</h1>
                 {seller.isVerified && (
-                  <span className="inline-flex items-center gap-1.5 bg-white/20 backdrop-blur-sm text-white text-sm px-3 py-1.5 rounded-full">
+                  <span className="inline-flex items-center gap-1.5 bg-surface-elevated/20 backdrop-blur-sm text-inverted text-sm px-3 py-1.5 rounded-full">
                     <CheckBadgeIcon className="w-4 h-4" />
                     {t('seller.verified')}
                   </span>
@@ -345,19 +346,19 @@ export default function SellerProfilePage() {
               </div>
               
               {seller.bio && (
-                <p className="text-white/80 max-w-xl mb-4 text-lg">{seller.bio}</p>
+                <p className="text-inverted/80 max-w-xl mb-4 text-lg">{seller.bio}</p>
               )}
 
               {/* Meta Info */}
-              <div className="flex flex-wrap items-center justify-center lg:justify-start gap-x-6 gap-y-2 text-white/70 text-sm mb-6">
+              <div className="flex flex-wrap items-center justify-center lg:justify-start gap-x-6 gap-y-2 text-inverted/70 text-sm mb-6">
                 <span className="flex items-center gap-2">
                   <CalendarIcon className="w-4 h-4" />
                   {getMembershipDuration()}
                 </span>
                 {hasRatings && (
                   <span className="flex items-center gap-2">
-                    <StarSolidIcon className="w-4 h-4 text-yellow-300" />
-                    <span className="text-white font-semibold">{averageRating.toFixed(1)}</span>
+                    <StarSolidIcon className="w-4 h-4 text-warning-300" />
+                    <span className="text-inverted font-semibold">{averageRating.toFixed(1)}</span>
                     <span>({seller.stats?.totalRatings} {locale === 'en' ? 'reviews' : 'değerlendirme'})</span>
                   </span>
                 )}
@@ -370,31 +371,25 @@ export default function SellerProfilePage() {
               {/* Action Buttons */}
               {!isOwnProfile && (
                 <div className="flex flex-wrap items-center justify-center lg:justify-start gap-3">
-                  <button
-                    onClick={handleMessage}
-                    className="flex items-center gap-2 bg-white text-orange-600 hover:bg-orange-50 px-6 py-3 rounded-xl font-semibold transition-all shadow-lg hover:shadow-xl"
-                  >
+                  <Button variant="secondary" onClick={handleMessage}
+                    className="flex items-center gap-2 bg-surface-elevated text-primary-600 hover:bg-primary-50 px-6 py-3 rounded-xl font-semibold transition-all shadow-lg hover:shadow-xl">
                     <ChatBubbleLeftRightIcon className="w-5 h-5" />
                     {t('product.sendMessage')}
-                  </button>
-                  <button
-                    onClick={handleFollow}
+                  </Button>
+                  <Button variant="secondary" onClick={handleFollow}
                     className={`flex items-center gap-2 px-6 py-3 rounded-xl font-semibold transition-all ${
                       isFollowing 
-                        ? 'bg-white/20 text-white hover:bg-white/30 backdrop-blur-sm' 
-                        : 'bg-orange-700/50 text-white hover:bg-orange-700/70 backdrop-blur-sm'
-                    }`}
-                  >
+                        ? 'bg-surface-elevated/20 text-inverted hover:bg-surface-elevated/30 backdrop-blur-sm' 
+                        : 'bg-primary-700/50 text-inverted hover:bg-primary-700/70 backdrop-blur-sm'
+                    }`}>
                     <HeartIcon className={`w-5 h-5 ${isFollowing ? 'fill-current' : ''}`} />
                     {isFollowing ? t('seller.following') : t('seller.follow')}
-                  </button>
-                  <button
-                    onClick={handleReport}
-                    className="p-3 rounded-xl bg-white/10 text-white/70 hover:bg-white/20 hover:text-white transition-all backdrop-blur-sm"
-                    title={t('seller.report')}
-                  >
+                  </Button>
+                  <Button variant="secondary" onClick={handleReport}
+                    className="p-3 rounded-xl bg-surface-elevated/10 text-inverted/70 hover:bg-surface-elevated/20 hover:text-inverted transition-all backdrop-blur-sm"
+                    title={t('seller.report')}>
                     <FlagIcon className="w-5 h-5" />
-                  </button>
+                  </Button>
                 </div>
               )}
             </motion.div>
@@ -406,20 +401,20 @@ export default function SellerProfilePage() {
               transition={{ delay: 0.2 }}
               className="grid grid-cols-3 gap-3 lg:gap-4"
             >
-              <div className="bg-white/15 backdrop-blur-sm rounded-2xl p-4 md:p-5 text-center min-w-[90px] hover:bg-white/20 transition-colors">
-                <CubeIcon className="w-6 h-6 text-white/70 mx-auto mb-2" />
-                <p className="text-2xl md:text-3xl font-bold text-white">{seller.stats?.totalListings || products.length}</p>
-                <p className="text-white/60 text-xs md:text-sm">{locale === 'en' ? 'Listings' : 'İlan'}</p>
+              <div className="bg-surface-elevated/15 backdrop-blur-sm rounded-2xl p-4 md:p-5 text-center min-w-[90px] hover:bg-surface-elevated/20 transition-colors">
+                <CubeIcon className="w-6 h-6 text-inverted/70 mx-auto mb-2" />
+                <p className="text-2xl md:text-3xl font-bold text-inverted">{seller.stats?.totalListings || products.length}</p>
+                <p className="text-inverted/60 text-xs md:text-sm">{locale === 'en' ? 'Listings' : 'İlan'}</p>
               </div>
-              <div className="bg-white/15 backdrop-blur-sm rounded-2xl p-4 md:p-5 text-center min-w-[90px] hover:bg-white/20 transition-colors">
-                <TruckIcon className="w-6 h-6 text-white/70 mx-auto mb-2" />
-                <p className="text-2xl md:text-3xl font-bold text-white">{seller.stats?.totalSales || 0}</p>
-                <p className="text-white/60 text-xs md:text-sm">{locale === 'en' ? 'Sales' : 'Satış'}</p>
+              <div className="bg-surface-elevated/15 backdrop-blur-sm rounded-2xl p-4 md:p-5 text-center min-w-[90px] hover:bg-surface-elevated/20 transition-colors">
+                <TruckIcon className="w-6 h-6 text-inverted/70 mx-auto mb-2" />
+                <p className="text-2xl md:text-3xl font-bold text-inverted">{seller.stats?.totalSales || 0}</p>
+                <p className="text-inverted/60 text-xs md:text-sm">{locale === 'en' ? 'Sales' : 'Satış'}</p>
               </div>
-              <div className="bg-white/15 backdrop-blur-sm rounded-2xl p-4 md:p-5 text-center min-w-[90px] hover:bg-white/20 transition-colors">
-                <ArrowsRightLeftIcon className="w-6 h-6 text-white/70 mx-auto mb-2" />
-                <p className="text-2xl md:text-3xl font-bold text-white">{seller.stats?.totalTrades || 0}</p>
-                <p className="text-white/60 text-xs md:text-sm">{locale === 'en' ? 'Trades' : 'Takas'}</p>
+              <div className="bg-surface-elevated/15 backdrop-blur-sm rounded-2xl p-4 md:p-5 text-center min-w-[90px] hover:bg-surface-elevated/20 transition-colors">
+                <ArrowsRightLeftIcon className="w-6 h-6 text-inverted/70 mx-auto mb-2" />
+                <p className="text-2xl md:text-3xl font-bold text-inverted">{seller.stats?.totalTrades || 0}</p>
+                <p className="text-inverted/60 text-xs md:text-sm">{locale === 'en' ? 'Trades' : 'Takas'}</p>
               </div>
             </motion.div>
           </div>
@@ -429,41 +424,37 @@ export default function SellerProfilePage() {
       {/* Content Section */}
       <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         {/* Tabs */}
-        <div className="flex gap-2 mb-8 bg-gray-100 p-1.5 rounded-xl w-fit">
-          <button
-            onClick={() => setTab('listings')}
+        <div className="flex gap-2 mb-8 bg-surface-alt p-1.5 rounded-xl w-fit">
+          <Button variant="secondary" onClick={() => setTab('listings')}
             className={`flex items-center gap-2 px-5 py-2.5 rounded-lg font-medium transition-all ${
               tab === 'listings'
-                ? 'bg-white text-orange-600 shadow-sm'
-                : 'text-gray-600 hover:text-gray-900'
-            }`}
-          >
+                ? 'bg-surface-elevated text-primary-600 shadow-sm'
+                : 'text-muted hover:text-heading'
+            }`}>
             <CubeIcon className="w-5 h-5" />
             {t('nav.listings')}
             <span className={`text-xs px-2 py-0.5 rounded-full ${
-              tab === 'listings' ? 'bg-orange-100 text-orange-600' : 'bg-gray-200 text-gray-600'
+              tab === 'listings' ? 'bg-primary-100 text-primary-600' : 'bg-border-subtle text-muted'
             }`}>
               {products.length}
             </span>
-          </button>
-          <button
-            onClick={() => {
+          </Button>
+          <Button variant="secondary" onClick={() => {
               setTab('reviews');
             }}
             className={`flex items-center gap-2 px-5 py-2.5 rounded-lg font-medium transition-all ${
               tab === 'reviews'
-                ? 'bg-white text-orange-600 shadow-sm'
-                : 'text-gray-600 hover:text-gray-900'
-            }`}
-          >
+                ? 'bg-surface-elevated text-primary-600 shadow-sm'
+                : 'text-muted hover:text-heading'
+            }`}>
             <StarIcon className="w-5 h-5" />
             {t('review.reviews')}
             <span className={`text-xs px-2 py-0.5 rounded-full ${
-              tab === 'reviews' ? 'bg-orange-100 text-orange-600' : 'bg-gray-200 text-gray-600'
+              tab === 'reviews' ? 'bg-primary-100 text-primary-600' : 'bg-border-subtle text-muted'
             }`}>
               {seller.stats?.totalRatings || 0}
             </span>
-          </button>
+          </Button>
         </div>
 
         <AnimatePresence mode="wait">
@@ -476,12 +467,12 @@ export default function SellerProfilePage() {
               exit={{ opacity: 0, y: -10 }}
             >
               {products.length === 0 ? (
-                <div className="text-center py-16 bg-white rounded-2xl border border-gray-100">
-                  <CubeIcon className="w-16 h-16 text-gray-300 mx-auto mb-4" />
-                  <h3 className="text-xl font-semibold text-gray-900 mb-2">
+                <div className="text-center py-16 bg-surface-elevated rounded-2xl border border-border-subtle">
+                  <CubeIcon className="w-16 h-16 text-border-strong mx-auto mb-4" />
+                  <h3 className="text-xl font-semibold text-heading mb-2">
                     {locale === 'en' ? 'No listings yet' : 'Henüz ilan yok'}
                   </h3>
-                  <p className="text-gray-500">{t('seller.noActiveListings')}</p>
+                  <p className="text-muted">{t('seller.noActiveListings')}</p>
                 </div>
               ) : (
                 <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-4">
@@ -494,9 +485,9 @@ export default function SellerProfilePage() {
                     >
                       <Link 
                         href={`/listings/${product.id}`} 
-                        className="block bg-white rounded-xl overflow-hidden shadow-sm hover:shadow-xl transition-all duration-300 group border border-gray-100"
+                        className="block bg-surface-elevated rounded-xl overflow-hidden shadow-sm hover:shadow-xl transition-all duration-300 group border border-border-subtle"
                       >
-                        <div className="relative aspect-square bg-gray-50">
+                        <div className="relative aspect-square bg-surface">
                           <OptimizedImage
                             src={getImageUrl(product.images)}
                             alt={product.title}
@@ -506,23 +497,23 @@ export default function SellerProfilePage() {
                             logContext={{ productId: product.id, page: 'seller-products' }}
                           />
                           {product.isTradeEnabled && (
-                            <div className="absolute top-2 left-2 bg-emerald-500 text-white text-xs px-2.5 py-1 rounded-lg flex items-center gap-1 shadow-sm">
+                            <div className="absolute top-2 left-2 bg-success-500 text-inverted text-xs px-2.5 py-1 rounded-lg flex items-center gap-1 shadow-sm">
                               <ArrowsRightLeftIcon className="w-3.5 h-3.5" />
                               {locale === 'en' ? 'Trade' : 'Takas'}
                             </div>
                           )}
-                          <div className="absolute inset-0 bg-gradient-to-t from-black/20 to-transparent opacity-0 group-hover:opacity-100 transition-opacity" />
+                          <div className="absolute inset-0 bg-gradient-to-t from-heading/20 to-transparent opacity-0 group-hover:opacity-100 transition-opacity" />
                         </div>
                         <div className="p-3">
-                          <h3 className="font-medium text-gray-900 line-clamp-2 text-sm group-hover:text-orange-600 transition-colors mb-2">
+                          <h3 className="font-medium text-heading line-clamp-2 text-sm group-hover:text-primary-600 transition-colors mb-2">
                             {product.title}
                           </h3>
                           <div className="flex items-center justify-between">
-                            <p className="text-orange-600 font-bold">
+                            <p className="text-primary-600 font-bold">
                               ₺{getProductEffectivePrice(product).toLocaleString('tr-TR')}
                             </p>
                             {(product.viewCount || 0) > 0 && (
-                              <span className="flex items-center gap-1 text-xs text-gray-400">
+                              <span className="flex items-center gap-1 text-xs text-subtle">
                                 <EyeIcon className="w-3.5 h-3.5" />
                                 {product.viewCount}
                               </span>
@@ -548,25 +539,25 @@ export default function SellerProfilePage() {
               {reviewsLoading ? (
                 <div className="flex items-center justify-center py-16">
                   <div className="relative w-12 h-12">
-                    <div className="absolute inset-0 rounded-full border-4 border-orange-200"></div>
-                    <div className="absolute inset-0 rounded-full border-4 border-orange-500 border-t-transparent animate-spin"></div>
+                    <div className="absolute inset-0 rounded-full border-4 border-primary-200"></div>
+                    <div className="absolute inset-0 rounded-full border-4 border-primary-500 border-t-transparent animate-spin"></div>
                   </div>
                 </div>
               ) : reviews.length === 0 ? (
-                <div className="text-center py-16 bg-white rounded-2xl border border-gray-100">
-                  <StarIcon className="w-16 h-16 text-gray-300 mx-auto mb-4" />
-                  <h3 className="text-xl font-semibold text-gray-900 mb-2">
+                <div className="text-center py-16 bg-surface-elevated rounded-2xl border border-border-subtle">
+                  <StarIcon className="w-16 h-16 text-border-strong mx-auto mb-4" />
+                  <h3 className="text-xl font-semibold text-heading mb-2">
                     {locale === 'en' ? 'No reviews yet' : 'Henüz değerlendirme yok'}
                   </h3>
-                  <p className="text-gray-500">{t('review.noReviews')}</p>
+                  <p className="text-muted">{t('review.noReviews')}</p>
                 </div>
               ) : (
                 <div className="grid lg:grid-cols-3 gap-6">
                   {/* Rating Summary */}
                   <div className="lg:col-span-1">
-                    <div className="bg-white rounded-2xl p-6 border border-gray-100 sticky top-24">
+                    <div className="bg-surface-elevated rounded-2xl p-6 border border-border-subtle sticky top-24">
                       <div className="text-center mb-6">
-                        <div className="text-5xl font-bold text-gray-900 mb-2">
+                        <div className="text-5xl font-bold text-heading mb-2">
                           {averageRating.toFixed(1)}
                         </div>
                         <div className="flex justify-center gap-1 mb-2">
@@ -575,13 +566,13 @@ export default function SellerProfilePage() {
                               key={star}
                               className={`w-6 h-6 ${
                                 star <= Math.round(averageRating)
-                                  ? 'text-yellow-400'
-                                  : 'text-gray-200'
+                                  ? 'text-warning-400'
+                                  : 'text-border-subtle'
                               }`}
                             />
                           ))}
                         </div>
-                        <p className="text-gray-500 text-sm">
+                        <p className="text-muted text-sm">
                           {seller.stats?.totalRatings || 0} {locale === 'en' ? 'total reviews' : 'değerlendirme'}
                         </p>
                       </div>
@@ -597,15 +588,15 @@ export default function SellerProfilePage() {
                             
                             return (
                               <div key={score} className="flex items-center gap-3">
-                                <span className="text-sm text-gray-600 w-3">{score}</span>
-                                <StarSolidIcon className="w-4 h-4 text-yellow-400" />
-                                <div className="flex-1 h-2 bg-gray-100 rounded-full overflow-hidden">
+                                <span className="text-sm text-muted w-3">{score}</span>
+                                <StarSolidIcon className="w-4 h-4 text-warning-400" />
+                                <div className="flex-1 h-2 bg-surface-alt rounded-full overflow-hidden">
                                   <div 
-                                    className="h-full bg-yellow-400 rounded-full transition-all duration-500"
+                                    className="h-full bg-warning-400 rounded-full transition-all duration-500"
                                     style={{ width: `${percentage}%` }}
                                   />
                                 </div>
-                                <span className="text-sm text-gray-500 w-8">{count}</span>
+                                <span className="text-sm text-muted w-8">{count}</span>
                               </div>
                             );
                           })}
@@ -624,7 +615,7 @@ export default function SellerProfilePage() {
                           initial={{ opacity: 0, y: 20 }}
                           animate={{ opacity: 1, y: 0 }}
                           transition={{ delay: index * 0.05 }}
-                          className="bg-white rounded-xl p-5 border border-gray-100 hover:border-gray-200 transition-colors"
+                          className="bg-surface-elevated rounded-xl p-5 border border-border-subtle hover:border-border transition-colors"
                         >
                           <div className="flex items-start gap-4">
                             {/* Reviewer Avatar */}
@@ -636,8 +627,8 @@ export default function SellerProfilePage() {
                             <div className="flex-1 min-w-0">
                               <div className="flex items-start justify-between gap-4 mb-2">
                                 <div>
-                                  <p className="font-semibold text-gray-900">{reviewerName || t('common.user')}</p>
-                                  <p className="text-xs text-gray-500">
+                                  <p className="font-semibold text-heading">{reviewerName || t('common.user')}</p>
+                                  <p className="text-xs text-muted">
                                     {new Date(review.createdAt).toLocaleDateString(locale === 'en' ? 'en-US' : 'tr-TR', {
                                       year: 'numeric',
                                       month: 'long',
@@ -645,21 +636,21 @@ export default function SellerProfilePage() {
                                     })}
                                   </p>
                                 </div>
-                                <div className="flex items-center gap-0.5 bg-yellow-50 px-2 py-1 rounded-lg">
+                                <div className="flex items-center gap-0.5 bg-warning-50 px-2 py-1 rounded-lg">
                                   {[1, 2, 3, 4, 5].map((star) => (
                                     <StarSolidIcon
                                       key={star}
                                       className={`w-4 h-4 ${
                                         star <= review.score
-                                          ? 'text-yellow-400'
-                                          : 'text-gray-200'
+                                          ? 'text-warning-400'
+                                          : 'text-border-subtle'
                                       }`}
                                     />
                                   ))}
                                 </div>
                               </div>
                               {review.comment && (
-                                <p className="text-gray-600 text-sm leading-relaxed whitespace-pre-line">{review.comment}</p>
+                                <p className="text-muted text-sm leading-relaxed whitespace-pre-line">{review.comment}</p>
                               )}
                             </div>
                           </div>

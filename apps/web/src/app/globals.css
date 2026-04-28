@@ -5,19 +5,20 @@
 @tailwind utilities;
 
 :root {
-  --primary: #f97316;
-  --primary-dark: #ea580c;
-  --accent-green: #4CAF50;
-  --accent-blue: #2196F3;
-  --text-heading: #111111;
-  --text-body: #2d2d2d;
-  --text-muted: #6b6b6b;
-  --text-subtle: #999999;
-  --background: #f8f8f8;
-  --surface: #FFFFFF;
-  --surface-alt: #f3f3f3;
-  --border: #e0e0e0;
-  --border-subtle: #eeeeee;
+  --primary: theme('colors.primary.500');
+  --primary-dark: theme('colors.primary.600');
+  --accent-green: theme('colors.success.500');
+  --accent-blue: theme('colors.info.500');
+  --accent-danger: theme('colors.danger.500');
+  --text-heading: theme('colors.heading');
+  --text-body: theme('colors.body');
+  --text-muted: theme('colors.muted');
+  --text-subtle: theme('colors.subtle');
+  --background: theme('colors.surface.DEFAULT');
+  --surface: theme('colors.surface.elevated');
+  --surface-alt: theme('colors.surface.alt');
+  --border: theme('colors.border.DEFAULT');
+  --border-subtle: theme('colors.border.subtle');
   --ease-premium: cubic-bezier(0.4, 0, 0.2, 1);
 }
 
@@ -45,18 +46,18 @@ body {
 }
 
 ::-webkit-scrollbar-thumb {
-  background: #ccc;
+  background: var(--border);
   border-radius: 3px;
 }
 
 ::-webkit-scrollbar-thumb:hover {
-  background: #999;
+  background: var(--text-subtle);
 }
 
 /* Native select: ensure dropdown options are visible (fixes dark/grey dropdown on macOS and some themes) */
 select option {
-  background: #ffffff;
-  color: #111827;
+  background: var(--surface);
+  color: var(--text-heading);
 }
 
 /* Focus styles */
@@ -71,76 +72,47 @@ select option {
 }
 
 /* ─── Design System ─── */
+/*
+ * Legacy .btn-primary / .btn-secondary / .btn-ghost helpers were removed in
+ * favour of <Button> / <ButtonLink> from @tarodan/ui. Use the `variant` prop
+ * (primary | secondary | ghost | danger) instead.
+ *
+ * The `.btn-trade` helper is kept because it represents a brand-specific
+ * success-coloured action that the shared Button variant system does not
+ * expose yet. Convert to a `trade` variant on @tarodan/ui Button when the
+ * team is ready.
+ */
 @layer components {
-  /* Buttons */
-  .btn-primary {
-    @apply inline-flex items-center justify-center gap-2
-           bg-primary-500 text-white px-6 py-2.5 font-semibold text-sm
-           border border-primary-600
-           transition-all duration-200 ease-premium;
-    border-radius: 4px;
-  }
-  .btn-primary:hover {
-    @apply bg-primary-600 shadow-soft;
-  }
-  .btn-primary:active {
-    @apply bg-primary-700;
-  }
-
-  .btn-secondary {
-    @apply inline-flex items-center justify-center gap-2
-           bg-white text-heading px-6 py-2.5 font-semibold text-sm
-           border border-gray-300
-           transition-all duration-200 ease-premium;
-    border-radius: 4px;
-  }
-  .btn-secondary:hover {
-    @apply border-gray-400 bg-gray-50;
-  }
-  .btn-secondary:active {
-    @apply bg-gray-100;
-  }
-
-  .btn-ghost {
-    @apply inline-flex items-center justify-center gap-2
-           bg-transparent text-muted px-6 py-2.5 font-medium text-sm
-           transition-all duration-200 ease-premium;
-    border-radius: 4px;
-  }
-  .btn-ghost:hover {
-    @apply bg-gray-100 text-heading;
-  }
-
   .btn-trade {
     @apply inline-flex items-center justify-center gap-2
-           bg-green-600 text-white px-6 py-2.5 font-semibold text-sm
-           border border-green-700
+           bg-success-600 text-inverted px-6 py-2.5 font-semibold text-sm
+           border border-success-700
            transition-all duration-200 ease-premium;
     border-radius: 4px;
   }
   .btn-trade:hover {
-    @apply bg-green-700;
+    @apply bg-success-700;
   }
 
   /* Cards */
   .card {
-    @apply bg-white border border-gray-200
+    @apply bg-surface-elevated border border-border
            transition-all duration-200 ease-premium;
     border-radius: 4px;
   }
 
   .card-premium {
-    @apply bg-white border border-gray-200
+    @apply bg-surface-elevated border border-border
            transition-all duration-200 ease-premium;
     border-radius: 4px;
   }
   .card-premium:hover {
-    @apply shadow-soft border-gray-300;
+    @apply shadow-soft border-border;
   }
 
   /* Inputs */
   .input {
-    @apply w-full px-4 py-2.5 border border-gray-300
+    @apply w-full px-4 py-2.5 border border-border
            focus:border-primary-500 focus:ring-1 focus:ring-primary-500/30
            transition-all duration-200 ease-premium outline-none;
     border-radius: 4px;
@@ -153,7 +125,7 @@ select option {
   }
 
   .badge-trade {
-    @apply bg-green-50 text-green-700 border border-green-200;
+    @apply bg-success-50 text-success-700 border border-success-200;
   }
 
   .badge-status {
@@ -161,17 +133,17 @@ select option {
   }
 
   .badge-sale {
-    @apply bg-gray-900 text-white text-[10px] font-bold px-2 py-0.5;
+    @apply bg-heading text-inverted text-[10px] font-bold px-2 py-0.5;
     border-radius: 2px;
   }
 
   .badge-new {
-    @apply bg-emerald-600 text-white text-[10px] font-bold px-2 py-0.5;
+    @apply bg-success-600 text-inverted text-[10px] font-bold px-2 py-0.5;
     border-radius: 2px;
   }
 
   .badge-rare {
-    @apply bg-violet-600 text-white text-[10px] font-bold px-2 py-0.5;
+    @apply bg-primary-600 text-inverted text-[10px] font-bold px-2 py-0.5;
     border-radius: 2px;
   }
 
@@ -182,15 +154,15 @@ select option {
 
   /* Skeleton shimmer */
   .skeleton {
-    @apply bg-gray-200 animate-shimmer;
+    @apply bg-border-subtle animate-shimmer;
     border-radius: 2px;
-    background-image: linear-gradient(90deg, #e5e7eb 0%, #f3f4f6 40%, #e5e7eb 80%);
+    background-image: linear-gradient(90deg, var(--border) 0%, var(--border-subtle) 40%, var(--border) 80%);
     background-size: 200% 100%;
   }
 
   /* Category nav link with animated underline */
   .nav-link-animated {
-    @apply relative whitespace-nowrap px-3 py-2 text-sm font-medium text-gray-600 
+    @apply relative whitespace-nowrap px-3 py-2 text-sm font-medium text-muted 
            transition-colors duration-200 ease-premium;
   }
   .nav-link-animated::after {
@@ -216,7 +188,7 @@ select option {
 
 /* Hero gradient */
 .hero-gradient {
-  background: linear-gradient(135deg, #1a1a2e 0%, #16213e 50%, #0f3460 100%);
+  background: linear-gradient(135deg, theme('colors.heading') 0%, theme('colors.body') 50%, theme('colors.primary.700') 100%);
 }
 
 /* Card hover effect (legacy compat) */

@@ -11,7 +11,6 @@ import * as qs from 'querystring';
 export class RawBodyMiddleware implements NestMiddleware {
   use(req: Request, res: Response, next: NextFunction) {
     if (
-      req.path.includes('/payments/callback/iyzico') ||
       req.path.includes('/payments/callback/paytr')
     ) {
       const chunks: Buffer[] = [];

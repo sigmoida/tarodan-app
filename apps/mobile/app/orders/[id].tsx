@@ -7,7 +7,9 @@ import { Ionicons } from '@expo/vector-icons';
 import { api } from '../../src/services/api';
 import { TarodanColors } from '../../src/theme';
 import RatingModal from '../../src/components/RatingModal';
-import { transformImageUrl, getImageUrl as getImageUrlFromUtils } from '../../src/utils/imageUrl';
+import { safeString } from '../../src/utils/safeString';
+import { apiStatusToUi, type UiOrderStatus } from '../../src/utils/orderStatus';
+import { getOrderProductImageUri } from '../../src/utils/orderProductImage';
 
 interface OrderDetail {
   id: string;
@@ -21,6 +23,7 @@ interface OrderDetail {
     price: number;
     condition: string;
     images?: Array<{ url: string }>;
+    imageUrl?: string;
   };
   seller: {
     id: string;
@@ -62,7 +65,15 @@ export default function OrderDetailScreen() {
       try {
         const response = await api.get(`/orders/${id}`);
         const data = response.data?.data ?? response.data;
-        return data;
+        if (!data) return null;
+        return {
+          ...data,
+          status: apiStatusToUi(data.status),
+          product: {
+            ...(data.product || {}),
+            imageUrl: data.product?.imageUrl,
+          },
+        };
       } catch (error) {
         console.log('Failed to fetch order');
         return null;
@@ -82,7 +93,7 @@ export default function OrderDetailScreen() {
     },
   });
 
-  const getStatusColor = (status: string) => {
+  const getStatusColor = (status: UiOrderStatus) => {
     switch (status) {
       case 'pending': return TarodanColors.warning;
       case 'paid': return TarodanColors.info;
@@ -91,20 +102,22 @@ export default function OrderDetailScreen() {
       case 'delivered': return TarodanColors.success;
       case 'completed': return TarodanColors.success;
       case 'cancelled': return TarodanColors.error;
+      case 'refunded': return TarodanColors.textSecondary;
       default: return TarodanColors.textSecondary;
     }
   };
 
-  const getStatusText = (status: string) => {
+  const getStatusText = (status: UiOrderStatus) => {
     switch (status) {
-      case 'pending': return 'Ödeme Bekliyor';
+      case 'pending': return 'Ödeme bekliyor';
       case 'paid': return 'Ödendi';
       case 'processing': return 'Hazırlanıyor';
       case 'shipped': return 'Kargoda';
       case 'delivered': return 'Teslim Edildi';
       case 'completed': return 'Tamamlandı';
       case 'cancelled': return 'İptal Edildi';
-      default: return status;
+      case 'refunded': return 'İade';
+      default: return String(status);
     }
   };
 
@@ -231,13 +244,13 @@ export default function OrderDetailScreen() {
           <TouchableOpacity onPress={() => router.push(`/product/${order.product.id}`)}>
             <Card.Content style={styles.productCard}>
               <Image
-                source={{ uri: getImageUrlFromUtils(order.product.images) || 'https://via.placeholder.com/80' }}
+                source={{ uri: getOrderProductImageUri(order.product) }}
                 style={styles.productImage}
               />
               <View style={styles.productInfo}>
                 <Text variant="titleSmall" numberOfLines={2}>{order.product.title}</Text>
                 <Text variant="bodySmall" style={styles.conditionText}>
-                  Durum: {order.product.condition}
+                  Durum: {safeString(order.product?.condition)}
                 </Text>
                 <Text variant="titleMedium" style={styles.productPrice}>
                   {formatPrice(order.product.price)}

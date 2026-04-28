@@ -13,6 +13,7 @@ import {
 } from '@heroicons/react/24/outline';
 import { adminApi } from '@/lib/api';
 import toast from 'react-hot-toast';
+import { Button, Select, Spinner, Textarea } from '@tarodan/ui';
 
 interface SupportTicketDetail {
   id: string;
@@ -46,18 +47,18 @@ interface SupportTicketDetail {
 }
 
 const statusConfig: Record<string, { label: string; color: string; bg: string }> = {
-  open: { label: 'Açık', color: 'text-blue-600', bg: 'bg-blue-100' },
-  in_progress: { label: 'İşlemde', color: 'text-yellow-600', bg: 'bg-yellow-100' },
-  waiting_customer: { label: 'Müşteri Bekleniyor', color: 'text-orange-600', bg: 'bg-orange-100' },
-  resolved: { label: 'Çözüldü', color: 'text-green-600', bg: 'bg-green-100' },
-  closed: { label: 'Kapatıldı', color: 'text-gray-600', bg: 'bg-gray-100' },
+  open: { label: 'Açık', color: 'text-info-600', bg: 'bg-info-100' },
+  in_progress: { label: 'İşlemde', color: 'text-warning-600', bg: 'bg-warning-100' },
+  waiting_customer: { label: 'Müşteri Bekleniyor', color: 'text-primary-600', bg: 'bg-primary-100' },
+  resolved: { label: 'Çözüldü', color: 'text-success-600', bg: 'bg-success-100' },
+  closed: { label: 'Kapatıldı', color: 'text-muted', bg: 'bg-surface-alt' },
 };
 
 const priorityConfig: Record<string, { label: string; color: string; bg: string }> = {
-  low: { label: 'Düşük', color: 'text-gray-600', bg: 'bg-gray-100' },
-  medium: { label: 'Orta', color: 'text-yellow-600', bg: 'bg-yellow-100' },
-  high: { label: 'Yüksek', color: 'text-orange-600', bg: 'bg-orange-100' },
-  urgent: { label: 'Acil', color: 'text-red-600', bg: 'bg-red-100' },
+  low: { label: 'Düşük', color: 'text-muted', bg: 'bg-surface-alt' },
+  medium: { label: 'Orta', color: 'text-warning-600', bg: 'bg-warning-100' },
+  high: { label: 'Yüksek', color: 'text-primary-600', bg: 'bg-primary-100' },
+  urgent: { label: 'Acil', color: 'text-danger-600', bg: 'bg-danger-100' },
 };
 
 export default function SupportTicketDetailPage() {
@@ -132,8 +133,8 @@ export default function SupportTicketDetailPage() {
     return (
       <div className="flex items-center justify-center min-h-screen">
         <div className="text-center">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary-600 mx-auto"></div>
-          <p className="mt-4 text-gray-600">Yükleniyor...</p>
+          <Spinner size="xl" color="border-primary-600 border-t-transparent" className="mx-auto" />
+          <p className="mt-4 text-muted">Yükleniyor...</p>
         </div>
       </div>
     );
@@ -142,7 +143,7 @@ export default function SupportTicketDetailPage() {
   if (!ticket) {
     return (
       <div className="text-center py-12">
-        <p className="text-gray-600">Destek talebi bulunamadı</p>
+        <p className="text-muted">Destek talebi bulunamadı</p>
       </div>
     );
   }
@@ -151,19 +152,19 @@ export default function SupportTicketDetailPage() {
   const priorityInfo = priorityConfig[ticket.priority] || priorityConfig.medium;
 
   return (
-      <div className="min-h-screen bg-gray-50">
+      <div className="min-h-screen bg-surface">
         <main className="max-w-6xl mx-auto px-4 py-8">
           {/* Header */}
           <div className="flex items-center gap-4 mb-8">
             <Link
               href="/support"
-              className="p-2 hover:bg-gray-200 rounded-lg transition-colors"
+              className="p-2 hover:bg-border-subtle rounded-lg transition-colors"
             >
-              <ArrowLeftIcon className="w-6 h-6 text-gray-600" />
+              <ArrowLeftIcon className="w-6 h-6 text-muted" />
             </Link>
             <div className="flex-1">
-              <h1 className="text-3xl font-bold text-gray-900">{ticket.subject}</h1>
-              <p className="text-sm text-gray-500">#{ticket.ticketNumber}</p>
+              <h1 className="text-3xl font-bold text-heading">{ticket.subject}</h1>
+              <p className="text-sm text-muted">#{ticket.ticketNumber}</p>
             </div>
             <div className="flex items-center gap-2">
               <span className={`px-4 py-2 rounded-full font-medium ${priorityInfo.color} ${priorityInfo.bg}`}>
@@ -179,18 +180,16 @@ export default function SupportTicketDetailPage() {
             {/* Main Content */}
             <div className="lg:col-span-2 space-y-6">
               {/* Messages */}
-              <div className="bg-white rounded-xl shadow-sm p-6">
+              <div className="bg-surface-elevated rounded-xl shadow-sm p-6">
                 <div className="flex items-center justify-between mb-4">
-                  <h2 className="text-lg font-semibold text-gray-900 flex items-center gap-2">
+                  <h2 className="text-lg font-semibold text-heading flex items-center gap-2">
                     <ChatBubbleLeftRightIcon className="w-5 h-5" />
                     Mesajlar
                   </h2>
-                  <button
-                    onClick={() => setShowReplyModal(true)}
-                    className="px-4 py-2 bg-primary-600 text-gray-900 rounded-lg hover:bg-primary-700 transition-colors"
-                  >
+                  <Button variant="secondary" onClick={() => setShowReplyModal(true)}
+                    className="px-4 py-2 bg-primary-600 text-heading rounded-lg hover:bg-primary-700 transition-colors">
                     Yanıtla
-                  </button>
+                  </Button>
                 </div>
                 <div className="space-y-4">
                   {ticket.messages.map((message) => (
@@ -198,24 +197,24 @@ export default function SupportTicketDetailPage() {
                       key={message.id}
                       className={`p-4 rounded-lg ${
                         message.isInternal
-                          ? 'bg-yellow-50 border border-yellow-200'
-                          : 'bg-gray-50'
+                          ? 'bg-warning-50 border border-warning-200'
+                          : 'bg-surface'
                       }`}
                     >
                       <div className="flex items-center justify-between mb-2">
                         <div className="flex items-center gap-2">
                           <span className="font-medium">{message.sender.displayName}</span>
                           {message.isInternal && (
-                            <span className="text-xs px-2 py-1 bg-yellow-200 text-yellow-800 rounded">
+                            <span className="text-xs px-2 py-1 bg-warning-200 text-warning-800 rounded">
                               İç Not
                             </span>
                           )}
                         </div>
-                        <span className="text-xs text-gray-500">
+                        <span className="text-xs text-muted">
                           {new Date(message.createdAt).toLocaleString('tr-TR')}
                         </span>
                       </div>
-                      <p className="text-gray-700 whitespace-pre-wrap">{message.content}</p>
+                      <p className="text-body whitespace-pre-wrap">{message.content}</p>
                     </div>
                   ))}
                 </div>
@@ -225,28 +224,28 @@ export default function SupportTicketDetailPage() {
             {/* Sidebar */}
             <div className="space-y-6">
               {/* Ticket Info */}
-              <div className="bg-white rounded-xl shadow-sm p-6">
-                <h3 className="text-lg font-semibold text-gray-900 mb-4">Talep Bilgileri</h3>
+              <div className="bg-surface-elevated rounded-xl shadow-sm p-6">
+                <h3 className="text-lg font-semibold text-heading mb-4">Talep Bilgileri</h3>
                 <div className="space-y-3">
                   <div>
-                    <span className="text-gray-600 text-sm">Kategori:</span>
+                    <span className="text-muted text-sm">Kategori:</span>
                     <p className="font-medium capitalize">{ticket.category}</p>
                   </div>
                   <div>
-                    <span className="text-gray-600 text-sm">Öncelik:</span>
+                    <span className="text-muted text-sm">Öncelik:</span>
                     <span className={`ml-2 px-2 py-1 rounded text-xs ${priorityInfo.color} ${priorityInfo.bg}`}>
                       {priorityInfo.label}
                     </span>
                   </div>
                   <div>
-                    <span className="text-gray-600 text-sm">Durum:</span>
+                    <span className="text-muted text-sm">Durum:</span>
                     <span className={`ml-2 px-2 py-1 rounded text-xs ${statusInfo.color} ${statusInfo.bg}`}>
                       {statusInfo.label}
                     </span>
                   </div>
                   {ticket.assignee && (
                     <div>
-                      <span className="text-gray-600 text-sm">Atanan:</span>
+                      <span className="text-muted text-sm">Atanan:</span>
                       <p className="font-medium">{ticket.assignee.displayName}</p>
                     </div>
                   )}
@@ -254,8 +253,8 @@ export default function SupportTicketDetailPage() {
               </div>
 
               {/* Creator Info */}
-              <div className="bg-white rounded-xl shadow-sm p-6">
-                <h3 className="text-lg font-semibold text-gray-900 mb-4">Oluşturan</h3>
+              <div className="bg-surface-elevated rounded-xl shadow-sm p-6">
+                <h3 className="text-lg font-semibold text-heading mb-4">Oluşturan</h3>
                 <div className="space-y-2">
                   <Link
                     href={`/users/${ticket.creator.id}`}
@@ -263,46 +262,44 @@ export default function SupportTicketDetailPage() {
                   >
                     {ticket.creator.displayName}
                   </Link>
-                  <p className="text-sm text-gray-600">{ticket.creator.email}</p>
+                  <p className="text-sm text-muted">{ticket.creator.email}</p>
                 </div>
               </div>
 
               {/* Actions */}
-              <div className="bg-white rounded-xl shadow-sm p-6">
-                <h3 className="text-lg font-semibold text-gray-900 mb-4">İşlemler</h3>
+              <div className="bg-surface-elevated rounded-xl shadow-sm p-6">
+                <h3 className="text-lg font-semibold text-heading mb-4">İşlemler</h3>
                 <div className="space-y-2">
-                  <button
-                    onClick={() => setShowStatusModal(true)}
-                    className="w-full px-4 py-2 bg-primary-600 text-gray-900 rounded-lg hover:bg-primary-700 transition-colors"
-                  >
+                  <Button variant="secondary" onClick={() => setShowStatusModal(true)}
+                    className="w-full px-4 py-2 bg-primary-600 text-heading rounded-lg hover:bg-primary-700 transition-colors">
                     Durum Güncelle
-                  </button>
+                  </Button>
                 </div>
               </div>
 
               {/* Timeline */}
-              <div className="bg-white rounded-xl shadow-sm p-6">
-                <h3 className="text-lg font-semibold text-gray-900 mb-4 flex items-center gap-2">
+              <div className="bg-surface-elevated rounded-xl shadow-sm p-6">
+                <h3 className="text-lg font-semibold text-heading mb-4 flex items-center gap-2">
                   <ClockIcon className="w-5 h-5" />
                   Zaman Çizelgesi
                 </h3>
                 <div className="space-y-3">
                   <div>
                     <p className="text-sm font-medium">Oluşturulma</p>
-                    <p className="text-xs text-gray-500">
+                    <p className="text-xs text-muted">
                       {new Date(ticket.createdAt).toLocaleString('tr-TR')}
                     </p>
                   </div>
                   <div>
                     <p className="text-sm font-medium">Son Güncelleme</p>
-                    <p className="text-xs text-gray-500">
+                    <p className="text-xs text-muted">
                       {new Date(ticket.updatedAt).toLocaleString('tr-TR')}
                     </p>
                   </div>
                   {ticket.resolvedAt && (
                     <div>
                       <p className="text-sm font-medium">Çözülme</p>
-                      <p className="text-xs text-gray-500">
+                      <p className="text-xs text-muted">
                         {new Date(ticket.resolvedAt).toLocaleString('tr-TR')}
                       </p>
                     </div>
@@ -315,39 +312,32 @@ export default function SupportTicketDetailPage() {
 
         {/* Reply Modal */}
         {showReplyModal && (
-          <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-            <div className="bg-white rounded-xl p-6 max-w-md w-full mx-4">
-              <h3 className="text-lg font-semibold text-gray-900 mb-4">Yanıt Ver</h3>
+          <div className="fixed inset-0 bg-heading bg-opacity-50 flex items-center justify-center z-50">
+            <div className="bg-surface-elevated rounded-xl p-6 max-w-md w-full mx-4">
+              <h3 className="text-lg font-semibold text-heading mb-4">Yanıt Ver</h3>
               <div className="mb-4">
-                <label className="block text-sm font-medium text-gray-700 mb-2">
+                <label className="block text-sm font-medium text-body mb-2">
                   Mesaj *
                 </label>
-                <textarea
-                  value={replyMessage}
+                <Textarea value={replyMessage}
                   onChange={(e) => setReplyMessage(e.target.value)}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent"
                   rows={6}
-                  placeholder="Yanıtınızı yazın..."
-                />
+                  placeholder="Yanıtınızı yazın..." />
               </div>
               <div className="flex gap-3">
-                <button
-                  onClick={() => {
+                <Button variant="secondary" onClick={() => {
                     setShowReplyModal(false);
                     setReplyMessage('');
                   }}
-                  className="flex-1 px-4 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors"
-                  disabled={processing}
-                >
+                  className="flex-1 px-4 text-body hover:bg-surface"
+                  disabled={processing}>
                   İptal
-                </button>
-                <button
-                  onClick={handleReply}
-                  className="flex-1 px-4 py-2 bg-primary-600 text-gray-900 rounded-lg hover:bg-primary-700 transition-colors disabled:opacity-50"
-                  disabled={processing}
-                >
+                </Button>
+                <Button variant="secondary" onClick={handleReply}
+                  className="flex-1 px-4 py-2 bg-primary-600 text-heading rounded-lg hover:bg-primary-700 transition-colors disabled:opacity-50"
+                  disabled={processing}>
                   {processing ? 'İşleniyor...' : 'Gönder'}
-                </button>
+                </Button>
               </div>
             </div>
           </div>
@@ -355,40 +345,35 @@ export default function SupportTicketDetailPage() {
 
         {/* Status Update Modal */}
         {showStatusModal && (
-          <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-            <div className="bg-white rounded-xl p-6 max-w-md w-full mx-4">
-              <h3 className="text-lg font-semibold text-gray-900 mb-4">Durum Güncelle</h3>
+          <div className="fixed inset-0 bg-heading bg-opacity-50 flex items-center justify-center z-50">
+            <div className="bg-surface-elevated rounded-xl p-6 max-w-md w-full mx-4">
+              <h3 className="text-lg font-semibold text-heading mb-4">Durum Güncelle</h3>
               <div className="mb-4">
-                <label className="block text-sm font-medium text-gray-700 mb-2">
+                <label className="block text-sm font-medium text-body mb-2">
                   Yeni Durum
                 </label>
-                <select
+                <Select
                   value={newStatus}
                   onChange={(e) => setNewStatus(e.target.value)}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent"
                 >
                   <option value="open">Açık</option>
                   <option value="in_progress">İşlemde</option>
                   <option value="waiting_customer">Müşteri Bekleniyor</option>
                   <option value="resolved">Çözüldü</option>
                   <option value="closed">Kapatıldı</option>
-                </select>
+                </Select>
               </div>
               <div className="flex gap-3">
-                <button
-                  onClick={() => setShowStatusModal(false)}
-                  className="flex-1 px-4 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors"
-                  disabled={processing}
-                >
+                <Button variant="secondary" onClick={() => setShowStatusModal(false)}
+                  className="flex-1 px-4 text-body hover:bg-surface"
+                  disabled={processing}>
                   İptal
-                </button>
-                <button
-                  onClick={handleStatusUpdate}
-                  className="flex-1 px-4 py-2 bg-primary-600 text-gray-900 rounded-lg hover:bg-primary-700 transition-colors disabled:opacity-50"
-                  disabled={processing}
-                >
+                </Button>
+                <Button variant="secondary" onClick={handleStatusUpdate}
+                  className="flex-1 px-4 py-2 bg-primary-600 text-heading rounded-lg hover:bg-primary-700 transition-colors disabled:opacity-50"
+                  disabled={processing}>
                   {processing ? 'İşleniyor...' : 'Güncelle'}
-                </button>
+                </Button>
               </div>
             </div>
           </div>

@@ -1,6 +1,6 @@
 /**
  * Payment Processing Worker
- * Handles payment webhooks, refunds, and escrow releases via iyzico
+ * Handles payment webhooks, refunds, and escrow releases (PayTR / internal jobs)
  */
 import { Processor, Process, OnQueueFailed, OnQueueCompleted } from '@nestjs/bull';
 import { Logger } from '@nestjs/common';
@@ -35,7 +35,7 @@ export class PaymentWorker {
     const { webhookData } = job.data;
 
     try {
-      // Process iyzico webhook
+      // Process payment webhook (generic)
       const status = webhookData?.status;
       const paymentId = webhookData?.paymentId;
       const token = webhookData?.token;
@@ -104,9 +104,8 @@ export class PaymentWorker {
         throw new Error(`Order or payment not found: ${orderId}`);
       }
 
-      // Call iyzico refund API (simplified)
       const refundAmount = amount || order.payment.amount.toNumber();
-      const refundResult = await this.processIyzicoRefund(
+      const refundResult = await this.processProviderRefundStub(
         order.payment.providerPaymentId || '',
         refundAmount,
       );
@@ -163,7 +162,7 @@ export class PaymentWorker {
       const commission = paymentAmount * commissionRate;
       const sellerAmount = paymentAmount - commission;
 
-      // In production: Call iyzico to release escrow to seller
+      // In production: release escrow to seller (provider / payout)
       this.logger.log(
         `Releasing ${sellerAmount} TL to seller ${order.sellerId} (commission: ${commission} TL)`,
       );
@@ -238,9 +237,9 @@ export class PaymentWorker {
     this.logger.error(`Payment job ${job.id} failed: ${error.message}`);
   }
 
-  private async processIyzicoRefund(paymentId: string, amount: number): Promise<any> {
-    // In production: Call iyzico refund API
-    this.logger.log(`Calling iyzico refund API for payment ${paymentId}, amount: ${amount}`);
+  /** Stub: real refunds go through PaymentService + PayTR API */
+  private async processProviderRefundStub(paymentId: string, amount: number): Promise<any> {
+    this.logger.log(`Refund stub for provider txn ${paymentId}, amount: ${amount}`);
     return { status: 'success', paymentId, amount };
   }
 }

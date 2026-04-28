@@ -13,6 +13,7 @@ import {
 } from '@heroicons/react/24/outline';
 import { adminApi } from '@/lib/api';
 import toast from 'react-hot-toast';
+import { Button, Input, Select, Spinner } from '@tarodan/ui';
 
 interface PaymentStatistics {
   period: string;
@@ -74,34 +75,34 @@ export default function AdminPaymentStatisticsPage() {
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
-        <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-primary-500"></div>
+      <div className="min-h-screen bg-surface flex items-center justify-center">
+        <Spinner size="xl" />
       </div>
     );
   }
 
   if (!statistics) {
     return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
-        <p className="text-gray-500">İstatistikler yüklenemedi</p>
+      <div className="min-h-screen bg-surface flex items-center justify-center">
+        <p className="text-muted">İstatistikler yüklenemedi</p>
       </div>
     );
   }
 
   return (
-    <div className="min-h-screen bg-gray-50">
+    <div className="min-h-screen bg-surface">
       <main className="max-w-7xl mx-auto px-4 py-8">
         {/* Header */}
         <div className="flex items-center gap-4 mb-8">
           <Link
             href="/payments"
-            className="p-2 hover:bg-gray-200 rounded-lg transition-colors"
+            className="p-2 hover:bg-border-subtle rounded-lg transition-colors"
           >
-            <ArrowLeftIcon className="w-6 h-6 text-gray-600" />
+            <ArrowLeftIcon className="w-6 h-6 text-muted" />
           </Link>
           <div className="flex-1">
-            <h1 className="text-3xl font-bold text-gray-900">Ödeme İstatistikleri</h1>
-            <p className="text-sm text-gray-500">
+            <h1 className="text-3xl font-bold text-heading">Ödeme İstatistikleri</h1>
+            <p className="text-sm text-muted">
               {new Date(statistics.startDate).toLocaleDateString('tr-TR')} -{' '}
               {new Date(statistics.endDate).toLocaleDateString('tr-TR')}
             </p>
@@ -109,112 +110,103 @@ export default function AdminPaymentStatisticsPage() {
         </div>
 
         {/* Filters */}
-        <div className="bg-white rounded-xl shadow-sm p-6 mb-6">
+        <div className="bg-surface-elevated rounded-xl shadow-sm p-6 mb-6">
           <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">Periyot</label>
-              <select
+              <label className="block text-sm font-medium text-body mb-2">Periyot</label>
+              <Select
                 value={filters.period}
                 onChange={(e) => setFilters({ ...filters, period: e.target.value as any })}
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
               >
                 <option value="daily">Günlük</option>
                 <option value="weekly">Haftalık</option>
                 <option value="monthly">Aylık</option>
-              </select>
+              </Select>
             </div>
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">Başlangıç Tarihi</label>
-              <input
-                type="date"
+              <label className="block text-sm font-medium text-body mb-2">Başlangıç Tarihi</label>
+              <Input type="date"
                 value={filters.startDate}
-                onChange={(e) => setFilters({ ...filters, startDate: e.target.value })}
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
-              />
+                onChange={(e) => setFilters({ ...filters, startDate: e.target.value })} />
             </div>
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">Bitiş Tarihi</label>
-              <input
-                type="date"
+              <label className="block text-sm font-medium text-body mb-2">Bitiş Tarihi</label>
+              <Input type="date"
                 value={filters.endDate}
-                onChange={(e) => setFilters({ ...filters, endDate: e.target.value })}
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
-              />
+                onChange={(e) => setFilters({ ...filters, endDate: e.target.value })} />
             </div>
             <div className="flex items-end">
-              <button
-                onClick={() => {
+              <Button variant="secondary" onClick={() => {
                   setFilters({ period: 'monthly', startDate: '', endDate: '' });
                 }}
-                className="w-full px-4 py-2 text-gray-600 hover:text-gray-800"
-              >
+                className="w-full px-4 py-2 text-muted hover:text-body">
                 Sıfırla
-              </button>
+              </Button>
             </div>
           </div>
         </div>
 
         {/* Summary Cards */}
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-6">
-          <div className="bg-white rounded-xl shadow-sm p-6">
+          <div className="bg-surface-elevated rounded-xl shadow-sm p-6">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm text-gray-600 mb-1">Toplam Gelir</p>
-                <p className="text-2xl font-bold text-gray-900">
+                <p className="text-sm text-muted mb-1">Toplam Gelir</p>
+                <p className="text-2xl font-bold text-heading">
                   ₺{statistics.summary.totalRevenue.toLocaleString('tr-TR', { minimumFractionDigits: 2 })}
                 </p>
               </div>
-              <CurrencyDollarIcon className="w-12 h-12 text-green-500" />
+              <CurrencyDollarIcon className="w-12 h-12 text-success-500" />
             </div>
           </div>
 
-          <div className="bg-white rounded-xl shadow-sm p-6">
+          <div className="bg-surface-elevated rounded-xl shadow-sm p-6">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm text-gray-600 mb-1">Toplam Ödeme</p>
-                <p className="text-2xl font-bold text-gray-900">{statistics.summary.totalPayments}</p>
+                <p className="text-sm text-muted mb-1">Toplam Ödeme</p>
+                <p className="text-2xl font-bold text-heading">{statistics.summary.totalPayments}</p>
               </div>
-              <CreditCardIcon className="w-12 h-12 text-blue-500" />
+              <CreditCardIcon className="w-12 h-12 text-info-500" />
             </div>
           </div>
 
-          <div className="bg-white rounded-xl shadow-sm p-6">
+          <div className="bg-surface-elevated rounded-xl shadow-sm p-6">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm text-gray-600 mb-1">Başarı Oranı</p>
-                <p className="text-2xl font-bold text-gray-900">{statistics.summary.successRate.toFixed(1)}%</p>
+                <p className="text-sm text-muted mb-1">Başarı Oranı</p>
+                <p className="text-2xl font-bold text-heading">{statistics.summary.successRate.toFixed(1)}%</p>
               </div>
-              <CheckCircleIcon className="w-12 h-12 text-green-500" />
+              <CheckCircleIcon className="w-12 h-12 text-success-500" />
             </div>
           </div>
 
-          <div className="bg-white rounded-xl shadow-sm p-6">
+          <div className="bg-surface-elevated rounded-xl shadow-sm p-6">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm text-gray-600 mb-1">Ortalama Tutar</p>
-                <p className="text-2xl font-bold text-gray-900">
+                <p className="text-sm text-muted mb-1">Ortalama Tutar</p>
+                <p className="text-2xl font-bold text-heading">
                   ₺{statistics.summary.averageAmount.toLocaleString('tr-TR', { minimumFractionDigits: 2 })}
                 </p>
               </div>
-              <ChartBarIcon className="w-12 h-12 text-purple-500" />
+              <ChartBarIcon className="w-12 h-12 text-primary-500" />
             </div>
           </div>
         </div>
 
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
           {/* By Status */}
-          <div className="bg-white rounded-xl shadow-sm p-6">
-            <h2 className="text-lg font-semibold text-gray-900 mb-4">Durum Dağılımı</h2>
+          <div className="bg-surface-elevated rounded-xl shadow-sm p-6">
+            <h2 className="text-lg font-semibold text-heading mb-4">Durum Dağılımı</h2>
             <div className="space-y-3">
               {statistics.byStatus.map((item) => (
                 <div key={item.status}>
                   <div className="flex justify-between mb-1">
-                    <span className="text-sm font-medium text-gray-700">{item.status}</span>
-                    <span className="text-sm text-gray-600">
+                    <span className="text-sm font-medium text-body">{item.status}</span>
+                    <span className="text-sm text-muted">
                       {item.count} ({item.percentage.toFixed(1)}%)
                     </span>
                   </div>
-                  <div className="w-full bg-gray-200 rounded-full h-2">
+                  <div className="w-full bg-border-subtle rounded-full h-2">
                     <div
                       className="bg-primary-500 h-2 rounded-full"
                       style={{ width: `${item.percentage}%` }}
@@ -226,21 +218,21 @@ export default function AdminPaymentStatisticsPage() {
           </div>
 
           {/* By Provider */}
-          <div className="bg-white rounded-xl shadow-sm p-6">
-            <h2 className="text-lg font-semibold text-gray-900 mb-4">Sağlayıcı Dağılımı</h2>
+          <div className="bg-surface-elevated rounded-xl shadow-sm p-6">
+            <h2 className="text-lg font-semibold text-heading mb-4">Sağlayıcı Dağılımı</h2>
             <div className="space-y-3">
               {statistics.byProvider.map((item) => (
                 <div key={item.provider}>
                   <div className="flex justify-between mb-1">
-                    <span className="text-sm font-medium text-gray-700 uppercase">{item.provider}</span>
-                    <span className="text-sm text-gray-600">
+                    <span className="text-sm font-medium text-body uppercase">{item.provider}</span>
+                    <span className="text-sm text-muted">
                       {item.count} ({item.percentage.toFixed(1)}%)
                     </span>
                   </div>
-                  <div className="flex justify-between text-xs text-gray-500 mb-1">
+                  <div className="flex justify-between text-xs text-muted mb-1">
                     <span>Toplam: ₺{item.totalAmount.toLocaleString('tr-TR', { minimumFractionDigits: 2 })}</span>
                   </div>
-                  <div className="w-full bg-gray-200 rounded-full h-2">
+                  <div className="w-full bg-border-subtle rounded-full h-2">
                     <div
                       className="bg-primary-500 h-2 rounded-full"
                       style={{ width: `${item.percentage}%` }}
@@ -253,24 +245,24 @@ export default function AdminPaymentStatisticsPage() {
         </div>
 
         {/* Detailed Breakdown */}
-        <div className="bg-white rounded-xl shadow-sm p-6 mt-6">
-          <h2 className="text-lg font-semibold text-gray-900 mb-4">Detaylı Özet</h2>
+        <div className="bg-surface-elevated rounded-xl shadow-sm p-6 mt-6">
+          <h2 className="text-lg font-semibold text-heading mb-4">Detaylı Özet</h2>
           <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-            <div className="p-4 bg-green-50 rounded-lg">
-              <p className="text-sm text-gray-600 mb-1">Tamamlanan</p>
-              <p className="text-2xl font-bold text-green-600">{statistics.summary.completedPayments}</p>
+            <div className="p-4 bg-success-50 rounded-lg">
+              <p className="text-sm text-muted mb-1">Tamamlanan</p>
+              <p className="text-2xl font-bold text-success-600">{statistics.summary.completedPayments}</p>
             </div>
-            <div className="p-4 bg-red-50 rounded-lg">
-              <p className="text-sm text-gray-600 mb-1">Başarısız</p>
-              <p className="text-2xl font-bold text-red-600">{statistics.summary.failedPayments}</p>
+            <div className="p-4 bg-danger-50 rounded-lg">
+              <p className="text-sm text-muted mb-1">Başarısız</p>
+              <p className="text-2xl font-bold text-danger-600">{statistics.summary.failedPayments}</p>
             </div>
-            <div className="p-4 bg-yellow-50 rounded-lg">
-              <p className="text-sm text-gray-600 mb-1">Bekleyen</p>
-              <p className="text-2xl font-bold text-yellow-600">{statistics.summary.pendingPayments}</p>
+            <div className="p-4 bg-warning-50 rounded-lg">
+              <p className="text-sm text-muted mb-1">Bekleyen</p>
+              <p className="text-2xl font-bold text-warning-600">{statistics.summary.pendingPayments}</p>
             </div>
-            <div className="p-4 bg-blue-50 rounded-lg">
-              <p className="text-sm text-gray-600 mb-1">Toplam</p>
-              <p className="text-2xl font-bold text-blue-600">{statistics.summary.totalPayments}</p>
+            <div className="p-4 bg-info-50 rounded-lg">
+              <p className="text-sm text-muted mb-1">Toplam</p>
+              <p className="text-2xl font-bold text-info-600">{statistics.summary.totalPayments}</p>
             </div>
           </div>
         </div>

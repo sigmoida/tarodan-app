@@ -69,6 +69,8 @@ model User {
   followers               UserFollow[]             @relation("Following")
   membership              UserMembership?
   wishlist                Wishlist?
+  bankAccount             SellerBankAccount?
+  payoutTransfers         PayoutTransfer[]         @relation("SellerPayoutTransfers")
 
   @@index([email])
   @@index([isSeller])
@@ -510,23 +512,29 @@ model TradeItem {
 }
 
 model TradeShipment {
-  id             String               @id @default(uuid())
-  tradeId        String               @map("trade_id")
-  shipperId      String               @map("shipper_id")
-  fromAddressId  String               @map("from_address_id")
-  carrier        String
-  trackingNumber String?              @map("tracking_number")
-  status         ShipmentStatus       @default(pending)
-  shippedAt      DateTime?            @map("shipped_at")
-  deliveredAt    DateTime?            @map("delivered_at")
-  confirmedAt    DateTime?            @map("confirmed_at")
-  createdAt      DateTime             @default(now()) @map("created_at")
-  updatedAt      DateTime             @updatedAt @map("updated_at")
-  events         TradeShipmentEvent[]
-  fromAddress    Address              @relation(fields: [fromAddressId], references: [id])
-  trade          Trade                @relation(fields: [tradeId], references: [id], onDelete: Cascade)
+  id              String               @id @default(uuid())
+  tradeId         String               @map("trade_id")
+  shipperId       String               @map("shipper_id")
+  fromAddressId   String               @map("from_address_id")
+  carrier         String
+  trackingNumber  String?              @map("tracking_number")
+  status          ShipmentStatus       @default(pending)
+  shippedAt       DateTime?            @map("shipped_at")
+  deliveredAt     DateTime?            @map("delivered_at")
+  confirmedAt     DateTime?            @map("confirmed_at")
+  // Escrow: which leg of the journey this shipment represents
+  leg             String               @default("to_warehouse")
+  // Recipient of this shipment: null = warehouse, else initiator or receiver user id
+  recipientUserId String?              @map("recipient_user_id")
+  recipientType   String               @default("warehouse") @map("recipient_type")
+  createdAt       DateTime             @default(now()) @map("created_at")
+  updatedAt       DateTime             @updatedAt @map("updated_at")
+  events          TradeShipmentEvent[]
+  fromAddress     Address              @relation(fields: [fromAddressId], references: [id])
+  trade           Trade                @relation(fields: [tradeId], references: [id], onDelete: Cascade)
 
   @@index([tradeId])
+  @@index([leg])
   @@map("trade_shipments")
 }
 
@@ -555,12 +563,15 @@ model TradeCashPayment {
   providerPaymentId String?       @map("provider_payment_id")
   status            PaymentStatus @default(pending)
   paidAt            DateTime?     @map("paid_at")
+  // Escrow hold: set when trade completes; released when holdReleaseAt passes
+  holdReleaseAt     DateTime?     @map("hold_release_at")
   releasedAt        DateTime?     @map("released_at")
   refundedAt        DateTime?     @map("refunded_at")
   createdAt         DateTime      @default(now()) @map("created_at")
   updatedAt         DateTime      @updatedAt @map("updated_at")
-  trade             Trade         @relation(fields: [tradeId], references: [id], onDelete: Cascade)
+  trade             Trade            @relation(fields: [tradeId], references: [id], onDelete: Cascade)
   payment           Payment?
+  payoutTransfers   PayoutTransfer[] @relation("TradeCashPayoutTransfers")
 
   @@map("trade_cash_payments")
 }
@@ -913,14 +924,17 @@ model Offer {
   amount    Decimal     @db.Decimal(10, 2)
   message   String?
   status    OfferStatus @default(pending)
+  /// Satıcı karşı teklifinden sonra: kabul/red için sıra alıcıda (buyerId)
+  buyerMustAccept Boolean @default(false) @map("buyer_must_accept")
   expiresAt DateTime    @map("expires_at")
   createdAt DateTime    @default(now()) @map("created_at")
   updatedAt DateTime    @updatedAt @map("updated_at")
-  version   Int         @default(1)
-  buyer     User        @relation("BuyerOffers", fields: [buyerId], references: [id])
-  product   Product     @relation(fields: [productId], references: [id])
-  seller    User        @relation("SellerOffers", fields: [sellerId], references: [id])
-  order     Order?
+  version      Int         @default(1)
+  cancelReason String?     @map("cancel_reason")
+  buyer        User        @relation("BuyerOffers", fields: [buyerId], references: [id])
+  product      Product     @relation(fields: [productId], references: [id])
+  seller       User        @relation("SellerOffers", fields: [sellerId], references: [id])
+  order        Order?
 
   @@index([productId])
   @@index([status])
@@ -949,7 +963,10 @@ model Order {
   discountBreakdown Json?       @map("discount_breakdown")
   discountCode      String?     @map("discount_code")
   subtotal          Decimal?    @db.Decimal(10, 2)
-  invoices          Invoice[]
+  cancelReason             String?     @map("cancel_reason")
+  preparingDeadline        DateTime?   @map("preparing_deadline")
+  preparingWarningSentAt   DateTime?   @map("preparing_warning_sent_at")
+  invoices                 Invoice[]
   buyer             User        @relation("BuyerOrders", fields: [buyerId], references: [id])
   offer             Offer?      @relation(fields: [offerId], references: [id])
   product           Product     @relation(fields: [productId], references: [id])
@@ -997,10 +1014,59 @@ model PaymentHold {
   releasedAt DateTime?         @map("released_at")
   createdAt  DateTime          @default(now()) @map("created_at")
   updatedAt  DateTime          @updatedAt @map("updated_at")
-  payment    Payment           @relation(fields: [paymentId], references: [id])
-  seller     User              @relation(fields: [sellerId], references: [id])
+  payment         Payment           @relation(fields: [paymentId], references: [id])
+  seller          User              @relation(fields: [sellerId], references: [id])
+  payoutTransfer  PayoutTransfer?   @relation("HoldPayoutTransfer")
 
   @@map("payment_holds")
+}
+
+model SellerBankAccount {
+  id            String    @id @default(uuid())
+  userId        String    @unique @map("user_id")
+  accountHolder String    @map("account_holder")
+  iban          String
+  tcKimlikNo    String?   @map("tc_kimlik_no")
+  taxId         String?   @map("tax_id")
+  isVerified    Boolean   @default(false) @map("is_verified")
+  verifiedAt    DateTime? @map("verified_at")
+  createdAt     DateTime  @default(now()) @map("created_at")
+  updatedAt     DateTime  @updatedAt @map("updated_at")
+  user          User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("seller_bank_accounts")
+}
+
+model PayoutTransfer {
+  id                 String            @id @default(uuid())
+  paymentHoldId      String?           @unique @map("payment_hold_id")
+  tradeCashPaymentId String?           @map("trade_cash_payment_id")
+  sellerId           String            @map("seller_id")
+  amount             Decimal           @db.Decimal(10, 2)
+  commission         Decimal           @db.Decimal(10, 2)
+  netAmount          Decimal           @map("net_amount") @db.Decimal(10, 2)
+  currency           String            @default("TRY")
+  merchantOid        String            @map("merchant_oid")
+  transId            String            @unique @map("trans_id")
+  transferIban       String            @map("transfer_iban")
+  transferName       String            @map("transfer_name")
+  status             PayoutStatus      @default(pending)
+  providerResponse   Json?             @map("provider_response")
+  failureReason      String?           @map("failure_reason")
+  retryCount         Int               @default(0) @map("retry_count")
+  maxRetries         Int               @default(3) @map("max_retries")
+  nextRetryAt        DateTime?         @map("next_retry_at")
+  processedAt        DateTime?         @map("processed_at")
+  createdAt          DateTime          @default(now()) @map("created_at")
+  updatedAt          DateTime          @updatedAt @map("updated_at")
+  paymentHold        PaymentHold?      @relation("HoldPayoutTransfer", fields: [paymentHoldId], references: [id])
+  tradeCashPayment   TradeCashPayment? @relation("TradeCashPayoutTransfers", fields: [tradeCashPaymentId], references: [id])
+  seller             User              @relation("SellerPayoutTransfers", fields: [sellerId], references: [id])
+
+  @@index([sellerId])
+  @@index([status])
+  @@index([processedAt])
+  @@map("payout_transfers")
 }
 
 model Invoice {
@@ -1033,21 +1099,26 @@ model Invoice {
 }
 
 model Shipment {
-  id                String          @id @default(uuid())
-  orderId           String          @unique @map("order_id")
-  provider          String
-  trackingNumber    String?         @map("tracking_number")
-  trackingUrl       String?         @map("tracking_url")
-  labelUrl          String?         @map("label_url")
-  cost              Decimal?        @db.Decimal(10, 2)
-  status            ShipmentStatus  @default(pending)
-  estimatedDelivery DateTime?       @map("estimated_delivery")
-  shippedAt         DateTime?       @map("shipped_at")
-  deliveredAt       DateTime?       @map("delivered_at")
-  createdAt         DateTime        @default(now()) @map("created_at")
-  updatedAt         DateTime        @updatedAt @map("updated_at")
-  events            ShipmentEvent[]
-  order             Order           @relation(fields: [orderId], references: [id])
+  id                  String          @id @default(uuid())
+  orderId             String          @unique @map("order_id")
+  provider            String
+  trackingNumber      String?         @map("tracking_number")
+  trackingUrl         String?         @map("tracking_url")
+  labelUrl            String?         @map("label_url")
+  cost                Decimal?        @db.Decimal(10, 2)
+  status              ShipmentStatus  @default(pending)
+  estimatedDelivery   DateTime?       @map("estimated_delivery")
+  shippedAt           DateTime?       @map("shipped_at")
+  deliveredAt         DateTime?       @map("delivered_at")
+  providerTrackingId  String?         @map("provider_tracking_id")
+  providerStatusCode  Int?            @map("provider_status_code")
+  providerRawStatus   String?         @map("provider_raw_status")
+  receivedBy          String?         @map("received_by")
+  returnReason        String?         @map("return_reason")
+  createdAt           DateTime        @default(now()) @map("created_at")
+  updatedAt           DateTime        @updatedAt @map("updated_at")
+  events              ShipmentEvent[]
+  order               Order           @relation(fields: [orderId], references: [id])
 
   @@map("shipments")
 }
@@ -1634,6 +1705,7 @@ enum OfferStatus {
   rejected
   expired
   cancelled
+  payment_expired
 }
 
 enum OrderStatus {
@@ -1662,15 +1734,27 @@ enum PaymentHoldStatus {
   cancelled
 }
 
+enum PayoutStatus {
+  pending
+  processing
+  completed
+  failed
+  returned
+  retry_pending
+}
+
 enum ShipmentStatus {
   pending
   label_created
   picked_up
   in_transit
+  at_delivery_branch
   out_for_delivery
   delivered
-  returned
   failed
+  return_in_progress
+  returned
+  cancelled
 }
 
 enum AdminRole {
@@ -1709,11 +1793,20 @@ enum TradeStatus {
   pending
   accepted
   rejected
+  // Legacy peer-to-peer statuses (backwards compat)
   initiator_shipped
   receiver_shipped
   both_shipped
   initiator_received
   receiver_received
+  // New escrow/safe-trade statuses
+  awaiting_payment
+  shipping_to_warehouse
+  at_warehouse
+  admin_reviewing
+  shipping_to_recipients
+  returning
+  // Final statuses
   completed
   cancelled
   disputed

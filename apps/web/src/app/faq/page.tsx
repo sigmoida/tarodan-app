@@ -4,7 +4,8 @@ import { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { ChevronDownIcon, MagnifyingGlassIcon } from '@heroicons/react/24/outline';
 import Link from 'next/link';
-import { useTranslation } from '@/i18n/LanguageContext';
+import { useTranslation } from '@/i18n/LanguageContext';import { Button, Input } from '@tarodan/ui';
+
 
 const FAQ_CATEGORIES = [
   {
@@ -223,9 +224,9 @@ export default function FAQPage() {
     : FAQ_CATEGORIES_LOCALIZED.filter((c) => c.id === activeCategory);
 
   return (
-    <div className="min-h-screen bg-gray-50">
+    <div className="min-h-screen bg-surface">
       {/* Hero Section */}
-      <div className="bg-gradient-to-br from-primary-500 to-primary-600 text-white py-16">
+      <div className="bg-gradient-to-br from-primary-500 to-primary-600 text-inverted py-16">
         <div className="max-w-4xl mx-auto px-4 text-center">
           <h1 className="text-4xl font-bold mb-4">{t('faq.title')}</h1>
           <p className="text-lg text-primary-100 mb-8">
@@ -234,14 +235,12 @@ export default function FAQPage() {
 
           {/* Search */}
           <div className="relative max-w-xl mx-auto">
-            <MagnifyingGlassIcon className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
-            <input
-              type="text"
+            <MagnifyingGlassIcon className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-subtle" />
+            <Input type="text"
               placeholder={t('faq.searchPlaceholder')}
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              className="w-full pl-12 pr-4 py-3 rounded-xl text-gray-900 placeholder-gray-400 focus:ring-2 focus:ring-white focus:outline-none"
-            />
+              className="w-full pl-12 pr-4 py-3 rounded-xl text-heading placeholder-subtle focus:ring-2 focus:ring-inverted focus:outline-none" />
           </div>
         </div>
       </div>
@@ -251,22 +250,20 @@ export default function FAQPage() {
           {/* Category Sidebar */}
           {!searchQuery && (
             <div className="lg:w-64 flex-shrink-0">
-              <div className="bg-white rounded-xl shadow-sm p-4 sticky top-24">
-                <h3 className="font-semibold text-gray-900 mb-4">{t('faq.categories')}</h3>
+              <div className="bg-surface-elevated rounded-xl shadow-sm p-4 sticky top-24">
+                <h3 className="font-semibold text-heading mb-4">{t('faq.categories')}</h3>
                 <nav className="space-y-1">
                   {FAQ_CATEGORIES_LOCALIZED.map((category) => (
-                    <button
-                      key={category.id}
+                    <Button variant="secondary" key={category.id}
                       onClick={() => setActiveCategory(category.id)}
                       className={`w-full flex items-center gap-3 px-3 py-2 rounded-lg text-left transition-colors ${
                         activeCategory === category.id
                           ? 'bg-primary-50 text-primary-600'
-                          : 'text-gray-600 hover:bg-gray-50'
-                      }`}
-                    >
+                          : 'text-muted hover:bg-surface'
+                      }`}>
                       <span className="text-xl">{category.icon}</span>
                       <span className="font-medium">{category.title}</span>
-                    </button>
+                    </Button>
                   ))}
                 </nav>
               </div>
@@ -277,7 +274,7 @@ export default function FAQPage() {
           <div className="flex-1">
             {activeData.map((category) => (
               <div key={category.id} className="mb-8">
-                <h2 className="text-xl font-semibold text-gray-900 mb-4 flex items-center gap-2">
+                <h2 className="text-xl font-semibold text-heading mb-4 flex items-center gap-2">
                   <span className="text-2xl">{category.icon}</span>
                   {category.title}
                 </h2>
@@ -289,21 +286,19 @@ export default function FAQPage() {
                     return (
                       <div
                         key={questionId}
-                        className="bg-white rounded-xl shadow-sm overflow-hidden"
+                        className="bg-surface-elevated rounded-xl shadow-sm overflow-hidden"
                       >
-                        <button
-                          onClick={() => toggleQuestion(questionId)}
-                          className="w-full flex items-center justify-between p-4 text-left hover:bg-gray-50 transition-colors"
-                        >
-                          <span className="font-medium text-gray-900 pr-4">
+                        <Button variant="secondary" onClick={() => toggleQuestion(questionId)}
+                          className="w-full flex items-center justify-between p-4 text-left hover:bg-surface transition-colors">
+                          <span className="font-medium text-heading pr-4">
                             {faq.question}
                           </span>
                           <ChevronDownIcon
-                            className={`w-5 h-5 text-gray-400 flex-shrink-0 transition-transform ${
+                            className={`w-5 h-5 text-subtle flex-shrink-0 transition-transform ${
                               isOpen ? 'rotate-180' : ''
                             }`}
                           />
-                        </button>
+                        </Button>
                         <AnimatePresence>
                           {isOpen && (
                             <motion.div
@@ -312,7 +307,7 @@ export default function FAQPage() {
                               exit={{ height: 0, opacity: 0 }}
                               transition={{ duration: 0.2 }}
                             >
-                              <div className="px-4 pb-4 text-gray-600 border-t border-gray-100 pt-3">
+                              <div className="px-4 pb-4 text-muted border-t border-border-subtle pt-3">
                                 {faq.answer}
                               </div>
                             </motion.div>
@@ -327,7 +322,7 @@ export default function FAQPage() {
 
             {searchQuery && filteredCategories.length === 0 && (
               <div className="text-center py-12">
-                <p className="text-gray-500 mb-4">
+                <p className="text-muted mb-4">
                   "{searchQuery}" {t('faq.noResults')}
                 </p>
                 <Link href="/contact" className="text-primary-500 hover:underline">
@@ -339,7 +334,7 @@ export default function FAQPage() {
         </div>
 
         {/* Contact CTA */}
-        <div className="mt-12 bg-gradient-to-r from-primary-500 to-primary-600 rounded-2xl p-8 text-center text-white">
+        <div className="mt-12 bg-gradient-to-r from-primary-500 to-primary-600 rounded-2xl p-8 text-center text-inverted">
           <h3 className="text-2xl font-bold mb-2">{t('faq.stillHaveQuestions')}</h3>
           <p className="text-primary-100 mb-6">
             {t('faq.supportTeamHappy')}
@@ -347,13 +342,13 @@ export default function FAQPage() {
           <div className="flex flex-wrap justify-center gap-4">
             <Link
               href="/contact"
-              className="px-6 py-3 bg-white text-primary-600 rounded-xl font-semibold hover:bg-primary-50 transition-colors"
+              className="px-6 py-3 bg-surface-elevated text-primary-600 rounded-xl font-semibold hover:bg-primary-50 transition-colors"
             >
               {t('faq.contactUs')}
             </Link>
             <Link
               href="/help"
-              className="px-6 py-3 bg-primary-400 text-white rounded-xl font-semibold hover:bg-primary-300 transition-colors"
+              className="px-6 py-3 bg-primary-400 text-inverted rounded-xl font-semibold hover:bg-primary-300 transition-colors"
             >
               {t('faq.helpCenter')}
             </Link>

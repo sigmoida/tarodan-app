@@ -244,8 +244,19 @@ export const useCartStore = create<CartState>()(
           });
           
           if (!response.ok) {
-            const errorData = await response.json();
-            throw new Error(errorData.message || 'Sepete eklenirken hata oluştu');
+            let errorData: { message?: string | string[] } = {};
+            try {
+              errorData = await response.json();
+            } catch {
+              /* ignore */
+            }
+            const raw = errorData.message;
+            const text = Array.isArray(raw)
+              ? raw.join(', ')
+              : typeof raw === 'string'
+                ? raw
+                : `Sepete eklenirken hata oluştu (${response.status})`;
+            throw new Error(text);
           }
           
           const data: CartResponse = await response.json();

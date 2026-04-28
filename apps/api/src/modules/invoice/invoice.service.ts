@@ -217,7 +217,7 @@ export class InvoiceService {
       commission: Number(order.commissionAmount || 0),
       total: Number(order.totalAmount),
 
-      paymentMethod: order.payment?.provider ?? 'iyzico',
+      paymentMethod: order.payment?.provider ?? 'paytr',
       paymentDate: order.payment?.paidAt ?? order.payment?.createdAt,
 
       currency: 'TRY',

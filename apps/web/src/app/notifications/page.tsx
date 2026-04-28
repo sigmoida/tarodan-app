@@ -15,8 +15,10 @@ import {
 } from '@heroicons/react/24/outline';
 import { BellIcon as BellSolidIcon } from '@heroicons/react/24/solid';
 import toast from 'react-hot-toast';
+import { Button, Spinner } from '@tarodan/ui';
 import { api } from '@/lib/api';
 import { useAuthStore } from '@/stores/authStore';
+import AuthLoadingScreen from '@/components/AuthLoadingScreen';
 import { useTranslation } from '@/i18n';
 
 interface Notification {
@@ -71,16 +73,17 @@ export default function NotificationsPage() {
   const router = useRouter();
   const queryClient = useQueryClient();
   const { t, locale } = useTranslation();
-  const { isAuthenticated } = useAuthStore();
+  const { isAuthenticated, isLoading: authLoading } = useAuthStore();
   const [filter, setFilter] = useState<FilterType>('all');
   const [showFilters, setShowFilters] = useState(false);
 
   useEffect(() => {
+    if (authLoading) return;
     if (!isAuthenticated) {
       router.push('/login?redirect=/notifications');
       return;
     }
-  }, [isAuthenticated, router]);
+  }, [authLoading, isAuthenticated, router]);
 
   const notificationsQuery = useQuery({
     queryKey: ['notifications'],
@@ -91,7 +94,7 @@ export default function NotificationsPage() {
       const data = response.data.notifications || response.data.data || [];
       return data;
     },
-    enabled: isAuthenticated,
+    enabled: !authLoading && isAuthenticated,
     meta: { page: 'notifications' },
   });
   const notifications = notificationsQuery.data ?? [];
@@ -145,25 +148,28 @@ export default function NotificationsPage() {
     return date.toLocaleDateString(locale === 'en' ? 'en-US' : 'tr-TR');
   };
 
+  if (authLoading) {
+    return <AuthLoadingScreen />;
+  }
   if (!isAuthenticated) {
     return null;
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-b from-gray-50 to-gray-100">
+    <div className="min-h-screen bg-gradient-to-b from-surface to-surface-alt">
       {/* Header */}
-      <div className="bg-white border-b border-gray-200 sticky top-0 z-10">
+      <div className="bg-surface-elevated border-b border-border sticky top-0 z-10">
         <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-4">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-3">
-              <div className="w-12 h-12 bg-gradient-to-br from-orange-400 to-orange-600 rounded-xl flex items-center justify-center">
-                <BellSolidIcon className="w-6 h-6 text-white" />
+              <div className="w-12 h-12 bg-gradient-to-br from-primary-400 to-primary-600 rounded-xl flex items-center justify-center">
+                <BellSolidIcon className="w-6 h-6 text-inverted" />
               </div>
               <div>
-                <h1 className="text-xl font-bold text-gray-900">
+                <h1 className="text-xl font-bold text-heading">
                   {locale === 'en' ? 'Notifications' : 'Bildirimler'}
                 </h1>
-                <p className="text-sm text-gray-500">
+                <p className="text-sm text-muted">
                   {unreadCount > 0
                     ? locale === 'en'
                       ? `${unreadCount} unread`
@@ -177,24 +183,20 @@ export default function NotificationsPage() {
 
             <div className="flex items-center gap-2">
               {unreadCount > 0 && (
-                <button
-                  onClick={markAllAsRead}
-                  className="flex items-center gap-1.5 px-3 py-2 text-sm font-medium text-orange-600 hover:bg-orange-50 rounded-lg transition-colors"
-                >
+                <Button variant="secondary" onClick={markAllAsRead}
+                  className="flex items-center gap-1.5 px-3 py-2 text-sm font-medium text-primary-600 hover:bg-primary-50 rounded-lg transition-colors">
                   <CheckCircleIcon className="w-4 h-4" />
                   <span className="hidden sm:inline">
                     {locale === 'en' ? 'Mark all read' : 'Tümünü oku'}
                   </span>
-                </button>
+                </Button>
               )}
-              <button
-                onClick={() => setShowFilters(!showFilters)}
+              <Button variant="secondary" onClick={() => setShowFilters(!showFilters)}
                 className={`p-2 rounded-lg transition-colors ${
-                  showFilters ? 'bg-orange-100 text-orange-600' : 'hover:bg-gray-100 text-gray-600'
-                }`}
-              >
+                  showFilters ? 'bg-primary-100 text-primary-600' : 'hover:bg-surface-alt text-muted'
+                }`}>
                 <FunnelIcon className="w-5 h-5" />
-              </button>
+              </Button>
             </div>
           </div>
 
@@ -209,22 +211,20 @@ export default function NotificationsPage() {
               >
                 <div className="flex flex-wrap gap-2 pt-4">
                   {(Object.keys(FILTER_LABELS) as FilterType[]).map((filterKey) => (
-                    <button
-                      key={filterKey}
+                    <Button variant="secondary" key={filterKey}
                       onClick={() => setFilter(filterKey)}
                       className={`px-3 py-1.5 text-sm font-medium rounded-full transition-colors ${
                         filter === filterKey
-                          ? 'bg-orange-500 text-white'
-                          : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
-                      }`}
-                    >
+                          ? 'bg-primary-500 text-inverted'
+                          : 'bg-surface-alt text-muted hover:bg-border-subtle'
+                      }`}>
                       {FILTER_LABELS[filterKey][locale as 'tr' | 'en']}
                       {filterKey === 'unread' && unreadCount > 0 && (
-                        <span className="ml-1.5 px-1.5 py-0.5 text-xs bg-white/20 rounded-full">
+                        <span className="ml-1.5 px-1.5 py-0.5 text-xs bg-surface-elevated/20 rounded-full">
                           {unreadCount}
                         </span>
                       )}
-                    </button>
+                    </Button>
                   ))}
                 </div>
               </motion.div>
@@ -237,19 +237,19 @@ export default function NotificationsPage() {
       <main className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
         {loading ? (
           <div className="flex flex-col items-center justify-center py-16">
-            <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-orange-500 mb-4"></div>
-            <p className="text-gray-500">{locale === 'en' ? 'Loading...' : 'Yükleniyor...'}</p>
+            <Spinner size="xl" color="border-primary-500 border-t-transparent" className="mb-4" />
+            <p className="text-muted">{locale === 'en' ? 'Loading...' : 'Yükleniyor...'}</p>
           </div>
         ) : filteredNotifications.length === 0 ? (
           <motion.div
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
-            className="text-center py-16 bg-white rounded-2xl shadow-sm"
+            className="text-center py-16 bg-surface-elevated rounded-2xl shadow-sm"
           >
-            <div className="w-20 h-20 bg-gray-100 rounded-full flex items-center justify-center mx-auto mb-4">
-              <BellIcon className="w-10 h-10 text-gray-400" />
+            <div className="w-20 h-20 bg-surface-alt rounded-full flex items-center justify-center mx-auto mb-4">
+              <BellIcon className="w-10 h-10 text-subtle" />
             </div>
-            <h3 className="text-lg font-semibold text-gray-900 mb-2">
+            <h3 className="text-lg font-semibold text-heading mb-2">
               {filter === 'unread'
                 ? locale === 'en'
                   ? 'No unread notifications'
@@ -258,7 +258,7 @@ export default function NotificationsPage() {
                 ? 'No notifications yet'
                 : 'Henüz bildirim yok'}
             </h3>
-            <p className="text-gray-500 max-w-sm mx-auto">
+            <p className="text-muted max-w-sm mx-auto">
               {locale === 'en'
                 ? 'When you receive notifications, they will appear here.'
                 : 'Bildirimleriniz burada görünecek.'}
@@ -272,13 +272,13 @@ export default function NotificationsPage() {
                 initial={{ opacity: 0, y: 10 }}
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ delay: index * 0.03 }}
-                className={`relative bg-white rounded-xl shadow-sm overflow-hidden transition-all hover:shadow-md ${
-                  !notification.isRead ? 'ring-2 ring-orange-200' : ''
+                className={`relative bg-surface-elevated rounded-xl shadow-sm overflow-hidden transition-all hover:shadow-md ${
+                  !notification.isRead ? 'ring-2 ring-primary-200' : ''
                 }`}
               >
                 {/* Unread indicator */}
                 {!notification.isRead && (
-                  <div className="absolute left-0 top-0 bottom-0 w-1 bg-gradient-to-b from-orange-400 to-orange-600" />
+                  <div className="absolute left-0 top-0 bottom-0 w-1 bg-gradient-to-b from-primary-400 to-primary-600" />
                 )}
 
                 <div className="p-4 pl-5">
@@ -287,8 +287,8 @@ export default function NotificationsPage() {
                     <div
                       className={`flex-shrink-0 w-10 h-10 rounded-full flex items-center justify-center text-xl ${
                         !notification.isRead
-                          ? 'bg-orange-100'
-                          : 'bg-gray-100'
+                          ? 'bg-primary-100'
+                          : 'bg-surface-alt'
                       }`}
                     >
                       {notification.icon || notification.data?.icon || '🔔'}
@@ -300,32 +300,30 @@ export default function NotificationsPage() {
                         <div className="flex-1">
                           <h3
                             className={`font-medium ${
-                              !notification.isRead ? 'text-gray-900' : 'text-gray-700'
+                              !notification.isRead ? 'text-heading' : 'text-body'
                             }`}
                           >
                             {notification.title}
                           </h3>
-                          <p className="text-sm text-gray-500 mt-0.5 line-clamp-2">
+                          <p className="text-sm text-muted mt-0.5 line-clamp-2">
                             {notification.message}
                           </p>
                         </div>
 
                         <div className="flex items-center gap-2 flex-shrink-0">
-                          <span className="text-xs text-gray-400 whitespace-nowrap">
+                          <span className="text-xs text-subtle whitespace-nowrap">
                             {getTimeAgo(notification.createdAt)}
                           </span>
                           {!notification.isRead && (
-                            <button
-                              onClick={(e) => {
+                            <Button variant="secondary" onClick={(e) => {
                                 e.preventDefault();
                                 e.stopPropagation();
                                 markAsRead(notification.id);
                               }}
-                              className="p-1 text-gray-400 hover:text-orange-500 transition-colors"
-                              title={locale === 'en' ? 'Mark as read' : 'Okundu işaretle'}
-                            >
+                              className="p-1 text-subtle hover:text-primary-500 transition-colors"
+                              title={locale === 'en' ? 'Mark as read' : 'Okundu işaretle'}>
                               <CheckIcon className="w-4 h-4" />
-                            </button>
+                            </Button>
                           )}
                         </div>
                       </div>
@@ -339,7 +337,7 @@ export default function NotificationsPage() {
                               markAsRead(notification.id);
                             }
                           }}
-                          className="inline-flex items-center gap-1 text-sm text-orange-500 hover:text-orange-600 font-medium mt-2"
+                          className="inline-flex items-center gap-1 text-sm text-primary-500 hover:text-primary-600 font-medium mt-2"
                         >
                           {locale === 'en' ? 'View details' : 'Detayları gör'}
                           <span>→</span>

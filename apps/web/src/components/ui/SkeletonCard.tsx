@@ -5,7 +5,7 @@ interface SkeletonCardProps {
 export default function SkeletonCard({ layout = 'grid' }: SkeletonCardProps) {
   if (layout === 'list') {
     return (
-      <div className="bg-white rounded-md border border-gray-100 flex gap-4 p-4 animate-pulse">
+      <div className="bg-surface-elevated rounded-md border border-border-subtle flex gap-4 p-4 animate-pulse">
         <div className="w-32 h-32 flex-shrink-0 skeleton rounded-lg" />
         <div className="flex-1 space-y-3 py-1">
           <div className="skeleton h-4 w-3/4 rounded" />
@@ -17,7 +17,7 @@ export default function SkeletonCard({ layout = 'grid' }: SkeletonCardProps) {
   }
 
   return (
-    <div className="bg-white rounded-md border border-gray-100 overflow-hidden">
+    <div className="bg-surface-elevated rounded-md border border-border-subtle overflow-hidden">
       <div className="aspect-square skeleton" />
       <div className="p-3 space-y-2.5">
         <div className="skeleton h-4 w-3/4 rounded" />

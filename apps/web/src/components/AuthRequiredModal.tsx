@@ -2,7 +2,8 @@
 
 import { useRouter } from 'next/navigation';
 import { XMarkIcon, UserIcon, UserPlusIcon } from '@heroicons/react/24/outline';
-import { useTranslation } from '@/i18n/LanguageContext';
+import { useTranslation } from '@/i18n/LanguageContext';import { Button } from '@tarodan/ui';
+
 
 interface AuthRequiredModalProps {
   isOpen: boolean;
@@ -42,63 +43,57 @@ export default function AuthRequiredModal({
     <div className="fixed inset-0 z-[200] flex items-center justify-center px-4 py-6 overflow-y-auto">
       {/* Backdrop */}
       <div 
-        className="fixed inset-0 bg-black/60 backdrop-blur-sm"
+        className="fixed inset-0 bg-heading/60 backdrop-blur-sm"
         onClick={onClose}
       />
       
       {/* Modal */}
-      <div className="relative bg-white shadow-2xl max-w-sm sm:max-w-md w-full mx-auto overflow-hidden" style={{borderRadius:'6px'}}>
+      <div className="relative bg-surface-elevated shadow-2xl max-w-sm sm:max-w-md w-full mx-auto overflow-hidden" style={{borderRadius:'6px'}}>
         {/* Close button */}
-        <button
-          onClick={onClose}
-          className="absolute top-3 right-3 p-1.5 hover:bg-gray-100 transition-colors z-10"
-          style={{borderRadius:'4px'}}
-        >
-          <XMarkIcon className="w-5 h-5 text-gray-400" />
-        </button>
+        <Button variant="secondary" onClick={onClose}
+          className="absolute top-3 right-3 p-1.5 hover:bg-surface-alt transition-colors z-10"
+          style={{borderRadius:'4px'}}>
+          <XMarkIcon className="w-5 h-5 text-subtle" />
+        </Button>
 
         {/* Content */}
         <div className="p-6 sm:p-8 text-center">
           {/* Icon */}
-          <div className="w-16 h-16 mx-auto mb-5 bg-orange-50 flex items-center justify-center" style={{borderRadius:'50%'}}>
+          <div className="w-16 h-16 mx-auto mb-5 bg-primary-50 flex items-center justify-center" style={{borderRadius:'50%'}}>
             {icon || (
-              <UserIcon className="w-8 h-8 text-orange-500" />
+              <UserIcon className="w-8 h-8 text-primary-500" />
             )}
           </div>
 
           {/* Title */}
-          <h2 className="text-xl font-bold text-gray-900 mb-2">
+          <h2 className="text-xl font-bold text-heading mb-2">
             {title || t('auth.authRequired')}
           </h2>
 
           {/* Message */}
-          <p className="text-sm text-gray-600 mb-6">
+          <p className="text-sm text-muted mb-6">
             {message}
           </p>
 
           {/* Buttons */}
           <div className="space-y-2.5">
-            <button
-              onClick={handleLogin}
-              className="w-full py-2.5 px-4 bg-orange-500 text-white font-semibold text-sm hover:bg-orange-600 transition-colors flex items-center justify-center gap-2"
-              style={{borderRadius:'4px'}}
-            >
+            <Button variant="secondary" onClick={handleLogin}
+              className="w-full py-2.5 px-4 bg-primary-500 text-inverted font-semibold text-sm hover:bg-primary-600 transition-colors flex items-center justify-center gap-2"
+              style={{borderRadius:'4px'}}>
               <UserIcon className="w-4 h-4" />
               {t('common.login')}
-            </button>
+            </Button>
             
-            <button
-              onClick={handleRegister}
-              className="w-full py-2.5 px-4 bg-gray-100 text-gray-800 font-semibold text-sm hover:bg-gray-200 transition-colors flex items-center justify-center gap-2"
-              style={{borderRadius:'4px'}}
-            >
+            <Button variant="secondary" onClick={handleRegister}
+              className="w-full py-2.5 px-4 bg-surface-alt text-body font-semibold text-sm hover:bg-border-subtle transition-colors flex items-center justify-center gap-2"
+              style={{borderRadius:'4px'}}>
               <UserPlusIcon className="w-4 h-4" />
               {t('auth.freeSignUp')}
-            </button>
+            </Button>
           </div>
 
           {/* Benefits hint */}
-          <p className="mt-5 text-xs text-gray-500">
+          <p className="mt-5 text-xs text-muted">
             {t('auth.memberBenefits')}
           </p>
         </div>

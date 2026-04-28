@@ -22,7 +22,7 @@ export const TarodanLightTheme = {
     outline: TarodanColors.border,
     outlineVariant: TarodanColors.borderLight,
   },
-  roundness: 12,
+  roundness: 2,
 };
 
 export const TarodanDarkTheme = {
@@ -46,7 +46,7 @@ export const TarodanDarkTheme = {
     outline: '#404040',
     outlineVariant: '#333333',
   },
-  roundness: 12,
+  roundness: 2,
 };
 
 export { TarodanColors, SCALES, BRANDS, CONDITIONS } from './colors';

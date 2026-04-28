@@ -14,6 +14,16 @@ interface UserBlock {
   createdAt: Date;
 }
 
+/** Edge case 1.11: allow address delete only when no open order references it as shipping (terminal orders keep JSON snapshot). */
+const ADDRESS_DELETE_BLOCKED_ORDER_STATUSES: OrderStatus[] = [
+  OrderStatus.pending_payment,
+  OrderStatus.paid,
+  OrderStatus.preparing,
+  OrderStatus.shipped,
+  OrderStatus.delivered,
+  OrderStatus.refund_requested,
+];
+
 @Injectable()
 export class UserService {
   private readonly logger = new Logger(UserService.name);
@@ -661,6 +671,19 @@ export class UserService {
 
     if (!address) {
       throw new NotFoundException('Adres bulunamadı');
+    }
+
+    const openOrdersUsingAddress = await this.prisma.order.count({
+      where: {
+        buyerId: userId,
+        shippingAddressId: addressId,
+        status: { in: ADDRESS_DELETE_BLOCKED_ORDER_STATUSES },
+      },
+    });
+    if (openOrdersUsingAddress > 0) {
+      throw new BadRequestException(
+        'Bu teslimat adresine bağlı devam eden siparişleriniz var. Sipariş tamamlanana veya iptal edilene kadar adresi silemezsiniz.',
+      );
     }
 
     await this.prisma.address.delete({
@@ -2038,5 +2061,50 @@ export class UserService {
       const v = c === 'x' ? r : (r & 0x3) | 0x8;
       return v.toString(16);
     });
+  }
+
+  // -------- Seller Bank Account --------
+
+  async getBankAccount(userId: string) {
+    return this.prisma.sellerBankAccount.findUnique({
+      where: { userId },
+    });
+  }
+
+  async upsertBankAccount(
+    userId: string,
+    data: { accountHolder: string; iban: string; tcKimlikNo?: string; taxId?: string },
+  ) {
+    const normalizedIban = data.iban.replace(/\s/g, '').toUpperCase();
+
+    return this.prisma.sellerBankAccount.upsert({
+      where: { userId },
+      create: {
+        userId,
+        accountHolder: data.accountHolder.trim(),
+        iban: normalizedIban,
+        tcKimlikNo: data.tcKimlikNo || null,
+        taxId: data.taxId || null,
+      },
+      update: {
+        accountHolder: data.accountHolder.trim(),
+        iban: normalizedIban,
+        tcKimlikNo: data.tcKimlikNo || null,
+        taxId: data.taxId || null,
+        isVerified: false,
+        verifiedAt: null,
+      },
+    });
+  }
+
+  async deleteBankAccount(userId: string) {
+    const existing = await this.prisma.sellerBankAccount.findUnique({
+      where: { userId },
+    });
+    if (!existing) {
+      throw new NotFoundException('Banka hesabı bulunamadı');
+    }
+    await this.prisma.sellerBankAccount.delete({ where: { userId } });
+    return { success: true };
   }
 }

@@ -4,6 +4,7 @@ import { useState, useEffect } from 'react';
 import { adminApi } from '@/lib/api';
 import { PencilIcon } from '@heroicons/react/24/outline';
 import toast from 'react-hot-toast';
+import { Button, Checkbox, Input, Spinner, Textarea } from '@tarodan/ui';
 
 interface MembershipTier {
   id: string;
@@ -122,19 +123,19 @@ export default function MembershipTiersPage() {
       <div className="space-y-6">
         {/* Header */}
         <div>
-          <h1 className="text-2xl font-bold text-gray-900">Üyelik Seviyeleri</h1>
-          <p className="text-gray-500 mt-1">Üyelik seviyelerini yönetin</p>
+          <h1 className="text-2xl font-bold text-heading">Üyelik Seviyeleri</h1>
+          <p className="text-muted mt-1">Üyelik seviyelerini yönetin</p>
         </div>
 
         {/* Tiers List */}
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
           {loading ? (
             <div className="col-span-full text-center py-12">
-              <div className="animate-spin rounded-full h-8 w-8 border-t-2 border-b-2 border-primary-500 mx-auto"></div>
-              <p className="text-gray-500 mt-4">Yükleniyor...</p>
+              <Spinner size="lg" className="mx-auto" />
+              <p className="text-muted mt-4">Yükleniyor...</p>
             </div>
           ) : tiers.length === 0 ? (
-            <div className="col-span-full text-center py-12 text-gray-500">
+            <div className="col-span-full text-center py-12 text-muted">
               Henüz üyelik seviyesi yok
             </div>
           ) : (
@@ -142,71 +143,69 @@ export default function MembershipTiersPage() {
               <div key={tier.id} className="admin-card">
                 <div className="flex items-start justify-between mb-4">
                   <div>
-                    <h3 className="text-lg font-semibold text-gray-900">{tier.name}</h3>
-                    <p className="text-sm text-gray-500 uppercase">{tier.type}</p>
+                    <h3 className="text-lg font-semibold text-heading">{tier.name}</h3>
+                    <p className="text-sm text-muted uppercase">{tier.type}</p>
                   </div>
-                  <button
-                    onClick={() => openEditModal(tier)}
-                    className="p-2 text-gray-500 hover:text-gray-900 hover:bg-gray-100 rounded-lg"
-                    title="Düzenle"
-                  >
+                  <Button variant="secondary" onClick={() => openEditModal(tier)}
+                    className="p-2 text-muted hover:text-heading hover:bg-surface-alt rounded-lg"
+                    title="Düzenle">
                     <PencilIcon className="h-5 w-5" />
-                  </button>
+                  </Button>
                 </div>
                 {tier.description && (
-                  <p className="text-sm text-gray-500 mb-4">{tier.description}</p>
+                  <p className="text-sm text-muted mb-4">{tier.description}</p>
                 )}
                 <div className="space-y-2 text-sm">
                   <div className="flex justify-between">
-                    <span className="text-gray-500">Aylık:</span>
-                    <span className="text-gray-900 font-medium">
+                    <span className="text-muted">Aylık:</span>
+                    <span className="text-heading font-medium">
                       ₺{tier.monthlyPrice.toLocaleString('tr-TR', { minimumFractionDigits: 2 })}
                     </span>
                   </div>
                   <div className="flex justify-between">
-                    <span className="text-gray-500">Yıllık:</span>
-                    <span className="text-gray-900 font-medium">
+                    <span className="text-muted">Yıllık:</span>
+                    <span className="text-heading font-medium">
                       ₺{tier.yearlyPrice.toLocaleString('tr-TR', { minimumFractionDigits: 2 })}
                     </span>
                   </div>
                   <div className="flex justify-between">
-                    <span className="text-gray-500">Ücretsiz İlan:</span>
-                    <span className="text-gray-900">{tier.maxFreeListings}</span>
+                    <span className="text-muted">Ücretsiz İlan:</span>
+                    <span className="text-heading">{tier.maxFreeListings}</span>
                   </div>
                   <div className="flex justify-between">
-                    <span className="text-gray-500">Toplam İlan:</span>
-                    <span className="text-gray-900">{tier.maxTotalListings}</span>
+                    <span className="text-muted">Toplam İlan:</span>
+                    <span className="text-heading">{tier.maxTotalListings}</span>
                   </div>
                   <div className="flex justify-between">
-                    <span className="text-gray-500">Görsel/İlan:</span>
-                    <span className="text-gray-900">{tier.maxImagesPerListing}</span>
+                    <span className="text-muted">Görsel/İlan:</span>
+                    <span className="text-heading">{tier.maxImagesPerListing}</span>
                   </div>
-                  <div className="pt-2 border-t border-gray-200">
+                  <div className="pt-2 border-t border-border">
                     <div className="flex justify-between">
-                      <span className="text-gray-500">Kullanıcı Sayısı:</span>
-                      <span className="text-gray-900 font-medium">{tier.userCount}</span>
+                      <span className="text-muted">Kullanıcı Sayısı:</span>
+                      <span className="text-heading font-medium">{tier.userCount}</span>
                     </div>
                   </div>
                 </div>
-                <div className="mt-4 pt-4 border-t border-gray-200">
+                <div className="mt-4 pt-4 border-t border-border">
                   <div className="flex flex-wrap gap-2">
                     {tier.canCreateCollections && (
-                      <span className="px-2 py-1 text-xs bg-green-50 text-green-700 rounded">
+                      <span className="px-2 py-1 text-xs bg-success-50 text-success-700 rounded">
                         Koleksiyon
                       </span>
                     )}
                     {tier.canTrade && (
-                      <span className="px-2 py-1 text-xs bg-blue-50 text-blue-700 rounded">
+                      <span className="px-2 py-1 text-xs bg-info-50 text-info-700 rounded">
                         Takas
                       </span>
                     )}
                     {tier.isAdFree && (
-                      <span className="px-2 py-1 text-xs bg-purple-50 text-purple-700 rounded">
+                      <span className="px-2 py-1 text-xs bg-primary-50 text-primary-700 rounded">
                         Reklamsız
                       </span>
                     )}
                     {!tier.isActive && (
-                      <span className="px-2 py-1 text-xs bg-gray-700 text-gray-500 rounded">
+                      <span className="px-2 py-1 text-xs bg-body text-muted rounded">
                         Pasif
                       </span>
                     )}
@@ -220,184 +219,152 @@ export default function MembershipTiersPage() {
 
       {/* Edit Modal */}
       {showModal && editingTier && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-          <div className="bg-white rounded-xl p-6 max-w-2xl w-full mx-4 border border-gray-200 max-h-[90vh] overflow-y-auto">
-            <h2 className="text-xl font-semibold text-gray-900 mb-4">Üyelik Seviyesi Düzenle</h2>
+        <div className="fixed inset-0 bg-heading bg-opacity-50 flex items-center justify-center z-50">
+          <div className="bg-surface-elevated rounded-xl p-6 max-w-2xl w-full mx-4 border border-border max-h-[90vh] overflow-y-auto">
+            <h2 className="text-xl font-semibold text-heading mb-4">Üyelik Seviyesi Düzenle</h2>
             <form onSubmit={handleSubmit} className="space-y-4">
               <div className="grid grid-cols-2 gap-4">
                 <div>
-                  <label className="block text-sm font-medium text-gray-600 mb-2">
+                  <label className="block text-sm font-medium text-muted mb-2">
                     Ad *
                   </label>
-                  <input
+                  <Input
                     type="text"
                     value={formData.name}
                     onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-                    className="admin-input w-full"
                     required
                   />
                 </div>
                 <div>
-                  <label className="block text-sm font-medium text-gray-600 mb-2">
+                  <label className="block text-sm font-medium text-muted mb-2">
                     Sıralama
                   </label>
-                  <input
+                  <Input
                     type="number"
                     value={formData.sortOrder}
                     onChange={(e) => setFormData({ ...formData, sortOrder: parseInt(e.target.value) || 0 })}
-                    className="admin-input w-full"
                   />
                 </div>
               </div>
               <div>
-                <label className="block text-sm font-medium text-gray-600 mb-2">
+                <label className="block text-sm font-medium text-muted mb-2">
                   Açıklama
                 </label>
-                <textarea
-                  value={formData.description}
+                <Textarea value={formData.description}
                   onChange={(e) => setFormData({ ...formData, description: e.target.value })}
-                  className="admin-input w-full"
-                  rows={2}
-                />
+                  rows={2} />
               </div>
               <div className="grid grid-cols-2 gap-4">
                 <div>
-                  <label className="block text-sm font-medium text-gray-600 mb-2">
+                  <label className="block text-sm font-medium text-muted mb-2">
                     Aylık Fiyat (₺)
                   </label>
-                  <input
+                  <Input
                     type="number"
                     step="0.01"
                     value={formData.monthlyPrice}
                     onChange={(e) => setFormData({ ...formData, monthlyPrice: parseFloat(e.target.value) || 0 })}
-                    className="admin-input w-full"
                   />
                 </div>
                 <div>
-                  <label className="block text-sm font-medium text-gray-600 mb-2">
+                  <label className="block text-sm font-medium text-muted mb-2">
                     Yıllık Fiyat (₺)
                   </label>
-                  <input
+                  <Input
                     type="number"
                     step="0.01"
                     value={formData.yearlyPrice}
                     onChange={(e) => setFormData({ ...formData, yearlyPrice: parseFloat(e.target.value) || 0 })}
-                    className="admin-input w-full"
                   />
                 </div>
               </div>
               <div className="grid grid-cols-3 gap-4">
                 <div>
-                  <label className="block text-sm font-medium text-gray-600 mb-2">
+                  <label className="block text-sm font-medium text-muted mb-2">
                     Ücretsiz İlan
                   </label>
-                  <input
+                  <Input
                     type="number"
                     value={formData.maxFreeListings}
                     onChange={(e) => setFormData({ ...formData, maxFreeListings: parseInt(e.target.value) || 0 })}
-                    className="admin-input w-full"
                   />
                 </div>
                 <div>
-                  <label className="block text-sm font-medium text-gray-600 mb-2">
+                  <label className="block text-sm font-medium text-muted mb-2">
                     Toplam İlan
                   </label>
-                  <input
+                  <Input
                     type="number"
                     value={formData.maxTotalListings}
                     onChange={(e) => setFormData({ ...formData, maxTotalListings: parseInt(e.target.value) || 0 })}
-                    className="admin-input w-full"
                   />
                 </div>
                 <div>
-                  <label className="block text-sm font-medium text-gray-600 mb-2">
+                  <label className="block text-sm font-medium text-muted mb-2">
                     Görsel/İlan
                   </label>
-                  <input
+                  <Input
                     type="number"
                     value={formData.maxImagesPerListing}
                     onChange={(e) => setFormData({ ...formData, maxImagesPerListing: parseInt(e.target.value) || 0 })}
-                    className="admin-input w-full"
                   />
                 </div>
               </div>
               <div className="grid grid-cols-2 gap-4">
                 <div>
-                  <label className="block text-sm font-medium text-gray-600 mb-2">
+                  <label className="block text-sm font-medium text-muted mb-2">
                     Öne Çıkan İlan Slotları
                   </label>
-                  <input
+                  <Input
                     type="number"
                     value={formData.featuredListingSlots}
                     onChange={(e) => setFormData({ ...formData, featuredListingSlots: parseInt(e.target.value) || 0 })}
-                    className="admin-input w-full"
                   />
                 </div>
                 <div>
-                  <label className="block text-sm font-medium text-gray-600 mb-2">
+                  <label className="block text-sm font-medium text-muted mb-2">
                     Komisyon İndirimi (%)
                   </label>
-                  <input
+                  <Input
                     type="number"
                     step="0.0001"
                     value={formData.commissionDiscount}
                     onChange={(e) => setFormData({ ...formData, commissionDiscount: parseFloat(e.target.value) || 0 })}
-                    className="admin-input w-full"
                   />
                 </div>
               </div>
               <div className="space-y-2">
-                <label className="flex items-center gap-2">
-                  <input
-                    type="checkbox"
-                    checked={formData.canCreateCollections}
-                    onChange={(e) => setFormData({ ...formData, canCreateCollections: e.target.checked })}
-                    className="w-4 h-4 rounded border-gray-600 bg-gray-100 text-primary-600"
-                  />
-                  <span className="text-sm text-gray-600">Koleksiyon Oluşturabilir</span>
-                </label>
-                <label className="flex items-center gap-2">
-                  <input
-                    type="checkbox"
-                    checked={formData.canTrade}
-                    onChange={(e) => setFormData({ ...formData, canTrade: e.target.checked })}
-                    className="w-4 h-4 rounded border-gray-600 bg-gray-100 text-primary-600"
-                  />
-                  <span className="text-sm text-gray-600">Takas Yapabilir</span>
-                </label>
-                <label className="flex items-center gap-2">
-                  <input
-                    type="checkbox"
-                    checked={formData.isAdFree}
-                    onChange={(e) => setFormData({ ...formData, isAdFree: e.target.checked })}
-                    className="w-4 h-4 rounded border-gray-600 bg-gray-100 text-primary-600"
-                  />
-                  <span className="text-sm text-gray-600">Reklamsız</span>
-                </label>
-                <label className="flex items-center gap-2">
-                  <input
-                    type="checkbox"
-                    checked={formData.isActive}
-                    onChange={(e) => setFormData({ ...formData, isActive: e.target.checked })}
-                    className="w-4 h-4 rounded border-gray-600 bg-gray-100 text-primary-600"
-                  />
-                  <span className="text-sm text-gray-600">Aktif</span>
-                </label>
+                <Checkbox
+                  checked={formData.canCreateCollections}
+                  onChange={(e) => setFormData({ ...formData, canCreateCollections: e.target.checked })}
+                  label="Koleksiyon Oluşturabilir"
+                />
+                <Checkbox
+                  checked={formData.canTrade}
+                  onChange={(e) => setFormData({ ...formData, canTrade: e.target.checked })}
+                  label="Takas Yapabilir"
+                />
+                <Checkbox
+                  checked={formData.isAdFree}
+                  onChange={(e) => setFormData({ ...formData, isAdFree: e.target.checked })}
+                  label="Reklamsız"
+                />
+                <Checkbox
+                  checked={formData.isActive}
+                  onChange={(e) => setFormData({ ...formData, isActive: e.target.checked })}
+                  label="Aktif"
+                />
               </div>
               <div className="flex gap-3 pt-4">
-                <button
-                  type="button"
+                <Button variant="secondary" type="button"
                   onClick={() => setShowModal(false)}
-                  className="flex-1 px-4 py-2 border border-gray-300 text-gray-600 rounded-lg hover:bg-gray-100 transition-colors"
-                >
+                  className="flex-1 px-4 text-muted hover:bg-surface-alt">
                   İptal
-                </button>
-                <button
-                  type="submit"
-                  className="flex-1 px-4 py-2 bg-primary-600 text-gray-900 rounded-lg hover:bg-primary-700 transition-colors"
-                >
+                </Button>
+                <Button variant="secondary" type="submit"
+                  className="flex-1 px-4 py-2 bg-primary-600 text-heading rounded-lg hover:bg-primary-700 transition-colors">
                   Güncelle
-                </button>
+                </Button>
               </div>
             </form>
           </div>

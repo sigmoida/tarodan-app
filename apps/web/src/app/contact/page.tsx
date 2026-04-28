@@ -3,7 +3,8 @@
 import { useState } from 'react';
 import toast from 'react-hot-toast';
 import { supportApi } from '@/lib/api';
-import { useTranslation } from '@/i18n';
+import { useTranslation } from '@/i18n';import { Button, Input, Textarea } from '@tarodan/ui';
+
 
 export default function ContactPage() {
   const { t } = useTranslation();
@@ -47,86 +48,76 @@ export default function ContactPage() {
   };
 
   return (
-    <div className="min-h-screen bg-gray-50">
+    <div className="min-h-screen bg-surface">
       <main className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
         <h1 className="text-3xl font-bold mb-2">{t('contact.title')}</h1>
-        <p className="text-gray-600 mb-8">{t('contact.subtitle')}</p>
+        <p className="text-muted mb-8">{t('contact.subtitle')}</p>
 
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 mb-8">
-          <div className="bg-white rounded-xl shadow-sm p-6">
-            <h2 className="font-semibold text-gray-900 mb-3">{t('information.contactInfo.title')}</h2>
-            <dl className="space-y-2 text-sm text-gray-700">
+          <div className="bg-surface-elevated rounded-xl shadow-sm p-6">
+            <h2 className="font-semibold text-heading mb-3">{t('information.contactInfo.title')}</h2>
+            <dl className="space-y-2 text-sm text-body">
               <div>
-                <dt className="text-gray-500">{t('information.contactInfo.email')}</dt>
-                <dd><a href={`mailto:${t('information.contactInfo.emailValue')}`} className="text-orange-600 hover:underline">{t('information.contactInfo.emailValue')}</a></dd>
+                <dt className="text-muted">{t('information.contactInfo.email')}</dt>
+                <dd><a href={`mailto:${t('information.contactInfo.emailValue')}`} className="text-primary-600 hover:underline">{t('information.contactInfo.emailValue')}</a></dd>
               </div>
               <div>
-                <dt className="text-gray-500">{t('information.contactInfo.phone')}</dt>
+                <dt className="text-muted">{t('information.contactInfo.phone')}</dt>
                 <dd>{t('information.contactInfo.phoneValue')}</dd>
               </div>
               <div>
-                <dt className="text-gray-500">{t('information.contactInfo.address')}</dt>
+                <dt className="text-muted">{t('information.contactInfo.address')}</dt>
                 <dd>{t('information.contactInfo.addressValue')}</dd>
               </div>
             </dl>
           </div>
-          <div className="lg:col-span-2 bg-white rounded-xl shadow-sm p-8">
+          <div className="lg:col-span-2 bg-surface-elevated rounded-xl shadow-sm p-8">
           <form onSubmit={handleSubmit} className="space-y-6">
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
+              <label className="block text-sm font-medium text-body mb-2">
                 {t('contact.name')}
               </label>
-              <input
-                type="text"
+              <Input type="text"
                 value={formData.name}
                 onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-                className="w-full px-4 py-3 border border-gray-300 rounded-lg"
-                required
-              />
+                className="px-4 py-3"
+                required />
             </div>
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
+              <label className="block text-sm font-medium text-body mb-2">
                 {t('contact.email')}
               </label>
-              <input
-                type="email"
+              <Input type="email"
                 value={formData.email}
                 onChange={(e) => setFormData({ ...formData, email: e.target.value })}
-                className="w-full px-4 py-3 border border-gray-300 rounded-lg"
-                required
-              />
+                className="px-4 py-3"
+                required />
             </div>
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
+              <label className="block text-sm font-medium text-body mb-2">
                 {t('contact.subject')}
               </label>
-              <input
-                type="text"
+              <Input type="text"
                 value={formData.subject}
                 onChange={(e) => setFormData({ ...formData, subject: e.target.value })}
-                className="w-full px-4 py-3 border border-gray-300 rounded-lg"
-                required
-              />
+                className="px-4 py-3"
+                required />
             </div>
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
+              <label className="block text-sm font-medium text-body mb-2">
                 {t('contact.message')}
               </label>
-              <textarea
-                value={formData.message}
+              <Textarea value={formData.message}
                 onChange={(e) => setFormData({ ...formData, message: e.target.value })}
-                className="w-full px-4 py-3 border border-gray-300 rounded-lg"
+                className="px-4 py-3"
                 rows={6}
-                required
-              />
+                required />
             </div>
-            <button
-              type="submit"
+            <Button variant="secondary" type="submit"
               disabled={isSubmitting}
-              className="w-full py-3 bg-primary-500 text-white rounded-lg hover:bg-primary-600 disabled:opacity-50 disabled:cursor-not-allowed"
-            >
+              className="w-full py-3 bg-primary-500 text-inverted rounded-lg hover:bg-primary-600 disabled:opacity-50 disabled:cursor-not-allowed">
               {isSubmitting ? t('contact.sending') : t('contact.send')}
-            </button>
+            </Button>
           </form>
           </div>
         </div>

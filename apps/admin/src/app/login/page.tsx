@@ -1,13 +1,14 @@
-'use client';
+"use client";
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect } from "react";
 
-import { useRouter } from 'next/navigation';
-import Image from 'next/image';
-import { useForm } from 'react-hook-form';
-import toast from 'react-hot-toast';
-import { useAuthStore } from '@/lib/stores/authStore';
-import { api } from '@/lib/api';
+import { useRouter } from "next/navigation";
+import Image from "next/image";
+import { useForm } from "react-hook-form";
+import toast from "react-hot-toast";
+import { useAuthStore } from "@/lib/stores/authStore";
+import { api } from "@/lib/api";
+import { Button, Input } from "@tarodan/ui";
 
 interface LoginForm {
   email: string;
@@ -17,16 +18,20 @@ interface LoginForm {
 
 export default function LoginPage() {
   const router = useRouter();
-  const { setUser, setToken, isAuthenticated, isLoading: isAuthLoading } = useAuthStore();
+  const {
+    setUser,
+    setToken,
+    isAuthenticated,
+    isLoading: isAuthLoading,
+  } = useAuthStore();
   const [isLoading, setIsLoading] = useState(false);
   const [requires2FA, setRequires2FA] = useState(false);
 
   useEffect(() => {
     if (!isAuthLoading && isAuthenticated) {
-      router.replace('/dashboard');
+      router.replace("/dashboard");
     }
   }, [isAuthenticated, isAuthLoading, router]);
-
 
   const {
     register,
@@ -37,7 +42,7 @@ export default function LoginPage() {
   const onSubmit = async (data: LoginForm) => {
     setIsLoading(true);
     try {
-      const response = await api.post('/auth/admin/login', {
+      const response = await api.post("/auth/admin/login", {
         email: data.email,
         password: data.password,
         ...(requires2FA && { twoFactorCode: data.twoFactorCode }),
@@ -45,7 +50,7 @@ export default function LoginPage() {
 
       if (response.data.requires2FA) {
         setRequires2FA(true);
-        toast.success('İki faktörlü doğrulama kodu gerekli');
+        toast.success("İki faktörlü doğrulama kodu gerekli");
         return;
       }
 
@@ -53,29 +58,31 @@ export default function LoginPage() {
         const accessToken = response.data.tokens.accessToken;
         setToken(accessToken);
         setUser(response.data.user);
-        if (typeof window !== 'undefined') {
-          localStorage.setItem('admin_token', accessToken);
-          localStorage.setItem('admin_user', JSON.stringify(response.data.user));
+        if (typeof window !== "undefined") {
+          localStorage.setItem("admin_token", accessToken);
+          localStorage.setItem(
+            "admin_user",
+            JSON.stringify(response.data.user),
+          );
           const maxAge = 24 * 60 * 60;
           document.cookie = `admin_token=${accessToken}; path=/; max-age=${maxAge}; SameSite=Lax`;
 
-          toast.success('Giriş başarılı!');
+          toast.success("Giriş başarılı!");
 
-          window.location.href = '/dashboard';
+          window.location.href = "/dashboard";
         }
       } else {
-        toast.error('Geçersiz yanıt formatı');
+        toast.error("Geçersiz yanıt formatı");
       }
-
     } catch (error: any) {
-      toast.error(error.response?.data?.message || 'Giriş başarısız');
+      toast.error(error.response?.data?.message || "Giriş başarısız");
     } finally {
       setIsLoading(false);
     }
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-gray-50 via-white to-gray-100 px-4">
+    <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-surface via-surface-elevated to-surface-alt px-4">
       <div className="max-w-md w-full">
         {/* Logo */}
         <div className="text-center mb-8">
@@ -85,82 +92,90 @@ export default function LoginPage() {
             width={200}
             height={65}
             className="mx-auto object-contain"
-            style={{ width: 'auto', height: 'auto', maxWidth: '100%', maxHeight: '65px' }}
+            style={{
+              width: "auto",
+              height: "auto",
+              maxWidth: "100%",
+              maxHeight: "65px",
+            }}
             priority
           />
-          <p className="text-gray-500 mt-2">Admin Panel</p>
+          <p className="text-muted mt-2">Admin Panel</p>
         </div>
 
         {/* Login Card */}
-        <div className="bg-white rounded-xl shadow-elevated p-8 border border-gray-200">
-          <h2 className="text-2xl font-semibold text-gray-900 mb-6">Giriş Yap</h2>
+        <div className="bg-surface-elevated rounded-xl shadow-elevated p-8 border border-border">
+          <h2 className="text-2xl font-semibold text-heading mb-6">
+            Giriş Yap
+          </h2>
 
           <form onSubmit={handleSubmit(onSubmit)} className="space-y-6">
             {/* Email */}
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
+              <label className="block text-sm font-medium text-body mb-2">
                 E-posta
               </label>
-              <input
+              <Input
                 type="email"
-                {...register('email', {
-                  required: 'E-posta gerekli',
+                {...register("email", {
+                  required: "E-posta gerekli",
                   pattern: {
                     value: /^[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}$/i,
-                    message: 'Geçerli bir e-posta girin',
+                    message: "Geçerli bir e-posta girin",
                   },
                 })}
-                className="admin-input"
                 placeholder="admin@tarodan.com"
               />
               {errors.email && (
-                <p className="mt-1 text-sm text-red-600">{errors.email.message}</p>
+                <p className="mt-1 text-sm text-danger-600">
+                  {errors.email.message}
+                </p>
               )}
             </div>
 
             {/* Password */}
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
+              <label className="block text-sm font-medium text-body mb-2">
                 Şifre
               </label>
-              <input
+              <Input
                 type="password"
-                {...register('password', {
-                  required: 'Şifre gerekli',
+                {...register("password", {
+                  required: "Şifre gerekli",
                   minLength: {
                     value: 6,
-                    message: 'Şifre en az 6 karakter olmalı',
+                    message: "Şifre en az 6 karakter olmalı",
                   },
                 })}
-                className="admin-input"
                 placeholder="••••••••"
               />
               {errors.password && (
-                <p className="mt-1 text-sm text-red-600">{errors.password.message}</p>
+                <p className="mt-1 text-sm text-danger-600">
+                  {errors.password.message}
+                </p>
               )}
             </div>
 
             {/* 2FA Code */}
             {requires2FA && (
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
+                <label className="block text-sm font-medium text-body mb-2">
                   Doğrulama Kodu
                 </label>
-                <input
+                <Input
                   type="text"
-                  {...register('twoFactorCode', {
-                    required: requires2FA ? 'Doğrulama kodu gerekli' : false,
+                  {...register("twoFactorCode", {
+                    required: requires2FA ? "Doğrulama kodu gerekli" : false,
                     pattern: {
                       value: /^\d{6}$/,
-                      message: '6 haneli kod girin',
+                      message: "6 haneli kod girin",
                     },
                   })}
-                  className="admin-input"
                   placeholder="000000"
                   maxLength={6}
                 />
                 {errors.twoFactorCode && (
-                  <p className="mt-1 text-sm text-red-600">
+                  <p className="mt-1 text-sm text-danger-600">
                     {errors.twoFactorCode.message}
                   </p>
                 )}
@@ -168,15 +183,15 @@ export default function LoginPage() {
             )}
 
             {/* Submit Button */}
-            <button
+            <Button
               type="submit"
               disabled={isLoading}
-              className="w-full btn-primary py-3 text-lg disabled:opacity-50 disabled:cursor-not-allowed"
+              className="w-full py-3 text-lg"
             >
               {isLoading ? (
                 <span className="flex items-center justify-center">
                   <svg
-                    className="animate-spin -ml-1 mr-3 h-5 w-5 text-white"
+                    className="animate-spin -ml-1 mr-3 h-5 w-5 text-inverted"
                     xmlns="http://www.w3.org/2000/svg"
                     fill="none"
                     viewBox="0 0 24 24"
@@ -198,14 +213,14 @@ export default function LoginPage() {
                   Giriş yapılıyor...
                 </span>
               ) : (
-                'Giriş Yap'
+                "Giriş Yap"
               )}
-            </button>
+            </Button>
           </form>
         </div>
 
         {/* Footer */}
-        <p className="text-center text-gray-500 text-sm mt-6">
+        <p className="text-center text-muted text-sm mt-6">
           © 2026 Tarodan Marketplace. Tüm hakları saklıdır.
         </p>
       </div>

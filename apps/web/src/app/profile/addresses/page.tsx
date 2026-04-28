@@ -8,8 +8,10 @@ import { PlusIcon, PencilIcon, TrashIcon, CheckIcon } from '@heroicons/react/24/
 import toast from 'react-hot-toast';
 import { addressesApi } from '@/lib/api';
 import { useAuthStore } from '@/stores/authStore';
+import AuthLoadingScreen from '@/components/AuthLoadingScreen';
 import CityDistrictSelector from '@/components/CityDistrictSelector';
 import { useTranslation } from '@/i18n/LanguageContext';
+import { Button, Checkbox, Input, Textarea } from '@tarodan/ui';
 
 interface Address {
   id: string;
@@ -26,7 +28,7 @@ interface Address {
 export default function AddressesPage() {
   const router = useRouter();
   const queryClient = useQueryClient();
-  const { isAuthenticated } = useAuthStore();
+  const { isAuthenticated, isLoading: authLoading } = useAuthStore();
   const { t, locale } = useTranslation();
   const [showForm, setShowForm] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
@@ -42,11 +44,12 @@ export default function AddressesPage() {
   });
 
   useEffect(() => {
+    if (authLoading) return;
     if (!isAuthenticated) {
       router.push('/login?redirect=/profile/addresses');
       return;
     }
-  }, [isAuthenticated, router]);
+  }, [authLoading, isAuthenticated, router]);
 
   const addressesQuery = useQuery({
     queryKey: ['profile-addresses'],
@@ -54,7 +57,7 @@ export default function AddressesPage() {
       const response = await addressesApi.getAll();
       return response.data.data || response.data || [];
     },
-    enabled: isAuthenticated,
+    enabled: !authLoading && isAuthenticated,
     meta: { page: 'profile-addresses' },
   });
   const addresses = addressesQuery.data ?? [];
@@ -166,14 +169,21 @@ export default function AddressesPage() {
     });
   };
 
+  if (authLoading) {
+    return <AuthLoadingScreen />;
+  }
+  if (!isAuthenticated) {
+    return null;
+  }
+
   if (isLoading) {
     return (
-      <div className="min-h-screen bg-gray-50">
+      <div className="min-h-screen bg-surface">
         <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
           <div className="animate-pulse space-y-4">
-            <div className="h-8 bg-gray-200 rounded w-1/3" />
+            <div className="h-8 bg-border-subtle rounded w-1/3" />
             {[...Array(3)].map((_, i) => (
-              <div key={i} className="h-32 bg-gray-200 rounded" />
+              <div key={i} className="h-32 bg-border-subtle rounded" />
             ))}
           </div>
         </div>
@@ -182,54 +192,52 @@ export default function AddressesPage() {
   }
 
   return (
-    <div className="min-h-screen bg-gray-50">
+    <div className="min-h-screen bg-surface">
       <main className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         <div className="flex items-center justify-between mb-8">
           <div>
             <h1 className="text-3xl font-bold mb-2">{t('address.myAddresses')}</h1>
-            <p className="text-gray-600">{t('address.manageAddresses')}</p>
+            <p className="text-muted">{t('address.manageAddresses')}</p>
           </div>
           {addresses.length >= 3 ? (
             <div className="text-right">
-              <p className="text-sm text-orange-600 font-medium mb-1">
+              <p className="text-sm text-primary-600 font-medium mb-1">
                 {locale === 'en' ? 'Address limit reached (3/3)' : 'Adres limiti doldu (3/3)'}
               </p>
-              <p className="text-xs text-gray-500">
+              <p className="text-xs text-muted">
                 {locale === 'en' 
                   ? 'Delete an address to add a new one' 
                   : 'Yeni adres eklemek için bir adres silin'}
               </p>
             </div>
           ) : (
-            <button
-              onClick={() => {
+            <Button variant="secondary" onClick={() => {
                 resetForm();
                 setEditingId(null);
                 setShowForm(true);
               }}
-              className="flex items-center gap-2 px-6 py-3 bg-primary-500 text-white rounded hover:bg-primary-600"
-            >
+              className="flex items-center gap-2 px-6 py-3 bg-primary-500 text-inverted rounded hover:bg-primary-600">
               <PlusIcon className="w-5 h-5" />
               {t('address.newAddress')}
-              <span className="text-xs bg-white/20 px-2 py-0.5 rounded-sm">
+              <span className="text-xs bg-surface-elevated/20 px-2 py-0.5 rounded-sm">
                 {addresses.length}/3
               </span>
-            </button>
+            </Button>
           )}
         </div>
 
         {/* Address Limit Warning */}
         {addresses.length >= 3 && !showForm && (
-          <div className="bg-orange-50 border border-orange-200 rounded p-4 mb-6">
+          <div className="bg-primary-50 border border-primary-200 rounded p-4 mb-6">
             <div className="flex items-center gap-3">
               <span className="text-2xl">📍</span>
               <div>
-                <p className="font-medium text-orange-800">
+                <p className="font-medium text-primary-800">
                   {locale === 'en' 
                     ? 'You have reached the maximum address limit' 
                     : 'Maksimum adres limitine ulaştınız'}
                 </p>
-                <p className="text-sm text-orange-700">
+                <p className="text-sm text-primary-700">
                   {locale === 'en' 
                     ? 'You can save up to 3 addresses. To add a new address, please delete one of your existing addresses first.'
                     : '3 adet adres kaydedebilirsiniz. Yeni bir adres eklemek için mevcut adreslerinizden birini silmeniz gerekmektedir.'}
@@ -243,48 +251,48 @@ export default function AddressesPage() {
           <motion.div
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
-            className="bg-white rounded shadow-sm p-6 mb-6"
+            className="bg-surface-elevated rounded shadow-sm p-6 mb-6"
           >
             <h2 className="text-xl font-semibold mb-4">
               {editingId ? t('address.editAddress') : t('address.addNewAddress')}
             </h2>
             <form onSubmit={handleSubmit} className="space-y-4">
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
+                <label className="block text-sm font-medium text-body mb-1">
                   {t('address.addressTitle')}
                 </label>
-                <input
+                <Input
                   type="text"
                   value={formData.title}
                   onChange={(e) => setFormData({ ...formData, title: e.target.value })}
-                  className="w-full px-4 py-2 border border-gray-300 rounded"
+                  className="rounded"
                   placeholder={locale === 'en' ? 'Home, Work, etc.' : 'Ev, İş, vb.'}
                 />
               </div>
 
               <div className="grid md:grid-cols-2 gap-4">
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
-                    {t('checkout.fullName')} <span className="text-red-500">*</span>
+                  <label className="block text-sm font-medium text-body mb-1">
+                    {t('checkout.fullName')} <span className="text-danger-500">*</span>
                   </label>
-                  <input
+                  <Input
                     type="text"
                     value={formData.fullName}
                     onChange={(e) => setFormData({ ...formData, fullName: e.target.value })}
-                    className="w-full px-4 py-2 border border-gray-300 rounded"
+                    className="rounded"
                     required
                   />
                 </div>
 
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
-                    {t('checkout.phone')} <span className="text-red-500">*</span>
+                  <label className="block text-sm font-medium text-body mb-1">
+                    {t('checkout.phone')} <span className="text-danger-500">*</span>
                   </label>
                   <div className="flex">
-                    <span className="inline-flex items-center px-3 bg-gray-100 border border-r-0 border-gray-300 rounded-l text-gray-500 text-sm font-medium">
+                    <span className="inline-flex items-center bg-surface-alt border-r-0 rounded-l text-muted font-medium">
                       +90
                     </span>
-                    <input
+                    <Input
                       type="tel"
                       value={formData.phone.replace('+90', '').replace(/\s/g, '').slice(0, 10).replace(/(\d{3})(\d{3})(\d{2})(\d{2})/, '$1 $2 $3 $4').trim()}
                       onChange={(e) => {
@@ -294,19 +302,19 @@ export default function AddressesPage() {
                       }}
                       placeholder="5XX XXX XX XX"
                       maxLength={14}
-                      className="w-full px-4 py-2 border border-gray-300 rounded-r"
+                      className="rounded-r rounded-l-none"
                       required
                     />
                   </div>
-                  <p className="text-xs text-gray-500 mt-1">
+                  <p className="text-xs text-muted mt-1">
                     {locale === 'en' ? '10 digits without country code' : '10 rakam (ülke kodu olmadan)'}
                   </p>
                 </div>
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  {t('address.cityDistrict')} <span className="text-red-500">*</span>
+                <label className="block text-sm font-medium text-body mb-1">
+                  {t('address.cityDistrict')} <span className="text-danger-500">*</span>
                 </label>
                 <CityDistrictSelector
                   city={formData.city}
@@ -319,78 +327,66 @@ export default function AddressesPage() {
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  {t('common.address')} <span className="text-red-500">*</span>
+                <label className="block text-sm font-medium text-body mb-1">
+                  {t('common.address')} <span className="text-danger-500">*</span>
                 </label>
-                <textarea
-                  value={formData.address}
+                <Textarea value={formData.address}
                   onChange={(e) => setFormData({ ...formData, address: e.target.value })}
-                  className="w-full px-4 py-2 border border-gray-300 rounded"
+                  className="px-4 rounded"
                   rows={3}
-                  required
-                />
+                  required />
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
+                <label className="block text-sm font-medium text-body mb-1">
                   {t('checkout.zipCode')}
                 </label>
-                <input
+                <Input
                   type="text"
                   value={formData.zipCode}
                   onChange={(e) => setFormData({ ...formData, zipCode: e.target.value })}
-                  className="w-full px-4 py-2 border border-gray-300 rounded"
+                  className="rounded"
                 />
               </div>
 
               <div className="flex items-center gap-2">
-                <input
-                  type="checkbox"
+                <Checkbox
                   id="isDefault"
                   checked={formData.isDefault}
                   onChange={(e) => setFormData({ ...formData, isDefault: e.target.checked })}
-                  className="w-4 h-4"
+                  label={t('address.setAsDefault')}
                 />
-                <label htmlFor="isDefault" className="text-sm text-gray-700">
-                  {t('address.setAsDefault')}
-                </label>
               </div>
 
               <div className="flex gap-3">
-                <button
-                  type="button"
+                <Button variant="secondary" type="button"
                   onClick={() => {
                     setShowForm(false);
                     setEditingId(null);
                     resetForm();
                   }}
-                  className="flex-1 px-4 py-2 border border-gray-300 rounded hover:bg-gray-50"
-                >
+                  className="flex-1 px-4 rounded hover:bg-surface">
                   {t('common.cancel')}
-                </button>
-                <button
-                  type="submit"
+                </Button>
+                <Button variant="secondary" type="submit"
                   disabled={isSaving}
-                  className="flex-1 px-4 py-2 bg-primary-500 text-white rounded hover:bg-primary-600 disabled:opacity-60"
-                >
+                  className="flex-1 px-4 py-2 bg-primary-500 text-inverted rounded hover:bg-primary-600 disabled:opacity-60">
                   {isSaving
                     ? (locale === 'en' ? 'Saving...' : 'Kaydediliyor...')
                     : editingId ? t('common.update') : t('common.save')}
-                </button>
+                </Button>
               </div>
             </form>
           </motion.div>
         )}
 
         {addresses.length === 0 && !showForm ? (
-          <div className="text-center py-16 bg-white rounded">
-            <p className="text-gray-600 text-lg mb-4">{t('address.noAddresses')}</p>
-            <button
-              onClick={() => setShowForm(true)}
-              className="px-6 py-3 bg-primary-500 text-white rounded hover:bg-primary-600"
-            >
+          <div className="text-center py-16 bg-surface-elevated rounded">
+            <p className="text-muted text-lg mb-4">{t('address.noAddresses')}</p>
+            <Button variant="secondary" onClick={() => setShowForm(true)}
+              className="px-6 py-3 bg-primary-500 text-inverted rounded hover:bg-primary-600">
               {t('address.addFirstAddress')}
-            </button>
+            </Button>
           </div>
         ) : (
           <div className="space-y-4">
@@ -399,7 +395,7 @@ export default function AddressesPage() {
                 key={address.id}
                 initial={{ opacity: 0, y: 20 }}
                 animate={{ opacity: 1, y: 0 }}
-                className="bg-white rounded shadow-sm p-6"
+                className="bg-surface-elevated rounded shadow-sm p-6"
               >
                 <div className="flex items-start justify-between">
                   <div className="flex-1">
@@ -411,37 +407,31 @@ export default function AddressesPage() {
                     {address.title && (
                       <h3 className="font-semibold text-lg mb-2">{address.title}</h3>
                     )}
-                    <p className="text-gray-900 font-medium">{address.fullName}</p>
-                    <p className="text-gray-600">{address.phone}</p>
-                    <p className="text-gray-600 mt-2">
+                    <p className="text-heading font-medium">{address.fullName}</p>
+                    <p className="text-muted">{address.phone}</p>
+                    <p className="text-muted mt-2">
                       {address.address}, {address.district}, {address.city}
                       {address.zipCode && ` ${address.zipCode}`}
                     </p>
                   </div>
                   <div className="flex gap-2">
                     {!address.isDefault && (
-                      <button
-                        onClick={() => handleSetDefault(address.id)}
+                      <Button variant="secondary" onClick={() => handleSetDefault(address.id)}
                         className="p-2 text-primary-500 hover:bg-primary-50 rounded"
-                        title={t('address.makeDefault')}
-                      >
+                        title={t('address.makeDefault')}>
                         <CheckIcon className="w-5 h-5" />
-                      </button>
+                      </Button>
                     )}
-                    <button
-                      onClick={() => handleEdit(address)}
-                      className="p-2 text-gray-600 hover:bg-gray-100 rounded"
-                      title={t('common.edit')}
-                    >
+                    <Button variant="secondary" onClick={() => handleEdit(address)}
+                      className="p-2 text-muted hover:bg-surface-alt rounded"
+                      title={t('common.edit')}>
                       <PencilIcon className="w-5 h-5" />
-                    </button>
-                    <button
-                      onClick={() => handleDelete(address.id)}
-                      className="p-2 text-red-500 hover:bg-red-50 rounded"
-                      title={t('common.delete')}
-                    >
+                    </Button>
+                    <Button variant="secondary" onClick={() => handleDelete(address.id)}
+                      className="p-2 text-danger-500 hover:bg-danger-50 rounded"
+                      title={t('common.delete')}>
                       <TrashIcon className="w-5 h-5" />
-                    </button>
+                    </Button>
                   </div>
                 </div>
               </motion.div>

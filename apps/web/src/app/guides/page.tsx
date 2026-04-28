@@ -13,7 +13,8 @@ import {
   ShieldCheckIcon,
   CheckCircleIcon,
 } from '@heroicons/react/24/outline';
-import { useTranslation } from '@/i18n/LanguageContext';
+import { useTranslation } from '@/i18n/LanguageContext';import { Button } from '@tarodan/ui';
+
 
 const GUIDES = [
   {
@@ -21,8 +22,8 @@ const GUIDES = [
     title: 'Başlangıç Rehberi',
     description: 'TARODAN\'a hoş geldiniz! Platformu kullanmaya başlamak için izlemeniz gereken adımlar.',
     icon: UserPlusIcon,
-    color: 'text-blue-500',
-    bgColor: 'bg-blue-50',
+    color: 'text-info-500',
+    bgColor: 'bg-info-50',
     steps: [
       {
         title: 'Üye Olun',
@@ -47,8 +48,8 @@ const GUIDES = [
     title: 'Alışveriş Rehberi',
     description: 'TARODAN\'da güvenle alışveriş yapmanın tüm detayları.',
     icon: ShoppingBagIcon,
-    color: 'text-green-500',
-    bgColor: 'bg-green-50',
+    color: 'text-success-500',
+    bgColor: 'bg-success-50',
     steps: [
       {
         title: 'Ürün Arama',
@@ -77,8 +78,8 @@ const GUIDES = [
     title: 'Satış Rehberi',
     description: 'Model arabalarınızı satışa sunmanın A\'dan Z\'ye tüm aşamaları.',
     icon: CurrencyDollarIcon,
-    color: 'text-yellow-500',
-    bgColor: 'bg-yellow-50',
+    color: 'text-warning-500',
+    bgColor: 'bg-warning-50',
     steps: [
       {
         title: 'İlan Ver Butonuna Tıklayın',
@@ -111,8 +112,8 @@ const GUIDES = [
     title: 'Takas Rehberi',
     description: 'Model araba takası yapmak için adım adım kılavuz.',
     icon: ArrowsRightLeftIcon,
-    color: 'text-purple-500',
-    bgColor: 'bg-purple-50',
+    color: 'text-primary-500',
+    bgColor: 'bg-primary-50',
     steps: [
       {
         title: 'Takasa Açık Ürünleri Bulun',
@@ -141,8 +142,8 @@ const GUIDES = [
     title: 'Fotoğraf Çekim Rehberi',
     description: 'İlanlarınız için profesyonel fotoğraflar çekmek.',
     icon: CameraIcon,
-    color: 'text-pink-500',
-    bgColor: 'bg-pink-50',
+    color: 'text-danger-500',
+    bgColor: 'bg-danger-50',
     steps: [
       {
         title: 'Işık Çok Önemli',
@@ -171,8 +172,8 @@ const GUIDES = [
     title: 'Paketleme ve Kargo Rehberi',
     description: 'Ürünlerinizi güvenle göndermenin yolları.',
     icon: TruckIcon,
-    color: 'text-orange-500',
-    bgColor: 'bg-orange-50',
+    color: 'text-primary-500',
+    bgColor: 'bg-primary-50',
     steps: [
       {
         title: 'Koruyucu Malzeme',
@@ -205,9 +206,9 @@ export default function GuidesPage() {
   const currentGuide = GUIDES.find((g) => g.id === activeGuide) || GUIDES[0];
 
   return (
-    <div className="min-h-screen bg-gray-50">
+    <div className="min-h-screen bg-surface">
       {/* Hero Section */}
-      <div className="bg-gradient-to-br from-primary-500 to-primary-600 text-white py-16">
+      <div className="bg-gradient-to-br from-primary-500 to-primary-600 text-inverted py-16">
         <div className="max-w-4xl mx-auto px-4 text-center">
           <h1 className="text-4xl font-bold mb-4">{t('guides.title')}</h1>
           <p className="text-lg text-primary-100">
@@ -220,36 +221,34 @@ export default function GuidesPage() {
         {/* Guide Selection Cards */}
         <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4 mb-12">
           {GUIDES.map((guide) => (
-            <button
-              key={guide.id}
+            <Button variant="secondary" key={guide.id}
               onClick={() => setActiveGuide(guide.id)}
               className={`p-4 rounded-xl text-center transition-all ${
                 activeGuide === guide.id
-                  ? 'bg-white shadow-lg ring-2 ring-primary-500'
-                  : 'bg-white shadow-sm hover:shadow-md'
-              }`}
-            >
+                  ? 'bg-surface-elevated shadow-lg ring-2 ring-primary-500'
+                  : 'bg-surface-elevated shadow-sm hover:shadow-md'
+              }`}>
               <div
                 className={`w-12 h-12 ${guide.bgColor} rounded-xl flex items-center justify-center mx-auto mb-3`}
               >
                 <guide.icon className={`w-6 h-6 ${guide.color}`} />
               </div>
-              <span className="text-sm font-medium text-gray-900">{guide.title.split(' ')[0]}</span>
-            </button>
+              <span className="text-sm font-medium text-heading">{guide.title.split(' ')[0]}</span>
+            </Button>
           ))}
         </div>
 
         {/* Active Guide Content */}
-        <div className="bg-white rounded-2xl shadow-sm overflow-hidden">
+        <div className="bg-surface-elevated rounded-2xl shadow-sm overflow-hidden">
           {/* Guide Header */}
           <div className={`${currentGuide.bgColor} p-8`}>
             <div className="flex items-center gap-4 mb-4">
-              <div className="w-16 h-16 bg-white rounded-2xl flex items-center justify-center shadow-sm">
+              <div className="w-16 h-16 bg-surface-elevated rounded-2xl flex items-center justify-center shadow-sm">
                 <currentGuide.icon className={`w-8 h-8 ${currentGuide.color}`} />
               </div>
               <div>
-                <h2 className="text-2xl font-bold text-gray-900">{currentGuide.title}</h2>
-                <p className="text-gray-600">{currentGuide.description}</p>
+                <h2 className="text-2xl font-bold text-heading">{currentGuide.title}</h2>
+                <p className="text-muted">{currentGuide.description}</p>
               </div>
             </div>
           </div>
@@ -260,25 +259,25 @@ export default function GuidesPage() {
               {currentGuide.steps.map((step, index) => (
                 <div key={index} className="flex gap-4">
                   <div className="flex-shrink-0">
-                    <div className="w-10 h-10 bg-primary-500 text-white rounded-full flex items-center justify-center font-bold">
+                    <div className="w-10 h-10 bg-primary-500 text-inverted rounded-full flex items-center justify-center font-bold">
                       {index + 1}
                     </div>
                   </div>
                   <div className="flex-1 pt-1">
-                    <h3 className="font-semibold text-gray-900 mb-2">{step.title}</h3>
-                    <p className="text-gray-600">{step.content}</p>
+                    <h3 className="font-semibold text-heading mb-2">{step.title}</h3>
+                    <p className="text-muted">{step.content}</p>
                   </div>
                 </div>
               ))}
             </div>
 
             {/* Tips */}
-            <div className="mt-8 p-6 bg-amber-50 rounded-xl border border-amber-200">
+            <div className="mt-8 p-6 bg-warning-50 rounded-xl border border-warning-200">
               <div className="flex items-start gap-3">
-                <StarIcon className="w-6 h-6 text-amber-500 flex-shrink-0" />
+                <StarIcon className="w-6 h-6 text-warning-500 flex-shrink-0" />
                 <div>
-                  <h4 className="font-semibold text-amber-800 mb-2">{t('guides.proTip')}</h4>
-                  <p className="text-amber-700 text-sm">
+                  <h4 className="font-semibold text-warning-800 mb-2">{t('guides.proTip')}</h4>
+                  <p className="text-warning-700 text-sm">
                     {currentGuide.id === 'selling' &&
                       'Detaylı açıklamalar ve kaliteli fotoğraflar, ürünlerinizin daha hızlı satılmasını sağlar. Hafta sonları yayınlanan ilanlar daha fazla görüntülenir.'}
                     {currentGuide.id === 'buying' &&
@@ -299,7 +298,7 @@ export default function GuidesPage() {
         </div>
 
         {/* Safety Tips */}
-        <div className="mt-12 bg-gradient-to-r from-green-500 to-emerald-600 rounded-2xl p-8 text-white">
+        <div className="mt-12 bg-gradient-to-r from-success-500 to-success-600 rounded-2xl p-8 text-inverted">
           <div className="flex items-start gap-4">
             <ShieldCheckIcon className="w-12 h-12 flex-shrink-0" />
             <div>
@@ -314,8 +313,8 @@ export default function GuidesPage() {
                   'Sorun olursa 24 saat içinde bildirin',
                 ].map((tip, index) => (
                   <div key={index} className="flex items-center gap-2">
-                    <CheckCircleIcon className="w-5 h-5 text-green-200 flex-shrink-0" />
-                    <span className="text-green-50">{tip}</span>
+                    <CheckCircleIcon className="w-5 h-5 text-success-200 flex-shrink-0" />
+                    <span className="text-success-50">{tip}</span>
                   </div>
                 ))}
               </div>
@@ -325,17 +324,17 @@ export default function GuidesPage() {
 
         {/* Help CTA */}
         <div className="mt-12 text-center">
-          <p className="text-gray-600 mb-4">{t('guides.stillHaveQuestions')}</p>
+          <p className="text-muted mb-4">{t('guides.stillHaveQuestions')}</p>
           <div className="flex flex-wrap justify-center gap-4">
             <Link
               href="/faq"
-              className="px-6 py-3 bg-gray-100 text-gray-700 rounded-xl font-semibold hover:bg-gray-200 transition-colors"
+              className="px-6 py-3 bg-surface-alt text-body rounded-xl font-semibold hover:bg-border-subtle transition-colors"
             >
               {t('guides.faqLink')}
             </Link>
             <Link
               href="/contact"
-              className="px-6 py-3 bg-primary-500 text-white rounded-xl font-semibold hover:bg-primary-600 transition-colors"
+              className="px-6 py-3 bg-primary-500 text-inverted rounded-xl font-semibold hover:bg-primary-600 transition-colors"
             >
               {t('guides.contactLink')}
             </Link>

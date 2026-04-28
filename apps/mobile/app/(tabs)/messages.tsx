@@ -1,4 +1,4 @@
-import { View, ScrollView, StyleSheet, TouchableOpacity, RefreshControl } from 'react-native';
+import { View, ScrollView, StyleSheet, TouchableOpacity, RefreshControl, Image } from 'react-native';
 import { Text, Avatar, Badge, FAB, ActivityIndicator, Searchbar } from 'react-native-paper';
 import { useState, useCallback } from 'react';
 import { router, useFocusEffect } from 'expo-router';
@@ -79,10 +79,14 @@ export default function MessagesTabScreen() {
     <View style={styles.container}>
       {/* Header */}
       <View style={styles.header}>
-        <Text style={styles.headerTitle}>Mesajlar</Text>
-        {unreadCount > 0 && (
-          <Badge style={styles.headerBadge}>{unreadCount}</Badge>
-        )}
+        <TouchableOpacity onPress={() => router.replace('/(tabs)')}>
+          <Image source={require('../../assets/tarodan-logo.jpg')} style={styles.headerLogo} resizeMode="contain" />
+        </TouchableOpacity>
+        <View style={styles.headerRight}>
+          {unreadCount > 0 && (
+            <Badge style={styles.headerBadge}>{unreadCount}</Badge>
+          )}
+        </View>
       </View>
 
       {/* Message Limit Banner */}
@@ -225,17 +229,20 @@ const styles = StyleSheet.create({
   },
   header: {
     backgroundColor: TarodanColors.primary,
-    paddingTop: 50,
-    paddingBottom: 16,
+    paddingTop: 44,
+    paddingBottom: 14,
     paddingHorizontal: 20,
     flexDirection: 'row',
-    justifyContent: 'center',
+    justifyContent: 'space-between',
     alignItems: 'center',
   },
-  headerTitle: {
-    fontSize: 18,
-    fontWeight: 'bold',
-    color: TarodanColors.textOnPrimary,
+  headerLogo: {
+    width: 130,
+    height: 42,
+  },
+  headerRight: {
+    minWidth: 28,
+    alignItems: 'flex-end',
   },
   headerBadge: {
     marginLeft: 8,
@@ -254,7 +261,7 @@ const styles = StyleSheet.create({
     backgroundColor: TarodanColors.primary,
     paddingHorizontal: 32,
     paddingVertical: 12,
-    borderRadius: 8,
+    borderRadius: 0,
   },
   loginButtonText: {
     color: TarodanColors.textOnPrimary,
@@ -327,7 +334,7 @@ const styles = StyleSheet.create({
     right: 0,
     width: 12,
     height: 12,
-    borderRadius: 6,
+    borderRadius: 0,
     backgroundColor: TarodanColors.primary,
     borderWidth: 2,
     borderColor: TarodanColors.background,

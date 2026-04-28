@@ -239,7 +239,7 @@ export default function SubscriptionSettingsScreen() {
                     </View>
                     <View style={styles.billingAmount}>
                       <Text variant="titleSmall" style={styles.amount}>
-                        ₺{payment.amount.toLocaleString('tr-TR')}
+                        ₺{(payment.amount ?? 0).toLocaleString('tr-TR')}
                       </Text>
                       <Chip 
                         compact 
