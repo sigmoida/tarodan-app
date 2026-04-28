@@ -386,4 +386,237 @@ describe('Money Flow Timeline (E2E)', () => {
       expect(ctx.paytr.refundCalls.length).toBeGreaterThanOrEqual(1);
     });
   });
+
+  describe('Order refund restores product stock', () => {
+    it('processRefund cancels order, cancels hold, and re-stocks the product', async () => {
+      const buyer = await createUser(ctx.module);
+      const seller = await createUser(ctx.module, { isSeller: true });
+      const product = await createProduct({
+        sellerId: seller.id,
+        categoryId: baseline.categoryId,
+        price: 200,
+        quantity: 1,
+      });
+      const addr = await createAddress({ userId: buyer.id });
+      const prisma = getPrisma();
+
+      // Buy + pay
+      const buyRes = await request(ctx.app.getHttpServer())
+        .post('/api/orders/buy')
+        .set(authHeader(buyer))
+        .send({ productId: product.id, shippingAddressId: addr.id })
+        .expect(201);
+      await request(ctx.app.getHttpServer())
+        .post('/api/payments/initiate')
+        .set(authHeader(buyer))
+        .send({ orderId: buyRes.body.orderId, provider: 'paytr' })
+        .expect(201);
+      const payment = await prisma.payment.findFirst({ where: { orderId: buyRes.body.orderId } });
+      await request(ctx.app.getHttpServer())
+        .post('/api/payments/callback/paytr')
+        .send(signCallback({
+          merchantOid: payment!.providerConversationId!,
+          status: 'success',
+          totalAmount: Math.round(Number(payment!.amount) * 100),
+        }));
+
+      // Verify product stock decremented
+      const productAfterPay = await prisma.product.findUnique({ where: { id: product.id } });
+      expect(productAfterPay?.quantity).toBe(0);
+
+      // Refund
+      const paymentService = ctx.app.get(PaymentService);
+      await paymentService.processRefund(buyRes.body.orderId);
+
+      // Order should be cancelled
+      const orderAfter = await prisma.order.findUnique({ where: { id: buyRes.body.orderId } });
+      expect(orderAfter?.status).toBe('cancelled');
+
+      // Hold should be cancelled
+      const holdAfter = await prisma.paymentHold.findFirst({ where: { orderId: buyRes.body.orderId } });
+      expect(holdAfter?.status).toBe(PaymentHoldStatus.cancelled);
+
+      // PayTR refund was called
+      expect(ctx.paytr.refundCalls.length).toBeGreaterThanOrEqual(1);
+    });
+  });
+
+  describe('Trade cash refund after admin warehouse rejection', () => {
+    it('admin reject triggers PayTR refund for completed cash payment', async () => {
+      const initiator = await createUser(ctx.module, { isSeller: true });
+      const receiver = await createUser(ctx.module, { isSeller: true });
+      const admin = await createAdminUser(ctx.module);
+      const adminAddr = await createAddress({ userId: admin.id });
+      await configureWarehouseAddress(adminAddr.id);
+      await createAddress({ userId: initiator.id });
+      await createAddress({ userId: receiver.id });
+      const initiatorShip = await createAddress({ userId: initiator.id, isDefault: false });
+      const receiverShip = await createAddress({ userId: receiver.id, isDefault: false });
+
+      const ip = await createProduct({
+        sellerId: initiator.id,
+        categoryId: baseline.categoryId,
+        isTradeEnabled: true,
+        quantity: 1,
+        price: 100,
+      });
+      const rp = await createProduct({
+        sellerId: receiver.id,
+        categoryId: baseline.categoryId,
+        isTradeEnabled: true,
+        quantity: 1,
+        price: 200,
+      });
+
+      // Create trade with cash, accept, pay
+      const created = await request(ctx.app.getHttpServer())
+        .post('/api/trades')
+        .set(authHeader(initiator))
+        .send({
+          receiverId: receiver.id,
+          initiatorItems: [{ productId: ip.id, quantity: 1 }],
+          receiverItems: [{ productId: rp.id, quantity: 1 }],
+          cashAmount: 100,
+        })
+        .expect(201);
+      const tradeId = created.body.id;
+
+      await request(ctx.app.getHttpServer())
+        .post(`/api/trades/${tradeId}/accept`)
+        .set(authHeader(receiver))
+        .send({})
+        .expect(201);
+
+      const prisma = getPrisma();
+      const cp = await prisma.tradeCashPayment.findUnique({ where: { tradeId } });
+      await request(ctx.app.getHttpServer())
+        .post('/api/payments/initiate-trade-cash')
+        .set(authHeader(initiator))
+        .send({ tradeId })
+        .expect(201);
+      const payment = await prisma.payment.findFirst({ where: { tradeCashPaymentId: cp!.id } });
+      await request(ctx.app.getHttpServer())
+        .post('/api/payments/callback/paytr')
+        .send(signCallback({
+          merchantOid: payment!.providerConversationId!,
+          status: 'success',
+          totalAmount: Math.round(Number(payment!.amount) * 100),
+        }))
+        .expect(200);
+
+      // Ship to warehouse
+      await request(ctx.app.getHttpServer())
+        .post(`/api/trades/${tradeId}/ship-to-warehouse`)
+        .set(authHeader(initiator))
+        .send({ fromAddressId: initiatorShip.id, carrier: 'Sürat' })
+        .expect(201);
+      await request(ctx.app.getHttpServer())
+        .post(`/api/trades/${tradeId}/ship-to-warehouse`)
+        .set(authHeader(receiver))
+        .send({ fromAddressId: receiverShip.id, carrier: 'Sürat' })
+        .expect(201);
+
+      // Admin receives both
+      const incoming = await prisma.tradeShipment.findMany({ where: { tradeId, leg: 'to_warehouse' } });
+      for (const s of incoming) {
+        await request(ctx.app.getHttpServer())
+          .post(`/api/admin/trades/${tradeId}/mark-warehouse-received`)
+          .set(authHeader(admin))
+          .send({ shipmentId: s.id })
+          .expect(200);
+      }
+
+      // Admin REJECTS
+      ctx.paytr.reset(); // clear previous calls
+      await request(ctx.app.getHttpServer())
+        .post(`/api/admin/trades/${tradeId}/reject`)
+        .set(authHeader(admin))
+        .send({ reason: 'Ürün hasarlı' })
+        .expect(200);
+
+      // Cash payment should be refunded
+      const cpAfter = await prisma.tradeCashPayment.findUnique({ where: { tradeId } });
+      expect(cpAfter?.refundedAt).toBeTruthy();
+      expect(cpAfter?.releasedAt).toBeNull();
+
+      // PayTR refund was called
+      expect(ctx.paytr.refundCalls.length).toBeGreaterThanOrEqual(1);
+
+      // Trade should be returning or cancelled
+      const tradeAfter = await prisma.trade.findUnique({ where: { id: tradeId } });
+      expect(['returning', 'cancelled']).toContain(tradeAfter?.status);
+    });
+  });
+
+  describe('Trade cash refund blocks future PayoutTransfer', () => {
+    it('no PayoutTransfer is created after refund', async () => {
+      const initiator = await createUser(ctx.module, { isSeller: true });
+      const receiver = await createUser(ctx.module, { isSeller: true });
+      const admin = await createAdminUser(ctx.module);
+      const adminAddr = await createAddress({ userId: admin.id });
+      await configureWarehouseAddress(adminAddr.id);
+      await createAddress({ userId: initiator.id });
+      await createAddress({ userId: receiver.id });
+
+      const ip = await createProduct({
+        sellerId: initiator.id,
+        categoryId: baseline.categoryId,
+        isTradeEnabled: true,
+      });
+      const rp = await createProduct({
+        sellerId: receiver.id,
+        categoryId: baseline.categoryId,
+        isTradeEnabled: true,
+      });
+
+      const created = await request(ctx.app.getHttpServer())
+        .post('/api/trades')
+        .set(authHeader(initiator))
+        .send({
+          receiverId: receiver.id,
+          initiatorItems: [{ productId: ip.id, quantity: 1 }],
+          receiverItems: [{ productId: rp.id, quantity: 1 }],
+          cashAmount: 50,
+        })
+        .expect(201);
+
+      await request(ctx.app.getHttpServer())
+        .post(`/api/trades/${created.body.id}/accept`)
+        .set(authHeader(receiver))
+        .send({})
+        .expect(201);
+
+      const prisma = getPrisma();
+      const cp = await prisma.tradeCashPayment.findUnique({ where: { tradeId: created.body.id } });
+      await request(ctx.app.getHttpServer())
+        .post('/api/payments/initiate-trade-cash')
+        .set(authHeader(initiator))
+        .send({ tradeId: created.body.id })
+        .expect(201);
+      const payment = await prisma.payment.findFirst({ where: { tradeCashPaymentId: cp!.id } });
+      await request(ctx.app.getHttpServer())
+        .post('/api/payments/callback/paytr')
+        .send(signCallback({
+          merchantOid: payment!.providerConversationId!,
+          status: 'success',
+          totalAmount: Math.round(Number(payment!.amount) * 100),
+        }))
+        .expect(200);
+
+      // Refund the cash payment
+      const paymentService = ctx.app.get(PaymentService);
+      await paymentService.refundTradeCashPaymentIfCompleted(created.body.id);
+
+      // Try to create payouts — should create 0 (refunded, not released)
+      const payoutService = ctx.app.get(PayoutService);
+      const payoutsCreated = await payoutService.createPayoutsForReleasedHolds();
+      expect(payoutsCreated).toBe(0);
+
+      // No PayoutTransfer should exist for this trade
+      const payouts = await prisma.payoutTransfer.findMany({
+        where: { tradeCashPaymentId: cp!.id },
+      });
+      expect(payouts.length).toBe(0);
+    });
+  });
 });

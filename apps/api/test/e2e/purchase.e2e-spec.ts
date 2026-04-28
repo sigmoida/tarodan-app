@@ -469,4 +469,183 @@ describe('Purchase Flow (E2E)', () => {
       expect(completedPayments).toHaveLength(1);
     });
   });
+
+  describe('Offer → payment → hold → payout end-to-end', () => {
+    it('offer accept creates order, payment completes, hold releases, PayoutTransfer created', async () => {
+      const buyer = await createUser(ctx.module);
+      const seller = await createUser(ctx.module, { isSeller: true });
+      const product = await createProduct({
+        sellerId: seller.id,
+        categoryId: baseline.categoryId,
+        price: 500,
+        quantity: 1,
+      });
+      const addr = await createAddress({ userId: buyer.id });
+      const prisma = getPrisma();
+
+      // Seller adds IBAN
+      await prisma.sellerBankAccount.create({
+        data: { userId: seller.id, accountHolder: 'Seller Name', iban: 'TR330006100519786457841326' },
+      });
+
+      // Create offer
+      const offerRes = await request(ctx.app.getHttpServer())
+        .post('/api/offers')
+        .set(authHeader(buyer))
+        .send({ productId: product.id, amount: 400 })
+        .expect(201);
+
+      // Seller accepts offer → order created
+      const acceptRes = await request(ctx.app.getHttpServer())
+        .post(`/api/offers/${offerRes.body.id}/accept`)
+        .set(authHeader(seller))
+        .send({})
+        .expect(200);
+
+      const orderId = acceptRes.body.orderId;
+      expect(orderId).toBeTruthy();
+
+      // Initiate payment
+      await request(ctx.app.getHttpServer())
+        .post('/api/payments/initiate')
+        .set(authHeader(buyer))
+        .send({ orderId, provider: 'paytr' })
+        .expect(201);
+
+      // PayTR callback
+      const payment = await prisma.payment.findFirst({ where: { orderId } });
+      await request(ctx.app.getHttpServer())
+        .post('/api/payments/callback/paytr')
+        .send(signCallback({
+          merchantOid: payment!.providerConversationId!,
+          status: 'success',
+          totalAmount: Math.round(Number(payment!.amount) * 100),
+        }));
+
+      // Hold exists
+      const hold = await prisma.paymentHold.findFirst({ where: { orderId } });
+      expect(hold?.status).toBe(PaymentHoldStatus.held);
+
+      // Force release
+      await prisma.paymentHold.update({
+        where: { id: hold!.id },
+        data: { releaseAt: new Date(Date.now() - 1000) },
+      });
+
+      const { PaymentService } = require('../../src/modules/payment/payment.service');
+      const { PayoutService } = require('../../src/modules/payout/payout.service');
+      const paymentService = ctx.app.get(PaymentService);
+      const payoutService = ctx.app.get(PayoutService);
+
+      await paymentService.releaseHoldsDue();
+      const payoutsCreated = await payoutService.createPayoutsForReleasedHolds();
+      expect(payoutsCreated).toBeGreaterThanOrEqual(1);
+
+      // PayoutTransfer for this offer-based order exists
+      const payout = await prisma.payoutTransfer.findFirst({ where: { paymentHoldId: hold!.id } });
+      expect(payout).toBeTruthy();
+      expect(payout?.sellerId).toBe(seller.id);
+      expect(payout?.transferIban).toBe('TR330006100519786457841326');
+    });
+  });
+
+  describe('Seller holds endpoint', () => {
+    it('GET /payments/holds/me returns seller payment holds', async () => {
+      const buyer = await createUser(ctx.module);
+      const seller = await createUser(ctx.module, { isSeller: true });
+      const product = await createProduct({
+        sellerId: seller.id,
+        categoryId: baseline.categoryId,
+        price: 300,
+        quantity: 1,
+      });
+      const addr = await createAddress({ userId: buyer.id });
+      const prisma = getPrisma();
+
+      // Buy + pay
+      const buyRes = await request(ctx.app.getHttpServer())
+        .post('/api/orders/buy')
+        .set(authHeader(buyer))
+        .send({ productId: product.id, shippingAddressId: addr.id })
+        .expect(201);
+      await request(ctx.app.getHttpServer())
+        .post('/api/payments/initiate')
+        .set(authHeader(buyer))
+        .send({ orderId: buyRes.body.orderId, provider: 'paytr' })
+        .expect(201);
+      const payment = await prisma.payment.findFirst({ where: { orderId: buyRes.body.orderId } });
+      await request(ctx.app.getHttpServer())
+        .post('/api/payments/callback/paytr')
+        .send(signCallback({
+          merchantOid: payment!.providerConversationId!,
+          status: 'success',
+          totalAmount: Math.round(Number(payment!.amount) * 100),
+        }));
+
+      // Seller should see the hold
+      const holdsRes = await request(ctx.app.getHttpServer())
+        .get('/api/payments/holds/me')
+        .set(authHeader(seller))
+        .expect(200);
+
+      expect(Array.isArray(holdsRes.body)).toBe(true);
+      expect(holdsRes.body.length).toBeGreaterThanOrEqual(1);
+      expect(holdsRes.body[0].status).toBe('held');
+      expect(Number(holdsRes.body[0].amount)).toBeGreaterThan(0);
+    });
+  });
+
+  describe('Reconciliation cron', () => {
+    it('reconcilePendingPaytrPayments recovers a missed callback via durum-sorgu', async () => {
+      const buyer = await createUser(ctx.module);
+      const seller = await createUser(ctx.module, { isSeller: true });
+      const product = await createProduct({
+        sellerId: seller.id,
+        categoryId: baseline.categoryId,
+        price: 100,
+        quantity: 1,
+      });
+      const addr = await createAddress({ userId: buyer.id });
+      const prisma = getPrisma();
+
+      // Buy + initiate (but NO callback — simulating missed webhook)
+      const buyRes = await request(ctx.app.getHttpServer())
+        .post('/api/orders/buy')
+        .set(authHeader(buyer))
+        .send({ productId: product.id, shippingAddressId: addr.id })
+        .expect(201);
+      await request(ctx.app.getHttpServer())
+        .post('/api/payments/initiate')
+        .set(authHeader(buyer))
+        .send({ orderId: buyRes.body.orderId, provider: 'paytr' })
+        .expect(201);
+
+      const payment = await prisma.payment.findFirst({ where: { orderId: buyRes.body.orderId } });
+      expect(payment?.status).toBe(PaymentStatus.pending);
+
+      // Set up mock durum-sorgu to return success
+      ctx.paytr.setQueryResult(payment!.providerConversationId!, {
+        ok: true,
+        paymentTotalTl: Number(payment!.amount),
+        paymentAmountTl: Number(payment!.amount),
+        paymentDate: new Date().toISOString(),
+        currency: 'TL',
+      } as any);
+
+      // Force the payment to be old enough for reconciliation (>3 min)
+      await prisma.payment.update({
+        where: { id: payment!.id },
+        data: { createdAt: new Date(Date.now() - 5 * 60 * 1000) },
+      });
+
+      const { PaymentService } = require('../../src/modules/payment/payment.service');
+      const paymentService = ctx.app.get(PaymentService);
+      const result = await paymentService.reconcilePendingPaytrPayments();
+      expect(result.completed).toBeGreaterThanOrEqual(1);
+
+      // Payment should now be completed
+      const paymentAfter = await prisma.payment.findUnique({ where: { id: payment!.id } });
+      expect(paymentAfter?.status).toBe(PaymentStatus.completed);
+    });
+  });
 });
