@@ -508,13 +508,17 @@ export class PaymentService {
 
       // Membership ödemelerinde başarı sayfası /membership/success olsun (PayTR yönlendirmesi)
       const isMembershipOrder = order.productId?.startsWith?.('membership-');
+      // PayTR success URL'ine paymentId ekle: success sayfası verify endpoint'ini bu ID ile çağırır.
+      const successQueryParams = isMembershipOrder
+        ? `paymentId=${payment.id}&type=membership`
+        : `paymentId=${payment.id}`;
       const result = await this.paytrService.processOrderPayment(
         merchantOid,
         Number(order.totalAmount),
         buyer,
         basketItems,
         1, // installment count
-        isMembershipOrder ? 'type=membership' : undefined,
+        successQueryParams,
       );
 
       // Update payment with provider reference (callback merchant_oid ile eşleşmesi için aynı değer)
