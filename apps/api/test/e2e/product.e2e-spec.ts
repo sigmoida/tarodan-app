@@ -51,20 +51,24 @@ describe('Product (E2E)', () => {
       expect(Number(res.body.price)).toBe(150);
     });
 
-    it('non-seller cannot create a product (403)', async () => {
+    it('non-seller is auto-promoted to seller on first listing (201)', async () => {
       const buyer = await createUser(ctx.module, { isSeller: false });
 
       const res = await request(ctx.app.getHttpServer())
         .post('/api/products')
         .set(authHeader(buyer))
         .send({
-          title: 'Should Not Work',
+          title: 'First Product Auto Seller',
           price: 100,
           categoryId: baseline.categoryId,
           condition: 'new',
-        });
+        })
+        .expect(201);
 
-      expect([201, 403]).toContain(res.status);
+      // User should now be a seller
+      const prisma = getPrisma();
+      const updated = await prisma.user.findUnique({ where: { id: buyer.id } });
+      expect(updated?.isSeller).toBe(true);
     });
 
     it('rejects product with missing title (400)', async () => {

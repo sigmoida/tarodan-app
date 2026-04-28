@@ -153,10 +153,10 @@ describe('Admin (E2E)', () => {
       });
 
       const res = await request(ctx.app.getHttpServer())
-        .patch(`/api/admin/products/${product.id}/approve`)
-        .set(authHeader(admin));
-
-      expect([200, 201, 404]).toContain(res.status);
+        .post(`/api/admin/products/${product.id}/approve`)
+        .set(authHeader(admin))
+        .send({})
+        .expect(200);
     });
   });
 
@@ -171,11 +171,10 @@ describe('Admin (E2E)', () => {
       });
 
       const res = await request(ctx.app.getHttpServer())
-        .patch(`/api/admin/products/${product.id}/reject`)
+        .post(`/api/admin/products/${product.id}/reject`)
         .set(authHeader(admin))
-        .send({ reason: 'Invalid listing' });
-
-      expect([200, 201, 404]).toContain(res.status);
+        .send({ reason: 'Invalid listing' })
+        .expect(200);
     });
   });
 });

@@ -42,11 +42,10 @@ describe('User Report (E2E)', () => {
         .send({
           type: 'product',
           targetId: product.id,
-          reason: 'Fake product listing',
-          description: 'This product looks counterfeit',
-        });
-
-      expect([200, 201, 400]).toContain(res.status);
+          reason: 'fake_product',
+          description: 'This product looks counterfeit and suspicious',
+        })
+        .expect(201);
     });
 
     it('user can report another user', async () => {
@@ -59,11 +58,10 @@ describe('User Report (E2E)', () => {
         .send({
           type: 'user',
           targetId: reported.id,
-          reason: 'Harassment',
-          description: 'Sending threatening messages',
-        });
-
-      expect([200, 201, 400]).toContain(res.status);
+          reason: 'harassment',
+          description: 'Sending threatening and abusive messages',
+        })
+        .expect(201);
     });
 
     it('rejects unauthenticated (401)', async () => {

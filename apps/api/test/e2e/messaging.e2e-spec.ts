@@ -32,12 +32,10 @@ describe('Messaging (E2E)', () => {
       const res = await request(ctx.app.getHttpServer())
         .post('/api/messages/threads')
         .set(authHeader(userA))
-        .send({ receiverId: userB.id, message: 'Hello' });
+        .send({ recipientId: userB.id, message: 'Hello' })
+        .expect(201);
 
-      expect([200, 201, 400]).toContain(res.status);
-      if (res.status === 200 || res.status === 201) {
-        expect(res.body.id).toBeTruthy();
-      }
+      expect(res.body.id).toBeTruthy();
     });
 
     it('rejects creating thread with yourself', async () => {
@@ -46,7 +44,7 @@ describe('Messaging (E2E)', () => {
       const res = await request(ctx.app.getHttpServer())
         .post('/api/messages/threads')
         .set(authHeader(user))
-        .send({ receiverId: user.id });
+        .send({ recipientId: user.id });
 
       expect([400, 403]).toContain(res.status);
     });
@@ -86,20 +84,15 @@ describe('Messaging (E2E)', () => {
       const thread = await request(ctx.app.getHttpServer())
         .post('/api/messages/threads')
         .set(authHeader(userA))
-        .send({ receiverId: userB.id, message: 'Hello' });
-
-      if (thread.status !== 200 && thread.status !== 201) {
-        // Thread creation not supported with this payload; skip dependent assertion
-        expect([200, 201, 400]).toContain(thread.status);
-        return;
-      }
+        .send({ recipientId: userB.id, message: 'Hello' })
+        .expect(201);
 
       const res = await request(ctx.app.getHttpServer())
         .post(`/api/messages/threads/${thread.body.id}/messages`)
         .set(authHeader(userA))
-        .send({ content: 'Merhaba, ürününüzle ilgileniyorum' });
+        .send({ content: 'Merhaba, ürününüzle ilgileniyorum' })
+        .expect(201);
 
-      expect([200, 201]).toContain(res.status);
       expect(res.body).toBeTruthy();
     });
 
@@ -111,12 +104,8 @@ describe('Messaging (E2E)', () => {
       const thread = await request(ctx.app.getHttpServer())
         .post('/api/messages/threads')
         .set(authHeader(userA))
-        .send({ receiverId: userB.id, message: 'Hello' });
-
-      if (thread.status !== 200 && thread.status !== 201) {
-        expect([200, 201, 400]).toContain(thread.status);
-        return;
-      }
+        .send({ recipientId: userB.id, message: 'Hello' })
+        .expect(201);
 
       await request(ctx.app.getHttpServer())
         .post(`/api/messages/threads/${thread.body.id}/messages`)
@@ -134,12 +123,8 @@ describe('Messaging (E2E)', () => {
       const thread = await request(ctx.app.getHttpServer())
         .post('/api/messages/threads')
         .set(authHeader(userA))
-        .send({ receiverId: userB.id, message: 'Hello' });
-
-      if (thread.status !== 200 && thread.status !== 201) {
-        expect([200, 201, 400]).toContain(thread.status);
-        return;
-      }
+        .send({ recipientId: userB.id, message: 'Hello' })
+        .expect(201);
 
       await request(ctx.app.getHttpServer())
         .get(`/api/messages/threads/${thread.body.id}`)
@@ -155,12 +140,8 @@ describe('Messaging (E2E)', () => {
       const thread = await request(ctx.app.getHttpServer())
         .post('/api/messages/threads')
         .set(authHeader(userA))
-        .send({ receiverId: userB.id, message: 'Hello' });
-
-      if (thread.status !== 200 && thread.status !== 201) {
-        expect([200, 201, 400]).toContain(thread.status);
-        return;
-      }
+        .send({ recipientId: userB.id, message: 'Hello' })
+        .expect(201);
 
       await request(ctx.app.getHttpServer())
         .get(`/api/messages/threads/${thread.body.id}`)

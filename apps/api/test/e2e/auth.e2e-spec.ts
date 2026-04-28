@@ -40,11 +40,12 @@ describe('Auth (E2E)', () => {
         })
         .expect(201);
 
-      const tokens = res.body.tokens || res.body;
-      expect(tokens.accessToken || tokens.access_token).toBeTruthy();
-      expect(tokens.refreshToken || tokens.refresh_token).toBeTruthy();
-      const user = res.body.user || res.body;
-      expect(user.email || user.id).toBeTruthy();
+      // AuthResponseDto: { user: {...}, tokens: { accessToken, refreshToken } }
+      expect(res.body.tokens).toBeTruthy();
+      expect(res.body.tokens.accessToken).toBeTruthy();
+      expect(res.body.tokens.refreshToken).toBeTruthy();
+      expect(res.body.user).toBeTruthy();
+      expect(res.body.user.email).toBe('newuser@test.com');
     });
 
     it('rejects duplicate email with 409', async () => {
@@ -132,11 +133,11 @@ describe('Auth (E2E)', () => {
         .send({ email: 'login@test.com', password: 'SecurePass123!' })
         .expect(200);
 
-      const tokens = res.body.tokens || res.body;
-      expect(tokens.accessToken || tokens.access_token).toBeTruthy();
-      expect(tokens.refreshToken || tokens.refresh_token).toBeTruthy();
-      const returnedUser = res.body.user || res.body;
-      expect(returnedUser.id || returnedUser.email).toBeTruthy();
+      expect(res.body.tokens).toBeTruthy();
+      expect(res.body.tokens.accessToken).toBeTruthy();
+      expect(res.body.tokens.refreshToken).toBeTruthy();
+      expect(res.body.user).toBeTruthy();
+      expect(res.body.user.id).toBe(user.id);
     });
 
     it('rejects wrong password with 401', async () => {
