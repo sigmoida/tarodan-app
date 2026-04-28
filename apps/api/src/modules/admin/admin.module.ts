@@ -16,6 +16,7 @@ import { DiscountModule } from '../discount/discount.module';
 import { EventModule } from '../events/event.module';
 import { StorageModule } from '../storage/storage.module';
 import { RatingModule } from '../rating/rating.module';
+import { SuratCargoModule } from '../surat-cargo/surat-cargo.module';
 
 @Module({
   imports: [
@@ -33,6 +34,7 @@ import { RatingModule } from '../rating/rating.module';
     EventModule,
     StorageModule,
     RatingModule,
+    SuratCargoModule,
   ],
   controllers: [AdminController],
   providers: [AdminService, ScheduledNotificationScheduler],

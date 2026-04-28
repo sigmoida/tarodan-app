@@ -1,4 +1,5 @@
 import { Injectable, Logger } from '@nestjs/common';
+import { ModuleRef } from '@nestjs/core';
 import { ConfigService } from '@nestjs/config';
 import { PrismaService } from '../../prisma';
 import { ShipmentStatus, OrderStatus } from '@prisma/client';
@@ -20,6 +21,7 @@ export class SuratTrackingService {
   constructor(
     private readonly configService: ConfigService,
     private readonly prisma: PrismaService,
+    private readonly moduleRef: ModuleRef,
   ) {}
 
   /**
@@ -109,6 +111,9 @@ export class SuratTrackingService {
    * Intended to be called by a cron job or Bull queue.
    */
   async syncAllActiveShipments(): Promise<{ synced: number; failed: number }> {
+    // Only sync shipments that have a tracking reference. Auto-created
+    // pending shipments without a Sürat tracking number would just spam
+    // the API with "not found" responses.
     const activeShipments = await this.prisma.shipment.findMany({
       where: {
         provider: 'surat',
@@ -120,6 +125,10 @@ export class SuratTrackingService {
             ShipmentStatus.failed,
           ],
         },
+        OR: [
+          { providerTrackingId: { not: null } },
+          { trackingNumber: { not: null } },
+        ],
       },
     });
 
@@ -214,6 +223,23 @@ export class SuratTrackingService {
         where: { id: shipment.orderId },
         data: { status: OrderStatus.refund_requested },
       });
+
+      // Auto-trigger refund when Sürat reports return delivery (status 12).
+      // PaymentService is resolved lazily via ModuleRef to avoid circular import.
+      try {
+        const { PaymentService } = await import('../payment/payment.service');
+        const paymentService = this.moduleRef.get(PaymentService, { strict: false });
+        if (paymentService) {
+          await paymentService.processRefund(shipment.orderId);
+          this.logger.log(
+            `Auto-refunded order ${shipment.orderId} after Sürat return completion (suratCode=${gonderi.KargonunDurumuSayi})`,
+          );
+        }
+      } catch (error: any) {
+        this.logger.error(
+          `Failed to auto-refund order ${shipment.orderId} after return: ${error.message}. Manual intervention may be needed.`,
+        );
+      }
     }
 
     this.logger.log(

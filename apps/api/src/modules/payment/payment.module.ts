@@ -14,6 +14,7 @@ import { InvoiceModule } from '../invoice/invoice.module';
 import { ProductModule } from '../product/product.module';
 import { NotificationModule } from '../notification/notification.module';
 import { PayoutModule } from '../payout/payout.module';
+import { SuratCargoModule } from '../surat-cargo/surat-cargo.module';
 
 @Module({
   imports: [
@@ -26,6 +27,7 @@ import { PayoutModule } from '../payout/payout.module';
     InvoiceModule,
     NotificationModule,
     PayoutModule,
+    SuratCargoModule,
     forwardRef(() => ProductModule),
     JwtModule.registerAsync({
       imports: [ConfigModule],

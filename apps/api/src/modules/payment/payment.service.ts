@@ -18,6 +18,7 @@ import { InvoiceService } from '../invoice/invoice.service';
 import { ProductLockService } from '../product/product-lock.service';
 import { NotificationService } from '../notification/notification.service';
 import { NotificationType } from '../notification/dto/notification.dto';
+import { SuratCargoService } from '../surat-cargo/surat-cargo.service';
 import { Request } from 'express';
 
 @Injectable()
@@ -34,8 +35,48 @@ export class PaymentService {
     private readonly invoiceService: InvoiceService,
     private readonly productLockService: ProductLockService,
     private readonly notificationService: NotificationService,
+    private readonly suratCargoService: SuratCargoService,
   ) {
     this.holdDays = parseInt(this.configService.get('PAYMENT_HOLD_DAYS') || '7', 10);
+  }
+
+  /**
+   * Cancel any active Surat shipment for an order. Best-effort: errors are logged
+   * but don't block the calling flow. Used when an order is cancelled or refunded.
+   */
+  private async cancelSuratShipmentIfExists(orderId: string, orderNumber: string): Promise<void> {
+    try {
+      const shipment = await this.prisma.shipment.findFirst({
+        where: { orderId, provider: 'surat' },
+      });
+      if (!shipment) return;
+
+      // Skip if shipment is already in a terminal state
+      const terminalStatuses = ['delivered', 'returned', 'cancelled', 'failed'];
+      if (terminalStatuses.includes(shipment.status)) {
+        this.logger.log(
+          `Skip Surat cancel: shipment ${shipment.id} already ${shipment.status}`,
+        );
+        return;
+      }
+
+      const result = await this.suratCargoService.cancelShipmentByOrderNumber(orderNumber);
+      if (result.ok) {
+        await this.prisma.shipment.update({
+          where: { id: shipment.id },
+          data: { status: 'cancelled' as any },
+        });
+        this.logger.log(`Surat shipment cancelled for order ${orderNumber}`);
+      } else {
+        this.logger.warn(
+          `Surat cancel returned non-OK for order ${orderNumber}: ${result.suratMessage}`,
+        );
+      }
+    } catch (error: any) {
+      this.logger.error(
+        `Surat cancel failed for order ${orderNumber}: ${error.message}. Continuing anyway.`,
+      );
+    }
   }
 
   /**
@@ -1184,6 +1225,15 @@ export class PaymentService {
     // Siparişi iptal et ve ürünü tekrar satışa aç (ilanlar listesinde görünsün)
     if (payment.orderId) {
       await this.releaseProductForFailedPayment(payment.orderId);
+
+      // Cancel any auto-created Surat shipment for this failed order
+      const order = await this.prisma.order.findUnique({
+        where: { id: payment.orderId },
+        select: { orderNumber: true },
+      });
+      if (order) {
+        await this.cancelSuratShipmentIfExists(payment.orderId, order.orderNumber);
+      }
     }
 
     // Log payment failure
@@ -1551,6 +1601,9 @@ export class PaymentService {
     }
 
     const amountToRefund = refundAmount || Number(payment.amount);
+
+    // Cancel any active Surat shipment before processing the refund (best-effort)
+    await this.cancelSuratShipmentIfExists(orderId, payment.order.orderNumber);
 
     // Race condition guard: if a payout transfer is already completed/processing, block refund
     const existingPayout = await this.prisma.payoutTransfer.findFirst({
@@ -2581,6 +2634,9 @@ export class PaymentService {
 
         // Siparişi iptal et ve ürünü tekrar satışa aç
         await this.releaseProductForFailedPayment(payment.orderId);
+
+        // Cancel any auto-created Surat shipment for this expired order
+        await this.cancelSuratShipmentIfExists(payment.orderId, payment.order.orderNumber);
 
         // Emit payment.failed event
         try {

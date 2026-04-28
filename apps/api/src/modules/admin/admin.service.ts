@@ -68,6 +68,14 @@ import { CacheService } from '../cache/cache.service';
 import { DiscountService } from '../discount/discount.service';
 import { EventService } from '../events/event.service';
 import { RatingService } from '../rating/rating.service';
+import { SuratCargoService } from '../surat-cargo/surat-cargo.service';
+import {
+  SuratKargoTuru,
+  SuratOdemeTipi,
+  SuratTasimaSekli,
+  SuratTeslimSekli,
+  SuratGonderiSekli,
+} from '../surat-cargo/surat-cargo.types';
 
 @Injectable()
 export class AdminService {
@@ -85,6 +93,8 @@ export class AdminService {
     private readonly ratingService: RatingService,
     @Optional()
     private readonly storageService: StorageService,
+    @Optional()
+    private readonly suratCargoService?: SuratCargoService,
   ) { }
 
   private resolveProductImageUrl(imageKeyOrUrl: string | null | undefined): string | null {
@@ -4485,14 +4495,68 @@ export class AdminService {
 
       const now = new Date();
 
+      // Submit each warehouse-to-recipient leg to Sürat as a real shipment.
+      // If integration is disabled, falls back to internal tracking number.
+      const initiatorOid = `TRD-${trade.tradeNumber}-INI`.replace(/[^a-zA-Z0-9-]/g, '').slice(0, 50);
+      const receiverOid = `TRD-${trade.tradeNumber}-REC`.replace(/[^a-zA-Z0-9-]/g, '').slice(0, 50);
+
+      const initiatorUser = await tx.user.findUnique({ where: { id: trade.initiatorId } });
+      const receiverUser = await tx.user.findUnique({ where: { id: trade.receiverId } });
+
+      const submitToSurat = async (oid: string, addr: any, user: any): Promise<{ carrier: string; trackingNumber: string }> => {
+        if (!this.suratCargoService || !this.suratCargoService.isIntegrationEnabled()) {
+          return { carrier: 'Tarodan Warehouse', trackingNumber: genTrackingNumber() };
+        }
+        try {
+          const result = await this.suratCargoService.submitShipmentWithRetry({
+            idempotencyKey: `surat:trade:${oid}`,
+            correlationId: `trade-approve-${tradeId}`,
+            payload: {
+              KisiKurum: addr.fullName || user?.displayName || 'Takas Alıcısı',
+              SahisBirim: 'Takas Gönderisi',
+              AliciAdresi: addr.address,
+              Il: addr.city,
+              Ilce: addr.district,
+              TelefonCep: addr.phone,
+              KargoTuru: SuratKargoTuru.Koli,
+              OdemeTipi: SuratOdemeTipi.Pesin,
+              OzelKargoTakipNo: oid,
+              Adet: 1,
+              BirimDesi: 1,
+              BirimKg: 1,
+              KapidanOdemeTahsilatTipi: 1,
+              TasimaSekli: SuratTasimaSekli.KaraYolu,
+              TeslimSekli: SuratTeslimSekli.AdreseTeslim,
+              GonderiSekli: SuratGonderiSekli.Standart,
+              Pazaryerimi: 0,
+              Iademi: false,
+            },
+          });
+          if (!result.ok) {
+            const r = result as any;
+            const errMsg = r.kind === 'business' ? r.suratMessage : `technical: ${r.code}`;
+            throw new BadRequestException(
+              `Sürat kargo onay siparişi reddedildi: ${errMsg}`,
+            );
+          }
+          return { carrier: 'surat', trackingNumber: oid };
+        } catch (error: any) {
+          this.logger.error(`Surat shipment submit failed for trade ${tradeId}: ${error.message}`);
+          throw error;
+        }
+      };
+
+      const initiatorShipResult = await submitToSurat(initiatorOid, initiatorAddress, initiatorUser);
+      const receiverShipResult = await submitToSurat(receiverOid, receiverAddress, receiverUser);
+
       // Shipment heading to the initiator (carrying receiver's items)
       const shipmentToInitiator = await tx.tradeShipment.create({
         data: {
           tradeId,
           shipperId: adminId,
           fromAddressId: warehouseAddressId,
-          carrier: 'Tarodan Warehouse',
-          trackingNumber: genTrackingNumber(),
+          carrier: initiatorShipResult.carrier,
+          trackingNumber: initiatorShipResult.trackingNumber,
           status: ShipmentStatus.label_created,
           shippedAt: now,
           leg: 'from_warehouse',
@@ -4507,8 +4571,8 @@ export class AdminService {
           tradeId,
           shipperId: adminId,
           fromAddressId: warehouseAddressId,
-          carrier: 'Tarodan Warehouse',
-          trackingNumber: genTrackingNumber(),
+          carrier: receiverShipResult.carrier,
+          trackingNumber: receiverShipResult.trackingNumber,
           status: ShipmentStatus.label_created,
           shippedAt: now,
           leg: 'from_warehouse',
@@ -4630,13 +4694,66 @@ export class AdminService {
 
       const now = new Date();
 
+      // Submit return shipments to Sürat (each party gets their own items back)
+      const initiatorReturnOid = `TRD-${trade.tradeNumber}-RET-INI`.replace(/[^a-zA-Z0-9-]/g, '').slice(0, 50);
+      const receiverReturnOid = `TRD-${trade.tradeNumber}-RET-REC`.replace(/[^a-zA-Z0-9-]/g, '').slice(0, 50);
+
+      const initiatorUser = await tx.user.findUnique({ where: { id: trade.initiatorId } });
+      const receiverUser = await tx.user.findUnique({ where: { id: trade.receiverId } });
+
+      const submitReturnToSurat = async (oid: string, addr: any, user: any): Promise<{ carrier: string; trackingNumber: string }> => {
+        if (!this.suratCargoService || !this.suratCargoService.isIntegrationEnabled()) {
+          return { carrier: 'Tarodan Warehouse', trackingNumber: genTrackingNumber() };
+        }
+        try {
+          const result = await this.suratCargoService.submitShipmentWithRetry({
+            idempotencyKey: `surat:trade-return:${oid}`,
+            correlationId: `trade-reject-${tradeId}`,
+            payload: {
+              KisiKurum: addr.fullName || user?.displayName || 'Takas İade',
+              SahisBirim: 'Takas İade Gönderisi',
+              AliciAdresi: addr.address,
+              Il: addr.city,
+              Ilce: addr.district,
+              TelefonCep: addr.phone,
+              KargoTuru: SuratKargoTuru.Koli,
+              OdemeTipi: SuratOdemeTipi.Pesin,
+              OzelKargoTakipNo: oid,
+              Adet: 1,
+              BirimDesi: 1,
+              BirimKg: 1,
+              KapidanOdemeTahsilatTipi: 1,
+              TasimaSekli: SuratTasimaSekli.KaraYolu,
+              TeslimSekli: SuratTeslimSekli.AdreseTeslim,
+              GonderiSekli: SuratGonderiSekli.Standart,
+              Pazaryerimi: 0,
+              Iademi: true, // İade gönderisi
+            },
+          });
+          if (!result.ok) {
+            const r = result as any;
+            const errMsg = r.kind === 'business' ? r.suratMessage : `technical: ${r.code}`;
+            throw new BadRequestException(
+              `Sürat iade kargo siparişi reddedildi: ${errMsg}`,
+            );
+          }
+          return { carrier: 'surat', trackingNumber: oid };
+        } catch (error: any) {
+          this.logger.error(`Surat return shipment failed for trade ${tradeId}: ${error.message}`);
+          throw error;
+        }
+      };
+
+      const initiatorReturnResult = await submitReturnToSurat(initiatorReturnOid, initiatorAddress, initiatorUser);
+      const receiverReturnResult = await submitReturnToSurat(receiverReturnOid, receiverAddress, receiverUser);
+
       const returnToInitiator = await tx.tradeShipment.create({
         data: {
           tradeId,
           shipperId: adminId,
           fromAddressId: warehouseAddressId,
-          carrier: 'Tarodan Warehouse',
-          trackingNumber: genTrackingNumber(),
+          carrier: initiatorReturnResult.carrier,
+          trackingNumber: initiatorReturnResult.trackingNumber,
           status: ShipmentStatus.label_created,
           shippedAt: now,
           leg: 'return',
@@ -4650,8 +4767,8 @@ export class AdminService {
           tradeId,
           shipperId: adminId,
           fromAddressId: warehouseAddressId,
-          carrier: 'Tarodan Warehouse',
-          trackingNumber: genTrackingNumber(),
+          carrier: receiverReturnResult.carrier,
+          trackingNumber: receiverReturnResult.trackingNumber,
           status: ShipmentStatus.label_created,
           shippedAt: now,
           leg: 'return',

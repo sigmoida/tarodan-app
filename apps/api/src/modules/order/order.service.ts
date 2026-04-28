@@ -346,16 +346,17 @@ export class OrderService {
         TelefonCep: ctx.recipientPhone,
         SahisBirim: ctx.productTitle,
         KargoTuru: SuratKargoTuru.Koli,
-        Odemetipi: SuratOdemeTipi.Pesin,
+        OdemeTipi: SuratOdemeTipi.Pesin,
         OzelKargoTakipNo: ctx.orderNumberPreview,
         Adet: 1,
         BirimDesi: 1,
         BirimKg: 1,
+        KapidanOdemeTahsilatTipi: 1, // Nakit (zorunlu alan)
         TasimaSekli: SuratTasimaSekli.KaraYolu,
         TeslimSekli: SuratTeslimSekli.AdreseTeslim,
         GonderiSekli: SuratGonderiSekli.Standart,
         Pazaryerimi: 0,
-        Iademi: 0,
+        Iademi: false,
       },
     });
 

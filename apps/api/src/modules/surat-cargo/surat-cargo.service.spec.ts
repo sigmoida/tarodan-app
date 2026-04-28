@@ -22,16 +22,17 @@ const basePayload: SuratGonderiPayload = {
   Ilce: 'Kadıköy',
   TelefonCep: '05551234567',
   KargoTuru: SuratKargoTuru.Koli,
-  Odemetipi: SuratOdemeTipi.Pesin,
+  OdemeTipi: SuratOdemeTipi.Pesin,
   OzelKargoTakipNo: 'ORD-1',
   Adet: 1,
   BirimDesi: 1,
   BirimKg: 1,
+  KapidanOdemeTahsilatTipi: 1,
   TasimaSekli: SuratTasimaSekli.KaraYolu,
   TeslimSekli: SuratTeslimSekli.AdreseTeslim,
   GonderiSekli: SuratGonderiSekli.Standart,
   Pazaryerimi: 0,
-  Iademi: 0,
+  Iademi: false,
 };
 
 describe('SuratCargoService', () => {
