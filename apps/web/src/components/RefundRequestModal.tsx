@@ -128,8 +128,8 @@ export default function RefundRequestModal({
         : "Satıcı henüz kargoya vermedi. İadeniz anında işlenecek."
       : phase === "in_cooling_off"
         ? locale === "en"
-          ? "You're within the 14-day cooling-off period. Once approved, a return shipping label will be issued."
-          : "14 günlük cayma hakkı süresindesiniz. Onaylandıktan sonra iade kargosu açılacak."
+          ? "You're within the 14-day right-of-withdrawal window. Your request will be approved automatically and a return shipping label will be created — drop the package off at any Sürat branch."
+          : "14 günlük cayma hakkı süresindesiniz. Talebiniz otomatik onaylanır; size bir iade kargo numarası verilecek, paketi en yakın Sürat şubesine bırakmanız yeterli."
         : locale === "en"
           ? "The cooling-off period has expired. Your request will be reviewed by the seller and admin team."
           : "14 günlük cayma süresi dolmuş. Talebiniz satıcı ve admin tarafından incelenecek.";

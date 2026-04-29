@@ -512,6 +512,13 @@ export class RefundService {
     });
   }
 
+  /**
+   * Cooling-off refund (≤14 days). 14-day right-of-withdrawal is statutory in
+   * Türkiye — the seller cannot reject it. We auto-approve and either:
+   *   - shipped/in_transit → wait_for_delivery; cron opens return shipment
+   *     once the buyer actually has the item.
+   *   - delivered → open return shipment immediately.
+   */
   private async createCoolingOffRefund(
     order: {
       id: string;
@@ -525,12 +532,7 @@ export class RefundService {
     const refundNumber = await this.generateRefundNumber();
     const amount = Number(order.totalAmount);
 
-    const initialStatus =
-      order.status === OrderStatus.delivered
-        ? RefundRequestStatus.pending_review
-        : RefundRequestStatus.wait_for_delivery;
-
-    return this.prisma.refundRequest.create({
+    const created = await this.prisma.refundRequest.create({
       data: {
         refundNumber,
         orderId: order.id,
@@ -539,9 +541,18 @@ export class RefundService {
         description: dto.description ?? null,
         evidencePhotoUrls: dto.evidencePhotoUrls ?? [],
         amount,
-        status: initialStatus,
+        status: RefundRequestStatus.wait_for_delivery,
+        decidedBy: 'system',
+        decidedAt: new Date(),
       },
     });
+
+    if (order.status === OrderStatus.delivered) {
+      await this.openReturnShipment(created.id);
+      return this.prisma.refundRequest.findUnique({ where: { id: created.id } });
+    }
+
+    return created;
   }
 
   private async createDisputedRefund(

@@ -238,7 +238,7 @@ describe('Refund flow (E2E)', () => {
     expect(returnCall!.Iademi).toBe(true);
   });
 
-  it('14-day cooling-off (delivered, accepted by seller) → return shipment opens immediately', async () => {
+  it('14-day cooling-off (delivered, ≤14 days) → return shipment opens immediately, no seller approval needed', async () => {
     const buyer = await createUser(ctx.module);
     const seller = await createUser(ctx.module, { isSeller: true });
     const product = await createProduct({
@@ -253,7 +253,6 @@ describe('Refund flow (E2E)', () => {
     const { orderId } = await buyAndPay(ctx, buyer, product.id, addr.id);
     const prisma = getPrisma();
 
-    // Force delivered
     await prisma.order.update({
       where: { id: orderId },
       data: { status: OrderStatus.delivered },
@@ -274,20 +273,16 @@ describe('Refund flow (E2E)', () => {
       .send({ reason: 'changed_mind' })
       .expect(201);
 
-    expect(createRes.body.status).toBe(RefundRequestStatus.pending_review);
+    // Auto-approved — return shipment opens during create call (no seller step)
+    expect(createRes.body.status).toBe(RefundRequestStatus.return_shipment_open);
+    expect(createRes.body.returnProvider).toBe('surat');
+    expect(createRes.body.returnTrackingNumber).toMatch(/^RFD-\d{4}-\d{6}$/);
 
-    // Seller accepts → service auto-opens return shipment because order is delivered
-    await request(ctx.app.getHttpServer())
-      .post(`/api/refund-requests/${createRes.body.id}/accept`)
-      .set(authHeader(seller))
-      .expect(200);
-
-    const rr = await prisma.refundRequest.findUnique({
-      where: { id: createRes.body.id },
-    });
-    expect(rr!.status).toBe(RefundRequestStatus.return_shipment_open);
-    expect(rr!.returnProvider).toBe('surat');
-    expect(rr!.returnTrackingNumber).toMatch(/^RFD-\d{4}-\d{6}$/);
+    const returnCall = ctx.surat.shipmentCalls.find(
+      (c) => c.OzelKargoTakipNo === createRes.body.returnTrackingNumber,
+    );
+    expect(returnCall).toBeDefined();
+    expect(returnCall!.Iademi).toBe(true);
   });
 
   it('past 14 days requires description ≥20 chars', async () => {
