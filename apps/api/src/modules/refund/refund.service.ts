@@ -500,7 +500,18 @@ export class RefundService {
       },
     });
 
-    const refundResult = await this.paymentService.processRefund(order.id, amount);
+    let refundResult: { providerRefundId: string };
+    try {
+      refundResult = await this.paymentService.processRefund(order.id, amount);
+    } catch (err) {
+      // Roll back the RefundRequest so the buyer can retry without hitting
+      // the "active duplicate" guard. Sürat cancel is idempotent on retry.
+      await this.prisma.refundRequest.delete({ where: { id: created.id } });
+      this.logger.warn(
+        `Instant refund failed for order ${order.orderNumber}, rolled back RefundRequest ${created.refundNumber}: ${(err as Error).message}`,
+      );
+      throw err;
+    }
 
     return this.prisma.refundRequest.update({
       where: { id: created.id },

@@ -1701,7 +1701,17 @@ export class PaymentService {
         const paytrOid =
           payment.providerConversationId?.trim() ||
           orderId.replace(/-/g, '');
-        refundResult = await this.paytrService.createRefund(paytrOid, amountToRefund);
+        try {
+          refundResult = await this.paytrService.createRefund(paytrOid, amountToRefund);
+        } catch (err) {
+          const msg = (err as Error).message || '';
+          if (/odeme henuz siteye bildirilmemis|henuz siteye bildirilmemi/i.test(msg)) {
+            throw new BadRequestException(
+              'Ödeme yeni tamamlandı, PayTR henüz işlemi tam senkronize etmedi. Lütfen 1-2 dakika sonra tekrar deneyin.',
+            );
+          }
+          throw err;
+        }
 
         if (refundResult.status !== 'success') {
           throw new BadRequestException(
