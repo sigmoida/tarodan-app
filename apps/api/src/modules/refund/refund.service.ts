@@ -464,8 +464,15 @@ export class RefundService {
     shipment: { status: ShipmentStatus; deliveredAt: Date | null } | null;
   }): 'paid' | 'preparing' | 'in_cooling_off' | 'past_cooling_off' | 'unknown' {
     if (order.status === OrderStatus.paid || order.status === OrderStatus.preparing) {
-      const shipped = order.shipment && order.shipment.status !== ShipmentStatus.pending;
-      return shipped ? 'in_cooling_off' : 'preparing';
+      // Sürat hasn't actually picked up if shipment is still pending, or if a
+      // previous attempt was cancelled / failed. In those cases we can still
+      // do an instant refund (no in-flight cargo to chase).
+      const stillNotShipped =
+        !order.shipment ||
+        order.shipment.status === ShipmentStatus.pending ||
+        order.shipment.status === ShipmentStatus.cancelled ||
+        order.shipment.status === ShipmentStatus.failed;
+      return stillNotShipped ? 'preparing' : 'in_cooling_off';
     }
     if (order.status === OrderStatus.shipped) {
       return 'in_cooling_off';

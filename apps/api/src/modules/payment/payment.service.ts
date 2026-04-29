@@ -1679,10 +1679,8 @@ export class PaymentService {
 
     const amountToRefund = refundAmount || Number(payment.amount);
 
-    // Cancel any active Surat shipment before processing the refund (best-effort)
-    await this.cancelSuratShipmentIfExists(orderId, payment.order.orderNumber);
-
-    // Race condition guard: if a payout transfer is already completed/processing, block refund
+    // Race condition guard: if a payout transfer is already completed/processing, block refund.
+    // Check this BEFORE touching PayTR or Sürat so we don't half-cancel.
     const existingPayout = await this.prisma.payoutTransfer.findFirst({
       where: {
         paymentHold: { orderId },
@@ -1765,12 +1763,38 @@ export class PaymentService {
           });
         }
 
-        // Update order status if full refund
+        // Update order status + restore stock on full refund.
+        // Idempotent: skip stock restore if order is already cancelled (e.g.
+        // handleExpiredPreparingOrders already restocked before calling us).
         if (amountToRefund >= Number(payment.amount)) {
+          const orderRow = await tx.order.findUnique({
+            where: { id: orderId },
+            select: { status: true, productId: true },
+          });
+          const alreadyCancelled = orderRow?.status === OrderStatus.cancelled;
+
           await tx.order.update({
             where: { id: orderId },
             data: { status: OrderStatus.cancelled },
           });
+
+          if (!alreadyCancelled && orderRow?.productId) {
+            const product = await tx.product.findUnique({
+              where: { id: orderRow.productId },
+              select: { quantity: true },
+            });
+            if (product?.quantity !== null && product?.quantity !== undefined) {
+              const newQty = product.quantity + 1;
+              await tx.product.update({
+                where: { id: orderRow.productId },
+                data: {
+                  quantity: { increment: 1 },
+                  status: getProductStatusFromQuantity(newQty),
+                },
+              });
+              this.logger.log(`Restored stock for product ${orderRow.productId} after refund of order ${orderId}`);
+            }
+          }
         }
 
         this.logger.log(`Refund processed for payment ${payment.id}: ${amountToRefund} TRY`);
@@ -1817,6 +1841,17 @@ export class PaymentService {
         }
 
         return refundResponse;
+      }).then(async (response) => {
+        // After PayTR refund + DB updates succeed, cancel the Sürat shipment.
+        // Best-effort: a failure here doesn't undo the refund (money is already back).
+        try {
+          await this.cancelSuratShipmentIfExists(orderId, payment.order.orderNumber);
+        } catch (err) {
+          this.logger.error(
+            `Sürat cancel failed after successful refund for order ${orderId}: ${(err as Error).message}. Manual cleanup may be needed.`,
+          );
+        }
+        return response;
       });
     } catch (error: any) {
       this.logger.error(`Refund error for payment ${payment.id}: ${error.message}`);

@@ -1822,6 +1822,9 @@ export class OrderService {
           },
         },
         payment: true,
+        refundRequests: {
+          orderBy: { createdAt: 'desc' },
+        },
       },
     });
 
@@ -2351,8 +2354,45 @@ export class OrderService {
             failureReason: order.payment.failureReason ?? undefined,
           }
         : undefined,
+      activeRefundRequest: this.pickActiveRefundRequest(order.refundRequests ?? []),
       createdAt: order.createdAt,
       updatedAt: order.updatedAt,
+    };
+  }
+
+  private pickActiveRefundRequest(refundRequests: any[]): any | null {
+    const activeStatuses = [
+      'pending_review',
+      'approved',
+      'wait_for_delivery',
+      'return_shipment_open',
+      'return_in_transit',
+      'return_delivered',
+      'disputed',
+    ];
+    const active = refundRequests.find((r) => activeStatuses.includes(r.status));
+    if (!active) {
+      const refunded = refundRequests.find((r) => r.status === 'refunded');
+      if (refunded) {
+        return {
+          id: refunded.id,
+          refundNumber: refunded.refundNumber,
+          status: refunded.status,
+          createdAt: refunded.createdAt,
+          refundedAt: refunded.refundedAt,
+        };
+      }
+      return null;
+    }
+    return {
+      id: active.id,
+      refundNumber: active.refundNumber,
+      status: active.status,
+      reason: active.reason,
+      returnTrackingNumber: active.returnTrackingNumber,
+      returnProvider: active.returnProvider,
+      returnStatus: active.returnStatus,
+      createdAt: active.createdAt,
     };
   }
 }
