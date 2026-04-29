@@ -40,21 +40,29 @@ export class IyzicoCallbackDto {
 }
 
 export class PayTRCallbackDto {
-  @ApiProperty({ description: 'Merchant order ID' })
+  // PayTR webhook protocol requires us to always reply "OK" — if we 4xx,
+  // PayTR retries the callback and the user stays stuck on the secure page.
+  // So all fields are optional at the DTO layer; the service validates the
+  // hash and required fields and decides what to do.
+  @ApiPropertyOptional({ description: 'Merchant order ID' })
+  @IsOptional()
   @IsString()
-  merchant_oid: string;
+  merchant_oid?: string;
 
-  @ApiProperty({ description: 'Status' })
+  @ApiPropertyOptional({ description: 'Status' })
+  @IsOptional()
   @IsString()
-  status: string;
+  status?: string;
 
-  @ApiProperty({ description: 'Total amount' })
+  @ApiPropertyOptional({ description: 'Total amount' })
+  @IsOptional()
   @IsString()
-  total_amount: string;
+  total_amount?: string;
 
-  @ApiProperty({ description: 'Hash' })
+  @ApiPropertyOptional({ description: 'Hash' })
+  @IsOptional()
   @IsString()
-  hash: string;
+  hash?: string;
 
   @ApiPropertyOptional({ description: 'Failed reason code' })
   @IsOptional()

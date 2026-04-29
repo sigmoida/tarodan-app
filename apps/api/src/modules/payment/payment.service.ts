@@ -355,22 +355,47 @@ export class PaymentService {
     });
 
     if (existingPayment) {
-      // Eski hata mesajını temizle; kullanıcı yeni deneme yapıyor
-      if (existingPayment.failureReason) {
-        await this.prisma.payment.update({
-          where: { id: existingPayment.id },
-          data: { failureReason: null },
-        });
+      const bypassEnabled = this.configService.get('PAYMENT_BYPASS') === 'true';
+
+      // Reset row before reuse: PayTR iframe tokens are single-use, so we must
+      // mint a fresh one on every retry (otherwise iframe shows
+      // "Bu ödeme sayfası artık geçersiz").
+      await this.prisma.payment.update({
+        where: { id: existingPayment.id },
+        data: {
+          status: PaymentStatus.pending,
+          failureReason: null,
+          providerPaymentId: null,
+        },
+      });
+
+      if (bypassEnabled) {
+        return {
+          paymentId: existingPayment.id,
+          orderId: order.id,
+          amount: Number(order.totalAmount),
+          provider: existingPayment.provider,
+          expiresIn: 300,
+          useBypass: true,
+        };
       }
 
-      const bypassEnabled = this.configService.get('PAYMENT_BYPASS') === 'true';
-      return {
-        paymentId: existingPayment.id,
-        paymentUrl: bypassEnabled ? undefined : `${this.configService.get('FRONTEND_URL') || (this.configService.get('NODE_ENV') === 'production' ? 'https://tarodan.com' : 'http://localhost:3000')}/payment/${existingPayment.id}`,
-        provider: existingPayment.provider,
-        expiresIn: 300,
-        ...(bypassEnabled ? { useBypass: true } : {}),
-      };
+      try {
+        const result = await this.initializePayTRPayment(
+          { ...existingPayment, providerPaymentId: null },
+          order,
+          this.getClientIp(req),
+        );
+        return {
+          paymentId: existingPayment.id,
+          paymentUrl: result.paymentUrl,
+          paymentHtml: result.paymentHtml,
+          provider: existingPayment.provider,
+          expiresIn: 300,
+        };
+      } catch (error: any) {
+        throw new BadRequestException(error.message || 'PayTR ödeme başlatılamadı');
+      }
     }
 
     // Offer-based order ise: ödeme başlatılırken stok rezerve et
@@ -676,6 +701,15 @@ export class PaymentService {
   async handlePayTRCallback(dto: PayTRCallbackDto) {
     this.logger.log('PayTR callback received');
 
+    // PayTR keeps retrying unless we reply with literal "OK". Always return
+    // "OK" — even on bad/missing payloads — and just log the issue.
+    if (!dto.merchant_oid || !dto.status || !dto.total_amount || !dto.hash) {
+      this.logger.warn(
+        `PayTR callback missing required fields: merchant_oid=${dto.merchant_oid} status=${dto.status} total_amount=${dto.total_amount} hash=${dto.hash ? 'present' : 'missing'}`,
+      );
+      return 'OK';
+    }
+
     const isValid = this.paytrService.verifyCallback({
       merchant_oid: dto.merchant_oid,
       status: dto.status as 'success' | 'failed',
@@ -692,7 +726,8 @@ export class PaymentService {
     const payment = await this.findPaymentForPaytrCallback(dto.merchant_oid);
 
     if (!payment) {
-      throw new NotFoundException('Payment not found');
+      this.logger.warn(`PayTR callback: payment not found for merchant_oid=${dto.merchant_oid}`);
+      return 'OK';
     }
 
     if (dto.status === 'success') {
