@@ -181,9 +181,13 @@ export class SuratCargoService {
       const raw = await this.soapClient.callGonderiSil(ozelKargoTakipNo, { timeoutMs });
       const normalized = (raw || '').trim();
 
-      // "Tamam" = cancelled, "Pasif Edilecek Gonderi Bulunamadi!" = already gone (idempotent OK)
+      // Success patterns: "Tamam", "Gönderiniz başarı ile pasif edilmiştir.",
+      // "Pasif Edilecek Gonderi Bulunamadi!" (already gone, idempotent OK)
       if (
         normalized === 'Tamam' ||
+        /başarı\s*ile\s*pasif/i.test(normalized) ||
+        /basari\s*ile\s*pasif/i.test(normalized) ||
+        /pasif\s*edil(miş|mistir|miştir|mis)/i.test(normalized) ||
         /pasif edilecek gonderi bulunamadi/i.test(normalized) ||
         /bulunamadi/i.test(normalized)
       ) {

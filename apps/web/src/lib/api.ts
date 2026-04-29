@@ -342,6 +342,28 @@ export const paymentsApi = {
   deletePaymentMethod: (paymentMethodId: string) => api.delete(`/payments/methods/${paymentMethodId}`),
 };
 
+export type RefundReason =
+  | 'changed_mind'
+  | 'damaged'
+  | 'wrong_item'
+  | 'not_as_described'
+  | 'missing_parts'
+  | 'other';
+
+export const refundsApi = {
+  create: (
+    orderId: string,
+    body: { reason: RefundReason; description?: string; evidencePhotoUrls?: string[] },
+  ) => api.post(`/orders/${orderId}/refund-requests`, body),
+  myRequests: () => api.get('/refund-requests/me'),
+  sellerRequests: () => api.get('/refund-requests/seller'),
+  getById: (id: string) => api.get(`/refund-requests/${id}`),
+  cancel: (id: string) => api.post(`/refund-requests/${id}/cancel`),
+  accept: (id: string) => api.post(`/refund-requests/${id}/accept`),
+  reject: (id: string, response: string) =>
+    api.post(`/refund-requests/${id}/reject`, { response }),
+};
+
 // Addresses
 export const addressesApi = {
   getAll: () => api.get('/users/me/addresses'),

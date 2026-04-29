@@ -295,7 +295,82 @@ export class SuratTrackingService {
     if (ddmmyyyy) {
       return new Date(`${ddmmyyyy[3]}-${ddmmyyyy[2]}-${ddmmyyyy[1]}T00:00:00.000Z`);
     }
-    // Fall back to ISO parse
     return new Date(dateStr);
+  }
+
+  /**
+   * Sync all active refund return shipments (alıcı → satıcı).
+   * Refund returns are tracked separately on RefundRequest, not on Shipment.
+   */
+  async syncAllActiveRefundReturns(): Promise<{ synced: number; failed: number }> {
+    const activeReturns = await this.prisma.refundRequest.findMany({
+      where: {
+        returnProvider: 'surat',
+        status: {
+          in: ['return_shipment_open', 'return_in_transit'],
+        },
+        returnTrackingNumber: { not: null },
+      },
+    });
+
+    let synced = 0;
+    let failed = 0;
+    for (const rr of activeReturns) {
+      try {
+        const ok = await this.syncRefundReturnTracking(rr.id);
+        if (ok) synced++;
+        else failed++;
+      } catch (error: any) {
+        this.logger.error(`Failed to sync refund return ${rr.id}: ${error.message}`);
+        failed++;
+      }
+    }
+    return { synced, failed };
+  }
+
+  async syncRefundReturnTracking(refundRequestId: string): Promise<boolean> {
+    const rr = await this.prisma.refundRequest.findUnique({
+      where: { id: refundRequestId },
+    });
+    if (!rr || rr.returnProvider !== 'surat' || !rr.returnTrackingNumber) {
+      return false;
+    }
+
+    const data = await this.fetchTrackingInfo(rr.returnTrackingNumber);
+    if (!data || data.Gonderiler.length === 0) return false;
+
+    const gonderi = data.Gonderiler[0];
+    const newStatus = mapSuratStatusToShipmentStatus(gonderi.KargonunDurumuSayi);
+    const isDelivered = isSuratDelivered(gonderi.KargonunDurumuSayi);
+
+    const { RefundService } = await import('../refund/refund.service');
+    const refundService = this.moduleRef.get(RefundService, { strict: false });
+    if (!refundService) {
+      this.logger.warn(`RefundService not resolvable when syncing ${refundRequestId}`);
+      return false;
+    }
+
+    await refundService.applyReturnTrackingUpdate(refundRequestId, {
+      status: newStatus,
+      deliveredAt:
+        isDelivered && gonderi.TeslimTarihi
+          ? this.parseSuratDate(gonderi.TeslimTarihi)
+          : undefined,
+    });
+
+    if (isDelivered) {
+      try {
+        await refundService.finalizeRefundForReturnedShipment(refundRequestId);
+        this.logger.log(
+          `Auto-refunded RefundRequest ${refundRequestId} after Sürat return delivery`,
+        );
+      } catch (error: any) {
+        this.logger.error(
+          `Failed to finalize refund ${refundRequestId}: ${error.message}`,
+        );
+      }
+    }
+
+    return true;
   }
 }

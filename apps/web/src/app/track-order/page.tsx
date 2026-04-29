@@ -327,21 +327,43 @@ export default function TrackOrderPage() {
               </div>
             </div>
 
-            {order.shipment && (
-              <div className="bg-surface-elevated rounded-xl shadow-sm p-6">
-                <h3 className="font-semibold text-heading mb-3 flex items-center gap-2">
-                  <TruckIcon className="w-5 h-5 text-primary-500" />
-                  {locale === "en" ? "Shipping" : "Kargo"}
-                </h3>
-                <div className="space-y-2 text-body">
-                  <p>
-                    <span className="text-muted">
-                      {locale === "en" ? "Carrier:" : "Firma:"}
-                    </span>{" "}
-                    {order.shipment.provider}
-                  </p>
-                  {order.shipment.trackingNumber ? (
-                    <>
+            {order.shipment && (() => {
+              const s = order.shipment.status;
+              const isPending = s === "pending";
+              const isCancelled = s === "cancelled" || s === "failed";
+              const showTracking =
+                !isPending && !isCancelled && !!order.shipment.trackingNumber;
+
+              return (
+                <div className="bg-surface-elevated rounded-xl shadow-sm p-6">
+                  <h3 className="font-semibold text-heading mb-3 flex items-center gap-2">
+                    <TruckIcon className="w-5 h-5 text-primary-500" />
+                    {locale === "en" ? "Shipping" : "Kargo"}
+                  </h3>
+                  {isPending && (
+                    <p className="text-sm bg-info-50 border border-info-200 rounded p-3 text-info-800">
+                      {locale === "en"
+                        ? "The seller is preparing the package. Tracking details will appear once it's handed over to the cargo branch."
+                        : "Satıcı paketi hazırlıyor. Kargo şubesine teslim edildiği anda takip bilgileri burada görünecek."}
+                    </p>
+                  )}
+                  {isCancelled && (
+                    <p className="text-sm bg-danger-50 border border-danger-200 rounded p-3 text-danger-800">
+                      {locale === "en"
+                        ? "This shipment has been cancelled."
+                        : "Bu kargo iptal edildi."}
+                    </p>
+                  )}
+                  {showTracking && (
+                    <div className="space-y-2 text-body">
+                      <p>
+                        <span className="text-muted">
+                          {locale === "en" ? "Carrier:" : "Firma:"}
+                        </span>{" "}
+                        {order.shipment.provider === "surat"
+                          ? "Sürat Kargo"
+                          : order.shipment.provider}
+                      </p>
                       <p>
                         <span className="text-muted">
                           {locale === "en" ? "Tracking number:" : "Takip no:"}
@@ -355,7 +377,7 @@ export default function TrackOrderPage() {
                         <a
                           href={
                             order.shipment.trackingUrl ||
-                            `https://www.suratkargo.com.tr/KargoTakip/?kargotakipno=${encodeURIComponent(order.shipment.trackingNumber)}`
+                            `https://www.suratkargo.com.tr/KargoTakip/?kargotakipno=${encodeURIComponent(order.shipment.trackingNumber!)}`
                           }
                           target="_blank"
                           rel="noopener noreferrer"
@@ -367,17 +389,11 @@ export default function TrackOrderPage() {
                           →
                         </a>
                       )}
-                    </>
-                  ) : (
-                    <p className="text-sm text-muted bg-info-50 border border-info-200 rounded p-2">
-                      {locale === "en"
-                        ? "Tracking number will appear once the seller delivers the package to the cargo branch."
-                        : "Takip numarası, satıcı paketi kargo şubesine teslim ettiğinde görünecektir."}
-                    </p>
+                    </div>
                   )}
                 </div>
-              </div>
-            )}
+              );
+            })()}
 
             {shipAddr && (shipAddr.address || shipAddr.fullName) && (
               <div className="bg-surface-elevated rounded-xl shadow-sm p-6">

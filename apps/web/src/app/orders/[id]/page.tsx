@@ -14,6 +14,7 @@ import {
   ratingsApi,
   mediaApi,
 } from "@/lib/api";
+import RefundRequestModal from "@/components/RefundRequestModal";
 import {
   ArrowLeftIcon,
   TruckIcon,
@@ -107,6 +108,17 @@ interface OrderDetail {
     status: string;
     cost?: number;
   };
+  activeRefundRequest?: {
+    id: string;
+    refundNumber: string;
+    status: string;
+    reason?: string;
+    returnTrackingNumber?: string | null;
+    returnProvider?: string | null;
+    returnStatus?: string | null;
+    createdAt: string;
+    refundedAt?: string | null;
+  } | null;
   isBuyer: boolean;
   isSeller: boolean;
   hasProductRating?: boolean;
@@ -581,8 +593,29 @@ export default function OrderDetailPage() {
     }
   };
 
-  const handleRefund = async () => {
-    toast(locale === "en" ? "Coming soon" : "Yakında gelecektir");
+  const handleRefund = () => {
+    if (!order) return;
+    if (order.status === "pending_payment") {
+      toast(
+        locale === "en"
+          ? "This order is not paid; cancel it instead"
+          : "Bu sipariş henüz ödenmemiş, iptal etmelisiniz",
+      );
+      return;
+    }
+    setShowRefundModal(true);
+  };
+
+  const inferRefundPhase = (): "preparing" | "in_cooling_off" | "past_cooling_off" => {
+    if (!order) return "preparing";
+    const shipmentStatus = order.shipment?.status;
+    if (
+      (order.status === "paid" || order.status === "preparing") &&
+      (!shipmentStatus || shipmentStatus === "pending")
+    ) {
+      return "preparing";
+    }
+    return "in_cooling_off";
   };
 
   const handleReactivate = async () => {
@@ -803,69 +836,236 @@ export default function OrderDetailPage() {
               </div>
             </div>
 
-            {/* Shipping Info */}
-            {order.shipment && (
-              <div className="bg-surface-elevated rounded-xl shadow-sm p-6">
-                <h2 className="text-lg font-semibold text-heading mb-4 flex items-center gap-2">
-                  <TruckIcon className="w-5 h-5" />
-                  {locale === "en" ? "Shipping Information" : "Kargo Bilgileri"}
-                </h2>
-                <div className="space-y-3">
-                  <div className="flex justify-between">
-                    <span className="text-muted">
-                      {locale === "en" ? "Carrier:" : "Kargo Firması:"}
-                    </span>
-                    <span className="font-medium capitalize">
-                      {order.shipment.provider === "surat" ? "Sürat Kargo" : order.shipment.provider}
+            {/* Active Refund Request Banner */}
+            {order.activeRefundRequest && (() => {
+              const rr = order.activeRefundRequest;
+              const isRefunded = rr.status === "refunded";
+              const isReturnReady =
+                rr.status === "return_shipment_open" && !!rr.returnTrackingNumber;
+              const labelMap: Record<string, { tr: string; en: string }> = {
+                pending_review: { tr: "Talep İnceleniyor", en: "Under Review" },
+                approved: { tr: "Onaylandı, İşleniyor", en: "Approved, Processing" },
+                wait_for_delivery: {
+                  tr: "Ürün Tesliminden Sonra İade Açılacak",
+                  en: "Awaiting Delivery",
+                },
+                return_shipment_open: {
+                  tr: "İade Kargonuz Hazır",
+                  en: "Return Shipment Ready",
+                },
+                return_in_transit: {
+                  tr: "İade Yolda",
+                  en: "Return In Transit",
+                },
+                return_delivered: {
+                  tr: "Satıcıya Ulaştı, Para İadesi Yapılıyor",
+                  en: "Delivered, Refund Processing",
+                },
+                refunded: { tr: "İade Tamamlandı", en: "Refunded" },
+                disputed: { tr: "İtirazlı (İnceleniyor)", en: "Under Dispute" },
+              };
+              const lbl = labelMap[rr.status] ?? { tr: rr.status, en: rr.status };
+              return (
+                <div
+                  className={`rounded-xl shadow-sm p-6 border-2 ${
+                    isRefunded
+                      ? "bg-success-50 border-success-200"
+                      : "bg-info-50 border-info-200"
+                  }`}
+                >
+                  <div className="flex items-start justify-between gap-3 mb-3">
+                    <div>
+                      <h2
+                        className={`text-lg font-semibold flex items-center gap-2 ${
+                          isRefunded ? "text-success-800" : "text-info-800"
+                        }`}
+                      >
+                        <ArrowUturnLeftIcon className="w-5 h-5" />
+                        {locale === "en" ? "Refund Request" : "İade Talebi"}
+                      </h2>
+                      <p className="text-sm text-muted mt-1">
+                        {rr.refundNumber} ·{" "}
+                        {new Date(rr.createdAt).toLocaleDateString(
+                          locale === "en" ? "en-US" : "tr-TR",
+                        )}
+                      </p>
+                    </div>
+                    <span
+                      className={`inline-flex items-center px-3 py-1 rounded-full text-sm font-medium border ${
+                        isRefunded
+                          ? "bg-success-100 text-success-800 border-success-300"
+                          : "bg-info-100 text-info-800 border-info-300"
+                      }`}
+                    >
+                      {locale === "en" ? lbl.en : lbl.tr}
                     </span>
                   </div>
-                  {order.shipment.trackingNumber ? (
-                    <div className="flex justify-between items-center">
-                      <span className="text-muted">
-                        {locale === "en" ? "Tracking Number:" : "Takip Numarası:"}
-                      </span>
-                      <span className="font-mono bg-surface-alt px-2 py-1 rounded">
-                        {order.shipment.trackingNumber}
-                      </span>
-                    </div>
-                  ) : (
-                    <div className="bg-info-50 border border-info-200 rounded-lg p-3 text-sm text-info-700">
-                      {locale === "en"
-                        ? "The tracking number will appear here once the seller drops the package at the cargo branch."
-                        : "Takip numarası, satıcı paketinizi kargo şubesine teslim ettiğinde burada görünecektir."}
+
+                  {isReturnReady && (
+                    <div className="bg-surface-elevated rounded-lg p-4 mb-3">
+                      <p className="text-sm text-body mb-2">
+                        {locale === "en"
+                          ? "Drop the package off at any Sürat branch with this number:"
+                          : "Bu numarayı paketle birlikte herhangi bir Sürat şubesine bırakın:"}
+                      </p>
+                      <div className="flex items-center justify-between gap-3">
+                        <span className="font-mono text-lg font-bold text-heading break-all">
+                          {rr.returnTrackingNumber}
+                        </span>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            navigator.clipboard.writeText(rr.returnTrackingNumber!);
+                            toast.success(locale === "en" ? "Copied" : "Kopyalandı");
+                          }}
+                          className="text-sm text-primary-600 hover:text-primary-700 font-medium"
+                        >
+                          {locale === "en" ? "Copy" : "Kopyala"}
+                        </button>
+                      </div>
                     </div>
                   )}
-                  <div className="flex justify-between">
-                    <span className="text-muted">
-                      {locale === "en" ? "Shipping Status:" : "Kargo Durumu:"}
-                    </span>
-                    <span className="font-medium">{order.shipment.status}</span>
-                  </div>
-                  {order.isBuyer && order.shipment.trackingNumber && (
-                    <div className="flex flex-col sm:flex-row gap-2 mt-3">
-                      {order.shipment.provider === "surat" && (
-                        <a
-                          href={`https://www.suratkargo.com.tr/KargoTakip/?kargotakipno=${encodeURIComponent(order.shipment.trackingNumber)}`}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          className="inline-flex items-center justify-center gap-2 px-4 py-2 bg-primary-600 hover:bg-primary-700 text-inverted rounded-lg text-sm font-medium transition-colors"
-                        >
-                          <TruckIcon className="w-4 h-4" />
-                          {locale === "en" ? "Track on Sürat" : "Sürat'ta Takip Et"}
-                        </a>
+
+                  {rr.returnProvider === "surat" && rr.returnTrackingNumber && (
+                    <a
+                      href={`https://www.suratkargo.com.tr/KargoTakip/?kargotakipno=${encodeURIComponent(rr.returnTrackingNumber)}`}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="inline-flex items-center gap-1 text-sm text-primary-600 hover:text-primary-700 font-medium mr-4"
+                    >
+                      <TruckIcon className="w-4 h-4" />
+                      {locale === "en" ? "Track on Sürat" : "Sürat'ta Takip Et"}
+                    </a>
+                  )}
+
+                  <Link
+                    href={`/refund-requests/${rr.id}`}
+                    className="inline-flex items-center gap-1 text-sm text-primary-600 hover:text-primary-700 font-medium"
+                  >
+                    {locale === "en" ? "View Details →" : "Detayı Gör →"}
+                  </Link>
+                </div>
+              );
+            })()}
+
+            {/* Shipping Info — alıcı için her zaman, satıcı için yalnızca kargo gerçekten
+                yola çıktıktan sonra (pending durumunda satıcının zaten 'Kargo Referans Numarası'
+                kartı var, çift bilgi olmasın) */}
+            {order.shipment && (() => {
+              const s = order.shipment.status;
+              const isPending = s === "pending";
+              const isCancelled = s === "cancelled" || s === "failed";
+              const isShippedActive =
+                s === "label_created" ||
+                s === "picked_up" ||
+                s === "in_transit" ||
+                s === "at_delivery_branch" ||
+                s === "out_for_delivery";
+              const isDelivered = s === "delivered";
+
+              // Satıcı için pending durumunda kartı tamamen gizle —
+              // 'Kargo Referans Numarası' aksiyon kartı zaten görünüyor
+              if (isPending && order.isSeller && !order.isBuyer) {
+                return null;
+              }
+
+              const statusLabelMap: Record<string, { tr: string; en: string }> = {
+                pending: { tr: "Satıcı Hazırlıyor", en: "Preparing" },
+                label_created: { tr: "Kargo Etiketi Oluşturuldu", en: "Label Created" },
+                picked_up: { tr: "Şubeye Teslim Edildi", en: "Picked Up" },
+                in_transit: { tr: "Yolda", en: "In Transit" },
+                at_delivery_branch: { tr: "Dağıtım Şubesinde", en: "At Delivery Branch" },
+                out_for_delivery: { tr: "Dağıtıma Çıktı", en: "Out For Delivery" },
+                delivered: { tr: "Teslim Edildi", en: "Delivered" },
+                failed: { tr: "Teslim Edilemedi", en: "Failed" },
+                return_in_progress: { tr: "İade Yolda", en: "Return In Progress" },
+                returned: { tr: "İade Tamamlandı", en: "Returned" },
+                cancelled: { tr: "İptal Edildi", en: "Cancelled" },
+              };
+              const statusLbl = statusLabelMap[s] ?? { tr: s, en: s };
+
+              return (
+                <div className="bg-surface-elevated rounded-xl shadow-sm p-6">
+                  <h2 className="text-lg font-semibold text-heading mb-4 flex items-center gap-2">
+                    <TruckIcon className="w-5 h-5" />
+                    {locale === "en" ? "Shipping Information" : "Kargo Bilgileri"}
+                  </h2>
+
+                  {isPending && order.isBuyer && (
+                    <div className="bg-info-50 border border-info-200 rounded-lg p-4 text-sm text-info-800">
+                      {locale === "en"
+                        ? "The seller is preparing your package. Tracking details will appear here once it's handed over to Sürat."
+                        : "Satıcı paketinizi hazırlıyor. Sürat şubesine teslim edildiği anda takip bilgileri burada görünecek."}
+                    </div>
+                  )}
+
+                  {isCancelled && (
+                    <div className="bg-danger-50 border border-danger-200 rounded-lg p-4 text-sm text-danger-800">
+                      {locale === "en"
+                        ? "This shipment has been cancelled."
+                        : "Bu kargo iptal edildi."}
+                    </div>
+                  )}
+
+                  {(isShippedActive || isDelivered) && (
+                    <div className="space-y-3">
+                      <div className="flex justify-between">
+                        <span className="text-muted">
+                          {locale === "en" ? "Carrier:" : "Kargo Firması:"}
+                        </span>
+                        <span className="font-medium">
+                          {order.shipment.provider === "surat"
+                            ? "Sürat Kargo"
+                            : order.shipment.provider}
+                        </span>
+                      </div>
+                      {order.shipment.trackingNumber && (
+                        <div className="flex justify-between items-center">
+                          <span className="text-muted">
+                            {locale === "en" ? "Tracking Number:" : "Takip Numarası:"}
+                          </span>
+                          <span className="font-mono bg-surface-alt px-2 py-1 rounded text-sm">
+                            {order.shipment.trackingNumber}
+                          </span>
+                        </div>
                       )}
-                      <Link
-                        href={`/track-order?orderNumber=${encodeURIComponent(order.orderNumber)}&email=${encodeURIComponent(user?.email || "")}`}
-                        className="inline-flex items-center justify-center gap-2 px-4 py-2 bg-info-600 hover:bg-info-700 text-inverted rounded-lg text-sm font-medium transition-colors"
-                      >
-                        <TruckIcon className="w-4 h-4" />
-                        {locale === "en" ? "Track on Tarodan" : "Tarodan'da Takip Et"}
-                      </Link>
+                      <div className="flex justify-between">
+                        <span className="text-muted">
+                          {locale === "en" ? "Status:" : "Durum:"}
+                        </span>
+                        <span
+                          className={`font-medium ${isDelivered ? "text-success-700" : "text-info-700"}`}
+                        >
+                          {locale === "en" ? statusLbl.en : statusLbl.tr}
+                        </span>
+                      </div>
+                      {order.isBuyer && order.shipment.trackingNumber && (
+                        <div className="flex flex-col sm:flex-row gap-2 mt-3 pt-3 border-t border-border-default">
+                          {order.shipment.provider === "surat" && (
+                            <a
+                              href={`https://www.suratkargo.com.tr/KargoTakip/?kargotakipno=${encodeURIComponent(order.shipment.trackingNumber)}`}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="inline-flex items-center justify-center gap-2 px-4 py-2 bg-primary-600 hover:bg-primary-700 text-inverted rounded-lg text-sm font-medium transition-colors"
+                            >
+                              <TruckIcon className="w-4 h-4" />
+                              {locale === "en" ? "Track on Sürat" : "Sürat'ta Takip Et"}
+                            </a>
+                          )}
+                          <Link
+                            href={`/track-order?orderNumber=${encodeURIComponent(order.orderNumber)}&email=${encodeURIComponent(user?.email || "")}`}
+                            className="inline-flex items-center justify-center gap-2 px-4 py-2 bg-info-600 hover:bg-info-700 text-inverted rounded-lg text-sm font-medium transition-colors"
+                          >
+                            <TruckIcon className="w-4 h-4" />
+                            {locale === "en" ? "Track on Tarodan" : "Tarodan'da Takip Et"}
+                          </Link>
+                        </div>
+                      )}
                     </div>
                   )}
                 </div>
-              </div>
-            )}
+              );
+            })()}
 
             {/* Shipping Address - sadece ödeme bekleyen alıcı değilse göster (alıcı için adres ödeme kartının içinde) */}
             {order.shippingAddress &&
@@ -1457,7 +1657,10 @@ export default function OrderDetailPage() {
             {/* Refund Button for Completed Payments - Only buyer can request refund */}
             {order.payment &&
               order.payment.status === "completed" &&
-              order.isBuyer && (
+              order.isBuyer &&
+              order.status !== "cancelled" &&
+              order.status !== "refunded" &&
+              !order.activeRefundRequest && (
                 <div className="bg-surface-elevated rounded-xl shadow-sm p-6">
                   <h2 className="text-lg font-semibold text-heading mb-4">
                     {locale === "en" ? "Refund" : "İade İşlemi"}
@@ -1471,7 +1674,6 @@ export default function OrderDetailPage() {
                     variant="secondary"
                     size="lg"
                     className="w-full flex items-center justify-center gap-2"
-                    disabled
                     onClick={handleRefund}
                   >
                     <ArrowUturnLeftIcon className="w-5 h-5" />
@@ -1713,13 +1915,14 @@ export default function OrderDetailPage() {
                     ? "Report Order Issue"
                     : "Sipariş Sorunu Bildir"}
                 </Button>
-                <Button
-                  variant="secondary"
-                  onClick={handleRefund}
-                  className="w-full text-left px-4 py-2 text-muted hover:bg-surface rounded-lg transition-colors"
+                <Link
+                  href="/refund-requests"
+                  className="block w-full text-left px-4 py-2 text-muted hover:bg-surface rounded-lg transition-colors"
                 >
-                  {locale === "en" ? "Request Refund" : "İade Talebi Oluştur"}
-                </Button>
+                  {locale === "en"
+                    ? "My Refund Requests"
+                    : "İade Taleplerim"}
+                </Link>
                 <Link
                   href="/support"
                   className="block w-full text-left px-4 py-2 text-muted hover:bg-surface rounded-lg transition-colors"
@@ -1992,6 +2195,19 @@ export default function OrderDetailPage() {
             </Button>
           </div>
         </Modal>
+
+        {order && (
+          <RefundRequestModal
+            isOpen={showRefundModal}
+            onClose={() => setShowRefundModal(false)}
+            orderId={order.id}
+            orderNumber={order.orderNumber}
+            phase={inferRefundPhase()}
+            onSuccess={() => {
+              queryClient.invalidateQueries({ queryKey: ["order", orderId] });
+            }}
+          />
+        )}
       </main>
     </div>
   );

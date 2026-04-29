@@ -23,5 +23,16 @@ export class ShippingSchedulerService {
     } catch (error: any) {
       this.logger.error(`Sürat tracking sync error: ${error.message}`);
     }
+
+    try {
+      const refundResult = await this.suratTracking.syncAllActiveRefundReturns();
+      if (refundResult.synced > 0 || refundResult.failed > 0) {
+        this.logger.log(
+          `Sürat refund-return sync: ${refundResult.synced} synced, ${refundResult.failed} failed`,
+        );
+      }
+    } catch (error: any) {
+      this.logger.error(`Sürat refund-return sync error: ${error.message}`);
+    }
   }
 }
