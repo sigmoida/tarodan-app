@@ -797,6 +797,38 @@ async function main() {
     },
   });
 
+  // Tarodan central warehouse address — required for safe-trade escrow.
+  // admin.service.ts → resolveWarehouseAddressId reads the
+  // `warehouse_address_id` platform setting; without it, approveWarehouseTrade
+  // throws BadRequestException("Depo adresi yapılandırılmamış").
+  const existingWarehouseAddr = await prisma.address.findFirst({
+    where: { userId: superAdmin.id, title: 'Tarodan Deposu' },
+  });
+  const warehouseAddress = existingWarehouseAddr ?? await prisma.address.create({
+    data: {
+      userId: superAdmin.id,
+      title: 'Tarodan Deposu',
+      fullName: 'Tarodan Lojistik',
+      phone: '+905000000000',
+      city: 'İstanbul',
+      district: 'Kadıköy',
+      address: 'Tarodan Depo, Hasanpaşa Mah., Test Sok. No:1',
+      zipCode: '34722',
+      isDefault: false,
+    },
+  });
+  await prisma.platformSetting.upsert({
+    where: { settingKey: 'warehouse_address_id' },
+    update: { settingValue: warehouseAddress.id },
+    create: {
+      settingKey: 'warehouse_address_id',
+      settingValue: warehouseAddress.id,
+      settingType: 'string',
+      description: 'Tarodan central warehouse address ID for safe-trade escrow',
+    },
+  });
+  console.log(`✅ Warehouse address ready: ${warehouseAddress.id}`);
+
   // Platform Seller
   const platformSeller = await prisma.user.upsert({
     where: { email: 'platform@tarodan.com' },
