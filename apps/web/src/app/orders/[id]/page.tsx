@@ -14,6 +14,7 @@ import {
   ratingsApi,
   mediaApi,
 } from "@/lib/api";
+import RefundRequestModal from "@/components/RefundRequestModal";
 import {
   ArrowLeftIcon,
   TruckIcon,
@@ -581,8 +582,29 @@ export default function OrderDetailPage() {
     }
   };
 
-  const handleRefund = async () => {
-    toast(locale === "en" ? "Coming soon" : "Yakında gelecektir");
+  const handleRefund = () => {
+    if (!order) return;
+    if (order.status === "pending_payment") {
+      toast(
+        locale === "en"
+          ? "This order is not paid; cancel it instead"
+          : "Bu sipariş henüz ödenmemiş, iptal etmelisiniz",
+      );
+      return;
+    }
+    setShowRefundModal(true);
+  };
+
+  const inferRefundPhase = (): "preparing" | "in_cooling_off" | "past_cooling_off" => {
+    if (!order) return "preparing";
+    const shipmentStatus = order.shipment?.status;
+    if (
+      (order.status === "paid" || order.status === "preparing") &&
+      (!shipmentStatus || shipmentStatus === "pending")
+    ) {
+      return "preparing";
+    }
+    return "in_cooling_off";
   };
 
   const handleReactivate = async () => {
@@ -1457,7 +1479,9 @@ export default function OrderDetailPage() {
             {/* Refund Button for Completed Payments - Only buyer can request refund */}
             {order.payment &&
               order.payment.status === "completed" &&
-              order.isBuyer && (
+              order.isBuyer &&
+              order.status !== "cancelled" &&
+              order.status !== "refunded" && (
                 <div className="bg-surface-elevated rounded-xl shadow-sm p-6">
                   <h2 className="text-lg font-semibold text-heading mb-4">
                     {locale === "en" ? "Refund" : "İade İşlemi"}
@@ -1471,7 +1495,6 @@ export default function OrderDetailPage() {
                     variant="secondary"
                     size="lg"
                     className="w-full flex items-center justify-center gap-2"
-                    disabled
                     onClick={handleRefund}
                   >
                     <ArrowUturnLeftIcon className="w-5 h-5" />
@@ -1713,13 +1736,14 @@ export default function OrderDetailPage() {
                     ? "Report Order Issue"
                     : "Sipariş Sorunu Bildir"}
                 </Button>
-                <Button
-                  variant="secondary"
-                  onClick={handleRefund}
-                  className="w-full text-left px-4 py-2 text-muted hover:bg-surface rounded-lg transition-colors"
+                <Link
+                  href="/refund-requests"
+                  className="block w-full text-left px-4 py-2 text-muted hover:bg-surface rounded-lg transition-colors"
                 >
-                  {locale === "en" ? "Request Refund" : "İade Talebi Oluştur"}
-                </Button>
+                  {locale === "en"
+                    ? "My Refund Requests"
+                    : "İade Taleplerim"}
+                </Link>
                 <Link
                   href="/support"
                   className="block w-full text-left px-4 py-2 text-muted hover:bg-surface rounded-lg transition-colors"
@@ -1992,6 +2016,19 @@ export default function OrderDetailPage() {
             </Button>
           </div>
         </Modal>
+
+        {order && (
+          <RefundRequestModal
+            isOpen={showRefundModal}
+            onClose={() => setShowRefundModal(false)}
+            orderId={order.id}
+            orderNumber={order.orderNumber}
+            phase={inferRefundPhase()}
+            onSuccess={() => {
+              queryClient.invalidateQueries({ queryKey: ["order", orderId] });
+            }}
+          />
+        )}
       </main>
     </div>
   );

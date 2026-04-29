@@ -13,6 +13,7 @@ import { ManufacturerModule } from './modules/manufacturer';
 import { OfferModule } from './modules/offer';
 import { OrderModule } from './modules/order';
 import { PaymentModule } from './modules/payment';
+import { RefundModule } from './modules/refund/refund.module';
 import { PayoutModule } from './modules/payout/payout.module';
 import { ShippingModule } from './modules/shipping';
 import { AdminModule } from './modules/admin';
@@ -120,6 +121,7 @@ import { ErrorLogInterceptor } from './common/interceptors/error-log.interceptor
     OrderModule,
     PaymentModule,
     PayoutModule,
+    RefundModule,
     ShippingModule,
     AdminModule,
     NotificationModule,
