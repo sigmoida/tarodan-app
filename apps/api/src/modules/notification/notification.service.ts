@@ -790,6 +790,7 @@ export class NotificationService {
     return this.send({
       userId: buyerId,
       type: NotificationType.OFFER_CANCELLED_OUT_OF_STOCK,
+      channels: [NotificationChannel.IN_APP, NotificationChannel.PUSH],
       data: { productId, productTitle, categoryId },
     });
   }

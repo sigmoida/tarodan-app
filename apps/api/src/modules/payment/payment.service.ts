@@ -836,6 +836,10 @@ export class PaymentService {
       return this.processSuccessfulTradeCashPayment(payment, transactionId);
     }
 
+    let cancelledOrders: { buyerId: string; productId: string; productTitle: string }[] = [];
+    let cancelledOffers: { buyerId: string; productId: string; productTitle: string }[] = [];
+    let stockoutCategoryId: string | null = null;
+
     const result = await this.prisma.$transaction(async (tx) => {
       const oldStatus = payment.status;
 
@@ -1029,19 +1033,34 @@ export class PaymentService {
         // reservedQuantity decrement.
         const refreshed = await tx.product.findUnique({
           where: { id: payment.order.productId },
-          select: { quantity: true, reservedQuantity: true },
+          select: { quantity: true, reservedQuantity: true, categoryId: true },
         });
         const available =
           (refreshed?.quantity ?? 0) - (refreshed?.reservedQuantity ?? 0);
         if (refreshed && refreshed.quantity !== null && available <= 0) {
-          await this.productLockService.invalidatePendingOrdersForProduct(
+          stockoutCategoryId = refreshed.categoryId ?? null;
+          const orderResult = await this.productLockService.invalidatePendingOrdersForProduct(
             tx,
             payment.order.productId,
             'Stok tükendi',
           );
-          await this.productLockService.invalidateRelatedOffers(
+          const offerResult = await this.productLockService.invalidateRelatedOffers(
             tx,
             payment.order.productId,
+          );
+          cancelledOrders.push(
+            ...orderResult.cancelledOrders.map((o) => ({
+              buyerId: o.buyerId,
+              productId: o.productId,
+              productTitle: o.productTitle,
+            })),
+          );
+          cancelledOffers.push(
+            ...offerResult.rejectedOffers.map((o) => ({
+              buyerId: o.buyerId,
+              productId: o.productId,
+              productTitle: o.productTitle,
+            })),
           );
         }
 
@@ -1118,6 +1137,27 @@ export class PaymentService {
     const resultOrder = result.order;
     for (const productId of result.productIdsToInvalidate) {
       await this.cache.del(`products:detail:${productId}`);
+    }
+
+    // Stockout cascade notifications: dispatch AFTER tx commits so failures
+    // here don't roll back the payment. Order-cancel notifications take
+    // precedence — if a buyer had both a pending order and a separate offer
+    // cancelled, only send the order notification.
+    const orderBuyerIds = new Set(cancelledOrders.map((o) => o.buyerId));
+    for (const o of cancelledOrders) {
+      await this.notificationService
+        .notifyOrderCancelledOutOfStock(o.buyerId, o.productId, o.productTitle, stockoutCategoryId)
+        .catch((err) =>
+          this.logger.warn(`stockout-notify (order) failed for ${o.buyerId}: ${err.message}`),
+        );
+    }
+    for (const o of cancelledOffers) {
+      if (orderBuyerIds.has(o.buyerId)) continue;
+      await this.notificationService
+        .notifyOfferCancelledOutOfStock(o.buyerId, o.productId, o.productTitle, stockoutCategoryId)
+        .catch((err) =>
+          this.logger.warn(`stockout-notify (offer) failed for ${o.buyerId}: ${err.message}`),
+        );
     }
 
     // Emit order.paid event AFTER transaction commits (only for regular product orders, not membership)
