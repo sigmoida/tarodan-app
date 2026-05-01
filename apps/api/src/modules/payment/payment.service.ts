@@ -144,6 +144,13 @@ export class PaymentService {
       throw new BadRequestException('Bu sipariş için ödeme beklenmiyor');
     }
 
+    // 24h kill-switch: defense in depth in case the cron hasn't run yet.
+    if (order.paymentExpiresAt && order.paymentExpiresAt.getTime() < Date.now()) {
+      throw new BadRequestException(
+        'Ödeme süresi doldu. Lütfen yeni bir sipariş oluşturun.',
+      );
+    }
+
     return this.processPaymentInitiation(order, dto, req);
   }
 
@@ -369,6 +376,22 @@ export class PaymentService {
         },
       });
 
+      // 30-min cron released the reservation; re-acquire it before letting
+      // the buyer retry. checkAndReserve throws if stock is gone in the
+      // meantime — caller surfaces "Ürün şu an stokta yok".
+      if (order.reservationReleasedAt) {
+        await this.prisma.$transaction(async (tx) => {
+          await this.productLockService.checkAndReserve(tx, order.productId, 1);
+          await tx.order.update({
+            where: { id: order.id },
+            data: { reservationReleasedAt: null },
+          });
+        });
+        this.logger.log(
+          `Re-reserved 1 unit for order ${order.id} after 30-min release (retry)`,
+        );
+      }
+
       if (bypassEnabled) {
         return {
           paymentId: existingPayment.id,
@@ -398,13 +421,21 @@ export class PaymentService {
       }
     }
 
-    // Offer-based order ise: ödeme başlatılırken stok rezerve et
-    // Direct buy'da reserve zaten createDirectBuyOrder'da yapıldı
-    if (order.offerId) {
+    // Offer-based order ise: ödeme başlatılırken stok rezerve et.
+    // Direct buy'da reserve zaten createDirectBuyOrder'da yapıldı, AMA cron
+    // 30-dk sonunda serbest bıraktıysa retry'da yeniden almak gerekir.
+    const needsReReservation = !!order.offerId || !!order.reservationReleasedAt;
+    if (needsReReservation) {
       await this.prisma.$transaction(async (tx) => {
         await this.productLockService.checkAndReserve(tx, order.productId, 1);
+        if (order.reservationReleasedAt) {
+          await tx.order.update({
+            where: { id: order.id },
+            data: { reservationReleasedAt: null },
+          });
+        }
       });
-      this.logger.log(`Reserved 1 unit for offer-based order ${order.id} (product ${order.productId})`);
+      this.logger.log(`Reserved 1 unit for order ${order.id} (product ${order.productId})`);
     }
 
     // Create payment record

@@ -67,6 +67,7 @@ describe('Stock Cascade (E2E)', () => {
         totalAmount: 150,
         commissionAmount: 0,
         status: OrderStatus.pending_payment,
+        paymentExpiresAt: new Date(Date.now() + 24 * 60 * 60 * 1000),
       },
     });
 
