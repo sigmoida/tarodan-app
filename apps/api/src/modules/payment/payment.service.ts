@@ -3042,7 +3042,15 @@ export class PaymentService {
 
     for (const payment of expiredPayments) {
       try {
-        // Update payment status to failed
+        // Split-window contract: if the parent order is still in pending_payment
+        // and its 24h paymentExpiresAt has not yet passed, only fail the Payment
+        // row. The order stays alive so the buyer can hit initiate again and a
+        // new Payment row is created. The 30-min reservation cron and the 24h
+        // kill-switch handle stock + order state independently.
+        const orderStillAlive =
+          payment.order.status === OrderStatus.pending_payment &&
+          payment.order.paymentExpiresAt > new Date();
+
         await this.prisma.payment.update({
           where: { id: payment.id },
           data: {
@@ -3051,11 +3059,11 @@ export class PaymentService {
           },
         });
 
-        // Siparişi iptal et ve ürünü tekrar satışa aç
-        await this.releaseProductForFailedPayment(payment.orderId);
-
-        // Cancel any auto-created Surat shipment for this expired order
-        await this.cancelSuratShipmentIfExists(payment.orderId, payment.order.orderNumber);
+        if (!orderStillAlive) {
+          // Order has been cancelled (or 24h passed): release stock + cleanup.
+          await this.releaseProductForFailedPayment(payment.orderId);
+          await this.cancelSuratShipmentIfExists(payment.orderId, payment.order.orderNumber);
+        }
 
         // Emit payment.failed event
         try {
