@@ -40,6 +40,10 @@ export class PaymentSchedulerService {
       if (released.count > 0) {
         this.logger.log(`Released ${released.count} expired order reservation(s)`);
       }
+      const expired = await this.paymentService.expireUnpaidOrders();
+      if (expired.count > 0) {
+        this.logger.log(`Expired ${expired.count} unpaid order(s) past 24h TTL`);
+      }
       const result = await this.paymentService.cancelExpiredPayments();
       if (result.count > 0) {
         this.logger.log(`Cancelled ${result.count} expired payment(s)`);

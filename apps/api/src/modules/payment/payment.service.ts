@@ -2885,6 +2885,100 @@ export class PaymentService {
   }
 
   /**
+   * 24h kill-switch: pending_payment siparişleri paymentExpiresAt geçtiğinde
+   * iptal eder. Eğer rezerv hâlâ tutuluyorsa (cron 30dk pas'ı kaçırdıysa) önce
+   * onu serbest bırakır. Bağlı offer payment_expired olur.
+   */
+  async expireUnpaidOrders(): Promise<{ count: number }> {
+    const now = new Date();
+    const expired = await this.prisma.order.findMany({
+      where: {
+        status: OrderStatus.pending_payment,
+        paymentExpiresAt: { lt: now },
+      },
+      select: {
+        id: true,
+        productId: true,
+        offerId: true,
+        buyerId: true,
+        orderNumber: true,
+        reservationReleasedAt: true,
+      },
+    });
+
+    let cancelled = 0;
+    for (const order of expired) {
+      try {
+        await this.prisma.$transaction(async (tx) => {
+          await tx.$queryRaw`SELECT id FROM orders WHERE id = ${order.id} FOR UPDATE`;
+          const fresh = await tx.order.findUnique({
+            where: { id: order.id },
+            select: { status: true },
+          });
+          if (!fresh || fresh.status !== OrderStatus.pending_payment) return;
+
+          // Rezerv hâlâ canlıysa serbest bırak (rare: 30dk cron'u kaçırdı)
+          if (!order.reservationReleasedAt && order.productId) {
+            await tx.$queryRaw`SELECT id FROM products WHERE id = ${order.productId} FOR UPDATE`;
+            const product = await tx.product.findUnique({
+              where: { id: order.productId },
+              select: { reservedQuantity: true, quantity: true },
+            });
+            if (product) {
+              const newReserved = safeDecrementReserved(product.reservedQuantity, 1);
+              const remaining = (product.quantity ?? 0) - newReserved;
+              await tx.product.update({
+                where: { id: order.productId },
+                data: {
+                  reservedQuantity: newReserved,
+                  status:
+                    newReserved > 0
+                      ? ProductStatus.reserved
+                      : remaining > 0
+                        ? ProductStatus.active
+                        : ProductStatus.reserved,
+                },
+              });
+            }
+          }
+
+          await tx.order.update({
+            where: { id: order.id },
+            data: {
+              status: OrderStatus.cancelled,
+              cancelReason: 'Ödeme süresi (24 saat) doldu',
+            },
+          });
+
+          if (order.offerId) {
+            await tx.offer.update({
+              where: { id: order.offerId },
+              data: { status: OfferStatus.payment_expired },
+            });
+          }
+
+          await tx.payment.updateMany({
+            where: { orderId: order.id, status: PaymentStatus.pending },
+            data: {
+              status: PaymentStatus.failed,
+              failureReason: 'Sipariş 24 saat içinde ödenmediği için iptal edildi',
+            },
+          });
+        });
+        if (order.productId) {
+          await this.cache.del(`products:detail:${order.productId}`);
+        }
+        cancelled++;
+        this.logger.log(`Expired unpaid order ${order.orderNumber} (24h TTL)`);
+      } catch (err: any) {
+        this.logger.error(`expireUnpaidOrders failed for ${order.id}: ${err.message}`);
+      }
+    }
+
+    return { count: cancelled };
+  }
+
+  /**
    * Cancel expired pending payments
    * Called by scheduler to automatically cancel payments older than timeout period
    */
