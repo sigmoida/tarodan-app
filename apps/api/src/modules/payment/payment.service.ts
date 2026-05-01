@@ -2782,8 +2782,11 @@ export class PaymentService {
   }
 
   /**
-   * Sipariş bazlı zaman aşımı: pending_payment siparişler X dakika (varsayılan 30) içinde ödenmezse
-   * ürünü tekrar active yapar, siparişi iptal eder. "Öde"ye hiç basılmadan çıkılan siparişler için.
+   * 30-dk rezervasyon serbest bırakma. pending_payment siparişler PAYMENT_TIMEOUT_MINUTES
+   * (varsayılan 30) içinde ödenmediyse stok rezervasyonu kaldırılır, AMA sipariş yaşamaya
+   * devam eder (status pending_payment kalır, reservationReleasedAt set edilir). Alıcı
+   * 24 saat içinde tekrar payment-initiate çağırırsa stok varsa yeniden rezerv alınır.
+   * 24h kill-switch'i için ayrı method: expireUnpaidOrders.
    */
   async releaseExpiredOrderReservations(): Promise<{ count: number }> {
     const timeoutMinutes = parseInt(
@@ -2793,81 +2796,91 @@ export class PaymentService {
     const cutoff = new Date();
     cutoff.setMinutes(cutoff.getMinutes() - timeoutMinutes);
 
-    // Include ALL pending_payment orders (both direct-buy and offer-based)
     const expiredOrders = await this.prisma.order.findMany({
       where: {
         status: OrderStatus.pending_payment,
         createdAt: { lt: cutoff },
+        reservationReleasedAt: null,
       },
-      select: { id: true, productId: true, orderNumber: true, offerId: true },
+      select: {
+        id: true,
+        productId: true,
+        orderNumber: true,
+        buyerId: true,
+        product: { select: { title: true } },
+      },
     });
 
     let released = 0;
+    const dispatched: { buyerId: string; orderId: string; productTitle: string }[] = [];
     for (const order of expiredOrders) {
       if (!order.productId) continue;
       try {
         await this.prisma.$transaction(async (tx) => {
-          // FOR UPDATE: sipariş satırını kilitle — aynı anda ödeme gelmesini engeller
           await tx.$queryRaw`SELECT id FROM orders WHERE id = ${order.id} FOR UPDATE`;
-
-          // Kilitleme sonrası statüyü tekrar kontrol et
           const freshOrder = await tx.order.findUnique({
             where: { id: order.id },
-            select: { status: true },
+            select: { status: true, reservationReleasedAt: true },
           });
-          if (!freshOrder || freshOrder.status !== OrderStatus.pending_payment) {
-            // Başka bir akış (ödeme webhook'u vb.) zaten işledi, atla
+          if (
+            !freshOrder ||
+            freshOrder.status !== OrderStatus.pending_payment ||
+            freshOrder.reservationReleasedAt !== null
+          ) {
             return;
           }
 
-          // Ürün satırını kilitle ve rezervasyonu kaldır
           await tx.$queryRaw`SELECT id FROM products WHERE id = ${order.productId} FOR UPDATE`;
           const product = await tx.product.findUnique({
             where: { id: order.productId },
-            select: { reservedQuantity: true, status: true },
+            select: { reservedQuantity: true, quantity: true, status: true },
           });
 
           if (product) {
             const newReserved = safeDecrementReserved(product.reservedQuantity, 1);
+            const remaining = (product.quantity ?? 0) - newReserved;
             await tx.product.update({
               where: { id: order.productId },
               data: {
                 reservedQuantity: newReserved,
-                status: newReserved > 0 ? ProductStatus.reserved : ProductStatus.active,
+                status:
+                  newReserved > 0
+                    ? ProductStatus.reserved
+                    : remaining > 0
+                      ? ProductStatus.active
+                      : ProductStatus.reserved,
               },
             });
           }
 
+          // Mark the reservation as released; order stays pending_payment so
+          // the buyer can re-initiate within paymentExpiresAt (24h window).
           await tx.order.update({
             where: { id: order.id },
-            data: { status: OrderStatus.cancelled },
-          });
-
-          // Offer-based ise: payment_expired yap (tekrar ödenebilir)
-          if (order.offerId) {
-            await tx.offer.update({
-              where: { id: order.offerId },
-              data: { status: OfferStatus.payment_expired },
-            });
-          }
-
-          // Mark payment as failed INSIDE the transaction to prevent race condition
-          // with PayTR callback arriving between order cancel and payment update.
-          await tx.payment.updateMany({
-            where: { orderId: order.id, status: PaymentStatus.pending },
-            data: {
-              status: PaymentStatus.failed,
-              failureReason: `Ödeme ${timeoutMinutes} dakika içinde tamamlanmadığı için otomatik iptal`,
-            },
+            data: { reservationReleasedAt: new Date() },
           });
         });
         await this.cache.del(`products:detail:${order.productId}`);
         released++;
+        dispatched.push({
+          buyerId: order.buyerId,
+          orderId: order.id,
+          productTitle: order.product?.title ?? 'Ürün',
+        });
         this.logger.log(`Released reservation for order ${order.orderNumber} (product ${order.productId})`);
       } catch (error: any) {
         this.logger.error(`Failed to release expired order ${order.id}: ${error?.message}`);
       }
     }
+
+    for (const d of dispatched) {
+      await this.notificationService
+        .notifyReservationReleased(d.buyerId, d.orderId, d.productTitle)
+        .catch((err) =>
+          this.logger.warn(`reservation-released notify failed for ${d.buyerId}: ${err.message}`),
+        );
+    }
+
     return { count: released };
   }
 
