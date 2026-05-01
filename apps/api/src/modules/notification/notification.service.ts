@@ -812,6 +812,16 @@ export class NotificationService {
     });
   }
 
+  async notifyOrderPaymentExpired(
+    buyerId: string, orderId: string, productTitle: string,
+  ) {
+    return this.send({
+      userId: buyerId,
+      type: NotificationType.ORDER_CANCELLED,
+      data: { orderId, productTitle },
+    });
+  }
+
   async notifyBackInStock(userId: string, productId: string, productTitle: string) {
     return this.send({
       userId,

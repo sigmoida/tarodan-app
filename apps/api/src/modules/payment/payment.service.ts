@@ -377,15 +377,17 @@ export class PaymentService {
       });
 
       // 30-min cron released the reservation; re-acquire it before letting
-      // the buyer retry. checkAndReserve throws if stock is gone in the
-      // meantime — caller surfaces "Ürün şu an stokta yok".
+      // the buyer retry. CAS-gate on reservationReleasedAt: only the request
+      // that flips it null actually re-reserves, so concurrent double-clicks
+      // can't both increment reservedQuantity.
       if (order.reservationReleasedAt) {
         await this.prisma.$transaction(async (tx) => {
-          await this.productLockService.checkAndReserve(tx, order.productId, 1);
-          await tx.order.update({
-            where: { id: order.id },
+          const claimed = await tx.order.updateMany({
+            where: { id: order.id, reservationReleasedAt: { not: null } },
             data: { reservationReleasedAt: null },
           });
+          if (claimed.count === 0) return; // another concurrent retry already won
+          await this.productLockService.checkAndReserve(tx, order.productId, 1);
         });
         this.logger.log(
           `Re-reserved 1 unit for order ${order.id} after 30-min release (retry)`,
@@ -424,18 +426,24 @@ export class PaymentService {
     // Offer-based order ise: ödeme başlatılırken stok rezerve et.
     // Direct buy'da reserve zaten createDirectBuyOrder'da yapıldı, AMA cron
     // 30-dk sonunda serbest bıraktıysa retry'da yeniden almak gerekir.
-    const needsReReservation = !!order.offerId || !!order.reservationReleasedAt;
-    if (needsReReservation) {
+    if (order.offerId && !order.reservationReleasedAt) {
+      // First-time payment for an offer-flow order — straightforward reserve.
       await this.prisma.$transaction(async (tx) => {
         await this.productLockService.checkAndReserve(tx, order.productId, 1);
-        if (order.reservationReleasedAt) {
-          await tx.order.update({
-            where: { id: order.id },
-            data: { reservationReleasedAt: null },
-          });
-        }
       });
-      this.logger.log(`Reserved 1 unit for order ${order.id} (product ${order.productId})`);
+      this.logger.log(`Reserved 1 unit for offer-based order ${order.id} (product ${order.productId})`);
+    } else if (order.reservationReleasedAt) {
+      // Retry after 30-min release. CAS-gate on the flag so concurrent
+      // initiate calls can't both increment reservedQuantity.
+      await this.prisma.$transaction(async (tx) => {
+        const claimed = await tx.order.updateMany({
+          where: { id: order.id, reservationReleasedAt: { not: null } },
+          data: { reservationReleasedAt: null },
+        });
+        if (claimed.count === 0) return;
+        await this.productLockService.checkAndReserve(tx, order.productId, 1);
+      });
+      this.logger.log(`Re-reserved 1 unit for order ${order.id} after release`);
     }
 
     // Create payment record
@@ -2934,10 +2942,12 @@ export class PaymentService {
         buyerId: true,
         orderNumber: true,
         reservationReleasedAt: true,
+        product: { select: { title: true } },
       },
     });
 
     let cancelled = 0;
+    const dispatched: { buyerId: string; orderId: string; productTitle: string }[] = [];
     for (const order of expired) {
       try {
         await this.prisma.$transaction(async (tx) => {
@@ -3000,10 +3010,23 @@ export class PaymentService {
           await this.cache.del(`products:detail:${order.productId}`);
         }
         cancelled++;
+        dispatched.push({
+          buyerId: order.buyerId,
+          orderId: order.id,
+          productTitle: order.product?.title ?? 'Ürün',
+        });
         this.logger.log(`Expired unpaid order ${order.orderNumber} (24h TTL)`);
       } catch (err: any) {
         this.logger.error(`expireUnpaidOrders failed for ${order.id}: ${err.message}`);
       }
+    }
+
+    for (const d of dispatched) {
+      await this.notificationService
+        .notifyOrderPaymentExpired(d.buyerId, d.orderId, d.productTitle)
+        .catch((err) =>
+          this.logger.warn(`order-expired notify failed for ${d.buyerId}: ${err.message}`),
+        );
     }
 
     return { count: cancelled };
