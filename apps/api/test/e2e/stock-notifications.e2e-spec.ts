@@ -84,7 +84,7 @@ describe('Stock Notifications (E2E)', () => {
     const inApp = await prisma.notificationLog.findFirst({
       where: {
         userId: slowBuyer.id,
-        type: 'OFFER_CANCELLED_OUT_OF_STOCK',
+        type: 'offer_cancelled_out_of_stock',
         channel: 'in_app',
       },
     });
@@ -156,12 +156,12 @@ describe('Stock Notifications (E2E)', () => {
       .expect(200);
 
     const orderNotif = await prisma.notificationLog.findFirst({
-      where: { userId: slowBuyer.id, type: 'ORDER_CANCELLED_OUT_OF_STOCK' },
+      where: { userId: slowBuyer.id, type: 'order_cancelled_out_of_stock' },
     });
     expect(orderNotif).not.toBeNull();
 
     const offerNotif = await prisma.notificationLog.findFirst({
-      where: { userId: slowBuyer.id, type: 'OFFER_CANCELLED_OUT_OF_STOCK' },
+      where: { userId: slowBuyer.id, type: 'offer_cancelled_out_of_stock' },
     });
     expect(offerNotif).toBeNull(); // dedup: order-side wins
   });
@@ -285,7 +285,7 @@ describe('Stock Notifications (E2E)', () => {
     await lock.sweepOutOfStockProducts();
 
     const notif = await prisma.notificationLog.findFirst({
-      where: { userId: buyer.id, type: 'OFFER_CANCELLED_OUT_OF_STOCK' },
+      where: { userId: buyer.id, type: 'offer_cancelled_out_of_stock' },
     });
     expect(notif).not.toBeNull();
   });
