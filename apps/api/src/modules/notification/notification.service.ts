@@ -58,6 +58,12 @@ const NOTIFICATION_TEMPLATES: Record<NotificationType, { title: string; message:
     icon: '❌',
     link: '/orders/{{orderId}}',
   },
+  [NotificationType.ORDER_CANCELLED_OUT_OF_STOCK]: {
+    title: 'Siparişiniz iptal edildi: stok tükendi',
+    message: '{{productTitle}} adlı ürün başka bir alıcı tarafından satın alındı. Benzer ürünlere göz atabilirsiniz.',
+    icon: '❌',
+    link: '/category/{{categoryId}}',
+  },
   [NotificationType.ORDER_REFUNDED]: {
     title: 'İade İşlemi Tamamlandı',
     message: 'Ödemeniz iade edildi. {{amount}} TL hesabınıza aktarılacak.',
@@ -107,6 +113,12 @@ const NOTIFICATION_TEMPLATES: Record<NotificationType, { title: string; message:
     message: '{{productTitle}} için teklifinizin süresi doldu.',
     icon: '⏰',
     link: '/listings/{{productId}}',
+  },
+  [NotificationType.OFFER_CANCELLED_OUT_OF_STOCK]: {
+    title: 'Teklifiniz iptal edildi: ürün stokta kalmadı',
+    message: '{{productTitle}} adlı ürün için verdiğiniz teklif, ürün satıldığı için iptal edildi.',
+    icon: '❌',
+    link: '/category/{{categoryId}}',
   },
 
   // Product notifications
@@ -759,6 +771,34 @@ export class NotificationService {
       type: NotificationType.OFFER_ACCEPTED,
       channels: [NotificationChannel.EMAIL, NotificationChannel.PUSH, NotificationChannel.IN_APP],
       data: { productId, amount },
+    });
+  }
+
+  async notifyOrderCancelledOutOfStock(
+    buyerId: string, productId: string, productTitle: string, categoryId: string | null,
+  ) {
+    return this.send({
+      userId: buyerId,
+      type: NotificationType.ORDER_CANCELLED_OUT_OF_STOCK,
+      data: { productId, productTitle, categoryId },
+    });
+  }
+
+  async notifyOfferCancelledOutOfStock(
+    buyerId: string, productId: string, productTitle: string, categoryId: string | null,
+  ) {
+    return this.send({
+      userId: buyerId,
+      type: NotificationType.OFFER_CANCELLED_OUT_OF_STOCK,
+      data: { productId, productTitle, categoryId },
+    });
+  }
+
+  async notifyBackInStock(userId: string, productId: string, productTitle: string) {
+    return this.send({
+      userId,
+      type: NotificationType.BACK_IN_STOCK,
+      data: { productId, productTitle },
     });
   }
 
