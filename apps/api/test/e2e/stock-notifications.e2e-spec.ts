@@ -166,6 +166,99 @@ describe('Stock Notifications (E2E)', () => {
     expect(offerNotif).toBeNull(); // dedup: order-side wins
   });
 
+  it('payment failure releases reservation and emits BACK_IN_STOCK to wishlist users (debounced 24h)', async () => {
+    const seller = await createUser(ctx.module, { isSeller: true });
+    const buyer = await createUser(ctx.module);
+    const wisher = await createUser(ctx.module);
+    const product = await createProduct({
+      sellerId: seller.id,
+      categoryId: baseline.categoryId,
+      price: 200,
+      quantity: 1,
+    });
+    const buyerAddr = await createAddress({ userId: buyer.id });
+
+    const prisma = getPrisma();
+
+    // Wisher adds product to wishlist.
+    const wishlist = await prisma.wishlist.create({ data: { userId: wisher.id } });
+    await prisma.wishlistItem.create({
+      data: { wishlistId: wishlist.id, productId: product.id },
+    });
+
+    // First failure flow: buyer reserves stock then payment fails -> back-in-stock fires.
+    const buy1 = await request(ctx.app.getHttpServer())
+      .post('/api/orders/buy')
+      .set(authHeader(buyer))
+      .send({ productId: product.id, shippingAddressId: buyerAddr.id })
+      .expect(201);
+    await request(ctx.app.getHttpServer())
+      .post('/api/payments/initiate')
+      .set(authHeader(buyer))
+      .send({ orderId: buy1.body.orderId, provider: 'paytr' })
+      .expect(201);
+    const pay1 = await prisma.payment.findFirst({
+      where: { orderId: buy1.body.orderId },
+    });
+    await request(ctx.app.getHttpServer())
+      .post('/api/payments/callback/paytr')
+      .send(
+        signCallback({
+          merchantOid: pay1!.providerConversationId!,
+          status: 'failed',
+          totalAmount: Math.round(Number(pay1!.amount) * 100),
+        }),
+      )
+      .expect(200);
+
+    const afterFirst = await prisma.notificationLog.findMany({
+      where: {
+        userId: wisher.id,
+        type: 'back_in_stock',
+        channel: 'in_app',
+        data: { path: ['productId'], equals: product.id } as any,
+      },
+    });
+    expect(afterFirst).toHaveLength(1);
+    expect(afterFirst[0].data).toMatchObject({ productId: product.id });
+
+    // Second failure flow within 24h: stock returned to available so a fresh
+    // Buy Now succeeds, but the second BACK_IN_STOCK must be debounced.
+    const buy2 = await request(ctx.app.getHttpServer())
+      .post('/api/orders/buy')
+      .set(authHeader(buyer))
+      .send({ productId: product.id, shippingAddressId: buyerAddr.id })
+      .expect(201);
+    await request(ctx.app.getHttpServer())
+      .post('/api/payments/initiate')
+      .set(authHeader(buyer))
+      .send({ orderId: buy2.body.orderId, provider: 'paytr' })
+      .expect(201);
+    const pay2 = await prisma.payment.findFirst({
+      where: { orderId: buy2.body.orderId },
+    });
+    await request(ctx.app.getHttpServer())
+      .post('/api/payments/callback/paytr')
+      .send(
+        signCallback({
+          merchantOid: pay2!.providerConversationId!,
+          status: 'failed',
+          totalAmount: Math.round(Number(pay2!.amount) * 100),
+        }),
+      )
+      .expect(200);
+
+    const afterSecond = await prisma.notificationLog.findMany({
+      where: {
+        userId: wisher.id,
+        type: 'back_in_stock',
+        channel: 'in_app',
+        data: { path: ['productId'], equals: product.id } as any,
+      },
+    });
+    expect(afterSecond).toHaveLength(1); // debounced — still 1
+  });
+
   it('cron sweep emits OFFER_CANCELLED_OUT_OF_STOCK', async () => {
     // Mirror stock-cascade test 2: q=0 product with accepted offer.
     const seller = await createUser(ctx.module, { isSeller: true });

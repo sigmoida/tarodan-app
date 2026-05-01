@@ -1268,15 +1268,17 @@ export class PaymentService {
       });
       if (!order || order.status !== OrderStatus.pending_payment || !order.productId) return;
 
-      const product = await this.prisma.product.findUnique({
+      const before = await this.prisma.product.findUnique({
         where: { id: order.productId },
-        select: { reservedQuantity: true, status: true },
+        select: { quantity: true, reservedQuantity: true, title: true, status: true },
       });
+      const beforeAvailable = (before?.quantity ?? 0) - (before?.reservedQuantity ?? 0);
+
       const updateData: { reservedQuantity?: number; status?: ProductStatus } = {};
-      if (product) {
-        const newReserved = safeDecrementReserved(product.reservedQuantity, 1);
+      if (before) {
+        const newReserved = safeDecrementReserved(before.reservedQuantity, 1);
         updateData.reservedQuantity = newReserved;
-        if (product.status === ProductStatus.reserved && newReserved === 0) {
+        if (before.status === ProductStatus.reserved && newReserved === 0) {
           updateData.status = ProductStatus.active;
         }
       }
@@ -1286,7 +1288,7 @@ export class PaymentService {
           where: { id: orderId },
           data: { status: OrderStatus.cancelled },
         }),
-        ...(product && Object.keys(updateData).length > 0
+        ...(before && Object.keys(updateData).length > 0
           ? [
               this.prisma.product.update({
                 where: { id: order.productId },
@@ -1306,8 +1308,65 @@ export class PaymentService {
       ]);
       this.logger.log(`Order ${orderId} cancelled and product ${order.productId} reservation released after payment failure`);
       await this.cache.del(`products:detail:${order.productId}`);
+
+      // BACK_IN_STOCK dispatch: only when availability transitioned from <=0 to >0.
+      const after = await this.prisma.product.findUnique({
+        where: { id: order.productId },
+        select: { quantity: true, reservedQuantity: true },
+      });
+      const afterAvailable = (after?.quantity ?? 0) - (after?.reservedQuantity ?? 0);
+      if (beforeAvailable <= 0 && afterAvailable > 0 && before?.title) {
+        await this.dispatchBackInStock(order.productId, before.title).catch((err: any) =>
+          this.logger.warn(`back-in-stock dispatch failed: ${err?.message}`),
+        );
+      }
     } catch (error: any) {
       this.logger.error(`Failed to release product for order ${orderId}: ${error?.message}`);
+    }
+  }
+
+  /**
+   * Notify all wishlist users for a product that just transitioned from
+   * unavailable -> available. Debounced 24h per (userId, productId) so
+   * repeated payment failures don't spam wishlists.
+   */
+  private async dispatchBackInStock(productId: string, productTitle: string): Promise<void> {
+    const wishlistItems = await this.prisma.wishlistItem.findMany({
+      where: { productId },
+      include: { wishlist: { select: { userId: true } } },
+    });
+    if (wishlistItems.length === 0) return;
+
+    const userIds = Array.from(
+      new Set(wishlistItems.map((w) => w.wishlist.userId).filter(Boolean)),
+    );
+    if (userIds.length === 0) return;
+
+    const since = new Date(Date.now() - 24 * 60 * 60 * 1000);
+    const recent = await this.prisma.notificationLog.findMany({
+      where: {
+        userId: { in: userIds },
+        type: NotificationType.BACK_IN_STOCK as any,
+        channel: 'in_app',
+        createdAt: { gte: since },
+      },
+      select: { userId: true, data: true },
+    });
+    const debouncedUserIds = new Set(
+      recent
+        .filter((row) => (row.data as any)?.productId === productId)
+        .map((row) => row.userId),
+    );
+
+    for (const userId of userIds) {
+      if (debouncedUserIds.has(userId)) continue;
+      try {
+        await this.notificationService.notifyBackInStock(userId, productId, productTitle);
+      } catch (err: any) {
+        this.logger.warn(
+          `notifyBackInStock failed for user ${userId} product ${productId}: ${err?.message}`,
+        );
+      }
     }
   }
 
