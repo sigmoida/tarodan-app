@@ -12,6 +12,7 @@ export enum NotificationType {
   ORDER_CANCELLED_OUT_OF_STOCK = 'order_cancelled_out_of_stock',
   ORDER_REFUNDED = 'order_refunded',
   ORDER_PREPARING_DEADLINE_WARNING = 'order_preparing_deadline_warning',
+  ORDER_RESERVATION_RELEASED = 'order_reservation_released',
 
   // Offer notifications
   OFFER_RECEIVED = 'offer_received',

@@ -76,6 +76,12 @@ const NOTIFICATION_TEMPLATES: Record<NotificationType, { title: string; message:
     icon: '⚠️',
     link: '/orders/{{orderId}}',
   },
+  [NotificationType.ORDER_RESERVATION_RELEASED]: {
+    title: 'Stok rezervasyonunuz kaldırıldı',
+    message: '{{productTitle}} için 30 dakika içinde ödeme tamamlanmadığı için stok rezervasyonu kaldırıldı. Ürün stoktaysa 24 saat içinde tekrar ödeme yapabilirsiniz.',
+    icon: '⏳',
+    link: '/orders/{{orderId}}',
+  },
 
   // Offer notifications
   [NotificationType.OFFER_RECEIVED]: {
@@ -792,6 +798,17 @@ export class NotificationService {
       type: NotificationType.OFFER_CANCELLED_OUT_OF_STOCK,
       channels: [NotificationChannel.IN_APP, NotificationChannel.PUSH],
       data: { productId, productTitle, categoryId },
+    });
+  }
+
+  async notifyReservationReleased(
+    buyerId: string, orderId: string, productTitle: string,
+  ) {
+    return this.send({
+      userId: buyerId,
+      type: NotificationType.ORDER_RESERVATION_RELEASED,
+      channels: [NotificationChannel.IN_APP, NotificationChannel.PUSH],
+      data: { orderId, productTitle },
     });
   }
 
