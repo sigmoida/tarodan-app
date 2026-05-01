@@ -12,6 +12,7 @@ import { createProduct } from '../factories/product.factory';
 import { createAddress } from '../factories/address.factory';
 import { createOfferRow } from '../factories/offer.factory';
 import { signCallback } from '../mocks/paytr.mock';
+import { ProductLockService } from '../../src/modules/product/product-lock.service';
 
 describe('Stock Cascade (E2E)', () => {
   let ctx: E2ETestApp;
@@ -105,5 +106,38 @@ describe('Stock Cascade (E2E)', () => {
 
     const slowOrderAfter = await prisma.order.findUnique({ where: { id: slowOrder.id } });
     expect(slowOrderAfter?.status).toBe(OrderStatus.cancelled);
+  });
+
+  it('sweepOutOfStockProducts cancels lingering accepted offers as a safety net', async () => {
+    const seller = await createUser(ctx.module, { isSeller: true });
+    const buyer = await createUser(ctx.module);
+    const product = await createProduct({
+      sellerId: seller.id,
+      categoryId: baseline.categoryId,
+      quantity: 1,
+    });
+    const offer = await createOfferRow({
+      productId: product.id,
+      buyerId: buyer.id,
+      sellerId: seller.id,
+      amount: 100,
+      status: OfferStatus.accepted,
+    });
+
+    // Simulate the unhappy path: stock dropped to 0 by a path that did not
+    // run the cascade (e.g., admin direct edit via Prisma Studio). The cron
+    // is the safety net that catches this.
+    const prisma = getPrisma();
+    await prisma.product.update({
+      where: { id: product.id },
+      data: { quantity: 0 },
+    });
+
+    // Run the cron method directly. Method lives on ProductLockService.
+    const lock = ctx.app.get(ProductLockService);
+    await lock.sweepOutOfStockProducts();
+
+    const offerAfter = await prisma.offer.findUnique({ where: { id: offer.id } });
+    expect(offerAfter?.status).toBe(OfferStatus.cancelled);
   });
 });
