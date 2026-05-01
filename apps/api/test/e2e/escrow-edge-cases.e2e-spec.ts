@@ -576,11 +576,19 @@ describe('Escrow Edge Cases (E2E)', () => {
         },
       });
 
-      // Force payment older than timeout so it gets cancelled
+      // Force payment older than timeout so it gets cancelled. Under the
+      // split-window contract we ALSO must push the order's paymentExpiresAt
+      // into the past — otherwise cancelExpiredPayments only fails the Payment
+      // row and leaves the order (and its shipment) alive so the buyer can
+      // re-initiate.
       const payment = await prisma.payment.findFirst({ where: { orderId: buyRes.body.orderId } });
       await prisma.payment.update({
         where: { id: payment!.id },
         data: { createdAt: new Date(Date.now() - 60 * 60 * 1000) }, // 1 hour ago
+      });
+      await prisma.order.update({
+        where: { id: buyRes.body.orderId },
+        data: { paymentExpiresAt: new Date(Date.now() - 60 * 1000) },
       });
 
       const paymentService = ctx.app.get(PaymentService);
