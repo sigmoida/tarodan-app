@@ -12,6 +12,7 @@ import { createProduct } from '../factories/product.factory';
 import { createAddress } from '../factories/address.factory';
 import { createOfferRow } from '../factories/offer.factory';
 import { signCallback } from '../mocks/paytr.mock';
+import { ProductLockService } from '../../src/modules/product/product-lock.service';
 
 describe('Stock Notifications (E2E)', () => {
   let ctx: E2ETestApp;
@@ -163,5 +164,36 @@ describe('Stock Notifications (E2E)', () => {
       where: { userId: slowBuyer.id, type: 'OFFER_CANCELLED_OUT_OF_STOCK' },
     });
     expect(offerNotif).toBeNull(); // dedup: order-side wins
+  });
+
+  it('cron sweep emits OFFER_CANCELLED_OUT_OF_STOCK', async () => {
+    // Mirror stock-cascade test 2: q=0 product with accepted offer.
+    const seller = await createUser(ctx.module, { isSeller: true });
+    const buyer = await createUser(ctx.module);
+    const product = await createProduct({
+      sellerId: seller.id,
+      categoryId: baseline.categoryId,
+      quantity: 1,
+    });
+    await createOfferRow({
+      productId: product.id,
+      buyerId: buyer.id,
+      sellerId: seller.id,
+      amount: 100,
+      status: OfferStatus.accepted,
+    });
+    const prisma = getPrisma();
+    await prisma.product.update({
+      where: { id: product.id },
+      data: { quantity: 0 },
+    });
+
+    const lock = ctx.app.get(ProductLockService);
+    await lock.sweepOutOfStockProducts();
+
+    const notif = await prisma.notificationLog.findFirst({
+      where: { userId: buyer.id, type: 'OFFER_CANCELLED_OUT_OF_STOCK' },
+    });
+    expect(notif).not.toBeNull();
   });
 });

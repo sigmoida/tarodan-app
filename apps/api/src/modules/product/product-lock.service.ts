@@ -1,4 +1,4 @@
-import { BadRequestException, Injectable, Logger } from '@nestjs/common';
+import { BadRequestException, Inject, Injectable, Logger, forwardRef } from '@nestjs/common';
 import {
   OfferStatus,
   OrderStatus,
@@ -8,6 +8,7 @@ import {
 } from '@prisma/client';
 import { PrismaService } from '../../prisma';
 import { getAvailableQuantity, safeDecrementReserved } from './helpers/product-availability.helper';
+import { NotificationService } from '../notification/notification.service';
 
 type PrismaTx = Prisma.TransactionClient;
 
@@ -67,7 +68,11 @@ export interface InvalidateOrdersResult {
 export class ProductLockService {
   private readonly logger = new Logger(ProductLockService.name);
 
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    @Inject(forwardRef(() => NotificationService))
+    private readonly notificationService: NotificationService,
+  ) {}
 
   /**
    * Acquire an exclusive row-level lock on the product and return the
@@ -373,6 +378,7 @@ export class ProductLockService {
 
     for (const product of outOfStockProducts) {
       try {
+        const productRejectedOffers: RejectedOfferPayload[] = [];
         await this.prisma.$transaction(async (tx) => {
           const offers = await this.invalidateRelatedOffers(tx, product.id);
           const trades = await this.invalidateRelatedTrades(tx, product.id);
@@ -380,7 +386,17 @@ export class ProductLockService {
           tradesCancelled += trades.count;
           allRejectedOffers.push(...offers.rejectedOffers);
           allCancelledTrades.push(...trades.cancelledTrades);
+          productRejectedOffers.push(...offers.rejectedOffers);
         });
+
+        // Dispatch notifications AFTER tx commit so a rollback can't emit phantom messages.
+        for (const o of productRejectedOffers) {
+          await this.notificationService
+            .notifyOfferCancelledOutOfStock(o.buyerId, o.productId, o.productTitle, null)
+            .catch((err) =>
+              this.logger.warn(`sweep-notify failed for ${o.buyerId}: ${err.message}`),
+            );
+        }
       } catch (e: any) {
         this.logger.error(
           `Failed to sweep out-of-stock product ${product.id}: ${e.message}`,
