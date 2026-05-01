@@ -1019,7 +1019,32 @@ export class PaymentService {
           data: updateData,
         });
 
-        // Invalidation YAPILMIYOR — cron (sweepOutOfStockProducts) halledecek.
+        // Stockout cascade: if this purchase drained the last available unit,
+        // cancel other open offers/orders for the same product within the same
+        // transaction so no other buyer can complete a payment that would push
+        // stock negative. The order matters: invalidate pending orders FIRST
+        // (so their linked offers chain-cancel atomically), then sweep any
+        // remaining standalone offers. Both helpers are idempotent w.r.t.
+        // already-terminal rows, and the order helper now safely clamps the
+        // reservedQuantity decrement.
+        const refreshed = await tx.product.findUnique({
+          where: { id: payment.order.productId },
+          select: { quantity: true, reservedQuantity: true },
+        });
+        const available =
+          (refreshed?.quantity ?? 0) - (refreshed?.reservedQuantity ?? 0);
+        if (refreshed && refreshed.quantity !== null && available <= 0) {
+          await this.productLockService.invalidatePendingOrdersForProduct(
+            tx,
+            payment.order.productId,
+            'Stok tükendi',
+          );
+          await this.productLockService.invalidateRelatedOffers(
+            tx,
+            payment.order.productId,
+          );
+        }
+
         this.logger.log(
           `Product ${payment.order.productId} stock updated: quantity=${newQuantity}, reserved=${updateData.reservedQuantity}`,
         );
