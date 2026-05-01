@@ -1485,6 +1485,7 @@ async function main() {
           shippingCost: 30,
           commissionAmount: commission,
           status: status,
+          paymentExpiresAt: new Date(Date.now() + 24 * 60 * 60 * 1000),
           shippingAddress: buyerAddress ? {
             fullName: buyerAddress.fullName,
             phone: buyerAddress.phone,

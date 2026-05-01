@@ -991,6 +991,7 @@ export class OrderService {
           buyerFeeAmount: commissionResult.buyerFeeAmount,
           sellerFeeAmount: commissionResult.sellerFeeAmount,
           status: OrderStatus.pending_payment,
+          paymentExpiresAt: new Date(Date.now() + 24 * 60 * 60 * 1000),
           shippingAddressId: shippingAddressId,
           shippingAddress: shippingAddressJson as Prisma.InputJsonValue,
         },
@@ -1209,6 +1210,7 @@ export class OrderService {
           buyerFeeAmount: commissionResult.buyerFeeAmount,
           sellerFeeAmount: commissionResult.sellerFeeAmount,
           status: OrderStatus.pending_payment,
+          paymentExpiresAt: new Date(Date.now() + 24 * 60 * 60 * 1000),
           shippingAddressId: dto.shippingAddressId,
           shippingAddress: offerShippingJson as Prisma.InputJsonValue | undefined,
         },
@@ -1626,6 +1628,7 @@ export class OrderService {
           buyerFeeAmount: commissionResult.buyerFeeAmount,
           sellerFeeAmount: commissionResult.sellerFeeAmount,
           status: OrderStatus.pending_payment,
+          paymentExpiresAt: new Date(Date.now() + 24 * 60 * 60 * 1000),
           shippingAddress: guestShippingJson as Prisma.InputJsonValue,
         },
         include: {

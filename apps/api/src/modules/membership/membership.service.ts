@@ -506,6 +506,7 @@ export class MembershipService {
         commissionAmount: 0, // No commission for membership
         shippingCost: 0,
         status: OrderStatus.pending_payment,
+        paymentExpiresAt: new Date(Date.now() + 24 * 60 * 60 * 1000),
         shippingAddress: {
           type: 'membership',
         } as any,

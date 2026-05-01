@@ -332,6 +332,7 @@ export class OfferService {
           buyerFeeAmount: commissionResult.buyerFeeAmount,
           sellerFeeAmount: commissionResult.sellerFeeAmount,
           status: OrderStatus.pending_payment,
+          paymentExpiresAt: new Date(Date.now() + 24 * 60 * 60 * 1000),
         },
       });
 
