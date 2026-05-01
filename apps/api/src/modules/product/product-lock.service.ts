@@ -254,13 +254,22 @@ export class ProductLockService {
     productId: string,
     cancelReason: string = 'Stok takas icin ayrildi',
   ): Promise<InvalidateOrdersResult> {
-    // Fetch each pending_payment order WITH its Payment row. The presence of a
-    // Payment row signals that reservation was actually taken (reservation
-    // happens at payment-initiate, not at order create — except for directBuy,
-    // which both creates the order AND its Payment together via initiatePayment).
-    // Offer-accepted-but-unpaid orders have NO Payment row and never reserved
-    // stock; counting them in the reservedQuantity decrement would push it
-    // negative.
+    // Fetch each pending_payment order with the signals we need to tell
+    // whether it currently holds a stock reservation:
+    //   - directBuy orders (offerId IS NULL): reservation is taken at order
+    //     create (order.service.ts createDirectOrder ~line 917-920), BEFORE
+    //     any Payment row exists. They always hold a reservation while in
+    //     pending_payment.
+    //   - offer-flow orders (offerId IS NOT NULL): no reservation at offer
+    //     accept ("Teklif kabul = sadece anlaşma. Stok değişmez", offer.
+    //     service.ts:307). Reservation is taken at payment-initiate
+    //     (payment.service.ts ~line 339 / order.service.ts:2068). So they
+    //     hold a reservation iff a Payment row exists.
+    //   - failed-and-released payments: processFailedPayment already released
+    //     the reservation, so a Payment row in `failed` status no longer
+    //     means a live reservation. We treat ANY Payment row as "reserved"
+    //     here and rely on the GREATEST(..., 0) clamp below to avoid
+    //     under-flow if reality has already drifted.
     const orders = await tx.order.findMany({
       where: {
         productId,
@@ -270,6 +279,7 @@ export class ProductLockService {
         id: true,
         buyerId: true,
         productId: true,
+        offerId: true,
         product: { select: { title: true } },
         payment: { select: { id: true } },
       },
@@ -288,11 +298,13 @@ export class ProductLockService {
       },
     });
 
-    // Release reservations ONLY for orders that actually held one. Use a
-    // clamped decrement (GREATEST(... , 0)) as defensive guard against any
-    // pre-existing reservedQuantity drift. Raw SQL because Prisma's `decrement`
-    // does not support clamping.
-    const reservedCount = orders.filter((o) => o.payment !== null).length;
+    // Release reservations only for orders that actually held one. Clamp with
+    // GREATEST(..., 0) as defensive guard against pre-existing drift or the
+    // failed-then-released payment edge case described above. Raw SQL because
+    // Prisma's `decrement` does not support clamping.
+    const reservedCount = orders.filter(
+      (o) => o.offerId === null || o.payment !== null,
+    ).length;
     if (reservedCount > 0) {
       await tx.$executeRaw`
         UPDATE "products"
