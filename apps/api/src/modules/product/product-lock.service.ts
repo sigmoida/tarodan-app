@@ -254,6 +254,13 @@ export class ProductLockService {
     productId: string,
     cancelReason: string = 'Stok takas icin ayrildi',
   ): Promise<InvalidateOrdersResult> {
+    // Fetch each pending_payment order WITH its Payment row. The presence of a
+    // Payment row signals that reservation was actually taken (reservation
+    // happens at payment-initiate, not at order create — except for directBuy,
+    // which both creates the order AND its Payment together via initiatePayment).
+    // Offer-accepted-but-unpaid orders have NO Payment row and never reserved
+    // stock; counting them in the reservedQuantity decrement would push it
+    // negative.
     const orders = await tx.order.findMany({
       where: {
         productId,
@@ -264,6 +271,7 @@ export class ProductLockService {
         buyerId: true,
         productId: true,
         product: { select: { title: true } },
+        payment: { select: { id: true } },
       },
     });
 
@@ -271,7 +279,7 @@ export class ProductLockService {
       return { count: 0, cancelledOrders: [] };
     }
 
-    // Cancel the orders
+    // Cancel the orders.
     await tx.order.updateMany({
       where: { id: { in: orders.map((o) => o.id) } },
       data: {
@@ -280,20 +288,20 @@ export class ProductLockService {
       },
     });
 
-    // Release reservations: decrement reservedQuantity by 1 per order
-    // (direct-buy orders reserve 1 unit each at createDirectOrder)
-    await tx.product.update({
-      where: { id: productId },
-      data: {
-        reservedQuantity: {
-          decrement: orders.length,
-        },
-      },
-    });
+    // Release reservations ONLY for orders that actually held one. Use a
+    // clamped decrement (GREATEST(... , 0)) as defensive guard against any
+    // pre-existing reservedQuantity drift. Raw SQL because Prisma's `decrement`
+    // does not support clamping.
+    const reservedCount = orders.filter((o) => o.payment !== null).length;
+    if (reservedCount > 0) {
+      await tx.$executeRaw`
+        UPDATE "products"
+        SET "reserved_quantity" = GREATEST("reserved_quantity" - ${reservedCount}, 0)
+        WHERE "id" = ${productId}
+      `;
+    }
 
-    // Mark the offer (if any) as payment_expired / cancelled so the buyer knows
-    // Note: offers still remain valid for re-payment in some cases; here we
-    // cancel outright because stock is gone.
+    // Chain-cancel the offers linked to the orders we just cancelled.
     const offerIds = await tx.offer.findMany({
       where: {
         productId,
@@ -312,7 +320,7 @@ export class ProductLockService {
     }
 
     this.logger.log(
-      `Auto-cancelled ${orders.length} pending_payment order(s) for product ${productId}: ${cancelReason}`,
+      `Auto-cancelled ${orders.length} pending_payment order(s) for product ${productId} (${reservedCount} reserved): ${cancelReason}`,
     );
 
     return {
