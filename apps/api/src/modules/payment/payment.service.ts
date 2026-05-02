@@ -1370,14 +1370,52 @@ export class PaymentService {
    * repeated payment failures don't spam wishlists.
    */
   private async dispatchBackInStock(productId: string, productTitle: string): Promise<void> {
-    const wishlistItems = await this.prisma.wishlistItem.findMany({
-      where: { productId },
-      include: { wishlist: { select: { userId: true } } },
-    });
-    if (wishlistItems.length === 0) return;
+    // Audience = wishlist users ∪ recently-stockout-cancelled offer/order owners
+    // (last 7 days). The cancelled buyers got "ürün satıldı" before; now that
+    // stock is back they deserve to know — they were the most engaged audience.
+    const SEVEN_DAYS_AGO = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000);
+    // Two reason strings exist in the codebase: orders use "Stok tükendi"
+    // (set by the cascade hook), offers use the longer
+    // "Stok tükendiği için otomatik iptal edildi" set by
+    // invalidateRelatedOffers. Match both.
+    const STOCKOUT_REASONS = [
+      'Stok tükendi',
+      'Stok tükendiği için otomatik iptal edildi',
+    ];
+
+    const [wishlistItems, cancelledOrders, cancelledOffers] = await Promise.all([
+      this.prisma.wishlistItem.findMany({
+        where: { productId },
+        include: { wishlist: { select: { userId: true } } },
+      }),
+      this.prisma.order.findMany({
+        where: {
+          productId,
+          status: OrderStatus.cancelled,
+          cancelReason: { in: STOCKOUT_REASONS },
+          updatedAt: { gte: SEVEN_DAYS_AGO },
+        },
+        select: { buyerId: true },
+      }),
+      this.prisma.offer.findMany({
+        where: {
+          productId,
+          status: OfferStatus.cancelled,
+          cancelReason: { in: STOCKOUT_REASONS },
+          updatedAt: { gte: SEVEN_DAYS_AGO },
+        },
+        select: { buyerId: true },
+      }),
+    ]);
 
     const userIds = Array.from(
-      new Set(wishlistItems.map((w) => w.wishlist.userId).filter(Boolean)),
+      new Set(
+        [
+          ...wishlistItems.map((w) => w.wishlist.userId),
+          ...cancelledOrders.map((o) => o.buyerId),
+          ...cancelledOffers.map((o) => o.buyerId),
+        ].filter(Boolean),
+      ),
     );
     if (userIds.length === 0) return;
 

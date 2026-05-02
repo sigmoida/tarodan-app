@@ -290,4 +290,108 @@ describe('Stock Notifications (E2E)', () => {
     });
     expect(notif).not.toBeNull();
   });
+
+  it('back-in-stock fires for previously stockout-cancelled buyers (not just wishlisters)', async () => {
+    const seller = await createUser(ctx.module, { isSeller: true });
+    const fastBuyer = await createUser(ctx.module);
+    const slowBuyer = await createUser(ctx.module);
+    const product = await createProduct({
+      sellerId: seller.id,
+      categoryId: baseline.categoryId,
+      price: 200,
+      quantity: 1,
+    });
+    const fastAddr = await createAddress({ userId: fastBuyer.id });
+
+    // slowBuyer has an accepted offer that the cascade will cancel.
+    await createOfferRow({
+      productId: product.id,
+      buyerId: slowBuyer.id,
+      sellerId: seller.id,
+      amount: 150,
+      status: OfferStatus.accepted,
+    });
+
+    // fastBuyer Buy Now → success → cascade fires, slowBuyer's offer cancelled.
+    const buyRes = await request(ctx.app.getHttpServer())
+      .post('/api/orders/buy')
+      .set(authHeader(fastBuyer))
+      .send({ productId: product.id, shippingAddressId: fastAddr.id })
+      .expect(201);
+    await request(ctx.app.getHttpServer())
+      .post('/api/payments/initiate')
+      .set(authHeader(fastBuyer))
+      .send({ orderId: buyRes.body.orderId, provider: 'paytr' })
+      .expect(201);
+    const fastPayment = await getPrisma().payment.findFirst({
+      where: { orderId: buyRes.body.orderId },
+    });
+    await request(ctx.app.getHttpServer())
+      .post('/api/payments/callback/paytr')
+      .send(
+        signCallback({
+          merchantOid: fastPayment!.providerConversationId!,
+          status: 'success',
+          totalAmount: Math.round(Number(fastPayment!.amount) * 100),
+        }),
+      )
+      .expect(200);
+
+    // Confirm cascade ran: slowBuyer's offer is cancelled with stockout reason.
+    const prisma = getPrisma();
+    const cancelledOffer = await prisma.offer.findFirst({
+      where: { buyerId: slowBuyer.id, productId: product.id },
+    });
+    expect(cancelledOffer?.status).toBe(OfferStatus.cancelled);
+    expect(cancelledOffer?.cancelReason).toContain('Stok');
+
+    // Now seller restocks the product (admin direct edit). This brings
+    // available from 0 → 1, which is what `dispatchBackInStock` reacts to.
+    // We trigger the dispatch by simulating a payment-failure release: in
+    // real life that's `releaseProductForFailedPayment`. Cleanest equivalent:
+    // call dispatchBackInStock directly via the new audience query.
+    // To exercise the production path end-to-end, restock + run the
+    // failure-release branch by creating a separate failing order.
+    const otherBuyer = await createUser(ctx.module);
+    const otherAddr = await createAddress({ userId: otherBuyer.id });
+    // Restore stock first so otherBuyer can reserve.
+    await prisma.product.update({
+      where: { id: product.id },
+      data: { quantity: 1, reservedQuantity: 0, status: 'active' },
+    });
+    const otherBuyRes = await request(ctx.app.getHttpServer())
+      .post('/api/orders/buy')
+      .set(authHeader(otherBuyer))
+      .send({ productId: product.id, shippingAddressId: otherAddr.id })
+      .expect(201);
+    await request(ctx.app.getHttpServer())
+      .post('/api/payments/initiate')
+      .set(authHeader(otherBuyer))
+      .send({ orderId: otherBuyRes.body.orderId, provider: 'paytr' })
+      .expect(201);
+    const otherPayment = await prisma.payment.findFirst({
+      where: { orderId: otherBuyRes.body.orderId },
+    });
+    // otherBuyer's payment fails → release branch runs → dispatchBackInStock
+    // fires for slowBuyer (recently-cancelled buyer) AND any wishlisters.
+    await request(ctx.app.getHttpServer())
+      .post('/api/payments/callback/paytr')
+      .send(
+        signCallback({
+          merchantOid: otherPayment!.providerConversationId!,
+          status: 'failed',
+          totalAmount: Math.round(Number(otherPayment!.amount) * 100),
+        }),
+      )
+      .expect(200);
+
+    const backInStock = await prisma.notificationLog.findFirst({
+      where: { userId: slowBuyer.id, type: 'back_in_stock' },
+      orderBy: { createdAt: 'desc' },
+    });
+    // Audience expansion proven by the existence of any BACK_IN_STOCK row
+    // for slowBuyer — they are not in the wishlist, so the only path that
+    // reaches them is the cancelled-buyers union added to dispatchBackInStock.
+    expect(backInStock).not.toBeNull();
+  });
 });
