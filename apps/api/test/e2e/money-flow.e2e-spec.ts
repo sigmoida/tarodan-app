@@ -2,6 +2,7 @@ import * as request from 'supertest';
 import {
   PaymentStatus,
   PaymentHoldStatus,
+  PrismaClient,
   TradeStatus,
   ShipmentStatus,
 } from '@prisma/client';
@@ -22,6 +23,28 @@ import { createAddress } from '../factories/address.factory';
 import { signCallback } from '../mocks/paytr.mock';
 import { PaymentService } from '../../src/modules/payment/payment.service';
 import { PayoutService } from '../../src/modules/payout/payout.service';
+
+/**
+ * Wait for the post-accept fire-and-forget inbound dispatch to settle.
+ */
+async function waitForInboundShipments(
+  prisma: PrismaClient,
+  tradeId: string,
+  expected = 2,
+  timeoutMs = 4_000,
+) {
+  const deadline = Date.now() + timeoutMs;
+  let rows = await prisma.tradeShipment.findMany({
+    where: { tradeId, leg: 'to_warehouse' },
+  });
+  while (rows.length < expected && Date.now() < deadline) {
+    await new Promise((r) => setTimeout(r, 50));
+    rows = await prisma.tradeShipment.findMany({
+      where: { tradeId, leg: 'to_warehouse' },
+    });
+  }
+  return rows;
+}
 
 async function configureWarehouseAddress(addressId: string): Promise<void> {
   const prisma = getPrisma();
@@ -231,21 +254,12 @@ describe('Money Flow Timeline (E2E)', () => {
       expect(cashPayment?.holdReleaseAt).toBeNull();
       expect(cashPayment?.releasedAt).toBeNull();
 
-      // Walk to completion: ship → admin receives → approve → confirm both
-      await request(ctx.app.getHttpServer())
-        .post(`/api/trades/${tradeId}/ship-to-warehouse`)
-        .set(authHeader(initiator))
-        .send({ fromAddressId: initiatorShip.id, carrier: 'Sürat' })
-        .expect(201);
-      await request(ctx.app.getHttpServer())
-        .post(`/api/trades/${tradeId}/ship-to-warehouse`)
-        .set(authHeader(receiver))
-        .send({ fromAddressId: receiverShip.id, carrier: 'Sürat' })
-        .expect(201);
-
-      const incoming = await prisma.tradeShipment.findMany({
-        where: { tradeId, leg: 'to_warehouse' },
-      });
+      // Walk to completion: inbound shipments are auto-created by
+      // PaymentService after cash success → admin receives → approve →
+      // confirm both. Poll for the fire-and-forget dispatch to settle.
+      void initiatorShip;
+      void receiverShip;
+      const incoming = await waitForInboundShipments(prisma, tradeId);
       for (const s of incoming) {
         await request(ctx.app.getHttpServer())
           .post(`/api/admin/trades/${tradeId}/mark-warehouse-received`)
@@ -504,20 +518,10 @@ describe('Money Flow Timeline (E2E)', () => {
         }))
         .expect(200);
 
-      // Ship to warehouse
-      await request(ctx.app.getHttpServer())
-        .post(`/api/trades/${tradeId}/ship-to-warehouse`)
-        .set(authHeader(initiator))
-        .send({ fromAddressId: initiatorShip.id, carrier: 'Sürat' })
-        .expect(201);
-      await request(ctx.app.getHttpServer())
-        .post(`/api/trades/${tradeId}/ship-to-warehouse`)
-        .set(authHeader(receiver))
-        .send({ fromAddressId: receiverShip.id, carrier: 'Sürat' })
-        .expect(201);
-
-      // Admin receives both
-      const incoming = await prisma.tradeShipment.findMany({ where: { tradeId, leg: 'to_warehouse' } });
+      // Inbound shipments auto-created post-cash-payment; poll for them.
+      void initiatorShip;
+      void receiverShip;
+      const incoming = await waitForInboundShipments(prisma, tradeId);
       for (const s of incoming) {
         await request(ctx.app.getHttpServer())
           .post(`/api/admin/trades/${tradeId}/mark-warehouse-received`)
