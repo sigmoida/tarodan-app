@@ -748,6 +748,50 @@ export class ProductService implements OnModuleInit {
   }
 
   /**
+   * Aynı kategorideki, aktif ve stoklu, kendisi olmayan en yeni ürünleri
+   * döner. Stockout cancel sayfası "alternatif ürünler" carousel'inde kullanır.
+   */
+  async findSimilarProducts(productId: string, limit = 12) {
+    const product = await this.prisma.product.findUnique({
+      where: { id: productId },
+      select: { categoryId: true },
+    });
+    if (!product?.categoryId) return [];
+
+    const products = await this.prisma.product.findMany({
+      where: {
+        categoryId: product.categoryId,
+        id: { not: productId },
+        status: ProductStatus.active,
+        quantity: { gt: 0 },
+      },
+      orderBy: { createdAt: 'desc' },
+      take: Math.min(limit, 24),
+      include: {
+        images: { orderBy: { sortOrder: 'asc' }, take: 1 },
+        seller: {
+          select: {
+            id: true,
+            displayName: true,
+            isVerified: true,
+            sellerType: true,
+          },
+        },
+        category: { select: { id: true, name: true, slug: true } },
+        brand: { select: { id: true, name: true, slug: true, logo: true } },
+        carModel: {
+          include: { brand: { select: { slug: true } } },
+        },
+        productAttributes: {
+          include: { attribute: { include: { group: true } } },
+        },
+      },
+    });
+
+    return Promise.all(products.map((p) => this.formatProductResponse(p)));
+  }
+
+  /**
    * Update product
    * PATCH /products/:id
    */
