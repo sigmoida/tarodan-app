@@ -256,6 +256,45 @@ const getTradeStatusMeta = (
   },
 });
 
+const SHIPMENT_STATUS_CHIP: Record<
+  string,
+  { label: string; className: string; icon?: string }
+> = {
+  label_created: {
+    label: "Etiket Hazır",
+    className: "bg-surface-muted text-muted border border-border-subtle",
+  },
+  pending: {
+    label: "Bekleniyor",
+    className: "bg-surface-muted text-muted border border-border-subtle",
+  },
+  in_transit: {
+    label: "Yolda",
+    className: "bg-info-50 text-info-700 border border-info-200",
+  },
+  delivered: {
+    label: "Depoya Ulaştı",
+    className: "bg-success-50 text-success-700 border border-success-200",
+    icon: "✓",
+  },
+};
+
+function ShipmentStatusChip({ status }: { status?: string | null }) {
+  const meta =
+    (status && SHIPMENT_STATUS_CHIP[status]) || {
+      label: "Beklemede",
+      className: "bg-surface-muted text-muted border border-border-subtle",
+    };
+  return (
+    <span
+      className={`inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-xs font-medium ${meta.className}`}
+    >
+      {meta.icon ? <span>{meta.icon}</span> : null}
+      {meta.label}
+    </span>
+  );
+}
+
 export default function TradeDetailPage() {
   const params = useParams();
   const router = useRouter();
@@ -288,7 +327,6 @@ export default function TradeDetailPage() {
   const [isLoadingCounterData, setIsLoadingCounterData] = useState(false);
   const [shipAddressId, setShipAddressId] = useState("");
   const [shipCarrier, setShipCarrier] = useState("aras");
-  const [shipTrackingNumber, setShipTrackingNumber] = useState("");
 
   useEffect(() => {
     if (authLoading) return;
@@ -387,50 +425,6 @@ export default function TradeDetailPage() {
       )
     : undefined;
 
-  const needToShipToWarehouse =
-    !!trade &&
-    !!user &&
-    trade.status === "shipping_to_warehouse" &&
-    (user.id === trade.initiatorId || user.id === trade.receiverId) &&
-    (!myToWarehouseShipment || !myToWarehouseShipment.shippedAt);
-
-  // Fallback for older API payloads where `shipments` is missing.
-  const fallbackMyWarehouseShipment =
-    trade && user
-      ? user.id === trade.initiatorId
-        ? trade.initiatorShipment
-        : trade.receiverShipment
-      : undefined;
-  const fallbackOtherWarehouseShipment =
-    trade && user
-      ? user.id === trade.initiatorId
-        ? trade.receiverShipment
-        : trade.initiatorShipment
-      : undefined;
-
-  const myWarehouseShipped =
-    !!(myToWarehouseShipment?.shippedAt || fallbackMyWarehouseShipment?.shippedAt);
-  const otherWarehouseShipped =
-    !!(
-      otherToWarehouseShipment?.shippedAt || fallbackOtherWarehouseShipment?.shippedAt
-    );
-
-  const warehouseProgressText = myWarehouseShipped
-    ? otherWarehouseShipped
-      ? locale === "en"
-        ? "Both shipments are on the way to the warehouse. Waiting for warehouse delivery confirmation."
-        : "Her iki gönderi depoya yolda. Depo teslim teyidi bekleniyor."
-      : locale === "en"
-        ? "Your shipment is submitted. Waiting for the other party to ship to the warehouse."
-        : "Gönderiniz alındı. Karşı tarafın depoya gönderimi bekleniyor."
-    : otherWarehouseShipped
-      ? locale === "en"
-        ? "The other party has shipped. Please submit your shipment to the warehouse."
-        : "Karşı taraf gönderdi. Lütfen siz de depoya gönderimi tamamlayın."
-      : locale === "en"
-        ? "Both parties must submit shipment details to send items to the warehouse."
-        : "Ürünlerin depoya ulaşması için her iki tarafın da gönderim yapması gerekiyor.";
-
   const addressesQuery = useQuery({
     queryKey: ["addresses"],
     queryFn: async () => {
@@ -438,7 +432,7 @@ export default function TradeDetailPage() {
       const list = res.data?.data ?? res.data?.addresses ?? res.data ?? [];
       return Array.isArray(list) ? list : [];
     },
-    enabled: !!needToShip || !!needToShipToWarehouse,
+    enabled: !!needToShip,
     meta: { page: "trade-ship-addresses" },
   });
   const addresses = addressesQuery.data ?? [];
@@ -530,47 +524,6 @@ export default function TradeDetailPage() {
     } catch (error: any) {
       if (process.env.NODE_ENV === "development")
         console.error("Failed to submit shipping:", error);
-      toast.error(
-        error.response?.data?.message ||
-          (locale === "en"
-            ? "Failed to submit shipping"
-            : "Kargo bilgisi gönderilemedi"),
-      );
-    } finally {
-      setIsActionLoading(false);
-    }
-  };
-
-  const handleShipToWarehouseSubmit = async () => {
-    if (!trade || !shipAddressId || !shipCarrier) {
-      toast.error(
-        locale === "en"
-          ? "Please select address and carrier"
-          : "Lütfen adres ve kargo firması seçin",
-      );
-      return;
-    }
-    setIsActionLoading(true);
-    try {
-      await tradesApi.shipToWarehouse(trade.id, {
-        fromAddressId: shipAddressId,
-        carrier: shipCarrier,
-        ...(shipTrackingNumber.trim()
-          ? { trackingNumber: shipTrackingNumber.trim() }
-          : {}),
-      });
-      toast.success(
-        locale === "en"
-          ? "Shipping info submitted"
-          : "Kargo bilgisi gönderildi",
-      );
-      setShipAddressId("");
-      setShipCarrier("aras");
-      setShipTrackingNumber("");
-      await invalidateTrade();
-    } catch (error: any) {
-      if (process.env.NODE_ENV === "development")
-        console.error("Failed to submit shipping-to-warehouse:", error);
       toast.error(
         error.response?.data?.message ||
           (locale === "en"
@@ -2096,196 +2049,66 @@ export default function TradeDetailPage() {
           </div>
         )}
 
-        {/* Ship to warehouse form (safe-trade escrow flow) */}
+        {/* Inbound shipment info card (auto-tracking, Sürat Kargo) */}
         {trade.status === "shipping_to_warehouse" &&
           user &&
           (user.id === trade.initiatorId || user.id === trade.receiverId) && (
-            <div className="card p-6 mb-6 bg-primary-50 border-primary-200">
-              <h2 className="text-lg font-semibold text-heading mb-4 flex items-center gap-2">
+            <div className="bg-surface-elevated border border-border rounded-xl p-6 mb-6">
+              <h3 className="text-lg font-semibold text-heading mb-2 flex items-center gap-2">
                 <TruckIcon className="w-5 h-5 text-primary-600" />
                 {locale === "en"
-                  ? "Ship to Tarodan Warehouse"
-                  : "Tarodan Deposuna Gönder"}
-              </h2>
-
-              {/* Both parties shipment status */}
-              <div className="mb-4 p-3 bg-surface-elevated/70 rounded-lg text-sm text-body">
-                <p>
-                  <span className="font-medium">
-                    {locale === "en" ? "You: " : "Siz: "}
-                  </span>
-                  {myWarehouseShipped
-                    ? locale === "en"
-                      ? "Shipped"
-                      : "Gönderildi"
-                    : locale === "en"
-                      ? "Pending"
-                      : "Bekleniyor"}
-                  {" · "}
-                  <span className="font-medium">
-                    {locale === "en" ? "Other party: " : "Karşı taraf: "}
-                  </span>
-                  {otherWarehouseShipped
-                    ? locale === "en"
-                      ? "Shipped"
-                      : "Gönderildi"
-                    : locale === "en"
-                      ? "Pending"
-                      : "Bekleniyor"}
-                </p>
-              </div>
-
-              <div className="mb-4 p-3 bg-info-50 border border-info-200 rounded-lg">
-                <p className="text-sm text-info-900">{warehouseProgressText}</p>
-              </div>
-
-              {myWarehouseShipped ? (
-                <div className="flex items-center gap-3 p-3 bg-surface-elevated rounded-lg border border-primary-200">
-                  <CheckCircleIcon className="w-5 h-5 text-success-600" />
-                  <div className="text-sm text-body">
-                    <p className="font-medium">
-                      {locale === "en"
-                        ? "Your shipping info is saved"
-                        : "Kargo bilginiz kaydedildi"}
-                    </p>
-                    {((myToWarehouseShipment?.carrier ||
-                      fallbackMyWarehouseShipment?.carrier) ||
-                      (myToWarehouseShipment?.trackingNumber ||
-                        fallbackMyWarehouseShipment?.trackingNumber)) && (
-                      <p className="text-xs text-muted mt-1">
-                        {myToWarehouseShipment?.carrier ||
-                          fallbackMyWarehouseShipment?.carrier}
-                        {(myToWarehouseShipment?.trackingNumber ||
-                          fallbackMyWarehouseShipment?.trackingNumber)
-                          ? ` · ${
-                              myToWarehouseShipment?.trackingNumber ||
-                              fallbackMyWarehouseShipment?.trackingNumber
-                            }`
-                          : ""}
-                      </p>
-                    )}
-                  </div>
-                </div>
-              ) : (
-                <>
-                  <p className="text-muted text-sm mb-4">
-                    {locale === "en"
-                      ? "Select the address you will ship from and the carrier. Items will be reviewed at our warehouse."
-                      : "Gönderim yapacağınız adresi ve kargo firmasını seçin. Ürünler depomuzda incelenecek."}
-                  </p>
-                  <div className="space-y-4">
-                    <div>
-                      <label className="block text-sm font-medium text-body mb-2">
-                        {locale === "en"
-                          ? "Shipping address"
-                          : "Gönderim adresi"}
-                      </label>
-                      <Select
-                        value={shipAddressId}
-                        onChange={(e) => setShipAddressId(e.target.value)}
-                        className="rounded-xl"
-                      >
-                        <option value="">
-                          {addressesQuery.isLoading
-                            ? locale === "en"
-                              ? "Loading..."
-                              : "Yükleniyor..."
-                            : locale === "en"
-                              ? "Select address"
-                              : "Adres seçin"}
-                        </option>
-                        {addresses.map((addr: any) => (
-                          <option key={addr.id} value={addr.id}>
-                            {addr.fullName || addr.title} – {addr.city} /{" "}
-                            {addr.district}{" "}
-                            {addr.address ? `– ${addr.address}` : ""}
-                          </option>
-                        ))}
-                      </Select>
-                      {addresses.length === 0 && !addressesQuery.isLoading && (
-                        <p className="text-sm text-warning-600 mt-2">
-                          {locale === "en"
-                            ? "No saved addresses. Add one in "
-                            : "Kayıtlı adres yok. "}
-                          <Link
-                            href="/profile/addresses"
-                            className="underline font-medium"
-                          >
-                            {locale === "en"
-                              ? "Profile → Addresses"
-                              : "Profil → Adresler"}
-                          </Link>
-                          {locale === "en"
-                            ? ""
-                            : " bölümünden ekleyebilirsiniz."}
-                        </p>
-                      )}
-                    </div>
-                    <div>
-                      <label className="block text-sm font-medium text-body mb-2">
-                        {locale === "en" ? "Carrier" : "Kargo firması"}
-                      </label>
-                      <Select
-                        value={shipCarrier}
-                        onChange={(e) => setShipCarrier(e.target.value)}
-                        className="rounded-xl"
-                      >
-                        <option value="aras">Aras Kargo</option>
-                        <option value="yurtici">Yurtiçi Kargo</option>
-                        <option value="mng">MNG Kargo</option>
-                      </Select>
-                    </div>
-                    <div>
-                      <label className="block text-sm font-medium text-body mb-2">
-                        {locale === "en"
-                          ? "Tracking number (optional)"
-                          : "Takip numarası (opsiyonel)"}
-                      </label>
-                      <Input
-                        type="text"
-                        value={shipTrackingNumber}
-                        onChange={(e) => setShipTrackingNumber(e.target.value)}
-                        placeholder={
-                          locale === "en"
-                            ? "e.g. 1234567890"
-                            : "örn. 1234567890"
-                        }
-                        className="h-12 px-4 rounded-xl"
-                      />
-                    </div>
-                    <Button
-                      variant="primary"
-                      size="lg"
-                      className="w-full flex items-center justify-center gap-2"
-                      onClick={handleShipToWarehouseSubmit}
-                      disabled={
-                        isActionLoading ||
-                        !shipAddressId ||
-                        addresses.length === 0
-                      }
+                  ? "Shipping to Tarodan Warehouse"
+                  : "Tarodan Deposuna Gönderim"}
+              </h3>
+              <p className="text-sm text-subtle mb-5">
+                {locale === "en"
+                  ? "The system has issued a Sürat Kargo tracking number for both parties. Take your item to the nearest Sürat branch with the number below."
+                  : "Sistem her iki tarafa Sürat Kargo takip numarası tahsis etti. Aşağıdaki numara ile en yakın Sürat şubesine giderek ürününüzü teslim edin."}
+              </p>
+              <div className="grid sm:grid-cols-2 gap-4">
+                {(["mine", "theirs"] as const).map((side) => {
+                  const ship =
+                    side === "mine"
+                      ? myToWarehouseShipment
+                      : otherToWarehouseShipment;
+                  const isMine = side === "mine";
+                  return (
+                    <div
+                      key={side}
+                      className="border border-border-subtle rounded-lg p-4"
                     >
-                      {isActionLoading ? (
-                        <>
-                          <Spinner
-                            size="sm"
-                            color="border-surface-elevated border-t-transparent"
-                          />
-                          {locale === "en"
-                            ? "Submitting..."
-                            : "Gönderiliyor..."}
-                        </>
-                      ) : (
-                        <>
-                          <TruckIcon className="w-5 h-5" />
-                          {locale === "en"
-                            ? "Ship to Warehouse"
-                            : "Depoya Gönder"}
-                        </>
-                      )}
-                    </Button>
-                  </div>
-                </>
-              )}
+                      <p className="text-xs uppercase text-subtle mb-1">
+                        {isMine
+                          ? locale === "en"
+                            ? "Your shipment"
+                            : "Sizin gönderiniz"
+                          : locale === "en"
+                            ? "Other party's shipment"
+                            : "Karşı tarafın gönderisi"}
+                      </p>
+                      <p className="font-mono text-base font-bold text-heading break-all">
+                        {ship?.trackingNumber
+                          ? isMine
+                            ? ship.trackingNumber
+                            : "••• •••"
+                          : "—"}
+                      </p>
+                      <p className="text-xs text-muted mt-2">
+                        {isMine
+                          ? locale === "en"
+                            ? "Take this number to the nearest Sürat Kargo branch and hand in your item."
+                            : "Bu numarayla Sürat Kargo şubesine gidip ürününüzü teslim edin."
+                          : locale === "en"
+                            ? "When the other party hands in their item, the status will appear here."
+                            : "Karşı taraf kargoya verdiğinde durumu burada göreceksiniz."}
+                      </p>
+                      <div className="mt-3">
+                        <ShipmentStatusChip status={ship?.status} />
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
             </div>
           )}
 
@@ -2364,7 +2187,10 @@ export default function TradeDetailPage() {
                 size="lg"
                 className="w-full flex items-center justify-center gap-2"
                 onClick={handleConfirmReceipt}
-                disabled={isActionLoading}
+                disabled={
+                  isActionLoading ||
+                  myFromWarehouseShipment?.status !== "delivered"
+                }
               >
                 {isActionLoading ? (
                   <>
@@ -2381,6 +2207,13 @@ export default function TradeDetailPage() {
                   </>
                 )}
               </Button>
+              {myFromWarehouseShipment?.status !== "delivered" && (
+                <p className="text-xs text-muted mt-2 text-center">
+                  {locale === "en"
+                    ? "Waiting for the carrier to mark the shipment as delivered."
+                    : "Kargonun teslim edildiği bilgisi bekleniyor."}
+                </p>
+              )}
             </div>
           )}
 
