@@ -1,5 +1,5 @@
-# Auth-login smoke: login-as ile login yap, profil ekranında kullanıcı görünür.
-# Tek başına çalışırken de batch'te de PASS olur.
+# 01-01: Login happy path — Zeynep (FREE seed user).
+# Önce logout dener (varsa), sonra login. Profil ekranında kullanıcı bilgisi görünür.
 appId: host.exp.Exponent
 env:
   EMAIL: zeynep@demo.com
@@ -8,13 +8,16 @@ env:
 - runFlow: ../subflows/open-tarodan.yaml
 - tapOn:
     text: "Profil, tab.*"
-# Eğer önceki flow'dan login kalmışsa logout yap.
 - runFlow:
     when:
       visible: "Çıkış Yap"
     file: ../subflows/logout.yaml
-# Şimdi login ekranındayız ya da profile'da go-login butonu var.
 - runFlow: ../subflows/login-as.yaml
 - tapOn:
     text: "Profil, tab.*"
+# Login başarılı → kullanıcının email'i profilde görünür.
+- extendedWaitUntil:
+    visible: "zeynep@demo.com"
+    timeout: 15000
 - assertVisible: "zeynep@demo.com"
+- assertNotVisible: ".*Network Error.*"

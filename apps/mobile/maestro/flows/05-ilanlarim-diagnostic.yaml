@@ -1,24 +1,31 @@
-# "İlanlarım açılmıyor" bug'ını yakalamak için tasarlanmış diagnostic flow.
-# Kullanıcı premium hesapla giriş yapmış olmalı (Zeynep'in 6 ilanı var seed'de).
-# Beklenen: Profile → İlanlarım tıkla → İlanlarım listesinde en az 1 ilan görünür.
+# İlanlarım ekranı: login → profile → İlanlarım listesinde en az 1 ilan görünür.
+# Zeynep'in seed'de 6 ilanı var.
 appId: host.exp.Exponent
+env:
+  EMAIL: zeynep@demo.com
+  PASSWORD: Demo123!
 ---
 - runFlow: ../subflows/open-tarodan.yaml
+- tapOn:
+    text: "Profil, tab.*"
+- runFlow:
+    when:
+      visible: "Çıkış Yap"
+    file: ../subflows/logout.yaml
+- runFlow: ../subflows/login-as.yaml
 - tapOn:
     text: "Profil, tab.*"
 - extendedWaitUntil:
     visible:
       text: ".*İlanlarım.*"
-    timeout: 10000
+    timeout: 15000
 - tapOn:
     text: ".*İlanlarım.*"
     index: 0
-# Beklenti: ilanlar listesi açılır. "İlan", "ilan ekle", veya bir ürün başlığı görünmeli.
 - extendedWaitUntil:
     visible:
       text: ".*İlan.*"
     timeout: 15000
-# Boş veya hatalı durumların regresyonu için:
 - assertNotVisible:
     text: ".*Bir hata oluştu.*"
 - assertNotVisible:

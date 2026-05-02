@@ -1,17 +1,20 @@
-# Logout subflow: Profil ekranı açıkken çağrılır.
+# Logout subflow: Profil ekranı açık + login yapılmış olmalı.
+# Logout sonrası uygulama login ekranına yönlendirir (router.push /(auth)/login).
 appId: host.exp.Exponent
 ---
 - scrollUntilVisible:
     element:
-      text: "Çıkış Yap"
+      id: "profile-logout-button"
     direction: DOWN
     timeout: 10000
-- tapOn: "Çıkış Yap"
+- tapOn:
+    id: "profile-logout-button"
 - runFlow:
     when:
       visible: "Onayla"
     commands:
       - tapOn: "Onayla"
 - extendedWaitUntil:
-    visible: "Giriş Yap"
+    visible:
+      id: "login-email-input"
     timeout: 10000

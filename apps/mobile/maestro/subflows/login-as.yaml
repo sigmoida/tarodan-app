@@ -1,0 +1,30 @@
+# Env-driven login subflow. Tarodan home (Kategoriler) görünüyor olmalı.
+# EMAIL ve PASSWORD env'den okunur (config.yaml veya --env flag).
+# Login zaten yapılmışsa (Profil tab'da Çıkış Yap görünüyor) atlanır.
+appId: host.exp.Exponent
+---
+- tapOn:
+    text: "Profil, tab.*"
+- runFlow:
+    when:
+      visible:
+        id: "profile-go-login-button"
+    commands:
+      - tapOn:
+          id: "profile-go-login-button"
+      - extendedWaitUntil:
+          visible:
+            id: "login-email-input"
+          timeout: 15000
+      - tapOn:
+          id: "login-email-input"
+      - inputText: ${EMAIL}
+      - tapOn:
+          id: "login-password-input"
+      - inputText: ${PASSWORD}
+      - tapOn:
+          id: "login-submit-button"
+      - extendedWaitUntil:
+          visible:
+            text: "Ana Sayfa, tab.*"
+          timeout: 30000

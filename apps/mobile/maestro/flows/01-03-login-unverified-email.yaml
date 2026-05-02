@@ -1,0 +1,40 @@
+# 01-03: Doğrulanmamış email kullanıcısı → login attempt → "doğrulayın" davranışı.
+# Pre-req: pnpm --filter @tarodan/api seed:edge:auth
+# Beklenen: ya login olur ama "doğrula" banner'ı çıkar, ya da login başarısız.
+# Bu flow ikisi de kabul: Network Error olmasın + Kategoriler'e geçiş YA da error banner.
+appId: host.exp.Exponent
+---
+- runFlow: ../subflows/open-tarodan.yaml
+- tapOn:
+    text: "Profil, tab.*"
+# Eğer önceki flow'dan login kalmışsa logout yap (login ekranına yönlendirir).
+- runFlow:
+    when:
+      visible: "Çıkış Yap"
+    file: ../subflows/logout.yaml
+# Profil'de go-login varsa tıkla; logout zaten login ekranına yönlendirdiyse atla.
+- runFlow:
+    when:
+      visible:
+        id: "profile-go-login-button"
+    commands:
+      - tapOn:
+          id: "profile-go-login-button"
+- extendedWaitUntil:
+    visible:
+      id: "login-email-input"
+    timeout: 15000
+- tapOn:
+    id: "login-email-input"
+- inputText: "unverified@demo.com"
+- tapOn:
+    id: "login-password-input"
+- inputText: "Demo123!"
+- tapOn:
+    id: "login-submit-button"
+# Sonuç ne olursa olsun network hatası olmasın.
+- extendedWaitUntil:
+    visible:
+      text: ".*[Dd]oğrula.*|Kategoriler|.*[Bb]aşar[ıi]s[ıi]z.*"
+    timeout: 30000
+- assertNotVisible: ".*Network Error.*"
