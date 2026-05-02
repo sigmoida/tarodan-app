@@ -63,6 +63,20 @@ interface Offer {
   };
 }
 
+function formatTimeAgo(timestamp: string, locale: string = 'tr'): string {
+  const diff = Date.now() - new Date(timestamp).getTime();
+  if (diff < 0) return locale === 'en' ? 'just now' : 'az önce';
+  const minutes = Math.floor(diff / 60000);
+  const hours = Math.floor(diff / 3600000);
+  const days = Math.floor(diff / 86400000);
+  if (minutes < 1) return locale === 'en' ? 'just now' : 'az önce';
+  if (minutes < 60) return locale === 'en' ? `${minutes} min ago` : `${minutes} dk önce`;
+  if (hours < 24) return locale === 'en' ? `${hours} hr ago` : `${hours} saat önce`;
+  if (days < 30) return locale === 'en' ? `${days} day${days === 1 ? '' : 's'} ago` : `${days} gün önce`;
+  const months = Math.floor(days / 30);
+  return locale === 'en' ? `${months} month${months === 1 ? '' : 's'} ago` : `${months} ay önce`;
+}
+
 function OffersPageContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -525,13 +539,15 @@ function OffersPageContent() {
                         <div className="flex items-center justify-between pt-3 border-t border-border-subtle">
                           <div className="flex items-center gap-2 text-subtle text-sm">
                             <CalendarIcon className="w-4 h-4" />
-                            {new Date(offer.createdAt).toLocaleDateString(locale === 'en' ? 'en-US' : 'tr-TR', {
+                            <span title={new Date(offer.createdAt).toLocaleString(locale === 'en' ? 'en-US' : 'tr-TR', {
                               day: 'numeric',
                               month: 'long',
                               year: 'numeric',
                               hour: '2-digit',
                               minute: '2-digit',
-                            })}
+                            })}>
+                              {formatTimeAgo(offer.createdAt, locale)}
+                            </span>
                           </div>
 
                           {/* Actions */}
