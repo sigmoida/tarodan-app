@@ -1062,13 +1062,28 @@ export default function TradeDetailScreen() {
               </View>
             </View>
 
-            {/* Karşı tarafın durumu — numara YOK, tek satır ipucu */}
+            {/* Karşı tarafın durumu — numara YOK, tek satır ipucu.
+                Tüm reachable ShipmentStatus değerlerini açıkça karşıla. */}
             <Text style={styles.confirmReceiptHint}>
-              {otherToWarehouseShipment?.status === 'delivered'
-                ? '✓ Karşı tarafın gönderisi de depoya ulaştı.'
-                : otherToWarehouseShipment?.status === 'in_transit'
-                  ? 'Karşı tarafın gönderisi yolda.'
-                  : 'Karşı tarafın kargoya teslim etmesi bekleniyor.'}
+              {(() => {
+                const s = otherToWarehouseShipment?.status;
+                if (s === 'delivered')
+                  return '✓ Karşı tarafın gönderisi de depoya ulaştı.';
+                if (
+                  s === 'picked_up' ||
+                  s === 'in_transit' ||
+                  s === 'at_delivery_branch' ||
+                  s === 'out_for_delivery'
+                )
+                  return 'Karşı tarafın gönderisi yolda.';
+                if (s === 'cancelled')
+                  return 'Karşı tarafın gönderisi iptal edildi; yetkili ekibimiz devreye girecek.';
+                if (s === 'failed')
+                  return 'Karşı tarafın gönderisinde bir aksaklık oluştu; yetkili ekibimiz inceliyor.';
+                if (s === 'returned' || s === 'return_in_progress')
+                  return 'Karşı tarafın gönderisi iade edildi.';
+                return 'Karşı tarafın kargoya teslim etmesi bekleniyor.';
+              })()}
             </Text>
           </View>
         )}

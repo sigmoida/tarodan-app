@@ -2085,28 +2085,73 @@ export default function TradeDetailPage() {
                 </div>
               </div>
 
-              {/* Karşı tarafın durumu — numara YOK, sadece tek satırlık ipucu */}
+              {/* Karşı tarafın durumu — numara YOK, sadece tek satırlık ipucu.
+                 ShipmentStatus enum'undaki tüm değerleri açıkça karşıla; aksi
+                 hâlde cancelled/failed/returned gibi terminal durumlar yanlış
+                 "bekleniyor" mesajına düşer. */}
               <div className="mt-3 flex items-center gap-2 text-sm text-subtle">
-                {otherToWarehouseShipment?.status === "delivered" ? (
-                  <span className="inline-flex items-center gap-2 text-success-700">
-                    ✓
-                    {locale === "en"
-                      ? "The other party's shipment has reached the warehouse."
-                      : "Karşı tarafın gönderisi de depoya ulaştı."}
-                  </span>
-                ) : otherToWarehouseShipment?.status === "in_transit" ? (
-                  <span>
-                    {locale === "en"
-                      ? "The other party's shipment is on the way."
-                      : "Karşı tarafın gönderisi yolda."}
-                  </span>
-                ) : (
-                  <span>
-                    {locale === "en"
-                      ? "Waiting for the other party to hand in their shipment."
-                      : "Karşı tarafın kargoya teslim etmesi bekleniyor."}
-                  </span>
-                )}
+                {(() => {
+                  const s = otherToWarehouseShipment?.status;
+                  if (s === "delivered") {
+                    return (
+                      <span className="inline-flex items-center gap-2 text-success-700">
+                        ✓
+                        {locale === "en"
+                          ? "The other party's shipment has reached the warehouse."
+                          : "Karşı tarafın gönderisi de depoya ulaştı."}
+                      </span>
+                    );
+                  }
+                  if (
+                    s === "picked_up" ||
+                    s === "in_transit" ||
+                    s === "at_delivery_branch" ||
+                    s === "out_for_delivery"
+                  ) {
+                    return (
+                      <span>
+                        {locale === "en"
+                          ? "The other party's shipment is on the way."
+                          : "Karşı tarafın gönderisi yolda."}
+                      </span>
+                    );
+                  }
+                  if (s === "cancelled") {
+                    return (
+                      <span className="text-warning-700">
+                        {locale === "en"
+                          ? "The other party's shipment was cancelled. Admin will follow up."
+                          : "Karşı tarafın gönderisi iptal edildi; yetkili ekibimiz devreye girecek."}
+                      </span>
+                    );
+                  }
+                  if (s === "failed") {
+                    return (
+                      <span className="text-warning-700">
+                        {locale === "en"
+                          ? "The other party's shipment failed. Admin will follow up."
+                          : "Karşı tarafın gönderisinde bir aksaklık oluştu; yetkili ekibimiz inceliyor."}
+                      </span>
+                    );
+                  }
+                  if (s === "returned" || s === "return_in_progress") {
+                    return (
+                      <span className="text-warning-700">
+                        {locale === "en"
+                          ? "The other party's shipment was returned."
+                          : "Karşı tarafın gönderisi iade edildi."}
+                      </span>
+                    );
+                  }
+                  // pending | label_created | undefined → henüz kargoya verilmedi
+                  return (
+                    <span>
+                      {locale === "en"
+                        ? "Waiting for the other party to hand in their shipment."
+                        : "Karşı tarafın kargoya teslim etmesi bekleniyor."}
+                    </span>
+                  );
+                })()}
               </div>
             </div>
           )}
