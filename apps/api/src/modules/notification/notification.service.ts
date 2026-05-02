@@ -62,7 +62,7 @@ const NOTIFICATION_TEMPLATES: Record<NotificationType, { title: string; message:
     title: 'Siparişiniz iptal edildi: stok tükendi',
     message: '{{productTitle}} adlı ürün başka bir alıcı tarafından satın alındı. Benzer ürünlere göz atabilirsiniz.',
     icon: '❌',
-    link: '/category/{{categoryId}}',
+    link: '/products/unavailable/{{productId}}',
   },
   [NotificationType.ORDER_REFUNDED]: {
     title: 'İade İşlemi Tamamlandı',
@@ -124,7 +124,7 @@ const NOTIFICATION_TEMPLATES: Record<NotificationType, { title: string; message:
     title: 'Teklifiniz iptal edildi: ürün stokta kalmadı',
     message: '{{productTitle}} adlı ürün için verdiğiniz teklif, ürün satıldığı için iptal edildi.',
     icon: '❌',
-    link: '/category/{{categoryId}}',
+    link: '/products/unavailable/{{productId}}',
   },
 
   // Product notifications
@@ -780,24 +780,63 @@ export class NotificationService {
     });
   }
 
+  /**
+   * Stockout cancel + back-in-stock bildirimleri için ortak data payload'ı
+   * üretir. Frontend `/products/unavailable/[productId]` sayfasında ek fetch
+   * yapmadan thumbnail + kategori bilgisini render edebilsin diye burada
+   * tek seferde toparlanır.
+   */
+  private async buildStockoutData(productId: string): Promise<{
+    productId: string;
+    productTitle: string;
+    productImage: string | null;
+    categoryId: string | null;
+    categorySlug: string | null;
+    categoryName: string | null;
+  }> {
+    const product = await this.prisma.product.findUnique({
+      where: { id: productId },
+      select: {
+        title: true,
+        categoryId: true,
+        category: { select: { slug: true, name: true } },
+        images: {
+          orderBy: { sortOrder: 'asc' },
+          take: 1,
+          select: { cardKey: true },
+        },
+      },
+    });
+    return {
+      productId,
+      productTitle: product?.title ?? '',
+      productImage: product?.images[0]?.cardKey ?? null,
+      categoryId: product?.categoryId ?? null,
+      categorySlug: product?.category?.slug ?? null,
+      categoryName: product?.category?.name ?? null,
+    };
+  }
+
   async notifyOrderCancelledOutOfStock(
-    buyerId: string, productId: string, productTitle: string, categoryId: string | null,
+    buyerId: string, productId: string, _productTitle: string, _categoryId: string | null,
   ) {
+    const data = await this.buildStockoutData(productId);
     return this.send({
       userId: buyerId,
       type: NotificationType.ORDER_CANCELLED_OUT_OF_STOCK,
-      data: { productId, productTitle, categoryId },
+      data,
     });
   }
 
   async notifyOfferCancelledOutOfStock(
-    buyerId: string, productId: string, productTitle: string, categoryId: string | null,
+    buyerId: string, productId: string, _productTitle: string, _categoryId: string | null,
   ) {
+    const data = await this.buildStockoutData(productId);
     return this.send({
       userId: buyerId,
       type: NotificationType.OFFER_CANCELLED_OUT_OF_STOCK,
       channels: [NotificationChannel.IN_APP, NotificationChannel.PUSH],
-      data: { productId, productTitle, categoryId },
+      data,
     });
   }
 
