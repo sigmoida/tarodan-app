@@ -154,6 +154,9 @@ export const adminApi = {
   markReturnDelivered: (tradeId: string, shipmentId: string) =>
     api.post(`/admin/trades/${tradeId}/mark-return-delivered`, { shipmentId }),
 
+  // Trade shipments (cross-trade listing)
+  getTradeShipments: (params?: any) => api.get('/admin/trade-shipments', { params }),
+
   // Messages
   getMessages: (params?: any) => api.get('/admin/messages', { params }),
   getMessage: (id: string) => api.get(`/admin/messages/${id}`),

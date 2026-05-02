@@ -75,6 +75,12 @@ const navGroups: NavGroup[] = [
         icon: ArrowsRightLeftIcon,
         keywords: ['takas', 'trade', 'barter', 'değişim', 'safe trade'],
       },
+      {
+        name: 'Takas Kargoları',
+        href: '/trade-shipments',
+        icon: TruckIcon,
+        keywords: ['trade shipment', 'takas kargo', 'depoya', 'from warehouse'],
+      },
       { name: 'Kargo', href: '/shipping', icon: TruckIcon },
       { name: 'İade Geçmişi', href: '/refunds', icon: BanknotesIcon, keywords: ['iade', 'refund'] },
     ],

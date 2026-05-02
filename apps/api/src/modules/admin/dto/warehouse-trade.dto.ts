@@ -1,5 +1,7 @@
-import { IsOptional, IsString, MaxLength } from 'class-validator';
+import { IsOptional, IsString, MaxLength, IsEnum, IsIn, IsNumber, Min, Max } from 'class-validator';
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
+import { Type } from 'class-transformer';
+import { ShipmentStatus } from '@prisma/client';
 
 export class ApproveWarehouseTradeDto {
   @ApiPropertyOptional({
@@ -29,4 +31,39 @@ export class MarkShipmentDto {
   })
   @IsString()
   shipmentId: string;
+}
+
+export class TradeShipmentQueryDto {
+  @ApiPropertyOptional({ enum: ShipmentStatus, example: 'in_transit' })
+  @IsOptional()
+  @IsEnum(ShipmentStatus)
+  status?: ShipmentStatus;
+
+  @ApiPropertyOptional({
+    enum: ['to_warehouse', 'from_warehouse', 'return'],
+    example: 'to_warehouse',
+  })
+  @IsOptional()
+  @IsIn(['to_warehouse', 'from_warehouse', 'return'])
+  leg?: 'to_warehouse' | 'from_warehouse' | 'return';
+
+  @ApiPropertyOptional({ example: 'TR-12345' })
+  @IsOptional()
+  @IsString()
+  tradeNumber?: string;
+
+  @ApiPropertyOptional({ example: 1 })
+  @IsOptional()
+  @IsNumber()
+  @Type(() => Number)
+  @Min(1)
+  page?: number;
+
+  @ApiPropertyOptional({ example: 20 })
+  @IsOptional()
+  @IsNumber()
+  @Type(() => Number)
+  @Min(1)
+  @Max(100)
+  limit?: number;
 }

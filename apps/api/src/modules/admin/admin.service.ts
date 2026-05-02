@@ -4129,6 +4129,76 @@ export class AdminService {
   }
 
   /**
+   * List ALL TradeShipments across trades with status / leg / tradeNumber filters.
+   * Joins shipper and (when present) recipient users by user id since
+   * TradeShipment does not have direct relations to User.
+   */
+  async findTradeShipments(query: {
+    status?: ShipmentStatus;
+    leg?: 'to_warehouse' | 'from_warehouse' | 'return';
+    tradeNumber?: string;
+    page?: number;
+    limit?: number;
+  }) {
+    const { status, leg, tradeNumber, page = 1, limit = 20 } = query;
+
+    const where: Prisma.TradeShipmentWhereInput = {
+      ...(status && { status }),
+      ...(leg && { leg }),
+      ...(tradeNumber && {
+        trade: {
+          tradeNumber: { contains: tradeNumber, mode: 'insensitive' },
+        },
+      }),
+    };
+
+    const [total, shipments] = await Promise.all([
+      this.prisma.tradeShipment.count({ where }),
+      this.prisma.tradeShipment.findMany({
+        where,
+        include: {
+          trade: {
+            select: { id: true, tradeNumber: true, status: true },
+          },
+        },
+        orderBy: { updatedAt: 'desc' },
+        skip: (page - 1) * limit,
+        take: limit,
+      }),
+    ]);
+
+    // Resolve shipper / recipient users in a single batched query
+    const userIds = Array.from(
+      new Set(
+        shipments
+          .flatMap((s) => [s.shipperId, s.recipientUserId])
+          .filter((v): v is string => !!v),
+      ),
+    );
+
+    const users = userIds.length
+      ? await this.prisma.user.findMany({
+          where: { id: { in: userIds } },
+          select: { id: true, displayName: true, email: true },
+        })
+      : [];
+    const userMap = new Map(users.map((u) => [u.id, u]));
+
+    const data = shipments.map((s) => ({
+      ...s,
+      shipper: userMap.get(s.shipperId) ?? null,
+      recipientUser: s.recipientUserId
+        ? userMap.get(s.recipientUserId) ?? null
+        : null,
+    }));
+
+    return {
+      data,
+      meta: { total, page, limit, totalPages: Math.ceil(total / limit) },
+    };
+  }
+
+  /**
    * Get trade by ID for admin
    */
   async getTradeById(tradeId: string) {

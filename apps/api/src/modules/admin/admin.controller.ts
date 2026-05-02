@@ -77,6 +77,7 @@ import {
   ApproveWarehouseTradeDto,
   RejectWarehouseTradeDto,
   MarkShipmentDto,
+  TradeShipmentQueryDto,
 } from './dto';
 
 @ApiTags('admin')
@@ -955,6 +956,14 @@ export class AdminController {
       page: page ? parseInt(page, 10) : 1,
       limit: limit ? parseInt(limit, 10) : 20,
     });
+  }
+
+  @Get('trade-shipments')
+  @Roles(AdminRole.super_admin, AdminRole.admin)
+  @ApiOperation({ summary: 'List trade shipments across all trades' })
+  @ApiResponse({ status: HttpStatus.OK, description: 'Paginated trade shipments' })
+  async getTradeShipments(@Query() query: TradeShipmentQueryDto) {
+    return this.adminService.findTradeShipments(query);
   }
 
   @Get('trades/:id')
