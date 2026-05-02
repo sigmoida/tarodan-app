@@ -1130,6 +1130,7 @@ export default function CheckoutPage() {
           const stockoutKeywords = [
             "satışta değil",
             "stokta yok",
+            "stokta bulunmamaktadır",
             "başkası tarafından",
             "başka alıcıya satıldı",
           ];
@@ -1212,6 +1213,7 @@ export default function CheckoutPage() {
             const stockoutKeywords = [
               "satışta değil",
               "stokta yok",
+              "stokta bulunmamaktadır",
               "başkası tarafından",
               "başka alıcıya satıldı",
             ];
