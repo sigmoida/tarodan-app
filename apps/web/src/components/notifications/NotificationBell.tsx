@@ -11,6 +11,13 @@ import { Button, Spinner } from '@tarodan/ui';
 import { api } from '@/lib/api';
 import { useAuthStore } from '@/stores/authStore';
 import { useTranslation } from '@/i18n';
+import OptimizedImage from '@/components/OptimizedImage';
+
+const STOCKOUT_TYPES = new Set([
+  'order_cancelled_out_of_stock',
+  'offer_cancelled_out_of_stock',
+  'back_in_stock',
+]);
 
 interface Notification {
   id: string;
@@ -198,9 +205,22 @@ export default function NotificationBell() {
                         className="block"
                       >
                         <div className="flex items-start gap-3">
-                          <span className="text-lg flex-shrink-0">
-                            {notification.icon || notification.data?.icon || '🔔'}
-                          </span>
+                          {STOCKOUT_TYPES.has(notification.type) && notification.data?.productImage ? (
+                            <div className="flex-shrink-0 w-10 h-10 relative rounded overflow-hidden bg-surface-alt">
+                              <OptimizedImage
+                                src={notification.data.productImage}
+                                alt={notification.data.productTitle ?? ''}
+                                fill
+                                className="object-cover"
+                                fallbackSrc="https://placehold.co/80x80/1a1a2e/666?text=?"
+                                logContext={{ page: 'notification-bell' }}
+                              />
+                            </div>
+                          ) : (
+                            <span className="text-lg flex-shrink-0">
+                              {notification.icon || notification.data?.icon || '🔔'}
+                            </span>
+                          )}
                           <div className="flex-1 min-w-0">
                             <div className="flex items-start justify-between gap-2">
                               <p
