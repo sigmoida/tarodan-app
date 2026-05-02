@@ -153,6 +153,8 @@ export const listingsApi = {
     api.get('/products', { params, headers: { 'Cache-Control': 'no-cache', Pragma: 'no-cache' } }),
   getOne: (id: string | number) => api.get(`/products/${id}`),
   getById: (id: string | number) => api.get(`/products/${id}`),
+  getSimilar: (id: string, limit = 12) =>
+    api.get(`/products/${id}/similar`, { params: { limit } }),
   create: (data: Record<string, any>) =>
     api.post('/products', data),
   update: (id: string | number, data: Record<string, any>) =>
