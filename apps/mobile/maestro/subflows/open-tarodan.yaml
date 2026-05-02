@@ -4,12 +4,16 @@ appId: host.exp.Exponent
 - launchApp:
     appId: host.exp.Exponent
     clearState: false
-# Recents'tan Tarodan'a tıkla (Tarodan zaten açıksa bu element olmaz, optional ile atlanır).
-- tapOn:
-    text: "Tarodan"
-    index: 0
-    optional: true
-# Tarodan tab bar görünene kadar bekle.
+- waitForAnimationToEnd:
+    timeout: 5000
+# Eğer Expo Go ana ekranındaysak Tarodan recents'ına tıkla.
+- runFlow:
+    when:
+      visible: "Recently opened"
+    commands:
+      - tapOn:
+          text: "Tarodan"
+          index: 0
 - extendedWaitUntil:
     visible:
       text: "Ana Sayfa, tab.*"

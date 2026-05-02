@@ -1,0 +1,51 @@
+# D-01: Checkout girişi smoke + B-001 koruma (kısmi).
+# Login → Ara tab → ilk ürün → Hemen Al → Teslimat Bilgileri → Ödeme adımı yüklenir.
+#
+# NOT: Tam B-001 regression için checkout 3. adıma kadar gitmek gerek ama mevcut UI
+# Maestro inputText'in PaperInput'a düşmesinde sorun yaratıyor. Tam regression için
+# API-level test (Supertest) Sprint 7'de eklenecek. Bu flow şimdilik kapsamı şu:
+#   - Hemen Al → checkout açılıyor mu
+#   - Adres ekranı yüklenip Ödeme adımına geçiliyor mu
+#   - Ödeme adımında kart formu render oluyor mu (regresyon: ekran çökmüyor)
+appId: host.exp.Exponent
+env:
+  EMAIL: zeynep@demo.com
+  PASSWORD: Demo123!
+---
+- runFlow: ../subflows/open-tarodan.yaml
+- tapOn:
+    text: "Profil, tab.*"
+- runFlow:
+    when:
+      visible: "Çıkış Yap"
+    file: ../subflows/logout.yaml
+- runFlow: ../subflows/login-as.yaml
+- tapOn:
+    text: "Ara, tab.*"
+- extendedWaitUntil:
+    visible:
+      text: ".*sonuç bulundu.*"
+    timeout: 30000
+- tapOn:
+    text: ".*₺.*"
+    index: 0
+- extendedWaitUntil:
+    visible: "Hemen Al"
+    timeout: 30000
+- tapOn: "Hemen Al"
+# Step 1 - Adres ekranı yüklendi
+- extendedWaitUntil:
+    visible: "Teslimat Bilgileri"
+    timeout: 15000
+- assertVisible: "Teslimat Bilgileri"
+- assertVisible: "Teslimat Adresi"
+- tapOn:
+    text: "Devam Et.*"
+# Step 2 - Ödeme adımı yüklendi
+- extendedWaitUntil:
+    visible: "Kart Numarası"
+    timeout: 15000
+- assertVisible: "Kart Numarası"
+- assertVisible: "Kargo Seçimi"
+- assertNotVisible: ".*Network Error.*"
+- assertNotVisible: ".*Bir hata oluştu.*"

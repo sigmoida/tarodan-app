@@ -1070,12 +1070,13 @@ export default function CheckoutScreen() {
       {/* Bottom Action Bar */}
       <View style={styles.bottomBar}>
         {step < 3 ? (
-          <TouchableOpacity style={styles.primaryButton} onPress={handleNextStep}>
+          <TouchableOpacity testID="checkout-next-button" style={styles.primaryButton} onPress={handleNextStep}>
             <Text style={styles.primaryButtonText}>Devam Et</Text>
             <Ionicons name="arrow-forward" size={20} color="#fff" />
           </TouchableOpacity>
         ) : (
           <TouchableOpacity
+            testID="checkout-confirm-button"
             style={[styles.primaryButton, loading && styles.primaryButtonDisabled]}
             onPress={handleCheckout}
             disabled={loading}

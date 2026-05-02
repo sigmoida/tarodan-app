@@ -105,7 +105,7 @@ export default function PaymentSuccessScreen() {
           </View>
         </View>
 
-        <Text style={styles.title}>Ödeme Başarıyla Tamamlandı!</Text>
+        <Text testID="payment-success-title" style={styles.title}>Ödeme Başarıyla Tamamlandı!</Text>
         <Text style={styles.subtitle}>
           Siparişiniz onaylandı ve işleme alındı.
         </Text>
