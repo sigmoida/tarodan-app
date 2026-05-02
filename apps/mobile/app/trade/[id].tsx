@@ -3,7 +3,6 @@ import {
   Text,
   Button,
   Card,
-  Chip,
   Divider,
   ActivityIndicator,
   Snackbar,
@@ -20,7 +19,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 import { format } from 'date-fns';
 import { tr } from 'date-fns/locale';
-import { tradesApi, addressesApi, paymentsApi, api } from '../../src/services/api';
+import { tradesApi, paymentsApi, api } from '../../src/services/api';
 import { useAuthStore } from '../../src/stores/authStore';
 import { TarodanColors } from '../../src/theme';
 import { formatApiErrorMessage } from '../../src/utils/formatApiErrorMessage';
@@ -66,6 +65,19 @@ interface TradeItem {
 interface TradeShipmentInfo {
   carrier?: string;
   trackingNumber?: string;
+  status?: string;
+}
+
+interface TradeShipment {
+  id: string;
+  direction: 'to_warehouse' | 'from_warehouse' | 'return' | string;
+  senderUserId?: string | null;
+  recipientUserId?: string | null;
+  carrier?: string | null;
+  trackingNumber?: string | null;
+  status?: string | null;
+  shippedAt?: string | null;
+  deliveredAt?: string | null;
 }
 
 interface Trade {
@@ -85,6 +97,7 @@ interface Trade {
   receiverTrackingNumber: string | null;
   initiatorShipment?: TradeShipmentInfo | null;
   receiverShipment?: TradeShipmentInfo | null;
+  shipments?: TradeShipment[];
   cashPayment?: {
     id?: string;
     commission?: number;
@@ -96,6 +109,68 @@ interface Trade {
   initiator: { id: string; displayName: string; avatar?: string };
   receiver: { id: string; displayName: string; avatar?: string };
   items: TradeItem[];
+}
+
+/**
+ * Web `apps/web/src/app/trades/[id]/page.tsx` SHIPMENT_STATUS_CHIP eşleniği —
+ * Sürat Kargo otomatik takip durumlarını rozetle gösterir.
+ */
+const SHIPMENT_STATUS_CHIP: Record<
+  string,
+  { label: string; bg: string; fg: string; border: string; icon?: string }
+> = {
+  label_created: {
+    label: 'Etiket Hazır',
+    bg: TarodanColors.backgroundTertiary,
+    fg: TarodanColors.textSecondary,
+    border: TarodanColors.border,
+  },
+  pending: {
+    label: 'Bekleniyor',
+    bg: TarodanColors.backgroundTertiary,
+    fg: TarodanColors.textSecondary,
+    border: TarodanColors.border,
+  },
+  in_transit: {
+    label: 'Yolda',
+    bg: TarodanColors.infoLight,
+    fg: '#1d4ed8',
+    border: '#bfdbfe',
+  },
+  delivered: {
+    label: 'Depoya Ulaştı',
+    bg: TarodanColors.successLight,
+    fg: '#15803d',
+    border: '#bbf7d0',
+    icon: '✓',
+  },
+};
+
+function ShipmentStatusChip({ status }: { status?: string | null }) {
+  const meta =
+    (status && SHIPMENT_STATUS_CHIP[status]) || {
+      label: 'Beklemede',
+      bg: TarodanColors.backgroundTertiary,
+      fg: TarodanColors.textSecondary,
+      border: TarodanColors.border,
+    };
+  return (
+    <View
+      style={[
+        styles.shipmentChip,
+        { backgroundColor: meta.bg, borderColor: meta.border },
+      ]}
+    >
+      {meta.icon ? (
+        <Text style={[styles.shipmentChipIcon, { color: meta.fg }]}>
+          {meta.icon}
+        </Text>
+      ) : null}
+      <Text style={[styles.shipmentChipLabel, { color: meta.fg }]}>
+        {meta.label}
+      </Text>
+    </View>
+  );
 }
 
 /**
@@ -159,19 +234,14 @@ function normalizeTradeFromApi(raw: Record<string, unknown> | Trade | null | und
   } as Trade;
 }
 
-type ShipCarrier = 'aras' | 'yurtici' | 'mng';
-
 export default function TradeDetailScreen() {
   const { id: idParam } = useLocalSearchParams();
   const id = Array.isArray(idParam) ? idParam[0] : idParam;
   const { user } = useAuthStore();
   const queryClient = useQueryClient();
-  
+
   const [snackbar, setSnackbar] = useState({ visible: false, message: '' });
   const [counterModalVisible, setCounterModalVisible] = useState(false);
-  const [shippingModalVisible, setShippingModalVisible] = useState(false);
-  const [shipAddressId, setShipAddressId] = useState('');
-  const [shipCarrier, setShipCarrier] = useState<ShipCarrier>('aras');
   const [counterCashAmount, setCounterCashAmount] = useState('');
   const [counterMessage, setCounterMessage] = useState('');
 
@@ -228,20 +298,6 @@ export default function TradeDetailScreen() {
   );
   const isCashPayer = Boolean(trade && user && trade.cashPayerId === user.id);
 
-  const needToShip = Boolean(
-    trade &&
-      user &&
-      !cashPaymentPending &&
-      ((user.id === trade.initiatorId &&
-        !trade.initiatorShipment &&
-        !trade.initiatorShippedAt &&
-        (trade.status === 'accepted' || trade.status === 'receiver_shipped')) ||
-        (user.id === trade.receiverId &&
-          !trade.receiverShipment &&
-          !trade.receiverShippedAt &&
-          (trade.status === 'accepted' || trade.status === 'initiator_shipped'))),
-  );
-
   useEffect(() => {
     setCardsFetched(false);
     setSavedCards([]);
@@ -274,24 +330,6 @@ export default function TradeDetailScreen() {
         setCardsFetched(true);
       });
   }, [cashPaymentPending, isCashPayer, cardsFetched]);
-
-  const { data: shipAddresses = [], isLoading: addressesLoading } = useQuery({
-    queryKey: ['addresses'],
-    queryFn: async () => {
-      const res = await addressesApi.getAll();
-      const list = res.data?.data ?? res.data?.addresses ?? res.data ?? [];
-      return Array.isArray(list) ? list : [];
-    },
-    enabled: !!id && needToShip,
-  });
-
-  useEffect(() => {
-    if (!shippingModalVisible || !shipAddresses.length) return;
-    const valid = shipAddresses.some((a: { id: string }) => a.id === shipAddressId);
-    if (!shipAddressId || !valid) {
-      setShipAddressId((shipAddresses[0] as { id: string }).id);
-    }
-  }, [shippingModalVisible, shipAddresses, shipAddressId]);
 
   // Accept trade mutation (web ile aynı isteğe bağlı mesaj)
   const acceptMutation = useMutation({
@@ -331,21 +369,6 @@ export default function TradeDetailScreen() {
       invalidateTradeCaches();
       setCounterModalVisible(false);
       setSnackbar({ visible: true, message: 'Karşı teklif gönderildi!' });
-    },
-    onError: (error: unknown) => {
-      setSnackbar({ visible: true, message: formatApiErrorMessage(error, 'İşlem başarısız') });
-    },
-  });
-
-  // Ship trade mutation (API: fromAddressId + carrier — takip no sunucuda üretilir)
-  const shipMutation = useMutation({
-    mutationFn: () =>
-      tradesApi.ship(String(id), { fromAddressId: shipAddressId, carrier: shipCarrier }),
-    onSuccess: () => {
-      invalidateTradeCaches();
-      queryClient.invalidateQueries({ queryKey: ['addresses'] });
-      setShippingModalVisible(false);
-      setSnackbar({ visible: true, message: 'Kargo bilgisi kaydedildi!' });
     },
     onError: (error: unknown) => {
       setSnackbar({ visible: true, message: formatApiErrorMessage(error, 'İşlem başarısız') });
@@ -521,6 +544,32 @@ export default function TradeDetailScreen() {
   const theirTrackingNumber =
     theirShipment?.trackingNumber ??
     (isInitiator ? trade.receiverTrackingNumber : trade.initiatorTrackingNumber);
+
+  // Web `trades/[id]/page.tsx` ile aynı: Sürat Kargo otomatik takip akışı.
+  const shipments: TradeShipment[] = trade.shipments ?? [];
+  const myToWarehouseShipment = user
+    ? shipments.find(
+        (s) => s.direction === 'to_warehouse' && s.senderUserId === user.id,
+      )
+    : undefined;
+  const otherToWarehouseShipment = user
+    ? shipments.find(
+        (s) =>
+          s.direction === 'to_warehouse' &&
+          s.senderUserId &&
+          s.senderUserId !== user.id,
+      )
+    : undefined;
+  const myFromWarehouseShipment = user
+    ? shipments.find(
+        (s) =>
+          s.direction === 'from_warehouse' && s.recipientUserId === user.id,
+      )
+    : undefined;
+
+  const showInboundCard =
+    trade.status === 'shipping_to_warehouse' ||
+    Boolean(myToWarehouseShipment || otherToWarehouseShipment);
 
   return (
     <View style={styles.container}>
@@ -980,6 +1029,54 @@ export default function TradeDetailScreen() {
           </Card>
         )}
 
+        {/* Inbound shipment info card (auto-tracking, Sürat Kargo) — web trades/[id] mirror */}
+        {showInboundCard && (
+          <View style={styles.inboundCard}>
+            <View style={styles.inboundHeaderRow}>
+              <MaterialCommunityIcons
+                name="truck-outline"
+                size={20}
+                color={TarodanColors.primary}
+              />
+              <Text variant="titleSmall" style={styles.inboundTitle}>
+                Tarodan Deposuna Gönderim
+              </Text>
+            </View>
+            <Text variant="bodySmall" style={styles.inboundSubtitle}>
+              Sistem her iki tarafa Sürat Kargo takip numarası tahsis etti.
+              Aşağıdaki numara ile en yakın Sürat şubesine giderek ürününüzü
+              teslim edin.
+            </Text>
+
+            {(['mine', 'theirs'] as const).map((side) => {
+              const ship =
+                side === 'mine' ? myToWarehouseShipment : otherToWarehouseShipment;
+              const isMine = side === 'mine';
+              const tracking = ship?.trackingNumber
+                ? isMine
+                  ? ship.trackingNumber
+                  : '••• •••'
+                : '—';
+              return (
+                <View key={side} style={styles.inboundShipBox}>
+                  <Text style={styles.inboundShipLabel}>
+                    {isMine ? 'Sizin gönderiniz' : 'Karşı tarafın gönderisi'}
+                  </Text>
+                  <Text style={styles.inboundTrackingNumber}>{tracking}</Text>
+                  <Text style={styles.inboundShipHint}>
+                    {isMine
+                      ? 'Bu numarayla Sürat Kargo şubesine gidip ürününüzü teslim edin.'
+                      : 'Karşı taraf kargoya verdiğinde durumu burada göreceksiniz.'}
+                  </Text>
+                  <View style={styles.inboundChipRow}>
+                    <ShipmentStatusChip status={ship?.status} />
+                  </View>
+                </View>
+              );
+            })}
+          </View>
+        )}
+
         {/* Trade Protection */}
         <Card style={styles.protectionCard}>
           <Card.Content style={styles.protectionContent}>
@@ -1038,29 +1135,28 @@ export default function TradeDetailScreen() {
             </Button>
           )}
 
-          {/* Accepted: Ship button */}
-          {needToShip && (
-            <Button
-              mode="contained"
-              onPress={() => setShippingModalVisible(true)}
-              icon="cube-send"
-              style={styles.actionButton}
-            >
-              Kargo Bilgisi Gir
-            </Button>
-          )}
-
           {/* Both shipped: Confirm receipt */}
           {canConfirm && (
-            <Button
-              mode="contained"
-              onPress={() => confirmMutation.mutate()}
-              loading={confirmMutation.isPending}
-              icon="checkmark-done"
-              style={[styles.actionButton, { backgroundColor: TarodanColors.success }]}
-            >
-              Teslim Aldım
-            </Button>
+            <>
+              <Button
+                mode="contained"
+                onPress={() => confirmMutation.mutate()}
+                loading={confirmMutation.isPending}
+                disabled={
+                  confirmMutation.isPending ||
+                  myFromWarehouseShipment?.status !== 'delivered'
+                }
+                icon="checkmark-done"
+                style={[styles.actionButton, { backgroundColor: TarodanColors.success }]}
+              >
+                Teslim Aldım
+              </Button>
+              {myFromWarehouseShipment?.status !== 'delivered' && (
+                <Text variant="bodySmall" style={styles.confirmReceiptHint}>
+                  Kargonun teslim edildiği bilgisi bekleniyor.
+                </Text>
+              )}
+            </>
           )}
 
           {/* Message other party */}
@@ -1109,107 +1205,6 @@ export default function TradeDetailScreen() {
               mode="contained"
               onPress={() => counterMutation.mutate()}
               loading={counterMutation.isPending}
-            >
-              Gönder
-            </Button>
-          </View>
-        </Modal>
-      </Portal>
-
-      {/* Shipping Modal — web trades/[id] ile aynı: gönderim adresi + kargo firması */}
-      <Portal>
-        <Modal
-          visible={shippingModalVisible}
-          onDismiss={() => setShippingModalVisible(false)}
-          contentContainerStyle={styles.modal}
-        >
-          <Text variant="titleLarge" style={styles.modalTitle}>
-            Kargo bilgisi
-          </Text>
-          <Text variant="bodySmall" style={styles.modalNote}>
-            Gönderim yapacağınız kayıtlı adresi ve kargo firmasını seçin. Takip numarası sistem tarafından oluşturulur.
-          </Text>
-
-          {addressesLoading ? (
-            <ActivityIndicator style={{ marginVertical: 16 }} color={TarodanColors.primary} />
-          ) : shipAddresses.length === 0 ? (
-            <View style={{ marginVertical: 12 }}>
-              <Text variant="bodyMedium" style={{ color: TarodanColors.warning, marginBottom: 12 }}>
-                Kayıtlı adres yok. Profil → Adreslerim bölümünden ekleyin.
-              </Text>
-              <Button mode="contained" onPress={() => router.push('/settings/addresses')}>
-                Adres Ekle
-              </Button>
-            </View>
-          ) : (
-            <ScrollView style={{ maxHeight: 220 }} keyboardShouldPersistTaps="handled">
-              <Text variant="labelLarge" style={{ marginBottom: 8 }}>
-                Gönderim adresi
-              </Text>
-              {(shipAddresses as Array<{ id: string; fullName?: string; title?: string; city: string; district: string; address: string }>).map((addr) => (
-                <TouchableOpacity
-                  key={addr.id}
-                  style={[
-                    styles.shipAddressRow,
-                    shipAddressId === addr.id && styles.shipAddressRowSelected,
-                  ]}
-                  onPress={() => setShipAddressId(addr.id)}
-                >
-                  <Ionicons
-                    name={shipAddressId === addr.id ? 'radio-button-on' : 'radio-button-off'}
-                    size={22}
-                    color={shipAddressId === addr.id ? TarodanColors.primary : TarodanColors.textTertiary}
-                  />
-                  <View style={{ flex: 1, marginLeft: 10 }}>
-                    <Text variant="bodyMedium" numberOfLines={1}>
-                      {addr.fullName || addr.title || 'Adres'}
-                    </Text>
-                    <Text variant="bodySmall" style={{ color: TarodanColors.textSecondary }} numberOfLines={2}>
-                      {addr.district}/{addr.city} — {addr.address}
-                    </Text>
-                  </View>
-                </TouchableOpacity>
-              ))}
-            </ScrollView>
-          )}
-
-          <Text variant="labelLarge" style={{ marginTop: 16, marginBottom: 8 }}>
-            Kargo firması
-          </Text>
-          <View style={styles.carrierRow}>
-            {(
-              [
-                { id: 'aras' as const, label: 'Aras' },
-                { id: 'yurtici' as const, label: 'Yurtiçi' },
-                { id: 'mng' as const, label: 'MNG' },
-              ] as const
-            ).map((c) => (
-              <TouchableOpacity
-                key={c.id}
-                style={[styles.carrierChip, shipCarrier === c.id && styles.carrierChipSelected]}
-                onPress={() => setShipCarrier(c.id)}
-              >
-                <Text
-                  style={{
-                    fontWeight: '600',
-                    color: shipCarrier === c.id ? '#fff' : TarodanColors.textPrimary,
-                  }}
-                >
-                  {c.label}
-                </Text>
-              </TouchableOpacity>
-            ))}
-          </View>
-
-          <View style={styles.modalActions}>
-            <Button mode="outlined" onPress={() => setShippingModalVisible(false)}>
-              İptal
-            </Button>
-            <Button
-              mode="contained"
-              onPress={() => shipMutation.mutate()}
-              loading={shipMutation.isPending}
-              disabled={!shipAddressId || shipAddresses.length === 0 || shipMutation.isPending}
             >
               Gönder
             </Button>
@@ -1592,8 +1587,83 @@ const styles = StyleSheet.create({
   shippingText: {
     flex: 1,
   },
-  trackButton: {
+  inboundCard: {
+    marginHorizontal: 16,
+    marginBottom: 16,
+    backgroundColor: TarodanColors.background,
+    borderWidth: 1,
+    borderColor: TarodanColors.border,
+    borderRadius: 12,
+    padding: 16,
+  },
+  inboundHeaderRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    marginBottom: 6,
+  },
+  inboundTitle: {
+    color: TarodanColors.textPrimary,
+    fontWeight: '600',
+  },
+  inboundSubtitle: {
+    color: TarodanColors.textSecondary,
+    marginBottom: 16,
+  },
+  inboundShipBox: {
+    borderWidth: 1,
+    borderColor: TarodanColors.border,
+    borderRadius: 10,
+    padding: 12,
+    marginBottom: 12,
+    backgroundColor: TarodanColors.backgroundSecondary,
+  },
+  inboundShipLabel: {
+    fontSize: 11,
+    fontWeight: '600',
+    letterSpacing: 0.5,
+    textTransform: 'uppercase',
+    color: TarodanColors.textSecondary,
+    marginBottom: 6,
+  },
+  inboundTrackingNumber: {
+    fontFamily: 'Courier',
+    fontSize: 17,
+    fontWeight: '700',
+    color: TarodanColors.textPrimary,
+  },
+  inboundShipHint: {
+    fontSize: 12,
+    color: TarodanColors.textSecondary,
     marginTop: 8,
+    lineHeight: 16,
+  },
+  inboundChipRow: {
+    flexDirection: 'row',
+    marginTop: 10,
+  },
+  shipmentChip: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderRadius: 999,
+    borderWidth: 1,
+    alignSelf: 'flex-start',
+  },
+  shipmentChipIcon: {
+    fontSize: 12,
+    fontWeight: '700',
+  },
+  shipmentChipLabel: {
+    fontSize: 12,
+    fontWeight: '600',
+  },
+  confirmReceiptHint: {
+    color: TarodanColors.textSecondary,
+    textAlign: 'center',
+    marginTop: -4,
   },
   protectionCard: {
     margin: 16,
@@ -1635,46 +1705,10 @@ const styles = StyleSheet.create({
     marginBottom: 12,
     backgroundColor: TarodanColors.background,
   },
-  modalNote: {
-    color: TarodanColors.textSecondary,
-    marginBottom: 16,
-  },
   modalActions: {
     flexDirection: 'row',
     justifyContent: 'flex-end',
     gap: 12,
     marginTop: 8,
-  },
-  shipAddressRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    padding: 12,
-    borderRadius: 10,
-    borderWidth: 1,
-    borderColor: TarodanColors.border,
-    marginBottom: 8,
-    backgroundColor: TarodanColors.backgroundSecondary,
-  },
-  shipAddressRowSelected: {
-    borderColor: TarodanColors.primary,
-    backgroundColor: TarodanColors.primaryLight,
-  },
-  carrierRow: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: 8,
-    marginBottom: 8,
-  },
-  carrierChip: {
-    paddingVertical: 10,
-    paddingHorizontal: 14,
-    borderRadius: 8,
-    borderWidth: 1,
-    borderColor: TarodanColors.border,
-    backgroundColor: TarodanColors.backgroundSecondary,
-  },
-  carrierChipSelected: {
-    backgroundColor: TarodanColors.primary,
-    borderColor: TarodanColors.primary,
   },
 });
