@@ -822,6 +822,84 @@ export class NotificationService {
     });
   }
 
+  /**
+   * Fan-out helper: send BACK_IN_STOCK to wishlist users ∪ stockout-cancelled
+   * buyers (last 7 days). 24h per (user, product) debounce.
+   *
+   * Caller should only invoke this when product availability transitions
+   * from <=0 to >0 (admin restock, refund, payment failure release).
+   */
+  async broadcastBackInStock(productId: string, productTitle: string): Promise<void> {
+    const SEVEN_DAYS_AGO = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000);
+    const STOCKOUT_REASONS = [
+      'Stok tükendi',
+      'Stok tükendiği için otomatik iptal edildi',
+    ];
+
+    const [wishlistItems, cancelledOrders, cancelledOffers] = await Promise.all([
+      this.prisma.wishlistItem.findMany({
+        where: { productId },
+        include: { wishlist: { select: { userId: true } } },
+      }),
+      this.prisma.order.findMany({
+        where: {
+          productId,
+          status: 'cancelled' as any,
+          cancelReason: { in: STOCKOUT_REASONS },
+          updatedAt: { gte: SEVEN_DAYS_AGO },
+        },
+        select: { buyerId: true },
+      }),
+      this.prisma.offer.findMany({
+        where: {
+          productId,
+          status: 'cancelled' as any,
+          cancelReason: { in: STOCKOUT_REASONS },
+          updatedAt: { gte: SEVEN_DAYS_AGO },
+        },
+        select: { buyerId: true },
+      }),
+    ]);
+
+    const userIds = Array.from(
+      new Set(
+        [
+          ...wishlistItems.map((w) => w.wishlist.userId),
+          ...cancelledOrders.map((o) => o.buyerId),
+          ...cancelledOffers.map((o) => o.buyerId),
+        ].filter(Boolean),
+      ),
+    );
+    if (userIds.length === 0) return;
+
+    const since = new Date(Date.now() - 24 * 60 * 60 * 1000);
+    const recent = await this.prisma.notificationLog.findMany({
+      where: {
+        userId: { in: userIds },
+        type: NotificationType.BACK_IN_STOCK as any,
+        channel: 'in_app',
+        createdAt: { gte: since },
+      },
+      select: { userId: true, data: true },
+    });
+    const debounced = new Set(
+      recent
+        .filter((row) => (row.data as any)?.productId === productId)
+        .map((row) => row.userId),
+    );
+
+    for (const userId of userIds) {
+      if (debounced.has(userId)) continue;
+      try {
+        await this.notifyBackInStock(userId, productId, productTitle);
+      } catch (err: any) {
+        this.logger.warn(
+          `broadcastBackInStock failed for user ${userId} product ${productId}: ${err?.message}`,
+        );
+      }
+    }
+  }
+
   async notifyBackInStock(userId: string, productId: string, productTitle: string) {
     return this.send({
       userId,

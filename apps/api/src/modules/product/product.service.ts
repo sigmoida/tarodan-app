@@ -793,6 +793,14 @@ export class ProductService implements OnModuleInit {
         });
         await this.cache.del(`products:detail:${id}`);
         await this.cache.delPattern('products:list:*');
+        // Stok geri geldi — wishlist + son 7 gün stockout-cancelled alıcılara
+        // back-in-stock bildirimi gönder. Hata atarsa kullanıcı reaktivasyonunu
+        // yine de başarılı say.
+        this.notificationService
+          .broadcastBackInStock(id, product.title)
+          .catch((err) =>
+            this.logger.warn(`broadcastBackInStock failed for ${id}: ${err?.message}`),
+          );
         const updated = await this.prisma.product.findUnique({
           where: { id },
           include: { images: true, category: true, brand: true, carModel: true },
@@ -1010,6 +1018,24 @@ export class ProductService implements OnModuleInit {
           // Don't fail the update if notification fails
           this.logger.error(`Failed to notify wishlist users of price change for product ${id}:`, error);
         }
+      }
+
+      // Stok geri geldi mi? available = quantity − reserved, 0→>0 transition'ı
+      // wishlist + stockout-cancelled alıcılara haber verir.
+      const beforeAvailable =
+        (product.quantity ?? 0) - (product.reservedQuantity ?? 0);
+      const afterAvailable =
+        (updated.quantity ?? 0) - (updated.reservedQuantity ?? 0);
+      if (
+        beforeAvailable <= 0 &&
+        afterAvailable > 0 &&
+        updated.status === ProductStatus.active
+      ) {
+        this.notificationService
+          .broadcastBackInStock(id, updated.title)
+          .catch((err) =>
+            this.logger.warn(`broadcastBackInStock failed for ${id}: ${err?.message}`),
+          );
       }
 
       // Refetch product after attribute linking so response includes updated scale/material

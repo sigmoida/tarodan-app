@@ -1370,82 +1370,11 @@ export class PaymentService {
    * repeated payment failures don't spam wishlists.
    */
   private async dispatchBackInStock(productId: string, productTitle: string): Promise<void> {
-    // Audience = wishlist users ∪ recently-stockout-cancelled offer/order owners
-    // (last 7 days). The cancelled buyers got "ürün satıldı" before; now that
-    // stock is back they deserve to know — they were the most engaged audience.
-    const SEVEN_DAYS_AGO = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000);
-    // Two reason strings exist in the codebase: orders use "Stok tükendi"
-    // (set by the cascade hook), offers use the longer
-    // "Stok tükendiği için otomatik iptal edildi" set by
-    // invalidateRelatedOffers. Match both.
-    const STOCKOUT_REASONS = [
-      'Stok tükendi',
-      'Stok tükendiği için otomatik iptal edildi',
-    ];
-
-    const [wishlistItems, cancelledOrders, cancelledOffers] = await Promise.all([
-      this.prisma.wishlistItem.findMany({
-        where: { productId },
-        include: { wishlist: { select: { userId: true } } },
-      }),
-      this.prisma.order.findMany({
-        where: {
-          productId,
-          status: OrderStatus.cancelled,
-          cancelReason: { in: STOCKOUT_REASONS },
-          updatedAt: { gte: SEVEN_DAYS_AGO },
-        },
-        select: { buyerId: true },
-      }),
-      this.prisma.offer.findMany({
-        where: {
-          productId,
-          status: OfferStatus.cancelled,
-          cancelReason: { in: STOCKOUT_REASONS },
-          updatedAt: { gte: SEVEN_DAYS_AGO },
-        },
-        select: { buyerId: true },
-      }),
-    ]);
-
-    const userIds = Array.from(
-      new Set(
-        [
-          ...wishlistItems.map((w) => w.wishlist.userId),
-          ...cancelledOrders.map((o) => o.buyerId),
-          ...cancelledOffers.map((o) => o.buyerId),
-        ].filter(Boolean),
-      ),
-    );
-    if (userIds.length === 0) return;
-
-    const since = new Date(Date.now() - 24 * 60 * 60 * 1000);
-    const recent = await this.prisma.notificationLog.findMany({
-      where: {
-        userId: { in: userIds },
-        type: NotificationType.BACK_IN_STOCK as any,
-        channel: 'in_app',
-        createdAt: { gte: since },
-      },
-      select: { userId: true, data: true },
-    });
-    const debouncedUserIds = new Set(
-      recent
-        .filter((row) => (row.data as any)?.productId === productId)
-        .map((row) => row.userId),
-    );
-
-    for (const userId of userIds) {
-      if (debouncedUserIds.has(userId)) continue;
-      try {
-        await this.notificationService.notifyBackInStock(userId, productId, productTitle);
-      } catch (err: any) {
-        this.logger.warn(
-          `notifyBackInStock failed for user ${userId} product ${productId}: ${err?.message}`,
-        );
-      }
-    }
+    // Delegated to NotificationService.broadcastBackInStock — kept here only
+    // as a thin wrapper to preserve the existing call site contract.
+    return this.notificationService.broadcastBackInStock(productId, productTitle);
   }
+
 
   /**
    * Process failed payment
