@@ -20,8 +20,15 @@ interface ProductLike {
   salePrice?: number | null;
   isOnSale?: boolean;
   isTradeEnabled?: boolean;
-  images?: string[];
+  images?: Array<{ cardUrl?: string; detailUrl?: string } | string>;
   category?: { id: string; name: string; slug: string } | null;
+}
+
+function pickImageUrl(images: ProductLike['images']): string | null {
+  const first = images?.[0];
+  if (!first) return null;
+  if (typeof first === 'string') return first;
+  return first.cardUrl ?? first.detailUrl ?? null;
 }
 
 const conditionLabels: Record<string, string> = {
@@ -129,7 +136,7 @@ export default function ProductUnavailablePage() {
             >
               <div className="aspect-square relative bg-surface-alt">
                 <OptimizedImage
-                  src={p.images?.[0] || 'https://placehold.co/400x400/1a1a2e/666?text=No+Image'}
+                  src={pickImageUrl(p.images) || 'https://placehold.co/400x400/1a1a2e/666?text=No+Image'}
                   alt={p.title}
                   fill
                   className="object-cover group-hover:scale-105 transition-transform"
