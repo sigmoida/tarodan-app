@@ -74,6 +74,7 @@ export default function RegisterScreen() {
           name="displayName"
           render={({ field: { onChange, value } }) => (
             <TextInput
+              testID="register-display-name-input"
               label="Adınız"
               value={value}
               onChangeText={onChange}
@@ -93,6 +94,7 @@ export default function RegisterScreen() {
           name="email"
           render={({ field: { onChange, value } }) => (
             <TextInput
+              testID="register-email-input"
               label="E-posta"
               value={value}
               onChangeText={onChange}
@@ -129,6 +131,7 @@ export default function RegisterScreen() {
           name="password"
           render={({ field: { onChange, value } }) => (
             <TextInput
+              testID="register-password-input"
               label="Şifre"
               value={value}
               onChangeText={onChange}
@@ -149,6 +152,7 @@ export default function RegisterScreen() {
           name="confirmPassword"
           render={({ field: { onChange, value } }) => (
             <TextInput
+              testID="register-confirm-password-input"
               label="Şifre Tekrar"
               value={value}
               onChangeText={onChange}
@@ -183,12 +187,13 @@ export default function RegisterScreen() {
         )}
 
         {registerMutation.isError && (
-          <Text variant="bodySmall" style={{ color: theme.colors.error, marginBottom: 16, textAlign: 'center' }}>
+          <Text testID="register-error-banner" variant="bodySmall" style={{ color: theme.colors.error, marginBottom: 16, textAlign: 'center' }}>
             Kayıt başarısız. Lütfen tekrar deneyin.
           </Text>
         )}
 
         <Button
+          testID="register-submit-button"
           mode="contained"
           onPress={handleSubmit(onSubmit)}
           loading={registerMutation.isPending}

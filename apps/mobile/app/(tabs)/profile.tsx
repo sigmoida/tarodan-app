@@ -93,18 +93,20 @@ export default function ProfileScreen() {
             <Text style={styles.guestSubtitle}>
               Tarodan'a giriş yaparak tüm özelliklerden yararlanın
             </Text>
-            <Button 
-              mode="contained" 
-              onPress={() => router.push('/(auth)/login')} 
+            <Button
+              testID="profile-go-login-button"
+              mode="contained"
+              onPress={() => router.push('/(auth)/login')}
               style={styles.loginButton}
               buttonColor={TarodanColors.primary}
               icon="login"
             >
               Giriş Yap
             </Button>
-            <Button 
-              mode="outlined" 
-              onPress={() => router.push('/(auth)/register')} 
+            <Button
+              testID="profile-go-register-button"
+              mode="outlined"
+              onPress={() => router.push('/(auth)/register')}
               style={styles.registerButton}
               textColor={TarodanColors.primary}
             >
@@ -475,7 +477,7 @@ export default function ProfileScreen() {
         </View>
 
         {/* Logout */}
-        <TouchableOpacity style={styles.logoutButton} onPress={handleLogout}>
+        <TouchableOpacity testID="profile-logout-button" style={styles.logoutButton} onPress={handleLogout}>
           <Ionicons name="log-out-outline" size={22} color={TarodanColors.error} />
           <Text style={styles.logoutText}>Çıkış Yap</Text>
         </TouchableOpacity>

@@ -110,6 +110,7 @@ export default function LoginScreen() {
           name="email"
           render={({ field: { onChange, value } }) => (
             <TextInput
+              testID="login-email-input"
               label="E-posta"
               value={value}
               onChangeText={onChange}
@@ -121,7 +122,7 @@ export default function LoginScreen() {
           )}
         />
         {errors.email && (
-          <Text variant="bodySmall" style={{ color: theme.colors.error, marginBottom: 8 }}>
+          <Text testID="login-email-error" variant="bodySmall" style={{ color: theme.colors.error, marginBottom: 8 }}>
             {errors.email.message}
           </Text>
         )}
@@ -131,6 +132,7 @@ export default function LoginScreen() {
           name="password"
           render={({ field: { onChange, value } }) => (
             <TextInput
+              testID="login-password-input"
               label="Şifre"
               value={value}
               onChangeText={onChange}
@@ -147,18 +149,19 @@ export default function LoginScreen() {
           )}
         />
         {errors.password && (
-          <Text variant="bodySmall" style={{ color: theme.colors.error, marginBottom: 16 }}>
+          <Text testID="login-password-error" variant="bodySmall" style={{ color: theme.colors.error, marginBottom: 16 }}>
             {errors.password.message}
           </Text>
         )}
 
         {loginMutation.isError && !showVerificationBanner && (
-          <Text variant="bodySmall" style={{ color: theme.colors.error, marginBottom: 16, textAlign: 'center' }}>
+          <Text testID="login-error-banner" variant="bodySmall" style={{ color: theme.colors.error, marginBottom: 16, textAlign: 'center' }}>
             Giriş başarısız. Bilgilerinizi kontrol edin.
           </Text>
         )}
 
         <Button
+          testID="login-submit-button"
           mode="contained"
           onPress={handleSubmit(onSubmit)}
           loading={loginMutation.isPending}
@@ -168,13 +171,13 @@ export default function LoginScreen() {
           Giriş Yap
         </Button>
 
-        <Button mode="text" onPress={() => router.push('/(auth)/forgot-password')}>
+        <Button testID="login-forgot-link" mode="text" onPress={() => router.push('/(auth)/forgot-password')}>
           Şifremi Unuttum
         </Button>
 
         <View style={{ flexDirection: 'row', justifyContent: 'center', marginTop: 24 }}>
           <Text variant="bodyMedium">Hesabınız yok mu? </Text>
-          <Button mode="text" compact onPress={() => router.push('/(auth)/register')}>
+          <Button testID="login-register-link" mode="text" compact onPress={() => router.push('/(auth)/register')}>
             Kayıt Ol
           </Button>
         </View>
