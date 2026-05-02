@@ -2065,49 +2065,48 @@ export default function TradeDetailPage() {
                   ? "The system has issued a Sürat Kargo tracking number for both parties. Take your item to the nearest Sürat branch with the number below."
                   : "Sistem her iki tarafa Sürat Kargo takip numarası tahsis etti. Aşağıdaki numara ile en yakın Sürat şubesine giderek ürününüzü teslim edin."}
               </p>
-              <div className="grid sm:grid-cols-2 gap-4">
-                {(["mine", "theirs"] as const).map((side) => {
-                  const ship =
-                    side === "mine"
-                      ? myToWarehouseShipment
-                      : otherToWarehouseShipment;
-                  const isMine = side === "mine";
-                  return (
-                    <div
-                      key={side}
-                      className="border border-border-subtle rounded-lg p-4"
-                    >
-                      <p className="text-xs uppercase text-subtle mb-1">
-                        {isMine
-                          ? locale === "en"
-                            ? "Your shipment"
-                            : "Sizin gönderiniz"
-                          : locale === "en"
-                            ? "Other party's shipment"
-                            : "Karşı tarafın gönderisi"}
-                      </p>
-                      <p className="font-mono text-base font-bold text-heading break-all">
-                        {ship?.trackingNumber
-                          ? isMine
-                            ? ship.trackingNumber
-                            : "••• •••"
-                          : "—"}
-                      </p>
-                      <p className="text-xs text-muted mt-2">
-                        {isMine
-                          ? locale === "en"
-                            ? "Take this number to the nearest Sürat Kargo branch and hand in your item."
-                            : "Bu numarayla Sürat Kargo şubesine gidip ürününüzü teslim edin."
-                          : locale === "en"
-                            ? "When the other party hands in their item, the status will appear here."
-                            : "Karşı taraf kargoya verdiğinde durumu burada göreceksiniz."}
-                      </p>
-                      <div className="mt-3">
-                        <ShipmentStatusChip status={ship?.status} />
-                      </div>
-                    </div>
-                  );
-                })}
+              {/* Tek kart: yalnız kullanıcının kendi gönderisi. Karşı tarafın
+                 numarası gösterilmez; sadece "kargoya verdi mi" durumu altta
+                 küçük bir satırla bilgi olarak yazılır. */}
+              <div className="border border-border-subtle rounded-lg p-4">
+                <p className="text-xs uppercase text-subtle mb-1">
+                  {locale === "en" ? "Your shipment" : "Sizin gönderiniz"}
+                </p>
+                <p className="font-mono text-base font-bold text-heading break-all">
+                  {myToWarehouseShipment?.trackingNumber ?? "—"}
+                </p>
+                <p className="text-xs text-muted mt-2">
+                  {locale === "en"
+                    ? "Take this number to the nearest Sürat Kargo branch and hand in your item."
+                    : "Bu numarayla Sürat Kargo şubesine gidip ürününüzü teslim edin."}
+                </p>
+                <div className="mt-3">
+                  <ShipmentStatusChip status={myToWarehouseShipment?.status} />
+                </div>
+              </div>
+
+              {/* Karşı tarafın durumu — numara YOK, sadece tek satırlık ipucu */}
+              <div className="mt-3 flex items-center gap-2 text-sm text-subtle">
+                {otherToWarehouseShipment?.status === "delivered" ? (
+                  <span className="inline-flex items-center gap-2 text-success-700">
+                    ✓
+                    {locale === "en"
+                      ? "The other party's shipment has reached the warehouse."
+                      : "Karşı tarafın gönderisi de depoya ulaştı."}
+                  </span>
+                ) : otherToWarehouseShipment?.status === "in_transit" ? (
+                  <span>
+                    {locale === "en"
+                      ? "The other party's shipment is on the way."
+                      : "Karşı tarafın gönderisi yolda."}
+                  </span>
+                ) : (
+                  <span>
+                    {locale === "en"
+                      ? "Waiting for the other party to hand in their shipment."
+                      : "Karşı tarafın kargoya teslim etmesi bekleniyor."}
+                  </span>
+                )}
               </div>
             </div>
           )}

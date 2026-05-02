@@ -1048,32 +1048,28 @@ export default function TradeDetailScreen() {
               teslim edin.
             </Text>
 
-            {(['mine', 'theirs'] as const).map((side) => {
-              const ship =
-                side === 'mine' ? myToWarehouseShipment : otherToWarehouseShipment;
-              const isMine = side === 'mine';
-              const tracking = ship?.trackingNumber
-                ? isMine
-                  ? ship.trackingNumber
-                  : '••• •••'
-                : '—';
-              return (
-                <View key={side} style={styles.inboundShipBox}>
-                  <Text style={styles.inboundShipLabel}>
-                    {isMine ? 'Sizin gönderiniz' : 'Karşı tarafın gönderisi'}
-                  </Text>
-                  <Text style={styles.inboundTrackingNumber}>{tracking}</Text>
-                  <Text style={styles.inboundShipHint}>
-                    {isMine
-                      ? 'Bu numarayla Sürat Kargo şubesine gidip ürününüzü teslim edin.'
-                      : 'Karşı taraf kargoya verdiğinde durumu burada göreceksiniz.'}
-                  </Text>
-                  <View style={styles.inboundChipRow}>
-                    <ShipmentStatusChip status={ship?.status} />
-                  </View>
-                </View>
-              );
-            })}
+            {/* Tek kart: yalnız kullanıcının kendi gönderisi */}
+            <View style={styles.inboundShipBox}>
+              <Text style={styles.inboundShipLabel}>Sizin gönderiniz</Text>
+              <Text style={styles.inboundTrackingNumber}>
+                {myToWarehouseShipment?.trackingNumber ?? '—'}
+              </Text>
+              <Text style={styles.inboundShipHint}>
+                Bu numarayla Sürat Kargo şubesine gidip ürününüzü teslim edin.
+              </Text>
+              <View style={styles.inboundChipRow}>
+                <ShipmentStatusChip status={myToWarehouseShipment?.status} />
+              </View>
+            </View>
+
+            {/* Karşı tarafın durumu — numara YOK, tek satır ipucu */}
+            <Text style={styles.confirmReceiptHint}>
+              {otherToWarehouseShipment?.status === 'delivered'
+                ? '✓ Karşı tarafın gönderisi de depoya ulaştı.'
+                : otherToWarehouseShipment?.status === 'in_transit'
+                  ? 'Karşı tarafın gönderisi yolda.'
+                  : 'Karşı tarafın kargoya teslim etmesi bekleniyor.'}
+            </Text>
           </View>
         )}
 

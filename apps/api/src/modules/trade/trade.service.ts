@@ -227,7 +227,9 @@ export class TradeService {
             continue;
           }
 
-          const ozelKargoTakipNo = `TRD-${trade.tradeNumber}-WH-${side.suffix}`
+          // tradeNumber zaten "TRD-..." formatında geliyor; çift "TRD-" ön
+          // ekini önlemek için doğrudan tradeNumber'ı kullan.
+          const ozelKargoTakipNo = `${trade.tradeNumber}-WH-${side.suffix}`
             .replace(/[^a-zA-Z0-9-]/g, '')
             .slice(0, 50);
 
