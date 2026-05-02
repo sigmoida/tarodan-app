@@ -1,0 +1,15 @@
+# Expo Go'yu launch et ve recents'tan Tarodan'ı aç. Tüm flow'ların başında çağrılır.
+appId: host.exp.Exponent
+---
+- launchApp:
+    appId: host.exp.Exponent
+    clearState: false
+- extendedWaitUntil:
+    visible: "Recently opened"
+    timeout: 30000
+- tapOn:
+    text: "Tarodan"
+    index: 0
+- extendedWaitUntil:
+    visible: "Kategoriler"
+    timeout: 90000

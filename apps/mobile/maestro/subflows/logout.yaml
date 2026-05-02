@@ -1,0 +1,17 @@
+# Logout subflow: Profil ekranı açıkken çağrılır.
+appId: host.exp.Exponent
+---
+- scrollUntilVisible:
+    element:
+      text: "Çıkış Yap"
+    direction: DOWN
+    timeout: 10000
+- tapOn: "Çıkış Yap"
+- runFlow:
+    when:
+      visible: "Onayla"
+    commands:
+      - tapOn: "Onayla"
+- extendedWaitUntil:
+    visible: "Giriş Yap"
+    timeout: 10000

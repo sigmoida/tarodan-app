@@ -1,0 +1,8 @@
+# Maestro project config - shared env across all flows.
+# Override per run: maestro test --env EMAIL=foo@bar.com flows/auth-login.yaml
+appId: host.exp.Exponent
+env:
+  EMAIL: zeynep@demo.com
+  PASSWORD: Demo123!
+  PREMIUM_EMAIL: ahmet@demo.com
+  BUSINESS_EMAIL: ali@demo.com

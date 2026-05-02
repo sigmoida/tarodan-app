@@ -1,0 +1,7 @@
+# Smoke: Expo Go açılır → Tarodan recents'tan açılır → home content görünür.
+appId: host.exp.Exponent
+---
+- runFlow: ../subflows/open-tarodan.yaml
+- assertVisible: "Kategoriler"
+- assertVisible: "Markalar"
+- assertVisible: "Diecast pazaryeri"

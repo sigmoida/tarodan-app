@@ -1,0 +1,15 @@
+# Login akışı: Profil tab → Giriş Yap → home dön.
+# Eğer kullanıcı zaten giriş yapmışsa flow başında logout dener.
+appId: host.exp.Exponent
+---
+- runFlow: ../subflows/open-tarodan.yaml
+- tapOn:
+    text: "Profil, tab.*"
+- runFlow:
+    when:
+      visible: "Çıkış Yap"
+    file: ../subflows/logout.yaml
+- runFlow:
+    when:
+      visible: "Giriş Yap"
+    file: ../subflows/login.yaml
