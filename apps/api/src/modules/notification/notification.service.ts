@@ -18,6 +18,7 @@ import { SendGridProvider } from './providers/sendgrid.provider';
 import { ExpoPushProvider } from './providers/expo-push.provider';
 import { SmsProvider } from './providers/sms.provider';
 import { SmtpProvider } from './providers/smtp.provider';
+import { StorageService } from '../storage/storage.service';
 
 // Notification templates (Turkish)
 const NOTIFICATION_TEMPLATES: Record<NotificationType, { title: string; message: string; icon?: string; link?: string }> = {
@@ -375,6 +376,7 @@ export class NotificationService {
     private readonly expoPushProvider: ExpoPushProvider,
     private readonly smsProvider: SmsProvider,
     private readonly smtpProvider: SmtpProvider,
+    private readonly storageService: StorageService,
   ) {}
 
   /**
@@ -807,10 +809,14 @@ export class NotificationService {
         },
       },
     });
+    const cardKey = product?.images[0]?.cardKey ?? null;
     return {
       productId,
       productTitle: product?.title ?? '',
-      productImage: product?.images[0]?.cardKey ?? null,
+      // Resolve to a public URL — clients (notification bell, unavailable
+      // page) can render <img src=...> directly. Without this, they'd get
+      // a raw S3 key like "products/abc/card.jpg" which won't load.
+      productImage: cardKey ? this.storageService.getPublicAssetUrl(cardKey) : null,
       categoryId: product?.categoryId ?? null,
       categorySlug: product?.category?.slug ?? null,
       categoryName: product?.category?.name ?? null,
