@@ -763,7 +763,10 @@ export class ProductService implements OnModuleInit {
         categoryId: product.categoryId,
         id: { not: productId },
         status: ProductStatus.active,
-        quantity: { gt: 0 },
+        // Match the canonical product-list filter (build-product-where.ts:56):
+        // quantity = null means "sınırsız stok" (digital/preorder) — must be
+        // included, not filtered out by a naive `> 0`.
+        OR: [{ quantity: { gt: 0 } }, { quantity: null }],
       },
       orderBy: { createdAt: 'desc' },
       take: Math.min(limit, 24),

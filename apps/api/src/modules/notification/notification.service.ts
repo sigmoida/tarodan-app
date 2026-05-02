@@ -939,11 +939,15 @@ export class NotificationService {
     }
   }
 
-  async notifyBackInStock(userId: string, productId: string, productTitle: string) {
+  async notifyBackInStock(userId: string, productId: string, _productTitle: string) {
+    // Enrich payload (productImage, categorySlug, ...) so the notification
+    // bell can render a thumbnail and the click-through can land on the
+    // unavailable-page back-in-stock variant without an extra fetch.
+    const data = await this.buildStockoutData(productId);
     return this.send({
       userId,
       type: NotificationType.BACK_IN_STOCK,
-      data: { productId, productTitle },
+      data,
     });
   }
 
