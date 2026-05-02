@@ -5,6 +5,7 @@ import {
   ForbiddenException,
   Logger,
 } from '@nestjs/common';
+import { ModuleRef } from '@nestjs/core';
 import { ConfigService } from '@nestjs/config';
 import { PrismaService } from '../../prisma';
 import { CacheService } from '../cache/cache.service';
@@ -36,6 +37,7 @@ export class PaymentService {
     private readonly productLockService: ProductLockService,
     private readonly notificationService: NotificationService,
     private readonly suratCargoService: SuratCargoService,
+    private readonly moduleRef: ModuleRef,
   ) {
     this.holdDays = parseInt(this.configService.get('PAYMENT_HOLD_DAYS') || '7', 10);
   }
@@ -1535,6 +1537,33 @@ export class PaymentService {
       } catch (error) {
         // Log but don't fail - payment was already completed
         this.logger.error(`Failed to emit trade.ready-for-shipping event: ${error}`);
+      }
+
+      // Auto-create the two `to_warehouse` Sürat shipments now that the cash
+      // trade has cleared payment and entered `shipping_to_warehouse`. Mirrors
+      // the non-cash hook in TradeService.acceptTrade. We resolve TradeService
+      // lazily via ModuleRef + a runtime require to avoid the Trade<>Payment
+      // module circular import (Membership eagerly imports Payment; Trade
+      // imports Payment; Payment can't statically import Trade).
+      try {
+        // eslint-disable-next-line @typescript-eslint/no-var-requires
+        const { TradeService } = require('../trade/trade.service');
+        const tradeService = this.moduleRef.get(TradeService, { strict: false });
+        if (tradeService && typeof tradeService.createInboundTradeShipments === 'function') {
+          tradeService.createInboundTradeShipments(result.trade.id).catch((err: any) =>
+            this.logger.error(
+              `createInboundTradeShipments crashed for cash-trade ${result.trade!.id}: ${err?.message ?? err}`,
+            ),
+          );
+        } else {
+          this.logger.warn(
+            `TradeService.createInboundTradeShipments not available; inbound shipments NOT auto-created for cash-trade ${result.trade.id}`,
+          );
+        }
+      } catch (err: any) {
+        this.logger.error(
+          `Failed to resolve TradeService for cash-trade inbound shipments: ${err?.message ?? err}`,
+        );
       }
     }
 
