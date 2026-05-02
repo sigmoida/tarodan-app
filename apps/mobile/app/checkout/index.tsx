@@ -416,6 +416,7 @@ export default function CheckoutScreen() {
           (payData as Record<string, unknown> | undefined)?.paymentId ??
           (payData as Record<string, unknown> | undefined)?.id;
         const paymentUrl = (payData as Record<string, unknown> | undefined)?.paymentUrl as string | undefined;
+        const useBypass = (payData as Record<string, unknown> | undefined)?.useBypass === true;
 
         if (paymentUrl && paymentUrl.startsWith('http')) {
           if (!isDirectBuy) clearCart();
@@ -425,8 +426,11 @@ export default function CheckoutScreen() {
 
         if (!isDirectBuy) clearCart();
         if (paymentId) {
-          const guestQ = !isAuthenticated ? '?guest=true' : '';
-          router.replace(`/payment/${paymentId}${guestQ}` as any);
+          const params = new URLSearchParams();
+          if (!isAuthenticated) params.set('guest', 'true');
+          if (useBypass) params.set('useBypass', 'true');
+          const qs = params.toString();
+          router.replace(`/payment/${paymentId}${qs ? `?${qs}` : ''}` as any);
           return;
         }
 

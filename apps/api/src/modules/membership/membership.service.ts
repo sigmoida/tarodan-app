@@ -402,6 +402,7 @@ export class MembershipService {
         paymentUrl: paymentResult.paymentUrl,
         paymentId: paymentResult.paymentId,
         provider: paymentResult.provider,
+        useBypass: paymentResult.useBypass === true,
       } as any;
     } catch (error) {
       // If payment initiation fails, rollback membership
@@ -530,6 +531,7 @@ export class MembershipService {
       paymentHtml: paymentResult.paymentHtml,
       provider: paymentResult.provider,
       expiresIn: paymentResult.expiresIn || 300,
+      useBypass: (paymentResult as { useBypass?: boolean }).useBypass === true,
     };
   }
 

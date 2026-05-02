@@ -12,13 +12,15 @@ import { formatApiErrorMessage } from '../../src/utils/formatApiErrorMessage';
 function pickPaymentFromSubscribeResponse(data: {
   paymentId?: string;
   paymentUrl?: string;
-  payment?: { id?: string; paymentId?: string; paymentUrl?: string };
+  useBypass?: boolean;
+  payment?: { id?: string; paymentId?: string; paymentUrl?: string; useBypass?: boolean };
 } | null | undefined) {
-  if (!data) return { paymentId: undefined as string | undefined, paymentUrl: undefined as string | undefined };
+  if (!data) return { paymentId: undefined as string | undefined, paymentUrl: undefined as string | undefined, useBypass: false };
   const nested = data.payment;
   const paymentId = data.paymentId ?? nested?.paymentId;
   const paymentUrl = data.paymentUrl ?? nested?.paymentUrl;
-  return { paymentId, paymentUrl };
+  const useBypass = data.useBypass === true || nested?.useBypass === true;
+  return { paymentId, paymentUrl, useBypass };
 }
 
 const TIER_NAMES: Record<string, string> = {
@@ -206,10 +208,11 @@ export default function MembershipCheckoutScreen() {
       const payload = (root?.data ?? root) as {
         paymentId?: string;
         paymentUrl?: string;
-        payment?: { id?: string; paymentId?: string; paymentUrl?: string };
+        useBypass?: boolean;
+        payment?: { id?: string; paymentId?: string; paymentUrl?: string; useBypass?: boolean };
       };
 
-      const { paymentId, paymentUrl } = pickPaymentFromSubscribeResponse(payload);
+      const { paymentId, paymentUrl, useBypass } = pickPaymentFromSubscribeResponse(payload);
 
       if (paymentUrl && paymentUrl.startsWith('http')) {
         try {
@@ -237,12 +240,14 @@ export default function MembershipCheckoutScreen() {
         return;
       }
 
+      const bypassQs = useBypass ? '&useBypass=true' : '';
+
       let statusData: { status?: string } | undefined;
       try {
         const statusRes = await paymentsApi.getStatusLight(paymentId);
         statusData = (statusRes.data as { data?: typeof statusData })?.data || statusRes.data;
       } catch {
-        router.replace(`/payment/${paymentId}?type=membership` as any);
+        router.replace(`/payment/${paymentId}?type=membership${bypassQs}` as any);
         return;
       }
 
@@ -254,7 +259,7 @@ export default function MembershipCheckoutScreen() {
         return;
       }
 
-      router.replace(`/payment/${paymentId}?type=membership` as any);
+      router.replace(`/payment/${paymentId}?type=membership${bypassQs}` as any);
     } catch (err: unknown) {
       const msg = formatApiErrorMessage(err, 'Abonelik oluşturulamadı.');
       Alert.alert('Hata', msg);

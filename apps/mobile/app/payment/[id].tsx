@@ -42,16 +42,41 @@ const STATUS_CONFIG: Record<string, { label: string; color: string; bgColor: str
 };
 
 export default function PaymentDetailScreen() {
-  const { id, type: paymentFlowType } = useLocalSearchParams<{ id: string; type?: string }>();
+  const { id, type: paymentFlowType, useBypass: useBypassParam } = useLocalSearchParams<{
+    id: string;
+    type?: string;
+    useBypass?: string;
+  }>();
   const [payment, setPayment] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    if (id) {
+    if (!id) return;
+    if (useBypassParam === 'true') {
+      runBypassThenFetch();
+    } else {
       fetchPaymentDetails();
     }
   }, [id]);
+
+  const runBypassThenFetch = async () => {
+    try {
+      setError(null);
+      const bypassRes = await paymentsApi.bypassComplete(id!);
+      if (!bypassRes.data?.success) {
+        setError('Ödeme tamamlanamadı (bypass başarısız).');
+        setLoading(false);
+        return;
+      }
+    } catch (err) {
+      console.error('Bypass complete failed:', err);
+      setError('Ödeme tamamlanırken bir hata oluştu.');
+      setLoading(false);
+      return;
+    }
+    await fetchPaymentDetails();
+  };
 
   const fetchPaymentDetails = async () => {
     try {
