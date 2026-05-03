@@ -1377,6 +1377,26 @@
     "carrierDeliveryTime": "2-3 iş günü teslimat",
     "errorSomethingWrong": "Bir şeyler ters gitti",
     "errorRetry": "Tekrar Dene",
-    "errorBoundaryDescription": "Beklenmedik bir hata oluştu. Bilgilendirildik.\nTekrar denemek için aşağıya dokun."
+    "errorBoundaryDescription": "Beklenmedik bir hata oluştu. Bilgilendirildik.\nTekrar denemek için aşağıya dokun.",
+    "registerSubtitle": "Koleksiyonculara katılın",
+    "forgotPasswordTitle": "Şifremi Unuttum",
+    "forgotPasswordSubtitle": "Şifre sıfırlama bağlantısı için e-posta adresinizi girin.",
+    "forgotPasswordSendButton": "Sıfırlama Bağlantısı Gönder",
+    "forgotPasswordSent": "Bağlantı gönderildi. E-postanızı kontrol edin.",
+    "forgotPasswordFailed": "Gönderilemedi. Tekrar deneyin.",
+    "resetPasswordTitle": "Yeni Şifre Belirle",
+    "resetPasswordSubtitle": "Yeni şifrenizi iki kez girin.",
+    "resetPasswordButton": "Şifreyi Güncelle",
+    "resetPasswordSuccess": "Şifre güncellendi. Yeni şifre ile giriş yapabilirsiniz.",
+    "resetPasswordFailed": "Güncellenemedi. Bağlantı geçersiz olabilir.",
+    "verifyEmailTitle": "E-posta Doğrulama",
+    "verifyEmailSent": "Doğrulama linki e-postanıza gönderildi.",
+    "verifyEmailFailed": "Doğrulanamadı. Linkin süresi dolmuş olabilir.",
+    "verifyEmailResend": "Tekrar Gönder",
+    "verifyEmailSuccess": "E-postanız doğrulandı.",
+    "newPassword": "Yeni Şifre",
+    "newPasswordRepeat": "Yeni Şifre (Tekrar)",
+    "passwordsDontMatch": "Şifreler eşleşmiyor",
+    "tokenInvalid": "Bağlantı geçersiz veya süresi dolmuş"
   }
 }

@@ -1379,6 +1379,26 @@
     "carrierDeliveryTime": "2-3 business days delivery",
     "errorSomethingWrong": "Something went wrong",
     "errorRetry": "Try Again",
-    "errorBoundaryDescription": "An unexpected error occurred. We've been notified.\nTap below to try again."
+    "errorBoundaryDescription": "An unexpected error occurred. We've been notified.\nTap below to try again.",
+    "registerSubtitle": "Join the collectors",
+    "forgotPasswordTitle": "Forgot Password",
+    "forgotPasswordSubtitle": "Enter your email to receive a reset link.",
+    "forgotPasswordSendButton": "Send Reset Link",
+    "forgotPasswordSent": "Link sent. Check your email.",
+    "forgotPasswordFailed": "Could not send. Please try again.",
+    "resetPasswordTitle": "Set New Password",
+    "resetPasswordSubtitle": "Enter your new password twice.",
+    "resetPasswordButton": "Update Password",
+    "resetPasswordSuccess": "Password updated. You can now log in with the new password.",
+    "resetPasswordFailed": "Could not update. The link may be invalid.",
+    "verifyEmailTitle": "Email Verification",
+    "verifyEmailSent": "Verification link sent to your email.",
+    "verifyEmailFailed": "Could not verify. The link may have expired.",
+    "verifyEmailResend": "Resend",
+    "verifyEmailSuccess": "Your email has been verified.",
+    "newPassword": "New Password",
+    "newPasswordRepeat": "New Password (Repeat)",
+    "passwordsDontMatch": "Passwords don't match",
+    "tokenInvalid": "Link is invalid or expired"
   }
 }

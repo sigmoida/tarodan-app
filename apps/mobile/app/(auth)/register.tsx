@@ -7,6 +7,7 @@ import { useMutation } from '@tanstack/react-query';
 import { router } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { authApi } from '../../src/services/api';
+import { useTranslation } from '../../src/i18n';
 
 const registerSchema = z.object({
   displayName: z.string().min(2, 'İsim en az 2 karakter olmalı'),
@@ -24,6 +25,7 @@ type RegisterForm = z.infer<typeof registerSchema>;
 
 export default function RegisterScreen() {
   const theme = useTheme();
+  const { t } = useTranslation();
 
   const { control, handleSubmit, formState: { errors } } = useForm<RegisterForm>({
     resolver: zodResolver(registerSchema),
@@ -63,10 +65,10 @@ export default function RegisterScreen() {
         </TouchableOpacity>
 
         <Text variant="displaySmall" style={{ textAlign: 'center', marginBottom: 8, color: theme.colors.primary }}>
-          Kayıt Ol
+          {t('common.register')}
         </Text>
         <Text variant="bodyLarge" style={{ textAlign: 'center', marginBottom: 32, color: theme.colors.outline }}>
-          Koleksiyonculara katılın
+          {t('mobile.registerSubtitle')}
         </Text>
 
         <Controller
@@ -75,7 +77,7 @@ export default function RegisterScreen() {
           render={({ field: { onChange, value } }) => (
             <TextInput
               testID="register-display-name-input"
-              label="Adınız"
+              label={t('mobile.displayNameLabel')}
               value={value}
               onChangeText={onChange}
               error={!!errors.displayName}
@@ -95,7 +97,7 @@ export default function RegisterScreen() {
           render={({ field: { onChange, value } }) => (
             <TextInput
               testID="register-email-input"
-              label="E-posta"
+              label={t('auth.email')}
               value={value}
               onChangeText={onChange}
               keyboardType="email-address"
@@ -116,7 +118,7 @@ export default function RegisterScreen() {
           name="phone"
           render={({ field: { onChange, value } }) => (
             <TextInput
-              label="Telefon (opsiyonel)"
+              label={t('mobile.phoneOptional')}
               value={value}
               onChangeText={onChange}
               keyboardType="phone-pad"
@@ -132,7 +134,7 @@ export default function RegisterScreen() {
           render={({ field: { onChange, value } }) => (
             <TextInput
               testID="register-password-input"
-              label="Şifre"
+              label={t('auth.password')}
               value={value}
               onChangeText={onChange}
               secureTextEntry
@@ -153,7 +155,7 @@ export default function RegisterScreen() {
           render={({ field: { onChange, value } }) => (
             <TextInput
               testID="register-confirm-password-input"
-              label="Şifre Tekrar"
+              label={t('mobile.passwordRepeat')}
               value={value}
               onChangeText={onChange}
               secureTextEntry
@@ -175,7 +177,7 @@ export default function RegisterScreen() {
             <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 8 }}>
               <Checkbox status={value ? 'checked' : 'unchecked'} onPress={() => onChange(!value)} />
               <Text variant="bodyMedium" style={{ flex: 1 }}>
-                Kullanım koşullarını ve gizlilik politikasını kabul ediyorum
+                {t('mobile.acceptTerms')}
               </Text>
             </View>
           )}
@@ -188,7 +190,7 @@ export default function RegisterScreen() {
 
         {registerMutation.isError && (
           <Text testID="register-error-banner" variant="bodySmall" style={{ color: theme.colors.error, marginBottom: 16, textAlign: 'center' }}>
-            Kayıt başarısız. Lütfen tekrar deneyin.
+            {t('mobile.registerFailed')}
           </Text>
         )}
 
@@ -200,13 +202,13 @@ export default function RegisterScreen() {
           disabled={registerMutation.isPending}
           style={{ marginBottom: 16 }}
         >
-          Kayıt Ol
+          {t('common.register')}
         </Button>
 
         <View style={{ flexDirection: 'row', justifyContent: 'center' }}>
-          <Text variant="bodyMedium">Zaten hesabınız var mı? </Text>
+          <Text variant="bodyMedium">{t('mobile.haveAccount')}</Text>
           <Button mode="text" compact onPress={() => router.push('/(auth)/login')}>
-            Giriş Yap
+            {t('common.login')}
           </Button>
         </View>
       </ScrollView>

@@ -7,6 +7,7 @@ import { useMutation } from '@tanstack/react-query';
 import { router } from 'expo-router';
 import { useState } from 'react';
 import { api } from '../../src/services/api';
+import { useTranslation } from '../../src/i18n';
 
 const forgotSchema = z.object({
   email: z.string().email('Geçerli email girin'),
@@ -17,6 +18,7 @@ type ForgotForm = z.infer<typeof forgotSchema>;
 export default function ForgotPasswordScreen() {
   const theme = useTheme();
   const [sent, setSent] = useState(false);
+  const { t } = useTranslation();
 
   const { control, handleSubmit, formState: { errors } } = useForm<ForgotForm>({
     resolver: zodResolver(forgotSchema),
@@ -36,12 +38,12 @@ export default function ForgotPasswordScreen() {
   if (sent) {
     return (
       <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', padding: 24, backgroundColor: theme.colors.background }}>
-        <Text variant="headlineSmall" style={{ marginBottom: 16 }}>Email Gönderildi</Text>
+        <Text variant="headlineSmall" style={{ marginBottom: 16 }}>{t('mobile.forgotPasswordSent')}</Text>
         <Text variant="bodyMedium" style={{ textAlign: 'center', marginBottom: 24, color: theme.colors.outline }}>
-          Şifre sıfırlama linki email adresinize gönderildi. Lütfen gelen kutunuzu kontrol edin.
+          {t('mobile.forgotPasswordSubtitle')}
         </Text>
         <Button mode="contained" onPress={() => router.push('/(auth)/login')}>
-          Giriş Sayfasına Dön
+          {t('common.login')}
         </Button>
       </View>
     );
@@ -54,10 +56,10 @@ export default function ForgotPasswordScreen() {
     >
       <View style={{ flex: 1, justifyContent: 'center', padding: 24 }}>
         <Text variant="headlineSmall" style={{ textAlign: 'center', marginBottom: 8 }}>
-          Şifremi Unuttum
+          {t('mobile.forgotPasswordTitle')}
         </Text>
         <Text variant="bodyMedium" style={{ textAlign: 'center', marginBottom: 32, color: theme.colors.outline }}>
-          Email adresinizi girin, şifre sıfırlama linki göndereceğiz
+          {t('mobile.forgotPasswordSubtitle')}
         </Text>
 
         <Controller
@@ -65,7 +67,7 @@ export default function ForgotPasswordScreen() {
           name="email"
           render={({ field: { onChange, value } }) => (
             <TextInput
-              label="E-posta"
+              label={t('auth.email')}
               value={value}
               onChangeText={onChange}
               keyboardType="email-address"
@@ -83,7 +85,7 @@ export default function ForgotPasswordScreen() {
 
         {forgotMutation.isError && (
           <Text variant="bodySmall" style={{ color: theme.colors.error, marginBottom: 16, textAlign: 'center' }}>
-            Bir hata oluştu. Lütfen tekrar deneyin.
+            {t('mobile.forgotPasswordFailed')}
           </Text>
         )}
 
@@ -94,11 +96,11 @@ export default function ForgotPasswordScreen() {
           disabled={forgotMutation.isPending}
           style={{ marginBottom: 16 }}
         >
-          Şifre Sıfırlama Linki Gönder
+          {t('mobile.forgotPasswordSendButton')}
         </Button>
 
         <Button mode="text" onPress={() => router.back()}>
-          Geri Dön
+          {t('common.back')}
         </Button>
       </View>
     </KeyboardAvoidingView>

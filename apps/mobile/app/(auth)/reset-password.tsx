@@ -5,8 +5,10 @@ import { router, useLocalSearchParams } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { authApi } from '../../src/services/api';
 import { TarodanColors } from '../../src/theme';
+import { useTranslation } from '../../src/i18n';
 
 export default function ResetPasswordScreen() {
+  const { t } = useTranslation();
   const { token } = useLocalSearchParams<{ token: string }>();
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
@@ -116,7 +118,7 @@ export default function ResetPasswordScreen() {
 
           {/* Password Input */}
           <TextInput
-            label="Yeni Şifre"
+            label={t('mobile.newPassword')}
             value={password}
             onChangeText={setPassword}
             secureTextEntry={!showPassword}
@@ -179,7 +181,7 @@ export default function ResetPasswordScreen() {
 
           {/* Confirm Password Input */}
           <TextInput
-            label="Şifre Tekrar"
+            label={t('mobile.newPasswordRepeat')}
             value={confirmPassword}
             onChangeText={setConfirmPassword}
             secureTextEntry={!showConfirmPassword}
@@ -207,7 +209,7 @@ export default function ResetPasswordScreen() {
                 styles.matchText,
                 { color: password === confirmPassword ? TarodanColors.success : TarodanColors.error }
               ]}>
-                {password === confirmPassword ? 'Şifreler eşleşiyor' : 'Şifreler eşleşmiyor'}
+                {password === confirmPassword ? t('common.success') : t('mobile.passwordsDontMatch')}
               </Text>
             </View>
           )}
@@ -228,7 +230,7 @@ export default function ResetPasswordScreen() {
             style={styles.submitButton}
             buttonColor={TarodanColors.primary}
           >
-            Şifreyi Değiştir
+            {t('mobile.resetPasswordButton')}
           </Button>
 
           {/* Back to Login */}
@@ -237,7 +239,7 @@ export default function ResetPasswordScreen() {
             onPress={() => router.replace('/(auth)/login')}
           >
             <Ionicons name="arrow-back" size={16} color={TarodanColors.primary} />
-            <Text style={styles.backToLoginText}>Giriş sayfasına dön</Text>
+            <Text style={styles.backToLoginText}>{t('common.login')}</Text>
           </TouchableOpacity>
         </View>
       </ScrollView>
