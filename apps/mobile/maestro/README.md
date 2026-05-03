@@ -43,6 +43,25 @@ maestro test --env EMAIL=ahmet@demo.com flows/02-auth-login.yaml
 maestro studio
 ```
 
+## Tag stratejisi
+
+Her flow YAML başında `tags:` bloğu ile bir öncelik kategorisine atanır:
+
+| Tag | Ne zaman koşar | İçerdiği | Toplam koşum |
+|-----|---------------|----------|-------------|
+| `smoke` | Her PR (Maestro Cloud workflow) | 01-smoke, 01-01-login-happy, 03-search, 05-ilanlarim-diagnostic, D-01 | ~2 dk 30 sn |
+| `regression` | Nightly + release öncesi | 01-02, 01-03, 01-12, 02-auth-login, D-02, D-03, D-04, D-05 | ~5 dk |
+| `placeholder` | Manuel tetik (henüz aktif değil) | 04-checkout-bypass | — |
+
+Çalıştırma örnekleri:
+```bash
+maestro test maestro/flows --include-tags smoke         # her PR
+maestro test maestro/flows --include-tags regression    # nightly
+maestro test maestro/flows                              # hepsi (placeholder dahil)
+```
+
+Cloud workflow (`.github/workflows/maestro-cloud.yml`) `include-tags: smoke` kullanır → secret + .app artefact eklenince her PR'da smoke set otomatik koşar.
+
 ## Klasör yapısı
 
 ```

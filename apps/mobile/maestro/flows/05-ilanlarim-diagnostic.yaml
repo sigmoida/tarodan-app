@@ -1,6 +1,8 @@
 # İlanlarım ekranı: login → profile → İlanlarım listesinde en az 1 ilan görünür.
 # Zeynep'in seed'de 6 ilanı var.
 appId: host.exp.Exponent
+tags:
+  - smoke
 env:
   EMAIL: zeynep@demo.com
   PASSWORD: Demo123!

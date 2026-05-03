@@ -1,6 +1,8 @@
 # 01-01: Login happy path — Zeynep (FREE seed user).
 # Önce logout dener (varsa), sonra login. Profil ekranında kullanıcı bilgisi görünür.
 appId: host.exp.Exponent
+tags:
+  - smoke
 env:
   EMAIL: zeynep@demo.com
   PASSWORD: Demo123!

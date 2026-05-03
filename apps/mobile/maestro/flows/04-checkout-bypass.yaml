@@ -14,6 +14,8 @@
 # Şimdilik sadece checkout/index.tsx + payment/[id].tsx'in B-001 fix'i içerdiğini
 # manuel doğrulanmış olarak işaretleyelim. Bkz. apps/mobile/docs/manual-test/bug-rapor.md.
 appId: host.exp.Exponent
+tags:
+  - placeholder
 ---
 - runFlow: ../subflows/open-tarodan.yaml
 - assertVisible: "Kategoriler"

@@ -3,6 +3,8 @@
 # Beklenen: ya login olur ama "doğrula" banner'ı çıkar, ya da login başarısız.
 # Bu flow ikisi de kabul: Network Error olmasın + Kategoriler'e geçiş YA da error banner.
 appId: host.exp.Exponent
+tags:
+  - regression
 ---
 - runFlow: ../subflows/open-tarodan.yaml
 - tapOn:

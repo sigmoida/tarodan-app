@@ -1,5 +1,7 @@
 # 01-12: Logout cleanup — login → logout → login ekranı (form alanları görünür).
 appId: host.exp.Exponent
+tags:
+  - regression
 env:
   EMAIL: zeynep@demo.com
   PASSWORD: Demo123!

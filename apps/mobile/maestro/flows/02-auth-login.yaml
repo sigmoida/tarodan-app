@@ -1,6 +1,8 @@
 # Auth-login smoke: login-as ile login yap, profil ekranında kullanıcı görünür.
 # Tek başına çalışırken de batch'te de PASS olur.
 appId: host.exp.Exponent
+tags:
+  - regression
 env:
   EMAIL: zeynep@demo.com
   PASSWORD: Demo123!

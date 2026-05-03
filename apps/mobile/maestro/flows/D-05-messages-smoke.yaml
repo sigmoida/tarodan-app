@@ -2,6 +2,8 @@
 # Yeni thread + mesaj gönderme akışı iki kullanıcı gerektirir, bu flow sadece
 # mesaj listesinin render olduğunu doğrular.
 appId: host.exp.Exponent
+tags:
+  - regression
 ---
 - runFlow: ../subflows/open-tarodan.yaml
 - tapOn:

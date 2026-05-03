@@ -2,6 +2,8 @@
 # Tam bypass üyelik akışı API e2e (payment-bypass.e2e-spec.ts) ile kapsanıyor; bu flow
 # UI'ın açıldığını + ekran çökmediğini garanti eder.
 appId: host.exp.Exponent
+tags:
+  - regression
 env:
   EMAIL: zeynep@demo.com
   PASSWORD: Demo123!

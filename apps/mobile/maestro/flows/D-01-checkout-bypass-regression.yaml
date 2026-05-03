@@ -1,13 +1,13 @@
 # D-01: Checkout girişi smoke + B-001 koruma (kısmi).
 # Login → Ara tab → ilk ürün → Hemen Al → Teslimat Bilgileri → Ödeme adımı yüklenir.
 #
-# NOT: Tam B-001 regression için checkout 3. adıma kadar gitmek gerek ama mevcut UI
-# Maestro inputText'in PaperInput'a düşmesinde sorun yaratıyor. Tam regression için
-# API-level test (Supertest) Sprint 7'de eklenecek. Bu flow şimdilik kapsamı şu:
-#   - Hemen Al → checkout açılıyor mu
-#   - Adres ekranı yüklenip Ödeme adımına geçiliyor mu
-#   - Ödeme adımında kart formu render oluyor mu (regresyon: ekran çökmüyor)
+# Tam B-001 (bypass payment chain) regression API-level test'te kapsanıyor
+# (apps/api/test/e2e/payment-bypass.e2e-spec.ts). Bu UI flow checkout chain'in
+# açılıp Ödeme adımına geçtiğini + bypass modunda kart formunun gizli olduğunu
+# (commit f9f3a81 ile getirildi) doğrular.
 appId: host.exp.Exponent
+tags:
+  - smoke
 env:
   EMAIL: zeynep@demo.com
   PASSWORD: Demo123!
@@ -41,11 +41,13 @@ env:
 - assertVisible: "Teslimat Adresi"
 - tapOn:
     text: "Devam Et.*"
-# Step 2 - Ödeme adımı yüklendi
+# Step 2 - Ödeme adımı yüklendi. Bypass aktif → kart formu gizli, bilgi notice'i görünür.
 - extendedWaitUntil:
-    visible: "Kart Numarası"
+    visible: "Kargo"
     timeout: 15000
-- assertVisible: "Kart Numarası"
-- assertVisible: "Kargo Seçimi"
+- assertVisible: "Kargo"
+- assertVisible:
+    text: ".*Geliştirici modu.*"
+- assertNotVisible: "Kart Bilgileri"
 - assertNotVisible: ".*Network Error.*"
 - assertNotVisible: ".*Bir hata oluştu.*"
