@@ -10,6 +10,11 @@ name: Maestro Cloud (Mobile e2e)
 
 on:
   workflow_dispatch:
+  push:
+    branches: [development]
+    paths:
+      - 'apps/mobile/**'
+      - '.github/workflows/maestro-cloud.yml'
   pull_request:
     branches: [development, master, main]
     paths:
