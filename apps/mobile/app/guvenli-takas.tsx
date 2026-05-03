@@ -3,6 +3,7 @@ import { Text } from 'react-native-paper';
 import { router } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { TarodanColors } from '../src/theme';
+import { useTranslation } from '../src/i18n';
 
 const STEPS = [
   {
@@ -38,13 +39,14 @@ const STEPS = [
 ];
 
 export default function GuvenliTakasScreen() {
+  const { t } = useTranslation();
   return (
     <View style={styles.container}>
       <View style={styles.header}>
         <TouchableOpacity onPress={() => router.back()}>
           <Ionicons name="arrow-back" size={24} color={TarodanColors.textOnPrimary} />
         </TouchableOpacity>
-        <Text style={styles.headerTitle}>Güvenli Takas</Text>
+        <Text style={styles.headerTitle}>{t('mobile.pageSafeTrade')}</Text>
         <View style={{ width: 24 }} />
       </View>
 

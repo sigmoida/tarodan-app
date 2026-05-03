@@ -5,6 +5,7 @@ import { router } from 'expo-router';
 import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 import { useAuthStore } from '../src/stores/authStore';
 import { TarodanColors } from '../src/theme';
+import { useTranslation } from '../src/i18n';
 
 type PlanType = 'monthly' | 'annual';
 
@@ -54,6 +55,7 @@ const COMPARISON = [
 ];
 
 export default function UpgradeScreen() {
+  const { t } = useTranslation();
   const { isAuthenticated, user } = useAuthStore();
   const [selectedPlan, setSelectedPlan] = useState<PlanType>('annual');
 
@@ -78,7 +80,7 @@ export default function UpgradeScreen() {
         <TouchableOpacity onPress={() => router.back()}>
           <Ionicons name="arrow-back" size={24} color={TarodanColors.textOnPrimary} />
         </TouchableOpacity>
-        <Text style={styles.headerTitle}>Premium Üyelik</Text>
+        <Text style={styles.headerTitle}>{t('mobile.pageUpgrade')}</Text>
         <View style={{ width: 24 }} />
       </View>
 

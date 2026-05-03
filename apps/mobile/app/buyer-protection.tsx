@@ -4,6 +4,7 @@ import { Stack, router } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { TouchableOpacity } from 'react-native';
 import { TarodanColors } from '../src/theme';
+import { useTranslation } from '../src/i18n';
 
 const sections = [
   {
@@ -44,9 +45,10 @@ const sections = [
 ];
 
 export default function BuyerProtectionScreen() {
+  const { t } = useTranslation();
   return (
     <View style={styles.container}>
-      <Stack.Screen options={{ title: 'Alıcı Koruma' }} />
+      <Stack.Screen options={{ title: t('mobile.pageBuyerProtection') }} />
 
       <View style={styles.hero}>
         <Ionicons name="shield-checkmark" size={40} color="#fff" />
