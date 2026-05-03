@@ -49,7 +49,7 @@
 
 - **Push notification** Expo Go'da çalışmaz → F1.7 push adımı kısmi (foreground only).
 - **WebSocket gerçek zamanlı** test için iki cihaz gerekir (iki sim ya da sim + web).
-- **Aras/Yurtiçi/MNG kargo** API kimlikleri yapılandırılmamış (loglarda WARN); takas akışında "kargo kimliği yok" davranışı görülebilir.
+- **Kargo:** sadece **Sürat Kargo** kullanılır (sipariş + takas) — web ve mobil tek opsiyon olarak sabit. Aras/Yurtiçi/MNG seçenekleri kullanım dışı.
 - **SendGrid / Twilio / Sentry** yapılandırılmamış (log-only). Mail için MailHog (http://localhost:8025) kullanılacak.
 
 ## Test kullanıcıları (hepsi `Demo123!`)

@@ -92,7 +92,8 @@ export default function CheckoutScreen() {
   const [showCityPicker, setShowCityPicker] = useState(false);
 
   // Carrier & shipping
-  const [selectedCarrier, setSelectedCarrier] = useState<'aras' | 'yurtici'>('aras');
+  // Sürat Kargo only — web parity (apps/web/src/app/checkout/page.tsx:160 also pins to 'surat').
+  const [selectedCarrier] = useState<'surat'>('surat');
   const [shippingCost, setShippingCost] = useState(0);
   const [shippingLoading, setShippingLoading] = useState(false);
 
@@ -234,7 +235,7 @@ export default function CheckoutScreen() {
       } else {
         const isIstanbul = city.toLowerCase().includes('istanbul');
         const baseRate = isIstanbul ? 34.90 : 49.90;
-        const carrierExtra = selectedCarrier === 'yurtici' ? 5 : 0;
+        const carrierExtra = 0;
         setShippingCost(baseRate + carrierExtra);
       }
     } catch {
@@ -448,11 +449,12 @@ export default function CheckoutScreen() {
 
   // ─── Helpers ────────────────────────────────────────────────────────
 
-  const getShippingRate = (carrier: 'aras' | 'yurtici'): number => {
+  const getShippingRate = (carrier: 'surat'): number => {
     const city = getActiveCity();
     const isIstanbul = city?.toLowerCase().includes('istanbul');
     const baseRate = isIstanbul ? 34.90 : 49.90;
-    return carrier === 'yurtici' ? baseRate + 5 : baseRate;
+    // Surat-only: no per-carrier surcharge.
+    return baseRate;
   };
 
   const getSelectedAddressSummary = (): string => {
@@ -852,44 +854,25 @@ export default function CheckoutScreen() {
         {/* ────── Step 2: Payment ────── */}
         {step === 2 && (
           <View>
-            {/* Carrier Selection */}
+            {/* Carrier — Surat Kargo only (web parity). Static info card, not selectable. */}
             <View style={styles.section}>
               <View style={styles.sectionHeader}>
                 <Ionicons name="car-outline" size={24} color={TarodanColors.primary} />
-                <Text style={styles.sectionTitle}>Kargo Seçimi</Text>
+                <Text style={styles.sectionTitle}>Kargo</Text>
               </View>
 
-              <TouchableOpacity
-                style={[styles.optionCard, selectedCarrier === 'aras' && styles.optionCardActive]}
-                onPress={() => setSelectedCarrier('aras')}
-              >
-                <View style={[styles.radioOuter, selectedCarrier === 'aras' && styles.radioOuterActive]}>
-                  {selectedCarrier === 'aras' && <View style={styles.radioInner} />}
+              <View style={[styles.optionCard, styles.optionCardActive]}>
+                <View style={[styles.radioOuter, styles.radioOuterActive]}>
+                  <View style={styles.radioInner} />
                 </View>
                 <View style={styles.optionContent}>
-                  <Text style={styles.optionTitle}>Aras Kargo</Text>
+                  <Text style={styles.optionTitle}>Sürat Kargo</Text>
                   <Text style={styles.optionDescription}>2-3 iş günü teslimat</Text>
                 </View>
                 <Text style={styles.optionPrice}>
-                  {shippingLoading ? '...' : `₺${formatPrice(getShippingRate('aras'))}`}
+                  {shippingLoading ? '...' : `₺${formatPrice(getShippingRate('surat'))}`}
                 </Text>
-              </TouchableOpacity>
-
-              <TouchableOpacity
-                style={[styles.optionCard, selectedCarrier === 'yurtici' && styles.optionCardActive]}
-                onPress={() => setSelectedCarrier('yurtici')}
-              >
-                <View style={[styles.radioOuter, selectedCarrier === 'yurtici' && styles.radioOuterActive]}>
-                  {selectedCarrier === 'yurtici' && <View style={styles.radioInner} />}
-                </View>
-                <View style={styles.optionContent}>
-                  <Text style={styles.optionTitle}>Yurtiçi Kargo</Text>
-                  <Text style={styles.optionDescription}>2-4 iş günü teslimat</Text>
-                </View>
-                <Text style={styles.optionPrice}>
-                  {shippingLoading ? '...' : `₺${formatPrice(getShippingRate('yurtici'))}`}
-                </Text>
-              </TouchableOpacity>
+              </View>
             </View>
 
             {/* Card Input */}
@@ -1002,9 +985,7 @@ export default function CheckoutScreen() {
                   <Ionicons name="car-outline" size={20} color={TarodanColors.textSecondary} />
                   <View style={styles.summaryContent}>
                     <Text style={styles.summaryLabel}>Kargo</Text>
-                    <Text style={styles.summaryValue}>
-                      {selectedCarrier === 'aras' ? 'Aras Kargo' : 'Yurtiçi Kargo'}
-                    </Text>
+                    <Text style={styles.summaryValue}>Sürat Kargo</Text>
                   </View>
                 </View>
 
@@ -1041,9 +1022,7 @@ export default function CheckoutScreen() {
           </View>
 
           <View style={styles.orderSummaryRow}>
-            <Text style={styles.orderSummaryLabel}>
-              Kargo ({selectedCarrier === 'aras' ? 'Aras' : 'Yurtiçi'})
-            </Text>
+            <Text style={styles.orderSummaryLabel}>Kargo (Sürat)</Text>
             <Text style={styles.orderSummaryValue}>
               {shippingLoading ? '...' : totalShipping > 0 ? `₺${formatPrice(totalShipping)}` : 'Adres seçin'}
             </Text>

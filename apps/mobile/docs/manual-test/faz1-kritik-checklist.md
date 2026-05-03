@@ -85,7 +85,7 @@ API restart komutu: `pkill -f "nest start" ; pnpm --filter @tarodan/api dev > /t
 - [ ] App restart → sepet hâlâ duruyor (cartStore persist).
 - [ ] Cart üzerinden checkout'a giriş.
 - [ ] Checkout: adres seç (yoksa yeni adres ekle).
-- [ ] Kargo seçimi (aras / yurtici / mng) — kargo kimlikleri yapılandırılmamışsa "kimlik yok" davranışını gözle.
+- [ ] Kargo: tek opsiyon olarak **Sürat Kargo** görünüyor (seçim yok, sabit) — web ile aynı.
 - [ ] Sipariş özeti (toplam, kargo, indirim) doğru hesaplanıyor.
 - [ ] "Siparişi Tamamla" / "Ödemeye geç" tıklanınca → ekran `/payment/[id]`'a yönlendiriyor mu? Metro logunda `paymentUrl` çağrısı YOK, ama `paymentId` ile navigation var.
 - [ ] `/payment/[id]` ekranında WebView'in davranışı: boş mu, "geçersiz token" hatası mı, sonsuz spinner mı? Gözlenen davranışı bug-rapor'a yaz.
@@ -126,7 +126,7 @@ API restart komutu: `pkill -f "nest start" ; pnpm --filter @tarodan/api dev > /t
 - [ ] B kabul edebiliyor.
 - [ ] B karşı teklif yapabiliyor.
 - [ ] B reddedebiliyor.
-- [ ] Kabul sonrası A: `fromAddressId` seçimi + kargo (aras/yurtici/mng).
+- [ ] Kabul sonrası A: `fromAddressId` seçimi (kargo otomatik **Sürat** üzerinden hallolur — backend takip no üretir).
 - [ ] API takip no üretildi (UI'da görünüyor + DB Shipment kaydı var).
 - [ ] B tarafı için aynı kargo akışı.
 - [ ] Nakit fark ödeme — **bypass yolu** (Koşu A, `PAYMENT_BYPASS=true`) ([trade/[id].tsx:478](apps/mobile/app/trade/[id].tsx#L478)): `tradesApi.initiateCashPayment` `useBypass: true` döner, mobil `paymentsApi.bypassComplete(paymentId)` çağırır → 200, success ekranı. (Bu mobilde bypass'ın test edildiği TEK yer — flag'in canlı çalıştığının kanıtı.)
