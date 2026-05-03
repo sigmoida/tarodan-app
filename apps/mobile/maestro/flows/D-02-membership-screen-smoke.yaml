@@ -1,0 +1,33 @@
+# D-02: Membership ekranı smoke — login → Profil → Üyelik Planı → tier kartları render olur.
+# Tam bypass üyelik akışı API e2e (payment-bypass.e2e-spec.ts) ile kapsanıyor; bu flow
+# UI'ın açıldığını + ekran çökmediğini garanti eder.
+appId: host.exp.Exponent
+env:
+  EMAIL: zeynep@demo.com
+  PASSWORD: Demo123!
+---
+- runFlow: ../subflows/open-tarodan.yaml
+- tapOn:
+    text: "Profil, tab.*"
+- runFlow:
+    when:
+      visible: "Çıkış Yap"
+    file: ../subflows/logout.yaml
+- runFlow: ../subflows/login-as.yaml
+- tapOn:
+    text: "Profil, tab.*"
+- scrollUntilVisible:
+    element:
+      id: "profile-membership-link"
+    direction: DOWN
+    timeout: 15000
+    visibilityPercentage: 30
+- tapOn:
+    id: "profile-membership-link"
+# Membership ekranı yüklenir — tier'lar görünür.
+- extendedWaitUntil:
+    visible:
+      text: ".*Premium.*|.*Basic.*|.*Business.*"
+    timeout: 30000
+- assertNotVisible: ".*Network Error.*"
+- assertNotVisible: ".*Bir hata oluştu.*"

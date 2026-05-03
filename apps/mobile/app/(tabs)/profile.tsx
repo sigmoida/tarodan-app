@@ -418,7 +418,7 @@ export default function ProfileScreen() {
             <Ionicons name="chevron-forward" size={20} color={TarodanColors.textLight} />
           </TouchableOpacity>
 
-          <TouchableOpacity style={styles.menuItem} onPress={() => router.push('/membership')}>
+          <TouchableOpacity testID="profile-membership-link" style={styles.menuItem} onPress={() => router.push('/membership')}>
             <Ionicons name="diamond-outline" size={22} color={TarodanColors.textSecondary} />
             <Text style={styles.menuItemText}>Üyelik Planı</Text>
             {user?.membershipTier === 'premium' && <Badge style={{ backgroundColor: TarodanColors.primary }}>PRO</Badge>}
