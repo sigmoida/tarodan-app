@@ -6,8 +6,10 @@ import { Ionicons } from '@expo/vector-icons';
 import { useAuthStore } from '../../src/stores/authStore';
 import { userApi } from '../../src/services/api';
 import { TarodanColors } from '../../src/theme';
+import { useTranslation } from '../../src/i18n';
 
 export default function SecuritySettingsScreen() {
+  const { t } = useTranslation();
   const { isAuthenticated, user, logout } = useAuthStore();
   const [twoFactorEnabled, setTwoFactorEnabled] = useState(user?.twoFactorEnabled || false);
   const [showPasswordDialog, setShowPasswordDialog] = useState(false);
@@ -149,7 +151,7 @@ export default function SecuritySettingsScreen() {
         <TouchableOpacity onPress={() => router.back()}>
           <Ionicons name="arrow-back" size={24} color={TarodanColors.textOnPrimary} />
         </TouchableOpacity>
-        <Text style={styles.headerTitle}>Güvenlik Ayarları</Text>
+        <Text style={styles.headerTitle}>{t('mobile.settingsSecurity')}</Text>
         <View style={{ width: 24 }} />
       </View>
 

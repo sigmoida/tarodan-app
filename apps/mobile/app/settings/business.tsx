@@ -7,6 +7,7 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { api } from '../../src/services/api';
 import { TarodanColors } from '../../src/theme';
 import { useAuthStore } from '../../src/stores/authStore';
+import { useTranslation } from '../../src/i18n';
 
 interface ProductStats {
   id: string;
@@ -58,6 +59,7 @@ interface BusinessStats {
 type TabType = 'overview' | 'products' | 'collections';
 
 export default function BusinessDashboardScreen() {
+  const { t } = useTranslation();
   const { isAuthenticated, user } = useAuthStore();
   const [stats, setStats] = useState<BusinessStats | null>(null);
   const [loading, setLoading] = useState(true);
@@ -104,7 +106,7 @@ export default function BusinessDashboardScreen() {
           <TouchableOpacity onPress={() => router.back()} style={styles.backButton}>
             <Ionicons name="arrow-back" size={24} color={TarodanColors.textPrimary} />
           </TouchableOpacity>
-          <Text style={styles.headerTitle}>İşletme Paneli</Text>
+          <Text style={styles.headerTitle}>{t('mobile.settingsBusiness')}</Text>
           <View style={{ width: 40 }} />
         </View>
         <View style={styles.errorContainer}>
@@ -147,7 +149,7 @@ export default function BusinessDashboardScreen() {
         <TouchableOpacity onPress={() => router.back()} style={styles.backButton}>
           <Ionicons name="arrow-back" size={24} color={TarodanColors.textPrimary} />
         </TouchableOpacity>
-        <Text style={styles.headerTitle}>İşletme Paneli</Text>
+        <Text style={styles.headerTitle}>{t('mobile.settingsBusiness')}</Text>
         <View style={{ width: 40 }} />
       </View>
 

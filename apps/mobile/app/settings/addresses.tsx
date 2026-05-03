@@ -7,6 +7,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { api } from '../../src/services/api';
 import { useAuthStore } from '../../src/stores/authStore';
 import { TarodanColors } from '../../src/theme';
+import { useTranslation } from '../../src/i18n';
 
 interface Address {
   id: string;
@@ -21,6 +22,7 @@ interface Address {
 }
 
 export default function AddressesScreen() {
+  const { t } = useTranslation();
   const { isAuthenticated, limits } = useAuthStore();
   const queryClient = useQueryClient();
   const [dialogVisible, setDialogVisible] = useState(false);
@@ -194,7 +196,7 @@ export default function AddressesScreen() {
         <TouchableOpacity onPress={() => router.back()}>
           <Ionicons name="arrow-back" size={24} color={TarodanColors.textOnPrimary} />
         </TouchableOpacity>
-        <Text style={styles.headerTitle}>Adreslerim</Text>
+        <Text style={styles.headerTitle}>{t('mobile.settingsAddresses')}</Text>
         <Text style={styles.headerCount}>{addresses.length}/{maxAddresses}</Text>
       </View>
 

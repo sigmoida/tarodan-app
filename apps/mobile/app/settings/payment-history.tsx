@@ -15,6 +15,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { TarodanColors } from '../../src/theme';
 import { useAuthStore } from '../../src/stores/authStore';
 import { api, membershipApi } from '../../src/services/api';
+import { useTranslation } from '../../src/i18n';
 
 interface Payment {
   id: string;
@@ -49,6 +50,7 @@ function formatCurrency(amount: number): string {
 }
 
 export default function PaymentHistoryScreen() {
+  const { t } = useTranslation();
   const { isAuthenticated } = useAuthStore();
   const [payments, setPayments] = useState<Payment[]>([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -135,7 +137,7 @@ export default function PaymentHistoryScreen() {
           <TouchableOpacity onPress={() => router.back()} style={styles.headerBackBtn}>
             <Ionicons name="arrow-back" size={24} color={TarodanColors.textOnPrimary} />
           </TouchableOpacity>
-          <Text style={styles.headerTitle}>Ödeme Geçmişi</Text>
+          <Text style={styles.headerTitle}>{t('mobile.settingsPaymentHistory')}</Text>
           <View style={styles.headerPlaceholder} />
         </View>
         <View style={styles.centeredContainer}>
@@ -156,7 +158,7 @@ export default function PaymentHistoryScreen() {
         <TouchableOpacity onPress={() => router.back()} style={styles.headerBackBtn}>
           <Ionicons name="arrow-back" size={24} color={TarodanColors.textOnPrimary} />
         </TouchableOpacity>
-        <Text style={styles.headerTitle}>Ödeme Geçmişi</Text>
+        <Text style={styles.headerTitle}>{t('mobile.settingsPaymentHistory')}</Text>
         <View style={styles.headerPlaceholder} />
       </View>
 

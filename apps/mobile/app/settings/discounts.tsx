@@ -16,6 +16,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { TarodanColors } from '../../src/theme';
 import { useAuthStore } from '../../src/stores/authStore';
 import { api, discountsApi } from '../../src/services/api';
+import { useTranslation } from '../../src/i18n';
 
 interface Discount {
   id: string;
@@ -49,6 +50,7 @@ function isExpired(dateStr: string | null): boolean {
 }
 
 export default function DiscountsScreen() {
+  const { t } = useTranslation();
   const { isAuthenticated } = useAuthStore();
   const [discounts, setDiscounts] = useState<Discount[]>([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -188,7 +190,7 @@ export default function DiscountsScreen() {
           <TouchableOpacity onPress={() => router.back()} style={styles.headerBackBtn}>
             <Ionicons name="arrow-back" size={24} color={TarodanColors.textOnPrimary} />
           </TouchableOpacity>
-          <Text style={styles.headerTitle}>İndirim Kuponlarım</Text>
+          <Text style={styles.headerTitle}>{t('mobile.settingsDiscounts')}</Text>
           <View style={styles.headerPlaceholder} />
         </View>
         <View style={styles.centeredContainer}>
@@ -209,7 +211,7 @@ export default function DiscountsScreen() {
         <TouchableOpacity onPress={() => router.back()} style={styles.headerBackBtn}>
           <Ionicons name="arrow-back" size={24} color={TarodanColors.textOnPrimary} />
         </TouchableOpacity>
-        <Text style={styles.headerTitle}>İndirim Kuponlarım</Text>
+        <Text style={styles.headerTitle}>{t('mobile.settingsDiscounts')}</Text>
         <View style={styles.headerPlaceholder} />
       </View>
 

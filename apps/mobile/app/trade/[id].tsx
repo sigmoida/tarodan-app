@@ -24,6 +24,7 @@ import { useAuthStore } from '../../src/stores/authStore';
 import { TarodanColors } from '../../src/theme';
 import { formatApiErrorMessage } from '../../src/utils/formatApiErrorMessage';
 import { transformImageUrl } from '../../src/utils/imageUrl';
+import { useTranslation } from '../../src/i18n';
 
 const TRADE_STATUSES = {
   pending: { label: 'Bekliyor', color: TarodanColors.warning, icon: 'time-outline' },
@@ -235,6 +236,7 @@ function normalizeTradeFromApi(raw: Record<string, unknown> | Trade | null | und
 }
 
 export default function TradeDetailScreen() {
+  const { t } = useTranslation();
   const { id: idParam } = useLocalSearchParams();
   const id = Array.isArray(idParam) ? idParam[0] : idParam;
   const { user } = useAuthStore();
@@ -573,7 +575,7 @@ export default function TradeDetailScreen() {
 
   return (
     <View style={styles.container}>
-      <Stack.Screen options={{ title: `Takas #${trade.tradeNumber}` }} />
+      <Stack.Screen options={{ title: `${t('mobile.tradeDetailTitle')} #${trade.tradeNumber}` }} />
 
       <ScrollView style={styles.content}>
         {/* Status Banner */}

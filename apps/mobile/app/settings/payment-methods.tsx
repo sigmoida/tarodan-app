@@ -15,6 +15,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { TarodanColors } from '../../src/theme';
 import { useAuthStore } from '../../src/stores/authStore';
 import { paymentsApi } from '../../src/services/api';
+import { useTranslation } from '../../src/i18n';
 
 interface PaymentMethod {
   id: string;
@@ -46,6 +47,7 @@ function getBrandDisplay(brand: string): { icon: string; color: string; label: s
 }
 
 export default function PaymentMethodsScreen() {
+  const { t } = useTranslation();
   const { isAuthenticated } = useAuthStore();
   const [methods, setMethods] = useState<PaymentMethod[]>([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -154,7 +156,7 @@ export default function PaymentMethodsScreen() {
           <TouchableOpacity onPress={() => router.back()} style={styles.headerBackBtn}>
             <Ionicons name="arrow-back" size={24} color={TarodanColors.textOnPrimary} />
           </TouchableOpacity>
-          <Text style={styles.headerTitle}>Ödeme Yöntemleri</Text>
+          <Text style={styles.headerTitle}>{t('mobile.settingsPaymentMethods')}</Text>
           <View style={styles.headerPlaceholder} />
         </View>
         <View style={styles.centeredContainer}>
@@ -175,7 +177,7 @@ export default function PaymentMethodsScreen() {
         <TouchableOpacity onPress={() => router.back()} style={styles.headerBackBtn}>
           <Ionicons name="arrow-back" size={24} color={TarodanColors.textOnPrimary} />
         </TouchableOpacity>
-        <Text style={styles.headerTitle}>Ödeme Yöntemleri</Text>
+        <Text style={styles.headerTitle}>{t('mobile.settingsPaymentMethods')}</Text>
         <View style={styles.headerPlaceholder} />
       </View>
 

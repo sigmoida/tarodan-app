@@ -6,6 +6,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { TarodanColors } from '../../src/theme/colors';
 import { useAuthStore } from '../../src/stores/authStore';
 import { api, membershipApi } from '../../src/services/api';
+import { useTranslation } from '../../src/i18n';
 
 const TIER_ORDER = ['free', 'basic', 'premium', 'business'] as const;
 type TierType = (typeof TIER_ORDER)[number];
@@ -66,6 +67,7 @@ interface PlatformSettings {
 }
 
 export default function MembershipScreen() {
+  const { t } = useTranslation();
   const { isAuthenticated, user } = useAuthStore();
   const [loading, setLoading] = useState(true);
   const [membership, setMembership] = useState<MembershipDetails | null>(null);
@@ -165,7 +167,7 @@ export default function MembershipScreen() {
           <TouchableOpacity onPress={() => router.back()} hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}>
             <Ionicons name="arrow-back" size={24} color={TarodanColors.textOnPrimary} />
           </TouchableOpacity>
-          <Text style={styles.headerTitle}>Üyelik</Text>
+          <Text style={styles.headerTitle}>{t('mobile.membershipTitle')}</Text>
           <View style={{ width: 24 }} />
         </View>
         <View style={styles.loadingContainer}>
@@ -182,7 +184,7 @@ export default function MembershipScreen() {
         <TouchableOpacity onPress={() => router.back()} hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}>
           <Ionicons name="arrow-back" size={24} color={TarodanColors.textOnPrimary} />
         </TouchableOpacity>
-        <Text style={styles.headerTitle}>Üyelik</Text>
+        <Text style={styles.headerTitle}>{t('mobile.membershipTitle')}</Text>
         <View style={{ width: 24 }} />
       </View>
 

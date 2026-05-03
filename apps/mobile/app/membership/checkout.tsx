@@ -7,6 +7,7 @@ import { TarodanColors } from '../../src/theme/colors';
 import { useAuthStore } from '../../src/stores/authStore';
 import { api, membershipApi, paymentsApi } from '../../src/services/api';
 import { formatApiErrorMessage } from '../../src/utils/formatApiErrorMessage';
+import { useTranslation } from '../../src/i18n';
 
 /** API subscribe spreads UserMembership + paymentId/paymentUrl at root — never use root `id` (that is membership row id). */
 function pickPaymentFromSubscribeResponse(data: {
@@ -65,6 +66,7 @@ function sanitizeMembershipPrice(price: number | undefined, defaultPrice: number
 }
 
 export default function MembershipCheckoutScreen() {
+  const { t } = useTranslation();
   const params = useLocalSearchParams<{
     tier?: string | string[];
     period?: string | string[];
@@ -280,7 +282,7 @@ export default function MembershipCheckoutScreen() {
           >
             <Ionicons name="arrow-back" size={24} color={TarodanColors.textOnPrimary} />
           </TouchableOpacity>
-          <Text style={styles.headerTitle}>Plan seçimi</Text>
+          <Text style={styles.headerTitle}>{t('mobile.membershipTitle')}</Text>
         </View>
         <View style={{ padding: 24, alignItems: 'center' }}>
           <Text style={{ fontSize: 16, color: TarodanColors.textSecondary, textAlign: 'center' }}>
@@ -311,7 +313,7 @@ export default function MembershipCheckoutScreen() {
         <TouchableOpacity onPress={() => router.back()} hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}>
           <Ionicons name="arrow-back" size={24} color={TarodanColors.textOnPrimary} />
         </TouchableOpacity>
-        <Text style={styles.headerTitle}>Üyelik Satın Al</Text>
+        <Text style={styles.headerTitle}>{t('mobile.membershipUpgrade')}</Text>
         <View style={{ width: 24 }} />
       </View>
 

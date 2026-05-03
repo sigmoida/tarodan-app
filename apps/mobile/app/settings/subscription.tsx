@@ -14,8 +14,10 @@ import {
   getSubscriptionStatusText 
 } from '../../src/stores/subscriptionStore';
 import { TarodanColors } from '../../src/theme';
+import { useTranslation } from '../../src/i18n';
 
 export default function SubscriptionSettingsScreen() {
+  const { t } = useTranslation();
   const { isAuthenticated, user } = useAuthStore();
   const { 
     subscription, 
@@ -104,7 +106,7 @@ export default function SubscriptionSettingsScreen() {
         <TouchableOpacity onPress={() => router.back()}>
           <Ionicons name="arrow-back" size={24} color={TarodanColors.textOnPrimary} />
         </TouchableOpacity>
-        <Text style={styles.headerTitle}>Abonelik Yönetimi</Text>
+        <Text style={styles.headerTitle}>{t('mobile.settingsSubscription')}</Text>
         <View style={{ width: 24 }} />
       </View>
 

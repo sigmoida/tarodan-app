@@ -7,6 +7,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { api } from '../../src/services/api';
 import { useAuthStore } from '../../src/stores/authStore';
 import { TarodanColors } from '../../src/theme';
+import { useTranslation } from '../../src/i18n';
 
 // Mock collections for demo when API fails
 const MOCK_COLLECTIONS = [
@@ -37,6 +38,7 @@ const MOCK_COLLECTIONS = [
 ];
 
 export default function CollectionsScreen() {
+  const { t } = useTranslation();
   const queryClient = useQueryClient();
   const { limits, isAuthenticated } = useAuthStore();
   const [refreshing, setRefreshing] = useState(false);
@@ -82,7 +84,7 @@ export default function CollectionsScreen() {
         <TouchableOpacity onPress={() => router.back()}>
           <Ionicons name="arrow-back" size={24} color={TarodanColors.textOnPrimary} />
         </TouchableOpacity>
-        <Text style={styles.headerTitle}>Koleksiyonlarım</Text>
+        <Text style={styles.headerTitle}>{t('mobile.settingsCollections')}</Text>
         <View style={{ width: 24 }} />
       </View>
 
