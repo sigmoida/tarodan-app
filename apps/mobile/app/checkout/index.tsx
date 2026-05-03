@@ -11,6 +11,7 @@ import { transformImageUrl } from '../../src/utils/imageUrl';
 import { safeString } from '../../src/utils/safeString';
 import { formatApiErrorMessage } from '../../src/utils/formatApiErrorMessage';
 import { captureException } from '../../src/services/sentry';
+import { useTranslation } from '../../src/i18n';
 
 interface ShippingAddress {
   fullName: string;
@@ -54,6 +55,7 @@ interface DirectProduct {
 const TURKISH_CITIES = ['Adana', 'Adıyaman', 'Afyonkarahisar', 'Ağrı', 'Aksaray', 'Amasya', 'Ankara', 'Antalya', 'Artvin', 'Aydın', 'Balıkesir', 'Bartın', 'Batman', 'Bayburt', 'Bilecik', 'Bingöl', 'Bitlis', 'Bolu', 'Burdur', 'Bursa', 'Çanakkale', 'Çankırı', 'Çorum', 'Denizli', 'Diyarbakır', 'Düzce', 'Edirne', 'Elazığ', 'Erzincan', 'Erzurum', 'Eskişehir', 'Gaziantep', 'Giresun', 'Gümüşhane', 'Hakkari', 'Hatay', 'Iğdır', 'Isparta', 'İstanbul', 'İzmir', 'Kahramanmaraş', 'Karabük', 'Karaman', 'Kars', 'Kastamonu', 'Kayseri', 'Kırıkkale', 'Kırklareli', 'Kırşehir', 'Kilis', 'Kocaeli', 'Konya', 'Kütahya', 'Malatya', 'Manisa', 'Mardin', 'Mersin', 'Muğla', 'Muş', 'Nevşehir', 'Niğde', 'Ordu', 'Osmaniye', 'Rize', 'Sakarya', 'Samsun', 'Şanlıurfa', 'Siirt', 'Sinop', 'Şırnak', 'Sivas', 'Tekirdağ', 'Tokat', 'Trabzon', 'Tunceli', 'Uşak', 'Van', 'Yalova', 'Yozgat', 'Zonguldak'];
 
 export default function CheckoutScreen() {
+  const { t } = useTranslation();
   const params = useLocalSearchParams<{ productId?: string }>();
   const { items, getSubtotal, clearCart } = useCartStore();
   const { isAuthenticated, user } = useAuthStore();
@@ -570,7 +572,7 @@ export default function CheckoutScreen() {
           >
             <Ionicons name="add-circle-outline" size={22} color={showNewAddressForm ? TarodanColors.primary : TarodanColors.textSecondary} />
             <Text style={[styles.addAddressText, showNewAddressForm && { color: TarodanColors.primary, fontWeight: '600' }]}>
-              Yeni Adres Ekle
+              {t('mobile.addNewAddress')}
             </Text>
           </TouchableOpacity>
 
@@ -771,7 +773,7 @@ export default function CheckoutScreen() {
 
       <View style={styles.sectionHeader}>
         <Ionicons name="location-outline" size={24} color={TarodanColors.primary} />
-        <Text style={styles.sectionTitle}>Teslimat Adresi</Text>
+        <Text style={styles.sectionTitle}>{t('mobile.deliveryAddress')}</Text>
       </View>
 
       {renderAddressForm()}
@@ -815,7 +817,7 @@ export default function CheckoutScreen() {
           <Ionicons name="arrow-back" size={24} color={TarodanColors.textOnPrimary} />
         </TouchableOpacity>
         <Text style={styles.headerTitle}>
-          {step === 1 ? 'Teslimat Bilgileri' : step === 2 ? 'Ödeme' : 'Sipariş Onayı'}
+          {step === 1 ? t('mobile.checkoutDeliveryInfo') : step === 2 ? t('mobile.checkoutPayment') : t('mobile.checkoutConfirmation')}
         </Text>
         <View style={{ width: 40 }} />
       </View>
@@ -847,7 +849,7 @@ export default function CheckoutScreen() {
             <View style={styles.sectionHeader}>
               <Ionicons name={isAuthenticated ? 'location-outline' : 'person-outline'} size={24} color={TarodanColors.primary} />
               <Text style={styles.sectionTitle}>
-                {isAuthenticated ? 'Teslimat Adresi' : 'İletişim Bilgileri'}
+                {isAuthenticated ? t('mobile.deliveryAddress') : t('mobile.contactInfo')}
               </Text>
             </View>
 
@@ -876,7 +878,7 @@ export default function CheckoutScreen() {
             <View style={styles.section}>
               <View style={styles.sectionHeader}>
                 <Ionicons name="car-outline" size={24} color={TarodanColors.primary} />
-                <Text style={styles.sectionTitle}>Kargo</Text>
+                <Text style={styles.sectionTitle}>{t('mobile.carrier')}</Text>
               </View>
 
               <View style={[styles.optionCard, styles.optionCardActive]}>
@@ -884,7 +886,7 @@ export default function CheckoutScreen() {
                   <View style={styles.radioInner} />
                 </View>
                 <View style={styles.optionContent}>
-                  <Text style={styles.optionTitle}>Sürat Kargo</Text>
+                  <Text style={styles.optionTitle}>{t('mobile.carrierSurat')}</Text>
                   <Text style={styles.optionDescription}>2-3 iş günü teslimat</Text>
                 </View>
                 <Text style={styles.optionPrice}>
@@ -898,10 +900,10 @@ export default function CheckoutScreen() {
             <View style={styles.section}>
               <View style={styles.sectionHeader}>
                 <Ionicons name="card-outline" size={24} color={TarodanColors.primary} />
-                <Text style={styles.sectionTitle}>Kart Bilgileri</Text>
+                <Text style={styles.sectionTitle}>{t('mobile.cardInfo')}</Text>
               </View>
 
-              <Text style={styles.inputLabel}>Kart Üzerindeki İsim</Text>
+              <Text style={styles.inputLabel}>{t("mobile.cardName")}</Text>
               <TextInput
                 style={styles.textInput}
                 value={cardHolder}
@@ -911,7 +913,7 @@ export default function CheckoutScreen() {
                 autoCapitalize="characters"
               />
 
-              <Text style={styles.inputLabel}>Kart Numarası</Text>
+              <Text style={styles.inputLabel}>{t("mobile.cardNumber")}</Text>
               <TextInput
                 style={styles.textInput}
                 value={cardNumber}
@@ -922,12 +924,12 @@ export default function CheckoutScreen() {
                 maxLength={19}
               />
               <Text style={styles.cardHint}>
-                Test modu: 0000000000000000
+                {t('mobile.testModePlaceholder')}
               </Text>
 
               <View style={{ flexDirection: 'row', gap: 12 }}>
                 <View style={{ flex: 1 }}>
-                  <Text style={styles.inputLabel}>Son Kullanma</Text>
+                  <Text style={styles.inputLabel}>{t("mobile.expiryDate")}</Text>
                   <TextInput
                     style={styles.textInput}
                     value={cardExpiry}
@@ -943,7 +945,7 @@ export default function CheckoutScreen() {
                   />
                 </View>
                 <View style={{ flex: 1 }}>
-                  <Text style={styles.inputLabel}>CVV</Text>
+                  <Text style={styles.inputLabel}>{t("mobile.cvv")}</Text>
                   <TextInput
                     style={styles.textInput}
                     value={cardCvv}
@@ -960,7 +962,7 @@ export default function CheckoutScreen() {
               <View style={styles.securityNotice}>
                 <Ionicons name="shield-checkmark" size={20} color={TarodanColors.success} />
                 <Text style={styles.securityText}>
-                  Ödemeniz şifreli olarak iletilir ve güvende tutulur.
+                  {t('mobile.encryptedNotice')}
                 </Text>
               </View>
             </View>
@@ -972,8 +974,7 @@ export default function CheckoutScreen() {
                 <View style={styles.securityNotice}>
                   <Ionicons name="flash-outline" size={20} color={TarodanColors.warning} />
                   <Text style={styles.securityText}>
-                    Geliştirici modu aktif (PAYMENT_BYPASS). Ödeme kart bilgisi
-                    gerektirmez — Sipariş Onayla'ya basınca otomatik tamamlanır.
+                    {t('mobile.developerModeBypass')}
                   </Text>
                 </View>
               </View>
@@ -999,7 +1000,7 @@ export default function CheckoutScreen() {
                 <View style={styles.summaryRow}>
                   <Ionicons name="location-outline" size={20} color={TarodanColors.textSecondary} />
                   <View style={styles.summaryContent}>
-                    <Text style={styles.summaryLabel}>Teslimat Adresi</Text>
+                    <Text style={styles.summaryLabel}>{t('mobile.deliveryAddress')}</Text>
                     <Text style={styles.summaryValue}>{getSelectedAddressSummary()}</Text>
                   </View>
                 </View>
@@ -1017,18 +1018,18 @@ export default function CheckoutScreen() {
                 <View style={styles.summaryRow}>
                   <Ionicons name="car-outline" size={20} color={TarodanColors.textSecondary} />
                   <View style={styles.summaryContent}>
-                    <Text style={styles.summaryLabel}>Kargo</Text>
-                    <Text style={styles.summaryValue}>Sürat Kargo</Text>
+                    <Text style={styles.summaryLabel}>{t('mobile.carrier')}</Text>
+                    <Text style={styles.summaryValue}>{t('mobile.carrierSurat')}</Text>
                   </View>
                 </View>
 
                 <View style={styles.summaryRow}>
                   <Ionicons name="card-outline" size={20} color={TarodanColors.textSecondary} />
                   <View style={styles.summaryContent}>
-                    <Text style={styles.summaryLabel}>Ödeme Yöntemi</Text>
+                    <Text style={styles.summaryLabel}>{t('mobile.paymentMethod')}</Text>
                     <Text style={styles.summaryValue}>
                       {bypassEnabled
-                        ? 'Geliştirici modu (bypass)'
+                        ? t('mobile.developerModeActive')
                         : `•••• •••• •••• ${cardNumber.replace(/\s/g, '').slice(-4) || '****'}`}
                     </Text>
                   </View>
@@ -1038,7 +1039,7 @@ export default function CheckoutScreen() {
               <View style={styles.securityNotice}>
                 <Ionicons name="shield-checkmark" size={20} color={TarodanColors.success} />
                 <Text style={styles.securityText}>
-                  Güvenli alışveriş. Ödemeniz ürün elinize ulaşana kadar güvende tutulur.
+                  {t('mobile.securityNotice')}
                 </Text>
               </View>
             </View>
@@ -1047,19 +1048,19 @@ export default function CheckoutScreen() {
 
         {/* ────── Order Summary (always) ────── */}
         <View style={styles.orderSummary}>
-          <Text style={styles.orderSummaryTitle}>Ödeme Detayı</Text>
+          <Text style={styles.orderSummaryTitle}>{t('mobile.paymentDetails')}</Text>
 
           <View style={styles.orderSummaryRow}>
-            <Text style={styles.orderSummaryLabel}>Ara Toplam ({checkoutItems.length} ürün)</Text>
+            <Text style={styles.orderSummaryLabel}>{t('mobile.subtotal')} ({checkoutItems.length} {t('mobile.items')})</Text>
             <Text style={styles.orderSummaryValue}>
               {quoteLoading ? '...' : `₺${formatPrice(subtotal)}`}
             </Text>
           </View>
 
           <View style={styles.orderSummaryRow}>
-            <Text style={styles.orderSummaryLabel}>Kargo (Sürat)</Text>
+            <Text style={styles.orderSummaryLabel}>{t('mobile.carrier')} ({t('mobile.carrierSurat')})</Text>
             <Text style={styles.orderSummaryValue}>
-              {shippingLoading ? '...' : totalShipping > 0 ? `₺${formatPrice(totalShipping)}` : 'Adres seçin'}
+              {shippingLoading ? '...' : totalShipping > 0 ? `₺${formatPrice(totalShipping)}` : t('mobile.selectAddressFirst')}
             </Text>
           </View>
 
@@ -1073,7 +1074,7 @@ export default function CheckoutScreen() {
           <View style={styles.totalDivider} />
 
           <View style={styles.orderSummaryRow}>
-            <Text style={styles.orderTotalLabel}>Toplam</Text>
+            <Text style={styles.orderTotalLabel}>{t('mobile.totalLabel')}</Text>
             <Text style={styles.orderTotalValue}>₺{formatPrice(total)}</Text>
           </View>
         </View>
@@ -1085,7 +1086,7 @@ export default function CheckoutScreen() {
       <View style={styles.bottomBar}>
         {step < 3 ? (
           <TouchableOpacity testID="checkout-next-button" style={styles.primaryButton} onPress={handleNextStep}>
-            <Text style={styles.primaryButtonText}>Devam Et</Text>
+            <Text style={styles.primaryButtonText}>{t('mobile.continue')}</Text>
             <Ionicons name="arrow-forward" size={20} color="#fff" />
           </TouchableOpacity>
         ) : (
