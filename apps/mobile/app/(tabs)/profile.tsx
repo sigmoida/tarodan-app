@@ -348,7 +348,7 @@ export default function ProfileScreen() {
               </View>
               <Text style={styles.quickActionText}>İlanlarım</Text>
             </TouchableOpacity>
-            <TouchableOpacity style={styles.quickAction} onPress={() => router.push('/orders')}>
+            <TouchableOpacity testID="profile-orders-link" style={styles.quickAction} onPress={() => router.push('/orders')}>
               <View style={[styles.quickActionIcon, { backgroundColor: '#E3F2FD' }]}>
                 <Ionicons name="cube" size={22} color="#2196F3" />
               </View>
@@ -381,7 +381,7 @@ export default function ProfileScreen() {
               </View>
               <Text style={styles.quickActionText}>Beğenilen{'\n'}Koleksiyonlar</Text>
             </TouchableOpacity>
-            <TouchableOpacity style={styles.quickAction} onPress={() => router.push('/trades')}>
+            <TouchableOpacity testID="profile-trades-link" style={styles.quickAction} onPress={() => router.push('/trades')}>
               <View style={[styles.quickActionIcon, { backgroundColor: '#FFF8E1' }]}>
                 <Ionicons name="swap-horizontal" size={22} color="#FFA000" />
               </View>
