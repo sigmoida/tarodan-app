@@ -2,11 +2,12 @@ name: Maestro Cloud (Mobile e2e)
 
 # Mobile UI flows are run on Maestro Cloud (real iOS simulators).
 # Requires:
-#   - secrets.MAESTRO_CLOUD_API_KEY: signup at https://cloud.mobile.dev to obtain
+#   - secrets.MAESTRO_CLOUD_API_KEY:        Cloud dashboard > Settings > API Keys
+#   - secrets.MAESTRO_CLOUD_PROJECT_ID:     Cloud dashboard > Project Settings > "Project ID"
 #   - A built .app artifact for the mobile app (Expo dev build or release build)
 #
-# Until the API key + .app artifact are wired up, this workflow is opt-in via
-# workflow_dispatch and a guard step that exits cleanly when the secret is missing.
+# Until both secrets + .app artifact are wired up, this workflow exits cleanly
+# via the guard step (see CLOUD_SETUP.md).
 
 on:
   workflow_dispatch:
@@ -28,12 +29,12 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Guard — skip if MAESTRO_CLOUD_API_KEY is not set
+      - name: Guard — skip if Maestro Cloud secrets are missing
         id: guard
         run: |
-          if [ -z "${{ secrets.MAESTRO_CLOUD_API_KEY }}" ]; then
+          if [ -z "${{ secrets.MAESTRO_CLOUD_API_KEY }}" ] || [ -z "${{ secrets.MAESTRO_CLOUD_PROJECT_ID }}" ]; then
             echo "skip=true" >> "$GITHUB_OUTPUT"
-            echo "::notice::MAESTRO_CLOUD_API_KEY secret yok — workflow no-op olarak biter. Cloud koşum için repo settings > secrets üzerinden ekleyin."
+            echo "::notice::Maestro Cloud secrets eksik — workflow no-op olarak biter. MAESTRO_CLOUD_API_KEY ve MAESTRO_CLOUD_PROJECT_ID için repo settings > secrets üzerinden ekleyin."
           else
             echo "skip=false" >> "$GITHUB_OUTPUT"
           fi
@@ -62,6 +63,7 @@ jobs:
         uses: mobile-dev-inc/action-maestro-cloud@v1
         with:
           api-key: ${{ secrets.MAESTRO_CLOUD_API_KEY }}
+          project-id: ${{ secrets.MAESTRO_CLOUD_PROJECT_ID }}
           app-file: apps/mobile/build/Tarodan.app
           workspace: apps/mobile/maestro
           # Smoke-only first: rapid iteration. Expand as flows stabilise.
