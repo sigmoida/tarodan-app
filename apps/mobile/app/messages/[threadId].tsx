@@ -8,8 +8,10 @@ import { useMessagesStore, Message } from '../../src/stores/messagesStore';
 import { useAuthStore } from '../../src/stores/authStore';
 import { mediaApi } from '../../src/services/api';
 import { TarodanColors } from '../../src/theme';
+import { useTranslation } from '../../src/i18n';
 
 export default function MessageThreadScreen() {
+  const { t } = useTranslation();
   const { threadId } = useLocalSearchParams<{ threadId: string }>();
   const { user, limits } = useAuthStore();
   const { 
@@ -318,7 +320,7 @@ export default function MessageThreadScreen() {
       {pendingImage && (
         <View style={styles.imagePreviewBar}>
           <Image source={{ uri: pendingImage }} style={styles.imagePreviewThumb} />
-          <Text style={{ flex: 1, fontSize: 12, color: TarodanColors.textSecondary, marginLeft: 8 }}>Görsel eklendi</Text>
+          <Text style={{ flex: 1, fontSize: 12, color: TarodanColors.textSecondary, marginLeft: 8 }}>{t("mobile.imageAttached")}</Text>
           <TouchableOpacity onPress={() => setPendingImage(null)}>
             <Ionicons name="close-circle" size={24} color={TarodanColors.error} />
           </TouchableOpacity>

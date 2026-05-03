@@ -1565,6 +1565,11 @@
     "verify": "Doğrula",
     "noPaymentMethod": "Kayıtlı ödeme yönteminiz yok",
     "addCardForFastPayment": "Hızlı ödeme için kart ekleyebilirsiniz",
-    "loginToManagePayments": "Ödeme yöntemlerinizi yönetmek için giriş yapın"
+    "loginToManagePayments": "Ödeme yöntemlerinizi yönetmek için giriş yapın",
+    "imageAttached": "Görsel eklendi",
+    "searchInMessages": "Mesajlarda ara...",
+    "goBack": "Geri Dön",
+    "counterOfferModal": "Karşı Teklif",
+    "messageInputPlaceholder": "Mesaj yazın..."
   }
 }

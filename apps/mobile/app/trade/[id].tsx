@@ -413,7 +413,7 @@ export default function TradeDetailScreen() {
     return (
       <View style={styles.errorContainer}>
         <Text>Takas bulunamadı</Text>
-        <Button mode="contained" onPress={() => router.back()}>Geri Dön</Button>
+        <Button mode="contained" onPress={() => router.back()}>{t("mobile.goBack")}</Button>
       </View>
     );
   }
@@ -1192,7 +1192,7 @@ export default function TradeDetailScreen() {
           onDismiss={() => setCounterModalVisible(false)}
           contentContainerStyle={styles.modal}
         >
-          <Text variant="titleLarge" style={styles.modalTitle}>Karşı Teklif</Text>
+          <Text variant="titleLarge" style={styles.modalTitle}>{t("mobile.counterOfferModal")}</Text>
           <TextInput
             label="Nakit Fark (₺)"
             value={counterCashAmount}

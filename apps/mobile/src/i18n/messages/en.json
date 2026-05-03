@@ -1567,6 +1567,11 @@
     "verify": "Verify",
     "noPaymentMethod": "No saved payment method",
     "addCardForFastPayment": "Add a card for fast payment",
-    "loginToManagePayments": "Log in to manage your payment methods"
+    "loginToManagePayments": "Log in to manage your payment methods",
+    "imageAttached": "Image attached",
+    "searchInMessages": "Search messages...",
+    "goBack": "Go Back",
+    "counterOfferModal": "Counter Offer",
+    "messageInputPlaceholder": "Type a message..."
   }
 }

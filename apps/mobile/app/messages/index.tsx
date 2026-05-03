@@ -80,7 +80,7 @@ export default function MessagesListScreen() {
     return (
       <View style={styles.centeredContainer}>
         <Ionicons name="chatbubbles-outline" size={64} color={TarodanColors.primary} />
-        <Text variant="titleLarge" style={styles.title}>Mesajlar</Text>
+        <Text variant="titleLarge" style={styles.title}>{t("mobile.messagesTitle")}</Text>
         <Text variant="bodyMedium" style={styles.subtitle}>
           Mesajlarınızı görmek için giriş yapın
         </Text>
@@ -128,7 +128,7 @@ export default function MessagesListScreen() {
       {/* Search */}
       <View style={styles.searchContainer}>
         <Searchbar
-          placeholder="Mesajlarda ara..."
+          placeholder={t("mobile.searchInMessages")}
           value={searchQuery}
           onChangeText={setSearchQuery}
           style={styles.searchbar}
