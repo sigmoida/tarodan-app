@@ -8,9 +8,11 @@ import { userApi } from '../../src/services/api';
 import { useAuthStore } from '../../src/stores/authStore';
 import { TarodanColors } from '../../src/theme';
 import { SignupPrompt } from '../../src/components/SignupPrompt';
+import { useTranslation } from '../../src/i18n';
 import { getRestrictionMessage, GuestAction } from '../../src/utils/guestRestrictions';
 
 export default function ProfileScreen() {
+  const { t } = useTranslation();
   const { isAuthenticated, user, logout } = useAuthStore();
   const [snackbarVisible, setSnackbarVisible] = useState(false);
   const [snackbarMessage, setSnackbarMessage] = useState('');
@@ -194,7 +196,7 @@ export default function ProfileScreen() {
               onPress={() => router.push('/cart')}
             >
               <Ionicons name="cart-outline" size={22} color={TarodanColors.primary} />
-              <Text style={styles.quickLinkText}>Sepetim</Text>
+              <Text style={styles.quickLinkText}>{t('mobile.myCart')}</Text>
               <Ionicons name="chevron-forward" size={20} color={TarodanColors.textLight} />
             </TouchableOpacity>
 
@@ -299,22 +301,22 @@ export default function ProfileScreen() {
         <View style={styles.statsGrid}>
           <TouchableOpacity style={styles.statItem} onPress={() => router.push('/settings/my-listings')}>
             <Text style={styles.statNumber}>{stats?.listings || 0}</Text>
-            <Text style={styles.statLabel}>İlanlarım</Text>
+            <Text style={styles.statLabel}>{t('mobile.myListings')}</Text>
           </TouchableOpacity>
           <TouchableOpacity style={styles.statItem} onPress={() => router.push('/trades')}>
             <Text style={styles.statNumber}>{stats?.trades || 0}</Text>
-            <Text style={styles.statLabel}>Takaslar</Text>
+            <Text style={styles.statLabel}>{t('mobile.trades')}</Text>
           </TouchableOpacity>
           <TouchableOpacity style={styles.statItem} onPress={() => router.push('/settings/collections')}>
             <Text style={styles.statNumber}>{stats?.collections || 0}</Text>
-            <Text style={styles.statLabel}>Koleksiyon</Text>
+            <Text style={styles.statLabel}>{t('mobile.collections')}</Text>
           </TouchableOpacity>
           <TouchableOpacity style={styles.statItem}>
             <View style={styles.ratingRow}>
               <Ionicons name="star" size={16} color={TarodanColors.star} />
               <Text style={styles.statNumber}>{stats?.rating || '-'}</Text>
             </View>
-            <Text style={styles.statLabel}>Puan</Text>
+            <Text style={styles.statLabel}>{t('mobile.score')}</Text>
           </TouchableOpacity>
         </View>
 
@@ -326,7 +328,7 @@ export default function ProfileScreen() {
               <Text style={styles.sectionTitle}>Dijital Garajım</Text>
             </View>
             <TouchableOpacity onPress={() => router.push('/settings/collections')}>
-              <Text style={styles.seeAllText}>Tümünü gör</Text>
+              <Text style={styles.seeAllText}>{t('mobile.seeAll')}</Text>
             </TouchableOpacity>
           </View>
           <TouchableOpacity style={styles.garageCard} onPress={() => router.push('/settings/collections')}>
@@ -334,7 +336,7 @@ export default function ProfileScreen() {
               <Ionicons name="add-circle" size={40} color={TarodanColors.primary} />
             </View>
             <Text style={styles.garageText}>Koleksiyon Oluştur</Text>
-            <Text style={styles.garageSubtext}>Araçlarını sergile ve paylaş</Text>
+            <Text style={styles.garageSubtext}>{t('mobile.garageSubtitle')}</Text>
           </TouchableOpacity>
         </View>
 
@@ -346,31 +348,31 @@ export default function ProfileScreen() {
               <View style={[styles.quickActionIcon, { backgroundColor: '#E8F5E9' }]}>
                 <Ionicons name="pricetag" size={22} color="#4CAF50" />
               </View>
-              <Text style={styles.quickActionText}>İlanlarım</Text>
+              <Text style={styles.quickActionText}>{t('mobile.myListings')}</Text>
             </TouchableOpacity>
             <TouchableOpacity testID="profile-orders-link" style={styles.quickAction} onPress={() => router.push('/orders')}>
               <View style={[styles.quickActionIcon, { backgroundColor: '#E3F2FD' }]}>
                 <Ionicons name="cube" size={22} color="#2196F3" />
               </View>
-              <Text style={styles.quickActionText}>Siparişlerim</Text>
+              <Text style={styles.quickActionText}>{t('mobile.myOrders')}</Text>
             </TouchableOpacity>
             <TouchableOpacity style={styles.quickAction} onPress={() => router.push('/offers')}>
               <View style={[styles.quickActionIcon, { backgroundColor: '#E8EAF6' }]}>
                 <Ionicons name="pricetag-outline" size={22} color="#5C6BC0" />
               </View>
-              <Text style={styles.quickActionText}>Tekliflerim</Text>
+              <Text style={styles.quickActionText}>{t('mobile.myOffers')}</Text>
             </TouchableOpacity>
             <TouchableOpacity style={styles.quickAction} onPress={() => router.push('/favorites')}>
               <View style={[styles.quickActionIcon, { backgroundColor: '#FCE4EC' }]}>
                 <Ionicons name="heart" size={22} color="#E91E63" />
               </View>
-              <Text style={styles.quickActionText}>Favorilerim</Text>
+              <Text style={styles.quickActionText}>{t('mobile.myFavorites')}</Text>
             </TouchableOpacity>
             <TouchableOpacity style={styles.quickAction} onPress={() => router.push('/messages')}>
               <View style={[styles.quickActionIcon, { backgroundColor: '#FFF3E0' }]}>
                 <Ionicons name="chatbubbles" size={22} color="#FF9800" />
               </View>
-              <Text style={styles.quickActionText}>Mesajlar</Text>
+              <Text style={styles.quickActionText}>{t('mobile.messages')}</Text>
             </TouchableOpacity>
           </View>
           {/* Second row of quick actions */}
@@ -379,25 +381,25 @@ export default function ProfileScreen() {
               <View style={[styles.quickActionIcon, { backgroundColor: '#F3E5F5' }]}>
                 <Ionicons name="albums" size={22} color="#9C27B0" />
               </View>
-              <Text style={styles.quickActionText}>Beğenilen{'\n'}Koleksiyonlar</Text>
+              <Text style={styles.quickActionText}>{t('mobile.likedCollections')}</Text>
             </TouchableOpacity>
             <TouchableOpacity testID="profile-trades-link" style={styles.quickAction} onPress={() => router.push('/trades')}>
               <View style={[styles.quickActionIcon, { backgroundColor: '#FFF8E1' }]}>
                 <Ionicons name="swap-horizontal" size={22} color="#FFA000" />
               </View>
-              <Text style={styles.quickActionText}>Takaslarım</Text>
+              <Text style={styles.quickActionText}>{t('mobile.myTrades')}</Text>
             </TouchableOpacity>
             <TouchableOpacity style={styles.quickAction} onPress={() => router.push('/settings/analytics')}>
               <View style={[styles.quickActionIcon, { backgroundColor: '#E0F7FA' }]}>
                 <Ionicons name="stats-chart" size={22} color="#00ACC1" />
               </View>
-              <Text style={styles.quickActionText}>İstatistikler</Text>
+              <Text style={styles.quickActionText}>{t('mobile.statistics')}</Text>
             </TouchableOpacity>
             <TouchableOpacity style={styles.quickAction} onPress={() => router.push('/help')}>
               <View style={[styles.quickActionIcon, { backgroundColor: '#ECEFF1' }]}>
                 <Ionicons name="help-circle" size={22} color="#607D8B" />
               </View>
-              <Text style={styles.quickActionText}>Yardım</Text>
+              <Text style={styles.quickActionText}>{t('mobile.help')}</Text>
             </TouchableOpacity>
           </View>
         </View>
@@ -408,38 +410,38 @@ export default function ProfileScreen() {
 
           <TouchableOpacity style={styles.menuItem} onPress={() => router.push('/offers')}>
             <Ionicons name="pricetag-outline" size={22} color={TarodanColors.textSecondary} />
-            <Text style={styles.menuItemText}>Tekliflerim</Text>
+            <Text style={styles.menuItemText}>{t('mobile.myOffers')}</Text>
             <Ionicons name="chevron-forward" size={20} color={TarodanColors.textLight} />
           </TouchableOpacity>
           
           <TouchableOpacity style={styles.menuItem} onPress={() => router.push('/settings/addresses')}>
             <Ionicons name="location-outline" size={22} color={TarodanColors.textSecondary} />
-            <Text style={styles.menuItemText}>Adreslerim</Text>
+            <Text style={styles.menuItemText}>{t('mobile.myAddresses')}</Text>
             <Ionicons name="chevron-forward" size={20} color={TarodanColors.textLight} />
           </TouchableOpacity>
 
           <TouchableOpacity testID="profile-membership-link" style={styles.menuItem} onPress={() => router.push('/membership')}>
             <Ionicons name="diamond-outline" size={22} color={TarodanColors.textSecondary} />
-            <Text style={styles.menuItemText}>Üyelik Planı</Text>
+            <Text style={styles.menuItemText}>{t('mobile.membershipPlan')}</Text>
             {user?.membershipTier === 'premium' && <Badge style={{ backgroundColor: TarodanColors.primary }}>PRO</Badge>}
             <Ionicons name="chevron-forward" size={20} color={TarodanColors.textLight} />
           </TouchableOpacity>
 
           <TouchableOpacity style={styles.menuItem} onPress={() => router.push('/settings/notifications')}>
             <Ionicons name="notifications-outline" size={22} color={TarodanColors.textSecondary} />
-            <Text style={styles.menuItemText}>Bildirim Ayarları</Text>
+            <Text style={styles.menuItemText}>{t('mobile.notificationSettings')}</Text>
             <Ionicons name="chevron-forward" size={20} color={TarodanColors.textLight} />
           </TouchableOpacity>
 
           <TouchableOpacity testID="profile-language-link" style={styles.menuItem} onPress={() => router.push('/settings/language')}>
             <Ionicons name="language-outline" size={22} color={TarodanColors.textSecondary} />
-            <Text style={styles.menuItemText}>Dil / Language</Text>
+            <Text style={styles.menuItemText}>{t('mobile.language')} / Language</Text>
             <Ionicons name="chevron-forward" size={20} color={TarodanColors.textLight} />
           </TouchableOpacity>
 
           <TouchableOpacity style={styles.menuItem} onPress={() => router.push('/settings/security')}>
             <Ionicons name="shield-checkmark-outline" size={22} color={TarodanColors.textSecondary} />
-            <Text style={styles.menuItemText}>Güvenlik</Text>
+            <Text style={styles.menuItemText}>{t('mobile.security')}</Text>
             <Ionicons name="chevron-forward" size={20} color={TarodanColors.textLight} />
           </TouchableOpacity>
 
@@ -447,7 +449,7 @@ export default function ProfileScreen() {
           {user?.membershipTier?.toLowerCase() === 'business' && (
             <TouchableOpacity style={styles.menuItem} onPress={() => router.push('/settings/business')}>
               <Ionicons name="business-outline" size={22} color={TarodanColors.primary} />
-              <Text style={[styles.menuItemText, { color: TarodanColors.primary }]}>İşletme Paneli</Text>
+              <Text style={[styles.menuItemText, { color: TarodanColors.primary }]}>{t('mobile.businessPanel')}</Text>
               <Badge style={{ backgroundColor: '#FFA500', marginLeft: 8 }}>👑</Badge>
               <Ionicons name="chevron-forward" size={20} color={TarodanColors.textLight} />
             </TouchableOpacity>
@@ -455,29 +457,29 @@ export default function ProfileScreen() {
 
           <TouchableOpacity style={styles.menuItem} onPress={() => router.push('/settings/analytics')}>
             <Ionicons name="stats-chart-outline" size={22} color={TarodanColors.textSecondary} />
-            <Text style={styles.menuItemText}>İstatistikler</Text>
+            <Text style={styles.menuItemText}>{t('mobile.statistics')}</Text>
             <Ionicons name="chevron-forward" size={20} color={TarodanColors.textLight} />
           </TouchableOpacity>
         </View>
 
         <View style={styles.menuSection}>
-          <Text style={styles.menuSectionTitle}>Destek</Text>
+          <Text style={styles.menuSectionTitle}>{t('mobile.supportTitle')}</Text>
           
           <TouchableOpacity style={styles.menuItem} onPress={() => router.push('/help')}>
             <Ionicons name="help-circle-outline" size={22} color={TarodanColors.textSecondary} />
-            <Text style={styles.menuItemText}>Yardım & SSS</Text>
+            <Text style={styles.menuItemText}>{t('mobile.helpAndFaq')}</Text>
             <Ionicons name="chevron-forward" size={20} color={TarodanColors.textLight} />
           </TouchableOpacity>
 
           <TouchableOpacity style={styles.menuItem} onPress={() => router.push('/support')}>
             <Ionicons name="headset-outline" size={22} color={TarodanColors.textSecondary} />
-            <Text style={styles.menuItemText}>Destek Talebi</Text>
+            <Text style={styles.menuItemText}>{t('mobile.supportTicket')}</Text>
             <Ionicons name="chevron-forward" size={20} color={TarodanColors.textLight} />
           </TouchableOpacity>
 
           <TouchableOpacity style={styles.menuItem} onPress={() => router.push('/help')}>
             <Ionicons name="information-circle-outline" size={22} color={TarodanColors.textSecondary} />
-            <Text style={styles.menuItemText}>Hakkında</Text>
+            <Text style={styles.menuItemText}>{t('mobile.about')}</Text>
             <Ionicons name="chevron-forward" size={20} color={TarodanColors.textLight} />
           </TouchableOpacity>
         </View>
