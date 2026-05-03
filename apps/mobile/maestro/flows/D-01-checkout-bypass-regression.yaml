@@ -14,14 +14,14 @@ env:
 ---
 - runFlow: ../subflows/open-tarodan.yaml
 - tapOn:
-    text: "Profil, tab.*"
+    text: "Profil"
 - runFlow:
     when:
       visible: "Çıkış Yap"
     file: ../subflows/logout.yaml
 - runFlow: ../subflows/login-as.yaml
 - tapOn:
-    text: "Ara, tab.*"
+    text: "Ara"
 - extendedWaitUntil:
     visible:
       text: ".*sonuç bulundu.*"

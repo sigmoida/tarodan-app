@@ -16,5 +16,5 @@ appId: host.exp.Exponent
           index: 0
 - extendedWaitUntil:
     visible:
-      text: "Ana Sayfa, tab.*"
+      text: "Ana Sayfa"
     timeout: 90000

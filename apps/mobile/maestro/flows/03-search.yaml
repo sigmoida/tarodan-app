@@ -4,7 +4,7 @@ appId: host.exp.Exponent
 ---
 - runFlow: ../subflows/open-tarodan.yaml
 - tapOn:
-    text: "Ara, tab.*"
+    text: "Ara"
 - extendedWaitUntil:
     visible:
       text: ".*sonuç bulundu.*"

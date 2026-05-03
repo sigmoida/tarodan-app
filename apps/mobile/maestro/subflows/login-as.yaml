@@ -4,7 +4,7 @@
 appId: host.exp.Exponent
 ---
 - tapOn:
-    text: "Profil, tab.*"
+    text: "Profil"
 - runFlow:
     when:
       visible:
@@ -26,7 +26,7 @@ appId: host.exp.Exponent
           id: "login-submit-button"
       - extendedWaitUntil:
           visible:
-            text: "Ana Sayfa, tab.*"
+            text: "Ana Sayfa"
           timeout: 30000
       # iOS keychain "Parolayı Kaydet" sheet — login sonrası gelir, Profil tap'ini bloker.
       - runFlow:

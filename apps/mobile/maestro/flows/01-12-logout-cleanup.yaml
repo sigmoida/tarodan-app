@@ -7,7 +7,7 @@ env:
 - runFlow: ../subflows/open-tarodan.yaml
 - runFlow: ../subflows/login-as.yaml
 - tapOn:
-    text: "Profil, tab.*"
+    text: "Profil"
 - runFlow: ../subflows/logout.yaml
 # Logout sonrası uygulama login ekranına yönlendirir.
 - assertVisible:

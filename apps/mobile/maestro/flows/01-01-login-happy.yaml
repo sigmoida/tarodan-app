@@ -7,14 +7,14 @@ env:
 ---
 - runFlow: ../subflows/open-tarodan.yaml
 - tapOn:
-    text: "Profil, tab.*"
+    text: "Profil"
 - runFlow:
     when:
       visible: "Çıkış Yap"
     file: ../subflows/logout.yaml
 - runFlow: ../subflows/login-as.yaml
 - tapOn:
-    text: "Profil, tab.*"
+    text: "Profil"
 # Login başarılı → kullanıcının email'i profilde görünür.
 - extendedWaitUntil:
     visible: "zeynep@demo.com"

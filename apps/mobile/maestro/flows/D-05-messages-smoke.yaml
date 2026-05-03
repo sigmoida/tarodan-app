@@ -5,14 +5,14 @@ appId: host.exp.Exponent
 ---
 - runFlow: ../subflows/open-tarodan.yaml
 - tapOn:
-    text: "Profil, tab.*"
+    text: "Profil"
 - runFlow:
     when:
       visible: "Çıkış Yap"
     file: ../subflows/logout.yaml
 - runFlow: ../subflows/login-as.yaml
 - tapOn:
-    text: "Mesajlar, tab.*"
+    text: "Mesajlar"
 - waitForAnimationToEnd
 - assertNotVisible: ".*Network Error.*"
 - assertNotVisible: ".*Bir hata oluştu.*"

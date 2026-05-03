@@ -64,7 +64,7 @@ maestro/
 
 Expo Router + React Native Paper UI'ı Maestro'nun text dump'ına `text` alanı olarak değil **`accessibilityText`** olarak çıkıyor. Maestro `tapOn: "..."` accessibility text'inde substring/regex araması yapar. Bu yüzden:
 
-- ✅ İyi: `tapOn: text: "Profil, tab.*"` (accessibility label birden fazla parça içerebilir)
+- ✅ İyi: `tapOn: text: "Profil"` (tab bar her ekrana `tabBarAccessibilityLabel` ile temiz string'i alır — bkz. [(tabs)/_layout.tsx](../app/(tabs)/_layout.tsx))
 - ✅ İyi: `assertVisible: text: ".*sonuç bulundu.*"`
 - ❌ Çalışmaz: `tapOn: "Profil"` (anchor'sız aramada multi-part label'a takılabilir)
 

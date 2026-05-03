@@ -41,6 +41,7 @@ export default function TabLayout() {
         name="index"
         options={{
           title: 'Ana Sayfa',
+          tabBarAccessibilityLabel: 'Ana Sayfa',
           tabBarIcon: ({ color, focused }) => (
             <Ionicons name={focused ? "home" : "home-outline"} size={24} color={color} />
           ),
@@ -50,6 +51,7 @@ export default function TabLayout() {
         name="search"
         options={{
           title: 'Ara',
+          tabBarAccessibilityLabel: 'Ara',
           tabBarIcon: ({ color, focused }) => (
             <Ionicons name={focused ? "search" : "search-outline"} size={24} color={color} />
           ),
@@ -59,6 +61,7 @@ export default function TabLayout() {
         name="sell"
         options={{
           title: '',
+          tabBarAccessibilityLabel: 'Satışa Çıkar',
           tabBarIcon: ({ focused }) => (
             <View style={styles.sellButton}>
               <Ionicons name="add" size={28} color="#fff" />
@@ -70,6 +73,7 @@ export default function TabLayout() {
         name="messages"
         options={{
           title: 'Mesajlar',
+          tabBarAccessibilityLabel: 'Mesajlar',
           tabBarIcon: ({ color, focused }) => (
             <View>
               <Ionicons name={focused ? "chatbubbles" : "chatbubbles-outline"} size={24} color={color} />
@@ -88,6 +92,7 @@ export default function TabLayout() {
         name="profile"
         options={{
           title: 'Profil',
+          tabBarAccessibilityLabel: 'Profil',
           tabBarIcon: ({ color, focused }) => (
             <Ionicons name={focused ? "person" : "person-outline"} size={24} color={color} />
           ),
