@@ -7,6 +7,8 @@ import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 import { api } from '../../src/services/api';
 import { useAuthStore } from '../../src/stores/authStore';
 import { TarodanColors } from '../../src/theme';
+import { getImageUrl } from '../../src/utils/imageUrl';
+import { isProductTradeOpen } from '../../src/utils/isProductTradeOpen';
 
 const { width } = Dimensions.get('window');
 const CARD_WIDTH = (width - 48) / 2;
@@ -56,7 +58,8 @@ export default function SellerProfileScreen() {
   const { data: apiSeller, isLoading, isError } = useQuery({
     queryKey: ['seller', id],
     queryFn: async () => {
-      const response = await api.get(`/users/${id}/public`);
+      // Backend route is /users/:id/profile (web parity); previous /public path returned 404.
+      const response = await api.get(`/users/${id}/profile`);
       return response.data.data || response.data;
     },
     retry: 1,
