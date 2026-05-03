@@ -3,6 +3,7 @@ import { View, Text, TouchableOpacity, StyleSheet, ScrollView } from 'react-nati
 import { Ionicons } from '@expo/vector-icons';
 import { TarodanColors } from '../theme';
 import { captureException } from '../services/sentry';
+import { useTranslation } from '../i18n';
 
 interface Props {
   children: ReactNode;
@@ -16,12 +17,12 @@ interface State {
 /**
  * Uygulama içinde herhangi bir render-time crash'i yakalar:
  *   - React tree'sini beyaz ekrana bırakmaz, friendly bir "tekrar dene"
- *     ekranı gösterir.
+ *     ekranı gösterir (i18n ile çevrilir).
  *   - Hatayı Sentry'ye gönderir (paketleme sonrası gerçekten gönderir;
  *     dev'de ve Expo Go'da no-op).
  *
- * Async/event-handler hataları React'in error boundary'sine düşmez —
- * onları yakalamak için manuel `captureException` çağrısı gerek.
+ * Class component → hook kullanılamaz; fallback UI ayrı bir functional
+ * component (FallbackScreen) ve useTranslation orada çağrılır.
  */
 export class ErrorBoundary extends Component<Props, State> {
   state: State = { hasError: false, error: null };
@@ -42,29 +43,31 @@ export class ErrorBoundary extends Component<Props, State> {
 
   render() {
     if (!this.state.hasError) return this.props.children;
-    return (
-      <View style={styles.container}>
-        <Ionicons name="warning-outline" size={64} color={TarodanColors.error} />
-        <Text style={styles.title}>Bir şeyler ters gitti</Text>
-        <Text style={styles.subtitle}>
-          Beklenmedik bir hata oluştu. Bilgilendirildik.{'\n'}
-          Tekrar denemek için aşağıya dokun.
-        </Text>
-        {__DEV__ && this.state.error && (
-          <ScrollView style={styles.errorBox}>
-            <Text style={styles.errorText}>
-              {this.state.error.message}
-              {'\n\n'}
-              {this.state.error.stack ?? ''}
-            </Text>
-          </ScrollView>
-        )}
-        <TouchableOpacity style={styles.button} onPress={this.reset}>
-          <Text style={styles.buttonText}>Tekrar Dene</Text>
-        </TouchableOpacity>
-      </View>
-    );
+    return <FallbackScreen error={this.state.error} onRetry={this.reset} />;
   }
+}
+
+function FallbackScreen({ error, onRetry }: { error: Error | null; onRetry: () => void }) {
+  const { t } = useTranslation();
+  return (
+    <View style={styles.container}>
+      <Ionicons name="warning-outline" size={64} color={TarodanColors.error} />
+      <Text style={styles.title}>{t('mobile.errorSomethingWrong')}</Text>
+      <Text style={styles.subtitle}>{t('mobile.errorBoundaryDescription')}</Text>
+      {__DEV__ && error && (
+        <ScrollView style={styles.errorBox}>
+          <Text style={styles.errorText}>
+            {error.message}
+            {'\n\n'}
+            {error.stack ?? ''}
+          </Text>
+        </ScrollView>
+      )}
+      <TouchableOpacity style={styles.button} onPress={onRetry}>
+        <Text style={styles.buttonText}>{t('mobile.errorRetry')}</Text>
+      </TouchableOpacity>
+    </View>
+  );
 }
 
 const styles = StyleSheet.create({

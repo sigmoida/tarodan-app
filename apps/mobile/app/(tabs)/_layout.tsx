@@ -4,10 +4,12 @@ import { View, Text, StyleSheet } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { TarodanColors } from '../../src/theme';
 import { useMessagesStore } from '../../src/stores/messagesStore';
+import { useTranslation } from '../../src/i18n';
 
 export default function TabLayout() {
   const insets = useSafeAreaInsets();
   const { getUnreadCount } = useMessagesStore();
+  const { t } = useTranslation();
   const unreadCount = getUnreadCount();
   const tabBarBottom = Math.max(insets.bottom, 8);
 
@@ -40,8 +42,8 @@ export default function TabLayout() {
       <Tabs.Screen
         name="index"
         options={{
-          title: 'Ana Sayfa',
-          tabBarAccessibilityLabel: 'Ana Sayfa',
+          title: t('nav.home'),
+          tabBarAccessibilityLabel: t('nav.home'),
           tabBarIcon: ({ color, focused }) => (
             <Ionicons name={focused ? "home" : "home-outline"} size={24} color={color} />
           ),
@@ -50,8 +52,8 @@ export default function TabLayout() {
       <Tabs.Screen
         name="search"
         options={{
-          title: 'Ara',
-          tabBarAccessibilityLabel: 'Ara',
+          title: t('common.search'),
+          tabBarAccessibilityLabel: t('common.search'),
           tabBarIcon: ({ color, focused }) => (
             <Ionicons name={focused ? "search" : "search-outline"} size={24} color={color} />
           ),
@@ -61,7 +63,7 @@ export default function TabLayout() {
         name="sell"
         options={{
           title: '',
-          tabBarAccessibilityLabel: 'Satışa Çıkar',
+          tabBarAccessibilityLabel: t('mobile.tabBarSell'),
           tabBarIcon: ({ focused }) => (
             <View style={styles.sellButton}>
               <Ionicons name="add" size={28} color="#fff" />
@@ -72,8 +74,8 @@ export default function TabLayout() {
       <Tabs.Screen
         name="messages"
         options={{
-          title: 'Mesajlar',
-          tabBarAccessibilityLabel: 'Mesajlar',
+          title: t('message.messages'),
+          tabBarAccessibilityLabel: t('message.messages'),
           tabBarIcon: ({ color, focused }) => (
             <View>
               <Ionicons name={focused ? "chatbubbles" : "chatbubbles-outline"} size={24} color={color} />
@@ -91,8 +93,8 @@ export default function TabLayout() {
       <Tabs.Screen
         name="profile"
         options={{
-          title: 'Profil',
-          tabBarAccessibilityLabel: 'Profil',
+          title: t('nav.profile'),
+          tabBarAccessibilityLabel: t('nav.profile'),
           tabBarIcon: ({ color, focused }) => (
             <Ionicons name={focused ? "person" : "person-outline"} size={24} color={color} />
           ),

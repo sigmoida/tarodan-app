@@ -14,6 +14,7 @@ import { registerForPushNotifications } from '../src/services/push';
 import { TarodanLightTheme, TarodanDarkTheme } from '../src/theme';
 import { ErrorBoundary } from '../src/components/ErrorBoundary';
 import { initSentry } from '../src/services/sentry';
+import { LanguageProvider } from '../src/i18n';
 
 // Initialize Sentry as early as possible — stub no-op until package is added
 // + EXPO_PUBLIC_SENTRY_DSN is set during production packaging.
@@ -87,26 +88,28 @@ export default function RootLayout() {
 
   return (
     <ErrorBoundary>
-      <GestureHandlerRootView style={styles.root}>
-        <SafeAreaProvider>
-          <QueryClientProvider client={queryClient}>
-            <PaperProvider theme={theme}>
-              <StatusBar style="auto" />
-              <Stack
-                screenOptions={{
-                  headerStyle: { backgroundColor: theme.colors.primary },
-                  headerTintColor: '#fff',
-                  headerTitleStyle: { fontWeight: 'bold' },
-                  headerShown: false,
-                }}
-              >
-                <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
-                <Stack.Screen name="(auth)" options={{ headerShown: false }} />
-              </Stack>
-            </PaperProvider>
-          </QueryClientProvider>
-        </SafeAreaProvider>
-      </GestureHandlerRootView>
+      <LanguageProvider>
+        <GestureHandlerRootView style={styles.root}>
+          <SafeAreaProvider>
+            <QueryClientProvider client={queryClient}>
+              <PaperProvider theme={theme}>
+                <StatusBar style="auto" />
+                <Stack
+                  screenOptions={{
+                    headerStyle: { backgroundColor: theme.colors.primary },
+                    headerTintColor: '#fff',
+                    headerTitleStyle: { fontWeight: 'bold' },
+                    headerShown: false,
+                  }}
+                >
+                  <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
+                  <Stack.Screen name="(auth)" options={{ headerShown: false }} />
+                </Stack>
+              </PaperProvider>
+            </QueryClientProvider>
+          </SafeAreaProvider>
+        </GestureHandlerRootView>
+      </LanguageProvider>
     </ErrorBoundary>
   );
 }

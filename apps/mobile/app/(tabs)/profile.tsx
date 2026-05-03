@@ -431,6 +431,12 @@ export default function ProfileScreen() {
             <Ionicons name="chevron-forward" size={20} color={TarodanColors.textLight} />
           </TouchableOpacity>
 
+          <TouchableOpacity testID="profile-language-link" style={styles.menuItem} onPress={() => router.push('/settings/language')}>
+            <Ionicons name="language-outline" size={22} color={TarodanColors.textSecondary} />
+            <Text style={styles.menuItemText}>Dil / Language</Text>
+            <Ionicons name="chevron-forward" size={20} color={TarodanColors.textLight} />
+          </TouchableOpacity>
+
           <TouchableOpacity style={styles.menuItem} onPress={() => router.push('/settings/security')}>
             <Ionicons name="shield-checkmark-outline" size={22} color={TarodanColors.textSecondary} />
             <Text style={styles.menuItemText}>Güvenlik</Text>

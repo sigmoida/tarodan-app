@@ -9,6 +9,7 @@ import { router, useLocalSearchParams } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { authApi } from '../../src/services/api';
 import { useAuthStore } from '../../src/stores/authStore';
+import { useTranslation } from '../../src/i18n';
 
 const loginSchema = z.object({
   email: z.string().email('Geçerli email girin'),
@@ -20,6 +21,7 @@ type LoginForm = z.infer<typeof loginSchema>;
 export default function LoginScreen() {
   const theme = useTheme();
   const { login } = useAuthStore();
+  const { t } = useTranslation();
   const params = useLocalSearchParams<{ redirect?: string }>();
   const [showPassword, setShowPassword] = useState(false);
   const [showVerificationBanner, setShowVerificationBanner] = useState(false);
@@ -111,7 +113,7 @@ export default function LoginScreen() {
           render={({ field: { onChange, value } }) => (
             <TextInput
               testID="login-email-input"
-              label="E-posta"
+              label={t('auth.email')}
               value={value}
               onChangeText={onChange}
               keyboardType="email-address"
@@ -133,7 +135,7 @@ export default function LoginScreen() {
           render={({ field: { onChange, value } }) => (
             <TextInput
               testID="login-password-input"
-              label="Şifre"
+              label={t('auth.password')}
               value={value}
               onChangeText={onChange}
               secureTextEntry={!showPassword}
@@ -156,7 +158,7 @@ export default function LoginScreen() {
 
         {loginMutation.isError && !showVerificationBanner && (
           <Text testID="login-error-banner" variant="bodySmall" style={{ color: theme.colors.error, marginBottom: 16, textAlign: 'center' }}>
-            Giriş başarısız. Bilgilerinizi kontrol edin.
+            {t('mobile.loginFailed')}
           </Text>
         )}
 
@@ -168,17 +170,17 @@ export default function LoginScreen() {
           disabled={loginMutation.isPending}
           style={{ marginBottom: 16 }}
         >
-          Giriş Yap
+          {t('common.login')}
         </Button>
 
         <Button testID="login-forgot-link" mode="text" onPress={() => router.push('/(auth)/forgot-password')}>
-          Şifremi Unuttum
+          {t('mobile.forgotPassword')}
         </Button>
 
         <View style={{ flexDirection: 'row', justifyContent: 'center', marginTop: 24 }}>
-          <Text variant="bodyMedium">Hesabınız yok mu? </Text>
+          <Text variant="bodyMedium">{t('mobile.noAccount')}</Text>
           <Button testID="login-register-link" mode="text" compact onPress={() => router.push('/(auth)/register')}>
-            Kayıt Ol
+            {t('common.register')}
           </Button>
         </View>
       </View>
