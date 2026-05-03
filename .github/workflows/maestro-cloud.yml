@@ -29,12 +29,15 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Guard — skip if Maestro Cloud secrets are missing
+      - name: Guard — skip if secrets or .app artefact are missing
         id: guard
         run: |
           if [ -z "${{ secrets.MAESTRO_CLOUD_API_KEY }}" ] || [ -z "${{ secrets.MAESTRO_CLOUD_PROJECT_ID }}" ]; then
             echo "skip=true" >> "$GITHUB_OUTPUT"
-            echo "::notice::Maestro Cloud secrets eksik — workflow no-op olarak biter. MAESTRO_CLOUD_API_KEY ve MAESTRO_CLOUD_PROJECT_ID için repo settings > secrets üzerinden ekleyin."
+            echo "::notice::Maestro Cloud secrets eksik — workflow no-op olarak biter."
+          elif [ ! -e apps/mobile/build/Tarodan.app ]; then
+            echo "skip=true" >> "$GITHUB_OUTPUT"
+            echo "::notice::apps/mobile/build/Tarodan.app yok — üretim paketleme (EAS Build) tamamlandığında otomatik devreye girer. Bu commit için sessiz no-op."
           else
             echo "skip=false" >> "$GITHUB_OUTPUT"
           fi
