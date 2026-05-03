@@ -10,6 +10,7 @@ import { useRecentSearchesStore } from '../../src/stores/recentSearchesStore';
 import { getImageUrl as getImageUrlFromUtils } from '../../src/utils/imageUrl';
 import { safeString } from '../../src/utils/safeString';
 import { isProductTradeOpen } from '../../src/utils/isProductTradeOpen';
+import { useTranslation } from '../../src/i18n';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 const SEARCH_LIST_H_PAD = 12;
@@ -51,6 +52,7 @@ function brandNamesForApi(brandIds: string[]): string | undefined {
 }
 
 export default function SearchScreen() {
+  const { t } = useTranslation();
   const params = useLocalSearchParams();
   const [searchQuery, setSearchQuery] = useState((params.q as string) || '');
   const [debouncedQuery, setDebouncedQuery] = useState(searchQuery);
@@ -374,12 +376,12 @@ export default function SearchScreen() {
         {tradeOpen && (
           <View style={styles.tradeBadge}>
             <Ionicons name="swap-horizontal" size={11} color="#fff" />
-            <Text style={styles.tradeBadgeText}>Takas</Text>
+            <Text style={styles.tradeBadgeText}>{t("mobile.trade")}</Text>
           </View>
         )}
         {item.condition === 'new' && (
           <View style={[styles.conditionBadge, { backgroundColor: TarodanColors.badgeNew }]}>
-            <Text style={styles.conditionBadgeText}>Sıfır</Text>
+            <Text style={styles.conditionBadgeText}>{t("mobile.newCondition")}</Text>
           </View>
         )}
         <View style={styles.statsRow}>
@@ -422,7 +424,7 @@ export default function SearchScreen() {
       {/* Search Bar */}
       <View style={styles.searchSection}>
         <Searchbar
-          placeholder="Model, marka veya anahtar kelime..."
+          placeholder={t("mobile.searchPlaceholder")}
           value={searchQuery}
           onChangeText={handleSearchChange}
           onSubmitEditing={() => setDebouncedQuery(searchQuery.trim())}
@@ -441,9 +443,9 @@ export default function SearchScreen() {
         {showRecentSearches && !searchQuery && recentSearchQueries.length > 0 && (
           <View style={styles.recentSearchesDropdown}>
             <View style={styles.recentSearchesHeader}>
-              <Text style={styles.recentSearchesTitle}>Son Aramalar</Text>
+              <Text style={styles.recentSearchesTitle}>{t("mobile.recentSearches")}</Text>
               <TouchableOpacity onPress={clearSearches}>
-                <Text style={styles.clearRecentText}>Temizle</Text>
+                <Text style={styles.clearRecentText}>{t("mobile.clear")}</Text>
               </TouchableOpacity>
             </View>
             {recentSearchQueries.map((query, index) => (
@@ -463,7 +465,7 @@ export default function SearchScreen() {
               </TouchableOpacity>
             ))}
             <View style={styles.suggestionsSection}>
-              <Text style={styles.suggestionsSectionTitle}>Popüler aramalar</Text>
+              <Text style={styles.suggestionsSectionTitle}>{t("mobile.popularSearches")}</Text>
               <View style={styles.popularChips}>
                 {['Hot Wheels', '1:18 ölçek', 'Ferrari', 'Matchbox', 'Porsche'].map((q) => (
                   <Chip key={q} style={styles.popularChip} onPress={() => handleRecentSearchSelect(q)} compact>
@@ -478,7 +480,7 @@ export default function SearchScreen() {
         {showRecentSearches && debouncedQuery.length >= 1 && suggestionItems.length > 0 && (
           <View style={styles.recentSearchesDropdown}>
             <View style={styles.recentSearchesHeader}>
-              <Text style={styles.recentSearchesTitle}>Öneriler</Text>
+              <Text style={styles.recentSearchesTitle}>{t("mobile.suggestions")}</Text>
             </View>
             {suggestionItems.map((item) => (
               <TouchableOpacity
@@ -512,7 +514,7 @@ export default function SearchScreen() {
             activeOpacity={0.85}
           >
             <Ionicons name="filter-outline" size={18} color={TarodanColors.primary} />
-            <Text style={styles.filterButtonText}>Filtrele</Text>
+            <Text style={styles.filterButtonText}>{t("mobile.filter")}</Text>
             {activeFiltersCount > 0 && (
               <View style={styles.filterBadge}>
                 <Text style={styles.filterBadgeText}>{activeFiltersCount}</Text>
@@ -602,7 +604,7 @@ export default function SearchScreen() {
       {isLoading ? (
         <View style={styles.loadingContainer}>
           <ActivityIndicator size="large" color={TarodanColors.primary} />
-          <Text style={styles.loadingText}>Sonuçlar yükleniyor...</Text>
+          <Text style={styles.loadingText}>{t("mobile.loadingResults")}</Text>
         </View>
       ) : (
         <FlatList
@@ -627,7 +629,7 @@ export default function SearchScreen() {
           ListEmptyComponent={
             <View style={styles.emptyContainer}>
               <Ionicons name="search-outline" size={64} color={TarodanColors.textLight} />
-              <Text style={styles.emptyTitle}>Sonuç Bulunamadı</Text>
+              <Text style={styles.emptyTitle}>{t("mobile.noResults")}</Text>
               <Text style={styles.emptySubtitle}>
                 Farklı anahtar kelimeler veya filtreler deneyin
               </Text>
@@ -652,7 +654,7 @@ export default function SearchScreen() {
       >
         <View style={styles.modalContainer}>
           <View style={styles.modalHeader}>
-            <Text style={styles.modalTitle}>Filtreler</Text>
+            <Text style={styles.modalTitle}>{t("mobile.filtersTitle")}</Text>
             <IconButton
               icon="close"
               size={24}
@@ -663,7 +665,7 @@ export default function SearchScreen() {
           <ScrollView style={styles.modalContent}>
             {/* Price Range */}
             <View style={styles.filterSection}>
-              <Text style={styles.filterSectionTitle}>Fiyat Aralığı</Text>
+              <Text style={styles.filterSectionTitle}>{t("mobile.priceRange")}</Text>
               
               {/* Quick Price Presets */}
               <View style={styles.pricePresets}>
@@ -712,7 +714,7 @@ export default function SearchScreen() {
               {/* Custom Range Inputs */}
               <View style={styles.priceInputs}>
                 <View style={styles.priceInputContainer}>
-                  <Text style={styles.priceInputLabel}>Min</Text>
+                  <Text style={styles.priceInputLabel}>{t("mobile.min")}</Text>
                   <TextInput
                     mode="outlined"
                     value={priceRange[0].toString()}
@@ -729,7 +731,7 @@ export default function SearchScreen() {
                 </View>
                 <Text style={styles.priceInputDivider}>-</Text>
                 <View style={styles.priceInputContainer}>
-                  <Text style={styles.priceInputLabel}>Max</Text>
+                  <Text style={styles.priceInputLabel}>{t("mobile.max")}</Text>
                   <TextInput
                     mode="outlined"
                     value={priceRange[1].toString()}
@@ -751,7 +753,7 @@ export default function SearchScreen() {
 
             {/* Brands */}
             <View style={styles.filterSection}>
-              <Text style={styles.filterSectionTitle}>Markalar</Text>
+              <Text style={styles.filterSectionTitle}>{t("mobile.brands")}</Text>
               <View style={styles.chipGrid}>
                 {BRANDS.map(brand => (
                   <Chip
@@ -774,7 +776,7 @@ export default function SearchScreen() {
 
             {/* Scales */}
             <View style={styles.filterSection}>
-              <Text style={styles.filterSectionTitle}>Ölçek</Text>
+              <Text style={styles.filterSectionTitle}>{t("mobile.scaleSection")}</Text>
               <View style={styles.chipGrid}>
                 {SCALES.map(scale => (
                   <Chip
@@ -797,7 +799,7 @@ export default function SearchScreen() {
 
             {/* Condition */}
             <View style={styles.filterSection}>
-              <Text style={styles.filterSectionTitle}>Durum</Text>
+              <Text style={styles.filterSectionTitle}>{t("mobile.conditionSection")}</Text>
               <View style={styles.chipGrid}>
                 {CONDITIONS.map(condition => (
                   <Chip
@@ -829,7 +831,7 @@ export default function SearchScreen() {
                 onPress={() => setTradeOnly(!tradeOnly)}
                 color={TarodanColors.primary}
               />
-              <Text style={styles.checkboxLabel}>Sadece Takas Yapılabilir</Text>
+              <Text style={styles.checkboxLabel}>{t("mobile.tradeOnly")}</Text>
             </TouchableOpacity>
 
             <View style={{ height: 100 }} />
@@ -869,7 +871,7 @@ export default function SearchScreen() {
         >
           <View style={styles.sortModalContent}>
             <View style={styles.sortModalHandle} />
-            <Text style={styles.sortModalTitle}>Sıralama</Text>
+            <Text style={styles.sortModalTitle}>{t("mobile.sort")}</Text>
             <RadioButton.Group onValueChange={value => { setSortBy(value); setSortModalVisible(false); }} value={sortBy}>
               {SORT_OPTIONS.map(option => (
                 <TouchableOpacity

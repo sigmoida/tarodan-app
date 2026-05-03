@@ -7,8 +7,10 @@ import { TarodanColors } from '../src/theme';
 import { useCartStore } from '../src/stores/cartStore';
 import { transformImageUrl } from '../src/utils/imageUrl';
 import { safeString } from '../src/utils/safeString';
+import { useTranslation } from '../src/i18n';
 
 export default function CartScreen() {
+  const { t } = useTranslation();
   const { items, getSubtotal, getItemCount, removeItem, updateQuantity, cleanExpiredItems } = useCartStore();
   
   // Clean expired items on mount
@@ -39,15 +41,15 @@ export default function CartScreen() {
           <TouchableOpacity onPress={() => router.back()}>
             <Ionicons name="arrow-back" size={24} color={TarodanColors.textOnPrimary} />
           </TouchableOpacity>
-          <Text style={styles.headerTitle}>Sepetim</Text>
+          <Text style={styles.headerTitle}>{t('mobile.myCart')}</Text>
           <View style={{ width: 24 }} />
         </View>
         
         <View style={styles.emptyContent}>
           <Ionicons name="cart-outline" size={80} color={TarodanColors.textSecondary} />
-          <Text style={styles.emptyTitle}>Sepetiniz Boş</Text>
+          <Text style={styles.emptyTitle}>{t('mobile.cartEmpty')}</Text>
           <Text style={styles.emptySubtitle}>
-            İlanlara göz atın ve beğendiklerinizi sepete ekleyin
+            {t('mobile.cartEmptySubtitle')}
           </Text>
           <Button
             mode="contained"
@@ -55,7 +57,7 @@ export default function CartScreen() {
             onPress={() => router.replace('/')}
             style={{ marginTop: 24 }}
           >
-            İlanlara Göz At
+            {t('mobile.browseListings')}
           </Button>
         </View>
       </View>
@@ -69,7 +71,7 @@ export default function CartScreen() {
         <TouchableOpacity onPress={() => router.back()}>
           <Ionicons name="arrow-back" size={24} color={TarodanColors.textOnPrimary} />
         </TouchableOpacity>
-        <Text style={styles.headerTitle}>Sepetim ({itemCount})</Text>
+        <Text style={styles.headerTitle}>{t('mobile.myCart')} ({itemCount})</Text>
         <View style={{ width: 24 }} />
       </View>
 
@@ -77,7 +79,7 @@ export default function CartScreen() {
       <View style={styles.expiryNotice}>
         <Ionicons name="time-outline" size={16} color={TarodanColors.warning} />
         <Text style={styles.expiryText}>
-          Sepetinizdeki ürünler 24 saat sonra otomatik olarak silinir
+          {t('mobile.cartAutoExpire')}
         </Text>
       </View>
 
@@ -95,8 +97,8 @@ export default function CartScreen() {
               <TouchableOpacity onPress={() => router.push(`/product/${item.productId}`)}>
                 <Text style={styles.itemTitle} numberOfLines={2}>{item.title}</Text>
               </TouchableOpacity>
-              <Text style={styles.itemMeta}>{safeString(item.brand, 'Marka')} • {safeString(item.scale, '1:64')}</Text>
-              <Text style={styles.itemSeller}>Satıcı: {item.seller?.displayName || 'Satıcı'}</Text>
+              <Text style={styles.itemMeta}>{safeString(item.brand, t('mobile.brand'))} • {safeString(item.scale, '1:64')}</Text>
+              <Text style={styles.itemSeller}>{t('mobile.seller')}: {item.seller?.displayName || t('mobile.seller')}</Text>
               <Text style={styles.itemPrice}>₺{(item.price ?? 0).toLocaleString('tr-TR')}</Text>
             </View>
             <View style={styles.itemActions}>
@@ -127,18 +129,18 @@ export default function CartScreen() {
 
         {/* Order Summary */}
         <View style={styles.summary}>
-          <Text style={styles.summaryTitle}>Sipariş Özeti</Text>
+          <Text style={styles.summaryTitle}>{t('mobile.orderSummary')}</Text>
           <View style={styles.summaryRow}>
-            <Text style={styles.summaryLabel}>Ara Toplam ({itemCount} ürün)</Text>
+            <Text style={styles.summaryLabel}>{t('mobile.subtotal')} ({itemCount} {t('mobile.items')})</Text>
             <Text style={styles.summaryValue}>₺{subtotal.toLocaleString('tr-TR')}</Text>
           </View>
           <View style={styles.summaryRow}>
-            <Text style={styles.summaryLabel}>Tahmini Kargo</Text>
+            <Text style={styles.summaryLabel}>{t('mobile.estimatedShipping')}</Text>
             <Text style={styles.summaryValue}>₺{shipping.toFixed(2)}</Text>
           </View>
           <Divider style={{ marginVertical: 12 }} />
           <View style={styles.summaryRow}>
-            <Text style={styles.totalLabel}>Toplam</Text>
+            <Text style={styles.totalLabel}>{t('mobile.totalLabel')}</Text>
             <Text style={styles.totalValue}>₺{total.toLocaleString('tr-TR')}</Text>
           </View>
         </View>
@@ -147,7 +149,7 @@ export default function CartScreen() {
         <View style={styles.guestInfo}>
           <Ionicons name="information-circle-outline" size={20} color={TarodanColors.info} />
           <Text style={styles.guestInfoText}>
-            Üye olmadan da alışveriş yapabilirsiniz. Siparişinizi e-posta ile takip edebilirsiniz.
+            {t('mobile.guestCheckoutInfo')}
           </Text>
         </View>
 
@@ -157,7 +159,7 @@ export default function CartScreen() {
       {/* Checkout Button */}
       <View style={styles.checkoutBar}>
         <View style={styles.checkoutTotal}>
-          <Text style={styles.checkoutLabel}>Toplam</Text>
+          <Text style={styles.checkoutLabel}>{t('mobile.totalLabel')}</Text>
           <Text style={styles.checkoutPrice}>₺{total.toLocaleString('tr-TR')}</Text>
         </View>
         <Button
@@ -166,7 +168,7 @@ export default function CartScreen() {
           buttonColor={TarodanColors.primary}
           onPress={() => router.push('/checkout')}
         >
-          Satın Al
+          {t('mobile.checkout')}
         </Button>
       </View>
     </View>

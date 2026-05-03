@@ -17,11 +17,13 @@ import { getProductEffectivePrice, isProductOnSaleDisplay, getProductOriginalPri
 import { safeString } from '../../src/utils/safeString';
 import { isProductTradeOpen } from '../../src/utils/isProductTradeOpen';
 import { formatApiErrorMessage } from '../../src/utils/formatApiErrorMessage';
+import { useTranslation } from '../../src/i18n';
 
 const { width } = Dimensions.get('window');
 
 
 export default function ProductDetailScreen() {
+  const { t } = useTranslation();
   const queryClient = useQueryClient();
   const { id } = useLocalSearchParams();
   const productId = String(id);
@@ -97,7 +99,7 @@ export default function ProductDetailScreen() {
     return (
       <View style={styles.loadingContainer}>
         <ActivityIndicator size="large" color={TarodanColors.primary} />
-        <Text style={styles.loadingText}>Yükleniyor...</Text>
+        <Text style={styles.loadingText}>{t("mobile.loading")}</Text>
       </View>
     );
   }
@@ -105,8 +107,8 @@ export default function ProductDetailScreen() {
     return (
       <View style={[styles.loadingContainer, { padding: 24 }]}>
         <Ionicons name="alert-circle-outline" size={48} color={TarodanColors.error} />
-        <Text style={[styles.loadingText, { fontSize: 18, fontWeight: '600', marginTop: 16 }]}>Ürün bulunamadı</Text>
-        <Button mode="contained" onPress={() => router.back()} style={{ marginTop: 16 }}>Geri Dön</Button>
+        <Text style={[styles.loadingText, { fontSize: 18, fontWeight: "600", marginTop: 16 }]}>{t("mobile.productNotFound")}</Text>
+        <Button mode="contained" onPress={() => router.back()} style={{ marginTop: 16 }}>{t("mobile.back")}</Button>
       </View>
     );
   }
@@ -381,7 +383,7 @@ export default function ProductDetailScreen() {
             {(product.tradeAvailable || product.trade_available || product.isTradeEnabled) && (
               <View style={[styles.badge, { backgroundColor: TarodanColors.accent }]}>
                 <Ionicons name="swap-horizontal" size={14} color="#fff" />
-                <Text style={styles.badgeText}>Takas Açık</Text>
+                <Text style={styles.badgeText}>{t("mobile.tradeOpen")}</Text>
               </View>
             )}
             <View style={[styles.badge, { backgroundColor: conditionInfo.color }]}>
@@ -422,25 +424,25 @@ export default function ProductDetailScreen() {
 
           {/* Specifications */}
           <View style={styles.section}>
-            <Text style={styles.sectionTitle}>Özellikler</Text>
+            <Text style={styles.sectionTitle}>{t("mobile.specifications")}</Text>
             <View style={styles.specGrid}>
               <View style={styles.specItem}>
-                <Text style={styles.specLabel}>Marka</Text>
+                <Text style={styles.specLabel}>{t("mobile.brand")}</Text>
                 <Text style={styles.specValue}>{safeString(product.brand)}</Text>
               </View>
               <View style={styles.specItem}>
-                <Text style={styles.specLabel}>Ölçek</Text>
+                <Text style={styles.specLabel}>{t("mobile.scale")}</Text>
                 <Text style={styles.specValue}>{safeString(product.scale)}</Text>
               </View>
               <View style={styles.specItem}>
-                <Text style={styles.specLabel}>Durum</Text>
+                <Text style={styles.specLabel}>{t("mobile.condition")}</Text>
                 <Text style={[styles.specValue, { color: conditionInfo.color }]}>
                   {conditionInfo.name}
                 </Text>
               </View>
               {product.category && (
                 <View style={styles.specItem}>
-                  <Text style={styles.specLabel}>Kategori</Text>
+                  <Text style={styles.specLabel}>{t("mobile.category")}</Text>
                   <Text style={styles.specValue}>
                     {typeof product.category === 'object' ? product.category.name : product.category}
                   </Text>
@@ -448,12 +450,12 @@ export default function ProductDetailScreen() {
               )}
               {product.year && (
                 <View style={styles.specItem}>
-                  <Text style={styles.specLabel}>Model Yılı</Text>
+                  <Text style={styles.specLabel}>{t("mobile.modelYear")}</Text>
                   <Text style={styles.specValue}>{product.year}</Text>
                 </View>
               )}
               <View style={styles.specItem}>
-                <Text style={styles.specLabel}>Stok</Text>
+                <Text style={styles.specLabel}>{t("mobile.stock")}</Text>
                 <Text style={styles.specValue}>{stockDisplay}</Text>
               </View>
             </View>
@@ -465,7 +467,7 @@ export default function ProductDetailScreen() {
           {product.description && (
             <>
               <View style={styles.section}>
-                <Text style={styles.sectionTitle}>Açıklama</Text>
+                <Text style={styles.sectionTitle}>{t("mobile.description")}</Text>
                 <Text 
                   style={styles.description}
                   numberOfLines={showAllDescription ? undefined : 4}
@@ -528,9 +530,9 @@ export default function ProductDetailScreen() {
           {/* Reviews */}
           <View style={styles.section}>
             <View style={styles.sectionHeader}>
-              <Text style={styles.sectionTitle}>Değerlendirmeler</Text>
+              <Text style={styles.sectionTitle}>{t("mobile.reviews")}</Text>
               <TouchableOpacity onPress={() => Alert.alert('Değerlendirmeler', 'Tüm değerlendirmeler bu üründe gösterilmektedir.')}>
-                <Text style={styles.seeAll}>Tümünü Gör</Text>
+                <Text style={styles.seeAll}>{t("mobile.seeAll")}</Text>
               </TouchableOpacity>
             </View>
 
@@ -557,7 +559,7 @@ export default function ProductDetailScreen() {
             ))}
 
             {(!Array.isArray(reviews) || reviews.length === 0) && (
-              <Text style={styles.noReviews}>Henüz değerlendirme yok</Text>
+              <Text style={styles.noReviews}>{t("mobile.noReviews")}</Text>
             )}
           </View>
 
@@ -565,7 +567,7 @@ export default function ProductDetailScreen() {
           <View style={styles.securityNotice}>
             <Ionicons name="shield-checkmark" size={24} color={TarodanColors.accent} />
             <View style={styles.securityContent}>
-              <Text style={styles.securityTitle}>Güvenli Alışveriş</Text>
+              <Text style={styles.securityTitle}>{t("mobile.secureShopping")}</Text>
               <Text style={styles.securityText}>
                 Ödemeniz, ürün elinize ulaşana kadar güvende tutulur.
               </Text>
@@ -579,7 +581,7 @@ export default function ProductDetailScreen() {
       {/* Bottom Actions */}
       <View style={styles.bottomBar}>
         <View style={styles.bottomPrice}>
-          <Text style={styles.bottomPriceLabel}>Fiyat</Text>
+          <Text style={styles.bottomPriceLabel}>{t("mobile.price")}</Text>
           <Text style={styles.bottomPriceValue}>₺{getProductEffectivePrice(product).toLocaleString('tr-TR')}</Text>
         </View>
         <View style={styles.bottomButtons}>
@@ -635,7 +637,7 @@ export default function ProductDetailScreen() {
           onDismiss={() => setShowOfferModal(false)}
           contentContainerStyle={{ backgroundColor: TarodanColors.background, margin: 20, padding: 20, borderRadius: 12 }}
         >
-          <Text variant="titleLarge" style={{ marginBottom: 4, textAlign: 'center' }}>Teklif Ver</Text>
+          <Text variant="titleLarge" style={{ marginBottom: 4, textAlign: 'center' }}>{t("mobile.makeOffer")}</Text>
           <Text variant="bodySmall" style={{ textAlign: 'center', color: TarodanColors.textLight, marginBottom: 16 }}>
             Listelenen fiyat: ₺{Number(product?.price || 0).toLocaleString('tr-TR')}
           </Text>
@@ -661,8 +663,8 @@ export default function ProductDetailScreen() {
             theme={{ colors: { onSurfaceVariant: TarodanColors.textSecondary, onSurface: TarodanColors.textPrimary } }}
           />
           <View style={{ flexDirection: 'row', justifyContent: 'flex-end', gap: 12 }}>
-            <Button mode="outlined" onPress={() => setShowOfferModal(false)}>İptal</Button>
-            <Button mode="contained" onPress={submitOffer} loading={offerLoading} disabled={offerLoading}>Gönder</Button>
+            <Button mode="outlined" onPress={() => setShowOfferModal(false)}>{t("mobile.cancelButton")}</Button>
+            <Button mode="contained" onPress={submitOffer} loading={offerLoading} disabled={offerLoading}>{t("mobile.send")}</Button>
           </View>
         </Modal>
       </Portal>
