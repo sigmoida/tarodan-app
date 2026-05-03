@@ -606,6 +606,18 @@ export default function ProductDetailScreen() {
             </Button>
           )}
           <Button
+            testID="product-add-to-cart-button"
+            mode="outlined"
+            onPress={handleAddToCart}
+            textColor={TarodanColors.primary}
+            style={styles.tradeButton}
+            labelStyle={styles.tradeButtonLabel}
+            icon="cart-plus"
+          >
+            Sepete Ekle
+          </Button>
+          <Button
+            testID="product-buy-now-button"
             mode="contained"
             onPress={handleBuyNow}
             buttonColor={TarodanColors.primary}
