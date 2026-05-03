@@ -5,6 +5,7 @@ import { router, useLocalSearchParams } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { TarodanColors } from '../../src/theme/colors';
 import { paymentsApi } from '../../src/services/api';
+import { captureException } from '../../src/services/sentry';
 
 type PaymentStatus = 'pending' | 'processing' | 'completed' | 'failed' | 'cancelled' | string;
 
@@ -71,6 +72,11 @@ export default function PaymentDetailScreen() {
       }
     } catch (err) {
       console.error('Bypass complete failed:', err);
+      captureException(err, {
+        level: 'error',
+        tags: { flow: 'payment', step: 'bypass-complete' },
+        extra: { paymentId: id, type: paymentFlowType },
+      });
       setError('Ödeme tamamlanırken bir hata oluştu.');
       setLoading(false);
       return;
@@ -106,6 +112,11 @@ export default function PaymentDetailScreen() {
 
     } catch (err) {
       console.error('Payment detail fetch error:', err);
+      captureException(err, {
+        level: 'warning',
+        tags: { flow: 'payment', step: 'get-status' },
+        extra: { paymentId: id },
+      });
       setError('Ödeme bilgileri yüklenirken bir hata oluştu.');
     } finally {
       setLoading(false);

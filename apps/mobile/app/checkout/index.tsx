@@ -10,6 +10,7 @@ import { api, ordersApi, addressesApi, paymentsApi, productsApi } from '../../sr
 import { transformImageUrl } from '../../src/utils/imageUrl';
 import { safeString } from '../../src/utils/safeString';
 import { formatApiErrorMessage } from '../../src/utils/formatApiErrorMessage';
+import { captureException } from '../../src/services/sentry';
 
 interface ShippingAddress {
   fullName: string;
@@ -453,6 +454,11 @@ export default function CheckoutScreen() {
         return;
       }
     } catch (error: unknown) {
+      captureException(error, {
+        level: 'error',
+        tags: { flow: 'checkout', step: 'submit-order' },
+        extra: { isAuthenticated, isDirectBuy, itemCount: checkoutItems.length },
+      });
       Alert.alert('Hata', formatApiErrorMessage(error, 'Sipariş oluşturulamadı'));
     } finally {
       setLoading(false);

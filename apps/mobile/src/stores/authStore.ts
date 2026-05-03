@@ -1,6 +1,7 @@
 import { create } from 'zustand';
 import * as SecureStore from 'expo-secure-store';
 import { authApi, userApi } from '../services/api';
+import { setUser as setSentryUser, captureException } from '../services/sentry';
 
 // Membership tier types
 export type MembershipTier = 'free' | 'basic' | 'premium' | 'business';
@@ -307,6 +308,12 @@ export const useAuthStore = create<AuthState>((set, get) => ({
     const limits = TIER_LIMITS[mappedUser.membershipTier];
     console.log('🔐 Auth stored - Tier:', mappedUser.membershipTier);
     set({ isAuthenticated: true, token, user: mappedUser, limits });
+    // Tag every subsequent Sentry event with the active user.
+    setSentryUser({
+      id: mappedUser.id,
+      email: mappedUser.email,
+      username: mappedUser.displayName,
+    });
   },
 
   // Web ile aynı endpoint: POST /auth/logout
@@ -314,11 +321,14 @@ export const useAuthStore = create<AuthState>((set, get) => ({
     try {
       await authApi.logout();
     } catch (error) {
-      // Ignore logout errors
+      // Best-effort: report logout failures so we don't lose them silently
+      // (no-op in dev/Expo Go).
+      captureException(error, { level: 'warning', tags: { flow: 'logout' } });
     }
     await SecureStore.deleteItemAsync('accessToken');
     await SecureStore.deleteItemAsync('refreshToken');
     set({ isAuthenticated: false, token: null, user: null, limits: null });
+    setSentryUser(null);
   },
 
   loadToken: async () => {

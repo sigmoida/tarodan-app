@@ -45,7 +45,14 @@ EXPO_PUBLIC_SENTRY_DSN="https://...@o123.ingest.sentry.io/mobile"
 
 ## Adım 3 — Mobile için Sentry'yi etkinleştir (üretim build'inden önce)
 
-**Şu an Expo Go'da çalıştığı için bu paket eklenmiyor** (native module yüklenemez). Üretim için EAS dev build veya release build üretirken:
+**Mobile kod tarafı önceden hazırlandı** ([commit ileride](apps/mobile/src/services/sentry.ts)):
+- `apps/mobile/src/services/sentry.ts` — stub sarmalayıcı (init, captureException, setUser, withTransaction). Şu an no-op; paket eklendiğinde aktive olur.
+- `apps/mobile/src/components/ErrorBoundary.tsx` — uygulama çökerse "Tekrar Dene" UI'sı, hata otomatik Sentry'ye gönderilir.
+- `app/_layout.tsx` — root'ta `<ErrorBoundary>` + `initSentry()` zaten çağrılıyor.
+- `authStore` — login/logout otomatik `setUser` ediyor (kullanıcı bilgisi her hatada Sentry'ye eklenir).
+- Kritik akışlarda manuel `captureException` çağrıları (checkout submit, payment bypass-complete, payment status fetch).
+
+Paketleme zamanı yapılacak değişiklikler **toplam 4 satır**:
 
 ### 3.1 Paketi ekle
 
@@ -67,28 +74,16 @@ npx expo install @sentry/react-native
 }
 ```
 
-### 3.3 `App.tsx`'e init kodu ekle
+### 3.3 Stub'ı aktive et
 
-`SplashScreen.preventAutoHideAsync()` çağrısının hemen üstüne:
+`apps/mobile/src/services/sentry.ts` dosyasında:
 
-```ts
-import * as Sentry from '@sentry/react-native';
-import Constants from 'expo-constants';
+1. `const SENTRY_PACKAGE_LOADED = false;` → `true`
+2. `// import * as Sentry from '@sentry/react-native';` satırının başındaki `//` kaldır
+3. `// Sentry.init({...})` bloğundaki yorumu kaldır
+4. Aşağıdaki `// Sentry.withScope...`, `// Sentry.captureMessage...`, `// Sentry.setUser...` bloklarındaki yorumları kaldır
 
-const dsn = process.env.EXPO_PUBLIC_SENTRY_DSN;
-const isExpoGo = Constants.executionEnvironment === 'storeClient';
-
-if (dsn && !isExpoGo) {
-  Sentry.init({
-    dsn,
-    environment: process.env.EXPO_PUBLIC_ENVIRONMENT ?? 'development',
-    tracesSampleRate: 0.1,           // %10 transaction sampling
-    enableNative: true,
-  });
-}
-```
-
-DSN yoksa veya Expo Go'da koşuluyorsa `Sentry.init` hiç çağrılmaz — geliştirme ortamı bozulmaz.
+Tüm çağıran kod (App.tsx, ErrorBoundary, authStore, checkout, payment) **dokunulmadan** çalışır — sarmalayıcı arkadan tetiklenir.
 
 ### 3.4 Sentry wizard (opsiyonel — source map upload için)
 
