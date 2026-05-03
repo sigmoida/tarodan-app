@@ -101,10 +101,8 @@ pnpm test:e2e --testPathPattern=payment-bypass
 
 ### 2. Maestro UI Cloud (opsiyonel — secret bekliyor)
 
-`.github/workflows/maestro-cloud.yml` hazır ama `MAESTRO_CLOUD_API_KEY` secret'ı eklenmediği sürece no-op olarak biter (notice mesajı bırakır). Etkinleştirmek için:
+`.github/workflows/maestro-cloud.yml` hazır ama `MAESTRO_CLOUD_API_KEY` secret'ı eklenmediği sürece no-op olarak biter (notice mesajı bırakır).
 
-1. https://cloud.mobile.dev'de hesap aç, API key al.
-2. GitHub repo > Settings > Secrets and variables > Actions > `MAESTRO_CLOUD_API_KEY` ekle.
-3. Mobile için bir `.app` artifact üretiminin pipeline'a eklenmesi gerek (Expo dev build).
+**Ayrıntılı kurulum talimatı:** [CLOUD_SETUP.md](CLOUD_SETUP.md).
 
 Şimdiye kadar: **API katmanı CI'da koşuyor; UI testleri yerelden manuel koşuluyor.** Bu pratik ayrım: para hareketleri ve veri kontratları otomatik korunuyor, UI smoke'ları sürüm öncesi spot kontrol için yerelde.
