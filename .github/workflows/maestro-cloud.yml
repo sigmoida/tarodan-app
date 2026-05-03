@@ -1,0 +1,63 @@
+name: Maestro Cloud (Mobile e2e)
+
+# Mobile UI flows are run on Maestro Cloud (real iOS simulators).
+# Requires:
+#   - secrets.MAESTRO_CLOUD_API_KEY: signup at https://cloud.mobile.dev to obtain
+#   - A built .app artifact for the mobile app (Expo dev build or release build)
+#
+# Until the API key + .app artifact are wired up, this workflow is opt-in via
+# workflow_dispatch and a guard step that exits cleanly when the secret is missing.
+
+on:
+  workflow_dispatch:
+  pull_request:
+    branches: [development, master, main]
+    paths:
+      - 'apps/mobile/**'
+      - '.github/workflows/maestro-cloud.yml'
+
+jobs:
+  maestro:
+    name: Maestro Cloud
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Guard — skip if MAESTRO_CLOUD_API_KEY is not set
+        id: guard
+        run: |
+          if [ -z "${{ secrets.MAESTRO_CLOUD_API_KEY }}" ]; then
+            echo "skip=true" >> "$GITHUB_OUTPUT"
+            echo "::notice::MAESTRO_CLOUD_API_KEY secret yok — workflow no-op olarak biter. Cloud koşum için repo settings > secrets üzerinden ekleyin."
+          else
+            echo "skip=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Setup Node + pnpm
+        if: steps.guard.outputs.skip == 'false'
+        uses: pnpm/action-setup@v4
+        with:
+          version: 8.12.0
+
+      - uses: actions/setup-node@v4
+        if: steps.guard.outputs.skip == 'false'
+        with:
+          node-version: 20
+          cache: pnpm
+
+      - name: Install deps
+        if: steps.guard.outputs.skip == 'false'
+        run: pnpm install --frozen-lockfile
+
+      # NOTE: Real run requires a built .app artifact (Expo Go custom build or
+      # eas build --profile development --platform ios --local). The path below
+      # is a placeholder until the build pipeline is configured.
+      - name: Run flows on Maestro Cloud
+        if: steps.guard.outputs.skip == 'false'
+        uses: mobile-dev-inc/action-maestro-cloud@v1
+        with:
+          api-key: ${{ secrets.MAESTRO_CLOUD_API_KEY }}
+          app-file: apps/mobile/build/Tarodan.app
+          workspace: apps/mobile/maestro
+          # Smoke-only first: rapid iteration. Expand as flows stabilise.
+          include-tags: smoke

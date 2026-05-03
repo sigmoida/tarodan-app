@@ -85,6 +85,26 @@ Daha sağlam flow'lar için `testID` prop'larını kritik UI öğelerine eklemek
 - **PayTR iframe (sandbox kart)**: WebView içine Maestro tıklayamaz; PayTR yolu için ayrı strateji (manual veya MockServer) gerekecek.
 - **Java warning** (`restricted method in java.lang.System`): Maestro 2.5 + JDK 25 cosmetic uyarısı, görmezden gel.
 
-## CI'da çalıştırma (sonra)
+## CI entegrasyonu
 
-Maestro Cloud (`maestro cloud`) iOS sim CI sağlar; bu repo için sonraki adım. Şimdilik local koşum yeterli.
+İki ayrı katmanda otomatik koruma vardır:
+
+### 1. API e2e (her PR'da otomatik) ✅
+
+`.github/workflows/ci.yml`'in `e2e-test` job'u Jest ile **tüm `*.e2e-spec.ts`** dosyalarını koşar — `payment-bypass.e2e-spec.ts` (B-001 regression) dahil. PR açılınca veya `development` branch'ine push edilince **otomatik tetiklenir**, ekstra ayar gerekmez.
+
+Yerel doğrulama:
+```bash
+cd apps/api
+pnpm test:e2e --testPathPattern=payment-bypass
+```
+
+### 2. Maestro UI Cloud (opsiyonel — secret bekliyor)
+
+`.github/workflows/maestro-cloud.yml` hazır ama `MAESTRO_CLOUD_API_KEY` secret'ı eklenmediği sürece no-op olarak biter (notice mesajı bırakır). Etkinleştirmek için:
+
+1. https://cloud.mobile.dev'de hesap aç, API key al.
+2. GitHub repo > Settings > Secrets and variables > Actions > `MAESTRO_CLOUD_API_KEY` ekle.
+3. Mobile için bir `.app` artifact üretiminin pipeline'a eklenmesi gerek (Expo dev build).
+
+Şimdiye kadar: **API katmanı CI'da koşuyor; UI testleri yerelden manuel koşuluyor.** Bu pratik ayrım: para hareketleri ve veri kontratları otomatik korunuyor, UI smoke'ları sürüm öncesi spot kontrol için yerelde.
