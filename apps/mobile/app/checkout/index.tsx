@@ -103,6 +103,16 @@ export default function CheckoutScreen() {
   const [cardExpiry, setCardExpiry] = useState('');
   const [cardCvv, setCardCvv] = useState('');
 
+  // Server-side bypass mode hint — hides the card form and skips the
+  // "Kart numarasını girin" alert when PAYMENT_BYPASS=true on the API.
+  const [bypassEnabled, setBypassEnabled] = useState(false);
+  useEffect(() => {
+    paymentsApi
+      .getConfig()
+      .then((res) => setBypassEnabled(res.data?.bypassEnabled === true))
+      .catch(() => setBypassEnabled(false));
+  }, []);
+
   // Quote
   const [quote, setQuote] = useState<QuoteData | null>(null);
   const [quoteLoading, setQuoteLoading] = useState(false);
@@ -304,6 +314,8 @@ export default function CheckoutScreen() {
   };
 
   const validateStep2 = (): boolean => {
+    // Bypass mode: card form is hidden, no validation needed.
+    if (bypassEnabled) return true;
     if (!cardNumber.trim()) {
       Alert.alert('Uyarı', 'Kart numarasını girin');
       return false;
@@ -875,7 +887,8 @@ export default function CheckoutScreen() {
               </View>
             </View>
 
-            {/* Card Input */}
+            {/* Card Input — bypass modunda gizli (PAYMENT_BYPASS=true) */}
+            {!bypassEnabled && (
             <View style={styles.section}>
               <View style={styles.sectionHeader}>
                 <Ionicons name="card-outline" size={24} color={TarodanColors.primary} />
@@ -945,6 +958,20 @@ export default function CheckoutScreen() {
                 </Text>
               </View>
             </View>
+            )}
+
+            {/* Bypass mode notice — only shown in dev/test environments */}
+            {bypassEnabled && (
+              <View style={styles.section}>
+                <View style={styles.securityNotice}>
+                  <Ionicons name="flash-outline" size={20} color={TarodanColors.warning} />
+                  <Text style={styles.securityText}>
+                    Geliştirici modu aktif (PAYMENT_BYPASS). Ödeme kart bilgisi
+                    gerektirmez — Sipariş Onayla'ya basınca otomatik tamamlanır.
+                  </Text>
+                </View>
+              </View>
+            )}
           </View>
         )}
 
@@ -992,9 +1019,11 @@ export default function CheckoutScreen() {
                 <View style={styles.summaryRow}>
                   <Ionicons name="card-outline" size={20} color={TarodanColors.textSecondary} />
                   <View style={styles.summaryContent}>
-                    <Text style={styles.summaryLabel}>Kart</Text>
+                    <Text style={styles.summaryLabel}>Ödeme Yöntemi</Text>
                     <Text style={styles.summaryValue}>
-                      •••• •••• •••• {cardNumber.replace(/\s/g, '').slice(-4) || '****'}
+                      {bypassEnabled
+                        ? 'Geliştirici modu (bypass)'
+                        : `•••• •••• •••• ${cardNumber.replace(/\s/g, '').slice(-4) || '****'}`}
                     </Text>
                   </View>
                 </View>

@@ -356,6 +356,8 @@ export const addressesApi = {
 };
 
 export const paymentsApi = {
+  // Public — lets the UI hide card form when bypass is on (dev/test).
+  getConfig: () => api.get<{ bypassEnabled: boolean }>('/payments/config'),
   initiate: (orderId: string | number, provider: 'paytr') =>
     api.post('/payments/initiate', { orderId, provider }),
   initiateGuest: (orderId: string | number, provider: 'paytr') =>
