@@ -1547,6 +1547,24 @@
     "membershipUpgrade": "Yükselt",
     "membershipCancel": "İptal Et",
     "membershipBenefits": "Avantajlar",
-    "membershipCurrent": "Mevcut Plan"
+    "membershipCurrent": "Mevcut Plan",
+    "save": "Kaydet",
+    "bioPlaceholder": "Kendinizi kısaca tanıtın...",
+    "noSavedAddress": "Kayıtlı adres yok",
+    "default": "Varsayılan",
+    "addressTitlePlaceholder": "Örn: Ev, İş",
+    "setAsDefault": "Varsayılan adres olarak ayarla",
+    "cancel": "İptal",
+    "password": "Şifre",
+    "sessions": "Oturumlar",
+    "tipStrongPassword": "Güçlü ve benzersiz bir şifre kullanın",
+    "tipTwoFactor": "İki faktörlü doğrulamayı aktifleştirin",
+    "tipChangePassword": "Şifrenizi düzenli olarak değiştirin",
+    "tipReportSuspicious": "Şüpheli aktiviteleri bildirin",
+    "change": "Değiştir",
+    "verify": "Doğrula",
+    "noPaymentMethod": "Kayıtlı ödeme yönteminiz yok",
+    "addCardForFastPayment": "Hızlı ödeme için kart ekleyebilirsiniz",
+    "loginToManagePayments": "Ödeme yöntemlerinizi yönetmek için giriş yapın"
   }
 }

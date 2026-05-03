@@ -178,7 +178,7 @@ export default function AddressesScreen() {
     return (
       <View style={styles.centeredContainer}>
         <Ionicons name="location-outline" size={64} color={TarodanColors.primary} />
-        <Text variant="titleLarge" style={styles.title}>Adreslerim</Text>
+        <Text variant="titleLarge" style={styles.title}>{t("mobile.settingsAddresses")}</Text>
         <Text variant="bodyMedium" style={styles.subtitle}>
           Adreslerinizi görmek için giriş yapın
         </Text>
@@ -208,7 +208,7 @@ export default function AddressesScreen() {
       ) : addresses.length === 0 ? (
         <View style={styles.emptyContainer}>
           <Ionicons name="location-outline" size={80} color={TarodanColors.textLight} />
-          <Text variant="titleMedium" style={styles.emptyTitle}>Kayıtlı adres yok</Text>
+          <Text variant="titleMedium" style={styles.emptyTitle}>{t("mobile.noSavedAddress")}</Text>
           <Text variant="bodyMedium" style={styles.emptySubtitle}>
             Teslimat adresinizi ekleyin
           </Text>
@@ -227,7 +227,7 @@ export default function AddressesScreen() {
                     <Text variant="titleSmall" style={styles.addressTitle}>{address.title}</Text>
                     {address.isDefault && (
                       <View style={styles.defaultBadge}>
-                        <Text style={styles.defaultBadgeText}>Varsayılan</Text>
+                        <Text style={styles.defaultBadgeText}>{t("mobile.default")}</Text>
                       </View>
                     )}
                   </View>
@@ -293,7 +293,7 @@ export default function AddressesScreen() {
                 value={formData.title}
                 onChangeText={(text) => setFormData({ ...formData, title: text })}
                 mode="outlined"
-                placeholder="Örn: Ev, İş"
+                placeholder={t("mobile.addressTitlePlaceholder")}
                 style={styles.input}
               />
               <TextInput
@@ -353,12 +353,12 @@ export default function AddressesScreen() {
                   size={24}
                   color={TarodanColors.primary}
                 />
-                <Text style={styles.checkboxLabel}>Varsayılan adres olarak ayarla</Text>
+                <Text style={styles.checkboxLabel}>{t("mobile.setAsDefault")}</Text>
               </TouchableOpacity>
             </ScrollView>
           </Dialog.ScrollArea>
           <Dialog.Actions>
-            <Button onPress={() => setDialogVisible(false)}>İptal</Button>
+            <Button onPress={() => setDialogVisible(false)}>{t("mobile.cancel")}</Button>
             <Button 
               mode="contained" 
               onPress={handleSubmit}

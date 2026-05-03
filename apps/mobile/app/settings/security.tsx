@@ -157,7 +157,7 @@ export default function SecuritySettingsScreen() {
 
       <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
         {/* Password Section */}
-        <Text style={styles.sectionTitle}>Şifre</Text>
+        <Text style={styles.sectionTitle}>{t("mobile.password")}</Text>
         <Card style={styles.card}>
           <Card.Content>
             <TouchableOpacity 
@@ -210,7 +210,7 @@ export default function SecuritySettingsScreen() {
         </Card>
 
         {/* Sessions */}
-        <Text style={styles.sectionTitle}>Oturumlar</Text>
+        <Text style={styles.sectionTitle}>{t("mobile.sessions")}</Text>
         <Card style={styles.card}>
           <Card.Content>
             <TouchableOpacity 
@@ -238,19 +238,19 @@ export default function SecuritySettingsScreen() {
           <Card.Content>
             <View style={styles.tipItem}>
               <Ionicons name="checkmark-circle" size={20} color={TarodanColors.success} />
-              <Text style={styles.tipText}>Güçlü ve benzersiz bir şifre kullanın</Text>
+              <Text style={styles.tipText}>{t("mobile.tipStrongPassword")}</Text>
             </View>
             <View style={styles.tipItem}>
               <Ionicons name="checkmark-circle" size={20} color={TarodanColors.success} />
-              <Text style={styles.tipText}>İki faktörlü doğrulamayı aktifleştirin</Text>
+              <Text style={styles.tipText}>{t("mobile.tipTwoFactor")}</Text>
             </View>
             <View style={styles.tipItem}>
               <Ionicons name="checkmark-circle" size={20} color={TarodanColors.success} />
-              <Text style={styles.tipText}>Şifrenizi düzenli olarak değiştirin</Text>
+              <Text style={styles.tipText}>{t("mobile.tipChangePassword")}</Text>
             </View>
             <View style={styles.tipItem}>
               <Ionicons name="checkmark-circle" size={20} color={TarodanColors.success} />
-              <Text style={styles.tipText}>Şüpheli aktiviteleri bildirin</Text>
+              <Text style={styles.tipText}>{t("mobile.tipReportSuspicious")}</Text>
             </View>
           </Card.Content>
         </Card>
@@ -289,8 +289,8 @@ export default function SecuritySettingsScreen() {
             />
           </Dialog.Content>
           <Dialog.Actions>
-            <Button onPress={() => setShowPasswordDialog(false)}>İptal</Button>
-            <Button onPress={handlePasswordChange} loading={loading}>Değiştir</Button>
+            <Button onPress={() => setShowPasswordDialog(false)}>{t("mobile.cancel")}</Button>
+            <Button onPress={handlePasswordChange} loading={loading}>{t("mobile.change")}</Button>
           </Dialog.Actions>
         </Dialog>
       </Portal>
@@ -321,8 +321,8 @@ export default function SecuritySettingsScreen() {
             />
           </Dialog.Content>
           <Dialog.Actions>
-            <Button onPress={() => setShowTwoFactorSetup(false)}>İptal</Button>
-            <Button onPress={handleVerifyTwoFactor} loading={loading}>Doğrula</Button>
+            <Button onPress={() => setShowTwoFactorSetup(false)}>{t("mobile.cancel")}</Button>
+            <Button onPress={handleVerifyTwoFactor} loading={loading}>{t("mobile.verify")}</Button>
           </Dialog.Actions>
         </Dialog>
       </Portal>

@@ -141,7 +141,7 @@ export default function EditProfileScreen() {
         </TouchableOpacity>
         <Text style={styles.headerTitle}>{t('mobile.settingsEditProfile')}</Text>
         <TouchableOpacity onPress={handleSubmit(onSubmit)}>
-          <Text style={styles.saveButton}>Kaydet</Text>
+          <Text style={styles.saveButton}>{t('mobile.save')}</Text>
         </TouchableOpacity>
       </View>
 
@@ -208,7 +208,7 @@ export default function EditProfileScreen() {
                   numberOfLines={4}
                   mode="outlined"
                   style={styles.input}
-                  placeholder="Kendinizi kısaca tanıtın..."
+                  placeholder={t("mobile.bioPlaceholder")}
                   error={!!errors.bio}
                 />
               )}

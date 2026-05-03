@@ -123,7 +123,7 @@ export default function PaymentMethodsScreen() {
             <Text style={styles.cardBrand}>{brandInfo.label}</Text>
             {item.isDefault && (
               <View style={styles.defaultBadge}>
-                <Text style={styles.defaultBadgeText}>Varsayılan</Text>
+                <Text style={styles.defaultBadgeText}>{t("mobile.default")}</Text>
               </View>
             )}
           </View>
@@ -162,7 +162,7 @@ export default function PaymentMethodsScreen() {
         <View style={styles.centeredContainer}>
           <Ionicons name="log-in-outline" size={48} color={TarodanColors.textTertiary} />
           <Text style={styles.emptyTitle}>Giriş Yapın</Text>
-          <Text style={styles.emptySubtitle}>Ödeme yöntemlerinizi yönetmek için giriş yapın</Text>
+          <Text style={styles.emptySubtitle}>{t("mobile.loginToManagePayments")}</Text>
           <TouchableOpacity style={styles.primaryButton} onPress={() => router.push('/(auth)/login')}>
             <Text style={styles.primaryButtonText}>Giriş Yap</Text>
           </TouchableOpacity>
@@ -216,8 +216,8 @@ export default function PaymentMethodsScreen() {
               <View style={styles.emptyIconCircle}>
                 <Ionicons name="card-outline" size={48} color={TarodanColors.textTertiary} />
               </View>
-              <Text style={styles.emptyTitle}>Kayıtlı ödeme yönteminiz yok</Text>
-              <Text style={styles.emptySubtitle}>Hızlı ödeme için kart ekleyebilirsiniz</Text>
+              <Text style={styles.emptyTitle}>{t("mobile.noPaymentMethod")}</Text>
+              <Text style={styles.emptySubtitle}>{t("mobile.addCardForFastPayment")}</Text>
               <TouchableOpacity style={styles.primaryButton} onPress={handleAddCard}>
                 <Ionicons name="add-circle-outline" size={18} color={TarodanColors.textOnPrimary} />
                 <Text style={styles.primaryButtonText}>Kart Ekle</Text>

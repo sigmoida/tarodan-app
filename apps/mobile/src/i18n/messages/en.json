@@ -1549,6 +1549,24 @@
     "membershipUpgrade": "Upgrade",
     "membershipCancel": "Cancel",
     "membershipBenefits": "Benefits",
-    "membershipCurrent": "Current Plan"
+    "membershipCurrent": "Current Plan",
+    "save": "Save",
+    "bioPlaceholder": "Tell us about yourself briefly...",
+    "noSavedAddress": "No saved address",
+    "default": "Default",
+    "addressTitlePlaceholder": "e.g., Home, Work",
+    "setAsDefault": "Set as default address",
+    "cancel": "Cancel",
+    "password": "Password",
+    "sessions": "Sessions",
+    "tipStrongPassword": "Use a strong and unique password",
+    "tipTwoFactor": "Enable two-factor authentication",
+    "tipChangePassword": "Change your password regularly",
+    "tipReportSuspicious": "Report suspicious activity",
+    "change": "Change",
+    "verify": "Verify",
+    "noPaymentMethod": "No saved payment method",
+    "addCardForFastPayment": "Add a card for fast payment",
+    "loginToManagePayments": "Log in to manage your payment methods"
   }
 }
