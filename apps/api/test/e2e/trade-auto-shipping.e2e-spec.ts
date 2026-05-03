@@ -5,12 +5,9 @@ import {
 } from '@prisma/client';
 import { createE2ETestApp, E2ETestApp } from '../test-utils/create-app';
 
-// Known flake: when run alongside the full e2e suite, the surat shipment stub
-// occasionally observes only 1 of 2 expected calls (post-accept fire-and-forget
-// dispatcher race). Standalone runs are deterministic. Retry once to keep CI
-// signal meaningful until the dispatcher race is debugged separately. A real
-// regression still fails the second attempt and turns CI red.
-jest.retryTimes(1, { logErrorsBeforeRetry: true });
+// Helper waits below cover both the DB row creation AND the async surat
+// dispatch. Earlier versions only polled the DB, leading to occasional flakes
+// when the surat call hadn't landed yet by the time we asserted on the stub.
 import {
   truncateAll,
   getPrisma,
@@ -32,24 +29,34 @@ import { SuratTrackingService } from '../../src/modules/surat-cargo/surat-tracki
  * background invocation (the (tradeId, shipperId, leg) idempotency check
  * sits inside the tx, so two concurrent runs both see "no existing rows"
  * and create duplicates). Polling avoids that race entirely.
+ *
+ * IMPORTANT: We wait for BOTH the DB row creation AND the carrier stub
+ * call counter to settle. The two are dispatched independently in the
+ * service (rows first, then surat); waiting only for rows leaves a gap
+ * where stub assertions race the dispatcher and intermittently see N-1
+ * calls under high load.
  */
 async function waitForInboundShipments(
   prisma: ReturnType<typeof getPrisma>,
   tradeId: string,
   expected = 2,
   timeoutMs = 4_000,
+  suratCallCount?: () => number,
 ) {
   const deadline = Date.now() + timeoutMs;
-  let rows = await prisma.tradeShipment.findMany({
-    where: { tradeId, leg: 'to_warehouse' },
-    orderBy: { trackingNumber: 'asc' },
-  });
-  while (rows.length < expected && Date.now() < deadline) {
-    await new Promise((r) => setTimeout(r, 50));
-    rows = await prisma.tradeShipment.findMany({
+  const fetchRows = () =>
+    prisma.tradeShipment.findMany({
       where: { tradeId, leg: 'to_warehouse' },
       orderBy: { trackingNumber: 'asc' },
     });
+  let rows = await fetchRows();
+  while (
+    Date.now() < deadline &&
+    (rows.length < expected ||
+      (suratCallCount !== undefined && suratCallCount() < expected))
+  ) {
+    await new Promise((r) => setTimeout(r, 50));
+    rows = await fetchRows();
   }
   return rows;
 }
@@ -135,7 +142,7 @@ describe('Trade Auto-Shipping (E2E)', () => {
       .expect(201);
 
     const prisma = getPrisma();
-    const toWarehouse = await waitForInboundShipments(prisma, tradeId);
+    const toWarehouse = await waitForInboundShipments(prisma, tradeId, 2, 4000, () => ctx.surat.shipmentCalls.length);
     expect(toWarehouse).toHaveLength(2);
 
     const trackingPattern = /^TRD-[\w-]+-WH-(INI|REC)$/;
@@ -183,7 +190,7 @@ describe('Trade Auto-Shipping (E2E)', () => {
       .expect(201);
 
     const prisma = getPrisma();
-    const toWarehouse = await waitForInboundShipments(prisma, tradeId);
+    const toWarehouse = await waitForInboundShipments(prisma, tradeId, 2, 4000, () => ctx.surat.shipmentCalls.length);
     expect(toWarehouse).toHaveLength(2);
 
     // Mark only ONE leg delivered.
@@ -226,7 +233,7 @@ describe('Trade Auto-Shipping (E2E)', () => {
       .expect(201);
 
     const prisma = getPrisma();
-    const toWarehouse = await waitForInboundShipments(prisma, tradeId);
+    const toWarehouse = await waitForInboundShipments(prisma, tradeId, 2, 4000, () => ctx.surat.shipmentCalls.length);
     expect(toWarehouse).toHaveLength(2);
 
     // Mark BOTH legs delivered (mirrors what the carrier-poll cron does
