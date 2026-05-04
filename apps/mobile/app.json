@@ -4,14 +4,8 @@
     "slug": "tarodan",
     "version": "1.0.0",
     "orientation": "portrait",
-    "icon": "./assets/icon.png",
     "scheme": "tarodan",
     "userInterfaceStyle": "automatic",
-    "splash": {
-      "image": "./assets/splash.png",
-      "resizeMode": "contain",
-      "backgroundColor": "#E53935"
-    },
     "assetBundlePatterns": [
       "**/*"
     ],
@@ -24,10 +18,6 @@
       }
     },
     "android": {
-      "adaptiveIcon": {
-        "foregroundImage": "./assets/adaptive-icon.png",
-        "backgroundColor": "#E53935"
-      },
       "package": "com.tarodan.app",
       "permissions": [
         "CAMERA",
@@ -37,8 +27,7 @@
     },
     "web": {
       "bundler": "metro",
-      "output": "static",
-      "favicon": "./assets/favicon.png"
+      "output": "static"
     },
     "plugins": [
       "expo-router",
@@ -57,7 +46,6 @@
       [
         "expo-notifications",
         {
-          "icon": "./assets/notification-icon.png",
           "color": "#E53935"
         }
       ],

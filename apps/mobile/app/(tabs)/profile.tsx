@@ -1,10 +1,11 @@
 import { View, ScrollView, StyleSheet, TouchableOpacity } from 'react-native';
-import { Text, Avatar, Button, List, Divider, Card, Badge, Snackbar } from 'react-native-paper';
+import { Avatar, Button, List, Divider, Card, Badge, Snackbar } from 'react-native-paper';
+import { Text } from '../../src/components/common';
 import { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { router } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
-import { userApi } from '../../src/services/api';
+import { userApi, notificationsApi } from '../../src/services/api';
 import { useAuthStore } from '../../src/stores/authStore';
 import { TarodanColors } from '../../src/theme';
 import { SignupPrompt } from '../../src/components/SignupPrompt';
@@ -34,14 +35,31 @@ export default function ProfileScreen() {
   });
 
   // Use API stats or fall back to user data from authStore
-  const stats = apiStats || { 
-    listings: user?.listingCount || 0, 
-    trades: user?.totalSales || 0, 
-    rating: user?.rating || 0, 
-    collections: 0, 
-    favorites: 0, 
-    orders: user?.totalPurchases || 0 
+  const stats = apiStats || {
+    listings: user?.listingCount || 0,
+    trades: user?.totalSales || 0,
+    rating: user?.rating || 0,
+    collections: 0,
+    favorites: 0,
+    orders: user?.totalPurchases || 0
   };
+
+  // Web `NotificationBell` paritesi: header'daki bell üzerinde unread badge.
+  const { data: unreadData } = useQuery({
+    queryKey: ['notifications-unread'],
+    queryFn: async () => {
+      try {
+        const response = await notificationsApi.getUnreadCount();
+        return (response.data as any)?.count ?? (response.data as any)?.data?.count ?? 0;
+      } catch {
+        return 0;
+      }
+    },
+    enabled: isAuthenticated,
+    refetchInterval: 60000, // Web ile aynı: 60sn'de bir poll.
+    refetchOnWindowFocus: true,
+  });
+  const unreadNotifications: number = typeof unreadData === 'number' ? unreadData : 0;
 
   const handleLogout = async () => {
     await logout();
@@ -263,8 +281,15 @@ export default function ProfileScreen() {
       {/* Header */}
       <View style={styles.header}>
         <Text style={styles.headerTitle}>Profil</Text>
-        <TouchableOpacity onPress={() => router.push('/notifications')}>
+        <TouchableOpacity onPress={() => router.push('/notifications')} style={styles.bellWrap}>
           <Ionicons name="notifications-outline" size={24} color={TarodanColors.textOnPrimary} />
+          {unreadNotifications > 0 && (
+            <View style={styles.bellBadge}>
+              <Text style={styles.bellBadgeText}>
+                {unreadNotifications > 99 ? '99+' : String(unreadNotifications)}
+              </Text>
+            </View>
+          )}
         </TouchableOpacity>
       </View>
 
@@ -405,7 +430,7 @@ export default function ProfileScreen() {
           <TouchableOpacity style={styles.menuItem} onPress={() => router.push('/membership')}>
             <Ionicons name="diamond-outline" size={22} color={TarodanColors.textSecondary} />
             <Text style={styles.menuItemText}>Üyelik Planı</Text>
-            {user?.membershipTier === 'Premium' && <Badge style={{ backgroundColor: TarodanColors.primary }}>PRO</Badge>}
+            {(user?.membershipTier === 'premium' || user?.membershipTier === 'business') && <Badge style={{ backgroundColor: TarodanColors.primary }}>PRO</Badge>}
             <Ionicons name="chevron-forward" size={20} color={TarodanColors.textLight} />
           </TouchableOpacity>
 
@@ -490,6 +515,29 @@ const styles = StyleSheet.create({
     fontSize: 20,
     fontWeight: 'bold',
     color: TarodanColors.textOnPrimary,
+  },
+  bellWrap: {
+    position: 'relative',
+    padding: 4,
+  },
+  bellBadge: {
+    position: 'absolute',
+    top: -2,
+    right: -4,
+    minWidth: 18,
+    height: 18,
+    borderRadius: 9,
+    backgroundColor: TarodanColors.error,
+    paddingHorizontal: 4,
+    justifyContent: 'center',
+    alignItems: 'center',
+    borderWidth: 1.5,
+    borderColor: TarodanColors.primary,
+  },
+  bellBadgeText: {
+    color: '#fff',
+    fontSize: 10,
+    fontWeight: 'bold',
   },
   scrollView: {
     flex: 1,

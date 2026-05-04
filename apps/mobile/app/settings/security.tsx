@@ -1,15 +1,16 @@
 import { useState } from 'react';
 import { View, ScrollView, StyleSheet, TouchableOpacity, Alert } from 'react-native';
-import { Text, Button, Card, Switch, TextInput, Dialog, Portal, ActivityIndicator } from 'react-native-paper';
+import { Button, Card, Switch, Dialog, Portal, ActivityIndicator } from 'react-native-paper';
+import { Text, TextInput } from '../../src/components/common';
 import { router } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { useAuthStore } from '../../src/stores/authStore';
-import { userApi } from '../../src/services/api';
+import { authApi } from '../../src/services/api';
 import { TarodanColors } from '../../src/theme';
 
 export default function SecuritySettingsScreen() {
   const { isAuthenticated, user, logout } = useAuthStore();
-  const [twoFactorEnabled, setTwoFactorEnabled] = useState(user?.twoFactorEnabled || false);
+  const [twoFactorEnabled, setTwoFactorEnabled] = useState((user as any)?.twoFactorEnabled || false);
   const [showPasswordDialog, setShowPasswordDialog] = useState(false);
   const [showTwoFactorSetup, setShowTwoFactorSetup] = useState(false);
   const [loading, setLoading] = useState(false);
@@ -42,10 +43,7 @@ export default function SecuritySettingsScreen() {
 
     setLoading(true);
     try {
-      await userApi.changePassword({
-        currentPassword,
-        newPassword,
-      });
+      await authApi.changePassword(currentPassword, newPassword);
       Alert.alert('Başarılı', 'Şifreniz değiştirildi');
       setShowPasswordDialog(false);
       setCurrentPassword('');
@@ -61,10 +59,10 @@ export default function SecuritySettingsScreen() {
   const handleSetupTwoFactor = async () => {
     setLoading(true);
     try {
-      const response = await userApi.setupTwoFactor();
-      const data = response.data;
-      setTotpSecret(data.secret);
-      setTotpQr(data.qrCode);
+      const response = await authApi.setupTwoFactor();
+      const payload = (response.data as any)?.data ?? (response.data as any) ?? {};
+      setTotpSecret(payload.secret ?? '');
+      setTotpQr(payload.qrCode ?? '');
       setShowTwoFactorSetup(true);
     } catch (error: any) {
       Alert.alert('Hata', error.response?.data?.message || '2FA kurulumu başarısız');
@@ -81,7 +79,7 @@ export default function SecuritySettingsScreen() {
 
     setLoading(true);
     try {
-      await userApi.verifyTwoFactor({ token: verificationCode });
+      await authApi.verifyTwoFactor(verificationCode);
       setTwoFactorEnabled(true);
       setShowTwoFactorSetup(false);
       setVerificationCode('');
@@ -105,7 +103,7 @@ export default function SecuritySettingsScreen() {
           onPress: async () => {
             setLoading(true);
             try {
-              await userApi.disableTwoFactor();
+              await authApi.disableTwoFactor();
               setTwoFactorEnabled(false);
               Alert.alert('Başarılı', 'İki faktörlü doğrulama kapatıldı');
             } catch (error: any) {
@@ -130,7 +128,7 @@ export default function SecuritySettingsScreen() {
           style: 'destructive',
           onPress: async () => {
             try {
-              await userApi.logoutAllDevices();
+              await authApi.logoutAll();
               logout();
               router.replace('/(auth)/login');
             } catch (error) {
@@ -190,7 +188,7 @@ export default function SecuritySettingsScreen() {
               </View>
               <Switch
                 value={twoFactorEnabled}
-                onValueChange={(value) => {
+                onValueChange={(value: boolean) => {
                   if (value) {
                     handleSetupTwoFactor();
                   } else {

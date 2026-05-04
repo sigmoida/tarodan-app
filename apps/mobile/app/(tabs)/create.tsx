@@ -1,5 +1,5 @@
 import { View, ScrollView, Image, StyleSheet, Alert, TouchableOpacity, Platform } from 'react-native';
-import { Text, TextInput, Button, SegmentedButtons, Switch, useTheme, Snackbar, IconButton, Card, Chip, ProgressBar, Banner, Portal, Dialog } from 'react-native-paper';
+import { Button, SegmentedButtons, Switch, useTheme, Snackbar, IconButton, Card, Chip, ProgressBar, Banner, Portal, Dialog } from 'react-native-paper';
 import { useState, useEffect } from 'react';
 import { useForm, Controller } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
@@ -11,6 +11,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { productsApi, categoriesApi, uploadApi } from '../../src/services/api';
 import { useAuthStore } from '../../src/stores/authStore';
 import { TarodanColors } from '../../src/theme';
+import { CommissionPreview, Text, TextInput } from '../../src/components/common';
 import { canPerformAction, getUpgradeMessage, getRemainingCount } from '../../src/utils/membershipLimits';
 
 const listingSchema = z.object({
@@ -124,6 +125,9 @@ export default function CreateScreen() {
   // Check if trade feature is available
   const canTrade = limits?.canTrade || false;
   const watchTradeEnabled = watch('isTradeEnabled');
+  // Komisyon önizlemesi için fiyat ve kategori izle
+  const watchPrice = watch('price');
+  const watchCategory = watch('categoryId');
 
   // Effect to check listing limits on mount
   useEffect(() => {
@@ -470,6 +474,7 @@ export default function CreateScreen() {
             Doğrulanmamış üyeler en fazla {(limits?.maxValuePerListing || 5000).toLocaleString('tr-TR')} TL değerinde ilan verebilir
           </Text>
         )}
+        <CommissionPreview amount={watchPrice} categoryId={watchCategory} />
 
         {/* Category */}
         <Text variant="titleSmall" style={styles.fieldLabel}>Kategori *</Text>
@@ -748,7 +753,7 @@ const styles = StyleSheet.create({
     width: 100,
     height: 100,
     borderWidth: 2,
-    borderColor: TarodanColors.outline,
+    borderColor: TarodanColors.border,
     borderStyle: 'dashed',
     borderRadius: 8,
     justifyContent: 'center',
@@ -787,7 +792,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     padding: 12,
     borderWidth: 1,
-    borderColor: TarodanColors.outline,
+    borderColor: TarodanColors.border,
     borderRadius: 8,
     marginBottom: 8,
     backgroundColor: '#fff',

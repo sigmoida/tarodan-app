@@ -1,5 +1,6 @@
 import { View, ScrollView, StyleSheet, TouchableOpacity, Image, RefreshControl } from 'react-native';
-import { Text, Card, Avatar, Button, ActivityIndicator, IconButton } from 'react-native-paper';
+import { Card, Avatar, Button, ActivityIndicator, IconButton } from 'react-native-paper';
+import { Text } from '../src/components/common';
 import { useState, useCallback } from 'react';
 import { router, useFocusEffect } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';

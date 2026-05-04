@@ -1,5 +1,6 @@
 import { View, ScrollView, StyleSheet, TouchableOpacity, Image, RefreshControl } from 'react-native';
-import { Text, FAB, Card, IconButton, ActivityIndicator, Snackbar } from 'react-native-paper';
+import { FAB, Card, IconButton, ActivityIndicator, Snackbar } from 'react-native-paper';
+import { Text } from '../../src/components/common';
 import { router } from 'expo-router';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useState } from 'react';

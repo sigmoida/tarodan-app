@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { View, ScrollView, StyleSheet, TouchableOpacity, FlatList, Image, Dimensions } from 'react-native';
-import { Text, Searchbar, Card, Avatar, Chip, ActivityIndicator } from 'react-native-paper';
+import { Card, Avatar, Chip, ActivityIndicator } from 'react-native-paper';
+import { Text, Searchbar } from '../../src/components/common';
 import { useQuery } from '@tanstack/react-query';
 import { router } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
@@ -252,7 +253,7 @@ export default function CollectionsScreen() {
               <TouchableOpacity
                 key={garage.id}
                 style={styles.garageCard}
-                onPress={() => router.push(`/garage/${garage.id}`)}
+                onPress={() => router.push(`/garage/${garage.id}` as any)}
               >
                 <View style={styles.garageHeader}>
                   <Avatar.Text

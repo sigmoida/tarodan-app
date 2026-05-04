@@ -1,5 +1,6 @@
 import { View, ScrollView, TouchableOpacity, StyleSheet, Image } from 'react-native';
-import { Text, ActivityIndicator, Card } from 'react-native-paper';
+import { ActivityIndicator, Card } from 'react-native-paper';
+import { Text } from '../../src/components/common';
 import { useState, useEffect } from 'react';
 import { router } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';

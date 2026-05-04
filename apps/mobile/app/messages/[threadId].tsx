@@ -1,11 +1,15 @@
-import { View, ScrollView, StyleSheet, TouchableOpacity, KeyboardAvoidingView, Platform, TextInput as RNTextInput } from 'react-native';
-import { Text, Avatar, IconButton, ActivityIndicator, Banner } from 'react-native-paper';
+import { View, ScrollView, StyleSheet, TouchableOpacity, KeyboardAvoidingView, Platform, TextInput as RNTextInput, Image as RNImage, Alert } from 'react-native';
+import { Avatar, IconButton, ActivityIndicator, Banner } from 'react-native-paper';
+import { Text } from '../../src/components/common';
 import { useState, useRef, useEffect, useCallback } from 'react';
 import { router, useLocalSearchParams, useFocusEffect } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
+import * as ImagePicker from 'expo-image-picker';
 import { useMessagesStore, Message } from '../../src/stores/messagesStore';
 import { useAuthStore } from '../../src/stores/authStore';
 import { TarodanColors } from '../../src/theme';
+import { detectViolations, getViolationMessage, parseMessageContent } from '../../src/utils/contentFilter';
+import { mediaApi } from '../../src/services/api';
 
 export default function MessageThreadScreen() {
   const { threadId } = useLocalSearchParams<{ threadId: string }>();
@@ -25,6 +29,8 @@ export default function MessageThreadScreen() {
   
   const [inputText, setInputText] = useState('');
   const [sending, setSending] = useState(false);
+  const [uploadingImage, setUploadingImage] = useState(false);
+  const [filterWarning, setFilterWarning] = useState<string | null>(null);
   const scrollViewRef = useRef<ScrollView>(null);
 
   const messageLimit = limits?.maxMessagesPerDay || 50;
@@ -49,11 +55,75 @@ export default function MessageThreadScreen() {
     }, 100);
   }, [messages]);
 
+  /**
+   * Resim seç → mediaApi.uploadMessageImage → "[IMG:url]" formatında mesaj gönder.
+   * Web `apps/web/src/app/messages/page.tsx:337` ile aynı akış.
+   */
+  const handleAttachImage = async () => {
+    if (!threadId || uploadingImage || !canSend) return;
+
+    // İzin iste
+    const perm = await ImagePicker.requestMediaLibraryPermissionsAsync();
+    if (!perm.granted) {
+      Alert.alert('İzin Gerekli', 'Resim göndermek için galeri erişim izni gerekli.');
+      return;
+    }
+
+    const result = await ImagePicker.launchImageLibraryAsync({
+      mediaTypes: ImagePicker.MediaTypeOptions.Images,
+      allowsMultipleSelection: false,
+      quality: 0.8,
+    });
+
+    if (result.canceled || !result.assets?.[0]) return;
+
+    const asset = result.assets[0];
+    const filename = asset.uri.split('/').pop() || `image_${Date.now()}.jpg`;
+    const match = /\.(\w+)$/.exec(filename);
+    const type = asset.mimeType || (match ? `image/${match[1]}` : 'image/jpeg');
+
+    const file = {
+      uri: Platform.OS === 'ios' ? asset.uri.replace('file://', '') : asset.uri,
+      name: filename,
+      type,
+    };
+
+    setUploadingImage(true);
+    try {
+      const response = await mediaApi.uploadMessageImage(file as any);
+      const url = (response.data as any)?.url ?? (response.data as any)?.data?.url;
+      if (!url) throw new Error('Resim yüklendi fakat URL alınamadı.');
+
+      // Mevcut input metnini koru, sonuna [IMG:url] ekle
+      const base = inputText.trim();
+      const content = base ? `${base} [IMG:${url}]` : `[IMG:${url}]`;
+      const success = await sendMessage(threadId, content);
+      if (success) {
+        setInputText('');
+        scrollViewRef.current?.scrollToEnd({ animated: true });
+      }
+    } catch (e: any) {
+      Alert.alert('Hata', e?.response?.data?.message || 'Resim gönderilemedi.');
+    } finally {
+      setUploadingImage(false);
+    }
+  };
+
   const handleSend = async () => {
     if (!inputText.trim() || !threadId || sending || !canSend) return;
 
+    const trimmed = inputText.trim();
+
+    // Platform dışı iletişim tespiti (telefon, email, IBAN, WhatsApp vs.)
+    const violations = detectViolations(trimmed);
+    if (violations.length > 0) {
+      setFilterWarning(getViolationMessage(violations));
+      setTimeout(() => setFilterWarning(null), 5000);
+      return;
+    }
+
     setSending(true);
-    const success = await sendMessage(threadId, inputText.trim());
+    const success = await sendMessage(threadId, trimmed);
     if (success) {
       setInputText('');
       scrollViewRef.current?.scrollToEnd({ animated: true });
@@ -174,6 +244,19 @@ export default function MessageThreadScreen() {
         </Banner>
       )}
 
+      {/* İçerik filtresi uyarısı */}
+      {filterWarning ? (
+        <Banner
+          visible
+          icon="shield-alert"
+          actions={[
+            { label: 'Tamam', onPress: () => setFilterWarning(null) },
+          ]}
+        >
+          {filterWarning}
+        </Banner>
+      ) : null}
+
       {/* Messages */}
       {isLoadingMessages && messages.length === 0 ? (
         <View style={styles.loadingContainer}>
@@ -224,12 +307,33 @@ export default function MessageThreadScreen() {
                       styles.messageBubble,
                       isOwn ? styles.messageBubbleOwn : styles.messageBubbleOther,
                     ]}>
-                      <Text style={[
-                        styles.messageText,
-                        isOwn ? styles.messageTextOwn : styles.messageTextOther,
-                      ]}>
-                        {message.content}
-                      </Text>
+                      {(() => {
+                        const parsed = parseMessageContent(message.content || '');
+                        return (
+                          <>
+                            {parsed.images.length > 0 ? (
+                              <View style={styles.messageImagesWrap}>
+                                {parsed.images.map((img, idx) => (
+                                  <RNImage
+                                    key={`${message.id}-img-${idx}`}
+                                    source={{ uri: img }}
+                                    style={styles.messageImage}
+                                    resizeMode="cover"
+                                  />
+                                ))}
+                              </View>
+                            ) : null}
+                            {parsed.text ? (
+                              <Text style={[
+                                styles.messageText,
+                                isOwn ? styles.messageTextOwn : styles.messageTextOther,
+                              ]}>
+                                {parsed.text}
+                              </Text>
+                            ) : null}
+                          </>
+                        );
+                      })()}
                       <View style={styles.messageFooter}>
                         <Text style={[
                           styles.messageTime,
@@ -256,6 +360,24 @@ export default function MessageThreadScreen() {
 
       {/* Input */}
       <View style={styles.inputContainer}>
+        <TouchableOpacity
+          style={[
+            styles.attachButton,
+            (!canSend || uploadingImage) && styles.attachButtonDisabled,
+          ]}
+          onPress={handleAttachImage}
+          disabled={!canSend || uploadingImage}
+        >
+          {uploadingImage ? (
+            <ActivityIndicator size={20} color={TarodanColors.primary} />
+          ) : (
+            <Ionicons
+              name="image-outline"
+              size={24}
+              color={canSend ? TarodanColors.primary : TarodanColors.textLight}
+            />
+          )}
+        </TouchableOpacity>
         <View style={styles.inputWrapper}>
           <RNTextInput
             style={styles.textInput}
@@ -264,10 +386,10 @@ export default function MessageThreadScreen() {
             onChangeText={setInputText}
             multiline
             maxLength={1000}
-            editable={canSend}
+            editable={canSend && !uploadingImage}
           />
         </View>
-        <TouchableOpacity 
+        <TouchableOpacity
           style={[
             styles.sendButton,
             (!inputText.trim() || !canSend || sending) && styles.sendButtonDisabled,
@@ -275,10 +397,10 @@ export default function MessageThreadScreen() {
           onPress={handleSend}
           disabled={!inputText.trim() || !canSend || sending}
         >
-          <Ionicons 
-            name="send" 
-            size={24} 
-            color={(!inputText.trim() || !canSend) ? TarodanColors.textLight : TarodanColors.textOnPrimary} 
+          <Ionicons
+            name="send"
+            size={24}
+            color={(!inputText.trim() || !canSend) ? TarodanColors.textLight : TarodanColors.textOnPrimary}
           />
         </TouchableOpacity>
       </View>
@@ -391,6 +513,18 @@ const styles = StyleSheet.create({
     backgroundColor: TarodanColors.background,
     borderBottomLeftRadius: 4,
   },
+  messageImagesWrap: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 6,
+    marginBottom: 6,
+  },
+  messageImage: {
+    width: 160,
+    height: 160,
+    borderRadius: 8,
+    backgroundColor: TarodanColors.surfaceVariant,
+  },
   messageText: {
     fontSize: 15,
     lineHeight: 20,
@@ -453,5 +587,17 @@ const styles = StyleSheet.create({
   },
   sendButtonDisabled: {
     backgroundColor: TarodanColors.surfaceVariant,
+  },
+  attachButton: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    backgroundColor: TarodanColors.surfaceVariant,
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginRight: 8,
+  },
+  attachButtonDisabled: {
+    opacity: 0.5,
   },
 });

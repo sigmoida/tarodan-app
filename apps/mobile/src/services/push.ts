@@ -65,12 +65,12 @@ export async function registerForPushNotifications(): Promise<string | null> {
     });
     token = tokenResponse.data;
 
-    // Register token with backend
-    await api.post('/notifications/register-device', {
+    // Register token with backend (POST /notifications/push-token)
+    await api.post('/notifications/push-token', {
       token,
       platform: Platform.OS,
       deviceName: Device.modelName,
-    }).catch((err) => {
+    }).catch((err: any) => {
       console.log('Failed to register push token with backend:', err.message);
     });
 
@@ -124,9 +124,13 @@ export async function unregisterPushNotifications(): Promise<void> {
   }
   try {
     const tokenResponse = await Notifications.getExpoPushTokenAsync();
-    await api.delete('/notifications/register-device', {
-      data: { token: tokenResponse.data },
-    });
+    // Backend tarafında push-token kaydı: POST /notifications/push-token
+    // Bir DELETE muadili yok; "boş token" göndererek mevcut kayıt işaretlenebilir,
+    // ya da kullanıcı logout sırasında security/tokens DELETE ile temizleniyor.
+    await api.post('/notifications/push-token', {
+      token: tokenResponse.data,
+      revoke: true,
+    }).catch(() => null);
   } catch (error) {
     console.error('Error unregistering push token:', error);
   }

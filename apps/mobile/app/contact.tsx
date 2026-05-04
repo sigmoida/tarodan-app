@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { View, ScrollView, StyleSheet, TouchableOpacity, Linking } from 'react-native';
-import { Text, TextInput, Button, Card, Snackbar } from 'react-native-paper';
+import { Button, Card, Snackbar } from 'react-native-paper';
+import { Text, TextInput } from '../src/components/common';
 import { router } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { TarodanColors } from '../src/theme';

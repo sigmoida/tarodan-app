@@ -1,10 +1,11 @@
 import { View, ScrollView, StyleSheet, TouchableOpacity, Linking, Alert } from 'react-native';
-import { Text, Card, Button, Chip, RadioButton, Divider, ActivityIndicator } from 'react-native-paper';
+import { Card, Button, Chip, RadioButton, Divider, ActivityIndicator } from 'react-native-paper';
+import { Text } from '../src/components/common';
 import { useState } from 'react';
 import { router } from 'expo-router';
 import { useMutation } from '@tanstack/react-query';
 import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
-import { api } from '../src/services/api';
+import { membershipApi } from '../src/services/api';
 import { useAuthStore } from '../src/stores/authStore';
 import { TarodanColors } from '../src/theme';
 
@@ -61,10 +62,16 @@ export default function UpgradeScreen() {
 
   const isPremium = user?.membershipTier === 'premium';
 
-  // Subscribe mutation
+  // Subscribe mutation — backend POST /membership/subscribe { tierType, billingPeriod }
   const subscribeMutation = useMutation({
     mutationFn: async (planId: string) => {
-      return api.post('/subscriptions/create', { planId });
+      // planId formatı: 'premium-annual' | 'premium-monthly' (örn.) → tierType + billingPeriod
+      const isAnnual = planId.includes('annual') || selectedPlan === 'annual';
+      const tierType = planId.split('-')[0] || 'premium';
+      return membershipApi.subscribe({
+        tierType,
+        billingPeriod: isAnnual ? 'yearly' : 'monthly',
+      });
     },
     onSuccess: (response) => {
       // In a real app, this would redirect to a payment gateway
@@ -113,7 +120,7 @@ export default function UpgradeScreen() {
         {isPremium && (
           <Card style={styles.alreadyPremiumCard}>
             <Card.Content style={styles.alreadyPremiumContent}>
-              <Ionicons name="checkmark-shield" size={48} color={TarodanColors.success} />
+              <Ionicons name="shield-checkmark" size={48} color={TarodanColors.success} />
               <Text variant="titleLarge" style={styles.alreadyPremiumTitle}>
                 Zaten Premium Üyesiniz!
               </Text>

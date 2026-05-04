@@ -1,5 +1,6 @@
 import { View, ScrollView, StyleSheet, TouchableOpacity, Alert, Linking } from 'react-native';
-import { Text, Card, Button, Chip, Divider, ActivityIndicator, List, Snackbar } from 'react-native-paper';
+import { Card, Button, Chip, Divider, ActivityIndicator, List, Snackbar } from 'react-native-paper';
+import { Text } from '../../src/components/common';
 import { useState, useEffect, useCallback } from 'react';
 import { router, useFocusEffect } from 'expo-router';
 import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
@@ -275,7 +276,7 @@ export default function SubscriptionSettingsScreen() {
                   description="Kredi kartı bilgilerinizi güncelleyin"
                   left={props => <List.Icon {...props} icon="credit-card" />}
                   right={props => <List.Icon {...props} icon="chevron-right" />}
-                  onPress={() => router.push('/settings/payment-methods')}
+                  onPress={() => router.push('/settings/payment-methods' as any)}
                   style={styles.listItem}
                 />
                 

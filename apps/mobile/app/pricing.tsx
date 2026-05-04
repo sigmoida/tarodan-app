@@ -1,5 +1,6 @@
 import { View, ScrollView, StyleSheet, TouchableOpacity, Dimensions } from 'react-native';
-import { Text, Button, Card } from 'react-native-paper';
+import { Button, Card } from 'react-native-paper';
+import { Text } from '../src/components/common';
 import { router } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { useAuthStore } from '../src/stores/authStore';

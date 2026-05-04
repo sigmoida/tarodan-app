@@ -12,7 +12,7 @@ import {
   ViewStyle,
   TextInputProps,
 } from 'react-native';
-import Icon from 'react-native-vector-icons/Ionicons';
+import { Ionicons as Icon } from '@expo/vector-icons';
 
 interface InputProps extends TextInputProps {
   label?: string;
@@ -52,7 +52,7 @@ const Input: React.FC<InputProps> = ({
         ]}
       >
         {leftIcon && (
-          <Icon name={leftIcon} size={20} color="#757575" style={styles.leftIcon} />
+          <Icon name={leftIcon as any} size={20} color="#757575" style={styles.leftIcon} />
         )}
         
         <TextInput
@@ -83,7 +83,7 @@ const Input: React.FC<InputProps> = ({
             style={styles.rightIconButton}
             disabled={!onRightIconPress}
           >
-            <Icon name={rightIcon} size={20} color="#757575" />
+            <Icon name={rightIcon as any} size={20} color="#757575" />
           </TouchableOpacity>
         )}
       </View>

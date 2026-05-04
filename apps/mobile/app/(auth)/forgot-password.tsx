@@ -1,12 +1,13 @@
 import { View, KeyboardAvoidingView, Platform } from 'react-native';
-import { Text, TextInput, Button, useTheme } from 'react-native-paper';
+import { Button, useTheme } from 'react-native-paper';
+import { Text, TextInput } from '../../src/components/common';
 import { useForm, Controller } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import { useMutation } from '@tanstack/react-query';
 import { router } from 'expo-router';
 import { useState } from 'react';
-import { api } from '../../src/services/api';
+import { authApi } from '../../src/services/api';
 
 const forgotSchema = z.object({
   email: z.string().email('Geçerli email girin'),
@@ -23,7 +24,7 @@ export default function ForgotPasswordScreen() {
   });
 
   const forgotMutation = useMutation({
-    mutationFn: (data: ForgotForm) => api.post('/auth/forgot-password', data),
+    mutationFn: (data: ForgotForm) => authApi.forgotPassword(data.email),
     onSuccess: () => {
       setSent(true);
     },

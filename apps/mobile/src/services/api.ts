@@ -36,6 +36,18 @@ export const api = axios.create({
   },
 });
 
+/**
+ * Guest (unauthenticated) axios instance — token eklemez.
+ * Kullanım: guest checkout, guest payment, guest order track, guest contact.
+ */
+export const guestApi = axios.create({
+  baseURL: API_URL,
+  timeout: 30000,
+  headers: {
+    'Content-Type': 'application/json',
+  },
+});
+
 // Request interceptor - add auth token
 api.interceptors.request.use(
   async (config) => {
@@ -101,12 +113,54 @@ export const parseResponse = (response: any) => {
 export const authApi = {
   login: (email: string, password: string) =>
     api.post('/auth/login', { email, password }),
-  register: (data: { displayName: string; email: string; password: string; phone?: string }) =>
-    api.post('/auth/register', data),
+  register: (data: {
+    displayName: string;
+    email: string;
+    password: string;
+    phone?: string;
+    birthDate?: string;
+    acceptsMarketingEmails?: boolean;
+  }) => api.post('/auth/register', data),
+  /** İşletme hesabı olarak kayıt. Web /auth/register/business ile eşleşir. */
+  registerBusiness: (data: {
+    displayName: string;
+    email: string;
+    password: string;
+    phone?: string;
+    birthDate?: string;
+    acceptsMarketingEmails?: boolean;
+    companyName: string;
+    taxId: string;
+    taxOffice?: string;
+  }) => api.post('/auth/register/business', data),
   logout: () => api.post('/auth/logout'),
   getProfile: () => api.get('/users/me'),
-  refreshToken: (refreshToken: string) =>
-    api.post('/auth/refresh', { refreshToken }),
+  refresh: (refreshToken: string) => api.post('/auth/refresh', { refreshToken }),
+  // Geriye uyumluluk için eski ad korunur
+  refreshToken: (refreshToken: string) => api.post('/auth/refresh', { refreshToken }),
+  // Şifre sıfırlama / e-posta doğrulama akışı
+  forgotPassword: (email: string) =>
+    guestApi.post('/auth/forgot-password', { email }),
+  resetPassword: (token: string, newPassword: string) =>
+    guestApi.post('/auth/reset-password', { token, newPassword }),
+  verifyEmail: (token: string) =>
+    guestApi.post('/auth/verify-email', { token }),
+  resendVerification: () => api.post('/auth/resend-verification'),
+  /** Şifre değiştirme — backend `security` modülüne taşındı. */
+  changePassword: (currentPassword: string, newPassword: string) =>
+    api.post('/security/password/change', { currentPassword, newPassword }),
+  // ---- 2FA / Güvenlik (backend: /security/2fa/*) ----
+  getTwoFactorStatus: () => api.get('/security/2fa/status'),
+  /** 2FA'yı etkinleştir; secret + qrCode + backupCodes döner */
+  setupTwoFactor: () =>
+    api.post<{ secret: string; qrCode: string; backupCodes?: string[] }>('/security/2fa/enable'),
+  verifyTwoFactor: (token: string) =>
+    api.post('/security/2fa/verify', { token }),
+  disableTwoFactor: (password?: string) =>
+    api.post('/security/2fa/disable', password ? { password } : {}),
+  regenerateBackupCodes: () => api.post('/security/2fa/backup-codes'),
+  /** Tüm cihazlardan çıkış — backend: DELETE /security/tokens */
+  logoutAll: () => api.delete('/security/tokens'),
 };
 
 // Products API - Web ile aynı endpoint'ler
@@ -121,10 +175,13 @@ export const productsApi = {
     api.patch(`/products/${id}`, data),
   delete: (id: string | number) => 
     api.delete(`/products/${id}`),
+  /** Backend: GET /products/my (web ile aynı). Daha önce /products/my-listings kullanılıyordu — backend'de yok. */
   getMyListings: (params?: Record<string, any>) =>
-    api.get('/products/my-listings', { params }),
-  search: (params?: Record<string, any>) =>
-    api.get('/products/search', { params }),
+    api.get('/products/my', { params }),
+  /** İlanlarım istatistikleri (aktif, satıldı, görüntülenme vb.) */
+  getMyStats: () => api.get('/products/my/stats'),
+  /** Mevcut sahibinin ilanı — düzenleme için */
+  getMyById: (id: string) => api.get(`/products/my/${id}`),
 };
 
 // Categories API - Web ile aynı endpoint'ler
@@ -147,43 +204,66 @@ export const wishlistApi = {
 };
 
 // Orders API - Web ile aynı endpoint'ler
+export type OrderAddressInput = {
+  fullName: string;
+  phone: string;
+  city: string;
+  district: string;
+  address: string;
+  zipCode?: string;
+};
+
 export const ordersApi = {
   getAll: (params?: Record<string, any>) =>
     api.get('/orders', { params }),
-  getOne: (id: string | number) => 
+  getOne: (id: string | number) =>
     api.get(`/orders/${id}`),
-  create: (data: any) => 
+  create: (data: any) =>
     api.post('/orders', data),
+  /** Buy Now — üye için doğrudan satın alma */
+  directBuy: (data: {
+    productId: string;
+    shippingAddressId?: string;
+    shippingAddress?: OrderAddressInput;
+    billingAddressId?: string;
+    billingAddress?: OrderAddressInput;
+  }) => api.post('/orders/buy', data),
   createGuest: (data: {
     productId: string;
     email: string;
     phone: string;
     guestName: string;
-    shippingAddress: {
-      fullName: string;
-      phone: string;
-      city: string;
-      district: string;
-      address: string;
-      zipCode?: string;
-    };
-    billingAddress?: {
-      fullName: string;
-      phone: string;
-      city: string;
-      district: string;
-      address: string;
-      zipCode?: string;
-    };
+    shippingAddress: OrderAddressInput;
+    billingAddress?: OrderAddressInput;
     offerId?: string;
     price?: number;
-  }) => api.post('/orders/guest', data),
+  }) => guestApi.post('/orders/guest', data),
   cancel: (id: string | number, reason?: string) =>
     api.post(`/orders/${id}/cancel`, { reason }),
+  /** Alıcı: teslim aldım onayı (backend: POST /orders/:id/confirm). */
   confirm: (id: string | number) =>
     api.post(`/orders/${id}/confirm`),
-  getStatus: (id: string | number) =>
-    api.get(`/orders/${id}/status`),
+  /** Satıcı: siparişi hazırlanıyor olarak işaretle (backend: POST /orders/:id/prepare) */
+  markAsPreparing: (id: string | number) =>
+    api.post(`/orders/${id}/prepare`),
+  /** İptal edilmiş teklif siparişini yeniden aç (backend: POST /orders/:id/reactivate) */
+  reactivate: (id: string | number) =>
+    api.post(`/orders/${id}/reactivate`),
+  /** Satıcı tarafında kargo adresi/bilgisi güncelleme */
+  setShippingAddress: (id: string | number, data: OrderAddressInput) =>
+    api.patch(`/orders/${id}/shipping-address`, data),
+  /** Guest sipariş takibi (orderNumber + email) */
+  trackGuest: (data: { orderNumber: string; email: string }) =>
+    guestApi.post('/orders/guest/track', data),
+  /** Checkout quote (fiyat kırılımı) */
+  getQuote: (data: { items: Array<{ productId: string; quantity?: number }> }) =>
+    api.post('/orders/quote', data),
+  /** İlan formunda komisyon önizleme (tek ürün) */
+  getCommissionPreview: (params: { amount: number; categoryId?: string }) =>
+    api.get('/orders/commission-preview', { params }),
+  /** İlanlarım listesi için toplu komisyon önizleme */
+  getCommissionPreviewBatch: (items: Array<{ amount: number; categoryId?: string | null }>) =>
+    api.post('/orders/commission-preview-batch', { items }),
 };
 
 // Messages API - Web ile aynı endpoint'ler
@@ -306,13 +386,42 @@ export const userApi = {
     phone?: string;
     bio?: string;
     avatarUrl?: string;
-  }) => api.patch('/users/me', data),
-  getStats: () => api.get('/users/me/stats'),
-  getPublicProfile: (userId: string) => api.get(`/users/${userId}`),
+  } | FormData) =>
+    api.patch('/users/me', data, data instanceof FormData
+      ? { headers: { 'Content-Type': 'multipart/form-data' } }
+      : undefined),
+  /** Hesabı sil (kullanıcının kendi). Backend: DELETE /users/me */
+  deleteAccount: () => api.delete('/users/me'),
+  /** Genel istatistikler (satıcı analitik dahil). Backend: GET /users/me/business-stats */
+  getStats: () => api.get('/users/me/business-stats'),
+  /** İlanlarım için ürün-bazlı istatistik (backend: GET /products/my/stats) */
+  getMyProductStats: () => api.get('/products/my/stats'),
+  /** Analitik raporu (timeRange ile) — backend: GET /users/me/analytics */
+  getAnalytics: (params?: { timeRange?: '7d' | '30d' | '90d' | 'all' }) =>
+    api.get('/users/me/analytics', { params }),
+  /** Kullanıcının public profili — backend: GET /users/:id/profile */
+  getPublicProfile: (userId: string) => api.get(`/users/${userId}/profile`),
+  /** Kullanıcının takip durumu (sen onu takip ediyor musun?) — GET /users/:id/follow */
+  getFollowStatus: (userId: string) => api.get(`/users/${userId}/follow`),
+  /** Takip ettiklerim — GET /users/me/following */
+  getMyFollowing: () => api.get('/users/me/following'),
   block: (userId: string) => api.post(`/users/${userId}/block`),
   unblock: (userId: string) => api.delete(`/users/${userId}/block`),
+  /** Bloke ettiğim kullanıcılar */
+  getBlockedUsers: () => api.get('/users/me/blocked'),
   follow: (userId: string) => api.post(`/users/${userId}/follow`),
   unfollow: (userId: string) => api.delete(`/users/${userId}/follow`),
+  /** İşletme satıcısına yükselt — backend: POST /users/me/seller */
+  upgradeToSeller: (data: { companyName?: string; taxId?: string; taxOffice?: string }) =>
+    api.post('/users/me/seller', data),
+  /** Anasayfa "Haftanın Şirketi" — backend: GET /users/featured-business */
+  getFeaturedBusiness: () => api.get('/users/featured-business'),
+  /** Anasayfa "Haftanın Koleksiyoneri" */
+  getFeaturedCollector: () => api.get('/users/featured-collector'),
+  /** Top sellers (anasayfa fallback) */
+  getTopSellers: (params?: { limit?: number }) => api.get('/users/top-sellers', { params }),
+  /** Top collections */
+  getTopCollections: (params?: { limit?: number }) => api.get('/users/top-collections', { params }),
 };
 
 // User Reports API - İçerik raporlama
@@ -357,34 +466,149 @@ export const addressesApi = {
 // Payments API - Web ile aynı endpoint'ler
 export const paymentsApi = {
   initiate: (orderId: string | number, provider: 'paytr' | 'iyzico') =>
-    api.post(`/payments/order/${orderId}/initiate`, { provider }),
+    api.post('/payments/initiate', { orderId, provider }),
+  initiateGuest: (orderId: string | number, provider: 'paytr' | 'iyzico') =>
+    guestApi.post('/payments/initiate-guest', { orderId, provider }),
+  /** Takas nakit fark ödemesi başlat */
+  initiateTradeCash: (tradeId: string) =>
+    api.post('/payments/initiate-trade-cash', { tradeId }),
   getStatus: (paymentId: string) =>
     api.get(`/payments/${paymentId}`),
+  getStatusLight: (paymentId: string) =>
+    api.get(`/payments/${paymentId}/status`),
+  getStatusLightGuest: (paymentId: string) =>
+    guestApi.get(`/payments/${paymentId}/status-guest`),
+  getMyPayments: (params?: {
+    status?: string;
+    provider?: string;
+    startDate?: string;
+    endDate?: string;
+    page?: number;
+    limit?: number;
+  }) => api.get('/payments/me', { params }),
+  cancel: (paymentId: string) =>
+    api.post(`/payments/${paymentId}/cancel`),
+  /** Fail sayfasında; hâlâ pending ise rezervasyonu serbest bırakır */
+  confirmFailed: (paymentId: string) =>
+    api.post(`/payments/${paymentId}/confirm-failed`),
+  /** Test bypass: PAYMENT_BYPASS=true iken tek kart başarılı */
+  bypassComplete: (paymentId: string, cardNumber: string) =>
+    api.post(`/payments/${paymentId}/bypass-complete`, { cardNumber }),
+  refund: (orderId: string, refundAmount?: number) =>
+    api.post('/payments/refund', { orderId, refundAmount }),
+  retry: (paymentId: string) =>
+    api.post(`/payments/${paymentId}/retry`),
+
+  processDirect: (data: {
+    orderId: string;
+    card?: {
+      cardHolderName: string;
+      cardNumber: string;
+      expireMonth: string;
+      expireYear: string;
+      cvc: string;
+      cardAlias?: string;
+    };
+    cardToken?: string;
+    saveCard?: boolean;
+    provider?: string;
+  }) => api.post('/payments/process-direct', data),
+
+  getPaymentMethods: () => api.get('/payments/methods'),
+  addPaymentMethod: (data: {
+    card: {
+      cardHolderName: string;
+      cardNumber: string;
+      expireMonth: string;
+      expireYear: string;
+      cvc: string;
+      cardAlias?: string;
+    };
+  }) => api.post('/payments/methods', data),
+  deletePaymentMethod: (cardToken: string) =>
+    api.delete(`/payments/methods/${cardToken}`),
 };
 
 // Membership API - Web ile aynı endpoint'ler
 export const membershipApi = {
   getTiers: () => api.get('/membership/tiers'),
-  getCurrentMembership: () => api.get('/membership'),
-  subscribe: (tierId: string, billingCycle: 'monthly' | 'yearly') =>
-    api.post('/membership/subscribe', { tierId, billingCycle }),
+  getCurrentMembership: () => api.get('/membership/me'),
+  /** Kullanıcının üyelik limitleri (maxListings, canTrade vs.) */
+  getLimits: () => api.get('/membership/me/limits'),
+  /**
+   * Üyelik satın alma. Web: subscribe({ tierType, billingPeriod }).
+   * Geriye uyum: tierId ilk parametre olarak da desteklenir.
+   */
+  subscribe: (
+    tierOrData: string | { tierType: string; billingPeriod: 'monthly' | 'yearly' },
+    billingCycleArg?: 'monthly' | 'yearly',
+  ) => {
+    if (typeof tierOrData === 'string') {
+      return api.post('/membership/subscribe', {
+        tierType: tierOrData,
+        billingPeriod: billingCycleArg || 'monthly',
+      });
+    }
+    return api.post('/membership/subscribe', tierOrData);
+  },
   cancel: () => api.post('/membership/cancel'),
-  getBillingHistory: () => api.get('/subscriptions/me/billing-history'),
+  /** Otomatik yenilemeyi aç/kapa — backend: PATCH /membership/auto-renew */
+  setAutoRenew: (autoRenew: boolean) =>
+    api.patch('/membership/auto-renew', { autoRenew }),
+  /** Üyelik ödemesini başlat — backend: POST /membership/payments/initiate */
+  initiatePayment: (data: { tierType: string; billingPeriod: 'monthly' | 'yearly'; provider?: 'paytr' | 'iyzico' }) =>
+    api.post('/membership/payments/initiate', data),
+  /** İlan oluşturma sınırı kontrol — GET /membership/check/listing */
+  checkListingLimit: () => api.get('/membership/check/listing'),
+  /** Takas özelliği erişimi — GET /membership/check/trade */
+  checkTradeAccess: () => api.get('/membership/check/trade'),
+  /** Koleksiyon özelliği erişimi — GET /membership/check/collection */
+  checkCollectionAccess: () => api.get('/membership/check/collection'),
 };
 
 // Notifications API - Web ile aynı endpoint'ler
 export const notificationsApi = {
   getAll: (params?: Record<string, any>) => api.get('/notifications', { params }),
   markAsRead: (id: string) => api.patch(`/notifications/${id}/read`),
-  markAllAsRead: () => api.patch('/notifications/read-all'),
-  getUnreadCount: () => api.get('/notifications/unread-count'),
+  /** Backend: POST /notifications/mark-all-read */
+  markAllAsRead: () => api.post('/notifications/mark-all-read'),
+  getUnreadCount: () => api.get<{ count: number }>('/notifications/unread-count'),
+  /** Mobile push bildirimleri için cihaz token kaydı (backend: POST /notifications/push-token) */
+  registerPushToken: (data: { token: string; platform: 'ios' | 'android'; deviceId?: string }) =>
+    api.post('/notifications/push-token', data),
 };
 
-// Shipping API
+// Shipping API — Backend `/shipping`
+export type ShippingProvider = 'aras' | 'yurtici' | 'mng';
+
 export const shippingApi = {
-  getRates: (params: { fromCity: string; toCity: string; weight?: number }) =>
-    api.get('/shipping/rates', { params }),
+  /** Şehir/firma için tek satır kargo ücreti (checkout / addresses) */
+  getRatesByCity: (params: { city: string; carrier: ShippingProvider; weight?: number }) =>
+    api.get<{ rate: number }>('/shipping/rates', { params }),
+  /** Geriye uyumluluk: eski parametre adlarıyla aynı çağrıyı yapan alias */
+  getRates: (params: { fromCity?: string; toCity?: string; city?: string; carrier?: ShippingProvider; weight?: number }) =>
+    api.get<{ rate: number } | any>('/shipping/rates', {
+      params: {
+        city: params.city ?? params.toCity ?? params.fromCity,
+        carrier: params.carrier ?? 'aras',
+        weight: params.weight,
+      },
+    }),
+  /** Kullanılabilir kargo firmaları */
   getCarriers: () => api.get('/shipping/carriers'),
+  /** Adres bazlı kargo hesaplama (backend: POST /shipping/rates) */
+  calculateRates: (data: { fromAddressId: string; toAddressId: string; weight?: number; provider?: ShippingProvider }) =>
+    api.post('/shipping/rates', data),
+  /** Sipariş için kargo başlat — backend: POST /shipping */
+  createShipment: (data: { orderId: string; provider: ShippingProvider }) =>
+    api.post('/shipping', data),
+  /** Kargo takip numarası gir — backend: PATCH /shipping/:id/tracking */
+  updateTracking: (shipmentId: string, data: { trackingNumber: string }) =>
+    api.patch(`/shipping/${shipmentId}/tracking`, data),
+  /** Tek shipment detayı */
+  getShipment: (id: string) => api.get(`/shipping/${id}`),
+  /** Siparişin shipment'ları */
+  getOrderShipments: (orderId: string) => api.get(`/shipping/order/${orderId}`),
 };
 
 // Search API - Elasticsearch ile gerçek arama
@@ -400,24 +624,179 @@ export const searchApi = {
     pageSize?: number;
     sortBy?: 'relevance' | 'price_asc' | 'price_desc' | 'newest';
   }) => api.get('/search/products', { params }),
-  
-  // Autocomplete önerileri
-  autocomplete: (query: string) => 
+
+  // Autocomplete önerileri (basit)
+  autocomplete: (query: string) =>
     api.get('/search/autocomplete', { params: { q: query } }),
-    
+
+  /** Zenginleştirilmiş autocomplete: products + brands + categories + manufacturers + scales + suggestions */
+  autocompleteRich: (query: string) =>
+    api.get<{
+      products: Array<{ id: string; title: string; imageUrl?: string; price: number; brandName?: string }>;
+      brands: Array<{ id: string; name: string; slug: string; logo?: string | null }>;
+      categories: Array<{ id: string; name: string; slug: string }>;
+      manufacturers: Array<{ id: string; name: string; slug: string; logo?: string | null }>;
+      carModels?: Array<{ id: string; name: string; slug: string; brandId: string }>;
+      scales?: string[];
+      materials?: Array<{ slug: string; label: string }>;
+      conditions?: Array<{ value: string; label: string }>;
+      suggestions: string[];
+    }>('/search/autocomplete-rich', { params: { q: query } }),
+
   // Kullanıcı arama
   users: (query: string, limit?: number) =>
     api.get('/users/search', { params: { q: query, limit } }),
 };
 
-// Upload API
+// =============================================================================
+// Yeni modüller — web paritesi (brands, manufacturers, pages, support, discounts, media)
+// =============================================================================
+
+/** Markalar (örn. Porsche, Ferrari) */
+export const brandsApi = {
+  findAll: () => api.get('/brands'),
+  findOne: (id: string) => api.get(`/brands/${id}`),
+  findBySlug: (slug: string) => api.get(`/brands/${slug}`),
+};
+
+/** Üreticiler / producers (örn. Hot Wheels, Bburago) */
+export const manufacturersApi = {
+  findAll: () => api.get('/manufacturers'),
+  findOne: (id: string) => api.get(`/manufacturers/${id}`),
+  findBySlug: (slug: string) => api.get(`/manufacturers/slug/${slug}`),
+};
+
+/** CMS statik sayfalar (hakkımızda, gizlilik, KVKK vb.) */
+export const pagesApi = {
+  getBySlug: (slug: string) =>
+    guestApi.get<{
+      id: string;
+      slug: string;
+      title: string;
+      content: string;
+      metaTitle: string | null;
+      metaDescription: string | null;
+      metaKeywords: string | null;
+      updatedAt: string;
+    }>(`/pages/${slug}`),
+};
+
+/** Destek / İletişim */
+export const supportApi = {
+  guestContact: (data: { name: string; email: string; message: string; subject?: string }) =>
+    guestApi.post('/support/contact', data),
+  createTicket: (data: {
+    subject: string;
+    category: string;
+    message: string;
+    orderId?: string;
+    tradeId?: string;
+    attachments?: string[];
+  }) => api.post('/support/tickets', data),
+  getMyTickets: (params?: { page?: number; pageSize?: number; status?: string }) =>
+    api.get('/support/tickets/me', { params }),
+  getTicket: (id: string) => api.get(`/support/tickets/${id}`),
+  addMessage: (id: string, data: { content: string; attachments?: string[] }) =>
+    api.post(`/support/tickets/${id}/messages`, data),
+};
+
+/** İndirim / kupon / kampanya */
+export const discountsApi = {
+  getAll: (params?: Record<string, any>) => api.get('/discounts', { params }),
+  getOne: (id: string) => api.get(`/discounts/${id}`),
+  create: (data: {
+    code?: string;
+    name: string;
+    description?: string;
+    type: 'percentage' | 'fixed_amount';
+    value: number;
+    scope: 'global' | 'category' | 'product' | 'seller';
+    categoryId?: string;
+    targetProductIds?: string[];
+    minCartValue?: number;
+    maxDiscountAmount?: number;
+    usageLimitTotal?: number;
+    usageLimitPerUser?: number;
+    isStackable?: boolean;
+    priority?: number;
+    isActive?: boolean;
+    startDate: string;
+    endDate: string;
+  }) => api.post('/discounts', data),
+  update: (id: string, data: Record<string, any>) =>
+    api.patch(`/discounts/${id}`, data),
+  delete: (id: string) => api.delete(`/discounts/${id}`),
+  validate: (data: {
+    code: string;
+    cartItems: Array<{ productId: string; quantity: number; price: number }>;
+  }) => api.post('/discounts/validate', data),
+  getActiveCampaigns: () => api.get('/discounts/active'),
+};
+
+/**
+ * Medya yükleme. React Native için dosyalar şu formatta iletilir:
+ *   { uri: string; name: string; type: string }
+ * (Web'deki File ile eşdeğer davranır.)
+ */
+export type RNFile = { uri: string; name: string; type: string };
+
+const appendRNFile = (formData: FormData, field: string, file: RNFile) => {
+  // RN'in kendine özel FormData implementasyonu dosya objesini aşağıdaki şekilde kabul eder.
+  // as any cast'i TS'in React Native FormData tiplerinin olmadığı durumlar için gerekli.
+  formData.append(field, file as any);
+};
+
+export const mediaApi = {
+  uploadProductImages: (files: RNFile[]) => {
+    const formData = new FormData();
+    files.forEach(file => appendRNFile(formData, 'images', file));
+    return api.post('/media/upload/product', formData, {
+      headers: { 'Content-Type': 'multipart/form-data' },
+    });
+  },
+  uploadAvatar: (file: RNFile) => {
+    const formData = new FormData();
+    appendRNFile(formData, 'avatar', file);
+    return api.post('/media/upload/avatar', formData, {
+      headers: { 'Content-Type': 'multipart/form-data' },
+    });
+  },
+  uploadMessageImage: (file: RNFile) => {
+    const formData = new FormData();
+    appendRNFile(formData, 'file', file);
+    return api.post<{ url: string; key?: string }>(
+      '/media/upload',
+      formData,
+      {
+        headers: { 'Content-Type': 'multipart/form-data' },
+        params: { folder: 'messages' },
+      },
+    );
+  },
+  deleteFile: (key: string) => api.delete(`/media/${encodeURIComponent(key)}`),
+};
+
+// =============================================================================
+// Car Models API — backend: /car-models (web ile aynı)
+// =============================================================================
+export const carModelsApi = {
+  findAll: (params?: { brandId?: string; brandSlug?: string }) =>
+    api.get('/car-models', { params }),
+  findOne: (id: string) => api.get(`/car-models/${id}`),
+  findBySlug: (slug: string) => api.get(`/car-models/${slug}`),
+};
+
+// Upload API — backend `/media` modülüne yönlendirilmiş eski uyumluluk katmanı.
+// Yeni kod `mediaApi` kullanmalı; bu wrapper geriye dönük çağrı dosyaları için bırakıldı.
 export const uploadApi = {
-  image: (formData: FormData) => 
-    api.post('/upload/image', formData, {
+  /** Tek resim yükle (genel — backend: POST /media/upload). */
+  image: (formData: FormData) =>
+    api.post('/media/upload', formData, {
       headers: { 'Content-Type': 'multipart/form-data' },
     }).then(res => res.data),
-  images: (formData: FormData) => 
-    api.post('/upload/images', formData, {
+  /** Çoklu resim yükle (backend: POST /media/upload/multiple). */
+  images: (formData: FormData) =>
+    api.post('/media/upload/multiple', formData, {
       headers: { 'Content-Type': 'multipart/form-data' },
     }).then(res => res.data),
 };
@@ -452,6 +831,15 @@ export const endpoints = {
   search: searchApi,
   upload: uploadApi,
   wishlist: wishlistApi,
+  // Yeni modüller
+  brands: brandsApi,
+  manufacturers: manufacturersApi,
+  pages: pagesApi,
+  support: supportApi,
+  discounts: discountsApi,
+  media: mediaApi,
+  userReports: userReportsApi,
+  carModels: carModelsApi,
 };
 
 export default api;

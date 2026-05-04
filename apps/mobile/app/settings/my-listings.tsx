@@ -1,5 +1,6 @@
 import { View, ScrollView, StyleSheet, TouchableOpacity, Image, RefreshControl, Alert } from 'react-native';
-import { Text, FAB, Chip, IconButton, Card, ProgressBar, Menu, Divider, Portal, Dialog, Button, ActivityIndicator } from 'react-native-paper';
+import { FAB, Chip, IconButton, Card, ProgressBar, Menu, Divider, Portal, Dialog, Button, ActivityIndicator } from 'react-native-paper';
+import { Text } from '../../src/components/common';
 import { useState, useCallback } from 'react';
 import { router, useFocusEffect } from 'expo-router';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';

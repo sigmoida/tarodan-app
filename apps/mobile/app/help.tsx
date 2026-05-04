@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { View, ScrollView, StyleSheet, TouchableOpacity, Linking } from 'react-native';
-import { Text, Searchbar, List, TextInput, Button, Snackbar, Divider } from 'react-native-paper';
+import { List, Button, Snackbar, Divider } from 'react-native-paper';
+import { Text, TextInput, Searchbar } from '../src/components/common';
 import { router } from 'expo-router';
 import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 import { TarodanColors } from '../src/theme';

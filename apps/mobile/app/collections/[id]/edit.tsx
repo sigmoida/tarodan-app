@@ -1,5 +1,6 @@
 import { View, ScrollView, StyleSheet, TouchableOpacity, Image, Alert } from 'react-native';
-import { Text, TextInput, Button, Switch, Card, Divider, Snackbar, IconButton, ActivityIndicator, List } from 'react-native-paper';
+import { Button, Switch, Card, Divider, Snackbar, IconButton, ActivityIndicator, List } from 'react-native-paper';
+import { Text, TextInput } from '../../../src/components/common';
 import { useState, useEffect } from 'react';
 import { router, useLocalSearchParams, Stack } from 'expo-router';
 import { useForm, Controller } from 'react-hook-form';
@@ -29,6 +30,8 @@ interface Collection {
   isPublic: boolean;
   viewCount: number;
   likeCount: number;
+  userId?: string;
+  ownerId?: string;
   items: Array<{
     id: string;
     product: {

@@ -1,9 +1,9 @@
 import { View, StyleSheet } from 'react-native';
-import { Text, Button } from 'react-native-paper';
+import { Button } from 'react-native-paper';
+import { Text } from '../../src/components/common';
 import { router } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { TarodanColors } from '../../src/theme';
-import LottieView from 'lottie-react-native';
 
 export default function MembershipSuccessScreen() {
   return (

@@ -1,10 +1,11 @@
 import { View, ScrollView, StyleSheet, TouchableOpacity, Image, RefreshControl, Alert } from 'react-native';
-import { Text, Chip, ActivityIndicator, Card, Button, TextInput, Portal, Dialog } from 'react-native-paper';
+import { Chip, ActivityIndicator, Card, Button, Portal, Dialog } from 'react-native-paper';
+import { Text, TextInput } from '../../src/components/common';
 import { useState, useCallback } from 'react';
 import { router, useFocusEffect } from 'expo-router';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { Ionicons } from '@expo/vector-icons';
-import { api } from '../../src/services/api';
+import { ordersApi, shippingApi } from '../../src/services/api';
 import { useAuthStore } from '../../src/stores/authStore';
 import { TarodanColors } from '../../src/theme';
 
@@ -52,8 +53,8 @@ export default function SalesScreen() {
         if (filter !== 'all') {
           params.status = filter;
         }
-        const response = await api.get('/orders', { params });
-        return response.data?.data || response.data || [];
+        const response = await ordersApi.getAll(params);
+        return (response.data as any)?.data || response.data || [];
       } catch (error) {
         console.log('Failed to fetch sales');
         return [];
@@ -64,10 +65,26 @@ export default function SalesScreen() {
 
   const sales: Sale[] = salesData || [];
 
-  // Update status mutation
+  /**
+   * Backend'de tek "status update" endpoint'i yok; iki ayrı akış:
+   *   - "processing"  → POST /orders/:id/prepare         (markAsPreparing)
+   *   - "shipped"     → POST /shipping  + PATCH /shipping/:id/tracking
+   * Bu mutasyon hangi durumun istendiğine göre doğru endpoint'i çağırır.
+   */
   const updateStatusMutation = useMutation({
     mutationFn: async ({ orderId, status, trackingNumber }: { orderId: string; status: string; trackingNumber?: string }) => {
-      return api.patch(`/orders/${orderId}/status`, { status, trackingNumber });
+      if (status === 'processing' || status === 'preparing') {
+        return ordersApi.markAsPreparing(orderId);
+      }
+      if (status === 'shipped') {
+        const created = await shippingApi.createShipment({ orderId, provider: 'aras' });
+        const shipment = (created.data as any)?.data ?? (created.data as any);
+        if (trackingNumber && shipment?.id) {
+          await shippingApi.updateTracking(shipment.id, { trackingNumber });
+        }
+        return created;
+      }
+      throw new Error(`Desteklenmeyen sipariş durumu: ${status}`);
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['orders'] });
@@ -75,8 +92,8 @@ export default function SalesScreen() {
       setTrackingNumber('');
       Alert.alert('Başarılı', 'Sipariş durumu güncellendi');
     },
-    onError: () => {
-      Alert.alert('Hata', 'Durum güncellenemedi');
+    onError: (e: any) => {
+      Alert.alert('Hata', e?.response?.data?.message || e?.message || 'Durum güncellenemedi');
     },
   });
 

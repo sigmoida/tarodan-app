@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { View, ScrollView, StyleSheet, TouchableOpacity } from 'react-native';
-import { Text, TextInput, Button, Divider, ActivityIndicator, Card } from 'react-native-paper';
+import { Button, Divider, ActivityIndicator, Card } from 'react-native-paper';
+import { Text, TextInput } from '../src/components/common';
 import { router } from 'expo-router';
 import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 import { TarodanColors } from '../src/theme';

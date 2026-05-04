@@ -1,5 +1,6 @@
 import { View, ScrollView, StyleSheet, TouchableOpacity, Image, Alert, Linking } from 'react-native';
-import { Text, TextInput, Button, Card, Switch, Divider, Snackbar, ActivityIndicator, Avatar, IconButton, List } from 'react-native-paper';
+import { Button, Card, Switch, Divider, Snackbar, ActivityIndicator, Avatar, IconButton, List } from 'react-native-paper';
+import { Text, TextInput } from '../../src/components/common';
 import { useState, useEffect } from 'react';
 import { router } from 'expo-router';
 import { useForm, Controller } from 'react-hook-form';

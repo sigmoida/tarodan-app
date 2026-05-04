@@ -1,5 +1,6 @@
 import { View, ScrollView, StyleSheet, TouchableOpacity, Dimensions } from 'react-native';
-import { Text, Card, Button, ActivityIndicator, ProgressBar, Chip, SegmentedButtons, Divider } from 'react-native-paper';
+import { Card, Button, ActivityIndicator, ProgressBar, Chip, SegmentedButtons, Divider } from 'react-native-paper';
+import { Text } from '../../src/components/common';
 import { useState, useCallback } from 'react';
 import { router, useFocusEffect } from 'expo-router';
 import { useQuery } from '@tanstack/react-query';

@@ -1,5 +1,5 @@
 import { View, ScrollView, Image, StyleSheet, Alert, TouchableOpacity } from 'react-native';
-import { Text, TextInput, Button, SegmentedButtons, Switch, useTheme, Snackbar, IconButton, Card, Chip, ActivityIndicator } from 'react-native-paper';
+import { Button, SegmentedButtons, Switch, useTheme, Snackbar, IconButton, Card, Chip, ActivityIndicator } from 'react-native-paper';
 import { useState, useEffect } from 'react';
 import { useForm, Controller } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
@@ -11,6 +11,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { api } from '../../../src/services/api';
 import { useAuthStore } from '../../../src/stores/authStore';
 import { TarodanColors } from '../../../src/theme';
+import { CommissionPreview, Text, TextInput } from '../../../src/components/common';
 
 const listingSchema = z.object({
   title: z.string().min(5, 'Başlık en az 5 karakter olmalı').max(200, 'Başlık en fazla 200 karakter olabilir'),
@@ -326,6 +327,7 @@ export default function EditListingScreen() {
           )}
         />
         {errors.price && <Text style={styles.errorText}>{errors.price.message}</Text>}
+        <CommissionPreview amount={watch('price')} categoryId={watch('categoryId')} />
 
         {/* Category */}
         <Text variant="titleSmall" style={styles.fieldLabel}>Kategori *</Text>
@@ -515,7 +517,7 @@ const styles = StyleSheet.create({
     width: 100,
     height: 100,
     borderWidth: 2,
-    borderColor: TarodanColors.outline,
+    borderColor: TarodanColors.border,
     borderStyle: 'dashed',
     borderRadius: 8,
     justifyContent: 'center',

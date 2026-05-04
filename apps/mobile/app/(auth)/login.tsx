@@ -1,16 +1,25 @@
-import { View, KeyboardAvoidingView, Platform } from 'react-native';
-import { Text, TextInput, Button, useTheme } from 'react-native-paper';
+import { View, KeyboardAvoidingView, Platform, ScrollView, Alert } from 'react-native';
+import { Button, useTheme, Banner, ActivityIndicator } from 'react-native-paper';
+import { Text, TextInput } from '../../src/components/common';
 import { useForm, Controller } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import { useMutation } from '@tanstack/react-query';
 import { router } from 'expo-router';
+import { useState } from 'react';
+import { Ionicons } from '@expo/vector-icons';
 import { authApi } from '../../src/services/api';
 import { useAuthStore } from '../../src/stores/authStore';
+import { TarodanColors } from '../../src/theme';
 
+/**
+ * Şifre minimum kuralı web ile aynı: 8+ karakter, küçük + büyük harf + rakam.
+ * Login için sadece "boş değil" kontrolü yapıyoruz — eski şifreyle de giriş yapılabilsin
+ * (zayıf şifre uyarısı oturum açtıktan sonra gösterilir). Web pattern'i.
+ */
 const loginSchema = z.object({
-  email: z.string().email('Geçerli email girin'),
-  password: z.string().min(6, 'Şifre en az 6 karakter olmalı'),
+  email: z.string().email('Geçerli e-posta girin'),
+  password: z.string().min(1, 'Şifre boş olamaz'),
 });
 
 type LoginForm = z.infer<typeof loginSchema>;
@@ -19,7 +28,12 @@ export default function LoginScreen() {
   const theme = useTheme();
   const { login } = useAuthStore();
 
-  const { control, handleSubmit, formState: { errors } } = useForm<LoginForm>({
+  /** Login sonrası doğrulanmamış e-posta için banner. */
+  const [unverifiedEmail, setUnverifiedEmail] = useState<string | null>(null);
+  /** Server'dan gelen ham hata mesajı (UI'da gösterilir). */
+  const [errorMessage, setErrorMessage] = useState<string | null>(null);
+
+  const { control, handleSubmit, formState: { errors }, getValues } = useForm<LoginForm>({
     resolver: zodResolver(loginSchema),
   });
 
@@ -27,22 +41,64 @@ export default function LoginScreen() {
   const loginMutation = useMutation({
     mutationFn: (data: LoginForm) => authApi.login(data.email, data.password),
     onSuccess: async (response) => {
-      // API response: { user, tokens: { accessToken, refreshToken } }
-      const data = response.data;
+      const data: any = response.data;
       const accessToken = data.tokens?.accessToken || data.accessToken;
       const refreshToken = data.tokens?.refreshToken || data.refreshToken;
       const user = data.user;
-      
+      setErrorMessage(null);
+
       console.log('✅ Login başarılı:', user?.email);
       await login(accessToken, user, refreshToken);
-      router.replace('/');
+
+      // Web pattern: e-posta doğrulanmadıysa bilgi banner'ı göster.
+      if (user && !user.isEmailVerified) {
+        setUnverifiedEmail(user.email);
+        // Yine de devam et — kullanıcı kapalı işlemleri görmek için banner'a "tekrar gönder" diyebilir.
+      }
+
+      // Web pattern: işletme bilgileri var ama Business tier değil ise membership upgrade'e yönlendir.
+      const hasBusinessInfo = !!(user?.companyName && user?.taxId);
+      const isBusinessTier = user?.membershipTier === 'business';
+      if (hasBusinessInfo && !isBusinessTier) {
+        Alert.alert(
+          'Kurumsal Üyelik',
+          'İşletme bilgilerinizi tamamlamışsınız. Kurumsal üyeliğe geçerek avantajlardan yararlanabilirsiniz.',
+          [
+            { text: 'Sonra', onPress: () => router.replace('/' as any), style: 'cancel' },
+            { text: 'Üyeliğe Geç', onPress: () => router.replace('/membership/checkout' as any) },
+          ],
+        );
+        return;
+      }
+
+      router.replace('/' as any);
     },
     onError: (error: any) => {
-      console.log('❌ Login hatası:', error.response?.data?.message || error.message);
+      const msg: string = error?.response?.data?.message || error?.message || 'Giriş başarısız.';
+      console.log('❌ Login hatası:', msg);
+      // Backend bazen "doğrulayınız" / "verify" / "doğrulanmadı" gibi mesajla 401/403 döner.
+      const lower = msg.toLowerCase();
+      if (lower.includes('doğrula') || lower.includes('verify') || lower.includes('doğrulanmadı')) {
+        setUnverifiedEmail(getValues('email'));
+        setErrorMessage(null);
+      } else {
+        setErrorMessage(msg);
+      }
+    },
+  });
+
+  const resendVerificationMutation = useMutation({
+    mutationFn: () => authApi.resendVerification(),
+    onSuccess: () => {
+      Alert.alert('Gönderildi', 'Doğrulama bağlantısı e-posta adresinize tekrar gönderildi.');
+    },
+    onError: (e: any) => {
+      Alert.alert('Hata', e?.response?.data?.message || 'Doğrulama bağlantısı gönderilemedi.');
     },
   });
 
   const onSubmit = (data: LoginForm) => {
+    setErrorMessage(null);
     loginMutation.mutate(data);
   };
 
@@ -51,13 +107,36 @@ export default function LoginScreen() {
       behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
       style={{ flex: 1, backgroundColor: theme.colors.background }}
     >
-      <View style={{ flex: 1, justifyContent: 'center', padding: 24 }}>
+      <ScrollView contentContainerStyle={{ flexGrow: 1, justifyContent: 'center', padding: 24 }}>
         <Text variant="displaySmall" style={{ textAlign: 'center', marginBottom: 8, color: theme.colors.primary }}>
           Tarodan
         </Text>
-        <Text variant="bodyLarge" style={{ textAlign: 'center', marginBottom: 32, color: theme.colors.outline }}>
+        <Text variant="bodyLarge" style={{ textAlign: 'center', marginBottom: 24, color: theme.colors.outline }}>
           Diecast Model Araba Pazaryeri
         </Text>
+
+        {unverifiedEmail ? (
+          <Banner
+            visible
+            icon={({ size }) => (
+              <Ionicons name="mail-unread-outline" size={size} color={TarodanColors.warning} />
+            )}
+            style={{ marginBottom: 12, backgroundColor: TarodanColors.warningLight }}
+            actions={[
+              {
+                label: resendVerificationMutation.isPending ? 'Gönderiliyor…' : 'Tekrar Gönder',
+                onPress: () => resendVerificationMutation.mutate(),
+              },
+              { label: 'Kapat', onPress: () => setUnverifiedEmail(null) },
+            ]}
+          >
+            <Text>
+              <Text style={{ fontWeight: '700' }}>{unverifiedEmail}</Text> adresi henüz
+              doğrulanmadı. Hesabınızı kullanmak için e-posta adresinize gönderilen bağlantıya
+              tıklayın veya yeni bir bağlantı isteyin.
+            </Text>
+          </Banner>
+        ) : null}
 
         <Controller
           control={control}
@@ -69,16 +148,17 @@ export default function LoginScreen() {
               onChangeText={onChange}
               keyboardType="email-address"
               autoCapitalize="none"
+              autoComplete="email"
               error={!!errors.email}
               style={{ marginBottom: 8 }}
             />
           )}
         />
-        {errors.email && (
+        {errors.email ? (
           <Text variant="bodySmall" style={{ color: theme.colors.error, marginBottom: 8 }}>
             {errors.email.message}
           </Text>
-        )}
+        ) : null}
 
         <Controller
           control={control}
@@ -89,22 +169,26 @@ export default function LoginScreen() {
               value={value}
               onChangeText={onChange}
               secureTextEntry
+              autoComplete="password"
               error={!!errors.password}
               style={{ marginBottom: 8 }}
             />
           )}
         />
-        {errors.password && (
+        {errors.password ? (
           <Text variant="bodySmall" style={{ color: theme.colors.error, marginBottom: 16 }}>
             {errors.password.message}
           </Text>
-        )}
+        ) : null}
 
-        {loginMutation.isError && (
-          <Text variant="bodySmall" style={{ color: theme.colors.error, marginBottom: 16, textAlign: 'center' }}>
-            Giriş başarısız. Bilgilerinizi kontrol edin.
+        {errorMessage ? (
+          <Text
+            variant="bodySmall"
+            style={{ color: theme.colors.error, marginBottom: 16, textAlign: 'center' }}
+          >
+            {errorMessage}
           </Text>
-        )}
+        ) : null}
 
         <Button
           mode="contained"
@@ -116,17 +200,26 @@ export default function LoginScreen() {
           Giriş Yap
         </Button>
 
-        <Button mode="text" onPress={() => router.push('/(auth)/forgot-password')}>
+        <Button mode="text" onPress={() => router.push('/(auth)/forgot-password' as any)}>
           Şifremi Unuttum
         </Button>
 
-        <View style={{ flexDirection: 'row', justifyContent: 'center', marginTop: 24 }}>
+        <View style={{ flexDirection: 'row', justifyContent: 'center', marginTop: 24, flexWrap: 'wrap' }}>
           <Text variant="bodyMedium">Hesabınız yok mu? </Text>
-          <Button mode="text" compact onPress={() => router.push('/(auth)/register')}>
+          <Button mode="text" compact onPress={() => router.push('/(auth)/register' as any)}>
             Kayıt Ol
           </Button>
         </View>
-      </View>
+
+        <View style={{ flexDirection: 'row', justifyContent: 'center', marginTop: 8, flexWrap: 'wrap' }}>
+          <Text variant="bodySmall" style={{ color: theme.colors.outline }}>
+            İşletmeyseniz{' '}
+          </Text>
+          <Button mode="text" compact onPress={() => router.push('/(auth)/register-business' as any)}>
+            Kurumsal Kayıt
+          </Button>
+        </View>
+      </ScrollView>
     </KeyboardAvoidingView>
   );
 }

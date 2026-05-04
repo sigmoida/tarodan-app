@@ -1,5 +1,6 @@
 import { View, ScrollView, StyleSheet, TouchableOpacity, Alert } from 'react-native';
-import { Text, Card, Button, TextInput, FAB, Portal, Dialog, ActivityIndicator, IconButton, RadioButton } from 'react-native-paper';
+import { Card, Button, FAB, Portal, Dialog, ActivityIndicator, IconButton, RadioButton } from 'react-native-paper';
+import { Text, TextInput, CityDistrictSelector } from '../../src/components/common';
 import { useState, useCallback } from 'react';
 import { router, useFocusEffect } from 'expo-router';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
@@ -318,22 +319,12 @@ export default function AddressesScreen() {
                 numberOfLines={2}
                 style={styles.input}
               />
-              <View style={styles.row}>
-                <TextInput
-                  label="İl *"
-                  value={formData.city}
-                  onChangeText={(text) => setFormData({ ...formData, city: text })}
-                  mode="outlined"
-                  style={[styles.input, styles.halfInput]}
-                />
-                <TextInput
-                  label="İlçe"
-                  value={formData.district}
-                  onChangeText={(text) => setFormData({ ...formData, district: text })}
-                  mode="outlined"
-                  style={[styles.input, styles.halfInput]}
-                />
-              </View>
+              <CityDistrictSelector
+                city={formData.city}
+                district={formData.district}
+                onChangeCity={(city) => setFormData({ ...formData, city })}
+                onChangeDistrict={(district) => setFormData({ ...formData, district })}
+              />
               <TextInput
                 label="Posta Kodu"
                 value={formData.postalCode}

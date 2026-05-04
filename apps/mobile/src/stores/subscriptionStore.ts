@@ -1,5 +1,5 @@
 import { create } from 'zustand';
-import { api } from '../services/api';
+import { membershipApi, paymentsApi } from '../services/api';
 
 export interface MembershipTier {
   id: string;
@@ -73,8 +73,8 @@ export const useSubscriptionStore = create<SubscriptionState>((set, get) => ({
   fetchSubscription: async () => {
     set({ isLoading: true, error: null });
     try {
-      const response = await api.get('/membership');
-      set({ subscription: response.data, isLoading: false });
+      const response = await membershipApi.getCurrentMembership();
+      set({ subscription: (response.data as any)?.data ?? response.data, isLoading: false });
     } catch (error: any) {
       // If no subscription found, set to null (free tier)
       set({ subscription: null, isLoading: false });
@@ -83,8 +83,8 @@ export const useSubscriptionStore = create<SubscriptionState>((set, get) => ({
 
   fetchTiers: async () => {
     try {
-      const response = await api.get('/membership/tiers');
-      set({ tiers: response.data });
+      const response = await membershipApi.getTiers();
+      set({ tiers: (response.data as any)?.data ?? response.data });
     } catch (error: any) {
       console.error('Failed to fetch tiers:', error);
       // Set default tiers as fallback
@@ -143,8 +143,10 @@ export const useSubscriptionStore = create<SubscriptionState>((set, get) => ({
 
   fetchBillingHistory: async () => {
     try {
-      const response = await api.get('/membership/billing-history');
-      set({ billingHistory: response.data });
+      // Backend'de henüz billing-history endpoint'i yok. Geçici olarak ödemelerden çek.
+      const response = await paymentsApi.getMyPayments({ status: 'paid', limit: 50 });
+      const list = (response.data as any)?.data ?? response.data ?? [];
+      set({ billingHistory: Array.isArray(list) ? list : [] });
     } catch (error: any) {
       console.error('Failed to fetch billing history:', error);
       set({ billingHistory: [] });
@@ -154,11 +156,13 @@ export const useSubscriptionStore = create<SubscriptionState>((set, get) => ({
   subscribe: async (tierId: string, billingPeriod: 'monthly' | 'yearly') => {
     set({ isLoading: true, error: null });
     try {
-      const response = await api.post('/membership/subscribe', { tierId, billingPeriod });
+      // Backend `tierType + billingPeriod` istiyor (web ile aynı). Eski tierId imzası
+      // korunuyor (subscriptionStore birden fazla tier modeli destekleyebilir).
+      const response = await membershipApi.subscribe({ tierType: tierId, billingPeriod });
       // Refresh subscription data
       await get().fetchSubscription();
       set({ isLoading: false });
-      return { paymentUrl: response.data?.paymentUrl };
+      return { paymentUrl: (response.data as any)?.paymentUrl };
     } catch (error: any) {
       set({ 
         isLoading: false, 
@@ -171,7 +175,7 @@ export const useSubscriptionStore = create<SubscriptionState>((set, get) => ({
   cancelSubscription: async () => {
     set({ isLoading: true, error: null });
     try {
-      await api.post('/membership/cancel');
+      await membershipApi.cancel();
       await get().fetchSubscription();
       set({ isLoading: false });
     } catch (error: any) {
@@ -186,13 +190,15 @@ export const useSubscriptionStore = create<SubscriptionState>((set, get) => ({
   reactivateSubscription: async () => {
     set({ isLoading: true, error: null });
     try {
-      await api.post('/membership/reactivate');
+      // Backend'de "reactivate" endpoint'i yok; auto-renew açma + yeni dönem
+      // başlangıcında subscribe çağrısı yapılarak benzer davranış elde edilir.
+      await membershipApi.setAutoRenew(true);
       await get().fetchSubscription();
       set({ isLoading: false });
     } catch (error: any) {
-      set({ 
-        isLoading: false, 
-        error: error.response?.data?.message || 'Abonelik yenilenemedi' 
+      set({
+        isLoading: false,
+        error: error.response?.data?.message || 'Abonelik yenilenemedi'
       });
       throw error;
     }
@@ -201,12 +207,15 @@ export const useSubscriptionStore = create<SubscriptionState>((set, get) => ({
   updatePaymentMethod: async (paymentMethodId: string) => {
     set({ isLoading: true, error: null });
     try {
-      await api.post('/membership/update-payment-method', { paymentMethodId });
+      // Backend membership için ayrı update-payment-method endpoint'i yok.
+      // Kart yönetimi `/payments/methods` endpoint'leri üzerinden — kullanıcı
+      // kayıtlı kart ekler/siler, bir sonraki tahsilat varsayılanı kullanır.
+      console.warn('updatePaymentMethod: backend endpoint yok; payment method seçimi /payments/methods üzerinden yapılır.');
       set({ isLoading: false });
     } catch (error: any) {
-      set({ 
-        isLoading: false, 
-        error: error.response?.data?.message || 'Ödeme yöntemi güncellenemedi' 
+      set({
+        isLoading: false,
+        error: error.response?.data?.message || 'Ödeme yöntemi güncellenemedi'
       });
       throw error;
     }

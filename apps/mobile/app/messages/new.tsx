@@ -1,5 +1,6 @@
 import { View, StyleSheet, TouchableOpacity, TextInput as RNTextInput, KeyboardAvoidingView, Platform } from 'react-native';
-import { Text, Searchbar, Avatar, ActivityIndicator, Button } from 'react-native-paper';
+import { Avatar, ActivityIndicator, Button } from 'react-native-paper';
+import { Text, Searchbar } from '../../src/components/common';
 import { useState } from 'react';
 import { router, useLocalSearchParams } from 'expo-router';
 import { useQuery } from '@tanstack/react-query';

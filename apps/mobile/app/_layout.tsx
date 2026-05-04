@@ -9,6 +9,7 @@ import Constants from 'expo-constants';
 import { useAuthStore } from '../src/stores/authStore';
 import { registerForPushNotifications } from '../src/services/push';
 import { TarodanLightTheme, TarodanDarkTheme } from '../src/theme';
+import { LanguageProvider } from '../src/i18n/LanguageContext';
 
 // Conditionally import notifications - only in development builds, not Expo Go
 let Notifications: any = null;
@@ -78,20 +79,22 @@ export default function RootLayout() {
 
   return (
     <QueryClientProvider client={queryClient}>
-      <PaperProvider theme={theme}>
-        <StatusBar style="auto" />
-        <Stack
-          screenOptions={{
-            headerStyle: { backgroundColor: theme.colors.primary },
-            headerTintColor: '#fff',
-            headerTitleStyle: { fontWeight: 'bold' },
-            headerShown: false,
-          }}
-        >
-          <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
-          <Stack.Screen name="(auth)" options={{ headerShown: false }} />
-        </Stack>
-      </PaperProvider>
+      <LanguageProvider>
+        <PaperProvider theme={theme}>
+          <StatusBar style="auto" />
+          <Stack
+            screenOptions={{
+              headerStyle: { backgroundColor: theme.colors.primary },
+              headerTintColor: '#fff',
+              headerTitleStyle: { fontWeight: 'bold' },
+              headerShown: false,
+            }}
+          >
+            <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
+            <Stack.Screen name="(auth)" options={{ headerShown: false }} />
+          </Stack>
+        </PaperProvider>
+      </LanguageProvider>
     </QueryClientProvider>
   );
 }

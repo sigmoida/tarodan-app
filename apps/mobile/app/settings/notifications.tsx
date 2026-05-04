@@ -1,5 +1,6 @@
 import { View, ScrollView, StyleSheet, TouchableOpacity, Alert } from 'react-native';
-import { Text, Card, Switch, Button, Divider, ActivityIndicator } from 'react-native-paper';
+import { Card, Switch, Button, Divider, ActivityIndicator } from 'react-native-paper';
+import { Text } from '../../src/components/common';
 import { useState, useCallback, useEffect } from 'react';
 import { router, useFocusEffect } from 'expo-router';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';

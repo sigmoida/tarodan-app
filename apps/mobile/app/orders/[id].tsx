@@ -1,10 +1,11 @@
 import { View, ScrollView, StyleSheet, TouchableOpacity, Image, Linking } from 'react-native';
-import { Text, Card, Button, ActivityIndicator, Divider, Chip } from 'react-native-paper';
+import { Card, Button, ActivityIndicator, Divider, Chip } from 'react-native-paper';
+import { Text } from '../../src/components/common';
 import { useState } from 'react';
 import { router, useLocalSearchParams } from 'expo-router';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { Ionicons } from '@expo/vector-icons';
-import { api } from '../../src/services/api';
+import { api, ordersApi } from '../../src/services/api';
 import { TarodanColors } from '../../src/theme';
 import RatingModal from '../../src/components/RatingModal';
 import { transformImageUrl, getImageUrl as getImageUrlFromUtils } from '../../src/utils/imageUrl';
@@ -74,7 +75,7 @@ export default function OrderDetailScreen() {
   // Confirm delivery mutation
   const confirmDeliveryMutation = useMutation({
     mutationFn: async () => {
-      return api.post(`/orders/${id}/confirm-delivery`);
+      return ordersApi.confirm(id as string);
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['order', id] });

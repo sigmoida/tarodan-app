@@ -11,7 +11,7 @@ import {
   ViewStyle,
   TextStyle,
 } from 'react-native';
-import Icon from 'react-native-vector-icons/Ionicons';
+import { Ionicons as Icon } from '@expo/vector-icons';
 
 interface ButtonProps {
   title: string;
@@ -118,11 +118,11 @@ const Button: React.FC<ButtonProps> = ({
       ) : (
         <>
           {icon && iconPosition === 'left' && (
-            <Icon name={icon} size={iconSize} color={getIconColor()} style={baseStyles.iconLeft} />
+            <Icon name={icon as any} size={iconSize} color={getIconColor()} style={baseStyles.iconLeft} />
           )}
           <Text style={[...getTextStyle(), textStyle]}>{title}</Text>
           {icon && iconPosition === 'right' && (
-            <Icon name={icon} size={iconSize} color={getIconColor()} style={baseStyles.iconRight} />
+            <Icon name={icon as any} size={iconSize} color={getIconColor()} style={baseStyles.iconRight} />
           )}
         </>
       )}

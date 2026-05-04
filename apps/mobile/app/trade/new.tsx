@@ -1,5 +1,6 @@
 import { View, ScrollView, StyleSheet, TouchableOpacity, Image, Alert } from 'react-native';
-import { Text, TextInput, Button, Card, Chip, Divider, ActivityIndicator, Snackbar } from 'react-native-paper';
+import { Button, Card, Chip, Divider, ActivityIndicator, Snackbar } from 'react-native-paper';
+import { Text, TextInput } from '../../src/components/common';
 import { useState, useEffect } from 'react';
 import { router, useLocalSearchParams } from 'expo-router';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';

@@ -1,6 +1,7 @@
 import { View, ScrollView, RefreshControl, Dimensions, Image, TouchableOpacity, StyleSheet } from 'react-native';
-import { Text, Card, Chip, Searchbar, ActivityIndicator, useTheme, Avatar, Badge, IconButton } from 'react-native-paper';
-import { useState, useCallback, useEffect } from 'react';
+import { Card, Chip, ActivityIndicator, useTheme, Avatar, Badge, IconButton } from 'react-native-paper';
+import { Text, Searchbar, CardCover } from '../../src/components/common';
+import React, { useState, useCallback, useEffect } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { router } from 'expo-router';
 import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
@@ -216,7 +217,14 @@ export default function HomeScreen() {
     const imageUrl = getImageUrl(item.images);
     const isTradeEnabled = item.isTradeEnabled || item.trade_available;
     const viewCount = item.viewCount || item.views || 0;
-    
+    // brand/scale backend'den {id,name,slug} obje veya string gelebilir — Text'e gömülmeden önce düzleştir.
+    const brandLabel = typeof item.brand === 'object' && item.brand !== null
+      ? (item.brand.name ?? '')
+      : (item.brand ?? 'Marka');
+    const scaleLabel = typeof item.scale === 'object' && item.scale !== null
+      ? (item.scale.name ?? '')
+      : (item.scale ?? '1:64');
+
     return (
       <Card
         key={item.id || index}
@@ -224,10 +232,7 @@ export default function HomeScreen() {
         onPress={() => handleProductPress(item.id)}
       >
         <View style={styles.productImageContainer}>
-          <Card.Cover
-            source={{ uri: imageUrl }}
-            style={styles.productImage}
-          />
+          <CardCover source={{ uri: imageUrl }} style={styles.productImage} />
           {isTradeEnabled && (
             <View style={[styles.badge, { backgroundColor: TarodanColors.success }]}>
               <Ionicons name="swap-horizontal" size={10} color="#fff" />
@@ -241,7 +246,7 @@ export default function HomeScreen() {
         </View>
         <Card.Content style={styles.productContent}>
           <Text style={styles.productTitle} numberOfLines={2}>{item.title}</Text>
-          <Text style={styles.productMeta}>{item.brand || 'Marka'} • {item.scale || '1:64'}</Text>
+          <Text style={styles.productMeta}>{brandLabel} • {scaleLabel}</Text>
           <Text style={styles.productPrice}>₺{item.price?.toLocaleString('tr-TR') || 0}</Text>
         </Card.Content>
       </Card>
@@ -286,7 +291,7 @@ export default function HomeScreen() {
           value={searchQuery}
           onChangeText={setSearchQuery}
           onSubmitEditing={handleSearch}
-          style={styles.searchBar}
+          style={styles.searchBar as any}
           inputStyle={styles.searchInput}
           iconColor={TarodanColors.textSecondary}
         />
@@ -459,7 +464,7 @@ export default function HomeScreen() {
               )}
               <TouchableOpacity 
                 style={styles.viewGarageBtn}
-                onPress={() => router.push(`/collection/${featuredCollector.id}`)}
+                onPress={() => router.push(`/collection/${featuredCollector.id}` as any)}
               >
                 <Text style={styles.viewGarageBtnText}>Garajını incele →</Text>
               </TouchableOpacity>
@@ -641,7 +646,7 @@ export default function HomeScreen() {
                     <TouchableOpacity 
                       key={collection.id} 
                       style={styles.companyCollectionCard}
-                      onPress={() => router.push(`/collection/${collection.id}`)}
+                      onPress={() => router.push(`/collection/${collection.id}` as any)}
                     >
                       {collection.coverImageUrl ? (
                         <Image
@@ -700,7 +705,7 @@ export default function HomeScreen() {
                 <TouchableOpacity 
                   key={collection.id} 
                   style={styles.collectionCard}
-                  onPress={() => router.push(`/collection/${collection.id}`)}
+                  onPress={() => router.push(`/collection/${collection.id}` as any)}
                 >
                   <Image 
                     source={{ uri: collection.coverImageUrl || 'https://placehold.co/200x150/f3f4f6/9ca3af?text=Koleksiyon' }} 
@@ -1068,18 +1073,6 @@ const styles = StyleSheet.create({
     fontSize: 18,
     fontWeight: 'bold',
     color: TarodanColors.price,
-  },
-  companyCard: {
-    backgroundColor: TarodanColors.background,
-    marginHorizontal: 16,
-    borderRadius: 12,
-    padding: 16,
-    borderWidth: 1,
-    borderColor: TarodanColors.border,
-  },
-  companyInfo: {
-    flexDirection: 'row',
-    marginBottom: 16,
   },
   companyDetails: {
     flex: 1,

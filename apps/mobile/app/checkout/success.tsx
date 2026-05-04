@@ -1,5 +1,6 @@
 import { View, StyleSheet, ScrollView } from 'react-native';
-import { Text, Button, Card } from 'react-native-paper';
+import { Button, Card } from 'react-native-paper';
+import { Text } from '../../src/components/common';
 import { router, useLocalSearchParams } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { TarodanColors } from '../../src/theme';

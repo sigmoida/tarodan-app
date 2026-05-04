@@ -1,11 +1,13 @@
 import { useEffect } from 'react';
 import { View, ScrollView, StyleSheet, TouchableOpacity, Image } from 'react-native';
-import { Text, Button, IconButton, Divider } from 'react-native-paper';
+import { Button, IconButton, Divider } from 'react-native-paper';
+import { Text } from '../src/components/common';
 import { router } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { TarodanColors } from '../src/theme';
 import { useCartStore } from '../src/stores/cartStore';
 import { transformImageUrl } from '../src/utils/imageUrl';
+import { asLabel } from '../src/utils/format';
 
 export default function CartScreen() {
   const { items, getSubtotal, getItemCount, removeItem, updateQuantity, cleanExpiredItems } = useCartStore();
@@ -94,7 +96,7 @@ export default function CartScreen() {
               <TouchableOpacity onPress={() => router.push(`/product/${item.productId}`)}>
                 <Text style={styles.itemTitle} numberOfLines={2}>{item.title}</Text>
               </TouchableOpacity>
-              <Text style={styles.itemMeta}>{item.brand || 'Marka'} • {item.scale || '1:64'}</Text>
+              <Text style={styles.itemMeta}>{asLabel(item.brand, 'Marka')} • {asLabel(item.scale, '1:64')}</Text>
               <Text style={styles.itemSeller}>Satıcı: {item.seller.displayName}</Text>
               <Text style={styles.itemPrice}>₺{item.price.toLocaleString('tr-TR')}</Text>
             </View>

@@ -1,5 +1,6 @@
 import { View, FlatList, RefreshControl } from 'react-native';
-import { Text, Card, Chip, Button, ActivityIndicator, useTheme, SegmentedButtons } from 'react-native-paper';
+import { Card, Chip, Button, ActivityIndicator, useTheme, SegmentedButtons } from 'react-native-paper';
+import { Text } from '../../src/components/common';
 import { useState, useCallback } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { router } from 'expo-router';

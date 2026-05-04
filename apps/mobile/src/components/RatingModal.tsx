@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { View, StyleSheet, TouchableOpacity, ScrollView } from 'react-native';
-import { Text, Portal, Dialog, Button, TextInput, IconButton } from 'react-native-paper';
+import { Portal, Dialog, Button, IconButton } from 'react-native-paper';
+import { Text, TextInput } from './common';
 import { Ionicons } from '@expo/vector-icons';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { api } from '../services/api';
@@ -154,7 +155,7 @@ export default function RatingModal({
             <TextInput
               label={type === 'product' ? 'Yorumunuz (opsiyonel)' : 'Yorumunuz (opsiyonel)'}
               value={review}
-              onChangeText={(text) => setReview(text.slice(0, maxReviewChars))}
+              onChangeText={(text: string) => setReview(text.slice(0, maxReviewChars))}
               multiline
               numberOfLines={4}
               style={styles.input}

@@ -1,6 +1,7 @@
 import { useState, useCallback } from 'react';
 import { View, ScrollView, StyleSheet, TouchableOpacity, Image, Dimensions, RefreshControl } from 'react-native';
-import { Text, Card, Searchbar, ActivityIndicator, Chip, Menu } from 'react-native-paper';
+import { Card, ActivityIndicator, Chip, Menu } from 'react-native-paper';
+import { Text, Searchbar } from '../../src/components/common';
 import { useQuery } from '@tanstack/react-query';
 import { router, useLocalSearchParams } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';

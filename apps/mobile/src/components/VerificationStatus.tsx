@@ -33,10 +33,10 @@ export default function VerificationStatus({ compact = false, showUpgradePrompt 
   // Compact version for profile header
   if (compact) {
     return (
-      <TouchableOpacity onPress={() => router.push('/settings/verification')}>
+      <TouchableOpacity onPress={() => router.push('/settings/verification' as any)}>
         <View style={styles.compactContainer}>
           <Ionicons
-            name={isVerified ? 'checkmark-shield' : 'shield-outline'}
+            name={isVerified ? 'shield-checkmark' : 'shield-outline'}
             size={20}
             color={isVerified ? TarodanColors.success : TarodanColors.warning}
           />
@@ -53,7 +53,7 @@ export default function VerificationStatus({ compact = false, showUpgradePrompt 
       <Card.Content>
         <View style={styles.header}>
           <Ionicons
-            name={isVerified ? 'checkmark-shield' : 'shield-half-outline'}
+            name={isVerified ? 'shield-checkmark' : 'shield-half-outline'}
             size={28}
             color={isVerified ? TarodanColors.success : TarodanColors.primary}
           />

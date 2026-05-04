@@ -1,10 +1,11 @@
 import { useState } from 'react';
 import { View, ScrollView, StyleSheet, TouchableOpacity, FlatList, Dimensions, Image } from 'react-native';
-import { Text, Avatar, Button, Card, Chip, Divider, ActivityIndicator } from 'react-native-paper';
+import { Avatar, Button, Card, Chip, Divider, ActivityIndicator } from 'react-native-paper';
+import { Text, CardCover } from '../../src/components/common';
 import { useQuery } from '@tanstack/react-query';
 import { useLocalSearchParams, router } from 'expo-router';
 import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
-import { api } from '../../src/services/api';
+import { userApi, productsApi, ratingsApi } from '../../src/services/api';
 import { useAuthStore } from '../../src/stores/authStore';
 import { TarodanColors } from '../../src/theme';
 
@@ -57,8 +58,9 @@ export default function SellerProfileScreen() {
     queryKey: ['seller', id],
     queryFn: async () => {
       try {
-        const response = await api.get(`/users/${id}/public`);
-        return response.data.data || response.data;
+        // Web `userApi.getPublicProfile` ile aynı: GET /users/:id/profile
+        const response = await userApi.getPublicProfile(String(id));
+        return (response.data as any)?.data || response.data;
       } catch (error) {
         console.log('⚠️ Satıcı bilgisi yüklenemedi, mock data kullanılacak');
         return null;
@@ -71,8 +73,9 @@ export default function SellerProfileScreen() {
     queryKey: ['seller-products', id],
     queryFn: async () => {
       try {
-        const response = await api.get('/products', { params: { sellerId: id } });
-        return response.data.data || response.data || [];
+        const response = await productsApi.getAll({ sellerId: id });
+        const data: any = response.data;
+        return data?.data ?? data?.items ?? data ?? [];
       } catch {
         return MOCK_SELLER.products;
       }
@@ -80,9 +83,40 @@ export default function SellerProfileScreen() {
     enabled: !!id,
   });
 
+  // Web `apps/web/src/app/seller/[id]/page.tsx:181-193` paritesi
+  const { data: ratingStats } = useQuery({
+    queryKey: ['seller-rating-stats', id],
+    queryFn: async () => {
+      try {
+        const response = await ratingsApi.getUserStats(String(id));
+        return (response.data as any)?.data ?? response.data ?? null;
+      } catch {
+        return null;
+      }
+    },
+    enabled: !!id,
+  });
+
+  const { data: ratingList } = useQuery({
+    queryKey: ['seller-ratings', id],
+    queryFn: async () => {
+      try {
+        const response = await ratingsApi.getUserRatings(String(id), { limit: 20 });
+        const data: any = response.data;
+        return data?.items ?? data?.data ?? data ?? [];
+      } catch {
+        return [];
+      }
+    },
+    enabled: !!id,
+  });
+
   const seller = apiSeller || MOCK_SELLER;
   const products = sellerProducts || MOCK_SELLER.products;
-  const reviews = seller.reviews || MOCK_SELLER.reviews;
+  // Backend ratings öncelikli; yoksa mock fallback.
+  const reviews = (Array.isArray(ratingList) && ratingList.length > 0)
+    ? ratingList
+    : (seller.reviews || MOCK_SELLER.reviews);
 
   const handleMessage = () => {
     if (!isAuthenticated) {
@@ -151,9 +185,15 @@ export default function SellerProfileScreen() {
             <View style={styles.statItem}>
               <View style={styles.ratingValue}>
                 <Ionicons name="star" size={18} color={TarodanColors.star} />
-                <Text style={styles.statValue}>{seller.rating}</Text>
+                <Text style={styles.statValue}>
+                  {(ratingStats?.averageScore ?? ratingStats?.averageRating ?? seller.rating ?? 0).toFixed
+                    ? (ratingStats?.averageScore ?? ratingStats?.averageRating ?? seller.rating ?? 0).toFixed(1)
+                    : seller.rating}
+                </Text>
               </View>
-              <Text style={styles.statLabel}>{seller.totalReviews} değerlendirme</Text>
+              <Text style={styles.statLabel}>
+                {(ratingStats?.totalRatings ?? ratingStats?.total ?? seller.totalReviews ?? 0)} değerlendirme
+              </Text>
             </View>
           </View>
 
@@ -246,7 +286,7 @@ export default function SellerProfileScreen() {
                 style={styles.productCard}
                 onPress={() => router.push(`/product/${product.id}`)}
               >
-                <Card.Cover
+                <CardCover
                   source={{ uri: product.images?.[0] || 'https://placehold.co/200x200/f3f4f6/9ca3af?text=Ürün' }}
                   style={styles.productImage}
                 />
@@ -264,34 +304,60 @@ export default function SellerProfileScreen() {
           </View>
         ) : (
           <View style={styles.reviewsList}>
-            {reviews.map((review: any) => (
-              <View key={review.id} style={styles.reviewCard}>
-                <View style={styles.reviewHeader}>
-                  <Avatar.Text
-                    size={40}
-                    label={review.userName?.substring(0, 2).toUpperCase() || 'U'}
-                    style={{ backgroundColor: TarodanColors.secondaryLight }}
-                  />
-                  <View style={styles.reviewInfo}>
-                    <Text style={styles.reviewerName}>{review.userName}</Text>
-                    <View style={styles.ratingStars}>
-                      {[1, 2, 3, 4, 5].map((star) => (
-                        <Ionicons
-                          key={star}
-                          name={star <= review.rating ? 'star' : 'star-outline'}
-                          size={14}
-                          color={TarodanColors.star}
-                        />
-                      ))}
-                      <Text style={styles.reviewDate}>
-                        {new Date(review.date).toLocaleDateString('tr-TR')}
-                      </Text>
-                    </View>
-                  </View>
-                </View>
-                <Text style={styles.reviewComment}>{review.comment}</Text>
+            {reviews.length === 0 ? (
+              <View style={{ alignItems: 'center', padding: 32 }}>
+                <Ionicons name="star-outline" size={48} color={TarodanColors.textTertiary} />
+                <Text style={{ color: TarodanColors.textSecondary, marginTop: 8, fontSize: 14 }}>
+                  Henüz değerlendirme yok
+                </Text>
               </View>
-            ))}
+            ) : (
+              reviews.map((review: any) => {
+                // Backend rating: { score, comment, createdAt, reviewer: { displayName, avatarUrl } }
+                // Mock: { rating, comment, date, userName }
+                const score = review.score ?? review.rating ?? 0;
+                const reviewerName =
+                  review.reviewer?.displayName ?? review.userName ?? 'Kullanıcı';
+                const dateStr = review.createdAt ?? review.date;
+                const avatarUrl = review.reviewer?.avatarUrl;
+                return (
+                  <View key={review.id} style={styles.reviewCard}>
+                    <View style={styles.reviewHeader}>
+                      {avatarUrl ? (
+                        <Avatar.Image size={40} source={{ uri: avatarUrl }} />
+                      ) : (
+                        <Avatar.Text
+                          size={40}
+                          label={reviewerName.substring(0, 2).toUpperCase()}
+                          style={{ backgroundColor: TarodanColors.secondaryLight }}
+                        />
+                      )}
+                      <View style={styles.reviewInfo}>
+                        <Text style={styles.reviewerName}>{reviewerName}</Text>
+                        <View style={styles.ratingStars}>
+                          {[1, 2, 3, 4, 5].map((star) => (
+                            <Ionicons
+                              key={star}
+                              name={star <= score ? 'star' : 'star-outline'}
+                              size={14}
+                              color={TarodanColors.star}
+                            />
+                          ))}
+                          {dateStr ? (
+                            <Text style={styles.reviewDate}>
+                              {new Date(dateStr).toLocaleDateString('tr-TR')}
+                            </Text>
+                          ) : null}
+                        </View>
+                      </View>
+                    </View>
+                    {review.comment ? (
+                      <Text style={styles.reviewComment}>{review.comment}</Text>
+                    ) : null}
+                  </View>
+                );
+              })
+            )}
           </View>
         )}
 

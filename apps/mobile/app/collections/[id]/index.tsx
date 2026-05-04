@@ -1,12 +1,14 @@
 import { useState } from 'react';
 import { View, ScrollView, StyleSheet, TouchableOpacity, Image, Dimensions, FlatList, Share } from 'react-native';
-import { Text, Avatar, Button, Chip, Divider, ActivityIndicator, IconButton, Card } from 'react-native-paper';
+import { Avatar, Button, Chip, Divider, ActivityIndicator, IconButton, Card } from 'react-native-paper';
+import { Text } from '../../../src/components/common';
 import { useQuery } from '@tanstack/react-query';
 import { useLocalSearchParams, router } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { api } from '../../../src/services/api';
 import { TarodanColors } from '../../../src/theme';
 import { transformImageUrl } from '../../../src/utils/imageUrl';
+import { asLabel } from '../../../src/utils/format';
 
 const { width } = Dimensions.get('window');
 
@@ -257,7 +259,7 @@ export default function CollectionDetailScreen() {
                 />
                 <View style={styles.itemInfo}>
                   <Text style={styles.itemTitle} numberOfLines={2}>{item.title}</Text>
-                  <Text style={styles.itemMeta}>{item.brand} • {item.scale}</Text>
+                  <Text style={styles.itemMeta}>{asLabel(item.brand)} • {asLabel(item.scale)}</Text>
                   {item.year && (
                     <Text style={styles.itemYear}>Model: {item.year}</Text>
                   )}

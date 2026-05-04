@@ -1,16 +1,22 @@
 import { View, ScrollView, KeyboardAvoidingView, Platform } from 'react-native';
-import { Text, TextInput, Button, Checkbox, useTheme } from 'react-native-paper';
+import { Button, Checkbox, useTheme } from 'react-native-paper';
+import { Text, TextInput } from '../../src/components/common';
 import { useForm, Controller } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import { useMutation } from '@tanstack/react-query';
 import { router } from 'expo-router';
 import { authApi } from '../../src/services/api';
+import {
+  displayNameSchema,
+  emailSchema,
+  strongPasswordSchema,
+} from '../../src/utils/validation';
 
 const registerSchema = z.object({
-  displayName: z.string().min(2, 'İsim en az 2 karakter olmalı'),
-  email: z.string().email('Geçerli email girin'),
-  password: z.string().min(6, 'Şifre en az 6 karakter olmalı'),
+  displayName: displayNameSchema,
+  email: emailSchema,
+  password: strongPasswordSchema,
   confirmPassword: z.string(),
   acceptTerms: z.boolean().refine(val => val, 'Kullanım koşullarını kabul etmelisiniz'),
 }).refine(data => data.password === data.confirmPassword, {

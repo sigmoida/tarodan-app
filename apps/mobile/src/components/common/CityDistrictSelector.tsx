@@ -1,0 +1,296 @@
+import React, { useMemo, useState } from 'react';
+import { View, StyleSheet, FlatList, TouchableOpacity, Modal, Pressable } from 'react-native';
+// (TouchableOpacity is used both for the input rows and modal list rows.)
+import { Ionicons } from '@expo/vector-icons';
+import { TarodanColors } from '../../theme';
+import { Text, TextInput } from './PaperCompat';
+import { turkeyLocations, getDistrictsForCity } from '../../utils/turkeyLocations';
+
+/**
+ * Web `CityDistrictSelector` bileşeninin mobile karşılığı.
+ *
+ * - 81 il + tüm ilçeler `turkeyLocations`'tan gelir.
+ * - İl seçildiğinde ilçe listesi otomatik bağımlı güncellenir.
+ * - "Search" yazılınca arama yapılır.
+ * - Boş alan dokunulduğunda alttan modal liste açar.
+ */
+interface Props {
+  city: string;
+  district: string;
+  onChangeCity: (city: string) => void;
+  onChangeDistrict: (district: string) => void;
+  /** İlçeyi gizle (örn. checkout'ta tek satır il gösterimi) */
+  hideDistrict?: boolean;
+  /** Form hata stili göster */
+  cityError?: boolean;
+  districtError?: boolean;
+}
+
+export function CityDistrictSelector({
+  city,
+  district,
+  onChangeCity,
+  onChangeDistrict,
+  hideDistrict = false,
+  cityError,
+  districtError,
+}: Props) {
+  const [cityModal, setCityModal] = useState(false);
+  const [districtModal, setDistrictModal] = useState(false);
+  const [citySearch, setCitySearch] = useState('');
+  const [districtSearch, setDistrictSearch] = useState('');
+
+  const filteredCities = useMemo(() => {
+    const q = citySearch.toLocaleLowerCase('tr-TR').trim();
+    if (!q) return turkeyLocations;
+    return turkeyLocations.filter(c => c.name.toLocaleLowerCase('tr-TR').includes(q));
+  }, [citySearch]);
+
+  const districts = useMemo(() => getDistrictsForCity(city), [city]);
+  const filteredDistricts = useMemo(() => {
+    const q = districtSearch.toLocaleLowerCase('tr-TR').trim();
+    if (!q) return districts;
+    return districts.filter(d => d.toLocaleLowerCase('tr-TR').includes(q));
+  }, [districts, districtSearch]);
+
+  const selectCity = (next: string) => {
+    if (next !== city) {
+      onChangeCity(next);
+      // İl değişince ilçe sıfırlanır (web ile aynı davranış)
+      onChangeDistrict('');
+    }
+    setCityModal(false);
+    setCitySearch('');
+  };
+
+  const selectDistrict = (next: string) => {
+    onChangeDistrict(next);
+    setDistrictModal(false);
+    setDistrictSearch('');
+  };
+
+  return (
+    <View>
+      <TouchableOpacity
+        activeOpacity={0.7}
+        onPress={() => setCityModal(true)}
+        style={[
+          styles.fakeInput,
+          cityError && styles.fakeInputError,
+        ]}
+      >
+        <View style={{ flex: 1 }}>
+          <Text style={styles.fakeLabel}>İl *</Text>
+          <Text
+            style={[
+              styles.fakeValue,
+              !city && styles.fakePlaceholder,
+            ]}
+            numberOfLines={1}
+          >
+            {city || 'Bir il seçin'}
+          </Text>
+        </View>
+        <Ionicons name="chevron-down" size={18} color={TarodanColors.textSecondary} />
+      </TouchableOpacity>
+
+      {!hideDistrict ? (
+        <TouchableOpacity
+          activeOpacity={0.7}
+          onPress={() => city && setDistrictModal(true)}
+          disabled={!city}
+          style={[
+            styles.fakeInput,
+            districtError && styles.fakeInputError,
+            !city && styles.fakeInputDisabled,
+          ]}
+        >
+          <View style={{ flex: 1 }}>
+            <Text style={styles.fakeLabel}>İlçe *</Text>
+            <Text
+              style={[
+                styles.fakeValue,
+                !district && styles.fakePlaceholder,
+              ]}
+              numberOfLines={1}
+            >
+              {district || (city ? 'Bir ilçe seçin' : 'Önce il seçin')}
+            </Text>
+          </View>
+          <Ionicons name="chevron-down" size={18} color={TarodanColors.textSecondary} />
+        </TouchableOpacity>
+      ) : null}
+
+      {/* City modal */}
+      <Modal visible={cityModal} animationType="slide" transparent onRequestClose={() => setCityModal(false)}>
+        <Pressable style={styles.backdrop} onPress={() => setCityModal(false)} />
+        <View style={styles.sheet}>
+          <View style={styles.sheetHeader}>
+            <Text style={styles.sheetTitle}>İl Seç</Text>
+            <TouchableOpacity onPress={() => setCityModal(false)}>
+              <Ionicons name="close" size={22} color={TarodanColors.textSecondary} />
+            </TouchableOpacity>
+          </View>
+          <View style={styles.sheetSearch}>
+            <TextInput
+              mode="outlined"
+              placeholder="İl ara…"
+              value={citySearch}
+              onChangeText={setCitySearch}
+              dense
+              outlineColor={TarodanColors.border}
+              activeOutlineColor={TarodanColors.primary}
+              left={<TextInput.Icon icon="magnify" />}
+            />
+          </View>
+          <FlatList
+            data={filteredCities}
+            keyExtractor={(item) => item.name}
+            keyboardShouldPersistTaps="handled"
+            renderItem={({ item }) => (
+              <TouchableOpacity
+                style={[styles.row, city === item.name && styles.rowSelected]}
+                onPress={() => selectCity(item.name)}
+              >
+                <Text style={styles.rowText}>{item.name}</Text>
+                {city === item.name ? (
+                  <Ionicons name="checkmark" size={18} color={TarodanColors.primary} />
+                ) : null}
+              </TouchableOpacity>
+            )}
+          />
+        </View>
+      </Modal>
+
+      {/* District modal */}
+      <Modal visible={districtModal} animationType="slide" transparent onRequestClose={() => setDistrictModal(false)}>
+        <Pressable style={styles.backdrop} onPress={() => setDistrictModal(false)} />
+        <View style={styles.sheet}>
+          <View style={styles.sheetHeader}>
+            <Text style={styles.sheetTitle}>İlçe Seç ({city})</Text>
+            <TouchableOpacity onPress={() => setDistrictModal(false)}>
+              <Ionicons name="close" size={22} color={TarodanColors.textSecondary} />
+            </TouchableOpacity>
+          </View>
+          <View style={styles.sheetSearch}>
+            <TextInput
+              mode="outlined"
+              placeholder="İlçe ara…"
+              value={districtSearch}
+              onChangeText={setDistrictSearch}
+              dense
+              outlineColor={TarodanColors.border}
+              activeOutlineColor={TarodanColors.primary}
+              left={<TextInput.Icon icon="magnify" />}
+            />
+          </View>
+          <FlatList
+            data={filteredDistricts}
+            keyExtractor={(item) => item}
+            keyboardShouldPersistTaps="handled"
+            renderItem={({ item }) => (
+              <TouchableOpacity
+                style={[styles.row, district === item && styles.rowSelected]}
+                onPress={() => selectDistrict(item)}
+              >
+                <Text style={styles.rowText}>{item}</Text>
+                {district === item ? (
+                  <Ionicons name="checkmark" size={18} color={TarodanColors.primary} />
+                ) : null}
+              </TouchableOpacity>
+            )}
+          />
+        </View>
+      </Modal>
+    </View>
+  );
+}
+
+const styles = StyleSheet.create({
+  input: {
+    marginBottom: 12,
+    backgroundColor: TarodanColors.background,
+  },
+  fakeInput: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: TarodanColors.background,
+    borderWidth: 1,
+    borderColor: TarodanColors.border,
+    borderRadius: 4,
+    paddingHorizontal: 14,
+    paddingVertical: 10,
+    minHeight: 56,
+    marginBottom: 12,
+  },
+  fakeInputError: {
+    borderColor: TarodanColors.error,
+  },
+  fakeInputDisabled: {
+    backgroundColor: TarodanColors.surfaceVariant,
+    opacity: 0.6,
+  },
+  fakeLabel: {
+    fontSize: 11,
+    color: TarodanColors.textSecondary,
+    marginBottom: 2,
+  },
+  fakeValue: {
+    fontSize: 15,
+    color: TarodanColors.textPrimary,
+  },
+  fakePlaceholder: {
+    color: TarodanColors.textTertiary,
+  },
+  backdrop: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.4)',
+  },
+  sheet: {
+    position: 'absolute',
+    bottom: 0,
+    left: 0,
+    right: 0,
+    maxHeight: '80%',
+    backgroundColor: TarodanColors.background,
+    borderTopLeftRadius: 16,
+    borderTopRightRadius: 16,
+    paddingBottom: 16,
+  },
+  sheetHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: 16,
+    paddingVertical: 14,
+    borderBottomWidth: StyleSheet.hairlineWidth,
+    borderBottomColor: TarodanColors.border,
+  },
+  sheetTitle: {
+    fontSize: 16,
+    fontWeight: '700',
+    color: TarodanColors.textPrimary,
+  },
+  sheetSearch: {
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+  },
+  row: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: 16,
+    paddingVertical: 14,
+    borderBottomWidth: StyleSheet.hairlineWidth,
+    borderBottomColor: TarodanColors.borderLight,
+  },
+  rowSelected: {
+    backgroundColor: TarodanColors.primaryLight,
+  },
+  rowText: {
+    fontSize: 14,
+    color: TarodanColors.textPrimary,
+  },
+});
+
+export default CityDistrictSelector;

@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { View, ScrollView, StyleSheet, Image, Alert } from 'react-native';
-import { Modal, Portal, Text, Button, Card, IconButton, Chip, Snackbar, ActivityIndicator, Divider } from 'react-native-paper';
+import { Modal, Portal, Button, Card, IconButton, Chip, Snackbar, ActivityIndicator, Divider } from 'react-native-paper';
+import { Text } from './common';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 import { api } from '../services/api';

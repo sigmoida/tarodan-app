@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { View, StyleSheet, TouchableOpacity, KeyboardAvoidingView, Platform, ScrollView } from 'react-native';
-import { Text, TextInput, Button, HelperText } from 'react-native-paper';
+import { Button, HelperText } from 'react-native-paper';
+import { Text, TextInput } from '../../src/components/common';
 import { router, useLocalSearchParams } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { authApi } from '../../src/services/api';
@@ -56,7 +57,7 @@ export default function ResetPasswordScreen() {
 
     setLoading(true);
     try {
-      await authApi.resetPassword({ token, newPassword: password });
+      await authApi.resetPassword(token, password);
       setSuccess(true);
     } catch (err: any) {
       const message = err.response?.data?.message || 'Şifre sıfırlama başarısız oldu';

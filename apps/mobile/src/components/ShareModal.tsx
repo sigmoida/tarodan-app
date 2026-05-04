@@ -1,9 +1,18 @@
 import React, { useState } from 'react';
 import { View, StyleSheet, Share, Linking, TouchableOpacity, Clipboard, Alert } from 'react-native';
-import { Modal, Portal, Text, Button, IconButton, Snackbar, Divider } from 'react-native-paper';
+import { Modal, Portal, Button, IconButton, Snackbar, Divider } from 'react-native-paper';
 import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
-import QRCode from 'react-native-qrcode-svg';
 import { TarodanColors } from '../theme';
+import { Text } from './common';
+
+// QR kod opsiyonel bağımlılık — paket yüklenmediğinde ekran bu bölümü gizler.
+let QRCode: any = null;
+try {
+  // eslint-disable-next-line @typescript-eslint/no-var-requires
+  QRCode = require('react-native-qrcode-svg').default;
+} catch {
+  QRCode = null;
+}
 
 interface ShareModalProps {
   visible: boolean;
@@ -202,7 +211,7 @@ export const ShareModal: React.FC<ShareModalProps> = ({
           />
         </TouchableOpacity>
 
-        {showQR && (
+        {showQR && QRCode && (
           <View style={styles.qrContainer}>
             <View style={styles.qrCode}>
               <QRCode

@@ -1,5 +1,6 @@
 import { View, ScrollView, StyleSheet, TouchableOpacity, Image, RefreshControl } from 'react-native';
-import { Text, Chip, ActivityIndicator, Card, Button, Badge } from 'react-native-paper';
+import { Chip, ActivityIndicator, Card, Button, Badge } from 'react-native-paper';
+import { Text } from '../../src/components/common';
 import { useState, useCallback } from 'react';
 import { router, useFocusEffect } from 'expo-router';
 import { useQuery } from '@tanstack/react-query';

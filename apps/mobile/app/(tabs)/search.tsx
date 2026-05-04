@@ -1,6 +1,7 @@
 import { useState, useMemo, useCallback, useEffect } from 'react';
 import { View, FlatList, Dimensions, StyleSheet, TouchableOpacity, ScrollView, Modal, TextInput as RNTextInput } from 'react-native';
-import { Text, Card, Searchbar, Chip, ActivityIndicator, Button, IconButton, Divider, RadioButton, Checkbox, TextInput } from 'react-native-paper';
+import { Card, Chip, ActivityIndicator, Button, IconButton, Divider, RadioButton, Checkbox } from 'react-native-paper';
+import { Text, TextInput, Searchbar, CardCover } from '../../src/components/common';
 import { useQuery } from '@tanstack/react-query';
 import { router, useLocalSearchParams } from 'expo-router';
 import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
@@ -8,6 +9,7 @@ import { productsApi, searchApi } from '../../src/services/api';
 import { TarodanColors, SCALES, BRANDS, CONDITIONS } from '../../src/theme';
 import { useRecentSearchesStore } from '../../src/stores/recentSearchesStore';
 import { getImageUrl as getImageUrlFromUtils } from '../../src/utils/imageUrl';
+import { asLabel } from '../../src/utils/format';
 
 const { width } = Dimensions.get('window');
 const CARD_WIDTH = (width - 48) / 2;
@@ -41,6 +43,33 @@ export default function SearchScreen() {
   // Recent searches store
   const { searches, addSearch, removeSearch, clearSearches } = useRecentSearchesStore();
   const recentSearchQueries = searches.map((s) => s.query);
+
+  // Web `Navbar.tsx:223` paritesi: autocompleteRich. Kullanıcı yazdıkça öneri listesi.
+  const [autocompleteOpen, setAutocompleteOpen] = useState(false);
+  const [autocompleteQuery, setAutocompleteQuery] = useState('');
+
+  useEffect(() => {
+    const t = setTimeout(() => {
+      const q = searchQuery.trim();
+      setAutocompleteQuery(q.length >= 2 ? q : '');
+    }, 300);
+    return () => clearTimeout(t);
+  }, [searchQuery]);
+
+  const autocompleteQueryRes = useQuery({
+    queryKey: ['autocomplete-rich', autocompleteQuery],
+    queryFn: async () => {
+      if (!autocompleteQuery) return null;
+      try {
+        const response = await searchApi.autocompleteRich(autocompleteQuery);
+        return response.data;
+      } catch {
+        return null;
+      }
+    },
+    enabled: !!autocompleteQuery,
+  });
+  const autocomplete = autocompleteQueryRes.data;
 
   // Save search when user submits
   useEffect(() => {
@@ -93,16 +122,21 @@ export default function SearchScreen() {
         // Eğer arama sorgusu varsa Elasticsearch kullan
         if (debouncedQuery && debouncedQuery.length >= 2) {
           console.log('🔍 Using Elasticsearch search for:', debouncedQuery);
+          const resolvedSort: 'relevance' | 'price_asc' | 'price_desc' | 'newest' =
+            sortBy === 'newest' ? 'newest'
+            : sortBy === 'price_asc' ? 'price_asc'
+            : sortBy === 'price_desc' ? 'price_desc'
+            : 'relevance';
           const searchParams = {
             q: debouncedQuery,
             categoryId: category || undefined,
             minPrice: priceRange[0] > 0 ? priceRange[0] : undefined,
             maxPrice: priceRange[1] < 50000 ? priceRange[1] : undefined,
             condition: selectedConditions.length > 0 ? selectedConditions[0] : undefined,
-            sortBy: sortBy === 'newest' ? 'newest' : sortBy === 'price_asc' ? 'price_asc' : sortBy === 'price_desc' ? 'price_desc' : 'relevance',
+            sortBy: resolvedSort,
             pageSize: 50,
           };
-          
+
           const res = await searchApi.products(searchParams);
           // Elasticsearch yanıtı: { results: [...], total, page, pageSize, took }
           data = res.data?.results || res.data?.data || [];
@@ -206,7 +240,7 @@ export default function SearchScreen() {
       style={styles.productCard}
       onPress={() => handleProductPress(item.id)}
     >
-      <Card.Cover
+      <CardCover
         source={{ uri: imageUrl }}
         style={styles.productImage}
       />
@@ -224,7 +258,7 @@ export default function SearchScreen() {
       <Card.Content style={styles.productContent}>
         <Text style={styles.productTitle} numberOfLines={2}>{item.title}</Text>
         <Text style={styles.productMeta}>
-          {item.brand} • {item.scale}
+          {asLabel(item.brand, 'Marka')} • {asLabel(item.scale, '1:64')}
         </Text>
         <Text style={styles.productPrice}>
           ₺{item.price?.toLocaleString('tr-TR')}
@@ -247,14 +281,22 @@ export default function SearchScreen() {
           placeholder="Model, marka veya anahtar kelime..."
           value={searchQuery}
           onChangeText={handleSearchChange}
-          onFocus={() => setShowRecentSearches(true)}
-          onBlur={() => setTimeout(() => setShowRecentSearches(false), 200)}
+          onFocus={() => {
+            setShowRecentSearches(true);
+            setAutocompleteOpen(true);
+          }}
+          onBlur={() => {
+            setTimeout(() => {
+              setShowRecentSearches(false);
+              setAutocompleteOpen(false);
+            }, 200);
+          }}
           style={styles.searchBar}
           inputStyle={styles.searchInput}
           iconColor={TarodanColors.textSecondary}
         />
-        
-        {/* Recent Searches Dropdown */}
+
+        {/* Recent Searches Dropdown — sadece sorgu boşken */}
         {showRecentSearches && recentSearchQueries.length > 0 && !searchQuery && (
           <View style={styles.recentSearchesDropdown}>
             <View style={styles.recentSearchesHeader}>
@@ -279,6 +321,119 @@ export default function SearchScreen() {
                 </TouchableOpacity>
               </TouchableOpacity>
             ))}
+          </View>
+        )}
+
+        {/* Autocomplete Rich — kullanıcı 2+ harf yazdıysa */}
+        {autocompleteOpen && autocompleteQuery.length >= 2 && autocomplete && (
+          <View style={styles.recentSearchesDropdown}>
+            <ScrollView keyboardShouldPersistTaps="handled" style={{ maxHeight: 360 }}>
+              {/* Suggestions */}
+              {autocomplete.suggestions && autocomplete.suggestions.length > 0 ? (
+                <View style={styles.acSection}>
+                  <Text style={styles.acSectionTitle}>Öneriler</Text>
+                  {autocomplete.suggestions.slice(0, 5).map((s, i) => (
+                    <TouchableOpacity
+                      key={`s-${i}`}
+                      style={styles.acItem}
+                      onPress={() => {
+                        setSearchQuery(s);
+                        setDebouncedQuery(s);
+                        setAutocompleteOpen(false);
+                      }}
+                    >
+                      <Ionicons name="search" size={16} color={TarodanColors.textTertiary} />
+                      <Text style={styles.acItemText}>{s}</Text>
+                    </TouchableOpacity>
+                  ))}
+                </View>
+              ) : null}
+
+              {/* Products */}
+              {autocomplete.products && autocomplete.products.length > 0 ? (
+                <View style={styles.acSection}>
+                  <Text style={styles.acSectionTitle}>Ürünler</Text>
+                  {autocomplete.products.slice(0, 5).map((p) => (
+                    <TouchableOpacity
+                      key={`p-${p.id}`}
+                      style={styles.acItem}
+                      onPress={() => {
+                        setAutocompleteOpen(false);
+                        router.push({ pathname: '/product/[id]', params: { id: p.id } } as any);
+                      }}
+                    >
+                      <Ionicons name="cube-outline" size={16} color={TarodanColors.primary} />
+                      <View style={{ flex: 1 }}>
+                        <Text style={styles.acItemText} numberOfLines={1}>{p.title}</Text>
+                        <Text style={styles.acItemMeta}>
+                          {p.brandName ? `${p.brandName} · ` : ''}₺{p.price?.toLocaleString('tr-TR')}
+                        </Text>
+                      </View>
+                    </TouchableOpacity>
+                  ))}
+                </View>
+              ) : null}
+
+              {/* Brands */}
+              {autocomplete.brands && autocomplete.brands.length > 0 ? (
+                <View style={styles.acSection}>
+                  <Text style={styles.acSectionTitle}>Markalar</Text>
+                  {autocomplete.brands.slice(0, 5).map((b) => (
+                    <TouchableOpacity
+                      key={`b-${b.id}`}
+                      style={styles.acItem}
+                      onPress={() => {
+                        setAutocompleteOpen(false);
+                        router.push({ pathname: '/brand/[slug]', params: { slug: b.slug } } as any);
+                      }}
+                    >
+                      <Ionicons name="bookmark-outline" size={16} color={TarodanColors.textSecondary} />
+                      <Text style={styles.acItemText}>{b.name}</Text>
+                    </TouchableOpacity>
+                  ))}
+                </View>
+              ) : null}
+
+              {/* Categories */}
+              {autocomplete.categories && autocomplete.categories.length > 0 ? (
+                <View style={styles.acSection}>
+                  <Text style={styles.acSectionTitle}>Kategoriler</Text>
+                  {autocomplete.categories.slice(0, 5).map((c) => (
+                    <TouchableOpacity
+                      key={`c-${c.id}`}
+                      style={styles.acItem}
+                      onPress={() => {
+                        setAutocompleteOpen(false);
+                        router.push({ pathname: '/category/[slug]', params: { slug: c.slug } } as any);
+                      }}
+                    >
+                      <Ionicons name="grid-outline" size={16} color={TarodanColors.textSecondary} />
+                      <Text style={styles.acItemText}>{c.name}</Text>
+                    </TouchableOpacity>
+                  ))}
+                </View>
+              ) : null}
+
+              {/* Car models */}
+              {autocomplete.carModels && autocomplete.carModels.length > 0 ? (
+                <View style={styles.acSection}>
+                  <Text style={styles.acSectionTitle}>Modeller</Text>
+                  {autocomplete.carModels.slice(0, 5).map((m) => (
+                    <TouchableOpacity
+                      key={`m-${m.id}`}
+                      style={styles.acItem}
+                      onPress={() => {
+                        setAutocompleteOpen(false);
+                        router.push({ pathname: '/models/[slug]', params: { slug: m.slug } } as any);
+                      }}
+                    >
+                      <Ionicons name="car-outline" size={16} color={TarodanColors.textSecondary} />
+                      <Text style={styles.acItemText}>{m.name}</Text>
+                    </TouchableOpacity>
+                  ))}
+                </View>
+              ) : null}
+            </ScrollView>
           </View>
         )}
       </View>
@@ -701,6 +856,38 @@ const styles = StyleSheet.create({
     marginTop: -8,
     borderWidth: 1,
     borderColor: TarodanColors.border,
+  },
+  acSection: {
+    paddingTop: 8,
+    paddingBottom: 4,
+    borderBottomWidth: StyleSheet.hairlineWidth,
+    borderBottomColor: TarodanColors.borderLight,
+  },
+  acSectionTitle: {
+    paddingHorizontal: 16,
+    paddingVertical: 6,
+    fontSize: 11,
+    fontWeight: '700',
+    color: TarodanColors.textTertiary,
+    textTransform: 'uppercase',
+    letterSpacing: 0.5,
+  },
+  acItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+    paddingHorizontal: 16,
+    paddingVertical: 10,
+  },
+  acItemText: {
+    fontSize: 14,
+    color: TarodanColors.textPrimary,
+    flex: 1,
+  },
+  acItemMeta: {
+    fontSize: 11,
+    color: TarodanColors.textSecondary,
+    marginTop: 2,
   },
   recentSearchesHeader: {
     flexDirection: 'row',

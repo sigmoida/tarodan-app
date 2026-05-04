@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { View, ScrollView, StyleSheet, TouchableOpacity } from 'react-native';
-import { Text, TextInput, Button, Card, RadioButton, Snackbar, Chip } from 'react-native-paper';
+import { Button, Card, RadioButton, Snackbar, Chip } from 'react-native-paper';
+import { Text, TextInput } from '../src/components/common';
 import { router } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { useAuthStore } from '../src/stores/authStore';

@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { View, ScrollView, StyleSheet, TouchableOpacity } from 'react-native';
-import { Text, Button, RadioButton, Card, ActivityIndicator, TextInput } from 'react-native-paper';
+import { Button, RadioButton, Card, ActivityIndicator } from 'react-native-paper';
+import { Text, TextInput } from '../../src/components/common';
 import { router, useLocalSearchParams } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { useAuthStore } from '../../src/stores/authStore';
@@ -120,7 +121,7 @@ export default function MembershipCheckoutScreen() {
                   ₺{tier.price}<Text style={styles.planPeriod}>/{tier.period}</Text>
                 </Text>
               </View>
-              {tier.popular && (
+              {'popular' in tier && tier.popular && (
                 <View style={[styles.popularBadge, { backgroundColor: tier.color }]}>
                   <Text style={styles.popularBadgeText}>Popüler</Text>
                 </View>

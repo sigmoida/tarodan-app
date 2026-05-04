@@ -1,12 +1,13 @@
 import { View, ScrollView, StyleSheet, TouchableOpacity, Image, Alert, Linking } from 'react-native';
-import { Text, Button, Card, Chip, Divider, ActivityIndicator, Snackbar, TextInput, Modal, Portal } from 'react-native-paper';
+import { Button, Card, Chip, Divider, ActivityIndicator, Snackbar, Modal, Portal } from 'react-native-paper';
+import { Text, TextInput } from '../../src/components/common';
 import { useState } from 'react';
 import { router, useLocalSearchParams, Stack } from 'expo-router';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 import { format } from 'date-fns';
 import { tr } from 'date-fns/locale';
-import { api } from '../../src/services/api';
+import { tradesApi, addressesApi } from '../../src/services/api';
 import { useAuthStore } from '../../src/stores/authStore';
 import { TarodanColors } from '../../src/theme';
 
@@ -75,15 +76,15 @@ export default function TradeDetailScreen() {
   const { data: trade, isLoading, refetch } = useQuery<Trade>({
     queryKey: ['trade', id],
     queryFn: async () => {
-      const response = await api.get(`/trades/${id}`);
-      return response.data;
+      const response = await tradesApi.getOne(id as string);
+      return response.data?.data ?? response.data;
     },
     enabled: !!id,
   });
 
   // Accept trade mutation
   const acceptMutation = useMutation({
-    mutationFn: () => api.patch(`/trades/${id}/accept`),
+    mutationFn: () => tradesApi.accept(id as string),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['trade', id] });
       queryClient.invalidateQueries({ queryKey: ['trades'] });
@@ -96,7 +97,7 @@ export default function TradeDetailScreen() {
 
   // Reject trade mutation
   const rejectMutation = useMutation({
-    mutationFn: () => api.patch(`/trades/${id}/reject`),
+    mutationFn: () => tradesApi.reject(id as string),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['trade', id] });
       queryClient.invalidateQueries({ queryKey: ['trades'] });
@@ -109,10 +110,12 @@ export default function TradeDetailScreen() {
 
   // Counter offer mutation
   const counterMutation = useMutation({
-    mutationFn: () => api.patch(`/trades/${id}/counter`, {
+    mutationFn: () => tradesApi.counter(id as string, {
+      initiatorItems: [],
+      receiverItems: [],
       cashAmount: parseFloat(counterCashAmount) || 0,
       message: counterMessage,
-    }),
+    } as any),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['trade', id] });
       setCounterModalVisible(false);
@@ -125,7 +128,7 @@ export default function TradeDetailScreen() {
 
   // Ship trade mutation
   const shipMutation = useMutation({
-    mutationFn: () => api.patch(`/trades/${id}/ship`, { trackingNumber }),
+    mutationFn: () => tradesApi.ship(id as string, { fromAddressId: '', carrier: 'aras' } as any),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['trade', id] });
       setShippingModalVisible(false);
@@ -139,7 +142,7 @@ export default function TradeDetailScreen() {
 
   // Confirm receipt mutation
   const confirmMutation = useMutation({
-    mutationFn: () => api.patch(`/trades/${id}/confirm`),
+    mutationFn: () => tradesApi.confirmReceipt(id as string),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['trade', id] });
       setSnackbar({ visible: true, message: 'Takas tamamlandı!' });
@@ -151,7 +154,7 @@ export default function TradeDetailScreen() {
 
   // Cancel trade mutation
   const cancelMutation = useMutation({
-    mutationFn: () => api.patch(`/trades/${id}/cancel`),
+    mutationFn: () => tradesApi.cancel(id as string),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['trade', id] });
       queryClient.invalidateQueries({ queryKey: ['trades'] });
@@ -460,8 +463,9 @@ export default function TradeDetailScreen() {
               </Button>
               <Button
                 mode="outlined"
-                onPress={() => setCounterModalVisible(true)}
+                onPress={() => router.push(`/trade/counter/${id}` as any)}
                 style={styles.actionButton}
+                icon="swap-horizontal"
               >
                 Karşı Teklif
               </Button>

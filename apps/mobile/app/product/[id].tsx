@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { View, ScrollView, Image, Dimensions, StyleSheet, TouchableOpacity, Share } from 'react-native';
-import { Text, Button, Chip, Card, Avatar, IconButton, ActivityIndicator, Snackbar, Divider } from 'react-native-paper';
+import { Button, Chip, Card, Avatar, IconButton, ActivityIndicator, Snackbar, Divider } from 'react-native-paper';
+import { Text } from '../../src/components/common';
 import { useQuery } from '@tanstack/react-query';
 import { useLocalSearchParams, router } from 'expo-router';
 import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
@@ -11,8 +12,11 @@ import { useCartStore } from '../../src/stores/cartStore';
 import { useGuestStore } from '../../src/stores/guestStore';
 import { useFavoritesStore } from '../../src/stores/favoritesStore';
 import { SignupPrompt } from '../../src/components/SignupPrompt';
+import MakeOfferModal from '../../src/components/product/MakeOfferModal';
+import AddToCollectionModal from '../../src/components/product/AddToCollectionModal';
 import { TarodanColors, CONDITIONS } from '../../src/theme';
 import { transformImageUrl, getImageUrl as getImageUrlFromUtils } from '../../src/utils/imageUrl';
+import { asLabel } from '../../src/utils/format';
 
 const { width } = Dimensions.get('window');
 
@@ -63,6 +67,8 @@ export default function ProductDetailScreen() {
   const [favoriteLoading, setFavoriteLoading] = useState(false);
   const [showPrompt, setShowPrompt] = useState(false);
   const [promptType, setPromptType] = useState<'favorites' | 'message' | 'purchase' | 'trade' | 'collections' | null>(null);
+  const [offerModalOpen, setOfferModalOpen] = useState(false);
+  const [collectionModalOpen, setCollectionModalOpen] = useState(false);
 
   // Check if product is in favorites when authenticated
   useEffect(() => {
@@ -142,8 +148,8 @@ export default function ProductDetailScreen() {
       title: product.title,
       price: product.price,
       imageUrl: typeof images[0] === 'string' ? images[0] : images[0]?.url || getImageUrlFromUtils(product.images),
-      brand: product.brand,
-      scale: product.scale,
+      brand: asLabel(product.brand, ''),
+      scale: asLabel(product.scale, ''),
       seller: {
         id: product.seller?.id || 'unknown',
         displayName: product.seller?.displayName || 'Satıcı',
@@ -198,10 +204,39 @@ export default function ProductDetailScreen() {
   const handleTrade = () => {
     if (!isAuthenticated) {
       setSnackbar({ visible: true, message: 'Takas teklifi için üye olun', type: 'error' });
-      setTimeout(() => router.push('/(auth)/login'), 1500);
+      setTimeout(() => router.push('/(auth)/login' as any), 1500);
       return;
     }
-    router.push(`/trade/create?productId=${id}`);
+    if (!product.seller?.id) {
+      setSnackbar({ visible: true, message: 'Satıcı bilgisi bulunamadı', type: 'error' });
+      return;
+    }
+    // /trade/new ekranı targetProductId + targetSellerId paramları bekliyor
+    router.push(
+      `/trade/new?targetProductId=${id}&targetSellerId=${product.seller.id}` as any,
+    );
+  };
+
+  const handleMakeOffer = () => {
+    if (!isAuthenticated) {
+      setSnackbar({ visible: true, message: 'Teklif vermek için üye olun', type: 'error' });
+      setTimeout(() => router.push('/(auth)/login' as any), 1500);
+      return;
+    }
+    if (product.seller?.id && user?.id === product.seller.id) {
+      setSnackbar({ visible: true, message: 'Kendi ürününüze teklif veremezsiniz', type: 'error' });
+      return;
+    }
+    setOfferModalOpen(true);
+  };
+
+  const handleAddToCollection = () => {
+    if (!isAuthenticated) {
+      setSnackbar({ visible: true, message: 'Koleksiyon için üye olun', type: 'error' });
+      setTimeout(() => router.push('/(auth)/login' as any), 1500);
+      return;
+    }
+    setCollectionModalOpen(true);
   };
 
   const handleShare = async () => {
@@ -380,17 +415,59 @@ export default function ProductDetailScreen() {
 
           <Divider style={styles.divider} />
 
+          {/* Aksiyon Bar — Takas / Teklif / Koleksiyon / Mesaj / Paylaş */}
+          <View style={styles.actionGrid}>
+            {product.tradeAvailable ? (
+              <TouchableOpacity style={styles.actionItem} onPress={handleTrade}>
+                <View style={[styles.actionIconWrap, { backgroundColor: TarodanColors.accentLight }]}>
+                  <Ionicons name="swap-horizontal" size={22} color={TarodanColors.accent} />
+                </View>
+                <Text style={styles.actionLabel}>Takas</Text>
+              </TouchableOpacity>
+            ) : null}
+
+            <TouchableOpacity style={styles.actionItem} onPress={handleMakeOffer}>
+              <View style={[styles.actionIconWrap, { backgroundColor: TarodanColors.warningLight }]}>
+                <Ionicons name="pricetag-outline" size={22} color={TarodanColors.warning} />
+              </View>
+              <Text style={styles.actionLabel}>Teklif Ver</Text>
+            </TouchableOpacity>
+
+            <TouchableOpacity style={styles.actionItem} onPress={handleAddToCollection}>
+              <View style={[styles.actionIconWrap, { backgroundColor: TarodanColors.primaryLight }]}>
+                <Ionicons name="albums-outline" size={22} color={TarodanColors.primary} />
+              </View>
+              <Text style={styles.actionLabel}>Koleksiyon</Text>
+            </TouchableOpacity>
+
+            <TouchableOpacity style={styles.actionItem} onPress={handleMessage}>
+              <View style={[styles.actionIconWrap, { backgroundColor: TarodanColors.infoLight }]}>
+                <Ionicons name="chatbubble-outline" size={22} color={TarodanColors.info} />
+              </View>
+              <Text style={styles.actionLabel}>Mesaj</Text>
+            </TouchableOpacity>
+
+            <TouchableOpacity style={styles.actionItem} onPress={handleShare}>
+              <View style={[styles.actionIconWrap, { backgroundColor: TarodanColors.successLight }]}>
+                <Ionicons name="share-social-outline" size={22} color={TarodanColors.success} />
+              </View>
+              <Text style={styles.actionLabel}>Paylaş</Text>
+            </TouchableOpacity>
+          </View>
+
+          <Divider style={styles.divider} />
+
           {/* Specifications */}
           <View style={styles.section}>
             <Text style={styles.sectionTitle}>Özellikler</Text>
             <View style={styles.specGrid}>
               <View style={styles.specItem}>
                 <Text style={styles.specLabel}>Marka</Text>
-                <Text style={styles.specValue}>{product.brand}</Text>
+                <Text style={styles.specValue}>{asLabel(product.brand)}</Text>
               </View>
               <View style={styles.specItem}>
                 <Text style={styles.specLabel}>Ölçek</Text>
-                <Text style={styles.specValue}>{product.scale}</Text>
+                <Text style={styles.specValue}>{asLabel(product.scale)}</Text>
               </View>
               <View style={styles.specItem}>
                 <Text style={styles.specLabel}>Durum</Text>
@@ -567,10 +644,11 @@ export default function ProductDetailScreen() {
         onDismiss={() => setSnackbar({ ...snackbar, visible: false })}
         duration={2000}
         style={{ backgroundColor: snackbar.type === 'success' ? TarodanColors.success : TarodanColors.error }}
-        action={{
-          label: snackbar.type === 'success' && snackbar.message.includes('sepet') ? 'Sepete Git' : undefined,
-          onPress: () => router.push('/cart'),
-        }}
+        action={
+          snackbar.type === 'success' && snackbar.message.includes('sepet')
+            ? { label: 'Sepete Git', onPress: () => router.push('/cart') }
+            : undefined
+        }
       >
         {snackbar.message}
       </Snackbar>
@@ -583,6 +661,34 @@ export default function ProductDetailScreen() {
           type={promptType}
         />
       )}
+
+      {/* Teklif Ver Modal */}
+      <MakeOfferModal
+        visible={offerModalOpen}
+        onDismiss={() => setOfferModalOpen(false)}
+        productId={productId}
+        productTitle={product.title}
+        listPrice={product.price}
+        onSuccess={() => {
+          setOfferModalOpen(false);
+          setSnackbar({ visible: true, message: 'Teklifiniz gönderildi', type: 'success' });
+        }}
+      />
+
+      {/* Koleksiyona Ekle Modal */}
+      <AddToCollectionModal
+        visible={collectionModalOpen}
+        onDismiss={() => setCollectionModalOpen(false)}
+        productId={productId}
+        onSuccess={(collectionName) => {
+          setCollectionModalOpen(false);
+          setSnackbar({
+            visible: true,
+            message: `"${collectionName}" koleksiyonuna eklendi`,
+            type: 'success',
+          });
+        }}
+      />
     </View>
   );
 }
@@ -700,6 +806,31 @@ const styles = StyleSheet.create({
   },
   divider: {
     marginVertical: 16,
+  },
+  actionGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    justifyContent: 'space-between',
+    gap: 12,
+  },
+  actionItem: {
+    width: '18%',
+    minWidth: 60,
+    alignItems: 'center',
+    gap: 6,
+  },
+  actionIconWrap: {
+    width: 48,
+    height: 48,
+    borderRadius: 24,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  actionLabel: {
+    fontSize: 11,
+    color: TarodanColors.textPrimary,
+    fontWeight: '500',
+    textAlign: 'center',
   },
   section: {
     marginBottom: 8,
