@@ -69,6 +69,43 @@ Her flow YAML başında `tags:` bloğu ile bir öncelik kategorisine atanır:
 
 **Not (manual tag):** E-01, E-02, E-04, E-05, E-06, E-08 backend fixture'ına bağımlıdır. CI Maestro Cloud workflow `--include-tags smoke` veya `regression` koşar; `manual` tag'li flow'lar yerelde elle koşulur.
 
+### Yeni F-XX flow'ları (comprehensive multi-step regression)
+
+01-XX/D-XX/E-XX smoke seti ekran açılır kontrolleri yapar; F-XX seti **5–15 adımlık gerçek user journey**'ler ile state geçişlerini, recovery yollarını ve happy/error path'leri birlikte kapsar.
+
+| Flow | Senaryo | Tag | Önkoşul / Seed user |
+|------|---------|-----|---------------------|
+| F-01 | Register form → verify-email gate | `manual` | timestamp-bazlı `REG_EMAIL` env (her run override) |
+| F-02 | Yanlış şifre → recover with right (form reload yok) | `regression` | zeynep |
+| F-03 | Forgot password → success notice | `regression` | zeynep |
+| F-04 | Logout superset (input cleared, no toast error) | `regression` | zeynep |
+| F-05 | Tab navigation (Ana Sayfa/Ara/Mesajlar/Profil) | `smoke` | zeynep |
+| F-06 | Search → product detail → back nav | `smoke` | zeynep |
+| F-07 | Category drill-down (3-deep) | `regression` | zeynep |
+| F-08 | Favorite toggle (list + detail) | `manual` | zeynep — heart accessibility label kararsız |
+| F-09 | Add to cart → cart screen → remove | `regression` | zeynep |
+| F-10 | Make offer → Tekliflerim'de görünür | `manual` | **mehmet** (kendi listing değil) |
+| F-11 | Bypass checkout end-to-end → order created | `manual` | zeynep + `PAYMENT_BYPASS=true` apps/api/.env + kayıtlı adres |
+| F-12 | Stockout deep-link redirect | `manual` | `STOCKOUT_PRODUCT_ID` env |
+| F-13 | Address create → edit → delete | `regression` | zeynep |
+| F-14 | Initiate trade flow | `manual` | **ali** + tradeAvailable fixture |
+| F-15 | Trade detail status display | `manual` | zeynep — aktif takas fixture |
+| F-16 | Language toggle (TR ↔ EN) | `regression` | zeynep |
+| F-17 | Notification prefs persistence | `regression` | zeynep |
+| F-18 | Empty cart checkout blocked | `smoke` | zeynep |
+| F-19 | Offer modal validation + recovery | `manual` | mehmet |
+
+**CI eligible (smoke + regression):** F-02, F-03, F-04, F-05, F-06, F-07, F-09, F-13, F-16, F-17, F-18 (= 11 flow). Manual: F-01, F-08, F-10, F-11, F-12, F-14, F-15, F-19 (= 8 flow, fixture/seed user'a veya `PAYMENT_BYPASS` env'e bağımlı).
+
+**`PAYMENT_BYPASS=true` gereksinimi:** F-11 dev modda bypass üzerinden checkout chain'i bitirir. Olmadan PayTR iframe'i Maestro'nun erişemeyeceği WebView'a düşer.
+
+**Seed user kullanımı:**
+- `zeynep@demo.com` (FREE, default) — F-02, F-03, F-04, F-05, F-06, F-07, F-09, F-11, F-12, F-13, F-15, F-16, F-17, F-18
+- `mehmet@demo.com` — F-10, F-19 (kendi listing'ine offer yapmayan ikinci kullanıcı)
+- `ali@demo.com` (BUSINESS) — F-14 (trade initiator)
+- `ahmet@demo.com` (PREMIUM) — kullanılmıyor (E-05'te kullanılır)
+- F-01: timestamp-bazlı yeni email; her run override'lı.
+
 Çalıştırma örnekleri:
 ```bash
 maestro test maestro/flows --include-tags smoke         # her PR
