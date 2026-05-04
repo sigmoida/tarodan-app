@@ -5,7 +5,8 @@ import { useState, useEffect } from 'react';
 import { router, useLocalSearchParams } from 'expo-router';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
-import { listingsApi, tradesApi, userApi } from '../../src/services/api';
+// listingsApi → productsApi (parite migrasyonu); userApi.getMyProducts → productsApi.getMyListings
+import { productsApi as listingsApi, tradesApi, productsApi } from '../../src/services/api';
 import { useAuthStore } from '../../src/stores/authStore';
 import { TarodanColors } from '../../src/theme';
 import { getUpgradeMessage } from '../../src/utils/membershipLimits';
@@ -73,7 +74,7 @@ export default function NewTradeScreen() {
   const { data: myProducts, isLoading: loadingMyProducts } = useQuery({
     queryKey: ['my-tradeable-products', user?.id],
     queryFn: async () => {
-      const response = await userApi.getMyProducts({ status: 'active' });
+      const response = await productsApi.getMyListings({ status: 'active' });
       const raw = response.data?.data || response.data?.products || response.data || [];
       const list = Array.isArray(raw) ? raw : [];
       return list.filter(

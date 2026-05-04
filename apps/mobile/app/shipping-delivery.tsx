@@ -92,7 +92,7 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
   },
-  pageTitle: { fontSize: 20, fontWeight: 'bold', color: TarodanColors.text },
+  pageTitle: { fontSize: 20, fontWeight: 'bold', color: TarodanColors.textPrimary },
   pageSubtitle: { fontSize: 14, color: TarodanColors.textLight, marginTop: 2 },
   card: { backgroundColor: TarodanColors.background, marginBottom: 12, borderRadius: 12 },
   sectionTitle: { fontSize: 16, fontWeight: '600', color: TarodanColors.text, marginBottom: 8 },
