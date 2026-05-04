@@ -142,7 +142,24 @@ export default function ProductDetailScreen() {
     return CONDITIONS.find(c => c.id === condition) || { name: condition, color: '#757575' };
   };
 
+  // Sold / inactive ürün → unavailable sayfasına yönlendir (web pariteti)
+  useEffect(() => {
+    if (apiProduct && (apiProduct.status === 'sold' || apiProduct.status === 'inactive')) {
+      router.replace({
+        pathname: '/products/unavailable/[productId]',
+        params: { productId: productId },
+      } as any);
+    }
+  }, [apiProduct, productId]);
+
   const handleAddToCart = () => {
+    if (apiProduct?.status === 'sold' || apiProduct?.status === 'inactive') {
+      router.push({
+        pathname: '/products/unavailable/[productId]',
+        params: { productId: productId },
+      } as any);
+      return;
+    }
     addItem({
       productId: product.id,
       title: product.title,
