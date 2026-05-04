@@ -1,6 +1,6 @@
 # Profil → Siparişlerim → ilk sipariş kartını aç.
 # Pre-req: kullanıcı login + en az bir sipariş seed'li.
-appId: host.exp.Exponent
+appId: com.tarodan.app
 ---
 - tapOn:
     text: "Profil"

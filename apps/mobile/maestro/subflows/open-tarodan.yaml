@@ -1,20 +1,50 @@
-# Expo Go'yu launch et ve Tarodan'ı aç. Tarodan zaten açıksa direkt geçer.
-appId: host.exp.Exponent
+appId: com.tarodan.app
 ---
 - launchApp:
-    appId: host.exp.Exponent
+    appId: com.tarodan.app
     clearState: false
 - waitForAnimationToEnd:
     timeout: 5000
-# Eğer Expo Go ana ekranındaysak Tarodan recents'ına tıkla.
 - runFlow:
     when:
-      visible: "Recently opened"
+      visible: "Açılsın mı"
+    commands:
+      - tapOn: "Aç"
+- runFlow:
+    when:
+      visible: "DEVELOPMENT SERVERS"
     commands:
       - tapOn:
-          text: "Tarodan"
-          index: 0
+          text: "http://localhost"
+          optional: true
+- tapOn:
+    text: "Continue"
+    optional: true
+- tapOn:
+    text: "Go home"
+    optional: true
+# Login screen — auth state cleared ise zeynep ile giriş yap
+- runFlow:
+    when:
+      visible:
+        id: "login-submit-button"
+    commands:
+      - tapOn:
+          id: "login-email-input"
+      - inputText: "zeynep@demo.com"
+      - tapOn:
+          id: "login-password-input"
+      - inputText: "Demo123!"
+      - tapOn:
+          id: "login-submit-button"
+      - extendedWaitUntil:
+          visible:
+            text: "Ana Sayfa"
+          timeout: 30000
+      - tapOn:
+          text: "Şimdi Değil"
+          optional: true
 - extendedWaitUntil:
     visible:
       text: "Ana Sayfa"
-    timeout: 90000
+    timeout: 60000

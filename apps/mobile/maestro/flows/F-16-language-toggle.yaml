@@ -1,5 +1,5 @@
 # F-16: Language toggle — TR → EN → assert strings changed → TR back.
-appId: host.exp.Exponent
+appId: com.tarodan.app
 tags:
   - regression
 env:

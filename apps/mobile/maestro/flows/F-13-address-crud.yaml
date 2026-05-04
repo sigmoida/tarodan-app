@@ -1,5 +1,5 @@
 # F-13: Address create/edit/delete — Adreslerim CRUD.
-appId: host.exp.Exponent
+appId: com.tarodan.app
 tags:
   - regression
 env:

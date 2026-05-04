@@ -1,6 +1,6 @@
 # F-02: Yanlış şifre denemesi → hata banner → şifreyi düzelt → home.
 # Form recovery: page reload olmadan inputlar düzeltilebilir.
-appId: host.exp.Exponent
+appId: com.tarodan.app
 tags:
   - regression
 env:

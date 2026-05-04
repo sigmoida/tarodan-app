@@ -1,7 +1,7 @@
 # E-06: Cash takas awaiting_payment → cashPayer → "Ödeme Yap" butonu görünür.
 # Pre-req: cashPayerId === current user, status === awaiting_payment olan bir takas seed'li olmalı.
 # Bu fixture'a bağımlı; manual tag.
-appId: host.exp.Exponent
+appId: com.tarodan.app
 tags:
   - manual
 env:

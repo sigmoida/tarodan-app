@@ -4,7 +4,7 @@
 # auth navigasyonunu kapsar.
 # Email çakışmasından kaçınmak için timestamp tabanlı email gerekir; manual tag
 # kullanıyoruz çünkü her run benzersiz değer istemek için override edilmeli.
-appId: host.exp.Exponent
+appId: com.tarodan.app
 tags:
   - manual
 env:

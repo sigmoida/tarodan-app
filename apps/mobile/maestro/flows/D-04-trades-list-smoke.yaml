@@ -2,7 +2,7 @@
 # Tam takas oluşturma + kabul akışı iki kullanıcı + complex state machine
 # gerektirir; tam regression backend e2e testlerinde (money-flow.e2e-spec.ts)
 # zaten kapsanıyor. Bu flow UI sayfasının ayağa kalktığını doğrular.
-appId: host.exp.Exponent
+appId: com.tarodan.app
 tags:
   - regression
 ---

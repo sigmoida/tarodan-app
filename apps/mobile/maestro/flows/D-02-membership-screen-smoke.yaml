@@ -1,7 +1,7 @@
 # D-02: Membership ekranı smoke — login → Profil → Üyelik Planı → tier kartları render olur.
 # Tam bypass üyelik akışı API e2e (payment-bypass.e2e-spec.ts) ile kapsanıyor; bu flow
 # UI'ın açıldığını + ekran çökmediğini garanti eder.
-appId: host.exp.Exponent
+appId: com.tarodan.app
 tags:
   - regression
 env:

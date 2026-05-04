@@ -1,6 +1,6 @@
 # E-03: Tekliflerim listesi + relatif zaman gösterimi.
 # login → Profil → Tekliflerim → liste yüklenir → en az bir kart "dk önce" / "saat önce" / "gün önce" gösterir.
-appId: host.exp.Exponent
+appId: com.tarodan.app
 tags:
   - regression
 env:

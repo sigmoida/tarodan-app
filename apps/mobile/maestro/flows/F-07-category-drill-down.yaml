@@ -1,6 +1,6 @@
 # F-07: Category drill-down — Home → Kategoriler → category → product.
 # Ana sayfada Kategoriler bölümü ya da kategori chip'i bekleniyor.
-appId: host.exp.Exponent
+appId: com.tarodan.app
 tags:
   - regression
 env:

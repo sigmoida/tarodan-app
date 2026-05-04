@@ -5,7 +5,7 @@
 # (apps/api/test/e2e/payment-bypass.e2e-spec.ts). Bu UI flow checkout chain'in
 # açılıp Ödeme adımına geçtiğini + bypass modunda kart formunun gizli olduğunu
 # (commit f9f3a81 ile getirildi) doğrular.
-appId: host.exp.Exponent
+appId: com.tarodan.app
 tags:
   - smoke
 env:

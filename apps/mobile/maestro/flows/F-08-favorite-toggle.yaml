@@ -2,7 +2,7 @@
 # Search ile ürün bul → kalp ikonu tap → Profil → Favoriler → list'te kalbi tekrar tap.
 # Heart icon testID yok, "kalp" /heart label fallback yok; ikona tıklamak için
 # "Beğen" / "Favoriye" gibi label dene; aksi halde optional flow.
-appId: host.exp.Exponent
+appId: com.tarodan.app
 tags:
   - manual
 env:

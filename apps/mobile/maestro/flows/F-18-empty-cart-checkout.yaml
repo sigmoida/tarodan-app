@@ -1,5 +1,5 @@
 # F-18: Empty cart checkout blocked — boş sepet → checkout butonu görünmemeli.
-appId: host.exp.Exponent
+appId: com.tarodan.app
 tags:
   - smoke
 env:

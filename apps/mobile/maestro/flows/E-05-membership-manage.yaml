@@ -2,7 +2,7 @@
 # "Üyeliği İptal Et" + "Otomatik Yenileme" görünür. Press etmiyoruz (destructive).
 #
 # Pre-req: PREMIUM_EMAIL kullanıcısının aktif premium aboneliği olmalı (free üye için ekran farklı render olur).
-appId: host.exp.Exponent
+appId: com.tarodan.app
 tags:
   - manual
 env:

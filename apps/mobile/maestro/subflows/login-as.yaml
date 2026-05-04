@@ -1,7 +1,7 @@
 # Login as zeynep@demo.com (default test user). Hard-coded — Maestro 2.5'te
 # runFlow.env inputText'e propagate olmuyor. Başka kullanıcı için ayrı subflow yaz.
 # Login zaten yapılmışsa (profile-go-login-button görünmüyorsa) komutlar atlanır.
-appId: host.exp.Exponent
+appId: com.tarodan.app
 ---
 - tapOn:
     text: "Profil"

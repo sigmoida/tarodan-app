@@ -1,7 +1,7 @@
 # F-10: Make offer flow — mehmet@demo.com → product (seller != self) → Teklif Ver →
 # amount → submit → Profil → Tekliflerim → Verdiğim Teklifler tab → görünür.
 # Seller filter manuel olduğu için — own listing'e teklif vermez. Tag: manual.
-appId: host.exp.Exponent
+appId: com.tarodan.app
 tags:
   - manual
 env:

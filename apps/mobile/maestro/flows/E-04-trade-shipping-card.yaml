@@ -3,7 +3,7 @@
 #
 # Pre-req: Zeynep'te `shipping_to_warehouse` statüsünde aktif bir takas seed'li olmalı.
 # Eğer yoksa kart render olmaz → flow fail eder. Manual tag, fixture'a bağlı.
-appId: host.exp.Exponent
+appId: com.tarodan.app
 tags:
   - manual
 env:

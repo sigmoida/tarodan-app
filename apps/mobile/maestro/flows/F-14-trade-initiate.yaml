@@ -1,6 +1,6 @@
 # F-14: Initiate trade → ali@demo.com → tradeAvailable ürün → "Takas" → trade/new.
 # Fixture: ali kendi listing'inde takas teklif edemez. Manual.
-appId: host.exp.Exponent
+appId: com.tarodan.app
 tags:
   - manual
 env:

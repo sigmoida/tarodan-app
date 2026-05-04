@@ -1,6 +1,6 @@
 # Search smoke: Ara tab → arama listesi yüklenir, sonuç sayısı görünür.
 # Detaylı filter testleri için ayrı flow'lar (testID gerektirir).
-appId: host.exp.Exponent
+appId: com.tarodan.app
 tags:
   - smoke
 ---

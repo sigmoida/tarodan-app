@@ -1,7 +1,7 @@
 # F-04: Logout flow — login → profile → Çıkış Yap → confirm → login form (boş).
 # 01-12-logout-cleanup'ın superset'i: ek olarak email/password input'ların boş
 # olduğunu ve no-toast-error doğrular.
-appId: host.exp.Exponent
+appId: com.tarodan.app
 tags:
   - regression
 env:

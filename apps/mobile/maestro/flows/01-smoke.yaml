@@ -1,5 +1,5 @@
 # Smoke: Expo Go açılır → Tarodan recents'tan açılır → home content görünür.
-appId: host.exp.Exponent
+appId: com.tarodan.app
 tags:
   - smoke
 ---

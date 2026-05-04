@@ -3,7 +3,7 @@
 # (disabled={!numeric}). Boş submit'te buton tap'i no-op olur. Bu yüzden flow:
 # 1) modal aç, 2) submit button disabled olduğunu doğrula (tap no-op),
 # 3) amount enter et, 4) submit enabled, 5) success.
-appId: host.exp.Exponent
+appId: com.tarodan.app
 tags:
   - manual
 env:

@@ -1,6 +1,6 @@
 # F-05: Tab navigation comprehensive — login → her bottom tab.
 # Sell/Ekle tab i18n key fallback nedeniyle özel: tab order ile gez.
-appId: host.exp.Exponent
+appId: com.tarodan.app
 tags:
   - smoke
 env:

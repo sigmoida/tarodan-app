@@ -1,5 +1,5 @@
 # F-06: Search → result → product detail → back nav.
-appId: host.exp.Exponent
+appId: com.tarodan.app
 tags:
   - smoke
 env:

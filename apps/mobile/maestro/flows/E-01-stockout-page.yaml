@@ -6,7 +6,7 @@
 # Bu flow, stockout fixture seed'ine bağımlıdır → gerçek bir productId gerek.
 # Eğer fixture yoksa Network/yükleme hatası olmaz, ama hero başlığı çıkmayabilir →
 # tags: [manual] altında işaretledik.
-appId: host.exp.Exponent
+appId: com.tarodan.app
 tags:
   - manual
 env:

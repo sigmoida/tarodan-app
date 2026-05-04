@@ -1,7 +1,7 @@
 # F-12: Stockout redirect — açılınca /products/unavailable/{id}'ye yönlendirilir.
 # E-01 unavailable hero ile paralel; E-08 push deeplink ile paralel.
 # Bu flow direct deeplink ile gidip hero + CTA görünürlüğünü doğrular.
-appId: host.exp.Exponent
+appId: com.tarodan.app
 tags:
   - manual
 env:

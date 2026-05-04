@@ -1,5 +1,5 @@
 # 01-12: Logout cleanup — login → logout → login ekranı (form alanları görünür).
-appId: host.exp.Exponent
+appId: com.tarodan.app
 tags:
   - regression
 env:

@@ -1,7 +1,7 @@
 # DEPRECATED — bu placeholder D-01-checkout-bypass-regression.yaml ile kapatıldı.
 # Bypass payment chain UI doğrulaması artık D-01 altında (smoke tag'inde) koşar.
 # Burada sadece launch + home doğrulaması yapılır; kaldırılma adayı.
-appId: host.exp.Exponent
+appId: com.tarodan.app
 tags:
   - placeholder
 ---

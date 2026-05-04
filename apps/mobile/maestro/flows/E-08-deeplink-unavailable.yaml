@@ -1,7 +1,7 @@
 # E-08: Deep-link routing simülasyonu (real push yok).
 # openLink: tarodan://products/unavailable/{productId} → unavailable hero görünür.
 # Bu, push notification handler'ın yönlendireceği rotayı doğrular.
-appId: host.exp.Exponent
+appId: com.tarodan.app
 tags:
   - manual
 env:

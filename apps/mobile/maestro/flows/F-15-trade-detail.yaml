@@ -1,6 +1,6 @@
 # F-15: Trade detail status display — ilk takasa tap → status chip + counterparty.
 # Mevcut takas fixture'ına bağımlı.
-appId: host.exp.Exponent
+appId: com.tarodan.app
 tags:
   - manual
 env:

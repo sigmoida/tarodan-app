@@ -9,7 +9,7 @@ import Constants from 'expo-constants';
 import { useAuthStore } from '../src/stores/authStore';
 import { registerForPushNotifications, setupPushNotificationRouting } from '../src/services/push';
 import { TarodanLightTheme, TarodanDarkTheme } from '../src/theme';
-import { LanguageProvider } from '../src/i18n/LanguageContext';
+import { LanguageProvider } from '../src/i18n';
 import { initSentry } from '../src/services/sentry';
 
 // Initialize Sentry as early as possible. Currently a stub (no-op until

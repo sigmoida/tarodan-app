@@ -185,6 +185,7 @@ export default function LoginScreen() {
 
         {errorMessage ? (
           <Text
+            testID="login-error-banner"
             variant="bodySmall"
             style={{ color: theme.colors.error, marginBottom: 16, textAlign: 'center' }}
           >

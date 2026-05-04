@@ -1,7 +1,7 @@
 # D-05: Mesajlar tab smoke — login → Mesajlar tab → ekran yüklenir.
 # Yeni thread + mesaj gönderme akışı iki kullanıcı gerektirir, bu flow sadece
 # mesaj listesinin render olduğunu doğrular.
-appId: host.exp.Exponent
+appId: com.tarodan.app
 tags:
   - regression
 ---
