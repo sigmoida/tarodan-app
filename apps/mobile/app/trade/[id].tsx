@@ -7,7 +7,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 import { format } from 'date-fns';
 import { tr } from 'date-fns/locale';
-import { tradesApi, addressesApi } from '../../src/services/api';
+import { tradesApi, addressesApi, paymentsApi } from '../../src/services/api';
 import { useAuthStore } from '../../src/stores/authStore';
 import { TarodanColors } from '../../src/theme';
 import { useTranslation } from '../../src/i18n/LanguageContext';
@@ -190,6 +190,31 @@ export default function TradeDetailScreen() {
     },
     onError: (error: any) => {
       setSnackbar({ visible: true, message: error.response?.data?.message || 'İşlem başarısız' });
+    },
+  });
+
+  // Cash payment mutation: awaiting_payment statüsünde, cashPayer'a "Ödeme Yap"
+  // butonu verir. paymentsApi.initiateTradeCash → POST /payments/initiate-trade-cash
+  const cashPayMutation = useMutation({
+    mutationFn: () => paymentsApi.initiateTradeCash(id as string),
+    onSuccess: (response: any) => {
+      const data = response?.data?.data ?? response?.data ?? {};
+      const paymentId = data.paymentId ?? data.id;
+      if (!paymentId) {
+        setSnackbar({ visible: true, message: 'Ödeme başlatılamadı (paymentId eksik).' });
+        return;
+      }
+      router.push(
+        `/payment/${paymentId}?provider=paytr&tradeCash=1` as any,
+      );
+    },
+    onError: (error: any) => {
+      captureException(error, {
+        level: 'error',
+        tags: { flow: 'trade.cashPay' },
+        extra: { tradeId: String(id ?? '') },
+      });
+      setSnackbar({ visible: true, message: error?.response?.data?.message || 'Ödeme başlatılamadı' });
     },
   });
 
@@ -637,6 +662,31 @@ export default function TradeDetailScreen() {
             >
               Teklifi İptal Et
             </Button>
+          )}
+
+          {/* awaiting_payment: cashPayer must initiate the cash payment */}
+          {trade.status === 'awaiting_payment' && trade.cashPayerId === user?.id && (
+            <>
+              <Button
+                mode="contained"
+                onPress={() => cashPayMutation.mutate()}
+                loading={cashPayMutation.isPending}
+                disabled={cashPayMutation.isPending}
+                icon="credit-card-outline"
+                buttonColor={TarodanColors.primary}
+                style={styles.actionButton}
+              >
+                Ödeme Yap (₺{Number(trade.cashAmount ?? 0).toLocaleString('tr-TR')})
+              </Button>
+              <Text variant="bodySmall" style={styles.confirmReceiptHint}>
+                Nakit fark ödemesi tamamlanınca takas akışı başlar.
+              </Text>
+            </>
+          )}
+          {trade.status === 'awaiting_payment' && trade.cashPayerId && trade.cashPayerId !== user?.id && (
+            <Text variant="bodySmall" style={styles.confirmReceiptHint}>
+              Karşı tarafın nakit fark ödemesi bekleniyor.
+            </Text>
           )}
 
           {/* shipping_to_recipients: Confirm receipt (gated by delivered status) */}
