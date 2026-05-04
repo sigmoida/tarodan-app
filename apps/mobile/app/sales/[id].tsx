@@ -1,24 +1,15 @@
-import React, { useState } from 'react';
+import React from 'react';
 import { View, StyleSheet, ScrollView, Image, Alert, Linking, TouchableOpacity } from 'react-native';
-import { Button, Portal, Dialog, SegmentedButtons, Divider } from 'react-native-paper';
+import { Button, Divider } from 'react-native-paper';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 import { router, useLocalSearchParams } from 'expo-router';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { ordersApi, shippingApi } from '../../src/services/api';
+import { ordersApi } from '../../src/services/api';
 import { TarodanColors } from '../../src/theme';
-import { ScreenHeader, ScreenLoader, ErrorState, Text, TextInput } from '../../src/components/common';
+import { ScreenHeader, ScreenLoader, ErrorState, Text } from '../../src/components/common';
 import { formatPrice, formatOrderStatus, formatRelativeDate } from '../../src/utils/format';
 import { transformImageUrl } from '../../src/utils/imageUrl';
-
-/** Backend yalnızca aras / yurtici / mng kargo firmasını destekliyor (ShippingProvider enum). */
-type CarrierKey = 'aras' | 'yurtici' | 'mng';
-
-const CARRIERS: Array<{ key: CarrierKey; label: string }> = [
-  { key: 'aras', label: 'Aras Kargo' },
-  { key: 'yurtici', label: 'Yurtiçi' },
-  { key: 'mng', label: 'MNG' },
-];
 
 interface Order {
   id: string;
@@ -54,6 +45,7 @@ interface Order {
   }>;
   shipment?: {
     carrier?: string;
+    provider?: string;
     trackingNumber?: string;
     status?: string;
     shippedAt?: string;
@@ -75,9 +67,6 @@ function statusColor(status: string): { bg: string; fg: string } {
 export default function SaleDetailScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const queryClient = useQueryClient();
-  const [shipDialog, setShipDialog] = useState(false);
-  const [carrier, setCarrier] = useState<CarrierKey>('aras');
-  const [trackingNumber, setTrackingNumber] = useState('');
 
   const {
     data: order,
@@ -95,39 +84,11 @@ export default function SaleDetailScreen() {
   });
 
   /**
-   * Backend iki adımlı kargo akışı kullanıyor:
-   *   1) POST /shipping        { orderId, provider }  → shipment yaratılır
-   *   2) PATCH /shipping/:id/tracking { trackingNumber } → takip no eklenir
-   * Bu mutasyon ikisini sırayla çalıştırır.
+   * Backend ödeme başarısı sonrasında siparişe Sürat Kargo gönderisini OTOMATIK
+   * yaratır (payment.service.ts → auto-create shipment, provider='surat',
+   * trackingNumber=orderNumber). Mobil tarafta artık satıcıdan kargo firması
+   * ya da takip numarası istemiyoruz; sadece okuma-amaçlı gösteriyoruz.
    */
-  const shipMutation = useMutation({
-    mutationFn: async () => {
-      const created = await shippingApi.createShipment({
-        orderId: id as string,
-        provider: carrier,
-      });
-      const shipment = (created.data as any)?.data ?? (created.data as any);
-      const shipmentId = shipment?.id;
-      if (!shipmentId) {
-        throw new Error('Kargo kaydı oluşturulamadı (id eksik).');
-      }
-      if (trackingNumber.trim()) {
-        await shippingApi.updateTracking(shipmentId, {
-          trackingNumber: trackingNumber.trim(),
-        });
-      }
-      return { shipmentId };
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['sale-order', id] });
-      queryClient.invalidateQueries({ queryKey: ['seller-pending-orders'] });
-      setShipDialog(false);
-      Alert.alert('Başarılı', 'Kargo bilgisi kaydedildi. Alıcıya bildirim gönderildi.');
-    },
-    onError: (e: any) =>
-      Alert.alert('Hata', e?.response?.data?.message || e?.message || 'Kargo bilgisi kaydedilemedi.'),
-  });
-
   const cancelMutation = useMutation({
     mutationFn: (reason: string) => ordersApi.cancel(id!, reason),
     onSuccess: () => {
@@ -158,20 +119,22 @@ export default function SaleDetailScreen() {
   }
 
   const sc = statusColor(order.status);
-  const canShip = ['paid', 'preparing'].includes(order.status) && !order.shipment?.trackingNumber;
   const canCancel = ['paid', 'preparing'].includes(order.status);
-  const hasShipment = !!order.shipment?.trackingNumber;
-
-  const handleShipSubmit = () => {
-    if (!trackingNumber.trim())
-      return Alert.alert('Eksik', 'Kargo takip numarası gerekli.');
-    shipMutation.mutate();
-  };
+  const shipmentTracking = order.shipment?.trackingNumber;
+  const shipmentProvider = order.shipment?.provider ?? order.shipment?.carrier;
+  const isSurat = (shipmentProvider ?? '').toLowerCase() === 'surat';
 
   const handleCall = () => {
     if (order.buyer?.phone) {
       Linking.openURL(`tel:${order.buyer.phone}`);
     }
+  };
+
+  const handleTrack = () => {
+    if (!shipmentTracking) return;
+    Linking.openURL(
+      `https://www.suratkargo.com.tr/KargoTakip/?kargotakipno=${encodeURIComponent(shipmentTracking)}`,
+    );
   };
 
   return (
@@ -251,28 +214,47 @@ export default function SaleDetailScreen() {
           </View>
         ) : null}
 
-        {/* Shipment */}
-        {hasShipment ? (
-          <View style={styles.card}>
-            <Text style={styles.sectionTitle}>Kargo Bilgisi</Text>
-            <View style={styles.kvRow}>
-              <MaterialCommunityIcons name="truck-delivery-outline" size={18} color={TarodanColors.textSecondary} />
-              <Text style={styles.kvValue}>{order.shipment?.carrier}</Text>
-            </View>
-            <View style={styles.kvRow}>
-              <Ionicons name="barcode-outline" size={18} color={TarodanColors.textSecondary} />
-              <Text selectable style={[styles.kvValue, { fontWeight: '700' }]}>
-                {order.shipment?.trackingNumber}
-              </Text>
-            </View>
-            {order.shipment?.status ? (
+        {/* Shipment — Sürat Kargo otomatik gönderi (auto-created, read-only) */}
+        <View style={styles.card}>
+          <Text style={styles.sectionTitle}>Kargo Bilgisi (Sürat Kargo)</Text>
+          {shipmentTracking ? (
+            <>
               <View style={styles.kvRow}>
-                <Ionicons name="pulse-outline" size={18} color={TarodanColors.textSecondary} />
-                <Text style={styles.kvValue}>{order.shipment.status}</Text>
+                <MaterialCommunityIcons name="truck-fast-outline" size={18} color={TarodanColors.primary} />
+                <Text style={styles.kvValue}>
+                  {isSurat ? 'Sürat Kargo' : (shipmentProvider || 'Sürat Kargo')}
+                </Text>
               </View>
-            ) : null}
-          </View>
-        ) : null}
+              <View style={styles.kvRow}>
+                <Ionicons name="barcode-outline" size={18} color={TarodanColors.textSecondary} />
+                <Text selectable style={[styles.kvValue, { fontWeight: '700' }]}>
+                  {shipmentTracking}
+                </Text>
+              </View>
+              {order.shipment?.status ? (
+                <View style={styles.kvRow}>
+                  <Ionicons name="pulse-outline" size={18} color={TarodanColors.textSecondary} />
+                  <Text style={styles.kvValue}>{order.shipment.status}</Text>
+                </View>
+              ) : null}
+              <Text style={styles.helperText}>
+                Sürat Kargo şubesinde bu takip numarasıyla ürünü teslim edin. Alıcıya bildirim otomatik gönderilir.
+              </Text>
+              <Button
+                mode="outlined"
+                icon="truck"
+                onPress={handleTrack}
+                style={{ marginTop: 8 }}
+              >
+                Sürat'ta Takip Et
+              </Button>
+            </>
+          ) : (
+            <Text style={styles.helperText}>
+              Ödeme onaylandıktan sonra Sürat Kargo gönderiniz otomatik oluşturulur. Takip numarası kısa süre içinde burada görünecek.
+            </Text>
+          )}
+        </View>
 
         {/* Totals */}
         <View style={styles.card}>
@@ -309,19 +291,6 @@ export default function SaleDetailScreen() {
         </View>
 
         {/* Actions */}
-        {canShip ? (
-          <Button
-            mode="contained"
-            buttonColor={TarodanColors.primary}
-            icon="truck-fast"
-            onPress={() => setShipDialog(true)}
-            style={styles.actionBtn}
-            contentStyle={{ paddingVertical: 4 }}
-          >
-            Kargo Bilgisi Gir
-          </Button>
-        ) : null}
-
         {canCancel ? (
           <Button
             mode="outlined"
@@ -348,46 +317,6 @@ export default function SaleDetailScreen() {
           </Button>
         ) : null}
       </ScrollView>
-
-      <Portal>
-        <Dialog visible={shipDialog} onDismiss={() => setShipDialog(false)}>
-          <Dialog.Title>Kargo Bilgisi</Dialog.Title>
-          <Dialog.ScrollArea style={{ paddingHorizontal: 0 }}>
-            <ScrollView contentContainerStyle={{ paddingHorizontal: 24, paddingBottom: 8 }}>
-              <Text style={{ marginBottom: 12, color: TarodanColors.textSecondary }}>
-                Kargo firmasını seçip takip numarasını girin. Alıcıya anında bildirim gönderilecek.
-              </Text>
-              <SegmentedButtons
-                value={carrier}
-                onValueChange={v => setCarrier(v as CarrierKey)}
-                density="small"
-                buttons={CARRIERS.map(c => ({ value: c.key, label: c.label }))}
-              />
-              <TextInput
-                mode="outlined"
-                label="Takip Numarası"
-                value={trackingNumber}
-                onChangeText={setTrackingNumber}
-                style={{ marginTop: 12, backgroundColor: TarodanColors.background }}
-                outlineColor={TarodanColors.border}
-                activeOutlineColor={TarodanColors.primary}
-              />
-            </ScrollView>
-          </Dialog.ScrollArea>
-          <Dialog.Actions>
-            <Button onPress={() => setShipDialog(false)}>Vazgeç</Button>
-            <Button
-              mode="contained"
-              buttonColor={TarodanColors.primary}
-              onPress={handleShipSubmit}
-              loading={shipMutation.isPending}
-              disabled={shipMutation.isPending}
-            >
-              Kaydet
-            </Button>
-          </Dialog.Actions>
-        </Dialog>
-      </Portal>
     </SafeAreaView>
   );
 }
@@ -484,6 +413,12 @@ const styles = StyleSheet.create({
     fontSize: 13,
     color: TarodanColors.textSecondary,
     lineHeight: 18,
+  },
+  helperText: {
+    fontSize: 12,
+    color: TarodanColors.textSecondary,
+    marginTop: 6,
+    lineHeight: 17,
   },
   actionBtn: {
     borderRadius: 10,
