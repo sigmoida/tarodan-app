@@ -182,6 +182,9 @@ export const productsApi = {
   getMyStats: () => api.get('/products/my/stats'),
   /** Mevcut sahibinin ilanı — düzenleme için */
   getMyById: (id: string) => api.get(`/products/my/${id}`),
+  /** Aynı kategoriden benzer ürünler — backend: GET /products/:id/similar */
+  getSimilar: (id: string, limit = 12) =>
+    api.get(`/products/${id}/similar`, { params: { limit } }),
 };
 
 // Categories API - Web ile aynı endpoint'ler
