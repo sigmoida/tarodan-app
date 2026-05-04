@@ -8,6 +8,7 @@ import { WebView, WebViewNavigation } from 'react-native-webview';
 import { paymentsApi } from '../../src/services/api';
 import { TarodanColors } from '../../src/theme';
 import { ScreenHeader, ErrorState, Text } from '../../src/components/common';
+import { captureException } from '../../src/services/sentry';
 
 /**
  * Ödeme WebView ekranı.
@@ -96,6 +97,11 @@ export default function PaymentWebViewScreen() {
         });
       }
     } catch (e: any) {
+      captureException(e, {
+        level: 'error',
+        tags: { flow: 'payment.initiate', provider: String(params.provider ?? 'unknown') },
+        extra: { paymentId, status: e?.response?.status },
+      });
       setState({
         loading: false,
         error: e?.response?.data?.message || 'Ödeme başlatılamadı.',

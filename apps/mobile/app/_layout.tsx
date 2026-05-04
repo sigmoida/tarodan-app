@@ -10,6 +10,12 @@ import { useAuthStore } from '../src/stores/authStore';
 import { registerForPushNotifications, setupPushNotificationRouting } from '../src/services/push';
 import { TarodanLightTheme, TarodanDarkTheme } from '../src/theme';
 import { LanguageProvider } from '../src/i18n/LanguageContext';
+import { initSentry } from '../src/services/sentry';
+
+// Initialize Sentry as early as possible. Currently a stub (no-op until
+// `@sentry/react-native` is installed and SENTRY_PACKAGE_LOADED is flipped
+// to true in services/sentry.ts). Calling here ensures the wiring exists.
+initSentry();
 
 // Conditionally import notifications - only in development builds, not Expo Go
 let Notifications: any = null;

@@ -350,7 +350,9 @@ export const useAuthStore = create<AuthState>((set, get) => ({
         set({ isLoading: false });
       }
     } catch (error) {
-      // Token invalid or expired
+      // Token invalid or expired — usually 401 (expected). Report only once,
+      // tagged so dashboards can filter expected vs unexpected.
+      captureException(error, { level: 'warning', tags: { flow: 'auth.loadToken' } });
       await SecureStore.deleteItemAsync('accessToken');
       await SecureStore.deleteItemAsync('refreshToken');
       set({ isAuthenticated: false, token: null, user: null, limits: null, isLoading: false });
@@ -375,6 +377,7 @@ export const useAuthStore = create<AuthState>((set, get) => ({
       set({ user: mappedUser, limits });
     } catch (error) {
       console.error('Failed to refresh user data:', error);
+      captureException(error, { level: 'warning', tags: { flow: 'auth.refreshUserData' } });
     }
   },
 

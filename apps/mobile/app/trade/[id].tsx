@@ -11,6 +11,7 @@ import { tradesApi, addressesApi } from '../../src/services/api';
 import { useAuthStore } from '../../src/stores/authStore';
 import { TarodanColors } from '../../src/theme';
 import { useTranslation } from '../../src/i18n/LanguageContext';
+import { captureException } from '../../src/services/sentry';
 
 type TFn = (key: string, params?: Record<string, string | number>) => string;
 
@@ -140,6 +141,11 @@ export default function TradeDetailScreen() {
       setSnackbar({ visible: true, message: 'Takas kabul edildi!' });
     },
     onError: (error: any) => {
+      captureException(error, {
+        level: 'error',
+        tags: { flow: 'trade.accept' },
+        extra: { tradeId: String(id ?? '') },
+      });
       setSnackbar({ visible: true, message: error.response?.data?.message || 'İşlem başarısız' });
     },
   });

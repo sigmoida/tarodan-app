@@ -28,6 +28,7 @@ import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 import { useQuery } from '@tanstack/react-query';
 import { TarodanColors } from '../../src/theme';
 import { useCartStore } from '../../src/stores/cartStore';
+import { captureException } from '../../src/services/sentry';
 import {
   ordersApi,
   paymentsApi,
@@ -544,6 +545,11 @@ export default function CheckoutScreen() {
       }
     } catch (error: any) {
       console.error('Checkout error:', error);
+      captureException(error, {
+        level: 'error',
+        tags: { flow: 'checkout' },
+        extra: { status: error?.response?.status },
+      });
       const errorMessage =
         error.response?.data?.message ||
         error.response?.data?.error ||

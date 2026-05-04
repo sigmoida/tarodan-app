@@ -8,6 +8,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { api, ordersApi, refundsApi } from '../../src/services/api';
 import { TarodanColors } from '../../src/theme';
 import RatingModal from '../../src/components/RatingModal';
+import { captureException } from '../../src/services/sentry';
 import { safeString } from '../../src/utils/safeString';
 import { apiStatusToUi, type UiOrderStatus } from '../../src/utils/orderStatus';
 import { getOrderProductImageUri } from '../../src/utils/orderProductImage';
@@ -138,6 +139,11 @@ export default function OrderDetailScreen() {
       queryClient.invalidateQueries({ queryKey: ['orders'] });
     },
     onError: (err: any) => {
+      captureException(err, {
+        level: 'error',
+        tags: { flow: 'refund.create' },
+        extra: { orderId: String(id ?? ''), reason: refundReason },
+      });
       const msg =
         err?.response?.data?.message ||
         (Array.isArray(err?.response?.data?.message)
