@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { View, FlatList, StyleSheet, TouchableOpacity, RefreshControl } from 'react-native';
+import { View, FlatList, Image, StyleSheet, TouchableOpacity, RefreshControl } from 'react-native';
 import { Badge, ActivityIndicator, Button } from 'react-native-paper';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { router, useFocusEffect } from 'expo-router';
@@ -18,9 +18,11 @@ interface Notification {
   read?: boolean;
   isRead?: boolean;
   createdAt: string;
+  link?: string | null;
   data?: {
     orderId?: string;
     productId?: string;
+    productImage?: string;
     offerId?: string;
     tradeId?: string;
     threadId?: string;
@@ -28,6 +30,12 @@ interface Notification {
     userId?: string;
   };
 }
+
+const STOCKOUT_TYPES = new Set([
+  'order_cancelled_out_of_stock',
+  'offer_cancelled_out_of_stock',
+  'back_in_stock',
+]);
 
 type IoniconName = React.ComponentProps<typeof Ionicons>['name'];
 
@@ -140,6 +148,11 @@ export default function NotificationsScreen() {
       }
     }
 
+    // Prefer backend-provided deep link (already interpolated with ids).
+    if (notification.link) {
+      router.push(notification.link as any);
+      return;
+    }
     const target = routeForNotification(notification);
     if (target) router.push(target as any);
   };
@@ -164,9 +177,16 @@ export default function NotificationsScreen() {
         onPress={() => handlePress(item)}
         activeOpacity={0.75}
       >
-        <View style={[styles.iconContainer, { backgroundColor: bg }]}>
-          <Ionicons name={icon} size={20} color={color} />
-        </View>
+        {STOCKOUT_TYPES.has(item.type) && item.data?.productImage ? (
+          <Image
+            source={{ uri: item.data.productImage }}
+            style={styles.thumb}
+          />
+        ) : (
+          <View style={[styles.iconContainer, { backgroundColor: bg }]}>
+            <Ionicons name={icon} size={20} color={color} />
+          </View>
+        )}
         <View style={styles.content}>
           <Text style={[styles.title, isUnread && styles.titleUnread]} numberOfLines={1}>
             {item.title}
@@ -305,6 +325,13 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     marginRight: 12,
+  },
+  thumb: {
+    width: 40,
+    height: 40,
+    borderRadius: 6,
+    marginRight: 12,
+    backgroundColor: TarodanColors.surfaceVariant,
   },
   content: {
     flex: 1,
