@@ -70,7 +70,7 @@ export default function ProductUnavailableScreen() {
             {isBackInStock ? (
               <>
                 <Text style={styles.heroEmoji}>🎉</Text>
-                <Text style={styles.heroTitle}>{t('stockout.page.titleBack')}</Text>
+                <Text testID="unavailable-hero-title" style={styles.heroTitle}>{t('stockout.page.titleBack')}</Text>
                 <Text style={styles.heroBody}>
                   {product?.title
                     ? t('stockout.page.bodyBack', { title: product.title })
@@ -93,7 +93,7 @@ export default function ProductUnavailableScreen() {
                   color={TarodanColors.error}
                   style={{ marginBottom: 8 }}
                 />
-                <Text style={styles.heroTitle}>{t('stockout.page.title')}</Text>
+                <Text testID="unavailable-hero-title" style={styles.heroTitle}>{t('stockout.page.title')}</Text>
                 <Text style={styles.heroBody}>
                   {product?.title
                     ? t('stockout.page.bodyOut', { title: product.title })

@@ -109,9 +109,10 @@ export default function ProfileScreen() {
             <Text style={styles.guestSubtitle}>
               Tarodan'a giriş yaparak tüm özelliklerden yararlanın
             </Text>
-            <Button 
-              mode="contained" 
-              onPress={() => router.push('/(auth)/login')} 
+            <Button
+              testID="profile-go-login-button"
+              mode="contained"
+              onPress={() => router.push('/(auth)/login')}
               style={styles.loginButton}
               buttonColor={TarodanColors.primary}
               icon="login"
@@ -369,7 +370,7 @@ export default function ProfileScreen() {
               </View>
               <Text style={styles.quickActionText}>İlanlarım</Text>
             </TouchableOpacity>
-            <TouchableOpacity style={styles.quickAction} onPress={() => router.push('/orders')}>
+            <TouchableOpacity testID="profile-orders-link" style={styles.quickAction} onPress={() => router.push('/orders')}>
               <View style={[styles.quickActionIcon, { backgroundColor: '#E3F2FD' }]}>
                 <Ionicons name="cube" size={22} color="#2196F3" />
               </View>
@@ -396,11 +397,17 @@ export default function ProfileScreen() {
               </View>
               <Text style={styles.quickActionText}>Beğenilen{'\n'}Koleksiyonlar</Text>
             </TouchableOpacity>
-            <TouchableOpacity style={styles.quickAction} onPress={() => router.push('/trades')}>
+            <TouchableOpacity testID="profile-trades-link" style={styles.quickAction} onPress={() => router.push('/trades')}>
               <View style={[styles.quickActionIcon, { backgroundColor: '#FFF8E1' }]}>
                 <Ionicons name="swap-horizontal" size={22} color="#FFA000" />
               </View>
               <Text style={styles.quickActionText}>Takaslarım</Text>
+            </TouchableOpacity>
+            <TouchableOpacity testID="profile-offers-link" style={styles.quickAction} onPress={() => router.push('/offers' as any)}>
+              <View style={[styles.quickActionIcon, { backgroundColor: '#E1F5FE' }]}>
+                <Ionicons name="pricetags" size={22} color="#0288D1" />
+              </View>
+              <Text style={styles.quickActionText}>Tekliflerim</Text>
             </TouchableOpacity>
             <TouchableOpacity style={styles.quickAction} onPress={() => router.push('/settings/analytics')}>
               <View style={[styles.quickActionIcon, { backgroundColor: '#E0F7FA' }]}>
@@ -427,7 +434,7 @@ export default function ProfileScreen() {
             <Ionicons name="chevron-forward" size={20} color={TarodanColors.textLight} />
           </TouchableOpacity>
 
-          <TouchableOpacity style={styles.menuItem} onPress={() => router.push('/membership')}>
+          <TouchableOpacity testID="profile-membership-link" style={styles.menuItem} onPress={() => router.push('/membership')}>
             <Ionicons name="diamond-outline" size={22} color={TarodanColors.textSecondary} />
             <Text style={styles.menuItemText}>Üyelik Planı</Text>
             {(user?.membershipTier === 'premium' || user?.membershipTier === 'business') && <Badge style={{ backgroundColor: TarodanColors.primary }}>PRO</Badge>}
@@ -486,7 +493,7 @@ export default function ProfileScreen() {
         </View>
 
         {/* Logout */}
-        <TouchableOpacity style={styles.logoutButton} onPress={handleLogout}>
+        <TouchableOpacity testID="profile-logout-button" style={styles.logoutButton} onPress={handleLogout}>
           <Ionicons name="log-out-outline" size={22} color={TarodanColors.error} />
           <Text style={styles.logoutText}>Çıkış Yap</Text>
         </TouchableOpacity>

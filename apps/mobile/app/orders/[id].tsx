@@ -519,6 +519,7 @@ export default function OrderDetailScreen() {
                   Ödeme tamamlandı. Gerekirse iade işlemi başlatabilirsiniz.
                 </Text>
                 <Button
+                  testID="refund-request-button"
                   mode="outlined"
                   icon="undo-variant"
                   onPress={() => setRefundModalVisible(true)}

@@ -668,6 +668,7 @@ export default function TradeDetailScreen() {
           {trade.status === 'awaiting_payment' && trade.cashPayerId === user?.id && (
             <>
               <Button
+                testID="cash-pay-button"
                 mode="contained"
                 onPress={() => cashPayMutation.mutate()}
                 loading={cashPayMutation.isPending}

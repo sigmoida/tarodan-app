@@ -143,6 +143,7 @@ export default function LoginScreen() {
           name="email"
           render={({ field: { onChange, value } }) => (
             <TextInput
+              testID="login-email-input"
               label="E-posta"
               value={value}
               onChangeText={onChange}
@@ -165,6 +166,7 @@ export default function LoginScreen() {
           name="password"
           render={({ field: { onChange, value } }) => (
             <TextInput
+              testID="login-password-input"
               label="Şifre"
               value={value}
               onChangeText={onChange}
@@ -191,6 +193,7 @@ export default function LoginScreen() {
         ) : null}
 
         <Button
+          testID="login-submit-button"
           mode="contained"
           onPress={handleSubmit(onSubmit)}
           loading={loginMutation.isPending}
