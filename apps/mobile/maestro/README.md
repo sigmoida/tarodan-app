@@ -50,8 +50,24 @@ Her flow YAML başında `tags:` bloğu ile bir öncelik kategorisine atanır:
 | Tag | Ne zaman koşar | İçerdiği | Toplam koşum |
 |-----|---------------|----------|-------------|
 | `smoke` | Her PR (Maestro Cloud workflow) | 01-smoke, 01-01-login-happy, 03-search, 05-ilanlarim-diagnostic, D-01 | ~2 dk 30 sn |
-| `regression` | Nightly + release öncesi | 01-02, 01-03, 01-12, 02-auth-login, D-02, D-03, D-04, D-05 | ~5 dk |
-| `placeholder` | Manuel tetik (henüz aktif değil) | 04-checkout-bypass | — |
+| `regression` | Nightly + release öncesi | 01-02, 01-03, 01-12, 02-auth-login, D-02, D-03, D-04, D-05, E-03, E-07 | ~6 dk |
+| `manual` | Yerel + fixture'a bağlı (CI'da koşulmaz) | E-01, E-02, E-04, E-05, E-06, E-08 | — |
+| `placeholder` | Deprecated (D-01 ile kapatıldı) | 04-checkout-bypass | — |
+
+### Yeni E-XX flow'ları (kapsam genişletme)
+
+| Flow | Senaryo | Ön koşul / fixture |
+|------|---------|--------------------|
+| E-01 | Stockout dedicated page (deep link) | `STOCKOUT_PRODUCT_ID` env (gerçek satılmış ürün UUID'si) |
+| E-02 | Iade talep akışı (modal → Hasarlı geldi → submit) | Zeynep'in `payment.status=completed` siparişi olmalı |
+| E-03 | Tekliflerim listesi açılır | `pnpm db:seed` (default seed) |
+| E-04 | `shipping_to_warehouse` takasında otomatik kargo kartı | Zeynep'te bu durumda aktif takas seed'li olmalı |
+| E-05 | Üyelik Yönet ekranı (Otomatik Yenileme + İptal) | `PREMIUM_EMAIL` (ahmet@demo.com) aktif premium aboneliği |
+| E-06 | Cash takas `awaiting_payment` → "Ödeme Yap" CTA | Zeynep'te `cashPayerId === user`, status `awaiting_payment` takas |
+| E-07 | Bildirimler tab smoke | `pnpm db:seed` |
+| E-08 | Push deep-link routing simülasyonu (`tarodan://products/unavailable/{id}`) | `STOCKOUT_PRODUCT_ID` env |
+
+**Not (manual tag):** E-01, E-02, E-04, E-05, E-06, E-08 backend fixture'ına bağımlıdır. CI Maestro Cloud workflow `--include-tags smoke` veya `regression` koşar; `manual` tag'li flow'lar yerelde elle koşulur.
 
 Çalıştırma örnekleri:
 ```bash
@@ -75,8 +91,10 @@ maestro/
 │   └── 05-ilanlarim-diagnostic.yaml # ✅ İlanlarım ekranı açılır + boş hata yok
 └── subflows/            # paylaşılan parça akışlar
     ├── open-tarodan.yaml      # Expo Go → Tarodan launch
-    ├── login.yaml             # Profil → Giriş Yap formu
-    └── logout.yaml            # Profil → Çıkış Yap
+    ├── login-as.yaml          # Profil → Giriş Yap formu (zeynep, hard-coded)
+    ├── logout.yaml            # Profil → Çıkış Yap
+    ├── open-first-order.yaml  # Profil → Siparişlerim → ilk kart
+    └── open-first-trade.yaml  # Profil → Takaslarım → liste
 ```
 
 ## Selector stratejisi (önemli)
