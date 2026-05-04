@@ -808,6 +808,29 @@ export const uploadApi = {
 };
 
 // =============================================================================
+// REFUND REQUESTS API
+// =============================================================================
+/**
+ * Buyer-side refund request endpoints.
+ * Backend module: apps/api/src/modules/refund (RefundController).
+ * Reasons (Prisma enum RefundReason): changed_mind | damaged | wrong_item |
+ * not_as_described | missing_parts | other.
+ */
+export const refundsApi = {
+  /** POST /orders/:orderId/refund-requests */
+  create: (
+    orderId: string,
+    body: { reason: string; description?: string; evidencePhotoUrls?: string[] },
+  ) => api.post(`/orders/${orderId}/refund-requests`, body),
+  /** GET /refund-requests/:id */
+  getById: (id: string) => api.get(`/refund-requests/${id}`),
+  /** GET /refund-requests/me — buyer's own refund requests */
+  getMine: () => api.get('/refund-requests/me'),
+  /** POST /refund-requests/:id/cancel */
+  cancel: (id: string) => api.post(`/refund-requests/${id}/cancel`),
+};
+
+// =============================================================================
 // ENDPOINTS OBJECT - Unified API access
 // =============================================================================
 export const endpoints = {

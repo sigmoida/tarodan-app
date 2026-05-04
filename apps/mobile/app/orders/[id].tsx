@@ -1,11 +1,11 @@
 import { View, ScrollView, StyleSheet, TouchableOpacity, Image, Linking } from 'react-native';
-import { Card, Button, ActivityIndicator, Divider, Chip } from 'react-native-paper';
-import { Text } from '../../src/components/common';
+import { Card, Button, ActivityIndicator, Divider, Chip, Modal, Portal, RadioButton, Snackbar } from 'react-native-paper';
+import { Text, TextInput } from '../../src/components/common';
 import { useState } from 'react';
 import { router, useLocalSearchParams } from 'expo-router';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { Ionicons } from '@expo/vector-icons';
-import { api, ordersApi } from '../../src/services/api';
+import { api, ordersApi, refundsApi } from '../../src/services/api';
 import { TarodanColors } from '../../src/theme';
 import RatingModal from '../../src/components/RatingModal';
 import { safeString } from '../../src/utils/safeString';
@@ -49,7 +49,39 @@ interface OrderDetail {
   hasSellerRating?: boolean;
   isBuyer?: boolean;
   isSeller?: boolean;
+  payment?: { status?: string } | null;
+  activeRefundRequest?: {
+    id: string;
+    refundNumber?: string;
+    status: string;
+    reason?: string;
+    createdAt: string;
+    returnTrackingNumber?: string | null;
+    returnProvider?: string | null;
+  } | null;
 }
+
+const REFUND_REASONS: Array<{ value: string; label: string }> = [
+  { value: 'damaged', label: 'Hasarlı geldi' },
+  { value: 'not_as_described', label: 'Açıklamayla uyuşmuyor' },
+  { value: 'wrong_item', label: 'Yanlış ürün geldi' },
+  { value: 'missing_parts', label: 'Eksik parça var' },
+  { value: 'changed_mind', label: 'Vazgeçtim' },
+  { value: 'other', label: 'Diğer' },
+];
+
+const REFUND_STATUS_LABELS: Record<string, string> = {
+  pending_review: 'Talep İnceleniyor',
+  approved: 'Onaylandı, İşleniyor',
+  wait_for_delivery: 'Ürün Tesliminden Sonra İade Açılacak',
+  return_shipment_open: 'İade Kargonuz Hazır',
+  return_in_transit: 'İade Yolda',
+  return_delivered: 'Satıcıya Ulaştı, Para İadesi Yapılıyor',
+  refunded: 'İade Tamamlandı',
+  rejected: 'Talep Reddedildi',
+  disputed: 'İtirazlı (İnceleniyor)',
+  cancelled: 'İptal Edildi',
+};
 
 export default function OrderDetailScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
@@ -58,6 +90,13 @@ export default function OrderDetailScreen() {
     visible: boolean;
     type: 'product' | 'seller';
   }>({ visible: false, type: 'product' });
+  const [refundModalVisible, setRefundModalVisible] = useState(false);
+  const [refundReason, setRefundReason] = useState<string>('damaged');
+  const [refundDescription, setRefundDescription] = useState('');
+  const [snackbar, setSnackbar] = useState<{ visible: boolean; message: string }>({
+    visible: false,
+    message: '',
+  });
 
   // Fetch order detail
   const { data: order, isLoading } = useQuery({
@@ -81,6 +120,31 @@ export default function OrderDetailScreen() {
       }
     },
     enabled: !!id,
+  });
+
+  // Refund request mutation
+  const refundMutation = useMutation({
+    mutationFn: async () => {
+      const body: { reason: string; description?: string } = { reason: refundReason };
+      const desc = refundDescription.trim();
+      if (desc.length > 0) body.description = desc;
+      return refundsApi.create(id as string, body);
+    },
+    onSuccess: () => {
+      setRefundModalVisible(false);
+      setRefundDescription('');
+      setSnackbar({ visible: true, message: 'İade talebiniz oluşturuldu.' });
+      queryClient.invalidateQueries({ queryKey: ['order', id] });
+      queryClient.invalidateQueries({ queryKey: ['orders'] });
+    },
+    onError: (err: any) => {
+      const msg =
+        err?.response?.data?.message ||
+        (Array.isArray(err?.response?.data?.message)
+          ? err.response.data.message.join(', ')
+          : 'İade talebi oluşturulamadı.');
+      setSnackbar({ visible: true, message: typeof msg === 'string' ? msg : 'İade talebi oluşturulamadı.' });
+    },
   });
 
   // Confirm delivery mutation
@@ -370,6 +434,96 @@ export default function OrderDetailScreen() {
           </Card>
         )}
 
+        {/* Refund — existing request banner */}
+        {order.activeRefundRequest && (
+          <Card style={styles.card}>
+            <Card.Content>
+              <View style={styles.refundHeaderRow}>
+                <Ionicons name="return-up-back" size={20} color={TarodanColors.info} />
+                <Text variant="titleSmall" style={styles.refundHeaderText}>
+                  İade Talebi
+                </Text>
+                <Chip
+                  compact
+                  style={{
+                    backgroundColor:
+                      order.activeRefundRequest.status === 'refunded'
+                        ? TarodanColors.success + '20'
+                        : TarodanColors.info + '20',
+                  }}
+                  textStyle={{
+                    color:
+                      order.activeRefundRequest.status === 'refunded'
+                        ? TarodanColors.success
+                        : TarodanColors.info,
+                  }}
+                >
+                  {REFUND_STATUS_LABELS[order.activeRefundRequest.status] ??
+                    order.activeRefundRequest.status}
+                </Chip>
+              </View>
+              {order.activeRefundRequest.refundNumber ? (
+                <Text variant="bodySmall" style={styles.refundMeta}>
+                  {order.activeRefundRequest.refundNumber} ·{' '}
+                  {formatDate(order.activeRefundRequest.createdAt)}
+                </Text>
+              ) : null}
+              {order.activeRefundRequest.status === 'return_shipment_open' &&
+              order.activeRefundRequest.returnTrackingNumber ? (
+                <View style={styles.refundTrackingBox}>
+                  <Text variant="bodySmall" style={styles.refundTrackingHint}>
+                    Bu numarayı paketle birlikte herhangi bir Sürat şubesine bırakın:
+                  </Text>
+                  <Text style={styles.refundTrackingNumber}>
+                    {order.activeRefundRequest.returnTrackingNumber}
+                  </Text>
+                  {order.activeRefundRequest.returnProvider === 'surat' ? (
+                    <Button
+                      mode="outlined"
+                      icon="truck"
+                      onPress={() =>
+                        Linking.openURL(
+                          `https://www.suratkargo.com.tr/KargoTakip/?kargotakipno=${encodeURIComponent(
+                            order.activeRefundRequest!.returnTrackingNumber!,
+                          )}`,
+                        )
+                      }
+                      style={{ marginTop: 8 }}
+                    >
+                      Sürat'ta Takip Et
+                    </Button>
+                  ) : null}
+                </View>
+              ) : null}
+            </Card.Content>
+          </Card>
+        )}
+
+        {/* Refund — request button (paid+ orders, buyer only, no active request) */}
+        {order.isBuyer &&
+          !order.activeRefundRequest &&
+          order.payment?.status === 'completed' &&
+          !['cancelled', 'refunded'].includes(order.status) && (
+            <Card style={styles.card}>
+              <Card.Content>
+                <Text variant="titleSmall" style={styles.sectionTitle}>
+                  İade İşlemleri
+                </Text>
+                <Text variant="bodySmall" style={styles.refundIntro}>
+                  Ödeme tamamlandı. Gerekirse iade işlemi başlatabilirsiniz.
+                </Text>
+                <Button
+                  mode="outlined"
+                  icon="undo-variant"
+                  onPress={() => setRefundModalVisible(true)}
+                  style={{ marginTop: 8 }}
+                >
+                  İade Talep Et
+                </Button>
+              </Card.Content>
+            </Card>
+          )}
+
         {/* Help */}
         <Card style={styles.card}>
           <TouchableOpacity onPress={() => router.push('/help')}>
@@ -385,6 +539,78 @@ export default function OrderDetailScreen() {
 
         <View style={{ height: 50 }} />
       </ScrollView>
+
+      {/* Refund Request Modal */}
+      <Portal>
+        <Modal
+          visible={refundModalVisible}
+          onDismiss={() => setRefundModalVisible(false)}
+          contentContainerStyle={styles.refundModal}
+        >
+          <ScrollView>
+            <Text variant="titleMedium" style={styles.refundModalTitle}>
+              İade Talebi Oluştur
+            </Text>
+            <Text variant="bodySmall" style={styles.refundModalHint}>
+              Lütfen iade nedeninizi seçin ve gerekiyorsa kısa bir açıklama ekleyin.
+            </Text>
+
+            <Text variant="bodySmall" style={styles.refundModalLabel}>
+              İade Nedeni
+            </Text>
+            <RadioButton.Group onValueChange={setRefundReason} value={refundReason}>
+              {REFUND_REASONS.map((r) => (
+                <RadioButton.Item
+                  key={r.value}
+                  label={r.label}
+                  value={r.value}
+                  position="leading"
+                  style={styles.refundRadio}
+                />
+              ))}
+            </RadioButton.Group>
+
+            <Text variant="bodySmall" style={styles.refundModalLabel}>
+              Açıklama (isteğe bağlı)
+            </Text>
+            <TextInput
+              mode="outlined"
+              placeholder="Sorunu kısaca anlatın..."
+              value={refundDescription}
+              onChangeText={setRefundDescription}
+              multiline
+              numberOfLines={4}
+              style={styles.refundDescription}
+            />
+
+            <View style={styles.refundModalActions}>
+              <Button
+                mode="text"
+                onPress={() => setRefundModalVisible(false)}
+                disabled={refundMutation.isPending}
+              >
+                Vazgeç
+              </Button>
+              <Button
+                mode="contained"
+                onPress={() => refundMutation.mutate()}
+                loading={refundMutation.isPending}
+                disabled={refundMutation.isPending}
+              >
+                Talebi Gönder
+              </Button>
+            </View>
+          </ScrollView>
+        </Modal>
+      </Portal>
+
+      <Snackbar
+        visible={snackbar.visible}
+        onDismiss={() => setSnackbar({ visible: false, message: '' })}
+        duration={3500}
+      >
+        {snackbar.message}
+      </Snackbar>
 
       {/* Rating Modal */}
       <RatingModal
@@ -627,5 +853,72 @@ const styles = StyleSheet.create({
   helpCard: {
     flexDirection: 'row',
     alignItems: 'center',
+  },
+  refundHeaderRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    marginBottom: 4,
+  },
+  refundHeaderText: {
+    flex: 1,
+    color: TarodanColors.textPrimary,
+  },
+  refundMeta: {
+    color: TarodanColors.textSecondary,
+    marginBottom: 6,
+  },
+  refundIntro: {
+    color: TarodanColors.textSecondary,
+  },
+  refundTrackingBox: {
+    backgroundColor: TarodanColors.backgroundSecondary,
+    padding: 12,
+    borderRadius: 8,
+    marginTop: 8,
+  },
+  refundTrackingHint: {
+    color: TarodanColors.textSecondary,
+    marginBottom: 4,
+  },
+  refundTrackingNumber: {
+    fontWeight: 'bold',
+    color: TarodanColors.textPrimary,
+    fontSize: 16,
+  },
+  refundModal: {
+    backgroundColor: TarodanColors.background,
+    margin: 16,
+    padding: 20,
+    borderRadius: 12,
+    maxHeight: '85%',
+  },
+  refundModalTitle: {
+    fontWeight: '700',
+    color: TarodanColors.textPrimary,
+    marginBottom: 6,
+  },
+  refundModalHint: {
+    color: TarodanColors.textSecondary,
+    marginBottom: 12,
+  },
+  refundModalLabel: {
+    color: TarodanColors.textPrimary,
+    fontWeight: '600',
+    marginTop: 8,
+    marginBottom: 4,
+  },
+  refundRadio: {
+    paddingVertical: 2,
+  },
+  refundDescription: {
+    backgroundColor: TarodanColors.background,
+    minHeight: 80,
+  },
+  refundModalActions: {
+    flexDirection: 'row',
+    justifyContent: 'flex-end',
+    gap: 8,
+    marginTop: 16,
   },
 });
