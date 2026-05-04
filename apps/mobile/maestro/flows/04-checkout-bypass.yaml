@@ -1,22 +1,10 @@
-# PLACEHOLDER — B-001 (bypass payment) regression flow.
-# Çalışır hâle getirmek için product detail + checkout ekranlarına testID eklenmesi gerek.
-#
-# Tasarım:
-# 1. login (Zeynep)
-# 2. Bir ürün kartına tıkla
-# 3. "Hemen Al" veya "Sepete Ekle" → checkout
-# 4. Ödeme: bypass yolunu seç
-# 5. assertVisible "Tamamlandı" / "/payment/success"
-#
-# Mevcut blocker: ürün kartlarında ve "Hemen Al" butonunda kararlı bir testID/accessibilityLabel yok.
-# Eklenince bu flow aktive edilecek.
-#
-# Şimdilik sadece checkout/index.tsx + payment/[id].tsx'in B-001 fix'i içerdiğini
-# manuel doğrulanmış olarak işaretleyelim. Bkz. apps/mobile/docs/manual-test/bug-rapor.md.
+# DEPRECATED — bu placeholder D-01-checkout-bypass-regression.yaml ile kapatıldı.
+# Bypass payment chain UI doğrulaması artık D-01 altında (smoke tag'inde) koşar.
+# Burada sadece launch + home doğrulaması yapılır; kaldırılma adayı.
 appId: host.exp.Exponent
 tags:
   - placeholder
 ---
 - runFlow: ../subflows/open-tarodan.yaml
-- assertVisible: "Kategoriler"
-# TODO: testID'ler eklendiğinde gerçek checkout adımları buraya
+- assertVisible:
+    text: "Ana Sayfa"

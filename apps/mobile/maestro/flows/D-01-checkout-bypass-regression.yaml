@@ -48,6 +48,15 @@ env:
 - assertVisible: "Kargo"
 - assertVisible:
     text: ".*Geliştirici modu.*"
+# Regression assertions (B-001):
+# 1. Kart numarası alanı bypass modunda render edilmemeli.
 - assertNotVisible: "Kart Bilgileri"
+- assertNotVisible:
+    text: ".*Kart Numaras.*"
+- assertNotVisible:
+    text: ".*[Cc]ard [Nn]umber.*"
+# 2. "Ödemeyi Tamamla" CTA görünür olmalı (bypass yine de bir submit butonu sunar).
+- assertVisible:
+    text: ".*Ödeme.*Tamamla.*|.*Ödemeyi.*"
 - assertNotVisible: ".*Network Error.*"
 - assertNotVisible: ".*Bir hata oluştu.*"

@@ -1,7 +1,15 @@
 # 01-03: Doğrulanmamış email kullanıcısı → login attempt → "doğrulayın" davranışı.
-# Pre-req: pnpm --filter @tarodan/api seed:edge:auth
-# Beklenen: ya login olur ama "doğrula" banner'ı çıkar, ya da login başarısız.
-# Bu flow ikisi de kabul: Network Error olmasın + Kategoriler'e geçiş YA da error banner.
+#
+# PRE-REQUISITE (zorunlu):
+#   pnpm --filter @tarodan/api seed:edge:auth
+#   → unverified@demo.com kullanıcısını seed eder. Bu adım çalıştırılmazsa
+#   "Geçersiz email/şifre" banner'ı dönecek, ki o da kabul edilebilir bir state
+#   (aşağıdaki "başarısız" regex bunu yakalar).
+#
+# Beklenen davranışlar (ikisi de geçer):
+#   1. Login başarılı + "doğrulayın" banner'ı (verify-email yönlendirmesi)
+#   2. Login başarısız + error mesajı (kullanıcı seed edilmemiş veya creds yanlış)
+# Asıl regression iddiası: Network Error olmasın → backend ulaşılabilir.
 appId: host.exp.Exponent
 tags:
   - regression
