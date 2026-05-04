@@ -72,14 +72,18 @@ function getTimeRemaining(expiresAt: string): string | null {
   return `${hours}s ${minutes}d`;
 }
 
-function formatDate(iso: string): string {
-  return new Date(iso).toLocaleDateString('tr-TR', {
-    day: 'numeric',
-    month: 'long',
-    year: 'numeric',
-    hour: '2-digit',
-    minute: '2-digit',
-  });
+function formatTimeAgo(iso: string): string {
+  const diff = Date.now() - new Date(iso).getTime();
+  if (diff < 0) return 'az önce';
+  const m = Math.floor(diff / 60000);
+  const h = Math.floor(diff / 3600000);
+  const d = Math.floor(diff / 86400000);
+  if (m < 1) return 'az önce';
+  if (m < 60) return `${m} dk önce`;
+  if (h < 24) return `${h} saat önce`;
+  if (d < 30) return `${d} gün önce`;
+  const mo = Math.floor(d / 30);
+  return `${mo} ay önce`;
 }
 
 function formatPrice(n: number): string {
@@ -413,7 +417,7 @@ export default function OffersScreen() {
         {/* Date */}
         <View style={styles.dateRow}>
           <Ionicons name="calendar-outline" size={14} color={TarodanColors.textTertiary} />
-          <Text style={styles.dateText}>{formatDate(offer.createdAt)}</Text>
+          <Text style={styles.dateText}>{formatTimeAgo(offer.createdAt)}</Text>
         </View>
 
         {/* Actions */}
