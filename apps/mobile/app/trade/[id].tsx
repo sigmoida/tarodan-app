@@ -16,13 +16,58 @@ const TRADE_STATUSES = {
   accepted: { label: 'Kabul Edildi', color: TarodanColors.success, icon: 'checkmark-circle-outline' },
   rejected: { label: 'Reddedildi', color: TarodanColors.error, icon: 'close-circle-outline' },
   countered: { label: 'Karşı Teklif', color: TarodanColors.info, icon: 'swap-horizontal' },
-  initiator_shipped: { label: 'Kargo Gönderildi', color: TarodanColors.info, icon: 'cube-outline' },
-  receiver_shipped: { label: 'Karşı Taraf Gönderdi', color: TarodanColors.info, icon: 'cube-outline' },
-  both_shipped: { label: 'Her İki Kargo Yolda', color: TarodanColors.primary, icon: 'airplane-outline' },
+  awaiting_payment: { label: 'Ödeme Bekleniyor', color: TarodanColors.warning, icon: 'card-outline' },
+  shipping_to_warehouse: { label: 'Depoya Gönderim', color: TarodanColors.info, icon: 'cube-outline' },
+  at_warehouse: { label: 'Depoda', color: TarodanColors.info, icon: 'business-outline' },
+  admin_reviewing: { label: 'İnceleniyor', color: TarodanColors.info, icon: 'search-outline' },
+  shipping_to_recipients: { label: 'Alıcılara Gönderim', color: TarodanColors.primary, icon: 'airplane-outline' },
+  returning: { label: 'İade Sürecinde', color: TarodanColors.warning, icon: 'return-up-back-outline' },
+  // Legacy fallbacks
+  initiator_shipped: { label: 'Kargo Yolda', color: TarodanColors.info, icon: 'cube-outline' },
+  receiver_shipped: { label: 'Kargo Yolda', color: TarodanColors.info, icon: 'cube-outline' },
+  both_shipped: { label: 'Kargo Yolda', color: TarodanColors.primary, icon: 'airplane-outline' },
   completed: { label: 'Tamamlandı', color: TarodanColors.success, icon: 'checkmark-done-circle-outline' },
   cancelled: { label: 'İptal Edildi', color: TarodanColors.textSecondary, icon: 'ban-outline' },
   disputed: { label: 'İtiraz Var', color: TarodanColors.error, icon: 'warning-outline' },
 };
+
+const SHIPMENT_STATUS_CHIP: Record<string, { label: string; bg: string; fg: string; icon?: string }> = {
+  label_created: { label: 'Etiket Hazır', bg: TarodanColors.backgroundSecondary, fg: TarodanColors.textSecondary },
+  pending: { label: 'Bekleniyor', bg: TarodanColors.backgroundSecondary, fg: TarodanColors.textSecondary },
+  picked_up: { label: 'Kuryede', bg: TarodanColors.info + '20', fg: TarodanColors.info },
+  in_transit: { label: 'Yolda', bg: TarodanColors.info + '20', fg: TarodanColors.info },
+  at_delivery_branch: { label: 'Teslimat Şubesinde', bg: TarodanColors.info + '20', fg: TarodanColors.info },
+  out_for_delivery: { label: 'Dağıtımda', bg: TarodanColors.info + '20', fg: TarodanColors.info },
+  delivered: { label: 'Depoya Ulaştı', bg: TarodanColors.success + '20', fg: TarodanColors.success, icon: '✓' },
+  failed: { label: 'Başarısız', bg: TarodanColors.warning + '20', fg: TarodanColors.warning },
+  cancelled: { label: 'İptal Edildi', bg: TarodanColors.warning + '20', fg: TarodanColors.warning },
+  returned: { label: 'İade Edildi', bg: TarodanColors.warning + '20', fg: TarodanColors.warning },
+  return_in_progress: { label: 'İade Sürecinde', bg: TarodanColors.warning + '20', fg: TarodanColors.warning },
+};
+
+function ShipmentStatusChip({ status }: { status?: string | null }) {
+  const meta = (status && SHIPMENT_STATUS_CHIP[status]) || {
+    label: 'Beklemede',
+    bg: TarodanColors.backgroundSecondary,
+    fg: TarodanColors.textSecondary,
+  };
+  return (
+    <View style={[styles.shipmentChip, { backgroundColor: meta.bg }]}>
+      {meta.icon ? <Text style={[styles.shipmentChipText, { color: meta.fg }]}>{meta.icon} </Text> : null}
+      <Text style={[styles.shipmentChipText, { color: meta.fg }]}>{meta.label}</Text>
+    </View>
+  );
+}
+
+interface TradeShipment {
+  id: string;
+  direction: 'to_warehouse' | 'from_warehouse';
+  senderUserId?: string | null;
+  recipientUserId?: string | null;
+  trackingNumber?: string | null;
+  status?: string | null;
+  carrier?: string | null;
+}
 
 interface TradeItem {
   id: string;
@@ -58,6 +103,7 @@ interface Trade {
   initiator: { id: string; displayName: string; avatar?: string };
   receiver: { id: string; displayName: string; avatar?: string };
   items: TradeItem[];
+  shipments?: TradeShipment[];
 }
 
 export default function TradeDetailScreen() {
@@ -67,8 +113,6 @@ export default function TradeDetailScreen() {
   
   const [snackbar, setSnackbar] = useState({ visible: false, message: '' });
   const [counterModalVisible, setCounterModalVisible] = useState(false);
-  const [shippingModalVisible, setShippingModalVisible] = useState(false);
-  const [trackingNumber, setTrackingNumber] = useState('');
   const [counterCashAmount, setCounterCashAmount] = useState('');
   const [counterMessage, setCounterMessage] = useState('');
 
@@ -120,20 +164,6 @@ export default function TradeDetailScreen() {
       queryClient.invalidateQueries({ queryKey: ['trade', id] });
       setCounterModalVisible(false);
       setSnackbar({ visible: true, message: 'Karşı teklif gönderildi!' });
-    },
-    onError: (error: any) => {
-      setSnackbar({ visible: true, message: error.response?.data?.message || 'İşlem başarısız' });
-    },
-  });
-
-  // Ship trade mutation
-  const shipMutation = useMutation({
-    mutationFn: () => tradesApi.ship(id as string, { fromAddressId: '', carrier: 'aras' } as any),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['trade', id] });
-      setShippingModalVisible(false);
-      setTrackingNumber('');
-      setSnackbar({ visible: true, message: 'Kargo bilgisi kaydedildi!' });
     },
     onError: (error: any) => {
       setSnackbar({ visible: true, message: error.response?.data?.message || 'İşlem başarısız' });
@@ -229,13 +259,32 @@ export default function TradeDetailScreen() {
     );
   };
 
-  const canShip = (trade.status === 'accepted' || trade.status === 'initiator_shipped' || trade.status === 'receiver_shipped') &&
-    ((isInitiator && !trade.initiatorShippedAt) || (isReceiver && !trade.receiverShippedAt));
+  const shipments: TradeShipment[] = trade.shipments ?? [];
+  const myToWarehouseShipment = user
+    ? shipments.find((s) => s.direction === 'to_warehouse' && s.senderUserId === user.id)
+    : undefined;
+  const otherToWarehouseShipment = user
+    ? shipments.find((s) => s.direction === 'to_warehouse' && s.senderUserId && s.senderUserId !== user.id)
+    : undefined;
+  const myFromWarehouseShipment = user
+    ? shipments.find((s) => s.direction === 'from_warehouse' && s.recipientUserId === user.id)
+    : undefined;
 
-  const canConfirm = trade.status === 'both_shipped';
+  const canConfirm =
+    trade.status === 'shipping_to_recipients' && myFromWarehouseShipment?.status === 'delivered';
 
   const myTrackingNumber = isInitiator ? trade.initiatorTrackingNumber : trade.receiverTrackingNumber;
   const theirTrackingNumber = isInitiator ? trade.receiverTrackingNumber : trade.initiatorTrackingNumber;
+
+  const renderOtherShipmentHint = (s?: string | null) => {
+    if (s === 'delivered') return 'Karşı tarafın gönderisi de depoya ulaştı.';
+    if (s === 'picked_up' || s === 'in_transit' || s === 'at_delivery_branch' || s === 'out_for_delivery')
+      return 'Karşı tarafın gönderisi yolda.';
+    if (s === 'cancelled') return 'Karşı tarafın gönderisi iptal edildi; yetkili ekibimiz devreye girecek.';
+    if (s === 'failed') return 'Karşı tarafın gönderisinde bir aksaklık oluştu; yetkili ekibimiz inceliyor.';
+    if (s === 'returned' || s === 'return_in_progress') return 'Karşı tarafın gönderisi iade edildi.';
+    return 'Karşı tarafın kargoya teslim etmesi bekleniyor.';
+  };
 
   return (
     <View style={styles.container}>
@@ -435,6 +484,80 @@ export default function TradeDetailScreen() {
           </Card>
         )}
 
+        {/* Inbound shipment info (Sürat Kargo, auto-issued) */}
+        {trade.status === 'shipping_to_warehouse' && (isInitiator || isReceiver) && (
+          <Card style={[styles.card, styles.inboundCard]}>
+            <Card.Content>
+              <View style={styles.shippingRow}>
+                <MaterialCommunityIcons name="truck-fast-outline" size={22} color={TarodanColors.primary} />
+                <Text variant="titleSmall" style={[styles.sectionTitle, { marginBottom: 0, flex: 1 }]}>
+                  Tarodan Deposuna Gönderim
+                </Text>
+              </View>
+              <Text variant="bodySmall" style={styles.protectionDesc}>
+                Sistem her iki tarafa Sürat Kargo takip numarası tahsis etti. Aşağıdaki numara ile en yakın Sürat şubesine giderek ürününüzü teslim edin.
+              </Text>
+              <View style={styles.inboundShipBox}>
+                <Text variant="bodySmall" style={styles.messageSender}>Sizin gönderiniz</Text>
+                <Text style={styles.inboundTrackingNumber}>
+                  {myToWarehouseShipment?.trackingNumber ?? '—'}
+                </Text>
+                <Text variant="bodySmall" style={styles.inboundShipHint}>
+                  Bu numarayla Sürat Kargo şubesine gidip ürününüzü teslim edin.
+                </Text>
+                <View style={styles.inboundChipRow}>
+                  <ShipmentStatusChip status={myToWarehouseShipment?.status} />
+                </View>
+              </View>
+              <Text variant="bodySmall" style={styles.inboundShipHint}>
+                {renderOtherShipmentHint(otherToWarehouseShipment?.status)}
+              </Text>
+            </Card.Content>
+          </Card>
+        )}
+
+        {/* Shipping to recipients — outbound from warehouse */}
+        {trade.status === 'shipping_to_recipients' && (isInitiator || isReceiver) && (
+          <Card style={[styles.card, styles.inboundCard]}>
+            <Card.Content>
+              <View style={styles.shippingRow}>
+                <MaterialCommunityIcons name="truck-delivery-outline" size={22} color={TarodanColors.info} />
+                <Text variant="titleSmall" style={[styles.sectionTitle, { marginBottom: 0, flex: 1 }]}>
+                  Kargonuz Yolda
+                </Text>
+              </View>
+              {myFromWarehouseShipment ? (
+                <View style={styles.inboundShipBox}>
+                  <Text variant="bodySmall" style={styles.messageSender}>Size gönderilen kargo</Text>
+                  <Text style={styles.inboundTrackingNumber}>
+                    {(myFromWarehouseShipment.carrier === 'surat' ? 'Sürat Kargo' : myFromWarehouseShipment.carrier || '—')}
+                    {myFromWarehouseShipment.trackingNumber ? ` · ${myFromWarehouseShipment.trackingNumber}` : ''}
+                  </Text>
+                  <View style={styles.inboundChipRow}>
+                    <ShipmentStatusChip status={myFromWarehouseShipment.status} />
+                  </View>
+                  {myFromWarehouseShipment.carrier === 'surat' && myFromWarehouseShipment.trackingNumber && (
+                    <Button
+                      mode="outlined"
+                      onPress={() => Linking.openURL(`https://www.suratkargo.com.tr/KargoTakip/?kargotakipno=${encodeURIComponent(myFromWarehouseShipment.trackingNumber!)}`)}
+                      style={styles.trackButton}
+                      icon="truck"
+                    >
+                      Sürat'ta Takip Et
+                    </Button>
+                  )}
+                </View>
+              ) : (
+                <View style={styles.inboundShipBox}>
+                  <Text variant="bodySmall" style={styles.inboundShipHint}>
+                    Takip bilgileri kısa süre içinde görünecek.
+                  </Text>
+                </View>
+              )}
+            </Card.Content>
+          </Card>
+        )}
+
         {/* Trade Protection */}
         <Card style={styles.protectionCard}>
           <Card.Content style={styles.protectionContent}>
@@ -494,29 +617,25 @@ export default function TradeDetailScreen() {
             </Button>
           )}
 
-          {/* Accepted: Ship button */}
-          {canShip && (
-            <Button
-              mode="contained"
-              onPress={() => setShippingModalVisible(true)}
-              icon="cube-send"
-              style={styles.actionButton}
-            >
-              Kargo Gönderildi
-            </Button>
-          )}
-
-          {/* Both shipped: Confirm receipt */}
-          {canConfirm && (
-            <Button
-              mode="contained"
-              onPress={() => confirmMutation.mutate()}
-              loading={confirmMutation.isPending}
-              icon="checkmark-done"
-              style={[styles.actionButton, { backgroundColor: TarodanColors.success }]}
-            >
-              Teslim Aldım
-            </Button>
+          {/* shipping_to_recipients: Confirm receipt (gated by delivered status) */}
+          {trade.status === 'shipping_to_recipients' && (isInitiator || isReceiver) && (
+            <>
+              <Button
+                mode="contained"
+                onPress={() => confirmMutation.mutate()}
+                loading={confirmMutation.isPending}
+                disabled={myFromWarehouseShipment?.status !== 'delivered'}
+                icon="checkmark-done"
+                style={[styles.actionButton, { backgroundColor: TarodanColors.success }]}
+              >
+                Teslim Aldım
+              </Button>
+              {myFromWarehouseShipment?.status !== 'delivered' && (
+                <Text variant="bodySmall" style={styles.confirmReceiptHint}>
+                  Kargonun teslim edildiği bilgisi bekleniyor.
+                </Text>
+              )}
+            </>
           )}
 
           {/* Message other party */}
@@ -567,41 +686,6 @@ export default function TradeDetailScreen() {
               loading={counterMutation.isPending}
             >
               Gönder
-            </Button>
-          </View>
-        </Modal>
-      </Portal>
-
-      {/* Shipping Modal */}
-      <Portal>
-        <Modal
-          visible={shippingModalVisible}
-          onDismiss={() => setShippingModalVisible(false)}
-          contentContainerStyle={styles.modal}
-        >
-          <Text variant="titleLarge" style={styles.modalTitle}>Kargo Bilgisi</Text>
-          <TextInput
-            label="Takip Numarası"
-            value={trackingNumber}
-            onChangeText={setTrackingNumber}
-            mode="outlined"
-            style={styles.modalInput}
-            placeholder="Kargo takip numaranızı girin"
-          />
-          <Text variant="bodySmall" style={styles.modalNote}>
-            Takip numarası karşı tarafla paylaşılacaktır.
-          </Text>
-          <View style={styles.modalActions}>
-            <Button mode="outlined" onPress={() => setShippingModalVisible(false)}>
-              İptal
-            </Button>
-            <Button
-              mode="contained"
-              onPress={() => shipMutation.mutate()}
-              loading={shipMutation.isPending}
-              disabled={!trackingNumber.trim()}
-            >
-              Kaydet
             </Button>
           </View>
         </Modal>
@@ -811,5 +895,49 @@ const styles = StyleSheet.create({
     justifyContent: 'flex-end',
     gap: 12,
     marginTop: 8,
+  },
+  inboundCard: {
+    borderWidth: 1,
+    borderColor: TarodanColors.border,
+  },
+  inboundShipBox: {
+    marginTop: 12,
+    padding: 12,
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: TarodanColors.border,
+    backgroundColor: TarodanColors.backgroundSecondary,
+  },
+  inboundTrackingNumber: {
+    fontFamily: 'Courier',
+    fontSize: 16,
+    fontWeight: 'bold',
+    color: TarodanColors.textPrimary,
+    marginTop: 4,
+  },
+  inboundChipRow: {
+    flexDirection: 'row',
+    marginTop: 8,
+  },
+  inboundShipHint: {
+    color: TarodanColors.textSecondary,
+    marginTop: 8,
+  },
+  confirmReceiptHint: {
+    color: TarodanColors.textSecondary,
+    textAlign: 'center',
+    marginTop: 4,
+  },
+  shipmentChip: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderRadius: 999,
+    alignSelf: 'flex-start',
+  },
+  shipmentChipText: {
+    fontSize: 12,
+    fontWeight: '600',
   },
 });
