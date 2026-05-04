@@ -104,6 +104,12 @@ export default function RootLayout() {
                 >
                   <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
                   <Stack.Screen name="(auth)" options={{ headerShown: false }} />
+                  {/* Detay ekranları: native header + geri butonu açık.
+                      Aksi halde root Stack screenOptions'taki headerShown:false
+                      her şeyi kapatıyor; trade/seller sub-layout'ları override
+                      etmiyor. */}
+                  <Stack.Screen name="trade/[id]" options={{ headerShown: true, title: '' }} />
+                  <Stack.Screen name="seller/[id]" options={{ headerShown: true, title: '' }} />
                 </Stack>
               </PaperProvider>
             </QueryClientProvider>
