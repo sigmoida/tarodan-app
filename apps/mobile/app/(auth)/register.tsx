@@ -70,6 +70,7 @@ export default function RegisterScreen() {
           name="displayName"
           render={({ field: { onChange, value } }) => (
             <TextInput
+              testID="register-displayName-input"
               label="Adınız"
               value={value}
               onChangeText={onChange}
@@ -89,6 +90,7 @@ export default function RegisterScreen() {
           name="email"
           render={({ field: { onChange, value } }) => (
             <TextInput
+              testID="register-email-input"
               label="E-posta"
               value={value}
               onChangeText={onChange}
@@ -110,6 +112,7 @@ export default function RegisterScreen() {
           name="password"
           render={({ field: { onChange, value } }) => (
             <TextInput
+              testID="register-password-input"
               label="Şifre"
               value={value}
               onChangeText={onChange}
@@ -170,6 +173,7 @@ export default function RegisterScreen() {
         )}
 
         <Button
+          testID="register-submit-button"
           mode="contained"
           onPress={handleSubmit(onSubmit)}
           loading={registerMutation.isPending}

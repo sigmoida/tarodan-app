@@ -278,6 +278,7 @@ export default function SearchScreen() {
       {/* Search Bar */}
       <View style={styles.searchSection}>
         <Searchbar
+          testID="search-input"
           placeholder="Model, marka veya anahtar kelime..."
           value={searchQuery}
           onChangeText={handleSearchChange}

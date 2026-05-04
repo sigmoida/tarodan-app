@@ -94,6 +94,7 @@ export default function MakeOfferModal({
           </View>
 
           <TextInput
+            testID="offer-amount-input"
             mode="outlined"
             label="Teklif tutarınız (TL) *"
             value={amount}
@@ -140,6 +141,7 @@ export default function MakeOfferModal({
             Vazgeç
           </Button>
           <Button
+            testID="offer-submit-button"
             mode="contained"
             buttonColor={TarodanColors.primary}
             onPress={handleSubmit}

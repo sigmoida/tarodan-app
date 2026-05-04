@@ -85,7 +85,7 @@ export default function CartScreen() {
       <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
         {/* Cart Items */}
         {items.map((item) => (
-          <View key={item.id} style={styles.cartItem}>
+          <View key={item.id} testID="cart-item-row" style={styles.cartItem}>
             <TouchableOpacity onPress={() => router.push(`/product/${item.productId}`)}>
               <Image 
                 source={{ uri: transformImageUrl(item.imageUrl) || 'https://placehold.co/100x100/f3f4f6/9ca3af?text=Ürün' }} 
@@ -162,6 +162,7 @@ export default function CartScreen() {
           <Text style={styles.checkoutPrice}>₺{total.toLocaleString('tr-TR')}</Text>
         </View>
         <Button
+          testID="cart-checkout-button"
           mode="contained"
           style={styles.checkoutButton}
           buttonColor={TarodanColors.primary}

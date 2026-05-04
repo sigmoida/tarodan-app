@@ -290,6 +290,7 @@ export default function AddressesScreen() {
           <Dialog.ScrollArea style={styles.dialogContent}>
             <ScrollView>
               <TextInput
+                testID="address-title-input"
                 label="Adres Başlığı *"
                 value={formData.title}
                 onChangeText={(text) => setFormData({ ...formData, title: text })}
@@ -350,8 +351,9 @@ export default function AddressesScreen() {
           </Dialog.ScrollArea>
           <Dialog.Actions>
             <Button onPress={() => setDialogVisible(false)}>{t("mobile.cancel")}</Button>
-            <Button 
-              mode="contained" 
+            <Button
+              testID="address-save-button"
+              mode="contained"
               onPress={handleSubmit}
               loading={saveMutation.isPending}
             >

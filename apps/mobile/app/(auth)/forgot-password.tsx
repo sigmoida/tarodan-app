@@ -66,6 +66,7 @@ export default function ForgotPasswordScreen() {
           name="email"
           render={({ field: { onChange, value } }) => (
             <TextInput
+              testID="forgot-email-input"
               label="E-posta"
               value={value}
               onChangeText={onChange}
@@ -89,6 +90,7 @@ export default function ForgotPasswordScreen() {
         )}
 
         <Button
+          testID="forgot-submit-button"
           mode="contained"
           onPress={handleSubmit(onSubmit)}
           loading={forgotMutation.isPending}

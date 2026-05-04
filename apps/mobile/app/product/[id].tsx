@@ -645,6 +645,7 @@ export default function ProductDetailScreen() {
             </Button>
           )}
           <Button
+            testID="product-detail-add-to-cart-button"
             mode="contained"
             onPress={handleAddToCart}
             buttonColor={TarodanColors.primary}
