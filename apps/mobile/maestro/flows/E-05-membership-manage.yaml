@@ -1,0 +1,54 @@
+# E-05: Üyelik Yönet ekranı — login (premium kullanıcı) → /membership/manage →
+# "Üyeliği İptal Et" + "Otomatik Yenileme" görünür. Press etmiyoruz (destructive).
+#
+# Pre-req: PREMIUM_EMAIL kullanıcısının aktif premium aboneliği olmalı (free üye için ekran farklı render olur).
+appId: host.exp.Exponent
+tags:
+  - manual
+env:
+  EMAIL: ahmet@demo.com
+  PASSWORD: Demo123!
+---
+- runFlow: ../subflows/open-tarodan.yaml
+- tapOn:
+    text: "Profil"
+- runFlow:
+    when:
+      visible: "Çıkış Yap"
+    file: ../subflows/logout.yaml
+# Login as Ahmet (premium) — login-as.yaml hard-coded zeynep, Ahmet için inline:
+- runFlow:
+    when:
+      visible:
+        id: "profile-go-login-button"
+    commands:
+      - tapOn:
+          id: "profile-go-login-button"
+      - extendedWaitUntil:
+          visible:
+            id: "login-email-input"
+          timeout: 15000
+      - tapOn:
+          id: "login-email-input"
+      - inputText: "ahmet@demo.com"
+      - tapOn:
+          id: "login-password-input"
+      - inputText: "Demo123!"
+      - tapOn:
+          id: "login-submit-button"
+      - extendedWaitUntil:
+          visible:
+            text: "Ana Sayfa"
+          timeout: 30000
+      - runFlow:
+          when:
+            visible: "Şimdi Değil"
+          commands:
+            - tapOn: "Şimdi Değil"
+- openLink: "tarodan://membership/manage"
+- extendedWaitUntil:
+    visible: "Üyelik Yönetimi"
+    timeout: 30000
+- assertVisible: "Otomatik Yenileme"
+- assertVisible: "Üyeliği İptal Et"
+- assertNotVisible: ".*Network Error.*"

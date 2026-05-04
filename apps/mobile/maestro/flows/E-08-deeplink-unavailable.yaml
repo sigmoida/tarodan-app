@@ -1,0 +1,27 @@
+# E-08: Deep-link routing simülasyonu (real push yok).
+# openLink: tarodan://products/unavailable/{productId} → unavailable hero görünür.
+# Bu, push notification handler'ın yönlendireceği rotayı doğrular.
+appId: host.exp.Exponent
+tags:
+  - manual
+env:
+  EMAIL: zeynep@demo.com
+  PASSWORD: Demo123!
+  STOCKOUT_PRODUCT_ID: "00000000-0000-0000-0000-000000000000"
+---
+- runFlow: ../subflows/open-tarodan.yaml
+- tapOn:
+    text: "Profil"
+- runFlow:
+    when:
+      visible: "Çıkış Yap"
+    file: ../subflows/logout.yaml
+- runFlow: ../subflows/login-as.yaml
+- openLink: "tarodan://products/unavailable/${STOCKOUT_PRODUCT_ID}"
+- extendedWaitUntil:
+    visible:
+      id: "unavailable-hero-title"
+    timeout: 30000
+- assertVisible:
+    text: ".*stokta yok.*|.*tekrar sat.*"
+- assertNotVisible: ".*Network Error.*"

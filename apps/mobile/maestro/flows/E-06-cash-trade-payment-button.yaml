@@ -1,0 +1,29 @@
+# E-06: Cash takas awaiting_payment → cashPayer → "Ödeme Yap" butonu görünür.
+# Pre-req: cashPayerId === current user, status === awaiting_payment olan bir takas seed'li olmalı.
+# Bu fixture'a bağımlı; manual tag.
+appId: host.exp.Exponent
+tags:
+  - manual
+env:
+  EMAIL: zeynep@demo.com
+  PASSWORD: Demo123!
+---
+- runFlow: ../subflows/open-tarodan.yaml
+- tapOn:
+    text: "Profil"
+- runFlow:
+    when:
+      visible: "Çıkış Yap"
+    file: ../subflows/logout.yaml
+- runFlow: ../subflows/login-as.yaml
+- runFlow: ../subflows/open-first-trade.yaml
+# Eğer awaiting_payment varsa cash-pay-button görünür olmalı.
+- extendedWaitUntil:
+    visible:
+      id: "cash-pay-button"
+    timeout: 30000
+- assertVisible:
+    id: "cash-pay-button"
+- assertVisible:
+    text: "Ödeme Yap.*"
+- assertNotVisible: ".*Network Error.*"

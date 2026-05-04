@@ -6,3 +6,6 @@ env:
   PASSWORD: Demo123!
   PREMIUM_EMAIL: ahmet@demo.com
   BUSINESS_EMAIL: ali@demo.com
+  # E-01 / E-08 deep-link hedefi. Gerçek bir stockout product UUID'si ile override edin:
+  # maestro test --env STOCKOUT_PRODUCT_ID=<uuid> flows/E-01-stockout-page.yaml
+  STOCKOUT_PRODUCT_ID: "00000000-0000-0000-0000-000000000000"
