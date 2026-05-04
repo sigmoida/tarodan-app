@@ -3,6 +3,7 @@ import {
   PaymentStatus,
   PaymentHoldStatus,
   PayoutStatus,
+  PrismaClient,
   TradeStatus,
   ShipmentStatus,
 } from '@prisma/client';
@@ -24,6 +25,30 @@ import { signCallback } from '../mocks/paytr.mock';
 import { PaymentService } from '../../src/modules/payment/payment.service';
 import { PayoutService } from '../../src/modules/payout/payout.service';
 import { TradeSchedulerService } from '../../src/modules/trade/trade-scheduler.service';
+
+/**
+ * Wait for the post-accept fire-and-forget inbound dispatch to settle.
+ * Polling avoids racing with the in-flight TradeService background job
+ * (which would otherwise duplicate to_warehouse rows).
+ */
+async function waitForInboundShipments(
+  prisma: PrismaClient,
+  tradeId: string,
+  expected = 2,
+  timeoutMs = 4_000,
+) {
+  const deadline = Date.now() + timeoutMs;
+  let rows = await prisma.tradeShipment.findMany({
+    where: { tradeId, leg: 'to_warehouse' },
+  });
+  while (rows.length < expected && Date.now() < deadline) {
+    await new Promise((r) => setTimeout(r, 50));
+    rows = await prisma.tradeShipment.findMany({
+      where: { tradeId, leg: 'to_warehouse' },
+    });
+  }
+  return rows;
+}
 
 async function configureWarehouseAddress(addressId: string): Promise<void> {
   const prisma = getPrisma();
@@ -101,24 +126,13 @@ describe('Escrow Edge Cases (E2E)', () => {
         .send({})
         .expect(201);
 
-      // Ship to warehouse
-      await request(ctx.app.getHttpServer())
-        .post(`/api/trades/${tradeId}/ship-to-warehouse`)
-        .set(authHeader(initiator))
-        .send({ fromAddressId: initiatorShip.id, carrier: 'Sürat' })
-        .expect(201);
-      await request(ctx.app.getHttpServer())
-        .post(`/api/trades/${tradeId}/ship-to-warehouse`)
-        .set(authHeader(receiver))
-        .send({ fromAddressId: receiverShip.id, carrier: 'Sürat' })
-        .expect(201);
-
+      // Inbound shipments are auto-created on accept (post-tx, async).
+      void initiatorShip;
+      void receiverShip;
       const prisma = getPrisma();
 
       // Admin receives + approves
-      const incoming = await prisma.tradeShipment.findMany({
-        where: { tradeId, leg: 'to_warehouse' },
-      });
+      const incoming = await waitForInboundShipments(prisma, tradeId);
       for (const s of incoming) {
         await request(ctx.app.getHttpServer())
           .post(`/api/admin/trades/${tradeId}/mark-warehouse-received`)
@@ -373,19 +387,11 @@ describe('Escrow Edge Cases (E2E)', () => {
         }))
         .expect(200);
 
-      // Ship to warehouse, admin receives + approves
-      await request(ctx.app.getHttpServer())
-        .post(`/api/trades/${tradeId}/ship-to-warehouse`)
-        .set(authHeader(initiator))
-        .send({ fromAddressId: initiatorShip.id, carrier: 'Sürat' })
-        .expect(201);
-      await request(ctx.app.getHttpServer())
-        .post(`/api/trades/${tradeId}/ship-to-warehouse`)
-        .set(authHeader(receiver))
-        .send({ fromAddressId: receiverShip.id, carrier: 'Sürat' })
-        .expect(201);
-
-      const incoming = await prisma.tradeShipment.findMany({ where: { tradeId, leg: 'to_warehouse' } });
+      // Inbound shipments now auto-created post-cash-payment by PaymentService;
+      // poll until both legs exist before admin acts on them.
+      void initiatorShip;
+      void receiverShip;
+      const incoming = await waitForInboundShipments(prisma, tradeId);
       for (const s of incoming) {
         await request(ctx.app.getHttpServer())
           .post(`/api/admin/trades/${tradeId}/mark-warehouse-received`)
@@ -576,11 +582,19 @@ describe('Escrow Edge Cases (E2E)', () => {
         },
       });
 
-      // Force payment older than timeout so it gets cancelled
+      // Force payment older than timeout so it gets cancelled. Under the
+      // split-window contract we ALSO must push the order's paymentExpiresAt
+      // into the past — otherwise cancelExpiredPayments only fails the Payment
+      // row and leaves the order (and its shipment) alive so the buyer can
+      // re-initiate.
       const payment = await prisma.payment.findFirst({ where: { orderId: buyRes.body.orderId } });
       await prisma.payment.update({
         where: { id: payment!.id },
         data: { createdAt: new Date(Date.now() - 60 * 60 * 1000) }, // 1 hour ago
+      });
+      await prisma.order.update({
+        where: { id: buyRes.body.orderId },
+        data: { paymentExpiresAt: new Date(Date.now() - 60 * 1000) },
       });
 
       const paymentService = ctx.app.get(PaymentService);
@@ -703,20 +717,12 @@ describe('Escrow Edge Cases (E2E)', () => {
         .set(authHeader(receiver))
         .send({})
         .expect(201);
-      await request(ctx.app.getHttpServer())
-        .post(`/api/trades/${tradeId}/ship-to-warehouse`)
-        .set(authHeader(initiator))
-        .send({ fromAddressId: initiatorShip.id, carrier: 'Sürat' })
-        .expect(201);
-      await request(ctx.app.getHttpServer())
-        .post(`/api/trades/${tradeId}/ship-to-warehouse`)
-        .set(authHeader(receiver))
-        .send({ fromAddressId: receiverShip.id, carrier: 'Sürat' })
-        .expect(201);
+      // Inbound shipments are auto-created on accept; wait for the
+      // fire-and-forget background dispatch.
+      void initiatorShip;
+      void receiverShip;
       const prisma = getPrisma();
-      const incoming = await prisma.tradeShipment.findMany({
-        where: { tradeId, leg: 'to_warehouse' },
-      });
+      const incoming = await waitForInboundShipments(prisma, tradeId);
       for (const s of incoming) {
         await request(ctx.app.getHttpServer())
           .post(`/api/admin/trades/${tradeId}/mark-warehouse-received`)
@@ -889,20 +895,14 @@ describe('Escrow Edge Cases (E2E)', () => {
           .set(authHeader(receiver))
           .send({})
           .expect(201);
-        await request(ctx.app.getHttpServer())
-          .post(`/api/trades/${tradeId}/ship-to-warehouse`)
-          .set(authHeader(initiator))
-          .send({ fromAddressId: initiatorShip.id, carrier: 'Sürat' })
-          .expect(201);
-        await request(ctx.app.getHttpServer())
-          .post(`/api/trades/${tradeId}/ship-to-warehouse`)
-          .set(authHeader(receiver))
-          .send({ fromAddressId: receiverShip.id, carrier: 'Sürat' })
-          .expect(201);
+        // Inbound shipments auto-created on accept; the SURAT_STUB_RESPONSE
+        // override applies to from_warehouse dispatch on admin approve, which
+        // is the path under test below. Inbound legs may end up at `pending`
+        // (Sürat returned non-Tamam) — admin still receives them manually.
+        void initiatorShip;
+        void receiverShip;
         const prisma = getPrisma();
-        const incoming = await prisma.tradeShipment.findMany({
-          where: { tradeId, leg: 'to_warehouse' },
-        });
+        const incoming = await waitForInboundShipments(prisma, tradeId);
         for (const s of incoming) {
           await request(ctx.app.getHttpServer())
             .post(`/api/admin/trades/${tradeId}/mark-warehouse-received`)

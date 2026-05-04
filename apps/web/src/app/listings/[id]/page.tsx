@@ -432,12 +432,15 @@ export default function ListingDetailPage() {
   const handleBuyNow = () => {
     if (!listing) return;
 
-    // Check if product is available for purchase
+    // Stokta yoksa toast yerine alıcıyı dedicated sayfaya gönder — orada
+    // hero + benzer ürünler önerisi var.
     if (listing.status && listing.status !== "active") {
+      if (listing.status === "sold" || listing.status === "inactive") {
+        router.push(`/products/unavailable/${listing.id}`);
+        return;
+      }
       if (listing.status === "reserved") {
         toast.error(t("product.productReserved"));
-      } else if (listing.status === "sold") {
-        toast.error(t("product.productSold"));
       } else {
         toast.error(t("product.productNotForSale"));
       }

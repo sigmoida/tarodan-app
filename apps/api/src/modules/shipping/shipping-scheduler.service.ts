@@ -25,6 +25,17 @@ export class ShippingSchedulerService {
     }
 
     try {
+      const tradeResult = await this.suratTracking.syncAllActiveTradeShipments();
+      if (tradeResult.synced > 0 || tradeResult.failed > 0) {
+        this.logger.log(
+          `Sürat trade-shipment sync: ${tradeResult.synced} synced, ${tradeResult.failed} failed`,
+        );
+      }
+    } catch (error: any) {
+      this.logger.error(`Sürat trade-shipment sync error: ${error.message}`);
+    }
+
+    try {
       const refundResult = await this.suratTracking.syncAllActiveRefundReturns();
       if (refundResult.synced > 0 || refundResult.failed > 0) {
         this.logger.log(

@@ -5,6 +5,7 @@ import { Text, TextInput, Searchbar } from '../src/components/common';
 import { router } from 'expo-router';
 import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 import { TarodanColors } from '../src/theme';
+import { useTranslation } from '../src/i18n';
 
 const FAQ_CATEGORIES = [
   {
@@ -137,6 +138,7 @@ const CONTACT_OPTIONS = [
 ];
 
 export default function HelpScreen() {
+  const { t } = useTranslation();
   const [searchQuery, setSearchQuery] = useState('');
   const [expandedCategory, setExpandedCategory] = useState<string | null>('general');
   const [expandedQuestion, setExpandedQuestion] = useState<string | null>(null);
@@ -190,7 +192,7 @@ export default function HelpScreen() {
         <TouchableOpacity onPress={() => router.back()}>
           <Ionicons name="arrow-back" size={24} color={TarodanColors.textOnPrimary} />
         </TouchableOpacity>
-        <Text style={styles.headerTitle}>Yardım Merkezi</Text>
+        <Text style={styles.headerTitle}>{t('mobile.pageHelpCenter')}</Text>
         <View style={{ width: 24 }} />
       </View>
 

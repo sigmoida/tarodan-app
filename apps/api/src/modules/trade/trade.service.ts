@@ -4,6 +4,7 @@ import {
   NotFoundException,
   ForbiddenException,
   ConflictException,
+  GoneException,
   Optional,
   Inject,
   forwardRef,
@@ -28,6 +29,14 @@ import { getProductStatusFromQuantity } from '../product/helpers/product-status.
 import { PaymentService } from '../payment/payment.service';
 import { ProductLockService } from '../product/product-lock.service';
 import { SuratCargoService } from '../surat-cargo/surat-cargo.service';
+import {
+  SuratKargoTuru,
+  SuratOdemeTipi,
+  SuratTasimaSekli,
+  SuratTeslimSekli,
+  SuratGonderiSekli,
+  SuratGonderiPayload,
+} from '../surat-cargo/surat-cargo.types';
 import {
   CreateTradeDto,
   TradeQueryDto,
@@ -99,6 +108,289 @@ export class TradeService {
     } catch (error: any) {
       this.logger.error(`cancelSuratShipmentsForTrade failed for ${tradeId}: ${error.message}`);
     }
+  }
+
+  /**
+   * Auto-create the two `to_warehouse` TradeShipment rows (one per side) and
+   * dispatch them to Sürat Kargo. Called after a trade transitions to
+   * `shipping_to_warehouse` (either via accept for non-cash, or via successful
+   * cash payment).
+   *
+   * Behaviour:
+   *   - Pre-generates `OzelKargoTakipNo` as `TRD-{tradeNumber}-WH-{INI|REC}`.
+   *   - Creates the rows in a single short transaction (no Sürat call inside).
+   *   - After the tx commits, calls `submitShipmentWithRetry` per side. On
+   *     failure, the row is left at `pending` and a warning is logged so the
+   *     admin can intervene.
+   *   - If a side has no default address, the shipment row is skipped and a
+   *     warning is logged. Trade acceptance is NOT blocked.
+   *   - Idempotent: if rows already exist for this trade & leg, no-ops.
+   *
+   * Never throws — all errors are swallowed/logged so callers can fire-and-forget.
+   */
+  async createInboundTradeShipments(tradeId: string): Promise<void> {
+    try {
+      // Resolve trade + sides + addresses outside the create-tx so we don't
+      // hold the DB lock while doing reads.
+      const trade = await this.prisma.trade.findUnique({
+        where: { id: tradeId },
+        include: {
+          initiator: {
+            include: {
+              addresses: {
+                where: { isDefault: true },
+                take: 1,
+              },
+            },
+          },
+          receiver: {
+            include: {
+              addresses: {
+                where: { isDefault: true },
+                take: 1,
+              },
+            },
+          },
+        },
+      });
+      if (!trade) {
+        this.logger.error(
+          `createInboundTradeShipments: trade ${tradeId} not found`,
+        );
+        return;
+      }
+
+      // Fallback: if neither user has a default address, take their first.
+      const initiatorAddress =
+        trade.initiator.addresses[0] ??
+        (await this.prisma.address.findFirst({
+          where: { userId: trade.initiatorId },
+          orderBy: { createdAt: 'asc' },
+        }));
+      const receiverAddress =
+        trade.receiver.addresses[0] ??
+        (await this.prisma.address.findFirst({
+          where: { userId: trade.receiverId },
+          orderBy: { createdAt: 'asc' },
+        }));
+
+      type SideKey = 'INI' | 'REC';
+      type Side = {
+        suffix: SideKey;
+        shipperId: string;
+        user: { displayName: string | null; email: string };
+        address: typeof initiatorAddress;
+      };
+      const sides: Side[] = [
+        {
+          suffix: 'INI',
+          shipperId: trade.initiatorId,
+          user: trade.initiator,
+          address: initiatorAddress,
+        },
+        {
+          suffix: 'REC',
+          shipperId: trade.receiverId,
+          user: trade.receiver,
+          address: receiverAddress,
+        },
+      ];
+
+      // Build the create-or-fetch result for each side inside a tx so we don't
+      // accidentally double-create on retry. Idempotent on (tradeId, shipperId, leg).
+      const dispatched: Array<{
+        shipmentId: string;
+        ozelKargoTakipNo: string;
+        payload: SuratGonderiPayload | null;
+      }> = [];
+
+      await this.prisma.$transaction(async (tx) => {
+        for (const side of sides) {
+          const existing = await tx.tradeShipment.findFirst({
+            where: {
+              tradeId: trade.id,
+              shipperId: side.shipperId,
+              leg: 'to_warehouse',
+            },
+          });
+          if (existing) {
+            this.logger.log(
+              `Inbound shipment for trade ${trade.tradeNumber} side ${side.suffix} already exists (id=${existing.id}); skipping`,
+            );
+            continue;
+          }
+
+          if (!side.address) {
+            this.logger.warn(
+              `Trade ${trade.tradeNumber} side ${side.suffix} (user=${side.shipperId}) has no address; inbound shipment NOT created — admin must intervene`,
+            );
+            continue;
+          }
+
+          // tradeNumber zaten "TRD-..." formatında geliyor; çift "TRD-" ön
+          // ekini önlemek için doğrudan tradeNumber'ı kullan.
+          const ozelKargoTakipNo = `${trade.tradeNumber}-WH-${side.suffix}`
+            .replace(/[^a-zA-Z0-9-]/g, '')
+            .slice(0, 50);
+
+          const created = await tx.tradeShipment.create({
+            data: {
+              tradeId: trade.id,
+              shipperId: side.shipperId,
+              fromAddressId: side.address.id,
+              carrier: 'surat',
+              trackingNumber: ozelKargoTakipNo,
+              status: ShipmentStatus.label_created,
+              leg: 'to_warehouse',
+              recipientType: 'warehouse',
+              recipientUserId: null,
+            },
+          });
+
+          const payload = this.buildSuratPayloadForInboundLeg(
+            side.user,
+            side.address,
+            ozelKargoTakipNo,
+            trade.tradeNumber,
+          );
+
+          dispatched.push({
+            shipmentId: created.id,
+            ozelKargoTakipNo,
+            payload,
+          });
+        }
+      });
+
+      // Now, OUTSIDE the tx, fire the Sürat SOAP calls. Each is wrapped in
+      // try/catch so one failure doesn't block the other side.
+      if (
+        !this.suratCargoService ||
+        !this.suratCargoService.isIntegrationEnabled()
+      ) {
+        this.logger.log(
+          `Sürat integration disabled; ${dispatched.length} inbound shipments for trade ${tradeId} left at label_created without remote dispatch`,
+        );
+        return;
+      }
+
+      for (const item of dispatched) {
+        if (!item.payload) continue;
+        try {
+          const result = await this.suratCargoService.submitShipmentWithRetry({
+            idempotencyKey: `surat:trade-inbound:${item.ozelKargoTakipNo}`,
+            correlationId: `trade-inbound-${tradeId}`,
+            payload: item.payload,
+          });
+          if (!result.ok) {
+            const r = result as any;
+            const errMsg =
+              r.kind === 'business'
+                ? r.suratMessage
+                : `technical:${r.code}`;
+            this.logger.warn(
+              `Sürat inbound submit non-ok for trade ${tradeId} oid=${item.ozelKargoTakipNo}: ${errMsg}; leaving shipment at label_created for admin review`,
+            );
+            // Mark shipment as pending so admin queue can flag it.
+            await this.prisma.tradeShipment
+              .update({
+                where: { id: item.shipmentId },
+                data: { status: ShipmentStatus.pending },
+              })
+              .catch((e) =>
+                this.logger.error(
+                  `Failed to mark shipment ${item.shipmentId} pending: ${e.message}`,
+                ),
+              );
+          } else {
+            this.logger.log(
+              `Sürat inbound submit OK trade=${tradeId} oid=${item.ozelKargoTakipNo}`,
+            );
+          }
+        } catch (err: any) {
+          this.logger.error(
+            `Sürat inbound submit threw for trade ${tradeId} oid=${item.ozelKargoTakipNo}: ${err?.message ?? err}`,
+          );
+          await this.prisma.tradeShipment
+            .update({
+              where: { id: item.shipmentId },
+              data: { status: ShipmentStatus.pending },
+            })
+            .catch(() => undefined);
+        }
+      }
+    } catch (error: any) {
+      this.logger.error(
+        `createInboundTradeShipments failed for ${tradeId}: ${error?.message ?? error}`,
+      );
+    }
+  }
+
+  /**
+   * Build the Sürat SOAP payload for an inbound (user → Tarodan warehouse) leg.
+   * Mirrors `admin.service.ts#approveWarehouseTrade` payload (lines 4514-4533),
+   * but the recipient is the Tarodan warehouse — Sürat uses the recipient
+   * fields, so the user's address fills the sender side at the branch they
+   * physically drop off at.
+   *
+   * For inbound legs, the user goes to the nearest Sürat branch with the
+   * `OzelKargoTakipNo`; Sürat picks up and routes to the warehouse. The
+   * payload describes the SHIPMENT (recipient = warehouse), so we write the
+   * warehouse address into KisiKurum/Adres/Il/Ilce/TelefonCep.
+   */
+  private buildSuratPayloadForInboundLeg(
+    user: { displayName: string | null; email: string },
+    fromAddress: {
+      fullName?: string | null;
+      phone?: string | null;
+      city?: string | null;
+      district?: string | null;
+      address?: string | null;
+    } | null,
+    ozelKargoTakipNo: string,
+    tradeNumber: string,
+  ): SuratGonderiPayload | null {
+    if (!fromAddress) return null;
+
+    // Sürat payload fields below describe the destination (alıcı). For inbound
+    // legs, destination is the Tarodan warehouse. We pull warehouse contact
+    // info from env so non-cash trades & cash trades alike share the same
+    // source. Defaults match Tarodan HQ (override via env).
+    const warehouseName =
+      process.env.TARODAN_WAREHOUSE_NAME?.trim() || 'Tarodan Depo';
+    const warehouseAddress =
+      process.env.TARODAN_WAREHOUSE_ADDRESS?.trim() ||
+      'Tarodan Merkez Depo Adresi';
+    const warehouseCity =
+      process.env.TARODAN_WAREHOUSE_CITY?.trim() || 'Istanbul';
+    const warehouseDistrict =
+      process.env.TARODAN_WAREHOUSE_DISTRICT?.trim() || 'Maltepe';
+    const warehousePhone =
+      process.env.TARODAN_WAREHOUSE_PHONE?.trim() || '05000000000';
+
+    const senderLabel =
+      fromAddress.fullName || user?.displayName || user?.email || 'Takas Gönderici';
+
+    return {
+      KisiKurum: warehouseName,
+      SahisBirim: `Takas Inbound: ${tradeNumber} (Gönderen: ${senderLabel})`,
+      AliciAdresi: warehouseAddress,
+      Il: warehouseCity,
+      Ilce: warehouseDistrict,
+      TelefonCep: warehousePhone,
+      KargoTuru: SuratKargoTuru.Koli,
+      OdemeTipi: SuratOdemeTipi.Pesin,
+      OzelKargoTakipNo: ozelKargoTakipNo,
+      Adet: 1,
+      BirimDesi: 1,
+      BirimKg: 1,
+      KapidanOdemeTahsilatTipi: 1 as any,
+      TasimaSekli: SuratTasimaSekli.KaraYolu,
+      TeslimSekli: SuratTeslimSekli.AdreseTeslim,
+      GonderiSekli: SuratGonderiSekli.Standart,
+      Pazaryerimi: 0,
+      Iademi: false,
+    };
   }
 
   // ==========================================================================
@@ -526,6 +818,7 @@ export class TradeService {
     const shippingDays = parseInt(shippingDaysSetting?.settingValue ?? '7');
 
     let tradeInitiatorId: string;
+    let acceptedNextStatus: TradeStatus | null = null;
 
     await this.prisma.$transaction(async (tx) => {
       // Lock trade row first
@@ -603,6 +896,7 @@ export class TradeService {
       const nextStatus = trade.cashPayerId && trade.cashAmount
         ? TradeStatus.awaiting_payment
         : TradeStatus.shipping_to_warehouse;
+      acceptedNextStatus = nextStatus;
 
       await tx.trade.update({
         where: { id: tradeId, version: trade.version },
@@ -651,6 +945,19 @@ export class TradeService {
       );
     } catch (error) {
       this.logger.warn('Failed to send trade accepted notification');
+    }
+
+    // Non-cash safe-trade: trade is already shipping_to_warehouse, so we
+    // auto-create both inbound TradeShipment rows + dispatch them to Sürat.
+    // Cash trades stay in awaiting_payment here; their inbound shipments are
+    // created by PaymentService after a successful cash payment.
+    if (acceptedNextStatus === TradeStatus.shipping_to_warehouse) {
+      // Fire-and-forget; the helper never throws.
+      this.createInboundTradeShipments(tradeId).catch((err) => {
+        this.logger.error(
+          `createInboundTradeShipments crashed for ${tradeId}: ${err?.message ?? err}`,
+        );
+      });
     }
 
     return this.getTradeById(tradeId, userId);
@@ -1156,83 +1463,26 @@ export class TradeService {
   }
 
   // ==========================================================================
-  // SHIP TO WAREHOUSE (Safe-trade: each party sends items to Tarodan warehouse)
+  // SHIP TO WAREHOUSE (DEPRECATED — auto-flow runs in createInboundTradeShipments)
+  //
+  // The user-driven form (address + carrier + tracking) is no longer the path
+  // by which inbound TradeShipment rows are created. After a trade is accepted
+  // (or, for cash trades, after payment succeeds), the backend auto-creates
+  // both `to_warehouse` shipments and dispatches them to Sürat. This route
+  // remains for backward compatibility with cached frontends and returns 410
+  // Gone so callers stop trying to create duplicate shipments.
   // ==========================================================================
   async shipToWarehouse(
     tradeId: string,
     userId: string,
-    dto: ShipTradeDto,
+    _dto: ShipTradeDto,
   ): Promise<TradeResponseDto> {
-    const userCanTrade = await this.membershipService.canCreateTrade(userId);
-    if (!userCanTrade.allowed) {
-      throw new BadRequestException(
-        'Trade işlemlerini yapmak için Temel veya üstü üyelik gereklidir.',
-      );
-    }
-
-    const address = await this.prisma.address.findFirst({
-      where: { id: dto.fromAddressId, userId },
-    });
-    if (!address) {
-      throw new NotFoundException('Adres bulunamadı');
-    }
-
-    await this.prisma.$transaction(async (tx) => {
-      const trade = await this.getTradeWithLock(tradeId, tx);
-
-      const isInitiator = trade.initiatorId === userId;
-      const isReceiver = trade.receiverId === userId;
-
-      if (!isInitiator && !isReceiver) {
-        throw new ForbiddenException('Bu takas işlemi için yetkiniz yok');
-      }
-
-      if (trade.status !== TradeStatus.shipping_to_warehouse) {
-        throw new BadRequestException(
-          `Takas durumu '${trade.status}' depoya gönderim yapılamaz. Önce takas kabul edilmeli ve varsa ödeme tamamlanmalı.`,
-        );
-      }
-
-      // User can only ship once for the to_warehouse leg
-      const existingShipment = await tx.tradeShipment.findFirst({
-        where: { tradeId, shipperId: userId, leg: 'to_warehouse' },
-      });
-      if (existingShipment) {
-        throw new BadRequestException('Depoya zaten gönderim yaptınız');
-      }
-
-      const trackingNumber = dto.trackingNumber ||
-        `TRK${Date.now().toString(36).toUpperCase()}${Math.random().toString(36).substring(2, 6).toUpperCase()}`;
-
-      await tx.tradeShipment.create({
-        data: {
-          tradeId,
-          shipperId: userId,
-          fromAddressId: dto.fromAddressId,
-          carrier: dto.carrier,
-          trackingNumber,
-          status: ShipmentStatus.label_created,
-          shippedAt: new Date(),
-          leg: 'to_warehouse',
-          recipientType: 'warehouse',
-          recipientUserId: null,
-        },
-      });
-
-      // Trade status stays as shipping_to_warehouse until admin marks both
-      // shipments as delivered, which transitions the trade to at_warehouse.
-      await tx.trade.update({
-        where: { id: tradeId, version: trade.version },
-        data: {
-          version: { increment: 1 },
-          updatedAt: new Date(),
-        },
-      });
-    });
-
-    await this.invalidateProductCachesForTrade(tradeId);
-
-    return this.getTradeById(tradeId, userId);
+    this.logger.warn(
+      `Deprecated shipToWarehouse called by user=${userId} trade=${tradeId}; auto-flow handles inbound shipments now`,
+    );
+    throw new GoneException(
+      'Bu uç nokta artık kullanılmıyor. Takas kabul edildiğinde sistem her iki taraf için Sürat Kargo takip numaralarını otomatik üretir; en yakın Sürat şubesine size atanan takip numarasıyla teslim edin.',
+    );
   }
 
   // ==========================================================================

@@ -14,6 +14,7 @@ import { useAuthStore } from '../../src/stores/authStore';
 import { TarodanColors } from '../../src/theme';
 import { PremiumBadge, MembershipBadgeCard } from '../../src/components/PremiumBadge';
 import { ReputationScore } from '../../src/components/ReputationBadge';
+import { useTranslation } from '../../src/i18n';
 
 // Free: 500 chars, Premium: 2000 chars
 const getMaxBioLength = (isPremium: boolean) => isPremium ? 2000 : 500;
@@ -37,6 +38,7 @@ const createProfileSchema = (isPremium: boolean) => z.object({
 type ProfileForm = z.infer<ReturnType<typeof createProfileSchema>>;
 
 export default function EditProfileScreen() {
+  const { t } = useTranslation();
   const { user, isAuthenticated, limits, updateUser } = useAuthStore();
   const queryClient = useQueryClient();
   
@@ -138,9 +140,9 @@ export default function EditProfileScreen() {
         <TouchableOpacity onPress={() => router.back()}>
           <Ionicons name="arrow-back" size={24} color={TarodanColors.textOnPrimary} />
         </TouchableOpacity>
-        <Text style={styles.headerTitle}>Profili Düzenle</Text>
+        <Text style={styles.headerTitle}>{t('mobile.settingsEditProfile')}</Text>
         <TouchableOpacity onPress={handleSubmit(onSubmit)}>
-          <Text style={styles.saveButton}>Kaydet</Text>
+          <Text style={styles.saveButton}>{t('mobile.save')}</Text>
         </TouchableOpacity>
       </View>
 
@@ -207,7 +209,7 @@ export default function EditProfileScreen() {
                   numberOfLines={4}
                   mode="outlined"
                   style={styles.input}
-                  placeholder="Kendinizi kısaca tanıtın..."
+                  placeholder={t("mobile.bioPlaceholder")}
                   error={!!errors.bio}
                 />
               )}

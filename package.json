@@ -63,6 +63,10 @@
           "@babel/types": "^7.28.0"
         }
       }
+    },
+    "overrides": {
+      "fast-xml-parser": ">=5.3.4",
+      "handlebars": ">=4.7.9"
     }
   }
 }

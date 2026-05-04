@@ -1,5 +1,6 @@
 import * as request from 'supertest';
 import {
+  PrismaClient,
   TradeStatus,
   PaymentStatus,
   ShipmentStatus,
@@ -20,6 +21,32 @@ import { createProduct } from '../factories/product.factory';
 import { createAddress } from '../factories/address.factory';
 import { signCallback } from '../mocks/paytr.mock';
 import { TradeSchedulerService } from '../../src/modules/trade/trade-scheduler.service';
+
+/**
+ * Helper: poll until the trade's `to_warehouse` shipments materialise.
+ * The post-accept dispatch in TradeService is fire-and-forget; calling
+ * the helper synchronously would race with the in-flight invocation and
+ * duplicate rows (the (tradeId, shipperId, leg) idempotency check sits
+ * inside the tx, so two concurrent runs each see "no existing rows").
+ */
+async function waitForInboundShipments(
+  prisma: PrismaClient,
+  tradeId: string,
+  expected = 2,
+  timeoutMs = 4_000,
+) {
+  const deadline = Date.now() + timeoutMs;
+  let rows = await prisma.tradeShipment.findMany({
+    where: { tradeId, leg: 'to_warehouse' },
+  });
+  while (rows.length < expected && Date.now() < deadline) {
+    await new Promise((r) => setTimeout(r, 50));
+    rows = await prisma.tradeShipment.findMany({
+      where: { tradeId, leg: 'to_warehouse' },
+    });
+  }
+  return rows;
+}
 
 /**
  * Helper: configure the warehouse address required by the admin approve flow.
@@ -198,27 +225,11 @@ describe('Trade Flow (Safe-Trade Warehouse Escrow) (E2E)', () => {
       expect(ip?.reservedQuantity).toBe(1);
       expect(rp?.reservedQuantity).toBe(1);
 
-      // 3) Both parties ship to warehouse
-      await request(ctx.app.getHttpServer())
-        .post(`/api/trades/${tradeId}/ship-to-warehouse`)
-        .set(authHeader(initiator))
-        .send({
-          fromAddressId: initiatorShipAddress.id,
-          carrier: 'Sürat Kargo',
-        })
-        .expect(201);
-      await request(ctx.app.getHttpServer())
-        .post(`/api/trades/${tradeId}/ship-to-warehouse`)
-        .set(authHeader(receiver))
-        .send({
-          fromAddressId: receiverShipAddress.id,
-          carrier: 'Sürat Kargo',
-        })
-        .expect(201);
-
-      const toWarehouse = await prisma.tradeShipment.findMany({
-        where: { tradeId, leg: 'to_warehouse' },
-      });
+      // 3) Inbound shipments are auto-created on accept. Poll until the
+      //    fire-and-forget background dispatch settles.
+      void initiatorShipAddress;
+      void receiverShipAddress;
+      const toWarehouse = await waitForInboundShipments(prisma, tradeId);
       expect(toWarehouse).toHaveLength(2);
 
       // 4) Admin marks both shipments as delivered to warehouse
@@ -379,7 +390,12 @@ describe('Trade Flow (Safe-Trade Warehouse Escrow) (E2E)', () => {
       expect(cashPaymentAfterPay?.holdReleaseAt).toBeNull();
     });
 
-    it('blocks ship-to-warehouse while trade is still awaiting_payment', async () => {
+    it('does NOT auto-create inbound shipments while trade is awaiting_payment', async () => {
+      // The legacy ship-to-warehouse form is gone (returns 410), so the
+      // analogous gate today is: PaymentService creates inbound shipments
+      // only AFTER the cash payment succeeds. Assert that on awaiting_payment
+      // there are no `to_warehouse` rows yet, and that the deprecated
+      // endpoint refuses with 410 regardless of trade state.
       const initiator = await createUser(ctx.module, { isSeller: true });
       const receiver = await createUser(ctx.module, { isSeller: true });
       const initiatorShipAddress = await createAddress({ userId: initiator.id });
@@ -417,12 +433,18 @@ describe('Trade Flow (Safe-Trade Warehouse Escrow) (E2E)', () => {
         .send({})
         .expect(201);
 
-      // Cash not yet paid — ship-to-warehouse must fail
+      const prisma = getPrisma();
+      const before = await prisma.tradeShipment.findMany({
+        where: { tradeId: created.body.id, leg: 'to_warehouse' },
+      });
+      expect(before).toHaveLength(0);
+
+      // Deprecated endpoint must reject manual ship-to-warehouse with 410.
       await request(ctx.app.getHttpServer())
         .post(`/api/trades/${created.body.id}/ship-to-warehouse`)
         .set(authHeader(initiator))
         .send({ fromAddressId: initiatorShipAddress.id, carrier: 'Sürat Kargo' })
-        .expect(400);
+        .expect(410);
     });
   });
 
@@ -466,21 +488,14 @@ describe('Trade Flow (Safe-Trade Warehouse Escrow) (E2E)', () => {
         .send({})
         .expect(201);
 
-      await request(ctx.app.getHttpServer())
-        .post(`/api/trades/${tradeId}/ship-to-warehouse`)
-        .set(authHeader(initiator))
-        .send({ fromAddressId: initiatorShip.id, carrier: 'Sürat' })
-        .expect(201);
-      await request(ctx.app.getHttpServer())
-        .post(`/api/trades/${tradeId}/ship-to-warehouse`)
-        .set(authHeader(receiver))
-        .send({ fromAddressId: receiverShip.id, carrier: 'Sürat' })
-        .expect(201);
-
+      // Inbound shipments are now auto-created on accept. Poll until the
+      // fire-and-forget dispatch settles. (The unused fromAddress fixtures
+      // stay in case future fixtures need explicit non-default addresses.)
+      void initiatorShip;
+      void receiverShip;
       const prisma = getPrisma();
-      const incoming = await prisma.tradeShipment.findMany({
-        where: { tradeId, leg: 'to_warehouse' },
-      });
+      const incoming = await waitForInboundShipments(prisma, tradeId);
+      expect(incoming).toHaveLength(2);
       for (const s of incoming) {
         await request(ctx.app.getHttpServer())
           .post(`/api/admin/trades/${tradeId}/mark-warehouse-received`)

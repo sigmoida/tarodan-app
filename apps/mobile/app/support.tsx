@@ -6,6 +6,7 @@ import { router } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { useAuthStore } from '../src/stores/authStore';
 import { TarodanColors } from '../src/theme';
+import { useTranslation } from '../src/i18n';
 
 const SUPPORT_CATEGORIES = [
   { id: 'order', name: 'Sipariş Sorunu', icon: 'cube-outline' },
@@ -23,6 +24,7 @@ const PRIORITY_OPTIONS = [
 ];
 
 export default function SupportScreen() {
+  const { t } = useTranslation();
   const { isAuthenticated, user } = useAuthStore();
   const [category, setCategory] = useState('');
   const [priority, setPriority] = useState('medium');
@@ -60,7 +62,7 @@ export default function SupportScreen() {
           <TouchableOpacity onPress={() => router.back()}>
             <Ionicons name="arrow-back" size={24} color={TarodanColors.textOnPrimary} />
           </TouchableOpacity>
-          <Text style={styles.headerTitle}>Destek</Text>
+          <Text style={styles.headerTitle}>{t('mobile.pageSupport')}</Text>
           <View style={{ width: 24 }} />
         </View>
         <View style={styles.authRequired}>

@@ -8,6 +8,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { api } from '../../src/services/api';
 import { useAuthStore } from '../../src/stores/authStore';
 import { TarodanColors } from '../../src/theme';
+import { useTranslation } from '../../src/i18n';
 
 interface NotificationSettings {
   pushEnabled: boolean;
@@ -28,6 +29,7 @@ interface NotificationSettings {
 }
 
 export default function NotificationSettingsScreen() {
+  const { t } = useTranslation();
   const { isAuthenticated } = useAuthStore();
   const queryClient = useQueryClient();
   const [settings, setSettings] = useState<NotificationSettings>({
@@ -118,7 +120,7 @@ export default function NotificationSettingsScreen() {
         <TouchableOpacity onPress={() => router.back()}>
           <Ionicons name="arrow-back" size={24} color={TarodanColors.textOnPrimary} />
         </TouchableOpacity>
-        <Text style={styles.headerTitle}>Bildirim Ayarları</Text>
+        <Text style={styles.headerTitle}>{t('mobile.settingsNotifications')}</Text>
         <TouchableOpacity onPress={handleSave} disabled={saveMutation.isPending}>
           <Text style={styles.saveButton}>
             {saveMutation.isPending ? 'Kaydediliyor...' : 'Kaydet'}

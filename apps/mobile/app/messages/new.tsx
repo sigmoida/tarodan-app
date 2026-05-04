@@ -9,6 +9,7 @@ import { api } from '../../src/services/api';
 import { useMessagesStore } from '../../src/stores/messagesStore';
 import { useAuthStore } from '../../src/stores/authStore';
 import { TarodanColors } from '../../src/theme';
+import { useTranslation } from '../../src/i18n';
 
 interface User {
   id: string;
@@ -18,6 +19,7 @@ interface User {
 }
 
 export default function NewMessageScreen() {
+  const { t } = useTranslation();
   const { sellerId, productId, productTitle } = useLocalSearchParams<{ sellerId?: string; productId?: string; productTitle?: string }>();
   const { canSendMessage, createThread } = useMessagesStore();
   const { limits } = useAuthStore();
@@ -119,7 +121,7 @@ export default function NewMessageScreen() {
         <TouchableOpacity onPress={() => router.back()}>
           <Ionicons name="arrow-back" size={24} color={TarodanColors.textOnPrimary} />
         </TouchableOpacity>
-        <Text style={styles.headerTitle}>Yeni Mesaj</Text>
+        <Text style={styles.headerTitle}>{t('mobile.messagesNew')}</Text>
         <View style={{ width: 24 }} />
       </View>
 

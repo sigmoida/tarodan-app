@@ -8,6 +8,7 @@ import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 import { productsApi } from '../../src/services/api';
 import { useAuthStore } from '../../src/stores/authStore';
 import { TarodanColors } from '../../src/theme';
+import { useTranslation } from '../../src/i18n';
 
 interface Listing {
   id: string;
@@ -27,6 +28,7 @@ interface Listing {
 type FilterType = 'all' | 'active' | 'pending' | 'sold' | 'expired' | 'inactive';
 
 export default function MyListingsScreen() {
+  const { t } = useTranslation();
   const queryClient = useQueryClient();
   const { user, limits, refreshUserData } = useAuthStore();
   const [filter, setFilter] = useState<FilterType>('all');
@@ -238,7 +240,7 @@ export default function MyListingsScreen() {
         <TouchableOpacity onPress={() => router.back()}>
           <Ionicons name="arrow-back" size={24} color={TarodanColors.textOnPrimary} />
         </TouchableOpacity>
-        <Text style={styles.headerTitle}>İlanlarım</Text>
+        <Text style={styles.headerTitle}>{t('mobile.settingsMyListings')}</Text>
         <TouchableOpacity onPress={() => router.push('/settings/analytics')}>
           <Ionicons name="stats-chart" size={24} color={TarodanColors.textOnPrimary} />
         </TouchableOpacity>

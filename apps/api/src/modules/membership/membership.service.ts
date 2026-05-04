@@ -402,6 +402,7 @@ export class MembershipService {
         paymentUrl: paymentResult.paymentUrl,
         paymentId: paymentResult.paymentId,
         provider: paymentResult.provider,
+        useBypass: paymentResult.useBypass === true,
       } as any;
     } catch (error) {
       // If payment initiation fails, rollback membership
@@ -506,6 +507,7 @@ export class MembershipService {
         commissionAmount: 0, // No commission for membership
         shippingCost: 0,
         status: OrderStatus.pending_payment,
+        paymentExpiresAt: new Date(Date.now() + 24 * 60 * 60 * 1000),
         shippingAddress: {
           type: 'membership',
         } as any,
@@ -529,6 +531,7 @@ export class MembershipService {
       paymentHtml: paymentResult.paymentHtml,
       provider: paymentResult.provider,
       expiresIn: paymentResult.expiresIn || 300,
+      useBypass: (paymentResult as { useBypass?: boolean }).useBypass === true,
     };
   }
 

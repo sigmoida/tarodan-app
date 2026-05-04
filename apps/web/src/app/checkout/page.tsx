@@ -1123,6 +1123,29 @@ export default function CheckoutPage() {
           } else if (orderError.message) {
             errorMessage = orderError.message;
           }
+
+          // Stockout: ürün satılmış / stokta yok / başkası tarafından alınıyor.
+          // Toast yerine kullanıcıyı dedicated sayfaya yönlendir; sayfa zaten
+          // hero + benzer ürünler önerisini gösteriyor.
+          const stockoutKeywords = [
+            "satışta değil",
+            "stokta yok",
+            "stokta bulunmamaktadır",
+            "başkası tarafından",
+            "başka alıcıya satıldı",
+          ];
+          const isStockout =
+            (orderError.response?.status === 400 ||
+              orderError.response?.status === 409) &&
+            stockoutKeywords.some((kw) =>
+              errorMessage.toLowerCase().includes(kw.toLowerCase()),
+            );
+
+          if (isStockout && item?.productId) {
+            router.push(`/products/unavailable/${item.productId}`);
+            return;
+          }
+
           toast.error(errorMessage);
           throw orderError;
         }
@@ -1186,8 +1209,27 @@ export default function CheckoutPage() {
             if (process.env.NODE_ENV === "development") {
               console.error("Payment initiation failed:", paymentError);
             }
+            const msg = paymentError.response?.data?.message ?? "";
+            const stockoutKeywords = [
+              "satışta değil",
+              "stokta yok",
+              "stokta bulunmamaktadır",
+              "başkası tarafından",
+              "başka alıcıya satıldı",
+            ];
+            const isStockout =
+              (paymentError.response?.status === 400 ||
+                paymentError.response?.status === 409) &&
+              typeof msg === "string" &&
+              stockoutKeywords.some((kw) =>
+                msg.toLowerCase().includes(kw.toLowerCase()),
+              );
+            if (isStockout && item?.productId) {
+              router.push(`/products/unavailable/${item.productId}`);
+              return;
+            }
             toast.error(
-              paymentError.response?.data?.message ||
+              msg ||
                 (locale === "en"
                   ? "Failed to initiate payment. Please try again."
                   : "Ödeme başlatılamadı. Lütfen tekrar deneyin."),

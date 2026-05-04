@@ -4,6 +4,7 @@ import { Text } from 'react-native-paper';
 import { router } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { TarodanColors } from '../src/theme';
+import { useTranslation } from '../src/i18n';
 
 const GUIDES = [
   {
@@ -91,6 +92,7 @@ const GUIDES = [
 ];
 
 export default function GuidesScreen() {
+  const { t } = useTranslation();
   const [expandedIndex, setExpandedIndex] = useState<number | null>(0);
 
   return (
@@ -99,7 +101,7 @@ export default function GuidesScreen() {
         <TouchableOpacity onPress={() => router.back()}>
           <Ionicons name="arrow-back" size={24} color={TarodanColors.textOnPrimary} />
         </TouchableOpacity>
-        <Text style={styles.headerTitle}>Rehberler</Text>
+        <Text style={styles.headerTitle}>{t('mobile.pageGuides')}</Text>
         <View style={{ width: 24 }} />
       </View>
 

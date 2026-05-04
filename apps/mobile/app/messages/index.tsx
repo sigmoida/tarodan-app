@@ -7,8 +7,10 @@ import { Ionicons } from '@expo/vector-icons';
 import { useMessagesStore, MessageThread } from '../../src/stores/messagesStore';
 import { useAuthStore } from '../../src/stores/authStore';
 import { TarodanColors } from '../../src/theme';
+import { useTranslation } from '../../src/i18n';
 
 export default function MessagesListScreen() {
+  const { t } = useTranslation();
   const { isAuthenticated, user, limits } = useAuthStore();
   const { threads, isLoading, fetchThreads, getUnreadCount, getOtherParticipant, dailyMessageCount } = useMessagesStore();
   const [refreshing, setRefreshing] = useState(false);
@@ -79,7 +81,7 @@ export default function MessagesListScreen() {
     return (
       <View style={styles.centeredContainer}>
         <Ionicons name="chatbubbles-outline" size={64} color={TarodanColors.primary} />
-        <Text variant="titleLarge" style={styles.title}>Mesajlar</Text>
+        <Text variant="titleLarge" style={styles.title}>{t("mobile.messagesTitle")}</Text>
         <Text variant="bodyMedium" style={styles.subtitle}>
           Mesajlarınızı görmek için giriş yapın
         </Text>
@@ -101,7 +103,7 @@ export default function MessagesListScreen() {
           <Ionicons name="arrow-back" size={24} color={TarodanColors.textOnPrimary} />
         </TouchableOpacity>
         <View style={styles.headerTitleContainer}>
-          <Text style={styles.headerTitle}>Mesajlar</Text>
+          <Text style={styles.headerTitle}>{t('mobile.messagesTitle')}</Text>
           {unreadCount > 0 && (
             <Badge style={styles.headerBadge}>{unreadCount}</Badge>
           )}
@@ -127,7 +129,7 @@ export default function MessagesListScreen() {
       {/* Search */}
       <View style={styles.searchContainer}>
         <Searchbar
-          placeholder="Mesajlarda ara..."
+          placeholder={t("mobile.searchInMessages")}
           value={searchQuery}
           onChangeText={setSearchQuery}
           style={styles.searchbar}

@@ -8,6 +8,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { api } from '../../src/services/api';
 import { useAuthStore } from '../../src/stores/authStore';
 import { TarodanColors } from '../../src/theme';
+import { useTranslation } from '../../src/i18n';
 
 interface SavedSearch {
   id: string;
@@ -29,6 +30,7 @@ interface SavedSearch {
 }
 
 export default function SavedSearchesScreen() {
+  const { t } = useTranslation();
   const { isAuthenticated, limits } = useAuthStore();
   const queryClient = useQueryClient();
 
@@ -149,7 +151,7 @@ export default function SavedSearchesScreen() {
         <TouchableOpacity onPress={() => router.back()}>
           <Ionicons name="arrow-back" size={24} color={TarodanColors.textOnPrimary} />
         </TouchableOpacity>
-        <Text style={styles.headerTitle}>Kayıtlı Aramalar</Text>
+        <Text style={styles.headerTitle}>{t('mobile.settingsSavedSearches')}</Text>
         <Text style={styles.headerCount}>
           {searches.length}/{maxSavedSearches === -1 ? '∞' : maxSavedSearches}
         </Text>

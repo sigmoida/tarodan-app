@@ -1,0 +1,25 @@
+# D-03: Sipariş listesi smoke — login → Profil → Siparişlerim → liste açılır.
+# Zeynep'in seed'de sipariş geçmişi var; ekran boş olmamalı.
+appId: host.exp.Exponent
+tags:
+  - regression
+---
+- runFlow: ../subflows/open-tarodan.yaml
+- tapOn:
+    text: "Profil"
+- runFlow:
+    when:
+      visible: "Çıkış Yap"
+    file: ../subflows/logout.yaml
+- runFlow: ../subflows/login-as.yaml
+- tapOn:
+    text: "Profil"
+- extendedWaitUntil:
+    visible:
+      id: "profile-orders-link"
+    timeout: 15000
+- tapOn:
+    id: "profile-orders-link"
+- waitForAnimationToEnd
+- assertNotVisible: ".*Network Error.*"
+- assertNotVisible: ".*Bir hata oluştu.*"

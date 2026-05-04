@@ -75,6 +75,12 @@ const navGroups: NavGroup[] = [
         icon: ArrowsRightLeftIcon,
         keywords: ['takas', 'trade', 'barter', 'değişim', 'safe trade'],
       },
+      {
+        name: 'Takas Kargoları',
+        href: '/trade-shipments',
+        icon: TruckIcon,
+        keywords: ['trade shipment', 'takas kargo', 'depoya', 'from warehouse'],
+      },
       { name: 'Kargo', href: '/shipping', icon: TruckIcon },
       { name: 'İade Geçmişi', href: '/refunds', icon: BanknotesIcon, keywords: ['iade', 'refund'] },
     ],
@@ -169,14 +175,16 @@ export default function AdminLayout({ children }: AdminLayoutProps) {
     return null;
   }, [pathname]);
 
-  const [openGroups, setOpenGroups] = useState<Set<string>>(() => {
-    if (typeof window === 'undefined') return new Set();
+  const [openGroups, setOpenGroups] = useState<Set<string>>(new Set());
+  const [hydrated, setHydrated] = useState(false);
+
+  useEffect(() => {
     try {
       const raw = window.localStorage.getItem(OPEN_GROUPS_STORAGE_KEY);
-      if (raw) return new Set(JSON.parse(raw) as string[]);
+      if (raw) setOpenGroups(new Set(JSON.parse(raw) as string[]));
     } catch {}
-    return new Set();
-  });
+    setHydrated(true);
+  }, []);
 
   useEffect(() => {
     if (activeGroupId && !openGroups.has(activeGroupId)) {
@@ -186,10 +194,11 @@ export default function AdminLayout({ children }: AdminLayoutProps) {
   }, [activeGroupId]);
 
   useEffect(() => {
+    if (!hydrated) return;
     try {
       window.localStorage.setItem(OPEN_GROUPS_STORAGE_KEY, JSON.stringify(Array.from(openGroups)));
     } catch {}
-  }, [openGroups]);
+  }, [openGroups, hydrated]);
 
   const toggleGroup = (id: string) => {
     setOpenGroups((prev) => {

@@ -3,8 +3,10 @@ import { Text } from '../src/components/common';
 import { router } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { TarodanColors } from '../src/theme';
+import { useTranslation } from '../src/i18n';
 
 export default function PrivacyPolicyScreen() {
+  const { t } = useTranslation();
   return (
     <View style={styles.container}>
       {/* Header */}
@@ -12,7 +14,7 @@ export default function PrivacyPolicyScreen() {
         <TouchableOpacity onPress={() => router.back()}>
           <Ionicons name="arrow-back" size={24} color={TarodanColors.textOnPrimary} />
         </TouchableOpacity>
-        <Text style={styles.headerTitle}>Gizlilik Politikası</Text>
+        <Text style={styles.headerTitle}>{t('mobile.pagePrivacy')}</Text>
         <View style={{ width: 24 }} />
       </View>
 

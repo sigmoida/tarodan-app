@@ -1,0 +1,20 @@
+# Expo Go'yu launch et ve Tarodan'ı aç. Tarodan zaten açıksa direkt geçer.
+appId: host.exp.Exponent
+---
+- launchApp:
+    appId: host.exp.Exponent
+    clearState: false
+- waitForAnimationToEnd:
+    timeout: 5000
+# Eğer Expo Go ana ekranındaysak Tarodan recents'ına tıkla.
+- runFlow:
+    when:
+      visible: "Recently opened"
+    commands:
+      - tapOn:
+          text: "Tarodan"
+          index: 0
+- extendedWaitUntil:
+    visible:
+      text: "Ana Sayfa"
+    timeout: 90000

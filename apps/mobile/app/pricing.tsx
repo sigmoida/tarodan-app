@@ -5,6 +5,7 @@ import { router } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { useAuthStore } from '../src/stores/authStore';
 import { TarodanColors } from '../src/theme';
+import { useTranslation } from '../src/i18n';
 
 const { width } = Dimensions.get('window');
 
@@ -85,6 +86,7 @@ const MEMBERSHIP_TIERS = [
 ];
 
 export default function PricingScreen() {
+  const { t } = useTranslation();
   const { isAuthenticated, user } = useAuthStore();
   const currentTier = user?.membershipTier || 'free';
 
@@ -108,7 +110,7 @@ export default function PricingScreen() {
         <TouchableOpacity onPress={() => router.back()}>
           <Ionicons name="arrow-back" size={24} color={TarodanColors.textOnPrimary} />
         </TouchableOpacity>
-        <Text style={styles.headerTitle}>Üyelik Planları</Text>
+        <Text style={styles.headerTitle}>{t('mobile.pagePricing')}</Text>
         <View style={{ width: 24 }} />
       </View>
 

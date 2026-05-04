@@ -1,0 +1,27 @@
+# D-04: Takas listesi smoke — login → Profil → Takaslarım → ekran yüklenir.
+# Tam takas oluşturma + kabul akışı iki kullanıcı + complex state machine
+# gerektirir; tam regression backend e2e testlerinde (money-flow.e2e-spec.ts)
+# zaten kapsanıyor. Bu flow UI sayfasının ayağa kalktığını doğrular.
+appId: host.exp.Exponent
+tags:
+  - regression
+---
+- runFlow: ../subflows/open-tarodan.yaml
+- tapOn:
+    text: "Profil"
+- runFlow:
+    when:
+      visible: "Çıkış Yap"
+    file: ../subflows/logout.yaml
+- runFlow: ../subflows/login-as.yaml
+- tapOn:
+    text: "Profil"
+- extendedWaitUntil:
+    visible:
+      id: "profile-trades-link"
+    timeout: 15000
+- tapOn:
+    id: "profile-trades-link"
+- waitForAnimationToEnd
+- assertNotVisible: ".*Network Error.*"
+- assertNotVisible: ".*Bir hata oluştu.*"

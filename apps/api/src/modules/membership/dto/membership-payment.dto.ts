@@ -30,4 +30,7 @@ export class MembershipPaymentInitResponseDto {
 
   @ApiProperty({ example: 300 })
   expiresIn: number;
+
+  @ApiPropertyOptional({ example: true, description: 'Dev/test bypass mode flag — client must call POST /payments/:id/bypass-complete' })
+  useBypass?: boolean;
 }

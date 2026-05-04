@@ -8,6 +8,7 @@ import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 import { api } from '../../src/services/api';
 import { useAuthStore } from '../../src/stores/authStore';
 import { TarodanColors } from '../../src/theme';
+import { useTranslation } from '../../src/i18n';
 
 interface Analytics {
   totalViews: number;
@@ -43,6 +44,7 @@ interface Analytics {
 }
 
 export default function AnalyticsScreen() {
+  const { t } = useTranslation();
   const { isAuthenticated, user, limits } = useAuthStore();
   const [timeRange, setTimeRange] = useState<'7d' | '30d' | 'all'>('7d');
 
@@ -142,7 +144,7 @@ export default function AnalyticsScreen() {
         <TouchableOpacity onPress={() => router.back()}>
           <Ionicons name="arrow-back" size={24} color={TarodanColors.textOnPrimary} />
         </TouchableOpacity>
-        <Text style={styles.headerTitle}>Analitikler</Text>
+        <Text style={styles.headerTitle}>{t('mobile.settingsAnalytics')}</Text>
         <View style={{ width: 24 }} />
       </View>
 

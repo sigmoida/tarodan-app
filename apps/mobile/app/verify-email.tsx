@@ -11,10 +11,12 @@ import { router, useLocalSearchParams } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { TarodanColors } from '../src/theme';
 import { api } from '../src/services/api';
+import { useTranslation } from '../src/i18n';
 
 type VerificationState = 'loading' | 'success' | 'error';
 
 export default function VerifyEmailScreen() {
+  const { t } = useTranslation();
   const { token } = useLocalSearchParams<{ token: string }>();
   const [state, setState] = useState<VerificationState>('loading');
   const [errorMessage, setErrorMessage] = useState('');
@@ -26,7 +28,7 @@ export default function VerifyEmailScreen() {
   const verifyEmail = async () => {
     if (!token) {
       setState('error');
-      setErrorMessage('Doğrulama bağlantısı geçersiz. Token bulunamadı.');
+      setErrorMessage(t('mobile.tokenInvalid'));
       return;
     }
 
@@ -38,9 +40,7 @@ export default function VerifyEmailScreen() {
       setState('success');
     } catch (err: any) {
       setState('error');
-      const msg =
-        err?.response?.data?.message ||
-        'E-posta doğrulama işlemi başarısız oldu. Bağlantının süresi dolmuş olabilir.';
+      const msg = err?.response?.data?.message || t('mobile.verifyEmailFailed');
       setErrorMessage(msg);
     }
   };
@@ -51,7 +51,7 @@ export default function VerifyEmailScreen() {
         <TouchableOpacity onPress={() => router.back()} style={styles.headerBackBtn}>
           <Ionicons name="arrow-back" size={24} color={TarodanColors.textOnPrimary} />
         </TouchableOpacity>
-        <Text style={styles.headerTitle}>E-posta Doğrulama</Text>
+        <Text style={styles.headerTitle}>{t('mobile.verifyEmailTitle')}</Text>
         <View style={styles.headerPlaceholder} />
       </View>
 
@@ -61,8 +61,8 @@ export default function VerifyEmailScreen() {
             <View style={styles.spinnerCircle}>
               <ActivityIndicator size="large" color={TarodanColors.primary} />
             </View>
-            <Text style={styles.stateTitle}>Doğrulanıyor...</Text>
-            <Text style={styles.stateSubtitle}>E-posta adresiniz doğrulanıyor, lütfen bekleyin.</Text>
+            <Text style={styles.stateTitle}>{t('common.loading')}</Text>
+            <Text style={styles.stateSubtitle}>{t('mobile.verifyEmailSent')}</Text>
           </View>
         )}
 
@@ -71,22 +71,22 @@ export default function VerifyEmailScreen() {
             <View style={[styles.iconCircle, { backgroundColor: TarodanColors.success + '15' }]}>
               <Ionicons name="checkmark-circle" size={64} color={TarodanColors.success} />
             </View>
-            <Text style={styles.stateTitle}>E-posta adresiniz doğrulandı!</Text>
+            <Text style={styles.stateTitle}>{t('mobile.verifyEmailSuccess')}</Text>
             <Text style={styles.stateSubtitle}>
-              Hesabınız başarıyla doğrulandı. Artık tüm özellikleri kullanabilirsiniz.
+              {t('mobile.verifyEmailSuccess')}
             </Text>
             <TouchableOpacity
               style={styles.primaryButton}
               onPress={() => router.replace('/settings/edit-profile')}
             >
               <Ionicons name="person-outline" size={18} color={TarodanColors.textOnPrimary} />
-              <Text style={styles.primaryButtonText}>Profile Git</Text>
+              <Text style={styles.primaryButtonText}>{t('nav.profile')}</Text>
             </TouchableOpacity>
             <TouchableOpacity
               style={styles.secondaryButton}
               onPress={() => router.replace('/')}
             >
-              <Text style={styles.secondaryButtonText}>Ana Sayfaya Dön</Text>
+              <Text style={styles.secondaryButtonText}>{t('nav.home')}</Text>
             </TouchableOpacity>
           </View>
         )}
@@ -96,24 +96,24 @@ export default function VerifyEmailScreen() {
             <View style={[styles.iconCircle, { backgroundColor: TarodanColors.error + '15' }]}>
               <Ionicons name="close-circle" size={64} color={TarodanColors.error} />
             </View>
-            <Text style={styles.stateTitle}>Doğrulama başarısız</Text>
+            <Text style={styles.stateTitle}>{t('mobile.verifyEmailFailed')}</Text>
             <Text style={styles.stateSubtitle}>{errorMessage}</Text>
             <TouchableOpacity style={styles.primaryButton} onPress={verifyEmail}>
               <Ionicons name="refresh-outline" size={18} color={TarodanColors.textOnPrimary} />
-              <Text style={styles.primaryButtonText}>Tekrar Dene</Text>
+              <Text style={styles.primaryButtonText}>{t('mobile.errorRetry')}</Text>
             </TouchableOpacity>
             <TouchableOpacity
               style={styles.outlineButton}
               onPress={() => router.push('/help')}
             >
               <Ionicons name="help-circle-outline" size={18} color={TarodanColors.primary} />
-              <Text style={styles.outlineButtonText}>Destek ile İletişime Geç</Text>
+              <Text style={styles.outlineButtonText}>{t('mobile.errorRetry')}</Text>
             </TouchableOpacity>
             <TouchableOpacity
               style={styles.secondaryButton}
               onPress={() => router.replace('/')}
             >
-              <Text style={styles.secondaryButtonText}>Ana Sayfaya Dön</Text>
+              <Text style={styles.secondaryButtonText}>{t('nav.home')}</Text>
             </TouchableOpacity>
           </View>
         )}

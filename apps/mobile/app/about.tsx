@@ -3,11 +3,13 @@ import { Text, Card } from 'react-native-paper';
 import { Stack } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { TarodanColors } from '../src/theme';
+import { useTranslation } from '../src/i18n';
 
 export default function AboutScreen() {
+  const { t } = useTranslation();
   return (
     <View style={styles.container}>
-      <Stack.Screen options={{ title: 'Hakkımızda' }} />
+      <Stack.Screen options={{ title: t('mobile.pageAbout') }} />
       <ScrollView contentContainerStyle={styles.content}>
         <View style={styles.header}>
           <Ionicons name="car-sport" size={48} color={TarodanColors.primary} />

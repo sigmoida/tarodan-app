@@ -3,11 +3,13 @@ import { Text } from 'react-native-paper';
 import { Stack, router } from 'expo-router';
 import { Button } from 'react-native-paper';
 import { TarodanColors } from '../src/theme';
+import { useTranslation } from '../src/i18n';
 
 export default function StatisticsScreen() {
+  const { t } = useTranslation();
   return (
     <View style={styles.container}>
-      <Stack.Screen options={{ title: 'İstatistikler' }} />
+      <Stack.Screen options={{ title: t('mobile.pageStatistics') }} />
       <View style={styles.content}>
         <Text variant="bodyLarge" style={styles.text}>
           Detaylı istatistikler için Analytics sayfasını kullanabilirsiniz.

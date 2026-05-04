@@ -1,0 +1,34 @@
+# İlanlarım ekranı: login → profile → İlanlarım listesinde en az 1 ilan görünür.
+# Zeynep'in seed'de 6 ilanı var.
+appId: host.exp.Exponent
+tags:
+  - smoke
+env:
+  EMAIL: zeynep@demo.com
+  PASSWORD: Demo123!
+---
+- runFlow: ../subflows/open-tarodan.yaml
+- tapOn:
+    text: "Profil"
+- runFlow:
+    when:
+      visible: "Çıkış Yap"
+    file: ../subflows/logout.yaml
+- runFlow: ../subflows/login-as.yaml
+- tapOn:
+    text: "Profil"
+- extendedWaitUntil:
+    visible:
+      text: ".*İlanlarım.*"
+    timeout: 15000
+- tapOn:
+    text: ".*İlanlarım.*"
+    index: 0
+- extendedWaitUntil:
+    visible:
+      text: ".*İlan.*"
+    timeout: 15000
+- assertNotVisible:
+    text: ".*Bir hata oluştu.*"
+- assertNotVisible:
+    text: ".*Network Error.*"

@@ -1,0 +1,22 @@
+# Auth-login smoke: login-as ile login yap, profil ekranında kullanıcı görünür.
+# Tek başına çalışırken de batch'te de PASS olur.
+appId: host.exp.Exponent
+tags:
+  - regression
+env:
+  EMAIL: zeynep@demo.com
+  PASSWORD: Demo123!
+---
+- runFlow: ../subflows/open-tarodan.yaml
+- tapOn:
+    text: "Profil"
+# Eğer önceki flow'dan login kalmışsa logout yap.
+- runFlow:
+    when:
+      visible: "Çıkış Yap"
+    file: ../subflows/logout.yaml
+# Şimdi login ekranındayız ya da profile'da go-login butonu var.
+- runFlow: ../subflows/login-as.yaml
+- tapOn:
+    text: "Profil"
+- assertVisible: "zeynep@demo.com"

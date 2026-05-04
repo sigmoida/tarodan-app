@@ -1,0 +1,20 @@
+# 01-12: Logout cleanup — login → logout → login ekranı (form alanları görünür).
+appId: host.exp.Exponent
+tags:
+  - regression
+env:
+  EMAIL: zeynep@demo.com
+  PASSWORD: Demo123!
+---
+- runFlow: ../subflows/open-tarodan.yaml
+- runFlow: ../subflows/login-as.yaml
+- tapOn:
+    text: "Profil"
+- runFlow: ../subflows/logout.yaml
+# Logout sonrası uygulama login ekranına yönlendirir.
+- assertVisible:
+    id: "login-email-input"
+- assertVisible:
+    id: "login-password-input"
+- assertNotVisible:
+    text: "zeynep@demo.com"

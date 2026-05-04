@@ -6,8 +6,10 @@ import { router } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { TarodanColors } from '../src/theme';
 import { supportApi } from '../src/services/api';
+import { useTranslation } from '../src/i18n';
 
 export default function ContactScreen() {
+  const { t } = useTranslation();
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
   const [subject, setSubject] = useState('');
@@ -70,7 +72,7 @@ export default function ContactScreen() {
         <TouchableOpacity onPress={() => router.back()}>
           <Ionicons name="arrow-back" size={24} color={TarodanColors.textOnPrimary} />
         </TouchableOpacity>
-        <Text style={styles.headerTitle}>İletişim</Text>
+        <Text style={styles.headerTitle}>{t('mobile.pageContact')}</Text>
         <View style={{ width: 24 }} />
       </View>
 

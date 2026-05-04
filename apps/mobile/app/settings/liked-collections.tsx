@@ -8,6 +8,7 @@ import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { collectionsApi } from '../../src/services/api';
 import { useAuthStore } from '../../src/stores/authStore';
 import { TarodanColors } from '../../src/theme';
+import { useTranslation } from '../../src/i18n';
 
 interface LikedCollection {
   id: string;
@@ -26,6 +27,7 @@ interface LikedCollection {
 }
 
 export default function LikedCollectionsScreen() {
+  const { t } = useTranslation();
   const { isAuthenticated } = useAuthStore();
   const queryClient = useQueryClient();
   const [refreshing, setRefreshing] = useState(false);
@@ -85,7 +87,7 @@ export default function LikedCollectionsScreen() {
           <TouchableOpacity onPress={() => router.back()} style={styles.backButton}>
             <Ionicons name="arrow-back" size={24} color={TarodanColors.textOnPrimary} />
           </TouchableOpacity>
-          <Text style={styles.headerTitle}>Beğenilen Koleksiyonlar</Text>
+          <Text style={styles.headerTitle}>{t('mobile.settingsLikedCollections')}</Text>
           <View style={{ width: 40 }} />
         </View>
         <View style={styles.emptyContainer}>
@@ -112,7 +114,7 @@ export default function LikedCollectionsScreen() {
         <TouchableOpacity onPress={() => router.back()} style={styles.backButton}>
           <Ionicons name="arrow-back" size={24} color={TarodanColors.textOnPrimary} />
         </TouchableOpacity>
-        <Text style={styles.headerTitle}>Beğenilen Koleksiyonlar</Text>
+        <Text style={styles.headerTitle}>{t('mobile.settingsLikedCollections')}</Text>
         <View style={{ width: 40 }} />
       </View>
 
