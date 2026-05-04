@@ -1,0 +1,89 @@
+# F-19: Submit empty offer modal → validation. Recovery: enter valid → success.
+# Modal'da Alert.alert ile "Geçersiz Tutar" çıkar; submit button disabled olur
+# (disabled={!numeric}). Boş submit'te buton tap'i no-op olur. Bu yüzden flow:
+# 1) modal aç, 2) submit button disabled olduğunu doğrula (tap no-op),
+# 3) amount enter et, 4) submit enabled, 5) success.
+appId: host.exp.Exponent
+tags:
+  - manual
+env:
+  EMAIL: mehmet@demo.com
+  PASSWORD: Demo123!
+  SEARCH_TERM: Hot Wheels
+  OFFER_AMOUNT: "100"
+---
+- runFlow: ../subflows/open-tarodan.yaml
+- tapOn:
+    text: "Profil"
+- runFlow:
+    when:
+      visible: "Çıkış Yap"
+    file: ../subflows/logout.yaml
+- runFlow:
+    when:
+      visible:
+        id: "profile-go-login-button"
+    commands:
+      - tapOn:
+          id: "profile-go-login-button"
+- extendedWaitUntil:
+    visible:
+      id: "login-email-input"
+    timeout: 15000
+- tapOn:
+    id: "login-email-input"
+- inputText: ${EMAIL}
+- tapOn:
+    id: "login-password-input"
+- inputText: ${PASSWORD}
+- tapOn:
+    id: "login-submit-button"
+- extendedWaitUntil:
+    visible: "Ana Sayfa"
+    timeout: 30000
+- runFlow:
+    when:
+      visible: "Şimdi Değil"
+    commands:
+      - tapOn: "Şimdi Değil"
+- tapOn:
+    text: "Ara"
+- extendedWaitUntil:
+    visible:
+      id: "search-input"
+    timeout: 20000
+- tapOn:
+    id: "search-input"
+- inputText: ${SEARCH_TERM}
+- extendedWaitUntil:
+    visible:
+      text: ".*₺.*"
+    timeout: 30000
+- tapOn:
+    text: ".*₺.*"
+    index: 0
+- extendedWaitUntil:
+    visible: "Teklif Ver"
+    timeout: 30000
+- tapOn:
+    text: "Teklif Ver"
+- extendedWaitUntil:
+    visible:
+      id: "offer-amount-input"
+    timeout: 15000
+# Boş submit — buton disabled, modal hala açık
+- tapOn:
+    id: "offer-submit-button"
+- assertVisible:
+    id: "offer-amount-input"
+# Geçerli amount → success
+- tapOn:
+    id: "offer-amount-input"
+- inputText: ${OFFER_AMOUNT}
+- tapOn:
+    id: "offer-submit-button"
+- extendedWaitUntil:
+    visible:
+      text: ".*Teklifiniz gönderildi.*|.*gönderildi.*"
+    timeout: 20000
+- assertNotVisible: ".*Network Error.*"

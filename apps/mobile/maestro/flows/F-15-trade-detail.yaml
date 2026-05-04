@@ -1,0 +1,24 @@
+# F-15: Trade detail status display — ilk takasa tap → status chip + counterparty.
+# Mevcut takas fixture'ına bağımlı.
+appId: host.exp.Exponent
+tags:
+  - manual
+env:
+  EMAIL: zeynep@demo.com
+  PASSWORD: Demo123!
+---
+- runFlow: ../subflows/open-tarodan.yaml
+- tapOn:
+    text: "Profil"
+- runFlow:
+    when:
+      visible: "Çıkış Yap"
+    file: ../subflows/logout.yaml
+- runFlow: ../subflows/login-as.yaml
+- runFlow: ../subflows/open-first-trade.yaml
+- extendedWaitUntil:
+    visible:
+      text: "Takas|Trade|TRD-"
+    timeout: 30000
+- assertNotVisible: ".*Network Error.*"
+- assertNotVisible: ".*Bir hata oluştu.*"

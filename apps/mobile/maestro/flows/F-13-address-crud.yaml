@@ -1,0 +1,79 @@
+# F-13: Address create/edit/delete — Adreslerim CRUD.
+appId: host.exp.Exponent
+tags:
+  - regression
+env:
+  EMAIL: zeynep@demo.com
+  PASSWORD: Demo123!
+  ADDRESS_TITLE: E2E Adresim
+  ADDRESS_TITLE_EDITED: E2E Adresim Düzenlendi
+---
+- runFlow: ../subflows/open-tarodan.yaml
+- tapOn:
+    text: "Profil"
+- runFlow:
+    when:
+      visible: "Çıkış Yap"
+    file: ../subflows/logout.yaml
+- runFlow: ../subflows/login-as.yaml
+- tapOn:
+    text: "Profil"
+# Profil → Ayarlar → Adresler (settings/addresses route)
+- scrollUntilVisible:
+    element:
+      text: "Adres"
+    direction: DOWN
+    timeout: 10000
+- tapOn:
+    text: "Adreslerim|Adresler"
+- extendedWaitUntil:
+    visible:
+      text: "Adres Ekle|Yeni Adres"
+    timeout: 20000
+# Yeni adres formu
+- tapOn:
+    text: "Adres Ekle|Yeni Adres"
+- extendedWaitUntil:
+    visible:
+      id: "address-title-input"
+    timeout: 15000
+- tapOn:
+    id: "address-title-input"
+- inputText: ${ADDRESS_TITLE}
+- tapOn:
+    text: "Ad Soyad"
+- inputText: "E2E Test User"
+- tapOn:
+    text: "Telefon"
+- inputText: "5551234567"
+- tapOn:
+    text: "Adres *"
+- inputText: "Test mahallesi test sokak no:1"
+# CityDistrictSelector — şehir + ilçe seçimi atla, mevcut default'la geç
+- tapOn:
+    id: "address-save-button"
+- extendedWaitUntil:
+    visible: ${ADDRESS_TITLE}
+    timeout: 20000
+- assertVisible: ${ADDRESS_TITLE}
+- assertNotVisible: ".*Network Error.*"
+# Edit
+- tapOn:
+    text: "pencil|Düzenle"
+    optional: true
+- runFlow:
+    when:
+      visible:
+        id: "address-title-input"
+    commands:
+      - tapOn:
+          id: "address-title-input"
+      - eraseText: 30
+      - inputText: ${ADDRESS_TITLE_EDITED}
+      - tapOn:
+          id: "address-save-button"
+      - extendedWaitUntil:
+          visible: ${ADDRESS_TITLE_EDITED}
+          timeout: 20000
+      - assertVisible: ${ADDRESS_TITLE_EDITED}
+- assertNotVisible: ".*Bir hata oluştu.*"

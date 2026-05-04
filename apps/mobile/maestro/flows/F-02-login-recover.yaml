@@ -1,0 +1,61 @@
+# F-02: Yanlış şifre denemesi → hata banner → şifreyi düzelt → home.
+# Form recovery: page reload olmadan inputlar düzeltilebilir.
+appId: host.exp.Exponent
+tags:
+  - regression
+env:
+  EMAIL: zeynep@demo.com
+  PASSWORD: Demo123!
+---
+- runFlow: ../subflows/open-tarodan.yaml
+- tapOn:
+    text: "Profil"
+- runFlow:
+    when:
+      visible: "Çıkış Yap"
+    file: ../subflows/logout.yaml
+- runFlow:
+    when:
+      visible:
+        id: "profile-go-login-button"
+    commands:
+      - tapOn:
+          id: "profile-go-login-button"
+- extendedWaitUntil:
+    visible:
+      id: "login-email-input"
+    timeout: 15000
+# 1. Yanlış şifre denemesi
+- tapOn:
+    id: "login-email-input"
+- inputText: ${EMAIL}
+- tapOn:
+    id: "login-password-input"
+- inputText: "yanlis-sifre-123"
+- tapOn:
+    id: "login-submit-button"
+- extendedWaitUntil:
+    visible:
+      id: "login-error-banner"
+    timeout: 15000
+- assertVisible:
+    id: "login-error-banner"
+# 2. Şifreyi temizle ve doğru olanı gir (form reload yok)
+- tapOn:
+    id: "login-password-input"
+- eraseText: 30
+- inputText: ${PASSWORD}
+- tapOn:
+    id: "login-submit-button"
+- extendedWaitUntil:
+    visible:
+      text: "Ana Sayfa"
+    timeout: 30000
+- runFlow:
+    when:
+      visible: "Şimdi Değil"
+    commands:
+      - tapOn: "Şimdi Değil"
+- assertVisible: "Ana Sayfa"
+- assertNotVisible:
+    id: "login-error-banner"

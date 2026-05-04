@@ -1,0 +1,32 @@
+# F-18: Empty cart checkout blocked — boş sepet → checkout butonu görünmemeli.
+appId: host.exp.Exponent
+tags:
+  - smoke
+env:
+  EMAIL: zeynep@demo.com
+  PASSWORD: Demo123!
+---
+- runFlow: ../subflows/open-tarodan.yaml
+- tapOn:
+    text: "Profil"
+- runFlow:
+    when:
+      visible: "Çıkış Yap"
+    file: ../subflows/logout.yaml
+- runFlow: ../subflows/login-as.yaml
+# Direct deep link: cart route
+- openLink: "tarodan://cart"
+- extendedWaitUntil:
+    visible: "Sepetim"
+    timeout: 30000
+# Boş sepet → "Sepetiniz Boş" görünür, checkout butonu gizli
+- runFlow:
+    when:
+      visible: "Sepetiniz Boş"
+    commands:
+      - assertVisible: "Sepetiniz Boş"
+      - assertVisible: "İlanlara Göz At"
+      - assertNotVisible:
+          id: "cart-checkout-button"
+- assertNotVisible: ".*Network Error.*"
+- assertNotVisible: ".*Bir hata oluştu.*"

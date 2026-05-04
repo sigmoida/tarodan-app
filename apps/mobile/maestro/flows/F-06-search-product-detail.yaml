@@ -1,0 +1,51 @@
+# F-06: Search → result → product detail → back nav.
+appId: host.exp.Exponent
+tags:
+  - smoke
+env:
+  EMAIL: zeynep@demo.com
+  PASSWORD: Demo123!
+  SEARCH_TERM: Hot Wheels
+---
+- runFlow: ../subflows/open-tarodan.yaml
+- tapOn:
+    text: "Profil"
+- runFlow:
+    when:
+      visible: "Çıkış Yap"
+    file: ../subflows/logout.yaml
+- runFlow: ../subflows/login-as.yaml
+- tapOn:
+    text: "Ara"
+- extendedWaitUntil:
+    visible:
+      id: "search-input"
+    timeout: 20000
+- tapOn:
+    id: "search-input"
+- inputText: ${SEARCH_TERM}
+- extendedWaitUntil:
+    visible:
+      text: ".*sonuç bulundu.*|.*₺.*"
+    timeout: 30000
+- assertVisible:
+    text: ".*₺.*"
+# İlk fiyat etiketine tap → product detail
+- tapOn:
+    text: ".*₺.*"
+    index: 0
+- extendedWaitUntil:
+    visible: "Sepete Ekle"
+    timeout: 30000
+- assertVisible: "Sepete Ekle"
+- assertVisible:
+    id: "product-detail-add-to-cart-button"
+- assertNotVisible: ".*Network Error.*"
+# Geri navigasyon ile arama sonuçlarına dön
+- back
+- extendedWaitUntil:
+    visible:
+      id: "search-input"
+    timeout: 15000
+- assertVisible:
+    id: "search-input"

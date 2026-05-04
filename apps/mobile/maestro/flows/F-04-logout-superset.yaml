@@ -1,0 +1,35 @@
+# F-04: Logout flow — login → profile → Çıkış Yap → confirm → login form (boş).
+# 01-12-logout-cleanup'ın superset'i: ek olarak email/password input'ların boş
+# olduğunu ve no-toast-error doğrular.
+appId: host.exp.Exponent
+tags:
+  - regression
+env:
+  EMAIL: zeynep@demo.com
+  PASSWORD: Demo123!
+---
+- runFlow: ../subflows/open-tarodan.yaml
+- tapOn:
+    text: "Profil"
+- runFlow:
+    when:
+      visible: "Çıkış Yap"
+    file: ../subflows/logout.yaml
+- runFlow: ../subflows/login-as.yaml
+- tapOn:
+    text: "Profil"
+- extendedWaitUntil:
+    visible: "zeynep@demo.com"
+    timeout: 15000
+- runFlow: ../subflows/logout.yaml
+- extendedWaitUntil:
+    visible:
+      id: "login-email-input"
+    timeout: 15000
+- assertVisible:
+    id: "login-email-input"
+- assertVisible:
+    id: "login-password-input"
+- assertNotVisible: "zeynep@demo.com"
+- assertNotVisible: ".*Network Error.*"
+- assertNotVisible: ".*Bir hata oluştu.*"

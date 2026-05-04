@@ -1,0 +1,74 @@
+# F-14: Initiate trade → ali@demo.com → tradeAvailable ürün → "Takas" → trade/new.
+# Fixture: ali kendi listing'inde takas teklif edemez. Manual.
+appId: host.exp.Exponent
+tags:
+  - manual
+env:
+  EMAIL: ali@demo.com
+  PASSWORD: Demo123!
+  SEARCH_TERM: Hot Wheels
+---
+- runFlow: ../subflows/open-tarodan.yaml
+- tapOn:
+    text: "Profil"
+- runFlow:
+    when:
+      visible: "Çıkış Yap"
+    file: ../subflows/logout.yaml
+- runFlow:
+    when:
+      visible:
+        id: "profile-go-login-button"
+    commands:
+      - tapOn:
+          id: "profile-go-login-button"
+- extendedWaitUntil:
+    visible:
+      id: "login-email-input"
+    timeout: 15000
+- tapOn:
+    id: "login-email-input"
+- inputText: ${EMAIL}
+- tapOn:
+    id: "login-password-input"
+- inputText: ${PASSWORD}
+- tapOn:
+    id: "login-submit-button"
+- extendedWaitUntil:
+    visible: "Ana Sayfa"
+    timeout: 30000
+- runFlow:
+    when:
+      visible: "Şimdi Değil"
+    commands:
+      - tapOn: "Şimdi Değil"
+- tapOn:
+    text: "Ara"
+- extendedWaitUntil:
+    visible:
+      id: "search-input"
+    timeout: 20000
+- tapOn:
+    id: "search-input"
+- inputText: ${SEARCH_TERM}
+- extendedWaitUntil:
+    visible:
+      text: ".*₺.*"
+    timeout: 30000
+- tapOn:
+    text: ".*₺.*"
+    index: 0
+- extendedWaitUntil:
+    visible:
+      text: "Sepete Ekle"
+    timeout: 30000
+# tradeAvailable ürünlerde "Takas" butonu var
+- tapOn:
+    text: "Takas"
+    optional: true
+- extendedWaitUntil:
+    visible:
+      text: "Takas|Eşya|teklif"
+    timeout: 20000
+- assertNotVisible: ".*Network Error.*"
+- assertNotVisible: ".*Bir hata oluştu.*"

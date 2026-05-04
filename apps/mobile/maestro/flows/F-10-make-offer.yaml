@@ -1,0 +1,101 @@
+# F-10: Make offer flow — mehmet@demo.com → product (seller != self) → Teklif Ver →
+# amount → submit → Profil → Tekliflerim → Verdiğim Teklifler tab → görünür.
+# Seller filter manuel olduğu için — own listing'e teklif vermez. Tag: manual.
+appId: host.exp.Exponent
+tags:
+  - manual
+env:
+  EMAIL: mehmet@demo.com
+  PASSWORD: Demo123!
+  SEARCH_TERM: Hot Wheels
+  OFFER_AMOUNT: "100"
+---
+- runFlow: ../subflows/open-tarodan.yaml
+- tapOn:
+    text: "Profil"
+- runFlow:
+    when:
+      visible: "Çıkış Yap"
+    file: ../subflows/logout.yaml
+# Hard-coded login subflow zeynep'e bağlı — burada inline login.
+- runFlow:
+    when:
+      visible:
+        id: "profile-go-login-button"
+    commands:
+      - tapOn:
+          id: "profile-go-login-button"
+- extendedWaitUntil:
+    visible:
+      id: "login-email-input"
+    timeout: 15000
+- tapOn:
+    id: "login-email-input"
+- inputText: ${EMAIL}
+- tapOn:
+    id: "login-password-input"
+- inputText: ${PASSWORD}
+- tapOn:
+    id: "login-submit-button"
+- extendedWaitUntil:
+    visible: "Ana Sayfa"
+    timeout: 30000
+- runFlow:
+    when:
+      visible: "Şimdi Değil"
+    commands:
+      - tapOn: "Şimdi Değil"
+- tapOn:
+    text: "Ara"
+- extendedWaitUntil:
+    visible:
+      id: "search-input"
+    timeout: 20000
+- tapOn:
+    id: "search-input"
+- inputText: ${SEARCH_TERM}
+- extendedWaitUntil:
+    visible:
+      text: ".*₺.*"
+    timeout: 30000
+- tapOn:
+    text: ".*₺.*"
+    index: 0
+- extendedWaitUntil:
+    visible: "Teklif Ver"
+    timeout: 30000
+- tapOn:
+    text: "Teklif Ver"
+- extendedWaitUntil:
+    visible:
+      id: "offer-amount-input"
+    timeout: 15000
+- tapOn:
+    id: "offer-amount-input"
+- inputText: ${OFFER_AMOUNT}
+- tapOn:
+    id: "offer-submit-button"
+- extendedWaitUntil:
+    visible:
+      text: ".*Teklifiniz gönderildi.*|.*gönderildi.*"
+    timeout: 20000
+- assertVisible:
+    text: ".*gönderildi.*"
+- assertNotVisible: ".*Hata.*"
+# Profil → Tekliflerim → Verdiğim Teklifler
+- tapOn:
+    text: "Profil"
+- scrollUntilVisible:
+    element:
+      id: "profile-offers-link"
+    direction: DOWN
+    timeout: 10000
+- tapOn:
+    id: "profile-offers-link"
+- extendedWaitUntil:
+    visible: "Tekliflerim"
+    timeout: 30000
+- tapOn:
+    text: "Verdiğim"
+    optional: true
+- assertNotVisible: ".*Network Error.*"
