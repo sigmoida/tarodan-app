@@ -180,3 +180,20 @@ pnpm test:e2e --testPathPattern=payment-bypass
 **Ayrıntılı kurulum talimatı:** [CLOUD_SETUP.md](CLOUD_SETUP.md).
 
 Şimdiye kadar: **API katmanı CI'da koşuyor; UI testleri yerelden manuel koşuluyor.** Bu pratik ayrım: para hareketleri ve veri kontratları otomatik korunuyor, UI smoke'ları sürüm öncesi spot kontrol için yerelde.
+
+## iOS secureTextEntry + Maestro inputText
+
+Maestro'nun yumuşak iOS klavyesi üzerinden `secureTextEntry` input'lara
+karakter göndermesinde bir sınırlaması var (boş kalıyor). Çözüm:
+**iOS Simulator'da hardware keyboard'ı aç**:
+
+```bash
+defaults write com.apple.iphonesimulator HardwareKeyboardEnabled -bool true
+# veya simulator menu'sünden Cmd+Shift+K
+```
+
+Sonra Maestro inputText karakterleri klavye eventi olarak gönderir,
+secureTextEntry alanları normal şekilde alır.
+
+Bu ayar sim'in disk state'inde kalıcıdır; CI runner'larda bir kere
+açılması yeterli.
