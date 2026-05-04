@@ -31,6 +31,8 @@ interface Offer {
   message?: string;
   expiresAt: string;
   createdAt: string;
+  /** Karşı teklif sonrası alıcı onayı bekleniyor mu (web ile parite). */
+  buyerMustAccept?: boolean;
   product: {
     id: string;
     title: string;
@@ -338,12 +340,12 @@ export default function OffersScreen() {
       <View style={styles.card}>
         {/* Top row: image + info */}
         <View style={styles.cardRow}>
-          <TouchableOpacity onPress={() => router.push(`/listing/${offer.product.id}`)}>
+          <TouchableOpacity onPress={() => router.push(`/product/${offer.product.id}` as any)}>
             <Image source={{ uri: getProductImage(offer.product) }} style={styles.productImage} />
           </TouchableOpacity>
 
           <View style={styles.cardContent}>
-            <TouchableOpacity onPress={() => router.push(`/listing/${offer.product.id}`)}>
+            <TouchableOpacity onPress={() => router.push(`/product/${offer.product.id}` as any)}>
               <Text style={styles.productTitle} numberOfLines={2}>{offer.product.title}</Text>
             </TouchableOpacity>
 

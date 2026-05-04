@@ -23,7 +23,7 @@ export default function ContactScreen() {
 
     setLoading(true);
     try {
-      await supportApi.contact({ name, email, subject, message });
+      await supportApi.guestContact({ name, email, subject, message });
       setSnackbar({ visible: true, message: 'Mesajınız gönderildi!' });
       setName('');
       setEmail('');

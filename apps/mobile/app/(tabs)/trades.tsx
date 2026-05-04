@@ -49,12 +49,12 @@ export default function TradesScreen() {
       if (filter === 'pending') params.status = 'pending';
       if (filter === 'completed') params.status = 'completed';
       const res = await tradesApi.getAll(params);
-      const body = res.data as { trades?: unknown[]; data?: unknown[] } | undefined;
-      let list = body?.trades ?? body?.data ?? [];
+      const body = res.data as { trades?: any[]; data?: any[] } | undefined;
+      let list: any[] = body?.trades ?? body?.data ?? [];
       if (!Array.isArray(list)) list = [];
       if (filter === 'shipping') {
         list = list.filter(
-          (t: { status?: string }) => t?.status && SHIPPING_STATUSES.has(t.status),
+          (t: any) => t?.status && SHIPPING_STATUSES.has(t.status),
         );
       }
       return { trades: list };
@@ -62,7 +62,7 @@ export default function TradesScreen() {
     enabled: isAuthenticated,
   });
 
-  const tradesList = tradesPayload?.trades ?? [];
+  const tradesList: any[] = tradesPayload?.trades ?? [];
 
   const onRefresh = useCallback(async () => {
     setRefreshing(true);

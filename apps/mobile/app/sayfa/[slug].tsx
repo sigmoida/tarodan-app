@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { View, ScrollView, StyleSheet, TouchableOpacity, ActivityIndicator } from 'react-native';
-import { Text } from 'react-native-paper';
+import { Text } from '../../src/components/common';
 import { router, useLocalSearchParams } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { TarodanColors } from '../../src/theme';
@@ -25,7 +25,7 @@ export default function DynamicCMSPage() {
       setLoading(true);
       setError('');
       try {
-        const response = await pagesApi.getBySlug(slug);
+        const response: any = await pagesApi.getBySlug(slug);
         const data = response.data?.data || response.data;
         setPage(data);
       } catch (err: any) {
@@ -92,7 +92,7 @@ export default function DynamicCMSPage() {
               setLoading(true);
               setError('');
               pagesApi.getBySlug(slug!)
-                .then((res) => setPage(res.data?.data || res.data))
+                .then((res: any) => setPage(res.data?.data || res.data))
                 .catch(() => setError('Sayfa yüklenirken bir hata oluştu.'))
                 .finally(() => setLoading(false));
             }}

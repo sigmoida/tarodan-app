@@ -353,7 +353,10 @@ export const offersApi = {
     api.post(`/offers/${id}/reject`),
   counter: (id: string, amount: number) =>
     api.post(`/offers/${id}/counter`, { amount }),
-  cancel: (id: string) => 
+  /** Alıcının karşı teklifi (satıcının counter'ından sonra). */
+  buyerCounter: (id: string, amount: number) =>
+    api.post(`/offers/${id}/buyer-counter`, { amount }),
+  cancel: (id: string) =>
     api.post(`/offers/${id}/cancel`),
 };
 

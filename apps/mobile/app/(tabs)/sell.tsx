@@ -20,7 +20,8 @@ import * as ImagePicker from 'expo-image-picker';
 import { router } from 'expo-router';
 import { TarodanColors } from '../../src/theme/colors';
 import { useAuthStore } from '../../src/stores/authStore';
-import { api, productsApi, categoriesApi, mediaApi, listingsApi } from '../../src/services/api';
+// listingsApi → productsApi alias (parite migrasyonu)
+import { api, productsApi, productsApi as listingsApi, categoriesApi, mediaApi } from '../../src/services/api';
 
 // ---------------------------------------------------------------------------
 // Types
@@ -259,7 +260,8 @@ export default function SellScreen() {
   const fetchFilters = async () => {
     setBrandsLoading(true);
     try {
-      const res = await listingsApi.getFilters();
+      // listingsApi.getFilters yok; web ile aynı: GET /products/filters
+      const res = await api.get('/products/filters');
       const data = res.data as {
         scales?: string[];
         materials?: MaterialOption[];
@@ -374,7 +376,10 @@ export default function SellScreen() {
         } as any);
       });
 
-      const res = await mediaApi.uploadProductImages(formData);
+      // mediaApi.uploadProductImages now expects RNFile[]; bu ekran hâlâ FormData üretiyor → raw axios fallback.
+      const res = await api.post('/media/upload/product', formData, {
+        headers: { 'Content-Type': 'multipart/form-data' },
+      });
       const uploaded = Array.isArray(res.data) ? res.data : [res.data];
 
       const newKeys = uploaded.map((r: any) => ({

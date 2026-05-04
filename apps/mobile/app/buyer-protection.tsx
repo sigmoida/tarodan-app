@@ -68,11 +68,11 @@ export default function BuyerProtectionScreen() {
         ))}
 
         <View style={styles.links}>
-          <TouchableOpacity style={styles.linkButton} onPress={() => router.push('/refund-policy')}>
+          <TouchableOpacity style={styles.linkButton} onPress={() => router.push('/refund-policy' as any)}>
             <Text style={styles.linkText}>İade Politikası</Text>
             <Ionicons name="chevron-forward" size={18} color={TarodanColors.primary} />
           </TouchableOpacity>
-          <TouchableOpacity style={styles.linkButton} onPress={() => router.push('/returns-exchanges')}>
+          <TouchableOpacity style={styles.linkButton} onPress={() => router.push('/returns-exchanges' as any)}>
             <Text style={styles.linkText}>İade ve Değişim</Text>
             <Ionicons name="chevron-forward" size={18} color={TarodanColors.primary} />
           </TouchableOpacity>

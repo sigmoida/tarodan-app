@@ -8,6 +8,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { productsApi, categoriesApi } from '../../src/services/api';
 import { TarodanColors, SCALES } from '../../src/theme';
 import { getImageUrl as getImageUrlFromUtils } from '../../src/utils/imageUrl';
+import { isProductTradeOpen } from '../../src/utils/isProductTradeOpen';
 import { safeString } from '../../src/utils/safeString';
 
 const { width } = Dimensions.get('window');
