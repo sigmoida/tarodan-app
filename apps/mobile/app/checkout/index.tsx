@@ -69,6 +69,13 @@ interface SavedCard {
   cardBrand?: string;
 }
 
+const STOCKOUT_KEYWORDS = [
+  'satışta değil',
+  'stokta yok',
+  'başkası tarafından',
+  'başka alıcıya satıldı',
+];
+
 const EMPTY_ADDRESS: ShippingAddressInput = {
   fullName: '',
   phone: '',
@@ -516,6 +523,21 @@ export default function CheckoutScreen() {
         const msg =
           payErr?.response?.data?.message ||
           'Ödeme başlatılamadı. Siparişinizi daha sonra siparişlerim üzerinden tamamlayabilirsiniz.';
+        const status = payErr?.response?.status;
+        const isStockout =
+          (status === 400 || status === 409) &&
+          typeof msg === 'string' &&
+          STOCKOUT_KEYWORDS.some((kw) => msg.toLowerCase().includes(kw.toLowerCase()));
+        if (isStockout) {
+          const productId = items[0]?.productId;
+          if (productId) {
+            router.replace({
+              pathname: '/products/unavailable/[productId]',
+              params: { productId },
+            } as any);
+            return;
+          }
+        }
         Alert.alert('Ödeme Başlatılamadı', msg, [
           { text: 'Tamam', onPress: () => router.replace(isAuthenticated ? '/orders' : '/' as any) },
         ]);
@@ -528,6 +550,21 @@ export default function CheckoutScreen() {
         (Array.isArray(error.response?.data?.message)
           ? error.response?.data?.message.join(', ')
           : 'Sipariş oluşturulamadı');
+      const status = error?.response?.status;
+      const isStockout =
+        (status === 400 || status === 409) &&
+        typeof errorMessage === 'string' &&
+        STOCKOUT_KEYWORDS.some((kw) => errorMessage.toLowerCase().includes(kw.toLowerCase()));
+      if (isStockout) {
+        const productId = items[0]?.productId;
+        if (productId) {
+          router.replace({
+            pathname: '/products/unavailable/[productId]',
+            params: { productId },
+          } as any);
+          return;
+        }
+      }
       Alert.alert('Hata', errorMessage);
     } finally {
       setLoading(false);
