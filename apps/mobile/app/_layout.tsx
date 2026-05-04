@@ -7,7 +7,7 @@ import { useColorScheme } from 'react-native';
 import * as SplashScreen from 'expo-splash-screen';
 import Constants from 'expo-constants';
 import { useAuthStore } from '../src/stores/authStore';
-import { registerForPushNotifications } from '../src/services/push';
+import { registerForPushNotifications, setupPushNotificationRouting } from '../src/services/push';
 import { TarodanLightTheme, TarodanDarkTheme } from '../src/theme';
 import { LanguageProvider } from '../src/i18n/LanguageContext';
 
@@ -75,6 +75,15 @@ export default function RootLayout() {
       }
     }
     prepare();
+  }, []);
+
+  // Wire push notification deep-link routing (tap + foreground-received).
+  // Safe in Expo Go (no-op when expo-notifications isn't available).
+  useEffect(() => {
+    const teardown = setupPushNotificationRouting();
+    return () => {
+      teardown();
+    };
   }, []);
 
   return (
