@@ -86,16 +86,27 @@ export const SCALES = [
   { id: '1:64', name: '1:64 Diecast' },
 ];
 
-// Brands matching web
+/**
+ * Ana sayfa marka şeridi — web `apps/web/src/app/page.tsx` BRANDS ile aynı (logoUrl = public path).
+ * Arama filtre çipleri `id` + `name` kullanır.
+ */
 export const BRANDS = [
-  { id: 'hotwheels', name: 'Hot Wheels', logo: 'https://via.placeholder.com/80x40?text=HotWheels' },
-  { id: 'matchbox', name: 'Matchbox', logo: 'https://via.placeholder.com/80x40?text=Matchbox' },
-  { id: 'tamiya', name: 'Tamiya', logo: 'https://via.placeholder.com/80x40?text=Tamiya' },
-  { id: 'autoart', name: 'AutoArt', logo: 'https://via.placeholder.com/80x40?text=AutoArt' },
-  { id: 'kyosho', name: 'Kyosho', logo: 'https://via.placeholder.com/80x40?text=Kyosho' },
-  { id: 'maisto', name: 'Maisto', logo: 'https://via.placeholder.com/80x40?text=Maisto' },
-  { id: 'bbr', name: 'BBR', logo: 'https://via.placeholder.com/80x40?text=BBR' },
-  { id: 'greenlight', name: 'Greenlight', logo: 'https://via.placeholder.com/80x40?text=Greenlight' },
+  { id: 'hotwheels', name: 'Hot Wheels', logoUrl: '/photos/logolar/2158430f294b152f30824d6bb1ac7bf9.jpg' },
+  { id: 'matchbox', name: 'Matchbox', logoUrl: '/photos/logolar/images.png' },
+  { id: 'tamiya', name: 'Tamiya', logoUrl: '/photos/logolar/tamiya-logo-png_seeklogo-324507.png' },
+  { id: 'autoart', name: 'AUTOart', logoUrl: '/photos/logolar/download.png' },
+  { id: 'kyosho', name: 'Kyosho', logoUrl: '/photos/logolar/Kyosho_corp_logo.png' },
+  { id: 'maisto', name: 'Maisto', logoUrl: '/photos/logolar/maisto-logo.png' },
+  { id: 'bburago', name: 'Bburago', logoUrl: '/photos/logolar/Bburago_Logo.png' },
+  { id: 'greenlight', name: 'Greenlight', logoUrl: '/photos/logolar/Greenlight_collectibles_logo.png' },
+  { id: 'minichamps', name: 'Minichamps', logoUrl: '/photos/logolar/minichamps_logo.png' },
+  { id: 'minigt', name: 'MINI GT', logoUrl: '/photos/logolar/mini-gt-logo-png_seeklogo-523421.png' },
+  { id: 'tomica', name: 'Tomica', logoUrl: '/photos/logolar/Tomica_brand_textlogo.png' },
+  { id: 'majorette', name: 'Majorette', logoUrl: '/photos/logolar/majorette-logo-png_seeklogo-492958.png' },
+  { id: 'gtspirit', name: 'GT Spirit', logoUrl: '/photos/logolar/GT-Spirit-Logo.webp' },
+  { id: 'cmc', name: 'CMC', logoUrl: '/photos/logolar/cmc_logo-640x320.jpg' },
+  { id: 'norev', name: 'Norev', logoUrl: '/photos/logolar/5bc0b46797d85-thumbnail.jpg' },
+  { id: 'schuco', name: 'Schuco', logoUrl: '/photos/logolar/logo-bmw-schuco-modell-car-toy-diecast-toy-model-car-model-building-siku-toys-png-clipart.jpg' },
 ];
 
 // Condition options

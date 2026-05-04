@@ -116,7 +116,7 @@ const TradeCard = ({ trade, currentUserId, onPress }: any) => {
             color="#4CAF50" 
           />
           <Text style={styles.cashText}>
-            +₺{trade.cash_amount.toLocaleString('tr-TR')}
+            +₺{(trade.cash_amount ?? 0).toLocaleString('tr-TR')}
           </Text>
         </View>
       )}

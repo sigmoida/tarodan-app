@@ -6,16 +6,15 @@ import { useQuery, useQueryClient } from '@tanstack/react-query';
 import Link from 'next/link';
 import toast from 'react-hot-toast';
 import { useAuthStore } from '@/stores/authStore';
+import AuthLoadingScreen from '@/components/AuthLoadingScreen';
 import { paymentsApi } from '@/lib/api';
 import {
-  CheckCircleIcon,
-  XCircleIcon,
-  ArrowPathIcon,
   CreditCardIcon,
   CalendarIcon,
   FunnelIcon,
 } from '@heroicons/react/24/outline';
 import { useTranslation } from '@/i18n/LanguageContext';
+import { Button, Input, Select, Spinner, StatusBadge, paymentStatusConfig } from '@tarodan/ui';
 
 interface Payment {
   id: string;
@@ -55,43 +54,19 @@ interface PaymentListResponse {
   };
 }
 
-const getStatusConfig = (locale: string) => ({
-  pending: {
-    label: locale === 'en' ? 'Pending' : 'Bekliyor',
-    color: 'text-yellow-600',
-    bg: 'bg-yellow-100',
-    icon: ArrowPathIcon,
-  },
-  processing: {
-    label: locale === 'en' ? 'Processing' : 'İşleniyor',
-    color: 'text-blue-600',
-    bg: 'bg-blue-100',
-    icon: ArrowPathIcon,
-  },
-  completed: {
-    label: locale === 'en' ? 'Completed' : 'Tamamlandı',
-    color: 'text-green-600',
-    bg: 'bg-green-100',
-    icon: CheckCircleIcon,
-  },
-  failed: {
-    label: locale === 'en' ? 'Failed' : 'Başarısız',
-    color: 'text-red-600',
-    bg: 'bg-red-100',
-    icon: XCircleIcon,
-  },
-  refunded: {
-    label: locale === 'en' ? 'Refunded' : 'İade Edildi',
-    color: 'text-gray-600',
-    bg: 'bg-gray-100',
-    icon: XCircleIcon,
-  },
-});
+const paymentStatusEnLabels: Record<string, string> = {
+  pending: 'Pending',
+  processing: 'Processing',
+  completed: 'Completed',
+  failed: 'Failed',
+  refunded: 'Refunded',
+  cancelled: 'Cancelled',
+};
 
 export default function PaymentHistoryPage() {
   const router = useRouter();
   const queryClient = useQueryClient();
-  const { isAuthenticated, user } = useAuthStore();
+  const { isAuthenticated, isLoading: authLoading, user } = useAuthStore();
   const { t, locale } = useTranslation();
   const [pagination, setPagination] = useState({
     page: 1,
@@ -108,11 +83,12 @@ export default function PaymentHistoryPage() {
   const [showFilters, setShowFilters] = useState(false);
 
   useEffect(() => {
+    if (authLoading) return;
     if (!isAuthenticated) {
       router.push('/login');
       return;
     }
-  }, [isAuthenticated, router]);
+  }, [authLoading, isAuthenticated, router]);
 
   const paymentsQuery = useQuery({
     queryKey: ['profile-payments', pagination.page, filters],
@@ -125,7 +101,7 @@ export default function PaymentHistoryPage() {
       const response = await paymentsApi.getMyPayments(params);
       return response.data;
     },
-    enabled: isAuthenticated,
+    enabled: !authLoading && isAuthenticated,
     meta: { page: 'profile-payments' },
   });
   const data = paymentsQuery.data;
@@ -185,46 +161,46 @@ export default function PaymentHistoryPage() {
     setPagination({ ...pagination, page: 1 });
   };
 
+  if (authLoading) {
+    return <AuthLoadingScreen />;
+  }
   if (!isAuthenticated || loading) {
     return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
-        <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-primary-500"></div>
+      <div className="min-h-screen bg-surface flex items-center justify-center">
+        <Spinner size="xl" />
       </div>
     );
   }
 
   return (
-    <div className="min-h-screen bg-gray-50">
+    <div className="min-h-screen bg-surface">
       <main className="max-w-6xl mx-auto px-4 py-8">
         {/* Header */}
         <div className="mb-8">
-          <h1 className="text-3xl font-bold text-gray-900 mb-2">{t('payment.history')}</h1>
-          <p className="text-gray-600">{t('payment.historyDesc')}</p>
+          <h1 className="text-3xl font-bold text-heading mb-2">{t('payment.history')}</h1>
+          <p className="text-muted">{t('payment.historyDesc')}</p>
         </div>
 
         {/* Filters */}
-        <div className="bg-white rounded-xl shadow-sm p-6 mb-6">
+        <div className="bg-surface-elevated rounded-xl shadow-sm p-6 mb-6">
           <div className="flex items-center justify-between mb-4">
-            <h2 className="text-lg font-semibold text-gray-900 flex items-center gap-2">
+            <h2 className="text-lg font-semibold text-heading flex items-center gap-2">
               <FunnelIcon className="w-5 h-5" />
               {t('common.filter')}
             </h2>
-            <button
-              onClick={() => setShowFilters(!showFilters)}
-              className="text-primary-600 hover:text-primary-700"
-            >
+            <Button variant="secondary" onClick={() => setShowFilters(!showFilters)}
+              className="text-primary-600 hover:text-primary-700">
               {showFilters ? t('common.hide') : t('common.show')}
-            </button>
+            </Button>
           </div>
 
           {showFilters && (
             <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">{t('common.status')}</label>
-                <select
+                <label className="block text-sm font-medium text-body mb-2">{t('common.status')}</label>
+                <Select
                   value={filters.status}
                   onChange={(e) => handleFilterChange('status', e.target.value)}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
                 >
                   <option value="">{t('common.all')}</option>
                   <option value="pending">{locale === 'en' ? 'Pending' : 'Bekliyor'}</option>
@@ -232,99 +208,88 @@ export default function PaymentHistoryPage() {
                   <option value="completed">{locale === 'en' ? 'Completed' : 'Tamamlandı'}</option>
                   <option value="failed">{locale === 'en' ? 'Failed' : 'Başarısız'}</option>
                   <option value="refunded">{locale === 'en' ? 'Refunded' : 'İade Edildi'}</option>
-                </select>
+                </Select>
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">{t('payment.provider')}</label>
-                <select
+                <label className="block text-sm font-medium text-body mb-2">{t('payment.provider')}</label>
+                <Select
                   value={filters.provider}
                   onChange={(e) => handleFilterChange('provider', e.target.value)}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
                 >
                   <option value="">{t('common.all')}</option>
                   <option value="paytr">PayTR</option>
-                </select>
+                </Select>
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">{t('payment.startDate')}</label>
-                <input
-                  type="date"
+                <label className="block text-sm font-medium text-body mb-2">{t('payment.startDate')}</label>
+                <Input type="date"
                   value={filters.startDate}
-                  onChange={(e) => handleFilterChange('startDate', e.target.value)}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
-                />
+                  onChange={(e) => handleFilterChange('startDate', e.target.value)} />
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">{t('payment.endDate')}</label>
-                <input
-                  type="date"
+                <label className="block text-sm font-medium text-body mb-2">{t('payment.endDate')}</label>
+                <Input type="date"
                   value={filters.endDate}
-                  onChange={(e) => handleFilterChange('endDate', e.target.value)}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
-                />
+                  onChange={(e) => handleFilterChange('endDate', e.target.value)} />
               </div>
             </div>
           )}
 
           {showFilters && (
             <div className="mt-4 flex justify-end">
-              <button
-                onClick={clearFilters}
-                className="px-4 py-2 text-gray-600 hover:text-gray-800"
-              >
+              <Button variant="secondary" onClick={clearFilters}
+                className="px-4 py-2 text-muted hover:text-body">
                 {t('product.clearFilters')}
-              </button>
+              </Button>
             </div>
           )}
         </div>
 
         {/* Payments List */}
-        <div className="bg-white rounded-xl shadow-sm overflow-hidden">
+        <div className="bg-surface-elevated rounded-xl shadow-sm overflow-hidden">
           {payments.length === 0 ? (
             <div className="p-12 text-center">
-              <CreditCardIcon className="w-16 h-16 text-gray-400 mx-auto mb-4" />
-              <p className="text-gray-500 text-lg">{t('payment.noHistory')}</p>
+              <CreditCardIcon className="w-16 h-16 text-subtle mx-auto mb-4" />
+              <p className="text-muted text-lg">{t('payment.noHistory')}</p>
             </div>
           ) : (
             <>
               <div className="overflow-x-auto">
                 <table className="w-full">
-                  <thead className="bg-gray-50">
+                  <thead className="bg-surface">
                     <tr>
-                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      <th className="px-6 py-3 text-left text-xs font-medium text-muted uppercase tracking-wider">
                         {t('order.orderNumber')}
                       </th>
-                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      <th className="px-6 py-3 text-left text-xs font-medium text-muted uppercase tracking-wider">
                         {locale === 'en' ? 'Product' : 'Ürün'}
                       </th>
-                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      <th className="px-6 py-3 text-left text-xs font-medium text-muted uppercase tracking-wider">
                         {t('common.amount')}
                       </th>
-                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      <th className="px-6 py-3 text-left text-xs font-medium text-muted uppercase tracking-wider">
                         {t('payment.provider')}
                       </th>
-                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      <th className="px-6 py-3 text-left text-xs font-medium text-muted uppercase tracking-wider">
                         {t('common.status')}
                       </th>
-                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      <th className="px-6 py-3 text-left text-xs font-medium text-muted uppercase tracking-wider">
                         {t('common.date')}
                       </th>
-                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      <th className="px-6 py-3 text-left text-xs font-medium text-muted uppercase tracking-wider">
                         {t('common.actions')}
                       </th>
                     </tr>
                   </thead>
-                  <tbody className="bg-white divide-y divide-gray-200">
+                  <tbody className="bg-surface-elevated divide-y divide-border">
                     {payments.map((payment) => {
-                      const statusConfig = getStatusConfig(locale);
-                      const statusInfo = statusConfig[payment.status as keyof typeof statusConfig] || statusConfig.pending;
-                      const StatusIcon = statusInfo.icon;
+                      const paymentStatusLabel = locale === 'en' ? (paymentStatusEnLabels[payment.status] || payment.status) : (paymentStatusConfig[payment.status]?.label || payment.status);
 
                       return (
-                        <tr key={payment.id} className="hover:bg-gray-50">
+                        <tr key={payment.id} className="hover:bg-surface">
                           <td className="px-6 py-4 whitespace-nowrap">
                             <Link
                               href={`/orders/${payment.orderId}`}
@@ -342,15 +307,15 @@ export default function PaymentHistoryPage() {
                                   className="w-12 h-12 object-cover rounded"
                                 />
                               ) : (
-                                <div className="w-12 h-12 bg-gray-200 rounded flex items-center justify-center">
-                                  <CreditCardIcon className="w-6 h-6 text-gray-400" />
+                                <div className="w-12 h-12 bg-border-subtle rounded flex items-center justify-center">
+                                  <CreditCardIcon className="w-6 h-6 text-subtle" />
                                 </div>
                               )}
                               <div>
-                                <p className="text-sm font-medium text-gray-900">
+                                <p className="text-sm font-medium text-heading">
                                   {payment.product.title}
                                 </p>
-                                <p className="text-xs text-gray-500">
+                                <p className="text-xs text-muted">
                                   {user?.id === payment.buyer.id ? (locale === 'en' ? 'Buyer' : 'Alıcı') : (locale === 'en' ? 'Seller' : 'Satıcı')}:{' '}
                                   {user?.id === payment.buyer.id
                                     ? payment.seller.displayName
@@ -360,25 +325,24 @@ export default function PaymentHistoryPage() {
                             </div>
                           </td>
                           <td className="px-6 py-4 whitespace-nowrap">
-                            <span className="text-sm font-medium text-gray-900">
+                            <span className="text-sm font-medium text-heading">
                               {payment.amount.toLocaleString('tr-TR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} TL
                             </span>
                           </td>
                           <td className="px-6 py-4 whitespace-nowrap">
-                            <span className="text-sm text-gray-600 uppercase">{payment.provider}</span>
+                            <span className="text-sm text-muted uppercase">{payment.provider}</span>
                           </td>
                           <td className="px-6 py-4 whitespace-nowrap">
-                            <span
-                              className={`inline-flex items-center gap-1 px-3 py-1 rounded-full text-xs font-medium ${statusInfo.color} ${statusInfo.bg}`}
-                            >
-                              <StatusIcon className="w-4 h-4" />
-                              {statusInfo.label}
-                            </span>
+                            <StatusBadge
+                              status={payment.status}
+                              config={paymentStatusConfig}
+                              label={paymentStatusLabel}
+                            />
                             {payment.failureReason && (
-                              <p className="text-xs text-red-600 mt-1">{payment.failureReason}</p>
+                              <p className="text-xs text-danger-600 mt-1">{payment.failureReason}</p>
                             )}
                           </td>
-                          <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                          <td className="px-6 py-4 whitespace-nowrap text-sm text-muted">
                             <div className="flex items-center gap-1">
                               <CalendarIcon className="w-4 h-4" />
                               {new Date(payment.createdAt).toLocaleDateString('tr-TR', {
@@ -399,20 +363,16 @@ export default function PaymentHistoryPage() {
                                 {t('common.details')}
                               </Link>
                               {payment.status === 'pending' && (
-                                <button
-                                  onClick={() => handleCancel(payment.id)}
-                                  className="text-red-600 hover:text-red-700"
-                                >
+                                <Button variant="secondary" onClick={() => handleCancel(payment.id)}
+                                  className="text-danger-600 hover:text-danger-700">
                                   {t('common.cancel')}
-                                </button>
+                                </Button>
                               )}
                               {payment.status === 'failed' && (
-                                <button
-                                  onClick={() => handleRetry(payment.id)}
-                                  className="text-blue-600 hover:text-blue-700"
-                                >
+                                <Button variant="secondary" onClick={() => handleRetry(payment.id)}
+                                  className="text-info-600 hover:text-info-700">
                                   {t('payment.retry')}
-                                </button>
+                                </Button>
                               )}
                             </div>
                           </td>
@@ -425,27 +385,23 @@ export default function PaymentHistoryPage() {
 
               {/* Pagination */}
               {pagination.totalPages > 1 && (
-                <div className="bg-gray-50 px-6 py-4 flex items-center justify-between border-t border-gray-200">
-                  <div className="text-sm text-gray-700">
+                <div className="bg-surface px-6 py-4 flex items-center justify-between border-t border-border">
+                  <div className="text-sm text-body">
                     {locale === 'en' 
                       ? `Total ${pagination.total} payments, Page ${pagination.page} / ${pagination.totalPages}`
                       : `Toplam ${pagination.total} ödeme, Sayfa ${pagination.page} / ${pagination.totalPages}`}
                   </div>
                   <div className="flex gap-2">
-                    <button
-                      onClick={() => handlePageChange(pagination.page - 1)}
+                    <Button variant="secondary" onClick={() => handlePageChange(pagination.page - 1)}
                       disabled={pagination.page === 1}
-                      className="px-4 py-2 border border-gray-300 rounded-lg disabled:opacity-50 disabled:cursor-not-allowed hover:bg-gray-50"
-                    >
+                      className="px-4 disabled:opacity-50 disabled:cursor-not-allowed hover:bg-surface">
                       {t('common.previous')}
-                    </button>
-                    <button
-                      onClick={() => handlePageChange(pagination.page + 1)}
+                    </Button>
+                    <Button variant="secondary" onClick={() => handlePageChange(pagination.page + 1)}
                       disabled={pagination.page >= pagination.totalPages}
-                      className="px-4 py-2 border border-gray-300 rounded-lg disabled:opacity-50 disabled:cursor-not-allowed hover:bg-gray-50"
-                    >
+                      className="px-4 disabled:opacity-50 disabled:cursor-not-allowed hover:bg-surface">
                       {t('common.next')}
-                    </button>
+                    </Button>
                   </div>
                 </div>
               )}

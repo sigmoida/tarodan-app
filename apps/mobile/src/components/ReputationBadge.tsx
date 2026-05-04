@@ -219,7 +219,7 @@ export const ReputationScore: React.FC<ReputationScoreProps> = ({
     <View style={styles.scoreContainer}>
       <View style={styles.scoreHeader}>
         <View style={styles.starsContainer}>{renderStars()}</View>
-        <Text style={styles.ratingText}>{rating.toFixed(1)}</Text>
+        <Text style={styles.ratingText}>{(rating ?? 0).toFixed(1)}</Text>
         <Text style={styles.reviewCount}>({totalReviews} değerlendirme)</Text>
       </View>
 
@@ -276,7 +276,7 @@ export const RatingBreakdown: React.FC<RatingBreakdownProps> = ({
               ]}
             />
           </View>
-          <Text style={styles.breakdownValue}>{category.value.toFixed(1)}</Text>
+          <Text style={styles.breakdownValue}>{(category.value ?? 0).toFixed(1)}</Text>
           <Text style={styles.breakdownWeight}>({category.weight})</Text>
         </View>
       ))}

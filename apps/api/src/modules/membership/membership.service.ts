@@ -113,7 +113,7 @@ export class MembershipService {
     }
 
     // Map tier to DTO first
-    let tierDto = this.mapTierToDto(effectiveTier);
+    const tierDto = this.mapTierToDto(effectiveTier);
     
     // Override listing limits based on tier type if platform setting exists
     // This must be done BEFORE getUserUsageStats so it uses the correct limit
@@ -389,13 +389,11 @@ export class MembershipService {
       });
     }
 
-    // Initiate payment with Iyzico (default provider)
-    // This will create an order and payment, then return payment URL
     try {
       const paymentResult = await this.initiateMembershipPayment(
         userId,
-        PaymentProvider.iyzico, // Default to Iyzico
-        undefined, // No request object needed here
+        PaymentProvider.paytr,
+        undefined,
       );
 
       // Return membership info with payment URL

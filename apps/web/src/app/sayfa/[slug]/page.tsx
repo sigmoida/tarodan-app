@@ -51,18 +51,18 @@ export default async function StaticPageRoute({ params }: Props) {
   if (!page) notFound();
 
   return (
-    <div className="min-h-screen bg-gray-50">
+    <div className="min-h-screen bg-surface">
       <div className="max-w-4xl mx-auto px-4 py-12">
-        <nav className="mb-8 text-sm text-gray-500">
+        <nav className="mb-8 text-sm text-muted">
           <Link href="/" className="hover:text-primary-600">
             Ana Sayfa
           </Link>
           <span className="mx-2">/</span>
-          <span className="text-gray-900">{page.title}</span>
+          <span className="text-heading">{page.title}</span>
         </nav>
-        <article className="bg-white rounded-xl shadow-sm overflow-hidden">
-          <header className="border-b border-gray-100 px-6 py-8">
-            <h1 className="text-3xl font-bold text-gray-900">{page.title}</h1>
+        <article className="bg-surface-elevated rounded-xl shadow-sm overflow-hidden">
+          <header className="border-b border-border-subtle px-6 py-8">
+            <h1 className="text-3xl font-bold text-heading">{page.title}</h1>
           </header>
           <PageContent content={page.content} />
         </article>

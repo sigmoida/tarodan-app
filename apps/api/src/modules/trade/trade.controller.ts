@@ -151,7 +151,7 @@ export class TradeController {
   }
 
   /**
-   * Ship items for a trade
+   * Ship items for a trade (legacy peer-to-peer flow)
    * POST /trades/:id/ship
    */
   @Post(':id/ship')
@@ -161,6 +161,19 @@ export class TradeController {
     @Body() dto: ShipTradeDto,
   ): Promise<TradeResponseDto> {
     return this.tradeService.shipTrade(id, this.getUserId(req), dto);
+  }
+
+  /**
+   * Ship items to Tarodan warehouse (safe-trade flow)
+   * POST /trades/:id/ship-to-warehouse
+   */
+  @Post(':id/ship-to-warehouse')
+  async shipToWarehouse(
+    @Request() req: any,
+    @Param('id', ParseUUIDPipe) id: string,
+    @Body() dto: ShipTradeDto,
+  ): Promise<TradeResponseDto> {
+    return this.tradeService.shipToWarehouse(id, this.getUserId(req), dto);
   }
 
   /**

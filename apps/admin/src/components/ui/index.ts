@@ -1,10 +1,62 @@
-// Export all UI components
-export * from "./button";
-export * from "./card";
-export * from "./input";
-export * from "./label";
-export * from "./dialog";
-export * from "./table";
-export * from "./badge";
-export * from "./select";
-export * from "./tabs";
+// Shared UI (from @tarodan/ui) — single entry point for admin components.
+export {
+  Button,
+  IconButton,
+  Input,
+  SearchInput,
+  Select,
+  Textarea,
+  Badge,
+  ProductBadge,
+  StatusBadge,
+  Checkbox,
+  Radio,
+  RadioGroup,
+  Label,
+  FormField,
+  Toggle,
+  Spinner,
+  Card,
+  CardHeader,
+  CardTitle,
+  CardDescription,
+  CardContent,
+  CardFooter,
+  Alert,
+  Modal,
+  Dialog,
+  ConfirmDialog,
+  EmptyState,
+  Breadcrumb,
+  Tabs,
+  TabsList,
+  TabsTrigger,
+  TabsContent,
+  DropdownMenu,
+  DropdownMenuTrigger,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+  Tooltip,
+  TooltipProvider,
+  Pagination,
+  Avatar,
+  Skeleton,
+  SkeletonText,
+  SkeletonAvatar,
+  Table,
+  TableHeader,
+  TableBody,
+  TableFooter,
+  TableRow,
+  TableHead,
+  TableCell,
+  TableCaption,
+  cn,
+  orderStatusConfig,
+  tradeStatusConfig,
+  offerStatusConfig,
+  paymentStatusConfig,
+  productStatusConfig,
+} from '@tarodan/ui';

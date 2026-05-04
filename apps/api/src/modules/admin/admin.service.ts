@@ -54,8 +54,11 @@ import {
   UpdateRatingStatusDto,
   ReplyToRatingDto,
   RatingStatus,
+  ApproveWarehouseTradeDto,
+  RejectWarehouseTradeDto,
 } from './dto';
-import { ProductStatus, OrderStatus, Prisma, PaymentStatus, PaymentHoldStatus, OfferStatus, TradeStatus, MessageStatus, TicketStatus, TicketPriority, TicketCategory, Brand } from '@prisma/client';
+import { ProductStatus, OrderStatus, Prisma, PaymentStatus, PaymentHoldStatus, OfferStatus, TradeStatus, ShipmentStatus, MessageStatus, TicketStatus, TicketPriority, TicketCategory, Brand } from '@prisma/client';
+import { safeDecrementReserved } from '../product/helpers/product-availability.helper';
 import { getProductStatusFromQuantity } from '../product/helpers/product-status.helper';
 import { PaymentService } from '../payment/payment.service';
 import { MessagingService } from '../messaging/messaging.service';
@@ -65,6 +68,14 @@ import { CacheService } from '../cache/cache.service';
 import { DiscountService } from '../discount/discount.service';
 import { EventService } from '../events/event.service';
 import { RatingService } from '../rating/rating.service';
+import { SuratCargoService } from '../surat-cargo/surat-cargo.service';
+import {
+  SuratKargoTuru,
+  SuratOdemeTipi,
+  SuratTasimaSekli,
+  SuratTeslimSekli,
+  SuratGonderiSekli,
+} from '../surat-cargo/surat-cargo.types';
 
 @Injectable()
 export class AdminService {
@@ -82,6 +93,8 @@ export class AdminService {
     private readonly ratingService: RatingService,
     @Optional()
     private readonly storageService: StorageService,
+    @Optional()
+    private readonly suratCargoService?: SuratCargoService,
   ) { }
 
   private resolveProductImageUrl(imageKeyOrUrl: string | null | undefined): string | null {
@@ -3980,6 +3993,59 @@ export class AdminService {
     return { success: true, orderId, message: 'Ödeme satıcıya serbest bırakıldı' };
   }
 
+  /**
+   * Release trade cash payment hold (admin manual release for trade escrow)
+   */
+  async releaseTradePaymentHold(adminId: string, tradeId: string) {
+    const tcp = await this.prisma.tradeCashPayment.findUnique({ where: { tradeId } });
+    if (!tcp) throw new NotFoundException('Trade cash payment bulunamadı');
+    if (tcp.releasedAt) return { success: true, message: 'Zaten serbest bırakılmış' };
+    if (tcp.refundedAt) throw new BadRequestException('İade edilmiş ödeme serbest bırakılamaz');
+
+    await this.prisma.tradeCashPayment.update({
+      where: { tradeId },
+      data: { releasedAt: new Date() },
+    });
+    await this.createAuditLog(adminId, 'trade_cash_hold_release', 'TradeCashPayment', tcp.id, { action: 'manual_release' }, { releasedAt: new Date() });
+    return { success: true, tradeId, message: 'Takas nakit ödemesi serbest bırakıldı' };
+  }
+
+  /**
+   * Retry a failed payout transfer
+   */
+  async retryPayoutTransfer(adminId: string, transferId: string) {
+    const transfer = await this.prisma.payoutTransfer.findUnique({ where: { id: transferId } });
+    if (!transfer) throw new NotFoundException('Payout transfer bulunamadı');
+    if (!['failed', 'returned'].includes(transfer.status)) {
+      throw new BadRequestException(`Transfer durumu '${transfer.status}' tekrar denenebilir değil`);
+    }
+
+    await this.prisma.payoutTransfer.update({
+      where: { id: transferId },
+      data: { status: 'pending', failureReason: null, retryCount: 0, nextRetryAt: null },
+    });
+    await this.createAuditLog(adminId, 'payout_retry', 'PayoutTransfer', transferId, { action: 'admin_retry' }, { status: 'pending' });
+    return { success: true, transferId, message: 'Transfer tekrar denenmek üzere sıraya alındı' };
+  }
+
+  /**
+   * Get failed/returned payout transfers
+   */
+  async getFailedPayouts(page = 1, limit = 20) {
+    const where = { status: { in: ['failed' as const, 'returned' as const] } };
+    const [items, total] = await Promise.all([
+      this.prisma.payoutTransfer.findMany({
+        where,
+        include: { seller: { select: { id: true, displayName: true, email: true } } },
+        orderBy: { createdAt: 'desc' },
+        skip: (page - 1) * limit,
+        take: limit,
+      }),
+      this.prisma.payoutTransfer.count({ where }),
+    ]);
+    return { items, total, page, limit, totalPages: Math.ceil(total / limit) };
+  }
+
   // ==================== TRADE MANAGEMENT ====================
 
   /**
@@ -4232,6 +4298,670 @@ export class AdminService {
       });
 
       return { success: true, tradeId, resolution: dto.resolution, status: newStatus };
+    });
+  }
+
+  // -------- Safe-trade (warehouse escrow) admin flow --------
+
+  /**
+   * Resolve the platform warehouse address used as `fromAddressId` for
+   * outbound and return shipments. First tries PlatformSetting key
+   * `warehouse_address_id`; falls back to the first address of any active
+   * admin user. Throws if no warehouse address can be determined.
+   */
+  private async resolveWarehouseAddressId(
+    tx: Prisma.TransactionClient,
+  ): Promise<string> {
+    const setting = await tx.platformSetting.findUnique({
+      where: { settingKey: 'warehouse_address_id' },
+    });
+    if (setting?.settingValue) {
+      const addr = await tx.address.findUnique({
+        where: { id: setting.settingValue },
+        select: { id: true },
+      });
+      if (addr) return addr.id;
+    }
+
+    // Fallback: any active admin user's first address
+    const admin = await tx.adminUser.findFirst({
+      where: { isActive: true },
+      select: { userId: true },
+      orderBy: { createdAt: 'asc' },
+    });
+    if (admin) {
+      const fallback = await tx.address.findFirst({
+        where: { userId: admin.userId },
+        select: { id: true },
+      });
+      if (fallback) return fallback.id;
+    }
+
+    throw new BadRequestException(
+      'Depo adresi yapılandırılmamış. Lütfen `warehouse_address_id` platform ayarını tanımlayın.',
+    );
+  }
+
+  /**
+   * Admin marks one of the two to_warehouse shipments as delivered to the
+   * Tarodan warehouse. When both to_warehouse shipments are delivered, the
+   * trade transitions to `at_warehouse` so admin review can begin.
+   */
+  async markWarehouseReceived(
+    adminId: string,
+    tradeId: string,
+    shipmentId: string,
+  ) {
+    return this.prisma.$transaction(async (tx) => {
+      // Lock the trade row for the duration of the transaction
+      await tx.$queryRaw`SELECT id FROM trades WHERE id = ${tradeId} FOR UPDATE`;
+
+      const trade = await tx.trade.findUnique({
+        where: { id: tradeId },
+        select: { id: true, status: true, initiatorId: true, receiverId: true },
+      });
+      if (!trade) {
+        throw new NotFoundException('Takas bulunamadı');
+      }
+
+      const shipment = await tx.tradeShipment.findUnique({
+        where: { id: shipmentId },
+      });
+      if (!shipment || shipment.tradeId !== tradeId) {
+        throw new NotFoundException('Gönderim bulunamadı');
+      }
+      if (shipment.leg !== 'to_warehouse') {
+        throw new BadRequestException(
+          'Bu gönderim depoya gelen bir gönderim değil',
+        );
+      }
+      if (shipment.deliveredAt) {
+        throw new BadRequestException(
+          'Bu gönderim zaten teslim alındı olarak işaretlenmiş',
+        );
+      }
+
+      const now = new Date();
+      const updatedShipment = await tx.tradeShipment.update({
+        where: { id: shipmentId },
+        data: {
+          status: ShipmentStatus.delivered,
+          deliveredAt: now,
+        },
+      });
+
+      // Check if both to_warehouse shipments are now delivered
+      const toWarehouseShipments = await tx.tradeShipment.findMany({
+        where: { tradeId, leg: 'to_warehouse' },
+        select: { id: true, deliveredAt: true },
+      });
+      const bothDelivered =
+        toWarehouseShipments.length >= 2 &&
+        toWarehouseShipments.every((s) => s.deliveredAt !== null);
+
+      let nextStatus: TradeStatus = trade.status;
+      if (bothDelivered && trade.status !== TradeStatus.at_warehouse) {
+        await tx.trade.update({
+          where: { id: tradeId },
+          data: {
+            status: TradeStatus.at_warehouse,
+            updatedAt: now,
+          },
+        });
+        nextStatus = TradeStatus.at_warehouse;
+      }
+
+      await this.createAuditLog(
+        adminId,
+        'trade_warehouse_received',
+        'TradeShipment',
+        shipmentId,
+        shipment,
+        { ...updatedShipment, bothDelivered, tradeStatus: nextStatus },
+      );
+
+      return {
+        success: true,
+        tradeId,
+        shipmentId,
+        status: nextStatus,
+        bothDelivered,
+      };
+    });
+  }
+
+  /**
+   * Admin approves the safe-trade after inspecting both items at the
+   * warehouse. Creates two outbound shipments (one to each party, carrying
+   * the other party's items) and transitions trade to
+   * `shipping_to_recipients`.
+   */
+  async approveWarehouseTrade(
+    adminId: string,
+    tradeId: string,
+    dto: ApproveWarehouseTradeDto,
+  ) {
+    const result = await this.prisma.$transaction(async (tx) => {
+      await tx.$queryRaw`SELECT id FROM trades WHERE id = ${tradeId} FOR UPDATE`;
+
+      const trade = await tx.trade.findUnique({
+        where: { id: tradeId },
+        include: {
+          items: true,
+        },
+      });
+      if (!trade) {
+        throw new NotFoundException('Takas bulunamadı');
+      }
+
+      if (
+        trade.status !== TradeStatus.at_warehouse &&
+        trade.status !== TradeStatus.admin_reviewing
+      ) {
+        throw new BadRequestException(
+          `Takas durumu '${trade.status}' onay için uygun değil. Beklenen: at_warehouse veya admin_reviewing.`,
+        );
+      }
+
+      const [initiatorAddress, receiverAddress] = await Promise.all([
+        tx.address.findFirst({
+          where: { userId: trade.initiatorId },
+          orderBy: { isDefault: 'desc' },
+        }),
+        tx.address.findFirst({
+          where: { userId: trade.receiverId },
+          orderBy: { isDefault: 'desc' },
+        }),
+      ]);
+
+      if (!initiatorAddress) {
+        throw new BadRequestException(
+          'Takası başlatan kullanıcının kayıtlı adresi yok',
+        );
+      }
+      if (!receiverAddress) {
+        throw new BadRequestException(
+          'Takası alan kullanıcının kayıtlı adresi yok',
+        );
+      }
+
+      const warehouseAddressId = await this.resolveWarehouseAddressId(tx);
+
+      const genTrackingNumber = () =>
+        `TRK${Date.now().toString(36).toUpperCase()}${Math.random()
+          .toString(36)
+          .substring(2, 6)
+          .toUpperCase()}`;
+
+      const now = new Date();
+
+      // Submit each warehouse-to-recipient leg to Sürat as a real shipment.
+      // If integration is disabled, falls back to internal tracking number.
+      const initiatorOid = `TRD-${trade.tradeNumber}-INI`.replace(/[^a-zA-Z0-9-]/g, '').slice(0, 50);
+      const receiverOid = `TRD-${trade.tradeNumber}-REC`.replace(/[^a-zA-Z0-9-]/g, '').slice(0, 50);
+
+      const initiatorUser = await tx.user.findUnique({ where: { id: trade.initiatorId } });
+      const receiverUser = await tx.user.findUnique({ where: { id: trade.receiverId } });
+
+      const submitToSurat = async (oid: string, addr: any, user: any): Promise<{ carrier: string; trackingNumber: string }> => {
+        if (!this.suratCargoService || !this.suratCargoService.isIntegrationEnabled()) {
+          return { carrier: 'Tarodan Warehouse', trackingNumber: genTrackingNumber() };
+        }
+        try {
+          const result = await this.suratCargoService.submitShipmentWithRetry({
+            idempotencyKey: `surat:trade:${oid}`,
+            correlationId: `trade-approve-${tradeId}`,
+            payload: {
+              KisiKurum: addr.fullName || user?.displayName || 'Takas Alıcısı',
+              SahisBirim: 'Takas Gönderisi',
+              AliciAdresi: addr.address,
+              Il: addr.city,
+              Ilce: addr.district,
+              TelefonCep: addr.phone,
+              KargoTuru: SuratKargoTuru.Koli,
+              OdemeTipi: SuratOdemeTipi.Pesin,
+              OzelKargoTakipNo: oid,
+              Adet: 1,
+              BirimDesi: 1,
+              BirimKg: 1,
+              KapidanOdemeTahsilatTipi: 1,
+              TasimaSekli: SuratTasimaSekli.KaraYolu,
+              TeslimSekli: SuratTeslimSekli.AdreseTeslim,
+              GonderiSekli: SuratGonderiSekli.Standart,
+              Pazaryerimi: 0,
+              Iademi: false,
+            },
+          });
+          if (!result.ok) {
+            const r = result as any;
+            const errMsg = r.kind === 'business' ? r.suratMessage : `technical: ${r.code}`;
+            throw new BadRequestException(
+              `Sürat kargo onay siparişi reddedildi: ${errMsg}`,
+            );
+          }
+          return { carrier: 'surat', trackingNumber: oid };
+        } catch (error: any) {
+          this.logger.error(`Surat shipment submit failed for trade ${tradeId}: ${error.message}`);
+          throw error;
+        }
+      };
+
+      const initiatorShipResult = await submitToSurat(initiatorOid, initiatorAddress, initiatorUser);
+      const receiverShipResult = await submitToSurat(receiverOid, receiverAddress, receiverUser);
+
+      // Shipment heading to the initiator (carrying receiver's items)
+      const shipmentToInitiator = await tx.tradeShipment.create({
+        data: {
+          tradeId,
+          shipperId: adminId,
+          fromAddressId: warehouseAddressId,
+          carrier: initiatorShipResult.carrier,
+          trackingNumber: initiatorShipResult.trackingNumber,
+          status: ShipmentStatus.label_created,
+          shippedAt: now,
+          leg: 'from_warehouse',
+          recipientType: 'user',
+          recipientUserId: trade.initiatorId,
+        },
+      });
+
+      // Shipment heading to the receiver (carrying initiator's items)
+      const shipmentToReceiver = await tx.tradeShipment.create({
+        data: {
+          tradeId,
+          shipperId: adminId,
+          fromAddressId: warehouseAddressId,
+          carrier: receiverShipResult.carrier,
+          trackingNumber: receiverShipResult.trackingNumber,
+          status: ShipmentStatus.label_created,
+          shippedAt: now,
+          leg: 'from_warehouse',
+          recipientType: 'user',
+          recipientUserId: trade.receiverId,
+        },
+      });
+
+      const updatedTrade = await tx.trade.update({
+        where: { id: tradeId },
+        data: {
+          status: TradeStatus.shipping_to_recipients,
+          updatedAt: now,
+        },
+      });
+
+      await this.createAuditLog(
+        adminId,
+        'trade_warehouse_approve',
+        'Trade',
+        tradeId,
+        trade,
+        {
+          ...updatedTrade,
+          notes: dto?.notes ?? null,
+          outboundShipments: [shipmentToInitiator.id, shipmentToReceiver.id],
+        },
+      );
+
+      return {
+        initiatorId: trade.initiatorId,
+        receiverId: trade.receiverId,
+        status: updatedTrade.status,
+      };
+    });
+
+    // Emit notifications after transaction commits
+    try {
+      await this.eventService.emitTradeWarehouseApproved({
+        tradeId,
+        initiatorId: result.initiatorId,
+        receiverId: result.receiverId,
+        notes: dto?.notes,
+      });
+    } catch (err) {
+      this.logger.error(
+        `Failed to emit trade.warehouse-approved for trade ${tradeId}: ${err}`,
+      );
+    }
+
+    return { success: true, tradeId, status: result.status };
+  }
+
+  /**
+   * Admin rejects the safe-trade after inspection. Creates two return
+   * shipments (each sending each party's own items back to them), sets
+   * the trade to `returning`, and triggers a cash refund if applicable.
+   */
+  async rejectWarehouseTrade(
+    adminId: string,
+    tradeId: string,
+    dto: RejectWarehouseTradeDto,
+  ) {
+    if (!dto?.reason || !dto.reason.trim()) {
+      throw new BadRequestException('Red nedeni zorunludur');
+    }
+
+    const result = await this.prisma.$transaction(async (tx) => {
+      await tx.$queryRaw`SELECT id FROM trades WHERE id = ${tradeId} FOR UPDATE`;
+
+      const trade = await tx.trade.findUnique({
+        where: { id: tradeId },
+        include: {
+          items: true,
+          cashPayment: true,
+        },
+      });
+      if (!trade) {
+        throw new NotFoundException('Takas bulunamadı');
+      }
+
+      if (
+        trade.status !== TradeStatus.at_warehouse &&
+        trade.status !== TradeStatus.admin_reviewing
+      ) {
+        throw new BadRequestException(
+          `Takas durumu '${trade.status}' reddetme için uygun değil. Beklenen: at_warehouse veya admin_reviewing.`,
+        );
+      }
+
+      const [initiatorAddress, receiverAddress] = await Promise.all([
+        tx.address.findFirst({
+          where: { userId: trade.initiatorId },
+          orderBy: { isDefault: 'desc' },
+        }),
+        tx.address.findFirst({
+          where: { userId: trade.receiverId },
+          orderBy: { isDefault: 'desc' },
+        }),
+      ]);
+      if (!initiatorAddress) {
+        throw new BadRequestException(
+          'Takası başlatan kullanıcının kayıtlı adresi yok',
+        );
+      }
+      if (!receiverAddress) {
+        throw new BadRequestException(
+          'Takası alan kullanıcının kayıtlı adresi yok',
+        );
+      }
+
+      const warehouseAddressId = await this.resolveWarehouseAddressId(tx);
+
+      const genTrackingNumber = () =>
+        `TRK${Date.now().toString(36).toUpperCase()}${Math.random()
+          .toString(36)
+          .substring(2, 6)
+          .toUpperCase()}`;
+
+      const now = new Date();
+
+      // Submit return shipments to Sürat (each party gets their own items back)
+      const initiatorReturnOid = `TRD-${trade.tradeNumber}-RET-INI`.replace(/[^a-zA-Z0-9-]/g, '').slice(0, 50);
+      const receiverReturnOid = `TRD-${trade.tradeNumber}-RET-REC`.replace(/[^a-zA-Z0-9-]/g, '').slice(0, 50);
+
+      const initiatorUser = await tx.user.findUnique({ where: { id: trade.initiatorId } });
+      const receiverUser = await tx.user.findUnique({ where: { id: trade.receiverId } });
+
+      const submitReturnToSurat = async (oid: string, addr: any, user: any): Promise<{ carrier: string; trackingNumber: string }> => {
+        if (!this.suratCargoService || !this.suratCargoService.isIntegrationEnabled()) {
+          return { carrier: 'Tarodan Warehouse', trackingNumber: genTrackingNumber() };
+        }
+        try {
+          const result = await this.suratCargoService.submitShipmentWithRetry({
+            idempotencyKey: `surat:trade-return:${oid}`,
+            correlationId: `trade-reject-${tradeId}`,
+            payload: {
+              KisiKurum: addr.fullName || user?.displayName || 'Takas İade',
+              SahisBirim: 'Takas İade Gönderisi',
+              AliciAdresi: addr.address,
+              Il: addr.city,
+              Ilce: addr.district,
+              TelefonCep: addr.phone,
+              KargoTuru: SuratKargoTuru.Koli,
+              OdemeTipi: SuratOdemeTipi.Pesin,
+              OzelKargoTakipNo: oid,
+              Adet: 1,
+              BirimDesi: 1,
+              BirimKg: 1,
+              KapidanOdemeTahsilatTipi: 1,
+              TasimaSekli: SuratTasimaSekli.KaraYolu,
+              TeslimSekli: SuratTeslimSekli.AdreseTeslim,
+              GonderiSekli: SuratGonderiSekli.Standart,
+              Pazaryerimi: 0,
+              Iademi: true, // İade gönderisi
+            },
+          });
+          if (!result.ok) {
+            const r = result as any;
+            const errMsg = r.kind === 'business' ? r.suratMessage : `technical: ${r.code}`;
+            throw new BadRequestException(
+              `Sürat iade kargo siparişi reddedildi: ${errMsg}`,
+            );
+          }
+          return { carrier: 'surat', trackingNumber: oid };
+        } catch (error: any) {
+          this.logger.error(`Surat return shipment failed for trade ${tradeId}: ${error.message}`);
+          throw error;
+        }
+      };
+
+      const initiatorReturnResult = await submitReturnToSurat(initiatorReturnOid, initiatorAddress, initiatorUser);
+      const receiverReturnResult = await submitReturnToSurat(receiverReturnOid, receiverAddress, receiverUser);
+
+      const returnToInitiator = await tx.tradeShipment.create({
+        data: {
+          tradeId,
+          shipperId: adminId,
+          fromAddressId: warehouseAddressId,
+          carrier: initiatorReturnResult.carrier,
+          trackingNumber: initiatorReturnResult.trackingNumber,
+          status: ShipmentStatus.label_created,
+          shippedAt: now,
+          leg: 'return',
+          recipientType: 'user',
+          recipientUserId: trade.initiatorId,
+        },
+      });
+
+      const returnToReceiver = await tx.tradeShipment.create({
+        data: {
+          tradeId,
+          shipperId: adminId,
+          fromAddressId: warehouseAddressId,
+          carrier: receiverReturnResult.carrier,
+          trackingNumber: receiverReturnResult.trackingNumber,
+          status: ShipmentStatus.label_created,
+          shippedAt: now,
+          leg: 'return',
+          recipientType: 'user',
+          recipientUserId: trade.receiverId,
+        },
+      });
+
+      const updatedTrade = await tx.trade.update({
+        where: { id: tradeId },
+        data: {
+          status: TradeStatus.returning,
+          cancelReason: dto.reason,
+          updatedAt: now,
+        },
+      });
+
+      await this.createAuditLog(
+        adminId,
+        'trade_warehouse_reject',
+        'Trade',
+        tradeId,
+        trade,
+        {
+          ...updatedTrade,
+          reason: dto.reason,
+          returnShipments: [returnToInitiator.id, returnToReceiver.id],
+        },
+      );
+
+      const shouldRefund =
+        !!trade.cashPayment &&
+        trade.cashPayment.status === PaymentStatus.completed;
+
+      return {
+        initiatorId: trade.initiatorId,
+        receiverId: trade.receiverId,
+        status: updatedTrade.status,
+        shouldRefund,
+      };
+    });
+
+    // After commit: refund cash payment (if completed) and notify parties
+    if (result.shouldRefund) {
+      try {
+        await this.paymentService.refundTradeCashPaymentIfCompleted(tradeId);
+      } catch (err: any) {
+        this.logger.error(
+          `refundTradeCashPaymentIfCompleted failed for trade ${tradeId}: ${err?.message}`,
+        );
+      }
+    }
+
+    try {
+      await this.eventService.emitTradeWarehouseRejected({
+        tradeId,
+        initiatorId: result.initiatorId,
+        receiverId: result.receiverId,
+        reason: dto.reason,
+      });
+    } catch (err) {
+      this.logger.error(
+        `Failed to emit trade.warehouse-rejected for trade ${tradeId}: ${err}`,
+      );
+    }
+
+    return { success: true, tradeId, status: result.status };
+  }
+
+  /**
+   * Admin marks a return shipment as delivered back to its original owner.
+   * When both return shipments are delivered, release any product
+   * reservations, re-activate the products, and cancel the trade.
+   */
+  async markReturnDelivered(
+    adminId: string,
+    tradeId: string,
+    shipmentId: string,
+  ) {
+    return this.prisma.$transaction(async (tx) => {
+      await tx.$queryRaw`SELECT id FROM trades WHERE id = ${tradeId} FOR UPDATE`;
+
+      const trade = await tx.trade.findUnique({
+        where: { id: tradeId },
+        select: { id: true, status: true },
+      });
+      if (!trade) {
+        throw new NotFoundException('Takas bulunamadı');
+      }
+
+      const shipment = await tx.tradeShipment.findUnique({
+        where: { id: shipmentId },
+      });
+      if (!shipment || shipment.tradeId !== tradeId) {
+        throw new NotFoundException('Gönderim bulunamadı');
+      }
+      if (shipment.leg !== 'return') {
+        throw new BadRequestException('Bu gönderim bir iade gönderimi değil');
+      }
+      if (shipment.deliveredAt) {
+        throw new BadRequestException(
+          'Bu iade gönderimi zaten teslim edildi olarak işaretlenmiş',
+        );
+      }
+
+      const now = new Date();
+      const updatedShipment = await tx.tradeShipment.update({
+        where: { id: shipmentId },
+        data: {
+          status: ShipmentStatus.delivered,
+          deliveredAt: now,
+          confirmedAt: now,
+        },
+      });
+
+      // Check if all return shipments are delivered
+      const returnShipments = await tx.tradeShipment.findMany({
+        where: { tradeId, leg: 'return' },
+        select: { id: true, deliveredAt: true },
+      });
+      const allDelivered =
+        returnShipments.length >= 2 &&
+        returnShipments.every((s) => s.deliveredAt !== null);
+
+      let finalStatus: TradeStatus = trade.status;
+      if (allDelivered && trade.status !== TradeStatus.cancelled) {
+        // Release reservations and reactivate products
+        const items = await tx.tradeItem.findMany({
+          where: { tradeId },
+          select: { productId: true, quantity: true },
+        });
+
+        const byProduct = new Map<string, number>();
+        for (const item of items) {
+          byProduct.set(
+            item.productId,
+            (byProduct.get(item.productId) ?? 0) + item.quantity,
+          );
+        }
+
+        for (const [productId, qty] of byProduct) {
+          await tx.$queryRaw`SELECT id FROM products WHERE id = ${productId} FOR UPDATE`;
+          const prod = await tx.product.findUnique({
+            where: { id: productId },
+            select: { reservedQuantity: true },
+          });
+          if (prod) {
+            const newReserved = safeDecrementReserved(
+              prod.reservedQuantity,
+              qty,
+            );
+            await tx.product.update({
+              where: { id: productId },
+              data: {
+                reservedQuantity: newReserved,
+                status:
+                  newReserved > 0 ? ProductStatus.reserved : ProductStatus.active,
+              },
+            });
+          }
+        }
+
+        await tx.trade.update({
+          where: { id: tradeId },
+          data: {
+            status: TradeStatus.cancelled,
+            cancelledAt: now,
+            updatedAt: now,
+          },
+        });
+        finalStatus = TradeStatus.cancelled;
+      }
+
+      await this.createAuditLog(
+        adminId,
+        'trade_return_delivered',
+        'TradeShipment',
+        shipmentId,
+        shipment,
+        {
+          ...updatedShipment,
+          allDelivered,
+          tradeStatus: finalStatus,
+        },
+      );
+
+      return {
+        success: true,
+        tradeId,
+        shipmentId,
+        status: finalStatus,
+        allDelivered,
+      };
     });
   }
 

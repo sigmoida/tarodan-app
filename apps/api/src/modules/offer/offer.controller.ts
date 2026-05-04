@@ -226,6 +226,24 @@ export class OfferController {
   }
 
   /**
+   * POST /offers/:id/buyer-counter — Satıcının karşı teklifine alıcı tutar önerir (ping-pong)
+   */
+  @Post(':id/buyer-counter')
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth()
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({ summary: 'Buyer counter-offer after seller counter (lower amount, min % rules)' })
+  @ApiParam({ name: 'id', description: 'Offer ID (pending, buyerMustAccept)' })
+  @ApiResponse({ status: HttpStatus.OK, description: 'Buyer counter created', type: OfferResponseDto })
+  async buyerCounter(
+    @Param('id') id: string,
+    @CurrentUser('id') userId: string,
+    @Body() dto: CounterOfferDto,
+  ): Promise<OfferResponseDto> {
+    return this.offerService.buyerCounter(id, userId, dto);
+  }
+
+  /**
    * POST /offers/:id/cancel - Cancel offer (buyer only)
    */
   @Post(':id/cancel')

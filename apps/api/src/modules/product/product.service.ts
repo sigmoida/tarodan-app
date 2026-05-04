@@ -461,6 +461,21 @@ export class ProductService implements OnModuleInit {
       products.map((p) => this.formatProductResponse(p)),
     );
 
+    // Tutarlılık: Postgres path ile aynı şekilde, discountOnly=true iken sadece
+    // gerçekten indirimli ürünleri döndür.
+    if (discountOnly) {
+      const onSale = formattedProducts.filter((p: any) => p.isOnSale === true);
+      return {
+        data: onSale,
+        meta: {
+          total: onSale.length,
+          page,
+          limit,
+          totalPages: Math.max(1, Math.ceil(onSale.length / limit)),
+        },
+      };
+    }
+
     return {
       data: formattedProducts,
       meta: {
@@ -558,6 +573,22 @@ export class ProductService implements OnModuleInit {
     const formattedProducts = await Promise.all(
       products.map((p) => this.formatProductResponse(p)),
     );
+
+    // discountOnly: WHERE kolayca "kampanya kapsamındaki" ürünleri geçirse de,
+    // formatProductResponse kampanya fiyatını uygulayamayabilir (değer 0, tarih
+    // dışı vs.). Kullanıcıya sadece gerçekten isOnSale=true olanları döndür.
+    if (discountOnly) {
+      const onSale = formattedProducts.filter((p: any) => p.isOnSale === true);
+      return {
+        data: onSale,
+        meta: {
+          total: onSale.length,
+          page,
+          limit,
+          totalPages: Math.max(1, Math.ceil(onSale.length / limit)),
+        },
+      };
+    }
 
     return {
       data: formattedProducts,
@@ -1511,7 +1542,7 @@ Bu ürünü istek listenizden kaldırmak için ürün sayfasına gidip "İstek L
       viewCount: product.viewCount || 0,
       likeCount: product.likeCount || 0,
       quantity: product.quantity !== null && product.quantity !== undefined ? Number(product.quantity) : null,
-      availableQuantity: getAvailableQuantity(product) ?? undefined, // müsait adet (quantity - reservedQuantity); null = sınırsız
+      availableQuantity: getAvailableQuantity(product) ?? undefined, // müsait adet = quantity; null = sınırsız stok
       images: (product.images || []).map((img: { id: string; cardKey: string; detailKey: string; sortOrder: number }) => ({
         id: img.id,
         cardKey: img.cardKey,

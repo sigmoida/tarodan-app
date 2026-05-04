@@ -98,7 +98,7 @@ export default function PricingScreen() {
       return; // Already free
     }
 
-    router.push(`/membership/checkout?tier=${tierId}`);
+    router.push(`/membership/checkout?tier=${tierId}&period=monthly`);
   };
 
   return (

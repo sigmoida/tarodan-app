@@ -45,35 +45,35 @@ export function AdminFinancialSummary({ pricing, fallback, className = '' }: Adm
 
   return (
     <div className={className}>
-      <h3 className="text-sm font-semibold text-gray-700 mb-3">Finansal Özet</h3>
+      <h3 className="text-sm font-semibold text-body mb-3">Finansal Özet</h3>
       <dl className="space-y-2 text-sm">
         <div className="flex justify-between">
-          <dt className="text-gray-600">Ara toplam (ürün):</dt>
-          <dd className="font-medium text-gray-900">₺{fmt(sub)}</dd>
+          <dt className="text-muted">Ara toplam (ürün):</dt>
+          <dd className="font-medium text-heading">₺{fmt(sub)}</dd>
         </div>
         <div className="flex justify-between">
-          <dt className="text-gray-600">Kargo:</dt>
-          <dd className="font-medium text-gray-900">₺{fmt(ship)}</dd>
+          <dt className="text-muted">Kargo:</dt>
+          <dd className="font-medium text-heading">₺{fmt(ship)}</dd>
         </div>
         <div className="flex justify-between">
-          <dt className="text-gray-600">Alıcı platform ücreti (buyerFeeAmount):</dt>
-          <dd className="font-medium text-gray-900">₺{fmt(buyerFee)}</dd>
+          <dt className="text-muted">Alıcı platform ücreti (buyerFeeAmount):</dt>
+          <dd className="font-medium text-heading">₺{fmt(buyerFee)}</dd>
         </div>
         <div className="flex justify-between">
-          <dt className="text-gray-600">Satıcı kesintisi (sellerFeeAmount):</dt>
-          <dd className="font-medium text-gray-900">₺{fmt(sellerFee)}</dd>
+          <dt className="text-muted">Satıcı kesintisi (sellerFeeAmount):</dt>
+          <dd className="font-medium text-heading">₺{fmt(sellerFee)}</dd>
         </div>
         <div className="flex justify-between">
-          <dt className="text-gray-600">Toplam komisyon (commissionAmount):</dt>
-          <dd className="font-medium text-gray-900">₺{fmt(commission)}</dd>
+          <dt className="text-muted">Toplam komisyon (commissionAmount):</dt>
+          <dd className="font-medium text-heading">₺{fmt(commission)}</dd>
         </div>
         <div className="flex justify-between border-t pt-2 mt-2">
-          <dt className="text-gray-900 font-semibold">Alıcı toplam (totalAmount):</dt>
-          <dd className="font-semibold text-gray-900">₺{fmt(total)}</dd>
+          <dt className="text-heading font-semibold">Alıcı toplam (totalAmount):</dt>
+          <dd className="font-semibold text-heading">₺{fmt(total)}</dd>
         </div>
         <div className="flex justify-between">
-          <dt className="text-gray-600">Satıcı net (sellerNetAmount):</dt>
-          <dd className="font-medium text-green-700">₺{fmt(sellerNet)}</dd>
+          <dt className="text-muted">Satıcı net (sellerNetAmount):</dt>
+          <dd className="font-medium text-success-700">₺{fmt(sellerNet)}</dd>
         </div>
       </dl>
     </div>

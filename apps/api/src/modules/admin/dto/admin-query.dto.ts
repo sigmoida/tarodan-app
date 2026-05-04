@@ -171,7 +171,7 @@ export class AdminPaymentQueryDto {
   @IsString()
   status?: string;
 
-  @ApiPropertyOptional({ example: 'iyzico' })
+  @ApiPropertyOptional({ example: 'paytr' })
   @IsOptional()
   @IsString()
   provider?: string;

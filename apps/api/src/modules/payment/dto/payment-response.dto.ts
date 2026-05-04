@@ -13,7 +13,7 @@ export class PaymentResponseDto {
   @ApiProperty({ example: 'TRY' })
   currency: string;
 
-  @ApiProperty({ example: 'iyzico' })
+  @ApiProperty({ example: 'paytr' })
   provider: string;
 
   @ApiProperty({ example: 'pending' })

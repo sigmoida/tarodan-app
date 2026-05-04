@@ -14,6 +14,7 @@
     "@tarodan/api-client": "workspace:*",
     "@tarodan/core": "workspace:*",
     "@tarodan/ui": "workspace:*",
+    "@tarodan/design-tokens": "workspace:*",
     "@headlessui/react": "^1.7.18",
     "@heroicons/react": "^2.1.1",
     "@hookform/resolvers": "^3.3.4",

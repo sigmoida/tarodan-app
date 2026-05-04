@@ -32,10 +32,12 @@ const isValidImageUrl = (value: unknown): value is string => {
  * @param url - The image URL (can be string or object with url property)
  * @returns A valid image URL string
  */
-export const transformImageUrl = (url: string | { url: string } | null | undefined): string => {
+export const transformImageUrl = (url: string | { url?: string; cardUrl?: string; detailUrl?: string } | null | undefined): string => {
   if (!url) return PLACEHOLDER;
 
-  const urlString = typeof url === 'string' ? url : url.url;
+  const urlString = typeof url === 'string'
+    ? url
+    : (url.detailUrl || url.cardUrl || url.url || '');
 
   if (isValidImageUrl(urlString)) return urlString;
 
@@ -59,5 +61,6 @@ export const getImageUrl = (images: any): string => {
     return transformImageUrl(firstImage);
   }
 
-  return transformImageUrl(firstImage?.url || firstImage);
+  const url = firstImage?.cardUrl || firstImage?.detailUrl || firstImage?.url || firstImage?.imageUrl;
+  return transformImageUrl(url || firstImage);
 };

@@ -25,6 +25,13 @@ api.interceptors.request.use(
   (error) => Promise.reject(error)
 );
 
+/** Checkout / ödeme sırasında 401'de token silmek PayTR dönüşü veya /payments/status çağrısını kırar. */
+function shouldPreserveAuthTokenOn401(): boolean {
+  if (typeof window === 'undefined') return false;
+  const p = window.location?.pathname || '';
+  return p === '/checkout' || p.startsWith('/payment') || p.startsWith('/cart');
+}
+
 // Response interceptor
 api.interceptors.response.use(
   (response) => response,
@@ -60,8 +67,10 @@ api.interceptors.response.use(
           } catch (refreshError) {
             // Refresh failed, logout user
             const hadToken = localStorage.getItem('auth_token');
-            localStorage.removeItem('auth_token');
-            localStorage.removeItem('refresh_token');
+            if (!shouldPreserveAuthTokenOn401()) {
+              localStorage.removeItem('auth_token');
+              localStorage.removeItem('refresh_token');
+            }
 
             // Only auto-redirect for expired sessions; never redirect on public/guest pages
             if (hadToken) {
@@ -89,8 +98,10 @@ api.interceptors.response.use(
         } else {
           // No refresh token or refresh endpoint failed, handle as before
           const hadToken = localStorage.getItem('auth_token');
-          localStorage.removeItem('auth_token');
-          localStorage.removeItem('refresh_token');
+          if (!shouldPreserveAuthTokenOn401()) {
+            localStorage.removeItem('auth_token');
+            localStorage.removeItem('refresh_token');
+          }
 
           // Only auto-redirect for expired sessions; never redirect on public/guest pages
           if (hadToken) {
@@ -175,6 +186,8 @@ export const tradesApi = {
     api.post(`/trades/${id}/cancel`, { reason }),
   ship: (id: string | number, data: { fromAddressId: string; carrier: string }) =>
     api.post(`/trades/${id}/ship`, data),
+  shipToWarehouse: (tradeId: string, data: { carrier: string; fromAddressId: string; trackingNumber?: string }) =>
+    api.post(`/trades/${tradeId}/ship-to-warehouse`, data),
   confirmReceipt: (id: string | number) =>
     api.post(`/trades/${id}/confirm-receipt`),
   raiseDispute: (id: string | number, data: { reason: string; description: string; evidenceUrls?: string[] }) =>
@@ -228,11 +241,14 @@ export const ordersApi = {
       zipCode?: string;
     };
   }) => api.post('/orders/buy', data),
+  sendGuestVerificationCode: (data: { email: string; expectedCheckoutCount?: number }) =>
+    api.post<{ success: boolean; expiresInSeconds: number }>('/orders/guest/send-verification-code', data),
   createGuest: (data: {
     productId: string;
     email: string;
     phone: string;
     guestName: string;
+    emailVerificationCode: string;
     shippingAddress: {
       fullName: string;
       phone: string;
@@ -273,9 +289,9 @@ export const ordersApi = {
 
 // Payments
 export const paymentsApi = {
-  initiate: (orderId: string | number, provider: 'paytr' | 'iyzico') =>
+  initiate: (orderId: string | number, provider: 'paytr') =>
     api.post('/payments/initiate', { orderId, provider }),
-  initiateGuest: (orderId: string | number, provider: 'paytr' | 'iyzico') =>
+  initiateGuest: (orderId: string | number, provider: 'paytr') =>
     api.post('/payments/initiate-guest', { orderId, provider }),
   /** Takas nakit fark ödemesi başlat (sipariş/teklif ile aynı ödeme altyapısı) */
   initiateTradeCash: (tradeId: string) =>
@@ -299,29 +315,16 @@ export const paymentsApi = {
   /** Fail sayfasından; ödeme hâlâ pending ise rezervasyonu serbest bırakır */
   confirmFailed: (paymentId: string) =>
     api.post<{ released: boolean }>(`/payments/${paymentId}/confirm-failed`),
-  /** Test bypass: tek kart başarılı, diğerleri başarısız (PAYMENT_BYPASS=true) */
-  bypassComplete: (paymentId: string, cardNumber: string) =>
-    api.post<{ success: boolean }>(`/payments/${paymentId}/bypass-complete`, { cardNumber }),
+  /** Success sayfasından; PayTR durum-sorgu ile ödemeyi anında tamamlar */
+  verify: (paymentId: string) =>
+    api.post<{ completed: boolean; status: string }>(`/payments/${paymentId}/verify`),
   refund: (orderId: string, refundAmount?: number) =>
     api.post('/payments/refund', { orderId, refundAmount }),
   retry: (paymentId: string) =>
     api.post(`/payments/${paymentId}/retry`),
-
-  // Direct Payment API
-  processDirect: (data: {
-    orderId: string;
-    card?: {
-      cardHolderName: string;
-      cardNumber: string;
-      expireMonth: string;
-      expireYear: string;
-      cvc: string;
-      cardAlias?: string;
-    };
-    cardToken?: string;
-    saveCard?: boolean;
-    provider?: string;
-  }) => api.post('/payments/process-direct', data),
+  /** Dev/test: PayTR olmadan ödemeyi tamamla */
+  bypassComplete: (paymentId: string, _card?: string) =>
+    api.post<{ success: boolean }>(`/payments/${paymentId}/bypass-complete`),
 
   getPaymentMethods: () => api.get('/payments/methods'),
 
@@ -336,7 +339,29 @@ export const paymentsApi = {
     };
   }) => api.post('/payments/methods', data),
 
-  deletePaymentMethod: (cardToken: string) => api.delete(`/payments/methods/${cardToken}`),
+  deletePaymentMethod: (paymentMethodId: string) => api.delete(`/payments/methods/${paymentMethodId}`),
+};
+
+export type RefundReason =
+  | 'changed_mind'
+  | 'damaged'
+  | 'wrong_item'
+  | 'not_as_described'
+  | 'missing_parts'
+  | 'other';
+
+export const refundsApi = {
+  create: (
+    orderId: string,
+    body: { reason: RefundReason; description?: string; evidencePhotoUrls?: string[] },
+  ) => api.post(`/orders/${orderId}/refund-requests`, body),
+  myRequests: () => api.get('/refund-requests/me'),
+  sellerRequests: () => api.get('/refund-requests/seller'),
+  getById: (id: string) => api.get(`/refund-requests/${id}`),
+  cancel: (id: string) => api.post(`/refund-requests/${id}/cancel`),
+  accept: (id: string) => api.post(`/refund-requests/${id}/accept`),
+  reject: (id: string, response: string) =>
+    api.post(`/refund-requests/${id}/reject`, { response }),
 };
 
 // Addresses
@@ -516,8 +541,10 @@ export const offersApi = {
     api.post('/offers', data),
   accept: (id: string) => api.post(`/offers/${id}/accept`),
   reject: (id: string) => api.post(`/offers/${id}/reject`),
-  counter: (id: string, amount: number) =>
-    api.post(`/offers/${id}/counter`, { amount }),
+  counter: (id: string, amount: number, message?: string) =>
+    api.post(`/offers/${id}/counter`, { amount, ...(message ? { message } : {}) }),
+  buyerCounter: (id: string, amount: number, message?: string) =>
+    api.post(`/offers/${id}/buyer-counter`, { amount, ...(message ? { message } : {}) }),
   cancel: (id: string) => api.post(`/offers/${id}/cancel`),
 };
 
@@ -636,6 +663,15 @@ export const mediaApi = {
     const formData = new FormData();
     formData.append('file', file);
     return api.post<{ url: string; key?: string }>('/media/upload?folder=messages', formData, {
+      headers: {
+        'Content-Type': 'multipart/form-data',
+      },
+    });
+  },
+  uploadReviewImage: (file: File) => {
+    const formData = new FormData();
+    formData.append('file', file);
+    return api.post<{ url: string; key?: string }>('/media/upload?folder=reviews', formData, {
       headers: {
         'Content-Type': 'multipart/form-data',
       },

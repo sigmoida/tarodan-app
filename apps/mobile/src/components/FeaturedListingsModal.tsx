@@ -220,7 +220,7 @@ export const FeaturedListingsModal: React.FC<FeaturedListingsModalProps> = ({
                       {slot.product.title}
                     </Text>
                     <Text variant="bodySmall" style={styles.productPrice}>
-                      ₺{slot.product.price.toLocaleString('tr-TR')}
+                      ₺{(slot.product?.price ?? 0).toLocaleString('tr-TR')}
                     </Text>
                     <Chip compact style={styles.expiryChip} textStyle={{ fontSize: 10 }}>
                       {formatRemainingTime(slot.expiresAt)}
@@ -286,7 +286,7 @@ export const FeaturedListingsModal: React.FC<FeaturedListingsModalProps> = ({
                             {product.title}
                           </Text>
                           <Text variant="bodySmall" style={styles.productPrice}>
-                            ₺{product.price.toLocaleString('tr-TR')}
+                            ₺{(product.price ?? 0).toLocaleString('tr-TR')}
                           </Text>
                         </View>
                       </Card.Content>

@@ -76,6 +76,10 @@ export class ShipTradeDto {
 
   @IsString()
   fromAddressId: string;
+
+  @IsOptional()
+  @IsString()
+  trackingNumber?: string;
 }
 
 export class ConfirmTradeReceiptDto {

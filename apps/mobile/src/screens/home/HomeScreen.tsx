@@ -18,6 +18,9 @@ import {
 import Icon from 'react-native-vector-icons/Ionicons';
 import { useListingsStore } from '../../stores/listingsStore';
 import { useCartStore } from '../../stores/cartStore';
+import { safeString } from '../../utils/safeString';
+import { getImageUrl } from '../../utils/imageUrl';
+import { isProductTradeOpen } from '../../utils/isProductTradeOpen';
 
 const { width } = Dimensions.get('window');
 const CARD_WIDTH = (width - 48) / 2;
@@ -44,19 +47,21 @@ const BRANDS = [
 
 const ListingCard = ({ item, onPress }: any) => (
   <TouchableOpacity style={styles.listingCard} onPress={onPress}>
-    <Image 
-      source={{ uri: item.images?.[0] || 'https://via.placeholder.com/200' }}
-      style={styles.listingImage}
-    />
-    {item.trade_available && (
-      <View style={styles.tradeBadge}>
-        <Icon name="swap-horizontal" size={12} color="#FFF" />
-        <Text style={styles.tradeBadgeText}>Takas</Text>
-      </View>
-    )}
+    <View style={styles.listingImageWrap}>
+      <Image
+        source={{ uri: getImageUrl(item.images) }}
+        style={styles.listingImage}
+      />
+      {isProductTradeOpen(item) && (
+        <View style={styles.tradeBadge}>
+          <Icon name="swap-horizontal" size={12} color="#FFF" />
+          <Text style={styles.tradeBadgeText}>Takas</Text>
+        </View>
+      )}
+    </View>
     <View style={styles.listingInfo}>
       <Text style={styles.listingTitle} numberOfLines={2}>{item.title}</Text>
-      <Text style={styles.listingBrand}>{item.brand} • {item.scale}</Text>
+      <Text style={styles.listingBrand}>{safeString(item.brand, 'Marka')} • {safeString(item.scale, '1:64')}</Text>
       <Text style={styles.listingPrice}>₺{item.price?.toLocaleString('tr-TR')}</Text>
     </View>
   </TouchableOpacity>
@@ -368,10 +373,16 @@ const styles = StyleSheet.create({
     shadowRadius: 4,
     elevation: 2,
   },
-  listingImage: {
+  listingImageWrap: {
+    position: 'relative',
     width: '100%',
     height: CARD_WIDTH,
+    overflow: 'hidden',
     backgroundColor: '#F5F5F5',
+  },
+  listingImage: {
+    width: '100%',
+    height: '100%',
   },
   tradeBadge: {
     position: 'absolute',

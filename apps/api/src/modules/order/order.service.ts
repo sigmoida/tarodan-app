@@ -8,17 +8,34 @@ import {
   Inject,
   forwardRef,
 } from '@nestjs/common';
+import { createHash, randomInt, randomUUID, timingSafeEqual } from 'crypto';
+import { ConfigService } from '@nestjs/config';
 import { PrismaService } from '../../prisma';
 import { CacheService } from '../cache/cache.service';
 import { StorageService } from '../storage/storage.service';
-import { CreateOrderDto, OrderQueryDto, UpdateOrderStatusDto, CancelOrderDto, GuestCheckoutDto, GuestOrderTrackDto, DirectBuyDto, CheckoutQuoteDto } from './dto';
+import {
+  CreateOrderDto,
+  OrderQueryDto,
+  UpdateOrderStatusDto,
+  CancelOrderDto,
+  GuestCheckoutDto,
+  GuestOrderTrackDto,
+  DirectBuyDto,
+  CheckoutQuoteDto,
+  GuestSendVerificationCodeDto,
+} from './dto';
 import { OrderStatus, OfferStatus, ProductStatus, CommissionRuleType, SellerType, CommissionAppliesTo, CommissionSellerType, MembershipTierType, Prisma } from '@prisma/client';
 import { getProductStatusFromQuantity } from '../product/helpers/product-status.helper';
 import { getAvailableQuantity } from '../product/helpers/product-availability.helper';
+import { ProductLockService } from '../product/product-lock.service';
 import { EventService } from '../events';
 import { NotificationService } from '../notification/notification.service';
 import { NotificationType } from '../notification/dto';
 import { DiscountService, DiscountCalculator } from '../discount';
+import { SuratCargoService } from '../surat-cargo/surat-cargo.service';
+import { mapSuratFailureToHttpException } from '../surat-cargo/surat-result.mapper';
+import type { SuratShipmentFailure } from '../surat-cargo/surat-cargo.types';
+import { SuratKargoTuru, SuratOdemeTipi, SuratTasimaSekli, SuratTeslimSekli, SuratGonderiSekli } from '../surat-cargo/surat-cargo.types';
 
 /**
  * Commission calculation result interface
@@ -45,44 +62,71 @@ export class OrderService {
     private readonly prisma: PrismaService,
     private readonly eventService: EventService,
     private readonly cache: CacheService,
+    private readonly configService: ConfigService,
     @Inject(forwardRef(() => NotificationService))
     private readonly notificationService: NotificationService,
     private readonly discountService: DiscountService,
     private readonly discountCalculator: DiscountCalculator,
+    private readonly suratCargoService: SuratCargoService,
+    private readonly productLockService: ProductLockService,
     @Optional()
     private readonly storageService: StorageService,
   ) {}
 
-  // Shipping cost settings
-  private readonly BASE_SHIPPING_COST = 29.99; // Base shipping cost in TL
-  private readonly FREE_SHIPPING_THRESHOLD = 500; // Free shipping threshold in TL
+  // Shipping cost defaults (overridden by PlatformSetting)
+  private readonly DEFAULT_SHIPPING_COST = 29.99;
+  private readonly DEFAULT_FREE_THRESHOLD = 500;
+  private shippingSettingsCache: { baseCost: number; freeThreshold: number; cachedAt: number } | null = null;
 
   /**
-   * Calculate shipping cost based on order amount
-   * Free shipping for orders >= 500 TL
+   * Load shipping cost settings from PlatformSetting (cached for 5 minutes).
    */
-  calculateShippingCost(orderAmount: number): number {
-    if (orderAmount >= this.FREE_SHIPPING_THRESHOLD) {
+  private async getShippingSettings(): Promise<{ baseCost: number; freeThreshold: number }> {
+    const now = Date.now();
+    if (this.shippingSettingsCache && now - this.shippingSettingsCache.cachedAt < 5 * 60 * 1000) {
+      return this.shippingSettingsCache;
+    }
+
+    const [baseSetting, thresholdSetting] = await Promise.all([
+      this.prisma.platformSetting.findUnique({ where: { settingKey: 'shipping_base_cost' } }),
+      this.prisma.platformSetting.findUnique({ where: { settingKey: 'free_shipping_threshold' } }),
+    ]);
+
+    const baseCost = baseSetting ? parseFloat(baseSetting.settingValue) : this.DEFAULT_SHIPPING_COST;
+    const freeThreshold = thresholdSetting ? parseFloat(thresholdSetting.settingValue) : this.DEFAULT_FREE_THRESHOLD;
+
+    this.shippingSettingsCache = { baseCost, freeThreshold, cachedAt: now };
+    return { baseCost, freeThreshold };
+  }
+
+  /**
+   * Calculate shipping cost based on order amount.
+   * Reads from PlatformSetting (admin-configurable), falls back to defaults.
+   */
+  async calculateShippingCost(orderAmount: number): Promise<number> {
+    const { baseCost, freeThreshold } = await this.getShippingSettings();
+    if (orderAmount >= freeThreshold) {
       return 0;
     }
-    return this.BASE_SHIPPING_COST;
+    return baseCost;
   }
 
   /**
    * Get free shipping info for frontend display
    */
-  getFreeShippingInfo(orderAmount: number): {
+  async getFreeShippingInfo(orderAmount: number): Promise<{
     isFreeShipping: boolean;
     shippingCost: number;
     threshold: number;
     amountToFreeShipping: number;
-  } {
-    const shippingCost = this.calculateShippingCost(orderAmount);
+  }> {
+    const { baseCost, freeThreshold } = await this.getShippingSettings();
+    const shippingCost = orderAmount >= freeThreshold ? 0 : baseCost;
     return {
       isFreeShipping: shippingCost === 0,
       shippingCost,
-      threshold: this.FREE_SHIPPING_THRESHOLD,
-      amountToFreeShipping: Math.max(0, this.FREE_SHIPPING_THRESHOLD - orderAmount),
+      threshold: freeThreshold,
+      amountToFreeShipping: Math.max(0, freeThreshold - orderAmount),
     };
   }
 
@@ -196,7 +240,7 @@ export class OrderService {
       });
     }
 
-    const shippingAmount = this.calculateShippingCost(itemsSubtotal);
+    const shippingAmount = await this.calculateShippingCost(itemsSubtotal);
     const commissionAmount = totalBuyerFee + totalSellerFee;
     const totalAmount = itemsSubtotal + shippingAmount + totalBuyerFee;
     const sellerNetAmount = Math.max(0, itemsSubtotal - totalSellerFee);
@@ -268,6 +312,72 @@ export class OrderService {
     return { results };
   }
 
+  private buildSuratIdempotencyKey(parts: string[]): string {
+    return createHash('sha256').update(parts.filter((p) => p.length > 0).join('|')).digest('hex');
+  }
+
+  /**
+   * Sürat gönderi oluşturma (edge case 1.7): SURAT_CARGO_ENABLED=true iken order.create öncesi fail-fast.
+   */
+  private async assertSuratShipmentSucceeded(ctx: {
+    correlationId: string;
+    idempotencyKey: string;
+    recipientFullName: string;
+    recipientPhone: string;
+    recipientCity: string;
+    recipientDistrict: string;
+    recipientAddressLine: string;
+    productId: string;
+    productTitle?: string;
+    orderNumberPreview: string;
+  }): Promise<void> {
+    if (!this.suratCargoService.isIntegrationEnabled()) {
+      return;
+    }
+
+    const result = await this.suratCargoService.submitShipmentWithRetry({
+      idempotencyKey: ctx.idempotencyKey,
+      correlationId: ctx.correlationId,
+      payload: {
+        KisiKurum: ctx.recipientFullName,
+        AliciAdresi: ctx.recipientAddressLine,
+        Il: ctx.recipientCity,
+        Ilce: ctx.recipientDistrict,
+        TelefonCep: ctx.recipientPhone,
+        SahisBirim: ctx.productTitle,
+        KargoTuru: SuratKargoTuru.Koli,
+        OdemeTipi: SuratOdemeTipi.Pesin,
+        OzelKargoTakipNo: ctx.orderNumberPreview,
+        Adet: 1,
+        BirimDesi: 1,
+        BirimKg: 1,
+        KapidanOdemeTahsilatTipi: 1, // Nakit (zorunlu alan)
+        TasimaSekli: SuratTasimaSekli.KaraYolu,
+        TeslimSekli: SuratTeslimSekli.AdreseTeslim,
+        GonderiSekli: SuratGonderiSekli.Standart,
+        Pazaryerimi: 0,
+        Iademi: false,
+      },
+    });
+
+    if (result.ok) {
+      return;
+    }
+    const failure = result as SuratShipmentFailure;
+    this.logger.warn({
+      msg: 'Surat shipment failed before order persist',
+      correlationId: ctx.correlationId,
+      idempotencyKey: ctx.idempotencyKey,
+      failure,
+    });
+    if (failure.kind === 'business') {
+      this.logger.warn(`Surat business message: ${failure.suratMessage}`);
+    } else if (failure.cause?.stack) {
+      this.logger.warn(failure.cause.stack);
+    }
+    mapSuratFailureToHttpException(failure);
+  }
+
   /**
    * Invalidate product caches when product status changes
    */
@@ -282,22 +392,24 @@ export class OrderService {
   }
 
   /**
-   * Generate unique order number
+   * Generate unique order number using atomic DB sequence.
+   * Falls back to timestamp+random if the sequence doesn't exist yet.
    */
   private async generateOrderNumber(): Promise<string> {
     const year = new Date().getFullYear();
     const prefix = `ORD-${year}-`;
 
-    // Get count of orders this year for sequential numbering
-    const count = await this.prisma.order.count({
-      where: {
-        createdAt: {
-          gte: new Date(`${year}-01-01`),
-        },
-      },
-    });
-
-    return `${prefix}${String(count + 1).padStart(6, '0')}`;
+    try {
+      const result = await this.prisma.$queryRaw<{ next_val: bigint }[]>`
+        SELECT nextval('order_number_seq') AS next_val
+      `;
+      return `${prefix}${String(result[0].next_val).padStart(6, '0')}`;
+    } catch {
+      // Sequence may not exist yet; use timestamp+random as safe fallback
+      const ts = Date.now().toString(36).toUpperCase();
+      const rand = randomInt(0, 9999).toString().padStart(4, '0');
+      return `${prefix}${ts}${rand}`;
+    }
   }
 
   /**
@@ -601,8 +713,16 @@ export class OrderService {
     }
 
     const result = await this.prisma.$transaction(async (tx) => {
-      // Get product with seller info - using Prisma instead of raw SQL
-      // Transaction provides isolation for concurrent purchases
+      const lockedRows = await tx.$queryRaw<{ id: string }[]>`
+        SELECT p.id
+        FROM products p
+        WHERE p.id = ${dto.productId}
+        FOR UPDATE
+      `;
+      if (!lockedRows?.length) {
+        throw new NotFoundException('Ürün bulunamadı');
+      }
+
       const product = await tx.product.findUnique({
         where: { id: dto.productId },
         include: {
@@ -648,7 +768,7 @@ export class OrderService {
         throw new BadRequestException('Bu ürün satışta değil veya başkası tarafından satın alınıyor');
       }
 
-      // Adet bazlı stok: müsait adet (quantity - reservedQuantity) >= 1 olmalı
+      // Adet bazlı stok kontrolü: müsait adet >= 1 olmalı
       const available = getAvailableQuantity(product);
       if (available !== null && available < 1) {
         throw new BadRequestException('Bu ürün stokta bulunmamaktadır');
@@ -785,14 +905,40 @@ export class OrderService {
       );
 
       // Calculate shipping cost (free shipping for orders >= 500 TL)
-      const shippingCost = this.calculateShippingCost(discountedPrice);
+      const shippingCost = await this.calculateShippingCost(discountedPrice);
       // Buyer fee is added to order total
       const totalAmount = discountedPrice + shippingCost + commissionResult.buyerFeeAmount;
 
       // Generate order number
       const orderNumber = await this.generateOrderNumber();
 
+      const suratIdempotencyKey =
+        dto.idempotencyKey?.trim() ||
+        this.buildSuratIdempotencyKey([
+          buyerId,
+          dto.productId,
+          String(shippingAddressId || ''),
+          dto.shippingAddress
+            ? `${dto.shippingAddress.city}|${dto.shippingAddress.phone}|${dto.shippingAddress.address}`
+            : '',
+          dto.couponCode || '',
+        ]);
+
+      await this.assertSuratShipmentSucceeded({
+        correlationId: randomUUID(),
+        idempotencyKey: suratIdempotencyKey,
+        recipientFullName: shippingAddress.fullName,
+        recipientPhone: shippingAddress.phone,
+        recipientCity: shippingAddress.city,
+        recipientDistrict: shippingAddress.district,
+        recipientAddressLine: shippingAddress.address,
+        productId: dto.productId,
+        productTitle: product.title ?? undefined,
+        orderNumberPreview: orderNumber,
+      });
+
       // Adet bazlı rezervasyon: 1 adet rezerve et (stok ödeme tamamlanınca düşer)
+      // Invalidation yapılmıyor — cron halledecek (stock_plan.md)
       await tx.product.update({
         where: { id: dto.productId },
         data: { reservedQuantity: { increment: 1 } },
@@ -809,6 +955,9 @@ export class OrderService {
         address: shippingAddress.address,
         zipCode: shippingAddress.zipCode,
       };
+      if (this.suratCargoService.isIntegrationEnabled()) {
+        shippingAddressJson.suratIdempotencyKey = suratIdempotencyKey;
+      }
       if (billingAddress !== shippingAddress) {
         (shippingAddressJson as any).billingAddress = {
           fullName: billingAddress.fullName,
@@ -911,15 +1060,15 @@ export class OrderService {
         subtotal,
         discountAmount: totalDiscount,
         appliedCouponCode: appliedCouponCode ?? undefined,
-        productId: dto.productId, // Include for cache invalidation
-        paymentUrl: '', // Will be set by payment service
-        provider: 'paytr', // Default provider
+        productId: dto.productId,
+        paymentUrl: '',
+        provider: 'paytr',
       };
     });
 
     // Invalidate product cache after successful transaction
     await this.invalidateProductCaches(result.productId);
-    
+
     return result;
   }
 
@@ -1011,8 +1160,41 @@ export class OrderService {
       // Generate order number
       const orderNumber = await this.generateOrderNumber();
 
+      const suratIdempotencyKeyOffer =
+        dto.idempotencyKey?.trim() ||
+        this.buildSuratIdempotencyKey([buyerId, dto.offerId, dto.shippingAddressId]);
+
+      await this.assertSuratShipmentSucceeded({
+        correlationId: randomUUID(),
+        idempotencyKey: suratIdempotencyKeyOffer,
+        recipientFullName: shippingAddress.fullName,
+        recipientPhone: shippingAddress.phone,
+        recipientCity: shippingAddress.city,
+        recipientDistrict: shippingAddress.district,
+        recipientAddressLine: shippingAddress.address,
+        productId: offer.productId,
+        productTitle: offer.product.title ?? undefined,
+        orderNumberPreview: orderNumber,
+      });
+
       // Buyer fee is added to order total
       const totalAmount = Number(offer.amount) + commissionResult.buyerFeeAmount;
+
+      const offerShippingJson: Record<string, unknown> | undefined = shippingAddress
+        ? {
+            id: shippingAddress.id,
+            title: shippingAddress.title,
+            fullName: shippingAddress.fullName,
+            phone: shippingAddress.phone,
+            city: shippingAddress.city,
+            district: shippingAddress.district,
+            address: shippingAddress.address,
+            zipCode: shippingAddress.zipCode,
+          }
+        : undefined;
+      if (offerShippingJson && this.suratCargoService.isIntegrationEnabled()) {
+        offerShippingJson.suratIdempotencyKey = suratIdempotencyKeyOffer;
+      }
 
       // Create order
       const order = await tx.order.create({
@@ -1028,16 +1210,7 @@ export class OrderService {
           sellerFeeAmount: commissionResult.sellerFeeAmount,
           status: OrderStatus.pending_payment,
           shippingAddressId: dto.shippingAddressId,
-          shippingAddress: shippingAddress ? {
-            id: shippingAddress.id,
-            title: shippingAddress.title,
-            fullName: shippingAddress.fullName,
-            phone: shippingAddress.phone,
-            city: shippingAddress.city,
-            district: shippingAddress.district,
-            address: shippingAddress.address,
-            zipCode: shippingAddress.zipCode,
-          } : undefined,
+          shippingAddress: offerShippingJson as Prisma.InputJsonValue | undefined,
         },
         include: {
           product: {
@@ -1133,13 +1306,168 @@ export class OrderService {
     }
   }
 
+  private normalizeGuestCheckoutEmail(email: string): string {
+    return email.trim().toLowerCase();
+  }
+
+  private guestCheckoutOtpKey(normEmail: string): string {
+    return `guest:checkout:otp:v1:${normEmail}`;
+  }
+
+  private guestCheckoutOtpRateKey(normEmail: string): string {
+    return `guest:checkout:rl:v1:${normEmail}`;
+  }
+
+  private guestCheckoutOtpPepper(): string {
+    return (
+      this.configService.get<string>('GUEST_CHECKOUT_OTP_SECRET') ||
+      this.configService.get<string>('JWT_SECRET') ||
+      'guest-checkout-otp-dev-only'
+    );
+  }
+
+  private hashGuestCheckoutOtp(normEmail: string, code: string): string {
+    return createHash('sha256')
+      .update(`${this.guestCheckoutOtpPepper()}:${normEmail}:${code}`, 'utf8')
+      .digest('hex');
+  }
+
+  /**
+   * Misafir checkout öncesi e-posta OTP gönderir (Redis + e-posta).
+   * expectedCheckoutCount: sepetteki misafir sipariş satırı sayısı (her başarılı guest checkout bir hak tüketir).
+   */
+  async sendGuestCheckoutVerificationCode(dto: GuestSendVerificationCodeDto): Promise<{
+    success: boolean;
+    expiresInSeconds: number;
+  }> {
+    const normEmail = this.normalizeGuestCheckoutEmail(dto.email);
+    const windowSec = parseInt(
+      this.configService.get<string>('GUEST_CHECKOUT_OTP_SEND_WINDOW_SEC', '900'),
+      10,
+    );
+    const maxSends = parseInt(
+      this.configService.get<string>('GUEST_CHECKOUT_OTP_MAX_SEND_PER_WINDOW', '3'),
+      10,
+    );
+    const ttlSec = parseInt(
+      this.configService.get<string>('GUEST_CHECKOUT_OTP_TTL_SEC', '600'),
+      10,
+    );
+    const maxVerifyAttempts = parseInt(
+      this.configService.get<string>('GUEST_CHECKOUT_OTP_MAX_VERIFY_ATTEMPTS', '5'),
+      10,
+    );
+
+    const now = Date.now();
+    const rlKey = this.guestCheckoutOtpRateKey(normEmail);
+    const prevSends = (await this.cache.get<number[]>(rlKey)) || [];
+    const windowMs = Math.max(60, windowSec) * 1000;
+    const recentSends = prevSends.filter((t) => now - t < windowMs);
+    if (recentSends.length >= maxSends) {
+      throw new BadRequestException(
+        'Çok fazla kod isteği gönderildi. Lütfen bir süre sonra tekrar deneyin.',
+      );
+    }
+    recentSends.push(now);
+    await this.cache.set(rlKey, recentSends, { ttl: windowSec });
+
+    const consumptions = Math.min(
+      20,
+      Math.max(1, dto.expectedCheckoutCount ?? 1),
+    );
+    const codeNum = randomInt(0, 1_000_000);
+    const code = String(codeNum).padStart(6, '0');
+    const h = this.hashGuestCheckoutOtp(normEmail, code);
+
+    const sendResult = await this.notificationService.sendGuestCheckoutVerificationCode(
+      normEmail,
+      code,
+      ttlSec,
+    );
+    if (!sendResult.success) {
+      throw new BadRequestException(
+        sendResult.error || 'Doğrulama kodu e-postası gönderilemedi',
+      );
+    }
+
+    const otpKey = this.guestCheckoutOtpKey(normEmail);
+    await this.cache.set(
+      otpKey,
+      { h, a: 0, c: consumptions, v: maxVerifyAttempts },
+      { ttl: ttlSec },
+    );
+
+    return { success: true, expiresInSeconds: ttlSec };
+  }
+
+  private async consumeGuestCheckoutOtp(normEmail: string, code: string): Promise<void> {
+    const otpKey = this.guestCheckoutOtpKey(normEmail);
+    const record = await this.cache.get<{
+      h: string;
+      a: number;
+      c: number;
+      v?: number;
+    }>(otpKey);
+
+    if (!record?.h) {
+      throw new BadRequestException('Doğrulama kodu geçersiz veya süresi dolmuş');
+    }
+
+    const maxWrong = record.v ?? 5;
+    if (record.a >= maxWrong) {
+      await this.cache.del(otpKey);
+      throw new BadRequestException('Çok fazla hatalı deneme. Yeni kod isteyin.');
+    }
+
+    const expectedHex = this.hashGuestCheckoutOtp(normEmail, code.trim());
+    const aBuf = Buffer.from(record.h, 'hex');
+    const bBuf = Buffer.from(expectedHex, 'hex');
+    const match =
+      aBuf.length === bBuf.length &&
+      aBuf.length > 0 &&
+      timingSafeEqual(aBuf, bBuf);
+
+    const ttlLeft = await this.cache.ttl(otpKey);
+
+    if (!match) {
+      record.a += 1;
+      if (record.a >= maxWrong) {
+        await this.cache.del(otpKey);
+      } else if (ttlLeft > 0) {
+        await this.cache.set(otpKey, record, { ttl: ttlLeft });
+      }
+      throw new BadRequestException('Doğrulama kodu hatalı');
+    }
+
+    record.c -= 1;
+    if (record.c <= 0) {
+      await this.cache.del(otpKey);
+    } else if (ttlLeft > 0) {
+      await this.cache.set(otpKey, { h: record.h, a: 0, c: record.c, v: maxWrong }, { ttl: ttlLeft });
+    } else {
+      await this.cache.del(otpKey);
+    }
+  }
+
   /**
    * Guest checkout - Create order without registration
    * Requirement: Guest checkout (requirements.txt)
    */
   async guestCheckout(dto: GuestCheckoutDto) {
+    const normEmail = this.normalizeGuestCheckoutEmail(dto.email);
+    await this.consumeGuestCheckoutOtp(normEmail, dto.emailVerificationCode);
+
     const result = await this.prisma.$transaction(async (tx) => {
-      // Get product
+      const lockedRows = await tx.$queryRaw<{ id: string }[]>`
+        SELECT p.id
+        FROM products p
+        WHERE p.id = ${dto.productId}
+        FOR UPDATE
+      `;
+      if (!lockedRows?.length) {
+        throw new NotFoundException('Ürün bulunamadı');
+      }
+
       const product = await tx.product.findUnique({
         where: { id: dto.productId },
         include: {
@@ -1228,17 +1556,39 @@ export class OrderService {
       );
 
       // Calculate shipping cost (free shipping for orders >= 500 TL)
-      const shippingCost = this.calculateShippingCost(finalPrice);
+      const shippingCost = await this.calculateShippingCost(finalPrice);
       // Buyer fee is added to order total
       const totalAmount = finalPrice + shippingCost + commissionResult.buyerFeeAmount;
 
       // Generate order number
       const orderNumber = await this.generateOrderNumber();
 
+      const guestSuratKey =
+        dto.idempotencyKey?.trim() ||
+        this.buildSuratIdempotencyKey([
+          dto.email?.trim() || '',
+          dto.productId,
+          dto.offerId || '',
+          `${dto.shippingAddress.city}|${dto.shippingAddress.phone}|${dto.shippingAddress.address}`,
+        ]);
+
+      await this.assertSuratShipmentSucceeded({
+        correlationId: randomUUID(),
+        idempotencyKey: guestSuratKey,
+        recipientFullName: dto.shippingAddress.fullName.trim(),
+        recipientPhone: dto.shippingAddress.phone.trim(),
+        recipientCity: dto.shippingAddress.city.trim(),
+        recipientDistrict: dto.shippingAddress.district.trim(),
+        recipientAddressLine: dto.shippingAddress.address.trim(),
+        productId: dto.productId,
+        productTitle: product.title ?? undefined,
+        orderNumberPreview: orderNumber,
+      });
+
       // Build guest shippingAddress JSON; add billing when provided and different
       const guestShippingJson: Record<string, unknown> = {
         guestName: dto.guestName?.trim() || dto.shippingAddress.fullName.trim(),
-        guestEmail: dto.email?.trim(),
+        guestEmail: normEmail,
         guestPhone: dto.phone?.trim(),
         fullName: dto.shippingAddress.fullName.trim(),
         phone: dto.shippingAddress.phone.trim(),
@@ -1248,6 +1598,9 @@ export class OrderService {
         zipCode: dto.shippingAddress.zipCode?.trim() || null,
         isGuestOrder: true,
       };
+      if (this.suratCargoService.isIntegrationEnabled()) {
+        guestShippingJson.suratIdempotencyKey = guestSuratKey;
+      }
       if (dto.billingAddress?.fullName?.trim() && dto.billingAddress?.city?.trim() && dto.billingAddress?.address?.trim()) {
         (guestShippingJson as any).billingAddress = {
           fullName: dto.billingAddress.fullName.trim(),
@@ -1299,7 +1652,7 @@ export class OrderService {
         commissionResult,
       );
 
-      // Adet bazlı rezervasyon: 1 adet rezerve et
+      // Adet bazlı rezervasyon: 1 adet rezerve et (invalidation yok — cron halledecek)
       await tx.product.update({
         where: { id: dto.productId },
         data: { reservedQuantity: { increment: 1 } },
@@ -1309,13 +1662,13 @@ export class OrderService {
         ...(await this.formatOrderResponse(order, guestUser.id)),
         guestEmail: dto.email,
         orderNumber: order.orderNumber,
-        productId: dto.productId, // Include for cache invalidation
+        productId: dto.productId,
       };
     });
 
     // Invalidate product cache after successful transaction
     await this.invalidateProductCaches(dto.productId);
-    
+
     return result;
   }
 
@@ -1469,6 +1822,9 @@ export class OrderService {
           },
         },
         payment: true,
+        refundRequests: {
+          orderBy: { createdAt: 'desc' },
+        },
       },
     });
 
@@ -1679,18 +2035,11 @@ export class OrderService {
         },
       });
 
-      // Adet bazlı: rezervasyonu kaldır (pending_payment ise 1 adet serbest bırak)
+      // Rezervasyonu kaldır (pending_payment ise 1 adet serbest bırak)
       if (order.status === OrderStatus.pending_payment) {
         await tx.product.update({
           where: { id: order.productId },
           data: { reservedQuantity: { decrement: 1 } },
-        });
-      }
-      // Eski davranış: ürün reserved idiyse tekrar active yap (geçiş dönemi)
-      if (order.product.status === ProductStatus.reserved) {
-        await tx.product.update({
-          where: { id: order.productId },
-          data: { status: ProductStatus.active },
         });
       }
 
@@ -1742,16 +2091,14 @@ export class OrderService {
       throw new BadRequestException('Ürün için yeterli müsait adet yok');
     }
 
-    await this.prisma.$transaction([
-      this.prisma.order.update({
+    await this.prisma.$transaction(async (tx) => {
+      // Yeniden rezerve et (FOR UPDATE ile)
+      await this.productLockService.checkAndReserve(tx, order.productId, 1);
+      await tx.order.update({
         where: { id: orderId },
         data: { status: OrderStatus.pending_payment, version: { increment: 1 } },
-      }),
-      this.prisma.product.update({
-        where: { id: order.productId },
-        data: { reservedQuantity: { increment: 1 } },
-      }),
-    ]);
+      });
+    });
 
     return this.findOne(orderId, userId);
   }
@@ -2007,8 +2354,45 @@ export class OrderService {
             failureReason: order.payment.failureReason ?? undefined,
           }
         : undefined,
+      activeRefundRequest: this.pickActiveRefundRequest(order.refundRequests ?? []),
       createdAt: order.createdAt,
       updatedAt: order.updatedAt,
+    };
+  }
+
+  private pickActiveRefundRequest(refundRequests: any[]): any | null {
+    const activeStatuses = [
+      'pending_review',
+      'approved',
+      'wait_for_delivery',
+      'return_shipment_open',
+      'return_in_transit',
+      'return_delivered',
+      'disputed',
+    ];
+    const active = refundRequests.find((r) => activeStatuses.includes(r.status));
+    if (!active) {
+      const refunded = refundRequests.find((r) => r.status === 'refunded');
+      if (refunded) {
+        return {
+          id: refunded.id,
+          refundNumber: refunded.refundNumber,
+          status: refunded.status,
+          createdAt: refunded.createdAt,
+          refundedAt: refunded.refundedAt,
+        };
+      }
+      return null;
+    }
+    return {
+      id: active.id,
+      refundNumber: active.refundNumber,
+      status: active.status,
+      reason: active.reason,
+      returnTrackingNumber: active.returnTrackingNumber,
+      returnProvider: active.returnProvider,
+      returnStatus: active.returnStatus,
+      createdAt: active.createdAt,
     };
   }
 }

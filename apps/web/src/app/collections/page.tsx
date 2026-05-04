@@ -17,6 +17,7 @@ import {
 import { useAuthStore } from '@/stores/authStore';
 import { collectionsApi, categoriesApi } from '@/lib/api';
 import { useTranslation } from '@/i18n';
+import { Button, Checkbox, Input, Select, Textarea } from '@tarodan/ui';
 
 interface Collection {
   id: string;
@@ -189,32 +190,34 @@ export default function CollectionsPage() {
   const displayedCollections = filteredAndSortedCollections;
 
   return (
-    <div className="min-h-screen bg-gray-50">
+    <div className="min-h-screen bg-surface">
       {/* Page Header */}
-      <div className="bg-white border-b border-gray-200">
+      <div className="bg-surface-elevated border-b border-border">
         <div className="mx-auto px-6 sm:px-8 lg:px-12 xl:px-16 py-5">
           <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
             <div>
-              <h1 className="text-xl font-bold text-gray-900 flex items-center gap-2">
-                <div className="w-1 h-6 bg-orange-500 rounded-sm" />
+              <h1 className="text-xl font-bold text-heading flex items-center gap-2">
+                <div className="w-1 h-6 bg-primary-500 rounded-sm" />
                 {t('collection.collections')}
               </h1>
-              <p className="text-sm text-gray-500 mt-0.5">{t('footer.description')}</p>
+              <p className="text-sm text-muted mt-0.5">{t('footer.description')}</p>
             </div>
             <div className="flex items-center gap-2">
               {mounted && isAuthenticated && limits?.canCreateCollections && (
-                <button
+                <Button
+                  variant="primary"
+                  size="md"
                   onClick={handleCreateClick}
-                  className="px-4 py-2 bg-orange-500 text-white hover:bg-orange-600 rounded text-sm font-medium transition-colors flex items-center gap-1.5"
+                  className="flex items-center gap-1.5"
                 >
                   <FolderPlusIcon className="w-4 h-4" />
                   {t('collection.createCollection')}
-                </button>
+                </Button>
               )}
               {mounted && isAuthenticated && !limits?.canCreateCollections && (
                 <Link
                   href="/pricing"
-                  className="px-4 py-2 bg-gray-100 text-gray-700 hover:bg-gray-200 rounded text-sm font-medium transition-colors"
+                  className="px-4 py-2 bg-surface-alt text-body hover:bg-border-subtle rounded text-sm font-medium transition-colors"
                 >
                   {t('membership.upgrade')}
                 </Link>
@@ -227,73 +230,69 @@ export default function CollectionsPage() {
       <div className="mx-auto px-6 sm:px-8 lg:px-12 xl:px-16 py-5">
         {/* Tabs */}
         {mounted && isAuthenticated && (
-          <div className="flex gap-1 mb-5 bg-gray-100 rounded p-0.5 w-fit">
-            <button
-              onClick={() => { setActiveTab('public'); setSearchQuery(''); }}
+          <div className="flex gap-1 mb-5 bg-surface-alt rounded p-0.5 w-fit">
+            <Button variant="secondary" onClick={() => { setActiveTab('public'); setSearchQuery(''); }}
               className={`px-4 py-1.5 rounded text-sm font-medium transition-colors ${
-                activeTab === 'public' ? 'bg-white text-gray-900 shadow-sm' : 'text-gray-500 hover:text-gray-700'
-              }`}
-            >
+                activeTab === 'public' ? 'bg-surface-elevated text-heading shadow-sm' : 'text-muted hover:text-body'
+              }`}>
               {t('collection.isPublic')}
-            </button>
-            <button
-              onClick={() => { setActiveTab('mine'); setSearchQuery(''); }}
+            </Button>
+            <Button variant="secondary" onClick={() => { setActiveTab('mine'); setSearchQuery(''); }}
               className={`px-4 py-1.5 rounded text-sm font-medium transition-colors ${
-                activeTab === 'mine' ? 'bg-white text-gray-900 shadow-sm' : 'text-gray-500 hover:text-gray-700'
-              }`}
-            >
+                activeTab === 'mine' ? 'bg-surface-elevated text-heading shadow-sm' : 'text-muted hover:text-body'
+              }`}>
               {t('collection.myCollections')} ({myCollections.length})
-            </button>
+            </Button>
           </div>
         )}
 
         {/* Search & Sort Bar */}
         <div className="flex flex-col sm:flex-row gap-3 mb-5">
           <div className="relative flex-1">
-            <MagnifyingGlassIcon className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
-            <input
-              type="text"
+            <MagnifyingGlassIcon className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-subtle" />
+            <Input type="text"
               placeholder={t('collection.searchCollections')}
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              className="w-full pl-9 pr-8 py-2 border border-gray-200 rounded bg-white text-sm text-gray-900 placeholder-gray-400 focus:outline-none focus:border-orange-400"
-            />
+              className="w-full pl-9 pr-8 py-2 border border-border rounded bg-surface-elevated text-sm text-heading placeholder-subtle focus:outline-none focus:border-primary-400" />
             {searchQuery && (
-              <button onClick={() => setSearchQuery('')} className="absolute right-2.5 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600">
+              <Button variant="secondary" onClick={() => setSearchQuery('')} className="absolute right-2.5 top-1/2 -translate-y-1/2 text-subtle hover:text-muted">
                 <XMarkIcon className="w-4 h-4" />
-              </button>
+              </Button>
             )}
           </div>
           <div className="flex items-center gap-2">
             {activeTab === 'public' && (
-              <select
+              <Select
                 value={categoryId}
                 onChange={(e) => setCategoryFilter(e.target.value)}
-                className="px-3 py-2 border border-gray-200 rounded bg-white text-sm text-gray-700 focus:outline-none focus:border-orange-400 min-w-[140px]"
+                className="w-auto min-w-[140px]"
+                selectSize="sm"
               >
                 <option value="">{locale === 'en' ? 'All Categories' : 'Tüm Kategoriler'}</option>
                 {flatCategories.map((cat) => (
                   <option key={cat.id} value={cat.id}>{cat.name}</option>
                 ))}
-              </select>
+              </Select>
             )}
-            <select
+            <Select
               value={sortBy}
               onChange={(e) => setSortBy(e.target.value as SortOption)}
-              className="px-3 py-2 border border-gray-200 rounded bg-white text-sm text-gray-700 focus:outline-none focus:border-orange-400"
+              className="w-auto"
+              selectSize="sm"
             >
               <option value="popular">{t('common.popular')}</option>
               <option value="recent">{t('common.newest')}</option>
               <option value="name">A-Z</option>
               <option value="items_desc">{t('common.desc')}</option>
               <option value="items_asc">{t('common.asc')}</option>
-            </select>
+            </Select>
           </div>
         </div>
 
         {/* Results Info */}
         {(displayedCollections.length > 0 || categoryParamId || searchQuery.trim()) && (
-          <p className="text-xs text-gray-500 mb-4">
+          <p className="text-xs text-muted mb-4">
             {activeTab === 'public'
               ? `${publicTotal} ${locale === 'en' ? 'collections' : 'koleksiyon'}`
               : `${displayedCollections.length} ${locale === 'en' ? 'collections' : 'koleksiyon'}`}
@@ -308,35 +307,35 @@ export default function CollectionsPage() {
         {loading ? (
           <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-4">
             {[...Array(12)].map((_, i) => (
-              <div key={i} className="bg-white rounded border border-gray-100 overflow-hidden animate-pulse">
-                <div className="aspect-[4/3] bg-gray-200" />
+              <div key={i} className="bg-surface-elevated rounded border border-border-subtle overflow-hidden animate-pulse">
+                <div className="aspect-[4/3] bg-border-subtle" />
                 <div className="p-3 space-y-2">
-                  <div className="h-3 bg-gray-200 rounded w-3/4" />
-                  <div className="h-3 bg-gray-200 rounded w-1/2" />
+                  <div className="h-3 bg-border-subtle rounded w-3/4" />
+                  <div className="h-3 bg-border-subtle rounded w-1/2" />
                 </div>
               </div>
             ))}
           </div>
         ) : displayedCollections.length === 0 ? (
-          <div className="text-center py-20 bg-white rounded border border-gray-200">
-            <div className="inline-flex items-center justify-center w-16 h-16 bg-gray-50 rounded mb-4">
-              <FolderPlusIcon className="w-7 h-7 text-gray-400" />
+          <div className="text-center py-20 bg-surface-elevated rounded border border-border">
+            <div className="inline-flex items-center justify-center w-16 h-16 bg-surface rounded mb-4">
+              <FolderPlusIcon className="w-7 h-7 text-subtle" />
             </div>
-            <p className="text-gray-600 text-lg font-medium mb-1">
+            <p className="text-muted text-lg font-medium mb-1">
               {searchQuery ? `"${searchQuery}" ${t('common.noResults')}` : t('collection.noCollections')}
             </p>
-            <p className="text-gray-400 text-sm mb-4">
+            <p className="text-subtle text-sm mb-4">
               {locale === 'en' ? 'Start building your collection today' : 'Koleksiyonunuzu bugün oluşturmaya başlayın'}
             </p>
             {searchQuery && (
-              <button onClick={() => setSearchQuery('')} className="px-5 py-2 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded text-sm font-medium transition-colors">
+              <Button variant="secondary" size="md" onClick={() => setSearchQuery('')}>
                 {t('common.clear')}
-              </button>
+              </Button>
             )}
             {activeTab === 'mine' && !searchQuery && (
-              <button onClick={() => setShowCreateModal(true)} className="px-5 py-2 bg-orange-500 text-white hover:bg-orange-600 rounded text-sm font-medium transition-colors">
+              <Button variant="primary" size="md" onClick={() => setShowCreateModal(true)}>
                 {t('collection.createCollection')}
-              </button>
+              </Button>
             )}
           </div>
         ) : (
@@ -350,9 +349,9 @@ export default function CollectionsPage() {
               >
                 <Link
                   href={`/collections/${collection.id}`}
-                  className="block bg-white rounded border border-gray-200 overflow-hidden hover:border-orange-300 hover:shadow-md transition-all group h-full"
+                  className="block bg-surface-elevated rounded border border-border overflow-hidden hover:border-primary-300 hover:shadow-md transition-all group h-full"
                 >
-                  <div className="aspect-[4/3] bg-gray-100 relative overflow-hidden">
+                  <div className="aspect-[4/3] bg-surface-alt relative overflow-hidden">
                     {collection.coverImageUrl ? (
                       <OptimizedImage
                         src={collection.coverImageUrl}
@@ -363,28 +362,28 @@ export default function CollectionsPage() {
                         logContext={{ collectionId: collection.id, page: 'collections' }}
                       />
                     ) : (
-                      <div className="absolute inset-0 flex items-center justify-center bg-gradient-to-br from-orange-50 to-orange-100 text-4xl">
+                      <div className="absolute inset-0 flex items-center justify-center bg-gradient-to-br from-primary-50 to-primary-100 text-4xl">
                         🚗
                       </div>
                     )}
                     <div className="absolute top-1.5 right-1.5">
                       {collection.isPublic ? (
-                        <span className="px-1.5 py-0.5 bg-emerald-500/90 text-white text-[10px] font-medium rounded">
+                        <span className="px-1.5 py-0.5 bg-success-500/90 text-inverted text-[10px] font-medium rounded">
                           {t('collection.isPublic')}
                         </span>
                       ) : (
-                        <span className="px-1.5 py-0.5 bg-gray-600/90 text-white text-[10px] font-medium rounded">
+                        <span className="px-1.5 py-0.5 bg-body/90 text-inverted text-[10px] font-medium rounded">
                           {t('collection.isPrivate')}
                         </span>
                       )}
                     </div>
                   </div>
                   <div className="p-2.5">
-                    <h3 className="font-medium text-gray-900 text-sm line-clamp-1 group-hover:text-orange-600 transition-colors">{collection.name}</h3>
+                    <h3 className="font-medium text-heading text-sm line-clamp-1 group-hover:text-primary-600 transition-colors">{collection.name}</h3>
                     {collection.description && (
-                      <p className="text-gray-400 text-[10px] mt-0.5 line-clamp-1">{collection.description}</p>
+                      <p className="text-subtle text-[10px] mt-0.5 line-clamp-1">{collection.description}</p>
                     )}
-                    <div className="flex items-center justify-between mt-2 text-[10px] text-gray-400">
+                    <div className="flex items-center justify-between mt-2 text-[10px] text-subtle">
                       <span className="font-medium">{collection.itemCount} {locale === 'en' ? 'items' : 'ürün'}</span>
                       <div className="flex items-center gap-2">
                         {collection.viewCount !== undefined && (
@@ -395,8 +394,8 @@ export default function CollectionsPage() {
                         )}
                       </div>
                     </div>
-                    <div className="mt-1.5 pt-1.5 border-t border-gray-100">
-                      <span className="text-[10px] text-gray-400">@{collection.userName || collection.user?.displayName || 'Kullanıcı'}</span>
+                    <div className="mt-1.5 pt-1.5 border-t border-border-subtle">
+                      <span className="text-[10px] text-subtle">@{collection.userName || collection.user?.displayName || 'Kullanıcı'}</span>
                     </div>
                   </div>
                 </Link>
@@ -422,24 +421,24 @@ export default function CollectionsPage() {
 
       {/* Premium Required Modal */}
       {showPremiumModal && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+        <div className="fixed inset-0 bg-heading/50 flex items-center justify-center z-50 p-4">
           <motion.div
             initial={{ opacity: 0, scale: 0.95 }}
             animate={{ opacity: 1, scale: 1 }}
-            className="bg-white rounded max-w-md w-full p-6 text-center"
+            className="bg-surface-elevated rounded max-w-md w-full p-6 text-center"
           >
-            <div className="w-14 h-14 bg-orange-50 rounded flex items-center justify-center mx-auto mb-4">
-              <FolderPlusIcon className="w-7 h-7 text-orange-500" />
+            <div className="w-14 h-14 bg-primary-50 rounded flex items-center justify-center mx-auto mb-4">
+              <FolderPlusIcon className="w-7 h-7 text-primary-500" />
             </div>
-            <h2 className="text-lg font-bold text-gray-900 mb-2">Üyelik Yükseltme Gerekli</h2>
-            <p className="text-gray-500 text-sm mb-5">
+            <h2 className="text-lg font-bold text-heading mb-2">Üyelik Yükseltme Gerekli</h2>
+            <p className="text-muted text-sm mb-5">
               Koleksiyon oluşturma özelliği Temel ve üzeri üyelikler için aktiftir.
             </p>
             <div className="flex gap-3">
-              <button onClick={() => setShowPremiumModal(false)} className="flex-1 px-4 py-2.5 border border-gray-200 text-gray-700 rounded font-medium hover:bg-gray-50 transition-colors text-sm">
+              <Button variant="outline" size="md" className="flex-1" onClick={() => setShowPremiumModal(false)}>
                 Vazgeç
-              </button>
-              <Link href="/membership" className="flex-1 px-4 py-2.5 bg-orange-500 text-white rounded font-medium hover:bg-orange-600 transition-colors text-center text-sm">
+              </Button>
+              <Link href="/membership" className="flex-1 px-4 py-2.5 bg-primary-500 text-inverted rounded font-medium hover:bg-primary-600 transition-colors text-center text-sm">
                 Üyeliği Yükselt
               </Link>
             </div>
@@ -491,65 +490,62 @@ function CreateCollectionModal({
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
-      <div className="bg-white rounded p-6 w-full max-w-md shadow-xl">
-        <h2 className="text-lg font-bold mb-4 text-gray-900">Yeni Koleksiyon</h2>
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-heading/50">
+      <div className="bg-surface-elevated rounded p-6 w-full max-w-md shadow-xl">
+        <h2 className="text-lg font-bold mb-4 text-heading">Yeni Koleksiyon</h2>
         <form onSubmit={handleSubmit} className="space-y-4">
           <div>
-            <label className="block text-xs text-gray-500 mb-1 font-medium uppercase tracking-wide">İsim</label>
-            <input
-              type="text"
+            <label className="block text-xs text-muted mb-1 font-medium uppercase tracking-wide">İsim</label>
+            <Input type="text"
               value={name}
               onChange={(e) => setName(e.target.value)}
-              className="w-full px-3 py-2 bg-white border border-gray-200 rounded text-sm text-gray-900 placeholder-gray-400 focus:outline-none focus:border-orange-400"
+              className="w-full px-3 py-2 bg-surface-elevated border border-border rounded text-sm text-heading placeholder-subtle focus:outline-none focus:border-primary-400"
               placeholder="Hot Wheels Koleksiyonum"
-              required
-            />
+              required />
           </div>
           <div>
-            <label className="block text-xs text-gray-500 mb-1 font-medium uppercase tracking-wide">Açıklama</label>
-            <textarea
-              value={description}
+            <label className="block text-xs text-muted mb-1 font-medium uppercase tracking-wide">Açıklama</label>
+            <Textarea value={description}
               onChange={(e) => setDescription(e.target.value)}
-              className="w-full px-3 py-2 bg-white border border-gray-200 rounded text-sm text-gray-900 placeholder-gray-400 focus:outline-none focus:border-orange-400"
+              className="w-full px-3 py-2 bg-surface-elevated border border-border rounded text-sm text-heading placeholder-subtle focus:outline-none focus:border-primary-400"
               placeholder="Koleksiyon hakkında..."
-              rows={3}
-            />
+              rows={3} />
           </div>
           <div>
-            <label className="block text-xs text-gray-500 mb-1 font-medium uppercase tracking-wide">Kategori</label>
-            <select
+            <label className="block text-xs text-muted mb-1 font-medium uppercase tracking-wide">Kategori</label>
+            <Select
               value={categoryId}
               onChange={(e) => setCategoryId(e.target.value)}
-              className="w-full px-3 py-2 bg-white border border-gray-200 rounded text-sm text-gray-900 focus:outline-none focus:border-orange-400"
+              selectSize="sm"
             >
               <option value="">Kategori seçin (isteğe bağlı)</option>
               {flatCategories.map((cat) => (
                 <option key={cat.id} value={cat.id}>{cat.name}</option>
               ))}
-            </select>
+            </Select>
           </div>
           <div className="flex items-center gap-2">
-            <input
-              type="checkbox"
+            <Checkbox
               id="isPublic"
               checked={isPublic}
               onChange={(e) => setIsPublic(e.target.checked)}
-              className="w-4 h-4 text-orange-500 border-gray-300 rounded focus:ring-orange-500"
+              label="Herkese açık koleksiyon"
             />
-            <label htmlFor="isPublic" className="text-sm text-gray-700">Herkese açık koleksiyon</label>
           </div>
           <div className="flex gap-3 pt-2">
-            <button type="button" onClick={onClose} className="flex-1 py-2 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded text-sm font-medium transition-colors">
+            <Button type="button" variant="secondary" size="md" className="flex-1" onClick={onClose}>
               İptal
-            </button>
-            <button
+            </Button>
+            <Button
               type="submit"
+              variant="primary"
+              size="md"
+              className="flex-1"
               disabled={loading || !name}
-              className="flex-1 py-2 bg-orange-500 hover:bg-orange-600 text-white rounded text-sm font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+              isLoading={loading}
             >
               {loading ? 'Oluşturuluyor...' : 'Oluştur'}
-            </button>
+            </Button>
           </div>
         </form>
       </div>

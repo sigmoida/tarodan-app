@@ -6,17 +6,17 @@ import { useTranslation } from '@/i18n/LanguageContext';
 export default function TermsPage() {
   const { t } = useTranslation();
   return (
-    <div className="min-h-screen bg-gray-50">
+    <div className="min-h-screen bg-surface">
       {/* Hero Section */}
-      <div className="bg-gradient-to-br from-gray-800 to-gray-900 text-white py-12">
+      <div className="bg-gradient-to-br from-body to-heading text-inverted py-12">
         <div className="max-w-4xl mx-auto px-4">
           <h1 className="text-3xl font-bold mb-2">{t('legal.termsTitle')}</h1>
-          <p className="text-gray-400">{t('legal.lastUpdated')}: 24 Ocak 2026</p>
+          <p className="text-subtle">{t('legal.lastUpdated')}: 24 Ocak 2026</p>
         </div>
       </div>
 
       <div className="max-w-4xl mx-auto px-4 py-12">
-        <div className="bg-white rounded-2xl shadow-sm p-8 prose prose-gray max-w-none">
+        <div className="bg-surface-elevated rounded-2xl shadow-sm p-8 prose prose-gray max-w-none">
           <h2>1. Giriş</h2>
           <p>
             TARODAN platformuna hoş geldiniz. Bu Kullanım Şartları ("Şartlar"), 
@@ -157,8 +157,8 @@ export default function TermsPage() {
             <li>Adres: [Şirket Adresi]</li>
           </ul>
 
-          <div className="mt-8 p-4 bg-gray-100 rounded-lg">
-            <p className="text-sm text-gray-600">
+          <div className="mt-8 p-4 bg-surface-alt rounded-lg">
+            <p className="text-sm text-muted">
               Bu kullanım şartlarını okuduğunuzu ve kabul ettiğinizi onaylıyorsunuz.
             </p>
           </div>

@@ -6,16 +6,16 @@ import { useTranslation } from '@/i18n/LanguageContext';
 export default function IntellectualPropertyPage() {
   const { t } = useTranslation();
   return (
-    <div className="min-h-screen bg-gray-50">
-      <div className="bg-gradient-to-br from-gray-800 to-gray-900 text-white py-12">
+    <div className="min-h-screen bg-surface">
+      <div className="bg-gradient-to-br from-body to-heading text-inverted py-12">
         <div className="max-w-4xl mx-auto px-4">
           <h1 className="text-3xl font-bold mb-2">{t('legal.intellectualPropertyTitle')}</h1>
-          <p className="text-gray-400">{t('legal.lastUpdated')}: 24 Ocak 2026</p>
+          <p className="text-subtle">{t('legal.lastUpdated')}: 24 Ocak 2026</p>
         </div>
       </div>
 
       <div className="max-w-4xl mx-auto px-4 py-12">
-        <div className="bg-white rounded-2xl shadow-sm p-8 prose prose-gray max-w-none">
+        <div className="bg-surface-elevated rounded-2xl shadow-sm p-8 prose prose-gray max-w-none">
           <h2>1. Genel İlke</h2>
           <p>
             TARODAN, üçüncü kişilerin telif hakkı, marka ve diğer fikri mülkiyet

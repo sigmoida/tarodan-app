@@ -20,6 +20,7 @@ import { PrismaModule } from '../prisma/prisma.module';
 import { PaymentModule } from '../modules/payment/payment.module';
 import { StorageModule } from '../modules/storage/storage.module';
 import { SearchModule } from '../modules/search/search.module';
+import { SuratCargoModule } from '../modules/surat-cargo/surat-cargo.module';
 import { QUEUE_NAMES } from './constants';
 
 @Module({
@@ -29,6 +30,7 @@ import { QUEUE_NAMES } from './constants';
     PaymentModule,
     StorageModule,
     SearchModule,
+    SuratCargoModule,
     // Configure BullMQ with Redis connection
     BullModule.forRootAsync({
       imports: [ConfigModule],

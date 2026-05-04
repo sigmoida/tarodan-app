@@ -5,6 +5,7 @@ import { Text, TextInput } from '../src/components/common';
 import { router } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { TarodanColors } from '../src/theme';
+import { supportApi } from '../src/services/api';
 
 export default function ContactScreen() {
   const [name, setName] = useState('');
@@ -21,15 +22,18 @@ export default function ContactScreen() {
     }
 
     setLoading(true);
-    // Simulate API call
-    await new Promise(resolve => setTimeout(resolve, 1500));
-    setLoading(false);
-    
-    setSnackbar({ visible: true, message: 'Mesajınız gönderildi!' });
-    setName('');
-    setEmail('');
-    setSubject('');
-    setMessage('');
+    try {
+      await supportApi.contact({ name, email, subject, message });
+      setSnackbar({ visible: true, message: 'Mesajınız gönderildi!' });
+      setName('');
+      setEmail('');
+      setSubject('');
+      setMessage('');
+    } catch {
+      setSnackbar({ visible: true, message: 'Mesaj gönderilemedi, lütfen tekrar deneyin.' });
+    } finally {
+      setLoading(false);
+    }
   };
 
   const contactMethods = [

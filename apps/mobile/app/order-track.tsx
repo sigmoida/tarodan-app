@@ -197,17 +197,17 @@ export default function OrderTrackScreen() {
               <View style={styles.priceRow}>
                 <Text style={styles.priceLabel}>Ürün Tutarı</Text>
                 <Text style={styles.priceValue}>
-                  ₺{(order.totalAmount - order.shippingCost).toLocaleString('tr-TR')}
+                  ₺{((order.totalAmount ?? 0) - (order.shippingCost ?? 0)).toLocaleString('tr-TR')}
                 </Text>
               </View>
               <View style={styles.priceRow}>
                 <Text style={styles.priceLabel}>Kargo</Text>
-                <Text style={styles.priceValue}>₺{order.shippingCost.toLocaleString('tr-TR')}</Text>
+                <Text style={styles.priceValue}>₺{(order.shippingCost ?? 0).toLocaleString('tr-TR')}</Text>
               </View>
               <Divider style={{ marginVertical: 8 }} />
               <View style={styles.priceRow}>
                 <Text style={styles.totalLabel}>Toplam</Text>
-                <Text style={styles.totalValue}>₺{order.totalAmount.toLocaleString('tr-TR')}</Text>
+                <Text style={styles.totalValue}>₺{(order.totalAmount ?? 0).toLocaleString('tr-TR')}</Text>
               </View>
             </View>
 

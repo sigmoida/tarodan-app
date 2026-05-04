@@ -8,7 +8,8 @@ import { manufacturersApi } from '@/lib/api';
 import { useTranslation } from '@/i18n/LanguageContext';
 import { useAuthStore } from '@/stores/authStore';
 import { motion, AnimatePresence } from 'framer-motion';
-import { MagnifyingGlassIcon, ChevronRightIcon, GlobeAltIcon, CalendarIcon, SparklesIcon } from '@heroicons/react/24/outline';
+import { MagnifyingGlassIcon, ChevronRightIcon, GlobeAltIcon, CalendarIcon, SparklesIcon } from '@heroicons/react/24/outline';import { Button, Input } from '@tarodan/ui';
+
 
 interface BrandData {
   name: string;
@@ -350,9 +351,9 @@ export default function UreticilerPage() {
   const totalProducts = brandsForPage.reduce((sum, b) => sum + b.productCount, 0);
 
   return (
-    <div className="min-h-screen bg-gray-50 pb-20">
+    <div className="min-h-screen bg-surface pb-20">
       {/* Hero - açık tema, lacivert yok; ülke bayrakları filtrede ve kartlarda */}
-      <div className="relative bg-gradient-to-br from-orange-50 via-white to-amber-50/50 overflow-hidden border-b border-gray-200">
+      <div className="relative bg-gradient-to-br from-primary-50 via-surface-elevated to-warning-50/50 overflow-hidden border-b border-border">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 py-14 sm:py-20 relative z-10">
           <motion.div
             initial={{ opacity: 0, y: 20 }}
@@ -360,14 +361,14 @@ export default function UreticilerPage() {
             transition={{ duration: 0.5 }}
             className="text-center"
           >
-            <div className="inline-flex items-center gap-2 bg-orange-100 text-orange-700 text-xs font-bold uppercase tracking-widest px-4 py-1.5 mb-5" style={{ borderRadius: '4px' }}>
+            <div className="inline-flex items-center gap-2 bg-primary-100 text-primary-700 text-xs font-bold uppercase tracking-widest px-4 py-1.5 mb-5" style={{ borderRadius: '4px' }}>
               <SparklesIcon className="w-3.5 h-3.5" />
               {brandsForPage.length} Üretici &middot; {totalProducts.toLocaleString('tr-TR')}+ Ürün
             </div>
-            <h1 className="text-4xl sm:text-5xl font-black text-gray-900 mb-4 tracking-tight">
+            <h1 className="text-4xl sm:text-5xl font-black text-heading mb-4 tracking-tight">
               Diecast Üreticiler Rehberi
             </h1>
-            <p className="text-gray-600 max-w-2xl mx-auto text-base sm:text-lg leading-relaxed">
+            <p className="text-muted max-w-2xl mx-auto text-base sm:text-lg leading-relaxed">
               Dünyanın en prestijli diecast model araba üreticilerini keşfedin. Her markanın tarihini, özel serilerini ve popüler modellerini inceleyin.
             </p>
           </motion.div>
@@ -386,8 +387,8 @@ export default function UreticilerPage() {
               { value: totalProducts.toLocaleString('tr-TR') + '+', label: 'Model' },
             ].map((stat) => (
               <div key={stat.label} className="text-center">
-                <p className="text-2xl sm:text-3xl font-black text-gray-900">{stat.value}</p>
-                <p className="text-xs text-gray-500 mt-1 uppercase tracking-wider font-medium">{stat.label}</p>
+                <p className="text-2xl sm:text-3xl font-black text-heading">{stat.value}</p>
+                <p className="text-xs text-muted mt-1 uppercase tracking-wider font-medium">{stat.label}</p>
               </div>
             ))}
           </motion.div>
@@ -395,62 +396,52 @@ export default function UreticilerPage() {
       </div>
 
       {/* Filters Bar */}
-      <div className="sticky top-0 z-30 bg-white border-b border-gray-200 shadow-sm">
+      <div className="sticky top-0 z-30 bg-surface-elevated border-b border-border shadow-sm">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 py-3">
           <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3">
             {/* Search */}
             <div className="relative flex-1">
-              <MagnifyingGlassIcon className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
-              <input
-                type="text"
+              <MagnifyingGlassIcon className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-subtle" />
+              <Input type="text"
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
                 placeholder="Üretici ara..."
-                className="w-full bg-gray-50 border border-gray-200 pl-9 pr-4 py-2 text-sm outline-none focus:border-orange-400 focus:ring-1 focus:ring-orange-400 transition-colors"
-                style={{ borderRadius: '4px' }}
-              />
+                className="w-full bg-surface border border-border pl-9 pr-4 py-2 text-sm outline-none focus:border-primary-400 focus:ring-1 focus:ring-primary-400 transition-colors"
+                style={{ borderRadius: '4px' }} />
             </div>
 
             {/* Scale Filter */}
             <div className="flex items-center gap-1.5 flex-wrap">
-              <button
-                onClick={() => setSelectedScale(null)}
-                className={`px-3 py-1.5 text-xs font-semibold border transition-colors ${!selectedScale ? 'bg-gray-900 text-white border-gray-900' : 'bg-white text-gray-600 border-gray-200 hover:border-gray-400'}`}
-                style={{ borderRadius: '4px' }}
-              >
+              <Button variant="secondary" onClick={() => setSelectedScale(null)}
+                className={`px-3 py-1.5 text-xs font-semibold border transition-colors ${!selectedScale ? 'bg-heading text-inverted border-border-strong' : 'bg-surface-elevated text-muted border-border hover:border-border-strong'}`}
+                style={{ borderRadius: '4px' }}>
                 Tümü
-              </button>
+              </Button>
               {SCALE_GROUPS.map((sg) => (
-                <button
-                  key={sg.scale}
+                <Button variant="secondary" key={sg.scale}
                   onClick={() => setSelectedScale(selectedScale === sg.scale ? null : sg.scale)}
-                  className={`px-3 py-1.5 text-xs font-semibold border transition-colors ${selectedScale === sg.scale ? 'bg-orange-500 text-white border-orange-500' : 'bg-white text-gray-600 border-gray-200 hover:border-orange-300'}`}
-                  style={{ borderRadius: '4px' }}
-                >
+                  className={`px-3 py-1.5 text-xs font-semibold border transition-colors ${selectedScale === sg.scale ? 'bg-primary-500 text-inverted border-primary-500' : 'bg-surface-elevated text-muted border-border hover:border-primary-300'}`}
+                  style={{ borderRadius: '4px' }}>
                   {sg.scale}
-                </button>
+                </Button>
               ))}
             </div>
 
             {/* Country Filter */}
             <div className="flex items-center gap-1.5 flex-wrap">
               {selectedCountry && (
-                <button
-                  onClick={() => setSelectedCountry(null)}
-                  className="px-2 py-1.5 text-xs font-semibold text-red-500 hover:text-red-700 transition-colors"
-                >
+                <Button variant="secondary" onClick={() => setSelectedCountry(null)}
+                  className="px-2 py-1.5 text-xs font-semibold text-danger-500 hover:text-danger-700 transition-colors">
                   ✕
-                </button>
+                </Button>
               )}
               {countries.slice(0, 5).map(([country, info]) => (
-                <button
-                  key={country}
+                <Button variant="secondary" key={country}
                   onClick={() => setSelectedCountry(selectedCountry === country ? null : country)}
-                  className={`px-2.5 py-1.5 text-xs font-medium border transition-colors ${selectedCountry === country ? 'bg-orange-50 text-orange-700 border-orange-300' : 'bg-white text-gray-500 border-gray-200 hover:border-gray-300'}`}
-                  style={{ borderRadius: '4px' }}
-                >
+                  className={`px-2.5 py-1.5 text-xs font-medium border transition-colors ${selectedCountry === country ? 'bg-primary-50 text-primary-700 border-primary-300' : 'bg-surface-elevated text-muted border-border hover:border-border'}`}
+                  style={{ borderRadius: '4px' }}>
                   {info.flag} {country}
-                </button>
+                </Button>
               ))}
             </div>
           </div>
@@ -463,17 +454,15 @@ export default function UreticilerPage() {
           {SCALE_GROUPS.map((sg) => {
             const count = brandsForPage.filter((b) => b.scale === sg.scale).length;
             return (
-              <button
-                key={sg.scale}
+              <Button variant="secondary" key={sg.scale}
                 onClick={() => setSelectedScale(selectedScale === sg.scale ? null : sg.scale)}
-                className={`text-left p-3 sm:p-4 border transition-all ${selectedScale === sg.scale ? 'bg-orange-50 border-orange-300 shadow-sm' : 'bg-white border-gray-200 hover:border-orange-200 hover:shadow-sm'}`}
-                style={{ borderRadius: '4px' }}
-              >
-                <div className="text-lg sm:text-xl font-black text-gray-900">{sg.scale}</div>
-                <div className="text-[11px] font-semibold text-orange-600 mt-0.5">{sg.label}</div>
-                <div className="text-[10px] text-gray-400 mt-1 leading-snug">{sg.desc}</div>
-                <div className="text-[10px] text-gray-500 mt-2 font-medium">{count} üretici</div>
-              </button>
+                className={`text-left p-3 sm:p-4 border transition-all ${selectedScale === sg.scale ? 'bg-primary-50 border-primary-300 shadow-sm' : 'bg-surface-elevated border-border hover:border-primary-200 hover:shadow-sm'}`}
+                style={{ borderRadius: '4px' }}>
+                <div className="text-lg sm:text-xl font-black text-heading">{sg.scale}</div>
+                <div className="text-[11px] font-semibold text-primary-600 mt-0.5">{sg.label}</div>
+                <div className="text-[10px] text-subtle mt-1 leading-snug">{sg.desc}</div>
+                <div className="text-[10px] text-muted mt-2 font-medium">{count} üretici</div>
+              </Button>
             );
           })}
         </div>
@@ -487,18 +476,16 @@ export default function UreticilerPage() {
             animate={{ opacity: 1 }}
             className="text-center py-20"
           >
-            <div className="inline-flex items-center justify-center w-16 h-16 bg-gray-100 mb-4" style={{ borderRadius: '4px' }}>
-              <MagnifyingGlassIcon className="w-8 h-8 text-gray-400" />
+            <div className="inline-flex items-center justify-center w-16 h-16 bg-surface-alt mb-4" style={{ borderRadius: '4px' }}>
+              <MagnifyingGlassIcon className="w-8 h-8 text-subtle" />
             </div>
-            <h3 className="text-lg font-bold text-gray-900 mb-1">Sonuç Bulunamadı</h3>
-            <p className="text-sm text-gray-500 mb-4">&quot;{searchQuery}&quot; aramasıyla eşleşen üretici yok.</p>
-            <button
-              onClick={() => { setSearchQuery(''); setSelectedScale(null); setSelectedCountry(null); }}
-              className="px-5 py-2 bg-gray-900 text-white text-sm font-semibold hover:bg-orange-600 transition-colors"
-              style={{ borderRadius: '4px' }}
-            >
+            <h3 className="text-lg font-bold text-heading mb-1">Sonuç Bulunamadı</h3>
+            <p className="text-sm text-muted mb-4">&quot;{searchQuery}&quot; aramasıyla eşleşen üretici yok.</p>
+            <Button variant="secondary" onClick={() => { setSearchQuery(''); setSelectedScale(null); setSelectedCountry(null); }}
+              className="px-5 py-2 bg-heading text-inverted text-sm font-semibold hover:bg-primary-600 transition-colors"
+              style={{ borderRadius: '4px' }}>
               Filtreleri Temizle
-            </button>
+            </Button>
           </motion.div>
         ) : (
           <div className="space-y-4">
@@ -510,15 +497,13 @@ export default function UreticilerPage() {
                 transition={{ delay: idx * 0.04, duration: 0.35 }}
               >
                 <div
-                  className={`bg-white border transition-all overflow-hidden ${expandedBrand === brand.slug ? 'border-orange-300 shadow-md' : 'border-gray-200 hover:border-orange-200 hover:shadow-sm'}`}
+                  className={`bg-surface-elevated border transition-all overflow-hidden ${expandedBrand === brand.slug ? 'border-primary-300 shadow-md' : 'border-border hover:border-primary-200 hover:shadow-sm'}`}
                   style={{ borderRadius: '6px' }}
                 >
                   {/* Brand Header - Always visible */}
-                  <button
-                    onClick={() => setExpandedBrand(expandedBrand === brand.slug ? null : brand.slug)}
-                    className="w-full text-left p-4 sm:p-5 flex items-center gap-4 sm:gap-5"
-                  >
-                    <div className="w-16 h-16 sm:w-20 sm:h-20 flex-shrink-0 bg-gray-50 border border-gray-100 flex items-center justify-center p-2 relative" style={{ borderRadius: '6px' }}>
+                  <Button variant="secondary" onClick={() => setExpandedBrand(expandedBrand === brand.slug ? null : brand.slug)}
+                    className="w-full text-left p-4 sm:p-5 flex items-center gap-4 sm:gap-5">
+                    <div className="w-16 h-16 sm:w-20 sm:h-20 flex-shrink-0 bg-surface border border-border-subtle flex items-center justify-center p-2 relative" style={{ borderRadius: '6px' }}>
                       {brand.logoUrl ? (
                         <Image
                           src={brand.logoUrl}
@@ -529,19 +514,19 @@ export default function UreticilerPage() {
                           unoptimized
                         />
                       ) : (
-                        <span className="text-xl font-bold text-gray-400">{brand.name.charAt(0)}</span>
+                        <span className="text-xl font-bold text-subtle">{brand.name.charAt(0)}</span>
                       )}
                     </div>
                     <div className="flex-1 min-w-0">
                       <div className="flex items-center gap-2 mb-1">
-                        <h2 className="text-lg sm:text-xl font-bold text-gray-900 truncate">{brand.name}</h2>
+                        <h2 className="text-lg sm:text-xl font-bold text-heading truncate">{brand.name}</h2>
                         <span className="text-sm">{brand.countryFlag}</span>
-                        <span className="ml-auto flex-shrink-0 bg-orange-50 text-orange-700 text-[11px] font-bold px-2.5 py-0.5" style={{ borderRadius: '4px' }}>
+                        <span className="ml-auto flex-shrink-0 bg-primary-50 text-primary-700 text-[11px] font-bold px-2.5 py-0.5" style={{ borderRadius: '4px' }}>
                           {brand.scale}
                         </span>
                       </div>
-                      <p className="text-sm text-gray-500 line-clamp-1">{brand.description}</p>
-                      <div className="flex items-center gap-4 mt-2 text-xs text-gray-400">
+                      <p className="text-sm text-muted line-clamp-1">{brand.description}</p>
+                      <div className="flex items-center gap-4 mt-2 text-xs text-subtle">
                         <span className="flex items-center gap-1">
                           <CalendarIcon className="w-3.5 h-3.5" />
                           {brand.founded}
@@ -550,11 +535,11 @@ export default function UreticilerPage() {
                           <GlobeAltIcon className="w-3.5 h-3.5" />
                           {brand.parent}
                         </span>
-                        <span className="font-medium text-gray-600">{brand.scale}</span>
+                        <span className="font-medium text-muted">{brand.scale}</span>
                       </div>
                     </div>
-                    <ChevronRightIcon className={`w-5 h-5 text-gray-400 flex-shrink-0 transition-transform duration-200 ${expandedBrand === brand.slug ? 'rotate-90' : ''}`} />
-                  </button>
+                    <ChevronRightIcon className={`w-5 h-5 text-subtle flex-shrink-0 transition-transform duration-200 ${expandedBrand === brand.slug ? 'rotate-90' : ''}`} />
+                  </Button>
 
                   {/* Expanded Content */}
                   <AnimatePresence>
@@ -566,20 +551,20 @@ export default function UreticilerPage() {
                         transition={{ duration: 0.25 }}
                         className="overflow-hidden"
                       >
-                        <div className="px-4 sm:px-5 pb-5 border-t border-gray-100 pt-4">
+                        <div className="px-4 sm:px-5 pb-5 border-t border-border-subtle pt-4">
                           <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
                             {/* History - only when we have content */}
                             {(brand.history || brand.specialty) && (
                               <div className="md:col-span-2">
-                                <h3 className="text-sm font-bold text-gray-900 mb-2 flex items-center gap-1.5">
-                                  <CalendarIcon className="w-4 h-4 text-orange-500" />
+                                <h3 className="text-sm font-bold text-heading mb-2 flex items-center gap-1.5">
+                                  <CalendarIcon className="w-4 h-4 text-primary-500" />
                                   Üretici Tarihi
                                 </h3>
-                                {brand.history && <p className="text-sm text-gray-600 leading-relaxed">{brand.history}</p>}
+                                {brand.history && <p className="text-sm text-muted leading-relaxed">{brand.history}</p>}
                                 {brand.specialty && (
-                                  <div className="mt-4 p-3 bg-orange-50/50 border border-orange-100" style={{ borderRadius: '4px' }}>
-                                    <h4 className="text-xs font-bold text-orange-700 mb-1">Uzmanlık Alanı</h4>
-                                    <p className="text-xs text-orange-600">{brand.specialty}</p>
+                                  <div className="mt-4 p-3 bg-primary-50/50 border border-primary-100" style={{ borderRadius: '4px' }}>
+                                    <h4 className="text-xs font-bold text-primary-700 mb-1">Uzmanlık Alanı</h4>
+                                    <p className="text-xs text-primary-600">{brand.specialty}</p>
                                   </div>
                                 )}
                               </div>
@@ -587,8 +572,8 @@ export default function UreticilerPage() {
 
                             {/* Popular Models - only when we have models */}
                             <div className={!(brand.history || brand.specialty) ? 'md:col-span-3' : ''}>
-                              <h3 className="text-sm font-bold text-gray-900 mb-2 flex items-center gap-1.5">
-                                <SparklesIcon className="w-4 h-4 text-orange-500" />
+                              <h3 className="text-sm font-bold text-heading mb-2 flex items-center gap-1.5">
+                                <SparklesIcon className="w-4 h-4 text-primary-500" />
                                 Popüler Modeller
                               </h3>
                               {Array.isArray(brand.popularModels) && brand.popularModels.length > 0 ? (
@@ -597,9 +582,9 @@ export default function UreticilerPage() {
                                   <li key={model}>
                                     <Link
                                       href={`/listings?manufacturer=${encodeURIComponent(brand.name)}&search=${encodeURIComponent(model)}`}
-                                      className="flex items-center gap-2 text-sm text-gray-600 hover:text-orange-600 transition-colors group"
+                                      className="flex items-center gap-2 text-sm text-muted hover:text-primary-600 transition-colors group"
                                     >
-                                      <span className="w-1.5 h-1.5 bg-gray-300 group-hover:bg-orange-500 transition-colors flex-shrink-0" style={{ borderRadius: '1px' }} />
+                                      <span className="w-1.5 h-1.5 bg-border-strong group-hover:bg-primary-500 transition-colors flex-shrink-0" style={{ borderRadius: '1px' }} />
                                       {model}
                                       <ChevronRightIcon className="w-3 h-3 ml-auto opacity-0 group-hover:opacity-100 transition-opacity" />
                                     </Link>
@@ -607,12 +592,12 @@ export default function UreticilerPage() {
                                 ))}
                               </ul>
                               ) : (
-                                <p className="text-sm text-gray-500">Bu üretici için popüler model listesi yok.</p>
+                                <p className="text-sm text-muted">Bu üretici için popüler model listesi yok.</p>
                               )}
 
                               <Link
                                 href={`/listings?manufacturer=${encodeURIComponent(brand.name)}`}
-                                className="inline-flex items-center gap-1 mt-4 text-sm font-semibold text-orange-600 hover:text-orange-700 transition-colors"
+                                className="inline-flex items-center gap-1 mt-4 text-sm font-semibold text-primary-600 hover:text-primary-700 transition-colors"
                               >
                                 Tüm {brand.name} ilanları
                                 <ChevronRightIcon className="w-3.5 h-3.5" />
@@ -621,22 +606,22 @@ export default function UreticilerPage() {
                           </div>
 
                           {/* Quick Info Bar */}
-                          <div className="flex flex-wrap items-center gap-3 mt-5 pt-4 border-t border-gray-100">
-                            <div className="flex items-center gap-2 bg-gray-50 px-3 py-1.5 text-xs" style={{ borderRadius: '4px' }}>
-                              <span className="font-bold text-gray-900">Kuruluş:</span>
-                              <span className="text-gray-600">{brand.founded}, {brand.country}</span>
+                          <div className="flex flex-wrap items-center gap-3 mt-5 pt-4 border-t border-border-subtle">
+                            <div className="flex items-center gap-2 bg-surface px-3 py-1.5 text-xs" style={{ borderRadius: '4px' }}>
+                              <span className="font-bold text-heading">Kuruluş:</span>
+                              <span className="text-muted">{brand.founded}, {brand.country}</span>
                             </div>
-                            <div className="flex items-center gap-2 bg-gray-50 px-3 py-1.5 text-xs" style={{ borderRadius: '4px' }}>
-                              <span className="font-bold text-gray-900">Ana Şirket:</span>
-                              <span className="text-gray-600">{brand.parent}</span>
+                            <div className="flex items-center gap-2 bg-surface px-3 py-1.5 text-xs" style={{ borderRadius: '4px' }}>
+                              <span className="font-bold text-heading">Ana Şirket:</span>
+                              <span className="text-muted">{brand.parent}</span>
                             </div>
-                            <div className="flex items-center gap-2 bg-gray-50 px-3 py-1.5 text-xs" style={{ borderRadius: '4px' }}>
-                              <span className="font-bold text-gray-900">Ölçek:</span>
-                              <span className="text-gray-600">{brand.scale}</span>
+                            <div className="flex items-center gap-2 bg-surface px-3 py-1.5 text-xs" style={{ borderRadius: '4px' }}>
+                              <span className="font-bold text-heading">Ölçek:</span>
+                              <span className="text-muted">{brand.scale}</span>
                             </div>
-                            <div className="flex items-center gap-2 bg-gray-50 px-3 py-1.5 text-xs" style={{ borderRadius: '4px' }}>
-                              <span className="font-bold text-gray-900">Aktif İlan:</span>
-                              <span className="text-orange-600 font-semibold">{brand.productCount ?? 0}</span>
+                            <div className="flex items-center gap-2 bg-surface px-3 py-1.5 text-xs" style={{ borderRadius: '4px' }}>
+                              <span className="font-bold text-heading">Aktif İlan:</span>
+                              <span className="text-primary-600 font-semibold">{brand.productCount ?? 0}</span>
                             </div>
                           </div>
                         </div>
@@ -652,12 +637,12 @@ export default function UreticilerPage() {
 
       {/* Timeline Section */}
       <div className="max-w-7xl mx-auto px-4 sm:px-6 mt-14">
-        <div className="bg-white border border-gray-200 p-5 sm:p-8" style={{ borderRadius: '6px' }}>
-          <h2 className="text-xl sm:text-2xl font-black text-gray-900 mb-2">Diecast Tarihi</h2>
-          <p className="text-sm text-gray-500 mb-8">Model araba dünyasını şekillendiren kilometre taşları</p>
+        <div className="bg-surface-elevated border border-border p-5 sm:p-8" style={{ borderRadius: '6px' }}>
+          <h2 className="text-xl sm:text-2xl font-black text-heading mb-2">Diecast Tarihi</h2>
+          <p className="text-sm text-muted mb-8">Model araba dünyasını şekillendiren kilometre taşları</p>
 
           <div className="relative">
-            <div className="absolute left-[18px] top-0 bottom-0 w-px bg-gray-200" />
+            <div className="absolute left-[18px] top-0 bottom-0 w-px bg-border-subtle" />
             <div className="space-y-6">
               {[
                 { year: 1912, event: 'Schuco Kuruluş', detail: 'Nürnberg, Almanya\'da Heinrich Müller tarafından kurulan Schuco, dünyanın en eski model araba markalarından biri olarak tarihe geçti.' },
@@ -681,16 +666,16 @@ export default function UreticilerPage() {
                   className="flex gap-4 pl-0"
                 >
                   <div className="relative flex-shrink-0">
-                    <div className="w-[37px] h-[37px] bg-white border-2 border-gray-200 flex items-center justify-center z-10 relative" style={{ borderRadius: '4px' }}>
-                      <div className="w-2.5 h-2.5 bg-orange-500" style={{ borderRadius: '2px' }} />
+                    <div className="w-[37px] h-[37px] bg-surface-elevated border-2 border-border flex items-center justify-center z-10 relative" style={{ borderRadius: '4px' }}>
+                      <div className="w-2.5 h-2.5 bg-primary-500" style={{ borderRadius: '2px' }} />
                     </div>
                   </div>
                   <div className="pb-1 pt-1">
                     <div className="flex items-center gap-2 mb-1">
-                      <span className="text-xs font-black text-orange-600 bg-orange-50 px-2 py-0.5" style={{ borderRadius: '3px' }}>{item.year}</span>
-                      <span className="text-sm font-bold text-gray-900">{item.event}</span>
+                      <span className="text-xs font-black text-primary-600 bg-primary-50 px-2 py-0.5" style={{ borderRadius: '3px' }}>{item.year}</span>
+                      <span className="text-sm font-bold text-heading">{item.event}</span>
                     </div>
-                    <p className="text-sm text-gray-500 leading-relaxed">{item.detail}</p>
+                    <p className="text-sm text-muted leading-relaxed">{item.detail}</p>
                   </div>
                 </motion.div>
               ))}
@@ -702,23 +687,23 @@ export default function UreticilerPage() {
       {/* CTA - sadece giriş yapmamış kullanıcılara göster */}
       {!isAuthenticated && (
         <div className="max-w-7xl mx-auto px-4 sm:px-6 mt-8">
-          <div className="bg-orange-50 border border-orange-100 p-6 sm:p-10 text-center relative overflow-hidden" style={{ borderRadius: '6px' }}>
+          <div className="bg-primary-50 border border-primary-100 p-6 sm:p-10 text-center relative overflow-hidden" style={{ borderRadius: '6px' }}>
             <div className="relative z-10">
-              <h2 className="text-2xl sm:text-3xl font-black text-gray-900 mb-3">Koleksiyonunuzu Başlatın</h2>
-              <p className="text-gray-600 mb-6 max-w-lg mx-auto text-sm sm:text-base">
+              <h2 className="text-2xl sm:text-3xl font-black text-heading mb-3">Koleksiyonunuzu Başlatın</h2>
+              <p className="text-muted mb-6 max-w-lg mx-auto text-sm sm:text-base">
                 Favori markalarınızdan binlerce diecast model arasından seçim yapın. Hemen üye olun ve koleksiyonunuzu oluşturmaya başlayın.
               </p>
               <div className="flex items-center justify-center gap-3">
                 <Link
                   href="/listings"
-                  className="px-6 py-2.5 bg-orange-500 text-white text-sm font-bold hover:bg-orange-600 transition-colors"
+                  className="px-6 py-2.5 bg-primary-500 text-inverted text-sm font-bold hover:bg-primary-600 transition-colors"
                   style={{ borderRadius: '4px' }}
                 >
                   İlanları Keşfet
                 </Link>
                 <Link
                   href="/register"
-                  className="px-6 py-2.5 bg-white text-gray-700 text-sm font-bold hover:bg-gray-50 transition-colors border border-gray-200"
+                  className="px-6 py-2.5 bg-surface-elevated text-body text-sm font-bold hover:bg-surface transition-colors border border-border"
                   style={{ borderRadius: '4px' }}
                 >
                   Üye Ol

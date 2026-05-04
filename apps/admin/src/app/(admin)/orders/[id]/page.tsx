@@ -16,7 +16,9 @@ import {
 import { adminApi } from '@/lib/api';
 import { getProductEffectivePrice } from '@/lib/productPrice';
 import toast from 'react-hot-toast';
+import { Button, Input, Select, Spinner, Textarea } from '@tarodan/ui';
 import { AdminFinancialSummary } from '@/components/AdminFinancialSummary';
+import { colors as dsColors } from '@tarodan/ui';
 
 interface OrderDetail {
   id: string;
@@ -73,14 +75,14 @@ interface OrderDetail {
 }
 
 const statusConfig: Record<string, { label: string; color: string; bg: string }> = {
-  pending_payment: { label: 'Ödeme Bekliyor', color: 'text-yellow-600', bg: 'bg-yellow-100' },
-  paid: { label: 'Ödendi', color: 'text-blue-600', bg: 'bg-blue-100' },
-  preparing: { label: 'Hazırlanıyor', color: 'text-purple-600', bg: 'bg-purple-100' },
-  shipped: { label: 'Kargoda', color: 'text-indigo-600', bg: 'bg-indigo-100' },
-  delivered: { label: 'Teslim Edildi', color: 'text-green-600', bg: 'bg-green-100' },
-  completed: { label: 'Tamamlandı', color: 'text-green-600', bg: 'bg-green-100' },
-  cancelled: { label: 'İptal', color: 'text-red-600', bg: 'bg-red-100' },
-  refunded: { label: 'İade Edildi', color: 'text-gray-600', bg: 'bg-gray-100' },
+  pending_payment: { label: 'Ödeme Bekliyor', color: 'text-warning-600', bg: 'bg-warning-100' },
+  paid: { label: 'Ödendi', color: 'text-info-600', bg: 'bg-info-100' },
+  preparing: { label: 'Hazırlanıyor', color: 'text-primary-600', bg: 'bg-primary-100' },
+  shipped: { label: 'Kargoda', color: 'text-info-600', bg: 'bg-info-100' },
+  delivered: { label: 'Teslim Edildi', color: 'text-success-600', bg: 'bg-success-100' },
+  completed: { label: 'Tamamlandı', color: 'text-success-600', bg: 'bg-success-100' },
+  cancelled: { label: 'İptal', color: 'text-danger-600', bg: 'bg-danger-100' },
+  refunded: { label: 'İade Edildi', color: 'text-muted', bg: 'bg-surface-alt' },
 };
 
 const carriers = [
@@ -190,6 +192,13 @@ export default function OrderDetailPage() {
     try {
       const response = await adminApi.getOrderInvoice(orderId);
       const invoiceData = response.data;
+      const invoiceTheme = {
+        heading: dsColors.text.heading,
+        body: dsColors.text.body,
+        muted: dsColors.text.muted,
+        surface: dsColors.surface.alt,
+        border: dsColors.border.DEFAULT,
+      };
 
       // Open print window with invoice content
       const printWindow = window.open('', '_blank');
@@ -201,16 +210,16 @@ export default function OrderDetailPage() {
             <title>Fatura - ${invoiceData.invoiceNumber}</title>
             <style>
               body { font-family: Arial, sans-serif; padding: 40px; max-width: 800px; margin: 0 auto; }
-              .header { text-align: center; margin-bottom: 30px; border-bottom: 2px solid #333; padding-bottom: 20px; }
+              .header { text-align: center; margin-bottom: 30px; border-bottom: 2px solid ${invoiceTheme.heading}; padding-bottom: 20px; }
               .header h1 { margin: 0; font-size: 24px; }
-              .header p { margin: 5px 0; color: #666; }
+              .header p { margin: 5px 0; color: ${invoiceTheme.muted}; }
               .info-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; margin-bottom: 30px; }
-              .info-box { background: #f5f5f5; padding: 15px; border-radius: 8px; }
-              .info-box h3 { margin: 0 0 10px 0; font-size: 14px; color: #666; }
+              .info-box { background: ${invoiceTheme.surface}; padding: 15px; border-radius: 8px; }
+              .info-box h3 { margin: 0 0 10px 0; font-size: 14px; color: ${invoiceTheme.muted}; }
               .info-box p { margin: 3px 0; font-size: 14px; }
               table { width: 100%; border-collapse: collapse; margin-bottom: 20px; }
-              th, td { border: 1px solid #ddd; padding: 10px; text-align: left; }
-              th { background: #f5f5f5; }
+              th, td { border: 1px solid ${invoiceTheme.border}; padding: 10px; text-align: left; }
+              th { background: ${invoiceTheme.surface}; }
               .totals { text-align: right; }
               .totals p { margin: 5px 0; }
               .total-row { font-weight: bold; font-size: 18px; }
@@ -258,7 +267,7 @@ export default function OrderDetailPage() {
               <p class="total-row">TOPLAM: ₺${invoiceData.total.toLocaleString('tr-TR', { minimumFractionDigits: 2 })}</p>
             </div>
             ${invoiceData.shipment?.trackingNumber ? `
-              <div style="margin-top: 20px; padding: 10px; background: #f5f5f5; border-radius: 4px;">
+              <div style="margin-top: 20px; padding: 10px; background: ${invoiceTheme.surface}; border-radius: 4px;">
                 <strong>Kargo Takip:</strong> ${invoiceData.shipment.carrier || ''} - ${invoiceData.shipment.trackingNumber}
               </div>
             ` : ''}
@@ -277,8 +286,8 @@ export default function OrderDetailPage() {
     return (
       <div className="flex items-center justify-center min-h-screen">
         <div className="text-center">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary-600 mx-auto"></div>
-          <p className="mt-4 text-gray-600">Yükleniyor...</p>
+          <Spinner size="xl" color="border-primary-600 border-t-transparent" className="mx-auto" />
+          <p className="mt-4 text-muted">Yükleniyor...</p>
         </div>
       </div>
     );
@@ -287,7 +296,7 @@ export default function OrderDetailPage() {
   if (!order) {
     return (
       <div className="text-center py-12">
-        <p className="text-gray-600">Sipariş bulunamadı</p>
+        <p className="text-muted">Sipariş bulunamadı</p>
       </div>
     );
   }
@@ -295,19 +304,19 @@ export default function OrderDetailPage() {
   const statusInfo = statusConfig[order.status] || statusConfig.pending_payment;
 
   return (
-      <div className="min-h-screen bg-gray-50">
+      <div className="min-h-screen bg-surface">
         <main className="max-w-6xl mx-auto px-4 py-8">
           {/* Header */}
           <div className="flex items-center gap-4 mb-8">
             <Link
               href="/orders"
-              className="p-2 hover:bg-gray-200 rounded-lg transition-colors"
+              className="p-2 hover:bg-border-subtle rounded-lg transition-colors"
             >
-              <ArrowLeftIcon className="w-6 h-6 text-gray-600" />
+              <ArrowLeftIcon className="w-6 h-6 text-muted" />
             </Link>
             <div className="flex-1">
-              <h1 className="text-3xl font-bold text-gray-900">Sipariş #{order.orderNumber}</h1>
-              <p className="text-sm text-gray-500">
+              <h1 className="text-3xl font-bold text-heading">Sipariş #{order.orderNumber}</h1>
+              <p className="text-sm text-muted">
                 {new Date(order.createdAt).toLocaleString('tr-TR')}
               </p>
             </div>
@@ -320,49 +329,41 @@ export default function OrderDetailPage() {
 
           {/* Action Buttons */}
           <div className="flex flex-wrap gap-2 mb-6">
-            <button
-              onClick={() => setShowStatusModal(true)}
-              className="px-4 py-2 bg-primary-600 text-gray-900 rounded-lg hover:bg-primary-700 transition-colors"
-            >
+            <Button variant="secondary" onClick={() => setShowStatusModal(true)}
+              className="px-4 py-2 bg-primary-600 text-heading rounded-lg hover:bg-primary-700 transition-colors">
               Durum Güncelle
-            </button>
-            <button
-              onClick={() => setShowTrackingModal(true)}
-              className="px-4 py-2 bg-indigo-600 text-gray-900 rounded-lg hover:bg-indigo-700 transition-colors flex items-center gap-2"
-            >
+            </Button>
+            <Button variant="secondary" onClick={() => setShowTrackingModal(true)}
+              className="px-4 py-2 bg-info-600 text-heading rounded-lg hover:bg-info-700 transition-colors flex items-center gap-2">
               <TruckIcon className="w-5 h-5" />
               Kargo Takibi Ekle
-            </button>
-            <button
-              onClick={() => setShowNotifyModal(true)}
-              className="px-4 py-2 bg-purple-600 text-gray-900 rounded-lg hover:bg-purple-700 transition-colors flex items-center gap-2"
-            >
+            </Button>
+            <Button variant="secondary" onClick={() => setShowNotifyModal(true)}
+              className="px-4 py-2 bg-primary-600 text-heading rounded-lg hover:bg-primary-700 transition-colors flex items-center gap-2">
               <BellIcon className="w-5 h-5" />
               Bildirim Gönder
-            </button>
-            <button
-              onClick={handlePrintInvoice}
-              className="px-4 py-2 bg-gray-600 text-gray-900 rounded-lg hover:bg-gray-100 transition-colors flex items-center gap-2"
-            >
+            </Button>
+            <Button variant="secondary" onClick={handlePrintInvoice}
+              className="px-4 py-2 bg-body text-heading rounded-lg hover:bg-surface-alt transition-colors flex items-center gap-2">
               <PrinterIcon className="w-5 h-5" />
               Fatura Yazdır
-            </button>
+            </Button>
           </div>
 
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
             {/* Main Content */}
             <div className="lg:col-span-2 space-y-6">
               {/* Order Info */}
-              <div className="bg-white rounded-xl shadow-sm p-6">
-                <h2 className="text-lg font-semibold text-gray-900 mb-4 flex items-center gap-2">
+              <div className="bg-surface-elevated rounded-xl shadow-sm p-6">
+                <h2 className="text-lg font-semibold text-heading mb-4 flex items-center gap-2">
                   <ShoppingBagIcon className="w-5 h-5" />
                   Sipariş Bilgileri
                 </h2>
                 <div className="space-y-4">
                   <div className="grid grid-cols-2 gap-4">
                     <div>
-                      <span className="text-gray-600 text-sm">Durum:</span>
-                      <p className="font-medium capitalize text-gray-900">{statusInfo.label}</p>
+                      <span className="text-muted text-sm">Durum:</span>
+                      <p className="font-medium capitalize text-heading">{statusInfo.label}</p>
                     </div>
                   </div>
                   <div className="border-t pt-4 mt-4">
@@ -383,11 +384,11 @@ export default function OrderDetailPage() {
               </div>
 
               {/* Product Info */}
-              <div className="bg-white rounded-xl shadow-sm p-6">
-                <h2 className="text-lg font-semibold text-gray-900 mb-4">Ürün Bilgileri</h2>
+              <div className="bg-surface-elevated rounded-xl shadow-sm p-6">
+                <h2 className="text-lg font-semibold text-heading mb-4">Ürün Bilgileri</h2>
                 <div className="flex gap-4">
                   {order.product.images && order.product.images.length > 0 && (
-                    <div className="w-24 h-24 rounded-lg overflow-hidden bg-gray-100 flex-shrink-0">
+                    <div className="w-24 h-24 rounded-lg overflow-hidden bg-surface-alt flex-shrink-0">
                       <img
                         src={order.product.images[0].url}
                         alt={order.product.title}
@@ -402,7 +403,7 @@ export default function OrderDetailPage() {
                     >
                       {order.product.title}
                     </Link>
-                    <p className="text-gray-600 mt-1">
+                    <p className="text-muted mt-1">
                       ₺{getProductEffectivePrice(order.product).toLocaleString('tr-TR', { minimumFractionDigits: 2 })}
                     </p>
                   </div>
@@ -411,25 +412,25 @@ export default function OrderDetailPage() {
 
               {/* Payment Info */}
               {order.payment && (
-                <div className="bg-white rounded-xl shadow-sm p-6">
-                  <h2 className="text-lg font-semibold text-gray-900 mb-4 flex items-center gap-2">
+                <div className="bg-surface-elevated rounded-xl shadow-sm p-6">
+                  <h2 className="text-lg font-semibold text-heading mb-4 flex items-center gap-2">
                     <CreditCardIcon className="w-5 h-5" />
                     Ödeme Bilgileri
                   </h2>
                   <div className="space-y-2">
                     <div className="flex justify-between">
-                      <span className="text-gray-600">Durum:</span>
-                      <span className="font-medium capitalize text-gray-900">{order.payment.status}</span>
+                      <span className="text-muted">Durum:</span>
+                      <span className="font-medium capitalize text-heading">{order.payment.status}</span>
                     </div>
                     <div className="flex justify-between">
-                      <span className="text-gray-600">Tutar:</span>
-                      <span className="font-medium text-gray-900">
+                      <span className="text-muted">Tutar:</span>
+                      <span className="font-medium text-heading">
                         ₺{order.payment.amount.toLocaleString('tr-TR', { minimumFractionDigits: 2 })}
                       </span>
                     </div>
                     <div className="flex justify-between">
-                      <span className="text-gray-600">Sağlayıcı:</span>
-                      <span className="uppercase text-gray-900">{order.payment.provider}</span>
+                      <span className="text-muted">Sağlayıcı:</span>
+                      <span className="uppercase text-heading">{order.payment.provider}</span>
                     </div>
                     <Link
                       href={`/payments/${order.payment.id}`}
@@ -443,28 +444,28 @@ export default function OrderDetailPage() {
 
               {/* Shipping Info */}
               {order.shipment && (
-                <div className="bg-white rounded-xl shadow-sm p-6">
-                  <h2 className="text-lg font-semibold text-gray-900 mb-4 flex items-center gap-2">
+                <div className="bg-surface-elevated rounded-xl shadow-sm p-6">
+                  <h2 className="text-lg font-semibold text-heading mb-4 flex items-center gap-2">
                     <TruckIcon className="w-5 h-5" />
                     Kargo Bilgileri
                   </h2>
                   <div className="space-y-2">
                     {order.shipment.trackingNumber && (
                       <div className="flex justify-between">
-                        <span className="text-gray-600">Takip No:</span>
-                        <span className="font-mono text-sm text-gray-900">{order.shipment.trackingNumber}</span>
+                        <span className="text-muted">Takip No:</span>
+                        <span className="font-mono text-sm text-heading">{order.shipment.trackingNumber}</span>
                       </div>
                     )}
                     {order.shipment.carrier && (
                       <div className="flex justify-between">
-                        <span className="text-gray-600">Kargo Firması:</span>
-                        <span className="text-gray-900">{order.shipment.carrier}</span>
+                        <span className="text-muted">Kargo Firması:</span>
+                        <span className="text-heading">{order.shipment.carrier}</span>
                       </div>
                     )}
                     {order.shipment.status && (
                       <div className="flex justify-between">
-                        <span className="text-gray-600">Durum:</span>
-                        <span className="font-medium capitalize text-gray-900">{order.shipment.status}</span>
+                        <span className="text-muted">Durum:</span>
+                        <span className="font-medium capitalize text-heading">{order.shipment.status}</span>
                       </div>
                     )}
                   </div>
@@ -473,8 +474,8 @@ export default function OrderDetailPage() {
 
               {/* Shipping Address */}
               {order.shippingAddress && (
-                <div className="bg-white rounded-xl shadow-sm p-6">
-                  <h2 className="text-lg font-semibold text-gray-900 mb-4 flex items-center gap-2">
+                <div className="bg-surface-elevated rounded-xl shadow-sm p-6">
+                  <h2 className="text-lg font-semibold text-heading mb-4 flex items-center gap-2">
                     <MapPinIcon className="w-5 h-5" />
                     Teslimat Adresi
                   </h2>
@@ -482,25 +483,25 @@ export default function OrderDetailPage() {
                     {typeof order.shippingAddress === 'object' ? (
                       <>
                         {order.shippingAddress.fullName && (
-                          <p className="font-medium text-gray-900">{order.shippingAddress.fullName}</p>
+                          <p className="font-medium text-heading">{order.shippingAddress.fullName}</p>
                         )}
                         {order.shippingAddress.address && (
-                          <p className="text-gray-600">{order.shippingAddress.address}</p>
+                          <p className="text-muted">{order.shippingAddress.address}</p>
                         )}
                         {order.shippingAddress.district && order.shippingAddress.city && (
-                          <p className="text-gray-600">
+                          <p className="text-muted">
                             {order.shippingAddress.district}, {order.shippingAddress.city}
                           </p>
                         )}
                         {order.shippingAddress.postalCode && (
-                          <p className="text-gray-600">Posta Kodu: {order.shippingAddress.postalCode}</p>
+                          <p className="text-muted">Posta Kodu: {order.shippingAddress.postalCode}</p>
                         )}
                         {order.shippingAddress.phone && (
-                          <p className="text-gray-600">Tel: {order.shippingAddress.phone}</p>
+                          <p className="text-muted">Tel: {order.shippingAddress.phone}</p>
                         )}
                       </>
                     ) : (
-                      <p className="text-gray-600">{String(order.shippingAddress)}</p>
+                      <p className="text-muted">{String(order.shippingAddress)}</p>
                     )}
                   </div>
                 </div>
@@ -510,8 +511,8 @@ export default function OrderDetailPage() {
             {/* Sidebar */}
             <div className="space-y-6">
               {/* Buyer Info */}
-              <div className="bg-white rounded-xl shadow-sm p-6">
-                <h3 className="text-lg font-semibold text-gray-900 mb-4">Alıcı</h3>
+              <div className="bg-surface-elevated rounded-xl shadow-sm p-6">
+                <h3 className="text-lg font-semibold text-heading mb-4">Alıcı</h3>
                 <div className="space-y-2">
                   <Link
                     href={`/users/${order.buyer.id}`}
@@ -519,16 +520,16 @@ export default function OrderDetailPage() {
                   >
                     {order.buyer.displayName}
                   </Link>
-                  <p className="text-sm text-gray-600">{order.buyer.email}</p>
+                  <p className="text-sm text-muted">{order.buyer.email}</p>
                   {order.buyer.phone && (
-                    <p className="text-sm text-gray-600">{order.buyer.phone}</p>
+                    <p className="text-sm text-muted">{order.buyer.phone}</p>
                   )}
                 </div>
               </div>
 
               {/* Seller Info */}
-              <div className="bg-white rounded-xl shadow-sm p-6">
-                <h3 className="text-lg font-semibold text-gray-900 mb-4">Satıcı</h3>
+              <div className="bg-surface-elevated rounded-xl shadow-sm p-6">
+                <h3 className="text-lg font-semibold text-heading mb-4">Satıcı</h3>
                 <div className="space-y-2">
                   <Link
                     href={`/users/${order.seller.id}`}
@@ -536,26 +537,26 @@ export default function OrderDetailPage() {
                   >
                     {order.seller.displayName}
                   </Link>
-                  <p className="text-sm text-gray-600">{order.seller.email}</p>
+                  <p className="text-sm text-muted">{order.seller.email}</p>
                 </div>
               </div>
 
               {/* Timeline */}
-              <div className="bg-white rounded-xl shadow-sm p-6">
-                <h3 className="text-lg font-semibold text-gray-900 mb-4 flex items-center gap-2">
+              <div className="bg-surface-elevated rounded-xl shadow-sm p-6">
+                <h3 className="text-lg font-semibold text-heading mb-4 flex items-center gap-2">
                   <ClockIcon className="w-5 h-5" />
                   Zaman Çizelgesi
                 </h3>
                 <div className="space-y-3">
                   <div>
-                    <p className="text-sm font-medium text-gray-900">Oluşturulma</p>
-                    <p className="text-xs text-gray-500">
+                    <p className="text-sm font-medium text-heading">Oluşturulma</p>
+                    <p className="text-xs text-muted">
                       {new Date(order.createdAt).toLocaleString('tr-TR')}
                     </p>
                   </div>
                   <div>
-                    <p className="text-sm font-medium text-gray-900">Son Güncelleme</p>
-                    <p className="text-xs text-gray-500">
+                    <p className="text-sm font-medium text-heading">Son Güncelleme</p>
+                    <p className="text-xs text-muted">
                       {new Date(order.updatedAt).toLocaleString('tr-TR')}
                     </p>
                   </div>
@@ -567,17 +568,16 @@ export default function OrderDetailPage() {
 
         {/* Status Update Modal */}
         {showStatusModal && (
-          <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-            <div className="bg-white rounded-xl p-6 max-w-md w-full mx-4">
-              <h3 className="text-lg font-semibold text-gray-900 mb-4">Durum Güncelle</h3>
+          <div className="fixed inset-0 bg-heading bg-opacity-50 flex items-center justify-center z-50">
+            <div className="bg-surface-elevated rounded-xl p-6 max-w-md w-full mx-4">
+              <h3 className="text-lg font-semibold text-heading mb-4">Durum Güncelle</h3>
               <div className="mb-4">
-                <label className="block text-sm font-medium text-gray-700 mb-2">
+                <label className="block text-sm font-medium text-body mb-2">
                   Yeni Durum
                 </label>
-                <select
+                <Select
                   value={newStatus}
                   onChange={(e) => setNewStatus(e.target.value)}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent text-gray-900 bg-white"
                 >
                   <option value="pending_payment">Ödeme Bekliyor</option>
                   <option value="paid">Ödendi</option>
@@ -587,23 +587,19 @@ export default function OrderDetailPage() {
                   <option value="completed">Tamamlandı</option>
                   <option value="cancelled">İptal</option>
                   <option value="refunded">İade Edildi</option>
-                </select>
+                </Select>
               </div>
               <div className="flex gap-3">
-                <button
-                  onClick={() => setShowStatusModal(false)}
-                  className="flex-1 px-4 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors"
-                  disabled={processing}
-                >
+                <Button variant="secondary" onClick={() => setShowStatusModal(false)}
+                  className="flex-1 px-4 text-body hover:bg-surface"
+                  disabled={processing}>
                   İptal
-                </button>
-                <button
-                  onClick={handleStatusUpdate}
-                  className="flex-1 px-4 py-2 bg-primary-600 text-gray-900 rounded-lg hover:bg-primary-700 transition-colors disabled:opacity-50"
-                  disabled={processing}
-                >
+                </Button>
+                <Button variant="secondary" onClick={handleStatusUpdate}
+                  className="flex-1 px-4 py-2 bg-primary-600 text-heading rounded-lg hover:bg-primary-700 transition-colors disabled:opacity-50"
+                  disabled={processing}>
                   {processing ? 'İşleniyor...' : 'Güncelle'}
-                </button>
+                </Button>
               </div>
             </div>
           </div>
@@ -611,47 +607,40 @@ export default function OrderDetailPage() {
 
         {/* Tracking Modal */}
         {showTrackingModal && (
-          <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-            <div className="bg-white rounded-xl p-6 max-w-md w-full mx-4">
-              <h3 className="text-lg font-semibold text-gray-900 mb-4">Kargo Takibi Ekle</h3>
+          <div className="fixed inset-0 bg-heading bg-opacity-50 flex items-center justify-center z-50">
+            <div className="bg-surface-elevated rounded-xl p-6 max-w-md w-full mx-4">
+              <h3 className="text-lg font-semibold text-heading mb-4">Kargo Takibi Ekle</h3>
               <div className="space-y-4 mb-4">
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">Kargo Firması</label>
-                  <select
+                  <label className="block text-sm font-medium text-body mb-2">Kargo Firması</label>
+                  <Select
                     value={carrier}
                     onChange={(e) => setCarrier(e.target.value)}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent text-gray-900 bg-white"
                   >
                     <option value="">Seçiniz</option>
                     {carriers.map((c) => (<option key={c} value={c}>{c}</option>))}
-                  </select>
+                  </Select>
                 </div>
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">Takip Numarası</label>
-                  <input
-                    type="text"
+                  <label className="block text-sm font-medium text-body mb-2">Takip Numarası</label>
+                  <Input type="text"
                     value={trackingNumber}
                     onChange={(e) => setTrackingNumber(e.target.value)}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent text-gray-900 bg-white"
-                    placeholder="Örn: 123456789"
-                  />
+                    className="text-heading"
+                    placeholder="Örn: 123456789" />
                 </div>
               </div>
               <div className="flex gap-3">
-                <button
-                  onClick={() => setShowTrackingModal(false)}
-                  className="flex-1 px-4 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors"
-                  disabled={processing}
-                >
+                <Button variant="secondary" onClick={() => setShowTrackingModal(false)}
+                  className="flex-1 px-4 text-body hover:bg-surface"
+                  disabled={processing}>
                   İptal
-                </button>
-                <button
-                  onClick={handleAddTracking}
-                  className="flex-1 px-4 py-2 bg-indigo-600 text-gray-900 rounded-lg hover:bg-indigo-700 transition-colors disabled:opacity-50"
-                  disabled={processing}
-                >
+                </Button>
+                <Button variant="secondary" onClick={handleAddTracking}
+                  className="flex-1 px-4 py-2 bg-info-600 text-heading rounded-lg hover:bg-info-700 transition-colors disabled:opacity-50"
+                  disabled={processing}>
                   {processing ? 'İşleniyor...' : 'Kaydet'}
-                </button>
+                </Button>
               </div>
             </div>
           </div>
@@ -659,51 +648,44 @@ export default function OrderDetailPage() {
 
         {/* Notify Modal */}
         {showNotifyModal && (
-          <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-            <div className="bg-white rounded-xl p-6 max-w-md w-full mx-4">
-              <h3 className="text-lg font-semibold text-gray-900 mb-4">Bildirim Gönder</h3>
+          <div className="fixed inset-0 bg-heading bg-opacity-50 flex items-center justify-center z-50">
+            <div className="bg-surface-elevated rounded-xl p-6 max-w-md w-full mx-4">
+              <h3 className="text-lg font-semibold text-heading mb-4">Bildirim Gönder</h3>
               <div className="space-y-4 mb-4">
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">Bildirim Türü</label>
-                  <select
+                  <label className="block text-sm font-medium text-body mb-2">Bildirim Türü</label>
+                  <Select
                     value={notifyType}
                     onChange={(e) => setNotifyType(e.target.value)}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent text-gray-900 bg-white"
                   >
                     <option value="status_update">Durum Güncelleme</option>
                     <option value="shipped">Kargoya Verildi</option>
                     <option value="delivered">Teslim Edildi</option>
                     <option value="custom">Özel Mesaj</option>
-                  </select>
+                  </Select>
                 </div>
                 {notifyType === 'custom' && (
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">Mesaj</label>
-                    <textarea
-                      value={notifyMessage}
+                    <label className="block text-sm font-medium text-body mb-2">Mesaj</label>
+                    <Textarea value={notifyMessage}
                       onChange={(e) => setNotifyMessage(e.target.value)}
-                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent text-gray-900 bg-white"
+                      className="text-heading"
                       rows={3}
-                      placeholder="Alıcıya gönderilecek mesajı yazın..."
-                    />
+                      placeholder="Alıcıya gönderilecek mesajı yazın..." />
                   </div>
                 )}
               </div>
               <div className="flex gap-3">
-                <button
-                  onClick={() => setShowNotifyModal(false)}
-                  className="flex-1 px-4 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors"
-                  disabled={processing}
-                >
+                <Button variant="secondary" onClick={() => setShowNotifyModal(false)}
+                  className="flex-1 px-4 text-body hover:bg-surface"
+                  disabled={processing}>
                   İptal
-                </button>
-                <button
-                  onClick={handleSendNotification}
-                  className="flex-1 px-4 py-2 bg-purple-600 text-gray-900 rounded-lg hover:bg-purple-700 transition-colors disabled:opacity-50"
-                  disabled={processing}
-                >
+                </Button>
+                <Button variant="secondary" onClick={handleSendNotification}
+                  className="flex-1 px-4 py-2 bg-primary-600 text-heading rounded-lg hover:bg-primary-700 transition-colors disabled:opacity-50"
+                  disabled={processing}>
                   {processing ? 'İşleniyor...' : 'Gönder'}
-                </button>
+                </Button>
               </div>
             </div>
           </div>

@@ -46,3 +46,6 @@ export * from './tag-admin.dto';
 // Attribute Management
 export * from './attribute-admin.dto';// Rating Management
 export * from './rating-admin.dto';
+
+// Safe-trade (warehouse escrow) admin actions
+export * from './warehouse-trade.dto';

@@ -20,6 +20,7 @@ import {
   InformationCircleIcon,
 } from '@heroicons/react/24/outline';
 import toast from 'react-hot-toast';
+import { Badge, Button, Checkbox, IconButton, Input, Select, Spinner } from '@tarodan/ui';
 
 // IAB Standard Ad Sizes
 const IAB_SIZES = [
@@ -343,62 +344,58 @@ export default function AdsPage() {
       <div className="space-y-6">
         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
           <div>
-            <h1 className="text-2xl font-bold text-gray-900">Reklam Yönetimi</h1>
-            <p className="text-sm text-gray-500 mt-1">IAB standartlarına uygun reklam yönetimi</p>
+            <h1 className="text-2xl font-bold text-heading">Reklam Yönetimi</h1>
+            <p className="text-sm text-muted mt-1">IAB standartlarına uygun reklam yönetimi</p>
           </div>
-          <button
-            onClick={openCreate}
-            className="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-primary-500 text-gray-900 hover:bg-primary-600 transition-colors"
-          >
-            <PlusIcon className="h-5 w-5" />
+          <Button variant="primary" onClick={openCreate} leftIcon={<PlusIcon className="h-5 w-5" />}>
             Yeni Reklam
-          </button>
+          </Button>
         </div>
 
         {/* Stats */}
         <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-          <div className="bg-white rounded-xl p-4 border border-gray-200">
+          <div className="bg-surface-elevated rounded-xl p-4 border border-border">
             <div className="flex items-center gap-3">
-              <div className="p-2 rounded-lg bg-blue-500/20">
-                <MegaphoneIcon className="h-6 w-6 text-blue-500" />
+              <div className="p-2 rounded-lg bg-info-500/20">
+                <MegaphoneIcon className="h-6 w-6 text-info-500" />
               </div>
               <div>
-                <p className="text-sm text-gray-500">Toplam Reklam</p>
-                <p className="text-xl font-bold text-gray-900">{ads.length}</p>
-                <p className="text-xs text-green-700">{activeAds} aktif</p>
+                <p className="text-sm text-muted">Toplam Reklam</p>
+                <p className="text-xl font-bold text-heading">{ads.length}</p>
+                <p className="text-xs text-success-700">{activeAds} aktif</p>
               </div>
             </div>
           </div>
-          <div className="bg-white rounded-xl p-4 border border-gray-200">
+          <div className="bg-surface-elevated rounded-xl p-4 border border-border">
             <div className="flex items-center gap-3">
               <div className="p-2 rounded-lg bg-primary-100">
                 <CursorArrowRaysIcon className="h-6 w-6 text-primary-600" />
               </div>
               <div>
-                <p className="text-sm text-gray-500">Toplam Tıklama</p>
-                <p className="text-xl font-bold text-gray-900">{totalClicks.toLocaleString()}</p>
+                <p className="text-sm text-muted">Toplam Tıklama</p>
+                <p className="text-xl font-bold text-heading">{totalClicks.toLocaleString()}</p>
               </div>
             </div>
           </div>
-          <div className="bg-white rounded-xl p-4 border border-gray-200">
+          <div className="bg-surface-elevated rounded-xl p-4 border border-border">
             <div className="flex items-center gap-3">
-              <div className="p-2 rounded-lg bg-green-500/20">
-                <EyeIcon className="h-6 w-6 text-green-500" />
+              <div className="p-2 rounded-lg bg-success-500/20">
+                <EyeIcon className="h-6 w-6 text-success-500" />
               </div>
               <div>
-                <p className="text-sm text-gray-500">Görüntülenme</p>
-                <p className="text-xl font-bold text-gray-900">{totalImpressions.toLocaleString()}</p>
+                <p className="text-sm text-muted">Görüntülenme</p>
+                <p className="text-xl font-bold text-heading">{totalImpressions.toLocaleString()}</p>
               </div>
             </div>
           </div>
-          <div className="bg-white rounded-xl p-4 border border-gray-200">
+          <div className="bg-surface-elevated rounded-xl p-4 border border-border">
             <div className="flex items-center gap-3">
-              <div className="p-2 rounded-lg bg-purple-500/20">
-                <ChartBarIcon className="h-6 w-6 text-purple-500" />
+              <div className="p-2 rounded-lg bg-primary-500/20">
+                <ChartBarIcon className="h-6 w-6 text-primary-500" />
               </div>
               <div>
-                <p className="text-sm text-gray-500">Ortalama CTR</p>
-                <p className="text-xl font-bold text-gray-900">{avgCTR}%</p>
+                <p className="text-sm text-muted">Ortalama CTR</p>
+                <p className="text-xl font-bold text-heading">{avgCTR}%</p>
               </div>
             </div>
           </div>
@@ -406,58 +403,58 @@ export default function AdsPage() {
 
         {/* Filters */}
         <div className="flex flex-wrap gap-3">
-          <select
+          <Select
             value={filterPosition}
             onChange={(e) => setFilterPosition(e.target.value)}
-            className="px-3 py-2 rounded-lg bg-white border border-gray-200 text-gray-900 text-sm"
+            className="w-auto"
           >
             <option value="">Tüm Pozisyonlar</option>
             {Object.entries(positionLabels).map(([key, label]) => (
               <option key={key} value={key}>{label}</option>
             ))}
-          </select>
-          <select
+          </Select>
+          <Select
             value={filterDevice}
             onChange={(e) => setFilterDevice(e.target.value)}
-            className="px-3 py-2 rounded-lg bg-white border border-gray-200 text-gray-900 text-sm"
+            className="w-auto"
           >
             <option value="">Tüm Cihazlar</option>
             {Object.entries(deviceLabels).map(([key, label]) => (
               <option key={key} value={key}>{label}</option>
             ))}
-          </select>
+          </Select>
         </div>
 
         {/* Table */}
-        <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
+        <div className="bg-surface-elevated rounded-xl border border-border overflow-hidden">
           {loading ? (
-            <div className="p-12 text-center text-gray-500">Yükleniyor...</div>
+            <div className="p-12 text-center text-muted">Yükleniyor...</div>
           ) : filteredAds.length === 0 ? (
-            <div className="p-12 text-center text-gray-500">
+            <div className="p-12 text-center text-muted">
               <MegaphoneIcon className="h-12 w-12 mx-auto mb-3 opacity-50" />
               <p>Henüz reklam yok. Yeni reklam ekleyin.</p>
             </div>
           ) : (
             <div className="overflow-x-auto">
               <table className="w-full">
-                <thead className="bg-gray-100/50">
+                <thead className="bg-surface-alt/50">
                   <tr>
-                    <th className="text-left py-3 px-4 text-gray-500 font-medium">Önizleme</th>
-                    <th className="text-left py-3 px-4 text-gray-500 font-medium">Başlık</th>
-                    <th className="text-left py-3 px-4 text-gray-500 font-medium">Boyut</th>
-                    <th className="text-left py-3 px-4 text-gray-500 font-medium">Pozisyon</th>
-                    <th className="text-left py-3 px-4 text-gray-500 font-medium">Cihaz</th>
-                    <th className="text-left py-3 px-4 text-gray-500 font-medium">Durum</th>
-                    <th className="text-left py-3 px-4 text-gray-500 font-medium">İstatistik</th>
-                    <th className="text-right py-3 px-4 text-gray-500 font-medium">İşlem</th>
+                    <th className="text-left py-3 px-4 text-muted font-medium">Önizleme</th>
+                    <th className="text-left py-3 px-4 text-muted font-medium">Başlık</th>
+                    <th className="text-left py-3 px-4 text-muted font-medium">Boyut</th>
+                    <th className="text-left py-3 px-4 text-muted font-medium">Pozisyon</th>
+                    <th className="text-left py-3 px-4 text-muted font-medium">Cihaz</th>
+                    <th className="text-left py-3 px-4 text-muted font-medium">Durum</th>
+                    <th className="text-left py-3 px-4 text-muted font-medium">İstatistik</th>
+                    <th className="text-right py-3 px-4 text-muted font-medium">İşlem</th>
                   </tr>
                 </thead>
-                <tbody className="divide-y divide-gray-200">
+                <tbody className="divide-y divide-border">
                   {filteredAds.map((ad) => (
-                    <tr key={ad.id} className="hover:bg-gray-100/30">
+                    <tr key={ad.id} className="hover:bg-surface-alt/30">
                       <td className="py-3 px-4">
                         {ad.imageUrl ? (
-                          <div className="relative w-20 h-12 rounded overflow-hidden bg-gray-100">
+                          <div className="relative w-20 h-12 rounded overflow-hidden bg-surface-alt">
                             <Image
                               src={ad.imageUrl}
                               alt={ad.title}
@@ -467,69 +464,70 @@ export default function AdsPage() {
                             />
                           </div>
                         ) : (
-                          <span className="text-gray-500 text-sm">—</span>
+                          <span className="text-muted text-sm">—</span>
                         )}
                       </td>
                       <td className="py-3 px-4">
-                        <div className="text-gray-900 font-medium">{ad.title}</div>
+                        <div className="text-heading font-medium">{ad.title}</div>
                         {ad.iabCompliant ? (
-                          <span className="text-xs text-green-700 flex items-center gap-1">
+                          <span className="text-xs text-success-700 flex items-center gap-1">
                             <CheckCircleIcon className="h-3 w-3" />
                             IAB: {ad.iabSize}
                           </span>
                         ) : ad.width && ad.height ? (
-                          <span className="text-xs text-yellow-700 flex items-center gap-1">
+                          <span className="text-xs text-warning-700 flex items-center gap-1">
                             <ExclamationTriangleIcon className="h-3 w-3" />
                             Non-IAB
                           </span>
                         ) : null}
                       </td>
-                      <td className="py-3 px-4 text-gray-600 text-sm">
+                      <td className="py-3 px-4 text-muted text-sm">
                         {ad.width && ad.height ? `${ad.width}x${ad.height}` : '—'}
                       </td>
                       <td className="py-3 px-4">
-                        <span className="px-2 py-1 rounded text-xs font-medium bg-gray-100 text-gray-600">
+                        <Badge variant="secondary" size="sm">
                           {positionLabels[ad.position] || ad.position}
-                        </span>
+                        </Badge>
                       </td>
                       <td className="py-3 px-4">
-                        <span className="flex items-center gap-1 text-gray-600 text-sm">
+                        <span className="flex items-center gap-1 text-muted text-sm">
                           <DeviceIcon type={ad.deviceType} />
                           {deviceLabels[ad.deviceType] || ad.deviceType}
                         </span>
                       </td>
                       <td className="py-3 px-4">
-                        <button
+                        <Button
+                          variant={ad.isActive ? 'success' : 'secondary'}
+                          size="sm"
                           onClick={() => handleToggleActive(ad)}
-                          className={`px-2 py-1 rounded text-xs font-medium ${
-                            ad.isActive
-                              ? 'bg-green-500/20 text-green-700'
-                              : 'bg-gray-500/20 text-gray-500'
-                          }`}
                         >
                           {ad.isActive ? 'Aktif' : 'Pasif'}
-                        </button>
+                        </Button>
                       </td>
                       <td className="py-3 px-4 text-sm">
-                        <div className="text-gray-600">{ad.clickCount} tıklama</div>
-                        <div className="text-gray-500">{ad.impressionCount} görüntü</div>
+                        <div className="text-muted">{ad.clickCount} tıklama</div>
+                        <div className="text-muted">{ad.impressionCount} görüntü</div>
                         <div className="text-primary-400">{ad.ctr}% CTR</div>
                       </td>
                       <td className="py-3 px-4 text-right">
-                        <button
+                        <IconButton
+                          variant="ghost"
+                          size="sm"
                           onClick={() => openEdit(ad)}
-                          className="p-2 text-gray-500 hover:text-primary-600 transition-colors"
                           title="Düzenle"
+                          aria-label="Reklamı düzenle"
                         >
                           <PencilIcon className="h-5 w-5" />
-                        </button>
-                        <button
+                        </IconButton>
+                        <IconButton
+                          variant="danger"
+                          size="sm"
                           onClick={() => handleDelete(ad.id)}
-                          className="p-2 text-gray-500 hover:text-red-600 transition-colors"
                           title="Sil"
+                          aria-label="Reklamı sil"
                         >
                           <TrashIcon className="h-5 w-5" />
-                        </button>
+                        </IconButton>
                       </td>
                     </tr>
                   ))}
@@ -542,35 +540,34 @@ export default function AdsPage() {
 
       {/* Modal */}
       {modalOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 overflow-y-auto">
-          <div className="bg-white rounded-xl border border-gray-200 w-full max-w-2xl shadow-xl my-8">
-            <div className="p-4 border-b border-gray-200">
-              <h2 className="text-lg font-semibold text-gray-900">
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-heading/60 overflow-y-auto">
+          <div className="bg-surface-elevated rounded-xl border border-border w-full max-w-2xl shadow-xl my-8">
+            <div className="p-4 border-b border-border">
+              <h2 className="text-lg font-semibold text-heading">
                 {editingId ? 'Reklam Düzenle' : 'Yeni Reklam'}
               </h2>
-              <p className="text-sm text-gray-500">IAB standartlarına uygun reklam oluşturun</p>
+              <p className="text-sm text-muted">IAB standartlarına uygun reklam oluşturun</p>
             </div>
             <form onSubmit={handleSubmit} className="p-4 space-y-4 max-h-[70vh] overflow-y-auto">
               {/* Title */}
               <div>
-                <label className="block text-sm text-gray-500 mb-1">Başlık *</label>
-                <input
+                <label className="block text-sm text-muted mb-1">Başlık *</label>
+                <Input
                   type="text"
                   value={form.title}
                   onChange={(e) => setForm(f => ({ ...f, title: e.target.value }))}
-                  className="w-full px-3 py-2 rounded-lg bg-gray-100 border border-gray-300 text-gray-900"
                   placeholder="Reklam başlığı"
                 />
               </div>
 
               {/* Drag & Drop Image Upload */}
               <div>
-                <label className="block text-sm text-gray-500 mb-1">Reklam Görseli</label>
+                <label className="block text-sm text-muted mb-1">Reklam Görseli</label>
                 <div
                   className={`border-2 border-dashed rounded-lg p-6 text-center transition-colors ${
                     dragActive 
                       ? 'border-primary-500 bg-primary-50' 
-                      : 'border-gray-300 hover:border-gray-300'
+                      : 'border-border hover:border-border'
                   }`}
                   onDragEnter={handleDrag}
                   onDragLeave={handleDrag}
@@ -578,8 +575,8 @@ export default function AdsPage() {
                   onDrop={handleDrop}
                 >
                   {uploadingImage ? (
-                    <div className="text-gray-500">
-                      <div className="animate-spin h-8 w-8 border-2 border-primary-500 border-t-transparent rounded-full mx-auto mb-2" />
+                    <div className="text-muted">
+                      <Spinner size="lg" className="mx-auto mb-2" />
                       Yükleniyor...
                     </div>
                   ) : imagePreview ? (
@@ -592,43 +589,40 @@ export default function AdsPage() {
                         />
                       </div>
                       <div className="flex items-center justify-center gap-2 text-sm">
-                        <span className="text-gray-500">
+                        <span className="text-muted">
                           {imagePreview.width} x {imagePreview.height} px
                         </span>
                         {form.width && form.height && (
                           IAB_SIZES.some(s => s.width === form.width && s.height === form.height) ? (
-                            <span className="flex items-center gap-1 text-green-700">
+                            <span className="flex items-center gap-1 text-success-700">
                               <CheckCircleIcon className="h-4 w-4" />
                               IAB Uyumlu
                             </span>
                           ) : (
-                            <span className="flex items-center gap-1 text-yellow-700">
+                            <span className="flex items-center gap-1 text-warning-700">
                               <ExclamationTriangleIcon className="h-4 w-4" />
                               Non-IAB
                             </span>
                           )
                         )}
                       </div>
-                      <button
-                        type="button"
+                      <Button variant="danger" size="sm" type="button"
                         onClick={() => {
                           setForm(f => ({ ...f, imageUrl: '', width: 0, height: 0 }));
                           setImagePreview(null);
                           setIabWarning(null);
                         }}
-                        className="text-sm text-red-600 hover:text-red-300"
                       >
                         Görseli Kaldır
-                      </button>
+                      </Button>
                     </div>
                   ) : (
                     <div>
-                      <CloudArrowUpIcon className="h-10 w-10 mx-auto text-gray-500 mb-2" />
-                      <p className="text-gray-500 mb-2">
+                      <CloudArrowUpIcon className="h-10 w-10 mx-auto text-muted mb-2" />
+                      <p className="text-muted mb-2">
                         Görseli sürükleyip bırakın veya
                       </p>
-                      <input
-                        ref={fileInputRef}
+                      <Input ref={fileInputRef}
                         type="file"
                         accept="image/jpeg,image/png,image/webp"
                         className="hidden"
@@ -636,16 +630,11 @@ export default function AdsPage() {
                           const file = e.target.files?.[0];
                           if (file) handleFileUpload(file);
                           e.target.value = '';
-                        }}
-                      />
-                      <button
-                        type="button"
-                        onClick={() => fileInputRef.current?.click()}
-                        className="px-4 py-2 rounded-lg bg-primary-500 text-gray-900 hover:bg-primary-600 transition-colors text-sm"
-                      >
+                        }} />
+                      <Button variant="primary" size="sm" type="button" onClick={() => fileInputRef.current?.click()}>
                         Dosya Seç
-                      </button>
-                      <p className="text-xs text-gray-500 mt-2">
+                      </Button>
+                      <p className="text-xs text-muted mt-2">
                         JPG, PNG, WebP • Max 2MB
                       </p>
                     </div>
@@ -654,7 +643,7 @@ export default function AdsPage() {
 
                 {/* Manual URL input */}
                 <div className="mt-2">
-                  <input
+                  <Input
                     type="url"
                     value={form.imageUrl}
                     onChange={(e) => {
@@ -666,18 +655,17 @@ export default function AdsPage() {
                         setIabWarning(null);
                       }
                     }}
-                    className="w-full px-3 py-2 rounded-lg bg-gray-100 border border-gray-300 text-gray-900 text-sm"
                     placeholder="veya görsel URL'si yapıştırın"
                   />
                 </div>
 
                 {/* IAB Warning */}
                 {iabWarning && (
-                  <div className="mt-2 p-3 rounded-lg bg-yellow-500/10 border border-yellow-500/30">
+                  <div className="mt-2 p-3 rounded-lg bg-warning-500/10 border border-warning-500/30">
                     <div className="flex items-start gap-2">
-                      <ExclamationTriangleIcon className="h-5 w-5 text-yellow-500 flex-shrink-0 mt-0.5" />
+                      <ExclamationTriangleIcon className="h-5 w-5 text-warning-500 flex-shrink-0 mt-0.5" />
                       <div>
-                        <p className="text-sm text-yellow-700">{iabWarning}</p>
+                        <p className="text-sm text-warning-700">{iabWarning}</p>
                       </div>
                     </div>
                   </div>
@@ -686,7 +674,7 @@ export default function AdsPage() {
 
               {/* IAB Size Presets */}
               <div>
-                <label className="block text-sm text-gray-500 mb-2">
+                <label className="block text-sm text-muted mb-2">
                   <span className="flex items-center gap-1">
                     <InformationCircleIcon className="h-4 w-4" />
                     IAB Standart Boyutları
@@ -694,42 +682,37 @@ export default function AdsPage() {
                 </label>
                 <div className="flex flex-wrap gap-2">
                   {IAB_SIZES.slice(0, 6).map((size) => (
-                    <button
+                    <Button
+                      variant={form.width === size.width && form.height === size.height ? 'primary' : 'outline'}
+                      size="sm"
                       key={`${size.width}x${size.height}`}
                       type="button"
                       onClick={() => applyIABSize(size)}
-                      className={`px-2 py-1 rounded text-xs border transition-colors ${
-                        form.width === size.width && form.height === size.height
-                          ? 'border-primary-500 bg-primary-100 text-primary-400'
-                          : 'border-gray-300 text-gray-500 hover:border-gray-300'
-                      }`}
                     >
                       {size.name} ({size.width}x{size.height})
-                    </button>
+                    </Button>
                   ))}
                 </div>
               </div>
 
               {/* Alt Text */}
               <div>
-                <label className="block text-sm text-gray-500 mb-1">Alt Metin (Erişilebilirlik)</label>
-                <input
+                <label className="block text-sm text-muted mb-1">Alt Metin (Erişilebilirlik)</label>
+                <Input
                   type="text"
                   value={form.altText}
                   onChange={(e) => setForm(f => ({ ...f, altText: e.target.value }))}
-                  className="w-full px-3 py-2 rounded-lg bg-gray-100 border border-gray-300 text-gray-900"
                   placeholder="Görsel açıklaması (görme engelli kullanıcılar için)"
                 />
               </div>
 
               {/* Link URL */}
               <div>
-                <label className="block text-sm text-gray-500 mb-1">Link URL</label>
-                <input
+                <label className="block text-sm text-muted mb-1">Link URL</label>
+                <Input
                   type="url"
                   value={form.linkUrl}
                   onChange={(e) => setForm(f => ({ ...f, linkUrl: e.target.value }))}
-                  className="w-full px-3 py-2 rounded-lg bg-gray-100 border border-gray-300 text-gray-900"
                   placeholder="Tıklanınca gidilecek adres"
                 />
               </div>
@@ -737,93 +720,78 @@ export default function AdsPage() {
               {/* Position & Device Type */}
               <div className="grid grid-cols-2 gap-4">
                 <div>
-                  <label className="block text-sm text-gray-500 mb-1">Pozisyon</label>
-                  <select
+                  <label className="block text-sm text-muted mb-1">Pozisyon</label>
+                  <Select
                     value={form.position}
                     onChange={(e) => setForm(f => ({ ...f, position: e.target.value }))}
-                    className="w-full px-3 py-2 rounded-lg bg-gray-100 border border-gray-300 text-gray-900"
                   >
                     {Object.entries(positionLabels).map(([key, label]) => (
                       <option key={key} value={key}>{label}</option>
                     ))}
-                  </select>
+                  </Select>
                 </div>
                 <div>
-                  <label className="block text-sm text-gray-500 mb-1">Cihaz Türü</label>
-                  <select
+                  <label className="block text-sm text-muted mb-1">Cihaz Türü</label>
+                  <Select
                     value={form.deviceType}
                     onChange={(e) => setForm(f => ({ ...f, deviceType: e.target.value }))}
-                    className="w-full px-3 py-2 rounded-lg bg-gray-100 border border-gray-300 text-gray-900"
                   >
                     {Object.entries(deviceLabels).map(([key, label]) => (
                       <option key={key} value={key}>{label}</option>
                     ))}
-                  </select>
+                  </Select>
                 </div>
               </div>
 
               {/* Display Order */}
               <div>
-                <label className="block text-sm text-gray-500 mb-1">Görüntüleme Sırası</label>
-                <input
+                <label className="block text-sm text-muted mb-1">Görüntüleme Sırası</label>
+                <Input
                   type="number"
                   min={0}
                   value={form.displayOrder}
                   onChange={(e) => setForm(f => ({ ...f, displayOrder: Number(e.target.value) || 0 }))}
-                  className="w-full px-3 py-2 rounded-lg bg-gray-100 border border-gray-300 text-gray-900"
                 />
               </div>
 
               {/* Date Range */}
               <div className="grid grid-cols-2 gap-4">
                 <div>
-                  <label className="block text-sm text-gray-500 mb-1">Başlangıç Tarihi</label>
-                  <input
+                  <label className="block text-sm text-muted mb-1">Başlangıç Tarihi</label>
+                  <Input
                     type="date"
                     value={form.startDate}
                     onChange={(e) => setForm(f => ({ ...f, startDate: e.target.value }))}
-                    className="w-full px-3 py-2 rounded-lg bg-gray-100 border border-gray-300 text-gray-900"
                   />
                 </div>
                 <div>
-                  <label className="block text-sm text-gray-500 mb-1">Bitiş Tarihi</label>
-                  <input
+                  <label className="block text-sm text-muted mb-1">Bitiş Tarihi</label>
+                  <Input
                     type="date"
                     value={form.endDate}
                     onChange={(e) => setForm(f => ({ ...f, endDate: e.target.value }))}
-                    className="w-full px-3 py-2 rounded-lg bg-gray-100 border border-gray-300 text-gray-900"
                   />
                 </div>
               </div>
 
               {/* Is Active */}
               <div className="flex items-center gap-2">
-                <input
-                  type="checkbox"
+                <Checkbox
                   id="isActive"
                   checked={form.isActive}
                   onChange={(e) => setForm(f => ({ ...f, isActive: e.target.checked }))}
-                  className="rounded border-gray-300 bg-gray-100 text-primary-600"
                 />
-                <label htmlFor="isActive" className="text-sm text-gray-600">Aktif</label>
+                <label htmlFor="isActive" className="text-sm text-muted">Aktif</label>
               </div>
 
               {/* Actions */}
-              <div className="flex justify-end gap-2 pt-4 border-t border-gray-200">
-                <button
-                  type="button"
-                  onClick={closeModal}
-                  className="px-4 py-2 rounded-lg text-gray-500 hover:bg-gray-100 transition-colors"
-                >
+              <div className="flex justify-end gap-2 pt-4 border-t border-border">
+                <Button variant="secondary" type="button" onClick={closeModal}>
                   İptal
-                </button>
-                <button
-                  type="submit"
-                  disabled={saving}
-                  className="px-4 py-2 rounded-lg bg-primary-500 text-gray-900 hover:bg-primary-600 disabled:opacity-50"
-                >
+                </Button>
+                <Button variant="primary" type="submit" disabled={saving}>
                   {saving ? 'Kaydediliyor...' : editingId ? 'Güncelle' : 'Oluştur'}
-                </button>
+                </Button>
               </div>
             </form>
           </div>

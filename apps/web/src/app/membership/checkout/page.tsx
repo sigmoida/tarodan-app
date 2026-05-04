@@ -11,7 +11,9 @@ import {
   ArrowLeftIcon,
 } from '@heroicons/react/24/outline';
 import toast from 'react-hot-toast';
+import { Button, Checkbox, Input, Spinner } from '@tarodan/ui';
 import { useAuthStore } from '@/stores/authStore';
+import AuthLoadingScreen from '@/components/AuthLoadingScreen';
 import { membershipApi, api, paymentsApi } from '@/lib/api';
 
 const TIER_FEATURES: Record<string, string[]> = {
@@ -43,7 +45,7 @@ const TIER_FEATURES: Record<string, string[]> = {
 export default function MembershipCheckoutPage() {
   const router = useRouter();
   const searchParams = useSearchParams();
-  const { isAuthenticated, user, refreshUserData } = useAuthStore();
+  const { isAuthenticated, isLoading: authLoading, user, refreshUserData } = useAuthStore();
   
   const tier = searchParams.get('tier') || 'premium';
   const period = (searchParams.get('period') || 'monthly') as 'monthly' | 'yearly';
@@ -121,10 +123,11 @@ export default function MembershipCheckoutPage() {
   }, []);
 
   useEffect(() => {
+    if (authLoading) return;
     if (!isAuthenticated) {
       router.push(`/login?redirect=/membership/checkout?tier=${tier}&period=${period}`);
     }
-  }, [isAuthenticated, tier, period, router]);
+  }, [authLoading, isAuthenticated, tier, period, router]);
 
   // Get tier info dynamically
   const getTierInfo = () => {
@@ -160,12 +163,21 @@ export default function MembershipCheckoutPage() {
   };
 
   const tierInfo = getTierInfo();
-  
+
+  useEffect(() => {
+    if (tierInfo && tierInfo.price > 100000) {
+      toast.error(
+        `Fiyat çok yüksek görünüyor (${tierInfo.price.toLocaleString('tr-TR')} TL). Lütfen admin panelinden membership fiyatlarını kontrol edin.`,
+        { duration: 10000 }
+      );
+    }
+  }, [tierInfo]);
+
   if (!tierInfo || !['basic', 'premium', 'business'].includes(tier)) {
     return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+      <div className="min-h-screen bg-surface flex items-center justify-center">
         <div className="text-center">
-          <p className="text-gray-600 mb-4">Geçersiz üyelik planı</p>
+          <p className="text-muted mb-4">Geçersiz üyelik planı</p>
           <Link href={required ? '/profile/membership?required=true' : '/profile/membership'} className="text-primary-500 hover:underline">
             Planlara Dön
           </Link>
@@ -177,16 +189,6 @@ export default function MembershipCheckoutPage() {
   const finalPrice = tierInfo.price;
   const basePrice = tierInfo.basePrice;
   const monthlyPrice = period === 'yearly' ? Math.round(finalPrice / 12) : finalPrice;
-
-  // Validate price - if it's too high, show warning
-  useEffect(() => {
-    if (finalPrice > 100000) {
-      toast.error(
-        `Fiyat çok yüksek görünüyor (${finalPrice.toLocaleString('tr-TR')} TL). Lütfen admin panelinden membership fiyatlarını kontrol edin.`,
-        { duration: 10000 }
-      );
-    }
-  }, [finalPrice]);
 
   const formatCardNumber = (value: string) => {
     const cleaned = value.replace(/\D/g, '');
@@ -242,28 +244,6 @@ export default function MembershipCheckoutPage() {
           return;
         }
       } else if (paymentId) {
-        // Bypass modundaysa kart zaten bu sayfada girildi; ara ödeme sayfasına göndermeden burada tamamla
-        try {
-          const statusRes = await paymentsApi.getStatusLight(paymentId);
-          if (statusRes.data?.useBypass) {
-            const cardNumber = cardData.number.replace(/\D/g, '');
-            if (cardNumber) {
-              const bypassRes = await paymentsApi.bypassComplete(paymentId, cardNumber);
-              if (bypassRes.data?.success) {
-                toast.success('Üyelik ödemesi başarılı!');
-                await refreshUserData();
-                window.location.href = '/membership/success';
-                return;
-              } else {
-                toast.error('Ödeme başarısız oldu');
-                setIsProcessing(false);
-                return;
-              }
-            }
-          }
-        } catch (bypassErr: any) {
-          if (process.env.NODE_ENV === 'development') console.error('Bypass check error:', bypassErr);
-        }
         router.push(`/payment/${paymentId}?type=membership`);
         return;
       } else {
@@ -280,28 +260,31 @@ export default function MembershipCheckoutPage() {
     }
   };
 
+  if (authLoading) {
+    return <AuthLoadingScreen />;
+  }
   if (!isAuthenticated) {
     return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
-        <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-primary-500"></div>
+      <div className="min-h-screen bg-surface flex items-center justify-center">
+        <Spinner size="xl" />
       </div>
     );
   }
 
   return (
-    <div className="min-h-screen bg-gray-50">
+    <div className="min-h-screen bg-surface">
       <main className="max-w-4xl mx-auto px-4 py-8">
         {/* Header */}
         <div className="flex items-center gap-4 mb-8">
           <Link 
             href={required ? '/profile/membership?required=true' : '/profile/membership'} 
-            className="p-2 hover:bg-gray-200 rounded-lg transition-colors"
+            className="p-2 hover:bg-border-subtle rounded-lg transition-colors"
           >
-            <ArrowLeftIcon className="w-6 h-6 text-gray-600" />
+            <ArrowLeftIcon className="w-6 h-6 text-muted" />
           </Link>
           <div>
-            <h1 className="text-2xl font-bold text-gray-900">Üyelik Yükseltme</h1>
-            <p className="text-sm text-gray-500">Güvenli ödeme ile üyeliğinizi yükseltin</p>
+            <h1 className="text-2xl font-bold text-heading">Üyelik Yükseltme</h1>
+            <p className="text-sm text-muted">Güvenli ödeme ile üyeliğinizi yükseltin</p>
           </div>
         </div>
 
@@ -310,79 +293,70 @@ export default function MembershipCheckoutPage() {
           <div className="lg:col-span-2">
             <form onSubmit={handleSubmit} className="space-y-6">
               {/* Payment Method */}
-              <div className="bg-white rounded-xl shadow-sm p-6">
-                <h2 className="text-lg font-semibold text-gray-900 mb-4 flex items-center gap-2">
+              <div className="bg-surface-elevated rounded-xl shadow-sm p-6">
+                <h2 className="text-lg font-semibold text-heading mb-4 flex items-center gap-2">
                   <CreditCardIcon className="w-5 h-5 text-primary-500" />
                   Kart Bilgileri
                 </h2>
                 
                 <div className="space-y-4">
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                    <label className="block text-sm font-medium text-body mb-2">
                       Kart Numarası
                     </label>
-                    <input
-                      type="text"
+                    <Input type="text"
                       value={cardData.number}
                       onChange={(e) => setCardData({ ...cardData, number: formatCardNumber(e.target.value) })}
                       placeholder="0000 0000 0000 0000"
-                      className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
-                      maxLength={19}
-                    />
+                      className="px-4 py-3"
+                      maxLength={19} />
                   </div>
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                    <label className="block text-sm font-medium text-body mb-2">
                       Kart Üzerindeki İsim
                     </label>
-                    <input
-                      type="text"
+                    <Input type="text"
                       value={cardData.name}
                       onChange={(e) => setCardData({ ...cardData, name: e.target.value.toUpperCase() })}
                       placeholder="AD SOYAD"
-                      className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
-                    />
+                      className="px-4 py-3" />
                   </div>
                   <div className="grid grid-cols-2 gap-4">
                     <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-2">
+                      <label className="block text-sm font-medium text-body mb-2">
                         Son Kullanma Tarihi
                       </label>
-                      <input
-                        type="text"
+                      <Input type="text"
                         value={cardData.expiry}
                         onChange={(e) => setCardData({ ...cardData, expiry: formatExpiry(e.target.value) })}
                         placeholder="AA/YY"
-                        className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
-                        maxLength={5}
-                      />
+                        className="px-4 py-3"
+                        maxLength={5} />
                     </div>
                     <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-2">
+                      <label className="block text-sm font-medium text-body mb-2">
                         CVV
                       </label>
-                      <input
-                        type="text"
+                      <Input type="text"
                         value={cardData.cvv}
                         onChange={(e) => setCardData({ ...cardData, cvv: e.target.value.replace(/\D/g, '').slice(0, 4) })}
                         placeholder="000"
-                        className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
-                        maxLength={4}
-                      />
+                        className="px-4 py-3"
+                        maxLength={4} />
                     </div>
                   </div>
                 </div>
               </div>
 
               {/* Terms */}
-              <div className="bg-white rounded-xl shadow-sm p-6">
+              <div className="bg-surface-elevated rounded-xl shadow-sm p-6">
                 <label className="flex items-start gap-3 cursor-pointer">
-                  <input
-                    type="checkbox"
+                  <Checkbox
                     checked={agreed}
                     onChange={(e) => setAgreed(e.target.checked)}
-                    className="w-5 h-5 mt-0.5 text-primary-500 border-gray-300 rounded focus:ring-primary-500"
+                    className="mt-0.5 h-5 w-5"
                   />
-                  <span className="text-sm text-gray-600">
+                  <span className="text-sm text-muted">
                     <Link href="/terms" className="text-primary-500 hover:underline">Kullanım koşullarını</Link> ve{' '}
                     <Link href="/privacy" className="text-primary-500 hover:underline">gizlilik politikasını</Link> okudum, kabul ediyorum.
                     Üyeliğimin {period === 'yearly' ? 'yıllık' : 'aylık'} olarak otomatik yenileneceğini anlıyorum.
@@ -391,14 +365,12 @@ export default function MembershipCheckoutPage() {
               </div>
 
               {/* Submit */}
-              <button
-                type="submit"
+              <Button variant="secondary" type="submit"
                 disabled={isProcessing}
-                className="w-full py-4 bg-primary-500 text-white text-lg font-semibold rounded-xl hover:bg-primary-600 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
-              >
+                className="w-full py-4 bg-primary-500 text-inverted text-lg font-semibold rounded-xl hover:bg-primary-600 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2">
                 {isProcessing ? (
                   <>
-                    <div className="animate-spin rounded-full h-5 w-5 border-t-2 border-b-2 border-white"></div>
+                    <Spinner size="sm" color="border-surface-elevated border-t-transparent" />
                     İşleniyor...
                   </>
                 ) : (
@@ -407,10 +379,10 @@ export default function MembershipCheckoutPage() {
                     {finalPrice.toLocaleString('tr-TR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} TL Öde
                   </>
                 )}
-              </button>
+              </Button>
 
               {/* Security Note */}
-              <p className="text-center text-sm text-gray-500 flex items-center justify-center gap-2">
+              <p className="text-center text-sm text-muted flex items-center justify-center gap-2">
                 <ShieldCheckIcon className="w-4 h-4" />
                 256-bit SSL ile güvenli ödeme
               </p>
@@ -419,33 +391,33 @@ export default function MembershipCheckoutPage() {
 
           {/* Order Summary */}
           <div className="lg:col-span-1">
-            <div className="bg-white rounded-xl shadow-sm p-6 sticky top-8">
-              <h2 className="text-lg font-semibold text-gray-900 mb-4">Sipariş Özeti</h2>
+            <div className="bg-surface-elevated rounded-xl shadow-sm p-6 sticky top-8">
+              <h2 className="text-lg font-semibold text-heading mb-4">Sipariş Özeti</h2>
               
-              <div className="border-b border-gray-200 pb-4 mb-4">
-                <h3 className="font-semibold text-gray-900">{tierInfo.name}</h3>
-                <p className="text-sm text-gray-500">
+              <div className="border-b border-border pb-4 mb-4">
+                <h3 className="font-semibold text-heading">{tierInfo.name}</h3>
+                <p className="text-sm text-muted">
                   {period === 'yearly' ? 'Yıllık plan' : 'Aylık plan'}
                 </p>
               </div>
 
               <ul className="space-y-2 mb-6">
                 {tierInfo.features.map((feature, idx) => (
-                  <li key={idx} className="flex items-center gap-2 text-sm text-gray-600">
-                    <CheckIcon className="w-4 h-4 text-green-500 flex-shrink-0" />
+                  <li key={idx} className="flex items-center gap-2 text-sm text-muted">
+                    <CheckIcon className="w-4 h-4 text-success-500 flex-shrink-0" />
                     {feature}
                   </li>
                 ))}
               </ul>
 
-              <div className="border-t border-gray-200 pt-4 space-y-2">
+              <div className="border-t border-border pt-4 space-y-2">
                 {period === 'yearly' && (
                   <>
-                    <div className="flex justify-between text-sm text-gray-500">
+                    <div className="flex justify-between text-sm text-muted">
                       <span>Normal fiyat</span>
                       <span className="line-through">{(basePrice * 12).toLocaleString('tr-TR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} TL</span>
                     </div>
-                    <div className="flex justify-between text-sm text-green-600">
+                    <div className="flex justify-between text-sm text-success-600">
                       <span>İndirim (%{membershipPrices.yearly_discount_percentage ?? 20})</span>
                       <span>-{(basePrice * 12 - finalPrice).toLocaleString('tr-TR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} TL</span>
                     </div>
@@ -456,7 +428,7 @@ export default function MembershipCheckoutPage() {
                   <span className="text-primary-500">{finalPrice.toLocaleString('tr-TR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} TL</span>
                 </div>
                 {period === 'yearly' && (
-                  <p className="text-xs text-gray-500 text-right">
+                  <p className="text-xs text-muted text-right">
                     Ayda {monthlyPrice.toLocaleString('tr-TR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} TL
                   </p>
                 )}

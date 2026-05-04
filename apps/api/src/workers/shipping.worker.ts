@@ -8,13 +8,14 @@ import { Job } from 'bull';
 import { ConfigService } from '@nestjs/config';
 import { PrismaService } from '../prisma';
 import { PaymentService } from '../modules/payment/payment.service';
+import { SuratTrackingService } from '../modules/surat-cargo/surat-tracking.service';
 import { ShipmentStatus, OrderStatus } from '@prisma/client';
 
 export interface ShippingJobData {
-  type: 'create-shipment' | 'track-update' | 'webhook' | 'generate-label';
+  type: 'create-shipment' | 'track-update' | 'webhook' | 'generate-label' | 'surat-sync' | 'surat-sync-all';
   orderId?: string;
   shipmentId?: string;
-  carrier?: 'aras' | 'yurtici' | 'mng';
+  carrier?: 'aras' | 'yurtici' | 'mng' | 'surat';
   trackingNumber?: string;
   webhookData?: Record<string, any>;
 }
@@ -27,6 +28,7 @@ export class ShippingWorker {
     private readonly configService: ConfigService,
     private readonly prisma: PrismaService,
     private readonly paymentService: PaymentService,
+    private readonly suratTrackingService: SuratTrackingService,
   ) {}
 
   @Process('create-shipment')
@@ -97,7 +99,13 @@ export class ShippingWorker {
         throw new Error(`Shipment not found: ${shipmentId || trackingNumber}`);
       }
 
-      // In production: Call carrier tracking API
+      // Sürat Kargo uses its own tracking service
+      if (shipment.provider === 'surat') {
+        const success = await this.suratTrackingService.syncShipmentTracking(shipment.id);
+        return { success, shipmentId: shipment.id, provider: 'surat' };
+      }
+
+      // Other carriers: call their tracking API
       const trackingInfo = await this.fetchTrackingInfo(
         shipment.provider,
         shipment.trackingNumber || '',
@@ -147,6 +155,32 @@ export class ShippingWorker {
       this.logger.error(`Failed to update tracking: ${error.message}`);
       throw error;
     }
+  }
+
+  /**
+   * Sync a single Sürat shipment's tracking status.
+   */
+  @Process('surat-sync')
+  async handleSuratSync(job: Job<ShippingJobData>) {
+    this.logger.log(`Processing Surat sync job ${job.id} for shipment ${job.data.shipmentId}`);
+
+    const { shipmentId } = job.data;
+    if (!shipmentId) {
+      throw new Error('shipmentId required for surat-sync');
+    }
+
+    const success = await this.suratTrackingService.syncShipmentTracking(shipmentId);
+    return { success, shipmentId };
+  }
+
+  /**
+   * Sync all active Sürat shipments. Intended for periodic cron/scheduled jobs.
+   */
+  @Process('surat-sync-all')
+  async handleSuratSyncAll(job: Job<ShippingJobData>) {
+    this.logger.log(`Processing Surat sync-all job ${job.id}`);
+    const result = await this.suratTrackingService.syncAllActiveShipments();
+    return result;
   }
 
   @Process('webhook')
@@ -267,7 +301,7 @@ export class ShippingWorker {
   }
 
   private calculateEstimatedDelivery(carrier: string): Date {
-    const days = carrier === 'aras' ? 3 : carrier === 'yurtici' ? 2 : 4;
+    const days = carrier === 'aras' ? 3 : carrier === 'yurtici' ? 2 : carrier === 'surat' ? 3 : 4;
     const date = new Date();
     date.setDate(date.getDate() + days);
     return date;
@@ -299,10 +333,13 @@ export class ShippingWorker {
     const statusMap: Record<string, ShipmentStatus> = {
       'PICKED_UP': ShipmentStatus.picked_up,
       'IN_TRANSIT': ShipmentStatus.in_transit,
+      'AT_DELIVERY_BRANCH': ShipmentStatus.at_delivery_branch,
       'OUT_FOR_DELIVERY': ShipmentStatus.out_for_delivery,
       'DELIVERED': ShipmentStatus.delivered,
+      'RETURN_IN_PROGRESS': ShipmentStatus.return_in_progress,
       'RETURNED': ShipmentStatus.returned,
       'FAILED': ShipmentStatus.failed,
+      'CANCELLED': ShipmentStatus.cancelled,
     };
     return statusMap[status] || ShipmentStatus.in_transit;
   }

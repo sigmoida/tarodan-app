@@ -9,8 +9,10 @@ import toast from 'react-hot-toast';
 import { useQueryClient } from '@tanstack/react-query';
 import { listingsApi, api, userApi, mediaApi, discountsApi, brandsApi } from '@/lib/api';
 import { useAuthStore } from '@/stores/authStore';
+import AuthLoadingScreen from '@/components/AuthLoadingScreen';
 import { useTranslation } from '@/i18n';
 import { SimpleDropdown } from '@/components/SimpleDropdown';
+import { Button, Input, Select, Spinner, Textarea, Toggle } from '@tarodan/ui';
 
 interface Category {
   id: string;
@@ -48,7 +50,7 @@ export default function EditListingPage() {
   const id = params.id as string;
   const { locale } = useTranslation();
   const queryClient = useQueryClient();
-  const { isAuthenticated, user, limits, refreshUserData } = useAuthStore();
+  const { isAuthenticated, isLoading: authLoading, user, limits, refreshUserData } = useAuthStore();
 
   const [categories, setCategories] = useState<Category[]>([]);
   const [brands, setBrands] = useState<Brand[]>([]);
@@ -194,6 +196,7 @@ export default function EditListingPage() {
   }, [formData, id]);
 
   useEffect(() => {
+    if (authLoading) return;
     if (!isAuthenticated) {
       toast.error('İlan düzenlemek için giriş yapmalısınız');
       router.push('/login');
@@ -231,7 +234,7 @@ export default function EditListingPage() {
     fetchListing();
     fetchCategories();
     fetchProductDiscounts();
-  }, [id, isAuthenticated]);
+  }, [id, authLoading, isAuthenticated]);
 
   const fetchFilters = async () => {
     setBrandsLoading(true);
@@ -767,23 +770,25 @@ export default function EditListingPage() {
 
   const flatCategories = flattenCategories(categories);
 
+  if (authLoading) return <AuthLoadingScreen />;
+  if (!authLoading && !isAuthenticated) return null;
   if (isFetching) {
     return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+      <div className="min-h-screen bg-surface flex items-center justify-center">
         <div className="text-center">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary-500 mx-auto mb-4"></div>
-          <p className="text-gray-600">Yükleniyor...</p>
+          <Spinner size="xl" className="mx-auto mb-4" />
+          <p className="text-muted">Yükleniyor...</p>
         </div>
       </div>
     );
   }
 
   return (
-    <div className="min-h-screen bg-gray-50">
+    <div className="min-h-screen bg-surface">
       <main className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         <Link
           href={`/listings/${id}`}
-          className="inline-flex items-center gap-2 text-gray-600 hover:text-gray-900 mb-6"
+          className="inline-flex items-center gap-2 text-muted hover:text-heading mb-6"
         >
           <ArrowLeftIcon className="w-5 h-5" />
           İlana Dön
@@ -792,48 +797,49 @@ export default function EditListingPage() {
         <motion.div
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
-          className="bg-white rounded-2xl shadow-sm p-6 md:p-8"
+          className="bg-surface-elevated rounded-2xl shadow-sm p-6 md:p-8"
         >
           <h1 className="text-3xl font-bold mb-2">İlanı Düzenle</h1>
-          <p className="text-gray-600 mb-6">
+          <p className="text-muted mb-6">
             İlan bilgilerinizi güncelleyin.
           </p>
 
           {(formData.status === 'sold' || formData.status === 'inactive') && (
-            <div className="mb-6 p-5 bg-amber-50 border border-amber-200 rounded-xl">
-              <h2 className="text-lg font-semibold text-amber-800 mb-2">
+            <div className="mb-6 p-5 bg-warning-50 border border-warning-200 rounded-xl">
+              <h2 className="text-lg font-semibold text-warning-800 mb-2">
                 {formData.status === 'sold' ? 'Bu ürün satılmış' : 'Bu ürün stokta yok'}
               </h2>
-              <p className="text-sm text-amber-700 mb-4">
+              <p className="text-sm text-warning-700 mb-4">
                 Yeniden satışa açmak için stok miktarı belirleyip aşağıdaki butonu kullanın.
               </p>
               <div className="flex items-end gap-3">
                 <div>
-                  <label className="block text-sm font-medium text-amber-800 mb-1">Stok Miktarı</label>
-                  <input
+                  <label className="block text-sm font-medium text-warning-800 mb-1">Stok Miktarı</label>
+                  <Input
                     type="number"
                     min="1"
                     value={reactivateQuantity}
                     onChange={(e) => setReactivateQuantity(e.target.value)}
-                    className="w-28 px-3 py-2 border border-amber-300 rounded-lg focus:ring-2 focus:ring-amber-500 text-gray-900"
+                    className="w-28 border-warning-300 focus:ring-warning-500"
                   />
                 </div>
-                <button
+                <Button
                   type="button"
+                  variant="primary"
+                  size="md"
                   onClick={handleReactivate}
                   disabled={reactivating}
-                  className="px-5 py-2 bg-amber-600 hover:bg-amber-700 text-white font-medium rounded-lg disabled:opacity-50 transition-colors"
                 >
                   {reactivating ? 'İşleniyor...' : 'Yeniden Satışa Aç'}
-                </button>
+                </Button>
               </div>
             </div>
           )}
 
           {formData.status === 'reserved' && (
-            <div className="mb-6 p-5 bg-blue-50 border border-blue-200 rounded-xl">
-              <h2 className="text-lg font-semibold text-blue-800 mb-2">Bu ürün rezerve edilmiş</h2>
-              <p className="text-sm text-blue-700">
+            <div className="mb-6 p-5 bg-info-50 border border-info-200 rounded-xl">
+              <h2 className="text-lg font-semibold text-info-800 mb-2">Bu ürün rezerve edilmiş</h2>
+              <p className="text-sm text-info-700">
                 Rezerve edilmiş ürünler düzenlenemez. Rezervasyon tamamlandıktan veya iptal edildikten sonra düzenleme yapabilirsiniz.
               </p>
             </div>
@@ -842,14 +848,14 @@ export default function EditListingPage() {
           <form onSubmit={handleSubmit} className="space-y-6" style={{ display: ['sold', 'reserved', 'inactive'].includes(formData.status) ? 'none' : undefined }}>
             {/* Title */}
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
-                Başlık <span className="text-red-500">*</span>
+              <label className="block text-sm font-medium text-body mb-2">
+                Başlık <span className="text-danger-500">*</span>
               </label>
-              <input
+              <Input
                 type="text"
                 value={formData.title}
                 onChange={(e) => setFormData({ ...formData, title: e.target.value })}
-                className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-primary-500 focus:border-primary-500 text-gray-900 placeholder-gray-500 bg-white"
+                className="h-12 px-4 rounded-xl"
                 placeholder="Örn: Hot Wheels '69 Camaro Z28"
                 required
                 minLength={5}
@@ -859,29 +865,27 @@ export default function EditListingPage() {
 
             {/* Description */}
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
+              <label className="block text-sm font-medium text-body mb-2">
                 Açıklama
               </label>
-              <textarea
-                value={formData.description}
+              <Textarea value={formData.description}
                 onChange={(e) => setFormData({ ...formData, description: e.target.value })}
-                className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-primary-500 focus:border-primary-500 text-gray-900 placeholder-gray-500 bg-white"
+                className="px-4 py-3 rounded-xl text-heading placeholder-muted"
                 placeholder="Ürün hakkında detaylı bilgi..."
                 rows={5}
-                maxLength={5000}
-              />
+                maxLength={5000} />
             </div>
 
             {/* Category & Condition */}
             <div className="grid md:grid-cols-2 gap-6">
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Kategori <span className="text-red-500">*</span>
+                <label className="block text-sm font-medium text-body mb-2">
+                  Kategori <span className="text-danger-500">*</span>
                 </label>
-                <select
+                <Select
                   value={formData.categoryId}
                   onChange={(e) => setFormData({ ...formData, categoryId: e.target.value })}
-                  className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-primary-500 focus:border-primary-500 text-gray-900 bg-white"
+                  className="rounded-xl"
                   required
                 >
                   <option value="">Kategori Seçin</option>
@@ -890,17 +894,17 @@ export default function EditListingPage() {
                       {cat.name}
                     </option>
                   ))}
-                </select>
+                </Select>
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Durum <span className="text-red-500">*</span>
+                <label className="block text-sm font-medium text-body mb-2">
+                  Durum <span className="text-danger-500">*</span>
                 </label>
-                <select
+                <Select
                   value={formData.condition}
                   onChange={(e) => setFormData({ ...formData, condition: e.target.value })}
-                  className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-primary-500 focus:border-primary-500 text-gray-900 bg-white"
+                  className="rounded-xl"
                   required
                 >
                   {CONDITIONS.map((cond) => (
@@ -908,7 +912,7 @@ export default function EditListingPage() {
                       {cond.label}
                     </option>
                   ))}
-                </select>
+                </Select>
               </div>
             </div>
 
@@ -923,7 +927,7 @@ export default function EditListingPage() {
                 options={brands.map((b) => ({ value: b.id, label: b.name }))}
                 placeholder={brandsLoading ? 'Yükleniyor...' : 'Marka Seçin'}
                 disabled={brandsLoading}
-                triggerClassName="py-3 rounded-xl border-gray-300"
+                triggerClassName="py-3 rounded-xl border-border"
               />
 
               <SimpleDropdown
@@ -941,34 +945,34 @@ export default function EditListingPage() {
                         : 'Model Seçin'
                 }
                 disabled={!formData.brandId || modelsLoading}
-                triggerClassName="py-3 rounded-xl border-gray-300"
+                triggerClassName="py-3 rounded-xl border-border"
               />
 
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
+                <label className="block text-sm font-medium text-body mb-2">
                   Ölçek
                 </label>
-                <select
+                <Select
                   value={formData.scale}
                   onChange={(e) => setFormData({ ...formData, scale: e.target.value })}
-                  className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-primary-500 focus:border-primary-500 text-gray-900 bg-white"
+                  className="rounded-xl"
                 >
                   {(scaleList.length > 0 ? scaleList : ['1:18', '1:24', '1:43', '1:64', '1:87']).map((scale) => (
                     <option key={scale} value={scale}>
                       {scale}
                     </option>
                   ))}
-                </select>
+                </Select>
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
+                <label className="block text-sm font-medium text-body mb-2">
                   Malzeme
                 </label>
-                <select
+                <Select
                   value={formData.material}
                   onChange={(e) => setFormData({ ...formData, material: e.target.value })}
-                  className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-primary-500 focus:border-primary-500 text-gray-900 bg-white"
+                  className="rounded-xl"
                 >
                   <option value="">Malzeme seçin</option>
                   {(materialList.length > 0 ? materialList : [
@@ -981,17 +985,17 @@ export default function EditListingPage() {
                       {m.label}
                     </option>
                   ))}
-                </select>
+                </Select>
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
+                <label className="block text-sm font-medium text-body mb-2">
                   Üretici
                 </label>
-                <select
+                <Select
                   value={formData.manufacturerId}
                   onChange={(e) => setFormData({ ...formData, manufacturerId: e.target.value })}
-                  className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-primary-500 focus:border-primary-500 text-gray-900 bg-white"
+                  className="rounded-xl"
                 >
                   <option value="">Üretici seçin</option>
                   {manufacturerList.map((m) => (
@@ -999,18 +1003,18 @@ export default function EditListingPage() {
                       {m.name}
                     </option>
                   ))}
-                </select>
+                </Select>
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
+                <label className="block text-sm font-medium text-body mb-1">
                   Çıkış yılı
                 </label>
-                <p className="text-xs text-gray-500 mb-2">Modelin çıkış yılı (isteğe bağlı)</p>
-                <select
+                <p className="text-xs text-muted mb-2">Modelin çıkış yılı (isteğe bağlı)</p>
+                <Select
                   value={formData.year}
                   onChange={(e) => setFormData({ ...formData, year: e.target.value })}
-                  className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-primary-500 focus:border-primary-500 text-gray-900 bg-white"
+                  className="rounded-xl"
                 >
                   <option value="">Yıl seçin</option>
                   {yearOptions.map((y) => (
@@ -1018,35 +1022,29 @@ export default function EditListingPage() {
                       {y}
                     </option>
                   ))}
-                </select>
+                </Select>
               </div>
             </div>
 
             {/* Trade Toggle */}
             <div className={`flex items-center justify-between p-4 rounded-xl border ${limits?.canTrade
-                ? 'bg-green-50 border-green-200'
-                : 'bg-gray-50 border-gray-200'
+                ? 'bg-success-50 border-success-200'
+                : 'bg-surface border-border'
               }`}>
               <div>
-                <label className="font-medium text-gray-900">Takas Aktif</label>
-                <p className="text-sm text-gray-600">
+                <label className="font-medium text-heading">Takas Aktif</label>
+                <p className="text-sm text-muted">
                   {limits?.canTrade
                     ? 'Bu ürünü takas için de açık tutar'
                     : 'Takas özelliği Temel veya üstü üyelik gerektirir'}
                 </p>
               </div>
               {limits?.canTrade ? (
-                <button
-                  type="button"
-                  onClick={() => setFormData({ ...formData, isTradeEnabled: !formData.isTradeEnabled })}
-                  className={`relative w-14 h-8 rounded-full transition-colors ${formData.isTradeEnabled ? 'bg-green-500' : 'bg-gray-300'
-                    }`}
-                >
-                  <span
-                    className={`absolute top-1 left-1 w-6 h-6 bg-white rounded-full shadow transition-transform ${formData.isTradeEnabled ? 'translate-x-6' : 'translate-x-0'
-                      }`}
-                  />
-                </button>
+                <Toggle
+                  checked={formData.isTradeEnabled}
+                  onChange={(val) => setFormData({ ...formData, isTradeEnabled: val })}
+                  size="md"
+                />
               ) : (
                 <Link href="/pricing" className="text-sm text-primary-600 hover:text-primary-700 font-medium">
                   Premium'a Geç →
@@ -1055,46 +1053,42 @@ export default function EditListingPage() {
             </div>
 
             {/* Ön Sipariş */}
-            <div className="flex items-center justify-between p-4 bg-gray-50 rounded-xl border border-gray-200">
+            <div className="flex items-center justify-between p-4 bg-surface rounded-xl border border-border">
               <div>
-                <label className="font-medium text-gray-900">Ön Sipariş</label>
-                <p className="text-sm text-gray-600">Ürün henüz stokta değil; çıkınca gönderilecek</p>
+                <label className="font-medium text-heading">Ön Sipariş</label>
+                <p className="text-sm text-muted">Ürün henüz stokta değil; çıkınca gönderilecek</p>
               </div>
-              <button
-                type="button"
+              <Button variant="secondary" type="button"
                 onClick={() => setFormData({ ...formData, isPreorder: !formData.isPreorder })}
-                className={`relative w-14 h-8 rounded-full transition-colors ${formData.isPreorder ? 'bg-violet-500' : 'bg-gray-300'}`}
-              >
-                <span className={`absolute top-1 left-1 w-6 h-6 bg-white rounded-full shadow transition-transform ${formData.isPreorder ? 'translate-x-6' : 'translate-x-0'}`} />
-              </button>
+                className={`relative w-14 h-8 rounded-full transition-colors ${formData.isPreorder ? 'bg-primary-500' : 'bg-border-strong'}`}>
+                <span className={`absolute top-1 left-1 w-6 h-6 bg-surface-elevated rounded-full shadow transition-transform ${formData.isPreorder ? 'translate-x-6' : 'translate-x-0'}`} />
+              </Button>
             </div>
 
             {/* Set / Paket */}
-            <div className="flex items-center justify-between p-4 bg-gray-50 rounded-xl border border-gray-200">
+            <div className="flex items-center justify-between p-4 bg-surface rounded-xl border border-border">
               <div>
-                <label className="font-medium text-gray-900">Set / Paket</label>
-                <p className="text-sm text-gray-600">Tek ilanda birden fazla model (örn. 5'li paket, garaj seti)</p>
+                <label className="font-medium text-heading">Set / Paket</label>
+                <p className="text-sm text-muted">Tek ilanda birden fazla model (örn. 5'li paket, garaj seti)</p>
               </div>
-              <button
-                type="button"
+              <Button variant="secondary" type="button"
                 onClick={() => setFormData({ ...formData, isSet: !formData.isSet })}
-                className={`relative w-14 h-8 rounded-full transition-colors ${formData.isSet ? 'bg-sky-500' : 'bg-gray-300'}`}
-              >
-                <span className={`absolute top-1 left-1 w-6 h-6 bg-white rounded-full shadow transition-transform ${formData.isSet ? 'translate-x-6' : 'translate-x-0'}`} />
-              </button>
+                className={`relative w-14 h-8 rounded-full transition-colors ${formData.isSet ? 'bg-info-500' : 'bg-border-strong'}`}>
+                <span className={`absolute top-1 left-1 w-6 h-6 bg-surface-elevated rounded-full shadow transition-transform ${formData.isSet ? 'translate-x-6' : 'translate-x-0'}`} />
+              </Button>
             </div>
 
             {/* Price & Quantity */}
             <div className="grid md:grid-cols-2 gap-6">
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Fiyat (₺) <span className="text-red-500">*</span>
+                <label className="block text-sm font-medium text-body mb-2">
+                  Fiyat (₺) <span className="text-danger-500">*</span>
                 </label>
-                <input
+                <Input
                   type="number"
                   value={formData.price}
                   onChange={(e) => setFormData({ ...formData, price: e.target.value })}
-                  className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-primary-500 focus:border-primary-500 text-gray-900 placeholder-gray-500 bg-white"
+                  className="h-12 px-4 rounded-xl"
                   placeholder="0.00"
                   required
                   min={1}
@@ -1104,103 +1098,98 @@ export default function EditListingPage() {
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
+                <label className="block text-sm font-medium text-body mb-2">
                   Stok Miktarı
                 </label>
-                <p className="text-xs text-gray-500 mb-2">
+                <p className="text-xs text-muted mb-2">
                   Boş bırakırsanız sınırsız stok olur
                 </p>
-                <input
+                <Input
                   type="number"
-                  value={formData.quantity || ''}
+                  value={formData.quantity === '' || formData.quantity === null || formData.quantity === undefined ? '' : formData.quantity}
                   onChange={(e) => {
                     const value = e.target.value;
                     if (process.env.NODE_ENV === 'development') console.log('[EDIT] Input onChange - value:', value, 'type:', typeof value);
-                    // Save as string, empty string means unlimited stock
-                    const newQuantity = value === '' ? '' : value;
+                    const newQuantity = value === '' ? '' : Number(value);
                     if (process.env.NODE_ENV === 'development') console.log('[EDIT] Input onChange - setting quantity to:', newQuantity);
                     setFormData({ ...formData, quantity: newQuantity });
                   }}
                   onBlur={() => {
                     if (process.env.NODE_ENV === 'development') console.log('[EDIT] Input onBlur - current formData.quantity:', formData.quantity);
                   }}
-                  className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-primary-500 focus:border-primary-500 text-gray-900 placeholder-gray-500 bg-white"
+                  className="h-12 px-4 rounded-xl"
                   placeholder="Sınırsız"
                   min={1}
                 />
               </div>
             </div>
             {(commissionPreviewLoading || commissionPreview) && (
-              <div className="p-3 bg-gray-50 rounded-xl border border-gray-100 text-sm">
-                <p className="text-gray-600 font-medium mb-1">{locale === 'en' ? 'Estimated (per sale)' : 'Tahmini (satış başına)'}</p>
+              <div className="p-3 bg-surface rounded-xl border border-border-subtle text-sm">
+                <p className="text-muted font-medium mb-1">{locale === 'en' ? 'Estimated (per sale)' : 'Tahmini (satış başına)'}</p>
                 {commissionPreviewLoading ? (
-                  <span className="text-gray-400">{locale === 'en' ? 'Calculating...' : 'Hesaplanıyor...'}</span>
+                  <span className="text-subtle">{locale === 'en' ? 'Calculating...' : 'Hesaplanıyor...'}</span>
                 ) : commissionPreview ? (
                   <div className="flex flex-wrap gap-x-4 gap-y-1">
-                    <span className="text-gray-600">{locale === 'en' ? 'Platform deduction' : 'Platform kesintisi'}: ₺{commissionPreview.sellerFeeAmount.toLocaleString('tr-TR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
-                    <span className="text-green-700 font-medium">{locale === 'en' ? 'Net to you' : 'Net kazanç'}: ₺{commissionPreview.sellerNetAmount.toLocaleString('tr-TR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+                    <span className="text-muted">{locale === 'en' ? 'Platform deduction' : 'Platform kesintisi'}: ₺{commissionPreview.sellerFeeAmount.toLocaleString('tr-TR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+                    <span className="text-success-700 font-medium">{locale === 'en' ? 'Net to you' : 'Net kazanç'}: ₺{commissionPreview.sellerNetAmount.toLocaleString('tr-TR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
                   </div>
                 ) : null}
               </div>
             )}
 
             {/* Discount Section */}
-            <div className="border border-gray-200 rounded-xl overflow-hidden">
-              <button
-                type="button"
+            <div className="border border-border rounded-xl overflow-hidden">
+              <Button variant="secondary" type="button"
                 onClick={() => setShowDiscountSection(!showDiscountSection)}
-                className="w-full flex items-center justify-between p-4 bg-gradient-to-r from-orange-50 to-amber-50 hover:from-orange-100 hover:to-amber-100 transition-colors"
-              >
+                className="w-full flex items-center justify-between p-4 bg-gradient-to-r from-primary-50 to-warning-50 hover:from-primary-100 hover:to-warning-100 transition-colors">
                 <div className="flex items-center gap-3">
-                  <ReceiptPercentIcon className="w-5 h-5 text-orange-600" />
-                  <span className="font-medium text-gray-900">İndirim & Kampanya</span>
+                  <ReceiptPercentIcon className="w-5 h-5 text-primary-600" />
+                  <span className="font-medium text-heading">İndirim & Kampanya</span>
                   {productDiscounts.length > 0 && (
-                    <span className="px-2 py-0.5 bg-orange-100 text-orange-700 text-xs rounded-full">
+                    <span className="px-2 py-0.5 bg-primary-100 text-primary-700 text-xs rounded-full">
                       {productDiscounts.length} aktif
                     </span>
                   )}
                 </div>
                 {showDiscountSection ? (
-                  <ChevronUpIcon className="w-5 h-5 text-gray-500" />
+                  <ChevronUpIcon className="w-5 h-5 text-muted" />
                 ) : (
-                  <ChevronDownIcon className="w-5 h-5 text-gray-500" />
+                  <ChevronDownIcon className="w-5 h-5 text-muted" />
                 )}
-              </button>
+              </Button>
 
               {showDiscountSection && (
-                <div className="p-4 space-y-4 bg-white">
+                <div className="p-4 space-y-4 bg-surface-elevated">
                   {/* Quick Sale Price */}
-                  <div className="p-4 bg-orange-50 rounded-lg border border-orange-100">
-                    <h4 className="font-medium text-gray-900 mb-3 flex items-center gap-2">
-                      <TagIcon className="w-4 h-4 text-orange-600" />
+                  <div className="p-4 bg-primary-50 rounded-lg border border-primary-100">
+                    <h4 className="font-medium text-heading mb-3 flex items-center gap-2">
+                      <TagIcon className="w-4 h-4 text-primary-600" />
                       Hızlı İndirim
                     </h4>
-                    <p className="text-sm text-gray-600 mb-4">
+                    <p className="text-sm text-muted mb-4">
                       Ürününüz için hızlıca indirimli fiyat belirleyin. Bu, ürün sayfasında üstü çizili fiyat olarak görünecektir.
                     </p>
 
                     <div className="grid md:grid-cols-2 gap-4 mb-4">
                       <div>
-                        <label className="block text-xs font-medium text-gray-700 mb-1">
+                        <label className="block text-xs font-medium text-body mb-1">
                           Orijinal Fiyat (₺)
                         </label>
-                        <input
+                        <Input
                           type="number"
                           value={saleData.originalPrice || formData.price}
                           onChange={(e) => setSaleData({ ...saleData, originalPrice: e.target.value })}
-                          className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-orange-500 text-sm"
                           placeholder={formData.price || 'Orijinal fiyat'}
                         />
                       </div>
                       <div>
-                        <label className="block text-xs font-medium text-gray-700 mb-1">
+                        <label className="block text-xs font-medium text-body mb-1">
                           İndirimli Fiyat (₺)
                         </label>
-                        <input
+                        <Input
                           type="number"
                           value={saleData.salePrice}
                           onChange={(e) => setSaleData({ ...saleData, salePrice: e.target.value })}
-                          className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-orange-500 text-sm"
                           placeholder="İndirimli fiyat"
                         />
                       </div>
@@ -1208,41 +1197,39 @@ export default function EditListingPage() {
 
                     <div className="grid md:grid-cols-2 gap-4 mb-4">
                       <div>
-                        <label className="block text-xs font-medium text-gray-700 mb-1">
+                        <label className="block text-xs font-medium text-body mb-1">
                           Başlangıç
                         </label>
-                        <input
+                        <Input
                           type="date"
                           value={saleData.saleStartDate}
                           onChange={(e) => setSaleData({ ...saleData, saleStartDate: e.target.value })}
-                          className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-orange-500 text-sm"
                         />
                       </div>
                       <div>
-                        <label className="block text-xs font-medium text-gray-700 mb-1">
+                        <label className="block text-xs font-medium text-body mb-1">
                           Bitiş
                         </label>
-                        <input
+                        <Input
                           type="date"
                           value={saleData.saleEndDate}
                           onChange={(e) => setSaleData({ ...saleData, saleEndDate: e.target.value })}
-                          className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-orange-500 text-sm"
                         />
                       </div>
                     </div>
 
                     {saleData.salePrice && saleData.originalPrice && (
-                      <div className="flex items-center gap-2 text-sm text-green-700 bg-green-50 p-2 rounded-lg mb-4">
+                      <div className="flex items-center gap-2 text-sm text-success-700 bg-success-50 p-2 rounded-lg mb-4">
                         <span>
                           %{Math.round((1 - Number(saleData.salePrice) / Number(saleData.originalPrice)) * 100)} indirim
                         </span>
-                        <span className="text-gray-500">
+                        <span className="text-muted">
                           ({Number(saleData.originalPrice).toLocaleString('tr-TR')} ₺ → {Number(saleData.salePrice).toLocaleString('tr-TR')} ₺)
                         </span>
                       </div>
                     )}
 
-                    <p className="text-xs text-gray-500">
+                    <p className="text-xs text-muted">
                       * Not: Bu özellik yakında aktif olacaktır. Şimdilik ürün fiyatını doğrudan değiştirebilirsiniz.
                     </p>
                   </div>
@@ -1250,20 +1237,20 @@ export default function EditListingPage() {
                   {/* Existing Discounts */}
                   {productDiscounts.length > 0 && (
                     <div>
-                      <h4 className="font-medium text-gray-900 mb-3">Bu Ürüne Uygulanan İndirimler</h4>
+                      <h4 className="font-medium text-heading mb-3">Bu Ürüne Uygulanan İndirimler</h4>
                       <div className="space-y-2">
                         {productDiscounts.map((discount: any) => (
-                          <div key={discount.id} className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
+                          <div key={discount.id} className="flex items-center justify-between p-3 bg-surface rounded-lg">
                             <div>
-                              <p className="font-medium text-gray-900">{discount.name}</p>
-                              <p className="text-sm text-gray-500">
+                              <p className="font-medium text-heading">{discount.name}</p>
+                              <p className="text-sm text-muted">
                                 {discount.type === 'percentage' ? `%${discount.value}` : `${discount.value} TL`}
                                 {discount.code && <span className="ml-2">Kod: {discount.code}</span>}
                               </p>
                             </div>
                             <span className={`px-2 py-1 text-xs rounded-full ${discount.isCurrentlyValid
-                                ? 'bg-green-100 text-green-700'
-                                : 'bg-gray-100 text-gray-600'
+                                ? 'bg-success-100 text-success-700'
+                                : 'bg-surface-alt text-muted'
                               }`}>
                               {discount.isCurrentlyValid ? 'Aktif' : 'Pasif'}
                             </span>
@@ -1274,10 +1261,10 @@ export default function EditListingPage() {
                   )}
 
                   {/* Link to full discount management */}
-                  <div className="pt-2 border-t border-gray-100">
+                  <div className="pt-2 border-t border-border-subtle">
                     <Link
                       href="/profile/discounts"
-                      className="inline-flex items-center gap-2 text-orange-600 hover:text-orange-700 text-sm font-medium"
+                      className="inline-flex items-center gap-2 text-primary-600 hover:text-primary-700 text-sm font-medium"
                     >
                       <ReceiptPercentIcon className="w-4 h-4" />
                       Tüm İndirimlerimi Yönet →
@@ -1289,19 +1276,17 @@ export default function EditListingPage() {
 
             {/* Images */}
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
+              <label className="block text-sm font-medium text-body mb-2">
                 Ürün Görselleri (En fazla {limits?.maxImagesPerListing || 3})
               </label>
               <div className="space-y-3">
                 <div>
-                  <input
-                    type="file"
+                  <Input type="file"
                     accept="image/*"
                     multiple
                     onChange={(e) => handleFileUpload(e.target.files)}
                     disabled={uploadingImages || formData.images.length >= (limits?.maxImagesPerListing || 3)}
-                    className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-primary-500 focus:border-primary-500 text-gray-900 bg-white disabled:bg-gray-100 disabled:cursor-not-allowed"
-                  />
+                    className="px-4 py-3 rounded-xl text-heading disabled:bg-surface-alt disabled:cursor-not-allowed" />
                   {uploadingImages && (
                     <p className="text-sm text-primary-600 mt-2">Resimler yükleniyor...</p>
                   )}
@@ -1316,80 +1301,88 @@ export default function EditListingPage() {
                           <img
                             src={previewUrl}
                             alt={`Preview ${index + 1}`}
-                            className="w-full h-32 object-cover rounded-lg border border-gray-200"
+                            className="w-full h-32 object-cover rounded-lg border border-border"
                             onError={(e) => {
                               (e.target as HTMLImageElement).src = 'https://placehold.co/200x200/f3f4f6/9ca3af?text=Resim';
                             }}
                           />
-                          <button
-                            type="button"
+                          <Button variant="secondary" type="button"
                             onClick={() => removeImage(index)}
-                            className="absolute top-2 right-2 bg-red-500 text-white rounded-full p-1 opacity-0 group-hover:opacity-100 transition-opacity"
-                          >
+                            className="absolute top-2 right-2 bg-danger-500 text-inverted rounded-full p-1 opacity-0 group-hover:opacity-100 transition-opacity">
                             ×
-                          </button>
+                          </Button>
                         </div>
                       );
                     })}
                   </div>
                 )}
               </div>
-              <p className="text-sm text-gray-500 mt-2">
+              <p className="text-sm text-muted mt-2">
                 {formData.images.length} / {limits?.maxImagesPerListing || 3} resim yüklendi
               </p>
             </div>
 
             {/* Submit */}
             <div className="flex gap-4 pt-4">
-              <button
+              <Button
                 type="button"
+                variant="secondary"
+                size="lg"
+                className="flex-1"
                 onClick={() => router.back()}
-                className="flex-1 px-6 py-3 border border-gray-300 rounded-xl hover:bg-gray-50 text-gray-700 font-medium"
               >
                 İptal
-              </button>
-              <button
+              </Button>
+              <Button
                 type="submit"
+                variant="primary"
+                size="lg"
+                className="flex-1"
                 disabled={isLoading}
-                className="flex-1 px-6 py-3 bg-primary-500 text-white rounded-xl hover:bg-primary-600 disabled:bg-gray-300 disabled:cursor-not-allowed"
               >
                 {isLoading ? 'Güncelleniyor...' : 'Değişiklikleri Kaydet'}
-              </button>
+              </Button>
             </div>
 
             {/* Status Actions */}
-            <div className="border-t border-gray-200 pt-6 mt-6">
-              <h3 className="text-lg font-semibold text-gray-900 mb-4">İlan Durumu</h3>
+            <div className="border-t border-border pt-6 mt-6">
+              <h3 className="text-lg font-semibold text-heading mb-4">İlan Durumu</h3>
               <div className="flex flex-col sm:flex-row gap-3">
                 {formData.status === 'active' ? (
-                  <button
+                  <Button
                     type="button"
+                    variant="secondary"
+                    size="lg"
+                    className="flex-1"
                     onClick={handleDeactivate}
                     disabled={isLoading}
-                    className="flex-1 px-6 py-3 bg-yellow-500 text-white rounded-xl hover:bg-yellow-600 disabled:bg-gray-300 disabled:cursor-not-allowed font-medium"
                   >
                     🔒 İlanı Pasife Al
-                  </button>
+                  </Button>
                 ) : (
-                  <button
+                  <Button
                     type="button"
+                    variant="success"
+                    size="lg"
+                    className="flex-1"
                     onClick={handleActivate}
                     disabled={isLoading}
-                    className="flex-1 px-6 py-3 bg-green-500 text-white rounded-xl hover:bg-green-600 disabled:bg-gray-300 disabled:cursor-not-allowed font-medium"
                   >
                     ✅ İlanı Aktif Et
-                  </button>
+                  </Button>
                 )}
-                <button
+                <Button
                   type="button"
+                  variant="danger"
+                  size="lg"
+                  className="flex-1"
                   onClick={() => setShowDeleteModal(true)}
                   disabled={isLoading}
-                  className="flex-1 px-6 py-3 bg-red-500 text-white rounded-xl hover:bg-red-600 disabled:bg-gray-300 disabled:cursor-not-allowed font-medium"
                 >
                   🗑️ İlanı Sil
-                </button>
+                </Button>
               </div>
-              <p className="text-sm text-gray-500 mt-2">
+              <p className="text-sm text-muted mt-2">
                 {formData.status === 'active'
                   ? 'Pasife alınan ilanlar listelemede görünmez ama silinmez.'
                   : 'Aktif ilanlar listelemede görünür.'}
@@ -1400,30 +1393,34 @@ export default function EditListingPage() {
 
         {/* Delete Confirmation Modal */}
         {showDeleteModal && (
-          <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+          <div className="fixed inset-0 bg-heading/50 flex items-center justify-center z-50 p-4">
             <motion.div
               initial={{ opacity: 0, scale: 0.95 }}
               animate={{ opacity: 1, scale: 1 }}
-              className="bg-white rounded-2xl p-6 max-w-md w-full"
+              className="bg-surface-elevated rounded-2xl p-6 max-w-md w-full"
             >
-              <h3 className="text-xl font-bold text-gray-900 mb-4">İlanı Sil</h3>
-              <p className="text-gray-600 mb-6">
+              <h3 className="text-xl font-bold text-heading mb-4">İlanı Sil</h3>
+              <p className="text-muted mb-6">
                 Bu ilanı silmek istediğinizden emin misiniz? Bu işlem geri alınamaz ve ilan kalıcı olarak silinir.
               </p>
               <div className="flex gap-3">
-                <button
+                <Button
+                  variant="secondary"
+                  size="lg"
+                  className="flex-1"
                   onClick={() => setShowDeleteModal(false)}
-                  className="flex-1 px-4 py-3 border border-gray-300 rounded-xl hover:bg-gray-50 font-medium"
                 >
                   İptal
-                </button>
-                <button
+                </Button>
+                <Button
+                  variant="danger"
+                  size="lg"
+                  className="flex-1"
                   onClick={handleDelete}
                   disabled={isLoading}
-                  className="flex-1 px-4 py-3 bg-red-500 text-white rounded-xl hover:bg-red-600 disabled:bg-gray-300 font-medium"
                 >
                   {isLoading ? 'Siliniyor...' : 'Evet, Sil'}
-                </button>
+                </Button>
               </div>
             </motion.div>
           </div>

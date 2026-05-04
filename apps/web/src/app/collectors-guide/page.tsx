@@ -8,41 +8,41 @@ export default function CollectorsGuidePage() {
   const { t } = useTranslation();
 
   return (
-    <div className="min-h-screen bg-gray-50">
+    <div className="min-h-screen bg-surface">
       <main className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
-        <nav className="mb-8 text-sm text-gray-500">
-          <Link href="/" className="hover:text-orange-600">Ana Sayfa</Link>
+        <nav className="mb-8 text-sm text-muted">
+          <Link href="/" className="hover:text-primary-600">Ana Sayfa</Link>
           <span className="mx-2">/</span>
-          <span className="text-gray-900">{t('information.collectorsGuide.title')}</span>
+          <span className="text-heading">{t('information.collectorsGuide.title')}</span>
         </nav>
-        <article className="bg-white rounded-xl shadow-sm overflow-hidden">
-          <header className="border-b border-gray-100 px-6 py-8">
+        <article className="bg-surface-elevated rounded-xl shadow-sm overflow-hidden">
+          <header className="border-b border-border-subtle px-6 py-8">
             <div className="flex items-center gap-3">
-              <div className="p-2 bg-orange-100 rounded-lg">
-                <BookOpenIcon className="w-8 h-8 text-orange-600" />
+              <div className="p-2 bg-primary-100 rounded-lg">
+                <BookOpenIcon className="w-8 h-8 text-primary-600" />
               </div>
               <div>
-                <h1 className="text-3xl font-bold text-gray-900">{t('information.collectorsGuide.title')}</h1>
-                <p className="text-gray-600 mt-1">{t('information.collectorsGuide.subtitle')}</p>
+                <h1 className="text-3xl font-bold text-heading">{t('information.collectorsGuide.title')}</h1>
+                <p className="text-muted mt-1">{t('information.collectorsGuide.subtitle')}</p>
               </div>
             </div>
           </header>
           <div className="px-6 py-8 space-y-8">
             <section>
-              <h2 className="text-lg font-semibold text-gray-900 mb-2">{t('information.collectorsGuide.tips')}</h2>
-              <p className="text-gray-700">{t('information.collectorsGuide.tipsDesc')}</p>
+              <h2 className="text-lg font-semibold text-heading mb-2">{t('information.collectorsGuide.tips')}</h2>
+              <p className="text-body">{t('information.collectorsGuide.tipsDesc')}</p>
             </section>
             <section>
-              <h2 className="text-lg font-semibold text-gray-900 mb-2">{t('information.collectorsGuide.grading')}</h2>
-              <p className="text-gray-700">{t('information.collectorsGuide.gradingDesc')}</p>
+              <h2 className="text-lg font-semibold text-heading mb-2">{t('information.collectorsGuide.grading')}</h2>
+              <p className="text-body">{t('information.collectorsGuide.gradingDesc')}</p>
             </section>
             <section>
-              <h2 className="text-lg font-semibold text-gray-900 mb-2">{t('information.collectorsGuide.storage')}</h2>
-              <p className="text-gray-700">{t('information.collectorsGuide.storageDesc')}</p>
+              <h2 className="text-lg font-semibold text-heading mb-2">{t('information.collectorsGuide.storage')}</h2>
+              <p className="text-body">{t('information.collectorsGuide.storageDesc')}</p>
             </section>
             <section>
-              <h2 className="text-lg font-semibold text-gray-900 mb-2">{t('information.collectorsGuide.valuation')}</h2>
-              <p className="text-gray-700">{t('information.collectorsGuide.valuationDesc')}</p>
+              <h2 className="text-lg font-semibold text-heading mb-2">{t('information.collectorsGuide.valuation')}</h2>
+              <p className="text-body">{t('information.collectorsGuide.valuationDesc')}</p>
             </section>
           </div>
         </article>

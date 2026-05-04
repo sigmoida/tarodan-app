@@ -7,8 +7,10 @@ import Link from 'next/link';
 import toast from 'react-hot-toast';
 import UserAvatar from '@/components/UserAvatar';
 import { useAuthStore } from '@/stores/authStore';
+import AuthLoadingScreen from '@/components/AuthLoadingScreen';
 import { api } from '@/lib/api';
 import { UserMinusIcon, ArrowLeftIcon, UserIcon } from '@heroicons/react/24/outline';
+import { Button, Spinner } from '@tarodan/ui';
 
 interface FollowedUser {
   id: string;
@@ -28,14 +30,15 @@ interface FollowedUser {
 export default function FollowingPage() {
   const router = useRouter();
   const queryClient = useQueryClient();
-  const { isAuthenticated } = useAuthStore();
+  const { isAuthenticated, isLoading: authLoading } = useAuthStore();
 
   useEffect(() => {
+    if (authLoading) return;
     if (!isAuthenticated) {
       router.push('/login?redirect=/profile/following');
       return;
     }
-  }, [isAuthenticated, router]);
+  }, [authLoading, isAuthenticated, router]);
 
   const followingQuery = useQuery({
     queryKey: ['profile-following'],
@@ -44,7 +47,7 @@ export default function FollowingPage() {
       const data = response.data.data || response.data.following || response.data || [];
       return Array.isArray(data) ? data : [];
     },
-    enabled: isAuthenticated,
+    enabled: !authLoading && isAuthenticated,
     meta: { page: 'profile-following' },
   });
   const following = followingQuery.data ?? [];
@@ -65,42 +68,45 @@ export default function FollowingPage() {
     }
   };
 
+  if (authLoading) {
+    return <AuthLoadingScreen />;
+  }
   if (!isAuthenticated) {
     return null;
   }
 
   return (
-    <div className="min-h-screen bg-gray-50">
+    <div className="min-h-screen bg-surface">
       <main className="max-w-4xl mx-auto px-4 py-8">
         {/* Header */}
         <div className="flex items-center gap-4 mb-8">
-          <Link href="/profile" className="p-2 hover:bg-gray-200 rounded transition-colors">
-            <ArrowLeftIcon className="w-6 h-6 text-gray-600" />
+          <Link href="/profile" className="p-2 hover:bg-border-subtle rounded transition-colors">
+            <ArrowLeftIcon className="w-6 h-6 text-muted" />
           </Link>
           <div>
-            <h1 className="text-2xl font-bold text-gray-900">Takip Ettiklerim</h1>
-            <p className="text-sm text-gray-500">{following.length} satıcı takip ediliyor</p>
+            <h1 className="text-2xl font-bold text-heading">Takip Ettiklerim</h1>
+            <p className="text-sm text-muted">{following.length} satıcı takip ediliyor</p>
           </div>
         </div>
 
         {loading ? (
           <div className="flex justify-center py-12">
-            <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-primary-500"></div>
+            <Spinner size="xl" />
           </div>
         ) : following.length === 0 ? (
-          <div className="text-center py-16 bg-white rounded">
-            <div className="w-20 h-20 bg-gray-100 rounded-sm flex items-center justify-center mx-auto mb-4">
-              <UserIcon className="w-8 h-8 text-gray-400" />
+          <div className="text-center py-16 bg-surface-elevated rounded">
+            <div className="w-20 h-20 bg-surface-alt rounded-sm flex items-center justify-center mx-auto mb-4">
+              <UserIcon className="w-8 h-8 text-subtle" />
             </div>
-            <h2 className="text-xl font-semibold text-gray-900 mb-2">
+            <h2 className="text-xl font-semibold text-heading mb-2">
               Henüz kimseyi takip etmiyorsunuz
             </h2>
-            <p className="text-gray-600 mb-6">
+            <p className="text-muted mb-6">
               Satıcıları takip ederek yeni ilanlarından haberdar olun
             </p>
             <Link
               href="/listings"
-              className="inline-block px-6 py-3 bg-primary-500 text-white rounded font-medium hover:bg-primary-600 transition-colors"
+              className="inline-block px-6 py-3 bg-primary-500 text-inverted rounded font-medium hover:bg-primary-600 transition-colors"
             >
               İlanları Keşfet
             </Link>
@@ -110,7 +116,7 @@ export default function FollowingPage() {
             {following.map((item) => (
               <div
                 key={item.id}
-                className="bg-white rounded shadow-sm p-4 flex items-center gap-4"
+                className="bg-surface-elevated rounded shadow-sm p-4 flex items-center gap-4"
               >
                 <Link
                   href={`/seller/${item.following.id}`}
@@ -118,26 +124,24 @@ export default function FollowingPage() {
                 >
                   <UserAvatar displayName={item.following.displayName} avatarUrl={item.following?.avatarUrl} size="lg" className="!w-16 !h-16 !text-2xl" />
                   <div className="flex-1">
-                    <h3 className="font-semibold text-gray-900">
+                    <h3 className="font-semibold text-heading">
                       {item.following.displayName}
                     </h3>
                     {item.following.bio && (
-                      <p className="text-sm text-gray-500 line-clamp-1">
+                      <p className="text-sm text-muted line-clamp-1">
                         {item.following.bio}
                       </p>
                     )}
-                    <p className="text-sm text-gray-400 mt-1">
+                    <p className="text-sm text-subtle mt-1">
                       {item.following._count?.products || 0} ilan
                     </p>
                   </div>
                 </Link>
-                <button
-                  onClick={() => handleUnfollow(item.following.id)}
-                  className="px-4 py-2 border border-red-200 text-red-600 rounded hover:bg-red-50 transition-colors flex items-center gap-2"
-                >
+                <Button variant="secondary" onClick={() => handleUnfollow(item.following.id)}
+                  className="px-4 py-2 border border-danger-200 text-danger-600 rounded hover:bg-danger-50 transition-colors flex items-center gap-2">
                   <UserMinusIcon className="w-5 h-5" />
                   <span className="hidden sm:inline">Takibi Bırak</span>
-                </button>
+                </Button>
               </div>
             ))}
           </div>

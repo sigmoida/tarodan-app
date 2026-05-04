@@ -9,6 +9,7 @@ import { ConfigService } from '@nestjs/config';
 import { PrismaService } from '../../prisma';
 import { PaymentService } from '../payment/payment.service';
 import { CreateShipmentDto, CalculateShippingDto, UpdateTrackingDto, ShippingProvider } from './dto';
+import { resolveShippingDestinationCity } from './shipping-destination.util';
 import { ShipmentStatus, OrderStatus } from '@prisma/client';
 
 @Injectable()
@@ -20,6 +21,7 @@ export class ShippingService {
     [ShippingProvider.aras]: 'Aras Kargo',
     [ShippingProvider.yurtici]: 'Yurtiçi Kargo',
     [ShippingProvider.mng]: 'MNG Kargo',
+    [ShippingProvider.surat]: 'Sürat Kargo',
   };
 
   // Base tracking URLs
@@ -27,6 +29,7 @@ export class ShippingService {
     [ShippingProvider.aras]: 'https://www.araskargo.com.tr/trs/trsTak662.aspx?kod=',
     [ShippingProvider.yurtici]: 'https://www.yurticikargo.com/tr/online-servisler/gonderi-sorgula?code=',
     [ShippingProvider.mng]: 'https://www.mngkargo.com.tr/gonderi-takip/?code=',
+    [ShippingProvider.surat]: 'https://www.suratkargo.com.tr/KargoTakip/?kargotakipno=',
   };
 
   constructor(
@@ -44,66 +47,27 @@ export class ShippingService {
     return {
       carriers: [
         {
-          id: ShippingProvider.aras,
-          name: 'Aras Kargo',
-          code: 'aras',
-          logo: 'https://www.araskargo.com.tr/images/logo.png',
-          trackingUrl: this.trackingUrls[ShippingProvider.aras],
+          id: ShippingProvider.surat,
+          name: 'Sürat Kargo',
+          code: 'surat',
+          logo: 'https://www.suratkargo.com.tr/images/logo.png',
+          trackingUrl: this.trackingUrls[ShippingProvider.surat],
           features: [
             'Standart Teslimat',
-            'Hızlı Teslimat',
-            'Kapıda Ödeme',
-            'Sigortalı Gönderi',
+            'Adrese Teslim',
+            'Şubede Teslim',
+            'SMS Bilgilendirme',
           ],
           estimatedDelivery: {
             sameCity: '1-2 iş günü',
             interCity: '2-4 iş günü',
           },
           isActive: true,
-          supportedRegions: ['Türkiye'],
-        },
-        {
-          id: ShippingProvider.yurtici,
-          name: 'Yurtiçi Kargo',
-          code: 'yurtici',
-          logo: 'https://www.yurticikargo.com/images/logo.png',
-          trackingUrl: this.trackingUrls[ShippingProvider.yurtici],
-          features: [
-            'Standart Teslimat',
-            'Express Teslimat',
-            'Ekonomik Teslimat',
-            'Kapıda Ödeme',
-            'Sigortalı Gönderi',
-            'İade Kargo',
-          ],
-          estimatedDelivery: {
-            sameCity: '1 iş günü',
-            interCity: '2-3 iş günü',
-          },
-          isActive: true,
-          supportedRegions: ['Türkiye'],
-        },
-        {
-          id: ShippingProvider.mng,
-          name: 'MNG Kargo',
-          code: 'mng',
-          logo: 'https://www.mngkargo.com.tr/images/logo.png',
-          trackingUrl: this.trackingUrls[ShippingProvider.mng],
-          features: [
-            'Standart Teslimat',
-            'Hızlı Teslimat',
-            'Kapıda Ödeme',
-          ],
-          estimatedDelivery: {
-            sameCity: '1-2 iş günü',
-            interCity: '2-4 iş günü',
-          },
-          isActive: false, // Not yet implemented
           supportedRegions: ['Türkiye'],
         },
       ],
-      defaultCarrier: ShippingProvider.aras,
-      totalActive: 2,
+      defaultCarrier: ShippingProvider.surat,
+      totalActive: 1,
     };
   }
 
@@ -168,11 +132,17 @@ export class ShippingService {
     toCity: string,
     weight: number,
   ) {
-    // Base rates (mock data)
+    // Base rate from PlatformSetting or default
+    const baseSetting = await this.prisma.platformSetting.findUnique({
+      where: { settingKey: 'shipping_base_cost' },
+    });
+    const baseRate = baseSetting ? parseFloat(baseSetting.settingValue) : 29.99;
+
     const baseRates: Record<ShippingProvider, number> = {
-      [ShippingProvider.aras]: 29.90,
-      [ShippingProvider.yurtici]: 32.50,
-      [ShippingProvider.mng]: 27.90,
+      [ShippingProvider.aras]: baseRate,
+      [ShippingProvider.yurtici]: baseRate,
+      [ShippingProvider.mng]: baseRate,
+      [ShippingProvider.surat]: baseRate,
     };
 
     // Same city discount
@@ -238,18 +208,17 @@ export class ShippingService {
       throw new BadRequestException('Satıcı adresi bulunamadı');
     }
 
-    // Get shipping address from JSON field or by ID
-    let shippingCity: string;
+    let shippingAddrRow: { city: string | null } | null = null;
     if (order.shippingAddressId) {
-      const shippingAddr = await this.prisma.address.findUnique({
+      shippingAddrRow = await this.prisma.address.findUnique({
         where: { id: order.shippingAddressId },
+        select: { city: true },
       });
-      shippingCity = shippingAddr?.city || 'Istanbul';
-    } else if (order.shippingAddress && typeof order.shippingAddress === 'object') {
-      shippingCity = (order.shippingAddress as any).city || 'Istanbul';
-    } else {
-      shippingCity = 'Istanbul';
     }
+    const shippingCity = resolveShippingDestinationCity(
+      shippingAddrRow,
+      order.shippingAddress,
+    );
 
     const rate = await this.calculateProviderRate(
       dto.provider,
@@ -490,6 +459,9 @@ export class ShippingService {
       status: shipment.status,
       cost: shipment.cost ? Number(shipment.cost) : undefined,
       estimatedDelivery: shipment.estimatedDelivery,
+      providerRawStatus: shipment.providerRawStatus,
+      receivedBy: shipment.receivedBy,
+      returnReason: shipment.returnReason,
       events: (shipment.events || []).map((e: any) => ({
         id: e.id,
         status: e.status,

@@ -2,7 +2,8 @@
 
 import { useState, useRef, useEffect } from 'react';
 import { useLanguage, Locale, localeNames, localeFlags } from '@/i18n/LanguageContext';
-import { GlobeAltIcon, ChevronDownIcon } from '@heroicons/react/24/outline';
+import { GlobeAltIcon, ChevronDownIcon } from '@heroicons/react/24/outline';import { Button } from '@tarodan/ui';
+
 
 interface LanguageSwitcherProps {
   variant?: 'dropdown' | 'buttons' | 'minimal';
@@ -31,17 +32,15 @@ export default function LanguageSwitcher({ variant = 'dropdown', className = '' 
     return (
       <div className={`flex items-center gap-1 ${className}`}>
         {locales.map((l) => (
-          <button
-            key={l}
+          <Button variant="secondary" key={l}
             onClick={() => setLocale(l)}
             className={`px-2 py-1 text-sm rounded transition-colors ${
               locale === l
-                ? 'bg-orange-500 text-white'
-                : 'text-gray-600 hover:bg-gray-100'
-            }`}
-          >
+                ? 'bg-primary-500 text-inverted'
+                : 'text-muted hover:bg-surface-alt'
+            }`}>
             {localeFlags[l]} {l.toUpperCase()}
-          </button>
+          </Button>
         ))}
       </div>
     );
@@ -49,51 +48,45 @@ export default function LanguageSwitcher({ variant = 'dropdown', className = '' 
 
   if (variant === 'minimal') {
     return (
-      <button
-        onClick={() => setLocale(locale === 'tr' ? 'en' : 'tr')}
-        className={`flex items-center gap-1 text-sm text-gray-600 hover:text-orange-500 transition-colors ${className}`}
-        title={t('language.selectLanguage')}
-      >
+      <Button variant="secondary" onClick={() => setLocale(locale === 'tr' ? 'en' : 'tr')}
+        className={`flex items-center gap-1 text-sm text-muted hover:text-primary-500 transition-colors ${className}`}
+        title={t('language.selectLanguage')}>
         <GlobeAltIcon className="w-5 h-5" />
         <span>{locale.toUpperCase()}</span>
-      </button>
+      </Button>
     );
   }
 
   return (
     <div ref={dropdownRef} className={`relative ${className}`}>
-      <button
-        onClick={() => setIsOpen(!isOpen)}
-        className="flex items-center gap-2 px-3 py-2 text-sm text-gray-700 hover:bg-gray-100 rounded-lg transition-colors"
+      <Button variant="secondary" onClick={() => setIsOpen(!isOpen)}
+        className="flex items-center gap-2 px-3 py-2 text-sm text-body hover:bg-surface-alt rounded-lg transition-colors"
         aria-expanded={isOpen}
-        aria-haspopup="listbox"
-      >
+        aria-haspopup="listbox">
         <GlobeAltIcon className="w-5 h-5" />
         <span className="hidden sm:inline">{localeFlags[locale]} {localeNames[locale]}</span>
         <span className="sm:hidden">{localeFlags[locale]}</span>
         <ChevronDownIcon className={`w-4 h-4 transition-transform ${isOpen ? 'rotate-180' : ''}`} />
-      </button>
+      </Button>
 
       {isOpen && (
-        <div className="absolute right-0 mt-2 w-40 bg-white rounded-lg shadow-lg border border-gray-200 py-1 z-50">
-          <div className="px-3 py-2 text-xs text-gray-500 border-b">
+        <div className="absolute right-0 mt-2 w-40 bg-surface-elevated rounded-lg shadow-lg border border-border py-1 z-50">
+          <div className="px-3 py-2 text-xs text-muted border-b">
             {t('language.selectLanguage')}
           </div>
           {locales.map((l) => (
-            <button
-              key={l}
+            <Button variant="secondary" key={l}
               onClick={() => {
                 setLocale(l);
                 setIsOpen(false);
               }}
               className={`w-full flex items-center gap-3 px-3 py-2 text-sm transition-colors ${
                 locale === l
-                  ? 'bg-orange-50 text-orange-600'
-                  : 'text-gray-700 hover:bg-gray-50'
+                  ? 'bg-primary-50 text-primary-600'
+                  : 'text-body hover:bg-surface'
               }`}
               role="option"
-              aria-selected={locale === l}
-            >
+              aria-selected={locale === l}>
               <span className="text-lg">{localeFlags[l]}</span>
               <span>{localeNames[l]}</span>
               {locale === l && (
@@ -101,7 +94,7 @@ export default function LanguageSwitcher({ variant = 'dropdown', className = '' 
                   <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
                 </svg>
               )}
-            </button>
+            </Button>
           ))}
         </div>
       )}

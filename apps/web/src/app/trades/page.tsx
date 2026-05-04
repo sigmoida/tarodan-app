@@ -11,6 +11,7 @@ import { useAuthStore } from '@/stores/authStore';
 import api from '@/lib/api';
 import { useTranslation } from '@/i18n';
 import { formatTradeStatus } from '@/lib/format';
+import { Button, StatusBadge, tradeStatusConfig } from '@tarodan/ui';
 
 interface TradeItem {
   id: string;
@@ -45,18 +46,18 @@ export default function TradesPage() {
   const { t, locale } = useTranslation();
   const { user, isAuthenticated, isLoading: authLoading } = useAuthStore();
 
-  const statusConfig: Record<string, { label: string; color: string; icon: any }> = {
-    pending: { label: t('trade.statusPending'), color: 'bg-yellow-100 text-yellow-800', icon: ClockIcon },
-    accepted: { label: t('trade.statusAccepted'), color: 'bg-green-100 text-green-800', icon: CheckCircleIcon },
-    rejected: { label: t('trade.statusRejected'), color: 'bg-red-100 text-red-800', icon: XCircleIcon },
-    initiator_shipped: { label: locale === 'en' ? 'Initiator Shipped' : 'Gönderen Kargoda', color: 'bg-blue-100 text-blue-800', icon: TruckIcon },
-    receiver_shipped: { label: locale === 'en' ? 'Receiver Shipped' : 'Alıcı Kargoda', color: 'bg-blue-100 text-blue-800', icon: TruckIcon },
-    both_shipped: { label: locale === 'en' ? 'Both Shipped' : 'Her İkisi Kargoda', color: 'bg-indigo-100 text-indigo-800', icon: TruckIcon },
-    initiator_received: { label: locale === 'en' ? 'Initiator Received' : 'Gönderen Teslim Aldı', color: 'bg-teal-100 text-teal-800', icon: CheckCircleIcon },
-    receiver_received: { label: locale === 'en' ? 'Receiver Received' : 'Alıcı Teslim Aldı', color: 'bg-teal-100 text-teal-800', icon: CheckCircleIcon },
-    completed: { label: t('trade.statusCompleted'), color: 'bg-green-100 text-green-800', icon: CheckCircleIcon },
-    cancelled: { label: t('trade.statusCancelled'), color: 'bg-gray-100 text-gray-800', icon: XCircleIcon },
-    disputed: { label: locale === 'en' ? 'Disputed' : 'Anlaşmazlık', color: 'bg-red-100 text-red-800', icon: XCircleIcon },
+  const tradeStatusLabels: Record<string, string> = {
+    pending: t('trade.statusPending'),
+    accepted: t('trade.statusAccepted'),
+    rejected: t('trade.statusRejected'),
+    initiator_shipped: locale === 'en' ? 'Initiator Shipped' : 'Gönderen Kargoda',
+    receiver_shipped: locale === 'en' ? 'Receiver Shipped' : 'Alıcı Kargoda',
+    both_shipped: locale === 'en' ? 'Both Shipped' : 'Her İkisi Kargoda',
+    initiator_received: locale === 'en' ? 'Initiator Received' : 'Gönderen Teslim Aldı',
+    receiver_received: locale === 'en' ? 'Receiver Received' : 'Alıcı Teslim Aldı',
+    completed: t('trade.statusCompleted'),
+    cancelled: t('trade.statusCancelled'),
+    disputed: locale === 'en' ? 'Disputed' : 'Anlaşmazlık',
   };
   const [statusFilter, setStatusFilter] = useState<string | null>(null);
 
@@ -91,28 +92,23 @@ export default function TradesPage() {
   const isLoading = tradesQuery.isLoading;
 
   const getStatusBadge = (status: string) => {
-    const config = statusConfig[status] || {
-      label: formatTradeStatus(status, locale),
-      color: 'bg-gray-100 text-gray-800',
-      icon: ClockIcon
-    };
-    const Icon = config.icon;
     return (
-      <span className={`inline-flex items-center gap-1 px-3 py-1 rounded-sm text-sm font-medium ${config.color}`}>
-        <Icon className="w-4 h-4" />
-        {config.label}
-      </span>
+      <StatusBadge
+        status={status}
+        config={tradeStatusConfig}
+        label={tradeStatusLabels[status] || formatTradeStatus(status, locale)}
+      />
     );
   };
 
   if (isLoading) {
     return (
-      <div className="min-h-screen bg-gray-50 py-8">
+      <div className="min-h-screen bg-surface py-8">
         <div className="max-w-4xl mx-auto px-4">
           <div className="animate-pulse space-y-4">
-            <div className="h-8 bg-gray-200 rounded w-1/3" />
+            <div className="h-8 bg-border-subtle rounded w-1/3" />
             {[...Array(3)].map((_, i) => (
-              <div key={i} className="h-32 bg-gray-200 rounded" />
+              <div key={i} className="h-32 bg-border-subtle rounded" />
             ))}
           </div>
         </div>
@@ -121,12 +117,12 @@ export default function TradesPage() {
   }
 
   return (
-    <div className="min-h-screen bg-gray-50 py-4 sm:py-8">
+    <div className="min-h-screen bg-surface py-4 sm:py-8">
       <div className="max-w-4xl mx-auto px-3 sm:px-4">
         {/* Header */}
         <div className="flex items-center justify-between mb-4 sm:mb-8">
-          <h1 className="text-xl sm:text-2xl font-bold text-gray-900 flex items-center gap-2 sm:gap-3">
-            <ArrowsRightLeftIcon className="w-6 h-6 sm:w-8 sm:h-8 text-orange-500" />
+          <h1 className="text-xl sm:text-2xl font-bold text-heading flex items-center gap-2 sm:gap-3">
+            <ArrowsRightLeftIcon className="w-6 h-6 sm:w-8 sm:h-8 text-primary-500" />
             {t('trade.myTrades')}
           </h1>
         </div>
@@ -143,34 +139,32 @@ export default function TradesPage() {
           ].map((f) => {
             const Icon = f.icon;
             return (
-              <button
-                key={f.value || 'all'}
+              <Button variant="secondary" key={f.value || 'all'}
                 onClick={() => setStatusFilter(f.value)}
                 className={`inline-flex items-center gap-1 sm:gap-2 px-2.5 py-1.5 sm:px-4 sm:py-2 rounded text-xs sm:text-sm font-medium transition-colors ${statusFilter === f.value
-                    ? 'bg-orange-500 text-white'
-                    : 'bg-white text-gray-700 hover:bg-gray-100 border border-gray-200'
-                  }`}
-              >
+                    ? 'bg-primary-500 text-inverted'
+                    : 'bg-surface-elevated text-body hover:bg-surface-alt border border-border'
+                  }`}>
                 {Icon && <Icon className="w-3.5 h-3.5 sm:w-4 sm:h-4" />}
                 {f.label}
-              </button>
+              </Button>
             );
           })}
         </div>
 
         {/* Trades List */}
         {trades.length === 0 ? (
-          <div className="bg-white rounded p-12 text-center border border-gray-200">
-            <ArrowsRightLeftIcon className="w-16 h-16 mx-auto text-gray-300 mb-4" />
-            <h2 className="text-xl font-semibold text-gray-900 mb-2">
+          <div className="bg-surface-elevated rounded p-12 text-center border border-border">
+            <ArrowsRightLeftIcon className="w-16 h-16 mx-auto text-border-strong mb-4" />
+            <h2 className="text-xl font-semibold text-heading mb-2">
               {t('trade.noTrades')}
             </h2>
-            <p className="text-gray-600 mb-6">
+            <p className="text-muted mb-6">
               {isAuthenticated ? t('trade.noTradesHint') : t('trade.tradeRequiresLogin')}
             </p>
             <Link
               href="/listings"
-              className="inline-flex items-center gap-2 px-6 py-3 bg-orange-500 hover:bg-orange-600 text-white rounded font-medium transition-colors"
+              className="inline-flex items-center gap-2 px-6 py-3 bg-primary-500 hover:bg-primary-600 text-inverted rounded font-medium transition-colors"
             >
               {t('cart.browseListings')}
             </Link>
@@ -201,14 +195,14 @@ export default function TradesPage() {
                 <Link
                   key={trade.id}
                   href={`/trades/${trade.id}`}
-                  className="block bg-white rounded p-6 border border-gray-200 hover:border-orange-300 hover:shadow-lg transition-all"
+                  className="block bg-surface-elevated rounded p-6 border border-border hover:border-primary-300 hover:shadow-lg transition-all"
                 >
                   <div className="flex items-start justify-between mb-5">
                     <div className="flex-1">
-                      <p className="text-xs text-gray-500 mb-1 font-mono">
+                      <p className="text-xs text-muted mb-1 font-mono">
                         #{trade.tradeNumber}
                       </p>
-                      <p className="font-semibold text-gray-900 text-lg">
+                      <p className="font-semibold text-heading text-lg">
                         {isSent ? t('trade.sentTrades') : t('trade.receivedTrades')} • {otherUserName}
                       </p>
                     </div>
@@ -218,13 +212,13 @@ export default function TradesPage() {
                   <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
                     {/* My Items */}
                     <div className="md:col-span-1">
-                      <p className="text-xs font-medium text-gray-600 mb-3 uppercase tracking-wide">
+                      <p className="text-xs font-medium text-muted mb-3 uppercase tracking-wide">
                         {t('trade.yourItems')}
                       </p>
                       <div className="space-y-2 max-h-[150px] overflow-y-auto pr-2">
                         {myItems.map((item, idx) => (
-                          <div key={item.id || idx} className="flex items-center gap-3 p-2 bg-gray-50 rounded hover:bg-gray-100 transition-colors">
-                            <div className="relative w-16 h-16 rounded overflow-hidden bg-gray-200 flex-shrink-0">
+                          <div key={item.id || idx} className="flex items-center gap-3 p-2 bg-surface rounded hover:bg-surface-alt transition-colors">
+                            <div className="relative w-16 h-16 rounded overflow-hidden bg-border-subtle flex-shrink-0">
                               <OptimizedImage
                                 src={getItemImage(item)}
                                 alt={item.productTitle}
@@ -235,8 +229,8 @@ export default function TradesPage() {
                               />
                             </div>
                             <div className="flex-1 min-w-0">
-                              <p className="text-sm font-medium text-gray-900 truncate">{item.productTitle}</p>
-                              <p className="text-xs text-gray-500">
+                              <p className="text-sm font-medium text-heading truncate">{item.productTitle}</p>
+                              <p className="text-xs text-muted">
                                 {item.quantity}x • {item.valueAtTrade.toLocaleString('tr-TR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} TL
                               </p>
                             </div>
@@ -244,9 +238,9 @@ export default function TradesPage() {
                         ))}
                       </div>
                       {myItems.length > 0 && (
-                        <div className="mt-3 pt-3 border-t border-gray-200">
-                          <p className="text-xs text-gray-500">Toplam</p>
-                          <p className="text-sm font-semibold text-gray-900">
+                        <div className="mt-3 pt-3 border-t border-border">
+                          <p className="text-xs text-muted">Toplam</p>
+                          <p className="text-sm font-semibold text-heading">
                             {myTotal.toLocaleString('tr-TR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} TL
                           </p>
                         </div>
@@ -255,20 +249,20 @@ export default function TradesPage() {
 
                     {/* Arrow */}
                     <div className="hidden md:flex items-center justify-center">
-                      <div className="w-12 h-12 rounded-sm bg-orange-100 flex items-center justify-center">
-                        <ArrowsRightLeftIcon className="w-6 h-6 text-orange-600" />
+                      <div className="w-12 h-12 rounded-sm bg-primary-100 flex items-center justify-center">
+                        <ArrowsRightLeftIcon className="w-6 h-6 text-primary-600" />
                       </div>
                     </div>
 
                     {/* Their Items */}
                     <div className="md:col-span-1">
-                      <p className="text-xs font-medium text-gray-600 mb-3 uppercase tracking-wide">
+                      <p className="text-xs font-medium text-muted mb-3 uppercase tracking-wide">
                         {t('trade.theirItems')}
                       </p>
                       <div className="space-y-2 max-h-[150px] overflow-y-auto pr-2">
                         {theirItems.map((item, idx) => (
-                          <div key={item.id || idx} className="flex items-center gap-3 p-2 bg-gray-50 rounded hover:bg-gray-100 transition-colors">
-                            <div className="relative w-16 h-16 rounded overflow-hidden bg-gray-200 flex-shrink-0">
+                          <div key={item.id || idx} className="flex items-center gap-3 p-2 bg-surface rounded hover:bg-surface-alt transition-colors">
+                            <div className="relative w-16 h-16 rounded overflow-hidden bg-border-subtle flex-shrink-0">
                               <OptimizedImage
                                 src={getItemImage(item)}
                                 alt={item.productTitle}
@@ -279,8 +273,8 @@ export default function TradesPage() {
                               />
                             </div>
                             <div className="flex-1 min-w-0">
-                              <p className="text-sm font-medium text-gray-900 truncate">{item.productTitle}</p>
-                              <p className="text-xs text-gray-500">
+                              <p className="text-sm font-medium text-heading truncate">{item.productTitle}</p>
+                              <p className="text-xs text-muted">
                                 {item.quantity}x • {item.valueAtTrade.toLocaleString('tr-TR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} TL
                               </p>
                             </div>
@@ -288,9 +282,9 @@ export default function TradesPage() {
                         ))}
                       </div>
                       {theirItems.length > 0 && (
-                        <div className="mt-3 pt-3 border-t border-gray-200">
-                          <p className="text-xs text-gray-500">Toplam</p>
-                          <p className="text-sm font-semibold text-gray-900">
+                        <div className="mt-3 pt-3 border-t border-border">
+                          <p className="text-xs text-muted">Toplam</p>
+                          <p className="text-sm font-semibold text-heading">
                             {theirTotal.toLocaleString('tr-TR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} TL
                           </p>
                         </div>
@@ -300,26 +294,26 @@ export default function TradesPage() {
 
                   {/* Mobile Arrow */}
                   <div className="md:hidden flex items-center justify-center my-4">
-                    <ArrowsRightLeftIcon className="w-6 h-6 text-orange-500" />
+                    <ArrowsRightLeftIcon className="w-6 h-6 text-primary-500" />
                   </div>
 
                   {(trade.cashAmount && trade.cashAmount > 0) && (
-                    <div className="mt-4 pt-4 border-t border-gray-200 bg-orange-50 rounded p-3">
-                      <p className="text-sm text-gray-700">
-                        {t('trade.cashDifference')}: <span className="font-bold text-orange-600 text-base">{Number(trade.cashAmount).toLocaleString('tr-TR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} TL</span>
+                    <div className="mt-4 pt-4 border-t border-border bg-primary-50 rounded p-3">
+                      <p className="text-sm text-body">
+                        {t('trade.cashDifference')}: <span className="font-bold text-primary-600 text-base">{Number(trade.cashAmount).toLocaleString('tr-TR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} TL</span>
                       </p>
                     </div>
                   )}
 
-                  <div className="mt-4 pt-4 border-t border-gray-100 flex items-center justify-between">
-                    <div className="text-sm text-gray-500">
+                  <div className="mt-4 pt-4 border-t border-border-subtle flex items-center justify-between">
+                    <div className="text-sm text-muted">
                       {new Date(trade.createdAt).toLocaleDateString('tr-TR', {
                         year: 'numeric',
                         month: 'long',
                         day: 'numeric',
                       })}
                     </div>
-                    <div className="text-xs text-gray-400">
+                    <div className="text-xs text-subtle">
                       {locale === 'en' ? 'Click to view details' : 'Detayları görmek için tıklayın'}
                     </div>
                   </div>

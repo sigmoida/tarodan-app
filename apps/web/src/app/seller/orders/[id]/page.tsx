@@ -19,8 +19,8 @@ export default function SellerOrderRedirectPage() {
   }, [orderId, router]);
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gray-50">
-      <p className="text-gray-500">Yönlendiriliyorsunuz…</p>
+    <div className="min-h-screen flex items-center justify-center bg-surface">
+      <p className="text-muted">Yönlendiriliyorsunuz…</p>
     </div>
   );
 }

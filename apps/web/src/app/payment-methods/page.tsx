@@ -6,7 +6,9 @@ import Link from 'next/link';
 import { CreditCardIcon, PlusIcon, TrashIcon, ArrowLeftIcon, CheckCircleIcon } from '@heroicons/react/24/outline';
 import toast from 'react-hot-toast';
 import { useAuthStore } from '@/stores/authStore';
-import api from '@/lib/api';
+import AuthLoadingScreen from '@/components/AuthLoadingScreen';
+import api from '@/lib/api';import { Button } from '@tarodan/ui';
+
 
 interface PaymentMethod {
   id: string;
@@ -20,17 +22,18 @@ interface PaymentMethod {
 
 export default function PaymentMethodsPage() {
   const router = useRouter();
-  const { isAuthenticated } = useAuthStore();
+  const { isAuthenticated, isLoading: authLoading } = useAuthStore();
   const [paymentMethods, setPaymentMethods] = useState<PaymentMethod[]>([]);
   const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
+    if (authLoading) return;
     if (!isAuthenticated) {
       router.push('/login?redirect=/payment-methods');
       return;
     }
     fetchPaymentMethods();
-  }, [isAuthenticated]);
+  }, [authLoading, isAuthenticated]);
 
   const fetchPaymentMethods = async () => {
     setIsLoading(true);
@@ -79,14 +82,21 @@ export default function PaymentMethodsPage() {
     return '💳';
   };
 
+  if (authLoading) {
+    return <AuthLoadingScreen />;
+  }
+  if (!isAuthenticated) {
+    return null;
+  }
+
   if (isLoading) {
     return (
-      <div className="min-h-screen bg-gray-50 py-8">
+      <div className="min-h-screen bg-surface py-8">
         <div className="max-w-2xl mx-auto px-4">
           <div className="animate-pulse space-y-4">
-            <div className="h-8 bg-gray-200 rounded w-1/3" />
+            <div className="h-8 bg-border-subtle rounded w-1/3" />
             {[...Array(2)].map((_, i) => (
-              <div key={i} className="h-24 bg-gray-200 rounded-xl" />
+              <div key={i} className="h-24 bg-border-subtle rounded-xl" />
             ))}
           </div>
         </div>
@@ -95,39 +105,39 @@ export default function PaymentMethodsPage() {
   }
 
   return (
-    <div className="min-h-screen bg-gray-50 py-8">
+    <div className="min-h-screen bg-surface py-8">
       <div className="max-w-2xl mx-auto px-4">
         {/* Header */}
         <div className="mb-8">
           <Link
             href="/profile"
-            className="inline-flex items-center gap-2 text-gray-600 hover:text-gray-900 mb-4"
+            className="inline-flex items-center gap-2 text-muted hover:text-heading mb-4"
           >
             <ArrowLeftIcon className="w-5 h-5" />
             Profile Dön
           </Link>
-          <h1 className="text-3xl font-bold text-gray-900 flex items-center gap-3">
+          <h1 className="text-3xl font-bold text-heading flex items-center gap-3">
             <CreditCardIcon className="w-8 h-8 text-primary-500" />
             Ödeme Yöntemlerim
           </h1>
-          <p className="text-gray-600 mt-2">
+          <p className="text-muted mt-2">
             Kayıtlı kartlarınızı buradan yönetebilirsiniz.
           </p>
         </div>
 
         {/* Payment Methods List */}
         {paymentMethods.length === 0 ? (
-          <div className="bg-white rounded-xl p-12 text-center border border-gray-200">
-            <CreditCardIcon className="w-16 h-16 mx-auto text-gray-300 mb-4" />
-            <h2 className="text-xl font-semibold text-gray-900 mb-2">
+          <div className="bg-surface-elevated rounded-xl p-12 text-center border border-border">
+            <CreditCardIcon className="w-16 h-16 mx-auto text-border-strong mb-4" />
+            <h2 className="text-xl font-semibold text-heading mb-2">
               Kayıtlı Kart Yok
             </h2>
-            <p className="text-gray-600 mb-6">
+            <p className="text-muted mb-6">
               Henüz kayıtlı kartınız bulunmuyor. Satın alma sırasında "Bu kartı kaydet" seçeneğini işaretleyerek kart ekleyebilirsiniz.
             </p>
             <Link
               href="/listings"
-              className="inline-flex items-center gap-2 px-6 py-3 bg-primary-500 hover:bg-primary-600 text-white rounded-xl font-medium transition-colors"
+              className="inline-flex items-center gap-2 px-6 py-3 bg-primary-500 hover:bg-primary-600 text-inverted rounded-xl font-medium transition-colors"
             >
               Alışverişe Başla
             </Link>
@@ -137,10 +147,10 @@ export default function PaymentMethodsPage() {
             {paymentMethods.map((method) => (
               <div
                 key={method.id}
-                className={`bg-white rounded-xl p-6 border-2 transition-colors ${
+                className={`bg-surface-elevated rounded-xl p-6 border-2 transition-colors ${
                   method.isDefault
                     ? 'border-primary-500 bg-primary-50/30'
-                    : 'border-gray-200 hover:border-gray-300'
+                    : 'border-border hover:border-border'
                 }`}
               >
                 <div className="flex items-center justify-between">
@@ -148,7 +158,7 @@ export default function PaymentMethodsPage() {
                     <div className="text-3xl">{getCardIcon(method.cardBrand)}</div>
                     <div>
                       <div className="flex items-center gap-2">
-                        <p className="font-semibold text-gray-900">
+                        <p className="font-semibold text-heading">
                           {method.cardBrand} •••• {method.lastFour}
                         </p>
                         {method.isDefault && (
@@ -158,7 +168,7 @@ export default function PaymentMethodsPage() {
                           </span>
                         )}
                       </div>
-                      <p className="text-sm text-gray-500">
+                      <p className="text-sm text-muted">
                         {method.expiryMonth.toString().padStart(2, '0')}/{method.expiryYear}
                       </p>
                     </div>
@@ -166,20 +176,16 @@ export default function PaymentMethodsPage() {
                   
                   <div className="flex items-center gap-2">
                     {!method.isDefault && (
-                      <button
-                        onClick={() => handleSetDefault(method.id)}
-                        className="px-3 py-2 text-sm text-primary-600 hover:bg-primary-50 rounded-lg transition-colors"
-                      >
+                      <Button variant="secondary" onClick={() => handleSetDefault(method.id)}
+                        className="px-3 py-2 text-sm text-primary-600 hover:bg-primary-50 rounded-lg transition-colors">
                         Varsayılan Yap
-                      </button>
+                      </Button>
                     )}
-                    <button
-                      onClick={() => handleDelete(method.id)}
-                      className="p-2 text-red-600 hover:bg-red-50 rounded-lg transition-colors"
-                      title="Sil"
-                    >
+                    <Button variant="secondary" onClick={() => handleDelete(method.id)}
+                      className="p-2 text-danger-600 hover:bg-danger-50 rounded-lg transition-colors"
+                      title="Sil">
                       <TrashIcon className="w-5 h-5" />
-                    </button>
+                    </Button>
                   </div>
                 </div>
               </div>
@@ -188,8 +194,8 @@ export default function PaymentMethodsPage() {
         )}
 
         {/* Security Info */}
-        <div className="mt-8 bg-gray-100 rounded-xl p-4">
-          <p className="text-gray-600 text-sm">
+        <div className="mt-8 bg-surface-alt rounded-xl p-4">
+          <p className="text-muted text-sm">
             🔒 Kart bilgileriniz güvenli bir şekilde saklanmaktadır. Kart numaranızın tamamı hiçbir zaman sistemimizde depolanmaz.
           </p>
         </div>

@@ -21,8 +21,9 @@
     "@tanstack/react-query": "^5.45.0",
     "@tarodan/api-client": "workspace:*",
     "@tarodan/core": "workspace:*",
+    "@tarodan/design-tokens": "workspace:*",
     "@tarodan/types": "workspace:*",
-    "@tarodan/ui": "workspace:*",
+    "@tarodan/ui-native": "workspace:*",
     "axios": "^1.7.2",
     "date-fns": "^3.6.0",
     "expo": "~54.0.31",
@@ -54,6 +55,7 @@
   },
   "devDependencies": {
     "@babel/core": "^7.24.0",
+    "@babel/types": "^7.28.0",
     "@types/react": "~19.1.17",
     "@typescript-eslint/eslint-plugin": "^7.13.0",
     "@typescript-eslint/parser": "^7.13.0",

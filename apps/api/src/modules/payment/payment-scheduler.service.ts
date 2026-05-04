@@ -1,25 +1,41 @@
-import { Injectable, Logger } from '@nestjs/common';
+import { Injectable, Logger, Optional } from '@nestjs/common';
 import { Cron, CronExpression } from '@nestjs/schedule';
 import { PaymentService } from './payment.service';
+import { ProductLockService } from '../product/product-lock.service';
+import { EventService } from '../events/event.service';
+import { PayoutService } from '../payout/payout.service';
 
 /**
  * Payment Scheduler Service
- * Automatically cancels expired pending payments
+ * Automatically cancels expired pending payments and sweeps out-of-stock products.
  */
 @Injectable()
 export class PaymentSchedulerService {
   private readonly logger = new Logger(PaymentSchedulerService.name);
 
-  constructor(private readonly paymentService: PaymentService) {}
+  constructor(
+    private readonly paymentService: PaymentService,
+    private readonly productLockService: ProductLockService,
+    private readonly eventService: EventService,
+    @Optional() private readonly payoutService?: PayoutService,
+  ) {}
 
   /**
-   * Run every 5 minutes: release expired order reservations (10 min), then cancel expired payments.
+   * Run every 5 minutes: release expired order reservations, cancel expired
+   * payments, then sweep any quantity=0 products to ensure pending offers/trades
+   * are cancelled.
    */
   @Cron('*/5 * * * *') // Every 5 minutes
   async handleExpiredPayments() {
     this.logger.log('Checking for expired reservations and payments...');
 
     try {
+      const reconcile = await this.paymentService.reconcilePendingPaytrPayments();
+      if (reconcile.completed > 0) {
+        this.logger.log(
+          `PayTR reconcile: completed ${reconcile.completed} of ${reconcile.checked} checked payment(s)`,
+        );
+      }
       const released = await this.paymentService.releaseExpiredOrderReservations();
       if (released.count > 0) {
         this.logger.log(`Released ${released.count} expired order reservation(s)`);
@@ -27,6 +43,43 @@ export class PaymentSchedulerService {
       const result = await this.paymentService.cancelExpiredPayments();
       if (result.count > 0) {
         this.logger.log(`Cancelled ${result.count} expired payment(s)`);
+      }
+
+      // Safety net: sweep out-of-stock products and cancel lingering offers/trades
+      const sweepResult = await this.productLockService.sweepOutOfStockProducts();
+      if (sweepResult.offersCancelled > 0 || sweepResult.tradesCancelled > 0) {
+        this.logger.log(
+          `Stock sweep: cancelled ${sweepResult.offersCancelled} offer(s) and ${sweepResult.tradesCancelled} trade(s) across ${sweepResult.productsScanned} out-of-stock product(s)`,
+        );
+
+        const cancelReason = 'Stok tükendiği için otomatik iptal edildi';
+
+        for (const offer of sweepResult.rejectedOffers) {
+          try {
+            await this.eventService.emitOfferAutoRejected({
+              offerId: offer.offerId,
+              buyerId: offer.buyerId,
+              productId: offer.productId,
+              productTitle: offer.productTitle,
+              reason: cancelReason,
+            });
+          } catch (err: any) {
+            this.logger.error(`Failed to notify offer ${offer.offerId}: ${err.message}`);
+          }
+        }
+
+        for (const trade of sweepResult.cancelledTrades) {
+          try {
+            await this.eventService.emitTradeAutoCancelled({
+              tradeId: trade.tradeId,
+              initiatorId: trade.initiatorId,
+              receiverId: trade.receiverId,
+              reason: cancelReason,
+            });
+          } catch (err: any) {
+            this.logger.error(`Failed to notify trade ${trade.tradeId}: ${err.message}`);
+          }
+        }
       }
     } catch (error: any) {
       this.logger.error(`Error in expired payments job: ${error.message}`, error.stack);
@@ -45,8 +98,40 @@ export class PaymentSchedulerService {
       if (result.count > 0) {
         this.logger.log(`Released ${result.count} payment hold(s)`);
       }
+      if (result.tradeCashReleased > 0) {
+        this.logger.log(`Released ${result.tradeCashReleased} trade cash payment(s)`);
+      }
+
+      // Create PayoutTransfer records for newly released holds
+      if (this.payoutService && (result.count > 0 || result.tradeCashReleased > 0)) {
+        const payoutsCreated = await this.payoutService.createPayoutsForReleasedHolds();
+        if (payoutsCreated > 0) {
+          this.logger.log(`Created ${payoutsCreated} payout transfer(s) for released holds`);
+        }
+      }
     } catch (error: any) {
       this.logger.error(`Error releasing payment holds: ${error.message}`, error.stack);
+    }
+  }
+
+  /**
+   * Run every 30 minutes: check for orders stuck in "preparing" past deadline.
+   * Warns sellers 24h before deadline, auto-cancels + refunds when deadline passes.
+   */
+  @Cron('*/30 * * * *') // Every 30 minutes
+  async handleExpiredPreparingOrders() {
+    this.logger.log('Checking for expired preparing orders...');
+
+    try {
+      const result = await this.paymentService.handleExpiredPreparingOrders();
+      if (result.warned > 0) {
+        this.logger.log(`Warned ${result.warned} seller(s) about preparing deadline`);
+      }
+      if (result.cancelled > 0) {
+        this.logger.log(`Auto-cancelled ${result.cancelled} order(s) past preparing deadline`);
+      }
+    } catch (error: any) {
+      this.logger.error(`Error in expired preparing orders job: ${error.message}`, error.stack);
     }
   }
 }

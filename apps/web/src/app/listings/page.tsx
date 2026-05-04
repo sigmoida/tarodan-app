@@ -23,6 +23,7 @@ import { useTranslation } from '@/i18n';
 import { formatCondition } from '@/lib/format';
 import SidebarFilters from '@/components/SidebarFilters';
 import ProductLayoutSelector, { ProductLayout } from '@/components/ProductLayoutSelector';
+import { Button, Select } from '@tarodan/ui';
 
 interface Listing {
   id: string | number;
@@ -332,7 +333,7 @@ export default function ListingsPage() {
   };
 
   return (
-    <div className="min-h-screen bg-gray-50">
+    <div className="min-h-screen bg-surface">
       <h1 className="sr-only">
         {currentSearch
           ? (locale === 'en' ? `Search results for ${currentSearch}` : `${currentSearch} arama sonuçları`)
@@ -344,33 +345,31 @@ export default function ListingsPage() {
       </h1>
 
       {/* Page Header */}
-      <div className="bg-white border-b border-gray-200">
+      <div className="bg-surface-elevated border-b border-border">
         <div className="mx-auto px-3 sm:px-6 lg:px-12 xl:px-16 py-4 sm:py-5">
           <div className="flex flex-col gap-3">
             <div className="flex items-center justify-between">
               <div className="min-w-0">
-                <h2 className="text-lg sm:text-xl font-bold text-gray-900 flex items-center gap-2 truncate">
-                  <div className="w-1 h-6 bg-orange-500 rounded-sm flex-shrink-0" />
+                <h2 className="text-lg sm:text-xl font-bold text-heading flex items-center gap-2 truncate">
+                  <div className="w-1 h-6 bg-primary-500 rounded-sm flex-shrink-0" />
                   <span className="truncate">
                     {currentSearch
                       ? (locale === 'en' ? `Results for "${currentSearch}"` : `"${currentSearch}" araması`)
                       : filters.brand || filters.category || (locale === 'en' ? 'All Listings' : 'Tüm İlanlar')}
                   </span>
                 </h2>
-                <p className="text-xs sm:text-sm text-gray-500 mt-0.5">
+                <p className="text-xs sm:text-sm text-muted mt-0.5">
                   {pagination.total} {locale === 'en' ? 'products found' : 'ürün bulundu'}
                 </p>
               </div>
-              <button
-                onClick={() => setShowMobileSidebar(true)}
-                className="lg:hidden flex items-center gap-1.5 px-2.5 py-1.5 bg-white border border-gray-200 rounded text-xs sm:text-sm font-medium hover:bg-gray-50 transition-colors flex-shrink-0 ml-2"
-              >
+              <Button variant="secondary" onClick={() => setShowMobileSidebar(true)}
+                className="lg:hidden flex items-center gap-1.5 px-2.5 py-1.5 bg-surface-elevated border border-border rounded text-xs sm:text-sm font-medium hover:bg-surface transition-colors flex-shrink-0 ml-2">
                 <FunnelIcon className="w-4 h-4" />
                 <span className="hidden sm:inline">{t('product.filters')}</span>
                 {activeFilterCount > 0 && (
-                  <span className="px-1.5 py-0.5 bg-orange-500 text-white text-[10px] font-bold rounded-sm">{activeFilterCount}</span>
+                  <span className="px-1.5 py-0.5 bg-primary-500 text-inverted text-[10px] font-bold rounded-sm">{activeFilterCount}</span>
                 )}
-              </button>
+              </Button>
             </div>
             <div className="flex items-center gap-2 overflow-x-auto">
               <ProductLayoutSelector
@@ -378,10 +377,11 @@ export default function ListingsPage() {
                 onLayoutChange={setProductLayout}
                 storageKey="listings-product-layout"
               />
-              <select
+              <Select
                 value={filters.sortBy}
                 onChange={(e) => handleFiltersChange({ ...filters, sortBy: e.target.value })}
-                className="px-2.5 py-1.5 border border-gray-200 rounded bg-white text-xs sm:text-sm focus:outline-none focus:border-orange-400 text-gray-700 flex-shrink-0"
+                className="w-auto flex-shrink-0"
+                selectSize="sm"
               >
                 <option value="created_desc">{t('product.sortNewest')}</option>
                 <option value="created_asc">{t('product.sortOldest')}</option>
@@ -391,7 +391,7 @@ export default function ListingsPage() {
                 <option value="rating_desc">{locale === 'en' ? 'Highest Rating' : 'En yüksek puan'}</option>
                 <option value="title_asc">A-Z</option>
                 <option value="title_desc">Z-A</option>
-              </select>
+              </Select>
             </div>
           </div>
         </div>
@@ -401,7 +401,7 @@ export default function ListingsPage() {
         <div className="flex gap-6">
           {/* Sidebar Filters (Desktop) */}
           <div className="hidden lg:block w-56 flex-shrink-0">
-            <div className="sticky top-[80px] max-h-[calc(100vh-80px)] overflow-y-auto bg-white rounded border border-gray-200">
+            <div className="sticky top-[80px] max-h-[calc(100vh-80px)] overflow-y-auto bg-surface-elevated rounded border border-border">
               <SidebarFilters
                 filters={filtersForSidebar}
                 onFilterChange={handleFiltersChange}
@@ -414,13 +414,13 @@ export default function ListingsPage() {
           {/* Mobile Sidebar Overlay */}
           {showMobileSidebar && (
             <div className="fixed inset-0 z-50 lg:hidden">
-              <div className="absolute inset-0 bg-black/50" onClick={() => setShowMobileSidebar(false)} />
-              <div className="absolute left-0 top-0 bottom-0 w-80 max-w-[85vw] bg-white shadow-xl flex flex-col overflow-y-auto">
-                <div className="flex-shrink-0 flex items-center justify-between p-4 bg-white border-b border-gray-100 z-10">
-                  <span className="font-semibold text-gray-900">{t('product.filters')}</span>
-                  <button onClick={() => setShowMobileSidebar(false)} className="p-2 hover:bg-gray-100 rounded">
+              <div className="absolute inset-0 bg-heading/50" onClick={() => setShowMobileSidebar(false)} />
+              <div className="absolute left-0 top-0 bottom-0 w-80 max-w-[85vw] bg-surface-elevated shadow-xl flex flex-col overflow-y-auto">
+                <div className="flex-shrink-0 flex items-center justify-between p-4 bg-surface-elevated border-b border-border-subtle z-10">
+                  <span className="font-semibold text-heading">{t('product.filters')}</span>
+                  <Button variant="secondary" onClick={() => setShowMobileSidebar(false)} className="p-2 hover:bg-surface-alt rounded">
                     <XMarkIcon className="w-5 h-5" />
-                  </button>
+                  </Button>
                 </div>
                 <div className="p-4">
                   <SidebarFilters
@@ -438,13 +438,12 @@ export default function ListingsPage() {
           <div className="flex-1 min-w-0">
             {/* Active Filters */}
             {activeFilterCount > 0 && (
-              <div className="flex flex-wrap items-center gap-2 mb-4 pb-4 border-b border-gray-200">
-                <span className="text-xs font-medium text-gray-500 uppercase tracking-wide mr-1">{locale === 'en' ? 'Filters' : 'Filtreler'}:</span>
+              <div className="flex flex-wrap items-center gap-2 mb-4 pb-4 border-b border-border">
+                <span className="text-xs font-medium text-muted uppercase tracking-wide mr-1">{locale === 'en' ? 'Filters' : 'Filtreler'}:</span>
                 {currentSearch && (
-                  <span className="inline-flex items-center gap-1 px-2.5 py-1 bg-orange-50 text-orange-700 text-xs font-medium rounded border border-orange-200">
+                  <span className="inline-flex items-center gap-1 px-2.5 py-1 bg-primary-50 text-primary-700 text-xs font-medium rounded border border-primary-200">
                     {locale === 'en' ? 'Search' : 'Arama'}: &quot;{currentSearch}&quot;
-                    <button
-                      onClick={() => {
+                    <Button variant="secondary" onClick={() => {
                         setFilters({ ...filters, search: '' });
                         setCurrentPage(1);
                         const params = new URLSearchParams(searchParams.toString());
@@ -452,11 +451,10 @@ export default function ListingsPage() {
                         params.delete('page');
                         router.replace(params.toString() ? `/listings?${params.toString()}` : '/listings');
                       }}
-                      className="hover:text-orange-900 ml-0.5"
-                      aria-label={locale === 'en' ? 'Remove search' : 'Aramayı kaldır'}
-                    >
+                      className="hover:text-primary-900 ml-0.5"
+                      aria-label={locale === 'en' ? 'Remove search' : 'Aramayı kaldır'}>
                       <XMarkIcon className="w-3.5 h-3.5" />
-                    </button>
+                    </Button>
                   </span>
                 )}
                 {[
@@ -464,57 +462,57 @@ export default function ListingsPage() {
                   { k: 'carModel', v: filters.carModel }, { k: 'scale', v: filters.scale }, { k: 'material', v: filters.material },
                   { k: 'condition', v: filters.condition }, { k: 'manufacturer', v: filters.manufacturer }
                 ].map(f => f.v && (
-                  <span key={f.k} className="inline-flex items-center gap-1 px-2.5 py-1 bg-orange-50 text-orange-700 text-xs font-medium rounded border border-orange-200">
+                  <span key={f.k} className="inline-flex items-center gap-1 px-2.5 py-1 bg-primary-50 text-primary-700 text-xs font-medium rounded border border-primary-200">
                     {f.k === 'condition' ? formatCondition(f.v, locale) :
                      f.k === 'material' ? ({ diecast: 'Diecast (Metal)', resin: 'Resin (Reçine)', composite: 'Composite', plastic: 'Plastic' }[f.v] || f.v) :
                      f.k === 'vehicleType' ? ({ 'araba': 'Arabalar', 'motosiklet': 'Motosikletler', 'motorsports': 'Motorsports', 'ticari': 'Ticari Araçlar', 'insaat': 'İnşaat Araçları', 'tarim': 'Tarım Araçları', 'askeri': 'Askeri Araçlar', 'acil-durum': 'Acil Durum Araçları', 'gemi': 'Gemiler', 'tren': 'Trenler', 'ucak': 'Uçaklar', 'set': 'Setler' }[f.v] || f.v) : f.v}
-                    <button onClick={() => {
+                    <Button variant="secondary" onClick={() => {
                       const updates: any = { ...filters, [f.k]: '' };
                       if (f.k === 'manufacturer') updates.manufacturerId = '';
                       if (f.k === 'brand') { updates.brandId = ''; updates.carModelId = ''; updates.carModel = ''; }
                       if (f.k === 'category') updates.categoryId = '';
                       if (f.k === 'carModel') { updates.carModelId = ''; }
                       handleFiltersChange(updates);
-                    }} className="hover:text-orange-900 ml-0.5"><XMarkIcon className="w-3.5 h-3.5" /></button>
+                    }} className="hover:text-primary-900 ml-0.5"><XMarkIcon className="w-3.5 h-3.5" /></Button>
                   </span>
                 ))}
                 {(filters.minPrice || filters.maxPrice) && (
-                  <span className="inline-flex items-center gap-1 px-2.5 py-1 bg-orange-50 text-orange-700 text-xs font-medium rounded border border-orange-200">
+                  <span className="inline-flex items-center gap-1 px-2.5 py-1 bg-primary-50 text-primary-700 text-xs font-medium rounded border border-primary-200">
                     ₺{filters.minPrice || '0'} - ₺{filters.maxPrice || '∞'}
-                    <button onClick={() => handleFiltersChange({ ...filters, minPrice: '', maxPrice: '' })} className="hover:text-orange-900 ml-0.5"><XMarkIcon className="w-3.5 h-3.5" /></button>
+                    <Button variant="secondary" onClick={() => handleFiltersChange({ ...filters, minPrice: '', maxPrice: '' })} className="hover:text-primary-900 ml-0.5"><XMarkIcon className="w-3.5 h-3.5" /></Button>
                   </span>
                 )}
                 {filters.tradeOnly && (
-                  <span className="inline-flex items-center gap-1 px-2.5 py-1 bg-emerald-50 text-emerald-700 text-xs font-medium rounded border border-emerald-200">
+                  <span className="inline-flex items-center gap-1 px-2.5 py-1 bg-success-50 text-success-700 text-xs font-medium rounded border border-success-200">
                     {t('product.tradeAvailable')}
-                    <button onClick={() => handleFiltersChange({ ...filters, tradeOnly: false })} className="hover:text-emerald-900 ml-0.5"><XMarkIcon className="w-3.5 h-3.5" /></button>
+                    <Button variant="secondary" onClick={() => handleFiltersChange({ ...filters, tradeOnly: false })} className="hover:text-success-900 ml-0.5"><XMarkIcon className="w-3.5 h-3.5" /></Button>
                   </span>
                 )}
                 {filters.preOrder && (
-                  <span className="inline-flex items-center gap-1 px-2.5 py-1 bg-violet-50 text-violet-700 text-xs font-medium rounded border border-violet-200">
+                  <span className="inline-flex items-center gap-1 px-2.5 py-1 bg-primary-50 text-primary-700 text-xs font-medium rounded border border-primary-200">
                     {t('product.preOrder')}
-                    <button onClick={() => handleFiltersChange({ ...filters, preOrder: false })} className="hover:text-violet-900 ml-0.5"><XMarkIcon className="w-3.5 h-3.5" /></button>
+                    <Button variant="secondary" onClick={() => handleFiltersChange({ ...filters, preOrder: false })} className="hover:text-primary-900 ml-0.5"><XMarkIcon className="w-3.5 h-3.5" /></Button>
                   </span>
                 )}
                 {filters.limited && (
-                  <span className="inline-flex items-center gap-1 px-2.5 py-1 bg-amber-50 text-amber-700 text-xs font-medium rounded border border-amber-200">
+                  <span className="inline-flex items-center gap-1 px-2.5 py-1 bg-warning-50 text-warning-700 text-xs font-medium rounded border border-warning-200">
                     {t('product.limitedEdition')}
-                    <button onClick={() => handleFiltersChange({ ...filters, limited: false })} className="hover:text-amber-900 ml-0.5"><XMarkIcon className="w-3.5 h-3.5" /></button>
+                    <Button variant="secondary" onClick={() => handleFiltersChange({ ...filters, limited: false })} className="hover:text-warning-900 ml-0.5"><XMarkIcon className="w-3.5 h-3.5" /></Button>
                   </span>
                 )}
                 {filters.set && (
-                  <span className="inline-flex items-center gap-1 px-2.5 py-1 bg-sky-50 text-sky-700 text-xs font-medium rounded border border-sky-200">
+                  <span className="inline-flex items-center gap-1 px-2.5 py-1 bg-info-50 text-info-700 text-xs font-medium rounded border border-info-200">
                     {t('product.sets')}
-                    <button onClick={() => handleFiltersChange({ ...filters, set: false })} className="hover:text-sky-900 ml-0.5"><XMarkIcon className="w-3.5 h-3.5" /></button>
+                    <Button variant="secondary" onClick={() => handleFiltersChange({ ...filters, set: false })} className="hover:text-info-900 ml-0.5"><XMarkIcon className="w-3.5 h-3.5" /></Button>
                   </span>
                 )}
                 {filters.discountOnly && (
-                  <span className="inline-flex items-center gap-1 px-2.5 py-1 bg-red-50 text-red-700 text-xs font-medium rounded border border-red-200">
+                  <span className="inline-flex items-center gap-1 px-2.5 py-1 bg-danger-50 text-danger-700 text-xs font-medium rounded border border-danger-200">
                     {locale === 'en' ? 'On Sale' : 'İndirimli'}
-                    <button onClick={() => handleFiltersChange({ ...filters, discountOnly: false })} className="hover:text-red-900 ml-0.5"><XMarkIcon className="w-3.5 h-3.5" /></button>
+                    <Button variant="secondary" onClick={() => handleFiltersChange({ ...filters, discountOnly: false })} className="hover:text-danger-900 ml-0.5"><XMarkIcon className="w-3.5 h-3.5" /></Button>
                   </span>
                 )}
-                <button onClick={clearFilters} className="text-xs text-orange-600 hover:text-orange-700 font-medium ml-1">{t('product.clearFilters')}</button>
+                <Button variant="secondary" onClick={clearFilters} className="text-xs text-primary-600 hover:text-primary-700 font-medium ml-1">{t('product.clearFilters')}</Button>
               </div>
             )}
 
@@ -522,25 +520,25 @@ export default function ListingsPage() {
             {isLoading ? (
               <div className={getGridClass()}>
                 {[...Array(12)].map((_, i) => (
-                  <div key={i} className="bg-white rounded border border-gray-100 overflow-hidden animate-pulse">
-                    <div className="aspect-square bg-gray-200" />
+                  <div key={i} className="bg-surface-elevated rounded border border-border-subtle overflow-hidden animate-pulse">
+                    <div className="aspect-square bg-border-subtle" />
                     <div className="p-3 space-y-2">
-                      <div className="h-3 bg-gray-200 rounded w-3/4" />
-                      <div className="h-3 bg-gray-200 rounded w-1/2" />
-                      <div className="h-4 bg-gray-200 rounded w-1/3" />
+                      <div className="h-3 bg-border-subtle rounded w-3/4" />
+                      <div className="h-3 bg-border-subtle rounded w-1/2" />
+                      <div className="h-4 bg-border-subtle rounded w-1/3" />
                     </div>
                   </div>
                 ))}
               </div>
             ) : listings.length === 0 ? (
-              <div className="text-center py-20 bg-white rounded border border-gray-200">
-                <div className="inline-flex items-center justify-center w-16 h-16 bg-gray-50 rounded mb-4">
-                  <MagnifyingGlassIcon className="w-7 h-7 text-gray-400" />
+              <div className="text-center py-20 bg-surface-elevated rounded border border-border">
+                <div className="inline-flex items-center justify-center w-16 h-16 bg-surface rounded mb-4">
+                  <MagnifyingGlassIcon className="w-7 h-7 text-subtle" />
                 </div>
-                <p className="text-gray-600 text-lg font-medium mb-1">{t('product.noListings')}</p>
-                <p className="text-gray-400 text-sm mb-4">{locale === 'en' ? 'Try adjusting your filters' : 'Filtrelerinizi değiştirmeyi deneyin'}</p>
+                <p className="text-muted text-lg font-medium mb-1">{t('product.noListings')}</p>
+                <p className="text-subtle text-sm mb-4">{locale === 'en' ? 'Try adjusting your filters' : 'Filtrelerinizi değiştirmeyi deneyin'}</p>
                 {activeFilterCount > 0 && (
-                  <button onClick={clearFilters} className="px-5 py-2 bg-orange-500 text-white rounded hover:bg-orange-600 transition-colors text-sm font-medium">{t('product.clearFilters')}</button>
+                  <Button variant="primary" size="md" onClick={clearFilters}>{t('product.clearFilters')}</Button>
                 )}
               </div>
             ) : productLayout === 'list' ? (
@@ -549,8 +547,8 @@ export default function ListingsPage() {
                 {listings.map((listing, index) => (
                   <motion.div key={listing.id} initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: index * 0.02 }}>
                     <Link href={`/listings/${listing.id}`}>
-                      <div className="bg-white rounded border border-gray-200 hover:border-orange-300 hover:shadow-sm transition-all flex gap-4 p-3">
-                        <div className="relative w-20 h-20 flex-shrink-0 bg-gray-100 rounded overflow-hidden">
+                      <div className="bg-surface-elevated rounded border border-border hover:border-primary-300 hover:shadow-sm transition-all flex gap-4 p-3">
+                        <div className="relative w-20 h-20 flex-shrink-0 bg-surface-alt rounded overflow-hidden">
                           <OptimizedImage
                             src={getImageUrl(listing.images?.[0], index, listing.title)}
                             alt={listing.title}
@@ -561,31 +559,31 @@ export default function ListingsPage() {
                             priority={index === 0}
                           />
                           {(listing.trade_available || listing.isTradeEnabled) && (
-                            <div className="absolute top-1 right-1 bg-emerald-500 text-white p-0.5 rounded">
+                            <div className="absolute top-1 right-1 bg-success-500 text-inverted p-0.5 rounded">
                               <ArrowsRightLeftIcon className="w-2.5 h-2.5" />
                             </div>
                           )}
                         </div>
                         <div className="flex-1 flex items-center justify-between min-w-0">
                           <div className="flex-1 min-w-0">
-                            <h3 className="font-medium text-gray-900 line-clamp-1 text-sm">{listing.title}</h3>
-                            <p className="text-xs text-gray-500 mt-0.5">
+                            <h3 className="font-medium text-heading line-clamp-1 text-sm">{listing.title}</h3>
+                            <p className="text-xs text-muted mt-0.5">
                               {typeof listing.brand === 'object' ? listing.brand.name : listing.brand}{listing.scale ? ` · ${listing.scale}` : ''}{listing.year ? ` · ${listing.year}` : ''}
                             </p>
-                            <span className="text-[10px] text-gray-400 bg-gray-100 px-1.5 py-0.5 rounded inline-block mt-1">{formatCondition(listing.condition, locale)}</span>
+                            <span className="text-[10px] text-subtle bg-surface-alt px-1.5 py-0.5 rounded inline-block mt-1">{formatCondition(listing.condition, locale)}</span>
                           </div>
                           <div className="flex items-center gap-3 ml-4">
                             {listing.rating && listing.rating.average !== null && listing.rating.count > 0 && (
                               <div className="flex items-center gap-1">
-                                <StarIconSolid className="w-3.5 h-3.5 text-yellow-400" />
-                                <span className="text-xs font-semibold text-gray-900">{listing.rating.average.toFixed(1)}</span>
-                                <span className="text-[11px] text-gray-400">({listing.rating.count})</span>
+                                <StarIconSolid className="w-3.5 h-3.5 text-warning-400" />
+                                <span className="text-xs font-semibold text-heading">{listing.rating.average.toFixed(1)}</span>
+                                <span className="text-[11px] text-subtle">({listing.rating.count})</span>
                               </div>
                             )}
                             {isProductOnSaleDisplay(listing) && (
-                              <span className="text-xs text-red-500 font-semibold bg-red-50 px-1.5 py-0.5 rounded">%{listing.discountPercent ?? 0}</span>
+                              <span className="text-xs text-danger-500 font-semibold bg-danger-50 px-1.5 py-0.5 rounded">%{listing.discountPercent ?? 0}</span>
                             )}
-                            <p className="text-base font-bold text-orange-600 whitespace-nowrap">{getProductEffectivePrice(listing).toLocaleString('tr-TR', { minimumFractionDigits: 0, maximumFractionDigits: 0 })} ₺</p>
+                            <p className="text-base font-bold text-primary-600 whitespace-nowrap">{getProductEffectivePrice(listing).toLocaleString('tr-TR', { minimumFractionDigits: 0, maximumFractionDigits: 0 })} ₺</p>
                           </div>
                         </div>
                       </div>
@@ -599,8 +597,8 @@ export default function ListingsPage() {
                 {listings.map((listing, index) => (
                   <motion.div key={listing.id} initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: index * 0.02 }}>
                     <Link href={`/listings/${listing.id}`}>
-                      <div className="bg-white rounded border border-gray-200 overflow-hidden hover:border-orange-300 hover:shadow-md transition-all group h-full flex flex-col">
-                        <div className="relative aspect-square bg-gray-100">
+                      <div className="bg-surface-elevated rounded border border-border overflow-hidden hover:border-primary-300 hover:shadow-md transition-all group h-full flex flex-col">
+                        <div className="relative aspect-square bg-surface-alt">
                           <OptimizedImage
                             src={getImageUrl(listing.images?.[0], index, listing.title)}
                             alt={listing.title}
@@ -611,35 +609,35 @@ export default function ListingsPage() {
                             priority={index < 4}
                           />
                           {(listing.trade_available || listing.isTradeEnabled) && (
-                            <div className="absolute top-1.5 left-1.5 bg-emerald-500 text-white text-[10px] px-1.5 py-0.5 rounded flex items-center gap-0.5">
+                            <div className="absolute top-1.5 left-1.5 bg-success-500 text-inverted text-[10px] px-1.5 py-0.5 rounded flex items-center gap-0.5">
                               <ArrowsRightLeftIcon className="w-2.5 h-2.5" />
                               <span className="hidden sm:inline">{locale === 'en' ? 'Trade' : 'Takas'}</span>
                             </div>
                           )}
                           {isProductOnSaleDisplay(listing) && (
-                            <div className="absolute top-1.5 right-1.5 bg-red-500 text-white text-[10px] font-bold px-1.5 py-0.5 rounded">
+                            <div className="absolute top-1.5 right-1.5 bg-danger-500 text-inverted text-[10px] font-bold px-1.5 py-0.5 rounded">
                               %{listing.discountPercent ?? 0}
                             </div>
                           )}
                         </div>
                         <div className="p-2.5 flex-1 flex flex-col">
-                          <h3 className="font-medium text-gray-900 line-clamp-2 text-xs leading-tight mb-1 group-hover:text-orange-600 transition-colors">{listing.title}</h3>
-                          <p className="text-[10px] text-gray-400 mb-1.5">
+                          <h3 className="font-medium text-heading line-clamp-2 text-xs leading-tight mb-1 group-hover:text-primary-600 transition-colors">{listing.title}</h3>
+                          <p className="text-[10px] text-subtle mb-1.5">
                             {typeof listing.brand === 'object' ? listing.brand.name : listing.brand}{listing.scale ? ` · ${listing.scale}` : ''}{listing.year ? ` · ${listing.year}` : ''}
                           </p>
                           {listing.rating && listing.rating.average !== null && listing.rating.count > 0 && (
                             <div className="flex items-center gap-0.5 mb-1.5">
-                              <StarIconSolid className="w-3 h-3 text-yellow-400" />
-                              <span className="text-[10px] font-semibold text-gray-900">{listing.rating.average.toFixed(1)}</span>
-                              <span className="text-[10px] text-gray-400">({listing.rating.count})</span>
+                              <StarIconSolid className="w-3 h-3 text-warning-400" />
+                              <span className="text-[10px] font-semibold text-heading">{listing.rating.average.toFixed(1)}</span>
+                              <span className="text-[10px] text-subtle">({listing.rating.count})</span>
                             </div>
                           )}
-                          <div className="mt-auto pt-1.5 border-t border-gray-100">
-                            <span className="text-[9px] text-gray-400 bg-gray-50 px-1 py-0.5 rounded inline-block mb-1">{formatCondition(listing.condition, locale)}</span>
+                          <div className="mt-auto pt-1.5 border-t border-border-subtle">
+                            <span className="text-[9px] text-subtle bg-surface px-1 py-0.5 rounded inline-block mb-1">{formatCondition(listing.condition, locale)}</span>
                             {isProductOnSaleDisplay(listing) && (
-                              <span className="text-[10px] text-gray-400 line-through ml-1.5">{getProductOriginalPriceForDisplay(listing).toLocaleString('tr-TR', { minimumFractionDigits: 0, maximumFractionDigits: 0 })} ₺</span>
+                              <span className="text-[10px] text-subtle line-through ml-1.5">{getProductOriginalPriceForDisplay(listing).toLocaleString('tr-TR', { minimumFractionDigits: 0, maximumFractionDigits: 0 })} ₺</span>
                             )}
-                            <p className="text-sm font-bold text-orange-600">{getProductEffectivePrice(listing).toLocaleString('tr-TR', { minimumFractionDigits: 0, maximumFractionDigits: 0 })} ₺</p>
+                            <p className="text-sm font-bold text-primary-600">{getProductEffectivePrice(listing).toLocaleString('tr-TR', { minimumFractionDigits: 0, maximumFractionDigits: 0 })} ₺</p>
                           </div>
                         </div>
                       </div>
@@ -651,20 +649,18 @@ export default function ListingsPage() {
 
             {/* Pagination */}
             {pagination.totalPages > 1 && (
-              <div className="mt-8 flex flex-col sm:flex-row items-center justify-between gap-4 bg-white rounded border border-gray-200 px-4 py-4">
-                <div className="text-sm text-gray-600">
+              <div className="mt-8 flex flex-col sm:flex-row items-center justify-between gap-4 bg-surface-elevated rounded border border-border px-4 py-4">
+                <div className="text-sm text-muted">
                   {locale === 'en'
                     ? `Showing ${((pagination.page - 1) * pagination.limit) + 1}-${Math.min(pagination.page * pagination.limit, pagination.total)} of ${pagination.total} products`
                     : `${((pagination.page - 1) * pagination.limit) + 1}-${Math.min(pagination.page * pagination.limit, pagination.total)} / ${pagination.total} ürün gösteriliyor`}
                 </div>
                 <div className="flex items-center gap-2">
-                  <button
-                    onClick={() => setCurrentPage(pagination.page - 1)}
+                  <Button variant="secondary" onClick={() => setCurrentPage(pagination.page - 1)}
                     disabled={pagination.page === 1}
-                    className="px-4 py-2 border border-gray-300 rounded-lg disabled:opacity-50 disabled:cursor-not-allowed hover:bg-gray-50 text-sm font-medium text-gray-700"
-                  >
+                    className="px-4 disabled:opacity-50 disabled:cursor-not-allowed hover:bg-surface font-medium text-body">
                     {locale === 'en' ? 'Previous' : 'Önceki'}
-                  </button>
+                  </Button>
                   <div className="flex items-center gap-1">
                     {Array.from({ length: Math.min(5, pagination.totalPages) }, (_, i) => {
                       let pageNum: number;
@@ -678,27 +674,23 @@ export default function ListingsPage() {
                         pageNum = pagination.page - 2 + i;
                       }
                       return (
-                        <button
-                          key={pageNum}
+                        <Button variant="secondary" key={pageNum}
                           onClick={() => setCurrentPage(pageNum)}
                           className={`px-3 py-2 rounded-lg text-sm font-medium ${
                             pagination.page === pageNum
-                              ? 'bg-orange-500 text-white'
-                              : 'border border-gray-300 text-gray-700 hover:bg-gray-50'
-                          }`}
-                        >
+                              ? 'bg-primary-500 text-inverted'
+                              : 'border border-border text-body hover:bg-surface'
+                          }`}>
                           {pageNum}
-                        </button>
+                        </Button>
                       );
                     })}
                   </div>
-                  <button
-                    onClick={() => setCurrentPage(pagination.page + 1)}
+                  <Button variant="secondary" onClick={() => setCurrentPage(pagination.page + 1)}
                     disabled={pagination.page >= pagination.totalPages}
-                    className="px-4 py-2 border border-gray-300 rounded-lg disabled:opacity-50 disabled:cursor-not-allowed hover:bg-gray-50 text-sm font-medium text-gray-700"
-                  >
+                    className="px-4 disabled:opacity-50 disabled:cursor-not-allowed hover:bg-surface font-medium text-body">
                     {locale === 'en' ? 'Next' : 'Sonraki'}
-                  </button>
+                  </Button>
                 </div>
               </div>
             )}

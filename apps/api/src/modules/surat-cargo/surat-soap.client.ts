@@ -1,0 +1,355 @@
+import { Injectable, Logger } from '@nestjs/common';
+import { ConfigService } from '@nestjs/config';
+import type { SuratGonderiPayload } from './surat-cargo.types';
+
+export interface SuratSoapCallOptions {
+  timeoutMs: number;
+}
+
+/**
+ * Abstraction over Sürat SOAP operations — returns raw string from carrier.
+ */
+export abstract class SuratSoapClient {
+  abstract callGonderiyiKargoyaGonderYeni(
+    payload: SuratGonderiPayload,
+    options: SuratSoapCallOptions,
+  ): Promise<string>;
+
+  /**
+   * Cancel/delete a shipment by OzelKargoTakipNo (order number).
+   * Returns raw response: "Tamam" on success, "Pasif Edilecek Gonderi Bulunamadi!" if already gone, etc.
+   */
+  abstract callGonderiSil(
+    ozelKargoTakipNo: string,
+    options: SuratSoapCallOptions,
+  ): Promise<string>;
+}
+
+/**
+ * Config-driven stub for dev/test. SURAT_STUB_RESPONSE defaults to Tamam.
+ * SURAT_STUB_THROW=TIMEOUT|NETWORK|HTTP_5XX|PARSE_ERROR|EMPTY|UNKNOWN simulates technical failures.
+ */
+@Injectable()
+export class StubSuratSoapClient extends SuratSoapClient {
+  private readonly logger = new Logger(StubSuratSoapClient.name);
+
+  /** Test introspection: history of submitShipment calls (cleared on reset) */
+  public readonly shipmentCalls: SuratGonderiPayload[] = [];
+  /** Test introspection: history of cancel calls */
+  public readonly cancelCalls: string[] = [];
+
+  /** Test helper to clear call history between tests */
+  reset(): void {
+    this.shipmentCalls.length = 0;
+    this.cancelCalls.length = 0;
+  }
+
+  constructor(private readonly configService: ConfigService) {
+    super();
+  }
+
+  async callGonderiyiKargoyaGonderYeni(
+    payload: SuratGonderiPayload,
+    _options: SuratSoapCallOptions,
+  ): Promise<string> {
+    this.shipmentCalls.push(payload);
+    const sim = this.configService.get<string>('SURAT_STUB_THROW', '')?.trim().toUpperCase();
+    this.logger.debug(
+      `Stub Surat call ref=${payload.OzelKargoTakipNo} sim=${sim || 'none'}`,
+    );
+
+    if (sim === 'TIMEOUT') {
+      const err = new Error('ETIMEDOUT');
+      (err as NodeJS.ErrnoException).code = 'ETIMEDOUT';
+      throw err;
+    }
+    if (sim === 'NETWORK') {
+      const err = new Error('ECONNRESET');
+      (err as NodeJS.ErrnoException).code = 'ECONNRESET';
+      throw err;
+    }
+    if (sim === 'HTTP_5XX') {
+      const err = new Error('HTTP 500');
+      (err as any).statusCode = 500;
+      throw err;
+    }
+    if (sim === 'SOAP_FAULT') {
+      throw new Error('SOAP Fault: server');
+    }
+    if (sim === 'PARSE_ERROR') {
+      throw new Error('Unexpected XML');
+    }
+    if (sim === 'EMPTY') {
+      return '';
+    }
+    if (sim === 'UNKNOWN') {
+      throw new Error('unknown stub error');
+    }
+
+    return this.configService.get<string>('SURAT_STUB_RESPONSE', 'Tamam');
+  }
+
+  async callGonderiSil(
+    ozelKargoTakipNo: string,
+    _options: SuratSoapCallOptions,
+  ): Promise<string> {
+    this.cancelCalls.push(ozelKargoTakipNo);
+    this.logger.debug(`Stub Surat cancel oid=${ozelKargoTakipNo}`);
+    return this.configService.get<string>('SURAT_STUB_CANCEL_RESPONSE', 'Tamam');
+  }
+}
+
+// ─── SOAP XML helpers ─────────────────────────────────────────────────────────
+
+function escapeXml(str: string): string {
+  return str
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&apos;');
+}
+
+function buildGonderiXml(payload: SuratGonderiPayload): string {
+  const field = (tag: string, value: string | number | boolean | undefined | null): string => {
+    if (value === undefined || value === null || value === '') return '';
+    const str = typeof value === 'boolean' ? (value ? 'true' : 'false') : String(value);
+    return `<${tag}>${escapeXml(str)}</${tag}>`;
+  };
+
+  // WSDL GonderiModel field order (zorunlu sıra!)
+  return [
+    field('KisiKurum', payload.KisiKurum),
+    field('SahisBirim', payload.SahisBirim),
+    field('AliciAdresi', payload.AliciAdresi),
+    field('Il', payload.Il),
+    field('Ilce', payload.Ilce),
+    field('TelefonEv', payload.TelefonEv),
+    field('TelefonIs', payload.TelefonIs),
+    field('TelefonCep', payload.TelefonCep),
+    field('Email', payload.Email),
+    field('AliciKodu', payload.AliciKodu),
+    field('KargoTuru', payload.KargoTuru),
+    field('OdemeTipi', payload.OdemeTipi),
+    field('IrsaliyeSeriNo', payload.IrsaliyeSeriNo),
+    field('IrsaliyeSiraNo', payload.IrsaliyeSiraNo),
+    field('ReferansNo', payload.ReferansNo),
+    field('OzelKargoTakipNo', payload.OzelKargoTakipNo),
+    field('Adet', payload.Adet),
+    field('BirimDesi', payload.BirimDesi),
+    field('BirimKg', payload.BirimKg),
+    field('KargoIcerigi', payload.KargoIcerigi),
+    field('KapidanOdemeTahsilatTipi', payload.KapidanOdemeTahsilatTipi),
+    field('KapidanOdemeTutari', payload.KapidanOdemeTutari ?? 0),
+    field('EkHizmetler', payload.EkHizmetler),
+    field('TasimaSekli', payload.TasimaSekli),
+    field('TeslimSekli', payload.TeslimSekli),
+    field('SevkAdresi', payload.SevkAdresi),
+    field('GonderiSekli', payload.GonderiSekli),
+    field('TeslimSubeKodu', payload.TeslimSubeKodu),
+    field('Pazaryerimi', payload.Pazaryerimi),
+    field('EntegrasyonFirmasi', payload.EntegrasyonFirmasi),
+    field('Iademi', payload.Iademi),
+  ]
+    .filter(Boolean)
+    .join('');
+}
+
+function buildSoapEnvelope(
+  kullaniciAdi: string,
+  sifre: string,
+  payload: SuratGonderiPayload,
+): string {
+  return `<?xml version="1.0" encoding="utf-8"?>
+<soap:Envelope xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+               xmlns:xsd="http://www.w3.org/2001/XMLSchema"
+               xmlns:soap="http://schemas.xmlsoap.org/soap/envelope/">
+  <soap:Body>
+    <GonderiyiKargoyaGonderYeni xmlns="http://tempuri.org/">
+      <KullaniciAdi>${escapeXml(kullaniciAdi)}</KullaniciAdi>
+      <Sifre>${escapeXml(sifre)}</Sifre>
+      <Gonderi>${buildGonderiXml(payload)}</Gonderi>
+    </GonderiyiKargoyaGonderYeni>
+  </soap:Body>
+</soap:Envelope>`;
+}
+
+function parseGonderResponse(xml: string): string {
+  // Extract the result from: <GonderiyiKargoyaGonderYeniResult>VALUE</GonderiyiKargoyaGonderYeniResult>
+  const match = xml.match(
+    /<GonderiyiKargoyaGonderYeniResult[^>]*>([\s\S]*?)<\/GonderiyiKargoyaGonderYeniResult>/i,
+  );
+  if (!match) {
+    // Check for SOAP Fault
+    const faultMatch = xml.match(/<faultstring[^>]*>([\s\S]*?)<\/faultstring>/i);
+    if (faultMatch) {
+      throw new Error(`SOAP Fault: ${faultMatch[1].trim()}`);
+    }
+    throw new Error('Unexpected XML: GonderiyiKargoyaGonderYeniResult not found');
+  }
+  return match[1].trim();
+}
+
+// ─── Live SOAP Client ─────────────────────────────────────────────────────────
+
+const SURAT_SOAP_URL = 'https://webservices.suratkargo.com.tr/services.asmx';
+const SURAT_SOAP_ACTION = 'http://tempuri.org/GonderiyiKargoyaGonderYeni';
+const SURAT_CANCEL_ACTION = 'http://tempuri.org/GonderiSil';
+
+function buildCancelEnvelope(cariKodu: string, webPassword: string, ozelKargoTakipNo: string): string {
+  return `<?xml version="1.0" encoding="utf-8"?>
+<soap:Envelope xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+               xmlns:xsd="http://www.w3.org/2001/XMLSchema"
+               xmlns:soap="http://schemas.xmlsoap.org/soap/envelope/">
+  <soap:Body>
+    <GonderiSil xmlns="http://tempuri.org/">
+      <cariKodu>${escapeXml(cariKodu)}</cariKodu>
+      <WebPassword>${escapeXml(webPassword)}</WebPassword>
+      <ozelKargoTakipNo>${escapeXml(ozelKargoTakipNo)}</ozelKargoTakipNo>
+    </GonderiSil>
+  </soap:Body>
+</soap:Envelope>`;
+}
+
+function parseCancelResponse(xml: string): string {
+  const match = xml.match(
+    /<GonderiSilResult[^>]*>([\s\S]*?)<\/GonderiSilResult>/i,
+  );
+  if (!match) {
+    const faultMatch = xml.match(/<faultstring[^>]*>([\s\S]*?)<\/faultstring>/i);
+    if (faultMatch) {
+      throw new Error(`SOAP Fault: ${faultMatch[1].trim()}`);
+    }
+    throw new Error('Unexpected XML: GonderiSilResult not found');
+  }
+  return match[1].trim();
+}
+
+/**
+ * Production SOAP client — sends real XML to Sürat Kargo web service.
+ */
+@Injectable()
+export class LiveSuratSoapClient extends SuratSoapClient {
+  private readonly logger = new Logger(LiveSuratSoapClient.name);
+
+  constructor(private readonly configService: ConfigService) {
+    super();
+  }
+
+  async callGonderiyiKargoyaGonderYeni(
+    payload: SuratGonderiPayload,
+    options: SuratSoapCallOptions,
+  ): Promise<string> {
+    const kullaniciAdi = this.configService.get<string>('SURAT_KARGO_CARI_KODU', '');
+    const sifre = this.configService.get<string>('SURAT_KARGO_SIFRE', '');
+
+    if (!kullaniciAdi || !sifre) {
+      throw new Error('SURAT_KARGO_CARI_KODU or SURAT_KARGO_SIFRE not configured');
+    }
+
+    const soapXml = buildSoapEnvelope(kullaniciAdi, sifre, payload);
+
+    this.logger.debug(
+      `Surat SOAP call ref=${payload.OzelKargoTakipNo} timeout=${options.timeoutMs}ms`,
+    );
+
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), options.timeoutMs);
+
+    try {
+      const response = await fetch(SURAT_SOAP_URL, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'text/xml; charset=utf-8',
+          SOAPAction: SURAT_SOAP_ACTION,
+        },
+        body: soapXml,
+        signal: controller.signal,
+      });
+
+      if (response.status >= 500) {
+        const err = new Error(`HTTP ${response.status}`);
+        (err as any).statusCode = response.status;
+        throw err;
+      }
+
+      const responseXml = await response.text();
+
+      if (!responseXml || responseXml.trim() === '') {
+        return '';
+      }
+
+      const result = parseGonderResponse(responseXml);
+
+      this.logger.log(
+        `Surat SOAP response ref=${payload.OzelKargoTakipNo} result="${result}"`,
+      );
+
+      return result;
+    } catch (error: any) {
+      if (error.name === 'AbortError') {
+        const err = new Error('ETIMEDOUT');
+        (err as NodeJS.ErrnoException).code = 'ETIMEDOUT';
+        throw err;
+      }
+      throw error;
+    } finally {
+      clearTimeout(timer);
+    }
+  }
+
+  async callGonderiSil(
+    ozelKargoTakipNo: string,
+    options: SuratSoapCallOptions,
+  ): Promise<string> {
+    const kullaniciAdi = this.configService.get<string>('SURAT_KARGO_CARI_KODU', '');
+    const sifre = this.configService.get<string>('SURAT_KARGO_SIFRE', '');
+
+    if (!kullaniciAdi || !sifre) {
+      throw new Error('SURAT_KARGO_CARI_KODU or SURAT_KARGO_SIFRE not configured');
+    }
+
+    const soapXml = buildCancelEnvelope(kullaniciAdi, sifre, ozelKargoTakipNo);
+
+    this.logger.debug(
+      `Surat cancel SOAP call ref=${ozelKargoTakipNo} timeout=${options.timeoutMs}ms`,
+    );
+
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), options.timeoutMs);
+
+    try {
+      const response = await fetch(SURAT_SOAP_URL, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'text/xml; charset=utf-8',
+          SOAPAction: SURAT_CANCEL_ACTION,
+        },
+        body: soapXml,
+        signal: controller.signal,
+      });
+
+      if (response.status >= 500) {
+        const err = new Error(`HTTP ${response.status}`);
+        (err as any).statusCode = response.status;
+        throw err;
+      }
+
+      const responseXml = await response.text();
+      if (!responseXml || responseXml.trim() === '') return '';
+
+      const result = parseCancelResponse(responseXml);
+      this.logger.log(`Surat cancel SOAP response ref=${ozelKargoTakipNo} result="${result}"`);
+      return result;
+    } catch (error: any) {
+      if (error.name === 'AbortError') {
+        const err = new Error('ETIMEDOUT');
+        (err as NodeJS.ErrnoException).code = 'ETIMEDOUT';
+        throw err;
+      }
+      throw error;
+    } finally {
+      clearTimeout(timer);
+    }
+  }
+}

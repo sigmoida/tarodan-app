@@ -273,7 +273,7 @@ export default function BusinessDashboardScreen() {
         {activeTab === 'products' && stats && (
           <View style={styles.tabContent}>
             <Text style={styles.sectionTitle}>En Çok Görüntülenen Ürünler</Text>
-            {stats.topProducts.byViews.length > 0 ? (
+            {stats.topProducts?.byViews?.length > 0 ? (
               stats.topProducts.byViews.map((product, index) => (
                 <ProductRow key={product.id} product={product} index={index} metric="views" />
               ))
@@ -282,7 +282,7 @@ export default function BusinessDashboardScreen() {
             )}
 
             <Text style={[styles.sectionTitle, { marginTop: 24 }]}>En Çok Beğenilen Ürünler</Text>
-            {stats.topProducts.byLikes.length > 0 ? (
+            {stats.topProducts?.byLikes?.length > 0 ? (
               stats.topProducts.byLikes.map((product, index) => (
                 <ProductRow key={product.id} product={product} index={index} metric="likes" />
               ))
@@ -296,7 +296,7 @@ export default function BusinessDashboardScreen() {
         {activeTab === 'collections' && stats && (
           <View style={styles.tabContent}>
             <Text style={styles.sectionTitle}>En Popüler Koleksiyonlar</Text>
-            {stats.topCollections.length > 0 ? (
+            {stats.topCollections?.length > 0 ? (
               stats.topCollections.map((collection, index) => (
                 <CollectionRow key={collection.id} collection={collection} index={index} />
               ))
@@ -342,19 +342,19 @@ function ProductRow({ product, index, metric }: { product: ProductStats; index: 
       )}
       <View style={styles.productInfo}>
         <Text style={styles.productTitle} numberOfLines={1}>{product.title}</Text>
-        <Text style={styles.productPrice}>₺{product.price.toLocaleString('tr-TR')}</Text>
+        <Text style={styles.productPrice}>₺{(product.price ?? 0).toLocaleString('tr-TR')}</Text>
       </View>
       <View style={styles.productStats}>
         <View style={styles.productStatItem}>
           <Ionicons name="eye" size={14} color={metric === 'views' ? '#3B82F6' : TarodanColors.textSecondary} />
           <Text style={[styles.productStatText, metric === 'views' && { color: '#3B82F6' }]}>
-            {product.viewCount.toLocaleString()}
+            {(product.viewCount ?? 0).toLocaleString()}
           </Text>
         </View>
         <View style={styles.productStatItem}>
           <Ionicons name="heart" size={14} color={metric === 'likes' ? '#EF4444' : TarodanColors.textSecondary} />
           <Text style={[styles.productStatText, metric === 'likes' && { color: '#EF4444' }]}>
-            {product.likeCount.toLocaleString()}
+            {(product.likeCount ?? 0).toLocaleString()}
           </Text>
         </View>
       </View>
