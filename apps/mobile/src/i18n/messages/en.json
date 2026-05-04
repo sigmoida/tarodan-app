@@ -529,7 +529,43 @@
     "backToTrades": "Back to Trades",
     "browseListings": "Browse Listings",
     "safeTradeTitle": "Safe Trade",
-    "safeTradeDesc": "After a trade is accepted, both parties enter shipping info. Items stay reserved until the other party receives them and confirms. This process ensures a safe trade for both sides."
+    "safeTradeDesc": "After a trade is accepted, both parties enter shipping info. Items stay reserved until the other party receives them and confirms. This process ensures a safe trade for both sides.",
+    "warehouseShipping": {
+      "title": "Shipping to Tarodan Warehouse",
+      "subtitle": "The system has assigned a Sürat Kargo tracking number for both parties. Use the number below to drop off your item at the nearest Sürat branch.",
+      "yourShipment": "Your shipment",
+      "handIn": "Take this number to a Sürat Kargo branch and hand in your item.",
+      "counterpartyDelivered": "✓ The other party's shipment has also reached the warehouse.",
+      "counterpartyInTransit": "The other party's shipment is on the way.",
+      "counterpartyCancelled": "The other party's shipment was cancelled; our team will step in.",
+      "counterpartyFailed": "There was an issue with the other party's shipment; our team is reviewing.",
+      "counterpartyReturned": "The other party's shipment was returned.",
+      "counterpartyWaiting": "Waiting for the other party to drop off their shipment."
+    },
+    "confirmReceipt": {
+      "waitingDelivered": "Waiting for delivery confirmation."
+    },
+    "tradeStatus": {
+      "shipping_to_warehouse": "Shipping to Warehouse",
+      "at_warehouse": "At Warehouse",
+      "admin_reviewing": "Under Review",
+      "shipping_to_recipients": "Shipping to Recipients",
+      "awaiting_payment": "Awaiting Payment"
+    },
+    "shipmentStatus": {
+      "label_created": "Label Ready",
+      "pending": "Waiting",
+      "in_transit": "In Transit",
+      "delivered": "Delivered to Warehouse",
+      "picked_up": "Picked Up",
+      "at_delivery_branch": "At Delivery Branch",
+      "out_for_delivery": "Out for Delivery",
+      "cancelled": "Cancelled",
+      "failed": "Failed",
+      "returned": "Returned",
+      "return_in_progress": "Return in Progress",
+      "fallback": "Pending"
+    }
   },
   "offer": {
     "makeOffer": "Make Offer",
@@ -886,7 +922,14 @@
     "daysAgo": "days ago",
     "weeksAgo": "weeks ago",
     "monthsAgo": "months ago",
-    "yearsAgo": "years ago"
+    "yearsAgo": "years ago",
+    "ago": {
+      "justNow": "just now",
+      "minutes": "{count} min ago",
+      "hours": "{count} hr ago",
+      "days": "{count} day ago",
+      "months": "{count} month ago"
+    }
   },
   "language": {
     "language": "Language",
@@ -1339,6 +1382,22 @@
       "unsubscribeTokenSuccess": "Your newsletter subscription has been cancelled.",
       "feedbackTitle": "Why are you leaving? (Optional)",
       "feedbackPlaceholder": "Your feedback..."
+    }
+  },
+  "stockout": {
+    "page": {
+      "screenTitle": "Product Unavailable",
+      "title": "This product is no longer in stock",
+      "titleBack": "Good news: this product is back in stock!",
+      "bodyOut": "\"{title}\" was purchased by another buyer. You can browse alternatives from the same category below.",
+      "bodyOutFallback": "Sorry, the product you were looking at is no longer available. You can browse alternatives below.",
+      "bodyBack": "\"{title}\" is back in stock. Would you like to take a look?",
+      "bodyBackFallback": "The product you were waiting for is back in stock. Want to take a look?",
+      "viewProduct": "View Product",
+      "allCategory": "All {category} products",
+      "allCategoryFallback": "All category products",
+      "similar": "Similar products",
+      "empty": "No other active products found in this category."
     }
   }
 }

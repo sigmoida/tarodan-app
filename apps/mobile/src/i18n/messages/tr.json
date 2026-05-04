@@ -528,7 +528,43 @@
     "backToTrades": "Takaslara Dön",
     "browseListings": "İlanları İncele",
     "safeTradeTitle": "Güvenli Takas",
-    "safeTradeDesc": "Takas teklifi kabul edildikten sonra her iki taraf da kargo bilgisini girer. Ürünler karşı tarafa ulaşana ve teslim onayı verilene kadar rezerve kalır. Bu süreç hem alıcı hem satıcı için güvenli bir takas sağlar."
+    "safeTradeDesc": "Takas teklifi kabul edildikten sonra her iki taraf da kargo bilgisini girer. Ürünler karşı tarafa ulaşana ve teslim onayı verilene kadar rezerve kalır. Bu süreç hem alıcı hem satıcı için güvenli bir takas sağlar.",
+    "warehouseShipping": {
+      "title": "Tarodan Deposuna Gönderim",
+      "subtitle": "Sistem her iki tarafa Sürat Kargo takip numarası tahsis etti. Aşağıdaki numara ile en yakın Sürat şubesine giderek ürününüzü teslim edin.",
+      "yourShipment": "Sizin gönderiniz",
+      "handIn": "Bu numarayla Sürat Kargo şubesine gidip ürününüzü teslim edin.",
+      "counterpartyDelivered": "✓ Karşı tarafın gönderisi de depoya ulaştı.",
+      "counterpartyInTransit": "Karşı tarafın gönderisi yolda.",
+      "counterpartyCancelled": "Karşı tarafın gönderisi iptal edildi; yetkili ekibimiz devreye girecek.",
+      "counterpartyFailed": "Karşı tarafın gönderisinde bir aksaklık oluştu; yetkili ekibimiz inceliyor.",
+      "counterpartyReturned": "Karşı tarafın gönderisi iade edildi.",
+      "counterpartyWaiting": "Karşı tarafın kargoya teslim etmesi bekleniyor."
+    },
+    "confirmReceipt": {
+      "waitingDelivered": "Kargonun teslim edildiği bilgisi bekleniyor."
+    },
+    "tradeStatus": {
+      "shipping_to_warehouse": "Depoya Gönderim",
+      "at_warehouse": "Depoda",
+      "admin_reviewing": "İnceleniyor",
+      "shipping_to_recipients": "Alıcılara Gönderim",
+      "awaiting_payment": "Ödeme Bekleniyor"
+    },
+    "shipmentStatus": {
+      "label_created": "Etiket Hazır",
+      "pending": "Bekleniyor",
+      "in_transit": "Yolda",
+      "delivered": "Depoya Ulaştı",
+      "picked_up": "Kuryede",
+      "at_delivery_branch": "Teslimat Şubesinde",
+      "out_for_delivery": "Dağıtımda",
+      "cancelled": "İptal Edildi",
+      "failed": "Başarısız",
+      "returned": "İade Edildi",
+      "return_in_progress": "İade Sürecinde",
+      "fallback": "Beklemede"
+    }
   },
   "offer": {
     "makeOffer": "Teklif Ver",
@@ -884,7 +920,14 @@
     "daysAgo": "gün önce",
     "weeksAgo": "hafta önce",
     "monthsAgo": "ay önce",
-    "yearsAgo": "yıl önce"
+    "yearsAgo": "yıl önce",
+    "ago": {
+      "justNow": "az önce",
+      "minutes": "{count} dk önce",
+      "hours": "{count} saat önce",
+      "days": "{count} gün önce",
+      "months": "{count} ay önce"
+    }
   },
   "language": {
     "language": "Dil",
@@ -1337,6 +1380,22 @@
       "unsubscribeTokenSuccess": "Bülten aboneliğiniz iptal edildi.",
       "feedbackTitle": "Neden ayrılıyorsunuz? (İsteğe bağlı)",
       "feedbackPlaceholder": "Geri bildiriminiz..."
+    }
+  },
+  "stockout": {
+    "page": {
+      "screenTitle": "Ürün Stokta Değil",
+      "title": "Bu ürün artık stokta yok",
+      "titleBack": "İyi haber: ürün tekrar satışta!",
+      "bodyOut": "\"{title}\" başka bir alıcı tarafından satın alındı. Aşağıda aynı kategoriden alternatif ürünleri inceleyebilirsiniz.",
+      "bodyOutFallback": "Üzgünüz, baktığınız ürün artık satışta değil. Aşağıda alternatif ürünleri inceleyebilirsiniz.",
+      "bodyBack": "\"{title}\" tekrar stoğa düştü. Hemen incelemek ister misin?",
+      "bodyBackFallback": "Beklediğiniz ürün tekrar satışta. Hemen incelemek ister misin?",
+      "viewProduct": "Ürünü Gör",
+      "allCategory": "Tüm {category} ürünleri",
+      "allCategoryFallback": "Tüm kategori ürünleri",
+      "similar": "Benzer ürünler",
+      "empty": "Bu kategoride başka aktif ürün bulunamadı."
     }
   }
 }

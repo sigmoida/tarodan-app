@@ -8,6 +8,7 @@ import { Text } from '../../../src/components/common';
 import { ProductCard, type ProductCardProduct } from '../../../src/components/product/ProductCard';
 import { productsApi } from '../../../src/services/api';
 import { TarodanColors } from '../../../src/theme';
+import { useTranslation } from '../../../src/i18n/LanguageContext';
 
 interface Product extends ProductCardProduct {
   status?: string;
@@ -16,6 +17,7 @@ interface Product extends ProductCardProduct {
 }
 
 export default function ProductUnavailableScreen() {
+  const { t } = useTranslation();
   const { productId } = useLocalSearchParams<{ productId: string }>();
   const id = String(productId ?? '');
 
@@ -55,7 +57,7 @@ export default function ProductUnavailableScreen() {
 
   return (
     <View style={styles.container}>
-      <Stack.Screen options={{ title: 'Ürün Stokta Değil' }} />
+      <Stack.Screen options={{ title: t('stockout.page.screenTitle') }} />
 
       {loading ? (
         <View style={styles.loading}>
@@ -68,12 +70,11 @@ export default function ProductUnavailableScreen() {
             {isBackInStock ? (
               <>
                 <Text style={styles.heroEmoji}>🎉</Text>
-                <Text style={styles.heroTitle}>İyi haber: ürün tekrar satışta!</Text>
+                <Text style={styles.heroTitle}>{t('stockout.page.titleBack')}</Text>
                 <Text style={styles.heroBody}>
                   {product?.title
-                    ? `"${product.title}" tekrar stoğa düştü.`
-                    : 'Beklediğiniz ürün tekrar satışta.'}{' '}
-                  Hemen incelemek ister misin?
+                    ? t('stockout.page.bodyBack', { title: product.title })
+                    : t('stockout.page.bodyBackFallback')}
                 </Text>
                 <Button
                   mode="contained"
@@ -81,7 +82,7 @@ export default function ProductUnavailableScreen() {
                   style={styles.heroBtn}
                   onPress={() => router.push(`/product/${id}` as any)}
                 >
-                  Ürünü Gör
+                  {t('stockout.page.viewProduct')}
                 </Button>
               </>
             ) : (
@@ -92,12 +93,11 @@ export default function ProductUnavailableScreen() {
                   color={TarodanColors.error}
                   style={{ marginBottom: 8 }}
                 />
-                <Text style={styles.heroTitle}>Bu ürün artık stokta yok</Text>
+                <Text style={styles.heroTitle}>{t('stockout.page.title')}</Text>
                 <Text style={styles.heroBody}>
                   {product?.title
-                    ? `"${product.title}" başka bir alıcı tarafından satın alındı.`
-                    : 'Üzgünüz, baktığınız ürün artık satışta değil.'}{' '}
-                  Aşağıda aynı kategoriden alternatif ürünleri inceleyebilirsiniz.
+                    ? t('stockout.page.bodyOut', { title: product.title })
+                    : t('stockout.page.bodyOutFallback')}
                 </Text>
                 {product?.category?.slug ? (
                   <Button
@@ -108,7 +108,9 @@ export default function ProductUnavailableScreen() {
                       router.push(`/category/${product.category!.slug}` as any)
                     }
                   >
-                    {`Tüm ${product.category.name ?? 'kategori'} ürünleri`}
+                    {product.category.name
+                      ? t('stockout.page.allCategory', { category: product.category.name })
+                      : t('stockout.page.allCategoryFallback')}
                   </Button>
                 ) : null}
               </>
@@ -116,10 +118,10 @@ export default function ProductUnavailableScreen() {
           </View>
 
           {/* Similar products */}
-          <Text style={styles.sectionTitle}>Benzer ürünler</Text>
+          <Text style={styles.sectionTitle}>{t('stockout.page.similar')}</Text>
           {similar.length === 0 ? (
             <Text style={styles.emptyText}>
-              Bu kategoride başka aktif ürün bulunamadı.
+              {t('stockout.page.empty')}
             </Text>
           ) : (
             <FlatList

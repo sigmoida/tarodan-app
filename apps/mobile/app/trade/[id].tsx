@@ -10,6 +10,9 @@ import { tr } from 'date-fns/locale';
 import { tradesApi, addressesApi } from '../../src/services/api';
 import { useAuthStore } from '../../src/stores/authStore';
 import { TarodanColors } from '../../src/theme';
+import { useTranslation } from '../../src/i18n/LanguageContext';
+
+type TFn = (key: string, params?: Record<string, string | number>) => string;
 
 const TRADE_STATUSES = {
   pending: { label: 'Bekliyor', color: TarodanColors.warning, icon: 'time-outline' },
@@ -31,30 +34,31 @@ const TRADE_STATUSES = {
   disputed: { label: 'İtiraz Var', color: TarodanColors.error, icon: 'warning-outline' },
 };
 
-const SHIPMENT_STATUS_CHIP: Record<string, { label: string; bg: string; fg: string; icon?: string }> = {
-  label_created: { label: 'Etiket Hazır', bg: TarodanColors.backgroundSecondary, fg: TarodanColors.textSecondary },
-  pending: { label: 'Bekleniyor', bg: TarodanColors.backgroundSecondary, fg: TarodanColors.textSecondary },
-  picked_up: { label: 'Kuryede', bg: TarodanColors.info + '20', fg: TarodanColors.info },
-  in_transit: { label: 'Yolda', bg: TarodanColors.info + '20', fg: TarodanColors.info },
-  at_delivery_branch: { label: 'Teslimat Şubesinde', bg: TarodanColors.info + '20', fg: TarodanColors.info },
-  out_for_delivery: { label: 'Dağıtımda', bg: TarodanColors.info + '20', fg: TarodanColors.info },
-  delivered: { label: 'Depoya Ulaştı', bg: TarodanColors.success + '20', fg: TarodanColors.success, icon: '✓' },
-  failed: { label: 'Başarısız', bg: TarodanColors.warning + '20', fg: TarodanColors.warning },
-  cancelled: { label: 'İptal Edildi', bg: TarodanColors.warning + '20', fg: TarodanColors.warning },
-  returned: { label: 'İade Edildi', bg: TarodanColors.warning + '20', fg: TarodanColors.warning },
-  return_in_progress: { label: 'İade Sürecinde', bg: TarodanColors.warning + '20', fg: TarodanColors.warning },
+const SHIPMENT_STATUS_CHIP: Record<string, { labelKey: string; bg: string; fg: string; icon?: string }> = {
+  label_created: { labelKey: 'trade.shipmentStatus.label_created', bg: TarodanColors.backgroundSecondary, fg: TarodanColors.textSecondary },
+  pending: { labelKey: 'trade.shipmentStatus.pending', bg: TarodanColors.backgroundSecondary, fg: TarodanColors.textSecondary },
+  picked_up: { labelKey: 'trade.shipmentStatus.picked_up', bg: TarodanColors.info + '20', fg: TarodanColors.info },
+  in_transit: { labelKey: 'trade.shipmentStatus.in_transit', bg: TarodanColors.info + '20', fg: TarodanColors.info },
+  at_delivery_branch: { labelKey: 'trade.shipmentStatus.at_delivery_branch', bg: TarodanColors.info + '20', fg: TarodanColors.info },
+  out_for_delivery: { labelKey: 'trade.shipmentStatus.out_for_delivery', bg: TarodanColors.info + '20', fg: TarodanColors.info },
+  delivered: { labelKey: 'trade.shipmentStatus.delivered', bg: TarodanColors.success + '20', fg: TarodanColors.success, icon: '✓' },
+  failed: { labelKey: 'trade.shipmentStatus.failed', bg: TarodanColors.warning + '20', fg: TarodanColors.warning },
+  cancelled: { labelKey: 'trade.shipmentStatus.cancelled', bg: TarodanColors.warning + '20', fg: TarodanColors.warning },
+  returned: { labelKey: 'trade.shipmentStatus.returned', bg: TarodanColors.warning + '20', fg: TarodanColors.warning },
+  return_in_progress: { labelKey: 'trade.shipmentStatus.return_in_progress', bg: TarodanColors.warning + '20', fg: TarodanColors.warning },
 };
 
-function ShipmentStatusChip({ status }: { status?: string | null }) {
+function ShipmentStatusChip({ status, t }: { status?: string | null; t: TFn }) {
   const meta = (status && SHIPMENT_STATUS_CHIP[status]) || {
-    label: 'Beklemede',
+    labelKey: 'trade.shipmentStatus.fallback',
     bg: TarodanColors.backgroundSecondary,
     fg: TarodanColors.textSecondary,
+    icon: undefined as string | undefined,
   };
   return (
     <View style={[styles.shipmentChip, { backgroundColor: meta.bg }]}>
       {meta.icon ? <Text style={[styles.shipmentChipText, { color: meta.fg }]}>{meta.icon} </Text> : null}
-      <Text style={[styles.shipmentChipText, { color: meta.fg }]}>{meta.label}</Text>
+      <Text style={[styles.shipmentChipText, { color: meta.fg }]}>{t(meta.labelKey)}</Text>
     </View>
   );
 }
@@ -107,6 +111,7 @@ interface Trade {
 }
 
 export default function TradeDetailScreen() {
+  const { t } = useTranslation();
   const { id } = useLocalSearchParams();
   const { user } = useAuthStore();
   const queryClient = useQueryClient();
@@ -215,7 +220,18 @@ export default function TradeDetailScreen() {
   const isInitiator = user?.id === trade.initiatorId;
   const isReceiver = user?.id === trade.receiverId;
   const otherParty = isInitiator ? trade.receiver : trade.initiator;
-  const statusInfo = TRADE_STATUSES[trade.status as keyof typeof TRADE_STATUSES] || TRADE_STATUSES.pending;
+  const statusInfoBase = TRADE_STATUSES[trade.status as keyof typeof TRADE_STATUSES] || TRADE_STATUSES.pending;
+  // Localize labels for the new auto-shipping flow statuses (i18n.tradeStatus.*)
+  const NEW_STATUS_KEYS: Record<string, string> = {
+    awaiting_payment: 'trade.tradeStatus.awaiting_payment',
+    shipping_to_warehouse: 'trade.tradeStatus.shipping_to_warehouse',
+    at_warehouse: 'trade.tradeStatus.at_warehouse',
+    admin_reviewing: 'trade.tradeStatus.admin_reviewing',
+    shipping_to_recipients: 'trade.tradeStatus.shipping_to_recipients',
+  };
+  const statusInfo = NEW_STATUS_KEYS[trade.status]
+    ? { ...statusInfoBase, label: t(NEW_STATUS_KEYS[trade.status]) }
+    : statusInfoBase;
 
   const initiatorItems = trade.items.filter(item => item.side === 'initiator');
   const receiverItems = trade.items.filter(item => item.side === 'receiver');
@@ -277,13 +293,13 @@ export default function TradeDetailScreen() {
   const theirTrackingNumber = isInitiator ? trade.receiverTrackingNumber : trade.initiatorTrackingNumber;
 
   const renderOtherShipmentHint = (s?: string | null) => {
-    if (s === 'delivered') return 'Karşı tarafın gönderisi de depoya ulaştı.';
+    if (s === 'delivered') return t('trade.warehouseShipping.counterpartyDelivered');
     if (s === 'picked_up' || s === 'in_transit' || s === 'at_delivery_branch' || s === 'out_for_delivery')
-      return 'Karşı tarafın gönderisi yolda.';
-    if (s === 'cancelled') return 'Karşı tarafın gönderisi iptal edildi; yetkili ekibimiz devreye girecek.';
-    if (s === 'failed') return 'Karşı tarafın gönderisinde bir aksaklık oluştu; yetkili ekibimiz inceliyor.';
-    if (s === 'returned' || s === 'return_in_progress') return 'Karşı tarafın gönderisi iade edildi.';
-    return 'Karşı tarafın kargoya teslim etmesi bekleniyor.';
+      return t('trade.warehouseShipping.counterpartyInTransit');
+    if (s === 'cancelled') return t('trade.warehouseShipping.counterpartyCancelled');
+    if (s === 'failed') return t('trade.warehouseShipping.counterpartyFailed');
+    if (s === 'returned' || s === 'return_in_progress') return t('trade.warehouseShipping.counterpartyReturned');
+    return t('trade.warehouseShipping.counterpartyWaiting');
   };
 
   return (
@@ -491,22 +507,22 @@ export default function TradeDetailScreen() {
               <View style={styles.shippingRow}>
                 <MaterialCommunityIcons name="truck-fast-outline" size={22} color={TarodanColors.primary} />
                 <Text variant="titleSmall" style={[styles.sectionTitle, { marginBottom: 0, flex: 1 }]}>
-                  Tarodan Deposuna Gönderim
+                  {t('trade.warehouseShipping.title')}
                 </Text>
               </View>
               <Text variant="bodySmall" style={styles.protectionDesc}>
-                Sistem her iki tarafa Sürat Kargo takip numarası tahsis etti. Aşağıdaki numara ile en yakın Sürat şubesine giderek ürününüzü teslim edin.
+                {t('trade.warehouseShipping.subtitle')}
               </Text>
               <View style={styles.inboundShipBox}>
-                <Text variant="bodySmall" style={styles.messageSender}>Sizin gönderiniz</Text>
+                <Text variant="bodySmall" style={styles.messageSender}>{t('trade.warehouseShipping.yourShipment')}</Text>
                 <Text style={styles.inboundTrackingNumber}>
                   {myToWarehouseShipment?.trackingNumber ?? '—'}
                 </Text>
                 <Text variant="bodySmall" style={styles.inboundShipHint}>
-                  Bu numarayla Sürat Kargo şubesine gidip ürününüzü teslim edin.
+                  {t('trade.warehouseShipping.handIn')}
                 </Text>
                 <View style={styles.inboundChipRow}>
-                  <ShipmentStatusChip status={myToWarehouseShipment?.status} />
+                  <ShipmentStatusChip status={myToWarehouseShipment?.status} t={t} />
                 </View>
               </View>
               <Text variant="bodySmall" style={styles.inboundShipHint}>
@@ -534,7 +550,7 @@ export default function TradeDetailScreen() {
                     {myFromWarehouseShipment.trackingNumber ? ` · ${myFromWarehouseShipment.trackingNumber}` : ''}
                   </Text>
                   <View style={styles.inboundChipRow}>
-                    <ShipmentStatusChip status={myFromWarehouseShipment.status} />
+                    <ShipmentStatusChip status={myFromWarehouseShipment.status} t={t} />
                   </View>
                   {myFromWarehouseShipment.carrier === 'surat' && myFromWarehouseShipment.trackingNumber && (
                     <Button
@@ -632,7 +648,7 @@ export default function TradeDetailScreen() {
               </Button>
               {myFromWarehouseShipment?.status !== 'delivered' && (
                 <Text variant="bodySmall" style={styles.confirmReceiptHint}>
-                  Kargonun teslim edildiği bilgisi bekleniyor.
+                  {t('trade.confirmReceipt.waitingDelivered')}
                 </Text>
               )}
             </>

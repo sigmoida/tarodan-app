@@ -21,6 +21,7 @@ import { useAuthStore } from '../src/stores/authStore';
 import { offersApi, ordersApi } from '../src/services/api';
 import { transformImageUrl } from '../src/utils/imageUrl';
 import { formatApiErrorMessage } from '../src/utils/formatApiErrorMessage';
+import { useTranslation } from '../src/i18n/LanguageContext';
 
 interface Offer {
   id: string;
@@ -72,18 +73,21 @@ function getTimeRemaining(expiresAt: string): string | null {
   return `${hours}s ${minutes}d`;
 }
 
-function formatTimeAgo(iso: string): string {
+function formatTimeAgo(
+  iso: string,
+  t: (key: string, params?: Record<string, string | number>) => string,
+): string {
   const diff = Date.now() - new Date(iso).getTime();
-  if (diff < 0) return 'az önce';
+  if (diff < 0) return t('time.ago.justNow');
   const m = Math.floor(diff / 60000);
   const h = Math.floor(diff / 3600000);
   const d = Math.floor(diff / 86400000);
-  if (m < 1) return 'az önce';
-  if (m < 60) return `${m} dk önce`;
-  if (h < 24) return `${h} saat önce`;
-  if (d < 30) return `${d} gün önce`;
+  if (m < 1) return t('time.ago.justNow');
+  if (m < 60) return t('time.ago.minutes', { count: m });
+  if (h < 24) return t('time.ago.hours', { count: h });
+  if (d < 30) return t('time.ago.days', { count: d });
   const mo = Math.floor(d / 30);
-  return `${mo} ay önce`;
+  return t('time.ago.months', { count: mo });
 }
 
 function formatPrice(n: number): string {
@@ -91,6 +95,7 @@ function formatPrice(n: number): string {
 }
 
 export default function OffersScreen() {
+  const { t } = useTranslation();
   const queryClient = useQueryClient();
   const params = useLocalSearchParams<{ tab?: string | string[] }>();
   const tabFromUrl = (Array.isArray(params.tab) ? params.tab[0] : params.tab)?.toLowerCase();
@@ -417,7 +422,7 @@ export default function OffersScreen() {
         {/* Date */}
         <View style={styles.dateRow}>
           <Ionicons name="calendar-outline" size={14} color={TarodanColors.textTertiary} />
-          <Text style={styles.dateText}>{formatTimeAgo(offer.createdAt)}</Text>
+          <Text style={styles.dateText}>{formatTimeAgo(offer.createdAt, t)}</Text>
         </View>
 
         {/* Actions */}
