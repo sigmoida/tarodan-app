@@ -18,10 +18,7 @@ tags:
 - tapOn:
     text: "Profil"
 # Eğer önceki flow'dan login kalmışsa logout yap (login ekranına yönlendirir).
-- runFlow:
-    when:
-      visible: "Çıkış Yap"
-    file: ../subflows/logout.yaml
+- runFlow: ../subflows/logout.yaml
 # Profil'de go-login varsa tıkla; logout zaten login ekranına yönlendirdiyse atla.
 - runFlow:
     when:

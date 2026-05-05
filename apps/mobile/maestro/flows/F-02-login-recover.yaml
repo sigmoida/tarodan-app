@@ -10,10 +10,7 @@ env:
 - runFlow: ../subflows/open-tarodan.yaml
 - tapOn:
     text: "Profil"
-- runFlow:
-    when:
-      visible: "Çıkış Yap"
-    file: ../subflows/logout.yaml
+- runFlow: ../subflows/logout.yaml
 - runFlow:
     when:
       visible:
