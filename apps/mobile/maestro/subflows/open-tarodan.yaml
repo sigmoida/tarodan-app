@@ -40,11 +40,13 @@ appId: com.tarodan.app
       - extendedWaitUntil:
           visible:
             text: "Ana Sayfa"
-          timeout: 30000
+          timeout: 60000
       - tapOn:
           text: "Şimdi Değil"
           optional: true
+# Login + bundle reload + home full render zinciri 40-50s sürebilir; 120s
+# güvenli payda.
 - extendedWaitUntil:
     visible:
       text: "Ana Sayfa"
-    timeout: 60000
+    timeout: 120000

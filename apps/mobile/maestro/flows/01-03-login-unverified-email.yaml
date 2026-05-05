@@ -42,9 +42,21 @@ tags:
 - inputText: "Demo123!"
 - tapOn:
     id: "login-submit-button"
-# Sonuç ne olursa olsun network hatası olmasın.
+# Sonuç ne olursa olsun network hatası olmasın. İki kabul edilen state:
+#   - Login başarılı + unverified-email-banner görünür (deterministic testID)
+#   - Login başarısız + login-error-banner görünür (seed yok / creds yanlış)
 - extendedWaitUntil:
     visible:
-      text: ".*[Dd]oğrula.*|Kategoriler|.*[Bb]aşar[ıi]s[ıi]z.*"
+      id: "unverified-email-banner"
     timeout: 30000
+    optional: true
+- runFlow:
+    when:
+      notVisible:
+        id: "unverified-email-banner"
+    commands:
+      - extendedWaitUntil:
+          visible:
+            id: "login-error-banner"
+          timeout: 15000
 - assertNotVisible: ".*Network Error.*"

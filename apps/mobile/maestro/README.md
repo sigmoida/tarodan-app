@@ -197,3 +197,25 @@ secureTextEntry alanları normal şekilde alır.
 
 Bu ayar sim'in disk state'inde kalıcıdır; CI runner'larda bir kere
 açılması yeterli.
+
+## F-XX flow envanteri (yeni eklenenler)
+
+| Flow | Tag | Pre-condition |
+|---|---|---|
+| F-20 | manual | zeynep'in `shipping_to_warehouse` takası + manuel `prisma.tradeShipment.update`'ler |
+| F-21 | manual | zeynep'in `shipping_to_recipients` takası + outbound shipment.status='delivered' |
+| F-22 | regression | zeynep'in en az bir sales order'ı (seed.ts default'lar yeterli) |
+| F-23 | smoke | `EXPO_PUBLIC_MAESTRO=1` + dev client + saved address |
+| F-24 | manual | zeynep'in delivered order'ı (14 gün içinde) + manual RefundRequest.status update |
+
+## CI keyboard requirement
+
+```bash
+defaults write com.apple.iphonesimulator HardwareKeyboardEnabled -bool true
+```
+
+## PayTR bypass-kapalı coverage
+
+Mobile UI tarafında WebView içi PayTR iframe'i Maestro accessibility tree'sinden
+okunamıyor. Bu yüzden gerçek-PayTR uçtan uca testi `apps/api/test/e2e/purchase.e2e-spec.ts`
+`signCallback` ile API E2E'de karşılanıyor.

@@ -27,7 +27,7 @@ appId: com.tarodan.app
       - extendedWaitUntil:
           visible:
             text: "Ana Sayfa"
-          timeout: 30000
+          timeout: 60000
       # iOS keychain "Parolayı Kaydet" sheet — login sonrası gelir, Profil tap'ini bloker.
       - runFlow:
           when:

@@ -18,3 +18,7 @@ appId: com.tarodan.app
     visible:
       id: "login-email-input"
     timeout: 10000
+# Post-logout state guard: login form gerçekten render olmuş, "Giriş Yap"
+# butonu görünür. Aksi takdirde sonraki subflow'lar SKIPPED yerine FAILED
+# dönebilir.
+- assertVisible: "Giriş Yap"
