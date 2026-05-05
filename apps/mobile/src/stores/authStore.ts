@@ -346,6 +346,40 @@ export const useAuthStore = create<AuthState>((set, get) => ({
           limits,
           isLoading: false,
         });
+      } else if (process.env.EXPO_PUBLIC_MAESTRO === '1') {
+        // Maestro test bypass: auto-login with seeded credentials so that
+        // e2e flows skip the login UI entirely. Code path is gated behind
+        // EXPO_PUBLIC_MAESTRO and excluded from prod bundles by Expo's
+        // compile-time env replacement (env var unset → branch dead-code
+        // eliminated).
+        try {
+          const email = process.env.EXPO_PUBLIC_MAESTRO_EMAIL || 'zeynep@demo.com';
+          const password = process.env.EXPO_PUBLIC_MAESTRO_PASSWORD || 'Demo123!';
+          console.log('🤖 Maestro auto-login as', email);
+          const response = await authApi.login(email, password);
+          const data: any = response.data;
+          const accessToken = data.tokens?.accessToken || data.accessToken;
+          const refreshToken = data.tokens?.refreshToken || data.refreshToken;
+          const user = data.user;
+          if (accessToken && user) {
+            await get().login(accessToken, user, refreshToken);
+            set({ isLoading: false });
+          } else {
+            set({ isLoading: false });
+          }
+        } catch (autoLoginError) {
+          captureException(autoLoginError, {
+            level: 'warning',
+            tags: { flow: 'auth.maestroAutoLogin' },
+          });
+          set({
+            isAuthenticated: false,
+            token: null,
+            user: null,
+            limits: null,
+            isLoading: false,
+          });
+        }
       } else {
         set({ isLoading: false });
       }

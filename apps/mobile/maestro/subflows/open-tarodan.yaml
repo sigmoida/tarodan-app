@@ -23,28 +23,13 @@ appId: com.tarodan.app
 - tapOn:
     text: "Go home"
     optional: true
-# Login screen — auth state cleared ise zeynep ile giriş yap
-- runFlow:
-    when:
-      visible:
-        id: "login-submit-button"
-    commands:
-      - tapOn:
-          id: "login-email-input"
-      - inputText: "zeynep@demo.com"
-      - tapOn:
-          id: "login-password-input"
-      - inputText: "Demo123!"
-      - tapOn:
-          id: "login-submit-button"
-      - extendedWaitUntil:
-          visible:
-            text: "Ana Sayfa"
-          timeout: 60000
-      - tapOn:
-          text: "Şimdi Değil"
-          optional: true
-# Login + bundle reload + home full render zinciri 40-50s sürebilir; 120s
+# Login UI is bypassed by EXPO_PUBLIC_MAESTRO=1 auto-login (see authStore.loadToken).
+# App boots → loadToken sees no SecureStore token → calls /auth/login with
+# zeynep@demo.com (override via EXPO_PUBLIC_MAESTRO_EMAIL/PASSWORD) → home renders.
+- tapOn:
+    text: "Şimdi Değil"
+    optional: true
+# Auto-login + bundle reload + home full render zinciri 40-50s sürebilir; 120s
 # güvenli payda.
 - extendedWaitUntil:
     visible:

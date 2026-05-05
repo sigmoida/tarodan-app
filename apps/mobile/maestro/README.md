@@ -214,6 +214,45 @@ açılması yeterli.
 defaults write com.apple.iphonesimulator HardwareKeyboardEnabled -bool true
 ```
 
+## Auto-login (test mode)
+
+Maestro flow'larında login UI üzerinden geçmek yerine `authStore.loadToken`
+boot sırasında otomatik login yapar:
+
+- **Etkinleştirme**: `EXPO_PUBLIC_MAESTRO=1` env var Metro start sırasında set edilmeli.
+- **Kullanıcı override**: `EXPO_PUBLIC_MAESTRO_EMAIL` / `EXPO_PUBLIC_MAESTRO_PASSWORD`
+  (default: `zeynep@demo.com` / `Demo123!`).
+- **Davranış**: SecureStore'da token yoksa app `POST /auth/login`'u credentials
+  ile çağırır, başarılıysa standart `login()` flow'undan token + user state'i
+  doldurur, doğrudan home ekranına düşer. Login fail olursa normal
+  unauthenticated state'e geri döner (login UI görünür).
+- **`open-tarodan.yaml` subflow**'u artık login formunu doldurmaz; sadece home
+  ekranını bekler.
+
+```bash
+cd apps/mobile
+EXPO_PUBLIC_MAESTRO=1 \
+  EXPO_PUBLIC_MAESTRO_EMAIL=zeynep@demo.com \
+  EXPO_PUBLIC_MAESTRO_PASSWORD=Demo123! \
+  pnpm exec expo start --dev-client --port 8081 --clear
+```
+
+### Production safety
+
+Auto-login kod yolu **prod build'lere sızmaz** çünkü:
+
+1. `process.env.EXPO_PUBLIC_*` Expo'nun Metro/Babel transformer'ı tarafından
+   **compile-time'da** literal string'e replace edilir. Prod build sırasında
+   `EXPO_PUBLIC_MAESTRO` set edilmediği için `process.env.EXPO_PUBLIC_MAESTRO === '1'`
+   ifadesi `undefined === '1'` (yani `false`) olarak inline'lanır ve dead-code
+   elimination şubeyi tamamen drop eder.
+2. EAS build profili (`eas.json` production) MAESTRO env var taşımaz.
+3. Test credentials hardcoded değil — fallback default sadece dev seed user'ı,
+   prod DB'de mevcut değil. Yine de gate `false` olduğu için çalıştırılmaz.
+
+Şüphe halinde bundle'da `EXPO_PUBLIC_MAESTRO` literal'i grep ile aranabilir;
+prod build'de bulunmamalı.
+
 ## PayTR bypass-kapalı coverage
 
 Mobile UI tarafında WebView içi PayTR iframe'i Maestro accessibility tree'sinden
