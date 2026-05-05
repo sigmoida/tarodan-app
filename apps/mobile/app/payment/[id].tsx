@@ -29,6 +29,7 @@ export default function PaymentWebViewScreen() {
     provider?: 'paytr' | 'iyzico';
     guest?: string;
     tradeCash?: string;
+    bypass?: string;
   }>();
 
   const paymentId = params.id!;
@@ -80,6 +81,27 @@ export default function PaymentWebViewScreen() {
       }
 
       const data = response?.data?.data ?? response?.data ?? {};
+      // PAYMENT_BYPASS=true: API gerçek PayTR sayfası üretmez, useBypass döner.
+      // Checkout normalde bu durumu kendi yakalar; defensive olarak burada da
+      // yakalayıp bypass-complete tetikliyoruz, aksi halde WebView boş kalır.
+      if (data.useBypass === true || params.bypass === '1') {
+        if (resolvedRef.current) return;
+        resolvedRef.current = true;
+        try {
+          await paymentsApi.bypassComplete(paymentId);
+        } catch (bypassErr: any) {
+          captureException(bypassErr, {
+            level: 'error',
+            tags: { flow: 'payment.bypassComplete' },
+            extra: { paymentId },
+          });
+        }
+        router.replace({
+          pathname: '/payment/success',
+          params: { paymentId, orderId: params.orderId, guest: params.guest },
+        } as any);
+        return;
+      }
       // API şu alanlardan birini dönebilir
       const html: string | undefined = data.paymentPageHtml || data.iframeHtml || data.html;
       const url: string | undefined = data.paymentPageUrl || data.redirectUrl || data.url;

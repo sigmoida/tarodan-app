@@ -498,8 +498,11 @@ export const paymentsApi = {
   confirmFailed: (paymentId: string) =>
     api.post(`/payments/${paymentId}/confirm-failed`),
   /** Test bypass: PAYMENT_BYPASS=true iken tek kart başarılı */
-  bypassComplete: (paymentId: string, cardNumber: string) =>
-    api.post(`/payments/${paymentId}/bypass-complete`, { cardNumber }),
+  bypassComplete: (paymentId: string, cardNumber?: string) =>
+    api.post(
+      `/payments/${paymentId}/bypass-complete`,
+      cardNumber ? { cardNumber } : {},
+    ),
   refund: (orderId: string, refundAmount?: number) =>
     api.post('/payments/refund', { orderId, refundAmount }),
   retry: (paymentId: string) =>

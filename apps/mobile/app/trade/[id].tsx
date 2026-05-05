@@ -49,7 +49,7 @@ const SHIPMENT_STATUS_CHIP: Record<string, { labelKey: string; bg: string; fg: s
   return_in_progress: { labelKey: 'trade.shipmentStatus.return_in_progress', bg: TarodanColors.warning + '20', fg: TarodanColors.warning },
 };
 
-function ShipmentStatusChip({ status, t }: { status?: string | null; t: TFn }) {
+function ShipmentStatusChip({ status, t, testID }: { status?: string | null; t: TFn; testID?: string }) {
   const meta = (status && SHIPMENT_STATUS_CHIP[status]) || {
     labelKey: 'trade.shipmentStatus.fallback',
     bg: TarodanColors.backgroundSecondary,
@@ -57,7 +57,7 @@ function ShipmentStatusChip({ status, t }: { status?: string | null; t: TFn }) {
     icon: undefined as string | undefined,
   };
   return (
-    <View style={[styles.shipmentChip, { backgroundColor: meta.bg }]}>
+    <View testID={testID} style={[styles.shipmentChip, { backgroundColor: meta.bg }]}>
       {meta.icon ? <Text style={[styles.shipmentChipText, { color: meta.fg }]}>{meta.icon} </Text> : null}
       <Text style={[styles.shipmentChipText, { color: meta.fg }]}>{t(meta.labelKey)}</Text>
     </View>
@@ -533,7 +533,7 @@ export default function TradeDetailScreen() {
 
         {/* Inbound shipment info (Sürat Kargo, auto-issued) */}
         {trade.status === 'shipping_to_warehouse' && (isInitiator || isReceiver) && (
-          <Card style={[styles.card, styles.inboundCard]}>
+          <Card style={[styles.card, styles.inboundCard]} testID="trade-inbound-card">
             <Card.Content>
               <View style={styles.shippingRow}>
                 <MaterialCommunityIcons name="truck-fast-outline" size={22} color={TarodanColors.primary} />
@@ -553,7 +553,7 @@ export default function TradeDetailScreen() {
                   {t('trade.warehouseShipping.handIn')}
                 </Text>
                 <View style={styles.inboundChipRow}>
-                  <ShipmentStatusChip status={myToWarehouseShipment?.status} t={t} />
+                  <ShipmentStatusChip testID="trade-status-chip-my-inbound" status={myToWarehouseShipment?.status} t={t} />
                 </View>
               </View>
               <Text variant="bodySmall" style={styles.inboundShipHint}>
@@ -565,7 +565,7 @@ export default function TradeDetailScreen() {
 
         {/* Shipping to recipients — outbound from warehouse */}
         {trade.status === 'shipping_to_recipients' && (isInitiator || isReceiver) && (
-          <Card style={[styles.card, styles.inboundCard]}>
+          <Card style={[styles.card, styles.inboundCard]} testID="trade-outbound-card">
             <Card.Content>
               <View style={styles.shippingRow}>
                 <MaterialCommunityIcons name="truck-delivery-outline" size={22} color={TarodanColors.info} />
@@ -581,7 +581,7 @@ export default function TradeDetailScreen() {
                     {myFromWarehouseShipment.trackingNumber ? ` · ${myFromWarehouseShipment.trackingNumber}` : ''}
                   </Text>
                   <View style={styles.inboundChipRow}>
-                    <ShipmentStatusChip status={myFromWarehouseShipment.status} t={t} />
+                    <ShipmentStatusChip testID="trade-status-chip-my-outbound" status={myFromWarehouseShipment.status} t={t} />
                   </View>
                   {myFromWarehouseShipment.carrier === 'surat' && myFromWarehouseShipment.trackingNumber && (
                     <Button
@@ -694,6 +694,7 @@ export default function TradeDetailScreen() {
           {trade.status === 'shipping_to_recipients' && (isInitiator || isReceiver) && (
             <>
               <Button
+                testID="trade-confirm-delivery-button"
                 mode="contained"
                 onPress={() => confirmMutation.mutate()}
                 loading={confirmMutation.isPending}

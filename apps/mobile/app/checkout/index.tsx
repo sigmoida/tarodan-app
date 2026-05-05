@@ -510,6 +510,29 @@ export default function CheckoutScreen() {
         const initData = initResp.data?.data ?? initResp.data ?? {};
         const paymentId =
           initData.paymentId || initData.id || initData.payment?.id || firstOrderId;
+
+        // PAYMENT_BYPASS=true ortamında API gerçek PayTR token üretmez; bunun
+        // yerine `useBypass: true` döner ve istemcinin POST
+        // /payments/:id/bypass-complete çağırması beklenir. Aksi halde WebView
+        // boş iframe ile çakılır (B-001).
+        if (initData.useBypass === true) {
+          try {
+            await paymentsApi.bypassComplete(paymentId);
+          } catch (bypassErr: any) {
+            captureException(bypassErr, {
+              level: 'error',
+              tags: { flow: 'checkout.bypassComplete' },
+              extra: { paymentId, orderId: firstOrderId },
+            });
+          }
+          clearCart();
+          router.replace({
+            pathname: '/payment/success',
+            params: { paymentId, orderId: firstOrderId },
+          } as any);
+          return;
+        }
+
         clearCart();
         router.replace({
           pathname: '/payment/[id]',

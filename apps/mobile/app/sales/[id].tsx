@@ -215,7 +215,7 @@ export default function SaleDetailScreen() {
         ) : null}
 
         {/* Shipment — Sürat Kargo otomatik gönderi (auto-created, read-only) */}
-        <View style={styles.card}>
+        <View style={styles.card} testID="sales-shipment-card">
           <Text style={styles.sectionTitle}>Kargo Bilgisi (Sürat Kargo)</Text>
           {shipmentTracking ? (
             <>
@@ -227,20 +227,21 @@ export default function SaleDetailScreen() {
               </View>
               <View style={styles.kvRow}>
                 <Ionicons name="barcode-outline" size={18} color={TarodanColors.textSecondary} />
-                <Text selectable style={[styles.kvValue, { fontWeight: '700' }]}>
+                <Text testID="sales-tracking-number" selectable style={[styles.kvValue, { fontWeight: '700' }]}>
                   {shipmentTracking}
                 </Text>
               </View>
               {order.shipment?.status ? (
                 <View style={styles.kvRow}>
                   <Ionicons name="pulse-outline" size={18} color={TarodanColors.textSecondary} />
-                  <Text style={styles.kvValue}>{order.shipment.status}</Text>
+                  <Text testID="sales-shipment-status" style={styles.kvValue}>{order.shipment.status}</Text>
                 </View>
               ) : null}
               <Text style={styles.helperText}>
                 Sürat Kargo şubesinde bu takip numarasıyla ürünü teslim edin. Alıcıya bildirim otomatik gönderilir.
               </Text>
               <Button
+                testID="sales-track-link"
                 mode="outlined"
                 icon="truck"
                 onPress={handleTrack}

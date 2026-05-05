@@ -273,8 +273,9 @@ export default function OrderDetailScreen() {
                 date={formatDate(order.paidAt)}
                 isActive={!!order.paidAt}
               />
-              <TimelineItem 
-                icon="cube" 
+              <TimelineItem
+                testID="order-shipped-timeline"
+                icon="cube"
                 label="Kargoya Verildi"
                 date={formatDate(order.shippedAt)}
                 isActive={!!order.shippedAt}
@@ -292,13 +293,13 @@ export default function OrderDetailScreen() {
 
         {/* Tracking Info */}
         {order.trackingNumber && (
-          <Card style={styles.card}>
+          <Card style={styles.card} testID="order-tracking-card">
             <Card.Content>
               <Text variant="titleSmall" style={styles.sectionTitle}>Kargo Takip</Text>
               <View style={styles.trackingRow}>
                 <Ionicons name="location" size={20} color={TarodanColors.primary} />
                 <View style={styles.trackingInfo}>
-                  <Text variant="bodyMedium">{order.trackingNumber}</Text>
+                  <Text testID="order-tracking-number" variant="bodyMedium">{order.trackingNumber}</Text>
                   {order.trackingUrl && (
                     <TouchableOpacity onPress={() => Linking.openURL(order.trackingUrl!)}>
                       <Text style={styles.trackLink}>Kargo Sitesinde Takip Et</Text>
@@ -389,6 +390,7 @@ export default function OrderDetailScreen() {
           <Card style={styles.card}>
             <Card.Content>
               <Button
+                testID="order-confirm-delivery-button"
                 mode="contained"
                 onPress={() => confirmDeliveryMutation.mutate()}
                 loading={confirmDeliveryMutation.isPending}
@@ -442,7 +444,7 @@ export default function OrderDetailScreen() {
 
         {/* Refund — existing request banner */}
         {order.activeRefundRequest && (
-          <Card style={styles.card}>
+          <Card style={styles.card} testID="refund-active-banner">
             <Card.Content>
               <View style={styles.refundHeaderRow}>
                 <Ionicons name="return-up-back" size={20} color={TarodanColors.info} />
@@ -636,21 +638,23 @@ export default function OrderDetailScreen() {
 }
 
 // Timeline Item Component
-function TimelineItem({ 
-  icon, 
-  label, 
-  date, 
-  isActive, 
-  isLast = false 
-}: { 
-  icon: string; 
-  label: string; 
-  date: string; 
+function TimelineItem({
+  icon,
+  label,
+  date,
+  isActive,
+  isLast = false,
+  testID,
+}: {
+  icon: string;
+  label: string;
+  date: string;
   isActive: boolean;
   isLast?: boolean;
+  testID?: string;
 }) {
   return (
-    <View style={styles.timelineItem}>
+    <View testID={testID} style={styles.timelineItem}>
       <View style={styles.timelineIcon}>
         <View style={[
           styles.iconCircle, 
