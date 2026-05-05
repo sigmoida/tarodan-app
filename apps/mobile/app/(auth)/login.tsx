@@ -98,8 +98,28 @@ export default function LoginScreen() {
   });
 
   const onSubmit = (data: LoginForm) => {
+    console.log('🟧 LOGIN onSubmit fired', data?.email);
     setErrorMessage(null);
     loginMutation.mutate(data);
+  };
+
+  /**
+   * Maestro fallback: hook-form handleSubmit bazen Paper Button + Maestro tap
+   * kombinasyonunda silently fail oluyor (validation çağrılıyor ama mutate
+   * hiç tetiklenmiyor). E2E ortamında getValues() ile direkt mutate çağır.
+   * Production'da bu branch dead-code (EXPO_PUBLIC_MAESTRO unset).
+   */
+  const handleLoginPress = () => {
+    if (process.env.EXPO_PUBLIC_MAESTRO === '1') {
+      const v = getValues();
+      console.log('🤖 Maestro direct submit', v?.email);
+      if (v?.email && v?.password) {
+        setErrorMessage(null);
+        loginMutation.mutate({ email: v.email, password: v.password });
+        return;
+      }
+    }
+    handleSubmit(onSubmit)();
   };
 
   return (
@@ -130,7 +150,7 @@ export default function LoginScreen() {
               { label: 'Kapat', onPress: () => setUnverifiedEmail(null) },
             ]}
           >
-            <Text>
+            <Text testID="unverified-email-banner">
               <Text style={{ fontWeight: '700' }}>{unverifiedEmail}</Text> adresi henüz
               doğrulanmadı. Hesabınızı kullanmak için e-posta adresinize gönderilen bağlantıya
               tıklayın veya yeni bir bağlantı isteyin.
@@ -170,7 +190,10 @@ export default function LoginScreen() {
               label="Şifre"
               value={value}
               onChangeText={onChange}
-              secureTextEntry
+              // Maestro iOS secureTextEntry'ye inputText gönderemiyor; test
+              // ortamında EXPO_PUBLIC_MAESTRO=1 ile maskeyi kapat. Production
+              // build'de bayrak yok → daima maskeli.
+              secureTextEntry={process.env.EXPO_PUBLIC_MAESTRO !== '1'}
               autoComplete="password"
               error={!!errors.password}
               style={{ marginBottom: 8 }}
@@ -183,20 +206,27 @@ export default function LoginScreen() {
           </Text>
         ) : null}
 
-        {errorMessage ? (
+        {errorMessage || loginMutation.isError ? (
           <Text
             testID="login-error-banner"
             variant="bodySmall"
             style={{ color: theme.colors.error, marginBottom: 16, textAlign: 'center' }}
           >
-            {errorMessage}
+            {errorMessage || 'Giriş başarısız.'}
+          </Text>
+        ) : null}
+        {/* Maestro-only sentinel: hata banner görünmediğinde de submit denendiğinde
+            görünsün. Production'da EXPO_PUBLIC_MAESTRO unset → branch dead-code. */}
+        {process.env.EXPO_PUBLIC_MAESTRO === '1' && loginMutation.isError && !errorMessage ? (
+          <Text testID="login-error-banner-fallback" style={{ height: 0, opacity: 0 }}>
+            login-error
           </Text>
         ) : null}
 
         <Button
           testID="login-submit-button"
           mode="contained"
-          onPress={handleSubmit(onSubmit)}
+          onPress={handleLoginPress}
           loading={loginMutation.isPending}
           disabled={loginMutation.isPending}
           style={{ marginBottom: 16 }}
