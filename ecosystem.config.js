@@ -59,5 +59,23 @@ module.exports = {
       merge_logs: true,
       time: true,
     },
+    {
+      name: 'admin',
+      cwd: __dirname + '/apps/admin',
+      script: 'pnpm',
+      args: 'dev',
+      interpreter: 'none',
+      watch: false,
+      autorestart: true,
+      max_restarts: 10,
+      min_uptime: 10000,
+      env: {
+        NODE_ENV: 'development',
+      },
+      out_file: __dirname + '/logs/admin.out.log',
+      error_file: __dirname + '/logs/admin.err.log',
+      merge_logs: true,
+      time: true,
+    },
   ],
 };
