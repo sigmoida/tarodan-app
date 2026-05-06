@@ -25,6 +25,13 @@
     "docker:up": "docker compose -f infrastructure/docker-compose.yml up -d",
     "docker:down": "docker compose -f infrastructure/docker-compose.yml down",
     "docker:prod": "docker compose -f infrastructure/docker-compose.prod.yml up -d",
+    "pm2:start": "pm2 start ecosystem.config.js",
+    "pm2:stop": "pm2 delete all",
+    "pm2:logs": "pm2 logs",
+    "pm2:status": "pm2 status",
+    "stack:up": "pnpm docker:up && pnpm pm2:start && echo '\\n✅ Tarodan stack ayağa kalktı: http://localhost:3000 (web), http://localhost:3001 (api), http://localhost:5601 (kibana), http://localhost:8025 (mailhog)'",
+    "stack:down": "pnpm pm2:stop; pnpm docker:down",
+    "stack:status": "pnpm pm2:status && docker compose -f infrastructure/docker-compose.yml ps",
     "ngrok": "./tools/ngrok http 3001",
     "postinstall": "echo Skipping husky"
   },
