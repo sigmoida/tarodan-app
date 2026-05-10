@@ -1,19 +1,26 @@
 /**
- * Common Components Index
+ * Mobile common components — köprü dosyası.
+ *
+ * Migrasyon sırasında dokunulmamış ekranların import path'leri kırılmadan
+ * çalışsın diye `@tarodan/ui-native`'den re-export ediyoruz. YENİ ekranlar
+ * doğrudan `@tarodan/ui-native`'den import etmeli (lint kuralları zorlar).
+ *
+ * Hâlâ yerelde kalanlar (domain-specific): AuthRequiredSheet, CommissionPreview,
+ * CityDistrictSelector, PaperCompat (Text/TextInput/Searchbar/CardCover wrapper).
  */
 
-export { default as Button } from './Button';
-export { default as Input } from './Input';
-export { default as ScreenHeader } from './ScreenHeader';
-export { default as EmptyState } from './EmptyState';
-export { default as ScreenLoader } from './ScreenLoader';
-export { default as ErrorState } from './ErrorState';
+export {
+  ScreenHeader,
+  EmptyState,
+  ErrorState,
+  ScreenLoader,
+} from '@tarodan/ui-native';
+
 export { default as AuthRequiredSheet } from './AuthRequiredSheet';
 export { default as CommissionPreview } from './CommissionPreview';
 export { default as CityDistrictSelector } from './CityDistrictSelector';
 
-// Paper wrappers — Paper'ın Text/TextInput bileşenlerini RN prop'larıyla birlikte export eder.
-// Yeni ekranlarda `react-native-paper` yerine buradan import edin ki keyboardType/numberOfLines
-// gibi prop'lar TS tarafından tanınsın.
+// Paper wrapper'ları — `react-native-paper` Text/TextInput/Searchbar/CardCover
+// için TS prop uyumluluğu. Migration ilerleyince bu da kalkacak.
 export { Text, TextInput, Searchbar, CardCover } from './PaperCompat';
 export type { TextProps, TextInputProps, SearchbarProps, CardCoverProps } from './PaperCompat';

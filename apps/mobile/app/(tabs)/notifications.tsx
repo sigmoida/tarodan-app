@@ -1,14 +1,22 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { View, FlatList, Image, StyleSheet, TouchableOpacity, RefreshControl } from 'react-native';
-import { Badge, ActivityIndicator, Button } from 'react-native-paper';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { router, useFocusEffect } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
+import {
+  Badge,
+  Button,
+  EmptyState,
+  ScreenLoader,
+  Text,
+  theme,
+} from '@tarodan/ui-native';
 import { notificationsApi } from '../../src/services/api';
 import { TarodanColors } from '../../src/theme';
-import { EmptyState, ScreenLoader, Text } from '../../src/components/common';
 import { formatRelativeDate } from '../../src/utils/format';
 import { useAuthStore } from '../../src/stores/authStore';
+
+const { colors } = theme;
 
 interface Notification {
   id: string;
@@ -178,23 +186,27 @@ export default function NotificationsScreen() {
         activeOpacity={0.75}
       >
         {STOCKOUT_TYPES.has(item.type) && item.data?.productImage ? (
-          <Image
-            source={{ uri: item.data.productImage }}
-            style={styles.thumb}
-          />
+          <Image source={{ uri: item.data.productImage }} style={styles.thumb} />
         ) : (
           <View style={[styles.iconContainer, { backgroundColor: bg }]}>
             <Ionicons name={icon} size={20} color={color} />
           </View>
         )}
         <View style={styles.content}>
-          <Text style={[styles.title, isUnread && styles.titleUnread]} numberOfLines={1}>
+          <Text
+            variant="bodySm"
+            weight={isUnread ? 'bold' : 'semibold'}
+            numberOfLines={1}
+            style={styles.titleSpacing}
+          >
             {item.title}
           </Text>
-          <Text style={styles.message} numberOfLines={2}>
+          <Text variant="bodySm" tone="muted" numberOfLines={2} style={styles.messageSpacing}>
             {item.message}
           </Text>
-          <Text style={styles.time}>{formatRelativeDate(item.createdAt)}</Text>
+          <Text variant="caption" tone="subtle">
+            {formatRelativeDate(item.createdAt)}
+          </Text>
         </View>
         {isUnread ? <View style={styles.dot} /> : null}
       </TouchableOpacity>
@@ -205,7 +217,7 @@ export default function NotificationsScreen() {
     return (
       <SafeAreaView style={styles.container} edges={['top']}>
         <View style={styles.header}>
-          <Text style={styles.headerTitle}>Bildirimler</Text>
+          <Text variant="h2">Bildirimler</Text>
         </View>
         <EmptyState
           fullscreen
@@ -223,7 +235,7 @@ export default function NotificationsScreen() {
     return (
       <SafeAreaView style={styles.container} edges={['top']}>
         <View style={styles.header}>
-          <Text style={styles.headerTitle}>Bildirimler</Text>
+          <Text variant="h2">Bildirimler</Text>
         </View>
         <ScreenLoader />
       </SafeAreaView>
@@ -234,15 +246,18 @@ export default function NotificationsScreen() {
     <SafeAreaView style={styles.container} edges={['top']}>
       <View style={styles.header}>
         <View style={styles.headerLeft}>
-          <Text style={styles.headerTitle}>Bildirimler</Text>
+          <Text variant="h2">Bildirimler</Text>
           {unreadCount > 0 ? (
-            <Badge style={styles.unreadBadge} size={22}>{unreadCount}</Badge>
+            <Badge variant="primary">{unreadCount}</Badge>
           ) : null}
         </View>
         {unreadCount > 0 ? (
-          <Button mode="text" compact onPress={handleMarkAllAsRead} textColor={TarodanColors.primary}>
-            Tümünü Okundu
-          </Button>
+          <Button
+            variant="ghost"
+            size="sm"
+            title="Tümünü Okundu"
+            onPress={handleMarkAllAsRead}
+          />
         ) : null}
       </View>
       <FlatList
@@ -291,14 +306,8 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     gap: 8,
   },
-  headerTitle: {
-    fontSize: 20,
-    fontWeight: '700',
-    color: TarodanColors.textPrimary,
-  },
-  unreadBadge: {
-    backgroundColor: TarodanColors.primary,
-  },
+  titleSpacing: { marginBottom: 4 },
+  messageSpacing: { marginBottom: 6 },
   list: {
     padding: 16,
   },
@@ -335,25 +344,6 @@ const styles = StyleSheet.create({
   },
   content: {
     flex: 1,
-  },
-  title: {
-    fontSize: 14,
-    fontWeight: '600',
-    color: TarodanColors.textPrimary,
-    marginBottom: 4,
-  },
-  titleUnread: {
-    fontWeight: '700',
-  },
-  message: {
-    fontSize: 13,
-    color: TarodanColors.textSecondary,
-    marginBottom: 6,
-    lineHeight: 18,
-  },
-  time: {
-    fontSize: 11,
-    color: TarodanColors.textTertiary,
   },
   dot: {
     width: 8,

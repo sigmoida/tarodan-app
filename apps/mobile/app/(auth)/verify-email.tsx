@@ -1,20 +1,30 @@
-import React, { useEffect, useState } from 'react';
-import { View, StyleSheet, ScrollView, Alert } from 'react-native';
-import { Button, ActivityIndicator } from 'react-native-paper';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { useEffect, useState } from 'react';
+import { Alert, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { router, useLocalSearchParams } from 'expo-router';
 import { useMutation } from '@tanstack/react-query';
+import { SafeAreaView } from 'react-native-safe-area-context';
+import {
+  Button,
+  Input,
+  ScreenHeader,
+  Spinner,
+  Text,
+  VStack,
+  theme,
+} from '@tarodan/ui-native';
 import { authApi } from '../../src/services/api';
-import { TarodanColors } from '../../src/theme';
-import { ScreenHeader, Text, TextInput } from '../../src/components/common';
 import { useAuthStore } from '../../src/stores/authStore';
+
+const { colors, spacing } = theme;
+
+type Status = 'idle' | 'verifying' | 'success' | 'error';
 
 export default function VerifyEmailScreen() {
   const { token: tokenParam } = useLocalSearchParams<{ token?: string }>();
   const { isAuthenticated, user } = useAuthStore();
   const [manualToken, setManualToken] = useState('');
-  const [status, setStatus] = useState<'idle' | 'verifying' | 'success' | 'error'>('idle');
+  const [status, setStatus] = useState<Status>('idle');
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
 
   const verifyMutation = useMutation({
@@ -23,9 +33,10 @@ export default function VerifyEmailScreen() {
       setStatus('success');
       setErrorMsg(null);
     },
-    onError: (e: any) => {
+    onError: (e: unknown) => {
+      const err = e as { response?: { data?: { message?: string } } };
       setStatus('error');
-      setErrorMsg(e?.response?.data?.message || 'Bağlantı geçersiz veya süresi dolmuş olabilir.');
+      setErrorMsg(err?.response?.data?.message || 'Bağlantı geçersiz veya süresi dolmuş olabilir.');
     },
   });
 
@@ -37,8 +48,10 @@ export default function VerifyEmailScreen() {
         'Yeni bir doğrulama bağlantısı e-posta adresinize gönderildi. Spam kutunuzu da kontrol etmeyi unutmayın.',
       );
     },
-    onError: (e: any) =>
-      Alert.alert('Hata', e?.response?.data?.message || 'Doğrulama bağlantısı gönderilemedi.'),
+    onError: (e: unknown) => {
+      const err = e as { response?: { data?: { message?: string } } };
+      Alert.alert('Hata', err?.response?.data?.message || 'Doğrulama bağlantısı gönderilemedi.');
+    },
   });
 
   useEffect(() => {
@@ -46,7 +59,7 @@ export default function VerifyEmailScreen() {
       setStatus('verifying');
       verifyMutation.mutate(tokenParam);
     }
-  }, [tokenParam]);
+  }, [tokenParam, status, verifyMutation]);
 
   const handleManual = () => {
     if (!manualToken.trim()) return Alert.alert('Eksik', 'Doğrulama kodunu girin.');
@@ -54,153 +67,119 @@ export default function VerifyEmailScreen() {
     verifyMutation.mutate(manualToken.trim());
   };
 
-  return (
-    <SafeAreaView style={styles.container} edges={['top']}>
-      <ScreenHeader title="E-posta Doğrulama" />
+  const iconName =
+    status === 'success' ? 'mail-open' : status === 'error' ? 'alert-circle' : 'mail';
+  const iconColor =
+    status === 'success'
+      ? colors.success[600]!
+      : status === 'error'
+        ? colors.danger[600]!
+        : colors.primary[600]!;
 
-      <ScrollView contentContainerStyle={styles.scrollBody}>
-        <View style={styles.iconWrap}>
-          <Ionicons
-            name={status === 'success' ? 'mail-open' : status === 'error' ? 'alert-circle' : 'mail'}
-            size={72}
-            color={status === 'success' ? TarodanColors.success : status === 'error' ? TarodanColors.error : TarodanColors.primary}
-          />
+  return (
+    <SafeAreaView style={{ flex: 1, backgroundColor: colors.surface.DEFAULT }} edges={['top']}>
+      <ScreenHeader title="E-posta Doğrulama" variant="light" onBack={() => router.back()} />
+
+      <VStack gap={2} align="center" padding={6} flex={1}>
+        <View style={{ marginTop: spacing[4], marginBottom: spacing[2] }}>
+          <Ionicons name={iconName} size={72} color={iconColor} />
         </View>
 
         {status === 'verifying' ? (
           <>
-            <Text style={styles.title}>Doğrulanıyor...</Text>
-            <ActivityIndicator color={TarodanColors.primary} style={{ marginTop: 12 }} />
+            <Text variant="h2" align="center">
+              Doğrulanıyor...
+            </Text>
+            <Spinner color={colors.primary[600]!} />
           </>
         ) : status === 'success' ? (
           <>
-            <Text style={styles.title}>E-postanız doğrulandı</Text>
-            <Text style={styles.subtitle}>
+            <Text variant="h2" align="center">
+              E-postanız doğrulandı
+            </Text>
+            <Text variant="bodySm" tone="muted" align="center">
               Hesabınız aktif. Artık tüm özelliklerden yararlanabilirsiniz.
             </Text>
             <Button
-              mode="contained"
-              buttonColor={TarodanColors.primary}
-              onPress={() => router.replace(isAuthenticated ? '/(tabs)' : '/(auth)/login')}
-              style={styles.btn}
-              contentStyle={{ paddingVertical: 4 }}
-            >
-              Devam Et
-            </Button>
+              variant="primary"
+              size="lg"
+              fullWidth
+              title="Devam Et"
+              onPress={() =>
+                router.replace(isAuthenticated ? '/(tabs)' : '/(auth)/login')
+              }
+              style={{ marginTop: spacing[3] }}
+            />
           </>
         ) : status === 'error' ? (
           <>
-            <Text style={styles.title}>Doğrulama Başarısız</Text>
-            <Text style={styles.subtitle}>
+            <Text variant="h2" align="center">
+              Doğrulama Başarısız
+            </Text>
+            <Text variant="bodySm" tone="muted" align="center">
               {errorMsg || 'Bağlantı geçersiz olabilir. Yeni bir doğrulama bağlantısı isteyebilirsiniz.'}
             </Text>
             {isAuthenticated ? (
               <Button
-                mode="contained"
-                buttonColor={TarodanColors.primary}
-                icon="email-send-outline"
+                variant="primary"
+                size="lg"
+                fullWidth
+                title="Yeni Bağlantı Gönder"
+                icon="mail-outline"
                 onPress={() => resendMutation.mutate()}
-                loading={resendMutation.isPending}
+                isLoading={resendMutation.isPending}
                 disabled={resendMutation.isPending}
-                style={styles.btn}
-              >
-                Yeni Bağlantı Gönder
-              </Button>
+                style={{ marginTop: spacing[3] }}
+              />
             ) : null}
             <Button
-              mode="text"
+              variant="ghost"
+              fullWidth
+              title="Giriş Ekranına Dön"
               onPress={() => router.replace('/(auth)/login')}
-              textColor={TarodanColors.textSecondary}
-            >
-              Giriş Ekranına Dön
-            </Button>
+            />
           </>
         ) : (
           <>
-            <Text style={styles.title}>E-posta Doğrulama</Text>
-            <Text style={styles.subtitle}>
+            <Text variant="h2" align="center">
+              E-posta Doğrulama
+            </Text>
+            <Text variant="bodySm" tone="muted" align="center">
               {user?.email
                 ? `${user.email} adresine gönderdiğimiz bağlantıya tıklayarak doğrulayabilirsiniz. Kod aldıysanız aşağıya yapıştırabilirsiniz.`
                 : 'E-posta adresinize gönderdiğimiz bağlantıya tıklayarak doğrulayabilirsiniz. Kod aldıysanız aşağıya yapıştırabilirsiniz.'}
             </Text>
 
-            <TextInput
-              mode="outlined"
+            <Input
               label="Doğrulama Kodu"
               value={manualToken}
               onChangeText={setManualToken}
               autoCapitalize="none"
-              style={styles.input}
-              outlineColor={TarodanColors.border}
-              activeOutlineColor={TarodanColors.primary}
             />
 
             <Button
-              mode="contained"
-              buttonColor={TarodanColors.primary}
+              variant="primary"
+              size="lg"
+              fullWidth
+              title="Kodu Doğrula"
               onPress={handleManual}
-              style={styles.btn}
-              contentStyle={{ paddingVertical: 4 }}
               disabled={!manualToken.trim()}
-            >
-              Kodu Doğrula
-            </Button>
+            />
 
             {isAuthenticated ? (
               <Button
-                mode="text"
-                icon="email-send-outline"
+                variant="ghost"
+                fullWidth
+                title="Yeniden Gönder"
+                icon="mail-outline"
                 onPress={() => resendMutation.mutate()}
-                loading={resendMutation.isPending}
+                isLoading={resendMutation.isPending}
                 disabled={resendMutation.isPending}
-                textColor={TarodanColors.primary}
-              >
-                Yeniden Gönder
-              </Button>
+              />
             ) : null}
           </>
         )}
-      </ScrollView>
+      </VStack>
     </SafeAreaView>
   );
 }
-
-const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: TarodanColors.background,
-  },
-  scrollBody: {
-    flexGrow: 1,
-    alignItems: 'center',
-    padding: 24,
-    gap: 8,
-  },
-  iconWrap: {
-    marginTop: 16,
-    marginBottom: 8,
-  },
-  title: {
-    fontSize: 22,
-    fontWeight: '800',
-    color: TarodanColors.textPrimary,
-    textAlign: 'center',
-    marginTop: 4,
-  },
-  subtitle: {
-    fontSize: 14,
-    color: TarodanColors.textSecondary,
-    textAlign: 'center',
-    lineHeight: 20,
-  },
-  input: {
-    width: '100%',
-    backgroundColor: TarodanColors.background,
-    marginTop: 16,
-  },
-  btn: {
-    width: '100%',
-    borderRadius: 10,
-    marginTop: 12,
-  },
-});

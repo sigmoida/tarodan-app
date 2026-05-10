@@ -12,13 +12,16 @@
     "ios": {
       "supportsTablet": true,
       "bundleIdentifier": "com.tarodan.app",
+      "buildNumber": "1",
       "infoPlist": {
         "NSCameraUsageDescription": "Ürün fotoğrafı çekmek için kamera erişimi gereklidir.",
-        "NSPhotoLibraryUsageDescription": "Ürün fotoğrafı seçmek için galeri erişimi gereklidir."
+        "NSPhotoLibraryUsageDescription": "Ürün fotoğrafı seçmek için galeri erişimi gereklidir.",
+        "ITSAppUsesNonExemptEncryption": false
       }
     },
     "android": {
       "package": "com.tarodan.app",
+      "versionCode": 1,
       "permissions": [
         "CAMERA",
         "READ_EXTERNAL_STORAGE",
@@ -53,6 +56,11 @@
     ],
     "experiments": {
       "typedRoutes": true
+    },
+    "extra": {
+      "eas": {
+        "projectId": "REPLACE_WITH_EAS_PROJECT_ID"
+      }
     }
   }
 }

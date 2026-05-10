@@ -1,24 +1,51 @@
 import { View, ScrollView, StyleSheet, TouchableOpacity } from 'react-native';
-import { Avatar, Button, List, Divider, Card, Badge, Snackbar } from 'react-native-paper';
-import { Text } from '../../src/components/common';
 import { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { router } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
+import {
+  Avatar,
+  Badge,
+  Button,
+  Snackbar,
+  Text,
+  theme,
+} from '@tarodan/ui-native';
 import { userApi, notificationsApi } from '../../src/services/api';
 import { useAuthStore } from '../../src/stores/authStore';
-import { TarodanColors } from '../../src/theme';
 import { SignupPrompt } from '../../src/components/SignupPrompt';
 import { getRestrictionMessage, GuestAction } from '../../src/utils/guestRestrictions';
+
+const { colors, spacing, radius } = theme;
+
+const benefitTints = [
+  { bg: colors.success[50]!, fg: colors.success[600]! },
+  { bg: colors.info[50]!, fg: colors.info[600]! },
+  { bg: colors.danger[50]!, fg: colors.danger[600]! },
+  { bg: colors.warning[50]!, fg: colors.warning[600]! },
+] as const;
+
+const quickActionTints = [
+  { bg: colors.success[50]!, fg: colors.success[600]! },
+  { bg: colors.info[50]!, fg: colors.info[600]! },
+  { bg: colors.danger[50]!, fg: colors.danger[600]! },
+  { bg: colors.warning[50]!, fg: colors.warning[600]! },
+  { bg: colors.primary[50]!, fg: colors.primary[700]! },
+  { bg: colors.warning[100]!, fg: colors.warning[700]! },
+  { bg: colors.info[100]!, fg: colors.info[700]! },
+  { bg: colors.success[100]!, fg: colors.success[700]! },
+  { bg: colors.gray[100], fg: colors.gray[700]! },
+] as const;
 
 export default function ProfileScreen() {
   const { isAuthenticated, user, logout } = useAuthStore();
   const [snackbarVisible, setSnackbarVisible] = useState(false);
   const [snackbarMessage, setSnackbarMessage] = useState('');
   const [showPrompt, setShowPrompt] = useState(false);
-  const [promptType, setPromptType] = useState<'favorites' | 'message' | 'purchase' | 'trade' | 'collections'>('favorites');
+  const [promptType, setPromptType] = useState<
+    'favorites' | 'message' | 'purchase' | 'trade' | 'collections'
+  >('favorites');
 
-  // Web ile aynı endpoint: GET /users/me/stats
   const { data: apiStats } = useQuery({
     queryKey: ['user-stats'],
     queryFn: async () => {
@@ -34,29 +61,30 @@ export default function ProfileScreen() {
     retry: 1,
   });
 
-  // Use API stats or fall back to user data from authStore
   const stats = apiStats || {
     listings: user?.listingCount || 0,
     trades: user?.totalSales || 0,
     rating: user?.rating || 0,
     collections: 0,
     favorites: 0,
-    orders: user?.totalPurchases || 0
+    orders: user?.totalPurchases || 0,
   };
 
-  // Web `NotificationBell` paritesi: header'daki bell üzerinde unread badge.
   const { data: unreadData } = useQuery({
     queryKey: ['notifications-unread'],
     queryFn: async () => {
       try {
         const response = await notificationsApi.getUnreadCount();
-        return (response.data as any)?.count ?? (response.data as any)?.data?.count ?? 0;
+        const body = response.data as
+          | { count?: number; data?: { count?: number } }
+          | undefined;
+        return body?.count ?? body?.data?.count ?? 0;
       } catch {
         return 0;
       }
     },
     enabled: isAuthenticated,
-    refetchInterval: 60000, // Web ile aynı: 60sn'de bir poll.
+    refetchInterval: 60000,
     refetchOnWindowFocus: true,
   });
   const unreadNotifications: number = typeof unreadData === 'number' ? unreadData : 0;
@@ -66,194 +94,177 @@ export default function ProfileScreen() {
     router.replace('/(auth)/login');
   };
 
-  const handleGuestAction = (action: GuestAction) => {
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  const _handleGuestAction = (action: GuestAction) => {
     const config = getRestrictionMessage(action);
     setSnackbarMessage(config.message);
     setSnackbarVisible(true);
-    
-    if (action === 'favorites' || action === 'wishlist') {
-      setPromptType('favorites');
-    } else if (action === 'message') {
-      setPromptType('message');
-    } else if (action === 'trade') {
-      setPromptType('trade');
-    } else if (action === 'collections') {
-      setPromptType('collections');
-    }
-    
-    setTimeout(() => {
-      setShowPrompt(true);
-    }, 500);
+
+    if (action === 'favorites' || action === 'wishlist') setPromptType('favorites');
+    else if (action === 'message') setPromptType('message');
+    else if (action === 'trade') setPromptType('trade');
+    else if (action === 'collections') setPromptType('collections');
+
+    setTimeout(() => setShowPrompt(true), 500);
   };
 
   // Guest View
   if (!isAuthenticated) {
     return (
       <View style={styles.container}>
-        {/* Header */}
         <View style={styles.header}>
-          <Text style={styles.headerTitle}>Profil</Text>
+          <Text variant="h3" tone="inverted" weight="bold">
+            Profil
+          </Text>
           <View style={{ width: 24 }} />
         </View>
 
         <ScrollView style={styles.scrollView} showsVerticalScrollIndicator={false}>
-          {/* Guest Welcome Card */}
           <View style={styles.guestWelcome}>
-            <Avatar.Icon 
-              size={80} 
-              icon="account-outline" 
-              style={{ backgroundColor: TarodanColors.primaryLight }}
-              color={TarodanColors.primary}
-            />
-            <Text style={styles.guestTitle}>Hoş Geldiniz!</Text>
-            <Text style={styles.guestSubtitle}>
+            <View
+              style={{
+                width: 80,
+                height: 80,
+                borderRadius: radius.full,
+                backgroundColor: colors.primary[50]!,
+                alignItems: 'center',
+                justifyContent: 'center',
+              }}
+            >
+              <Ionicons name="person-outline" size={48} color={colors.primary[600]!} />
+            </View>
+            <Text variant="h1" align="center" style={{ marginTop: spacing[4] }}>
+              Hoş Geldiniz!
+            </Text>
+            <Text
+              variant="body"
+              tone="muted"
+              align="center"
+              style={{ marginTop: spacing[2], marginBottom: spacing[5] }}
+            >
               Tarodan'a giriş yaparak tüm özelliklerden yararlanın
             </Text>
             <Button
               testID="profile-go-login-button"
-              mode="contained"
+              variant="primary"
+              size="lg"
+              fullWidth
+              icon="log-in-outline"
+              title="Giriş Yap"
               onPress={() => router.push('/(auth)/login')}
               style={styles.loginButton}
-              buttonColor={TarodanColors.primary}
-              icon="login"
-            >
-              Giriş Yap
-            </Button>
-            <Button 
-              mode="outlined" 
-              onPress={() => router.push('/(auth)/register')} 
+            />
+            <Button
+              variant="outline"
+              size="lg"
+              fullWidth
+              title="Ücretsiz Üye Ol"
+              onPress={() => router.push('/(auth)/register')}
               style={styles.registerButton}
-              textColor={TarodanColors.primary}
-            >
-              Ücretsiz Üye Ol
-            </Button>
+            />
           </View>
 
-          {/* Guest Benefits */}
           <View style={styles.benefitsSection}>
-            <Text style={styles.benefitsTitle}>Üye Olarak Neler Yapabilirsiniz?</Text>
-            
-            <View style={styles.benefitCard}>
-              <View style={[styles.benefitIcon, { backgroundColor: '#E8F5E9' }]}>
-                <Ionicons name="pricetag" size={24} color="#4CAF50" />
-              </View>
-              <View style={styles.benefitContent}>
-                <Text style={styles.benefitTitle}>İlan Yayınlayın</Text>
-                <Text style={styles.benefitDescription}>
-                  Koleksiyonunuzdaki modelleri satışa çıkarın veya takasa açın
-                </Text>
-              </View>
-            </View>
+            <Text variant="h3" style={{ marginBottom: spacing[4] }}>
+              Üye Olarak Neler Yapabilirsiniz?
+            </Text>
 
-            <View style={styles.benefitCard}>
-              <View style={[styles.benefitIcon, { backgroundColor: '#E3F2FD' }]}>
-                <Ionicons name="swap-horizontal" size={24} color="#2196F3" />
+            {[
+              {
+                icon: 'pricetag' as const,
+                title: 'İlan Yayınlayın',
+                desc: 'Koleksiyonunuzdaki modelleri satışa çıkarın veya takasa açın',
+                tint: benefitTints[0],
+              },
+              {
+                icon: 'swap-horizontal' as const,
+                title: 'Takas Yapın',
+                desc: 'Diğer koleksiyonerlerle model değişimi yapın',
+                tint: benefitTints[1],
+              },
+              {
+                icon: 'heart' as const,
+                title: 'Favorilere Kaydedin',
+                desc: 'Beğendiğiniz ürünleri kaydedin, fiyat değişikliklerinden haberdar olun',
+                tint: benefitTints[2],
+              },
+              {
+                icon: 'car-sport' as const,
+                title: 'Digital Garage',
+                desc: 'Koleksiyonunuzu sergileyin ve diğerleriyle paylaşın',
+                tint: benefitTints[3],
+              },
+            ].map((b) => (
+              <View key={b.title} style={styles.benefitCard}>
+                <View style={[styles.benefitIcon, { backgroundColor: b.tint.bg }]}>
+                  <Ionicons name={b.icon} size={24} color={b.tint.fg} />
+                </View>
+                <View style={styles.benefitContent}>
+                  <Text variant="label">{b.title}</Text>
+                  <Text variant="bodySm" tone="muted" style={{ marginTop: spacing[1] }}>
+                    {b.desc}
+                  </Text>
+                </View>
               </View>
-              <View style={styles.benefitContent}>
-                <Text style={styles.benefitTitle}>Takas Yapın</Text>
-                <Text style={styles.benefitDescription}>
-                  Diğer koleksiyonerlerle model değişimi yapın
-                </Text>
-              </View>
-            </View>
-
-            <View style={styles.benefitCard}>
-              <View style={[styles.benefitIcon, { backgroundColor: '#FCE4EC' }]}>
-                <Ionicons name="heart" size={24} color="#E91E63" />
-              </View>
-              <View style={styles.benefitContent}>
-                <Text style={styles.benefitTitle}>Favorilere Kaydedin</Text>
-                <Text style={styles.benefitDescription}>
-                  Beğendiğiniz ürünleri kaydedin, fiyat değişikliklerinden haberdar olun
-                </Text>
-              </View>
-            </View>
-
-            <View style={styles.benefitCard}>
-              <View style={[styles.benefitIcon, { backgroundColor: '#FFF3E0' }]}>
-                <Ionicons name="car-sport" size={24} color="#FF9800" />
-              </View>
-              <View style={styles.benefitContent}>
-                <Text style={styles.benefitTitle}>Digital Garage</Text>
-                <Text style={styles.benefitDescription}>
-                  Koleksiyonunuzu sergileyin ve diğerleriyle paylaşın
-                </Text>
-              </View>
-            </View>
+            ))}
           </View>
 
-          {/* Guest Quick Links */}
           <View style={styles.quickLinksSection}>
-            <Text style={styles.quickLinksTitle}>Şimdilik Şunları Yapabilirsiniz</Text>
-            
-            <TouchableOpacity 
-              style={styles.quickLinkItem}
-              onPress={() => router.push('/search')}
-            >
-              <Ionicons name="search-outline" size={22} color={TarodanColors.primary} />
-              <Text style={styles.quickLinkText}>İlanlara Göz At</Text>
-              <Ionicons name="chevron-forward" size={20} color={TarodanColors.textLight} />
-            </TouchableOpacity>
+            <Text variant="label" tone="muted" style={{ marginBottom: spacing[3] }}>
+              Şimdilik Şunları Yapabilirsiniz
+            </Text>
 
-            <TouchableOpacity 
-              style={styles.quickLinkItem}
-              onPress={() => router.push('/collections')}
-            >
-              <Ionicons name="albums-outline" size={22} color={TarodanColors.primary} />
-              <Text style={styles.quickLinkText}>Koleksiyonları Keşfet</Text>
-              <Ionicons name="chevron-forward" size={20} color={TarodanColors.textLight} />
-            </TouchableOpacity>
-
-            <TouchableOpacity 
-              style={styles.quickLinkItem}
-              onPress={() => router.push('/cart')}
-            >
-              <Ionicons name="cart-outline" size={22} color={TarodanColors.primary} />
-              <Text style={styles.quickLinkText}>Sepetim</Text>
-              <Ionicons name="chevron-forward" size={20} color={TarodanColors.textLight} />
-            </TouchableOpacity>
-
-            <TouchableOpacity 
-              style={styles.quickLinkItem}
-              onPress={() => router.push('/order-track')}
-            >
-              <Ionicons name="location-outline" size={22} color={TarodanColors.primary} />
-              <Text style={styles.quickLinkText}>Sipariş Takip</Text>
-              <Ionicons name="chevron-forward" size={20} color={TarodanColors.textLight} />
-            </TouchableOpacity>
-
-            <TouchableOpacity 
-              style={styles.quickLinkItem}
-              onPress={() => router.push('/help')}
-            >
-              <Ionicons name="help-circle-outline" size={22} color={TarodanColors.primary} />
-              <Text style={styles.quickLinkText}>Yardım Merkezi</Text>
-              <Ionicons name="chevron-forward" size={20} color={TarodanColors.textLight} />
-            </TouchableOpacity>
+            {[
+              { icon: 'search-outline' as const, label: 'İlanlara Göz At', to: '/search' },
+              { icon: 'albums-outline' as const, label: 'Koleksiyonları Keşfet', to: '/collections' },
+              { icon: 'cart-outline' as const, label: 'Sepetim', to: '/cart' },
+              { icon: 'location-outline' as const, label: 'Sipariş Takip', to: '/order-track' },
+              { icon: 'help-circle-outline' as const, label: 'Yardım Merkezi', to: '/help' },
+            ].map((q) => (
+              <TouchableOpacity
+                key={q.label}
+                style={styles.quickLinkItem}
+                onPress={() => router.push(q.to as never)}
+              >
+                <Ionicons name={q.icon} size={22} color={colors.primary[600]!} />
+                <Text variant="body" style={styles.quickLinkText}>
+                  {q.label}
+                </Text>
+                <Ionicons name="chevron-forward" size={20} color={colors.text.subtle} />
+              </TouchableOpacity>
+            ))}
           </View>
 
-          {/* Premium Promo */}
           <View style={styles.premiumPromo}>
             <View style={styles.premiumHeader}>
-              <Ionicons name="diamond" size={32} color={TarodanColors.star} />
-              <Text style={styles.premiumTitle}>Premium Üyelik</Text>
+              <Ionicons name="diamond" size={32} color={colors.warning[500]!} />
+              <Text variant="h2" tone="inverted" style={{ marginLeft: spacing[3] }}>
+                Premium Üyelik
+              </Text>
             </View>
-            <Text style={styles.premiumDescription}>
+            <Text
+              variant="body"
+              color={colors.white}
+              style={{ marginBottom: spacing[4], opacity: 0.85 }}
+            >
               Sınırsız ilan, takas özelliği, Digital Garage ve daha fazlası için Premium üye olun!
             </Text>
             <View style={styles.premiumPrice}>
-              <Text style={styles.premiumPriceLabel}>Aylık sadece</Text>
-              <Text style={styles.premiumPriceValue}>₺99</Text>
+              <Text variant="bodySm" color={colors.white} style={{ opacity: 0.7, marginRight: spacing[2] }}>
+                Aylık sadece
+              </Text>
+              <Text variant="displaySm" color={colors.warning[500]!} weight="bold">
+                ₺99
+              </Text>
             </View>
-            <Button 
-              mode="contained" 
+            <Button
+              variant="primary"
+              size="lg"
+              fullWidth
+              title="Premium Ol"
               onPress={() => router.push('/(auth)/register')}
-              buttonColor={TarodanColors.star}
-              style={styles.premiumButton}
-              icon="crown"
-            >
-              Premium Ol
-            </Button>
+              style={{ backgroundColor: colors.warning[500]! }}
+            />
           </View>
 
           <View style={{ height: 100 }} />
@@ -276,17 +287,33 @@ export default function ProfileScreen() {
     );
   }
 
-  // Authenticated User View
+  // Authenticated View
+  const quickActionItems = [
+    { icon: 'pricetag' as const, label: 'İlanlarım', to: '/settings/my-listings', tint: quickActionTints[0] },
+    { icon: 'cube' as const, label: 'Siparişlerim', to: '/orders', tint: quickActionTints[1], testID: 'profile-orders-link' },
+    { icon: 'heart' as const, label: 'Favorilerim', to: '/favorites', tint: quickActionTints[2] },
+    { icon: 'chatbubbles' as const, label: 'Mesajlar', to: '/messages', tint: quickActionTints[3] },
+  ];
+
+  const quickActionItems2 = [
+    { icon: 'albums' as const, label: 'Beğenilen\nKoleksiyonlar', to: '/settings/liked-collections', tint: quickActionTints[4] },
+    { icon: 'swap-horizontal' as const, label: 'Takaslarım', to: '/trades', tint: quickActionTints[5], testID: 'profile-trades-link' },
+    { icon: 'pricetags' as const, label: 'Tekliflerim', to: '/offers', tint: quickActionTints[6], testID: 'profile-offers-link' },
+    { icon: 'stats-chart' as const, label: 'İstatistikler', to: '/settings/analytics', tint: quickActionTints[7] },
+    { icon: 'help-circle' as const, label: 'Yardım', to: '/help', tint: quickActionTints[8] },
+  ];
+
   return (
     <View style={styles.container}>
-      {/* Header */}
       <View style={styles.header}>
-        <Text style={styles.headerTitle}>Profil</Text>
+        <Text variant="h3" tone="inverted" weight="bold">
+          Profil
+        </Text>
         <TouchableOpacity onPress={() => router.push('/notifications')} style={styles.bellWrap}>
-          <Ionicons name="notifications-outline" size={24} color={TarodanColors.textOnPrimary} />
+          <Ionicons name="notifications-outline" size={24} color={colors.text.inverted} />
           {unreadNotifications > 0 && (
             <View style={styles.bellBadge}>
-              <Text style={styles.bellBadgeText}>
+              <Text variant="caption" color={colors.white} weight="bold">
                 {unreadNotifications > 99 ? '99+' : String(unreadNotifications)}
               </Text>
             </View>
@@ -295,207 +322,217 @@ export default function ProfileScreen() {
       </View>
 
       <ScrollView style={styles.scrollView} showsVerticalScrollIndicator={false}>
-        {/* Profile Card */}
         <View style={styles.profileCard}>
-          <Avatar.Text 
-            size={72} 
-            label={user?.displayName?.substring(0, 2).toUpperCase() || 'U'} 
-            style={{ backgroundColor: TarodanColors.primaryLight }}
-          />
+          <Avatar size="lg" name={user?.displayName || 'U'} />
           <View style={styles.profileInfo}>
-            <Text style={styles.profileName}>{user?.displayName}</Text>
-            <Text style={styles.profileEmail}>{user?.email}</Text>
+            <Text variant="h3">{user?.displayName}</Text>
+            <Text variant="bodySm" tone="muted" style={{ marginTop: 2 }}>
+              {user?.email}
+            </Text>
             {user?.membershipTier && (
               <View style={styles.membershipBadge}>
-                <Ionicons name="diamond" size={14} color={TarodanColors.star} />
-                <Text style={styles.membershipText}>{user.membershipTier} Üye</Text>
+                <Ionicons name="diamond" size={14} color={colors.warning[500]!} />
+                <Text variant="caption" weight="semibold" style={{ marginLeft: spacing[1] }}>
+                  {user.membershipTier} Üye
+                </Text>
               </View>
             )}
           </View>
-          <TouchableOpacity style={styles.editButton} onPress={() => router.push('/settings/edit-profile')}>
-            <Ionicons name="pencil" size={18} color={TarodanColors.primary} />
+          <TouchableOpacity
+            style={styles.editButton}
+            onPress={() => router.push('/settings/edit-profile')}
+          >
+            <Ionicons name="pencil" size={18} color={colors.primary[600]!} />
           </TouchableOpacity>
         </View>
 
-        {/* Stats Grid */}
         <View style={styles.statsGrid}>
-          <TouchableOpacity style={styles.statItem} onPress={() => router.push('/settings/my-listings')}>
-            <Text style={styles.statNumber}>{stats?.listings || 0}</Text>
-            <Text style={styles.statLabel}>İlanlarım</Text>
+          <TouchableOpacity
+            style={styles.statItem}
+            onPress={() => router.push('/settings/my-listings')}
+          >
+            <Text variant="h2" tone="primary">
+              {stats?.listings || 0}
+            </Text>
+            <Text variant="caption" tone="muted" style={{ marginTop: spacing[1] }}>
+              İlanlarım
+            </Text>
           </TouchableOpacity>
           <TouchableOpacity style={styles.statItem} onPress={() => router.push('/trades')}>
-            <Text style={styles.statNumber}>{stats?.trades || 0}</Text>
-            <Text style={styles.statLabel}>Takaslar</Text>
+            <Text variant="h2" tone="primary">
+              {stats?.trades || 0}
+            </Text>
+            <Text variant="caption" tone="muted" style={{ marginTop: spacing[1] }}>
+              Takaslar
+            </Text>
           </TouchableOpacity>
-          <TouchableOpacity style={styles.statItem} onPress={() => router.push('/settings/collections')}>
-            <Text style={styles.statNumber}>{stats?.collections || 0}</Text>
-            <Text style={styles.statLabel}>Koleksiyon</Text>
+          <TouchableOpacity
+            style={styles.statItem}
+            onPress={() => router.push('/settings/collections')}
+          >
+            <Text variant="h2" tone="primary">
+              {stats?.collections || 0}
+            </Text>
+            <Text variant="caption" tone="muted" style={{ marginTop: spacing[1] }}>
+              Koleksiyon
+            </Text>
           </TouchableOpacity>
           <TouchableOpacity style={styles.statItem}>
             <View style={styles.ratingRow}>
-              <Ionicons name="star" size={16} color={TarodanColors.star} />
-              <Text style={styles.statNumber}>{stats?.rating || '-'}</Text>
+              <Ionicons name="star" size={16} color={colors.warning[500]!} />
+              <Text variant="h2" tone="primary" style={{ marginLeft: 4 }}>
+                {stats?.rating || '-'}
+              </Text>
             </View>
-            <Text style={styles.statLabel}>Puan</Text>
+            <Text variant="caption" tone="muted" style={{ marginTop: spacing[1] }}>
+              Puan
+            </Text>
           </TouchableOpacity>
         </View>
 
-        {/* Digital Garage Section */}
         <View style={styles.section}>
           <View style={styles.sectionHeader}>
             <View style={styles.sectionTitleRow}>
-              <Ionicons name="car-sport" size={20} color={TarodanColors.primary} />
-              <Text style={styles.sectionTitle}>Dijital Garajım</Text>
+              <Ionicons name="car-sport" size={20} color={colors.primary[600]!} />
+              <Text variant="h3" style={{ marginLeft: spacing[2] }}>
+                Dijital Garajım
+              </Text>
             </View>
             <TouchableOpacity onPress={() => router.push('/settings/collections')}>
-              <Text style={styles.seeAllText}>Tümünü gör</Text>
+              <Text variant="bodySm" tone="primary" weight="medium">
+                Tümünü gör
+              </Text>
             </TouchableOpacity>
           </View>
-          <TouchableOpacity style={styles.garageCard} onPress={() => router.push('/settings/collections')}>
-            <View style={styles.garageIconContainer}>
-              <Ionicons name="add-circle" size={40} color={TarodanColors.primary} />
-            </View>
-            <Text style={styles.garageText}>Koleksiyon Oluştur</Text>
-            <Text style={styles.garageSubtext}>Araçlarını sergile ve paylaş</Text>
+          <TouchableOpacity
+            style={styles.garageCard}
+            onPress={() => router.push('/settings/collections')}
+          >
+            <Ionicons name="add-circle" size={40} color={colors.primary[600]!} />
+            <Text variant="h3" style={{ marginTop: spacing[3] }}>
+              Koleksiyon Oluştur
+            </Text>
+            <Text variant="bodySm" tone="muted" style={{ marginTop: spacing[1] }}>
+              Araçlarını sergile ve paylaş
+            </Text>
           </TouchableOpacity>
         </View>
 
-        {/* Quick Actions */}
         <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Hızlı Erişim</Text>
+          <Text variant="h3">Hızlı Erişim</Text>
           <View style={styles.quickActions}>
-            <TouchableOpacity style={styles.quickAction} onPress={() => router.push('/settings/my-listings')}>
-              <View style={[styles.quickActionIcon, { backgroundColor: '#E8F5E9' }]}>
-                <Ionicons name="pricetag" size={22} color="#4CAF50" />
-              </View>
-              <Text style={styles.quickActionText}>İlanlarım</Text>
-            </TouchableOpacity>
-            <TouchableOpacity testID="profile-orders-link" style={styles.quickAction} onPress={() => router.push('/orders')}>
-              <View style={[styles.quickActionIcon, { backgroundColor: '#E3F2FD' }]}>
-                <Ionicons name="cube" size={22} color="#2196F3" />
-              </View>
-              <Text style={styles.quickActionText}>Siparişlerim</Text>
-            </TouchableOpacity>
-            <TouchableOpacity style={styles.quickAction} onPress={() => router.push('/favorites')}>
-              <View style={[styles.quickActionIcon, { backgroundColor: '#FCE4EC' }]}>
-                <Ionicons name="heart" size={22} color="#E91E63" />
-              </View>
-              <Text style={styles.quickActionText}>Favorilerim</Text>
-            </TouchableOpacity>
-            <TouchableOpacity style={styles.quickAction} onPress={() => router.push('/messages')}>
-              <View style={[styles.quickActionIcon, { backgroundColor: '#FFF3E0' }]}>
-                <Ionicons name="chatbubbles" size={22} color="#FF9800" />
-              </View>
-              <Text style={styles.quickActionText}>Mesajlar</Text>
-            </TouchableOpacity>
+            {quickActionItems.map((q) => (
+              <TouchableOpacity
+                key={q.label}
+                testID={q.testID}
+                style={styles.quickAction}
+                onPress={() => router.push(q.to as never)}
+              >
+                <View style={[styles.quickActionIcon, { backgroundColor: q.tint.bg }]}>
+                  <Ionicons name={q.icon} size={22} color={q.tint.fg} />
+                </View>
+                <Text variant="caption" tone="muted" align="center">
+                  {q.label}
+                </Text>
+              </TouchableOpacity>
+            ))}
           </View>
-          {/* Second row of quick actions */}
-          <View style={[styles.quickActions, { marginTop: 12 }]}>
-            <TouchableOpacity style={styles.quickAction} onPress={() => router.push('/settings/liked-collections')}>
-              <View style={[styles.quickActionIcon, { backgroundColor: '#F3E5F5' }]}>
-                <Ionicons name="albums" size={22} color="#9C27B0" />
-              </View>
-              <Text style={styles.quickActionText}>Beğenilen{'\n'}Koleksiyonlar</Text>
-            </TouchableOpacity>
-            <TouchableOpacity testID="profile-trades-link" style={styles.quickAction} onPress={() => router.push('/trades')}>
-              <View style={[styles.quickActionIcon, { backgroundColor: '#FFF8E1' }]}>
-                <Ionicons name="swap-horizontal" size={22} color="#FFA000" />
-              </View>
-              <Text style={styles.quickActionText}>Takaslarım</Text>
-            </TouchableOpacity>
-            <TouchableOpacity testID="profile-offers-link" style={styles.quickAction} onPress={() => router.push('/offers' as any)}>
-              <View style={[styles.quickActionIcon, { backgroundColor: '#E1F5FE' }]}>
-                <Ionicons name="pricetags" size={22} color="#0288D1" />
-              </View>
-              <Text style={styles.quickActionText}>Tekliflerim</Text>
-            </TouchableOpacity>
-            <TouchableOpacity style={styles.quickAction} onPress={() => router.push('/settings/analytics')}>
-              <View style={[styles.quickActionIcon, { backgroundColor: '#E0F7FA' }]}>
-                <Ionicons name="stats-chart" size={22} color="#00ACC1" />
-              </View>
-              <Text style={styles.quickActionText}>İstatistikler</Text>
-            </TouchableOpacity>
-            <TouchableOpacity style={styles.quickAction} onPress={() => router.push('/help')}>
-              <View style={[styles.quickActionIcon, { backgroundColor: '#ECEFF1' }]}>
-                <Ionicons name="help-circle" size={22} color="#607D8B" />
-              </View>
-              <Text style={styles.quickActionText}>Yardım</Text>
-            </TouchableOpacity>
+          <View style={[styles.quickActions, { marginTop: spacing[3] }]}>
+            {quickActionItems2.map((q) => (
+              <TouchableOpacity
+                key={q.label}
+                testID={q.testID}
+                style={styles.quickAction}
+                onPress={() => router.push(q.to as never)}
+              >
+                <View style={[styles.quickActionIcon, { backgroundColor: q.tint.bg }]}>
+                  <Ionicons name={q.icon} size={22} color={q.tint.fg} />
+                </View>
+                <Text variant="caption" tone="muted" align="center">
+                  {q.label}
+                </Text>
+              </TouchableOpacity>
+            ))}
           </View>
         </View>
 
-        {/* Menu */}
         <View style={styles.menuSection}>
-          <Text style={styles.menuSectionTitle}>Hesap Ayarları</Text>
-          
-          <TouchableOpacity style={styles.menuItem} onPress={() => router.push('/settings/addresses')}>
-            <Ionicons name="location-outline" size={22} color={TarodanColors.textSecondary} />
-            <Text style={styles.menuItemText}>Adreslerim</Text>
-            <Ionicons name="chevron-forward" size={20} color={TarodanColors.textLight} />
-          </TouchableOpacity>
+          <Text variant="overline" tone="muted" style={{ marginBottom: spacing[3] }}>
+            Hesap Ayarları
+          </Text>
 
-          <TouchableOpacity testID="profile-membership-link" style={styles.menuItem} onPress={() => router.push('/membership')}>
-            <Ionicons name="diamond-outline" size={22} color={TarodanColors.textSecondary} />
-            <Text style={styles.menuItemText}>Üyelik Planı</Text>
-            {(user?.membershipTier === 'premium' || user?.membershipTier === 'business') && <Badge style={{ backgroundColor: TarodanColors.primary }}>PRO</Badge>}
-            <Ionicons name="chevron-forward" size={20} color={TarodanColors.textLight} />
-          </TouchableOpacity>
-
-          <TouchableOpacity style={styles.menuItem} onPress={() => router.push('/settings/notifications')}>
-            <Ionicons name="notifications-outline" size={22} color={TarodanColors.textSecondary} />
-            <Text style={styles.menuItemText}>Bildirim Ayarları</Text>
-            <Ionicons name="chevron-forward" size={20} color={TarodanColors.textLight} />
-          </TouchableOpacity>
-
-          <TouchableOpacity style={styles.menuItem} onPress={() => router.push('/settings/security')}>
-            <Ionicons name="shield-checkmark-outline" size={22} color={TarodanColors.textSecondary} />
-            <Text style={styles.menuItemText}>Güvenlik</Text>
-            <Ionicons name="chevron-forward" size={20} color={TarodanColors.textLight} />
-          </TouchableOpacity>
-
-          {/* Business Panel - Web ile aynı */}
+          <MenuItem
+            icon="location-outline"
+            label="Adreslerim"
+            onPress={() => router.push('/settings/addresses')}
+          />
+          <MenuItem
+            testID="profile-membership-link"
+            icon="diamond-outline"
+            label="Üyelik Planı"
+            onPress={() => router.push('/membership')}
+            rightSlot={
+              user?.membershipTier === 'premium' || user?.membershipTier === 'business' ? (
+                <Badge variant="primary">PRO</Badge>
+              ) : null
+            }
+          />
+          <MenuItem
+            icon="notifications-outline"
+            label="Bildirim Ayarları"
+            onPress={() => router.push('/settings/notifications')}
+          />
+          <MenuItem
+            icon="shield-checkmark-outline"
+            label="Güvenlik"
+            onPress={() => router.push('/settings/security')}
+          />
           {user?.membershipTier?.toLowerCase() === 'business' && (
-            <TouchableOpacity style={styles.menuItem} onPress={() => router.push('/settings/business')}>
-              <Ionicons name="business-outline" size={22} color={TarodanColors.primary} />
-              <Text style={[styles.menuItemText, { color: TarodanColors.primary }]}>İşletme Paneli</Text>
-              <Badge style={{ backgroundColor: '#FFA500', marginLeft: 8 }}>👑</Badge>
-              <Ionicons name="chevron-forward" size={20} color={TarodanColors.textLight} />
-            </TouchableOpacity>
+            <MenuItem
+              icon="business-outline"
+              label="İşletme Paneli"
+              tone="primary"
+              onPress={() => router.push('/settings/business')}
+              rightSlot={<Badge variant="warning">👑</Badge>}
+            />
           )}
-
-          <TouchableOpacity style={styles.menuItem} onPress={() => router.push('/settings/analytics')}>
-            <Ionicons name="stats-chart-outline" size={22} color={TarodanColors.textSecondary} />
-            <Text style={styles.menuItemText}>İstatistikler</Text>
-            <Ionicons name="chevron-forward" size={20} color={TarodanColors.textLight} />
-          </TouchableOpacity>
+          <MenuItem
+            icon="stats-chart-outline"
+            label="İstatistikler"
+            onPress={() => router.push('/settings/analytics')}
+          />
         </View>
 
         <View style={styles.menuSection}>
-          <Text style={styles.menuSectionTitle}>Destek</Text>
-          
-          <TouchableOpacity style={styles.menuItem} onPress={() => router.push('/help')}>
-            <Ionicons name="help-circle-outline" size={22} color={TarodanColors.textSecondary} />
-            <Text style={styles.menuItemText}>Yardım & SSS</Text>
-            <Ionicons name="chevron-forward" size={20} color={TarodanColors.textLight} />
-          </TouchableOpacity>
-
-          <TouchableOpacity style={styles.menuItem} onPress={() => router.push('/support')}>
-            <Ionicons name="headset-outline" size={22} color={TarodanColors.textSecondary} />
-            <Text style={styles.menuItemText}>Destek Talebi</Text>
-            <Ionicons name="chevron-forward" size={20} color={TarodanColors.textLight} />
-          </TouchableOpacity>
-
-          <TouchableOpacity style={styles.menuItem} onPress={() => router.push('/help')}>
-            <Ionicons name="information-circle-outline" size={22} color={TarodanColors.textSecondary} />
-            <Text style={styles.menuItemText}>Hakkında</Text>
-            <Ionicons name="chevron-forward" size={20} color={TarodanColors.textLight} />
-          </TouchableOpacity>
+          <Text variant="overline" tone="muted" style={{ marginBottom: spacing[3] }}>
+            Destek
+          </Text>
+          <MenuItem
+            icon="help-circle-outline"
+            label="Yardım & SSS"
+            onPress={() => router.push('/help')}
+          />
+          <MenuItem
+            icon="headset-outline"
+            label="Destek Talebi"
+            onPress={() => router.push('/support')}
+          />
+          <MenuItem
+            icon="information-circle-outline"
+            label="Hakkında"
+            onPress={() => router.push('/help')}
+          />
         </View>
 
-        {/* Logout */}
-        <TouchableOpacity testID="profile-logout-button" style={styles.logoutButton} onPress={handleLogout}>
-          <Ionicons name="log-out-outline" size={22} color={TarodanColors.error} />
-          <Text style={styles.logoutText}>Çıkış Yap</Text>
+        <TouchableOpacity
+          testID="profile-logout-button"
+          style={styles.logoutButton}
+          onPress={handleLogout}
+        >
+          <Ionicons name="log-out-outline" size={22} color={colors.danger[600]!} />
+          <Text variant="body" tone="danger" weight="semibold" style={{ marginLeft: spacing[2] }}>
+            Çıkış Yap
+          </Text>
         </TouchableOpacity>
 
         <View style={{ height: 100 }} />
@@ -504,24 +541,43 @@ export default function ProfileScreen() {
   );
 }
 
+interface MenuItemProps {
+  icon: React.ComponentProps<typeof Ionicons>['name'];
+  label: string;
+  onPress: () => void;
+  tone?: 'default' | 'primary';
+  rightSlot?: React.ReactNode;
+  testID?: string;
+}
+
+function MenuItem({ icon, label, onPress, tone = 'default', rightSlot, testID }: MenuItemProps) {
+  const labelTone = tone === 'primary' ? 'primary' : 'heading';
+  const iconColor = tone === 'primary' ? colors.primary[600]! : colors.text.muted;
+  return (
+    <TouchableOpacity testID={testID} style={styles.menuItem} onPress={onPress}>
+      <Ionicons name={icon} size={22} color={iconColor} />
+      <Text variant="body" tone={labelTone} style={styles.menuItemText}>
+        {label}
+      </Text>
+      {rightSlot}
+      <Ionicons name="chevron-forward" size={20} color={colors.text.subtle} />
+    </TouchableOpacity>
+  );
+}
+
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: TarodanColors.backgroundSecondary,
+    backgroundColor: colors.surface.alt,
   },
   header: {
-    backgroundColor: TarodanColors.primary,
+    backgroundColor: colors.primary[600]!,
     paddingTop: 50,
-    paddingBottom: 16,
-    paddingHorizontal: 20,
+    paddingBottom: spacing[4],
+    paddingHorizontal: spacing[5],
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-  },
-  headerTitle: {
-    fontSize: 20,
-    fontWeight: 'bold',
-    color: TarodanColors.textOnPrimary,
   },
   bellWrap: {
     position: 'relative',
@@ -534,215 +590,118 @@ const styles = StyleSheet.create({
     minWidth: 18,
     height: 18,
     borderRadius: 9,
-    backgroundColor: TarodanColors.error,
+    backgroundColor: colors.danger[600]!,
     paddingHorizontal: 4,
     justifyContent: 'center',
     alignItems: 'center',
     borderWidth: 1.5,
-    borderColor: TarodanColors.primary,
+    borderColor: colors.primary[600]!,
   },
-  bellBadgeText: {
-    color: '#fff',
-    fontSize: 10,
-    fontWeight: 'bold',
-  },
-  scrollView: {
-    flex: 1,
-  },
-  // Guest styles
+  scrollView: { flex: 1 },
   guestWelcome: {
-    backgroundColor: TarodanColors.background,
-    margin: 16,
-    padding: 24,
-    borderRadius: 16,
+    backgroundColor: colors.surface.DEFAULT,
+    margin: spacing[4],
+    padding: spacing[6],
+    borderRadius: radius['3xl'],
     alignItems: 'center',
     elevation: 2,
-    shadowColor: '#000',
+    shadowColor: colors.black,
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.1,
     shadowRadius: 4,
   },
-  guestTitle: {
-    fontSize: 24,
-    fontWeight: 'bold',
-    color: TarodanColors.textPrimary,
-    marginTop: 16,
-  },
-  guestSubtitle: {
-    fontSize: 14,
-    color: TarodanColors.textSecondary,
-    textAlign: 'center',
-    marginTop: 8,
-    marginBottom: 20,
-  },
-  loginButton: {
-    width: '100%',
-    borderRadius: 12,
-    marginBottom: 12,
-  },
-  registerButton: {
-    width: '100%',
-    borderRadius: 12,
-  },
+  loginButton: { width: '100%', marginBottom: spacing[3] },
+  registerButton: { width: '100%' },
   benefitsSection: {
-    paddingHorizontal: 16,
-    marginTop: 8,
-  },
-  benefitsTitle: {
-    fontSize: 18,
-    fontWeight: 'bold',
-    color: TarodanColors.textPrimary,
-    marginBottom: 16,
+    paddingHorizontal: spacing[4],
+    marginTop: spacing[2],
   },
   benefitCard: {
     flexDirection: 'row',
-    backgroundColor: TarodanColors.background,
-    borderRadius: 12,
-    padding: 16,
-    marginBottom: 12,
+    backgroundColor: colors.surface.DEFAULT,
+    borderRadius: radius['2xl'],
+    padding: spacing[4],
+    marginBottom: spacing[3],
   },
   benefitIcon: {
     width: 48,
     height: 48,
-    borderRadius: 24,
+    borderRadius: radius.full,
     justifyContent: 'center',
     alignItems: 'center',
   },
   benefitContent: {
     flex: 1,
-    marginLeft: 12,
-  },
-  benefitTitle: {
-    fontSize: 15,
-    fontWeight: '600',
-    color: TarodanColors.textPrimary,
-  },
-  benefitDescription: {
-    fontSize: 13,
-    color: TarodanColors.textSecondary,
-    marginTop: 4,
-    lineHeight: 18,
+    marginLeft: spacing[3],
   },
   quickLinksSection: {
-    marginTop: 24,
-    paddingHorizontal: 16,
-  },
-  quickLinksTitle: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: TarodanColors.textSecondary,
-    marginBottom: 12,
+    marginTop: spacing[6],
+    paddingHorizontal: spacing[4],
   },
   quickLinkItem: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: TarodanColors.background,
-    padding: 16,
-    borderRadius: 12,
-    marginBottom: 8,
+    backgroundColor: colors.surface.DEFAULT,
+    padding: spacing[4],
+    borderRadius: radius['2xl'],
+    marginBottom: spacing[2],
   },
   quickLinkText: {
     flex: 1,
-    fontSize: 15,
-    color: TarodanColors.textPrimary,
-    marginLeft: 12,
+    marginLeft: spacing[3],
   },
   premiumPromo: {
-    margin: 16,
-    padding: 24,
-    backgroundColor: TarodanColors.secondary,
-    borderRadius: 16,
+    margin: spacing[4],
+    padding: spacing[6],
+    backgroundColor: colors.gray[800],
+    borderRadius: radius['3xl'],
   },
   premiumHeader: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginBottom: 12,
-  },
-  premiumTitle: {
-    fontSize: 20,
-    fontWeight: 'bold',
-    color: TarodanColors.textOnPrimary,
-    marginLeft: 12,
-  },
-  premiumDescription: {
-    fontSize: 14,
-    color: 'rgba(255,255,255,0.8)',
-    lineHeight: 20,
-    marginBottom: 16,
+    marginBottom: spacing[3],
   },
   premiumPrice: {
     flexDirection: 'row',
     alignItems: 'baseline',
-    marginBottom: 16,
+    marginBottom: spacing[4],
   },
-  premiumPriceLabel: {
-    fontSize: 14,
-    color: 'rgba(255,255,255,0.7)',
-    marginRight: 8,
-  },
-  premiumPriceValue: {
-    fontSize: 32,
-    fontWeight: 'bold',
-    color: TarodanColors.star,
-  },
-  premiumButton: {
-    borderRadius: 12,
-  },
-  // Authenticated styles
   profileCard: {
-    backgroundColor: TarodanColors.background,
-    margin: 16,
-    padding: 20,
-    borderRadius: 16,
+    backgroundColor: colors.surface.DEFAULT,
+    margin: spacing[4],
+    padding: spacing[5],
+    borderRadius: radius['3xl'],
     flexDirection: 'row',
     alignItems: 'center',
     elevation: 2,
-    shadowColor: '#000',
+    shadowColor: colors.black,
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.1,
     shadowRadius: 4,
   },
   profileInfo: {
     flex: 1,
-    marginLeft: 16,
-  },
-  profileName: {
-    fontSize: 18,
-    fontWeight: 'bold',
-    color: TarodanColors.textPrimary,
-  },
-  profileEmail: {
-    fontSize: 14,
-    color: TarodanColors.textSecondary,
-    marginTop: 2,
+    marginLeft: spacing[4],
   },
   membershipBadge: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: TarodanColors.surfaceVariant,
-    paddingHorizontal: 10,
-    paddingVertical: 4,
-    borderRadius: 12,
-    marginTop: 8,
+    backgroundColor: colors.surface.alt,
+    paddingHorizontal: spacing[2.5],
+    paddingVertical: spacing[1],
+    borderRadius: radius['2xl'],
+    marginTop: spacing[2],
     alignSelf: 'flex-start',
   },
-  membershipText: {
-    fontSize: 12,
-    fontWeight: '600',
-    color: TarodanColors.textPrimary,
-    marginLeft: 4,
-  },
-  editButton: {
-    padding: 8,
-  },
+  editButton: { padding: spacing[2] },
   statsGrid: {
     flexDirection: 'row',
-    marginHorizontal: 16,
-    backgroundColor: TarodanColors.background,
-    borderRadius: 16,
-    padding: 16,
+    marginHorizontal: spacing[4],
+    backgroundColor: colors.surface.DEFAULT,
+    borderRadius: radius['3xl'],
+    padding: spacing[4],
     elevation: 2,
-    shadowColor: '#000',
+    shadowColor: colors.black,
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.1,
     shadowRadius: 4,
@@ -751,71 +710,37 @@ const styles = StyleSheet.create({
     flex: 1,
     alignItems: 'center',
   },
-  statNumber: {
-    fontSize: 22,
-    fontWeight: 'bold',
-    color: TarodanColors.primary,
-  },
-  statLabel: {
-    fontSize: 12,
-    color: TarodanColors.textSecondary,
-    marginTop: 4,
-  },
   ratingRow: {
     flexDirection: 'row',
     alignItems: 'center',
   },
   section: {
-    marginTop: 24,
-    paddingHorizontal: 16,
+    marginTop: spacing[6],
+    paddingHorizontal: spacing[4],
   },
   sectionHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    marginBottom: 12,
+    marginBottom: spacing[3],
   },
   sectionTitleRow: {
     flexDirection: 'row',
     alignItems: 'center',
   },
-  sectionTitle: {
-    fontSize: 16,
-    fontWeight: 'bold',
-    color: TarodanColors.textPrimary,
-    marginLeft: 8,
-  },
-  seeAllText: {
-    fontSize: 14,
-    color: TarodanColors.primary,
-    fontWeight: '500',
-  },
   garageCard: {
-    backgroundColor: TarodanColors.background,
-    borderRadius: 16,
-    padding: 24,
+    backgroundColor: colors.surface.DEFAULT,
+    borderRadius: radius['3xl'],
+    padding: spacing[6],
     alignItems: 'center',
     borderWidth: 2,
-    borderColor: TarodanColors.border,
+    borderColor: colors.border.DEFAULT,
     borderStyle: 'dashed',
-  },
-  garageIconContainer: {
-    marginBottom: 12,
-  },
-  garageText: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: TarodanColors.textPrimary,
-  },
-  garageSubtext: {
-    fontSize: 13,
-    color: TarodanColors.textSecondary,
-    marginTop: 4,
   },
   quickActions: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    marginTop: 12,
+    marginTop: spacing[3],
   },
   quickAction: {
     alignItems: 'center',
@@ -824,57 +749,37 @@ const styles = StyleSheet.create({
   quickActionIcon: {
     width: 50,
     height: 50,
-    borderRadius: 25,
+    borderRadius: radius.full,
     alignItems: 'center',
     justifyContent: 'center',
-    marginBottom: 8,
-  },
-  quickActionText: {
-    fontSize: 12,
-    color: TarodanColors.textSecondary,
-    textAlign: 'center',
+    marginBottom: spacing[2],
   },
   menuSection: {
-    marginTop: 24,
-    paddingHorizontal: 16,
-  },
-  menuSectionTitle: {
-    fontSize: 14,
-    fontWeight: '600',
-    color: TarodanColors.textSecondary,
-    marginBottom: 12,
-    textTransform: 'uppercase',
+    marginTop: spacing[6],
+    paddingHorizontal: spacing[4],
   },
   menuItem: {
-    backgroundColor: TarodanColors.background,
+    backgroundColor: colors.surface.DEFAULT,
     flexDirection: 'row',
     alignItems: 'center',
-    padding: 16,
-    borderRadius: 12,
-    marginBottom: 8,
+    padding: spacing[4],
+    borderRadius: radius['2xl'],
+    marginBottom: spacing[2],
   },
   menuItemText: {
     flex: 1,
-    fontSize: 15,
-    color: TarodanColors.textPrimary,
-    marginLeft: 12,
+    marginLeft: spacing[3],
   },
   logoutButton: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    marginHorizontal: 16,
-    marginTop: 24,
-    padding: 16,
-    borderRadius: 12,
-    backgroundColor: TarodanColors.background,
+    marginHorizontal: spacing[4],
+    marginTop: spacing[6],
+    padding: spacing[4],
+    borderRadius: radius['2xl'],
+    backgroundColor: colors.surface.DEFAULT,
     borderWidth: 1,
-    borderColor: TarodanColors.error,
-  },
-  logoutText: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: TarodanColors.error,
-    marginLeft: 8,
+    borderColor: colors.danger[600]!,
   },
 });

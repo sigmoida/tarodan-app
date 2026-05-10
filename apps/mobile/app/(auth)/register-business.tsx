@@ -1,19 +1,40 @@
-import React, { useState } from 'react';
-import { View, StyleSheet, ScrollView, Alert, KeyboardAvoidingView, Platform, TouchableOpacity } from 'react-native';
-import { Button, Checkbox } from 'react-native-paper';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { useState } from 'react';
+import { Alert, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { router } from 'expo-router';
 import * as SecureStore from 'expo-secure-store';
 import { useMutation } from '@tanstack/react-query';
+import { SafeAreaView } from 'react-native-safe-area-context';
+import {
+  Button,
+  Checkbox,
+  HStack,
+  Input,
+  Screen,
+  ScreenHeader,
+  Text,
+  VStack,
+  theme,
+} from '@tarodan/ui-native';
 import { authApi } from '../../src/services/api';
-import { TarodanColors } from '../../src/theme';
-import { ScreenHeader, Text, TextInput } from '../../src/components/common';
 import { useAuthStore } from '../../src/stores/authStore';
+
+const { colors, spacing, radius } = theme;
+
+interface BusinessForm {
+  companyName: string;
+  taxId: string;
+  taxOffice: string;
+  displayName: string;
+  email: string;
+  phone: string;
+  password: string;
+  passwordConfirm: string;
+}
 
 export default function RegisterBusinessScreen() {
   const { login } = useAuthStore();
-  const [form, setForm] = useState({
+  const [form, setForm] = useState<BusinessForm>({
     companyName: '',
     taxId: '',
     taxOffice: '',
@@ -25,11 +46,13 @@ export default function RegisterBusinessScreen() {
   });
   const [acceptTerms, setAcceptTerms] = useState(false);
   const [acceptMarketing, setAcceptMarketing] = useState(false);
-  const [showPassword, setShowPassword] = useState(false);
+
+  const setField = <K extends keyof BusinessForm>(key: K, value: BusinessForm[K]) =>
+    setForm((f) => ({ ...f, [key]: value }));
 
   const registerMutation = useMutation({
-    mutationFn: async () => {
-      return authApi.registerBusiness({
+    mutationFn: async () =>
+      authApi.registerBusiness({
         displayName: form.displayName.trim(),
         email: form.email.trim().toLowerCase(),
         password: form.password,
@@ -38,18 +61,20 @@ export default function RegisterBusinessScreen() {
         companyName: form.companyName.trim(),
         taxId: form.taxId.trim(),
         taxOffice: form.taxOffice.trim() || undefined,
-      });
-    },
+      }),
     onSuccess: async (response) => {
-      const data = response.data?.data ?? response.data ?? {};
-      const accessToken = data.accessToken ?? data.token;
-      const refreshToken = data.refreshToken;
+      const data =
+        (response.data as { data?: Record<string, unknown> })?.data ??
+        ((response.data as Record<string, unknown>) ?? {});
+      const accessToken = (data.accessToken ?? data.token) as string | undefined;
+      const refreshToken = data.refreshToken as string | undefined;
       if (accessToken) {
         await SecureStore.setItemAsync('accessToken', accessToken);
         if (refreshToken) await SecureStore.setItemAsync('refreshToken', refreshToken);
       }
       if (data.user && login) {
-        await login(data.user, accessToken);
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        await login(accessToken!, data.user as any);
       }
       Alert.alert(
         'Kurumsal hesap oluşturuldu',
@@ -57,8 +82,10 @@ export default function RegisterBusinessScreen() {
         [{ text: 'Devam', onPress: () => router.replace('/seller/dashboard') }],
       );
     },
-    onError: (e: any) =>
-      Alert.alert('Hata', e?.response?.data?.message || 'Kayıt tamamlanamadı.'),
+    onError: (e: unknown) => {
+      const err = e as { response?: { data?: { message?: string } } };
+      Alert.alert('Hata', err?.response?.data?.message || 'Kayıt tamamlanamadı.');
+    },
   });
 
   const handleSubmit = () => {
@@ -67,7 +94,6 @@ export default function RegisterBusinessScreen() {
       return Alert.alert('Eksik', 'Vergi / T.C. no 10 veya 11 hane olmalı.');
     if (!form.displayName.trim()) return Alert.alert('Eksik', 'Yetkili adı gerekli.');
     if (!/^\S+@\S+\.\S+$/.test(form.email)) return Alert.alert('Eksik', 'Geçerli e-posta girin.');
-    // Şifre kuralı web ile birebir: 8+ karakter, 1 büyük + 1 küçük + 1 rakam.
     if (form.password.length < 8)
       return Alert.alert('Şifre Yetersiz', 'Şifre en az 8 karakter olmalı.');
     if (!/[A-Z]/.test(form.password))
@@ -76,235 +102,143 @@ export default function RegisterBusinessScreen() {
       return Alert.alert('Şifre Yetersiz', 'Şifre en az 1 küçük harf içermeli.');
     if (!/\d/.test(form.password))
       return Alert.alert('Şifre Yetersiz', 'Şifre en az 1 rakam içermeli.');
-    if (form.password !== form.passwordConfirm) return Alert.alert('Eksik', 'Şifreler eşleşmiyor.');
-    if (!acceptTerms) return Alert.alert('Sözleşme', 'Üyelik sözleşmesini ve KVKK aydınlatmasını kabul etmelisiniz.');
+    if (form.password !== form.passwordConfirm)
+      return Alert.alert('Eksik', 'Şifreler eşleşmiyor.');
+    if (!acceptTerms)
+      return Alert.alert(
+        'Sözleşme',
+        'Üyelik sözleşmesini ve KVKK aydınlatmasını kabul etmelisiniz.',
+      );
     registerMutation.mutate();
   };
 
   return (
-    <SafeAreaView style={styles.container} edges={['top']}>
-      <ScreenHeader title="Kurumsal Kayıt" />
+    <SafeAreaView style={{ flex: 1, backgroundColor: colors.surface.alt }} edges={['top']}>
+      <ScreenHeader title="Kurumsal Kayıt" variant="light" onBack={() => router.back()} />
 
-      <KeyboardAvoidingView
-        style={{ flex: 1 }}
-        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
-        keyboardVerticalOffset={80}
-      >
-        <ScrollView contentContainerStyle={styles.scrollBody}>
-          <View style={styles.headerInfo}>
-            <Ionicons name="business" size={24} color={TarodanColors.primary} />
-            <Text style={styles.headerTitle}>İşletme olarak kaydol</Text>
-            <Text style={styles.headerSubtitle}>
-              Vergi ve şirket bilgilerinizle kurumsal satıcı hesabı açın. Avantajlı komisyon oranları, sınırsız ilan ve kurumsal rozet otomatik etkinleşir.
+      <Screen bg="alt" padding={4}>
+        <VStack gap={3}>
+          <View
+            style={{
+              backgroundColor: colors.primary[50]!,
+              padding: spacing[4],
+              borderRadius: radius.xl,
+              alignItems: 'center',
+              gap: spacing[1],
+            }}
+          >
+            <Ionicons name="business" size={24} color={colors.primary[600]!} />
+            <Text variant="h3" align="center">
+              İşletme olarak kaydol
+            </Text>
+            <Text variant="bodySm" tone="muted" align="center">
+              Vergi ve şirket bilgilerinizle kurumsal satıcı hesabı açın. Avantajlı komisyon
+              oranları, sınırsız ilan ve kurumsal rozet otomatik etkinleşir.
             </Text>
           </View>
 
-          <Text style={styles.section}>Şirket Bilgileri</Text>
-          <TextInput
-            mode="outlined"
+          <Text variant="label" style={{ marginTop: spacing[2] }}>
+            Şirket Bilgileri
+          </Text>
+          <Input
             label="Şirket / İşletme Adı *"
             value={form.companyName}
-            onChangeText={(v: string) => setForm(f => ({ ...f,companyName: v }))}
-            style={styles.input}
-            outlineColor={TarodanColors.border}
-            activeOutlineColor={TarodanColors.primary}
+            onChangeText={(v) => setField('companyName', v)}
           />
-          <View style={styles.row}>
-            <TextInput
-              mode="outlined"
-              label="Vergi / TC No *"
-              value={form.taxId}
-              onChangeText={(v: string) => setForm(f => ({ ...f,taxId: v.replace(/[^\d]/g, '') }))}
-              keyboardType="number-pad"
-              maxLength={11}
-              style={[styles.input, { flex: 1 }]}
-              outlineColor={TarodanColors.border}
-              activeOutlineColor={TarodanColors.primary}
-            />
-            <TextInput
-              mode="outlined"
-              label="Vergi Dairesi"
-              value={form.taxOffice}
-              onChangeText={(v: string) => setForm(f => ({ ...f,taxOffice: v }))}
-              style={[styles.input, { flex: 1 }]}
-              outlineColor={TarodanColors.border}
-              activeOutlineColor={TarodanColors.primary}
-            />
-          </View>
+          <HStack gap={2}>
+            <View style={{ flex: 1 }}>
+              <Input
+                label="Vergi / TC No *"
+                value={form.taxId}
+                onChangeText={(v) => setField('taxId', v.replace(/[^\d]/g, ''))}
+                keyboardType="number-pad"
+                maxLength={11}
+              />
+            </View>
+            <View style={{ flex: 1 }}>
+              <Input
+                label="Vergi Dairesi"
+                value={form.taxOffice}
+                onChangeText={(v) => setField('taxOffice', v)}
+              />
+            </View>
+          </HStack>
 
-          <Text style={styles.section}>Yetkili / Hesap Bilgileri</Text>
-          <TextInput
-            mode="outlined"
+          <Text variant="label" style={{ marginTop: spacing[2] }}>
+            Yetkili / Hesap Bilgileri
+          </Text>
+          <Input
             label="Yetkili Adı *"
             value={form.displayName}
-            onChangeText={(v: string) => setForm(f => ({ ...f,displayName: v }))}
-            style={styles.input}
-            outlineColor={TarodanColors.border}
-            activeOutlineColor={TarodanColors.primary}
+            onChangeText={(v) => setField('displayName', v)}
           />
-          <TextInput
-            mode="outlined"
+          <Input
             label="E-posta *"
             value={form.email}
-            onChangeText={(v: string) => setForm(f => ({ ...f,email: v }))}
+            onChangeText={(v) => setField('email', v)}
             keyboardType="email-address"
             autoCapitalize="none"
-            style={styles.input}
-            outlineColor={TarodanColors.border}
-            activeOutlineColor={TarodanColors.primary}
           />
-          <TextInput
-            mode="outlined"
+          <Input
             label="Telefon"
             placeholder="+90 5XX XXX XX XX"
             value={form.phone}
-            onChangeText={(v: string) => setForm(f => ({ ...f,phone: v }))}
+            onChangeText={(v) => setField('phone', v)}
             keyboardType="phone-pad"
-            style={styles.input}
-            outlineColor={TarodanColors.border}
-            activeOutlineColor={TarodanColors.primary}
           />
-          <TextInput
-            mode="outlined"
+          <Input
             label="Şifre *"
             value={form.password}
-            onChangeText={(v: string) => setForm(f => ({ ...f,password: v }))}
-            secureTextEntry={!showPassword}
-            right={
-              <TextInput.Icon
-                icon={showPassword ? 'eye-off' : 'eye'}
-                onPress={() => setShowPassword(s => !s)}
-                color={TarodanColors.textSecondary}
-              />
-            }
-            style={styles.input}
-            outlineColor={TarodanColors.border}
-            activeOutlineColor={TarodanColors.primary}
+            onChangeText={(v) => setField('password', v)}
+            secureTextEntry
+            togglePasswordVisibility
           />
-          <TextInput
-            mode="outlined"
+          <Input
             label="Şifre (Tekrar) *"
             value={form.passwordConfirm}
-            onChangeText={(v: string) => setForm(f => ({ ...f,passwordConfirm: v }))}
-            secureTextEntry={!showPassword}
-            style={styles.input}
-            outlineColor={TarodanColors.border}
-            activeOutlineColor={TarodanColors.primary}
+            onChangeText={(v) => setField('passwordConfirm', v)}
+            secureTextEntry
+            togglePasswordVisibility
           />
 
-          <TouchableOpacity
-            style={styles.checkRow}
-            onPress={() => setAcceptTerms(!acceptTerms)}
-          >
-            <Checkbox.Android
-              status={acceptTerms ? 'checked' : 'unchecked'}
-              onPress={() => setAcceptTerms(!acceptTerms)}
-              color={TarodanColors.primary}
-            />
-            <Text style={styles.checkText}>
-              Üyelik sözleşmesini ve KVKK aydınlatma metnini okudum, kabul ediyorum. *
-            </Text>
-          </TouchableOpacity>
+          <Checkbox
+            checked={acceptTerms}
+            onChange={() => setAcceptTerms(!acceptTerms)}
+            label="Üyelik sözleşmesini ve KVKK aydınlatma metnini okudum, kabul ediyorum. *"
+          />
 
-          <TouchableOpacity
-            style={styles.checkRow}
-            onPress={() => setAcceptMarketing(!acceptMarketing)}
-          >
-            <Checkbox.Android
-              status={acceptMarketing ? 'checked' : 'unchecked'}
-              onPress={() => setAcceptMarketing(!acceptMarketing)}
-              color={TarodanColors.primary}
-            />
-            <Text style={styles.checkText}>
-              Kampanya ve bilgilendirmeleri e-posta ile almak istiyorum.
-            </Text>
-          </TouchableOpacity>
+          <Checkbox
+            checked={acceptMarketing}
+            onChange={() => setAcceptMarketing(!acceptMarketing)}
+            label="Kampanya ve bilgilendirmeleri e-posta ile almak istiyorum."
+          />
 
           <Button
-            mode="contained"
-            buttonColor={TarodanColors.primary}
+            variant="primary"
+            size="lg"
+            fullWidth
+            title="Hesap Oluştur"
             onPress={handleSubmit}
-            loading={registerMutation.isPending}
+            isLoading={registerMutation.isPending}
             disabled={registerMutation.isPending}
-            style={styles.submitBtn}
-            contentStyle={{ paddingVertical: 4 }}
-          >
-            Hesap Oluştur
-          </Button>
+            style={{ marginTop: spacing[3] }}
+          />
 
-          <TouchableOpacity onPress={() => router.replace('/(auth)/login')}>
-            <Text style={styles.loginLink}>
-              Zaten hesabınız var mı? <Text style={{ color: TarodanColors.primary, fontWeight: '700' }}>Giriş yapın</Text>
+          <HStack justify="center" gap={1} style={{ marginTop: spacing[3] }}>
+            <Text variant="bodySm" tone="muted">
+              Zaten hesabınız var mı?
             </Text>
-          </TouchableOpacity>
-        </ScrollView>
-      </KeyboardAvoidingView>
+            <Text
+              variant="bodySm"
+              tone="primary"
+              weight="bold"
+              onPress={() => router.replace('/(auth)/login')}
+            >
+              Giriş yapın
+            </Text>
+          </HStack>
+        </VStack>
+      </Screen>
     </SafeAreaView>
   );
 }
-
-const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: TarodanColors.backgroundSecondary,
-  },
-  scrollBody: {
-    padding: 16,
-    gap: 10,
-    paddingBottom: 40,
-  },
-  headerInfo: {
-    alignItems: 'center',
-    padding: 16,
-    gap: 6,
-    backgroundColor: TarodanColors.primaryLight,
-    borderRadius: 12,
-  },
-  headerTitle: {
-    fontSize: 18,
-    fontWeight: '800',
-    color: TarodanColors.textPrimary,
-  },
-  headerSubtitle: {
-    fontSize: 13,
-    color: TarodanColors.textSecondary,
-    textAlign: 'center',
-    lineHeight: 18,
-  },
-  section: {
-    fontSize: 14,
-    fontWeight: '700',
-    color: TarodanColors.textPrimary,
-    marginTop: 10,
-    marginBottom: 4,
-  },
-  input: {
-    backgroundColor: TarodanColors.background,
-  },
-  row: {
-    flexDirection: 'row',
-    gap: 8,
-  },
-  checkRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-    marginTop: 4,
-  },
-  checkText: {
-    flex: 1,
-    fontSize: 12,
-    color: TarodanColors.textSecondary,
-    lineHeight: 17,
-  },
-  submitBtn: {
-    borderRadius: 10,
-    marginTop: 10,
-  },
-  loginLink: {
-    textAlign: 'center',
-    marginTop: 16,
-    fontSize: 13,
-    color: TarodanColors.textSecondary,
-  },
-});

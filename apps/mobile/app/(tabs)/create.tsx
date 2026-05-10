@@ -1,5 +1,4 @@
 import { View, ScrollView, Image, StyleSheet, Alert, TouchableOpacity, Platform } from 'react-native';
-import { Button, SegmentedButtons, Switch, useTheme, Snackbar, IconButton, Card, Chip, ProgressBar, Banner, Portal, Dialog } from 'react-native-paper';
 import { useState, useEffect } from 'react';
 import { useForm, Controller } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
@@ -8,16 +7,32 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { router } from 'expo-router';
 import * as ImagePicker from 'expo-image-picker';
 import { Ionicons } from '@expo/vector-icons';
+import {
+  Alert as UIAlert,
+  Button,
+  Card,
+  Chip,
+  IconButton,
+  Input,
+  Modal,
+  ProgressBar,
+  Snackbar,
+  Switch,
+  Text,
+  VStack,
+  theme,
+} from '@tarodan/ui-native';
 import { productsApi, categoriesApi, uploadApi } from '../../src/services/api';
 import { useAuthStore } from '../../src/stores/authStore';
-import { TarodanColors } from '../../src/theme';
-import { CommissionPreview, Text, TextInput } from '../../src/components/common';
-import { canPerformAction, getUpgradeMessage, getRemainingCount } from '../../src/utils/membershipLimits';
+import { CommissionPreview } from '../../src/components/common';
+import { getUpgradeMessage } from '../../src/utils/membershipLimits';
+
+const { colors, spacing, radius } = theme;
 
 const listingSchema = z.object({
   title: z.string().min(5, 'Başlık en az 5 karakter olmalı').max(200, 'Başlık en fazla 200 karakter olabilir'),
   description: z.string().max(5000, 'Açıklama en fazla 5000 karakter olabilir').optional(),
-  price: z.string().refine(val => !isNaN(Number(val)) && Number(val) >= 1, 'Fiyat en az 1 TL olmalı'),
+  price: z.string().refine((val) => !isNaN(Number(val)) && Number(val) >= 1, 'Fiyat en az 1 TL olmalı'),
   brand: z.string().min(1, 'Marka seçin'),
   scale: z.string().min(1, 'Ölçek seçin'),
   condition: z.string().min(1, 'Durum seçin'),
@@ -68,22 +83,21 @@ interface Category {
 }
 
 export default function CreateScreen() {
-  const theme = useTheme();
   const queryClient = useQueryClient();
-  const { isAuthenticated, user, limits, canCreateListing, getRemainingListings, refreshUserData } = useAuthStore();
+  const { isAuthenticated, user, limits, canCreateListing, getRemainingListings, refreshUserData } =
+    useAuthStore();
   const [images, setImages] = useState<string[]>([]);
   const [snackbar, setSnackbar] = useState({ visible: false, message: '' });
   const [showUpgradeDialog, setShowUpgradeDialog] = useState(false);
-  const [upgradeReason, setUpgradeReason] = useState<'listingLimit' | 'tradeFeature' | 'imageLimit'>('listingLimit');
+  const [upgradeReason, setUpgradeReason] = useState<
+    'listingLimit' | 'tradeFeature' | 'imageLimit'
+  >('listingLimit');
   const [selectedCategory, setSelectedCategory] = useState<string>('');
 
-  // Get image limit based on membership
   const maxImages = limits?.maxImagesPerListing || 5;
   const remainingListings = getRemainingListings();
   const canCreate = canCreateListing();
 
-  // Fetch categories from API
-  // Web ile aynı endpoint: GET /categories
   const { data: categoriesData } = useQuery({
     queryKey: ['categories'],
     queryFn: async () => {
@@ -122,53 +136,42 @@ export default function CreateScreen() {
     },
   });
 
-  // Check if trade feature is available
   const canTrade = limits?.canTrade || false;
-  const watchTradeEnabled = watch('isTradeEnabled');
-  // Komisyon önizlemesi için fiyat ve kategori izle
   const watchPrice = watch('price');
   const watchCategory = watch('categoryId');
 
-  // Effect to check listing limits on mount
   useEffect(() => {
     if (isAuthenticated) {
       refreshUserData();
     }
-  }, [isAuthenticated]);
+  }, [isAuthenticated, refreshUserData]);
 
   const createMutation = useMutation({
     mutationFn: async (data: ListingForm) => {
-      // First, upload images to get URLs
       const uploadedImageUrls: string[] = [];
-      
       for (const uri of images) {
         try {
           const formData = new FormData();
           const filename = uri.split('/').pop() || `image_${Date.now()}.jpg`;
           const match = /\.(\w+)$/.exec(filename);
           const type = match ? `image/${match[1]}` : 'image/jpeg';
-          
           formData.append('file', {
             uri: Platform.OS === 'ios' ? uri.replace('file://', '') : uri,
             type,
             name: filename,
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
           } as any);
-          
           const uploadResponse = await uploadApi.image(formData);
           if (uploadResponse.key || uploadResponse.url) {
             uploadedImageUrls.push(uploadResponse.key || uploadResponse.url);
           }
         } catch (uploadError) {
           console.error('Image upload error:', uploadError);
-          // Continue with other images
         }
       }
-      
       if (uploadedImageUrls.length === 0 && images.length > 0) {
         throw new Error('Fotoğraflar yüklenemedi. Lütfen tekrar deneyin.');
       }
-
-      // Prepare payload matching API DTO
       const payload = {
         title: data.title,
         description: data.description || undefined,
@@ -180,22 +183,21 @@ export default function CreateScreen() {
         isTradeEnabled: data.isTradeEnabled,
         imageUrls: uploadedImageUrls.length > 0 ? uploadedImageUrls : undefined,
       };
-
-      // Web ile aynı endpoint: POST /products
       return productsApi.create(payload);
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['products'] });
       queryClient.invalidateQueries({ queryKey: ['my-listings'] });
-      refreshUserData(); // Refresh user data to update listing count
+      refreshUserData();
       setSnackbar({ visible: true, message: 'İlan başarıyla oluşturuldu! Onay bekliyor.' });
       reset();
       setImages([]);
       setSelectedCategory('');
       setTimeout(() => router.push('/settings/my-listings'), 1500);
     },
-    onError: (error: any) => {
-      const message = error.response?.data?.message || error.message || 'İlan oluşturulamadı';
+    onError: (error: unknown) => {
+      const e = error as { response?: { data?: { message?: string } }; message?: string };
+      const message = e.response?.data?.message || e.message || 'İlan oluşturulamadı';
       setSnackbar({ visible: true, message });
     },
   });
@@ -210,27 +212,21 @@ export default function CreateScreen() {
       }
       return;
     }
-
     const result = await ImagePicker.launchImageLibraryAsync({
       mediaTypes: ImagePicker.MediaTypeOptions.Images,
       allowsMultipleSelection: true,
       selectionLimit: maxImages - images.length,
       quality: 0.8,
     });
-
     if (!result.canceled) {
-      const newImages = result.assets.map(asset => asset.uri);
+      const newImages = result.assets.map((asset) => asset.uri);
       setImages([...images, ...newImages].slice(0, maxImages));
     }
   };
 
   const takePhoto = async () => {
     if (images.length >= maxImages) return;
-
-    const result = await ImagePicker.launchCameraAsync({
-      quality: 0.8,
-    });
-
+    const result = await ImagePicker.launchCameraAsync({ quality: 0.8 });
     if (!result.canceled) {
       setImages([...images, result.assets[0].uri].slice(0, maxImages));
     }
@@ -250,135 +246,140 @@ export default function CreateScreen() {
   };
 
   const onSubmit = (data: ListingForm) => {
-    // Check listing limit before submitting
     if (!canCreate) {
       setUpgradeReason('listingLimit');
       setShowUpgradeDialog(true);
       return;
     }
-
     if (images.length === 0) {
       setSnackbar({ visible: true, message: 'En az bir fotoğraf ekleyin' });
       return;
     }
-
-    // Check price limit for unverified members
     const price = parseFloat(data.price);
     const maxValue = limits?.maxValuePerListing || 5000;
     if (maxValue > 0 && price > maxValue && !user?.isVerified) {
       Alert.alert(
         'Fiyat Limiti',
         `Doğrulanmamış üyeler en fazla ${maxValue.toLocaleString('tr-TR')} TL değerinde ilan verebilir. Profil doğrulamanızı tamamlayın.`,
-        [{ text: 'Tamam' }]
+        [{ text: 'Tamam' }],
       );
       return;
     }
-
     createMutation.mutate(data);
   };
 
-  // Not authenticated - show login prompt
   if (!isAuthenticated) {
     return (
       <View style={styles.centeredContainer}>
-        <Ionicons name="add-circle-outline" size={64} color={TarodanColors.primary} />
-        <Text variant="titleLarge" style={styles.loginTitle}>Giriş Yapın</Text>
-        <Text variant="bodyMedium" style={styles.loginSubtitle}>
+        <Ionicons name="add-circle-outline" size={64} color={colors.primary[600]!} />
+        <Text variant="h2" style={{ marginTop: spacing[4], marginBottom: spacing[2] }}>
+          Giriş Yapın
+        </Text>
+        <Text
+          variant="body"
+          tone="muted"
+          align="center"
+          style={{ marginBottom: spacing[6], paddingHorizontal: spacing[4] }}
+        >
           İlan vermek için giriş yapmanız gerekiyor
         </Text>
-        <Button mode="contained" onPress={() => router.push('/(auth)/login')} style={styles.loginButton}>
-          Giriş Yap
-        </Button>
-        <Button mode="text" onPress={() => router.push('/(auth)/register')}>
-          Hesabınız yok mu? Kayıt olun
-        </Button>
+        <Button
+          variant="primary"
+          size="lg"
+          fullWidth
+          title="Giriş Yap"
+          onPress={() => router.push('/(auth)/login')}
+          style={{ marginBottom: spacing[2] }}
+        />
+        <Button
+          variant="ghost"
+          fullWidth
+          title="Hesabınız yok mu? Kayıt olun"
+          onPress={() => router.push('/(auth)/register')}
+        />
       </View>
     );
   }
 
-  // Listing limit reached
   if (!canCreate) {
     return (
       <View style={styles.centeredContainer}>
-        <Ionicons name="alert-circle-outline" size={64} color={TarodanColors.warning} />
-        <Text variant="titleLarge" style={styles.loginTitle}>İlan Limitine Ulaştınız</Text>
-        <Text variant="bodyMedium" style={styles.loginSubtitle}>
-          Ücretsiz üye olarak en fazla {limits?.maxListings || 10} ilan verebilirsiniz.
-          Sınırsız ilan için Premium üyeliğe geçin.
+        <Ionicons name="alert-circle-outline" size={64} color={colors.warning[600]!} />
+        <Text variant="h2" style={{ marginTop: spacing[4], marginBottom: spacing[2] }}>
+          İlan Limitine Ulaştınız
+        </Text>
+        <Text variant="body" tone="muted" align="center" style={{ marginBottom: spacing[6] }}>
+          Ücretsiz üye olarak en fazla {limits?.maxListings || 10} ilan verebilirsiniz. Sınırsız ilan
+          için Premium üyeliğe geçin.
         </Text>
         <Card style={styles.upgradeCard}>
-          <Card.Content>
-            <Text variant="titleMedium" style={{ color: TarodanColors.primary, marginBottom: 8 }}>
-              Premium Avantajları
-            </Text>
-            <View style={styles.benefitRow}>
-              <Ionicons name="checkmark-circle" size={20} color={TarodanColors.success} />
-              <Text style={styles.benefitText}>Sınırsız ilan verme</Text>
+          <Text variant="h3" tone="primary" style={{ marginBottom: spacing[2] }}>
+            Premium Avantajları
+          </Text>
+          {[
+            'Sınırsız ilan verme',
+            '15 fotoğraf yükleme',
+            'Takas özelliği',
+            'Dijital Garaj',
+          ].map((b) => (
+            <View key={b} style={styles.benefitRow}>
+              <Ionicons name="checkmark-circle" size={20} color={colors.success[600]!} />
+              <Text variant="body" style={{ marginLeft: spacing[2] }}>
+                {b}
+              </Text>
             </View>
-            <View style={styles.benefitRow}>
-              <Ionicons name="checkmark-circle" size={20} color={TarodanColors.success} />
-              <Text style={styles.benefitText}>15 fotoğraf yükleme</Text>
-            </View>
-            <View style={styles.benefitRow}>
-              <Ionicons name="checkmark-circle" size={20} color={TarodanColors.success} />
-              <Text style={styles.benefitText}>Takas özelliği</Text>
-            </View>
-            <View style={styles.benefitRow}>
-              <Ionicons name="checkmark-circle" size={20} color={TarodanColors.success} />
-              <Text style={styles.benefitText}>Dijital Garaj</Text>
-            </View>
-          </Card.Content>
+          ))}
         </Card>
-        <Button mode="contained" onPress={() => router.push('/upgrade')} style={styles.upgradeButton}>
-          Premium'a Geç - 99 TL/ay
-        </Button>
-        <Button mode="text" onPress={() => router.push('/settings/my-listings')}>
-          Mevcut ilanlarımı görüntüle
-        </Button>
+        <Button
+          variant="primary"
+          size="lg"
+          fullWidth
+          title="Premium'a Geç - 99 TL/ay"
+          onPress={() => router.push('/upgrade')}
+          style={{ marginTop: spacing[4] }}
+        />
+        <Button
+          variant="ghost"
+          fullWidth
+          title="Mevcut ilanlarımı görüntüle"
+          onPress={() => router.push('/settings/my-listings')}
+        />
       </View>
     );
   }
 
   return (
-    <ScrollView style={[styles.container, { backgroundColor: theme.colors.background }]}>
+    <ScrollView style={[styles.container, { backgroundColor: colors.surface.alt }]}>
       <View style={styles.content}>
-        {/* Listing Count Banner */}
         {remainingListings !== -1 && remainingListings <= 3 && (
-          <Banner
-            visible={true}
-            icon="information"
-            style={styles.warningBanner}
-          >
-            <Text>
-              {remainingListings === 0 
-                ? 'İlan limitinize ulaştınız!' 
-                : `Kalan ilan hakkınız: ${remainingListings}/${limits?.maxListings || 10}`}
-            </Text>
-          </Banner>
+          <UIAlert variant="warning" style={{ marginBottom: spacing[4] }}>
+            {remainingListings === 0
+              ? 'İlan limitinize ulaştınız!'
+              : `Kalan ilan hakkınız: ${remainingListings}/${limits?.maxListings || 10}`}
+          </UIAlert>
         )}
 
-        {/* Progress Indicator */}
         <Card style={styles.progressCard}>
-          <Card.Content>
-            <View style={styles.progressHeader}>
-              <Text variant="titleSmall">İlan Kullanımı</Text>
-              <Text variant="bodySmall" style={{ color: TarodanColors.textSecondary }}>
-                {user?.listingCount || 0}/{limits?.maxListings === -1 ? '∞' : limits?.maxListings || 10}
-              </Text>
-            </View>
-            {limits?.maxListings !== -1 && (
-              <ProgressBar
-                progress={(user?.listingCount || 0) / (limits?.maxListings || 10)}
-                color={remainingListings <= 2 ? TarodanColors.warning : TarodanColors.primary}
-                style={styles.progressBar}
-              />
-            )}
-          </Card.Content>
+          <View style={styles.progressHeader}>
+            <Text variant="label">İlan Kullanımı</Text>
+            <Text variant="bodySm" tone="muted">
+              {user?.listingCount || 0}/{limits?.maxListings === -1 ? '∞' : limits?.maxListings || 10}
+            </Text>
+          </View>
+          {limits?.maxListings !== -1 && (
+            <ProgressBar
+              progress={(user?.listingCount || 0) / (limits?.maxListings || 10)}
+              color={remainingListings <= 2 ? colors.warning[600]! : colors.primary[600]!}
+              height={8}
+              style={{ marginTop: spacing[2] }}
+            />
+          )}
         </Card>
 
-        {/* Images Section */}
-        <Text variant="titleMedium" style={styles.sectionTitle}>Fotoğraflar *</Text>
-        <Text variant="bodySmall" style={styles.sectionSubtitle}>
+        <Text variant="h3" style={styles.sectionTitle}>
+          Fotoğraflar *
+        </Text>
+        <Text variant="bodySm" tone="muted" style={styles.sectionSubtitle}>
           İlk fotoğraf kapak fotoğrafı olacak. Ücretsiz üyeler {maxImages} fotoğraf yükleyebilir.
         </Text>
         <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.imageScrollView}>
@@ -387,13 +388,16 @@ export default function CreateScreen() {
               <Image source={{ uri }} style={styles.image} />
               {index === 0 && (
                 <View style={styles.coverBadge}>
-                  <Text style={styles.coverBadgeText}>Kapak</Text>
+                  <Text variant="caption" tone="inverted" weight="bold">
+                    Kapak
+                  </Text>
                 </View>
               )}
               <IconButton
                 icon="close-circle"
-                size={24}
-                iconColor="#fff"
+                accessibilityLabel="Fotoğrafı sil"
+                size="sm"
+                color={colors.white}
                 style={styles.removeImageButton}
                 onPress={() => removeImage(index)}
               />
@@ -402,167 +406,178 @@ export default function CreateScreen() {
           {images.length < maxImages && (
             <View style={styles.addImageButtons}>
               <TouchableOpacity style={styles.addImageButton} onPress={pickImage}>
-                <Ionicons name="images-outline" size={32} color={TarodanColors.primary} />
-                <Text variant="bodySmall">Galeri</Text>
+                <Ionicons name="images-outline" size={32} color={colors.primary[600]!} />
+                <Text variant="caption">Galeri</Text>
               </TouchableOpacity>
               <TouchableOpacity style={styles.addImageButton} onPress={takePhoto}>
-                <Ionicons name="camera-outline" size={32} color={TarodanColors.primary} />
-                <Text variant="bodySmall">Kamera</Text>
+                <Ionicons name="camera-outline" size={32} color={colors.primary[600]!} />
+                <Text variant="caption">Kamera</Text>
               </TouchableOpacity>
             </View>
           )}
         </ScrollView>
-        <Text variant="bodySmall" style={styles.imageCounter}>
+        <Text variant="caption" tone="muted" style={{ marginBottom: spacing[4] }}>
           {images.length}/{maxImages} fotoğraf
         </Text>
 
-        {/* Title */}
         <Controller
           control={control}
           name="title"
           render={({ field: { onChange, value } }) => (
-            <TextInput
+            <Input
               label="Başlık *"
               value={value}
               onChangeText={onChange}
-              error={!!errors.title}
-              style={styles.input}
+              error={errors.title?.message}
               placeholder="Örn: Hot Wheels 1967 Ford Mustang"
               maxLength={200}
             />
           )}
         />
-        {errors.title && <Text style={styles.errorText}>{errors.title.message}</Text>}
 
-        {/* Description */}
         <Controller
           control={control}
           name="description"
           render={({ field: { onChange, value } }) => (
-            <TextInput
+            <Input
               label="Açıklama"
               value={value}
               onChangeText={onChange}
               multiline
               numberOfLines={4}
-              style={styles.input}
               placeholder="Ürün hakkında detaylı bilgi verin..."
               maxLength={5000}
+              style={{ minHeight: 96, textAlignVertical: 'top' }}
             />
           )}
         />
 
-        {/* Price */}
         <Controller
           control={control}
           name="price"
           render={({ field: { onChange, value } }) => (
-            <TextInput
+            <Input
               label="Fiyat (₺) *"
               value={value}
               onChangeText={onChange}
               keyboardType="numeric"
-              error={!!errors.price}
-              style={styles.input}
-              left={<TextInput.Affix text="₺" />}
+              error={errors.price?.message}
+              leftIconName="cash-outline"
             />
           )}
         />
-        {errors.price && <Text style={styles.errorText}>{errors.price.message}</Text>}
         {!user?.isVerified && (
-          <Text variant="bodySmall" style={styles.limitWarning}>
-            Doğrulanmamış üyeler en fazla {(limits?.maxValuePerListing || 5000).toLocaleString('tr-TR')} TL değerinde ilan verebilir
+          <Text variant="bodySm" tone="warning" style={{ marginBottom: spacing[4] }}>
+            Doğrulanmamış üyeler en fazla{' '}
+            {(limits?.maxValuePerListing || 5000).toLocaleString('tr-TR')} TL değerinde ilan verebilir
           </Text>
         )}
         <CommissionPreview amount={watchPrice} categoryId={watchCategory} />
 
-        {/* Category */}
-        <Text variant="titleSmall" style={styles.fieldLabel}>Kategori *</Text>
+        <Text variant="label" style={styles.fieldLabel}>
+          Kategori *
+        </Text>
         <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.chipScrollView}>
           {categories.map((cat) => (
             <Chip
               key={cat.id}
+              label={cat.name}
               selected={selectedCategory === cat.id}
               onPress={() => {
                 setSelectedCategory(cat.id);
                 setValue('categoryId', cat.id);
               }}
               style={styles.chip}
-              mode={selectedCategory === cat.id ? 'flat' : 'outlined'}
-            >
-              {cat.name}
-            </Chip>
+            />
           ))}
         </ScrollView>
-        {errors.categoryId && <Text style={styles.errorText}>{errors.categoryId.message}</Text>}
+        {errors.categoryId && (
+          <Text variant="bodySm" tone="danger">
+            {errors.categoryId.message}
+          </Text>
+        )}
 
-        {/* Brand */}
-        <Text variant="titleSmall" style={styles.fieldLabel}>Marka *</Text>
+        <Text variant="label" style={styles.fieldLabel}>
+          Marka *
+        </Text>
         <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.chipScrollView}>
           {BRANDS.map((brand) => (
             <Chip
               key={brand.id}
+              label={brand.name}
               selected={watch('brand') === brand.id}
               onPress={() => setValue('brand', brand.id)}
               style={styles.chip}
-              mode={watch('brand') === brand.id ? 'flat' : 'outlined'}
-            >
-              {brand.name}
-            </Chip>
+            />
           ))}
         </ScrollView>
-        {errors.brand && <Text style={styles.errorText}>{errors.brand.message}</Text>}
+        {errors.brand && (
+          <Text variant="bodySm" tone="danger">
+            {errors.brand.message}
+          </Text>
+        )}
 
-        {/* Scale */}
-        <Text variant="titleSmall" style={styles.fieldLabel}>Ölçek *</Text>
+        <Text variant="label" style={styles.fieldLabel}>
+          Ölçek *
+        </Text>
         <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.chipScrollView}>
           {SCALES.map((scale) => (
             <Chip
               key={scale.id}
+              label={scale.name}
               selected={watch('scale') === scale.id}
               onPress={() => setValue('scale', scale.id)}
               style={styles.chip}
-              mode={watch('scale') === scale.id ? 'flat' : 'outlined'}
-            >
-              {scale.name}
-            </Chip>
+            />
           ))}
         </ScrollView>
-        {errors.scale && <Text style={styles.errorText}>{errors.scale.message}</Text>}
+        {errors.scale && (
+          <Text variant="bodySm" tone="danger">
+            {errors.scale.message}
+          </Text>
+        )}
 
-        {/* Condition */}
-        <Text variant="titleSmall" style={styles.fieldLabel}>Durum *</Text>
-        {CONDITIONS.map((condition) => (
-          <TouchableOpacity
-            key={condition.id}
-            style={[
-              styles.conditionOption,
-              watch('condition') === condition.id && styles.conditionOptionSelected,
-            ]}
-            onPress={() => setValue('condition', condition.id)}
-          >
-            <View style={styles.conditionContent}>
-              <Text variant="bodyMedium" style={watch('condition') === condition.id ? styles.conditionTextSelected : undefined}>
-                {condition.name}
-              </Text>
-              <Text variant="bodySmall" style={styles.conditionDescription}>
-                {condition.description}
-              </Text>
-            </View>
-            {watch('condition') === condition.id && (
-              <Ionicons name="checkmark-circle" size={24} color={TarodanColors.primary} />
-            )}
-          </TouchableOpacity>
-        ))}
-        {errors.condition && <Text style={styles.errorText}>{errors.condition.message}</Text>}
+        <Text variant="label" style={styles.fieldLabel}>
+          Durum *
+        </Text>
+        {CONDITIONS.map((condition) => {
+          const isSelected = watch('condition') === condition.id;
+          return (
+            <TouchableOpacity
+              key={condition.id}
+              style={[styles.conditionOption, isSelected && styles.conditionOptionSelected]}
+              onPress={() => setValue('condition', condition.id)}
+            >
+              <View style={styles.conditionContent}>
+                <Text
+                  variant="body"
+                  tone={isSelected ? 'primary' : 'heading'}
+                  weight={isSelected ? 'semibold' : 'regular'}
+                >
+                  {condition.name}
+                </Text>
+                <Text variant="bodySm" tone="muted" style={{ marginTop: 2 }}>
+                  {condition.description}
+                </Text>
+              </View>
+              {isSelected && (
+                <Ionicons name="checkmark-circle" size={24} color={colors.primary[600]!} />
+              )}
+            </TouchableOpacity>
+          );
+        })}
+        {errors.condition && (
+          <Text variant="bodySm" tone="danger">
+            {errors.condition.message}
+          </Text>
+        )}
 
-        {/* Trade Available */}
         <View style={styles.tradeSection}>
           <View style={styles.tradeContent}>
-            <Text variant="titleSmall">Takas Kabul</Text>
-            <Text variant="bodySmall" style={styles.tradeSubtitle}>
-              {canTrade 
-                ? 'Takas tekliflerine açık mısınız?' 
+            <Text variant="label">Takas Kabul</Text>
+            <Text variant="bodySm" tone="muted">
+              {canTrade
+                ? 'Takas tekliflerine açık mısınız?'
                 : 'Bu özellik Premium üyelere özeldir'}
             </Text>
           </View>
@@ -570,70 +585,88 @@ export default function CreateScreen() {
             control={control}
             name="isTradeEnabled"
             render={({ field: { value } }) => (
-              <Switch 
-                value={value} 
+              <Switch
+                value={value}
                 onValueChange={handleTradeToggle}
                 disabled={!canTrade}
               />
             )}
           />
           {!canTrade && (
-            <TouchableOpacity onPress={() => {
-              setUpgradeReason('tradeFeature');
-              setShowUpgradeDialog(true);
-            }}>
-              <Ionicons name="lock-closed" size={20} color={TarodanColors.warning} style={{ marginLeft: 8 }} />
+            <TouchableOpacity
+              onPress={() => {
+                setUpgradeReason('tradeFeature');
+                setShowUpgradeDialog(true);
+              }}
+            >
+              <Ionicons
+                name="lock-closed"
+                size={20}
+                color={colors.warning[600]!}
+                style={{ marginLeft: spacing[2] }}
+              />
             </TouchableOpacity>
           )}
         </View>
 
-        {/* Submit Button */}
         <Button
-          mode="contained"
+          variant="primary"
+          size="lg"
+          fullWidth
+          title="İlanı Yayınla"
           onPress={handleSubmit(onSubmit)}
-          loading={createMutation.isPending}
+          isLoading={createMutation.isPending}
           disabled={createMutation.isPending}
-          style={styles.submitButton}
-          contentStyle={styles.submitButtonContent}
-        >
-          İlanı Yayınla
-        </Button>
-        <Text variant="bodySmall" style={styles.submitNote}>
+          style={{ marginTop: spacing[2] }}
+        />
+        <Text variant="bodySm" tone="muted" align="center" style={{ marginTop: spacing[2] }}>
           İlanınız yayınlanmadan önce moderatör onayına tabi tutulacaktır.
         </Text>
 
-        {/* Bottom Spacing */}
         <View style={{ height: 100 }} />
       </View>
 
-      {/* Upgrade Dialog */}
-      <Portal>
-        <Dialog visible={showUpgradeDialog} onDismiss={() => setShowUpgradeDialog(false)}>
-          <Dialog.Title>{getUpgradeMessage(upgradeReason).title}</Dialog.Title>
-          <Dialog.Content>
-            <Text>{getUpgradeMessage(upgradeReason).message}</Text>
-            <View style={styles.dialogBenefits}>
-              <Text variant="titleSmall" style={{ marginTop: 16, marginBottom: 8 }}>Premium Avantajları:</Text>
-              <Text>• Sınırsız ilan</Text>
-              <Text>• 15 fotoğraf yükleme</Text>
-              <Text>• Takas özelliği</Text>
-              <Text>• Dijital Garaj</Text>
-              <Text>• Reklamsız deneyim</Text>
-            </View>
-          </Dialog.Content>
-          <Dialog.Actions>
-            <Button onPress={() => setShowUpgradeDialog(false)}>Vazgeç</Button>
-            <Button mode="contained" onPress={() => {
-              setShowUpgradeDialog(false);
-              router.push('/upgrade');
-            }}>
-              Premium'a Geç
-            </Button>
-          </Dialog.Actions>
-        </Dialog>
-      </Portal>
+      <Modal
+        isOpen={showUpgradeDialog}
+        onClose={() => setShowUpgradeDialog(false)}
+        title={getUpgradeMessage(upgradeReason).title}
+      >
+        <VStack gap={2}>
+          <Text variant="body">{getUpgradeMessage(upgradeReason).message}</Text>
+          <Text variant="label" style={{ marginTop: spacing[4] }}>
+            Premium Avantajları:
+          </Text>
+          {[
+            '• Sınırsız ilan',
+            '• 15 fotoğraf yükleme',
+            '• Takas özelliği',
+            '• Dijital Garaj',
+            '• Reklamsız deneyim',
+          ].map((b) => (
+            <Text key={b} variant="bodySm">
+              {b}
+            </Text>
+          ))}
+          <View style={{ flexDirection: 'row', gap: spacing[2], marginTop: spacing[4] }}>
+            <Button
+              variant="ghost"
+              title="Vazgeç"
+              onPress={() => setShowUpgradeDialog(false)}
+              style={{ flex: 1 }}
+            />
+            <Button
+              variant="primary"
+              title="Premium'a Geç"
+              onPress={() => {
+                setShowUpgradeDialog(false);
+                router.push('/upgrade');
+              }}
+              style={{ flex: 1 }}
+            />
+          </View>
+        </VStack>
+      </Modal>
 
-      {/* Snackbar */}
       <Snackbar
         visible={snackbar.visible}
         onDismiss={() => setSnackbar({ ...snackbar, visible: false })}
@@ -646,199 +679,102 @@ export default function CreateScreen() {
 }
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-  },
-  content: {
-    padding: 16,
-  },
+  container: { flex: 1 },
+  content: { padding: spacing[4] },
   centeredContainer: {
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
-    padding: 32,
-    backgroundColor: '#fff',
-  },
-  loginTitle: {
-    marginTop: 16,
-    marginBottom: 8,
-  },
-  loginSubtitle: {
-    textAlign: 'center',
-    marginBottom: 24,
-    color: TarodanColors.textSecondary,
-    paddingHorizontal: 16,
-  },
-  loginButton: {
-    marginBottom: 8,
-    width: '100%',
+    padding: spacing[8],
+    backgroundColor: colors.surface.DEFAULT,
   },
   upgradeCard: {
-    marginVertical: 16,
+    marginVertical: spacing[4],
     width: '100%',
-  },
-  upgradeButton: {
-    marginBottom: 8,
-    width: '100%',
-    backgroundColor: TarodanColors.primary,
   },
   benefitRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginVertical: 4,
-  },
-  benefitText: {
-    marginLeft: 8,
-  },
-  warningBanner: {
-    marginBottom: 16,
-    backgroundColor: TarodanColors.warningLight,
+    marginVertical: spacing[1],
   },
   progressCard: {
-    marginBottom: 16,
+    marginBottom: spacing[4],
   },
   progressHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    marginBottom: 8,
+    marginBottom: spacing[2],
   },
-  progressBar: {
-    height: 8,
-    borderRadius: 4,
-  },
-  sectionTitle: {
-    marginBottom: 4,
-  },
-  sectionSubtitle: {
-    color: TarodanColors.textSecondary,
-    marginBottom: 12,
-  },
-  imageScrollView: {
-    marginBottom: 8,
-  },
+  sectionTitle: { marginBottom: spacing[1] },
+  sectionSubtitle: { marginBottom: spacing[3] },
+  imageScrollView: { marginBottom: spacing[2] },
   imageContainer: {
-    marginRight: 12,
+    marginRight: spacing[3],
     position: 'relative',
   },
   image: {
     width: 120,
     height: 120,
-    borderRadius: 8,
+    borderRadius: radius.xl,
   },
   coverBadge: {
     position: 'absolute',
     bottom: 4,
     left: 4,
-    backgroundColor: TarodanColors.primary,
-    paddingHorizontal: 8,
+    backgroundColor: colors.primary[600]!,
+    paddingHorizontal: spacing[2],
     paddingVertical: 2,
-    borderRadius: 4,
-  },
-  coverBadgeText: {
-    color: '#fff',
-    fontSize: 10,
-    fontWeight: 'bold',
+    borderRadius: radius.md,
   },
   removeImageButton: {
     position: 'absolute',
     top: -8,
     right: -8,
-    backgroundColor: 'rgba(0,0,0,0.5)',
+    backgroundColor: colors.gray[800],
   },
   addImageButtons: {
     flexDirection: 'row',
-    gap: 12,
+    gap: spacing[3],
   },
   addImageButton: {
     width: 100,
     height: 100,
     borderWidth: 2,
-    borderColor: TarodanColors.border,
+    borderColor: colors.border.DEFAULT,
     borderStyle: 'dashed',
-    borderRadius: 8,
+    borderRadius: radius.xl,
     justifyContent: 'center',
     alignItems: 'center',
   },
-  imageCounter: {
-    color: TarodanColors.textSecondary,
-    marginBottom: 16,
-  },
-  input: {
-    marginBottom: 8,
-    backgroundColor: '#fff',
-  },
-  errorText: {
-    color: TarodanColors.error,
-    fontSize: 12,
-    marginBottom: 8,
-  },
-  limitWarning: {
-    color: TarodanColors.warning,
-    marginBottom: 16,
-  },
   fieldLabel: {
-    marginTop: 16,
-    marginBottom: 8,
+    marginTop: spacing[4],
+    marginBottom: spacing[2],
   },
-  chipScrollView: {
-    marginBottom: 8,
-  },
-  chip: {
-    marginRight: 8,
-    marginBottom: 8,
-  },
+  chipScrollView: { marginBottom: spacing[2] },
+  chip: { marginRight: spacing[2] },
   conditionOption: {
     flexDirection: 'row',
     alignItems: 'center',
-    padding: 12,
+    padding: spacing[3],
     borderWidth: 1,
-    borderColor: TarodanColors.border,
-    borderRadius: 8,
-    marginBottom: 8,
-    backgroundColor: '#fff',
+    borderColor: colors.border.DEFAULT,
+    borderRadius: radius.xl,
+    marginBottom: spacing[2],
+    backgroundColor: colors.surface.DEFAULT,
   },
   conditionOptionSelected: {
-    borderColor: TarodanColors.primary,
-    backgroundColor: TarodanColors.primaryLight + '20',
+    borderColor: colors.primary[600]!,
+    backgroundColor: colors.primary[50]!,
   },
-  conditionContent: {
-    flex: 1,
-  },
-  conditionTextSelected: {
-    color: TarodanColors.primary,
-    fontWeight: '600',
-  },
-  conditionDescription: {
-    color: TarodanColors.textSecondary,
-    marginTop: 2,
-  },
+  conditionContent: { flex: 1 },
   tradeSection: {
     flexDirection: 'row',
     alignItems: 'center',
-    padding: 16,
-    backgroundColor: '#fff',
-    borderRadius: 8,
-    marginTop: 16,
-    marginBottom: 24,
+    padding: spacing[4],
+    backgroundColor: colors.surface.DEFAULT,
+    borderRadius: radius.xl,
+    marginTop: spacing[4],
+    marginBottom: spacing[6],
   },
-  tradeContent: {
-    flex: 1,
-  },
-  tradeSubtitle: {
-    color: TarodanColors.textSecondary,
-  },
-  submitButton: {
-    marginTop: 8,
-  },
-  submitButtonContent: {
-    paddingVertical: 8,
-  },
-  submitNote: {
-    textAlign: 'center',
-    color: TarodanColors.textSecondary,
-    marginTop: 8,
-  },
-  dialogBenefits: {
-    marginTop: 8,
-  },
+  tradeContent: { flex: 1 },
 });

@@ -4,21 +4,25 @@ import { router } from 'expo-router';
 import { Platform } from 'react-native';
 import Constants from 'expo-constants';
 
-// Expo'nun belirlediği LAN IP'sini al
+// API URL çözümleme sırası:
+// 1) EXPO_PUBLIC_API_URL (production / preview / staging build'leri için zorunlu)
+// 2) Expo Go LAN host (lokal geliştirme)
+// 3) Platform fallback'i (emülatör)
 const getApiUrl = () => {
-  // Expo Go'nun çalıştığı bilgisayarın IP'si
+  const envUrl = process.env.EXPO_PUBLIC_API_URL;
+  if (envUrl && envUrl.length > 0) {
+    return envUrl.replace(/\/$/, '');
+  }
+
   const expoHost = Constants.expoConfig?.hostUri?.split(':')[0];
-  
   if (expoHost) {
-    // Expo host IP'sini kullan - API /api prefix'i ile
     return `http://${expoHost}:3001/api`;
   }
-  
-  // Fallback - Android emulator için 10.0.2.2, diğerleri için localhost
+
   if (Platform.OS === 'android') {
     return 'http://10.0.2.2:3001/api';
   }
-  
+
   return 'http://localhost:3001/api';
 };
 

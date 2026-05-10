@@ -2,9 +2,11 @@ import { Tabs } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { View, Text, StyleSheet } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { TarodanColors } from '../../src/theme';
+import { theme } from '@tarodan/ui-native';
 import { useMessagesStore } from '../../src/stores/messagesStore';
 import { useTranslation } from '../../src/i18n';
+
+const { colors } = theme;
 
 export default function TabLayout() {
   const insets = useSafeAreaInsets();
@@ -16,17 +18,17 @@ export default function TabLayout() {
   return (
     <Tabs
       screenOptions={{
-        tabBarActiveTintColor: TarodanColors.primary,
-        tabBarInactiveTintColor: TarodanColors.textTertiary,
+        tabBarActiveTintColor: colors.primary[600]!,
+        tabBarInactiveTintColor: colors.text.subtle,
         tabBarStyle: {
-          backgroundColor: TarodanColors.background,
-          borderTopColor: TarodanColors.borderLight,
+          backgroundColor: colors.surface.DEFAULT,
+          borderTopColor: colors.border.subtle,
           borderTopWidth: 1,
           paddingTop: 8,
           paddingBottom: tabBarBottom,
           height: 56 + tabBarBottom,
           elevation: 10,
-          shadowColor: '#000',
+          shadowColor: colors.black,
           shadowOffset: { width: 0, height: -4 },
           shadowOpacity: 0.08,
           shadowRadius: 8,
@@ -64,9 +66,9 @@ export default function TabLayout() {
         options={{
           title: '',
           tabBarAccessibilityLabel: t('mobile.tabBarSell'),
-          tabBarIcon: ({ focused }) => (
+          tabBarIcon: () => (
             <View style={styles.sellButton}>
-              <Ionicons name="add" size={28} color="#fff" />
+              <Ionicons name="add" size={28} color={colors.white} />
             </View>
           ),
         }}
@@ -128,10 +130,10 @@ const styles = StyleSheet.create({
     width: 48,
     height: 48,
     borderRadius: 24,
-    backgroundColor: TarodanColors.primary,
+    backgroundColor: colors.primary[600]!,
     justifyContent: 'center',
     alignItems: 'center',
-    shadowColor: TarodanColors.primary,
+    shadowColor: colors.primary[600]!,
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.3,
     shadowRadius: 6,
@@ -141,7 +143,7 @@ const styles = StyleSheet.create({
     position: 'absolute',
     right: -10,
     top: -5,
-    backgroundColor: TarodanColors.error,
+    backgroundColor: colors.danger[600]!,
     borderRadius: 12,
     minWidth: 20,
     height: 20,
@@ -149,10 +151,10 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     paddingHorizontal: 5,
     borderWidth: 2,
-    borderColor: TarodanColors.background,
+    borderColor: colors.surface.DEFAULT,
   },
   badgeText: {
-    color: '#fff',
+    color: colors.white,
     fontSize: 10,
     fontWeight: 'bold',
   },

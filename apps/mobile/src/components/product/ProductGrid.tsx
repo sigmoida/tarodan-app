@@ -2,9 +2,7 @@ import React, { useMemo } from 'react';
 import { FlatList, StyleSheet, View, RefreshControl, Dimensions, ListRenderItemInfo } from 'react-native';
 import { TarodanColors } from '../../theme';
 import { ProductCard, ProductCardProduct, ProductCardLayout } from './ProductCard';
-import { EmptyState } from '../common/EmptyState';
-import { ScreenLoader } from '../common/ScreenLoader';
-import { ErrorState } from '../common/ErrorState';
+import { EmptyState, ScreenLoader, ErrorState } from '@tarodan/ui-native';
 
 interface ProductGridProps {
   items: ProductCardProduct[];
