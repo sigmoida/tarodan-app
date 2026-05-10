@@ -1,15 +1,16 @@
 import React from 'react';
 import { View, ScrollView, StyleSheet, Image, TouchableOpacity, Dimensions } from 'react-native';
-import { ActivityIndicator } from 'react-native-paper';
+import { theme, Spinner, Text, EmptyState } from '@tarodan/ui-native';
 import { useLocalSearchParams, router } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { useQuery } from '@tanstack/react-query';
-import { Text, ScreenHeader, EmptyState } from '../../src/components/common';
-import { TarodanColors, CONDITIONS } from '../../src/theme';
+import { ScreenHeader } from '../../src/components/common';
+import { CONDITIONS } from '../../src/theme';
 import { carModelsApi, productsApi } from '../../src/services/api';
 import { transformImageUrl } from '../../src/utils/imageUrl';
 import { formatPrice } from '../../src/utils/format';
 
+const { colors } = theme;
 const { width } = Dimensions.get('window');
 const CARD_WIDTH = (width - 16 * 2 - 12) / 2; // 2 sütun, 16 padding, 12 gap
 
@@ -95,7 +96,7 @@ export default function ModelDetailScreen() {
       <View style={styles.container}>
         <ScreenHeader title="Model" />
         <View style={styles.loading}>
-          <ActivityIndicator size="large" color={TarodanColors.primary} />
+          <Spinner size="lg" />
         </View>
       </View>
     );
@@ -127,7 +128,7 @@ export default function ModelDetailScreen() {
             <Image source={{ uri: transformImageUrl(model.image) }} style={styles.heroImage} resizeMode="cover" />
           ) : (
             <View style={[styles.heroImage, styles.heroFallback]}>
-              <Ionicons name="car-sport" size={64} color={TarodanColors.textTertiary} />
+              <Ionicons name="car-sport" size={64} color={colors.text.subtle} />
             </View>
           )}
           <View style={styles.heroOverlay}>
@@ -165,7 +166,7 @@ export default function ModelDetailScreen() {
           </View>
 
           {productsQuery.isLoading ? (
-            <ActivityIndicator color={TarodanColors.primary} style={{ marginVertical: 24 }} />
+            <Spinner size="lg" />
           ) : products.length === 0 ? (
             <EmptyState
               icon="cube-outline"
@@ -184,7 +185,7 @@ export default function ModelDetailScreen() {
                     <Image source={{ uri: getImageUri(p) }} style={styles.productImage} />
                   ) : (
                     <View style={[styles.productImage, styles.productImageFallback]}>
-                      <Ionicons name="cube-outline" size={32} color={TarodanColors.textTertiary} />
+                      <Ionicons name="cube-outline" size={32} color={colors.text.subtle} />
                     </View>
                   )}
                   <View style={styles.productBody}>
@@ -209,7 +210,7 @@ export default function ModelDetailScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: TarodanColors.backgroundSecondary,
+    backgroundColor: colors.surface.alt,
   },
   loading: {
     flex: 1,
@@ -218,7 +219,7 @@ const styles = StyleSheet.create({
   },
   hero: {
     position: 'relative',
-    backgroundColor: TarodanColors.surfaceVariant,
+    backgroundColor: colors.gray[50],
   },
   heroImage: {
     width: '100%',
@@ -234,7 +235,7 @@ const styles = StyleSheet.create({
     right: 0,
     bottom: 0,
     padding: 16,
-    backgroundColor: 'rgba(0,0,0,0.55)',
+    backgroundColor: colors.overlay.black50,
   },
   brandRow: {
     flexDirection: 'row',
@@ -246,37 +247,37 @@ const styles = StyleSheet.create({
     width: 24,
     height: 24,
     borderRadius: 12,
-    backgroundColor: '#fff',
+    backgroundColor: colors.white,
   },
   brandName: {
     fontSize: 13,
-    color: '#fff',
+    color: colors.white,
     fontWeight: '600',
     opacity: 0.9,
   },
   modelName: {
     fontSize: 24,
     fontWeight: 'bold',
-    color: '#fff',
+    color: colors.white,
   },
   yearLabel: {
     fontSize: 13,
-    color: '#fff',
+    color: colors.white,
     opacity: 0.8,
     marginTop: 2,
   },
   descriptionWrap: {
-    backgroundColor: TarodanColors.background,
+    backgroundColor: colors.surface.DEFAULT,
     padding: 16,
     marginBottom: 12,
   },
   description: {
     fontSize: 14,
     lineHeight: 20,
-    color: TarodanColors.textPrimary,
+    color: colors.text.heading,
   },
   productsSection: {
-    backgroundColor: TarodanColors.background,
+    backgroundColor: colors.surface.DEFAULT,
     paddingVertical: 12,
   },
   productsHeader: {
@@ -290,11 +291,11 @@ const styles = StyleSheet.create({
     flex: 1,
     fontSize: 16,
     fontWeight: '700',
-    color: TarodanColors.textPrimary,
+    color: colors.text.heading,
   },
   productCount: {
     fontSize: 12,
-    color: TarodanColors.textSecondary,
+    color: colors.text.muted,
     fontWeight: '500',
   },
   productsGrid: {
@@ -305,7 +306,7 @@ const styles = StyleSheet.create({
   },
   productCard: {
     width: CARD_WIDTH,
-    backgroundColor: TarodanColors.surfaceVariant,
+    backgroundColor: colors.gray[50],
     borderRadius: 10,
     overflow: 'hidden',
     marginBottom: 12,
@@ -313,7 +314,7 @@ const styles = StyleSheet.create({
   productImage: {
     width: '100%',
     aspectRatio: 1,
-    backgroundColor: TarodanColors.borderLight,
+    backgroundColor: colors.border.subtle,
   },
   productImageFallback: {
     alignItems: 'center',
@@ -325,18 +326,18 @@ const styles = StyleSheet.create({
   productTitle: {
     fontSize: 13,
     fontWeight: '500',
-    color: TarodanColors.textPrimary,
+    color: colors.text.heading,
     minHeight: 34,
   },
   productPrice: {
     fontSize: 15,
     fontWeight: 'bold',
-    color: TarodanColors.primary,
+    color: colors.primary[600]!,
     marginTop: 4,
   },
   productCondition: {
     fontSize: 11,
-    color: TarodanColors.textSecondary,
+    color: colors.text.muted,
     marginTop: 2,
   },
 });

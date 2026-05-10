@@ -1,6 +1,16 @@
-import { View, ScrollView, StyleSheet, TouchableOpacity, Image, Alert } from 'react-native';
-import { Button, Card, Chip, Divider, ActivityIndicator, Snackbar } from 'react-native-paper';
-import { Text, TextInput } from '../../src/components/common';
+import { View, ScrollView, StyleSheet, Pressable, Image, Alert } from 'react-native';
+import {
+  theme,
+  Button,
+  Card,
+  Chip,
+  Divider,
+  Spinner,
+  Snackbar,
+  Text,
+  Input,
+  Textarea,
+} from '@tarodan/ui-native';
 import { useState, useEffect } from 'react';
 import { router, useLocalSearchParams } from 'expo-router';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
@@ -8,11 +18,12 @@ import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 // listingsApi → productsApi (parite migrasyonu); userApi.getMyProducts → productsApi.getMyListings
 import { productsApi as listingsApi, tradesApi, productsApi } from '../../src/services/api';
 import { useAuthStore } from '../../src/stores/authStore';
-import { TarodanColors } from '../../src/theme';
 import { getUpgradeMessage } from '../../src/utils/membershipLimits';
 import { getImageUrl } from '../../src/utils/imageUrl';
 import { getProductEffectivePrice } from '../../src/utils/productPrice';
 import { formatApiErrorMessage } from '../../src/utils/formatApiErrorMessage';
+
+const { colors } = theme;
 
 interface Product {
   id: string;
@@ -158,8 +169,6 @@ export default function NewTradeScreen() {
   const myTotal = selectedMyItems.reduce((sum, p) => sum + getProductEffectivePrice(p), 0);
   const theirTotal = selectedTheirItems.reduce((sum, p) => sum + getProductEffectivePrice(p), 0);
   const cashValue = parseFloat(cashAmount.replace(',', '.')) || 0;
-  const effectiveCash = cashDirection === 'offer' ? cashValue : -cashValue;
-  const finalDiff = theirTotal - myTotal - effectiveCash;
 
   // Check premium access
   if (!canTrade) {
@@ -167,43 +176,39 @@ export default function NewTradeScreen() {
     return (
       <View style={styles.container}>
         <View style={styles.header}>
-          <TouchableOpacity onPress={() => router.back()}>
-            <Ionicons name="arrow-back" size={24} color={TarodanColors.textOnPrimary} />
-          </TouchableOpacity>
+          <Pressable onPress={() => router.back()}>
+            <Ionicons name="arrow-back" size={24} color={colors.white} />
+          </Pressable>
           <Text style={styles.headerTitle}>Takas Teklifi</Text>
           <View style={{ width: 24 }} />
         </View>
-        
+
         <View style={styles.premiumRequired}>
-          <MaterialCommunityIcons name="swap-horizontal" size={80} color={TarodanColors.primary} />
-          <Text variant="headlineSmall" style={styles.premiumTitle}>{upgradeInfo.title}</Text>
-          <Text variant="bodyMedium" style={styles.premiumSubtitle}>{upgradeInfo.message}</Text>
-          
+          <MaterialCommunityIcons name="swap-horizontal" size={80} color={colors.primary[600]!} />
+          <Text variant="h2" style={styles.premiumTitle}>{upgradeInfo.title}</Text>
+          <Text variant="body" style={styles.premiumSubtitle}>{upgradeInfo.message}</Text>
+
           <View style={styles.premiumFeatures}>
             <View style={styles.premiumFeature}>
-              <Ionicons name="checkmark-circle" size={20} color={TarodanColors.success} />
+              <Ionicons name="checkmark-circle" size={20} color={colors.success[600]!} />
               <Text style={styles.premiumFeatureText}>Takas teklifi oluşturun</Text>
             </View>
             <View style={styles.premiumFeature}>
-              <Ionicons name="checkmark-circle" size={20} color={TarodanColors.success} />
+              <Ionicons name="checkmark-circle" size={20} color={colors.success[600]!} />
               <Text style={styles.premiumFeatureText}>Karşı teklif yapın</Text>
             </View>
             <View style={styles.premiumFeature}>
-              <Ionicons name="checkmark-circle" size={20} color={TarodanColors.success} />
+              <Ionicons name="checkmark-circle" size={20} color={colors.success[600]!} />
               <Text style={styles.premiumFeatureText}>Nakit fark ekleyin</Text>
             </View>
             <View style={styles.premiumFeature}>
-              <Ionicons name="checkmark-circle" size={20} color={TarodanColors.success} />
+              <Ionicons name="checkmark-circle" size={20} color={colors.success[600]!} />
               <Text style={styles.premiumFeatureText}>Takas koruma programı</Text>
             </View>
           </View>
-          
-          <Button mode="contained" onPress={() => router.push('/membership')} style={styles.upgradeButton}>
-            Üyelik Planları
-          </Button>
-          <Button mode="text" onPress={() => router.back()}>
-            Geri Dön
-          </Button>
+
+          <Button variant="primary" title="Üyelik Planları" onPress={() => router.push('/membership')} style={styles.upgradeButton} />
+          <Button variant="ghost" title="Geri Dön" onPress={() => router.back()} />
         </View>
       </View>
     );
@@ -212,9 +217,9 @@ export default function NewTradeScreen() {
   if (!isAuthenticated) {
     return (
       <View style={styles.centeredContainer}>
-        <Text variant="titleLarge">Giriş Yapın</Text>
-        <Text variant="bodyMedium" style={styles.subtitle}>Takas teklifi vermek için giriş yapmalısınız</Text>
-        <Button mode="contained" onPress={() => router.push('/(auth)/login')}>Giriş Yap</Button>
+        <Text variant="h3">Giriş Yapın</Text>
+        <Text variant="body" style={styles.subtitle}>Takas teklifi vermek için giriş yapmalısınız</Text>
+        <Button variant="primary" title="Giriş Yap" onPress={() => router.push('/(auth)/login')} />
       </View>
     );
   }
@@ -249,9 +254,13 @@ export default function NewTradeScreen() {
   };
 
   const renderProductCard = (product: Product, isSelected: boolean, onToggle: () => void) => (
-    <TouchableOpacity
+    <Pressable
       key={product.id}
-      style={[styles.productCard, isSelected && styles.productCardSelected]}
+      style={({ pressed }) => [
+        styles.productCard,
+        isSelected && styles.productCardSelected,
+        pressed && { opacity: 0.85 },
+      ]}
       onPress={onToggle}
     >
       <Image
@@ -259,26 +268,26 @@ export default function NewTradeScreen() {
         style={styles.productImage}
       />
       <View style={styles.productInfo}>
-        <Text variant="bodyMedium" numberOfLines={2} style={styles.productTitle}>
+        <Text variant="body" numberOfLines={2} style={styles.productTitle}>
           {product.title}
         </Text>
-        <Text variant="bodySmall" style={styles.productPrice}>
+        <Text variant="caption" style={styles.productPrice}>
           ₺{getProductEffectivePrice(product).toLocaleString('tr-TR')}
         </Text>
       </View>
       <View style={[styles.checkbox, isSelected && styles.checkboxSelected]}>
-        {isSelected && <Ionicons name="checkmark" size={16} color="#fff" />}
+        {isSelected && <Ionicons name="checkmark" size={16} color={colors.white} />}
       </View>
-    </TouchableOpacity>
+    </Pressable>
   );
 
   return (
     <View style={styles.container}>
       {/* Header */}
       <View style={styles.header}>
-        <TouchableOpacity onPress={() => router.back()}>
-          <Ionicons name="arrow-back" size={24} color={TarodanColors.textOnPrimary} />
-        </TouchableOpacity>
+        <Pressable onPress={() => router.back()}>
+          <Ionicons name="arrow-back" size={24} color={colors.white} />
+        </Pressable>
         <Text style={styles.headerTitle}>Takas Teklifi</Text>
         <View style={{ width: 24 }} />
       </View>
@@ -301,23 +310,23 @@ export default function NewTradeScreen() {
         {/* Step 1: Select My Items */}
         {step === 1 && (
           <View>
-            <Text variant="titleMedium" style={styles.sectionTitle}>
+            <Text variant="h3" style={styles.sectionTitle}>
               Takas için ürünlerinizi seçin
             </Text>
-            
+
             {loadingMyProducts ? (
-              <ActivityIndicator style={{ marginTop: 32 }} />
+              <View style={{ marginTop: 32 }}>
+                <Spinner size="md" />
+              </View>
             ) : myProducts?.length === 0 ? (
               <Card style={styles.emptyCard}>
-                <Card.Content style={styles.emptyContent}>
-                  <Ionicons name="pricetag-outline" size={48} color={TarodanColors.textLight} />
-                  <Text variant="bodyMedium" style={styles.emptyText}>
+                <View style={styles.emptyContent}>
+                  <Ionicons name="pricetag-outline" size={48} color={colors.text.subtle} />
+                  <Text variant="body" style={styles.emptyText}>
                     Takas için aktif ilanınız yok
                   </Text>
-                  <Button mode="outlined" onPress={() => router.push('/(tabs)/create')}>
-                    İlan Oluştur
-                  </Button>
-                </Card.Content>
+                  <Button variant="outline" title="İlan Oluştur" onPress={() => router.push('/(tabs)/create')} />
+                </View>
               </Card>
             ) : (
               myProducts?.map((product: Product) =>
@@ -330,9 +339,7 @@ export default function NewTradeScreen() {
             )}
 
             <View style={styles.stepActions}>
-              <Button mode="contained" onPress={() => setStep(2)}>
-                Devam ({selectedMyItems.length} seçili)
-              </Button>
+              <Button variant="primary" title={`Devam (${selectedMyItems.length} seçili)`} onPress={() => setStep(2)} />
             </View>
           </View>
         )}
@@ -340,20 +347,22 @@ export default function NewTradeScreen() {
         {/* Step 2: Select Their Items */}
         {step === 2 && (
           <View>
-            <Text variant="titleMedium" style={styles.sectionTitle}>
+            <Text variant="h3" style={styles.sectionTitle}>
               İstediğiniz ürünleri seçin
             </Text>
-            
+
             {loadingTheirProducts ? (
-              <ActivityIndicator style={{ marginTop: 32 }} />
+              <View style={{ marginTop: 32 }}>
+                <Spinner size="md" />
+              </View>
             ) : theirProducts?.length === 0 ? (
               <Card style={styles.emptyCard}>
-                <Card.Content style={styles.emptyContent}>
-                  <Ionicons name="swap-horizontal" size={48} color={TarodanColors.textLight} />
-                  <Text variant="bodyMedium" style={styles.emptyText}>
+                <View style={styles.emptyContent}>
+                  <Ionicons name="swap-horizontal" size={48} color={colors.text.subtle} />
+                  <Text variant="body" style={styles.emptyText}>
                     Bu satıcının takas için ürünü yok
                   </Text>
-                </Card.Content>
+                </View>
               </Card>
             ) : (
               theirProducts?.map((product: Product) =>
@@ -367,50 +376,40 @@ export default function NewTradeScreen() {
 
             {/* Cash Adjustment */}
             <Card style={styles.cashCard}>
-              <Card.Content>
-                <Text variant="titleSmall" style={styles.cashTitle}>Nakit Fark (Opsiyonel)</Text>
-                <View style={styles.cashDirectionRow}>
-                  <Chip
-                    selected={cashDirection === 'offer'}
-                    onPress={() => setCashDirection('offer')}
-                    style={styles.cashChip}
-                  >
-                    Ben ödeyeceğim
-                  </Chip>
-                  <Chip
-                    selected={cashDirection === 'request'}
-                    onPress={() => setCashDirection('request')}
-                    style={styles.cashChip}
-                  >
-                    Karşı taraf ödesin
-                  </Chip>
-                </View>
-                <TextInput
-                  label="Tutar (₺)"
-                  value={cashAmount}
-                  onChangeText={setCashAmount}
-                  keyboardType="numeric"
-                  mode="outlined"
-                  style={styles.cashInput}
-                  textColor={TarodanColors.textPrimary}
-                  outlineColor={TarodanColors.border}
-                  activeOutlineColor={TarodanColors.primary}
-                  theme={{ colors: { onSurfaceVariant: TarodanColors.textSecondary } }}
+              <Text variant="label" style={styles.cashTitle}>Nakit Fark (Opsiyonel)</Text>
+              <View style={styles.cashDirectionRow}>
+                <Chip
+                  label="Ben ödeyeceğim"
+                  selected={cashDirection === 'offer'}
+                  onPress={() => setCashDirection('offer')}
+                  variant="primary"
+                  style={styles.cashChip}
                 />
-              </Card.Content>
+                <Chip
+                  label="Karşı taraf ödesin"
+                  selected={cashDirection === 'request'}
+                  onPress={() => setCashDirection('request')}
+                  variant="primary"
+                  style={styles.cashChip}
+                />
+              </View>
+              <Input
+                label="Tutar (₺)"
+                value={cashAmount}
+                onChangeText={setCashAmount}
+                keyboardType="numeric"
+                containerStyle={styles.cashInput}
+              />
             </Card>
 
             <View style={styles.stepActions}>
-              <Button mode="outlined" onPress={() => setStep(1)} style={{ marginRight: 12 }}>
-                Geri
-              </Button>
+              <Button variant="outline" title="Geri" onPress={() => setStep(1)} style={{ marginRight: 12 }} />
               <Button
-                mode="contained"
+                variant="primary"
+                title="Devam"
                 disabled={selectedTheirItems.length === 0}
                 onPress={() => setStep(3)}
-              >
-                Devam
-              </Button>
+              />
             </View>
           </View>
         )}
@@ -418,122 +417,111 @@ export default function NewTradeScreen() {
         {/* Step 3: Review & Submit */}
         {step === 3 && (
           <View>
-            <Text variant="titleMedium" style={styles.sectionTitle}>
+            <Text variant="h3" style={styles.sectionTitle}>
               Takas Özeti
             </Text>
 
             {/* My Items Summary */}
             <Card style={styles.summaryCard}>
-              <Card.Content>
-                <Text variant="titleSmall" style={styles.summaryTitle}>
-                  Teklif Ettiğiniz Ürünler
-                </Text>
-                {selectedMyItems.map((product) => (
-                  <View key={product.id} style={styles.summaryItem}>
-                    <Image
-                      source={{ uri: getImageUrl(product.images) }}
-                      style={styles.summaryImage}
-                    />
-                    <Text variant="bodySmall" style={styles.summaryItemTitle} numberOfLines={1}>
-                      {product.title}
-                    </Text>
-                    <Text variant="bodySmall" style={styles.summaryItemPrice}>
-                      ₺{product.price?.toLocaleString('tr-TR')}
-                    </Text>
-                  </View>
-                ))}
-                <Divider style={styles.summaryDivider} />
-                <View style={styles.summaryTotal}>
-                  <Text variant="bodyMedium">Toplam Değer:</Text>
-                  <Text variant="titleSmall" style={styles.totalPrice}>
-                    ₺{myTotal.toLocaleString('tr-TR')}
+              <Text variant="label" style={styles.summaryTitle}>
+                Teklif Ettiğiniz Ürünler
+              </Text>
+              {selectedMyItems.map((product) => (
+                <View key={product.id} style={styles.summaryItem}>
+                  <Image
+                    source={{ uri: getImageUrl(product.images) }}
+                    style={styles.summaryImage}
+                  />
+                  <Text variant="caption" style={styles.summaryItemTitle} numberOfLines={1}>
+                    {product.title}
+                  </Text>
+                  <Text variant="caption" style={styles.summaryItemPrice}>
+                    ₺{product.price?.toLocaleString('tr-TR')}
                   </Text>
                 </View>
-              </Card.Content>
+              ))}
+              <Divider style={styles.summaryDivider} />
+              <View style={styles.summaryTotal}>
+                <Text variant="body">Toplam Değer:</Text>
+                <Text variant="label" style={styles.totalPrice}>
+                  ₺{myTotal.toLocaleString('tr-TR')}
+                </Text>
+              </View>
             </Card>
 
             {/* Their Items Summary */}
             <Card style={styles.summaryCard}>
-              <Card.Content>
-                <Text variant="titleSmall" style={styles.summaryTitle}>
-                  İstediğiniz Ürünler
-                </Text>
-                {selectedTheirItems.map((product) => (
-                  <View key={product.id} style={styles.summaryItem}>
-                    <Image
-                      source={{ uri: getImageUrl(product.images) }}
-                      style={styles.summaryImage}
-                    />
-                    <Text variant="bodySmall" style={styles.summaryItemTitle} numberOfLines={1}>
-                      {product.title}
-                    </Text>
-                    <Text variant="bodySmall" style={styles.summaryItemPrice}>
-                      ₺{product.price?.toLocaleString('tr-TR')}
-                    </Text>
-                  </View>
-                ))}
-                <Divider style={styles.summaryDivider} />
-                <View style={styles.summaryTotal}>
-                  <Text variant="bodyMedium">Toplam Değer:</Text>
-                  <Text variant="titleSmall" style={styles.totalPrice}>
-                    ₺{theirTotal.toLocaleString('tr-TR')}
+              <Text variant="label" style={styles.summaryTitle}>
+                İstediğiniz Ürünler
+              </Text>
+              {selectedTheirItems.map((product) => (
+                <View key={product.id} style={styles.summaryItem}>
+                  <Image
+                    source={{ uri: getImageUrl(product.images) }}
+                    style={styles.summaryImage}
+                  />
+                  <Text variant="caption" style={styles.summaryItemTitle} numberOfLines={1}>
+                    {product.title}
+                  </Text>
+                  <Text variant="caption" style={styles.summaryItemPrice}>
+                    ₺{product.price?.toLocaleString('tr-TR')}
                   </Text>
                 </View>
-              </Card.Content>
+              ))}
+              <Divider style={styles.summaryDivider} />
+              <View style={styles.summaryTotal}>
+                <Text variant="body">Toplam Değer:</Text>
+                <Text variant="label" style={styles.totalPrice}>
+                  ₺{theirTotal.toLocaleString('tr-TR')}
+                </Text>
+              </View>
             </Card>
 
             {/* Cash Summary */}
             {cashValue > 0 && (
               <Card style={styles.summaryCard}>
-                <Card.Content>
-                  <Text variant="titleSmall" style={styles.summaryTitle}>Nakit Fark</Text>
-                  <Text variant="bodyMedium">
-                    {cashDirection === 'offer' ? 'Siz ödeyeceksiniz: ' : 'Karşı taraf ödeyecek: '}
-                    <Text style={{ color: TarodanColors.primary, fontWeight: 'bold' }}>
-                      ₺{cashValue.toLocaleString('tr-TR')}
-                    </Text>
+                <Text variant="label" style={styles.summaryTitle}>Nakit Fark</Text>
+                <Text variant="body">
+                  {cashDirection === 'offer' ? 'Siz ödeyeceksiniz: ' : 'Karşı taraf ödeyecek: '}
+                  <Text style={{ color: colors.primary[600]!, fontWeight: 'bold' }}>
+                    ₺{cashValue.toLocaleString('tr-TR')}
                   </Text>
-                </Card.Content>
+                </Text>
               </Card>
             )}
 
             {/* Message */}
-            <TextInput
+            <Textarea
               label="Mesajınız (Opsiyonel)"
               value={message}
               onChangeText={setMessage}
-              multiline
-              numberOfLines={3}
-              mode="outlined"
-              style={styles.messageInput}
+              rows={3}
+              containerStyle={styles.messageInput}
               placeholder="Teklif hakkında bir not ekleyin..."
             />
 
             {/* Trade Protection Info */}
             <Card style={styles.protectionCard}>
-              <Card.Content style={styles.protectionContent}>
-                <Ionicons name="shield-checkmark" size={24} color={TarodanColors.success} />
+              <View style={styles.protectionContent}>
+                <Ionicons name="shield-checkmark" size={24} color={colors.success[600]!} />
                 <View style={styles.protectionText}>
-                  <Text variant="titleSmall">Takas Koruma Programı</Text>
-                  <Text variant="bodySmall" style={styles.protectionDesc}>
+                  <Text variant="label">Takas Koruma Programı</Text>
+                  <Text variant="caption" style={styles.protectionDesc}>
                     Her iki taraf da kargoyu göndermeden ödeme yapılmaz. Güvenli takas garantisi.
                   </Text>
                 </View>
-              </Card.Content>
+              </View>
             </Card>
 
             <View style={styles.stepActions}>
-              <Button mode="outlined" onPress={() => setStep(2)} style={{ marginRight: 12 }}>
-                Geri
-              </Button>
+              <Button variant="outline" title="Geri" onPress={() => setStep(2)} style={{ marginRight: 12 }} />
               <Button
-                mode="contained"
+                variant="primary"
+                title="Teklifi Gönder"
                 onPress={handleSubmit}
-                loading={createTradeMutation.isPending}
+                isLoading={createTradeMutation.isPending}
                 disabled={createTradeMutation.isPending}
-              >
-                Teklifi Gönder
-              </Button>
+              />
             </View>
           </View>
         )}
@@ -555,7 +543,7 @@ export default function NewTradeScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: TarodanColors.backgroundSecondary,
+    backgroundColor: colors.surface.alt,
   },
   centeredContainer: {
     flex: 1,
@@ -564,7 +552,7 @@ const styles = StyleSheet.create({
     padding: 32,
   },
   header: {
-    backgroundColor: TarodanColors.primary,
+    backgroundColor: colors.primary[600]!,
     paddingTop: 50,
     paddingBottom: 16,
     paddingHorizontal: 20,
@@ -575,21 +563,21 @@ const styles = StyleSheet.create({
   headerTitle: {
     fontSize: 18,
     fontWeight: 'bold',
-    color: TarodanColors.textOnPrimary,
+    color: colors.white,
   },
   subtitle: {
     textAlign: 'center',
     marginVertical: 16,
-    color: TarodanColors.textSecondary,
+    color: colors.text.muted,
   },
   stepsContainer: {
     flexDirection: 'row',
     justifyContent: 'space-around',
     paddingVertical: 16,
     paddingHorizontal: 20,
-    backgroundColor: TarodanColors.background,
+    backgroundColor: colors.surface.DEFAULT,
     borderBottomWidth: 1,
-    borderBottomColor: TarodanColors.border,
+    borderBottomColor: colors.border.DEFAULT,
   },
   stepWrapper: {
     alignItems: 'center',
@@ -598,27 +586,27 @@ const styles = StyleSheet.create({
     width: 32,
     height: 32,
     borderRadius: 16,
-    backgroundColor: TarodanColors.border,
+    backgroundColor: colors.border.DEFAULT,
     justifyContent: 'center',
     alignItems: 'center',
   },
   stepCircleActive: {
-    backgroundColor: TarodanColors.primary,
+    backgroundColor: colors.primary[600]!,
   },
   stepNumber: {
     fontWeight: 'bold',
-    color: TarodanColors.textSecondary,
+    color: colors.text.muted,
   },
   stepNumberActive: {
-    color: '#fff',
+    color: colors.white,
   },
   stepLabel: {
     marginTop: 4,
     fontSize: 12,
-    color: TarodanColors.textSecondary,
+    color: colors.text.muted,
   },
   stepLabelActive: {
-    color: TarodanColors.primary,
+    color: colors.primary[600]!,
     fontWeight: '500',
   },
   content: {
@@ -627,12 +615,12 @@ const styles = StyleSheet.create({
   },
   sectionTitle: {
     marginBottom: 16,
-    color: TarodanColors.textPrimary,
+    color: colors.text.heading,
   },
   productCard: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: TarodanColors.background,
+    backgroundColor: colors.surface.DEFAULT,
     borderRadius: 12,
     padding: 12,
     marginBottom: 12,
@@ -640,24 +628,24 @@ const styles = StyleSheet.create({
     borderColor: 'transparent',
   },
   productCardSelected: {
-    borderColor: TarodanColors.primary,
-    backgroundColor: TarodanColors.primary + '08',
+    borderColor: colors.primary[600]!,
+    backgroundColor: colors.primary[50]!,
   },
   productImage: {
     width: 60,
     height: 60,
     borderRadius: 8,
-    backgroundColor: TarodanColors.border,
+    backgroundColor: colors.border.DEFAULT,
   },
   productInfo: {
     flex: 1,
     marginLeft: 12,
   },
   productTitle: {
-    color: TarodanColors.textPrimary,
+    color: colors.text.heading,
   },
   productPrice: {
-    color: TarodanColors.primary,
+    color: colors.primary[600]!,
     fontWeight: '600',
     marginTop: 4,
   },
@@ -666,30 +654,30 @@ const styles = StyleSheet.create({
     height: 24,
     borderRadius: 12,
     borderWidth: 2,
-    borderColor: TarodanColors.border,
+    borderColor: colors.border.DEFAULT,
     justifyContent: 'center',
     alignItems: 'center',
   },
   checkboxSelected: {
-    backgroundColor: TarodanColors.primary,
-    borderColor: TarodanColors.primary,
+    backgroundColor: colors.primary[600]!,
+    borderColor: colors.primary[600]!,
   },
   emptyCard: {
     marginTop: 32,
-    backgroundColor: TarodanColors.background,
+    backgroundColor: colors.surface.DEFAULT,
   },
   emptyContent: {
     alignItems: 'center',
     padding: 24,
   },
   emptyText: {
-    color: TarodanColors.textSecondary,
+    color: colors.text.muted,
     marginVertical: 16,
     textAlign: 'center',
   },
   cashCard: {
     marginTop: 16,
-    backgroundColor: TarodanColors.background,
+    backgroundColor: colors.surface.DEFAULT,
   },
   cashTitle: {
     marginBottom: 12,
@@ -703,7 +691,7 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   cashInput: {
-    backgroundColor: TarodanColors.background,
+    backgroundColor: colors.surface.DEFAULT,
   },
   stepActions: {
     flexDirection: 'row',
@@ -712,11 +700,11 @@ const styles = StyleSheet.create({
   },
   summaryCard: {
     marginBottom: 12,
-    backgroundColor: TarodanColors.background,
+    backgroundColor: colors.surface.DEFAULT,
   },
   summaryTitle: {
     marginBottom: 12,
-    color: TarodanColors.textPrimary,
+    color: colors.text.heading,
   },
   summaryItem: {
     flexDirection: 'row',
@@ -727,15 +715,15 @@ const styles = StyleSheet.create({
     width: 40,
     height: 40,
     borderRadius: 4,
-    backgroundColor: TarodanColors.border,
+    backgroundColor: colors.border.DEFAULT,
   },
   summaryItemTitle: {
     flex: 1,
     marginLeft: 12,
-    color: TarodanColors.textPrimary,
+    color: colors.text.heading,
   },
   summaryItemPrice: {
-    color: TarodanColors.primary,
+    color: colors.primary[600]!,
     fontWeight: '500',
   },
   summaryDivider: {
@@ -747,18 +735,18 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   totalPrice: {
-    color: TarodanColors.primary,
+    color: colors.primary[600]!,
     fontWeight: 'bold',
   },
   messageInput: {
     marginBottom: 16,
-    backgroundColor: TarodanColors.background,
+    backgroundColor: colors.surface.DEFAULT,
   },
   protectionCard: {
     marginBottom: 16,
-    backgroundColor: TarodanColors.success + '10',
+    backgroundColor: colors.success[50]!,
     borderWidth: 1,
-    borderColor: TarodanColors.success + '40',
+    borderColor: colors.success[200]!,
   },
   protectionContent: {
     flexDirection: 'row',
@@ -769,7 +757,7 @@ const styles = StyleSheet.create({
     marginLeft: 12,
   },
   protectionDesc: {
-    color: TarodanColors.textSecondary,
+    color: colors.text.muted,
     marginTop: 4,
   },
   premiumRequired: {
@@ -777,17 +765,17 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
     padding: 32,
-    backgroundColor: TarodanColors.background,
+    backgroundColor: colors.surface.DEFAULT,
   },
   premiumTitle: {
     marginTop: 24,
     textAlign: 'center',
-    color: TarodanColors.textPrimary,
+    color: colors.text.heading,
   },
   premiumSubtitle: {
     marginTop: 8,
     textAlign: 'center',
-    color: TarodanColors.textSecondary,
+    color: colors.text.muted,
   },
   premiumFeatures: {
     marginTop: 24,
@@ -801,11 +789,10 @@ const styles = StyleSheet.create({
   },
   premiumFeatureText: {
     marginLeft: 12,
-    color: TarodanColors.textPrimary,
+    color: colors.text.heading,
   },
   upgradeButton: {
     marginTop: 24,
-    backgroundColor: TarodanColors.primary,
     width: '100%',
   },
 });

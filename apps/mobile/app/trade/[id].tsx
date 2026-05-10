@@ -1,59 +1,73 @@
-import { View, ScrollView, StyleSheet, TouchableOpacity, Image, Alert, Linking } from 'react-native';
-import { Button, Card, Chip, Divider, ActivityIndicator, Snackbar, Modal, Portal } from 'react-native-paper';
-import { Text, TextInput } from '../../src/components/common';
+import { View, ScrollView, StyleSheet, Pressable, Image, Alert, Linking } from 'react-native';
+import {
+  theme,
+  Button,
+  Card,
+  Divider,
+  Spinner,
+  Snackbar,
+  Modal,
+  Text,
+  Input,
+  StatusBadge,
+  tradeStatusConfig,
+} from '@tarodan/ui-native';
 import { useState } from 'react';
 import { router, useLocalSearchParams, Stack } from 'expo-router';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 import { format } from 'date-fns';
 import { tr } from 'date-fns/locale';
-import { tradesApi, addressesApi, paymentsApi } from '../../src/services/api';
+import { tradesApi, paymentsApi } from '../../src/services/api';
 import { useAuthStore } from '../../src/stores/authStore';
-import { TarodanColors } from '../../src/theme';
 import { useTranslation } from '../../src/i18n/LanguageContext';
 import { captureException } from '../../src/services/sentry';
 
+const { colors } = theme;
+
 type TFn = (key: string, params?: Record<string, string | number>) => string;
 
+// Status meta (icon + color) used for the top status banner. Localized labels
+// for the new auto-shipping flow are applied later via NEW_STATUS_KEYS.
 const TRADE_STATUSES = {
-  pending: { label: 'Bekliyor', color: TarodanColors.warning, icon: 'time-outline' },
-  accepted: { label: 'Kabul Edildi', color: TarodanColors.success, icon: 'checkmark-circle-outline' },
-  rejected: { label: 'Reddedildi', color: TarodanColors.error, icon: 'close-circle-outline' },
-  countered: { label: 'Karşı Teklif', color: TarodanColors.info, icon: 'swap-horizontal' },
-  awaiting_payment: { label: 'Ödeme Bekleniyor', color: TarodanColors.warning, icon: 'card-outline' },
-  shipping_to_warehouse: { label: 'Depoya Gönderim', color: TarodanColors.info, icon: 'cube-outline' },
-  at_warehouse: { label: 'Depoda', color: TarodanColors.info, icon: 'business-outline' },
-  admin_reviewing: { label: 'İnceleniyor', color: TarodanColors.info, icon: 'search-outline' },
-  shipping_to_recipients: { label: 'Alıcılara Gönderim', color: TarodanColors.primary, icon: 'airplane-outline' },
-  returning: { label: 'İade Sürecinde', color: TarodanColors.warning, icon: 'return-up-back-outline' },
+  pending: { label: 'Bekliyor', color: colors.warning[600]!, icon: 'time-outline' },
+  accepted: { label: 'Kabul Edildi', color: colors.success[600]!, icon: 'checkmark-circle-outline' },
+  rejected: { label: 'Reddedildi', color: colors.danger[600]!, icon: 'close-circle-outline' },
+  countered: { label: 'Karşı Teklif', color: colors.info[600]!, icon: 'swap-horizontal' },
+  awaiting_payment: { label: 'Ödeme Bekleniyor', color: colors.warning[600]!, icon: 'card-outline' },
+  shipping_to_warehouse: { label: 'Depoya Gönderim', color: colors.info[600]!, icon: 'cube-outline' },
+  at_warehouse: { label: 'Depoda', color: colors.info[600]!, icon: 'business-outline' },
+  admin_reviewing: { label: 'İnceleniyor', color: colors.info[600]!, icon: 'search-outline' },
+  shipping_to_recipients: { label: 'Alıcılara Gönderim', color: colors.primary[600]!, icon: 'airplane-outline' },
+  returning: { label: 'İade Sürecinde', color: colors.warning[600]!, icon: 'return-up-back-outline' },
   // Legacy fallbacks
-  initiator_shipped: { label: 'Kargo Yolda', color: TarodanColors.info, icon: 'cube-outline' },
-  receiver_shipped: { label: 'Kargo Yolda', color: TarodanColors.info, icon: 'cube-outline' },
-  both_shipped: { label: 'Kargo Yolda', color: TarodanColors.primary, icon: 'airplane-outline' },
-  completed: { label: 'Tamamlandı', color: TarodanColors.success, icon: 'checkmark-done-circle-outline' },
-  cancelled: { label: 'İptal Edildi', color: TarodanColors.textSecondary, icon: 'ban-outline' },
-  disputed: { label: 'İtiraz Var', color: TarodanColors.error, icon: 'warning-outline' },
+  initiator_shipped: { label: 'Kargo Yolda', color: colors.info[600]!, icon: 'cube-outline' },
+  receiver_shipped: { label: 'Kargo Yolda', color: colors.info[600]!, icon: 'cube-outline' },
+  both_shipped: { label: 'Kargo Yolda', color: colors.primary[600]!, icon: 'airplane-outline' },
+  completed: { label: 'Tamamlandı', color: colors.success[600]!, icon: 'checkmark-done-circle-outline' },
+  cancelled: { label: 'İptal Edildi', color: colors.text.muted, icon: 'ban-outline' },
+  disputed: { label: 'İtiraz Var', color: colors.danger[600]!, icon: 'warning-outline' },
 };
 
 const SHIPMENT_STATUS_CHIP: Record<string, { labelKey: string; bg: string; fg: string; icon?: string }> = {
-  label_created: { labelKey: 'trade.shipmentStatus.label_created', bg: TarodanColors.backgroundSecondary, fg: TarodanColors.textSecondary },
-  pending: { labelKey: 'trade.shipmentStatus.pending', bg: TarodanColors.backgroundSecondary, fg: TarodanColors.textSecondary },
-  picked_up: { labelKey: 'trade.shipmentStatus.picked_up', bg: TarodanColors.info + '20', fg: TarodanColors.info },
-  in_transit: { labelKey: 'trade.shipmentStatus.in_transit', bg: TarodanColors.info + '20', fg: TarodanColors.info },
-  at_delivery_branch: { labelKey: 'trade.shipmentStatus.at_delivery_branch', bg: TarodanColors.info + '20', fg: TarodanColors.info },
-  out_for_delivery: { labelKey: 'trade.shipmentStatus.out_for_delivery', bg: TarodanColors.info + '20', fg: TarodanColors.info },
-  delivered: { labelKey: 'trade.shipmentStatus.delivered', bg: TarodanColors.success + '20', fg: TarodanColors.success, icon: '✓' },
-  failed: { labelKey: 'trade.shipmentStatus.failed', bg: TarodanColors.warning + '20', fg: TarodanColors.warning },
-  cancelled: { labelKey: 'trade.shipmentStatus.cancelled', bg: TarodanColors.warning + '20', fg: TarodanColors.warning },
-  returned: { labelKey: 'trade.shipmentStatus.returned', bg: TarodanColors.warning + '20', fg: TarodanColors.warning },
-  return_in_progress: { labelKey: 'trade.shipmentStatus.return_in_progress', bg: TarodanColors.warning + '20', fg: TarodanColors.warning },
+  label_created: { labelKey: 'trade.shipmentStatus.label_created', bg: colors.surface.alt, fg: colors.text.muted },
+  pending: { labelKey: 'trade.shipmentStatus.pending', bg: colors.surface.alt, fg: colors.text.muted },
+  picked_up: { labelKey: 'trade.shipmentStatus.picked_up', bg: colors.info[50]!, fg: colors.info[600]! },
+  in_transit: { labelKey: 'trade.shipmentStatus.in_transit', bg: colors.info[50]!, fg: colors.info[600]! },
+  at_delivery_branch: { labelKey: 'trade.shipmentStatus.at_delivery_branch', bg: colors.info[50]!, fg: colors.info[600]! },
+  out_for_delivery: { labelKey: 'trade.shipmentStatus.out_for_delivery', bg: colors.info[50]!, fg: colors.info[600]! },
+  delivered: { labelKey: 'trade.shipmentStatus.delivered', bg: colors.success[50]!, fg: colors.success[600]!, icon: '✓' },
+  failed: { labelKey: 'trade.shipmentStatus.failed', bg: colors.warning[50]!, fg: colors.warning[600]! },
+  cancelled: { labelKey: 'trade.shipmentStatus.cancelled', bg: colors.warning[50]!, fg: colors.warning[600]! },
+  returned: { labelKey: 'trade.shipmentStatus.returned', bg: colors.warning[50]!, fg: colors.warning[600]! },
+  return_in_progress: { labelKey: 'trade.shipmentStatus.return_in_progress', bg: colors.warning[50]!, fg: colors.warning[600]! },
 };
 
 function ShipmentStatusChip({ status, t, testID }: { status?: string | null; t: TFn; testID?: string }) {
   const meta = (status && SHIPMENT_STATUS_CHIP[status]) || {
     labelKey: 'trade.shipmentStatus.fallback',
-    bg: TarodanColors.backgroundSecondary,
-    fg: TarodanColors.textSecondary,
+    bg: colors.surface.alt,
+    fg: colors.text.muted,
     icon: undefined as string | undefined,
   };
   return (
@@ -116,14 +130,14 @@ export default function TradeDetailScreen() {
   const { id } = useLocalSearchParams();
   const { user } = useAuthStore();
   const queryClient = useQueryClient();
-  
+
   const [snackbar, setSnackbar] = useState({ visible: false, message: '' });
   const [counterModalVisible, setCounterModalVisible] = useState(false);
   const [counterCashAmount, setCounterCashAmount] = useState('');
   const [counterMessage, setCounterMessage] = useState('');
 
   // Fetch trade details
-  const { data: trade, isLoading, refetch } = useQuery<Trade>({
+  const { data: trade, isLoading } = useQuery<Trade>({
     queryKey: ['trade', id],
     queryFn: async () => {
       const response = await tradesApi.getOne(id as string);
@@ -234,7 +248,7 @@ export default function TradeDetailScreen() {
   if (isLoading) {
     return (
       <View style={styles.loadingContainer}>
-        <ActivityIndicator size="large" color={TarodanColors.primary} />
+        <Spinner size="lg" />
       </View>
     );
   }
@@ -243,7 +257,7 @@ export default function TradeDetailScreen() {
     return (
       <View style={styles.errorContainer}>
         <Text>Takas bulunamadı</Text>
-        <Button mode="contained" onPress={() => router.back()}>Geri Dön</Button>
+        <Button variant="primary" title="Geri Dön" onPress={() => router.back()} />
       </View>
     );
   }
@@ -317,9 +331,6 @@ export default function TradeDetailScreen() {
     ? shipments.find((s) => s.direction === 'from_warehouse' && s.recipientUserId === user.id)
     : undefined;
 
-  const canConfirm =
-    trade.status === 'shipping_to_recipients' && myFromWarehouseShipment?.status === 'delivered';
-
   const myTrackingNumber = isInitiator ? trade.initiatorTrackingNumber : trade.receiverTrackingNumber;
   const theirTrackingNumber = isInitiator ? trade.receiverTrackingNumber : trade.initiatorTrackingNumber;
 
@@ -333,6 +344,10 @@ export default function TradeDetailScreen() {
     return t('trade.warehouseShipping.counterpartyWaiting');
   };
 
+  // tradeStatusConfig'in kapsadığı statüler için StatusBadge; banner ayrıca
+  // icon + tonal background için TRADE_STATUSES'tan beslenir.
+  const hasBadge = !!tradeStatusConfig[trade.status];
+
   return (
     <View style={styles.container}>
       <Stack.Screen options={{ title: `Takas #${trade.tradeNumber}` }} />
@@ -344,6 +359,9 @@ export default function TradeDetailScreen() {
           <Text style={[styles.statusText, { color: statusInfo.color }]}>
             {statusInfo.label}
           </Text>
+          {hasBadge ? (
+            <StatusBadge status={trade.status} config={tradeStatusConfig} size="sm" />
+          ) : null}
           {trade.status === 'pending' && trade.responseDeadline && (
             <Text style={styles.deadlineText}>
               Son: {format(new Date(trade.responseDeadline), 'dd MMM HH:mm', { locale: tr })}
@@ -353,269 +371,250 @@ export default function TradeDetailScreen() {
 
         {/* Trade Info */}
         <Card style={styles.card}>
-          <Card.Content>
-            <View style={styles.tradeHeader}>
-              <Text variant="titleMedium">Takas #{trade.tradeNumber}</Text>
-              <Text variant="bodySmall" style={styles.dateText}>
-                {format(new Date(trade.createdAt), 'dd MMMM yyyy HH:mm', { locale: tr })}
+          <View style={styles.tradeHeader}>
+            <Text variant="h3">Takas #{trade.tradeNumber}</Text>
+            <Text variant="caption" style={styles.dateText}>
+              {format(new Date(trade.createdAt), 'dd MMMM yyyy HH:mm', { locale: tr })}
+            </Text>
+          </View>
+
+          <Pressable
+            style={({ pressed }) => [styles.otherParty, pressed && { opacity: 0.85 }]}
+            onPress={() => router.push(`/seller/${otherParty.id}`)}
+          >
+            <View style={styles.avatar}>
+              <Text style={styles.avatarText}>
+                {otherParty.displayName.charAt(0).toUpperCase()}
               </Text>
             </View>
-            
-            <TouchableOpacity 
-              style={styles.otherParty}
-              onPress={() => router.push(`/seller/${otherParty.id}`)}
-            >
-              <View style={styles.avatar}>
-                <Text style={styles.avatarText}>
-                  {otherParty.displayName.charAt(0).toUpperCase()}
-                </Text>
-              </View>
-              <View style={styles.otherPartyInfo}>
-                <Text variant="bodyMedium">{isInitiator ? 'Alıcı' : 'Teklif Eden'}</Text>
-                <Text variant="titleSmall">{otherParty.displayName}</Text>
-              </View>
-              <Ionicons name="chevron-forward" size={20} color={TarodanColors.textSecondary} />
-            </TouchableOpacity>
-          </Card.Content>
+            <View style={styles.otherPartyInfo}>
+              <Text variant="body">{isInitiator ? 'Alıcı' : 'Teklif Eden'}</Text>
+              <Text variant="label">{otherParty.displayName}</Text>
+            </View>
+            <Ionicons name="chevron-forward" size={20} color={colors.text.muted} />
+          </Pressable>
         </Card>
 
         {/* My Items */}
         <Card style={styles.card}>
-          <Card.Content>
-            <Text variant="titleSmall" style={styles.sectionTitle}>
-              {isInitiator ? 'Teklif Ettiğiniz' : 'Alacağınız'} Ürünler
+          <Text variant="label" style={styles.sectionTitle}>
+            {isInitiator ? 'Teklif Ettiğiniz' : 'Alacağınız'} Ürünler
+          </Text>
+          {myItems.map((item) => (
+            <Pressable
+              key={item.id}
+              style={({ pressed }) => [styles.itemRow, pressed && { opacity: 0.85 }]}
+              onPress={() => router.push(`/product/${item.product.id}`)}
+            >
+              <Image
+                source={{ uri: item.product.images?.[0]?.url || 'https://via.placeholder.com/50' }}
+                style={styles.itemImage}
+              />
+              <View style={styles.itemInfo}>
+                <Text variant="body" numberOfLines={1}>{item.product.title}</Text>
+                <Text variant="caption" style={styles.itemPrice}>
+                  ₺{Number(item.valueAtTrade).toLocaleString('tr-TR')}
+                </Text>
+              </View>
+            </Pressable>
+          ))}
+          <Divider style={styles.divider} />
+          <View style={styles.totalRow}>
+            <Text variant="body">Toplam:</Text>
+            <Text variant="label" style={styles.totalPrice}>
+              ₺{(isInitiator ? initiatorTotal : receiverTotal).toLocaleString('tr-TR')}
             </Text>
-            {myItems.map((item) => (
-              <TouchableOpacity
-                key={item.id}
-                style={styles.itemRow}
-                onPress={() => router.push(`/product/${item.product.id}`)}
-              >
-                <Image
-                  source={{ uri: item.product.images?.[0]?.url || 'https://via.placeholder.com/50' }}
-                  style={styles.itemImage}
-                />
-                <View style={styles.itemInfo}>
-                  <Text variant="bodyMedium" numberOfLines={1}>{item.product.title}</Text>
-                  <Text variant="bodySmall" style={styles.itemPrice}>
-                    ₺{Number(item.valueAtTrade).toLocaleString('tr-TR')}
-                  </Text>
-                </View>
-              </TouchableOpacity>
-            ))}
-            <Divider style={styles.divider} />
-            <View style={styles.totalRow}>
-              <Text variant="bodyMedium">Toplam:</Text>
-              <Text variant="titleSmall" style={styles.totalPrice}>
-                ₺{(isInitiator ? initiatorTotal : receiverTotal).toLocaleString('tr-TR')}
-              </Text>
-            </View>
-          </Card.Content>
+          </View>
         </Card>
 
         {/* Their Items */}
         <Card style={styles.card}>
-          <Card.Content>
-            <Text variant="titleSmall" style={styles.sectionTitle}>
-              {isInitiator ? 'Alacağınız' : 'Vereceğiniz'} Ürünler
+          <Text variant="label" style={styles.sectionTitle}>
+            {isInitiator ? 'Alacağınız' : 'Vereceğiniz'} Ürünler
+          </Text>
+          {theirItems.map((item) => (
+            <Pressable
+              key={item.id}
+              style={({ pressed }) => [styles.itemRow, pressed && { opacity: 0.85 }]}
+              onPress={() => router.push(`/product/${item.product.id}`)}
+            >
+              <Image
+                source={{ uri: item.product.images?.[0]?.url || 'https://via.placeholder.com/50' }}
+                style={styles.itemImage}
+              />
+              <View style={styles.itemInfo}>
+                <Text variant="body" numberOfLines={1}>{item.product.title}</Text>
+                <Text variant="caption" style={styles.itemPrice}>
+                  ₺{Number(item.valueAtTrade).toLocaleString('tr-TR')}
+                </Text>
+              </View>
+            </Pressable>
+          ))}
+          <Divider style={styles.divider} />
+          <View style={styles.totalRow}>
+            <Text variant="body">Toplam:</Text>
+            <Text variant="label" style={styles.totalPrice}>
+              ₺{(isInitiator ? receiverTotal : initiatorTotal).toLocaleString('tr-TR')}
             </Text>
-            {theirItems.map((item) => (
-              <TouchableOpacity
-                key={item.id}
-                style={styles.itemRow}
-                onPress={() => router.push(`/product/${item.product.id}`)}
-              >
-                <Image
-                  source={{ uri: item.product.images?.[0]?.url || 'https://via.placeholder.com/50' }}
-                  style={styles.itemImage}
-                />
-                <View style={styles.itemInfo}>
-                  <Text variant="bodyMedium" numberOfLines={1}>{item.product.title}</Text>
-                  <Text variant="bodySmall" style={styles.itemPrice}>
-                    ₺{Number(item.valueAtTrade).toLocaleString('tr-TR')}
-                  </Text>
-                </View>
-              </TouchableOpacity>
-            ))}
-            <Divider style={styles.divider} />
-            <View style={styles.totalRow}>
-              <Text variant="bodyMedium">Toplam:</Text>
-              <Text variant="titleSmall" style={styles.totalPrice}>
-                ₺{(isInitiator ? receiverTotal : initiatorTotal).toLocaleString('tr-TR')}
-              </Text>
-            </View>
-          </Card.Content>
+          </View>
         </Card>
 
         {/* Cash Adjustment */}
         {trade.cashAmount && trade.cashAmount > 0 && (
           <Card style={styles.card}>
-            <Card.Content>
-              <Text variant="titleSmall" style={styles.sectionTitle}>Nakit Fark</Text>
-              <View style={styles.cashRow}>
-                <MaterialCommunityIcons name="cash" size={24} color={TarodanColors.primary} />
-                <Text variant="bodyMedium" style={styles.cashText}>
-                  {trade.cashPayerId === user?.id ? 'Ödeyeceğiniz' : 'Alacağınız'} tutar:
-                </Text>
-                <Text variant="titleMedium" style={styles.cashAmount}>
-                  ₺{Number(trade.cashAmount).toLocaleString('tr-TR')}
-                </Text>
-              </View>
-            </Card.Content>
+            <Text variant="label" style={styles.sectionTitle}>Nakit Fark</Text>
+            <View style={styles.cashRow}>
+              <MaterialCommunityIcons name="cash" size={24} color={colors.primary[600]!} />
+              <Text variant="body" style={styles.cashText}>
+                {trade.cashPayerId === user?.id ? 'Ödeyeceğiniz' : 'Alacağınız'} tutar:
+              </Text>
+              <Text variant="h3" style={styles.cashAmount}>
+                ₺{Number(trade.cashAmount).toLocaleString('tr-TR')}
+              </Text>
+            </View>
           </Card>
         )}
 
         {/* Messages */}
         {(trade.initiatorMessage || trade.receiverMessage) && (
           <Card style={styles.card}>
-            <Card.Content>
-              <Text variant="titleSmall" style={styles.sectionTitle}>Mesajlar</Text>
-              {trade.initiatorMessage && (
-                <View style={styles.messageBox}>
-                  <Text variant="bodySmall" style={styles.messageSender}>
-                    {trade.initiator.displayName}:
-                  </Text>
-                  <Text variant="bodyMedium">{trade.initiatorMessage}</Text>
-                </View>
-              )}
-              {trade.receiverMessage && (
-                <View style={styles.messageBox}>
-                  <Text variant="bodySmall" style={styles.messageSender}>
-                    {trade.receiver.displayName}:
-                  </Text>
-                  <Text variant="bodyMedium">{trade.receiverMessage}</Text>
-                </View>
-              )}
-            </Card.Content>
+            <Text variant="label" style={styles.sectionTitle}>Mesajlar</Text>
+            {trade.initiatorMessage && (
+              <View style={styles.messageBox}>
+                <Text variant="caption" style={styles.messageSender}>
+                  {trade.initiator.displayName}:
+                </Text>
+                <Text variant="body">{trade.initiatorMessage}</Text>
+              </View>
+            )}
+            {trade.receiverMessage && (
+              <View style={styles.messageBox}>
+                <Text variant="caption" style={styles.messageSender}>
+                  {trade.receiver.displayName}:
+                </Text>
+                <Text variant="body">{trade.receiverMessage}</Text>
+              </View>
+            )}
           </Card>
         )}
 
         {/* Shipping Info */}
         {(trade.status === 'accepted' || trade.status.includes('shipped') || trade.status === 'completed') && (
           <Card style={styles.card}>
-            <Card.Content>
-              <Text variant="titleSmall" style={styles.sectionTitle}>Kargo Durumu</Text>
-              
-              <View style={styles.shippingRow}>
-                <Ionicons 
-                  name={myTrackingNumber ? 'checkmark-circle' : 'ellipse-outline'} 
-                  size={20} 
-                  color={myTrackingNumber ? TarodanColors.success : TarodanColors.textSecondary} 
-                />
-                <Text variant="bodyMedium" style={styles.shippingText}>
-                  Sizin kargonuz: {myTrackingNumber || 'Henüz gönderilmedi'}
-                </Text>
-              </View>
-              
-              <View style={styles.shippingRow}>
-                <Ionicons 
-                  name={theirTrackingNumber ? 'checkmark-circle' : 'ellipse-outline'} 
-                  size={20} 
-                  color={theirTrackingNumber ? TarodanColors.success : TarodanColors.textSecondary} 
-                />
-                <Text variant="bodyMedium" style={styles.shippingText}>
-                  Karşı taraf: {theirTrackingNumber || 'Henüz gönderilmedi'}
-                </Text>
-              </View>
+            <Text variant="label" style={styles.sectionTitle}>Kargo Durumu</Text>
 
-              {theirTrackingNumber && (
-                <Button
-                  mode="outlined"
-                  onPress={() => Linking.openURL(`https://www.araskargo.com.tr/ttrweb/takip_sonuc.jsp?kession=&siession=&evession=&action=tr&ara=1&soression=${theirTrackingNumber}`)}
-                  style={styles.trackButton}
-                >
-                  Kargoyu Takip Et
-                </Button>
-              )}
-            </Card.Content>
+            <View style={styles.shippingRow}>
+              <Ionicons
+                name={myTrackingNumber ? 'checkmark-circle' : 'ellipse-outline'}
+                size={20}
+                color={myTrackingNumber ? colors.success[600]! : colors.text.muted}
+              />
+              <Text variant="body" style={styles.shippingText}>
+                Sizin kargonuz: {myTrackingNumber || 'Henüz gönderilmedi'}
+              </Text>
+            </View>
+
+            <View style={styles.shippingRow}>
+              <Ionicons
+                name={theirTrackingNumber ? 'checkmark-circle' : 'ellipse-outline'}
+                size={20}
+                color={theirTrackingNumber ? colors.success[600]! : colors.text.muted}
+              />
+              <Text variant="body" style={styles.shippingText}>
+                Karşı taraf: {theirTrackingNumber || 'Henüz gönderilmedi'}
+              </Text>
+            </View>
+
+            {theirTrackingNumber && (
+              <Button
+                variant="outline"
+                title="Kargoyu Takip Et"
+                onPress={() => Linking.openURL(`https://www.araskargo.com.tr/ttrweb/takip_sonuc.jsp?kession=&siession=&evession=&action=tr&ara=1&soression=${theirTrackingNumber}`)}
+                style={styles.trackButton}
+              />
+            )}
           </Card>
         )}
 
         {/* Inbound shipment info (Sürat Kargo, auto-issued) */}
         {trade.status === 'shipping_to_warehouse' && (isInitiator || isReceiver) && (
-          <Card style={[styles.card, styles.inboundCard]} testID="trade-inbound-card">
-            <Card.Content>
-              <View style={styles.shippingRow}>
-                <MaterialCommunityIcons name="truck-fast-outline" size={22} color={TarodanColors.primary} />
-                <Text variant="titleSmall" style={[styles.sectionTitle, { marginBottom: 0, flex: 1 }]}>
-                  {t('trade.warehouseShipping.title')}
-                </Text>
-              </View>
-              <Text variant="bodySmall" style={styles.protectionDesc}>
-                {t('trade.warehouseShipping.subtitle')}
+          <Card style={{ ...styles.card, ...styles.inboundCard }} testID="trade-inbound-card">
+            <View style={styles.shippingRow}>
+              <MaterialCommunityIcons name="truck-fast-outline" size={22} color={colors.primary[600]!} />
+              <Text variant="label" style={{ ...styles.sectionTitle, marginBottom: 0, flex: 1 }}>
+                {t('trade.warehouseShipping.title')}
               </Text>
-              <View style={styles.inboundShipBox}>
-                <Text variant="bodySmall" style={styles.messageSender}>{t('trade.warehouseShipping.yourShipment')}</Text>
-                <Text style={styles.inboundTrackingNumber}>
-                  {myToWarehouseShipment?.trackingNumber ?? '—'}
-                </Text>
-                <Text variant="bodySmall" style={styles.inboundShipHint}>
-                  {t('trade.warehouseShipping.handIn')}
-                </Text>
-                <View style={styles.inboundChipRow}>
-                  <ShipmentStatusChip testID="trade-status-chip-my-inbound" status={myToWarehouseShipment?.status} t={t} />
-                </View>
-              </View>
-              <Text variant="bodySmall" style={styles.inboundShipHint}>
-                {renderOtherShipmentHint(otherToWarehouseShipment?.status)}
+            </View>
+            <Text variant="caption" style={styles.protectionDesc}>
+              {t('trade.warehouseShipping.subtitle')}
+            </Text>
+            <View style={styles.inboundShipBox}>
+              <Text variant="caption" style={styles.messageSender}>{t('trade.warehouseShipping.yourShipment')}</Text>
+              <Text style={styles.inboundTrackingNumber}>
+                {myToWarehouseShipment?.trackingNumber ?? '—'}
               </Text>
-            </Card.Content>
+              <Text variant="caption" style={styles.inboundShipHint}>
+                {t('trade.warehouseShipping.handIn')}
+              </Text>
+              <View style={styles.inboundChipRow}>
+                <ShipmentStatusChip testID="trade-status-chip-my-inbound" status={myToWarehouseShipment?.status} t={t} />
+              </View>
+            </View>
+            <Text variant="caption" style={styles.inboundShipHint}>
+              {renderOtherShipmentHint(otherToWarehouseShipment?.status)}
+            </Text>
           </Card>
         )}
 
         {/* Shipping to recipients — outbound from warehouse */}
         {trade.status === 'shipping_to_recipients' && (isInitiator || isReceiver) && (
-          <Card style={[styles.card, styles.inboundCard]} testID="trade-outbound-card">
-            <Card.Content>
-              <View style={styles.shippingRow}>
-                <MaterialCommunityIcons name="truck-delivery-outline" size={22} color={TarodanColors.info} />
-                <Text variant="titleSmall" style={[styles.sectionTitle, { marginBottom: 0, flex: 1 }]}>
-                  Kargonuz Yolda
+          <Card style={{ ...styles.card, ...styles.inboundCard }} testID="trade-outbound-card">
+            <View style={styles.shippingRow}>
+              <MaterialCommunityIcons name="truck-delivery-outline" size={22} color={colors.info[600]!} />
+              <Text variant="label" style={{ ...styles.sectionTitle, marginBottom: 0, flex: 1 }}>
+                Kargonuz Yolda
+              </Text>
+            </View>
+            {myFromWarehouseShipment ? (
+              <View style={styles.inboundShipBox}>
+                <Text variant="caption" style={styles.messageSender}>Size gönderilen kargo</Text>
+                <Text style={styles.inboundTrackingNumber}>
+                  {(myFromWarehouseShipment.carrier === 'surat' ? 'Sürat Kargo' : myFromWarehouseShipment.carrier || '—')}
+                  {myFromWarehouseShipment.trackingNumber ? ` · ${myFromWarehouseShipment.trackingNumber}` : ''}
+                </Text>
+                <View style={styles.inboundChipRow}>
+                  <ShipmentStatusChip testID="trade-status-chip-my-outbound" status={myFromWarehouseShipment.status} t={t} />
+                </View>
+                {myFromWarehouseShipment.carrier === 'surat' && myFromWarehouseShipment.trackingNumber && (
+                  <Button
+                    variant="outline"
+                    title="Sürat'ta Takip Et"
+                    onPress={() => Linking.openURL(`https://www.suratkargo.com.tr/KargoTakip/?kargotakipno=${encodeURIComponent(myFromWarehouseShipment.trackingNumber!)}`)}
+                    style={styles.trackButton}
+                  />
+                )}
+              </View>
+            ) : (
+              <View style={styles.inboundShipBox}>
+                <Text variant="caption" style={styles.inboundShipHint}>
+                  Takip bilgileri kısa süre içinde görünecek.
                 </Text>
               </View>
-              {myFromWarehouseShipment ? (
-                <View style={styles.inboundShipBox}>
-                  <Text variant="bodySmall" style={styles.messageSender}>Size gönderilen kargo</Text>
-                  <Text style={styles.inboundTrackingNumber}>
-                    {(myFromWarehouseShipment.carrier === 'surat' ? 'Sürat Kargo' : myFromWarehouseShipment.carrier || '—')}
-                    {myFromWarehouseShipment.trackingNumber ? ` · ${myFromWarehouseShipment.trackingNumber}` : ''}
-                  </Text>
-                  <View style={styles.inboundChipRow}>
-                    <ShipmentStatusChip testID="trade-status-chip-my-outbound" status={myFromWarehouseShipment.status} t={t} />
-                  </View>
-                  {myFromWarehouseShipment.carrier === 'surat' && myFromWarehouseShipment.trackingNumber && (
-                    <Button
-                      mode="outlined"
-                      onPress={() => Linking.openURL(`https://www.suratkargo.com.tr/KargoTakip/?kargotakipno=${encodeURIComponent(myFromWarehouseShipment.trackingNumber!)}`)}
-                      style={styles.trackButton}
-                      icon="truck"
-                    >
-                      Sürat'ta Takip Et
-                    </Button>
-                  )}
-                </View>
-              ) : (
-                <View style={styles.inboundShipBox}>
-                  <Text variant="bodySmall" style={styles.inboundShipHint}>
-                    Takip bilgileri kısa süre içinde görünecek.
-                  </Text>
-                </View>
-              )}
-            </Card.Content>
+            )}
           </Card>
         )}
 
         {/* Trade Protection */}
         <Card style={styles.protectionCard}>
-          <Card.Content style={styles.protectionContent}>
-            <Ionicons name="shield-checkmark" size={24} color={TarodanColors.success} />
+          <View style={styles.protectionContent}>
+            <Ionicons name="shield-checkmark" size={24} color={colors.success[600]!} />
             <View style={styles.protectionTextContainer}>
-              <Text variant="titleSmall">Takas Koruma Programı</Text>
-              <Text variant="bodySmall" style={styles.protectionDesc}>
+              <Text variant="label">Takas Koruma Programı</Text>
+              <Text variant="caption" style={styles.protectionDesc}>
                 Her iki taraf da ürünü teslim alana kadar işlem güvence altındadır.
               </Text>
             </View>
-          </Card.Content>
+          </View>
         </Card>
 
         {/* Actions */}
@@ -624,44 +623,37 @@ export default function TradeDetailScreen() {
           {trade.status === 'pending' && isReceiver && (
             <>
               <Button
-                mode="contained"
+                variant="primary"
+                title="Kabul Et"
                 onPress={handleAccept}
-                loading={acceptMutation.isPending}
-                style={[styles.actionButton, { backgroundColor: TarodanColors.success }]}
-              >
-                Kabul Et
-              </Button>
+                isLoading={acceptMutation.isPending}
+                style={styles.actionButton}
+              />
               <Button
-                mode="outlined"
+                variant="outline"
+                title="Karşı Teklif"
                 onPress={() => router.push(`/trade/counter/${id}` as any)}
                 style={styles.actionButton}
-                icon="swap-horizontal"
-              >
-                Karşı Teklif
-              </Button>
+              />
               <Button
-                mode="outlined"
+                variant="outline"
+                title="Reddet"
                 onPress={handleReject}
-                loading={rejectMutation.isPending}
-                textColor={TarodanColors.error}
-                style={[styles.actionButton, { borderColor: TarodanColors.error }]}
-              >
-                Reddet
-              </Button>
+                isLoading={rejectMutation.isPending}
+                style={{ ...styles.actionButton, borderColor: colors.danger[600]! }}
+              />
             </>
           )}
 
           {/* Pending: Cancel for initiator */}
           {trade.status === 'pending' && isInitiator && (
             <Button
-              mode="outlined"
+              variant="outline"
+              title="Teklifi İptal Et"
               onPress={handleCancel}
-              loading={cancelMutation.isPending}
-              textColor={TarodanColors.error}
-              style={[styles.actionButton, { borderColor: TarodanColors.error }]}
-            >
-              Teklifi İptal Et
-            </Button>
+              isLoading={cancelMutation.isPending}
+              style={{ ...styles.actionButton, borderColor: colors.danger[600]! }}
+            />
           )}
 
           {/* awaiting_payment: cashPayer must initiate the cash payment */}
@@ -669,23 +661,20 @@ export default function TradeDetailScreen() {
             <>
               <Button
                 testID="cash-pay-button"
-                mode="contained"
+                variant="primary"
+                title={`Ödeme Yap (₺${Number(trade.cashAmount ?? 0).toLocaleString('tr-TR')})`}
                 onPress={() => cashPayMutation.mutate()}
-                loading={cashPayMutation.isPending}
+                isLoading={cashPayMutation.isPending}
                 disabled={cashPayMutation.isPending}
-                icon="credit-card-outline"
-                buttonColor={TarodanColors.primary}
                 style={styles.actionButton}
-              >
-                Ödeme Yap (₺{Number(trade.cashAmount ?? 0).toLocaleString('tr-TR')})
-              </Button>
-              <Text variant="bodySmall" style={styles.confirmReceiptHint}>
+              />
+              <Text variant="caption" style={styles.confirmReceiptHint}>
                 Nakit fark ödemesi tamamlanınca takas akışı başlar.
               </Text>
             </>
           )}
           {trade.status === 'awaiting_payment' && trade.cashPayerId && trade.cashPayerId !== user?.id && (
-            <Text variant="bodySmall" style={styles.confirmReceiptHint}>
+            <Text variant="caption" style={styles.confirmReceiptHint}>
               Karşı tarafın nakit fark ödemesi bekleniyor.
             </Text>
           )}
@@ -695,17 +684,15 @@ export default function TradeDetailScreen() {
             <>
               <Button
                 testID="trade-confirm-delivery-button"
-                mode="contained"
+                variant="primary"
+                title="Teslim Aldım"
                 onPress={() => confirmMutation.mutate()}
-                loading={confirmMutation.isPending}
+                isLoading={confirmMutation.isPending}
                 disabled={myFromWarehouseShipment?.status !== 'delivered'}
-                icon="checkmark-done"
-                style={[styles.actionButton, { backgroundColor: TarodanColors.success }]}
-              >
-                Teslim Aldım
-              </Button>
+                style={styles.actionButton}
+              />
               {myFromWarehouseShipment?.status !== 'delivered' && (
-                <Text variant="bodySmall" style={styles.confirmReceiptHint}>
+                <Text variant="caption" style={styles.confirmReceiptHint}>
                   {t('trade.confirmReceipt.waitingDelivered')}
                 </Text>
               )}
@@ -714,56 +701,47 @@ export default function TradeDetailScreen() {
 
           {/* Message other party */}
           <Button
-            mode="text"
+            variant="ghost"
+            title="Mesaj Gönder"
             onPress={() => router.push(`/messages/new?receiverId=${otherParty.id}`)}
-            icon="chatbubble-outline"
-          >
-            Mesaj Gönder
-          </Button>
+          />
         </View>
 
         <View style={{ height: 50 }} />
       </ScrollView>
 
       {/* Counter Offer Modal */}
-      <Portal>
-        <Modal
-          visible={counterModalVisible}
-          onDismiss={() => setCounterModalVisible(false)}
-          contentContainerStyle={styles.modal}
-        >
-          <Text variant="titleLarge" style={styles.modalTitle}>Karşı Teklif</Text>
-          <TextInput
-            label="Nakit Fark (₺)"
-            value={counterCashAmount}
-            onChangeText={setCounterCashAmount}
-            keyboardType="numeric"
-            mode="outlined"
-            style={styles.modalInput}
+      <Modal
+        isOpen={counterModalVisible}
+        onClose={() => setCounterModalVisible(false)}
+        title="Karşı Teklif"
+      >
+        <Input
+          label="Nakit Fark (₺)"
+          value={counterCashAmount}
+          onChangeText={setCounterCashAmount}
+          keyboardType="numeric"
+          containerStyle={{ marginBottom: 12 }}
+        />
+        <Input
+          label="Mesajınız"
+          value={counterMessage}
+          onChangeText={setCounterMessage}
+          multiline
+          numberOfLines={3}
+          containerStyle={{ marginBottom: 12 }}
+          inputStyle={{ minHeight: 80 }}
+        />
+        <View style={styles.modalActions}>
+          <Button variant="outline" title="İptal" onPress={() => setCounterModalVisible(false)} />
+          <Button
+            variant="primary"
+            title="Gönder"
+            onPress={() => counterMutation.mutate()}
+            isLoading={counterMutation.isPending}
           />
-          <TextInput
-            label="Mesajınız"
-            value={counterMessage}
-            onChangeText={setCounterMessage}
-            multiline
-            numberOfLines={3}
-            mode="outlined"
-            style={styles.modalInput}
-          />
-          <View style={styles.modalActions}>
-            <Button mode="outlined" onPress={() => setCounterModalVisible(false)}>
-              İptal
-            </Button>
-            <Button
-              mode="contained"
-              onPress={() => counterMutation.mutate()}
-              loading={counterMutation.isPending}
-            >
-              Gönder
-            </Button>
-          </View>
-        </Modal>
-      </Portal>
+        </View>
+      </Modal>
 
       <Snackbar
         visible={snackbar.visible}
@@ -779,7 +757,7 @@ export default function TradeDetailScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: TarodanColors.backgroundSecondary,
+    backgroundColor: colors.surface.alt,
   },
   loadingContainer: {
     flex: 1,
@@ -811,18 +789,18 @@ const styles = StyleSheet.create({
   },
   deadlineText: {
     fontSize: 12,
-    color: TarodanColors.textSecondary,
+    color: colors.text.muted,
   },
   card: {
     margin: 16,
     marginTop: 0,
-    backgroundColor: TarodanColors.background,
+    backgroundColor: colors.surface.DEFAULT,
   },
   tradeHeader: {
     marginBottom: 16,
   },
   dateText: {
-    color: TarodanColors.textSecondary,
+    color: colors.text.muted,
     marginTop: 4,
   },
   otherParty: {
@@ -830,18 +808,18 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     paddingTop: 12,
     borderTopWidth: 1,
-    borderTopColor: TarodanColors.border,
+    borderTopColor: colors.border.DEFAULT,
   },
   avatar: {
     width: 40,
     height: 40,
     borderRadius: 20,
-    backgroundColor: TarodanColors.primary,
+    backgroundColor: colors.primary[600]!,
     justifyContent: 'center',
     alignItems: 'center',
   },
   avatarText: {
-    color: '#fff',
+    color: colors.white,
     fontWeight: 'bold',
     fontSize: 16,
   },
@@ -851,7 +829,7 @@ const styles = StyleSheet.create({
   },
   sectionTitle: {
     marginBottom: 12,
-    color: TarodanColors.textPrimary,
+    color: colors.text.heading,
   },
   itemRow: {
     flexDirection: 'row',
@@ -862,14 +840,14 @@ const styles = StyleSheet.create({
     width: 50,
     height: 50,
     borderRadius: 6,
-    backgroundColor: TarodanColors.border,
+    backgroundColor: colors.border.DEFAULT,
   },
   itemInfo: {
     flex: 1,
     marginLeft: 12,
   },
   itemPrice: {
-    color: TarodanColors.primary,
+    color: colors.primary[600]!,
     fontWeight: '500',
     marginTop: 2,
   },
@@ -882,7 +860,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   totalPrice: {
-    color: TarodanColors.primary,
+    color: colors.primary[600]!,
     fontWeight: 'bold',
   },
   cashRow: {
@@ -894,17 +872,17 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   cashAmount: {
-    color: TarodanColors.primary,
+    color: colors.primary[600]!,
     fontWeight: 'bold',
   },
   messageBox: {
-    backgroundColor: TarodanColors.backgroundSecondary,
+    backgroundColor: colors.surface.alt,
     padding: 12,
     borderRadius: 8,
     marginBottom: 8,
   },
   messageSender: {
-    color: TarodanColors.primary,
+    color: colors.primary[600]!,
     fontWeight: '500',
     marginBottom: 4,
   },
@@ -923,9 +901,9 @@ const styles = StyleSheet.create({
   protectionCard: {
     margin: 16,
     marginTop: 0,
-    backgroundColor: TarodanColors.success + '10',
+    backgroundColor: colors.success[50]!,
     borderWidth: 1,
-    borderColor: TarodanColors.success + '40',
+    borderColor: colors.success[200]!,
   },
   protectionContent: {
     flexDirection: 'row',
@@ -936,7 +914,7 @@ const styles = StyleSheet.create({
     marginLeft: 12,
   },
   protectionDesc: {
-    color: TarodanColors.textSecondary,
+    color: colors.text.muted,
     marginTop: 2,
   },
   actions: {
@@ -946,24 +924,6 @@ const styles = StyleSheet.create({
   actionButton: {
     borderRadius: 8,
   },
-  modal: {
-    backgroundColor: TarodanColors.background,
-    margin: 20,
-    padding: 20,
-    borderRadius: 12,
-  },
-  modalTitle: {
-    marginBottom: 16,
-    textAlign: 'center',
-  },
-  modalInput: {
-    marginBottom: 12,
-    backgroundColor: TarodanColors.background,
-  },
-  modalNote: {
-    color: TarodanColors.textSecondary,
-    marginBottom: 16,
-  },
   modalActions: {
     flexDirection: 'row',
     justifyContent: 'flex-end',
@@ -972,21 +932,21 @@ const styles = StyleSheet.create({
   },
   inboundCard: {
     borderWidth: 1,
-    borderColor: TarodanColors.border,
+    borderColor: colors.border.DEFAULT,
   },
   inboundShipBox: {
     marginTop: 12,
     padding: 12,
     borderRadius: 8,
     borderWidth: 1,
-    borderColor: TarodanColors.border,
-    backgroundColor: TarodanColors.backgroundSecondary,
+    borderColor: colors.border.DEFAULT,
+    backgroundColor: colors.surface.alt,
   },
   inboundTrackingNumber: {
     fontFamily: 'Courier',
     fontSize: 16,
     fontWeight: 'bold',
-    color: TarodanColors.textPrimary,
+    color: colors.text.heading,
     marginTop: 4,
   },
   inboundChipRow: {
@@ -994,11 +954,11 @@ const styles = StyleSheet.create({
     marginTop: 8,
   },
   inboundShipHint: {
-    color: TarodanColors.textSecondary,
+    color: colors.text.muted,
     marginTop: 8,
   },
   confirmReceiptHint: {
-    color: TarodanColors.textSecondary,
+    color: colors.text.muted,
     textAlign: 'center',
     marginTop: 4,
   },

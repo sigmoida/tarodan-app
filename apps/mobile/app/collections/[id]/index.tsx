@@ -1,15 +1,14 @@
 import { useState } from 'react';
-import { View, ScrollView, StyleSheet, TouchableOpacity, Image, Dimensions, FlatList, Share } from 'react-native';
-import { Avatar, Button, Chip, Divider, ActivityIndicator, IconButton, Card } from 'react-native-paper';
-import { Text } from '../../../src/components/common';
+import { View, ScrollView, StyleSheet, TouchableOpacity, Image, Dimensions, Share } from 'react-native';
+import { theme, Avatar, Button, Chip, Divider, Spinner, Text } from '@tarodan/ui-native';
 import { useQuery } from '@tanstack/react-query';
 import { useLocalSearchParams, router } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { api } from '../../../src/services/api';
-import { TarodanColors } from '../../../src/theme';
 import { transformImageUrl } from '../../../src/utils/imageUrl';
 import { asLabel } from '../../../src/utils/format';
 
+const { colors } = theme;
 const { width } = Dimensions.get('window');
 
 // Mock collection for demo
@@ -34,21 +33,21 @@ const MOCK_COLLECTION = {
     memberSince: '2023-01-15',
   },
   items: [
-    { 
-      id: 'i1', 
-      title: 'Ferrari F40', 
-      brand: 'Kyosho', 
-      scale: '1:18', 
+    {
+      id: 'i1',
+      title: 'Ferrari F40',
+      brand: 'Kyosho',
+      scale: '1:18',
       year: '1987',
       acquiredDate: '2023-06-15',
       notes: 'Pristine condition, original box',
       imageUrl: 'https://placehold.co/200x200/e74c3c/ffffff?text=F40',
       estimatedValue: 3500,
     },
-    { 
-      id: 'i2', 
-      title: 'Ferrari 250 GTO', 
-      brand: 'CMC', 
+    {
+      id: 'i2',
+      title: 'Ferrari 250 GTO',
+      brand: 'CMC',
       scale: '1:18',
       year: '1962',
       acquiredDate: '2022-11-20',
@@ -56,10 +55,10 @@ const MOCK_COLLECTION = {
       imageUrl: 'https://placehold.co/200x200/e74c3c/ffffff?text=250+GTO',
       estimatedValue: 8500,
     },
-    { 
-      id: 'i3', 
-      title: 'Ferrari 488 GTB', 
-      brand: 'Bburago', 
+    {
+      id: 'i3',
+      title: 'Ferrari 488 GTB',
+      brand: 'Bburago',
       scale: '1:18',
       year: '2015',
       acquiredDate: '2023-01-10',
@@ -67,10 +66,10 @@ const MOCK_COLLECTION = {
       imageUrl: 'https://placehold.co/200x200/e74c3c/ffffff?text=488',
       estimatedValue: 1200,
     },
-    { 
-      id: 'i4', 
-      title: 'Ferrari SF90 Stradale', 
-      brand: 'BBR', 
+    {
+      id: 'i4',
+      title: 'Ferrari SF90 Stradale',
+      brand: 'BBR',
       scale: '1:18',
       year: '2019',
       acquiredDate: '2024-01-05',
@@ -119,7 +118,7 @@ export default function CollectionDetailScreen() {
   if (isLoading && !collection) {
     return (
       <View style={styles.loadingContainer}>
-        <ActivityIndicator size="large" color={TarodanColors.primary} />
+        <Spinner size="lg" />
         <Text style={styles.loadingText}>Yükleniyor...</Text>
       </View>
     );
@@ -133,21 +132,21 @@ export default function CollectionDetailScreen() {
         style={styles.coverImage}
         resizeMode="cover"
       />
-      
+
       {/* Header Buttons */}
       <View style={styles.headerButtons}>
         <TouchableOpacity style={styles.headerButton} onPress={() => router.back()}>
-          <Ionicons name="arrow-back" size={24} color="#fff" />
+          <Ionicons name="arrow-back" size={24} color={colors.white} />
         </TouchableOpacity>
         <View style={styles.headerActions}>
           <TouchableOpacity style={styles.headerButton} onPress={handleShare}>
-            <Ionicons name="share-outline" size={24} color="#fff" />
+            <Ionicons name="share-outline" size={24} color={colors.white} />
           </TouchableOpacity>
           <TouchableOpacity style={styles.headerButton} onPress={handleLike}>
-            <Ionicons 
-              name={isLiked ? "heart" : "heart-outline"} 
-              size={24} 
-              color={isLiked ? TarodanColors.error : "#fff"} 
+            <Ionicons
+              name={isLiked ? 'heart' : 'heart-outline'}
+              size={24}
+              color={isLiked ? colors.danger[600]! : colors.white}
             />
           </TouchableOpacity>
         </View>
@@ -157,50 +156,49 @@ export default function CollectionDetailScreen() {
         {/* Collection Info */}
         <View style={styles.infoSection}>
           <Text style={styles.collectionName}>{collection.name}</Text>
-          
+
           {/* Owner */}
-          <TouchableOpacity 
+          <TouchableOpacity
             style={styles.ownerRow}
             onPress={() => router.push(`/seller/${collection.owner?.id}`)}
           >
-            <Avatar.Text
-              size={40}
-              label={collection.owner?.displayName?.substring(0, 2).toUpperCase() || 'U'}
-              style={{ backgroundColor: TarodanColors.primary }}
+            <Avatar
+              size="md"
+              name={collection.owner?.displayName || 'U'}
             />
             <View style={styles.ownerInfo}>
               <View style={styles.ownerNameRow}>
                 <Text style={styles.ownerName}>{collection.owner?.displayName}</Text>
                 {collection.owner?.verified && (
-                  <Ionicons name="checkmark-circle" size={16} color={TarodanColors.accent} />
+                  <Ionicons name="checkmark-circle" size={16} color={colors.warning[500]!} />
                 )}
               </View>
               <Text style={styles.ownerSince}>
                 Üye: {new Date(collection.owner?.memberSince).toLocaleDateString('tr-TR', { month: 'short', year: 'numeric' })}
               </Text>
             </View>
-            <Ionicons name="chevron-forward" size={20} color={TarodanColors.textSecondary} />
+            <Ionicons name="chevron-forward" size={20} color={colors.text.muted} />
           </TouchableOpacity>
 
           {/* Stats */}
           <View style={styles.statsRow}>
             <View style={styles.statItem}>
-              <Ionicons name="images-outline" size={20} color={TarodanColors.textSecondary} />
+              <Ionicons name="images-outline" size={20} color={colors.text.muted} />
               <Text style={styles.statValue}>{collection.itemCount}</Text>
               <Text style={styles.statLabel}>Model</Text>
             </View>
             <View style={styles.statItem}>
-              <Ionicons name="eye-outline" size={20} color={TarodanColors.textSecondary} />
+              <Ionicons name="eye-outline" size={20} color={colors.text.muted} />
               <Text style={styles.statValue}>{collection.viewCount}</Text>
               <Text style={styles.statLabel}>Görüntülenme</Text>
             </View>
             <View style={styles.statItem}>
-              <Ionicons name="heart" size={20} color={TarodanColors.error} />
+              <Ionicons name="heart" size={20} color={colors.danger[600]!} />
               <Text style={styles.statValue}>{isLiked ? collection.likeCount + 1 : collection.likeCount}</Text>
               <Text style={styles.statLabel}>Beğeni</Text>
             </View>
             <View style={styles.statItem}>
-              <Ionicons name="share-social-outline" size={20} color={TarodanColors.textSecondary} />
+              <Ionicons name="share-social-outline" size={20} color={colors.text.muted} />
               <Text style={styles.statValue}>{collection.shareCount}</Text>
               <Text style={styles.statLabel}>Paylaşım</Text>
             </View>
@@ -209,7 +207,7 @@ export default function CollectionDetailScreen() {
           {/* Estimated Value */}
           {collection.estimatedValue && (
             <View style={styles.valueCard}>
-              <Ionicons name="diamond-outline" size={24} color={TarodanColors.primary} />
+              <Ionicons name="diamond-outline" size={24} color={colors.primary[600]!} />
               <View style={styles.valueInfo}>
                 <Text style={styles.valueLabel}>Tahmini Koleksiyon Değeri</Text>
                 <Text style={styles.valueAmount}>
@@ -226,18 +224,15 @@ export default function CollectionDetailScreen() {
           {collection.tags && collection.tags.length > 0 && (
             <View style={styles.tagsRow}>
               {collection.tags.map((tag: string, index: number) => (
-                <Chip 
-                  key={index} 
-                  style={styles.tag}
-                  textStyle={styles.tagText}
-                >
-                  {tag}
-                </Chip>
+                <Chip
+                  key={index}
+                  label={tag}
+                />
               ))}
             </View>
           )}
 
-          <Divider style={styles.divider} />
+          <Divider />
 
           {/* Items Section */}
           <View style={styles.itemsHeader}>
@@ -248,8 +243,8 @@ export default function CollectionDetailScreen() {
           {/* Items Grid */}
           <View style={styles.itemsGrid}>
             {items.map((item: any) => (
-              <TouchableOpacity 
-                key={item.id} 
+              <TouchableOpacity
+                key={item.id}
                 style={styles.itemCard}
               >
                 <Image
@@ -281,21 +276,19 @@ export default function CollectionDetailScreen() {
 
         {/* Guest Notice */}
         <View style={styles.guestNotice}>
-          <Ionicons name="lock-closed-outline" size={24} color={TarodanColors.textSecondary} />
+          <Ionicons name="lock-closed-outline" size={24} color={colors.text.muted} />
           <View style={styles.noticeContent}>
             <Text style={styles.noticeTitle}>Kendi Koleksiyonunuzu Oluşturun</Text>
             <Text style={styles.noticeText}>
-              Premium üye olarak kendi Digital Garage'ınızı oluşturabilir, 
+              Premium üye olarak kendi Digital Garage'ınızı oluşturabilir,
               koleksiyonlarınızı sergileyebilirsiniz.
             </Text>
-            <Button 
-              mode="contained" 
-              buttonColor={TarodanColors.primary}
+            <Button
+              variant="primary"
+              title="Premium Üye Ol"
               onPress={() => router.push('/(auth)/register')}
               style={styles.noticeButton}
-            >
-              Premium Üye Ol
-            </Button>
+            />
           </View>
         </View>
 
@@ -308,20 +301,20 @@ export default function CollectionDetailScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: TarodanColors.background,
+    backgroundColor: colors.surface.DEFAULT,
   },
   loadingContainer: {
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
-    backgroundColor: TarodanColors.background,
+    backgroundColor: colors.surface.DEFAULT,
   },
   loadingText: {
     marginTop: 16,
-    color: TarodanColors.textSecondary,
+    color: colors.text.muted,
   },
   coverImage: {
-    width: width,
+    width,
     height: 200,
   },
   headerButtons: {
@@ -337,7 +330,7 @@ const styles = StyleSheet.create({
     width: 40,
     height: 40,
     borderRadius: 20,
-    backgroundColor: 'rgba(0,0,0,0.4)',
+    backgroundColor: colors.overlay.black50,
     justifyContent: 'center',
     alignItems: 'center',
   },
@@ -354,13 +347,13 @@ const styles = StyleSheet.create({
   collectionName: {
     fontSize: 24,
     fontWeight: 'bold',
-    color: TarodanColors.textPrimary,
+    color: colors.text.heading,
     marginBottom: 16,
   },
   ownerRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: TarodanColors.surfaceVariant,
+    backgroundColor: colors.gray[50],
     padding: 12,
     borderRadius: 12,
     marginBottom: 16,
@@ -377,17 +370,17 @@ const styles = StyleSheet.create({
   ownerName: {
     fontSize: 16,
     fontWeight: '600',
-    color: TarodanColors.textPrimary,
+    color: colors.text.heading,
   },
   ownerSince: {
     fontSize: 12,
-    color: TarodanColors.textSecondary,
+    color: colors.text.muted,
     marginTop: 2,
   },
   statsRow: {
     flexDirection: 'row',
     justifyContent: 'space-around',
-    backgroundColor: TarodanColors.surfaceVariant,
+    backgroundColor: colors.gray[50],
     borderRadius: 12,
     padding: 16,
     marginBottom: 16,
@@ -398,17 +391,17 @@ const styles = StyleSheet.create({
   statValue: {
     fontSize: 18,
     fontWeight: 'bold',
-    color: TarodanColors.textPrimary,
+    color: colors.text.heading,
     marginTop: 4,
   },
   statLabel: {
     fontSize: 12,
-    color: TarodanColors.textSecondary,
+    color: colors.text.muted,
   },
   valueCard: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: TarodanColors.primaryLight,
+    backgroundColor: colors.primary[50]!,
     borderRadius: 12,
     padding: 16,
     marginBottom: 16,
@@ -418,17 +411,17 @@ const styles = StyleSheet.create({
   },
   valueLabel: {
     fontSize: 12,
-    color: TarodanColors.textSecondary,
+    color: colors.text.muted,
   },
   valueAmount: {
     fontSize: 20,
     fontWeight: 'bold',
-    color: TarodanColors.primary,
+    color: colors.primary[600]!,
   },
   description: {
     fontSize: 15,
     lineHeight: 22,
-    color: TarodanColors.textPrimary,
+    color: colors.text.heading,
     marginBottom: 16,
   },
   tagsRow: {
@@ -437,36 +430,27 @@ const styles = StyleSheet.create({
     gap: 8,
     marginBottom: 16,
   },
-  tag: {
-    backgroundColor: TarodanColors.surfaceVariant,
-  },
-  tagText: {
-    fontSize: 12,
-  },
-  divider: {
-    marginVertical: 16,
-  },
   itemsHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    marginBottom: 16,
+    marginVertical: 16,
   },
   itemsTitle: {
     fontSize: 18,
     fontWeight: 'bold',
-    color: TarodanColors.textPrimary,
+    color: colors.text.heading,
   },
   itemsCount: {
     fontSize: 14,
-    color: TarodanColors.textSecondary,
+    color: colors.text.muted,
   },
   itemsGrid: {
     gap: 12,
   },
   itemCard: {
     flexDirection: 'row',
-    backgroundColor: TarodanColors.surfaceVariant,
+    backgroundColor: colors.gray[50],
     borderRadius: 12,
     overflow: 'hidden',
   },
@@ -481,33 +465,33 @@ const styles = StyleSheet.create({
   itemTitle: {
     fontSize: 14,
     fontWeight: '600',
-    color: TarodanColors.textPrimary,
+    color: colors.text.heading,
     marginBottom: 4,
   },
   itemMeta: {
     fontSize: 12,
-    color: TarodanColors.textSecondary,
+    color: colors.text.muted,
   },
   itemYear: {
     fontSize: 12,
-    color: TarodanColors.textSecondary,
+    color: colors.text.muted,
     marginTop: 2,
   },
   itemValue: {
     fontSize: 13,
     fontWeight: '600',
-    color: TarodanColors.primary,
+    color: colors.primary[600]!,
     marginTop: 4,
   },
   itemNotes: {
     fontSize: 11,
-    color: TarodanColors.textSecondary,
+    color: colors.text.muted,
     marginTop: 4,
     fontStyle: 'italic',
   },
   guestNotice: {
     flexDirection: 'row',
-    backgroundColor: TarodanColors.surfaceVariant,
+    backgroundColor: colors.gray[50],
     margin: 16,
     borderRadius: 12,
     padding: 16,
@@ -519,16 +503,15 @@ const styles = StyleSheet.create({
   noticeTitle: {
     fontSize: 16,
     fontWeight: '600',
-    color: TarodanColors.textPrimary,
+    color: colors.text.heading,
   },
   noticeText: {
     fontSize: 13,
-    color: TarodanColors.textSecondary,
+    color: colors.text.muted,
     marginTop: 4,
     lineHeight: 18,
   },
   noticeButton: {
     marginTop: 12,
-    borderRadius: 8,
   },
 });

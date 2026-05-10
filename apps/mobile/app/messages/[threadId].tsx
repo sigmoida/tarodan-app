@@ -1,32 +1,32 @@
 import { View, ScrollView, StyleSheet, TouchableOpacity, KeyboardAvoidingView, Platform, TextInput as RNTextInput, Image as RNImage, Alert } from 'react-native';
-import { Avatar, IconButton, ActivityIndicator, Banner } from 'react-native-paper';
-import { Text } from '../../src/components/common';
+import { Avatar, IconButton, Spinner, Alert as UIAlert, Text, theme } from '@tarodan/ui-native';
 import { useState, useRef, useEffect, useCallback } from 'react';
 import { router, useLocalSearchParams, useFocusEffect } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import * as ImagePicker from 'expo-image-picker';
 import { useMessagesStore, Message } from '../../src/stores/messagesStore';
 import { useAuthStore } from '../../src/stores/authStore';
-import { TarodanColors } from '../../src/theme';
 import { detectViolations, getViolationMessage, parseMessageContent } from '../../src/utils/contentFilter';
 import { mediaApi } from '../../src/services/api';
+
+const { colors } = theme;
 
 export default function MessageThreadScreen() {
   const { threadId } = useLocalSearchParams<{ threadId: string }>();
   const { user, limits } = useAuthStore();
-  const { 
-    currentThread, 
-    messages, 
-    isLoadingMessages, 
-    fetchThread, 
-    fetchMessages, 
-    sendMessage, 
+  const {
+    currentThread,
+    messages,
+    isLoadingMessages,
+    fetchThread,
+    fetchMessages,
+    sendMessage,
     markAsRead,
     getOtherParticipant,
     canSendMessage,
     dailyMessageCount,
   } = useMessagesStore();
-  
+
   const [inputText, setInputText] = useState('');
   const [sending, setSending] = useState(false);
   const [uploadingImage, setUploadingImage] = useState(false);
@@ -165,7 +165,7 @@ export default function MessageThreadScreen() {
   // Group messages by date
   const groupedMessages: { date: string; messages: Message[] }[] = [];
   let currentDate = '';
-  
+
   messages.forEach(message => {
     const messageDate = formatDate(message.createdAt);
     if (messageDate !== currentDate) {
@@ -179,7 +179,7 @@ export default function MessageThreadScreen() {
   const other = currentThread ? getOtherParticipant(currentThread) : null;
 
   return (
-    <KeyboardAvoidingView 
+    <KeyboardAvoidingView
       style={styles.container}
       behavior={Platform.OS === 'ios' ? 'padding' : undefined}
       keyboardVerticalOffset={0}
@@ -187,18 +187,18 @@ export default function MessageThreadScreen() {
       {/* Header */}
       <View style={styles.header}>
         <TouchableOpacity onPress={() => router.back()} style={styles.backButton}>
-          <Ionicons name="arrow-back" size={24} color={TarodanColors.textOnPrimary} />
+          <Ionicons name="arrow-back" size={24} color={colors.white} />
         </TouchableOpacity>
-        
-        <TouchableOpacity 
+
+        <TouchableOpacity
           style={styles.headerContent}
           onPress={() => other && router.push(`/seller/${other.id}`)}
         >
-          {other?.avatarUrl ? (
-            <Avatar.Image size={40} source={{ uri: other.avatarUrl }} />
-          ) : (
-            <Avatar.Text size={40} label={other?.displayName?.charAt(0) || '?'} />
-          )}
+          <Avatar
+            size="md"
+            source={other?.avatarUrl || undefined}
+            name={other?.displayName?.charAt(0) || '?'}
+          />
           <View style={styles.headerInfo}>
             <Text style={styles.headerTitle}>{other?.displayName || 'Yükleniyor...'}</Text>
             {currentThread?.product && (
@@ -210,57 +210,45 @@ export default function MessageThreadScreen() {
         </TouchableOpacity>
 
         <IconButton
-          icon="dots-vertical"
-          iconColor={TarodanColors.textOnPrimary}
+          icon="ellipsis-vertical"
+          accessibilityLabel="Daha fazla"
+          size="md"
           onPress={() => {}}
         />
       </View>
 
       {/* Product Banner */}
       {currentThread?.product && (
-        <TouchableOpacity 
+        <TouchableOpacity
           style={styles.productBanner}
           onPress={() => router.push(`/product/${currentThread.product?.id}`)}
         >
-          <Ionicons name="pricetag" size={16} color={TarodanColors.primary} />
+          <Ionicons name="pricetag" size={16} color={colors.primary[600]!} />
           <Text style={styles.productBannerText} numberOfLines={1}>
             {currentThread.product.title}
           </Text>
-          <Ionicons name="chevron-forward" size={16} color={TarodanColors.textSecondary} />
+          <Ionicons name="chevron-forward" size={16} color={colors.text.muted} />
         </TouchableOpacity>
       )}
 
       {/* Message Limit Warning */}
       {!isUnlimited && !canSend && (
-        <Banner
-          visible={true}
-          icon="alert-circle"
-          style={styles.limitBanner}
-          actions={[
-            { label: 'Premium\'a Geç', onPress: () => router.push('/upgrade') }
-          ]}
-        >
+        <UIAlert variant="warning">
           Günlük mesaj limitinize ulaştınız ({messageLimit} mesaj). Premium üyelikle sınırsız mesaj gönderin.
-        </Banner>
+        </UIAlert>
       )}
 
       {/* İçerik filtresi uyarısı */}
       {filterWarning ? (
-        <Banner
-          visible
-          icon="shield-alert"
-          actions={[
-            { label: 'Tamam', onPress: () => setFilterWarning(null) },
-          ]}
-        >
+        <UIAlert variant="warning">
           {filterWarning}
-        </Banner>
+        </UIAlert>
       ) : null}
 
       {/* Messages */}
       {isLoadingMessages && messages.length === 0 ? (
         <View style={styles.loadingContainer}>
-          <ActivityIndicator size="large" color={TarodanColors.primary} />
+          <Spinner size="lg" />
         </View>
       ) : (
         <ScrollView
@@ -281,13 +269,13 @@ export default function MessageThreadScreen() {
               {group.messages.map((message, messageIndex) => {
                 const isOwn = message.senderId === user?.id;
                 const showAvatar = !isOwn && (
-                  messageIndex === 0 || 
+                  messageIndex === 0 ||
                   group.messages[messageIndex - 1]?.senderId !== message.senderId
                 );
 
                 return (
-                  <View 
-                    key={message.id} 
+                  <View
+                    key={message.id}
                     style={[
                       styles.messageRow,
                       isOwn ? styles.messageRowOwn : styles.messageRowOther,
@@ -295,14 +283,16 @@ export default function MessageThreadScreen() {
                   >
                     {!isOwn && (
                       <View style={styles.avatarPlaceholder}>
-                        {showAvatar && other?.avatarUrl ? (
-                          <Avatar.Image size={28} source={{ uri: other.avatarUrl }} />
-                        ) : showAvatar ? (
-                          <Avatar.Text size={28} label={other?.displayName?.charAt(0) || '?'} />
+                        {showAvatar ? (
+                          <Avatar
+                            size="sm"
+                            source={other?.avatarUrl || undefined}
+                            name={other?.displayName?.charAt(0) || '?'}
+                          />
                         ) : null}
                       </View>
                     )}
-                    
+
                     <View style={[
                       styles.messageBubble,
                       isOwn ? styles.messageBubbleOwn : styles.messageBubbleOther,
@@ -369,12 +359,12 @@ export default function MessageThreadScreen() {
           disabled={!canSend || uploadingImage}
         >
           {uploadingImage ? (
-            <ActivityIndicator size={20} color={TarodanColors.primary} />
+            <Spinner size="sm" />
           ) : (
             <Ionicons
               name="image-outline"
               size={24}
-              color={canSend ? TarodanColors.primary : TarodanColors.textLight}
+              color={canSend ? colors.primary[600]! : colors.text.subtle}
             />
           )}
         </TouchableOpacity>
@@ -400,7 +390,7 @@ export default function MessageThreadScreen() {
           <Ionicons
             name="send"
             size={24}
-            color={(!inputText.trim() || !canSend) ? TarodanColors.textLight : TarodanColors.textOnPrimary}
+            color={(!inputText.trim() || !canSend) ? colors.text.subtle : colors.white}
           />
         </TouchableOpacity>
       </View>
@@ -411,10 +401,10 @@ export default function MessageThreadScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: TarodanColors.backgroundSecondary,
+    backgroundColor: colors.surface.alt,
   },
   header: {
-    backgroundColor: TarodanColors.primary,
+    backgroundColor: colors.primary[600]!,
     paddingTop: 50,
     paddingBottom: 12,
     paddingHorizontal: 8,
@@ -437,28 +427,25 @@ const styles = StyleSheet.create({
   headerTitle: {
     fontSize: 16,
     fontWeight: '600',
-    color: TarodanColors.textOnPrimary,
+    color: colors.white,
   },
   headerSubtitle: {
     fontSize: 12,
-    color: TarodanColors.textOnPrimary + 'CC',
+    color: colors.overlay.white85,
   },
   productBanner: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: TarodanColors.background,
+    backgroundColor: colors.surface.DEFAULT,
     padding: 12,
     borderBottomWidth: 1,
-    borderBottomColor: TarodanColors.border,
+    borderBottomColor: colors.border.DEFAULT,
   },
   productBannerText: {
     flex: 1,
     marginHorizontal: 8,
-    color: TarodanColors.textPrimary,
+    color: colors.text.heading,
     fontSize: 13,
-  },
-  limitBanner: {
-    backgroundColor: TarodanColors.warningLight,
   },
   loadingContainer: {
     flex: 1,
@@ -479,12 +466,12 @@ const styles = StyleSheet.create({
   dateDividerLine: {
     flex: 1,
     height: 1,
-    backgroundColor: TarodanColors.border,
+    backgroundColor: colors.border.DEFAULT,
   },
   dateDividerText: {
     paddingHorizontal: 12,
     fontSize: 12,
-    color: TarodanColors.textSecondary,
+    color: colors.text.muted,
   },
   messageRow: {
     flexDirection: 'row',
@@ -506,11 +493,11 @@ const styles = StyleSheet.create({
     borderRadius: 16,
   },
   messageBubbleOwn: {
-    backgroundColor: TarodanColors.primary,
+    backgroundColor: colors.primary[600]!,
     borderBottomRightRadius: 4,
   },
   messageBubbleOther: {
-    backgroundColor: TarodanColors.background,
+    backgroundColor: colors.surface.DEFAULT,
     borderBottomLeftRadius: 4,
   },
   messageImagesWrap: {
@@ -523,17 +510,17 @@ const styles = StyleSheet.create({
     width: 160,
     height: 160,
     borderRadius: 8,
-    backgroundColor: TarodanColors.surfaceVariant,
+    backgroundColor: colors.surface.alt,
   },
   messageText: {
     fontSize: 15,
     lineHeight: 20,
   },
   messageTextOwn: {
-    color: TarodanColors.textOnPrimary,
+    color: colors.white,
   },
   messageTextOther: {
-    color: TarodanColors.textPrimary,
+    color: colors.text.heading,
   },
   messageFooter: {
     flexDirection: 'row',
@@ -545,27 +532,27 @@ const styles = StyleSheet.create({
     fontSize: 11,
   },
   messageTimeOwn: {
-    color: TarodanColors.textOnPrimary + 'AA',
+    color: colors.overlay.white70,
   },
   messageTimeOther: {
-    color: TarodanColors.textSecondary,
+    color: colors.text.muted,
   },
   messageStatus: {
     marginLeft: 4,
     fontSize: 11,
-    color: TarodanColors.textOnPrimary + 'AA',
+    color: colors.overlay.white70,
   },
   inputContainer: {
     flexDirection: 'row',
     alignItems: 'flex-end',
     padding: 12,
-    backgroundColor: TarodanColors.background,
+    backgroundColor: colors.surface.DEFAULT,
     borderTopWidth: 1,
-    borderTopColor: TarodanColors.border,
+    borderTopColor: colors.border.DEFAULT,
   },
   inputWrapper: {
     flex: 1,
-    backgroundColor: TarodanColors.surfaceVariant,
+    backgroundColor: colors.surface.alt,
     borderRadius: 24,
     paddingHorizontal: 16,
     paddingVertical: 8,
@@ -574,25 +561,25 @@ const styles = StyleSheet.create({
   },
   textInput: {
     fontSize: 16,
-    color: TarodanColors.textPrimary,
+    color: colors.text.heading,
     maxHeight: 100,
   },
   sendButton: {
     width: 48,
     height: 48,
     borderRadius: 24,
-    backgroundColor: TarodanColors.primary,
+    backgroundColor: colors.primary[600]!,
     justifyContent: 'center',
     alignItems: 'center',
   },
   sendButtonDisabled: {
-    backgroundColor: TarodanColors.surfaceVariant,
+    backgroundColor: colors.surface.alt,
   },
   attachButton: {
     width: 44,
     height: 44,
     borderRadius: 22,
-    backgroundColor: TarodanColors.surfaceVariant,
+    backgroundColor: colors.surface.alt,
     justifyContent: 'center',
     alignItems: 'center',
     marginRight: 8,

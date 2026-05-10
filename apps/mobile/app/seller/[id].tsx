@@ -1,13 +1,13 @@
 import { useState } from 'react';
-import { View, ScrollView, StyleSheet, TouchableOpacity, FlatList, Dimensions, Image } from 'react-native';
-import { Avatar, Button, Card, Chip, Divider, ActivityIndicator } from 'react-native-paper';
-import { Text, CardCover } from '../../src/components/common';
+import { View, ScrollView, StyleSheet, TouchableOpacity, Dimensions, Image, Pressable } from 'react-native';
+import { Avatar, Button, Card, Spinner, Text, theme } from '@tarodan/ui-native';
 import { useQuery } from '@tanstack/react-query';
 import { useLocalSearchParams, router } from 'expo-router';
-import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
+import { Ionicons } from '@expo/vector-icons';
 import { userApi, productsApi, ratingsApi } from '../../src/services/api';
 import { useAuthStore } from '../../src/stores/authStore';
-import { TarodanColors } from '../../src/theme';
+
+const { colors } = theme;
 
 const { width } = Dimensions.get('window');
 const CARD_WIDTH = (width - 48) / 2;
@@ -42,11 +42,11 @@ const MOCK_SELLER = {
 };
 
 const BADGE_INFO: Record<string, { label: string; icon: string; color: string }> = {
-  fast_shipper: { label: 'Hızlı Kargo', icon: 'rocket-outline', color: '#9C27B0' },
-  trusted_seller: { label: 'Güvenilir', icon: 'shield-checkmark', color: '#4CAF50' },
-  responsive: { label: 'Hızlı Yanıt', icon: 'chatbubble-outline', color: '#2196F3' },
-  elite_collector: { label: 'Elit Koleksiyoner', icon: 'diamond-outline', color: '#FF9800' },
-  hall_of_fame: { label: 'Onur Listesi', icon: 'trophy-outline', color: '#FFD700' },
+  fast_shipper: { label: 'Hızlı Kargo', icon: 'rocket-outline', color: colors.info[600]! },
+  trusted_seller: { label: 'Güvenilir', icon: 'shield-checkmark', color: colors.success[600]! },
+  responsive: { label: 'Hızlı Yanıt', icon: 'chatbubble-outline', color: colors.info[600]! },
+  elite_collector: { label: 'Elit Koleksiyoner', icon: 'diamond-outline', color: colors.warning[500]! },
+  hall_of_fame: { label: 'Onur Listesi', icon: 'trophy-outline', color: colors.warning[500]! },
 };
 
 export default function SellerProfileScreen() {
@@ -129,7 +129,7 @@ export default function SellerProfileScreen() {
   if (isLoading && !seller) {
     return (
       <View style={styles.loadingContainer}>
-        <ActivityIndicator size="large" color={TarodanColors.primary} />
+        <Spinner size="lg" />
         <Text style={styles.loadingText}>Yükleniyor...</Text>
       </View>
     );
@@ -140,7 +140,7 @@ export default function SellerProfileScreen() {
       {/* Header */}
       <View style={styles.header}>
         <TouchableOpacity onPress={() => router.back()}>
-          <Ionicons name="arrow-back" size={24} color={TarodanColors.textOnPrimary} />
+          <Ionicons name="arrow-back" size={24} color={colors.white} />
         </TouchableOpacity>
         <Text style={styles.headerTitle}>Satıcı Profili</Text>
         <View style={{ width: 24 }} />
@@ -149,20 +149,19 @@ export default function SellerProfileScreen() {
       <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
         {/* Profile Card */}
         <View style={styles.profileCard}>
-          <Avatar.Text
-            size={80}
-            label={seller.displayName?.substring(0, 2).toUpperCase() || 'S'}
-            style={{ backgroundColor: TarodanColors.primary }}
+          <Avatar
+            size="xl"
+            name={seller.displayName?.substring(0, 2).toUpperCase() || 'S'}
           />
           <View style={styles.profileNameRow}>
             <Text style={styles.profileName}>{seller.displayName}</Text>
             {seller.verified && (
-              <Ionicons name="checkmark-circle" size={24} color={TarodanColors.accent} />
+              <Ionicons name="checkmark-circle" size={24} color={colors.warning[500]!} />
             )}
           </View>
           {seller.location && (
             <View style={styles.locationRow}>
-              <Ionicons name="location-outline" size={16} color={TarodanColors.textSecondary} />
+              <Ionicons name="location-outline" size={16} color={colors.text.muted} />
               <Text style={styles.locationText}>{seller.location}</Text>
             </View>
           )}
@@ -184,7 +183,7 @@ export default function SellerProfileScreen() {
             <View style={styles.statDivider} />
             <View style={styles.statItem}>
               <View style={styles.ratingValue}>
-                <Ionicons name="star" size={18} color={TarodanColors.star} />
+                <Ionicons name="star" size={18} color={colors.warning[500]!} />
                 <Text style={styles.statValue}>
                   {(ratingStats?.averageScore ?? ratingStats?.averageRating ?? seller.rating ?? 0).toFixed
                     ? (ratingStats?.averageScore ?? ratingStats?.averageRating ?? seller.rating ?? 0).toFixed(1)
@@ -205,7 +204,7 @@ export default function SellerProfileScreen() {
                 if (!info) return null;
                 return (
                   <View key={badge} style={[styles.badge, { backgroundColor: info.color }]}>
-                    <Ionicons name={info.icon as any} size={14} color="#fff" />
+                    <Ionicons name={info.icon as any} size={14} color={colors.white} />
                     <Text style={styles.badgeText}>{info.label}</Text>
                   </View>
                 );
@@ -216,11 +215,11 @@ export default function SellerProfileScreen() {
           {/* Response Info */}
           <View style={styles.responseInfo}>
             <View style={styles.responseItem}>
-              <Ionicons name="time-outline" size={20} color={TarodanColors.textSecondary} />
+              <Ionicons name="time-outline" size={20} color={colors.text.muted} />
               <Text style={styles.responseText}>Yanıt süresi: {seller.responseTime}</Text>
             </View>
             <View style={styles.responseItem}>
-              <Ionicons name="chatbubbles-outline" size={20} color={TarodanColors.textSecondary} />
+              <Ionicons name="chatbubbles-outline" size={20} color={colors.text.muted} />
               <Text style={styles.responseText}>Yanıt oranı: %{seller.responseRate}</Text>
             </View>
           </View>
@@ -232,14 +231,12 @@ export default function SellerProfileScreen() {
 
           {/* Message Button */}
           <Button
-            mode="contained"
-            buttonColor={TarodanColors.primary}
+            variant="primary"
+            title="Mesaj Gönder"
             onPress={handleMessage}
             style={styles.messageButton}
-            icon="message-text-outline"
-          >
-            Mesaj Gönder
-          </Button>
+            icon="chatbubble-outline"
+          />
           {!isAuthenticated && (
             <Text style={styles.loginNotice}>
               Mesaj göndermek için üye girişi yapın
@@ -253,10 +250,10 @@ export default function SellerProfileScreen() {
             style={[styles.tab, activeTab === 'listings' && styles.tabActive]}
             onPress={() => setActiveTab('listings')}
           >
-            <Ionicons 
-              name="grid-outline" 
-              size={20} 
-              color={activeTab === 'listings' ? TarodanColors.primary : TarodanColors.textSecondary} 
+            <Ionicons
+              name="grid-outline"
+              size={20}
+              color={activeTab === 'listings' ? colors.primary[600]! : colors.text.muted}
             />
             <Text style={[styles.tabText, activeTab === 'listings' && styles.tabTextActive]}>
               İlanlar ({products.length})
@@ -266,10 +263,10 @@ export default function SellerProfileScreen() {
             style={[styles.tab, activeTab === 'reviews' && styles.tabActive]}
             onPress={() => setActiveTab('reviews')}
           >
-            <Ionicons 
-              name="star-outline" 
-              size={20} 
-              color={activeTab === 'reviews' ? TarodanColors.primary : TarodanColors.textSecondary} 
+            <Ionicons
+              name="star-outline"
+              size={20}
+              color={activeTab === 'reviews' ? colors.primary[600]! : colors.text.muted}
             />
             <Text style={[styles.tabText, activeTab === 'reviews' && styles.tabTextActive]}>
               Değerlendirmeler ({reviews.length})
@@ -281,33 +278,36 @@ export default function SellerProfileScreen() {
         {activeTab === 'listings' ? (
           <View style={styles.listingsGrid}>
             {products.map((product: any) => (
-              <Card
+              <Pressable
                 key={product.id}
-                style={styles.productCard}
                 onPress={() => router.push(`/product/${product.id}`)}
+                style={({ pressed }) => ({ opacity: pressed ? 0.85 : 1 })}
               >
-                <CardCover
-                  source={{ uri: product.images?.[0] || 'https://placehold.co/200x200/f3f4f6/9ca3af?text=Ürün' }}
-                  style={styles.productImage}
-                />
-                {product.tradeAvailable && (
-                  <View style={styles.tradeBadge}>
-                    <Ionicons name="swap-horizontal" size={12} color="#fff" />
+                <Card style={styles.productCard} padding={0}>
+                  <Image
+                    source={{ uri: product.images?.[0] || 'https://placehold.co/200x200/f3f4f6/9ca3af?text=Ürün' }}
+                    style={styles.productImage}
+                    resizeMode="cover"
+                  />
+                  {product.tradeAvailable && (
+                    <View style={styles.tradeBadge}>
+                      <Ionicons name="swap-horizontal" size={12} color={colors.white} />
+                    </View>
+                  )}
+                  <View style={styles.productContent}>
+                    <Text style={styles.productTitle} numberOfLines={2}>{product.title}</Text>
+                    <Text style={styles.productPrice}>₺{product.price?.toLocaleString('tr-TR')}</Text>
                   </View>
-                )}
-                <Card.Content style={styles.productContent}>
-                  <Text style={styles.productTitle} numberOfLines={2}>{product.title}</Text>
-                  <Text style={styles.productPrice}>₺{product.price?.toLocaleString('tr-TR')}</Text>
-                </Card.Content>
-              </Card>
+                </Card>
+              </Pressable>
             ))}
           </View>
         ) : (
           <View style={styles.reviewsList}>
             {reviews.length === 0 ? (
               <View style={{ alignItems: 'center', padding: 32 }}>
-                <Ionicons name="star-outline" size={48} color={TarodanColors.textTertiary} />
-                <Text style={{ color: TarodanColors.textSecondary, marginTop: 8, fontSize: 14 }}>
+                <Ionicons name="star-outline" size={48} color={colors.text.subtle} />
+                <Text style={{ color: colors.text.muted, marginTop: 8, fontSize: 14 }}>
                   Henüz değerlendirme yok
                 </Text>
               </View>
@@ -323,15 +323,11 @@ export default function SellerProfileScreen() {
                 return (
                   <View key={review.id} style={styles.reviewCard}>
                     <View style={styles.reviewHeader}>
-                      {avatarUrl ? (
-                        <Avatar.Image size={40} source={{ uri: avatarUrl }} />
-                      ) : (
-                        <Avatar.Text
-                          size={40}
-                          label={reviewerName.substring(0, 2).toUpperCase()}
-                          style={{ backgroundColor: TarodanColors.secondaryLight }}
-                        />
-                      )}
+                      <Avatar
+                        size="md"
+                        source={avatarUrl}
+                        name={reviewerName.substring(0, 2).toUpperCase()}
+                      />
                       <View style={styles.reviewInfo}>
                         <Text style={styles.reviewerName}>{reviewerName}</Text>
                         <View style={styles.ratingStars}>
@@ -340,7 +336,7 @@ export default function SellerProfileScreen() {
                               key={star}
                               name={star <= score ? 'star' : 'star-outline'}
                               size={14}
-                              color={TarodanColors.star}
+                              color={colors.warning[500]!}
                             />
                           ))}
                           {dateStr ? (
@@ -370,20 +366,20 @@ export default function SellerProfileScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: TarodanColors.backgroundSecondary,
+    backgroundColor: colors.surface.alt,
   },
   loadingContainer: {
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
-    backgroundColor: TarodanColors.background,
+    backgroundColor: colors.surface.DEFAULT,
   },
   loadingText: {
     marginTop: 16,
-    color: TarodanColors.textSecondary,
+    color: colors.text.muted,
   },
   header: {
-    backgroundColor: TarodanColors.primary,
+    backgroundColor: colors.primary[600]!,
     paddingTop: 50,
     paddingBottom: 16,
     paddingHorizontal: 20,
@@ -394,13 +390,13 @@ const styles = StyleSheet.create({
   headerTitle: {
     fontSize: 18,
     fontWeight: 'bold',
-    color: TarodanColors.textOnPrimary,
+    color: colors.white,
   },
   content: {
     flex: 1,
   },
   profileCard: {
-    backgroundColor: TarodanColors.background,
+    backgroundColor: colors.surface.DEFAULT,
     padding: 24,
     alignItems: 'center',
   },
@@ -413,7 +409,7 @@ const styles = StyleSheet.create({
   profileName: {
     fontSize: 24,
     fontWeight: 'bold',
-    color: TarodanColors.textPrimary,
+    color: colors.text.heading,
   },
   locationRow: {
     flexDirection: 'row',
@@ -423,11 +419,11 @@ const styles = StyleSheet.create({
   },
   locationText: {
     fontSize: 14,
-    color: TarodanColors.textSecondary,
+    color: colors.text.muted,
   },
   memberSince: {
     fontSize: 13,
-    color: TarodanColors.textSecondary,
+    color: colors.text.muted,
     marginTop: 4,
   },
   statsRow: {
@@ -436,7 +432,7 @@ const styles = StyleSheet.create({
     paddingVertical: 16,
     borderTopWidth: 1,
     borderBottomWidth: 1,
-    borderColor: TarodanColors.border,
+    borderColor: colors.border.DEFAULT,
     width: '100%',
   },
   statItem: {
@@ -445,16 +441,16 @@ const styles = StyleSheet.create({
   },
   statDivider: {
     width: 1,
-    backgroundColor: TarodanColors.border,
+    backgroundColor: colors.border.DEFAULT,
   },
   statValue: {
     fontSize: 20,
     fontWeight: 'bold',
-    color: TarodanColors.textPrimary,
+    color: colors.text.heading,
   },
   statLabel: {
     fontSize: 13,
-    color: TarodanColors.textSecondary,
+    color: colors.text.muted,
     marginTop: 4,
   },
   ratingValue: {
@@ -480,7 +476,7 @@ const styles = StyleSheet.create({
   badgeText: {
     fontSize: 12,
     fontWeight: '600',
-    color: '#fff',
+    color: colors.white,
   },
   responseInfo: {
     flexDirection: 'row',
@@ -494,12 +490,12 @@ const styles = StyleSheet.create({
   },
   responseText: {
     fontSize: 13,
-    color: TarodanColors.textSecondary,
+    color: colors.text.muted,
   },
   bio: {
     fontSize: 14,
     lineHeight: 20,
-    color: TarodanColors.textPrimary,
+    color: colors.text.heading,
     textAlign: 'center',
     marginTop: 16,
     paddingHorizontal: 20,
@@ -511,16 +507,16 @@ const styles = StyleSheet.create({
   },
   loginNotice: {
     fontSize: 12,
-    color: TarodanColors.textSecondary,
+    color: colors.text.muted,
     marginTop: 8,
     fontStyle: 'italic',
   },
   tabs: {
     flexDirection: 'row',
-    backgroundColor: TarodanColors.background,
+    backgroundColor: colors.surface.DEFAULT,
     marginTop: 8,
     borderBottomWidth: 1,
-    borderBottomColor: TarodanColors.border,
+    borderBottomColor: colors.border.DEFAULT,
   },
   tab: {
     flex: 1,
@@ -533,14 +529,14 @@ const styles = StyleSheet.create({
     borderBottomColor: 'transparent',
   },
   tabActive: {
-    borderBottomColor: TarodanColors.primary,
+    borderBottomColor: colors.primary[600]!,
   },
   tabText: {
     fontSize: 14,
-    color: TarodanColors.textSecondary,
+    color: colors.text.muted,
   },
   tabTextActive: {
-    color: TarodanColors.primary,
+    color: colors.primary[600]!,
     fontWeight: '600',
   },
   listingsGrid: {
@@ -553,38 +549,40 @@ const styles = StyleSheet.create({
     width: CARD_WIDTH,
     borderRadius: 12,
     overflow: 'hidden',
-    backgroundColor: TarodanColors.background,
+    backgroundColor: colors.surface.DEFAULT,
   },
   productImage: {
+    width: '100%',
     height: CARD_WIDTH,
   },
   tradeBadge: {
     position: 'absolute',
     top: 8,
     left: 8,
-    backgroundColor: TarodanColors.accent,
+    backgroundColor: colors.warning[500]!,
     padding: 6,
     borderRadius: 12,
   },
   productContent: {
     paddingVertical: 10,
+    paddingHorizontal: 10,
   },
   productTitle: {
     fontSize: 14,
     fontWeight: '500',
-    color: TarodanColors.textPrimary,
+    color: colors.text.heading,
     marginBottom: 4,
   },
   productPrice: {
     fontSize: 16,
     fontWeight: 'bold',
-    color: TarodanColors.primary,
+    color: colors.primary[600]!,
   },
   reviewsList: {
     padding: 16,
   },
   reviewCard: {
-    backgroundColor: TarodanColors.background,
+    backgroundColor: colors.surface.DEFAULT,
     borderRadius: 12,
     padding: 16,
     marginBottom: 12,
@@ -600,7 +598,7 @@ const styles = StyleSheet.create({
   reviewerName: {
     fontSize: 15,
     fontWeight: '600',
-    color: TarodanColors.textPrimary,
+    color: colors.text.heading,
   },
   ratingStars: {
     flexDirection: 'row',
@@ -610,12 +608,12 @@ const styles = StyleSheet.create({
   },
   reviewDate: {
     fontSize: 12,
-    color: TarodanColors.textSecondary,
+    color: colors.text.muted,
     marginLeft: 8,
   },
   reviewComment: {
     fontSize: 14,
     lineHeight: 20,
-    color: TarodanColors.textPrimary,
+    color: colors.text.heading,
   },
 });

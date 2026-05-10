@@ -1,14 +1,15 @@
 import React, { useState } from 'react';
 import { View, StyleSheet, ScrollView, Alert, KeyboardAvoidingView, Platform } from 'react-native';
-import { Button } from 'react-native-paper';
+import { Button, Input, Text, theme } from '@tarodan/ui-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 import { router } from 'expo-router';
 import { useMutation } from '@tanstack/react-query';
 import { userApi } from '../../src/services/api';
-import { TarodanColors } from '../../src/theme';
-import { ScreenHeader, EmptyState, Text, TextInput } from '../../src/components/common';
+import { ScreenHeader, EmptyState } from '../../src/components/common';
 import { useAuthStore } from '../../src/stores/authStore';
+
+const { colors } = theme;
 
 export default function SellerRegisterScreen() {
   const { isAuthenticated, user, refreshUserData } = useAuthStore();
@@ -75,7 +76,7 @@ export default function SellerRegisterScreen() {
         <ScrollView contentContainerStyle={styles.scrollBody}>
           {isBusiness ? (
             <View style={styles.infoCard}>
-              <Ionicons name="checkmark-circle" size={22} color={TarodanColors.success} />
+              <Ionicons name="checkmark-circle" size={22} color={colors.success[600]!} />
               <Text style={styles.infoCardText}>
                 Hesabınız zaten kurumsal (Business) üyelik olarak işaretli. Bilgilerinizi burada güncelleyebilirsiniz.
               </Text>
@@ -85,96 +86,79 @@ export default function SellerRegisterScreen() {
           <View style={styles.benefitsCard}>
             <Text style={styles.benefitsTitle}>Kurumsal Satıcı Avantajları</Text>
             <View style={styles.benefitRow}>
-              <Ionicons name="checkmark-circle" size={18} color={TarodanColors.success} />
+              <Ionicons name="checkmark-circle" size={18} color={colors.success[600]!} />
               <Text style={styles.benefitText}>Sınırsız ilan ve daha düşük komisyon oranı</Text>
             </View>
             <View style={styles.benefitRow}>
-              <Ionicons name="checkmark-circle" size={18} color={TarodanColors.success} />
+              <Ionicons name="checkmark-circle" size={18} color={colors.success[600]!} />
               <Text style={styles.benefitText}>Arama sonuçlarında öncelikli gösterim</Text>
             </View>
             <View style={styles.benefitRow}>
-              <Ionicons name="checkmark-circle" size={18} color={TarodanColors.success} />
+              <Ionicons name="checkmark-circle" size={18} color={colors.success[600]!} />
               <Text style={styles.benefitText}>Fatura düzenleme ve toplu yükleme</Text>
             </View>
             <View style={styles.benefitRow}>
-              <Ionicons name="checkmark-circle" size={18} color={TarodanColors.success} />
+              <Ionicons name="checkmark-circle" size={18} color={colors.success[600]!} />
               <Text style={styles.benefitText}>Kurumsal rozet ve istatistik paneli</Text>
             </View>
           </View>
 
           <Text style={styles.sectionTitle}>Şirket Bilgileri</Text>
 
-          <TextInput
-            mode="outlined"
+          <Input
             label="Şirket / İşletme Adı *"
             value={companyName}
             onChangeText={setCompanyName}
-            style={styles.input}
-            outlineColor={TarodanColors.border}
-            activeOutlineColor={TarodanColors.primary}
-            left={<TextInput.Icon icon="domain" color={TarodanColors.textSecondary} />}
+            containerStyle={styles.input}
+            leftIconName="business-outline"
           />
-          <TextInput
-            mode="outlined"
+          <Input
             label="Vergi No / T.C. Kimlik *"
             value={taxId}
             onChangeText={(v: string) => setTaxId(v.replace(/[^\d]/g, ''))}
             keyboardType="number-pad"
             maxLength={11}
-            style={styles.input}
-            outlineColor={TarodanColors.border}
-            activeOutlineColor={TarodanColors.primary}
-            left={<TextInput.Icon icon="card-account-details-outline" color={TarodanColors.textSecondary} />}
+            containerStyle={styles.input}
+            leftIconName="card-outline"
           />
-          <TextInput
-            mode="outlined"
+          <Input
             label="Vergi Dairesi"
             value={taxOffice}
             onChangeText={setTaxOffice}
-            style={styles.input}
-            outlineColor={TarodanColors.border}
-            activeOutlineColor={TarodanColors.primary}
-            left={<TextInput.Icon icon="office-building" color={TarodanColors.textSecondary} />}
+            containerStyle={styles.input}
+            leftIconName="business-outline"
           />
-          <TextInput
-            mode="outlined"
+          <Input
             label="İşletme Telefonu"
             value={companyPhone}
             onChangeText={setCompanyPhone}
             keyboardType="phone-pad"
             placeholder="+90 5XX XXX XX XX"
-            style={styles.input}
-            outlineColor={TarodanColors.border}
-            activeOutlineColor={TarodanColors.primary}
-            left={<TextInput.Icon icon="phone-outline" color={TarodanColors.textSecondary} />}
+            containerStyle={styles.input}
+            leftIconName="call-outline"
           />
 
           <View style={styles.noteCard}>
-            <MaterialCommunityIcons name="shield-check-outline" size={18} color={TarodanColors.info} />
+            <MaterialCommunityIcons name="shield-check-outline" size={18} color={colors.info[600]!} />
             <Text style={styles.noteText}>
               Vergi ve şirket bilgilerin resmi belgelerle doğrulanacak. Hatalı veya yanıltıcı bilgi, hesabın askıya alınmasına yol açabilir.
             </Text>
           </View>
 
           <Button
-            mode="contained"
-            buttonColor={TarodanColors.primary}
+            variant="primary"
+            title="Bilgileri Kaydet"
             onPress={handleSubmit}
-            loading={upgradeMutation.isPending}
+            isLoading={upgradeMutation.isPending}
             disabled={upgradeMutation.isPending}
             style={styles.submitBtn}
-            contentStyle={{ paddingVertical: 4 }}
-          >
-            Bilgileri Kaydet
-          </Button>
+          />
 
           <Button
-            mode="text"
-            textColor={TarodanColors.textSecondary}
+            variant="ghost"
+            title="Vazgeç"
             onPress={() => router.back()}
-          >
-            Vazgeç
-          </Button>
+          />
         </ScrollView>
       </KeyboardAvoidingView>
     </SafeAreaView>
@@ -184,7 +168,7 @@ export default function SellerRegisterScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: TarodanColors.backgroundSecondary,
+    backgroundColor: colors.surface.alt,
   },
   scrollBody: {
     padding: 16,
@@ -195,17 +179,17 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     gap: 8,
     alignItems: 'flex-start',
-    backgroundColor: TarodanColors.successLight,
+    backgroundColor: colors.success[50]!,
     padding: 12,
     borderRadius: 10,
   },
   infoCardText: {
     flex: 1,
     fontSize: 13,
-    color: TarodanColors.success,
+    color: colors.success[600]!,
   },
   benefitsCard: {
-    backgroundColor: TarodanColors.primaryLight,
+    backgroundColor: colors.primary[50]!,
     borderRadius: 12,
     padding: 14,
     gap: 8,
@@ -213,7 +197,7 @@ const styles = StyleSheet.create({
   benefitsTitle: {
     fontSize: 15,
     fontWeight: '700',
-    color: TarodanColors.primary,
+    color: colors.primary[600]!,
     marginBottom: 4,
   },
   benefitRow: {
@@ -224,29 +208,29 @@ const styles = StyleSheet.create({
   benefitText: {
     flex: 1,
     fontSize: 13,
-    color: TarodanColors.textPrimary,
+    color: colors.text.heading,
   },
   sectionTitle: {
     fontSize: 14,
     fontWeight: '700',
-    color: TarodanColors.textPrimary,
+    color: colors.text.heading,
     marginTop: 6,
   },
   input: {
-    backgroundColor: TarodanColors.background,
+    backgroundColor: colors.surface.DEFAULT,
   },
   noteCard: {
     flexDirection: 'row',
     gap: 8,
     alignItems: 'flex-start',
-    backgroundColor: TarodanColors.infoLight,
+    backgroundColor: colors.info[50]!,
     padding: 12,
     borderRadius: 10,
   },
   noteText: {
     flex: 1,
     fontSize: 12,
-    color: TarodanColors.info,
+    color: colors.info[600]!,
     lineHeight: 17,
   },
   submitBtn: {

@@ -1,15 +1,16 @@
 import React from 'react';
 import { View, StyleSheet, ScrollView, TouchableOpacity, RefreshControl } from 'react-native';
-import { Card } from 'react-native-paper';
+import { Card, Text, theme } from '@tarodan/ui-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 import { router } from 'expo-router';
 import { useQuery } from '@tanstack/react-query';
 import { userApi, ordersApi, productsApi } from '../../src/services/api';
-import { TarodanColors } from '../../src/theme';
-import { ScreenHeader, EmptyState, ScreenLoader, Text } from '../../src/components/common';
+import { ScreenHeader, EmptyState, ScreenLoader } from '../../src/components/common';
 import { formatPrice } from '../../src/utils/format';
 import { useAuthStore } from '../../src/stores/authStore';
+
+const { colors } = theme;
 
 interface SellerStats {
   activeListings?: number;
@@ -60,7 +61,7 @@ function QuickAction({
   icon,
   label,
   onPress,
-  color = TarodanColors.primary,
+  color = colors.primary[600]!,
 }: {
   icon: React.ComponentProps<typeof MaterialCommunityIcons>['name'];
   label: string;
@@ -157,14 +158,14 @@ export default function SellerDashboardScreen() {
           <RefreshControl
             refreshing={statsQuery.isRefetching}
             onRefresh={refresh}
-            colors={[TarodanColors.primary]}
-            tintColor={TarodanColors.primary}
+            colors={[colors.primary[600]!]}
+            tintColor={colors.primary[600]!}
           />
         }
       >
         {/* Welcome */}
         <View style={styles.welcomeCard}>
-          <MaterialCommunityIcons name="storefront" size={28} color={TarodanColors.primary} />
+          <MaterialCommunityIcons name="storefront" size={28} color={colors.primary[600]!} />
           <View style={{ flex: 1 }}>
             <Text style={styles.welcomeTitle}>
               {isBusiness ? 'Kurumsal Satıcı Paneli' : 'Hoş Geldin!'}
@@ -191,103 +192,99 @@ export default function SellerDashboardScreen() {
             icon="pricetag"
             label="Aktif İlan"
             value={activeListings}
-            color={TarodanColors.primary}
+            color={colors.primary[600]!}
             onPress={() => router.push('/settings/my-listings')}
           />
           <StatCard
             icon="cube"
             label="Bekleyen Sipariş"
             value={pendingOrders}
-            color={TarodanColors.warning}
+            color={colors.warning[600]!}
             onPress={() => router.push('/sales')}
           />
           <StatCard
             icon="cash"
             label="Bu Ay Satış"
             value={formatPrice(monthly)}
-            color={TarodanColors.success}
+            color={colors.success[600]!}
           />
           <StatCard
             icon="star"
             label="Puan"
             value={rating > 0 ? rating.toFixed(1) : '—'}
-            color={TarodanColors.star}
+            color={colors.warning[500]!}
           />
         </View>
 
         {/* Quick actions */}
         <Card style={styles.actionsCard}>
-          <Card.Content>
-            <Text style={styles.sectionTitle}>Hızlı İşlemler</Text>
-            <View style={styles.quickGrid}>
-              <QuickAction
-                icon="plus-circle-outline"
-                label="Yeni İlan"
-                onPress={() => router.push('/(tabs)/create')}
-                color={TarodanColors.primary}
-              />
-              <QuickAction
-                icon="format-list-bulleted"
-                label="İlanlarım"
-                onPress={() => router.push('/settings/my-listings')}
-                color={TarodanColors.info}
-              />
-              <QuickAction
-                icon="cube-send"
-                label="Satışlarım"
-                onPress={() => router.push('/sales')}
-                color={TarodanColors.accent}
-              />
-              <QuickAction
-                icon="chart-line"
-                label="Analitik"
-                onPress={() => router.push('/settings/analytics')}
-                color={TarodanColors.badgePremium}
-              />
-              <QuickAction
-                icon="message-text-outline"
-                label="Mesajlar"
-                onPress={() => router.push('/(tabs)/messages')}
-                color={TarodanColors.badgeTrade}
-              />
-              <QuickAction
-                icon="account-cog-outline"
-                label="İşletme Bilgileri"
-                onPress={() => router.push('/seller/register')}
-                color={TarodanColors.secondary}
-              />
-            </View>
-          </Card.Content>
+          <Text style={styles.sectionTitle}>Hızlı İşlemler</Text>
+          <View style={styles.quickGrid}>
+            <QuickAction
+              icon="plus-circle-outline"
+              label="Yeni İlan"
+              onPress={() => router.push('/(tabs)/create')}
+              color={colors.primary[600]!}
+            />
+            <QuickAction
+              icon="format-list-bulleted"
+              label="İlanlarım"
+              onPress={() => router.push('/settings/my-listings')}
+              color={colors.info[600]!}
+            />
+            <QuickAction
+              icon="cube-send"
+              label="Satışlarım"
+              onPress={() => router.push('/sales')}
+              color={colors.warning[500]!}
+            />
+            <QuickAction
+              icon="chart-line"
+              label="Analitik"
+              onPress={() => router.push('/settings/analytics')}
+              color={colors.warning[500]!}
+            />
+            <QuickAction
+              icon="message-text-outline"
+              label="Mesajlar"
+              onPress={() => router.push('/(tabs)/messages')}
+              color={colors.info[600]!}
+            />
+            <QuickAction
+              icon="account-cog-outline"
+              label="İşletme Bilgileri"
+              onPress={() => router.push('/seller/register')}
+              color={colors.gray[200]}
+            />
+          </View>
         </Card>
 
         {/* Summary */}
         {stats.totalListings || stats.totalOrders ? (
           <Card style={styles.summaryCard}>
-            <Card.Content>
-              <Text style={styles.sectionTitle}>Toplam Özet</Text>
+            <Text style={styles.sectionTitle}>Toplam Özet</Text>
+            <View style={styles.summaryRow}>
+              <Text style={styles.summaryLabel}>Toplam İlan</Text>
+              <Text style={styles.summaryValue}>{stats.totalListings ?? 0}</Text>
+            </View>
+            <View style={styles.summaryRow}>
+              <Text style={styles.summaryLabel}>Toplam Sipariş</Text>
+              <Text style={styles.summaryValue}>{stats.totalOrders ?? 0}</Text>
+            </View>
+            {stats.totalSales ? (
               <View style={styles.summaryRow}>
-                <Text style={styles.summaryLabel}>Toplam İlan</Text>
-                <Text style={styles.summaryValue}>{stats.totalListings ?? 0}</Text>
+                <Text style={styles.summaryLabel}>Toplam Satış</Text>
+                <Text style={[styles.summaryValue, { color: colors.primary[600]! }]}>
+                  {formatPrice(stats.totalSales)}
+                </Text>
               </View>
+            ) : null}
+            {stats.ratingCount ? (
               <View style={styles.summaryRow}>
-                <Text style={styles.summaryLabel}>Toplam Sipariş</Text>
-                <Text style={styles.summaryValue}>{stats.totalOrders ?? 0}</Text>
+                <Text style={styles.summaryLabel}>Değerlendirme Sayısı</Text>
+                <Text style={styles.summaryValue}>{stats.ratingCount}</Text>
               </View>
-              {stats.totalSales ? (
-                <View style={styles.summaryRow}>
-                  <Text style={styles.summaryLabel}>Toplam Satış</Text>
-                  <Text style={[styles.summaryValue, { color: TarodanColors.primary }]}>
-                    {formatPrice(stats.totalSales)}
-                  </Text>
-                </View>
-              ) : null}
-              {stats.ratingCount ? (
-                <View style={styles.summaryRow}>
-                  <Text style={styles.summaryLabel}>Değerlendirme Sayısı</Text>
-                  <Text style={styles.summaryValue}>{stats.ratingCount}</Text>
-                </View>
-              ) : null}
-            </Card.Content>
+            ) : null}
           </Card>
         ) : null}
       </ScrollView>
@@ -298,7 +295,7 @@ export default function SellerDashboardScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: TarodanColors.backgroundSecondary,
+    backgroundColor: colors.surface.alt,
   },
   scrollBody: {
     padding: 16,
@@ -309,29 +306,29 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     gap: 12,
     padding: 14,
-    backgroundColor: TarodanColors.primaryLight,
+    backgroundColor: colors.primary[50]!,
     borderRadius: 12,
     borderWidth: 1,
-    borderColor: TarodanColors.primary + '30',
+    borderColor: colors.primary[200]!,
   },
   welcomeTitle: {
     fontSize: 15,
     fontWeight: '700',
-    color: TarodanColors.textPrimary,
+    color: colors.text.heading,
   },
   welcomeSubtitle: {
     fontSize: 12,
-    color: TarodanColors.textSecondary,
+    color: colors.text.muted,
     marginTop: 2,
   },
   upgradeBtn: {
-    backgroundColor: TarodanColors.primary,
+    backgroundColor: colors.primary[600]!,
     paddingHorizontal: 12,
     paddingVertical: 6,
     borderRadius: 8,
   },
   upgradeBtnText: {
-    color: '#fff',
+    color: colors.white,
     fontSize: 12,
     fontWeight: '700',
   },
@@ -342,11 +339,11 @@ const styles = StyleSheet.create({
   },
   statCard: {
     flexBasis: '48%',
-    backgroundColor: TarodanColors.background,
+    backgroundColor: colors.surface.DEFAULT,
     borderRadius: 12,
     padding: 14,
     borderWidth: StyleSheet.hairlineWidth,
-    borderColor: TarodanColors.border,
+    borderColor: colors.border.DEFAULT,
   },
   statIconWrap: {
     width: 36,
@@ -359,20 +356,20 @@ const styles = StyleSheet.create({
   statValue: {
     fontSize: 20,
     fontWeight: '800',
-    color: TarodanColors.textPrimary,
+    color: colors.text.heading,
   },
   statLabel: {
     fontSize: 12,
-    color: TarodanColors.textSecondary,
+    color: colors.text.muted,
     marginTop: 2,
   },
   actionsCard: {
-    backgroundColor: TarodanColors.background,
+    backgroundColor: colors.surface.DEFAULT,
   },
   sectionTitle: {
     fontSize: 16,
     fontWeight: '700',
-    color: TarodanColors.textPrimary,
+    color: colors.text.heading,
     marginBottom: 12,
   },
   quickGrid: {
@@ -394,11 +391,11 @@ const styles = StyleSheet.create({
   },
   quickLabel: {
     fontSize: 11,
-    color: TarodanColors.textPrimary,
+    color: colors.text.heading,
     textAlign: 'center',
   },
   summaryCard: {
-    backgroundColor: TarodanColors.background,
+    backgroundColor: colors.surface.DEFAULT,
   },
   summaryRow: {
     flexDirection: 'row',
@@ -408,11 +405,11 @@ const styles = StyleSheet.create({
   },
   summaryLabel: {
     fontSize: 13,
-    color: TarodanColors.textSecondary,
+    color: colors.text.muted,
   },
   summaryValue: {
     fontSize: 14,
     fontWeight: '700',
-    color: TarodanColors.textPrimary,
+    color: colors.text.heading,
   },
 });

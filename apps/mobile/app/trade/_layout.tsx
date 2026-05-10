@@ -1,5 +1,7 @@
 import { Stack } from 'expo-router';
-import { TarodanColors } from '../../src/theme';
+import { theme } from '@tarodan/ui-native';
+
+const { colors } = theme;
 
 export default function TradeLayout() {
   // headerShown TRUE: trade ekranlarının çoğu Stack.Screen options ile title
@@ -9,10 +11,10 @@ export default function TradeLayout() {
     <Stack
       screenOptions={{
         headerShown: true,
-        headerStyle: { backgroundColor: TarodanColors.primary },
-        headerTintColor: '#fff',
+        headerStyle: { backgroundColor: colors.primary[600]! },
+        headerTintColor: colors.white,
         headerTitleStyle: { fontWeight: 'bold' },
-        contentStyle: { backgroundColor: TarodanColors.background },
+        contentStyle: { backgroundColor: colors.surface.DEFAULT },
       }}
     />
   );

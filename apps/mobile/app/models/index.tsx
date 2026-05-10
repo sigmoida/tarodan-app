@@ -1,13 +1,14 @@
 import React, { useMemo, useState } from 'react';
 import { View, ScrollView, StyleSheet, TouchableOpacity, Image } from 'react-native';
-import { Chip, ActivityIndicator } from 'react-native-paper';
+import { theme, Chip, Spinner, Text, Input, EmptyState } from '@tarodan/ui-native';
 import { router } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { useQuery } from '@tanstack/react-query';
-import { Text, ScreenHeader, Searchbar, EmptyState } from '../../src/components/common';
-import { TarodanColors } from '../../src/theme';
+import { ScreenHeader } from '../../src/components/common';
 import { carModelsApi } from '../../src/services/api';
 import { transformImageUrl } from '../../src/utils/imageUrl';
+
+const { colors } = theme;
 
 /**
  * Araba modeli tarama (web `apps/web/src/app/models/page.tsx` paritesi).
@@ -89,13 +90,11 @@ export default function ModelsScreen() {
       <ScreenHeader title="Araba Modelleri" />
 
       <View style={styles.searchWrap}>
-        <Searchbar
+        <Input
           placeholder="Model veya marka ara..."
           value={search}
           onChangeText={setSearch}
-          style={styles.searchBar}
-          iconColor={TarodanColors.textSecondary}
-          inputStyle={styles.searchInput}
+          leftIconName="search"
         />
       </View>
 
@@ -106,29 +105,25 @@ export default function ModelsScreen() {
         contentContainerStyle={styles.brandFilterRow}
       >
         <Chip
+          label="Tüm Markalar"
           selected={selectedBrand === 'all'}
           onPress={() => setSelectedBrand('all')}
-          style={[styles.brandChip, selectedBrand === 'all' && styles.brandChipActive]}
-          textStyle={selectedBrand === 'all' ? styles.brandChipTextActive : undefined}
-        >
-          Tüm Markalar
-        </Chip>
+          variant="primary"
+        />
         {brands.map((b) => (
           <Chip
             key={b.slug}
+            label={b.name}
             selected={selectedBrand === b.slug}
             onPress={() => setSelectedBrand(b.slug)}
-            style={[styles.brandChip, selectedBrand === b.slug && styles.brandChipActive]}
-            textStyle={selectedBrand === b.slug ? styles.brandChipTextActive : undefined}
-          >
-            {b.name}
-          </Chip>
+            variant="primary"
+          />
         ))}
       </ScrollView>
 
       {isLoading ? (
         <View style={styles.loading}>
-          <ActivityIndicator size="large" color={TarodanColors.primary} />
+          <Spinner size="lg" />
         </View>
       ) : grouped.length === 0 ? (
         <EmptyState
@@ -149,7 +144,7 @@ export default function ModelsScreen() {
                   <Image source={{ uri: transformImageUrl(brand.logo) }} style={styles.brandLogo} />
                 ) : (
                   <View style={[styles.brandLogo, styles.brandLogoFallback]}>
-                    <Ionicons name="car-sport-outline" size={18} color={TarodanColors.primary} />
+                    <Ionicons name="car-sport-outline" size={18} color={colors.primary[600]!} />
                   </View>
                 )}
                 <View style={{ flex: 1 }}>
@@ -172,7 +167,7 @@ export default function ModelsScreen() {
                       <Image source={{ uri: transformImageUrl(m.image) }} style={styles.modelImage} />
                     ) : (
                       <View style={[styles.modelImage, styles.modelImageFallback]}>
-                        <Ionicons name="car-outline" size={36} color={TarodanColors.textTertiary} />
+                        <Ionicons name="car-outline" size={36} color={colors.text.subtle} />
                       </View>
                     )}
                     <View style={styles.modelBody}>
@@ -202,42 +197,25 @@ export default function ModelsScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: TarodanColors.backgroundSecondary,
+    backgroundColor: colors.surface.alt,
   },
   searchWrap: {
-    backgroundColor: TarodanColors.background,
+    backgroundColor: colors.surface.DEFAULT,
     paddingHorizontal: 16,
     paddingVertical: 8,
     borderBottomWidth: 1,
-    borderBottomColor: TarodanColors.borderLight,
-  },
-  searchBar: {
-    backgroundColor: TarodanColors.surfaceVariant,
-    elevation: 0,
-  },
-  searchInput: {
-    fontSize: 14,
+    borderBottomColor: colors.border.subtle,
   },
   brandFilterScroll: {
-    backgroundColor: TarodanColors.background,
+    backgroundColor: colors.surface.DEFAULT,
     maxHeight: 60,
     borderBottomWidth: 1,
-    borderBottomColor: TarodanColors.borderLight,
+    borderBottomColor: colors.border.subtle,
   },
   brandFilterRow: {
     paddingHorizontal: 16,
     paddingVertical: 12,
     gap: 8,
-  },
-  brandChip: {
-    backgroundColor: TarodanColors.surfaceVariant,
-  },
-  brandChipActive: {
-    backgroundColor: TarodanColors.primaryLight,
-  },
-  brandChipTextActive: {
-    color: TarodanColors.primary,
-    fontWeight: '600',
   },
   loading: {
     flex: 1,
@@ -248,7 +226,7 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   brandSection: {
-    backgroundColor: TarodanColors.background,
+    backgroundColor: colors.surface.DEFAULT,
     marginTop: 12,
     paddingVertical: 12,
   },
@@ -263,7 +241,7 @@ const styles = StyleSheet.create({
     width: 36,
     height: 36,
     borderRadius: 18,
-    backgroundColor: TarodanColors.surfaceVariant,
+    backgroundColor: colors.gray[50],
   },
   brandLogoFallback: {
     alignItems: 'center',
@@ -272,11 +250,11 @@ const styles = StyleSheet.create({
   brandName: {
     fontSize: 16,
     fontWeight: '700',
-    color: TarodanColors.textPrimary,
+    color: colors.text.heading,
   },
   brandMeta: {
     fontSize: 12,
-    color: TarodanColors.textSecondary,
+    color: colors.text.muted,
     marginTop: 2,
   },
   modelsGrid: {
@@ -287,7 +265,7 @@ const styles = StyleSheet.create({
   },
   modelCard: {
     width: '48%',
-    backgroundColor: TarodanColors.surfaceVariant,
+    backgroundColor: colors.gray[50],
     borderRadius: 10,
     overflow: 'hidden',
     marginBottom: 8,
@@ -295,7 +273,7 @@ const styles = StyleSheet.create({
   modelImage: {
     width: '100%',
     aspectRatio: 16 / 10,
-    backgroundColor: TarodanColors.borderLight,
+    backgroundColor: colors.border.subtle,
   },
   modelImageFallback: {
     alignItems: 'center',
@@ -307,16 +285,16 @@ const styles = StyleSheet.create({
   modelName: {
     fontSize: 14,
     fontWeight: '600',
-    color: TarodanColors.textPrimary,
+    color: colors.text.heading,
   },
   modelYears: {
     fontSize: 11,
-    color: TarodanColors.textSecondary,
+    color: colors.text.muted,
     marginTop: 2,
   },
   modelCount: {
     fontSize: 11,
-    color: TarodanColors.primary,
+    color: colors.primary[600]!,
     fontWeight: '600',
     marginTop: 2,
   },

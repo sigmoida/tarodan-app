@@ -1,16 +1,27 @@
-import React, { useEffect, useMemo, useState } from 'react';
-import { View, StyleSheet, ScrollView, TouchableOpacity, Image, Alert } from 'react-native';
-import { Button, Chip, Card, Divider, Snackbar } from 'react-native-paper';
+import React, { useEffect, useState } from 'react';
+import { View, StyleSheet, ScrollView, Pressable, Image, Alert } from 'react-native';
+import {
+  theme,
+  Button,
+  Chip,
+  Card,
+  Divider,
+  Snackbar,
+  Text,
+  Input,
+  Textarea,
+} from '@tarodan/ui-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { router, useLocalSearchParams } from 'expo-router';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { tradesApi, productsApi } from '../../../src/services/api';
-import { TarodanColors } from '../../../src/theme';
-import { ScreenHeader, ScreenLoader, ErrorState, Text, TextInput } from '../../../src/components/common';
+import { ScreenHeader, ScreenLoader, ErrorState } from '../../../src/components/common';
 import { formatPrice } from '../../../src/utils/format';
 import { transformImageUrl } from '../../../src/utils/imageUrl';
 import { useAuthStore } from '../../../src/stores/authStore';
+
+const { colors } = theme;
 
 interface TradeItem {
   id: string;
@@ -35,13 +46,6 @@ interface Trade {
   receiver?: { id: string; displayName: string };
   initiatorItems?: TradeItem[];
   receiverItems?: TradeItem[];
-}
-
-function firstImg(product?: TradeItem['product']): string | null {
-  if (!product?.images) return null;
-  const first = product.images[0] as any;
-  if (!first) return null;
-  return typeof first === 'string' ? first : first?.cardUrl || first?.url || null;
 }
 
 export default function TradeCounterScreen() {
@@ -191,37 +195,38 @@ export default function TradeCounterScreen() {
     toggle: (p: any) => void,
   ) => (
     <Card style={styles.card}>
-      <Card.Content>
-        <Text style={styles.section}>{title}</Text>
-        <Text style={styles.sectionSubtitle}>{subtitle}</Text>
-        {products.length === 0 ? (
-          <Text style={styles.emptyText}>Takasa uygun ürün bulunamadı.</Text>
-        ) : (
-          <View style={{ gap: 8, marginTop: 8 }}>
-            {products.map(p => {
-              const isSelected = !!selected.find(x => (x.productId ?? (x as any).id) === p.id);
-              const img = p.images?.[0]?.cardUrl || p.images?.[0]?.url || p.images?.[0];
-              return (
-                <TouchableOpacity
-                  key={p.id}
-                  style={[styles.productRow, isSelected && styles.productRowSelected]}
-                  onPress={() => toggle(p)}
-                  activeOpacity={0.85}
-                >
-                  <Image source={{ uri: transformImageUrl(img) }} style={styles.productImg} />
-                  <View style={{ flex: 1 }}>
-                    <Text style={styles.productTitle} numberOfLines={2}>{p.title}</Text>
-                    <Text style={styles.productPrice}>{formatPrice(p.price)}</Text>
-                  </View>
-                  <View style={[styles.checkbox, isSelected && styles.checkboxOn]}>
-                    {isSelected ? <Ionicons name="checkmark" size={14} color="#fff" /> : null}
-                  </View>
-                </TouchableOpacity>
-              );
-            })}
-          </View>
-        )}
-      </Card.Content>
+      <Text style={styles.section}>{title}</Text>
+      <Text style={styles.sectionSubtitle}>{subtitle}</Text>
+      {products.length === 0 ? (
+        <Text style={styles.emptyText}>Takasa uygun ürün bulunamadı.</Text>
+      ) : (
+        <View style={{ gap: 8, marginTop: 8 }}>
+          {products.map(p => {
+            const isSelected = !!selected.find(x => (x.productId ?? (x as any).id) === p.id);
+            const img = p.images?.[0]?.cardUrl || p.images?.[0]?.url || p.images?.[0];
+            return (
+              <Pressable
+                key={p.id}
+                style={({ pressed }) => [
+                  styles.productRow,
+                  isSelected && styles.productRowSelected,
+                  pressed && { opacity: 0.85 },
+                ]}
+                onPress={() => toggle(p)}
+              >
+                <Image source={{ uri: transformImageUrl(img) }} style={styles.productImg} />
+                <View style={{ flex: 1 }}>
+                  <Text style={styles.productTitle} numberOfLines={2}>{p.title}</Text>
+                  <Text style={styles.productPrice}>{formatPrice(p.price)}</Text>
+                </View>
+                <View style={[styles.checkbox, isSelected && styles.checkboxOn]}>
+                  {isSelected ? <Ionicons name="checkmark" size={14} color={colors.white} /> : null}
+                </View>
+              </Pressable>
+            );
+          })}
+        </View>
+      )}
     </Card>
   );
 
@@ -231,7 +236,7 @@ export default function TradeCounterScreen() {
 
       <ScrollView contentContainerStyle={styles.scrollBody}>
         <View style={styles.noticeCard}>
-          <Ionicons name="information-circle" size={18} color={TarodanColors.info} />
+          <Ionicons name="information-circle" size={18} color={colors.info[600]!} />
           <Text style={styles.noticeText}>
             Orijinal teklifi düzenleyip karşı tarafa yeni bir teklif gönderirsiniz. Nakit fark ekleyebilir, ürün ekleyip çıkartabilirsiniz.
           </Text>
@@ -254,105 +259,84 @@ export default function TradeCounterScreen() {
         )}
 
         <Card style={styles.card}>
-          <Card.Content>
-            <Text style={styles.section}>Nakit Fark</Text>
-            <View style={styles.chipsRow}>
-              <Chip
-                selected={cashDirection === 'offer'}
-                onPress={() => setCashDirection('offer')}
-                style={styles.chip}
-                showSelectedCheck
-              >
-                Ben ödeyeceğim
-              </Chip>
-              <Chip
-                selected={cashDirection === 'request'}
-                onPress={() => setCashDirection('request')}
-                style={styles.chip}
-                showSelectedCheck
-              >
-                Karşı taraf ödesin
-              </Chip>
-            </View>
-            <TextInput
-              mode="outlined"
-              label="Tutar (TL)"
-              value={cashAmount}
-              onChangeText={(v: string) => setCashAmount(v.replace(/[^\d.]/g, ''))}
-              keyboardType="numeric"
-              style={styles.cashInput}
-              outlineColor={TarodanColors.border}
-              activeOutlineColor={TarodanColors.primary}
+          <Text style={styles.section}>Nakit Fark</Text>
+          <View style={styles.chipsRow}>
+            <Chip
+              label="Ben ödeyeceğim"
+              selected={cashDirection === 'offer'}
+              onPress={() => setCashDirection('offer')}
+              variant="primary"
+              style={styles.chip}
             />
-          </Card.Content>
+            <Chip
+              label="Karşı taraf ödesin"
+              selected={cashDirection === 'request'}
+              onPress={() => setCashDirection('request')}
+              variant="primary"
+              style={styles.chip}
+            />
+          </View>
+          <Input
+            label="Tutar (TL)"
+            value={cashAmount}
+            onChangeText={(v: string) => setCashAmount(v.replace(/[^\d.]/g, ''))}
+            keyboardType="numeric"
+            containerStyle={styles.cashInput}
+          />
         </Card>
 
         <Card style={styles.card}>
-          <Card.Content>
-            <Text style={styles.section}>Mesaj (opsiyonel)</Text>
-            <TextInput
-              mode="outlined"
-              value={message}
-              onChangeText={setMessage}
-              multiline
-              numberOfLines={3}
-              placeholder="Karşı tarafa not bırakın..."
-              style={styles.messageInput}
-              outlineColor={TarodanColors.border}
-              activeOutlineColor={TarodanColors.primary}
-            />
-          </Card.Content>
+          <Text style={styles.section}>Mesaj (opsiyonel)</Text>
+          <Textarea
+            value={message}
+            onChangeText={setMessage}
+            rows={3}
+            placeholder="Karşı tarafa not bırakın..."
+            containerStyle={styles.messageInput}
+          />
         </Card>
 
         {/* Summary */}
         <Card style={styles.card}>
-          <Card.Content>
-            <Text style={styles.section}>Özet</Text>
+          <Text style={styles.section}>Özet</Text>
+          <View style={styles.summaryRow}>
+            <Text style={styles.summaryLabel}>Verdiğim Toplam</Text>
+            <Text style={styles.summaryValue}>{formatPrice(myTotal)}</Text>
+          </View>
+          <View style={styles.summaryRow}>
+            <Text style={styles.summaryLabel}>İstediğim Toplam</Text>
+            <Text style={styles.summaryValue}>{formatPrice(theirTotal)}</Text>
+          </View>
+          {cashValue > 0 ? (
             <View style={styles.summaryRow}>
-              <Text style={styles.summaryLabel}>Verdiğim Toplam</Text>
-              <Text style={styles.summaryValue}>{formatPrice(myTotal)}</Text>
+              <Text style={styles.summaryLabel}>
+                {cashDirection === 'offer' ? 'Ödeyeceğim' : 'Alacağım'} nakit
+              </Text>
+              <Text style={[styles.summaryValue, { color: colors.primary[600]! }]}>
+                {formatPrice(cashValue)}
+              </Text>
             </View>
-            <View style={styles.summaryRow}>
-              <Text style={styles.summaryLabel}>İstediğim Toplam</Text>
-              <Text style={styles.summaryValue}>{formatPrice(theirTotal)}</Text>
-            </View>
-            {cashValue > 0 ? (
-              <View style={styles.summaryRow}>
-                <Text style={styles.summaryLabel}>
-                  {cashDirection === 'offer' ? 'Ödeyeceğim' : 'Alacağım'} nakit
-                </Text>
-                <Text style={[styles.summaryValue, { color: TarodanColors.primary }]}>
-                  {formatPrice(cashValue)}
-                </Text>
-              </View>
-            ) : null}
-            <Divider style={{ marginVertical: 8 }} />
-            <Text style={styles.summaryHint}>
-              {selectedMine.length} ürün vereceksiniz, {selectedTheirs.length} ürün alacaksınız.
-            </Text>
-          </Card.Content>
+          ) : null}
+          <Divider style={{ marginVertical: 8 }} />
+          <Text style={styles.summaryHint}>
+            {selectedMine.length} ürün vereceksiniz, {selectedTheirs.length} ürün alacaksınız.
+          </Text>
         </Card>
 
         <Button
-          mode="contained"
-          buttonColor={TarodanColors.primary}
+          variant="primary"
+          title="Karşı Teklifi Gönder"
           onPress={() => counterMutation.mutate()}
-          loading={counterMutation.isPending}
+          isLoading={counterMutation.isPending}
           disabled={counterMutation.isPending || (selectedMine.length === 0 && selectedTheirs.length === 0)}
           style={styles.submitBtn}
-          contentStyle={{ paddingVertical: 4 }}
-          icon="send"
-        >
-          Karşı Teklifi Gönder
-        </Button>
+        />
 
         <Button
-          mode="text"
+          variant="ghost"
+          title="Vazgeç"
           onPress={() => router.back()}
-          textColor={TarodanColors.textSecondary}
-        >
-          Vazgeç
-        </Button>
+        />
       </ScrollView>
 
       <Snackbar visible={!!snack} onDismiss={() => setSnack(null)} duration={2000}>
@@ -365,7 +349,7 @@ export default function TradeCounterScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: TarodanColors.backgroundSecondary,
+    backgroundColor: colors.surface.alt,
   },
   scrollBody: {
     padding: 16,
@@ -375,31 +359,31 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     gap: 8,
     padding: 12,
-    backgroundColor: TarodanColors.infoLight,
+    backgroundColor: colors.info[50]!,
     borderRadius: 10,
   },
   noticeText: {
     flex: 1,
     fontSize: 13,
-    color: TarodanColors.info,
+    color: colors.info[600]!,
     lineHeight: 18,
   },
   card: {
-    backgroundColor: TarodanColors.background,
+    backgroundColor: colors.surface.DEFAULT,
   },
   section: {
     fontSize: 14,
     fontWeight: '700',
-    color: TarodanColors.textPrimary,
+    color: colors.text.heading,
   },
   sectionSubtitle: {
     fontSize: 12,
-    color: TarodanColors.textSecondary,
+    color: colors.text.muted,
     marginTop: 2,
   },
   emptyText: {
     fontSize: 13,
-    color: TarodanColors.textTertiary,
+    color: colors.text.subtle,
     marginTop: 8,
   },
   productRow: {
@@ -410,27 +394,27 @@ const styles = StyleSheet.create({
     borderRadius: 10,
     borderWidth: 1,
     borderColor: 'transparent',
-    backgroundColor: TarodanColors.surfaceVariant,
+    backgroundColor: colors.surface.alt,
   },
   productRowSelected: {
-    borderColor: TarodanColors.primary,
-    backgroundColor: TarodanColors.primaryLight,
+    borderColor: colors.primary[600]!,
+    backgroundColor: colors.primary[50]!,
   },
   productImg: {
     width: 50,
     height: 50,
     borderRadius: 8,
-    backgroundColor: TarodanColors.border,
+    backgroundColor: colors.border.DEFAULT,
   },
   productTitle: {
     fontSize: 13,
     fontWeight: '600',
-    color: TarodanColors.textPrimary,
+    color: colors.text.heading,
   },
   productPrice: {
     fontSize: 13,
     fontWeight: '700',
-    color: TarodanColors.primary,
+    color: colors.primary[600]!,
     marginTop: 2,
   },
   checkbox: {
@@ -438,13 +422,13 @@ const styles = StyleSheet.create({
     height: 22,
     borderRadius: 11,
     borderWidth: 2,
-    borderColor: TarodanColors.border,
+    borderColor: colors.border.DEFAULT,
     alignItems: 'center',
     justifyContent: 'center',
   },
   checkboxOn: {
-    backgroundColor: TarodanColors.primary,
-    borderColor: TarodanColors.primary,
+    backgroundColor: colors.primary[600]!,
+    borderColor: colors.primary[600]!,
   },
   chipsRow: {
     flexDirection: 'row',
@@ -456,11 +440,11 @@ const styles = StyleSheet.create({
   },
   cashInput: {
     marginTop: 10,
-    backgroundColor: TarodanColors.background,
+    backgroundColor: colors.surface.DEFAULT,
   },
   messageInput: {
     marginTop: 8,
-    backgroundColor: TarodanColors.background,
+    backgroundColor: colors.surface.DEFAULT,
   },
   summaryRow: {
     flexDirection: 'row',
@@ -470,16 +454,16 @@ const styles = StyleSheet.create({
   },
   summaryLabel: {
     fontSize: 13,
-    color: TarodanColors.textSecondary,
+    color: colors.text.muted,
   },
   summaryValue: {
     fontSize: 14,
     fontWeight: '700',
-    color: TarodanColors.textPrimary,
+    color: colors.text.heading,
   },
   summaryHint: {
     fontSize: 12,
-    color: TarodanColors.textSecondary,
+    color: colors.text.muted,
     textAlign: 'center',
   },
   submitBtn: {
