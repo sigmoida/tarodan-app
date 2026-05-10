@@ -1,10 +1,18 @@
 import { useState, useEffect } from 'react';
-import { View, ScrollView, Image, Dimensions, StyleSheet, TouchableOpacity, Share } from 'react-native';
-import { Button, Chip, Card, Avatar, IconButton, ActivityIndicator, Snackbar, Divider } from 'react-native-paper';
-import { Text } from '../../src/components/common';
+import { View, ScrollView, Image, Dimensions, StyleSheet, Pressable, Share } from 'react-native';
+import {
+  Button,
+  IconButton,
+  Spinner,
+  Snackbar,
+  Divider,
+  Avatar,
+  Text,
+  theme,
+} from '@tarodan/ui-native';
 import { useQuery } from '@tanstack/react-query';
 import { useLocalSearchParams, router } from 'expo-router';
-import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
+import { Ionicons } from '@expo/vector-icons';
 import { productsApi, ratingsApi, userReportsApi } from '../../src/services/api';
 import { useAuthStore } from '../../src/stores/authStore';
 import { Alert } from 'react-native';
@@ -14,11 +22,21 @@ import { useFavoritesStore } from '../../src/stores/favoritesStore';
 import { SignupPrompt } from '../../src/components/SignupPrompt';
 import MakeOfferModal from '../../src/components/product/MakeOfferModal';
 import AddToCollectionModal from '../../src/components/product/AddToCollectionModal';
-import { TarodanColors, CONDITIONS } from '../../src/theme';
 import { transformImageUrl, getImageUrl as getImageUrlFromUtils } from '../../src/utils/imageUrl';
 import { asLabel } from '../../src/utils/format';
 
+const { colors } = theme;
+
 const { width } = Dimensions.get('window');
+
+// Local condition palette — replaces TarodanColors-driven CONDITIONS
+const CONDITION_LABELS: Record<string, { name: string; color: string }> = {
+  new: { name: 'Sıfır', color: colors.success[600]! },
+  like_new: { name: 'Az Kullanılmış', color: colors.info[400]! },
+  good: { name: 'İyi', color: colors.info[600]! },
+  fair: { name: 'Orta', color: colors.warning[500]! },
+  poor: { name: 'Hasarlı', color: colors.danger[600]! },
+};
 
 // Mock product for demo/offline mode
 const MOCK_PRODUCT = {
@@ -59,7 +77,7 @@ export default function ProductDetailScreen() {
   const { addItem } = useCartStore();
   const { incrementProductView, getPromptType, setLastPromptShown, canShowPrompt } = useGuestStore();
   const { addToFavorites, removeFromFavorites, isInFavorites, fetchFavorites } = useFavoritesStore();
-  
+
   const [currentImage, setCurrentImage] = useState(0);
   const [snackbar, setSnackbar] = useState({ visible: false, message: '', type: 'success' as 'success' | 'error' });
   const [showAllDescription, setShowAllDescription] = useState(false);
@@ -83,7 +101,7 @@ export default function ProductDetailScreen() {
   useEffect(() => {
     if (!isAuthenticated && id) {
       incrementProductView();
-      
+
       // Check if we should show a signup prompt
       const type = getPromptType();
       if (type && canShowPrompt()) {
@@ -131,7 +149,7 @@ export default function ProductDetailScreen() {
   // Use API data or fallback to mock
   const product = apiProduct || MOCK_PRODUCT;
   // Transform image URLs to use network IP instead of localhost
-  const images = product.images?.length > 0 
+  const images = product.images?.length > 0
     ? product.images.map((img: any) => {
         const url = typeof img === 'string' ? img : img.url;
         return typeof img === 'string' ? transformImageUrl(url) : { ...img, url: transformImageUrl(url) };
@@ -139,7 +157,7 @@ export default function ProductDetailScreen() {
     : ['https://placehold.co/400x400/f3f4f6/9ca3af?text=Ürün'];
 
   const getConditionInfo = (condition: string) => {
-    return CONDITIONS.find(c => c.id === condition) || { name: condition, color: '#757575' };
+    return CONDITION_LABELS[condition] || { name: condition, color: colors.gray[500] };
   };
 
   // Sold / inactive ürün → unavailable sayfasına yönlendir (web pariteti)
@@ -181,7 +199,7 @@ export default function ProductDetailScreen() {
       setTimeout(() => router.push('/(auth)/login'), 1500);
       return;
     }
-    
+
     setFavoriteLoading(true);
     try {
       if (isFavorite) {
@@ -313,7 +331,7 @@ export default function ProductDetailScreen() {
   if (isLoading && !product) {
     return (
       <View style={styles.loadingContainer}>
-        <ActivityIndicator size="large" color={TarodanColors.primary} />
+        <Spinner size="lg" />
         <Text style={styles.loadingText}>Yükleniyor...</Text>
       </View>
     );
@@ -325,31 +343,33 @@ export default function ProductDetailScreen() {
     <View style={styles.container}>
       {/* Header */}
       <View style={styles.header}>
-        <TouchableOpacity onPress={() => router.back()} style={styles.headerButton}>
-          <Ionicons name="arrow-back" size={24} color="#fff" />
-        </TouchableOpacity>
+        <Pressable onPress={() => router.back()} style={styles.headerButton} accessibilityRole="button" accessibilityLabel="Geri">
+          <Ionicons name="arrow-back" size={24} color={colors.white} />
+        </Pressable>
         <View style={styles.headerActions}>
-          <TouchableOpacity onPress={handleReport} style={styles.headerButton}>
-            <Ionicons name="flag-outline" size={22} color="#fff" />
-          </TouchableOpacity>
-          <TouchableOpacity onPress={handleShare} style={styles.headerButton}>
-            <Ionicons name="share-outline" size={24} color="#fff" />
-          </TouchableOpacity>
-          <TouchableOpacity 
-            onPress={handleFavorite} 
+          <Pressable onPress={handleReport} style={styles.headerButton} accessibilityRole="button" accessibilityLabel="Raporla">
+            <Ionicons name="flag-outline" size={22} color={colors.white} />
+          </Pressable>
+          <Pressable onPress={handleShare} style={styles.headerButton} accessibilityRole="button" accessibilityLabel="Paylaş">
+            <Ionicons name="share-outline" size={24} color={colors.white} />
+          </Pressable>
+          <Pressable
+            onPress={handleFavorite}
             style={styles.headerButton}
             disabled={favoriteLoading}
+            accessibilityRole="button"
+            accessibilityLabel="Favorilere ekle"
           >
             {favoriteLoading ? (
-              <ActivityIndicator size={20} color="#fff" />
+              <Spinner size="sm" color={colors.white} />
             ) : (
-              <Ionicons 
-                name={isFavorite ? "heart" : "heart-outline"} 
-                size={24} 
-                color={isFavorite ? TarodanColors.error : "#fff"} 
+              <Ionicons
+                name={isFavorite ? "heart" : "heart-outline"}
+                size={24}
+                color={isFavorite ? colors.danger[600]! : colors.white}
               />
             )}
-          </TouchableOpacity>
+          </Pressable>
         </View>
       </View>
 
@@ -398,8 +418,8 @@ export default function ProductDetailScreen() {
           {/* Badges */}
           <View style={styles.badgeRow}>
             {product.tradeAvailable && (
-              <View style={[styles.badge, { backgroundColor: TarodanColors.accent }]}>
-                <Ionicons name="swap-horizontal" size={14} color="#fff" />
+              <View style={[styles.badge, { backgroundColor: colors.success[500]! }]}>
+                <Ionicons name="swap-horizontal" size={14} color={colors.white} />
                 <Text style={styles.badgeText}>Takas Açık</Text>
               </View>
             )}
@@ -415,15 +435,15 @@ export default function ProductDetailScreen() {
           {/* Quick Info */}
           <View style={styles.quickInfo}>
             <View style={styles.quickInfoItem}>
-              <Ionicons name="eye-outline" size={16} color={TarodanColors.textSecondary} />
+              <Ionicons name="eye-outline" size={16} color={colors.text.muted} />
               <Text style={styles.quickInfoText}>{product.viewCount || 0} görüntülenme</Text>
             </View>
             <View style={styles.quickInfoItem}>
-              <Ionicons name="heart-outline" size={16} color={TarodanColors.textSecondary} />
+              <Ionicons name="heart-outline" size={16} color={colors.text.muted} />
               <Text style={styles.quickInfoText}>{product.favoriteCount || 0} favori</Text>
             </View>
             <View style={styles.quickInfoItem}>
-              <Ionicons name="time-outline" size={16} color={TarodanColors.textSecondary} />
+              <Ionicons name="time-outline" size={16} color={colors.text.muted} />
               <Text style={styles.quickInfoText}>
                 {new Date(product.createdAt).toLocaleDateString('tr-TR', { day: 'numeric', month: 'short' })}
               </Text>
@@ -435,41 +455,41 @@ export default function ProductDetailScreen() {
           {/* Aksiyon Bar — Takas / Teklif / Koleksiyon / Mesaj / Paylaş */}
           <View style={styles.actionGrid}>
             {product.tradeAvailable ? (
-              <TouchableOpacity style={styles.actionItem} onPress={handleTrade}>
-                <View style={[styles.actionIconWrap, { backgroundColor: TarodanColors.accentLight }]}>
-                  <Ionicons name="swap-horizontal" size={22} color={TarodanColors.accent} />
+              <Pressable style={styles.actionItem} onPress={handleTrade}>
+                <View style={[styles.actionIconWrap, { backgroundColor: colors.success[100]! }]}>
+                  <Ionicons name="swap-horizontal" size={22} color={colors.success[600]!} />
                 </View>
                 <Text style={styles.actionLabel}>Takas</Text>
-              </TouchableOpacity>
+              </Pressable>
             ) : null}
 
-            <TouchableOpacity style={styles.actionItem} onPress={handleMakeOffer}>
-              <View style={[styles.actionIconWrap, { backgroundColor: TarodanColors.warningLight }]}>
-                <Ionicons name="pricetag-outline" size={22} color={TarodanColors.warning} />
+            <Pressable style={styles.actionItem} onPress={handleMakeOffer}>
+              <View style={[styles.actionIconWrap, { backgroundColor: colors.warning[50]! }]}>
+                <Ionicons name="pricetag-outline" size={22} color={colors.warning[600]!} />
               </View>
               <Text style={styles.actionLabel}>Teklif Ver</Text>
-            </TouchableOpacity>
+            </Pressable>
 
-            <TouchableOpacity style={styles.actionItem} onPress={handleAddToCollection}>
-              <View style={[styles.actionIconWrap, { backgroundColor: TarodanColors.primaryLight }]}>
-                <Ionicons name="albums-outline" size={22} color={TarodanColors.primary} />
+            <Pressable style={styles.actionItem} onPress={handleAddToCollection}>
+              <View style={[styles.actionIconWrap, { backgroundColor: colors.primary[50]! }]}>
+                <Ionicons name="albums-outline" size={22} color={colors.primary[600]!} />
               </View>
               <Text style={styles.actionLabel}>Koleksiyon</Text>
-            </TouchableOpacity>
+            </Pressable>
 
-            <TouchableOpacity style={styles.actionItem} onPress={handleMessage}>
-              <View style={[styles.actionIconWrap, { backgroundColor: TarodanColors.infoLight }]}>
-                <Ionicons name="chatbubble-outline" size={22} color={TarodanColors.info} />
+            <Pressable style={styles.actionItem} onPress={handleMessage}>
+              <View style={[styles.actionIconWrap, { backgroundColor: colors.info[50]! }]}>
+                <Ionicons name="chatbubble-outline" size={22} color={colors.info[600]!} />
               </View>
               <Text style={styles.actionLabel}>Mesaj</Text>
-            </TouchableOpacity>
+            </Pressable>
 
-            <TouchableOpacity style={styles.actionItem} onPress={handleShare}>
-              <View style={[styles.actionIconWrap, { backgroundColor: TarodanColors.successLight }]}>
-                <Ionicons name="share-social-outline" size={22} color={TarodanColors.success} />
+            <Pressable style={styles.actionItem} onPress={handleShare}>
+              <View style={[styles.actionIconWrap, { backgroundColor: colors.success[50]! }]}>
+                <Ionicons name="share-social-outline" size={22} color={colors.success[600]!} />
               </View>
               <Text style={styles.actionLabel}>Paylaş</Text>
-            </TouchableOpacity>
+            </Pressable>
           </View>
 
           <Divider style={styles.divider} />
@@ -516,18 +536,18 @@ export default function ProductDetailScreen() {
             <>
               <View style={styles.section}>
                 <Text style={styles.sectionTitle}>Açıklama</Text>
-                <Text 
+                <Text
                   style={styles.description}
                   numberOfLines={showAllDescription ? undefined : 4}
                 >
                   {product.description}
                 </Text>
                 {product.description.length > 200 && (
-                  <TouchableOpacity onPress={() => setShowAllDescription(!showAllDescription)}>
+                  <Pressable onPress={() => setShowAllDescription(!showAllDescription)}>
                     <Text style={styles.readMore}>
                       {showAllDescription ? 'Daha az göster' : 'Devamını oku'}
                     </Text>
-                  </TouchableOpacity>
+                  </Pressable>
                 )}
               </View>
               <Divider style={styles.divider} />
@@ -535,29 +555,28 @@ export default function ProductDetailScreen() {
           )}
 
           {/* Seller */}
-          <TouchableOpacity 
+          <Pressable
             style={styles.sellerCard}
             onPress={() => router.push(`/seller/${product.seller?.id}`)}
           >
-            <Avatar.Text
-              size={56}
-              label={product.seller?.displayName?.substring(0, 2).toUpperCase() || 'S'}
-              style={{ backgroundColor: TarodanColors.primary }}
+            <Avatar
+              size="lg"
+              name={product.seller?.displayName || 'Satıcı'}
             />
             <View style={styles.sellerInfo}>
               <View style={styles.sellerNameRow}>
                 <Text style={styles.sellerName}>{product.seller?.displayName}</Text>
                 {product.seller?.verified && (
-                  <Ionicons name="checkmark-circle" size={18} color={TarodanColors.accent} />
+                  <Ionicons name="checkmark-circle" size={18} color={colors.success[500]!} />
                 )}
               </View>
               <View style={styles.sellerStats}>
                 <View style={styles.sellerStat}>
-                  <Ionicons name="star" size={14} color={TarodanColors.star} />
+                  <Ionicons name="star" size={14} color={colors.warning[500]!} />
                   <Text style={styles.sellerStatText}>{product.seller?.rating || 0}</Text>
                 </View>
                 <View style={styles.sellerStat}>
-                  <Ionicons name="bag-check-outline" size={14} color={TarodanColors.textSecondary} />
+                  <Ionicons name="bag-check-outline" size={14} color={colors.text.muted} />
                   <Text style={styles.sellerStatText}>{product.seller?.totalSales || 0} satış</Text>
                 </View>
               </View>
@@ -566,12 +585,17 @@ export default function ProductDetailScreen() {
               </Text>
             </View>
             <View style={styles.sellerAction}>
-              <TouchableOpacity style={styles.messageButton} onPress={handleMessage}>
-                <Ionicons name="chatbubble-outline" size={20} color={TarodanColors.primary} />
-              </TouchableOpacity>
-              <Ionicons name="chevron-forward" size={20} color={TarodanColors.textSecondary} />
+              <IconButton
+                icon="chatbubble-outline"
+                size="sm"
+                color={colors.primary[600]!}
+                style={styles.messageButton}
+                onPress={handleMessage}
+                accessibilityLabel="Satıcıya mesaj gönder"
+              />
+              <Ionicons name="chevron-forward" size={20} color={colors.text.muted} />
             </View>
-          </TouchableOpacity>
+          </Pressable>
 
           <Divider style={styles.divider} />
 
@@ -579,9 +603,9 @@ export default function ProductDetailScreen() {
           <View style={styles.section}>
             <View style={styles.sectionHeader}>
               <Text style={styles.sectionTitle}>Değerlendirmeler</Text>
-              <TouchableOpacity onPress={() => router.push(`/product/${id}/reviews`)}>
+              <Pressable onPress={() => router.push(`/product/${id}/reviews`)}>
                 <Text style={styles.seeAll}>Tümünü Gör</Text>
-              </TouchableOpacity>
+              </Pressable>
             </View>
 
             {(Array.isArray(reviews) && reviews.length > 0 ? reviews : MOCK_PRODUCT.reviews || []).slice(0, 2).map((review: any) => (
@@ -594,7 +618,7 @@ export default function ProductDetailScreen() {
                         key={star}
                         name={star <= review.rating ? 'star' : 'star-outline'}
                         size={14}
-                        color={TarodanColors.star}
+                        color={colors.warning[500]!}
                       />
                     ))}
                   </View>
@@ -613,7 +637,7 @@ export default function ProductDetailScreen() {
 
           {/* Security Notice */}
           <View style={styles.securityNotice}>
-            <Ionicons name="shield-checkmark" size={24} color={TarodanColors.accent} />
+            <Ionicons name="shield-checkmark" size={24} color={colors.success[500]!} />
             <View style={styles.securityContent}>
               <Text style={styles.securityTitle}>Güvenli Alışveriş</Text>
               <Text style={styles.securityText}>
@@ -635,22 +659,21 @@ export default function ProductDetailScreen() {
         <View style={styles.bottomButtons}>
           {product.tradeAvailable && (
             <Button
-              mode="outlined"
+              variant="outline"
               onPress={handleTrade}
-              style={styles.tradeButton}
-              labelStyle={styles.tradeButtonLabel}
               icon="swap-horizontal"
+              style={styles.tradeButton}
+              textStyle={styles.tradeButtonLabel}
             >
               Takas
             </Button>
           )}
           <Button
             testID="product-detail-add-to-cart-button"
-            mode="contained"
+            variant="primary"
             onPress={handleAddToCart}
-            buttonColor={TarodanColors.primary}
-            style={styles.cartButton}
             icon="cart"
+            style={styles.cartButton}
           >
             Sepete Ekle
           </Button>
@@ -661,7 +684,7 @@ export default function ProductDetailScreen() {
         visible={snackbar.visible}
         onDismiss={() => setSnackbar({ ...snackbar, visible: false })}
         duration={2000}
-        style={{ backgroundColor: snackbar.type === 'success' ? TarodanColors.success : TarodanColors.error }}
+        variant={snackbar.type === 'success' ? 'success' : 'danger'}
         action={
           snackbar.type === 'success' && snackbar.message.includes('sepet')
             ? { label: 'Sepete Git', onPress: () => router.push('/cart') }
@@ -714,17 +737,17 @@ export default function ProductDetailScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: TarodanColors.background,
+    backgroundColor: colors.white,
   },
   loadingContainer: {
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
-    backgroundColor: TarodanColors.background,
+    backgroundColor: colors.white,
   },
   loadingText: {
     marginTop: 16,
-    color: TarodanColors.textSecondary,
+    color: colors.text.muted,
   },
   header: {
     position: 'absolute',
@@ -743,7 +766,7 @@ const styles = StyleSheet.create({
     width: 40,
     height: 40,
     borderRadius: 20,
-    backgroundColor: 'rgba(0,0,0,0.3)',
+    backgroundColor: colors.overlay.black30,
     justifyContent: 'center',
     alignItems: 'center',
   },
@@ -757,23 +780,23 @@ const styles = StyleSheet.create({
   productImage: {
     width,
     height: width,
-    backgroundColor: TarodanColors.surfaceVariant,
+    backgroundColor: colors.gray[50],
   },
   imageIndicators: {
     flexDirection: 'row',
     justifyContent: 'center',
     paddingVertical: 12,
-    backgroundColor: TarodanColors.background,
+    backgroundColor: colors.white,
   },
   indicator: {
     width: 8,
     height: 8,
     borderRadius: 4,
-    backgroundColor: TarodanColors.border,
+    backgroundColor: colors.border.DEFAULT,
     marginHorizontal: 4,
   },
   indicatorActive: {
-    backgroundColor: TarodanColors.primary,
+    backgroundColor: colors.primary[600]!,
     width: 24,
   },
   mainContent: {
@@ -793,20 +816,20 @@ const styles = StyleSheet.create({
     gap: 4,
   },
   badgeText: {
-    color: '#fff',
+    color: colors.white,
     fontSize: 12,
     fontWeight: '600',
   },
   title: {
     fontSize: 22,
     fontWeight: 'bold',
-    color: TarodanColors.textPrimary,
+    color: colors.text.heading,
     marginBottom: 8,
   },
   price: {
     fontSize: 28,
     fontWeight: 'bold',
-    color: TarodanColors.primary,
+    color: colors.primary[600]!,
     marginBottom: 12,
   },
   quickInfo: {
@@ -820,7 +843,7 @@ const styles = StyleSheet.create({
   },
   quickInfoText: {
     fontSize: 13,
-    color: TarodanColors.textSecondary,
+    color: colors.text.muted,
   },
   divider: {
     marginVertical: 16,
@@ -846,7 +869,7 @@ const styles = StyleSheet.create({
   },
   actionLabel: {
     fontSize: 11,
-    color: TarodanColors.textPrimary,
+    color: colors.text.heading,
     fontWeight: '500',
     textAlign: 'center',
   },
@@ -862,12 +885,12 @@ const styles = StyleSheet.create({
   sectionTitle: {
     fontSize: 18,
     fontWeight: '600',
-    color: TarodanColors.textPrimary,
+    color: colors.text.heading,
     marginBottom: 12,
   },
   seeAll: {
     fontSize: 14,
-    color: TarodanColors.primary,
+    color: colors.primary[600]!,
     fontWeight: '500',
   },
   specGrid: {
@@ -880,28 +903,28 @@ const styles = StyleSheet.create({
   },
   specLabel: {
     fontSize: 13,
-    color: TarodanColors.textSecondary,
+    color: colors.text.muted,
     marginBottom: 2,
   },
   specValue: {
     fontSize: 15,
     fontWeight: '500',
-    color: TarodanColors.textPrimary,
+    color: colors.text.heading,
   },
   description: {
     fontSize: 15,
     lineHeight: 22,
-    color: TarodanColors.textPrimary,
+    color: colors.text.heading,
   },
   readMore: {
-    color: TarodanColors.primary,
+    color: colors.primary[600]!,
     marginTop: 8,
     fontWeight: '500',
   },
   sellerCard: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: TarodanColors.surfaceVariant,
+    backgroundColor: colors.gray[50],
     borderRadius: 12,
     padding: 16,
   },
@@ -917,7 +940,7 @@ const styles = StyleSheet.create({
   sellerName: {
     fontSize: 16,
     fontWeight: '600',
-    color: TarodanColors.textPrimary,
+    color: colors.text.heading,
   },
   sellerStats: {
     flexDirection: 'row',
@@ -931,11 +954,11 @@ const styles = StyleSheet.create({
   },
   sellerStatText: {
     fontSize: 13,
-    color: TarodanColors.textSecondary,
+    color: colors.text.muted,
   },
   sellerResponseTime: {
     fontSize: 12,
-    color: TarodanColors.textSecondary,
+    color: colors.text.muted,
     marginTop: 4,
   },
   sellerAction: {
@@ -944,17 +967,12 @@ const styles = StyleSheet.create({
     gap: 8,
   },
   messageButton: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    backgroundColor: TarodanColors.background,
-    justifyContent: 'center',
-    alignItems: 'center',
+    backgroundColor: colors.white,
     borderWidth: 1,
-    borderColor: TarodanColors.primary,
+    borderColor: colors.primary[600]!,
   },
   reviewCard: {
-    backgroundColor: TarodanColors.surfaceVariant,
+    backgroundColor: colors.gray[50],
     borderRadius: 8,
     padding: 12,
     marginBottom: 8,
@@ -968,7 +986,7 @@ const styles = StyleSheet.create({
   reviewerName: {
     fontSize: 14,
     fontWeight: '600',
-    color: TarodanColors.textPrimary,
+    color: colors.text.heading,
   },
   ratingStars: {
     flexDirection: 'row',
@@ -976,22 +994,22 @@ const styles = StyleSheet.create({
   },
   reviewComment: {
     fontSize: 14,
-    color: TarodanColors.textPrimary,
+    color: colors.text.heading,
     lineHeight: 20,
   },
   reviewDate: {
     fontSize: 12,
-    color: TarodanColors.textSecondary,
+    color: colors.text.muted,
     marginTop: 8,
   },
   noReviews: {
     fontSize: 14,
-    color: TarodanColors.textSecondary,
+    color: colors.text.muted,
     fontStyle: 'italic',
   },
   securityNotice: {
     flexDirection: 'row',
-    backgroundColor: '#E8F5E9',
+    backgroundColor: colors.success[50]!,
     borderRadius: 12,
     padding: 16,
     marginTop: 16,
@@ -1003,32 +1021,32 @@ const styles = StyleSheet.create({
   securityTitle: {
     fontSize: 14,
     fontWeight: '600',
-    color: TarodanColors.success,
+    color: colors.success[600]!,
   },
   securityText: {
     fontSize: 13,
-    color: '#388E3C',
+    color: colors.success[700]!,
     marginTop: 2,
   },
   bottomBar: {
     flexDirection: 'row',
     alignItems: 'center',
     padding: 16,
-    backgroundColor: TarodanColors.background,
+    backgroundColor: colors.white,
     borderTopWidth: 1,
-    borderTopColor: TarodanColors.border,
+    borderTopColor: colors.border.DEFAULT,
   },
   bottomPrice: {
     marginRight: 16,
   },
   bottomPriceLabel: {
     fontSize: 12,
-    color: TarodanColors.textSecondary,
+    color: colors.text.muted,
   },
   bottomPriceValue: {
     fontSize: 20,
     fontWeight: 'bold',
-    color: TarodanColors.textPrimary,
+    color: colors.text.heading,
   },
   bottomButtons: {
     flex: 1,
@@ -1038,10 +1056,10 @@ const styles = StyleSheet.create({
   tradeButton: {
     flex: 1,
     borderRadius: 12,
-    borderColor: TarodanColors.primary,
+    borderColor: colors.primary[600]!,
   },
   tradeButtonLabel: {
-    color: TarodanColors.primary,
+    color: colors.primary[600]!,
   },
   cartButton: {
     flex: 2,

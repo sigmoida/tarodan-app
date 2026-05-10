@@ -1,13 +1,22 @@
 import { useState } from 'react';
 import { View, ScrollView, StyleSheet, TouchableOpacity, Alert } from 'react-native';
-import { Button, Card, Switch, Dialog, Portal, ActivityIndicator } from 'react-native-paper';
-import { Text, TextInput } from '../../src/components/common';
+import {
+  Button,
+  Card,
+  Switch,
+  Modal,
+  Spinner,
+  Input,
+  Text,
+  theme,
+} from '@tarodan/ui-native';
 import { router } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { useAuthStore } from '../../src/stores/authStore';
 import { authApi } from '../../src/services/api';
-import { TarodanColors } from '../../src/theme';
 import { useTranslation } from '../../src/i18n';
+
+const { colors } = theme;
 
 export default function SecuritySettingsScreen() {
   const { t } = useTranslation();
@@ -16,15 +25,15 @@ export default function SecuritySettingsScreen() {
   const [showPasswordDialog, setShowPasswordDialog] = useState(false);
   const [showTwoFactorSetup, setShowTwoFactorSetup] = useState(false);
   const [loading, setLoading] = useState(false);
-  
+
   // Password change
   const [currentPassword, setCurrentPassword] = useState('');
   const [newPassword, setNewPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
-  
+
   // 2FA setup
   const [totpSecret, setTotpSecret] = useState('');
-  const [totpQr, setTotpQr] = useState('');
+  const [, setTotpQr] = useState('');
   const [verificationCode, setVerificationCode] = useState('');
 
   if (!isAuthenticated) {
@@ -147,7 +156,7 @@ export default function SecuritySettingsScreen() {
       {/* Header */}
       <View style={styles.header}>
         <TouchableOpacity onPress={() => router.back()}>
-          <Ionicons name="arrow-back" size={24} color={TarodanColors.textOnPrimary} />
+          <Ionicons name="arrow-back" size={24} color={colors.white} />
         </TouchableOpacity>
         <Text style={styles.headerTitle}>{t('mobile.settingsSecurity')}</Text>
         <View style={{ width: 24 }} />
@@ -155,175 +164,152 @@ export default function SecuritySettingsScreen() {
 
       <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
         {/* Password Section */}
-        <Text style={styles.sectionTitle}>{t("mobile.password")}</Text>
+        <Text style={styles.sectionTitle}>{t('mobile.password')}</Text>
         <Card style={styles.card}>
-          <Card.Content>
-            <TouchableOpacity 
-              style={styles.settingRow}
-              onPress={() => setShowPasswordDialog(true)}
-            >
-              <View style={styles.settingInfo}>
-                <Ionicons name="lock-closed-outline" size={24} color={TarodanColors.primary} />
-                <View style={styles.settingText}>
-                  <Text style={styles.settingTitle}>Şifre Değiştir</Text>
-                  <Text style={styles.settingSubtitle}>Son değişiklik: Bilinmiyor</Text>
-                </View>
+          <TouchableOpacity
+            style={styles.settingRow}
+            onPress={() => setShowPasswordDialog(true)}
+          >
+            <View style={styles.settingInfo}>
+              <Ionicons name="lock-closed-outline" size={24} color={colors.primary[600]!} />
+              <View style={styles.settingText}>
+                <Text style={styles.settingTitle}>Şifre Değiştir</Text>
+                <Text style={styles.settingSubtitle}>Son değişiklik: Bilinmiyor</Text>
               </View>
-              <Ionicons name="chevron-forward" size={20} color={TarodanColors.textLight} />
-            </TouchableOpacity>
-          </Card.Content>
+            </View>
+            <Ionicons name="chevron-forward" size={20} color={colors.text.subtle} />
+          </TouchableOpacity>
         </Card>
 
         {/* Two-Factor Auth */}
         <Text style={styles.sectionTitle}>İki Faktörlü Doğrulama (2FA)</Text>
         <Card style={styles.card}>
-          <Card.Content>
-            <View style={styles.settingRow}>
-              <View style={styles.settingInfo}>
-                <Ionicons name="shield-checkmark-outline" size={24} color={TarodanColors.primary} />
-                <View style={styles.settingText}>
-                  <Text style={styles.settingTitle}>2FA</Text>
-                  <Text style={styles.settingSubtitle}>
-                    {twoFactorEnabled ? 'Aktif' : 'Devre dışı'}
-                  </Text>
-                </View>
+          <View style={styles.settingRow}>
+            <View style={styles.settingInfo}>
+              <Ionicons name="shield-checkmark-outline" size={24} color={colors.primary[600]!} />
+              <View style={styles.settingText}>
+                <Text style={styles.settingTitle}>2FA</Text>
+                <Text style={styles.settingSubtitle}>
+                  {twoFactorEnabled ? 'Aktif' : 'Devre dışı'}
+                </Text>
               </View>
-              <Switch
-                value={twoFactorEnabled}
-                onValueChange={(value: boolean) => {
-                  if (value) {
-                    handleSetupTwoFactor();
-                  } else {
-                    handleDisableTwoFactor();
-                  }
-                }}
-                color={TarodanColors.primary}
-              />
             </View>
-            <Text style={styles.infoText}>
-              İki faktörlü doğrulama, hesabınıza ek bir güvenlik katmanı ekler. 
-              Google Authenticator veya benzeri bir uygulama gereklidir.
-            </Text>
-          </Card.Content>
+            <Switch
+              value={twoFactorEnabled}
+              onValueChange={(value: boolean) => {
+                if (value) {
+                  handleSetupTwoFactor();
+                } else {
+                  handleDisableTwoFactor();
+                }
+              }}
+            />
+          </View>
+          <Text style={styles.infoText}>
+            İki faktörlü doğrulama, hesabınıza ek bir güvenlik katmanı ekler.
+            Google Authenticator veya benzeri bir uygulama gereklidir.
+          </Text>
         </Card>
 
         {/* Sessions */}
-        <Text style={styles.sectionTitle}>{t("mobile.sessions")}</Text>
+        <Text style={styles.sectionTitle}>{t('mobile.sessions')}</Text>
         <Card style={styles.card}>
-          <Card.Content>
-            <TouchableOpacity 
-              style={styles.settingRow}
-              onPress={handleLogoutAllDevices}
-            >
-              <View style={styles.settingInfo}>
-                <Ionicons name="log-out-outline" size={24} color={TarodanColors.error} />
-                <View style={styles.settingText}>
-                  <Text style={[styles.settingTitle, { color: TarodanColors.error }]}>
-                    Tüm Cihazlardan Çıkış
-                  </Text>
-                  <Text style={styles.settingSubtitle}>
-                    Diğer tüm cihazlarda oturumunuzu sonlandırın
-                  </Text>
-                </View>
+          <TouchableOpacity
+            style={styles.settingRow}
+            onPress={handleLogoutAllDevices}
+          >
+            <View style={styles.settingInfo}>
+              <Ionicons name="log-out-outline" size={24} color={colors.danger[600]!} />
+              <View style={styles.settingText}>
+                <Text style={[styles.settingTitle, { color: colors.danger[600]! }]}>
+                  Tüm Cihazlardan Çıkış
+                </Text>
+                <Text style={styles.settingSubtitle}>
+                  Diğer tüm cihazlarda oturumunuzu sonlandırın
+                </Text>
               </View>
-            </TouchableOpacity>
-          </Card.Content>
+            </View>
+          </TouchableOpacity>
         </Card>
 
         {/* Security Tips */}
         <Text style={styles.sectionTitle}>Güvenlik İpuçları</Text>
         <Card style={styles.tipsCard}>
-          <Card.Content>
-            <View style={styles.tipItem}>
-              <Ionicons name="checkmark-circle" size={20} color={TarodanColors.success} />
-              <Text style={styles.tipText}>{t("mobile.tipStrongPassword")}</Text>
-            </View>
-            <View style={styles.tipItem}>
-              <Ionicons name="checkmark-circle" size={20} color={TarodanColors.success} />
-              <Text style={styles.tipText}>{t("mobile.tipTwoFactor")}</Text>
-            </View>
-            <View style={styles.tipItem}>
-              <Ionicons name="checkmark-circle" size={20} color={TarodanColors.success} />
-              <Text style={styles.tipText}>{t("mobile.tipChangePassword")}</Text>
-            </View>
-            <View style={styles.tipItem}>
-              <Ionicons name="checkmark-circle" size={20} color={TarodanColors.success} />
-              <Text style={styles.tipText}>{t("mobile.tipReportSuspicious")}</Text>
-            </View>
-          </Card.Content>
+          <View style={styles.tipItem}>
+            <Ionicons name="checkmark-circle" size={20} color={colors.success[600]!} />
+            <Text style={styles.tipText}>{t('mobile.tipStrongPassword')}</Text>
+          </View>
+          <View style={styles.tipItem}>
+            <Ionicons name="checkmark-circle" size={20} color={colors.success[600]!} />
+            <Text style={styles.tipText}>{t('mobile.tipTwoFactor')}</Text>
+          </View>
+          <View style={styles.tipItem}>
+            <Ionicons name="checkmark-circle" size={20} color={colors.success[600]!} />
+            <Text style={styles.tipText}>{t('mobile.tipChangePassword')}</Text>
+          </View>
+          <View style={styles.tipItem}>
+            <Ionicons name="checkmark-circle" size={20} color={colors.success[600]!} />
+            <Text style={styles.tipText}>{t('mobile.tipReportSuspicious')}</Text>
+          </View>
         </Card>
 
         <View style={{ height: 40 }} />
       </ScrollView>
 
       {/* Password Change Dialog */}
-      <Portal>
-        <Dialog visible={showPasswordDialog} onDismiss={() => setShowPasswordDialog(false)}>
-          <Dialog.Title>Şifre Değiştir</Dialog.Title>
-          <Dialog.Content>
-            <TextInput
-              label="Mevcut Şifre"
-              value={currentPassword}
-              onChangeText={setCurrentPassword}
-              mode="outlined"
-              secureTextEntry
-              style={styles.dialogInput}
-            />
-            <TextInput
-              label="Yeni Şifre"
-              value={newPassword}
-              onChangeText={setNewPassword}
-              mode="outlined"
-              secureTextEntry
-              style={styles.dialogInput}
-            />
-            <TextInput
-              label="Yeni Şifre Tekrar"
-              value={confirmPassword}
-              onChangeText={setConfirmPassword}
-              mode="outlined"
-              secureTextEntry
-              style={styles.dialogInput}
-            />
-          </Dialog.Content>
-          <Dialog.Actions>
-            <Button onPress={() => setShowPasswordDialog(false)}>{t("mobile.cancel")}</Button>
-            <Button onPress={handlePasswordChange} loading={loading}>{t("mobile.change")}</Button>
-          </Dialog.Actions>
-        </Dialog>
-      </Portal>
+      <Modal isOpen={showPasswordDialog} onClose={() => setShowPasswordDialog(false)} title="Şifre Değiştir">
+        <Input
+          label="Mevcut Şifre"
+          value={currentPassword}
+          onChangeText={setCurrentPassword}
+          secureTextEntry
+          containerStyle={styles.dialogInput}
+        />
+        <Input
+          label="Yeni Şifre"
+          value={newPassword}
+          onChangeText={setNewPassword}
+          secureTextEntry
+          containerStyle={styles.dialogInput}
+        />
+        <Input
+          label="Yeni Şifre Tekrar"
+          value={confirmPassword}
+          onChangeText={setConfirmPassword}
+          secureTextEntry
+          containerStyle={styles.dialogInput}
+        />
+        <View style={styles.dialogActions}>
+          <Button variant="ghost" title={t('mobile.cancel')} onPress={() => setShowPasswordDialog(false)} />
+          <Button variant="primary" title={t('mobile.change')} onPress={handlePasswordChange} isLoading={loading} />
+        </View>
+      </Modal>
 
       {/* 2FA Setup Dialog */}
-      <Portal>
-        <Dialog visible={showTwoFactorSetup} onDismiss={() => setShowTwoFactorSetup(false)}>
-          <Dialog.Title>2FA Kurulumu</Dialog.Title>
-          <Dialog.Content>
-            <Text style={styles.dialogText}>
-              Google Authenticator veya benzeri bir uygulamayı kullanarak aşağıdaki kodu tarayın veya manuel olarak girin:
-            </Text>
-            {totpSecret ? (
-              <View style={styles.secretContainer}>
-                <Text style={styles.secretText}>{totpSecret}</Text>
-              </View>
-            ) : (
-              <ActivityIndicator size="small" color={TarodanColors.primary} />
-            )}
-            <TextInput
-              label="Doğrulama Kodu"
-              value={verificationCode}
-              onChangeText={setVerificationCode}
-              mode="outlined"
-              keyboardType="numeric"
-              maxLength={6}
-              style={styles.dialogInput}
-            />
-          </Dialog.Content>
-          <Dialog.Actions>
-            <Button onPress={() => setShowTwoFactorSetup(false)}>{t("mobile.cancel")}</Button>
-            <Button onPress={handleVerifyTwoFactor} loading={loading}>{t("mobile.verify")}</Button>
-          </Dialog.Actions>
-        </Dialog>
-      </Portal>
+      <Modal isOpen={showTwoFactorSetup} onClose={() => setShowTwoFactorSetup(false)} title="2FA Kurulumu">
+        <Text style={styles.dialogText}>
+          Google Authenticator veya benzeri bir uygulamayı kullanarak aşağıdaki kodu tarayın veya manuel olarak girin:
+        </Text>
+        {totpSecret ? (
+          <View style={styles.secretContainer}>
+            <Text style={styles.secretText}>{totpSecret}</Text>
+          </View>
+        ) : (
+          <Spinner size="sm" />
+        )}
+        <Input
+          label="Doğrulama Kodu"
+          value={verificationCode}
+          onChangeText={setVerificationCode}
+          keyboardType="numeric"
+          maxLength={6}
+          containerStyle={styles.dialogInput}
+        />
+        <View style={styles.dialogActions}>
+          <Button variant="ghost" title={t('mobile.cancel')} onPress={() => setShowTwoFactorSetup(false)} />
+          <Button variant="primary" title={t('mobile.verify')} onPress={handleVerifyTwoFactor} isLoading={loading} />
+        </View>
+      </Modal>
     </View>
   );
 }
@@ -331,10 +317,10 @@ export default function SecuritySettingsScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: TarodanColors.backgroundSecondary,
+    backgroundColor: colors.surface.alt,
   },
   header: {
-    backgroundColor: TarodanColors.primary,
+    backgroundColor: colors.primary[600]!,
     paddingTop: 50,
     paddingBottom: 16,
     paddingHorizontal: 20,
@@ -345,7 +331,7 @@ const styles = StyleSheet.create({
   headerTitle: {
     fontSize: 18,
     fontWeight: 'bold',
-    color: TarodanColors.textOnPrimary,
+    color: colors.white,
   },
   content: {
     flex: 1,
@@ -354,12 +340,12 @@ const styles = StyleSheet.create({
   sectionTitle: {
     fontSize: 16,
     fontWeight: 'bold',
-    color: TarodanColors.textPrimary,
+    color: colors.text.heading,
     marginBottom: 12,
     marginTop: 16,
   },
   card: {
-    backgroundColor: TarodanColors.background,
+    backgroundColor: colors.surface.DEFAULT,
     marginBottom: 8,
   },
   settingRow: {
@@ -380,21 +366,21 @@ const styles = StyleSheet.create({
   settingTitle: {
     fontSize: 15,
     fontWeight: '500',
-    color: TarodanColors.textPrimary,
+    color: colors.text.heading,
   },
   settingSubtitle: {
     fontSize: 13,
-    color: TarodanColors.textSecondary,
+    color: colors.text.muted,
     marginTop: 2,
   },
   infoText: {
     fontSize: 13,
-    color: TarodanColors.textSecondary,
+    color: colors.text.muted,
     marginTop: 12,
     lineHeight: 18,
   },
   tipsCard: {
-    backgroundColor: TarodanColors.surfaceVariant,
+    backgroundColor: colors.gray[100],
   },
   tipItem: {
     flexDirection: 'row',
@@ -404,20 +390,19 @@ const styles = StyleSheet.create({
   tipText: {
     marginLeft: 12,
     fontSize: 14,
-    color: TarodanColors.textPrimary,
+    color: colors.text.heading,
   },
   dialogInput: {
     marginBottom: 12,
-    backgroundColor: TarodanColors.background,
   },
   dialogText: {
     fontSize: 14,
-    color: TarodanColors.textSecondary,
+    color: colors.text.muted,
     marginBottom: 16,
     lineHeight: 20,
   },
   secretContainer: {
-    backgroundColor: TarodanColors.surfaceVariant,
+    backgroundColor: colors.gray[100],
     padding: 12,
     borderRadius: 8,
     marginBottom: 16,
@@ -425,7 +410,13 @@ const styles = StyleSheet.create({
   secretText: {
     fontFamily: 'monospace',
     fontSize: 14,
-    color: TarodanColors.textPrimary,
+    color: colors.text.heading,
     textAlign: 'center',
+  },
+  dialogActions: {
+    flexDirection: 'row',
+    justifyContent: 'flex-end',
+    gap: 8,
+    marginTop: 8,
   },
 });

@@ -1,14 +1,24 @@
 import React, { useState } from 'react';
-import { View, StyleSheet, ScrollView, Alert, TouchableOpacity } from 'react-native';
-import { Button, Card, Portal, Dialog, FAB, IconButton } from 'react-native-paper';
+import { View, StyleSheet, ScrollView, Alert } from 'react-native';
+import {
+  Button,
+  Card,
+  Modal,
+  FAB,
+  IconButton,
+  Input,
+  Text,
+  theme,
+} from '@tarodan/ui-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 import { router } from 'expo-router';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { paymentsApi } from '../../src/services/api';
-import { TarodanColors } from '../../src/theme';
-import { ScreenHeader, ScreenLoader, EmptyState, Text, TextInput } from '../../src/components/common';
+import { ScreenHeader, ScreenLoader, EmptyState } from '../../src/components/common';
 import { useAuthStore } from '../../src/stores/authStore';
+
+const { colors } = theme;
 
 interface PaymentMethod {
   cardToken: string;
@@ -154,12 +164,12 @@ export default function PaymentMethodsScreen() {
         <ScrollView contentContainerStyle={styles.list}>
           {methods.map(m => (
             <Card key={m.cardToken} style={styles.cardItem}>
-              <Card.Content style={styles.cardContent}>
+              <View style={styles.cardContent}>
                 <View style={styles.cardIconWrap}>
                   <MaterialCommunityIcons
                     name={brandIcon(m.cardBrand)}
                     size={28}
-                    color={TarodanColors.primary}
+                    color={colors.primary[600]!}
                   />
                 </View>
                 <View style={styles.cardBody}>
@@ -177,16 +187,17 @@ export default function PaymentMethodsScreen() {
                   ) : null}
                 </View>
                 <IconButton
-                  icon="delete-outline"
-                  iconColor={TarodanColors.error}
+                  icon="trash-outline"
+                  variant="danger"
+                  accessibilityLabel="Kartı sil"
                   onPress={() => handleDelete(m)}
                 />
-              </Card.Content>
+              </View>
             </Card>
           ))}
 
           <View style={styles.secNote}>
-            <Ionicons name="lock-closed" size={14} color={TarodanColors.success} />
+            <Ionicons name="lock-closed" size={14} color={colors.success[600]!} />
             <Text style={styles.secNoteText}>
               Kart bilgileriniz PCI-DSS uyumlu ödeme sağlayıcıda saklanır; Tarodan'da tam kart numarası bulunmaz.
             </Text>
@@ -196,101 +207,76 @@ export default function PaymentMethodsScreen() {
 
       {methods.length > 0 ? (
         <FAB
-          icon="plus"
+          icon="add"
+          accessibilityLabel="Yeni kart ekle"
           style={styles.fab}
           onPress={() => setDialogOpen(true)}
-          color="#fff"
         />
       ) : null}
 
-      <Portal>
-        <Dialog visible={dialogOpen} onDismiss={() => setDialogOpen(false)}>
-          <Dialog.Title>Yeni Kart</Dialog.Title>
-          <Dialog.ScrollArea style={styles.dialogScroll}>
-            <ScrollView>
-              <TextInput
-                mode="outlined"
-                label="Kart Takma Adı (ör. 'İş Kartım')"
-                value={form.cardAlias}
-                onChangeText={(v: string) => setForm(f => ({ ...f,cardAlias: v }))}
-                style={styles.input}
-                outlineColor={TarodanColors.border}
-                activeOutlineColor={TarodanColors.primary}
-              />
-              <TextInput
-                mode="outlined"
-                label="Kart Sahibi"
-                value={form.cardHolderName}
-                onChangeText={(v: string) => setForm(f => ({ ...f,cardHolderName: v }))}
-                style={styles.input}
-                outlineColor={TarodanColors.border}
-                activeOutlineColor={TarodanColors.primary}
-              />
-              <TextInput
-                mode="outlined"
-                label="Kart Numarası"
-                value={form.cardNumber}
-                onChangeText={(v: string) => setForm(f => ({ ...f,cardNumber: v.replace(/[^\d\s]/g, '') }))}
-                keyboardType="number-pad"
-                maxLength={19}
-                style={styles.input}
-                outlineColor={TarodanColors.border}
-                activeOutlineColor={TarodanColors.primary}
-              />
-              <View style={styles.row}>
-                <TextInput
-                  mode="outlined"
-                  label="Ay"
-                  placeholder="MM"
-                  value={form.expireMonth}
-                  onChangeText={(v: string) => setForm(f => ({ ...f,expireMonth: v.replace(/[^\d]/g, '') }))}
-                  keyboardType="number-pad"
-                  maxLength={2}
-                  style={[styles.input, styles.rowItem]}
-                  outlineColor={TarodanColors.border}
-                  activeOutlineColor={TarodanColors.primary}
-                />
-                <TextInput
-                  mode="outlined"
-                  label="Yıl"
-                  placeholder="YY"
-                  value={form.expireYear}
-                  onChangeText={(v: string) => setForm(f => ({ ...f,expireYear: v.replace(/[^\d]/g, '') }))}
-                  keyboardType="number-pad"
-                  maxLength={4}
-                  style={[styles.input, styles.rowItem]}
-                  outlineColor={TarodanColors.border}
-                  activeOutlineColor={TarodanColors.primary}
-                />
-                <TextInput
-                  mode="outlined"
-                  label="CVC"
-                  value={form.cvc}
-                  onChangeText={(v: string) => setForm(f => ({ ...f,cvc: v.replace(/[^\d]/g, '') }))}
-                  keyboardType="number-pad"
-                  maxLength={4}
-                  secureTextEntry
-                  style={[styles.input, styles.rowItem]}
-                  outlineColor={TarodanColors.border}
-                  activeOutlineColor={TarodanColors.primary}
-                />
-              </View>
-            </ScrollView>
-          </Dialog.ScrollArea>
-          <Dialog.Actions>
-            <Button onPress={() => setDialogOpen(false)}>Vazgeç</Button>
+      <Modal isOpen={dialogOpen} onClose={() => setDialogOpen(false)} title="Yeni Kart">
+        <ScrollView>
+          <Input
+            label="Kart Takma Adı (ör. 'İş Kartım')"
+            value={form.cardAlias}
+            onChangeText={(v: string) => setForm(f => ({ ...f, cardAlias: v }))}
+            containerStyle={styles.input}
+          />
+          <Input
+            label="Kart Sahibi"
+            value={form.cardHolderName}
+            onChangeText={(v: string) => setForm(f => ({ ...f, cardHolderName: v }))}
+            containerStyle={styles.input}
+          />
+          <Input
+            label="Kart Numarası"
+            value={form.cardNumber}
+            onChangeText={(v: string) => setForm(f => ({ ...f, cardNumber: v.replace(/[^\d\s]/g, '') }))}
+            keyboardType="number-pad"
+            maxLength={19}
+            containerStyle={styles.input}
+          />
+          <View style={styles.row}>
+            <Input
+              label="Ay"
+              placeholder="MM"
+              value={form.expireMonth}
+              onChangeText={(v: string) => setForm(f => ({ ...f, expireMonth: v.replace(/[^\d]/g, '') }))}
+              keyboardType="number-pad"
+              maxLength={2}
+              containerStyle={styles.rowItem}
+            />
+            <Input
+              label="Yıl"
+              placeholder="YY"
+              value={form.expireYear}
+              onChangeText={(v: string) => setForm(f => ({ ...f, expireYear: v.replace(/[^\d]/g, '') }))}
+              keyboardType="number-pad"
+              maxLength={4}
+              containerStyle={styles.rowItem}
+            />
+            <Input
+              label="CVC"
+              value={form.cvc}
+              onChangeText={(v: string) => setForm(f => ({ ...f, cvc: v.replace(/[^\d]/g, '') }))}
+              keyboardType="number-pad"
+              maxLength={4}
+              secureTextEntry
+              containerStyle={styles.rowItem}
+            />
+          </View>
+          <View style={styles.dialogActions}>
+            <Button variant="ghost" title="Vazgeç" onPress={() => setDialogOpen(false)} />
             <Button
-              mode="contained"
-              buttonColor={TarodanColors.primary}
+              variant="primary"
+              title="Kaydet"
               onPress={handleAdd}
-              loading={addMutation.isPending}
+              isLoading={addMutation.isPending}
               disabled={addMutation.isPending}
-            >
-              Kaydet
-            </Button>
-          </Dialog.Actions>
-        </Dialog>
-      </Portal>
+            />
+          </View>
+        </ScrollView>
+      </Modal>
     </SafeAreaView>
   );
 }
@@ -298,14 +284,14 @@ export default function PaymentMethodsScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: TarodanColors.backgroundSecondary,
+    backgroundColor: colors.surface.alt,
   },
   list: {
     padding: 16,
     gap: 10,
   },
   cardItem: {
-    backgroundColor: TarodanColors.background,
+    backgroundColor: colors.surface.DEFAULT,
     borderRadius: 12,
   },
   cardContent: {
@@ -318,7 +304,7 @@ const styles = StyleSheet.create({
     width: 48,
     height: 48,
     borderRadius: 10,
-    backgroundColor: TarodanColors.primaryLight,
+    backgroundColor: colors.primary[50]!,
     alignItems: 'center',
     justifyContent: 'center',
   },
@@ -329,56 +315,55 @@ const styles = StyleSheet.create({
   cardAlias: {
     fontSize: 15,
     fontWeight: '700',
-    color: TarodanColors.textPrimary,
+    color: colors.text.heading,
   },
   cardNumber: {
     fontSize: 13,
-    color: TarodanColors.textSecondary,
+    color: colors.text.muted,
     letterSpacing: 1,
   },
   cardExpiry: {
     fontSize: 12,
-    color: TarodanColors.textTertiary,
+    color: colors.text.subtle,
   },
   cardHolder: {
     fontSize: 12,
-    color: TarodanColors.textTertiary,
+    color: colors.text.subtle,
   },
   secNote: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 6,
     padding: 12,
-    backgroundColor: TarodanColors.successLight,
+    backgroundColor: colors.success[50]!,
     borderRadius: 10,
     marginTop: 8,
   },
   secNoteText: {
     flex: 1,
     fontSize: 12,
-    color: TarodanColors.success,
+    color: colors.success[600]!,
   },
   fab: {
     position: 'absolute',
     right: 16,
     bottom: 24,
-    backgroundColor: TarodanColors.primary,
-  },
-  dialogScroll: {
-    paddingHorizontal: 0,
   },
   input: {
-    marginHorizontal: 24,
     marginBottom: 12,
-    backgroundColor: TarodanColors.background,
   },
   row: {
     flexDirection: 'row',
-    paddingHorizontal: 24,
     gap: 8,
   },
   rowItem: {
     flex: 1,
-    marginHorizontal: 0,
+    marginBottom: 12,
+  },
+  dialogActions: {
+    flexDirection: 'row',
+    justifyContent: 'flex-end',
+    gap: 8,
+    marginTop: 8,
   },
 });

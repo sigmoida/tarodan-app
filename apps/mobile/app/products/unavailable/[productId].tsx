@@ -1,14 +1,14 @@
 import React from 'react';
 import { View, ScrollView, StyleSheet, FlatList } from 'react-native';
 import { Stack, useLocalSearchParams, router } from 'expo-router';
-import { Button, ActivityIndicator } from 'react-native-paper';
+import { Button, Spinner, Text, theme } from '@tarodan/ui-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useQuery } from '@tanstack/react-query';
-import { Text } from '../../../src/components/common';
 import { ProductCard, type ProductCardProduct } from '../../../src/components/product/ProductCard';
 import { productsApi } from '../../../src/services/api';
-import { TarodanColors } from '../../../src/theme';
 import { useTranslation } from '../../../src/i18n/LanguageContext';
+
+const { colors } = theme;
 
 interface Product extends ProductCardProduct {
   status?: string;
@@ -61,7 +61,7 @@ export default function ProductUnavailableScreen() {
 
       {loading ? (
         <View style={styles.loading}>
-          <ActivityIndicator size="large" color={TarodanColors.primary} />
+          <Spinner size="lg" />
         </View>
       ) : (
         <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
@@ -77,8 +77,7 @@ export default function ProductUnavailableScreen() {
                     : t('stockout.page.bodyBackFallback')}
                 </Text>
                 <Button
-                  mode="contained"
-                  buttonColor={TarodanColors.primary}
+                  variant="primary"
                   style={styles.heroBtn}
                   onPress={() => router.push(`/product/${id}` as any)}
                 >
@@ -90,7 +89,7 @@ export default function ProductUnavailableScreen() {
                 <Ionicons
                   name="close-circle"
                   size={56}
-                  color={TarodanColors.error}
+                  color={colors.danger[600]!}
                   style={{ marginBottom: 8 }}
                 />
                 <Text testID="unavailable-hero-title" style={styles.heroTitle}>{t('stockout.page.title')}</Text>
@@ -101,8 +100,7 @@ export default function ProductUnavailableScreen() {
                 </Text>
                 {product?.category?.slug ? (
                   <Button
-                    mode="contained"
-                    buttonColor={TarodanColors.primary}
+                    variant="primary"
                     style={styles.heroBtn}
                     onPress={() =>
                       router.push(`/category/${product.category!.slug}` as any)
@@ -147,7 +145,7 @@ export default function ProductUnavailableScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: TarodanColors.backgroundSecondary,
+    backgroundColor: colors.gray[50],
   },
   loading: {
     flex: 1,
@@ -159,12 +157,12 @@ const styles = StyleSheet.create({
     paddingBottom: 40,
   },
   hero: {
-    backgroundColor: TarodanColors.background,
+    backgroundColor: colors.white,
     borderRadius: 16,
     padding: 24,
     alignItems: 'center',
     borderWidth: StyleSheet.hairlineWidth,
-    borderColor: TarodanColors.border,
+    borderColor: colors.border.DEFAULT,
     marginBottom: 24,
   },
   heroEmoji: {
@@ -174,13 +172,13 @@ const styles = StyleSheet.create({
   heroTitle: {
     fontSize: 22,
     fontWeight: '700',
-    color: TarodanColors.textPrimary,
+    color: colors.text.heading,
     textAlign: 'center',
     marginBottom: 8,
   },
   heroBody: {
     fontSize: 14,
-    color: TarodanColors.textSecondary,
+    color: colors.text.muted,
     textAlign: 'center',
     lineHeight: 20,
   },
@@ -191,12 +189,12 @@ const styles = StyleSheet.create({
   sectionTitle: {
     fontSize: 18,
     fontWeight: '600',
-    color: TarodanColors.textPrimary,
+    color: colors.text.heading,
     marginBottom: 12,
   },
   emptyText: {
     fontSize: 14,
-    color: TarodanColors.textSecondary,
+    color: colors.text.muted,
   },
   gridRow: {
     gap: 12,

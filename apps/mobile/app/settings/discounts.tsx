@@ -1,14 +1,30 @@
 import React, { useState, useMemo } from 'react';
-import { View, ScrollView, StyleSheet, TouchableOpacity, Alert } from 'react-native';
-import { Portal, Dialog, Button, ActivityIndicator, Card, Switch, FAB, Snackbar, IconButton, Chip } from 'react-native-paper';
+import { View, ScrollView, StyleSheet, Pressable, Alert } from 'react-native';
+import {
+  Modal,
+  Button,
+  Spinner,
+  Card,
+  Switch,
+  FAB,
+  Snackbar,
+  IconButton,
+  Chip,
+  Input,
+  Text,
+  ScreenHeader,
+  EmptyState,
+  ScreenLoader,
+  theme,
+} from '@tarodan/ui-native';
 import { router } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { Text, TextInput, ScreenHeader, EmptyState, ScreenLoader } from '../../src/components/common';
-import { TarodanColors } from '../../src/theme';
 import { useAuthStore } from '../../src/stores/authStore';
 import { discountsApi, productsApi } from '../../src/services/api';
 import { formatPrice } from '../../src/utils/format';
+
+const { colors, spacing, radius } = theme;
 
 /**
  * Satıcı kupon/indirim yönetimi.
@@ -288,13 +304,11 @@ export default function DiscountsScreen() {
         {FILTERS.map((f) => (
           <Chip
             key={f.value}
+            label={f.label}
             selected={filter === f.value}
+            variant={filter === f.value ? 'primary' : 'neutral'}
             onPress={() => setFilter(f.value)}
-            style={[styles.filterChip, filter === f.value && styles.filterChipActive]}
-            textStyle={filter === f.value ? styles.filterChipTextActive : undefined}
-          >
-            {f.label}
-          </Chip>
+          />
         ))}
       </View>
 
@@ -312,347 +326,303 @@ export default function DiscountsScreen() {
         <ScrollView style={styles.list} contentContainerStyle={{ padding: 16, paddingBottom: 100 }}>
           {filteredDiscounts.map((d) => (
             <Card key={d.id} style={styles.discountCard}>
-              <Card.Content>
-                <View style={styles.cardHeader}>
-                  <View style={{ flex: 1 }}>
-                    <Text style={styles.discountName}>{d.name}</Text>
-                    {d.code ? (
-                      <View style={styles.codeBadge}>
-                        <Ionicons name="pricetag" size={12} color={TarodanColors.primary} />
-                        <Text style={styles.codeText}>{d.code}</Text>
-                      </View>
-                    ) : null}
-                  </View>
-                  <View style={styles.valueWrap}>
-                    <Text style={styles.valueText}>{valueLabel(d)}</Text>
-                    <Text style={styles.valueLabel}>İndirim</Text>
-                  </View>
+              <View style={styles.cardHeader}>
+                <View style={{ flex: 1 }}>
+                  <Text style={styles.discountName}>{d.name}</Text>
+                  {d.code ? (
+                    <View style={styles.codeBadge}>
+                      <Ionicons name="pricetag" size={12} color={colors.primary[600]!} />
+                      <Text style={styles.codeText}>{d.code}</Text>
+                    </View>
+                  ) : null}
                 </View>
-
-                {d.description ? (
-                  <Text style={styles.discountDesc}>{d.description}</Text>
-                ) : null}
-
-                <View style={styles.metaRow}>
-                  <View style={styles.metaItem}>
-                    <Ionicons name="layers-outline" size={14} color={TarodanColors.textSecondary} />
-                    <Text style={styles.metaText}>
-                      {d.scope === 'product' ? 'Seçili Ürünler' : 'Tüm Mağaza'}
-                    </Text>
-                  </View>
-                  <View style={styles.metaItem}>
-                    <Ionicons name="calendar-outline" size={14} color={TarodanColors.textSecondary} />
-                    <Text style={styles.metaText}>
-                      {formatDate(d.startDate)} - {formatDate(d.endDate)}
-                    </Text>
-                  </View>
-                  <View style={styles.metaItem}>
-                    <Ionicons name="people-outline" size={14} color={TarodanColors.textSecondary} />
-                    <Text style={styles.metaText}>
-                      {d.usedCount} / {d.usageLimitTotal ?? '∞'}
-                    </Text>
-                  </View>
+                <View style={styles.valueWrap}>
+                  <Text style={styles.valueText}>{valueLabel(d)}</Text>
+                  <Text style={styles.valueLabel}>İndirim</Text>
                 </View>
+              </View>
 
-                <View style={styles.actions}>
-                  <View style={styles.activeRow}>
-                    <Switch
-                      value={d.isActive}
-                      onValueChange={(v: boolean) => toggleActiveMutation.mutate({ id: d.id, isActive: v })}
-                      color={TarodanColors.primary}
-                    />
-                    <Text style={styles.activeLabel}>{d.isActive ? 'Aktif' : 'Pasif'}</Text>
-                  </View>
-                  <View style={{ flexDirection: 'row' }}>
-                    <IconButton
-                      icon="pencil"
-                      iconColor={TarodanColors.primary}
-                      onPress={() => openEdit(d)}
-                      size={20}
-                    />
-                    <IconButton
-                      icon="delete"
-                      iconColor={TarodanColors.error}
-                      onPress={() => handleDelete(d)}
-                      size={20}
-                    />
-                  </View>
+              {d.description ? (
+                <Text style={styles.discountDesc}>{d.description}</Text>
+              ) : null}
+
+              <View style={styles.metaRow}>
+                <View style={styles.metaItem}>
+                  <Ionicons name="layers-outline" size={14} color={colors.text.muted} />
+                  <Text style={styles.metaText}>
+                    {d.scope === 'product' ? 'Seçili Ürünler' : 'Tüm Mağaza'}
+                  </Text>
                 </View>
-              </Card.Content>
+                <View style={styles.metaItem}>
+                  <Ionicons name="calendar-outline" size={14} color={colors.text.muted} />
+                  <Text style={styles.metaText}>
+                    {formatDate(d.startDate)} - {formatDate(d.endDate)}
+                  </Text>
+                </View>
+                <View style={styles.metaItem}>
+                  <Ionicons name="people-outline" size={14} color={colors.text.muted} />
+                  <Text style={styles.metaText}>
+                    {d.usedCount} / {d.usageLimitTotal ?? '∞'}
+                  </Text>
+                </View>
+              </View>
+
+              <View style={styles.actions}>
+                <View style={styles.activeRow}>
+                  <Switch
+                    value={d.isActive}
+                    onValueChange={(v: boolean) => toggleActiveMutation.mutate({ id: d.id, isActive: v })}
+                  />
+                  <Text style={styles.activeLabel}>{d.isActive ? 'Aktif' : 'Pasif'}</Text>
+                </View>
+                <View style={{ flexDirection: 'row' }}>
+                  <IconButton
+                    icon="pencil"
+                    size="sm"
+                    accessibilityLabel="İndirimi düzenle"
+                    onPress={() => openEdit(d)}
+                  />
+                  <IconButton
+                    icon="trash-outline"
+                    variant="danger"
+                    size="sm"
+                    accessibilityLabel="İndirimi sil"
+                    onPress={() => handleDelete(d)}
+                  />
+                </View>
+              </View>
             </Card>
           ))}
         </ScrollView>
       )}
 
       <FAB
-        icon="plus"
+        icon="add"
+        accessibilityLabel="Yeni indirim oluştur"
         style={styles.fab}
-        color="#fff"
         onPress={openCreate}
-        label="Yeni İndirim"
       />
 
       {/* Form Dialog */}
-      <Portal>
-        <Dialog visible={formOpen} onDismiss={() => setFormOpen(false)} style={styles.dialog}>
-          <Dialog.Title>{form.id ? 'İndirimi Düzenle' : 'Yeni İndirim'}</Dialog.Title>
-          <Dialog.ScrollArea style={styles.dialogScroll}>
-            <ScrollView>
-              <View style={{ paddingVertical: 8 }}>
-                <TextInput
-                  mode="outlined"
-                  label="İndirim Adı *"
-                  value={form.name}
-                  onChangeText={(v: string) => setForm({ ...form, name: v })}
-                  style={styles.input}
-                  outlineColor={TarodanColors.border}
-                  activeOutlineColor={TarodanColors.primary}
-                />
-                <TextInput
-                  mode="outlined"
-                  label="Açıklama"
-                  value={form.description}
-                  onChangeText={(v: string) => setForm({ ...form, description: v })}
-                  multiline
-                  numberOfLines={2}
-                  style={styles.input}
-                  outlineColor={TarodanColors.border}
-                  activeOutlineColor={TarodanColors.primary}
-                />
-                <TextInput
-                  mode="outlined"
-                  label="Kupon Kodu (opsiyonel)"
-                  value={form.code}
-                  onChangeText={(v: string) => setForm({ ...form, code: v.toUpperCase() })}
-                  autoCapitalize="characters"
-                  style={styles.input}
-                  outlineColor={TarodanColors.border}
-                  activeOutlineColor={TarodanColors.primary}
-                />
+      <Modal
+        isOpen={formOpen}
+        onClose={() => setFormOpen(false)}
+        title={form.id ? 'İndirimi Düzenle' : 'Yeni İndirim'}
+      >
+        <ScrollView style={styles.dialogScroll}>
+          <View style={{ paddingVertical: 8 }}>
+            <Input
+              label="İndirim Adı *"
+              value={form.name}
+              onChangeText={(v: string) => setForm({ ...form, name: v })}
+              containerStyle={styles.input}
+            />
+            <Input
+              label="Açıklama"
+              value={form.description}
+              onChangeText={(v: string) => setForm({ ...form, description: v })}
+              multiline
+              numberOfLines={2}
+              containerStyle={styles.input}
+            />
+            <Input
+              label="Kupon Kodu (opsiyonel)"
+              value={form.code}
+              onChangeText={(v: string) => setForm({ ...form, code: v.toUpperCase() })}
+              autoCapitalize="characters"
+              containerStyle={styles.input}
+            />
 
-                <Text style={styles.sectionLabel}>İndirim Tipi</Text>
-                <View style={styles.toggleRow}>
-                  <Chip
-                    selected={form.type === 'percentage'}
-                    onPress={() => setForm({ ...form, type: 'percentage' })}
-                    style={[styles.toggleChip, form.type === 'percentage' && styles.toggleChipActive]}
-                    textStyle={form.type === 'percentage' ? styles.toggleChipTextActive : undefined}
-                  >
-                    Yüzde (%)
-                  </Chip>
-                  <Chip
-                    selected={form.type === 'fixed_amount'}
-                    onPress={() => setForm({ ...form, type: 'fixed_amount' })}
-                    style={[styles.toggleChip, form.type === 'fixed_amount' && styles.toggleChipActive]}
-                    textStyle={form.type === 'fixed_amount' ? styles.toggleChipTextActive : undefined}
-                  >
-                    Sabit (TL)
-                  </Chip>
-                </View>
+            <Text style={styles.sectionLabel}>İndirim Tipi</Text>
+            <View style={styles.toggleRow}>
+              <Chip
+                label="Yüzde (%)"
+                selected={form.type === 'percentage'}
+                variant={form.type === 'percentage' ? 'primary' : 'neutral'}
+                onPress={() => setForm({ ...form, type: 'percentage' })}
+              />
+              <Chip
+                label="Sabit (TL)"
+                selected={form.type === 'fixed_amount'}
+                variant={form.type === 'fixed_amount' ? 'primary' : 'neutral'}
+                onPress={() => setForm({ ...form, type: 'fixed_amount' })}
+              />
+            </View>
 
-                <TextInput
-                  mode="outlined"
-                  label={`Değer * ${form.type === 'percentage' ? '(%)' : '(TL)'}`}
-                  value={form.value}
-                  onChangeText={(v: string) => setForm({ ...form, value: v.replace(',', '.') })}
-                  keyboardType="numeric"
-                  style={styles.input}
-                  outlineColor={TarodanColors.border}
-                  activeOutlineColor={TarodanColors.primary}
-                />
+            <Input
+              label={`Değer * ${form.type === 'percentage' ? '(%)' : '(TL)'}`}
+              value={form.value}
+              onChangeText={(v: string) => setForm({ ...form, value: v.replace(',', '.') })}
+              keyboardType="numeric"
+              containerStyle={styles.input}
+            />
 
-                <Text style={styles.sectionLabel}>Kapsam</Text>
-                <View style={styles.toggleRow}>
-                  <Chip
-                    selected={form.scope === 'seller'}
-                    onPress={() => setForm({ ...form, scope: 'seller', targetProductIds: [] })}
-                    style={[styles.toggleChip, form.scope === 'seller' && styles.toggleChipActive]}
-                    textStyle={form.scope === 'seller' ? styles.toggleChipTextActive : undefined}
-                  >
-                    Tüm Mağaza
-                  </Chip>
-                  <Chip
-                    selected={form.scope === 'product'}
-                    onPress={() => setForm({ ...form, scope: 'product' })}
-                    style={[styles.toggleChip, form.scope === 'product' && styles.toggleChipActive]}
-                    textStyle={form.scope === 'product' ? styles.toggleChipTextActive : undefined}
-                  >
-                    Seçili Ürünler
-                  </Chip>
-                </View>
+            <Text style={styles.sectionLabel}>Kapsam</Text>
+            <View style={styles.toggleRow}>
+              <Chip
+                label="Tüm Mağaza"
+                selected={form.scope === 'seller'}
+                variant={form.scope === 'seller' ? 'primary' : 'neutral'}
+                onPress={() => setForm({ ...form, scope: 'seller', targetProductIds: [] })}
+              />
+              <Chip
+                label="Seçili Ürünler"
+                selected={form.scope === 'product'}
+                variant={form.scope === 'product' ? 'primary' : 'neutral'}
+                onPress={() => setForm({ ...form, scope: 'product' })}
+              />
+            </View>
 
-                {form.scope === 'product' ? (
-                  <TouchableOpacity
-                    style={styles.productPickerRow}
-                    onPress={() => setProductPickerOpen(true)}
-                  >
-                    <Ionicons name="cube-outline" size={20} color={TarodanColors.primary} />
-                    <Text style={styles.productPickerText}>
-                      {form.targetProductIds.length > 0
-                        ? `${form.targetProductIds.length} ürün seçildi`
-                        : 'Ürün seçin'}
+            {form.scope === 'product' ? (
+              <Pressable
+                style={styles.productPickerRow}
+                onPress={() => setProductPickerOpen(true)}
+              >
+                <Ionicons name="cube-outline" size={20} color={colors.primary[600]!} />
+                <Text style={styles.productPickerText}>
+                  {form.targetProductIds.length > 0
+                    ? `${form.targetProductIds.length} ürün seçildi`
+                    : 'Ürün seçin'}
+                </Text>
+                <Ionicons name="chevron-forward" size={18} color={colors.text.subtle} />
+              </Pressable>
+            ) : null}
+
+            <Text style={styles.sectionLabel}>Geçerlilik (YYYY-AA-GG)</Text>
+            <View style={styles.dateRow}>
+              <Input
+                label="Başlangıç"
+                value={form.startDate}
+                onChangeText={(v: string) => setForm({ ...form, startDate: v })}
+                placeholder="2026-04-22"
+                containerStyle={styles.dateInput}
+              />
+              <Input
+                label="Bitiş"
+                value={form.endDate}
+                onChangeText={(v: string) => setForm({ ...form, endDate: v })}
+                placeholder="2026-05-22"
+                containerStyle={styles.dateInput}
+              />
+            </View>
+
+            <Text style={styles.sectionLabel}>Limitler (opsiyonel)</Text>
+            <Input
+              label="Min Sepet Tutarı (TL)"
+              value={form.minCartValue}
+              onChangeText={(v: string) => setForm({ ...form, minCartValue: v.replace(',', '.') })}
+              keyboardType="numeric"
+              containerStyle={styles.input}
+            />
+            <Input
+              label="Max İndirim Tutarı (TL)"
+              value={form.maxDiscountAmount}
+              onChangeText={(v: string) => setForm({ ...form, maxDiscountAmount: v.replace(',', '.') })}
+              keyboardType="numeric"
+              containerStyle={styles.input}
+            />
+            <Input
+              label="Toplam Kullanım Limiti"
+              value={form.usageLimitTotal}
+              onChangeText={(v: string) => setForm({ ...form, usageLimitTotal: v.replace(/[^0-9]/g, '') })}
+              keyboardType="numeric"
+              containerStyle={styles.input}
+            />
+            <Input
+              label="Kullanıcı Başına Limit"
+              value={form.usageLimitPerUser}
+              onChangeText={(v: string) => setForm({ ...form, usageLimitPerUser: v.replace(/[^0-9]/g, '') || '1' })}
+              keyboardType="numeric"
+              containerStyle={styles.input}
+            />
+
+            <View style={styles.switchRow}>
+              <Text style={styles.switchLabel}>Birleşebilir İndirim</Text>
+              <Switch
+                value={form.isStackable}
+                onValueChange={(v: boolean) => setForm({ ...form, isStackable: v })}
+              />
+            </View>
+            <View style={styles.switchRow}>
+              <Text style={styles.switchLabel}>Aktif</Text>
+              <Switch
+                value={form.isActive}
+                onValueChange={(v: boolean) => setForm({ ...form, isActive: v })}
+              />
+            </View>
+          </View>
+        </ScrollView>
+
+        <View style={styles.dialogActions}>
+          <Button
+            variant="ghost"
+            title="Vazgeç"
+            onPress={() => setFormOpen(false)}
+            disabled={saveMutation.isPending}
+          />
+          <Button
+            variant="primary"
+            title={form.id ? 'Güncelle' : 'Oluştur'}
+            onPress={handleSubmit}
+            isLoading={saveMutation.isPending}
+            disabled={saveMutation.isPending}
+          />
+        </View>
+      </Modal>
+
+      {/* Product picker */}
+      <Modal
+        isOpen={productPickerOpen}
+        onClose={() => setProductPickerOpen(false)}
+        title="Ürün Seç"
+      >
+        <ScrollView style={styles.dialogScroll}>
+          {productsQuery.isLoading ? (
+            <View style={{ paddingVertical: 24, alignItems: 'center' }}>
+              <Spinner size="lg" />
+            </View>
+          ) : products.length === 0 ? (
+            <Text style={styles.emptyProducts}>Aktif ürününüz yok.</Text>
+          ) : (
+            products.map((p) => {
+              const checked = form.targetProductIds.includes(p.id);
+              return (
+                <Pressable
+                  key={p.id}
+                  style={styles.productRow}
+                  onPress={() => {
+                    const next = checked
+                      ? form.targetProductIds.filter((id) => id !== p.id)
+                      : [...form.targetProductIds, p.id];
+                    setForm({ ...form, targetProductIds: next });
+                  }}
+                >
+                  <Ionicons
+                    name={checked ? 'checkbox' : 'square-outline'}
+                    size={22}
+                    color={checked ? colors.primary[600]! : colors.text.subtle}
+                  />
+                  <View style={{ flex: 1, marginLeft: 12 }}>
+                    <Text style={styles.productTitle} numberOfLines={1}>
+                      {p.title}
                     </Text>
-                    <Ionicons name="chevron-forward" size={18} color={TarodanColors.textTertiary} />
-                  </TouchableOpacity>
-                ) : null}
-
-                <Text style={styles.sectionLabel}>Geçerlilik (YYYY-AA-GG)</Text>
-                <View style={styles.dateRow}>
-                  <TextInput
-                    mode="outlined"
-                    label="Başlangıç"
-                    value={form.startDate}
-                    onChangeText={(v: string) => setForm({ ...form, startDate: v })}
-                    placeholder="2026-04-22"
-                    style={[styles.input, { flex: 1, marginBottom: 0 }]}
-                    outlineColor={TarodanColors.border}
-                    activeOutlineColor={TarodanColors.primary}
-                  />
-                  <TextInput
-                    mode="outlined"
-                    label="Bitiş"
-                    value={form.endDate}
-                    onChangeText={(v: string) => setForm({ ...form, endDate: v })}
-                    placeholder="2026-05-22"
-                    style={[styles.input, { flex: 1, marginBottom: 0 }]}
-                    outlineColor={TarodanColors.border}
-                    activeOutlineColor={TarodanColors.primary}
-                  />
-                </View>
-
-                <Text style={styles.sectionLabel}>Limitler (opsiyonel)</Text>
-                <TextInput
-                  mode="outlined"
-                  label="Min Sepet Tutarı (TL)"
-                  value={form.minCartValue}
-                  onChangeText={(v: string) => setForm({ ...form, minCartValue: v.replace(',', '.') })}
-                  keyboardType="numeric"
-                  style={styles.input}
-                  outlineColor={TarodanColors.border}
-                  activeOutlineColor={TarodanColors.primary}
-                />
-                <TextInput
-                  mode="outlined"
-                  label="Max İndirim Tutarı (TL)"
-                  value={form.maxDiscountAmount}
-                  onChangeText={(v: string) => setForm({ ...form, maxDiscountAmount: v.replace(',', '.') })}
-                  keyboardType="numeric"
-                  style={styles.input}
-                  outlineColor={TarodanColors.border}
-                  activeOutlineColor={TarodanColors.primary}
-                />
-                <TextInput
-                  mode="outlined"
-                  label="Toplam Kullanım Limiti"
-                  value={form.usageLimitTotal}
-                  onChangeText={(v: string) => setForm({ ...form, usageLimitTotal: v.replace(/[^0-9]/g, '') })}
-                  keyboardType="numeric"
-                  style={styles.input}
-                  outlineColor={TarodanColors.border}
-                  activeOutlineColor={TarodanColors.primary}
-                />
-                <TextInput
-                  mode="outlined"
-                  label="Kullanıcı Başına Limit"
-                  value={form.usageLimitPerUser}
-                  onChangeText={(v: string) => setForm({ ...form, usageLimitPerUser: v.replace(/[^0-9]/g, '') || '1' })}
-                  keyboardType="numeric"
-                  style={styles.input}
-                  outlineColor={TarodanColors.border}
-                  activeOutlineColor={TarodanColors.primary}
-                />
-
-                <View style={styles.switchRow}>
-                  <Text style={styles.switchLabel}>Birleşebilir İndirim</Text>
-                  <Switch
-                    value={form.isStackable}
-                    onValueChange={(v: boolean) => setForm({ ...form, isStackable: v })}
-                    color={TarodanColors.primary}
-                  />
-                </View>
-                <View style={styles.switchRow}>
-                  <Text style={styles.switchLabel}>Aktif</Text>
-                  <Switch
-                    value={form.isActive}
-                    onValueChange={(v: boolean) => setForm({ ...form, isActive: v })}
-                    color={TarodanColors.primary}
-                  />
-                </View>
-              </View>
-            </ScrollView>
-          </Dialog.ScrollArea>
-
-          <Dialog.Actions>
-            <Button onPress={() => setFormOpen(false)} disabled={saveMutation.isPending}>
-              Vazgeç
-            </Button>
-            <Button
-              mode="contained"
-              buttonColor={TarodanColors.primary}
-              onPress={handleSubmit}
-              loading={saveMutation.isPending}
-              disabled={saveMutation.isPending}
-            >
-              {form.id ? 'Güncelle' : 'Oluştur'}
-            </Button>
-          </Dialog.Actions>
-        </Dialog>
-
-        {/* Product picker */}
-        <Dialog
-          visible={productPickerOpen}
-          onDismiss={() => setProductPickerOpen(false)}
-          style={styles.dialog}
-        >
-          <Dialog.Title>Ürün Seç</Dialog.Title>
-          <Dialog.ScrollArea style={styles.dialogScroll}>
-            <ScrollView>
-              {productsQuery.isLoading ? (
-                <ActivityIndicator color={TarodanColors.primary} style={{ paddingVertical: 24 }} />
-              ) : products.length === 0 ? (
-                <Text style={styles.emptyProducts}>Aktif ürününüz yok.</Text>
-              ) : (
-                products.map((p) => {
-                  const checked = form.targetProductIds.includes(p.id);
-                  return (
-                    <TouchableOpacity
-                      key={p.id}
-                      style={styles.productRow}
-                      onPress={() => {
-                        const next = checked
-                          ? form.targetProductIds.filter((id) => id !== p.id)
-                          : [...form.targetProductIds, p.id];
-                        setForm({ ...form, targetProductIds: next });
-                      }}
-                    >
-                      <Ionicons
-                        name={checked ? 'checkbox' : 'square-outline'}
-                        size={22}
-                        color={checked ? TarodanColors.primary : TarodanColors.textTertiary}
-                      />
-                      <View style={{ flex: 1, marginLeft: 12 }}>
-                        <Text style={styles.productTitle} numberOfLines={1}>
-                          {p.title}
-                        </Text>
-                        <Text style={styles.productPrice}>{formatPrice(p.price)}</Text>
-                      </View>
-                    </TouchableOpacity>
-                  );
-                })
-              )}
-            </ScrollView>
-          </Dialog.ScrollArea>
-          <Dialog.Actions>
-            <Button onPress={() => setProductPickerOpen(false)}>Tamam</Button>
-          </Dialog.Actions>
-        </Dialog>
-      </Portal>
+                    <Text style={styles.productPrice}>{formatPrice(p.price)}</Text>
+                  </View>
+                </Pressable>
+              );
+            })
+          )}
+        </ScrollView>
+        <View style={styles.dialogActions}>
+          <Button variant="primary" title="Tamam" onPress={() => setProductPickerOpen(false)} />
+        </View>
+      </Modal>
 
       <Snackbar
         visible={snackbar.visible}
         onDismiss={() => setSnackbar({ visible: false, message: '' })}
         duration={2000}
-        style={{ backgroundColor: TarodanColors.success }}
+        variant="success"
       >
         {snackbar.message}
       </Snackbar>
@@ -663,39 +633,29 @@ export default function DiscountsScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: TarodanColors.backgroundSecondary,
+    backgroundColor: colors.surface.alt,
   },
   gateContainer: {
     flex: 1,
-    backgroundColor: TarodanColors.background,
+    backgroundColor: colors.surface.DEFAULT,
   },
   filterRow: {
     flexDirection: 'row',
     paddingHorizontal: 16,
     paddingVertical: 12,
     gap: 8,
-    backgroundColor: TarodanColors.background,
+    backgroundColor: colors.white,
     borderBottomWidth: 1,
-    borderBottomColor: TarodanColors.borderLight,
-  },
-  filterChip: {
-    backgroundColor: TarodanColors.surfaceVariant,
-  },
-  filterChipActive: {
-    backgroundColor: TarodanColors.primaryLight,
-  },
-  filterChipTextActive: {
-    color: TarodanColors.primary,
-    fontWeight: '600',
+    borderBottomColor: colors.border.subtle,
   },
   list: {
     flex: 1,
   },
   discountCard: {
-    backgroundColor: TarodanColors.background,
+    backgroundColor: colors.white,
     marginBottom: 12,
     borderWidth: 1,
-    borderColor: TarodanColors.borderLight,
+    borderColor: colors.border.subtle,
   },
   cardHeader: {
     flexDirection: 'row',
@@ -706,21 +666,21 @@ const styles = StyleSheet.create({
   discountName: {
     fontSize: 16,
     fontWeight: '700',
-    color: TarodanColors.textPrimary,
+    color: colors.text.heading,
   },
   codeBadge: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 4,
-    backgroundColor: TarodanColors.primaryLight,
+    backgroundColor: colors.primary[50]!,
     paddingHorizontal: 8,
     paddingVertical: 3,
-    borderRadius: 6,
+    borderRadius: radius.sm,
     alignSelf: 'flex-start',
     marginTop: 4,
   },
   codeText: {
-    color: TarodanColors.primary,
+    color: colors.primary[600]!,
     fontSize: 12,
     fontWeight: '600',
   },
@@ -730,15 +690,15 @@ const styles = StyleSheet.create({
   valueText: {
     fontSize: 22,
     fontWeight: 'bold',
-    color: TarodanColors.primary,
+    color: colors.primary[600]!,
   },
   valueLabel: {
     fontSize: 11,
-    color: TarodanColors.textSecondary,
+    color: colors.text.muted,
   },
   discountDesc: {
     fontSize: 13,
-    color: TarodanColors.textSecondary,
+    color: colors.text.muted,
     marginBottom: 8,
   },
   metaRow: {
@@ -752,14 +712,14 @@ const styles = StyleSheet.create({
   },
   metaText: {
     fontSize: 12,
-    color: TarodanColors.textSecondary,
+    color: colors.text.muted,
   },
   actions: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
     borderTopWidth: 1,
-    borderTopColor: TarodanColors.borderLight,
+    borderTopColor: colors.border.subtle,
     paddingTop: 8,
     marginTop: 8,
   },
@@ -770,30 +730,27 @@ const styles = StyleSheet.create({
   },
   activeLabel: {
     fontSize: 13,
-    color: TarodanColors.textSecondary,
+    color: colors.text.muted,
   },
   fab: {
     position: 'absolute',
     right: 16,
     bottom: 16,
-    backgroundColor: TarodanColors.primary,
-  },
-  dialog: {
-    backgroundColor: TarodanColors.background,
-    maxHeight: '90%',
   },
   dialogScroll: {
-    paddingHorizontal: 0,
     maxHeight: 460,
   },
   input: {
     marginBottom: 10,
-    backgroundColor: TarodanColors.background,
+  },
+  dateInput: {
+    flex: 1,
+    marginBottom: 0,
   },
   sectionLabel: {
     fontSize: 13,
     fontWeight: '600',
-    color: TarodanColors.textSecondary,
+    color: colors.text.muted,
     marginTop: 8,
     marginBottom: 6,
   },
@@ -802,30 +759,20 @@ const styles = StyleSheet.create({
     gap: 8,
     marginBottom: 10,
   },
-  toggleChip: {
-    backgroundColor: TarodanColors.surfaceVariant,
-  },
-  toggleChipActive: {
-    backgroundColor: TarodanColors.primaryLight,
-  },
-  toggleChipTextActive: {
-    color: TarodanColors.primary,
-    fontWeight: '600',
-  },
   productPickerRow: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 10,
     paddingVertical: 12,
     paddingHorizontal: 14,
-    backgroundColor: TarodanColors.surfaceVariant,
-    borderRadius: 8,
+    backgroundColor: colors.surface.alt,
+    borderRadius: radius.md,
     marginBottom: 10,
   },
   productPickerText: {
     flex: 1,
     fontSize: 14,
-    color: TarodanColors.textPrimary,
+    color: colors.text.heading,
     fontWeight: '500',
   },
   dateRow: {
@@ -841,11 +788,11 @@ const styles = StyleSheet.create({
   },
   switchLabel: {
     fontSize: 14,
-    color: TarodanColors.textPrimary,
+    color: colors.text.heading,
   },
   emptyProducts: {
     textAlign: 'center',
-    color: TarodanColors.textSecondary,
+    color: colors.text.muted,
     paddingVertical: 24,
     fontSize: 14,
   },
@@ -855,16 +802,22 @@ const styles = StyleSheet.create({
     paddingVertical: 12,
     paddingHorizontal: 16,
     borderBottomWidth: StyleSheet.hairlineWidth,
-    borderBottomColor: TarodanColors.borderLight,
+    borderBottomColor: colors.border.subtle,
   },
   productTitle: {
     fontSize: 14,
     fontWeight: '500',
-    color: TarodanColors.textPrimary,
+    color: colors.text.heading,
   },
   productPrice: {
     fontSize: 13,
-    color: TarodanColors.primary,
+    color: colors.primary[600]!,
     marginTop: 2,
+  },
+  dialogActions: {
+    flexDirection: 'row',
+    justifyContent: 'flex-end',
+    gap: 8,
+    marginTop: 12,
   },
 });

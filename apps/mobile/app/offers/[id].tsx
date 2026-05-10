@@ -1,16 +1,17 @@
 import React, { useState } from 'react';
-import { View, StyleSheet, ScrollView, Image, Alert, TouchableOpacity } from 'react-native';
-import { Button, Portal, Dialog, ActivityIndicator } from 'react-native-paper';
+import { View, StyleSheet, ScrollView, Image, Alert, Pressable } from 'react-native';
+import { Button, Modal, Input, Text, theme } from '@tarodan/ui-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { router, useLocalSearchParams } from 'expo-router';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { offersApi } from '../../src/services/api';
-import { TarodanColors } from '../../src/theme';
-import { ScreenHeader, ScreenLoader, ErrorState, Text, TextInput } from '../../src/components/common';
+import { ScreenHeader, ScreenLoader, ErrorState } from '../../src/components/common';
 import { formatPrice, formatOfferStatus, formatRelativeDate } from '../../src/utils/format';
 import { transformImageUrl } from '../../src/utils/imageUrl';
 import { useAuthStore } from '../../src/stores/authStore';
+
+const { colors } = theme;
 
 interface Offer {
   id: string;
@@ -37,16 +38,16 @@ interface Offer {
 function statusColor(status: string): { bg: string; fg: string } {
   switch (status) {
     case 'accepted':
-      return { bg: TarodanColors.successLight, fg: TarodanColors.success };
+      return { bg: colors.success[50]!, fg: colors.success[600]! };
     case 'rejected':
     case 'cancelled':
     case 'expired':
-      return { bg: TarodanColors.errorLight, fg: TarodanColors.error };
+      return { bg: colors.danger[50]!, fg: colors.danger[600]! };
     case 'countered':
     case 'counter_offered':
-      return { bg: TarodanColors.infoLight, fg: TarodanColors.info };
+      return { bg: colors.info[50]!, fg: colors.info[600]! };
     default:
-      return { bg: TarodanColors.warningLight, fg: TarodanColors.warning };
+      return { bg: colors.warning[50]!, fg: colors.warning[600]! };
   }
 }
 
@@ -157,10 +158,9 @@ export default function OfferDetailScreen() {
 
       <ScrollView contentContainerStyle={styles.scrollBody}>
         {/* Product */}
-        <TouchableOpacity
-          style={styles.productCard}
+        <Pressable
+          style={({ pressed }) => [styles.productCard, pressed && { opacity: 0.85 }]}
           onPress={() => offer.product?.id && router.push(`/product/${offer.product.id}`)}
-          activeOpacity={0.85}
         >
           <Image source={{ uri: transformImageUrl(firstImg) }} style={styles.productImage} />
           <View style={styles.productBody}>
@@ -173,7 +173,7 @@ export default function OfferDetailScreen() {
               </Text>
             ) : null}
           </View>
-        </TouchableOpacity>
+        </Pressable>
 
         {/* Status */}
         <View style={[styles.statusBanner, { backgroundColor: color.bg }]}>
@@ -207,17 +207,17 @@ export default function OfferDetailScreen() {
         {/* Parties */}
         <View style={styles.partyCard}>
           <View style={styles.partyRow}>
-            <Ionicons name="person-circle-outline" size={18} color={TarodanColors.textSecondary} />
+            <Ionicons name="person-circle-outline" size={18} color={colors.text.muted} />
             <Text style={styles.partyLabel}>Alıcı:</Text>
             <Text style={styles.partyName}>{offer.buyer?.displayName || '—'}</Text>
           </View>
           <View style={styles.partyRow}>
-            <Ionicons name="person-circle-outline" size={18} color={TarodanColors.textSecondary} />
+            <Ionicons name="person-circle-outline" size={18} color={colors.text.muted} />
             <Text style={styles.partyLabel}>Satıcı:</Text>
             <Text style={styles.partyName}>{offer.seller?.displayName || '—'}</Text>
           </View>
           <View style={styles.partyRow}>
-            <Ionicons name="time-outline" size={18} color={TarodanColors.textSecondary} />
+            <Ionicons name="time-outline" size={18} color={colors.text.muted} />
             <Text style={styles.partyLabel}>Oluşturuldu:</Text>
             <Text style={styles.partyName}>{formatRelativeDate(offer.createdAt)}</Text>
           </View>
@@ -227,32 +227,32 @@ export default function OfferDetailScreen() {
         {isPending && isSeller ? (
           <View style={styles.actionsStack}>
             <Button
-              mode="contained"
-              buttonColor={TarodanColors.success}
+              variant="success"
               onPress={() => acceptMutation.mutate()}
-              loading={acceptMutation.isPending}
+              isLoading={acceptMutation.isPending}
               disabled={acceptMutation.isPending || rejectMutation.isPending || counterMutation.isPending}
-              icon="check"
+              icon="checkmark"
+              fullWidth
               style={styles.actionBtn}
             >
               Kabul Et
             </Button>
             <Button
-              mode="outlined"
-              textColor={TarodanColors.info}
+              variant="outline"
               onPress={() => {
                 setCounterAmount(offer.amount.toString());
                 setCounterDialog(true);
               }}
               disabled={counterMutation.isPending}
               icon="swap-horizontal"
-              style={[styles.actionBtn, { borderColor: TarodanColors.info }]}
+              fullWidth
+              style={{ ...styles.actionBtn, borderColor: colors.info[600]! }}
+              textStyle={{ color: colors.info[600]! }}
             >
               Karşı Teklif Ver
             </Button>
             <Button
-              mode="outlined"
-              textColor={TarodanColors.error}
+              variant="outline"
               onPress={() =>
                 Alert.alert('Reddet', 'Teklifi reddetmek istediğinize emin misiniz?', [
                   { text: 'Vazgeç', style: 'cancel' },
@@ -261,7 +261,9 @@ export default function OfferDetailScreen() {
               }
               disabled={rejectMutation.isPending}
               icon="close"
-              style={[styles.actionBtn, { borderColor: TarodanColors.error }]}
+              fullWidth
+              style={{ ...styles.actionBtn, borderColor: colors.danger[600]! }}
+              textStyle={{ color: colors.danger[600]! }}
             >
               Reddet
             </Button>
@@ -270,60 +272,54 @@ export default function OfferDetailScreen() {
 
         {isPending && isBuyer ? (
           <Button
-            mode="outlined"
-            textColor={TarodanColors.error}
+            variant="outline"
             onPress={() =>
               Alert.alert('İptal Et', 'Teklifinizi iptal etmek istediğinize emin misiniz?', [
                 { text: 'Vazgeç', style: 'cancel' },
                 { text: 'İptal Et', style: 'destructive', onPress: () => cancelMutation.mutate() },
               ])
             }
-            loading={cancelMutation.isPending}
-            icon="trash-can-outline"
-            style={[styles.actionBtn, { borderColor: TarodanColors.error, margin: 16 }]}
+            isLoading={cancelMutation.isPending}
+            icon="trash-outline"
+            fullWidth
+            style={{ ...styles.actionBtn, borderColor: colors.danger[600]!, margin: 16 }}
+            textStyle={{ color: colors.danger[600]! }}
           >
             Teklifi İptal Et
           </Button>
         ) : null}
       </ScrollView>
 
-      <Portal>
-        <Dialog visible={counterDialog} onDismiss={() => setCounterDialog(false)}>
-          <Dialog.Title>Karşı Teklif</Dialog.Title>
-          <Dialog.Content>
-            <Text style={{ marginBottom: 12, color: TarodanColors.textSecondary }}>
-              Karşı teklif tutarınızı girin.
-            </Text>
-            <TextInput
-              mode="outlined"
-              label="Tutar (TL)"
-              value={counterAmount}
-              onChangeText={setCounterAmount}
-              keyboardType="numeric"
-              outlineColor={TarodanColors.border}
-              activeOutlineColor={TarodanColors.primary}
-            />
-          </Dialog.Content>
-          <Dialog.Actions>
-            <Button onPress={() => setCounterDialog(false)}>Vazgeç</Button>
-            <Button
-              mode="contained"
-              buttonColor={TarodanColors.primary}
-              onPress={() => {
-                if (counterValue <= 0) {
-                  Alert.alert('Geçersiz tutar', 'Pozitif bir tutar girin.');
-                  return;
-                }
-                counterMutation.mutate(counterValue);
-              }}
-              loading={counterMutation.isPending}
-              disabled={counterMutation.isPending || counterValue <= 0}
-            >
-              Gönder
-            </Button>
-          </Dialog.Actions>
-        </Dialog>
-      </Portal>
+      <Modal isOpen={counterDialog} onClose={() => setCounterDialog(false)} title="Karşı Teklif">
+        <Text style={{ marginBottom: 12, color: colors.text.muted }}>
+          Karşı teklif tutarınızı girin.
+        </Text>
+        <Input
+          label="Tutar (TL)"
+          value={counterAmount}
+          onChangeText={setCounterAmount}
+          keyboardType="numeric"
+        />
+        <View style={styles.dialogActions}>
+          <Button variant="ghost" onPress={() => setCounterDialog(false)}>
+            Vazgeç
+          </Button>
+          <Button
+            variant="primary"
+            onPress={() => {
+              if (counterValue <= 0) {
+                Alert.alert('Geçersiz tutar', 'Pozitif bir tutar girin.');
+                return;
+              }
+              counterMutation.mutate(counterValue);
+            }}
+            isLoading={counterMutation.isPending}
+            disabled={counterMutation.isPending || counterValue <= 0}
+          >
+            Gönder
+          </Button>
+        </View>
+      </Modal>
     </SafeAreaView>
   );
 }
@@ -331,7 +327,7 @@ export default function OfferDetailScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: TarodanColors.backgroundSecondary,
+    backgroundColor: colors.gray[50],
   },
   scrollBody: {
     padding: 16,
@@ -341,16 +337,16 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     gap: 12,
     padding: 12,
-    backgroundColor: TarodanColors.background,
+    backgroundColor: colors.white,
     borderRadius: 12,
     borderWidth: StyleSheet.hairlineWidth,
-    borderColor: TarodanColors.border,
+    borderColor: colors.border.DEFAULT,
   },
   productImage: {
     width: 80,
     height: 80,
     borderRadius: 8,
-    backgroundColor: TarodanColors.surfaceVariant,
+    backgroundColor: colors.gray[50],
   },
   productBody: {
     flex: 1,
@@ -360,11 +356,11 @@ const styles = StyleSheet.create({
   productTitle: {
     fontSize: 15,
     fontWeight: '700',
-    color: TarodanColors.textPrimary,
+    color: colors.text.heading,
   },
   listPrice: {
     fontSize: 13,
-    color: TarodanColors.textSecondary,
+    color: colors.text.muted,
   },
   statusBanner: {
     flexDirection: 'row',
@@ -378,56 +374,56 @@ const styles = StyleSheet.create({
   },
   amountCard: {
     padding: 16,
-    backgroundColor: TarodanColors.background,
+    backgroundColor: colors.white,
     borderRadius: 12,
     borderWidth: StyleSheet.hairlineWidth,
-    borderColor: TarodanColors.border,
+    borderColor: colors.border.DEFAULT,
   },
   amountLabel: {
     fontSize: 13,
-    color: TarodanColors.textSecondary,
+    color: colors.text.muted,
   },
   amountValue: {
     fontSize: 24,
     fontWeight: '800',
-    color: TarodanColors.price,
+    color: colors.primary[700]!,
     marginTop: 4,
   },
   counterValue: {
     fontSize: 20,
     fontWeight: '800',
-    color: TarodanColors.info,
+    color: colors.info[600]!,
     marginTop: 4,
   },
   divider: {
     height: StyleSheet.hairlineWidth,
-    backgroundColor: TarodanColors.border,
+    backgroundColor: colors.border.DEFAULT,
     marginVertical: 10,
   },
   messageCard: {
     padding: 14,
-    backgroundColor: TarodanColors.background,
+    backgroundColor: colors.white,
     borderRadius: 12,
     borderWidth: StyleSheet.hairlineWidth,
-    borderColor: TarodanColors.border,
+    borderColor: colors.border.DEFAULT,
   },
   sectionTitle: {
     fontSize: 14,
     fontWeight: '700',
-    color: TarodanColors.textPrimary,
+    color: colors.text.heading,
     marginBottom: 8,
   },
   messageText: {
     fontSize: 14,
-    color: TarodanColors.textPrimary,
+    color: colors.text.heading,
     lineHeight: 20,
   },
   partyCard: {
     padding: 14,
-    backgroundColor: TarodanColors.background,
+    backgroundColor: colors.white,
     borderRadius: 12,
     borderWidth: StyleSheet.hairlineWidth,
-    borderColor: TarodanColors.border,
+    borderColor: colors.border.DEFAULT,
     gap: 8,
   },
   partyRow: {
@@ -437,11 +433,11 @@ const styles = StyleSheet.create({
   },
   partyLabel: {
     fontSize: 13,
-    color: TarodanColors.textSecondary,
+    color: colors.text.muted,
   },
   partyName: {
     fontSize: 13,
-    color: TarodanColors.textPrimary,
+    color: colors.text.heading,
     fontWeight: '600',
     flex: 1,
   },
@@ -451,5 +447,11 @@ const styles = StyleSheet.create({
   },
   actionBtn: {
     borderRadius: 10,
+  },
+  dialogActions: {
+    flexDirection: 'row',
+    justifyContent: 'flex-end',
+    gap: 8,
+    marginTop: 16,
   },
 });

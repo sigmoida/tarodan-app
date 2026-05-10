@@ -1,14 +1,20 @@
-import { View, ScrollView, TouchableOpacity, StyleSheet, Image } from 'react-native';
-import { ActivityIndicator, Card } from 'react-native-paper';
-import { Text } from '../../src/components/common';
+import { View, ScrollView, StyleSheet, Pressable, Image } from 'react-native';
+import {
+  Card,
+  Spinner,
+  Button,
+  Text,
+  theme,
+} from '@tarodan/ui-native';
 import { useState, useEffect } from 'react';
 import { router } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { api } from '../../src/services/api';
-import { TarodanColors } from '../../src/theme';
 import { useAuthStore } from '../../src/stores/authStore';
 import { useTranslation } from '../../src/i18n';
+
+const { colors, spacing, radius } = theme;
 
 interface ProductStats {
   id: string;
@@ -61,7 +67,7 @@ type TabType = 'overview' | 'products' | 'collections';
 
 export default function BusinessDashboardScreen() {
   const { t } = useTranslation();
-  const { isAuthenticated, user } = useAuthStore();
+  const { isAuthenticated } = useAuthStore();
   const [stats, setStats] = useState<BusinessStats | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -94,7 +100,7 @@ export default function BusinessDashboardScreen() {
   if (loading) {
     return (
       <View style={styles.loadingContainer}>
-        <ActivityIndicator size="large" color={TarodanColors.primary} />
+        <Spinner size="lg" />
         <Text style={styles.loadingText}>İstatistikler yükleniyor...</Text>
       </View>
     );
@@ -104,39 +110,27 @@ export default function BusinessDashboardScreen() {
     return (
       <View style={styles.container}>
         <View style={styles.header}>
-          <TouchableOpacity onPress={() => router.back()} style={styles.backButton}>
-            <Ionicons name="arrow-back" size={24} color={TarodanColors.textPrimary} />
-          </TouchableOpacity>
+          <Pressable onPress={() => router.back()} style={styles.backButton}>
+            <Ionicons name="arrow-back" size={24} color={colors.text.heading} />
+          </Pressable>
           <Text style={styles.headerTitle}>{t('mobile.settingsBusiness')}</Text>
           <View style={{ width: 40 }} />
         </View>
         <View style={styles.errorContainer}>
-          <Ionicons name="warning-outline" size={64} color={TarodanColors.error} />
+          <Ionicons name="warning-outline" size={64} color={colors.danger[600]!} />
           <Text style={styles.errorText}>{error}</Text>
           {error.includes('şirket adı') || error.includes('companyName') ? (
-            <TouchableOpacity 
-              style={styles.actionButton}
+            <Button
+              variant="primary"
+              title="Şirket Adı Ekle"
               onPress={() => router.push('/settings/edit-profile')}
-            >
-              <LinearGradient
-                colors={[TarodanColors.primary, '#FFA500']}
-                style={styles.actionButtonGradient}
-              >
-                <Text style={styles.actionButtonText}>Şirket Adı Ekle</Text>
-              </LinearGradient>
-            </TouchableOpacity>
+            />
           ) : (
-            <TouchableOpacity 
-              style={styles.actionButton}
+            <Button
+              variant="primary"
+              title="Üyeliğimi Yükselt"
               onPress={() => router.push('/pricing')}
-            >
-              <LinearGradient
-                colors={[TarodanColors.primary, '#FFA500']}
-                style={styles.actionButtonGradient}
-              >
-                <Text style={styles.actionButtonText}>Üyeliğimi Yükselt</Text>
-              </LinearGradient>
-            </TouchableOpacity>
+            />
           )}
         </View>
       </View>
@@ -147,9 +141,9 @@ export default function BusinessDashboardScreen() {
     <View style={styles.container}>
       {/* Header */}
       <View style={styles.header}>
-        <TouchableOpacity onPress={() => router.back()} style={styles.backButton}>
-          <Ionicons name="arrow-back" size={24} color={TarodanColors.textPrimary} />
-        </TouchableOpacity>
+        <Pressable onPress={() => router.back()} style={styles.backButton}>
+          <Ionicons name="arrow-back" size={24} color={colors.text.heading} />
+        </Pressable>
         <Text style={styles.headerTitle}>{t('mobile.settingsBusiness')}</Text>
         <View style={{ width: 40 }} />
       </View>
@@ -157,7 +151,7 @@ export default function BusinessDashboardScreen() {
       <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
         {/* Company Header */}
         <LinearGradient
-          colors={['rgba(249,115,22,0.2)', 'rgba(251,191,36,0.2)']}
+          colors={[colors.primary[100]!, colors.warning[100]!]}
           style={styles.companyHeader}
         >
           <View style={styles.companyInfo}>
@@ -174,7 +168,7 @@ export default function BusinessDashboardScreen() {
                   {stats?.company.name || stats?.company.displayName}
                 </Text>
                 {stats?.company.isVerified && (
-                  <Ionicons name="checkmark-circle" size={20} color={TarodanColors.success} />
+                  <Ionicons name="checkmark-circle" size={20} color={colors.success[600]!} />
                 )}
               </View>
               <Text style={styles.companyTitle}>📊 İşletme Paneli</Text>
@@ -189,20 +183,20 @@ export default function BusinessDashboardScreen() {
             { id: 'products', label: 'Ürünler', icon: 'cube' },
             { id: 'collections', label: 'Koleksiyonlar', icon: 'albums' },
           ].map((tab) => (
-            <TouchableOpacity
+            <Pressable
               key={tab.id}
               style={[styles.tab, activeTab === tab.id && styles.tabActive]}
               onPress={() => setActiveTab(tab.id as TabType)}
             >
-              <Ionicons 
-                name={tab.icon as any} 
-                size={18} 
-                color={activeTab === tab.id ? TarodanColors.primary : TarodanColors.textSecondary} 
+              <Ionicons
+                name={tab.icon as any}
+                size={18}
+                color={activeTab === tab.id ? colors.primary[600]! : colors.text.muted}
               />
               <Text style={[styles.tabText, activeTab === tab.id && styles.tabTextActive]}>
                 {tab.label}
               </Text>
-            </TouchableOpacity>
+            </Pressable>
           ))}
         </View>
 
@@ -211,17 +205,17 @@ export default function BusinessDashboardScreen() {
           <View style={styles.tabContent}>
             {/* Main Stats */}
             <View style={styles.statsGrid}>
-              <StatCard icon="eye" label="Görüntülenme" value={stats.overview.totalViews} color="#3B82F6" />
-              <StatCard icon="heart" label="Beğeni" value={stats.overview.totalLikes} color="#EF4444" />
-              <StatCard icon="bag-handle" label="Satış" value={stats.overview.totalSales} color="#22C55E" />
-              <StatCard icon="cube" label="Aktif Ürün" value={stats.overview.activeProducts} color="#8B5CF6" />
-              <StatCard icon="albums" label="Koleksiyon" value={stats.overview.totalCollections} color="#F97316" />
+              <StatCard icon="eye" label="Görüntülenme" value={stats.overview.totalViews} color={colors.info[600]!} />
+              <StatCard icon="heart" label="Beğeni" value={stats.overview.totalLikes} color={colors.danger[600]!} />
+              <StatCard icon="bag-handle" label="Satış" value={stats.overview.totalSales} color={colors.success[600]!} />
+              <StatCard icon="cube" label="Aktif Ürün" value={stats.overview.activeProducts} color={colors.info[700]!} />
+              <StatCard icon="albums" label="Koleksiyon" value={stats.overview.totalCollections} color={colors.primary[600]!} />
             </View>
 
             {/* Revenue Card */}
-            <Card style={styles.revenueCard}>
+            <Card style={styles.revenueCard} padding={0}>
               <LinearGradient
-                colors={['rgba(34,197,94,0.2)', 'rgba(16,185,129,0.2)']}
+                colors={[colors.success[100]!, colors.success[50]!]}
                 style={styles.revenueGradient}
               >
                 <Text style={styles.revenueLabel}>Toplam Gelir</Text>
@@ -231,42 +225,38 @@ export default function BusinessDashboardScreen() {
 
             {/* Weekly Stats */}
             <Card style={styles.weeklyCard}>
-              <Card.Content>
-                <Text style={styles.sectionTitle}>Bu Hafta</Text>
-                <View style={styles.weeklyStatsRow}>
-                  <View style={styles.weeklyStat}>
-                    <Ionicons name="eye" size={20} color="#3B82F6" />
-                    <Text style={styles.weeklyStatValue}>{stats.weekly.views.toLocaleString()}</Text>
-                    <Text style={styles.weeklyStatLabel}>Görüntülenme</Text>
-                  </View>
-                  <View style={styles.weeklyStat}>
-                    <Ionicons name="heart" size={20} color="#EF4444" />
-                    <Text style={styles.weeklyStatValue}>{stats.weekly.likes.toLocaleString()}</Text>
-                    <Text style={styles.weeklyStatLabel}>Beğeni</Text>
-                  </View>
+              <Text style={styles.sectionTitle}>Bu Hafta</Text>
+              <View style={styles.weeklyStatsRow}>
+                <View style={styles.weeklyStat}>
+                  <Ionicons name="eye" size={20} color={colors.info[600]!} />
+                  <Text style={styles.weeklyStatValue}>{stats.weekly.views.toLocaleString()}</Text>
+                  <Text style={styles.weeklyStatLabel}>Görüntülenme</Text>
                 </View>
-              </Card.Content>
+                <View style={styles.weeklyStat}>
+                  <Ionicons name="heart" size={20} color={colors.danger[600]!} />
+                  <Text style={styles.weeklyStatValue}>{stats.weekly.likes.toLocaleString()}</Text>
+                  <Text style={styles.weeklyStatLabel}>Beğeni</Text>
+                </View>
+              </View>
             </Card>
 
             {/* Collection Stats */}
             <Card style={styles.collectionStatsCard}>
-              <Card.Content>
-                <Text style={styles.sectionTitle}>Koleksiyon İstatistikleri</Text>
-                <View style={styles.weeklyStatsRow}>
-                  <View style={styles.weeklyStat}>
-                    <Text style={[styles.weeklyStatValue, { color: '#3B82F6' }]}>
-                      {stats.overview.collectionViews.toLocaleString()}
-                    </Text>
-                    <Text style={styles.weeklyStatLabel}>Toplam Görüntülenme</Text>
-                  </View>
-                  <View style={styles.weeklyStat}>
-                    <Text style={[styles.weeklyStatValue, { color: '#EF4444' }]}>
-                      {stats.overview.collectionLikes.toLocaleString()}
-                    </Text>
-                    <Text style={styles.weeklyStatLabel}>Toplam Beğeni</Text>
-                  </View>
+              <Text style={styles.sectionTitle}>Koleksiyon İstatistikleri</Text>
+              <View style={styles.weeklyStatsRow}>
+                <View style={styles.weeklyStat}>
+                  <Text style={[styles.weeklyStatValue, { color: colors.info[600]! }]}>
+                    {stats.overview.collectionViews.toLocaleString()}
+                  </Text>
+                  <Text style={styles.weeklyStatLabel}>Toplam Görüntülenme</Text>
                 </View>
-              </Card.Content>
+                <View style={styles.weeklyStat}>
+                  <Text style={[styles.weeklyStatValue, { color: colors.danger[600]! }]}>
+                    {stats.overview.collectionLikes.toLocaleString()}
+                  </Text>
+                  <Text style={styles.weeklyStatLabel}>Toplam Beğeni</Text>
+                </View>
+              </View>
             </Card>
           </View>
         )}
@@ -328,7 +318,7 @@ function StatCard({ icon, label, value, color }: { icon: string; label: string; 
 // Product Row Component
 function ProductRow({ product, index, metric }: { product: ProductStats; index: number; metric: 'views' | 'likes' }) {
   return (
-    <TouchableOpacity 
+    <Pressable
       style={styles.productRow}
       onPress={() => router.push(`/product/${product.id}`)}
     >
@@ -348,26 +338,26 @@ function ProductRow({ product, index, metric }: { product: ProductStats; index: 
       </View>
       <View style={styles.productStats}>
         <View style={styles.productStatItem}>
-          <Ionicons name="eye" size={14} color={metric === 'views' ? '#3B82F6' : TarodanColors.textSecondary} />
-          <Text style={[styles.productStatText, metric === 'views' && { color: '#3B82F6' }]}>
+          <Ionicons name="eye" size={14} color={metric === 'views' ? colors.info[600]! : colors.text.muted} />
+          <Text style={[styles.productStatText, metric === 'views' && { color: colors.info[600]! }]}>
             {(product.viewCount ?? 0).toLocaleString()}
           </Text>
         </View>
         <View style={styles.productStatItem}>
-          <Ionicons name="heart" size={14} color={metric === 'likes' ? '#EF4444' : TarodanColors.textSecondary} />
-          <Text style={[styles.productStatText, metric === 'likes' && { color: '#EF4444' }]}>
+          <Ionicons name="heart" size={14} color={metric === 'likes' ? colors.danger[600]! : colors.text.muted} />
+          <Text style={[styles.productStatText, metric === 'likes' && { color: colors.danger[600]! }]}>
             {(product.likeCount ?? 0).toLocaleString()}
           </Text>
         </View>
       </View>
-    </TouchableOpacity>
+    </Pressable>
   );
 }
 
 // Collection Row Component
 function CollectionRow({ collection, index }: { collection: CollectionStats; index: number }) {
   return (
-    <TouchableOpacity 
+    <Pressable
       style={styles.productRow}
       onPress={() => router.push(`/collections/${collection.id}`)}
     >
@@ -387,36 +377,36 @@ function CollectionRow({ collection, index }: { collection: CollectionStats; ind
       </View>
       <View style={styles.productStats}>
         <View style={styles.productStatItem}>
-          <Ionicons name="eye" size={14} color="#3B82F6" />
-          <Text style={[styles.productStatText, { color: '#3B82F6' }]}>
+          <Ionicons name="eye" size={14} color={colors.info[600]!} />
+          <Text style={[styles.productStatText, { color: colors.info[600]! }]}>
             {collection.viewCount.toLocaleString()}
           </Text>
         </View>
         <View style={styles.productStatItem}>
-          <Ionicons name="heart" size={14} color="#EF4444" />
-          <Text style={[styles.productStatText, { color: '#EF4444' }]}>
+          <Ionicons name="heart" size={14} color={colors.danger[600]!} />
+          <Text style={[styles.productStatText, { color: colors.danger[600]! }]}>
             {collection.likeCount.toLocaleString()}
           </Text>
         </View>
       </View>
-    </TouchableOpacity>
+    </Pressable>
   );
 }
 
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: TarodanColors.background,
+    backgroundColor: colors.surface.DEFAULT,
   },
   loadingContainer: {
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
-    backgroundColor: TarodanColors.background,
+    backgroundColor: colors.surface.DEFAULT,
   },
   loadingText: {
     marginTop: 12,
-    color: TarodanColors.textSecondary,
+    color: colors.text.muted,
   },
   header: {
     flexDirection: 'row',
@@ -425,9 +415,9 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
     paddingTop: 50,
     paddingBottom: 16,
-    backgroundColor: TarodanColors.surface,
+    backgroundColor: colors.white,
     borderBottomWidth: 1,
-    borderBottomColor: TarodanColors.border,
+    borderBottomColor: colors.border.DEFAULT,
   },
   backButton: {
     padding: 8,
@@ -435,7 +425,7 @@ const styles = StyleSheet.create({
   headerTitle: {
     fontSize: 18,
     fontWeight: 'bold',
-    color: TarodanColors.textPrimary,
+    color: colors.text.heading,
   },
   errorContainer: {
     flex: 1,
@@ -445,23 +435,10 @@ const styles = StyleSheet.create({
   },
   errorText: {
     fontSize: 16,
-    color: TarodanColors.error,
+    color: colors.danger[600]!,
     textAlign: 'center',
     marginTop: 16,
     marginBottom: 24,
-  },
-  actionButton: {
-    borderRadius: 12,
-    overflow: 'hidden',
-  },
-  actionButtonGradient: {
-    paddingHorizontal: 24,
-    paddingVertical: 14,
-  },
-  actionButtonText: {
-    color: '#fff',
-    fontWeight: 'bold',
-    fontSize: 16,
   },
   content: {
     flex: 1,
@@ -469,9 +446,9 @@ const styles = StyleSheet.create({
   companyHeader: {
     padding: 16,
     margin: 16,
-    borderRadius: 16,
+    borderRadius: radius.xl,
     borderWidth: 1,
-    borderColor: TarodanColors.primary + '30',
+    borderColor: colors.primary[200]!,
   },
   companyInfo: {
     flexDirection: 'row',
@@ -486,7 +463,7 @@ const styles = StyleSheet.create({
     width: 64,
     height: 64,
     borderRadius: 32,
-    backgroundColor: TarodanColors.primary + '30',
+    backgroundColor: colors.primary[100]!,
     justifyContent: 'center',
     alignItems: 'center',
   },
@@ -505,18 +482,18 @@ const styles = StyleSheet.create({
   companyName: {
     fontSize: 20,
     fontWeight: 'bold',
-    color: TarodanColors.textPrimary,
+    color: colors.text.heading,
   },
   companyTitle: {
     fontSize: 14,
-    color: TarodanColors.primary,
+    color: colors.primary[600]!,
     marginTop: 4,
   },
   tabsContainer: {
     flexDirection: 'row',
     paddingHorizontal: 16,
     borderBottomWidth: 1,
-    borderBottomColor: TarodanColors.border,
+    borderBottomColor: colors.border.DEFAULT,
   },
   tab: {
     flex: 1,
@@ -528,15 +505,15 @@ const styles = StyleSheet.create({
   },
   tabActive: {
     borderBottomWidth: 2,
-    borderBottomColor: TarodanColors.primary,
+    borderBottomColor: colors.primary[600]!,
   },
   tabText: {
     fontSize: 12,
-    color: TarodanColors.textSecondary,
+    color: colors.text.muted,
     fontWeight: '500',
   },
   tabTextActive: {
-    color: TarodanColors.primary,
+    color: colors.primary[600]!,
     fontWeight: 'bold',
   },
   tabContent: {
@@ -550,8 +527,8 @@ const styles = StyleSheet.create({
   },
   statCard: {
     width: '47%',
-    backgroundColor: TarodanColors.surface,
-    borderRadius: 12,
+    backgroundColor: colors.white,
+    borderRadius: radius.lg,
     padding: 16,
     borderLeftWidth: 4,
     alignItems: 'center',
@@ -559,17 +536,17 @@ const styles = StyleSheet.create({
   statValue: {
     fontSize: 24,
     fontWeight: 'bold',
-    color: TarodanColors.textPrimary,
+    color: colors.text.heading,
     marginTop: 8,
   },
   statLabel: {
     fontSize: 12,
-    color: TarodanColors.textSecondary,
+    color: colors.text.muted,
     marginTop: 4,
   },
   revenueCard: {
     marginBottom: 16,
-    borderRadius: 12,
+    borderRadius: radius.lg,
     overflow: 'hidden',
   },
   revenueGradient: {
@@ -577,26 +554,26 @@ const styles = StyleSheet.create({
   },
   revenueLabel: {
     fontSize: 14,
-    color: TarodanColors.success,
+    color: colors.success[700]!,
     fontWeight: '600',
   },
   revenueValue: {
     fontSize: 32,
     fontWeight: 'bold',
-    color: TarodanColors.textPrimary,
+    color: colors.text.heading,
     marginTop: 4,
   },
   weeklyCard: {
     marginBottom: 16,
-    borderRadius: 12,
+    borderRadius: radius.lg,
   },
   collectionStatsCard: {
-    borderRadius: 12,
+    borderRadius: radius.lg,
   },
   sectionTitle: {
     fontSize: 16,
     fontWeight: 'bold',
-    color: TarodanColors.textPrimary,
+    color: colors.text.heading,
     marginBottom: 12,
   },
   weeklyStatsRow: {
@@ -610,19 +587,19 @@ const styles = StyleSheet.create({
   weeklyStatValue: {
     fontSize: 24,
     fontWeight: 'bold',
-    color: TarodanColors.textPrimary,
+    color: colors.text.heading,
     marginTop: 8,
   },
   weeklyStatLabel: {
     fontSize: 12,
-    color: TarodanColors.textSecondary,
+    color: colors.text.muted,
     marginTop: 4,
   },
   productRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: TarodanColors.surface,
-    borderRadius: 12,
+    backgroundColor: colors.white,
+    borderRadius: radius.lg,
     padding: 12,
     marginBottom: 8,
   },
@@ -630,7 +607,7 @@ const styles = StyleSheet.create({
     width: 28,
     height: 28,
     borderRadius: 14,
-    backgroundColor: TarodanColors.surfaceVariant,
+    backgroundColor: colors.surface.alt,
     justifyContent: 'center',
     alignItems: 'center',
     marginRight: 12,
@@ -638,16 +615,16 @@ const styles = StyleSheet.create({
   productRankText: {
     fontSize: 12,
     fontWeight: 'bold',
-    color: TarodanColors.textPrimary,
+    color: colors.text.heading,
   },
   productImage: {
     width: 48,
     height: 48,
-    borderRadius: 8,
+    borderRadius: radius.md,
     marginRight: 12,
   },
   productImagePlaceholder: {
-    backgroundColor: TarodanColors.surfaceVariant,
+    backgroundColor: colors.surface.alt,
     justifyContent: 'center',
     alignItems: 'center',
   },
@@ -657,11 +634,11 @@ const styles = StyleSheet.create({
   productTitle: {
     fontSize: 14,
     fontWeight: '600',
-    color: TarodanColors.textPrimary,
+    color: colors.text.heading,
   },
   productPrice: {
     fontSize: 12,
-    color: TarodanColors.primary,
+    color: colors.primary[600]!,
     marginTop: 2,
   },
   productStats: {
@@ -674,11 +651,11 @@ const styles = StyleSheet.create({
   },
   productStatText: {
     fontSize: 12,
-    color: TarodanColors.textSecondary,
+    color: colors.text.muted,
   },
   emptyText: {
     textAlign: 'center',
-    color: TarodanColors.textSecondary,
+    color: colors.text.muted,
     paddingVertical: 24,
   },
 });

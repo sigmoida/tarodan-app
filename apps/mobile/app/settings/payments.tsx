@@ -1,14 +1,15 @@
 import React, { useState } from 'react';
-import { View, ScrollView, StyleSheet, TouchableOpacity, Alert, RefreshControl } from 'react-native';
-import { Card, Chip, Snackbar, ActivityIndicator } from 'react-native-paper';
+import { View, ScrollView, StyleSheet, Pressable, Alert, RefreshControl } from 'react-native';
+import { Card, Chip, Snackbar, Spinner, Text, theme } from '@tarodan/ui-native';
 import { router } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { Text, ScreenHeader, EmptyState } from '../../src/components/common';
-import { TarodanColors } from '../../src/theme';
+import { ScreenHeader, EmptyState } from '../../src/components/common';
 import { useAuthStore } from '../../src/stores/authStore';
 import { paymentsApi } from '../../src/services/api';
 import { formatPrice } from '../../src/utils/format';
+
+const { colors } = theme;
 
 /**
  * Ödeme geçmişi.
@@ -41,10 +42,10 @@ const STATUS_OPTIONS: Array<{ value: string; label: string }> = [
 ];
 
 const STATUS_COLORS: Record<string, { bg: string; fg: string; label: string; icon: any }> = {
-  completed: { bg: TarodanColors.successLight, fg: TarodanColors.success, label: 'Tamamlandı', icon: 'checkmark-circle' },
-  pending: { bg: TarodanColors.warningLight, fg: TarodanColors.warning, label: 'Bekliyor', icon: 'time-outline' },
-  failed: { bg: TarodanColors.errorLight, fg: TarodanColors.error, label: 'Başarısız', icon: 'close-circle' },
-  cancelled: { bg: TarodanColors.surfaceVariant, fg: TarodanColors.textSecondary, label: 'İptal', icon: 'ban-outline' },
+  completed: { bg: colors.success[50]!, fg: colors.success[600]!, label: 'Tamamlandı', icon: 'checkmark-circle' },
+  pending: { bg: colors.warning[50]!, fg: colors.warning[600]!, label: 'Bekliyor', icon: 'time-outline' },
+  failed: { bg: colors.danger[50]!, fg: colors.danger[600]!, label: 'Başarısız', icon: 'close-circle' },
+  cancelled: { bg: colors.gray[100], fg: colors.text.muted, label: 'İptal', icon: 'ban-outline' },
 };
 
 export default function PaymentsScreen() {
@@ -154,19 +155,18 @@ export default function PaymentsScreen() {
         {STATUS_OPTIONS.map((opt) => (
           <Chip
             key={opt.value || 'all'}
+            label={opt.label}
+            variant="primary"
             selected={statusFilter === opt.value}
             onPress={() => setStatusFilter(opt.value)}
-            style={[styles.filterChip, statusFilter === opt.value && styles.filterChipActive]}
-            textStyle={statusFilter === opt.value ? styles.filterChipTextActive : undefined}
-          >
-            {opt.label}
-          </Chip>
+            style={styles.filterChip}
+          />
         ))}
       </ScrollView>
 
       {paymentsQuery.isLoading ? (
         <View style={styles.loading}>
-          <ActivityIndicator size="large" color={TarodanColors.primary} />
+          <Spinner size="lg" />
         </View>
       ) : payments.length === 0 ? (
         <EmptyState
@@ -182,7 +182,7 @@ export default function PaymentsScreen() {
             <RefreshControl
               refreshing={paymentsQuery.isFetching}
               onRefresh={() => paymentsQuery.refetch()}
-              colors={[TarodanColors.primary]}
+              colors={[colors.primary[600]!]}
             />
           }
         >
@@ -190,69 +190,67 @@ export default function PaymentsScreen() {
             const status = STATUS_COLORS[p.status] ?? STATUS_COLORS.pending;
             return (
               <Card key={p.id} style={styles.paymentCard}>
-                <Card.Content>
-                  <View style={styles.cardHeader}>
-                    <View style={{ flex: 1 }}>
-                      <Text style={styles.orderNumber}>
-                        {p.orderNumber ? `#${p.orderNumber}` : `Sipariş #${p.orderId.slice(0, 8)}`}
+                <View style={styles.cardHeader}>
+                  <View style={{ flex: 1 }}>
+                    <Text style={styles.orderNumber}>
+                      {p.orderNumber ? `#${p.orderNumber}` : `Sipariş #${p.orderId.slice(0, 8)}`}
+                    </Text>
+                    {p.product?.title ? (
+                      <Text style={styles.productTitle} numberOfLines={2}>
+                        {p.product.title}
                       </Text>
-                      {p.product?.title ? (
-                        <Text style={styles.productTitle} numberOfLines={2}>
-                          {p.product.title}
-                        </Text>
-                      ) : null}
-                    </View>
-                    <Text style={styles.amount}>{formatPrice(p.amount)}</Text>
+                    ) : null}
                   </View>
+                  <Text style={styles.amount}>{formatPrice(p.amount)}</Text>
+                </View>
 
-                  <View style={styles.metaRow}>
-                    <View style={[styles.statusChip, { backgroundColor: status.bg }]}>
-                      <Ionicons name={status.icon} size={13} color={status.fg} />
-                      <Text style={[styles.statusText, { color: status.fg }]}>{status.label}</Text>
-                    </View>
-                    <View style={styles.providerWrap}>
-                      <Ionicons name="card-outline" size={13} color={TarodanColors.textSecondary} />
-                      <Text style={styles.providerText}>{p.provider?.toUpperCase()}</Text>
-                    </View>
+                <View style={styles.metaRow}>
+                  <View style={[styles.statusChip, { backgroundColor: status.bg }]}>
+                    <Ionicons name={status.icon} size={13} color={status.fg} />
+                    <Text style={[styles.statusText, { color: status.fg }]}>{status.label}</Text>
                   </View>
+                  <View style={styles.providerWrap}>
+                    <Ionicons name="card-outline" size={13} color={colors.text.muted} />
+                    <Text style={styles.providerText}>{p.provider?.toUpperCase()}</Text>
+                  </View>
+                </View>
 
-                  <Text style={styles.dateText}>{formatDate(p.paidAt || p.createdAt)}</Text>
+                <Text style={styles.dateText}>{formatDate(p.paidAt || p.createdAt)}</Text>
 
-                  {p.failureReason ? (
-                    <View style={styles.failureBox}>
-                      <Ionicons name="alert-circle" size={14} color={TarodanColors.error} />
-                      <Text style={styles.failureText}>{p.failureReason}</Text>
-                    </View>
-                  ) : null}
+                {p.failureReason ? (
+                  <View style={styles.failureBox}>
+                    <Ionicons name="alert-circle" size={14} color={colors.danger[600]!} />
+                    <Text style={styles.failureText}>{p.failureReason}</Text>
+                  </View>
+                ) : null}
 
-                  <View style={styles.actions}>
-                    {p.status === 'pending' && (
-                      <TouchableOpacity
-                        onPress={() => handleCancel(p.id)}
-                        style={[styles.actionButton, styles.cancelButton]}
-                      >
-                        <Ionicons name="close-circle-outline" size={16} color={TarodanColors.error} />
-                        <Text style={[styles.actionLabel, { color: TarodanColors.error }]}>İptal</Text>
-                      </TouchableOpacity>
-                    )}
-                    {p.status === 'failed' && (
-                      <TouchableOpacity
-                        onPress={() => handleRetry(p.id)}
-                        style={[styles.actionButton, styles.retryButton]}
-                      >
-                        <Ionicons name="refresh" size={16} color={TarodanColors.primary} />
-                        <Text style={[styles.actionLabel, { color: TarodanColors.primary }]}>Yeniden Dene</Text>
-                      </TouchableOpacity>
-                    )}
-                    <TouchableOpacity
-                      onPress={() => router.push({ pathname: '/orders/[id]', params: { id: p.orderId } } as any)}
-                      style={[styles.actionButton, styles.viewButton]}
+                <View style={styles.actions}>
+                  {p.status === 'pending' && (
+                    <Pressable
+                      onPress={() => handleCancel(p.id)}
+                      style={[styles.actionButton, styles.cancelButton]}
                     >
-                      <Ionicons name="receipt-outline" size={16} color={TarodanColors.textSecondary} />
-                      <Text style={[styles.actionLabel, { color: TarodanColors.textSecondary }]}>Sipariş</Text>
-                    </TouchableOpacity>
-                  </View>
-                </Card.Content>
+                      <Ionicons name="close-circle-outline" size={16} color={colors.danger[600]!} />
+                      <Text style={[styles.actionLabel, { color: colors.danger[600]! }]}>İptal</Text>
+                    </Pressable>
+                  )}
+                  {p.status === 'failed' && (
+                    <Pressable
+                      onPress={() => handleRetry(p.id)}
+                      style={[styles.actionButton, styles.retryButton]}
+                    >
+                      <Ionicons name="refresh" size={16} color={colors.primary[600]!} />
+                      <Text style={[styles.actionLabel, { color: colors.primary[600]! }]}>Yeniden Dene</Text>
+                    </Pressable>
+                  )}
+                  <Pressable
+                    onPress={() => router.push({ pathname: '/orders/[id]', params: { id: p.orderId } } as any)}
+                    style={[styles.actionButton, styles.viewButton]}
+                  >
+                    <Ionicons name="receipt-outline" size={16} color={colors.text.muted} />
+                    <Text style={[styles.actionLabel, { color: colors.text.muted }]}>Sipariş</Text>
+                  </Pressable>
+                </View>
               </Card>
             );
           })}
@@ -263,7 +261,7 @@ export default function PaymentsScreen() {
         visible={snackbar.visible}
         onDismiss={() => setSnackbar({ visible: false, message: '' })}
         duration={2000}
-        style={{ backgroundColor: TarodanColors.success }}
+        variant="success"
       >
         {snackbar.message}
       </Snackbar>
@@ -274,13 +272,13 @@ export default function PaymentsScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: TarodanColors.backgroundSecondary,
+    backgroundColor: colors.surface.alt,
   },
   filterScroll: {
-    backgroundColor: TarodanColors.background,
+    backgroundColor: colors.surface.DEFAULT,
     maxHeight: 60,
     borderBottomWidth: 1,
-    borderBottomColor: TarodanColors.borderLight,
+    borderBottomColor: colors.border.subtle,
   },
   filterRow: {
     paddingHorizontal: 16,
@@ -288,14 +286,7 @@ const styles = StyleSheet.create({
     gap: 8,
   },
   filterChip: {
-    backgroundColor: TarodanColors.surfaceVariant,
-  },
-  filterChipActive: {
-    backgroundColor: TarodanColors.primaryLight,
-  },
-  filterChipTextActive: {
-    color: TarodanColors.primary,
-    fontWeight: '600',
+    // Chip variant handles bg/fg states
   },
   loading: {
     flex: 1,
@@ -306,10 +297,10 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   paymentCard: {
-    backgroundColor: TarodanColors.background,
+    backgroundColor: colors.surface.DEFAULT,
     marginBottom: 12,
     borderWidth: 1,
-    borderColor: TarodanColors.borderLight,
+    borderColor: colors.border.subtle,
   },
   cardHeader: {
     flexDirection: 'row',
@@ -318,19 +309,19 @@ const styles = StyleSheet.create({
   },
   orderNumber: {
     fontSize: 13,
-    color: TarodanColors.textSecondary,
+    color: colors.text.muted,
     fontWeight: '500',
   },
   productTitle: {
     fontSize: 15,
     fontWeight: '600',
-    color: TarodanColors.textPrimary,
+    color: colors.text.heading,
     marginTop: 2,
   },
   amount: {
     fontSize: 18,
     fontWeight: 'bold',
-    color: TarodanColors.primary,
+    color: colors.primary[600]!,
   },
   metaRow: {
     flexDirection: 'row',
@@ -357,19 +348,19 @@ const styles = StyleSheet.create({
   },
   providerText: {
     fontSize: 12,
-    color: TarodanColors.textSecondary,
+    color: colors.text.muted,
     fontWeight: '500',
   },
   dateText: {
     fontSize: 12,
-    color: TarodanColors.textTertiary,
+    color: colors.text.subtle,
     marginBottom: 8,
   },
   failureBox: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 6,
-    backgroundColor: TarodanColors.errorLight,
+    backgroundColor: colors.danger[50]!,
     padding: 8,
     borderRadius: 6,
     marginBottom: 8,
@@ -377,7 +368,7 @@ const styles = StyleSheet.create({
   failureText: {
     flex: 1,
     fontSize: 12,
-    color: TarodanColors.error,
+    color: colors.danger[600]!,
   },
   actions: {
     flexDirection: 'row',
@@ -395,16 +386,16 @@ const styles = StyleSheet.create({
     borderWidth: 1,
   },
   cancelButton: {
-    borderColor: TarodanColors.error,
-    backgroundColor: TarodanColors.errorLight,
+    borderColor: colors.danger[600]!,
+    backgroundColor: colors.danger[50]!,
   },
   retryButton: {
-    borderColor: TarodanColors.primary,
-    backgroundColor: TarodanColors.primaryLight,
+    borderColor: colors.primary[600]!,
+    backgroundColor: colors.primary[50]!,
   },
   viewButton: {
-    borderColor: TarodanColors.border,
-    backgroundColor: TarodanColors.background,
+    borderColor: colors.border.DEFAULT,
+    backgroundColor: colors.surface.DEFAULT,
   },
   actionLabel: {
     fontSize: 12,

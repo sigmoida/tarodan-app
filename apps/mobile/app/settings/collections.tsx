@@ -1,14 +1,14 @@
 import { View, ScrollView, StyleSheet, TouchableOpacity, Image, RefreshControl } from 'react-native';
-import { FAB, Card, IconButton, ActivityIndicator, Snackbar } from 'react-native-paper';
-import { Text } from '../../src/components/common';
+import { FAB, Snackbar, Spinner, Text, theme } from '@tarodan/ui-native';
 import { router } from 'expo-router';
-import { useQuery, useQueryClient } from '@tanstack/react-query';
+import { useQuery } from '@tanstack/react-query';
 import { useState } from 'react';
 import { Ionicons } from '@expo/vector-icons';
 import { api } from '../../src/services/api';
 import { useAuthStore } from '../../src/stores/authStore';
-import { TarodanColors } from '../../src/theme';
 import { useTranslation } from '../../src/i18n';
+
+const { colors, radius } = theme;
 
 // Mock collections for demo when API fails
 const MOCK_COLLECTIONS = [
@@ -40,7 +40,6 @@ const MOCK_COLLECTIONS = [
 
 export default function CollectionsScreen() {
   const { t } = useTranslation();
-  const queryClient = useQueryClient();
   const { limits, isAuthenticated } = useAuthStore();
   const [refreshing, setRefreshing] = useState(false);
   const [snackbar, setSnackbar] = useState({ visible: false, message: '' });
@@ -83,22 +82,22 @@ export default function CollectionsScreen() {
       {/* Header */}
       <View style={styles.header}>
         <TouchableOpacity onPress={() => router.back()}>
-          <Ionicons name="arrow-back" size={24} color={TarodanColors.textOnPrimary} />
+          <Ionicons name="arrow-back" size={24} color={colors.white} />
         </TouchableOpacity>
         <Text style={styles.headerTitle}>{t('mobile.settingsCollections')}</Text>
         <View style={{ width: 24 }} />
       </View>
 
-      <ScrollView 
-        style={styles.content} 
+      <ScrollView
+        style={styles.content}
         showsVerticalScrollIndicator={false}
         refreshControl={
-          <RefreshControl refreshing={refreshing} onRefresh={onRefresh} colors={[TarodanColors.primary]} />
+          <RefreshControl refreshing={refreshing} onRefresh={onRefresh} colors={[colors.primary[600]!]} />
         }
       >
         {/* Info Banner */}
         <View style={styles.infoBanner}>
-          <Ionicons name="car-sport" size={32} color={TarodanColors.primary} />
+          <Ionicons name="car-sport" size={32} color={colors.primary[600]!} />
           <View style={styles.infoBannerText}>
             <Text style={styles.infoBannerTitle}>Dijital Garaj</Text>
             <Text style={styles.infoBannerDesc}>
@@ -110,20 +109,20 @@ export default function CollectionsScreen() {
         {/* Premium Notice if not premium */}
         {!canCreateCollections && (
           <TouchableOpacity style={styles.premiumNotice} onPress={() => router.push('/upgrade')}>
-            <Ionicons name="diamond" size={24} color={TarodanColors.star} />
+            <Ionicons name="diamond" size={24} color={colors.warning[500]!} />
             <View style={styles.premiumNoticeText}>
               <Text style={styles.premiumNoticeTitle}>Premium Özellik</Text>
               <Text style={styles.premiumNoticeDesc}>
                 Koleksiyon oluşturma özelliği Premium üyelere özeldir.
               </Text>
             </View>
-            <Ionicons name="chevron-forward" size={20} color={TarodanColors.textSecondary} />
+            <Ionicons name="chevron-forward" size={20} color={colors.text.muted} />
           </TouchableOpacity>
         )}
 
         {isLoading ? (
           <View style={styles.loadingContainer}>
-            <ActivityIndicator size="large" color={TarodanColors.primary} />
+            <Spinner size="lg" />
           </View>
         ) : (
           <>
@@ -142,7 +141,7 @@ export default function CollectionsScreen() {
                   <View style={styles.collectionOverlay}>
                     {!collection.isPublic && (
                       <View style={styles.privateBadge}>
-                        <Ionicons name="lock-closed" size={12} color={TarodanColors.textOnPrimary} />
+                        <Ionicons name="lock-closed" size={12} color={colors.white} />
                       </View>
                     )}
                   </View>
@@ -156,7 +155,7 @@ export default function CollectionsScreen() {
               {/* Add New Collection Card */}
               {canCreateCollections && (
                 <TouchableOpacity style={styles.addCollectionCard} onPress={handleCreateCollection}>
-                  <Ionicons name="add-circle-outline" size={40} color={TarodanColors.primary} />
+                  <Ionicons name="add-circle-outline" size={40} color={colors.primary[600]!} />
                   <Text style={styles.addCollectionText}>Yeni Koleksiyon</Text>
                 </TouchableOpacity>
               )}
@@ -165,7 +164,7 @@ export default function CollectionsScreen() {
             {/* Empty State */}
             {collections.length === 0 && (
               <View style={styles.emptyState}>
-                <Ionicons name="albums-outline" size={64} color={TarodanColors.textLight} />
+                <Ionicons name="albums-outline" size={64} color={colors.text.subtle} />
                 <Text style={styles.emptyTitle}>Henüz koleksiyon yok</Text>
                 <Text style={styles.emptyDesc}>
                   İlk koleksiyonunuzu oluşturmak için + butonuna tıklayın
@@ -180,10 +179,10 @@ export default function CollectionsScreen() {
 
       {canCreateCollections && (
         <FAB
-          icon="plus"
+          icon="add"
+          accessibilityLabel="Yeni koleksiyon oluştur"
           style={styles.fab}
           onPress={handleCreateCollection}
-          color={TarodanColors.textOnPrimary}
         />
       )}
 
@@ -201,10 +200,10 @@ export default function CollectionsScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: TarodanColors.backgroundSecondary,
+    backgroundColor: colors.surface.alt,
   },
   header: {
-    backgroundColor: TarodanColors.primary,
+    backgroundColor: colors.primary[600]!,
     paddingTop: 50,
     paddingBottom: 16,
     paddingHorizontal: 20,
@@ -215,21 +214,21 @@ const styles = StyleSheet.create({
   headerTitle: {
     fontSize: 18,
     fontWeight: 'bold',
-    color: TarodanColors.textOnPrimary,
+    color: colors.white,
   },
   content: {
     flex: 1,
     padding: 16,
   },
   infoBanner: {
-    backgroundColor: TarodanColors.background,
+    backgroundColor: colors.surface.DEFAULT,
     borderRadius: 16,
     padding: 20,
     flexDirection: 'row',
     alignItems: 'center',
     marginBottom: 20,
     borderLeftWidth: 4,
-    borderLeftColor: TarodanColors.primary,
+    borderLeftColor: colors.primary[600]!,
   },
   infoBannerText: {
     flex: 1,
@@ -238,11 +237,11 @@ const styles = StyleSheet.create({
   infoBannerTitle: {
     fontSize: 16,
     fontWeight: 'bold',
-    color: TarodanColors.textPrimary,
+    color: colors.text.heading,
   },
   infoBannerDesc: {
     fontSize: 13,
-    color: TarodanColors.textSecondary,
+    color: colors.text.muted,
     marginTop: 4,
   },
   collectionsGrid: {
@@ -252,12 +251,12 @@ const styles = StyleSheet.create({
   },
   collectionCard: {
     width: '48%',
-    backgroundColor: TarodanColors.background,
+    backgroundColor: colors.surface.DEFAULT,
     borderRadius: 12,
     marginBottom: 16,
     overflow: 'hidden',
     elevation: 2,
-    shadowColor: '#000',
+    shadowColor: colors.black,
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.1,
     shadowRadius: 4,
@@ -265,7 +264,7 @@ const styles = StyleSheet.create({
   collectionImage: {
     width: '100%',
     height: 120,
-    backgroundColor: TarodanColors.surfaceVariant,
+    backgroundColor: colors.surface.alt,
   },
   collectionOverlay: {
     position: 'absolute',
@@ -273,7 +272,7 @@ const styles = StyleSheet.create({
     right: 8,
   },
   privateBadge: {
-    backgroundColor: 'rgba(0,0,0,0.6)',
+    backgroundColor: colors.overlay.black50,
     padding: 6,
     borderRadius: 12,
   },
@@ -283,36 +282,35 @@ const styles = StyleSheet.create({
   collectionName: {
     fontSize: 14,
     fontWeight: '600',
-    color: TarodanColors.textPrimary,
+    color: colors.text.heading,
   },
   collectionMeta: {
     fontSize: 12,
-    color: TarodanColors.textSecondary,
+    color: colors.text.muted,
     marginTop: 4,
   },
   addCollectionCard: {
     width: '48%',
     height: 180,
-    backgroundColor: TarodanColors.background,
+    backgroundColor: colors.surface.DEFAULT,
     borderRadius: 12,
     marginBottom: 16,
     alignItems: 'center',
     justifyContent: 'center',
     borderWidth: 2,
-    borderColor: TarodanColors.border,
+    borderColor: colors.border.DEFAULT,
     borderStyle: 'dashed',
   },
   addCollectionText: {
     fontSize: 14,
     fontWeight: '500',
-    color: TarodanColors.primary,
+    color: colors.primary[600]!,
     marginTop: 8,
   },
   fab: {
     position: 'absolute',
     right: 16,
     bottom: 24,
-    backgroundColor: TarodanColors.primary,
   },
   loadingContainer: {
     flex: 1,
@@ -323,12 +321,12 @@ const styles = StyleSheet.create({
   premiumNotice: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: TarodanColors.background,
+    backgroundColor: colors.surface.DEFAULT,
     borderRadius: 12,
     padding: 16,
     marginBottom: 20,
     borderLeftWidth: 4,
-    borderLeftColor: TarodanColors.star,
+    borderLeftColor: colors.warning[500]!,
   },
   premiumNoticeText: {
     flex: 1,
@@ -337,11 +335,11 @@ const styles = StyleSheet.create({
   premiumNoticeTitle: {
     fontSize: 15,
     fontWeight: '600',
-    color: TarodanColors.textPrimary,
+    color: colors.text.heading,
   },
   premiumNoticeDesc: {
     fontSize: 12,
-    color: TarodanColors.textSecondary,
+    color: colors.text.muted,
     marginTop: 2,
   },
   emptyState: {
@@ -352,12 +350,12 @@ const styles = StyleSheet.create({
   emptyTitle: {
     fontSize: 18,
     fontWeight: '600',
-    color: TarodanColors.textPrimary,
+    color: colors.text.heading,
     marginTop: 16,
   },
   emptyDesc: {
     fontSize: 14,
-    color: TarodanColors.textSecondary,
+    color: colors.text.muted,
     marginTop: 8,
     textAlign: 'center',
   },

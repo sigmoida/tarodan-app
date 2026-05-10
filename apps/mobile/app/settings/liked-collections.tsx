@@ -1,14 +1,14 @@
 import { View, ScrollView, StyleSheet, TouchableOpacity, Image, RefreshControl } from 'react-native';
-import { ActivityIndicator, Snackbar } from 'react-native-paper';
-import { Text } from '../../src/components/common';
+import { Spinner, Snackbar, Text, theme } from '@tarodan/ui-native';
 import { useState, useCallback } from 'react';
 import { router, useFocusEffect } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { collectionsApi } from '../../src/services/api';
 import { useAuthStore } from '../../src/stores/authStore';
-import { TarodanColors } from '../../src/theme';
 import { useTranslation } from '../../src/i18n';
+
+const { colors } = theme;
 
 interface LikedCollection {
   id: string;
@@ -38,7 +38,7 @@ export default function LikedCollectionsScreen() {
     queryFn: async () => {
       try {
         const response = await collectionsApi.getLikedCollections();
-        console.log('📚 Liked collections response:', JSON.stringify(response.data).substring(0, 500));
+        console.log('Liked collections response:', JSON.stringify(response.data).substring(0, 500));
         return response.data?.collections || response.data?.data || response.data || [];
       } catch (err) {
         console.error('Failed to fetch liked collections:', err);
@@ -85,13 +85,13 @@ export default function LikedCollectionsScreen() {
       <View style={styles.container}>
         <View style={styles.header}>
           <TouchableOpacity onPress={() => router.back()} style={styles.backButton}>
-            <Ionicons name="arrow-back" size={24} color={TarodanColors.textOnPrimary} />
+            <Ionicons name="arrow-back" size={24} color={colors.white} />
           </TouchableOpacity>
           <Text style={styles.headerTitle}>{t('mobile.settingsLikedCollections')}</Text>
           <View style={{ width: 40 }} />
         </View>
         <View style={styles.emptyContainer}>
-          <Ionicons name="heart-outline" size={64} color={TarodanColors.textLight} />
+          <Ionicons name="heart-outline" size={64} color={colors.text.subtle} />
           <Text style={styles.emptyTitle}>Giriş Yapın</Text>
           <Text style={styles.emptySubtitle}>
             Beğendiğiniz koleksiyonları görmek için giriş yapmanız gerekiyor
@@ -112,7 +112,7 @@ export default function LikedCollectionsScreen() {
       {/* Header */}
       <View style={styles.header}>
         <TouchableOpacity onPress={() => router.back()} style={styles.backButton}>
-          <Ionicons name="arrow-back" size={24} color={TarodanColors.textOnPrimary} />
+          <Ionicons name="arrow-back" size={24} color={colors.white} />
         </TouchableOpacity>
         <Text style={styles.headerTitle}>{t('mobile.settingsLikedCollections')}</Text>
         <View style={{ width: 40 }} />
@@ -120,12 +120,12 @@ export default function LikedCollectionsScreen() {
 
       {isLoading ? (
         <View style={styles.loadingContainer}>
-          <ActivityIndicator size="large" color={TarodanColors.primary} />
+          <Spinner size="lg" />
           <Text style={styles.loadingText}>Yükleniyor...</Text>
         </View>
       ) : error ? (
         <View style={styles.emptyContainer}>
-          <Ionicons name="alert-circle-outline" size={64} color={TarodanColors.error} />
+          <Ionicons name="alert-circle-outline" size={64} color={colors.danger[600]!} />
           <Text style={styles.emptyTitle}>Bir Hata Oluştu</Text>
           <Text style={styles.emptySubtitle}>
             Koleksiyonlar yüklenirken bir hata oluştu. Lütfen tekrar deneyin.
@@ -136,7 +136,7 @@ export default function LikedCollectionsScreen() {
         </View>
       ) : collections.length === 0 ? (
         <View style={styles.emptyContainer}>
-          <Ionicons name="albums-outline" size={64} color={TarodanColors.textLight} />
+          <Ionicons name="albums-outline" size={64} color={colors.text.subtle} />
           <Text style={styles.emptyTitle}>Henüz Beğeni Yok</Text>
           <Text style={styles.emptySubtitle}>
             Beğendiğiniz koleksiyonlar burada görünecek
@@ -171,11 +171,11 @@ export default function LikedCollectionsScreen() {
                 <View style={styles.collectionOverlay}>
                   <View style={styles.collectionStats}>
                     <View style={styles.collectionStat}>
-                      <Ionicons name="images-outline" size={12} color="#fff" />
+                      <Ionicons name="images-outline" size={12} color={colors.white} />
                       <Text style={styles.collectionStatText}>{collection.itemCount || 0}</Text>
                     </View>
                     <View style={styles.collectionStat}>
-                      <Ionicons name="heart" size={12} color="#fff" />
+                      <Ionicons name="heart" size={12} color={colors.white} />
                       <Text style={styles.collectionStatText}>{collection.likeCount || 0}</Text>
                     </View>
                   </View>
@@ -186,7 +186,7 @@ export default function LikedCollectionsScreen() {
                       handleUnlike(collection.id);
                     }}
                   >
-                    <Ionicons name="heart-dislike" size={16} color="#fff" />
+                    <Ionicons name="heart-dislike" size={16} color={colors.white} />
                   </TouchableOpacity>
                 </View>
                 <View style={styles.collectionInfo}>
@@ -220,10 +220,10 @@ export default function LikedCollectionsScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: TarodanColors.backgroundSecondary,
+    backgroundColor: colors.surface.alt,
   },
   header: {
-    backgroundColor: TarodanColors.primary,
+    backgroundColor: colors.primary[600]!,
     paddingTop: 50,
     paddingBottom: 16,
     paddingHorizontal: 16,
@@ -237,7 +237,7 @@ const styles = StyleSheet.create({
   headerTitle: {
     fontSize: 18,
     fontWeight: 'bold',
-    color: TarodanColors.textOnPrimary,
+    color: colors.white,
   },
   scrollView: {
     flex: 1,
@@ -250,7 +250,7 @@ const styles = StyleSheet.create({
   loadingText: {
     marginTop: 12,
     fontSize: 14,
-    color: TarodanColors.textSecondary,
+    color: colors.text.muted,
   },
   emptyContainer: {
     flex: 1,
@@ -261,49 +261,49 @@ const styles = StyleSheet.create({
   emptyTitle: {
     fontSize: 20,
     fontWeight: 'bold',
-    color: TarodanColors.textPrimary,
+    color: colors.text.heading,
     marginTop: 16,
   },
   emptySubtitle: {
     fontSize: 14,
-    color: TarodanColors.textSecondary,
+    color: colors.text.muted,
     textAlign: 'center',
     marginTop: 8,
     lineHeight: 20,
   },
   loginButton: {
     marginTop: 24,
-    backgroundColor: TarodanColors.primary,
+    backgroundColor: colors.primary[600]!,
     paddingHorizontal: 32,
     paddingVertical: 12,
     borderRadius: 8,
   },
   loginButtonText: {
-    color: TarodanColors.textOnPrimary,
+    color: colors.white,
     fontSize: 16,
     fontWeight: '600',
   },
   retryButton: {
     marginTop: 24,
-    backgroundColor: TarodanColors.primary,
+    backgroundColor: colors.primary[600]!,
     paddingHorizontal: 32,
     paddingVertical: 12,
     borderRadius: 8,
   },
   retryButtonText: {
-    color: TarodanColors.textOnPrimary,
+    color: colors.white,
     fontSize: 16,
     fontWeight: '600',
   },
   browseButton: {
     marginTop: 24,
-    backgroundColor: TarodanColors.primary,
+    backgroundColor: colors.primary[600]!,
     paddingHorizontal: 32,
     paddingVertical: 12,
     borderRadius: 8,
   },
   browseButtonText: {
-    color: TarodanColors.textOnPrimary,
+    color: colors.white,
     fontSize: 16,
     fontWeight: '600',
   },
@@ -315,11 +315,11 @@ const styles = StyleSheet.create({
   collectionCard: {
     width: '48%',
     margin: '1%',
-    backgroundColor: TarodanColors.background,
+    backgroundColor: colors.surface.DEFAULT,
     borderRadius: 12,
     overflow: 'hidden',
     elevation: 2,
-    shadowColor: '#000',
+    shadowColor: colors.black,
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.1,
     shadowRadius: 4,
@@ -327,7 +327,7 @@ const styles = StyleSheet.create({
   collectionImage: {
     width: '100%',
     height: 120,
-    backgroundColor: TarodanColors.surfaceVariant,
+    backgroundColor: colors.gray[100],
   },
   collectionOverlay: {
     position: 'absolute',
@@ -342,7 +342,7 @@ const styles = StyleSheet.create({
   },
   collectionStats: {
     flexDirection: 'row',
-    backgroundColor: 'rgba(0,0,0,0.5)',
+    backgroundColor: colors.overlay.black50,
     borderRadius: 12,
     paddingHorizontal: 8,
     paddingVertical: 4,
@@ -354,11 +354,11 @@ const styles = StyleSheet.create({
   },
   collectionStatText: {
     fontSize: 11,
-    color: '#fff',
+    color: colors.white,
     marginLeft: 4,
   },
   unlikeButton: {
-    backgroundColor: 'rgba(0,0,0,0.5)',
+    backgroundColor: colors.overlay.black50,
     borderRadius: 16,
     padding: 6,
   },
@@ -368,11 +368,11 @@ const styles = StyleSheet.create({
   collectionName: {
     fontSize: 14,
     fontWeight: '600',
-    color: TarodanColors.textPrimary,
+    color: colors.text.heading,
   },
   ownerName: {
     fontSize: 12,
-    color: TarodanColors.textSecondary,
+    color: colors.text.muted,
     marginTop: 4,
   },
 });
