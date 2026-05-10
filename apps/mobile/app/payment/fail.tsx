@@ -1,12 +1,12 @@
 import React, { useEffect, useState } from 'react';
 import { View, StyleSheet, ScrollView } from 'react-native';
-import { Button, ActivityIndicator } from 'react-native-paper';
-import { Text } from '../../src/components/common';
+import { Button, Spinner, Text, theme } from '@tarodan/ui-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { router, useLocalSearchParams } from 'expo-router';
 import { paymentsApi } from '../../src/services/api';
-import { TarodanColors } from '../../src/theme';
+
+const { colors } = theme;
 
 interface PaymentInfo {
   id: string;
@@ -66,18 +66,20 @@ export default function PaymentFailScreen() {
     <SafeAreaView style={styles.container}>
       <ScrollView contentContainerStyle={styles.scrollBody}>
         <View style={styles.iconWrap}>
-          <Ionicons name="close-circle" size={96} color={TarodanColors.error} />
+          <Ionicons name="close-circle" size={96} color={colors.danger[600]!} />
         </View>
 
         <Text style={styles.title}>Ödeme Başarısız</Text>
         <Text style={styles.subtitle}>{reason}</Text>
 
         {loading ? (
-          <ActivityIndicator style={{ marginTop: 24 }} color={TarodanColors.primary} />
+          <View style={{ marginTop: 24 }}>
+            <Spinner size="md" />
+          </View>
         ) : null}
 
         <View style={styles.hintCard}>
-          <Ionicons name="information-circle-outline" size={18} color={TarodanColors.info} />
+          <Ionicons name="information-circle-outline" size={18} color={colors.info[600]!} />
           <Text style={styles.hintText}>
             Hesabınızdan bir tahsilat yapılmadı. Tekrar deneyebilir veya farklı bir ödeme yöntemi seçebilirsiniz.
           </Text>
@@ -85,33 +87,26 @@ export default function PaymentFailScreen() {
 
         <View style={styles.actions}>
           <Button
-            mode="contained"
-            buttonColor={TarodanColors.primary}
-            icon="refresh"
+            variant="primary"
+            title="Tekrar Dene"
             onPress={handleRetry}
-            loading={retrying}
+            isLoading={retrying}
             disabled={retrying || !paymentId}
             style={styles.btn}
-          >
-            Tekrar Dene
-          </Button>
+          />
           {orderId && guest !== '1' ? (
             <Button
-              mode="outlined"
-              textColor={TarodanColors.primary}
+              variant="outline"
+              title="Sipariş Detayına Git"
               onPress={() => router.replace(`/orders/${orderId}` as any)}
-              style={[styles.btn, { borderColor: TarodanColors.primary }]}
-            >
-              Sipariş Detayına Git
-            </Button>
+              style={styles.btn}
+            />
           ) : null}
           <Button
-            mode="text"
-            textColor={TarodanColors.textSecondary}
+            variant="ghost"
+            title="Ana Sayfaya Dön"
             onPress={() => router.replace('/')}
-          >
-            Ana Sayfaya Dön
-          </Button>
+          />
         </View>
       </ScrollView>
     </SafeAreaView>
@@ -121,7 +116,7 @@ export default function PaymentFailScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: TarodanColors.background,
+    backgroundColor: colors.surface.DEFAULT,
   },
   scrollBody: {
     flexGrow: 1,
@@ -136,12 +131,12 @@ const styles = StyleSheet.create({
   title: {
     fontSize: 26,
     fontWeight: '800',
-    color: TarodanColors.textPrimary,
+    color: colors.text.heading,
     textAlign: 'center',
   },
   subtitle: {
     fontSize: 14,
-    color: TarodanColors.textSecondary,
+    color: colors.text.muted,
     textAlign: 'center',
     lineHeight: 20,
   },
@@ -150,7 +145,7 @@ const styles = StyleSheet.create({
     gap: 8,
     alignItems: 'flex-start',
     width: '100%',
-    backgroundColor: TarodanColors.infoLight,
+    backgroundColor: colors.info[50]!,
     borderRadius: 10,
     padding: 12,
     marginTop: 16,
@@ -158,7 +153,7 @@ const styles = StyleSheet.create({
   hintText: {
     flex: 1,
     fontSize: 13,
-    color: TarodanColors.info,
+    color: colors.info[600]!,
     lineHeight: 18,
   },
   actions: {

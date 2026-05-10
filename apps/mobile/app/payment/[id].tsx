@@ -1,14 +1,15 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { View, StyleSheet, ActivityIndicator, Alert, BackHandler } from 'react-native';
-import { Button } from 'react-native-paper';
+import { View, StyleSheet, Alert, BackHandler } from 'react-native';
+import { Button, Spinner, Text, theme } from '@tarodan/ui-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { router, useFocusEffect, useLocalSearchParams } from 'expo-router';
 import { WebView, WebViewNavigation } from 'react-native-webview';
 import { paymentsApi } from '../../src/services/api';
-import { TarodanColors } from '../../src/theme';
-import { ScreenHeader, ErrorState, Text } from '../../src/components/common';
+import { ScreenHeader, ErrorState } from '../../src/components/common';
 import { captureException } from '../../src/services/sentry';
+
+const { colors } = theme;
 
 /**
  * Ödeme WebView ekranı.
@@ -197,7 +198,7 @@ export default function PaymentWebViewScreen() {
       />
 
       <View style={styles.safeNotice}>
-        <Ionicons name="lock-closed" size={14} color={TarodanColors.success} />
+        <Ionicons name="lock-closed" size={14} color={colors.success[600]!} />
         <Text style={styles.safeNoticeText}>
           Bu sayfa SSL şifrelemeyle korunmaktadır. Kart bilgileriniz Tarodan'a iletilmez.
         </Text>
@@ -205,15 +206,13 @@ export default function PaymentWebViewScreen() {
 
       {state.loading ? (
         <View style={styles.center}>
-          <ActivityIndicator size="large" color={TarodanColors.primary} />
+          <Spinner size="lg" />
           <Text style={styles.loadingText}>Ödeme sayfası hazırlanıyor...</Text>
         </View>
       ) : state.error ? (
         <View style={styles.errorWrap}>
           <ErrorState message={state.error} onRetry={initiatePayment} />
-          <Button mode="text" onPress={() => router.back()} textColor={TarodanColors.textSecondary}>
-            Geri Dön
-          </Button>
+          <Button variant="ghost" title="Geri Dön" onPress={() => router.back()} />
         </View>
       ) : state.html ? (
         <WebView
@@ -224,7 +223,7 @@ export default function PaymentWebViewScreen() {
           startInLoadingState
           renderLoading={() => (
             <View style={styles.center}>
-              <ActivityIndicator size="large" color={TarodanColors.primary} />
+              <Spinner size="lg" />
             </View>
           )}
           javaScriptEnabled
@@ -240,7 +239,7 @@ export default function PaymentWebViewScreen() {
           startInLoadingState
           renderLoading={() => (
             <View style={styles.center}>
-              <ActivityIndicator size="large" color={TarodanColors.primary} />
+              <Spinner size="lg" />
             </View>
           )}
           javaScriptEnabled
@@ -256,7 +255,7 @@ export default function PaymentWebViewScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: TarodanColors.background,
+    backgroundColor: colors.surface.DEFAULT,
   },
   safeNotice: {
     flexDirection: 'row',
@@ -264,12 +263,12 @@ const styles = StyleSheet.create({
     gap: 6,
     paddingHorizontal: 16,
     paddingVertical: 8,
-    backgroundColor: TarodanColors.successLight,
+    backgroundColor: colors.success[50]!,
   },
   safeNoticeText: {
     flex: 1,
     fontSize: 12,
-    color: TarodanColors.success,
+    color: colors.success[600]!,
   },
   center: {
     flex: 1,
@@ -279,7 +278,7 @@ const styles = StyleSheet.create({
   },
   loadingText: {
     marginTop: 12,
-    color: TarodanColors.textSecondary,
+    color: colors.text.muted,
   },
   errorWrap: {
     flex: 1,

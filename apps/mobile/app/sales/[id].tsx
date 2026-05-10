@@ -1,15 +1,23 @@
 import React from 'react';
-import { View, StyleSheet, ScrollView, Image, Alert, Linking, TouchableOpacity } from 'react-native';
-import { Button, Divider } from 'react-native-paper';
+import { View, StyleSheet, ScrollView, Image, Alert, Linking, Pressable } from 'react-native';
+import {
+  Button,
+  Divider,
+  ScreenLoader,
+  ErrorState,
+  Text,
+  theme,
+} from '@tarodan/ui-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 import { router, useLocalSearchParams } from 'expo-router';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { ordersApi } from '../../src/services/api';
-import { TarodanColors } from '../../src/theme';
-import { ScreenHeader, ScreenLoader, ErrorState, Text } from '../../src/components/common';
+import { ScreenHeader } from '../../src/components/common';
 import { formatPrice, formatOrderStatus, formatRelativeDate } from '../../src/utils/format';
 import { transformImageUrl } from '../../src/utils/imageUrl';
+
+const { colors } = theme;
 
 interface Order {
   id: string;
@@ -54,14 +62,14 @@ interface Order {
 }
 
 function statusColor(status: string): { bg: string; fg: string } {
-  if (['paid', 'preparing'].includes(status)) return { bg: TarodanColors.warningLight, fg: TarodanColors.warning };
+  if (['paid', 'preparing'].includes(status)) return { bg: colors.warning[50]!, fg: colors.warning[600]! };
   if (['shipped', 'in_transit', 'out_for_delivery'].includes(status))
-    return { bg: TarodanColors.infoLight, fg: TarodanColors.info };
+    return { bg: colors.info[50]!, fg: colors.info[600]! };
   if (['delivered', 'completed'].includes(status))
-    return { bg: TarodanColors.successLight, fg: TarodanColors.success };
+    return { bg: colors.success[50]!, fg: colors.success[600]! };
   if (['cancelled', 'refunded'].includes(status))
-    return { bg: TarodanColors.errorLight, fg: TarodanColors.error };
-  return { bg: TarodanColors.surfaceVariant, fg: TarodanColors.textSecondary };
+    return { bg: colors.danger[50]!, fg: colors.danger[600]! };
+  return { bg: colors.surface.alt, fg: colors.text.muted };
 }
 
 export default function SaleDetailScreen() {
@@ -159,11 +167,10 @@ export default function SaleDetailScreen() {
         <View style={styles.card}>
           <Text style={styles.sectionTitle}>Ürünler</Text>
           {(order.items || []).map(item => (
-            <TouchableOpacity
+            <Pressable
               key={item.id}
-              style={styles.itemRow}
+              style={({ pressed }) => [styles.itemRow, { opacity: pressed ? 0.85 : 1 }]}
               onPress={() => router.push(`/product/${item.productId}`)}
-              activeOpacity={0.85}
             >
               <Image source={{ uri: transformImageUrl(item.imageUrl) }} style={styles.itemImg} />
               <View style={{ flex: 1 }}>
@@ -171,7 +178,7 @@ export default function SaleDetailScreen() {
                 <Text style={styles.itemMeta}>Adet: {item.quantity}</Text>
                 <Text style={styles.itemPrice}>{formatPrice(item.price * item.quantity)}</Text>
               </View>
-            </TouchableOpacity>
+            </Pressable>
           ))}
         </View>
 
@@ -180,20 +187,20 @@ export default function SaleDetailScreen() {
           <View style={styles.card}>
             <Text style={styles.sectionTitle}>Alıcı</Text>
             <View style={styles.kvRow}>
-              <Ionicons name="person-outline" size={16} color={TarodanColors.textSecondary} />
+              <Ionicons name="person-outline" size={16} color={colors.text.muted} />
               <Text style={styles.kvValue}>{order.buyer.displayName}</Text>
             </View>
             {order.buyer.phone ? (
-              <TouchableOpacity style={styles.kvRow} onPress={handleCall}>
-                <Ionicons name="call-outline" size={16} color={TarodanColors.textSecondary} />
-                <Text style={[styles.kvValue, { color: TarodanColors.primary }]}>
+              <Pressable style={styles.kvRow} onPress={handleCall}>
+                <Ionicons name="call-outline" size={16} color={colors.text.muted} />
+                <Text style={[styles.kvValue, { color: colors.primary[600]! }]}>
                   {order.buyer.phone}
                 </Text>
-              </TouchableOpacity>
+              </Pressable>
             ) : null}
             {order.buyer.email ? (
               <View style={styles.kvRow}>
-                <Ionicons name="mail-outline" size={16} color={TarodanColors.textSecondary} />
+                <Ionicons name="mail-outline" size={16} color={colors.text.muted} />
                 <Text style={styles.kvValue}>{order.buyer.email}</Text>
               </View>
             ) : null}
@@ -220,20 +227,20 @@ export default function SaleDetailScreen() {
           {shipmentTracking ? (
             <>
               <View style={styles.kvRow}>
-                <MaterialCommunityIcons name="truck-fast-outline" size={18} color={TarodanColors.primary} />
+                <MaterialCommunityIcons name="truck-fast-outline" size={18} color={colors.primary[600]!} />
                 <Text style={styles.kvValue}>
                   {isSurat ? 'Sürat Kargo' : (shipmentProvider || 'Sürat Kargo')}
                 </Text>
               </View>
               <View style={styles.kvRow}>
-                <Ionicons name="barcode-outline" size={18} color={TarodanColors.textSecondary} />
+                <Ionicons name="barcode-outline" size={18} color={colors.text.muted} />
                 <Text testID="sales-tracking-number" selectable style={[styles.kvValue, { fontWeight: '700' }]}>
                   {shipmentTracking}
                 </Text>
               </View>
               {order.shipment?.status ? (
                 <View style={styles.kvRow}>
-                  <Ionicons name="pulse-outline" size={18} color={TarodanColors.textSecondary} />
+                  <Ionicons name="pulse-outline" size={18} color={colors.text.muted} />
                   <Text testID="sales-shipment-status" style={styles.kvValue}>{order.shipment.status}</Text>
                 </View>
               ) : null}
@@ -242,13 +249,12 @@ export default function SaleDetailScreen() {
               </Text>
               <Button
                 testID="sales-track-link"
-                mode="outlined"
-                icon="truck"
+                variant="outline"
+                icon="cube"
+                title="Sürat'ta Takip Et"
                 onPress={handleTrack}
                 style={{ marginTop: 8 }}
-              >
-                Sürat'ta Takip Et
-              </Button>
+              />
             </>
           ) : (
             <Text style={styles.helperText}>
@@ -275,7 +281,7 @@ export default function SaleDetailScreen() {
           {order.commission ? (
             <View style={styles.kvRow}>
               <Text style={styles.kvLabel}>Komisyon</Text>
-              <Text style={[styles.kvValue, { color: TarodanColors.error }]}>
+              <Text style={[styles.kvValue, { color: colors.danger[600]! }]}>
                 - {formatPrice(order.commission)}
               </Text>
             </View>
@@ -285,7 +291,7 @@ export default function SaleDetailScreen() {
             <Text style={[styles.kvLabel, { fontWeight: '700' }]}>
               {order.netAmount ? 'Net Kazanç' : 'Toplam'}
             </Text>
-            <Text style={[styles.kvValue, { fontSize: 18, fontWeight: '800', color: TarodanColors.primary }]}>
+            <Text style={[styles.kvValue, { fontSize: 18, fontWeight: '800', color: colors.primary[600]! }]}>
               {formatPrice(order.netAmount ?? order.totalAmount ?? 0)}
             </Text>
           </View>
@@ -294,9 +300,9 @@ export default function SaleDetailScreen() {
         {/* Actions */}
         {canCancel ? (
           <Button
-            mode="outlined"
-            textColor={TarodanColors.error}
+            variant="outline"
             icon="close-circle-outline"
+            title="Siparişi İptal Et"
             onPress={() =>
               Alert.alert(
                 'Siparişi İptal Et',
@@ -311,11 +317,9 @@ export default function SaleDetailScreen() {
                 ],
               )
             }
-            style={[styles.actionBtn, { borderColor: TarodanColors.error }]}
-            loading={cancelMutation.isPending}
-          >
-            Siparişi İptal Et
-          </Button>
+            style={{ ...styles.actionBtn, borderColor: colors.danger[600]! }}
+            isLoading={cancelMutation.isPending}
+          />
         ) : null}
       </ScrollView>
     </SafeAreaView>
@@ -325,7 +329,7 @@ export default function SaleDetailScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: TarodanColors.backgroundSecondary,
+    backgroundColor: colors.surface.alt,
   },
   scrollBody: {
     padding: 16,
@@ -348,16 +352,16 @@ const styles = StyleSheet.create({
     marginTop: 2,
   },
   card: {
-    backgroundColor: TarodanColors.background,
+    backgroundColor: colors.surface.DEFAULT,
     borderRadius: 12,
     padding: 14,
     borderWidth: StyleSheet.hairlineWidth,
-    borderColor: TarodanColors.border,
+    borderColor: colors.border.DEFAULT,
   },
   sectionTitle: {
     fontSize: 14,
     fontWeight: '700',
-    color: TarodanColors.textPrimary,
+    color: colors.text.heading,
     marginBottom: 10,
   },
   itemRow: {
@@ -370,22 +374,22 @@ const styles = StyleSheet.create({
     width: 56,
     height: 56,
     borderRadius: 8,
-    backgroundColor: TarodanColors.surfaceVariant,
+    backgroundColor: colors.surface.alt,
   },
   itemTitle: {
     fontSize: 14,
     fontWeight: '600',
-    color: TarodanColors.textPrimary,
+    color: colors.text.heading,
   },
   itemMeta: {
     fontSize: 12,
-    color: TarodanColors.textSecondary,
+    color: colors.text.muted,
     marginTop: 2,
   },
   itemPrice: {
     fontSize: 14,
     fontWeight: '700',
-    color: TarodanColors.primary,
+    color: colors.primary[600]!,
     marginTop: 2,
   },
   kvRow: {
@@ -397,27 +401,27 @@ const styles = StyleSheet.create({
   },
   kvLabel: {
     fontSize: 13,
-    color: TarodanColors.textSecondary,
+    color: colors.text.muted,
   },
   kvValue: {
     flex: 1,
     fontSize: 13,
-    color: TarodanColors.textPrimary,
+    color: colors.text.heading,
   },
   addressName: {
     fontSize: 14,
     fontWeight: '700',
-    color: TarodanColors.textPrimary,
+    color: colors.text.heading,
     marginBottom: 4,
   },
   addressLine: {
     fontSize: 13,
-    color: TarodanColors.textSecondary,
+    color: colors.text.muted,
     lineHeight: 18,
   },
   helperText: {
     fontSize: 12,
-    color: TarodanColors.textSecondary,
+    color: colors.text.muted,
     marginTop: 6,
     lineHeight: 17,
   },

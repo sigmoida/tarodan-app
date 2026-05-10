@@ -11,22 +11,22 @@ import {
 } from 'react-native';
 import {
   Button,
-  RadioButton,
   Divider,
-  ActivityIndicator,
   Snackbar,
+  Spinner,
   Switch,
-} from 'react-native-paper';
-import {
   Text,
-  TextInput,
+  Input,
+  Radio,
+  theme,
+} from '@tarodan/ui-native';
+import {
   CityDistrictSelector,
   ScreenHeader,
 } from '../../src/components/common';
 import { router } from 'expo-router';
 import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 import { useQuery } from '@tanstack/react-query';
-import { TarodanColors } from '../../src/theme';
 import { useCartStore } from '../../src/stores/cartStore';
 import { captureException } from '../../src/services/sentry';
 import {
@@ -40,6 +40,8 @@ import {
 import { transformImageUrl } from '../../src/utils/imageUrl';
 import { useAuthStore } from '../../src/stores/authStore';
 import { formatPrice, asLabel } from '../../src/utils/format';
+
+const { colors } = theme;
 
 interface ShippingAddressInput {
   fullName: string;
@@ -604,17 +606,15 @@ export default function CheckoutScreen() {
   if (items.length === 0) {
     return (
       <View style={styles.emptyContainer}>
-        <Ionicons name="cart-outline" size={80} color={TarodanColors.textSecondary} />
+        <Ionicons name="cart-outline" size={80} color={colors.text.muted} />
         <Text style={styles.emptyTitle}>Sepetiniz Boş</Text>
         <Text style={styles.emptySubtitle}>Ödeme yapabilmek için sepetinize ürün ekleyin</Text>
         <Button
-          mode="contained"
-          buttonColor={TarodanColors.primary}
+          variant="primary"
+          title="Alışverişe Başla"
           onPress={() => router.replace('/' as any)}
           style={{ marginTop: 20 }}
-        >
-          Alışverişe Başla
-        </Button>
+        />
       </View>
     );
   }
@@ -641,11 +641,9 @@ export default function CheckoutScreen() {
                 ]}
                 onPress={() => setSelectedId(a.id)}
               >
-                <RadioButton
-                  value={a.id}
-                  status={selectedId === a.id ? 'checked' : 'unchecked'}
-                  onPress={() => setSelectedId(a.id)}
-                  color={TarodanColors.primary}
+                <Radio
+                  checked={selectedId === a.id}
+                  onChange={() => setSelectedId(a.id)}
                 />
                 <View style={{ flex: 1 }}>
                   <View style={{ flexDirection: 'row', alignItems: 'center' }}>
@@ -667,14 +665,12 @@ export default function CheckoutScreen() {
               style={[styles.savedAddressRow, selectedId === 'new' && styles.savedAddressRowActive]}
               onPress={() => setSelectedId('new')}
             >
-              <RadioButton
-                value="new"
-                status={selectedId === 'new' ? 'checked' : 'unchecked'}
-                onPress={() => setSelectedId('new')}
-                color={TarodanColors.primary}
+              <Radio
+                checked={selectedId === 'new'}
+                onChange={() => setSelectedId('new')}
               />
               <View style={{ flex: 1, flexDirection: 'row', alignItems: 'center' }}>
-                <Ionicons name="add-circle-outline" size={18} color={TarodanColors.primary} />
+                <Ionicons name="add-circle-outline" size={18} color={colors.primary[600]!} />
                 <Text style={[styles.addressTitle, { marginLeft: 8 }]}>Yeni Adres Ekle</Text>
               </View>
             </TouchableOpacity>
@@ -684,25 +680,19 @@ export default function CheckoutScreen() {
         {/* Yeni adres formu (konuk veya üye + 'new' seçildi) */}
         {selectedId === 'new' ? (
           <View>
-            <TextInput
+            <Input
               label="Ad Soyad *"
               value={inline.fullName}
               onChangeText={(text: string) => setInline({ ...inline, fullName: text })}
-              mode="outlined"
-              style={styles.input}
-              outlineColor={TarodanColors.border}
-              activeOutlineColor={TarodanColors.primary}
+              containerStyle={styles.input}
             />
-            <TextInput
+            <Input
               label="Telefon *"
               value={inline.phone}
               onChangeText={(text: string) => setInline({ ...inline, phone: text })}
-              mode="outlined"
               keyboardType="phone-pad"
               placeholder="+90 5XX XXX XX XX"
-              style={styles.input}
-              outlineColor={TarodanColors.border}
-              activeOutlineColor={TarodanColors.primary}
+              containerStyle={styles.input}
             />
             <CityDistrictSelector
               city={inline.city}
@@ -710,27 +700,21 @@ export default function CheckoutScreen() {
               onChangeCity={(city) => setInline({ ...inline, city })}
               onChangeDistrict={(district) => setInline({ ...inline, district })}
             />
-            <TextInput
+            <Input
               label="Açık Adres *"
               value={inline.address}
               onChangeText={(text: string) => setInline({ ...inline, address: text })}
-              mode="outlined"
               multiline
               numberOfLines={3}
-              style={styles.input}
-              outlineColor={TarodanColors.border}
-              activeOutlineColor={TarodanColors.primary}
+              containerStyle={styles.input}
             />
-            <TextInput
+            <Input
               label="Posta Kodu"
               value={inline.zipCode || ''}
               onChangeText={(text: string) => setInline({ ...inline, zipCode: text })}
-              mode="outlined"
               keyboardType="number-pad"
               maxLength={5}
-              style={styles.input}
-              outlineColor={TarodanColors.border}
-              activeOutlineColor={TarodanColors.primary}
+              containerStyle={styles.input}
             />
           </View>
         ) : null}
@@ -756,7 +740,7 @@ export default function CheckoutScreen() {
           <View key={s} style={styles.progressStep}>
             <View style={[styles.progressCircle, step >= s && styles.progressCircleActive]}>
               {step > s ? (
-                <Ionicons name="checkmark" size={16} color="#fff" />
+                <Ionicons name="checkmark" size={16} color={colors.white} />
               ) : (
                 <Text style={[styles.progressNumber, step >= s && styles.progressNumberActive]}>
                   {s}
@@ -781,50 +765,41 @@ export default function CheckoutScreen() {
             {!isAuthenticated ? (
               <View style={styles.section}>
                 <View style={styles.sectionHeader}>
-                  <Ionicons name="person-outline" size={24} color={TarodanColors.primary} />
+                  <Ionicons name="person-outline" size={24} color={colors.primary[600]!} />
                   <Text style={styles.sectionTitle}>İletişim Bilgileri</Text>
                 </View>
                 <View style={styles.guestNotice}>
                   <Ionicons
                     name="information-circle-outline"
                     size={20}
-                    color={TarodanColors.warning}
+                    color={colors.warning[600]!}
                   />
                   <Text style={styles.guestNoticeText}>
                     Üye olmadan alışveriş yapıyorsunuz. Siparişinizi takip etmek için e-posta
                     adresinizi girin.
                   </Text>
                 </View>
-                <TextInput
+                <Input
                   label="Ad Soyad *"
                   value={guestName}
                   onChangeText={setGuestName}
-                  mode="outlined"
-                  style={styles.input}
-                  outlineColor={TarodanColors.border}
-                  activeOutlineColor={TarodanColors.primary}
+                  containerStyle={styles.input}
                 />
-                <TextInput
+                <Input
                   label="E-posta *"
                   value={guestEmail}
                   onChangeText={setGuestEmail}
-                  mode="outlined"
                   keyboardType="email-address"
                   autoCapitalize="none"
-                  style={styles.input}
-                  outlineColor={TarodanColors.border}
-                  activeOutlineColor={TarodanColors.primary}
+                  containerStyle={styles.input}
                 />
-                <TextInput
+                <Input
                   label="Telefon *"
                   value={guestPhone}
                   onChangeText={setGuestPhone}
-                  mode="outlined"
                   keyboardType="phone-pad"
                   placeholder="+90 5XX XXX XX XX"
-                  style={styles.input}
-                  outlineColor={TarodanColors.border}
-                  activeOutlineColor={TarodanColors.primary}
+                  containerStyle={styles.input}
                 />
                 <TouchableOpacity
                   style={styles.loginLink}
@@ -838,7 +813,7 @@ export default function CheckoutScreen() {
             {/* Teslimat Adresi */}
             <View style={styles.section}>
               <View style={styles.sectionHeader}>
-                <Ionicons name="location-outline" size={24} color={TarodanColors.primary} />
+                <Ionicons name="location-outline" size={24} color={colors.primary[600]!} />
                 <Text style={styles.sectionTitle}>Teslimat Adresi</Text>
               </View>
               {renderAddressSelector(false)}
@@ -848,13 +823,12 @@ export default function CheckoutScreen() {
             <View style={styles.section}>
               <View style={[styles.sectionHeader, { justifyContent: 'space-between' }]}>
                 <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-                  <Ionicons name="receipt-outline" size={24} color={TarodanColors.primary} />
+                  <Ionicons name="receipt-outline" size={24} color={colors.primary[600]!} />
                   <Text style={styles.sectionTitle}>Fatura Adresi</Text>
                 </View>
                 <Switch
                   value={billingDifferent}
                   onValueChange={setBillingDifferent}
-                  color={TarodanColors.primary}
                 />
               </View>
               {billingDifferent ? (
@@ -874,7 +848,7 @@ export default function CheckoutScreen() {
             {/* Kargo Seçimi */}
             <View style={styles.section}>
               <View style={styles.sectionHeader}>
-                <Ionicons name="car-outline" size={24} color={TarodanColors.primary} />
+                <Ionicons name="car-outline" size={24} color={colors.primary[600]!} />
                 <Text style={styles.sectionTitle}>Kargo Seçimi</Text>
               </View>
 
@@ -887,11 +861,9 @@ export default function CheckoutScreen() {
                   ]}
                   onPress={() => setSelectedCarrier(c)}
                 >
-                  <RadioButton
-                    value={c}
-                    status={selectedCarrier === c ? 'checked' : 'unchecked'}
-                    onPress={() => setSelectedCarrier(c)}
-                    color={TarodanColors.primary}
+                  <Radio
+                    checked={selectedCarrier === c}
+                    onChange={() => setSelectedCarrier(c)}
                   />
                   <View style={styles.optionContent}>
                     <Text style={styles.optionTitle}>
@@ -900,7 +872,7 @@ export default function CheckoutScreen() {
                     <Text style={styles.optionDescription}>2-4 iş günü teslimat</Text>
                   </View>
                   {shippingLoading ? (
-                    <ActivityIndicator size="small" color={TarodanColors.primary} />
+                    <Spinner size="sm" />
                   ) : (
                     <Text style={styles.optionPrice}>{formatPrice(shippingCost)}</Text>
                   )}
@@ -911,7 +883,7 @@ export default function CheckoutScreen() {
             {/* Ödeme Yöntemi */}
             <View style={styles.section}>
               <View style={styles.sectionHeader}>
-                <Ionicons name="card-outline" size={24} color={TarodanColors.primary} />
+                <Ionicons name="card-outline" size={24} color={colors.primary[600]!} />
                 <Text style={styles.sectionTitle}>Ödeme Yöntemi</Text>
               </View>
 
@@ -927,18 +899,14 @@ export default function CheckoutScreen() {
                       ]}
                       onPress={() => setSelectedCardToken(card.cardToken)}
                     >
-                      <RadioButton
-                        value={card.cardToken}
-                        status={
-                          selectedCardToken === card.cardToken ? 'checked' : 'unchecked'
-                        }
-                        onPress={() => setSelectedCardToken(card.cardToken)}
-                        color={TarodanColors.primary}
+                      <Radio
+                        checked={selectedCardToken === card.cardToken}
+                        onChange={() => setSelectedCardToken(card.cardToken)}
                       />
                       <MaterialCommunityIcons
                         name="credit-card"
                         size={22}
-                        color={TarodanColors.primary}
+                        color={colors.primary[600]!}
                         style={{ marginRight: 6 }}
                       />
                       <View style={styles.optionContent}>
@@ -961,16 +929,14 @@ export default function CheckoutScreen() {
                     ]}
                     onPress={() => setSelectedCardToken('new')}
                   >
-                    <RadioButton
-                      value="new"
-                      status={selectedCardToken === 'new' ? 'checked' : 'unchecked'}
-                      onPress={() => setSelectedCardToken('new')}
-                      color={TarodanColors.primary}
+                    <Radio
+                      checked={selectedCardToken === 'new'}
+                      onChange={() => setSelectedCardToken('new')}
                     />
                     <MaterialCommunityIcons
                       name="credit-card-plus"
                       size={22}
-                      color={TarodanColors.primary}
+                      color={colors.primary[600]!}
                       style={{ marginRight: 6 }}
                     />
                     <View style={styles.optionContent}>
@@ -987,16 +953,14 @@ export default function CheckoutScreen() {
                     ]}
                     onPress={() => setSelectedCardToken('webview')}
                   >
-                    <RadioButton
-                      value="webview"
-                      status={selectedCardToken === 'webview' ? 'checked' : 'unchecked'}
-                      onPress={() => setSelectedCardToken('webview')}
-                      color={TarodanColors.primary}
+                    <Radio
+                      checked={selectedCardToken === 'webview'}
+                      onChange={() => setSelectedCardToken('webview')}
                     />
                     <MaterialCommunityIcons
                       name="shield-key-outline"
                       size={22}
-                      color={TarodanColors.primary}
+                      color={colors.primary[600]!}
                       style={{ marginRight: 6 }}
                     />
                     <View style={styles.optionContent}>
@@ -1012,19 +976,15 @@ export default function CheckoutScreen() {
               {/* Üye + kart yok ya da yeni kart formu seçili */}
               {isAuthenticated && selectedCardToken === 'new' ? (
                 <View>
-                  <TextInput
-                    mode="outlined"
+                  <Input
                     label="Kart Sahibi *"
                     value={cardForm.cardHolderName}
                     onChangeText={(v: string) =>
                       setCardForm({ ...cardForm, cardHolderName: v })
                     }
-                    style={styles.input}
-                    outlineColor={TarodanColors.border}
-                    activeOutlineColor={TarodanColors.primary}
+                    containerStyle={styles.input}
                   />
-                  <TextInput
-                    mode="outlined"
+                  <Input
                     label="Kart Numarası *"
                     value={cardForm.cardNumber}
                     onChangeText={(v: string) =>
@@ -1032,13 +992,10 @@ export default function CheckoutScreen() {
                     }
                     keyboardType="number-pad"
                     maxLength={19}
-                    style={styles.input}
-                    outlineColor={TarodanColors.border}
-                    activeOutlineColor={TarodanColors.primary}
+                    containerStyle={styles.input}
                   />
                   <View style={{ flexDirection: 'row', gap: 8 }}>
-                    <TextInput
-                      mode="outlined"
+                    <Input
                       label="Ay *"
                       value={cardForm.expireMonth}
                       onChangeText={(v: string) =>
@@ -1046,12 +1003,9 @@ export default function CheckoutScreen() {
                       }
                       keyboardType="number-pad"
                       maxLength={2}
-                      style={[styles.input, { flex: 1 }]}
-                      outlineColor={TarodanColors.border}
-                      activeOutlineColor={TarodanColors.primary}
+                      containerStyle={{ ...styles.input, flex: 1 }}
                     />
-                    <TextInput
-                      mode="outlined"
+                    <Input
                       label="Yıl *"
                       value={cardForm.expireYear}
                       onChangeText={(v: string) =>
@@ -1059,12 +1013,9 @@ export default function CheckoutScreen() {
                       }
                       keyboardType="number-pad"
                       maxLength={4}
-                      style={[styles.input, { flex: 1 }]}
-                      outlineColor={TarodanColors.border}
-                      activeOutlineColor={TarodanColors.primary}
+                      containerStyle={{ ...styles.input, flex: 1 }}
                     />
-                    <TextInput
-                      mode="outlined"
+                    <Input
                       label="CVC *"
                       value={cardForm.cvc}
                       onChangeText={(v: string) =>
@@ -1073,25 +1024,19 @@ export default function CheckoutScreen() {
                       keyboardType="number-pad"
                       maxLength={4}
                       secureTextEntry
-                      style={[styles.input, { flex: 1 }]}
-                      outlineColor={TarodanColors.border}
-                      activeOutlineColor={TarodanColors.primary}
+                      containerStyle={{ ...styles.input, flex: 1 }}
                     />
                   </View>
-                  <TextInput
-                    mode="outlined"
+                  <Input
                     label="Kart Takma Adı (opsiyonel)"
                     value={cardForm.cardAlias}
                     onChangeText={(v: string) => setCardForm({ ...cardForm, cardAlias: v })}
-                    style={styles.input}
-                    outlineColor={TarodanColors.border}
-                    activeOutlineColor={TarodanColors.primary}
+                    containerStyle={styles.input}
                   />
                   <View style={styles.saveCardRow}>
                     <Switch
                       value={cardForm.saveCard}
                       onValueChange={(v: boolean) => setCardForm({ ...cardForm, saveCard: v })}
-                      color={TarodanColors.primary}
                     />
                     <Text style={styles.saveCardLabel}>Bu kartı sonraki alışverişler için kaydet</Text>
                   </View>
@@ -1128,46 +1073,39 @@ export default function CheckoutScreen() {
             {/* Kupon */}
             <View style={styles.section}>
               <View style={styles.sectionHeader}>
-                <Ionicons name="pricetag-outline" size={22} color={TarodanColors.primary} />
+                <Ionicons name="pricetag-outline" size={22} color={colors.primary[600]!} />
                 <Text style={styles.sectionTitle}>İndirim Kuponu</Text>
               </View>
               {appliedDiscount ? (
                 <View style={styles.appliedCoupon}>
-                  <Ionicons name="checkmark-circle" size={18} color={TarodanColors.success} />
+                  <Ionicons name="checkmark-circle" size={18} color={colors.success[600]!} />
                   <View style={{ flex: 1, marginLeft: 8 }}>
                     <Text style={styles.optionTitle}>
                       {appliedDiscount.code} · -{formatPrice(appliedDiscount.amount)}
                     </Text>
                   </View>
                   <Button
-                    mode="text"
+                    variant="ghost"
+                    title="Kaldır"
                     onPress={() => setAppliedDiscount(null)}
-                    textColor={TarodanColors.error}
-                  >
-                    Kaldır
-                  </Button>
+                  />
                 </View>
               ) : (
                 <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
-                  <TextInput
-                    mode="outlined"
+                  <Input
                     placeholder="Kupon kodu"
                     value={couponCode}
                     onChangeText={(v: string) => setCouponCode(v.toUpperCase())}
                     autoCapitalize="characters"
-                    style={[styles.input, { flex: 1, marginBottom: 0 }]}
-                    outlineColor={TarodanColors.border}
-                    activeOutlineColor={TarodanColors.primary}
+                    containerStyle={{ ...styles.input, flex: 1, marginBottom: 0 }}
                   />
                   <Button
-                    mode="contained"
-                    buttonColor={TarodanColors.primary}
+                    variant="primary"
+                    title="Uygula"
                     onPress={handleApplyCoupon}
-                    loading={couponLoading}
+                    isLoading={couponLoading}
                     disabled={!couponCode.trim() || couponLoading}
-                  >
-                    Uygula
-                  </Button>
+                  />
                 </View>
               )}
             </View>
@@ -1178,7 +1116,7 @@ export default function CheckoutScreen() {
         {step === 3 ? (
           <View style={styles.section}>
             <View style={styles.sectionHeader}>
-              <Ionicons name="receipt-outline" size={24} color={TarodanColors.primary} />
+              <Ionicons name="receipt-outline" size={24} color={colors.primary[600]!} />
               <Text style={styles.sectionTitle}>Sipariş Özeti</Text>
             </View>
 
@@ -1205,7 +1143,7 @@ export default function CheckoutScreen() {
             <Divider style={{ marginVertical: 12 }} />
 
             <View style={styles.securityNotice}>
-              <Ionicons name="shield-checkmark" size={20} color={TarodanColors.success} />
+              <Ionicons name="shield-checkmark" size={20} color={colors.success[600]!} />
               <View style={styles.securityContent}>
                 <Text style={styles.securityTitle}>Güvenli Alışveriş</Text>
                 <Text style={styles.securityText}>
@@ -1241,7 +1179,7 @@ export default function CheckoutScreen() {
           {appliedDiscount ? (
             <View style={styles.orderSummaryRow}>
               <Text style={styles.orderSummaryLabel}>Kupon ({appliedDiscount.code})</Text>
-              <Text style={[styles.orderSummaryValue, { color: TarodanColors.success }]}>
+              <Text style={[styles.orderSummaryValue, { color: colors.success[600]! }]}>
                 -{formatPrice(appliedDiscount.amount)}
               </Text>
             </View>
@@ -1260,27 +1198,21 @@ export default function CheckoutScreen() {
       <View style={styles.bottomBar}>
         {step < 3 ? (
           <Button
-            mode="contained"
-            buttonColor={TarodanColors.primary}
+            variant="primary"
+            title="Devam Et"
             onPress={handleNextStep}
             style={styles.actionButton}
-            contentStyle={styles.actionButtonContent}
-          >
-            Devam Et
-          </Button>
+          />
         ) : (
           <Button
-            mode="contained"
-            buttonColor={TarodanColors.primary}
+            variant="primary"
+            title={loading ? 'İşleniyor...' : `Onayla ve Öde (${formatPrice(total)})`}
             onPress={handleCheckout}
-            loading={loading}
+            isLoading={loading}
             disabled={loading}
             style={styles.actionButton}
-            contentStyle={styles.actionButtonContent}
-            icon="credit-card-check"
-          >
-            {loading ? 'İşleniyor...' : `Onayla ve Öde (${formatPrice(total)})`}
-          </Button>
+            icon="card-outline"
+          />
         )}
       </View>
 
@@ -1288,7 +1220,7 @@ export default function CheckoutScreen() {
         visible={snackbar.visible}
         onDismiss={() => setSnackbar({ visible: false, message: '' })}
         duration={3000}
-        style={{ backgroundColor: TarodanColors.error }}
+        variant="danger"
       >
         {snackbar.message}
       </Snackbar>
@@ -1299,14 +1231,14 @@ export default function CheckoutScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: TarodanColors.backgroundSecondary,
+    backgroundColor: colors.surface.alt,
   },
   progressContainer: {
     flexDirection: 'row',
     justifyContent: 'center',
     alignItems: 'center',
     paddingVertical: 20,
-    backgroundColor: TarodanColors.background,
+    backgroundColor: colors.surface.DEFAULT,
   },
   progressStep: {
     flexDirection: 'row',
@@ -1316,45 +1248,45 @@ const styles = StyleSheet.create({
     width: 32,
     height: 32,
     borderRadius: 16,
-    backgroundColor: TarodanColors.border,
+    backgroundColor: colors.border.DEFAULT,
     justifyContent: 'center',
     alignItems: 'center',
   },
   progressCircleActive: {
-    backgroundColor: TarodanColors.primary,
+    backgroundColor: colors.primary[600]!,
   },
   progressNumber: {
     fontSize: 14,
     fontWeight: 'bold',
-    color: TarodanColors.textSecondary,
+    color: colors.text.muted,
   },
   progressNumberActive: {
-    color: TarodanColors.textOnPrimary,
+    color: colors.white,
   },
   progressLabel: {
     fontSize: 12,
-    color: TarodanColors.textSecondary,
+    color: colors.text.muted,
     marginLeft: 8,
   },
   progressLabelActive: {
-    color: TarodanColors.primary,
+    color: colors.primary[600]!,
     fontWeight: '600',
   },
   progressLine: {
     width: 30,
     height: 2,
-    backgroundColor: TarodanColors.border,
+    backgroundColor: colors.border.DEFAULT,
     marginHorizontal: 8,
   },
   progressLineActive: {
-    backgroundColor: TarodanColors.primary,
+    backgroundColor: colors.primary[600]!,
   },
   content: {
     flex: 1,
     padding: 16,
   },
   section: {
-    backgroundColor: TarodanColors.background,
+    backgroundColor: colors.surface.DEFAULT,
     borderRadius: 12,
     padding: 16,
     marginBottom: 16,
@@ -1367,12 +1299,12 @@ const styles = StyleSheet.create({
   sectionTitle: {
     fontSize: 18,
     fontWeight: 'bold',
-    color: TarodanColors.textPrimary,
+    color: colors.text.heading,
     marginLeft: 12,
   },
   guestNotice: {
     flexDirection: 'row',
-    backgroundColor: TarodanColors.warningLight,
+    backgroundColor: colors.warning[50]!,
     padding: 12,
     borderRadius: 8,
     marginBottom: 16,
@@ -1380,37 +1312,37 @@ const styles = StyleSheet.create({
   guestNoticeText: {
     flex: 1,
     fontSize: 13,
-    color: TarodanColors.warning,
+    color: colors.warning[600]!,
     marginLeft: 8,
   },
   input: {
     marginBottom: 12,
-    backgroundColor: TarodanColors.background,
+    backgroundColor: colors.surface.DEFAULT,
   },
   helperText: {
     fontSize: 13,
-    color: TarodanColors.textSecondary,
+    color: colors.text.muted,
   },
   loginLink: {
     marginTop: 8,
   },
   loginLinkText: {
-    color: TarodanColors.primary,
+    color: colors.primary[600]!,
     fontSize: 14,
   },
   optionCard: {
     flexDirection: 'row',
     alignItems: 'center',
     padding: 12,
-    backgroundColor: TarodanColors.surfaceVariant,
+    backgroundColor: colors.surface.alt,
     borderRadius: 12,
     marginBottom: 10,
     borderWidth: 2,
     borderColor: 'transparent',
   },
   optionCardActive: {
-    borderColor: TarodanColors.primary,
-    backgroundColor: TarodanColors.primaryLight,
+    borderColor: colors.primary[600]!,
+    backgroundColor: colors.primary[50]!,
   },
   optionContent: {
     flex: 1,
@@ -1419,22 +1351,22 @@ const styles = StyleSheet.create({
   optionTitle: {
     fontSize: 15,
     fontWeight: '600',
-    color: TarodanColors.textPrimary,
+    color: colors.text.heading,
   },
   optionDescription: {
     fontSize: 12,
-    color: TarodanColors.textSecondary,
+    color: colors.text.muted,
     marginTop: 2,
   },
   optionPrice: {
     fontSize: 15,
     fontWeight: 'bold',
-    color: TarodanColors.primary,
+    color: colors.primary[600]!,
   },
   savedAddressRow: {
     flexDirection: 'row',
     alignItems: 'flex-start',
-    backgroundColor: TarodanColors.surfaceVariant,
+    backgroundColor: colors.surface.alt,
     borderRadius: 12,
     padding: 12,
     marginBottom: 8,
@@ -1442,22 +1374,22 @@ const styles = StyleSheet.create({
     borderColor: 'transparent',
   },
   savedAddressRowActive: {
-    borderColor: TarodanColors.primary,
-    backgroundColor: TarodanColors.primaryLight,
+    borderColor: colors.primary[600]!,
+    backgroundColor: colors.primary[50]!,
   },
   addressTitle: {
     fontSize: 14,
     fontWeight: '700',
-    color: TarodanColors.textPrimary,
+    color: colors.text.heading,
   },
   addressLine: {
     fontSize: 12,
-    color: TarodanColors.textSecondary,
+    color: colors.text.muted,
     marginTop: 2,
   },
   defaultBadge: {
     fontSize: 11,
-    color: TarodanColors.success,
+    color: colors.success[600]!,
     fontWeight: '600',
   },
   saveCardRow: {
@@ -1468,7 +1400,7 @@ const styles = StyleSheet.create({
   },
   saveCardLabel: {
     fontSize: 13,
-    color: TarodanColors.textPrimary,
+    color: colors.text.heading,
     flex: 1,
   },
   providerChip: {
@@ -1476,24 +1408,24 @@ const styles = StyleSheet.create({
     paddingVertical: 8,
     borderRadius: 999,
     borderWidth: 1,
-    borderColor: TarodanColors.border,
+    borderColor: colors.border.DEFAULT,
   },
   providerChipActive: {
-    backgroundColor: TarodanColors.primary,
-    borderColor: TarodanColors.primary,
+    backgroundColor: colors.primary[600]!,
+    borderColor: colors.primary[600]!,
   },
   providerChipText: {
     fontSize: 13,
-    color: TarodanColors.textPrimary,
+    color: colors.text.heading,
     fontWeight: '600',
   },
   providerChipTextActive: {
-    color: TarodanColors.textOnPrimary,
+    color: colors.white,
   },
   appliedCoupon: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: TarodanColors.successLight,
+    backgroundColor: colors.success[50]!,
     padding: 12,
     borderRadius: 10,
   },
@@ -1506,7 +1438,7 @@ const styles = StyleSheet.create({
     width: 60,
     height: 60,
     borderRadius: 8,
-    backgroundColor: TarodanColors.surfaceVariant,
+    backgroundColor: colors.surface.alt,
   },
   orderItemInfo: {
     flex: 1,
@@ -1515,21 +1447,21 @@ const styles = StyleSheet.create({
   orderItemTitle: {
     fontSize: 14,
     fontWeight: '500',
-    color: TarodanColors.textPrimary,
+    color: colors.text.heading,
   },
   orderItemMeta: {
     fontSize: 12,
-    color: TarodanColors.textSecondary,
+    color: colors.text.muted,
     marginTop: 2,
   },
   orderItemPrice: {
     fontSize: 16,
     fontWeight: 'bold',
-    color: TarodanColors.primary,
+    color: colors.primary[600]!,
   },
   securityNotice: {
     flexDirection: 'row',
-    backgroundColor: TarodanColors.successLight,
+    backgroundColor: colors.success[50]!,
     padding: 16,
     borderRadius: 12,
   },
@@ -1540,22 +1472,22 @@ const styles = StyleSheet.create({
   securityTitle: {
     fontSize: 14,
     fontWeight: 'bold',
-    color: TarodanColors.success,
+    color: colors.success[600]!,
   },
   securityText: {
     fontSize: 13,
-    color: TarodanColors.success,
+    color: colors.success[600]!,
     marginTop: 4,
   },
   orderSummary: {
-    backgroundColor: TarodanColors.background,
+    backgroundColor: colors.surface.DEFAULT,
     borderRadius: 12,
     padding: 16,
   },
   orderSummaryTitle: {
     fontSize: 16,
     fontWeight: 'bold',
-    color: TarodanColors.textPrimary,
+    color: colors.text.heading,
     marginBottom: 16,
   },
   orderSummaryRow: {
@@ -1565,50 +1497,47 @@ const styles = StyleSheet.create({
   },
   orderSummaryLabel: {
     fontSize: 14,
-    color: TarodanColors.textSecondary,
+    color: colors.text.muted,
   },
   orderSummaryValue: {
     fontSize: 14,
-    color: TarodanColors.textPrimary,
+    color: colors.text.heading,
   },
   orderTotalLabel: {
     fontSize: 16,
     fontWeight: 'bold',
-    color: TarodanColors.textPrimary,
+    color: colors.text.heading,
   },
   orderTotalValue: {
     fontSize: 20,
     fontWeight: 'bold',
-    color: TarodanColors.primary,
+    color: colors.primary[600]!,
   },
   bottomBar: {
-    backgroundColor: TarodanColors.background,
+    backgroundColor: colors.surface.DEFAULT,
     padding: 16,
     borderTopWidth: 1,
-    borderTopColor: TarodanColors.border,
+    borderTopColor: colors.border.DEFAULT,
   },
   actionButton: {
     borderRadius: 12,
-  },
-  actionButtonContent: {
-    paddingVertical: 8,
   },
   emptyContainer: {
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
-    backgroundColor: TarodanColors.backgroundSecondary,
+    backgroundColor: colors.surface.alt,
     padding: 20,
   },
   emptyTitle: {
     fontSize: 20,
     fontWeight: 'bold',
-    color: TarodanColors.textPrimary,
+    color: colors.text.heading,
     marginTop: 16,
   },
   emptySubtitle: {
     fontSize: 14,
-    color: TarodanColors.textSecondary,
+    color: colors.text.muted,
     textAlign: 'center',
     marginTop: 8,
   },

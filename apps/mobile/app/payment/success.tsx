@@ -1,13 +1,13 @@
 import React, { useEffect, useState } from 'react';
 import { View, StyleSheet, ScrollView } from 'react-native';
-import { Button, ActivityIndicator } from 'react-native-paper';
-import { Text } from '../../src/components/common';
+import { Button, Spinner, Text, theme } from '@tarodan/ui-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { router, useLocalSearchParams } from 'expo-router';
 import { paymentsApi } from '../../src/services/api';
-import { TarodanColors } from '../../src/theme';
 import { formatPrice } from '../../src/utils/format';
+
+const { colors } = theme;
 
 interface PaymentInfo {
   id: string;
@@ -47,7 +47,7 @@ export default function PaymentSuccessScreen() {
     <SafeAreaView style={styles.container}>
       <ScrollView contentContainerStyle={styles.scrollBody}>
         <View style={styles.iconWrap}>
-          <Ionicons name="checkmark-circle" size={96} color={TarodanColors.success} />
+          <Ionicons name="checkmark-circle" size={96} color={colors.success[600]!} />
         </View>
 
         <Text style={styles.title}>Ödemeniz Başarılı!</Text>
@@ -56,7 +56,9 @@ export default function PaymentSuccessScreen() {
         </Text>
 
         {loading ? (
-          <ActivityIndicator style={{ marginTop: 24 }} color={TarodanColors.primary} />
+          <View style={{ marginTop: 24 }}>
+            <Spinner size="md" />
+          </View>
         ) : info ? (
           <View style={styles.summaryCard}>
             {info.order?.orderNumber ? (
@@ -68,7 +70,7 @@ export default function PaymentSuccessScreen() {
             {info.amount ? (
               <View style={styles.summaryRow}>
                 <Text style={styles.summaryLabel}>Tutar</Text>
-                <Text style={[styles.summaryValue, { color: TarodanColors.primary, fontSize: 18 }]}>
+                <Text style={[styles.summaryValue, { color: colors.primary[600]!, fontSize: 18 }]}>
                   {formatPrice(info.amount)}
                 </Text>
               </View>
@@ -76,7 +78,7 @@ export default function PaymentSuccessScreen() {
             {info.status ? (
               <View style={styles.summaryRow}>
                 <Text style={styles.summaryLabel}>Durum</Text>
-                <Text style={[styles.summaryValue, { color: TarodanColors.success }]}>
+                <Text style={[styles.summaryValue, { color: colors.success[600]! }]}>
                   {info.status === 'paid' ? 'Ödendi' : info.status}
                 </Text>
               </View>
@@ -87,23 +89,18 @@ export default function PaymentSuccessScreen() {
         <View style={styles.actions}>
           {orderId && guest !== '1' ? (
             <Button
-              mode="contained"
-              buttonColor={TarodanColors.primary}
-              icon="receipt"
+              variant="primary"
+              title="Siparişimi Gör"
               onPress={() => router.replace(`/orders/${orderId}` as any)}
               style={styles.btn}
-            >
-              Siparişimi Gör
-            </Button>
+            />
           ) : null}
           <Button
-            mode="outlined"
-            textColor={TarodanColors.primary}
+            variant="outline"
+            title="Ana Sayfaya Dön"
             onPress={() => router.replace('/')}
-            style={[styles.btn, { borderColor: TarodanColors.primary }]}
-          >
-            Ana Sayfaya Dön
-          </Button>
+            style={styles.btn}
+          />
         </View>
       </ScrollView>
     </SafeAreaView>
@@ -113,7 +110,7 @@ export default function PaymentSuccessScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: TarodanColors.background,
+    backgroundColor: colors.surface.DEFAULT,
   },
   scrollBody: {
     flexGrow: 1,
@@ -128,21 +125,21 @@ const styles = StyleSheet.create({
   title: {
     fontSize: 26,
     fontWeight: '800',
-    color: TarodanColors.textPrimary,
+    color: colors.text.heading,
     textAlign: 'center',
   },
   subtitle: {
     fontSize: 14,
-    color: TarodanColors.textSecondary,
+    color: colors.text.muted,
     textAlign: 'center',
     lineHeight: 20,
   },
   summaryCard: {
     width: '100%',
-    backgroundColor: TarodanColors.background,
+    backgroundColor: colors.surface.DEFAULT,
     borderRadius: 12,
     borderWidth: StyleSheet.hairlineWidth,
-    borderColor: TarodanColors.border,
+    borderColor: colors.border.DEFAULT,
     padding: 16,
     marginTop: 16,
     gap: 10,
@@ -154,12 +151,12 @@ const styles = StyleSheet.create({
   },
   summaryLabel: {
     fontSize: 13,
-    color: TarodanColors.textSecondary,
+    color: colors.text.muted,
   },
   summaryValue: {
     fontSize: 14,
     fontWeight: '700',
-    color: TarodanColors.textPrimary,
+    color: colors.text.heading,
   },
   actions: {
     width: '100%',
