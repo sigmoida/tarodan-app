@@ -1,9 +1,10 @@
 import { View, ScrollView, StyleSheet, TouchableOpacity } from 'react-native';
-import { Text } from 'react-native-paper';
 import { router } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
-import { TarodanColors } from '../src/theme';
+import { theme, Text } from '@tarodan/ui-native';
 import { useTranslation } from '../src/i18n';
+
+const { colors } = theme;
 
 const FEATURES = [
   {
@@ -64,7 +65,7 @@ export default function SecurityFeaturesScreen() {
     <View style={styles.container}>
       <View style={styles.header}>
         <TouchableOpacity onPress={() => router.back()}>
-          <Ionicons name="arrow-back" size={24} color={TarodanColors.textOnPrimary} />
+          <Ionicons name="arrow-back" size={24} color={colors.white} />
         </TouchableOpacity>
         <Text style={styles.headerTitle}>{t('mobile.pageSecurityFeatures')}</Text>
         <View style={{ width: 24 }} />
@@ -72,7 +73,7 @@ export default function SecurityFeaturesScreen() {
 
       <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
         <View style={styles.intro}>
-          <Ionicons name="shield-checkmark" size={48} color={TarodanColors.primary} />
+          <Ionicons name="shield-checkmark" size={48} color={colors.primary[600]!} />
           <Text style={styles.introTitle}>Güvenliğiniz Bizim Önceliğimiz</Text>
           <Text style={styles.introText}>
             Tarodan'da alışveriş ve takas güvenliği en üst düzeyde sağlanır. Aşağıda platformumuzun sunduğu güvenlik özelliklerini inceleyebilirsiniz.
@@ -82,7 +83,7 @@ export default function SecurityFeaturesScreen() {
         {FEATURES.map((feature, index) => (
           <View key={index} style={styles.featureCard}>
             <View style={styles.featureIcon}>
-              <Ionicons name={feature.icon} size={28} color={TarodanColors.primary} />
+              <Ionicons name={feature.icon} size={28} color={colors.primary[600]!} />
             </View>
             <View style={styles.featureContent}>
               <Text style={styles.featureTitle}>{feature.title}</Text>
@@ -107,10 +108,10 @@ export default function SecurityFeaturesScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: TarodanColors.background,
+    backgroundColor: colors.surface.DEFAULT,
   },
   header: {
-    backgroundColor: TarodanColors.primary,
+    backgroundColor: colors.primary[600]!,
     paddingTop: 50,
     paddingBottom: 16,
     paddingHorizontal: 20,
@@ -121,7 +122,7 @@ const styles = StyleSheet.create({
   headerTitle: {
     fontSize: 18,
     fontWeight: 'bold',
-    color: TarodanColors.textOnPrimary,
+    color: colors.white,
   },
   content: {
     flex: 1,
@@ -135,19 +136,19 @@ const styles = StyleSheet.create({
   introTitle: {
     fontSize: 20,
     fontWeight: 'bold',
-    color: TarodanColors.textPrimary,
+    color: colors.text.heading,
     marginTop: 12,
     marginBottom: 8,
   },
   introText: {
     fontSize: 14,
-    color: TarodanColors.textSecondary,
+    color: colors.text.muted,
     lineHeight: 22,
     textAlign: 'center',
   },
   featureCard: {
     flexDirection: 'row',
-    backgroundColor: TarodanColors.backgroundSecondary,
+    backgroundColor: colors.surface.alt,
     borderRadius: 12,
     padding: 16,
     marginBottom: 12,
@@ -156,7 +157,7 @@ const styles = StyleSheet.create({
     width: 48,
     height: 48,
     borderRadius: 24,
-    backgroundColor: TarodanColors.primaryLight,
+    backgroundColor: colors.primary[50]!,
     justifyContent: 'center',
     alignItems: 'center',
     marginRight: 14,
@@ -167,30 +168,30 @@ const styles = StyleSheet.create({
   featureTitle: {
     fontSize: 15,
     fontWeight: '600',
-    color: TarodanColors.textPrimary,
+    color: colors.text.heading,
     marginBottom: 4,
   },
   featureDesc: {
     fontSize: 13,
-    color: TarodanColors.textSecondary,
+    color: colors.text.muted,
     lineHeight: 20,
   },
   footer: {
     marginTop: 16,
     padding: 16,
-    backgroundColor: TarodanColors.backgroundSecondary,
+    backgroundColor: colors.surface.alt,
     borderRadius: 12,
     alignItems: 'center',
   },
   footerText: {
     fontSize: 14,
-    color: TarodanColors.textSecondary,
+    color: colors.text.muted,
     textAlign: 'center',
     marginBottom: 8,
   },
   contactInfo: {
     fontSize: 14,
-    color: TarodanColors.primary,
+    color: colors.primary[600]!,
     fontWeight: '600',
   },
 });

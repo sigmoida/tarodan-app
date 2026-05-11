@@ -1,9 +1,10 @@
 import { View, ScrollView, StyleSheet, TouchableOpacity } from 'react-native';
-import { Text } from 'react-native-paper';
 import { router } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
-import { TarodanColors } from '../src/theme';
+import { theme, Text } from '@tarodan/ui-native';
 import { useTranslation } from '../src/i18n';
+
+const { colors } = theme;
 
 const STEPS = [
   {
@@ -44,7 +45,7 @@ export default function GuvenliTakasScreen() {
     <View style={styles.container}>
       <View style={styles.header}>
         <TouchableOpacity onPress={() => router.back()}>
-          <Ionicons name="arrow-back" size={24} color={TarodanColors.textOnPrimary} />
+          <Ionicons name="arrow-back" size={24} color={colors.white} />
         </TouchableOpacity>
         <Text style={styles.headerTitle}>{t('mobile.pageSafeTrade')}</Text>
         <View style={{ width: 24 }} />
@@ -52,7 +53,7 @@ export default function GuvenliTakasScreen() {
 
       <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
         <View style={styles.hero}>
-          <Ionicons name="swap-horizontal" size={56} color={TarodanColors.primary} />
+          <Ionicons name="swap-horizontal" size={56} color={colors.primary[600]!} />
           <Text style={styles.heroTitle}>Güvenli Takas Sistemi</Text>
           <Text style={styles.heroText}>
             Koleksiyonunuzu büyütmenin en kolay yolu. Platform güvencesi altında diğer koleksiyonerlerle model araçlarınızı takas edin.
@@ -70,7 +71,7 @@ export default function GuvenliTakasScreen() {
             </View>
             <View style={styles.stepContent}>
               <View style={styles.stepIconRow}>
-                <Ionicons name={step.icon} size={20} color={TarodanColors.primary} />
+                <Ionicons name={step.icon} size={20} color={colors.primary[600]!} />
                 <Text style={styles.stepTitle}>{step.title}</Text>
               </View>
               <Text style={styles.stepDesc}>{step.description}</Text>
@@ -81,23 +82,23 @@ export default function GuvenliTakasScreen() {
         <Text style={styles.sectionTitle}>Güvenlik Garantileri</Text>
         <View style={styles.guaranteeCard}>
           <View style={styles.guaranteeRow}>
-            <Ionicons name="checkmark-circle" size={20} color={TarodanColors.accent} />
+            <Ionicons name="checkmark-circle" size={20} color={colors.warning[500]!} />
             <Text style={styles.guaranteeText}>Her iki tarafın ürünleri platform garantisi altındadır</Text>
           </View>
           <View style={styles.guaranteeRow}>
-            <Ionicons name="checkmark-circle" size={20} color={TarodanColors.accent} />
+            <Ionicons name="checkmark-circle" size={20} color={colors.warning[500]!} />
             <Text style={styles.guaranteeText}>Nakit fark ödemeleri güvenli emanet hesapta tutulur</Text>
           </View>
           <View style={styles.guaranteeRow}>
-            <Ionicons name="checkmark-circle" size={20} color={TarodanColors.accent} />
+            <Ionicons name="checkmark-circle" size={20} color={colors.warning[500]!} />
             <Text style={styles.guaranteeText}>Anlaşmazlık durumunda platform arabuluculuk yapar</Text>
           </View>
           <View style={styles.guaranteeRow}>
-            <Ionicons name="checkmark-circle" size={20} color={TarodanColors.accent} />
+            <Ionicons name="checkmark-circle" size={20} color={colors.warning[500]!} />
             <Text style={styles.guaranteeText}>Ürün açıklamaya uymuyorsa takas iptal edilebilir</Text>
           </View>
           <View style={styles.guaranteeRow}>
-            <Ionicons name="checkmark-circle" size={20} color={TarodanColors.accent} />
+            <Ionicons name="checkmark-circle" size={20} color={colors.warning[500]!} />
             <Text style={styles.guaranteeText}>Kargo takibi her iki taraf için de platformda görüntülenir</Text>
           </View>
         </View>
@@ -117,7 +118,7 @@ export default function GuvenliTakasScreen() {
           onPress={() => router.push('/(tabs)/trades')}
           activeOpacity={0.8}
         >
-          <Ionicons name="swap-horizontal" size={20} color={TarodanColors.textOnPrimary} />
+          <Ionicons name="swap-horizontal" size={20} color={colors.white} />
           <Text style={styles.ctaText}>Takas Tekliflerini Keşfet</Text>
         </TouchableOpacity>
 
@@ -130,10 +131,10 @@ export default function GuvenliTakasScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: TarodanColors.background,
+    backgroundColor: colors.surface.DEFAULT,
   },
   header: {
-    backgroundColor: TarodanColors.primary,
+    backgroundColor: colors.primary[600]!,
     paddingTop: 50,
     paddingBottom: 16,
     paddingHorizontal: 20,
@@ -144,7 +145,7 @@ const styles = StyleSheet.create({
   headerTitle: {
     fontSize: 18,
     fontWeight: 'bold',
-    color: TarodanColors.textOnPrimary,
+    color: colors.white,
   },
   content: {
     flex: 1,
@@ -158,12 +159,12 @@ const styles = StyleSheet.create({
   heroTitle: {
     fontSize: 22,
     fontWeight: 'bold',
-    color: TarodanColors.textPrimary,
+    color: colors.text.heading,
     marginTop: 12,
   },
   heroText: {
     fontSize: 14,
-    color: TarodanColors.textSecondary,
+    color: colors.text.muted,
     lineHeight: 22,
     textAlign: 'center',
     marginTop: 8,
@@ -172,7 +173,7 @@ const styles = StyleSheet.create({
   sectionTitle: {
     fontSize: 18,
     fontWeight: 'bold',
-    color: TarodanColors.textPrimary,
+    color: colors.text.heading,
     marginTop: 24,
     marginBottom: 16,
   },
@@ -189,19 +190,19 @@ const styles = StyleSheet.create({
     width: 28,
     height: 28,
     borderRadius: 14,
-    backgroundColor: TarodanColors.primary,
+    backgroundColor: colors.primary[600]!,
     justifyContent: 'center',
     alignItems: 'center',
   },
   stepNumber: {
     fontSize: 13,
     fontWeight: 'bold',
-    color: TarodanColors.textOnPrimary,
+    color: colors.white,
   },
   stepLine: {
     width: 2,
     flex: 1,
-    backgroundColor: TarodanColors.primaryMedium,
+    backgroundColor: colors.primary[200]!,
     marginVertical: 4,
   },
   stepContent: {
@@ -217,15 +218,15 @@ const styles = StyleSheet.create({
   stepTitle: {
     fontSize: 15,
     fontWeight: '600',
-    color: TarodanColors.textPrimary,
+    color: colors.text.heading,
   },
   stepDesc: {
     fontSize: 13,
-    color: TarodanColors.textSecondary,
+    color: colors.text.muted,
     lineHeight: 20,
   },
   guaranteeCard: {
-    backgroundColor: TarodanColors.accentLight,
+    backgroundColor: colors.warning[50]!,
     borderRadius: 12,
     padding: 16,
     gap: 12,
@@ -238,12 +239,12 @@ const styles = StyleSheet.create({
   guaranteeText: {
     flex: 1,
     fontSize: 13,
-    color: TarodanColors.textSecondary,
+    color: colors.text.muted,
     lineHeight: 20,
   },
   paragraph: {
     fontSize: 14,
-    color: TarodanColors.textSecondary,
+    color: colors.text.muted,
     lineHeight: 22,
     marginBottom: 12,
   },
@@ -251,7 +252,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: TarodanColors.primary,
+    backgroundColor: colors.primary[600]!,
     paddingVertical: 14,
     borderRadius: 12,
     marginTop: 24,
@@ -260,6 +261,6 @@ const styles = StyleSheet.create({
   ctaText: {
     fontSize: 15,
     fontWeight: '600',
-    color: TarodanColors.textOnPrimary,
+    color: colors.white,
   },
 });

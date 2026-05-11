@@ -19,37 +19,10 @@
  * Migrasyonla birlikte bu listeden çıkar. Yeni dosya EKLEME.
  */
 const MIGRATION_OVERRIDES = [
-  // tabs/* artık tamamen migrate edildi — override list'te yok
-  'app/_layout.tsx',
-  'app/about.tsx',
-  'app/buyer-protection.tsx',
-  'app/contact.tsx',
-  'app/cookies.tsx',
-  'app/distance-sales.tsx',
-  'app/faq.tsx',
-  'app/favorites.tsx',
-  'app/following.tsx',
-  'app/guides.tsx',
-  'app/guvenli-takas.tsx',
-  'app/help.tsx',
-  'app/intellectual-property.tsx',
-  'app/listings.tsx',
-  'app/maintenance.tsx',
+  // tabs/* ve info pages migrate edildi — kalan: membership/newsletter/offers/index
   'app/membership/**/*.{ts,tsx}',
   'app/newsletter/**/*.{ts,tsx}',
   'app/offers/index.tsx',
-  'app/order-track.tsx',
-  'app/payment-options.tsx',
-  'app/pricing.tsx',
-  'app/refund-policy.tsx',
-  'app/returns-exchanges.tsx',
-  'app/security-features.tsx',
-  'app/seller-agreement.tsx',
-  'app/shipping-delivery.tsx',
-  'app/size-guide.tsx',
-  'app/statistics.tsx',
-  'app/support.tsx',
-  'app/upgrade.tsx',
   // Domain components — internal Paper usage, refactor sonra
   'src/components/FeaturedListingsModal.tsx',
   'src/components/PremiumBadge.tsx',

@@ -1,9 +1,10 @@
 import { View, ScrollView, StyleSheet, TouchableOpacity } from 'react-native';
-import { Text } from 'react-native-paper';
 import { router } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
-import { TarodanColors } from '../src/theme';
+import { theme, Text } from '@tarodan/ui-native';
 import { useTranslation } from '../src/i18n';
+
+const { colors } = theme;
 
 const SCALES = [
   {
@@ -86,7 +87,7 @@ export default function SizeGuideScreen() {
     <View style={styles.container}>
       <View style={styles.header}>
         <TouchableOpacity onPress={() => router.back()}>
-          <Ionicons name="arrow-back" size={24} color={TarodanColors.textOnPrimary} />
+          <Ionicons name="arrow-back" size={24} color={colors.white} />
         </TouchableOpacity>
         <Text style={styles.headerTitle}>{t('mobile.pageSizeGuide')}</Text>
         <View style={{ width: 24 }} />
@@ -110,11 +111,11 @@ export default function SizeGuideScreen() {
               </View>
               <View style={styles.scaleSpecs}>
                 <View style={styles.specRow}>
-                  <Ionicons name="resize-outline" size={14} color={TarodanColors.textTertiary} />
+                  <Ionicons name="resize-outline" size={14} color={colors.text.subtle} />
                   <Text style={styles.specText}>{item.length}</Text>
                 </View>
                 <View style={styles.specRow}>
-                  <Ionicons name="barbell-outline" size={14} color={TarodanColors.textTertiary} />
+                  <Ionicons name="barbell-outline" size={14} color={colors.text.subtle} />
                   <Text style={styles.specText}>{item.weight}</Text>
                 </View>
               </View>
@@ -134,7 +135,7 @@ export default function SizeGuideScreen() {
         ))}
 
         <View style={styles.tip}>
-          <Ionicons name="bulb-outline" size={20} color={TarodanColors.warning} />
+          <Ionicons name="bulb-outline" size={20} color={colors.warning[600]!} />
           <Text style={styles.tipText}>
             İpucu: Koleksiyonunuza başlarken tek bir ölçekte yoğunlaşmanız, vitrin düzeninizi kolaylaştırır ve bütçenizi daha iyi yönetmenizi sağlar.
           </Text>
@@ -149,10 +150,10 @@ export default function SizeGuideScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: TarodanColors.background,
+    backgroundColor: colors.surface.DEFAULT,
   },
   header: {
-    backgroundColor: TarodanColors.primary,
+    backgroundColor: colors.primary[600]!,
     paddingTop: 50,
     paddingBottom: 16,
     paddingHorizontal: 20,
@@ -163,7 +164,7 @@ const styles = StyleSheet.create({
   headerTitle: {
     fontSize: 18,
     fontWeight: 'bold',
-    color: TarodanColors.textOnPrimary,
+    color: colors.white,
   },
   content: {
     flex: 1,
@@ -171,21 +172,21 @@ const styles = StyleSheet.create({
   },
   intro: {
     fontSize: 14,
-    color: TarodanColors.textSecondary,
+    color: colors.text.muted,
     lineHeight: 22,
     marginBottom: 20,
   },
   scaleCard: {
-    backgroundColor: TarodanColors.backgroundSecondary,
+    backgroundColor: colors.surface.alt,
     borderRadius: 12,
     padding: 16,
     marginBottom: 12,
     borderWidth: 1,
-    borderColor: TarodanColors.borderLight,
+    borderColor: colors.border.subtle,
   },
   scaleCardHighlight: {
-    borderColor: TarodanColors.primary,
-    backgroundColor: TarodanColors.primaryLight,
+    borderColor: colors.primary[600]!,
+    backgroundColor: colors.primary[50]!,
   },
   scaleHeader: {
     flexDirection: 'row',
@@ -194,21 +195,21 @@ const styles = StyleSheet.create({
     marginBottom: 10,
   },
   scaleBadge: {
-    backgroundColor: TarodanColors.backgroundTertiary,
+    backgroundColor: colors.gray[200],
     paddingHorizontal: 14,
     paddingVertical: 6,
     borderRadius: 8,
   },
   scaleBadgeHighlight: {
-    backgroundColor: TarodanColors.primary,
+    backgroundColor: colors.primary[600]!,
   },
   scaleText: {
     fontSize: 18,
     fontWeight: 'bold',
-    color: TarodanColors.textPrimary,
+    color: colors.text.heading,
   },
   scaleTextHighlight: {
-    color: TarodanColors.textOnPrimary,
+    color: colors.white,
   },
   scaleSpecs: {
     flexDirection: 'row',
@@ -221,11 +222,11 @@ const styles = StyleSheet.create({
   },
   specText: {
     fontSize: 12,
-    color: TarodanColors.textTertiary,
+    color: colors.text.subtle,
   },
   scaleDesc: {
     fontSize: 13,
-    color: TarodanColors.textSecondary,
+    color: colors.text.muted,
     lineHeight: 20,
     marginBottom: 10,
   },
@@ -236,23 +237,23 @@ const styles = StyleSheet.create({
   detailLabel: {
     fontSize: 12,
     fontWeight: '600',
-    color: TarodanColors.textPrimary,
+    color: colors.text.heading,
     marginRight: 6,
   },
   detailValue: {
     fontSize: 12,
-    color: TarodanColors.textSecondary,
+    color: colors.text.muted,
     flex: 1,
   },
   priceValue: {
     fontSize: 12,
-    color: TarodanColors.price,
+    color: colors.primary[700]!,
     fontWeight: '600',
     flex: 1,
   },
   tip: {
     flexDirection: 'row',
-    backgroundColor: TarodanColors.warningLight,
+    backgroundColor: colors.warning[50]!,
     borderRadius: 12,
     padding: 16,
     marginTop: 8,
@@ -262,7 +263,7 @@ const styles = StyleSheet.create({
   tipText: {
     flex: 1,
     fontSize: 13,
-    color: TarodanColors.textSecondary,
+    color: colors.text.muted,
     lineHeight: 20,
   },
 });

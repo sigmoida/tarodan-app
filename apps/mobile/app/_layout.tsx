@@ -2,15 +2,15 @@ import { useEffect } from 'react';
 import { Stack } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import { PaperProvider } from 'react-native-paper';
-import { useColorScheme } from 'react-native';
 import * as SplashScreen from 'expo-splash-screen';
 import Constants from 'expo-constants';
+import { theme } from '@tarodan/ui-native';
 import { useAuthStore } from '../src/stores/authStore';
 import { registerForPushNotifications, setupPushNotificationRouting } from '../src/services/push';
-import { TarodanLightTheme, TarodanDarkTheme } from '../src/theme';
 import { LanguageProvider } from '../src/i18n';
 import { initSentry } from '../src/services/sentry';
+
+const { colors } = theme;
 
 // Initialize Sentry as early as possible. Currently a stub (no-op until
 // `@sentry/react-native` is installed and SENTRY_PACKAGE_LOADED is flipped
@@ -58,8 +58,6 @@ if (!isExpoGo && Notifications) {
 }
 
 export default function RootLayout() {
-  const colorScheme = useColorScheme();
-  const theme = colorScheme === 'dark' ? TarodanDarkTheme : TarodanLightTheme;
   const { loadToken, isAuthenticated } = useAuthStore();
 
   useEffect(() => {
@@ -95,20 +93,18 @@ export default function RootLayout() {
   return (
     <QueryClientProvider client={queryClient}>
       <LanguageProvider>
-        <PaperProvider theme={theme}>
-          <StatusBar style="auto" />
-          <Stack
-            screenOptions={{
-              headerStyle: { backgroundColor: theme.colors.primary },
-              headerTintColor: '#fff',
-              headerTitleStyle: { fontWeight: 'bold' },
-              headerShown: false,
-            }}
-          >
-            <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
-            <Stack.Screen name="(auth)" options={{ headerShown: false }} />
-          </Stack>
-        </PaperProvider>
+        <StatusBar style="auto" />
+        <Stack
+          screenOptions={{
+            headerStyle: { backgroundColor: colors.primary[600]! },
+            headerTintColor: colors.white,
+            headerTitleStyle: { fontWeight: 'bold' },
+            headerShown: false,
+          }}
+        >
+          <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
+          <Stack.Screen name="(auth)" options={{ headerShown: false }} />
+        </Stack>
       </LanguageProvider>
     </QueryClientProvider>
   );

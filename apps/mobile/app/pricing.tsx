@@ -1,13 +1,11 @@
-import { View, ScrollView, StyleSheet, TouchableOpacity, Dimensions } from 'react-native';
-import { Button, Card } from 'react-native-paper';
-import { Text } from '../src/components/common';
+import { View, ScrollView, StyleSheet, TouchableOpacity } from 'react-native';
 import { router } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
+import { theme, Text, Card, Button } from '@tarodan/ui-native';
 import { useAuthStore } from '../src/stores/authStore';
-import { TarodanColors } from '../src/theme';
 import { useTranslation } from '../src/i18n';
 
-const { width } = Dimensions.get('window');
+const { colors } = theme;
 
 const MEMBERSHIP_TIERS = [
   {
@@ -16,7 +14,7 @@ const MEMBERSHIP_TIERS = [
     price: 0,
     period: '',
     description: 'Başlangıç için ideal',
-    color: '#6B7280',
+    color: colors.gray[500]!,
     features: [
       { text: '5 ücretsiz ilan', included: true },
       { text: '10 toplam ilan', included: true },
@@ -33,7 +31,7 @@ const MEMBERSHIP_TIERS = [
     price: 49,
     period: '/ay',
     description: 'Koleksiyonerler için',
-    color: '#3B82F6',
+    color: colors.info[500]!,
     features: [
       { text: '15 ücretsiz ilan', included: true },
       { text: '50 toplam ilan', included: true },
@@ -50,7 +48,7 @@ const MEMBERSHIP_TIERS = [
     price: 99,
     period: '/ay',
     description: 'En popüler seçim',
-    color: '#8B5CF6',
+    color: colors.primary[600]!,
     popular: true,
     features: [
       { text: '50 ücretsiz ilan', included: true },
@@ -69,7 +67,7 @@ const MEMBERSHIP_TIERS = [
     price: 199,
     period: '/ay',
     description: 'Profesyonel satıcılar için',
-    color: '#F59E0B',
+    color: colors.warning[500]!,
     features: [
       { text: '200 ücretsiz ilan', included: true },
       { text: '1000 toplam ilan', included: true },
@@ -108,7 +106,7 @@ export default function PricingScreen() {
       {/* Header */}
       <View style={styles.header}>
         <TouchableOpacity onPress={() => router.back()}>
-          <Ionicons name="arrow-back" size={24} color={TarodanColors.textOnPrimary} />
+          <Ionicons name="arrow-back" size={24} color={colors.white} />
         </TouchableOpacity>
         <Text style={styles.headerTitle}>{t('mobile.pagePricing')}</Text>
         <View style={{ width: 24 }} />
@@ -125,13 +123,13 @@ export default function PricingScreen() {
 
         {/* Plans */}
         {MEMBERSHIP_TIERS.map((tier) => (
-          <Card 
-            key={tier.id} 
-            style={[
-              styles.planCard,
-              tier.popular && styles.popularPlanCard,
-              currentTier === tier.id && styles.currentPlanCard,
-            ]}
+          <Card
+            key={tier.id}
+            style={{
+              ...styles.planCard,
+              ...(tier.popular ? styles.popularPlanCard : null),
+              ...(currentTier === tier.id ? styles.currentPlanCard : null),
+            }}
           >
             {tier.popular && (
               <View style={[styles.popularBadge, { backgroundColor: tier.color }]}>
@@ -143,62 +141,57 @@ export default function PricingScreen() {
                 <Text style={styles.currentBadgeText}>Mevcut Plan</Text>
               </View>
             )}
-            
-            <Card.Content>
-              <Text style={[styles.planName, { color: tier.color }]}>{tier.name}</Text>
-              <Text style={styles.planDescription}>{tier.description}</Text>
-              
-              <View style={styles.priceRow}>
-                {tier.price > 0 ? (
-                  <>
-                    <Text style={styles.planPrice}>₺{tier.price}</Text>
-                    <Text style={styles.planPeriod}>{tier.period}</Text>
-                  </>
-                ) : (
-                  <Text style={styles.planPrice}>Ücretsiz</Text>
-                )}
-              </View>
 
-              <View style={styles.featuresList}>
-                {tier.features.map((feature, index) => (
-                  <View key={index} style={styles.featureItem}>
-                    <Ionicons 
-                      name={feature.included ? 'checkmark-circle' : 'close-circle'} 
-                      size={18} 
-                      color={feature.included ? tier.color : TarodanColors.textLight} 
-                    />
-                    <Text style={[
-                      styles.featureText,
-                      !feature.included && styles.featureTextDisabled,
-                    ]}>
-                      {feature.text}
-                    </Text>
-                  </View>
-                ))}
-              </View>
+            <Text style={[styles.planName, { color: tier.color }]}>{tier.name}</Text>
+            <Text style={styles.planDescription}>{tier.description}</Text>
 
-              <Button
-                mode={tier.popular ? 'contained' : 'outlined'}
-                onPress={() => handleSelectPlan(tier.id)}
-                style={styles.planButton}
-                buttonColor={tier.popular ? tier.color : undefined}
-                textColor={tier.popular ? '#fff' : tier.color}
-                disabled={currentTier === tier.id}
-              >
-                {currentTier === tier.id 
-                  ? 'Mevcut Plan' 
-                  : tier.price === 0 
-                    ? 'Mevcut' 
-                    : 'Seç'}
-              </Button>
-            </Card.Content>
+            <View style={styles.priceRow}>
+              {tier.price > 0 ? (
+                <>
+                  <Text style={styles.planPrice}>₺{tier.price}</Text>
+                  <Text style={styles.planPeriod}>{tier.period}</Text>
+                </>
+              ) : (
+                <Text style={styles.planPrice}>Ücretsiz</Text>
+              )}
+            </View>
+
+            <View style={styles.featuresList}>
+              {tier.features.map((feature, index) => (
+                <View key={index} style={styles.featureItem}>
+                  <Ionicons
+                    name={feature.included ? 'checkmark-circle' : 'close-circle'}
+                    size={18}
+                    color={feature.included ? tier.color : colors.text.subtle}
+                  />
+                  <Text style={[
+                    styles.featureText,
+                    !feature.included && styles.featureTextDisabled,
+                  ]}>
+                    {feature.text}
+                  </Text>
+                </View>
+              ))}
+            </View>
+
+            <Button
+              variant={tier.popular ? 'primary' : 'outline'}
+              title={currentTier === tier.id
+                ? 'Mevcut Plan'
+                : tier.price === 0
+                  ? 'Mevcut'
+                  : 'Seç'}
+              onPress={() => handleSelectPlan(tier.id)}
+              style={styles.planButton}
+              disabled={currentTier === tier.id}
+            />
           </Card>
         ))}
 
         {/* FAQ Section */}
         <View style={styles.faqSection}>
           <Text style={styles.faqTitle}>Sık Sorulan Sorular</Text>
-          
+
           <TouchableOpacity style={styles.faqItem}>
             <Text style={styles.faqQuestion}>Plan değişikliği nasıl yapılır?</Text>
             <Text style={styles.faqAnswer}>
@@ -222,11 +215,11 @@ export default function PricingScreen() {
         </View>
 
         {/* Support Link */}
-        <TouchableOpacity 
+        <TouchableOpacity
           style={styles.supportLink}
           onPress={() => router.push('/support')}
         >
-          <Ionicons name="help-circle-outline" size={20} color={TarodanColors.primary} />
+          <Ionicons name="help-circle-outline" size={20} color={colors.primary[600]!} />
           <Text style={styles.supportLinkText}>Sorularınız mı var? Destek ekibimizle iletişime geçin</Text>
         </TouchableOpacity>
 
@@ -239,10 +232,10 @@ export default function PricingScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: TarodanColors.backgroundSecondary,
+    backgroundColor: colors.surface.alt,
   },
   header: {
-    backgroundColor: TarodanColors.primary,
+    backgroundColor: colors.primary[600]!,
     paddingTop: 50,
     paddingBottom: 16,
     paddingHorizontal: 20,
@@ -253,7 +246,7 @@ const styles = StyleSheet.create({
   headerTitle: {
     fontSize: 18,
     fontWeight: 'bold',
-    color: TarodanColors.textOnPrimary,
+    color: colors.white,
   },
   content: {
     flex: 1,
@@ -266,29 +259,29 @@ const styles = StyleSheet.create({
   title: {
     fontSize: 24,
     fontWeight: 'bold',
-    color: TarodanColors.textPrimary,
+    color: colors.text.heading,
     textAlign: 'center',
     marginBottom: 8,
   },
   subtitle: {
     fontSize: 14,
-    color: TarodanColors.textSecondary,
+    color: colors.text.muted,
     textAlign: 'center',
     lineHeight: 20,
   },
   planCard: {
     marginBottom: 16,
-    backgroundColor: TarodanColors.background,
+    backgroundColor: colors.surface.DEFAULT,
     position: 'relative',
     overflow: 'visible',
   },
   popularPlanCard: {
     borderWidth: 2,
-    borderColor: '#8B5CF6',
+    borderColor: colors.primary[600]!,
   },
   currentPlanCard: {
     borderWidth: 2,
-    borderColor: TarodanColors.success,
+    borderColor: colors.success[600]!,
   },
   popularBadge: {
     position: 'absolute',
@@ -300,7 +293,7 @@ const styles = StyleSheet.create({
     zIndex: 1,
   },
   popularBadgeText: {
-    color: '#fff',
+    color: colors.white,
     fontSize: 12,
     fontWeight: 'bold',
   },
@@ -311,11 +304,11 @@ const styles = StyleSheet.create({
     paddingHorizontal: 12,
     paddingVertical: 4,
     borderRadius: 12,
-    backgroundColor: TarodanColors.success,
+    backgroundColor: colors.success[600]!,
     zIndex: 1,
   },
   currentBadgeText: {
-    color: '#fff',
+    color: colors.white,
     fontSize: 12,
     fontWeight: 'bold',
   },
@@ -327,7 +320,7 @@ const styles = StyleSheet.create({
   },
   planDescription: {
     fontSize: 13,
-    color: TarodanColors.textSecondary,
+    color: colors.text.muted,
     marginBottom: 16,
   },
   priceRow: {
@@ -338,11 +331,11 @@ const styles = StyleSheet.create({
   planPrice: {
     fontSize: 32,
     fontWeight: 'bold',
-    color: TarodanColors.textPrimary,
+    color: colors.text.heading,
   },
   planPeriod: {
     fontSize: 14,
-    color: TarodanColors.textSecondary,
+    color: colors.text.muted,
     marginLeft: 4,
   },
   featuresList: {
@@ -356,10 +349,10 @@ const styles = StyleSheet.create({
   featureText: {
     marginLeft: 10,
     fontSize: 14,
-    color: TarodanColors.textPrimary,
+    color: colors.text.heading,
   },
   featureTextDisabled: {
-    color: TarodanColors.textLight,
+    color: colors.text.subtle,
     textDecorationLine: 'line-through',
   },
   planButton: {
@@ -373,11 +366,11 @@ const styles = StyleSheet.create({
   faqTitle: {
     fontSize: 18,
     fontWeight: 'bold',
-    color: TarodanColors.textPrimary,
+    color: colors.text.heading,
     marginBottom: 16,
   },
   faqItem: {
-    backgroundColor: TarodanColors.background,
+    backgroundColor: colors.surface.DEFAULT,
     padding: 16,
     borderRadius: 12,
     marginBottom: 12,
@@ -385,12 +378,12 @@ const styles = StyleSheet.create({
   faqQuestion: {
     fontSize: 15,
     fontWeight: '600',
-    color: TarodanColors.textPrimary,
+    color: colors.text.heading,
     marginBottom: 8,
   },
   faqAnswer: {
     fontSize: 13,
-    color: TarodanColors.textSecondary,
+    color: colors.text.muted,
     lineHeight: 20,
   },
   supportLink: {
@@ -402,7 +395,7 @@ const styles = StyleSheet.create({
   supportLinkText: {
     marginLeft: 8,
     fontSize: 14,
-    color: TarodanColors.primary,
+    color: colors.primary[600]!,
     fontWeight: '500',
   },
 });

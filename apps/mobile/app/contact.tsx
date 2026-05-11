@@ -1,12 +1,12 @@
 import { useState } from 'react';
 import { View, ScrollView, StyleSheet, TouchableOpacity, Linking } from 'react-native';
-import { Button, Card, Snackbar } from 'react-native-paper';
-import { Text, TextInput } from '../src/components/common';
 import { router } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
-import { TarodanColors } from '../src/theme';
+import { theme, Button, Card, Snackbar, Text, Input, Textarea } from '@tarodan/ui-native';
 import { supportApi } from '../src/services/api';
 import { useTranslation } from '../src/i18n';
+
+const { colors } = theme;
 
 export default function ContactScreen() {
   const { t } = useTranslation();
@@ -70,7 +70,7 @@ export default function ContactScreen() {
       {/* Header */}
       <View style={styles.header}>
         <TouchableOpacity onPress={() => router.back()}>
-          <Ionicons name="arrow-back" size={24} color={TarodanColors.textOnPrimary} />
+          <Ionicons name="arrow-back" size={24} color={colors.white} />
         </TouchableOpacity>
         <Text style={styles.headerTitle}>{t('mobile.pageContact')}</Text>
         <View style={{ width: 24 }} />
@@ -87,13 +87,13 @@ export default function ContactScreen() {
               onPress={method.action}
             >
               <View style={styles.contactMethodIcon}>
-                <Ionicons name={method.icon as any} size={24} color={TarodanColors.primary} />
+                <Ionicons name={method.icon as any} size={24} color={colors.primary[600]!} />
               </View>
               <View style={styles.contactMethodContent}>
                 <Text style={styles.contactMethodTitle}>{method.title}</Text>
                 <Text style={styles.contactMethodValue}>{method.value}</Text>
               </View>
-              <Ionicons name="chevron-forward" size={20} color={TarodanColors.textLight} />
+              <Ionicons name="chevron-forward" size={20} color={colors.text.subtle} />
             </TouchableOpacity>
           ))}
         </View>
@@ -101,84 +101,65 @@ export default function ContactScreen() {
         {/* Contact Form */}
         <Text style={styles.sectionTitle}>Mesaj Gönderin</Text>
         <Card style={styles.formCard}>
-          <Card.Content>
-            <TextInput
-              label="Adınız"
-              value={name}
-              onChangeText={setName}
-              mode="outlined"
-              style={styles.input}
-              outlineColor={TarodanColors.border}
-              activeOutlineColor={TarodanColors.primary}
-            />
-            <TextInput
-              label="E-posta"
-              value={email}
-              onChangeText={setEmail}
-              mode="outlined"
-              style={styles.input}
-              keyboardType="email-address"
-              autoCapitalize="none"
-              outlineColor={TarodanColors.border}
-              activeOutlineColor={TarodanColors.primary}
-            />
-            <TextInput
-              label="Konu"
-              value={subject}
-              onChangeText={setSubject}
-              mode="outlined"
-              style={styles.input}
-              outlineColor={TarodanColors.border}
-              activeOutlineColor={TarodanColors.primary}
-            />
-            <TextInput
-              label="Mesajınız"
-              value={message}
-              onChangeText={setMessage}
-              mode="outlined"
-              style={styles.input}
-              multiline
-              numberOfLines={5}
-              outlineColor={TarodanColors.border}
-              activeOutlineColor={TarodanColors.primary}
-            />
-            <Button
-              mode="contained"
-              onPress={handleSubmit}
-              loading={loading}
-              disabled={loading}
-              style={styles.submitButton}
-              buttonColor={TarodanColors.primary}
-            >
-              Gönder
-            </Button>
-          </Card.Content>
+          <Input
+            label="Adınız"
+            value={name}
+            onChangeText={setName}
+            style={styles.input}
+          />
+          <Input
+            label="E-posta"
+            value={email}
+            onChangeText={setEmail}
+            style={styles.input}
+            keyboardType="email-address"
+            autoCapitalize="none"
+          />
+          <Input
+            label="Konu"
+            value={subject}
+            onChangeText={setSubject}
+            style={styles.input}
+          />
+          <Textarea
+            label="Mesajınız"
+            value={message}
+            onChangeText={setMessage}
+            style={styles.input}
+            rows={5}
+          />
+          <Button
+            variant="primary"
+            title="Gönder"
+            onPress={handleSubmit}
+            isLoading={loading}
+            disabled={loading}
+            style={styles.submitButton}
+          />
         </Card>
 
         {/* Working Hours */}
         <Text style={styles.sectionTitle}>Çalışma Saatleri</Text>
         <Card style={styles.hoursCard}>
-          <Card.Content>
-            <View style={styles.hoursRow}>
-              <Text style={styles.hoursDay}>Pazartesi - Cuma</Text>
-              <Text style={styles.hoursTime}>09:00 - 18:00</Text>
-            </View>
-            <View style={styles.hoursRow}>
-              <Text style={styles.hoursDay}>Cumartesi</Text>
-              <Text style={styles.hoursTime}>10:00 - 14:00</Text>
-            </View>
-            <View style={styles.hoursRow}>
-              <Text style={styles.hoursDay}>Pazar</Text>
-              <Text style={styles.hoursClosed}>Kapalı</Text>
-            </View>
-          </Card.Content>
+          <View style={styles.hoursRow}>
+            <Text style={styles.hoursDay}>Pazartesi - Cuma</Text>
+            <Text style={styles.hoursTime}>09:00 - 18:00</Text>
+          </View>
+          <View style={styles.hoursRow}>
+            <Text style={styles.hoursDay}>Cumartesi</Text>
+            <Text style={styles.hoursTime}>10:00 - 14:00</Text>
+          </View>
+          <View style={styles.hoursRow}>
+            <Text style={styles.hoursDay}>Pazar</Text>
+            <Text style={styles.hoursClosed}>Kapalı</Text>
+          </View>
         </Card>
 
         {/* FAQ Link */}
         <TouchableOpacity style={styles.faqLink} onPress={() => router.push('/help')}>
-          <Ionicons name="help-circle-outline" size={24} color={TarodanColors.primary} />
+          <Ionicons name="help-circle-outline" size={24} color={colors.primary[600]!} />
           <Text style={styles.faqLinkText}>Sık Sorulan Sorular</Text>
-          <Ionicons name="chevron-forward" size={20} color={TarodanColors.primary} />
+          <Ionicons name="chevron-forward" size={20} color={colors.primary[600]!} />
         </TouchableOpacity>
 
         <View style={{ height: 40 }} />
@@ -198,10 +179,10 @@ export default function ContactScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: TarodanColors.backgroundSecondary,
+    backgroundColor: colors.surface.alt,
   },
   header: {
-    backgroundColor: TarodanColors.primary,
+    backgroundColor: colors.primary[600]!,
     paddingTop: 50,
     paddingBottom: 16,
     paddingHorizontal: 20,
@@ -212,7 +193,7 @@ const styles = StyleSheet.create({
   headerTitle: {
     fontSize: 18,
     fontWeight: 'bold',
-    color: TarodanColors.textOnPrimary,
+    color: colors.white,
   },
   content: {
     flex: 1,
@@ -221,12 +202,12 @@ const styles = StyleSheet.create({
   sectionTitle: {
     fontSize: 16,
     fontWeight: 'bold',
-    color: TarodanColors.textPrimary,
+    color: colors.text.heading,
     marginBottom: 12,
     marginTop: 8,
   },
   contactMethods: {
-    backgroundColor: TarodanColors.background,
+    backgroundColor: colors.surface.DEFAULT,
     borderRadius: 12,
     marginBottom: 24,
   },
@@ -235,13 +216,13 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     padding: 16,
     borderBottomWidth: 1,
-    borderBottomColor: TarodanColors.border,
+    borderBottomColor: colors.border.DEFAULT,
   },
   contactMethodIcon: {
     width: 48,
     height: 48,
     borderRadius: 24,
-    backgroundColor: TarodanColors.primaryLight,
+    backgroundColor: colors.primary[50]!,
     justifyContent: 'center',
     alignItems: 'center',
   },
@@ -252,27 +233,27 @@ const styles = StyleSheet.create({
   contactMethodTitle: {
     fontSize: 14,
     fontWeight: '600',
-    color: TarodanColors.textPrimary,
+    color: colors.text.heading,
   },
   contactMethodValue: {
     fontSize: 13,
-    color: TarodanColors.textSecondary,
+    color: colors.text.muted,
     marginTop: 2,
   },
   formCard: {
-    backgroundColor: TarodanColors.background,
+    backgroundColor: colors.surface.DEFAULT,
     marginBottom: 24,
   },
   input: {
     marginBottom: 12,
-    backgroundColor: TarodanColors.background,
+    backgroundColor: colors.surface.DEFAULT,
   },
   submitButton: {
     borderRadius: 12,
     marginTop: 8,
   },
   hoursCard: {
-    backgroundColor: TarodanColors.background,
+    backgroundColor: colors.surface.DEFAULT,
     marginBottom: 24,
   },
   hoursRow: {
@@ -282,22 +263,22 @@ const styles = StyleSheet.create({
   },
   hoursDay: {
     fontSize: 14,
-    color: TarodanColors.textPrimary,
+    color: colors.text.heading,
   },
   hoursTime: {
     fontSize: 14,
-    color: TarodanColors.success,
+    color: colors.success[600]!,
     fontWeight: '500',
   },
   hoursClosed: {
     fontSize: 14,
-    color: TarodanColors.error,
+    color: colors.danger[600]!,
     fontWeight: '500',
   },
   faqLink: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: TarodanColors.background,
+    backgroundColor: colors.surface.DEFAULT,
     padding: 16,
     borderRadius: 12,
   },
@@ -305,7 +286,7 @@ const styles = StyleSheet.create({
     flex: 1,
     marginLeft: 12,
     fontSize: 15,
-    color: TarodanColors.primary,
+    color: colors.primary[600]!,
     fontWeight: '500',
   },
 });

@@ -1,9 +1,10 @@
 import { View, ScrollView, StyleSheet, TouchableOpacity } from 'react-native';
-import { Text, Card } from 'react-native-paper';
 import { router } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
-import { TarodanColors } from '../src/theme';
+import { theme, Text, Card } from '@tarodan/ui-native';
 import { useTranslation } from '../src/i18n';
+
+const { colors } = theme;
 
 const sections = [
   {
@@ -30,7 +31,7 @@ export default function PaymentOptionsScreen() {
     <View style={styles.container}>
       <View style={styles.header}>
         <TouchableOpacity onPress={() => router.back()}>
-          <Ionicons name="arrow-back" size={24} color={TarodanColors.textOnPrimary} />
+          <Ionicons name="arrow-back" size={24} color={colors.white} />
         </TouchableOpacity>
         <Text style={styles.headerTitle}>{t('mobile.pagePaymentOptions')}</Text>
         <View style={{ width: 24 }} />
@@ -38,8 +39,8 @@ export default function PaymentOptionsScreen() {
 
       <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
         <View style={styles.iconRow}>
-          <View style={[styles.iconCircle, { backgroundColor: '#D1FAE5' }]}>
-            <Ionicons name="card-outline" size={32} color="#059669" />
+          <View style={[styles.iconCircle, { backgroundColor: colors.success[50]! }]}>
+            <Ionicons name="card-outline" size={32} color={colors.success[700]!} />
           </View>
           <View style={{ flex: 1 }}>
             <Text style={styles.pageTitle}>Ödeme Seçenekleri</Text>
@@ -49,16 +50,14 @@ export default function PaymentOptionsScreen() {
 
         {sections.map((s, i) => (
           <Card key={i} style={styles.card}>
-            <Card.Content>
-              {s.icon && (
-                <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 8, gap: 8 }}>
-                  <Ionicons name={s.icon as any} size={20} color="#059669" />
-                  <Text style={styles.sectionTitle}>{s.title}</Text>
-                </View>
-              )}
-              {!s.icon && <Text style={styles.sectionTitle}>{s.title}</Text>}
-              <Text style={styles.sectionContent}>{s.content}</Text>
-            </Card.Content>
+            {s.icon && (
+              <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 8, gap: 8 }}>
+                <Ionicons name={s.icon as any} size={20} color={colors.success[700]!} />
+                <Text style={styles.sectionTitle}>{s.title}</Text>
+              </View>
+            )}
+            {!s.icon && <Text style={styles.sectionTitle}>{s.title}</Text>}
+            <Text style={styles.sectionContent}>{s.content}</Text>
           </Card>
         ))}
 
@@ -69,9 +68,9 @@ export default function PaymentOptionsScreen() {
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: TarodanColors.backgroundSecondary },
+  container: { flex: 1, backgroundColor: colors.surface.alt },
   header: {
-    backgroundColor: TarodanColors.primary,
+    backgroundColor: colors.primary[600]!,
     paddingTop: 50,
     paddingBottom: 16,
     paddingHorizontal: 20,
@@ -79,7 +78,7 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     alignItems: 'center',
   },
-  headerTitle: { fontSize: 18, fontWeight: 'bold', color: TarodanColors.textOnPrimary },
+  headerTitle: { fontSize: 18, fontWeight: 'bold', color: colors.white },
   content: { flex: 1, padding: 16 },
   iconRow: { flexDirection: 'row', alignItems: 'center', marginBottom: 20, gap: 12 },
   iconCircle: {
@@ -89,9 +88,9 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
   },
-  pageTitle: { fontSize: 20, fontWeight: 'bold', color: TarodanColors.text },
-  pageSubtitle: { fontSize: 14, color: TarodanColors.textLight, marginTop: 2 },
-  card: { backgroundColor: TarodanColors.background, marginBottom: 12, borderRadius: 12 },
-  sectionTitle: { fontSize: 16, fontWeight: '600', color: TarodanColors.text, marginBottom: 8 },
-  sectionContent: { fontSize: 14, color: TarodanColors.textSecondary, lineHeight: 22 },
+  pageTitle: { fontSize: 20, fontWeight: 'bold', color: colors.text.heading },
+  pageSubtitle: { fontSize: 14, color: colors.text.subtle, marginTop: 2 },
+  card: { backgroundColor: colors.surface.DEFAULT, marginBottom: 12, borderRadius: 12 },
+  sectionTitle: { fontSize: 16, fontWeight: '600', color: colors.text.heading, marginBottom: 8 },
+  sectionContent: { fontSize: 14, color: colors.text.muted, lineHeight: 22 },
 });

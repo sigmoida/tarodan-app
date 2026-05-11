@@ -1,12 +1,12 @@
 import { useState } from 'react';
 import { View, ScrollView, StyleSheet, TouchableOpacity } from 'react-native';
-import { Button, Card, RadioButton, Snackbar, Chip } from 'react-native-paper';
-import { Text, TextInput } from '../src/components/common';
 import { router } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
+import { theme, Text, Card, Chip, Snackbar, Input, Textarea, Button } from '@tarodan/ui-native';
 import { useAuthStore } from '../src/stores/authStore';
-import { TarodanColors } from '../src/theme';
 import { useTranslation } from '../src/i18n';
+
+const { colors } = theme;
 
 const SUPPORT_CATEGORIES = [
   { id: 'order', name: 'Sipariş Sorunu', icon: 'cube-outline' },
@@ -18,9 +18,9 @@ const SUPPORT_CATEGORIES = [
 ];
 
 const PRIORITY_OPTIONS = [
-  { id: 'low', name: 'Düşük', color: TarodanColors.success },
-  { id: 'medium', name: 'Orta', color: TarodanColors.warning },
-  { id: 'high', name: 'Yüksek', color: TarodanColors.error },
+  { id: 'low', name: 'Düşük', color: colors.success[600]! },
+  { id: 'medium', name: 'Orta', color: colors.warning[600]! },
+  { id: 'high', name: 'Yüksek', color: colors.danger[600]! },
 ];
 
 export default function SupportScreen() {
@@ -44,9 +44,9 @@ export default function SupportScreen() {
     // Simulate API call
     await new Promise(resolve => setTimeout(resolve, 1500));
     setLoading(false);
-    
+
     setSnackbar({ visible: true, message: 'Destek talebiniz oluşturuldu!' });
-    
+
     // Reset form
     setCategory('');
     setSubject('');
@@ -60,24 +60,22 @@ export default function SupportScreen() {
       <View style={styles.container}>
         <View style={styles.header}>
           <TouchableOpacity onPress={() => router.back()}>
-            <Ionicons name="arrow-back" size={24} color={TarodanColors.textOnPrimary} />
+            <Ionicons name="arrow-back" size={24} color={colors.white} />
           </TouchableOpacity>
           <Text style={styles.headerTitle}>{t('mobile.pageSupport')}</Text>
           <View style={{ width: 24 }} />
         </View>
         <View style={styles.authRequired}>
-          <Ionicons name="headset-outline" size={64} color={TarodanColors.primary} />
+          <Ionicons name="headset-outline" size={64} color={colors.primary[600]!} />
           <Text style={styles.authTitle}>Giriş Gerekli</Text>
           <Text style={styles.authSubtitle}>
             Destek talebi oluşturmak için giriş yapmanız gerekmektedir.
           </Text>
           <Button
-            mode="contained"
+            variant="primary"
+            title="Giriş Yap"
             onPress={() => router.push('/(auth)/login')}
-            buttonColor={TarodanColors.primary}
-          >
-            Giriş Yap
-          </Button>
+          />
         </View>
       </View>
     );
@@ -88,7 +86,7 @@ export default function SupportScreen() {
       {/* Header */}
       <View style={styles.header}>
         <TouchableOpacity onPress={() => router.back()}>
-          <Ionicons name="arrow-back" size={24} color={TarodanColors.textOnPrimary} />
+          <Ionicons name="arrow-back" size={24} color={colors.white} />
         </TouchableOpacity>
         <Text style={styles.headerTitle}>Destek Talebi</Text>
         <View style={{ width: 24 }} />
@@ -107,10 +105,10 @@ export default function SupportScreen() {
               ]}
               onPress={() => setCategory(cat.id)}
             >
-              <Ionicons 
-                name={cat.icon as any} 
-                size={24} 
-                color={category === cat.id ? TarodanColors.primary : TarodanColors.textSecondary} 
+              <Ionicons
+                name={cat.icon as any}
+                size={24}
+                color={category === cat.id ? colors.primary[600]! : colors.text.muted}
               />
               <Text style={[
                 styles.categoryItemText,
@@ -128,89 +126,68 @@ export default function SupportScreen() {
           {PRIORITY_OPTIONS.map((opt) => (
             <Chip
               key={opt.id}
+              label={opt.name}
               selected={priority === opt.id}
               onPress={() => setPriority(opt.id)}
-              style={[
-                styles.priorityChip,
-                priority === opt.id && { backgroundColor: opt.color + '20' },
-              ]}
-              textStyle={{ color: priority === opt.id ? opt.color : TarodanColors.textSecondary }}
-            >
-              {opt.name}
-            </Chip>
+              variant="primary"
+            />
           ))}
         </View>
 
         {/* Form Fields */}
         <Card style={styles.formCard}>
-          <Card.Content>
-            {(category === 'order' || category === 'trade') && (
-              <TextInput
-                label="Sipariş/Takas Numarası (Opsiyonel)"
-                value={orderId}
-                onChangeText={setOrderId}
-                mode="outlined"
-                style={styles.input}
-                outlineColor={TarodanColors.border}
-                activeOutlineColor={TarodanColors.primary}
-              />
-            )}
-            
-            <TextInput
-              label="Konu *"
-              value={subject}
-              onChangeText={setSubject}
-              mode="outlined"
+          {(category === 'order' || category === 'trade') && (
+            <Input
+              label="Sipariş/Takas Numarası (Opsiyonel)"
+              value={orderId}
+              onChangeText={setOrderId}
               style={styles.input}
-              outlineColor={TarodanColors.border}
-              activeOutlineColor={TarodanColors.primary}
             />
-            
-            <TextInput
-              label="Açıklama *"
-              value={description}
-              onChangeText={setDescription}
-              mode="outlined"
-              style={styles.input}
-              multiline
-              numberOfLines={6}
-              outlineColor={TarodanColors.border}
-              activeOutlineColor={TarodanColors.primary}
-            />
+          )}
 
-            <Text style={styles.note}>
-              * ile işaretli alanların doldurulması zorunludur.
-            </Text>
-          </Card.Content>
+          <Input
+            label="Konu *"
+            value={subject}
+            onChangeText={setSubject}
+            style={styles.input}
+          />
+
+          <Textarea
+            label="Açıklama *"
+            value={description}
+            onChangeText={setDescription}
+            style={styles.input}
+            rows={6}
+          />
+
+          <Text style={styles.note}>
+            * ile işaretli alanların doldurulması zorunludur.
+          </Text>
         </Card>
 
         {/* User Info */}
         <Card style={styles.userInfoCard}>
-          <Card.Content>
-            <Text style={styles.userInfoTitle}>İletişim Bilgileriniz</Text>
-            <View style={styles.userInfoRow}>
-              <Ionicons name="person-outline" size={18} color={TarodanColors.textSecondary} />
-              <Text style={styles.userInfoText}>{user?.displayName}</Text>
-            </View>
-            <View style={styles.userInfoRow}>
-              <Ionicons name="mail-outline" size={18} color={TarodanColors.textSecondary} />
-              <Text style={styles.userInfoText}>{user?.email}</Text>
-            </View>
-          </Card.Content>
+          <Text style={styles.userInfoTitle}>İletişim Bilgileriniz</Text>
+          <View style={styles.userInfoRow}>
+            <Ionicons name="person-outline" size={18} color={colors.text.muted} />
+            <Text style={styles.userInfoText}>{user?.displayName}</Text>
+          </View>
+          <View style={styles.userInfoRow}>
+            <Ionicons name="mail-outline" size={18} color={colors.text.muted} />
+            <Text style={styles.userInfoText}>{user?.email}</Text>
+          </View>
         </Card>
 
         {/* Submit Button */}
         <Button
-          mode="contained"
+          variant="primary"
+          title="Talep Oluştur"
           onPress={handleSubmit}
-          loading={loading}
+          isLoading={loading}
           disabled={loading || !category || !subject || !description}
           style={styles.submitButton}
-          buttonColor={TarodanColors.primary}
           icon="send"
-        >
-          Talep Oluştur
-        </Button>
+        />
 
         {/* Contact Info */}
         <View style={styles.contactInfo}>
@@ -236,10 +213,10 @@ export default function SupportScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: TarodanColors.backgroundSecondary,
+    backgroundColor: colors.surface.alt,
   },
   header: {
-    backgroundColor: TarodanColors.primary,
+    backgroundColor: colors.primary[600]!,
     paddingTop: 50,
     paddingBottom: 16,
     paddingHorizontal: 20,
@@ -250,7 +227,7 @@ const styles = StyleSheet.create({
   headerTitle: {
     fontSize: 18,
     fontWeight: 'bold',
-    color: TarodanColors.textOnPrimary,
+    color: colors.white,
   },
   authRequired: {
     flex: 1,
@@ -261,13 +238,13 @@ const styles = StyleSheet.create({
   authTitle: {
     fontSize: 20,
     fontWeight: 'bold',
-    color: TarodanColors.textPrimary,
+    color: colors.text.heading,
     marginTop: 16,
     marginBottom: 8,
   },
   authSubtitle: {
     fontSize: 14,
-    color: TarodanColors.textSecondary,
+    color: colors.text.muted,
     textAlign: 'center',
     marginBottom: 24,
   },
@@ -278,7 +255,7 @@ const styles = StyleSheet.create({
   sectionTitle: {
     fontSize: 16,
     fontWeight: 'bold',
-    color: TarodanColors.textPrimary,
+    color: colors.text.heading,
     marginBottom: 12,
     marginTop: 8,
   },
@@ -290,7 +267,7 @@ const styles = StyleSheet.create({
   },
   categoryItem: {
     width: '31%',
-    backgroundColor: TarodanColors.background,
+    backgroundColor: colors.surface.DEFAULT,
     borderRadius: 12,
     padding: 16,
     alignItems: 'center',
@@ -298,17 +275,17 @@ const styles = StyleSheet.create({
     borderColor: 'transparent',
   },
   categoryItemActive: {
-    borderColor: TarodanColors.primary,
-    backgroundColor: TarodanColors.primaryLight,
+    borderColor: colors.primary[600]!,
+    backgroundColor: colors.primary[50]!,
   },
   categoryItemText: {
     marginTop: 8,
     fontSize: 12,
-    color: TarodanColors.textSecondary,
+    color: colors.text.muted,
     textAlign: 'center',
   },
   categoryItemTextActive: {
-    color: TarodanColors.primary,
+    color: colors.primary[600]!,
     fontWeight: '600',
   },
   priorityRow: {
@@ -316,30 +293,26 @@ const styles = StyleSheet.create({
     gap: 8,
     marginBottom: 24,
   },
-  priorityChip: {
-    backgroundColor: TarodanColors.surfaceVariant,
-  },
   formCard: {
-    backgroundColor: TarodanColors.background,
+    backgroundColor: colors.surface.DEFAULT,
     marginBottom: 16,
   },
   input: {
     marginBottom: 12,
-    backgroundColor: TarodanColors.background,
   },
   note: {
     fontSize: 12,
-    color: TarodanColors.textSecondary,
+    color: colors.text.muted,
     fontStyle: 'italic',
   },
   userInfoCard: {
-    backgroundColor: TarodanColors.surfaceVariant,
+    backgroundColor: colors.surface.alt,
     marginBottom: 24,
   },
   userInfoTitle: {
     fontSize: 14,
     fontWeight: '600',
-    color: TarodanColors.textSecondary,
+    color: colors.text.muted,
     marginBottom: 12,
   },
   userInfoRow: {
@@ -350,7 +323,7 @@ const styles = StyleSheet.create({
   userInfoText: {
     marginLeft: 10,
     fontSize: 14,
-    color: TarodanColors.textPrimary,
+    color: colors.text.heading,
   },
   submitButton: {
     borderRadius: 12,
@@ -362,10 +335,10 @@ const styles = StyleSheet.create({
   },
   contactInfoText: {
     fontSize: 13,
-    color: TarodanColors.textSecondary,
+    color: colors.text.muted,
   },
   contactInfoLink: {
-    color: TarodanColors.primary,
+    color: colors.primary[600]!,
     fontWeight: '500',
   },
 });

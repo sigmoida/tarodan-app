@@ -1,14 +1,14 @@
 import { View, ScrollView, StyleSheet, TouchableOpacity, Image, Dimensions, RefreshControl } from 'react-native';
-import { Card, ActivityIndicator, Chip, IconButton, Menu, Divider } from 'react-native-paper';
-import { Text, Searchbar } from '../src/components/common';
+import { theme, Text, Input, Chip, Spinner, Modal } from '@tarodan/ui-native';
 import { useState, useCallback } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { router, useLocalSearchParams } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { productsApi } from '../src/services/api';
-import { TarodanColors, BRANDS, SCALES } from '../src/theme';
+import { BRANDS, SCALES } from '../src/theme';
 import { getImageUrl as getImageUrlFromUtils } from '../src/utils/imageUrl';
 
+const { colors } = theme;
 const { width } = Dimensions.get('window');
 const CARD_WIDTH = (width - 48) / 2;
 
@@ -29,18 +29,18 @@ const SORT_OPTIONS = [
 ];
 
 export default function ListingsScreen() {
-  const params = useLocalSearchParams<{ 
-    brand?: string; 
-    scale?: string; 
+  const params = useLocalSearchParams<{
+    brand?: string;
+    scale?: string;
     categoryId?: string;
     search?: string;
   }>();
-  
+
   const [searchQuery, setSearchQuery] = useState(params.search || '');
   const [showFilters, setShowFilters] = useState(false);
   const [sortMenuVisible, setSortMenuVisible] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
-  
+
   const [filters, setFilters] = useState({
     brand: params.brand || '',
     scale: params.scale || '',
@@ -59,7 +59,7 @@ export default function ListingsScreen() {
           limit: 100,
           page: 1,
         };
-        
+
         if (searchQuery) queryParams.search = searchQuery;
         if (filters.brand) queryParams.brand = filters.brand;
         if (filters.scale) queryParams.scale = filters.scale;
@@ -69,7 +69,7 @@ export default function ListingsScreen() {
         if (filters.tradeOnly) queryParams.tradeOnly = true;
         if (filters.sortBy) queryParams.sortBy = filters.sortBy;
         if (params.categoryId) queryParams.categoryId = params.categoryId;
-        
+
         const response = await productsApi.getAll(queryParams);
         return response.data.data || response.data.products || [];
       } catch (error) {
@@ -116,7 +116,7 @@ export default function ListingsScreen() {
 
   const renderProductCard = (item: any) => {
     const isTradeEnabled = item.isTradeEnabled || item.trade_available;
-    
+
     return (
       <TouchableOpacity
         key={item.id}
@@ -127,7 +127,7 @@ export default function ListingsScreen() {
           <Image source={{ uri: getImageUrl(item) }} style={styles.productImage} />
           {isTradeEnabled && (
             <View style={styles.tradeBadge}>
-              <Ionicons name="swap-horizontal" size={12} color="#fff" />
+              <Ionicons name="swap-horizontal" size={12} color={colors.white} />
               <Text style={styles.tradeBadgeText}>Takas</Text>
             </View>
           )}
@@ -155,7 +155,7 @@ export default function ListingsScreen() {
       {/* Header */}
       <View style={styles.header}>
         <TouchableOpacity onPress={() => router.back()}>
-          <Ionicons name="arrow-back" size={24} color={TarodanColors.textOnPrimary} />
+          <Ionicons name="arrow-back" size={24} color={colors.white} />
         </TouchableOpacity>
         <Text style={styles.headerTitle}>İlanlar</Text>
         <View style={{ width: 24 }} />
@@ -163,48 +163,31 @@ export default function ListingsScreen() {
 
       {/* Search & Sort */}
       <View style={styles.searchSection}>
-        <Searchbar
+        <Input
           placeholder="Model, marka ara..."
           value={searchQuery}
           onChangeText={setSearchQuery}
           onSubmitEditing={handleSearch}
-          style={styles.searchBar}
+          leftIconName="search"
+          containerStyle={styles.searchBar}
         />
         <View style={styles.actionRow}>
-          <Menu
-            visible={sortMenuVisible}
-            onDismiss={() => setSortMenuVisible(false)}
-            anchor={
-              <TouchableOpacity 
-                style={styles.sortButton}
-                onPress={() => setSortMenuVisible(true)}
-              >
-                <Ionicons name="swap-vertical" size={18} color={TarodanColors.textSecondary} />
-                <Text style={styles.sortButtonText}>{getSortLabel()}</Text>
-              </TouchableOpacity>
-            }
+          <TouchableOpacity
+            style={styles.sortButton}
+            onPress={() => setSortMenuVisible(true)}
           >
-            {SORT_OPTIONS.map((option) => (
-              <Menu.Item
-                key={option.id}
-                onPress={() => {
-                  setFilters({ ...filters, sortBy: option.id });
-                  setSortMenuVisible(false);
-                }}
-                title={option.name}
-                leadingIcon={filters.sortBy === option.id ? 'check' : undefined}
-              />
-            ))}
-          </Menu>
+            <Ionicons name="swap-vertical" size={18} color={colors.text.muted} />
+            <Text style={styles.sortButtonText}>{getSortLabel()}</Text>
+          </TouchableOpacity>
 
           <TouchableOpacity
             style={[styles.filterButton, showFilters && styles.filterButtonActive]}
             onPress={() => setShowFilters(!showFilters)}
           >
-            <Ionicons 
-              name="options-outline" 
-              size={18} 
-              color={showFilters ? '#fff' : TarodanColors.textSecondary} 
+            <Ionicons
+              name="options-outline"
+              size={18}
+              color={showFilters ? colors.white : colors.text.muted}
             />
             <Text style={[styles.filterButtonText, showFilters && styles.filterButtonTextActive]}>
               Filtreler
@@ -220,68 +203,92 @@ export default function ListingsScreen() {
         </View>
       </View>
 
+      {/* Sort Modal */}
+      <Modal
+        isOpen={sortMenuVisible}
+        onClose={() => setSortMenuVisible(false)}
+        title="Sırala"
+      >
+        <View>
+          {SORT_OPTIONS.map((option) => {
+            const isSelected = filters.sortBy === option.id;
+            return (
+              <TouchableOpacity
+                key={option.id}
+                style={styles.sortOption}
+                onPress={() => {
+                  setFilters({ ...filters, sortBy: option.id });
+                  setSortMenuVisible(false);
+                }}
+              >
+                <Text style={styles.sortOptionText}>{option.name}</Text>
+                {isSelected && (
+                  <Ionicons name="checkmark" size={20} color={colors.primary[600]!} />
+                )}
+              </TouchableOpacity>
+            );
+          })}
+        </View>
+      </Modal>
+
       {/* Filters Panel */}
       {showFilters && (
         <View style={styles.filtersPanel}>
           <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.filterChips}>
             {/* Brand Filter */}
             {BRANDS.slice(0, 6).map((brand) => (
-              <Chip
-                key={brand.id}
-                selected={filters.brand === brand.name}
-                onPress={() => setFilters({ ...filters, brand: filters.brand === brand.name ? '' : brand.name })}
-                style={styles.filterChip}
-                textStyle={filters.brand === brand.name ? styles.filterChipTextActive : undefined}
-              >
-                {brand.name}
-              </Chip>
+              <View key={brand.id} style={styles.filterChipWrap}>
+                <Chip
+                  label={brand.name}
+                  selected={filters.brand === brand.name}
+                  variant="primary"
+                  onPress={() => setFilters({ ...filters, brand: filters.brand === brand.name ? '' : brand.name })}
+                />
+              </View>
             ))}
           </ScrollView>
-          
+
           <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.filterChips}>
             {/* Scale Filter */}
             {SCALES.map((scale) => (
-              <Chip
-                key={scale.id}
-                selected={filters.scale === scale.id}
-                onPress={() => setFilters({ ...filters, scale: filters.scale === scale.id ? '' : scale.id })}
-                style={styles.filterChip}
-                textStyle={filters.scale === scale.id ? styles.filterChipTextActive : undefined}
-              >
-                {scale.name}
-              </Chip>
+              <View key={scale.id} style={styles.filterChipWrap}>
+                <Chip
+                  label={scale.name}
+                  selected={filters.scale === scale.id}
+                  variant="primary"
+                  onPress={() => setFilters({ ...filters, scale: filters.scale === scale.id ? '' : scale.id })}
+                />
+              </View>
             ))}
           </ScrollView>
 
           <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.filterChips}>
             {/* Condition Filter */}
             {CONDITIONS.map((cond) => (
-              <Chip
-                key={cond.id}
-                selected={filters.condition === cond.id}
-                onPress={() => setFilters({ ...filters, condition: filters.condition === cond.id ? '' : cond.id })}
-                style={styles.filterChip}
-                textStyle={filters.condition === cond.id ? styles.filterChipTextActive : undefined}
-              >
-                {cond.name}
-              </Chip>
+              <View key={cond.id} style={styles.filterChipWrap}>
+                <Chip
+                  label={cond.name}
+                  selected={filters.condition === cond.id}
+                  variant="primary"
+                  onPress={() => setFilters({ ...filters, condition: filters.condition === cond.id ? '' : cond.id })}
+                />
+              </View>
             ))}
-            
+
             {/* Trade Only */}
-            <Chip
-              selected={filters.tradeOnly}
-              onPress={() => setFilters({ ...filters, tradeOnly: !filters.tradeOnly })}
-              style={styles.filterChip}
-              icon="swap-horizontal"
-              textStyle={filters.tradeOnly ? styles.filterChipTextActive : undefined}
-            >
-              Sadece Takas
-            </Chip>
+            <View style={styles.filterChipWrap}>
+              <Chip
+                label="Sadece Takas"
+                selected={filters.tradeOnly}
+                variant="primary"
+                onPress={() => setFilters({ ...filters, tradeOnly: !filters.tradeOnly })}
+              />
+            </View>
           </ScrollView>
 
           {activeFilterCount > 0 && (
             <TouchableOpacity style={styles.clearFiltersBtn} onPress={clearFilters}>
-              <Ionicons name="close-circle" size={16} color={TarodanColors.primary} />
+              <Ionicons name="close-circle" size={16} color={colors.primary[600]!} />
               <Text style={styles.clearFiltersText}>Filtreleri Temizle</Text>
             </TouchableOpacity>
           )}
@@ -291,12 +298,12 @@ export default function ListingsScreen() {
       {/* Listings */}
       {isLoading ? (
         <View style={styles.loadingContainer}>
-          <ActivityIndicator size="large" color={TarodanColors.primary} />
+          <Spinner size="lg" />
           <Text style={styles.loadingText}>İlanlar yükleniyor...</Text>
         </View>
       ) : !listings || listings.length === 0 ? (
         <View style={styles.emptyContainer}>
-          <Ionicons name="pricetag-outline" size={64} color={TarodanColors.textLight} />
+          <Ionicons name="pricetag-outline" size={64} color={colors.text.subtle} />
           <Text style={styles.emptyTitle}>İlan bulunamadı</Text>
           <Text style={styles.emptySubtitle}>Farklı filtreler deneyebilirsiniz</Text>
         </View>
@@ -305,7 +312,7 @@ export default function ListingsScreen() {
           style={styles.listingsContainer}
           contentContainerStyle={styles.listingsContent}
           refreshControl={
-            <RefreshControl refreshing={refreshing} onRefresh={onRefresh} colors={[TarodanColors.primary]} />
+            <RefreshControl refreshing={refreshing} onRefresh={onRefresh} colors={[colors.primary[600]!]} />
           }
         >
           <Text style={styles.resultsCount}>{listings.length} ilan bulundu</Text>
@@ -322,10 +329,10 @@ export default function ListingsScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: TarodanColors.backgroundSecondary,
+    backgroundColor: colors.surface.alt,
   },
   header: {
-    backgroundColor: TarodanColors.primary,
+    backgroundColor: colors.primary[600]!,
     paddingTop: 50,
     paddingBottom: 16,
     paddingHorizontal: 20,
@@ -336,19 +343,16 @@ const styles = StyleSheet.create({
   headerTitle: {
     fontSize: 18,
     fontWeight: 'bold',
-    color: TarodanColors.textOnPrimary,
+    color: colors.white,
   },
   searchSection: {
-    backgroundColor: TarodanColors.background,
+    backgroundColor: colors.surface.DEFAULT,
     paddingHorizontal: 16,
     paddingVertical: 12,
     borderBottomWidth: 1,
-    borderBottomColor: TarodanColors.border,
+    borderBottomColor: colors.border.DEFAULT,
   },
   searchBar: {
-    backgroundColor: TarodanColors.surfaceVariant,
-    elevation: 0,
-    borderRadius: 8,
     marginBottom: 12,
   },
   actionRow: {
@@ -362,12 +366,25 @@ const styles = StyleSheet.create({
     paddingVertical: 8,
     paddingHorizontal: 12,
     borderRadius: 8,
-    backgroundColor: TarodanColors.surfaceVariant,
+    backgroundColor: colors.surface.alt,
   },
   sortButtonText: {
     marginLeft: 6,
     fontSize: 13,
-    color: TarodanColors.textSecondary,
+    color: colors.text.muted,
+  },
+  sortOption: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingVertical: 14,
+    paddingHorizontal: 4,
+    borderBottomWidth: 1,
+    borderBottomColor: colors.border.subtle,
+  },
+  sortOptionText: {
+    fontSize: 15,
+    color: colors.text.heading,
   },
   filterButton: {
     flexDirection: 'row',
@@ -375,53 +392,49 @@ const styles = StyleSheet.create({
     paddingVertical: 8,
     paddingHorizontal: 12,
     borderRadius: 8,
-    backgroundColor: TarodanColors.surfaceVariant,
+    backgroundColor: colors.surface.alt,
   },
   filterButtonActive: {
-    backgroundColor: TarodanColors.primary,
+    backgroundColor: colors.primary[600]!,
   },
   filterButtonText: {
     marginLeft: 6,
     fontSize: 13,
-    color: TarodanColors.textSecondary,
+    color: colors.text.muted,
   },
   filterButtonTextActive: {
-    color: '#fff',
+    color: colors.white,
   },
   filterBadge: {
     marginLeft: 6,
-    backgroundColor: TarodanColors.primary,
+    backgroundColor: colors.primary[600]!,
     borderRadius: 10,
     paddingHorizontal: 6,
     paddingVertical: 2,
   },
   filterBadgeActive: {
-    backgroundColor: '#fff',
+    backgroundColor: colors.white,
   },
   filterBadgeText: {
     fontSize: 11,
     fontWeight: 'bold',
-    color: '#fff',
+    color: colors.white,
   },
   filterBadgeTextActive: {
-    color: TarodanColors.primary,
+    color: colors.primary[600]!,
   },
   filtersPanel: {
-    backgroundColor: TarodanColors.background,
+    backgroundColor: colors.surface.DEFAULT,
     paddingVertical: 12,
     borderBottomWidth: 1,
-    borderBottomColor: TarodanColors.border,
+    borderBottomColor: colors.border.DEFAULT,
   },
   filterChips: {
     paddingHorizontal: 16,
     marginBottom: 8,
   },
-  filterChip: {
+  filterChipWrap: {
     marginRight: 8,
-    backgroundColor: TarodanColors.surfaceVariant,
-  },
-  filterChipTextActive: {
-    color: '#fff',
   },
   clearFiltersBtn: {
     flexDirection: 'row',
@@ -432,7 +445,7 @@ const styles = StyleSheet.create({
   clearFiltersText: {
     marginLeft: 6,
     fontSize: 13,
-    color: TarodanColors.primary,
+    color: colors.primary[600]!,
     fontWeight: '500',
   },
   loadingContainer: {
@@ -442,7 +455,7 @@ const styles = StyleSheet.create({
   },
   loadingText: {
     marginTop: 12,
-    color: TarodanColors.textSecondary,
+    color: colors.text.muted,
   },
   emptyContainer: {
     flex: 1,
@@ -454,12 +467,12 @@ const styles = StyleSheet.create({
     marginTop: 16,
     fontSize: 18,
     fontWeight: 'bold',
-    color: TarodanColors.textPrimary,
+    color: colors.text.heading,
   },
   emptySubtitle: {
     marginTop: 8,
     fontSize: 14,
-    color: TarodanColors.textSecondary,
+    color: colors.text.muted,
     textAlign: 'center',
   },
   listingsContainer: {
@@ -470,7 +483,7 @@ const styles = StyleSheet.create({
   },
   resultsCount: {
     fontSize: 13,
-    color: TarodanColors.textSecondary,
+    color: colors.text.muted,
     marginBottom: 12,
   },
   productsGrid: {
@@ -480,12 +493,12 @@ const styles = StyleSheet.create({
   },
   productCard: {
     width: CARD_WIDTH,
-    backgroundColor: TarodanColors.background,
+    backgroundColor: colors.surface.DEFAULT,
     borderRadius: 12,
     overflow: 'hidden',
     marginBottom: 16,
     elevation: 2,
-    shadowColor: '#000',
+    shadowColor: colors.black,
     shadowOffset: { width: 0, height: 1 },
     shadowOpacity: 0.1,
     shadowRadius: 2,
@@ -496,7 +509,7 @@ const styles = StyleSheet.create({
   productImage: {
     width: '100%',
     height: CARD_WIDTH * 0.9,
-    backgroundColor: TarodanColors.surfaceVariant,
+    backgroundColor: colors.surface.alt,
   },
   tradeBadge: {
     position: 'absolute',
@@ -504,7 +517,7 @@ const styles = StyleSheet.create({
     left: 8,
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: TarodanColors.success,
+    backgroundColor: colors.success[600]!,
     paddingHorizontal: 8,
     paddingVertical: 4,
     borderRadius: 4,
@@ -513,7 +526,7 @@ const styles = StyleSheet.create({
     marginLeft: 4,
     fontSize: 11,
     fontWeight: 'bold',
-    color: '#fff',
+    color: colors.white,
   },
   productContent: {
     padding: 12,
@@ -521,12 +534,12 @@ const styles = StyleSheet.create({
   productTitle: {
     fontSize: 13,
     fontWeight: '600',
-    color: TarodanColors.textPrimary,
+    color: colors.text.heading,
     marginBottom: 4,
   },
   productMeta: {
     fontSize: 11,
-    color: TarodanColors.textSecondary,
+    color: colors.text.muted,
     marginBottom: 8,
   },
   priceRow: {
@@ -537,12 +550,12 @@ const styles = StyleSheet.create({
   productPrice: {
     fontSize: 16,
     fontWeight: 'bold',
-    color: TarodanColors.primary,
+    color: colors.primary[600]!,
   },
   conditionBadge: {
     fontSize: 10,
-    color: TarodanColors.textSecondary,
-    backgroundColor: TarodanColors.surfaceVariant,
+    color: colors.text.muted,
+    backgroundColor: colors.surface.alt,
     paddingHorizontal: 6,
     paddingVertical: 2,
     borderRadius: 4,

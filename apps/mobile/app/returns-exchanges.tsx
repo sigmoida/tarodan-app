@@ -1,9 +1,10 @@
 import { View, ScrollView, StyleSheet, TouchableOpacity } from 'react-native';
-import { Text, Card } from 'react-native-paper';
 import { router } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
-import { TarodanColors } from '../src/theme';
+import { theme, Text, Card } from '@tarodan/ui-native';
 import { useTranslation } from '../src/i18n';
+
+const { colors } = theme;
 
 const sections = [
   {
@@ -29,7 +30,7 @@ export default function ReturnsExchangesScreen() {
     <View style={styles.container}>
       <View style={styles.header}>
         <TouchableOpacity onPress={() => router.back()}>
-          <Ionicons name="arrow-back" size={24} color={TarodanColors.textOnPrimary} />
+          <Ionicons name="arrow-back" size={24} color={colors.white} />
         </TouchableOpacity>
         <Text style={styles.headerTitle}>{t('mobile.pageReturns')}</Text>
         <View style={{ width: 24 }} />
@@ -37,8 +38,8 @@ export default function ReturnsExchangesScreen() {
 
       <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
         <View style={styles.iconRow}>
-          <View style={[styles.iconCircle, { backgroundColor: '#DBEAFE' }]}>
-            <Ionicons name="repeat-outline" size={32} color="#2563EB" />
+          <View style={[styles.iconCircle, { backgroundColor: colors.info[50]! }]}>
+            <Ionicons name="repeat-outline" size={32} color={colors.info[600]!} />
           </View>
           <View style={{ flex: 1 }}>
             <Text style={styles.pageTitle}>İade ve Değişim</Text>
@@ -48,10 +49,8 @@ export default function ReturnsExchangesScreen() {
 
         {sections.map((s, i) => (
           <Card key={i} style={styles.card}>
-            <Card.Content>
-              <Text style={styles.sectionTitle}>{s.title}</Text>
-              <Text style={styles.sectionContent}>{s.content}</Text>
-            </Card.Content>
+            <Text style={styles.sectionTitle}>{s.title}</Text>
+            <Text style={styles.sectionContent}>{s.content}</Text>
           </Card>
         ))}
 
@@ -62,9 +61,9 @@ export default function ReturnsExchangesScreen() {
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: TarodanColors.backgroundSecondary },
+  container: { flex: 1, backgroundColor: colors.surface.alt },
   header: {
-    backgroundColor: TarodanColors.primary,
+    backgroundColor: colors.primary[600]!,
     paddingTop: 50,
     paddingBottom: 16,
     paddingHorizontal: 20,
@@ -72,7 +71,7 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     alignItems: 'center',
   },
-  headerTitle: { fontSize: 18, fontWeight: 'bold', color: TarodanColors.textOnPrimary },
+  headerTitle: { fontSize: 18, fontWeight: 'bold', color: colors.white },
   content: { flex: 1, padding: 16 },
   iconRow: { flexDirection: 'row', alignItems: 'center', marginBottom: 20, gap: 12 },
   iconCircle: {
@@ -82,9 +81,9 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
   },
-  pageTitle: { fontSize: 20, fontWeight: 'bold', color: TarodanColors.text },
-  pageSubtitle: { fontSize: 14, color: TarodanColors.textLight, marginTop: 2 },
-  card: { backgroundColor: TarodanColors.background, marginBottom: 12, borderRadius: 12 },
-  sectionTitle: { fontSize: 16, fontWeight: '600', color: TarodanColors.text, marginBottom: 8 },
-  sectionContent: { fontSize: 14, color: TarodanColors.textSecondary, lineHeight: 22 },
+  pageTitle: { fontSize: 20, fontWeight: 'bold', color: colors.text.heading },
+  pageSubtitle: { fontSize: 14, color: colors.text.subtle, marginTop: 2 },
+  card: { backgroundColor: colors.surface.DEFAULT, marginBottom: 12, borderRadius: 12 },
+  sectionTitle: { fontSize: 16, fontWeight: '600', color: colors.text.heading, marginBottom: 8 },
+  sectionContent: { fontSize: 14, color: colors.text.muted, lineHeight: 22 },
 });

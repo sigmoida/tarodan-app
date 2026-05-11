@@ -1,12 +1,12 @@
-import { View, ScrollView, StyleSheet, TouchableOpacity, Image, RefreshControl } from 'react-native';
-import { Card, Avatar, Button, ActivityIndicator, IconButton } from 'react-native-paper';
-import { Text } from '../src/components/common';
+import { View, ScrollView, StyleSheet, TouchableOpacity, RefreshControl } from 'react-native';
 import { useState, useCallback } from 'react';
 import { router, useFocusEffect } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
+import { theme, Text, Card, Avatar, Button, Spinner } from '@tarodan/ui-native';
 import { useFollowStore, FollowedSeller } from '../src/stores/followStore';
 import { useAuthStore } from '../src/stores/authStore';
-import { TarodanColors } from '../src/theme';
+
+const { colors } = theme;
 
 export default function FollowingScreen() {
   const { isAuthenticated } = useAuthStore();
@@ -44,14 +44,12 @@ export default function FollowingScreen() {
   if (!isAuthenticated) {
     return (
       <View style={styles.centeredContainer}>
-        <Ionicons name="people-outline" size={64} color={TarodanColors.primary} />
-        <Text variant="titleLarge" style={styles.title}>Takip Ettiklerim</Text>
-        <Text variant="bodyMedium" style={styles.subtitle}>
+        <Ionicons name="people-outline" size={64} color={colors.primary[600]!} />
+        <Text variant="h2" style={styles.title}>Takip Ettiklerim</Text>
+        <Text variant="body" style={styles.subtitle}>
           Satıcıları takip etmek için giriş yapın
         </Text>
-        <Button mode="contained" onPress={() => router.push('/(auth)/login')}>
-          Giriş Yap
-        </Button>
+        <Button variant="primary" title="Giriş Yap" onPress={() => router.push('/(auth)/login')} />
       </View>
     );
   }
@@ -61,7 +59,7 @@ export default function FollowingScreen() {
       {/* Header */}
       <View style={styles.header}>
         <TouchableOpacity onPress={() => router.back()}>
-          <Ionicons name="arrow-back" size={24} color={TarodanColors.textOnPrimary} />
+          <Ionicons name="arrow-back" size={24} color={colors.white} />
         </TouchableOpacity>
         <Text style={styles.headerTitle}>Takip Ettiklerim ({getFollowingCount()})</Text>
         <View style={{ width: 24 }} />
@@ -70,43 +68,41 @@ export default function FollowingScreen() {
       {/* Content */}
       {isLoading && following.length === 0 ? (
         <View style={styles.loadingContainer}>
-          <ActivityIndicator size="large" color={TarodanColors.primary} />
+          <Spinner size="lg" />
         </View>
       ) : following.length === 0 ? (
         <View style={styles.emptyContainer}>
-          <Ionicons name="people-outline" size={80} color={TarodanColors.textLight} />
-          <Text variant="titleMedium" style={styles.emptyTitle}>Henüz kimseyi takip etmiyorsunuz</Text>
-          <Text variant="bodyMedium" style={styles.emptySubtitle}>
+          <Ionicons name="people-outline" size={80} color={colors.text.subtle} />
+          <Text variant="h3" style={styles.emptyTitle}>Henüz kimseyi takip etmiyorsunuz</Text>
+          <Text variant="body" style={styles.emptySubtitle}>
             Satıcıları takip ederek yeni ilanlarından haberdar olun
           </Text>
-          <Button mode="contained" onPress={() => router.push('/(tabs)/search')}>
-            Satıcıları Keşfet
-          </Button>
+          <Button variant="primary" title="Satıcıları Keşfet" onPress={() => router.push('/(tabs)/search')} />
         </View>
       ) : (
         <ScrollView
           style={styles.content}
           refreshControl={
-            <RefreshControl refreshing={refreshing} onRefresh={onRefresh} colors={[TarodanColors.primary]} />
+            <RefreshControl refreshing={refreshing} onRefresh={onRefresh} colors={[colors.primary[600]!]} />
           }
         >
           {following.map((seller) => (
-            <Card key={seller.id} style={styles.sellerCard}>
+            <Card key={seller.id} padding={0} style={styles.sellerCard}>
               <TouchableOpacity onPress={() => router.push(`/seller/${seller.id}`)}>
-                <Card.Content style={styles.sellerContent}>
-                  {seller.avatarUrl ? (
-                    <Avatar.Image size={56} source={{ uri: seller.avatarUrl }} />
-                  ) : (
-                    <Avatar.Text size={56} label={seller.displayName.charAt(0)} />
-                  )}
+                <View style={styles.sellerContent}>
+                  <Avatar
+                    size="lg"
+                    source={seller.avatarUrl}
+                    name={seller.displayName}
+                  />
                   <View style={styles.sellerInfo}>
-                    <Text variant="titleSmall">{seller.displayName}</Text>
+                    <Text variant="label">{seller.displayName}</Text>
                     <View style={styles.sellerStats}>
-                      <Ionicons name="pricetag" size={14} color={TarodanColors.textSecondary} />
+                      <Ionicons name="pricetag" size={14} color={colors.text.muted} />
                       <Text style={styles.statText}>{seller.listingCount} ilan</Text>
                       {seller.rating && (
                         <>
-                          <Ionicons name="star" size={14} color={TarodanColors.warning} style={{ marginLeft: 12 }} />
+                          <Ionicons name="star" size={14} color={colors.warning[500]!} style={{ marginLeft: 12 }} />
                           <Text style={styles.statText}>{seller.rating.toFixed(1)}</Text>
                         </>
                       )}
@@ -117,14 +113,13 @@ export default function FollowingScreen() {
                   </View>
                   <View style={styles.actions}>
                     <Button
-                      mode="outlined"
-                      compact
+                      variant="outline"
+                      size="sm"
+                      title="Takibi Bırak"
                       onPress={() => handleUnfollow(seller)}
-                    >
-                      Takibi Bırak
-                    </Button>
+                    />
                   </View>
-                </Card.Content>
+                </View>
               </TouchableOpacity>
             </Card>
           ))}
@@ -139,17 +134,17 @@ export default function FollowingScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: TarodanColors.backgroundSecondary,
+    backgroundColor: colors.surface.alt,
   },
   centeredContainer: {
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
     padding: 32,
-    backgroundColor: TarodanColors.background,
+    backgroundColor: colors.surface.DEFAULT,
   },
   header: {
-    backgroundColor: TarodanColors.primary,
+    backgroundColor: colors.primary[600]!,
     paddingTop: 50,
     paddingBottom: 16,
     paddingHorizontal: 20,
@@ -160,7 +155,7 @@ const styles = StyleSheet.create({
   headerTitle: {
     fontSize: 18,
     fontWeight: 'bold',
-    color: TarodanColors.textOnPrimary,
+    color: colors.white,
   },
   title: {
     marginTop: 16,
@@ -169,7 +164,7 @@ const styles = StyleSheet.create({
   subtitle: {
     textAlign: 'center',
     marginBottom: 24,
-    color: TarodanColors.textSecondary,
+    color: colors.text.muted,
   },
   loadingContainer: {
     flex: 1,
@@ -185,12 +180,12 @@ const styles = StyleSheet.create({
   emptyTitle: {
     marginTop: 16,
     marginBottom: 8,
-    color: TarodanColors.textPrimary,
+    color: colors.text.heading,
   },
   emptySubtitle: {
     textAlign: 'center',
     marginBottom: 24,
-    color: TarodanColors.textSecondary,
+    color: colors.text.muted,
   },
   content: {
     flex: 1,
@@ -198,11 +193,12 @@ const styles = StyleSheet.create({
   },
   sellerCard: {
     marginBottom: 12,
-    backgroundColor: TarodanColors.background,
+    backgroundColor: colors.surface.DEFAULT,
   },
   sellerContent: {
     flexDirection: 'row',
     alignItems: 'center',
+    padding: 12,
   },
   sellerInfo: {
     flex: 1,
@@ -215,11 +211,11 @@ const styles = StyleSheet.create({
   },
   statText: {
     marginLeft: 4,
-    color: TarodanColors.textSecondary,
+    color: colors.text.muted,
     fontSize: 12,
   },
   followedDate: {
-    color: TarodanColors.textLight,
+    color: colors.text.subtle,
     fontSize: 11,
     marginTop: 4,
   },
