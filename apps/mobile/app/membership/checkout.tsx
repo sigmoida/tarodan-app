@@ -1,11 +1,11 @@
 import { useState } from 'react';
 import { View, ScrollView, StyleSheet, TouchableOpacity } from 'react-native';
-import { Button, RadioButton, Card, ActivityIndicator } from 'react-native-paper';
-import { Text, TextInput } from '../../src/components/common';
+import { theme, Button, Card, Input, Radio, Text } from '@tarodan/ui-native';
 import { router, useLocalSearchParams } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { useAuthStore } from '../../src/stores/authStore';
-import { TarodanColors } from '../../src/theme';
+
+const { colors } = theme;
 
 const MEMBERSHIP_TIERS = {
   basic: {
@@ -20,7 +20,7 @@ const MEMBERSHIP_TIERS = {
       'Koleksiyon oluşturma',
       '2 öne çıkan ilan',
     ],
-    color: '#3B82F6',
+    color: colors.info[600]!,
   },
   premium: {
     id: 'premium',
@@ -36,7 +36,7 @@ const MEMBERSHIP_TIERS = {
       'Reklamsız deneyim',
       'Öncelikli destek',
     ],
-    color: '#8B5CF6',
+    color: colors.primary[600]!,
     popular: true,
   },
   business: {
@@ -55,7 +55,7 @@ const MEMBERSHIP_TIERS = {
       'API erişimi',
       'Özel satıcı rozeti',
     ],
-    color: '#F59E0B',
+    color: colors.warning[500]!,
   },
 };
 
@@ -104,7 +104,7 @@ export default function MembershipCheckoutScreen() {
       {/* Header */}
       <View style={styles.header}>
         <TouchableOpacity onPress={() => router.back()}>
-          <Ionicons name="arrow-back" size={24} color={TarodanColors.textOnPrimary} />
+          <Ionicons name="arrow-back" size={24} color={colors.white} />
         </TouchableOpacity>
         <Text style={styles.headerTitle}>Üyelik Satın Al</Text>
         <View style={{ width: 24 }} />
@@ -113,100 +113,88 @@ export default function MembershipCheckoutScreen() {
       <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
         {/* Selected Plan */}
         <Card style={[styles.planCard, { borderColor: tier.color }]}>
-          <Card.Content>
-            <View style={styles.planHeader}>
-              <View>
-                <Text style={[styles.planName, { color: tier.color }]}>{tier.name}</Text>
-                <Text style={styles.planPrice}>
-                  ₺{tier.price}<Text style={styles.planPeriod}>/{tier.period}</Text>
-                </Text>
+          <View style={styles.planHeader}>
+            <View>
+              <Text style={[styles.planName, { color: tier.color }]}>{tier.name}</Text>
+              <Text style={styles.planPrice}>
+                ₺{tier.price}<Text style={styles.planPeriod}>/{tier.period}</Text>
+              </Text>
+            </View>
+            {'popular' in tier && tier.popular && (
+              <View style={[styles.popularBadge, { backgroundColor: tier.color }]}>
+                <Text style={styles.popularBadgeText}>Popüler</Text>
               </View>
-              {'popular' in tier && tier.popular && (
-                <View style={[styles.popularBadge, { backgroundColor: tier.color }]}>
-                  <Text style={styles.popularBadgeText}>Popüler</Text>
-                </View>
-              )}
-            </View>
-            <View style={styles.featuresCompact}>
-              {tier.features.slice(0, 3).map((feature, index) => (
-                <View key={index} style={styles.featureItem}>
-                  <Ionicons name="checkmark-circle" size={16} color={tier.color} />
-                  <Text style={styles.featureText}>{feature}</Text>
-                </View>
-              ))}
-              {tier.features.length > 3 && (
-                <Text style={styles.moreFeatures}>+{tier.features.length - 3} daha fazla</Text>
-              )}
-            </View>
-          </Card.Content>
+            )}
+          </View>
+          <View style={styles.featuresCompact}>
+            {tier.features.slice(0, 3).map((feature, index) => (
+              <View key={index} style={styles.featureItem}>
+                <Ionicons name="checkmark-circle" size={16} color={tier.color} />
+                <Text style={styles.featureText}>{feature}</Text>
+              </View>
+            ))}
+            {tier.features.length > 3 && (
+              <Text style={styles.moreFeatures}>+{tier.features.length - 3} daha fazla</Text>
+            )}
+          </View>
         </Card>
 
         {/* Payment Method */}
         <Text style={styles.sectionTitle}>Ödeme Yöntemi</Text>
         <Card style={styles.paymentCard}>
-          <Card.Content>
-            <RadioButton.Group onValueChange={setPaymentMethod} value={paymentMethod}>
-              <TouchableOpacity 
-                style={styles.paymentOption}
-                onPress={() => setPaymentMethod('card')}
-              >
-                <RadioButton value="card" color={TarodanColors.primary} />
-                <Ionicons name="card-outline" size={24} color={TarodanColors.textPrimary} />
-                <Text style={styles.paymentOptionText}>Kredi/Banka Kartı</Text>
-              </TouchableOpacity>
-            </RadioButton.Group>
-          </Card.Content>
+          <TouchableOpacity
+            style={styles.paymentOption}
+            onPress={() => setPaymentMethod('card')}
+          >
+            <Radio
+              checked={paymentMethod === 'card'}
+              onChange={() => setPaymentMethod('card')}
+              label=""
+            />
+            <Ionicons name="card-outline" size={24} color={colors.text.heading} />
+            <Text style={styles.paymentOptionText}>Kredi/Banka Kartı</Text>
+          </TouchableOpacity>
         </Card>
 
         {/* Card Details */}
         {paymentMethod === 'card' && (
           <View style={styles.cardForm}>
-            <TextInput
+            <Input
               label="Kart Üzerindeki İsim"
               value={cardName}
               onChangeText={setCardName}
-              mode="outlined"
-              style={styles.input}
-              outlineColor={TarodanColors.border}
-              activeOutlineColor={TarodanColors.primary}
+              containerStyle={styles.input}
             />
-            <TextInput
+            <Input
               label="Kart Numarası"
               value={cardNumber}
-              onChangeText={(text) => setCardNumber(formatCardNumber(text))}
-              mode="outlined"
-              style={styles.input}
+              onChangeText={(text: string) => setCardNumber(formatCardNumber(text))}
               keyboardType="numeric"
               maxLength={19}
-              outlineColor={TarodanColors.border}
-              activeOutlineColor={TarodanColors.primary}
-              left={<TextInput.Icon icon="credit-card-outline" />}
+              leftIconName="card-outline"
+              containerStyle={styles.input}
             />
             <View style={styles.cardRow}>
-              <TextInput
-                label="Son Kullanma"
-                value={cardExpiry}
-                onChangeText={(text) => setCardExpiry(formatExpiry(text))}
-                mode="outlined"
-                style={[styles.input, styles.halfInput]}
-                keyboardType="numeric"
-                maxLength={5}
-                placeholder="MM/YY"
-                outlineColor={TarodanColors.border}
-                activeOutlineColor={TarodanColors.primary}
-              />
-              <TextInput
-                label="CVC"
-                value={cardCvc}
-                onChangeText={setCardCvc}
-                mode="outlined"
-                style={[styles.input, styles.halfInput]}
-                keyboardType="numeric"
-                maxLength={4}
-                secureTextEntry
-                outlineColor={TarodanColors.border}
-                activeOutlineColor={TarodanColors.primary}
-              />
+              <View style={styles.halfInput}>
+                <Input
+                  label="Son Kullanma"
+                  value={cardExpiry}
+                  onChangeText={(text: string) => setCardExpiry(formatExpiry(text))}
+                  keyboardType="numeric"
+                  maxLength={5}
+                  placeholder="MM/YY"
+                />
+              </View>
+              <View style={styles.halfInput}>
+                <Input
+                  label="CVC"
+                  value={cardCvc}
+                  onChangeText={setCardCvc}
+                  keyboardType="numeric"
+                  maxLength={4}
+                  secureTextEntry
+                />
+              </View>
             </View>
           </View>
         )}
@@ -214,21 +202,19 @@ export default function MembershipCheckoutScreen() {
         {/* Order Summary */}
         <Text style={styles.sectionTitle}>Sipariş Özeti</Text>
         <Card style={styles.summaryCard}>
-          <Card.Content>
-            <View style={styles.summaryRow}>
-              <Text style={styles.summaryLabel}>{tier.name} Üyelik</Text>
-              <Text style={styles.summaryValue}>₺{tier.price}</Text>
-            </View>
-            <View style={styles.summaryRow}>
-              <Text style={styles.summaryLabel}>KDV (%20)</Text>
-              <Text style={styles.summaryValue}>₺{(tier.price * 0.2).toFixed(2)}</Text>
-            </View>
-            <View style={styles.divider} />
-            <View style={styles.summaryRow}>
-              <Text style={styles.totalLabel}>Toplam</Text>
-              <Text style={styles.totalValue}>₺{(tier.price * 1.2).toFixed(2)}</Text>
-            </View>
-          </Card.Content>
+          <View style={styles.summaryRow}>
+            <Text style={styles.summaryLabel}>{tier.name} Üyelik</Text>
+            <Text style={styles.summaryValue}>₺{tier.price}</Text>
+          </View>
+          <View style={styles.summaryRow}>
+            <Text style={styles.summaryLabel}>KDV (%20)</Text>
+            <Text style={styles.summaryValue}>₺{(tier.price * 0.2).toFixed(2)}</Text>
+          </View>
+          <View style={styles.divider} />
+          <View style={styles.summaryRow}>
+            <Text style={styles.totalLabel}>Toplam</Text>
+            <Text style={styles.totalValue}>₺{(tier.price * 1.2).toFixed(2)}</Text>
+          </View>
         </Card>
 
         {/* Terms */}
@@ -242,15 +228,13 @@ export default function MembershipCheckoutScreen() {
 
         {/* Pay Button */}
         <Button
-          mode="contained"
+          variant="primary"
+          title={loading ? 'İşleniyor...' : `₺${(tier.price * 1.2).toFixed(2)} Öde`}
           onPress={handlePayment}
-          loading={loading}
+          isLoading={loading}
           disabled={loading || !cardNumber || !cardExpiry || !cardCvc || !cardName}
           style={styles.payButton}
-          buttonColor={tier.color}
-        >
-          {loading ? 'İşleniyor...' : `₺${(tier.price * 1.2).toFixed(2)} Öde`}
-        </Button>
+        />
 
         <View style={{ height: 40 }} />
       </ScrollView>
@@ -261,10 +245,10 @@ export default function MembershipCheckoutScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: TarodanColors.backgroundSecondary,
+    backgroundColor: colors.surface.alt,
   },
   header: {
-    backgroundColor: TarodanColors.primary,
+    backgroundColor: colors.primary[600]!,
     paddingTop: 50,
     paddingBottom: 16,
     paddingHorizontal: 20,
@@ -275,7 +259,7 @@ const styles = StyleSheet.create({
   headerTitle: {
     fontSize: 18,
     fontWeight: 'bold',
-    color: TarodanColors.textOnPrimary,
+    color: colors.white,
   },
   content: {
     flex: 1,
@@ -284,7 +268,7 @@ const styles = StyleSheet.create({
   planCard: {
     marginBottom: 24,
     borderWidth: 2,
-    backgroundColor: TarodanColors.background,
+    backgroundColor: colors.surface.DEFAULT,
   },
   planHeader: {
     flexDirection: 'row',
@@ -299,13 +283,13 @@ const styles = StyleSheet.create({
   planPrice: {
     fontSize: 32,
     fontWeight: 'bold',
-    color: TarodanColors.textPrimary,
+    color: colors.text.heading,
     marginTop: 4,
   },
   planPeriod: {
     fontSize: 14,
     fontWeight: 'normal',
-    color: TarodanColors.textSecondary,
+    color: colors.text.muted,
   },
   popularBadge: {
     paddingHorizontal: 12,
@@ -313,7 +297,7 @@ const styles = StyleSheet.create({
     borderRadius: 12,
   },
   popularBadgeText: {
-    color: '#fff',
+    color: colors.white,
     fontSize: 12,
     fontWeight: 'bold',
   },
@@ -327,39 +311,38 @@ const styles = StyleSheet.create({
   featureText: {
     marginLeft: 8,
     fontSize: 14,
-    color: TarodanColors.textPrimary,
+    color: colors.text.heading,
   },
   moreFeatures: {
     marginLeft: 24,
     fontSize: 13,
-    color: TarodanColors.textSecondary,
+    color: colors.text.muted,
     fontStyle: 'italic',
   },
   sectionTitle: {
     fontSize: 16,
     fontWeight: 'bold',
-    color: TarodanColors.textPrimary,
+    color: colors.text.heading,
     marginBottom: 12,
   },
   paymentCard: {
     marginBottom: 24,
-    backgroundColor: TarodanColors.background,
+    backgroundColor: colors.surface.DEFAULT,
   },
   paymentOption: {
     flexDirection: 'row',
     alignItems: 'center',
+    gap: 8,
   },
   paymentOptionText: {
-    marginLeft: 8,
     fontSize: 15,
-    color: TarodanColors.textPrimary,
+    color: colors.text.heading,
   },
   cardForm: {
     marginBottom: 24,
   },
   input: {
     marginBottom: 12,
-    backgroundColor: TarodanColors.background,
   },
   cardRow: {
     flexDirection: 'row',
@@ -370,7 +353,7 @@ const styles = StyleSheet.create({
   },
   summaryCard: {
     marginBottom: 16,
-    backgroundColor: TarodanColors.background,
+    backgroundColor: colors.surface.DEFAULT,
   },
   summaryRow: {
     flexDirection: 'row',
@@ -379,40 +362,39 @@ const styles = StyleSheet.create({
   },
   summaryLabel: {
     fontSize: 14,
-    color: TarodanColors.textSecondary,
+    color: colors.text.muted,
   },
   summaryValue: {
     fontSize: 14,
-    color: TarodanColors.textPrimary,
+    color: colors.text.heading,
   },
   divider: {
     height: 1,
-    backgroundColor: TarodanColors.border,
+    backgroundColor: colors.border.DEFAULT,
     marginVertical: 12,
   },
   totalLabel: {
     fontSize: 16,
     fontWeight: 'bold',
-    color: TarodanColors.textPrimary,
+    color: colors.text.heading,
   },
   totalValue: {
     fontSize: 18,
     fontWeight: 'bold',
-    color: TarodanColors.primary,
+    color: colors.primary[600]!,
   },
   terms: {
     fontSize: 12,
-    color: TarodanColors.textSecondary,
+    color: colors.text.muted,
     textAlign: 'center',
     marginBottom: 16,
     lineHeight: 18,
   },
   termsLink: {
-    color: TarodanColors.primary,
+    color: colors.primary[600]!,
     textDecorationLine: 'underline',
   },
   payButton: {
     borderRadius: 12,
-    paddingVertical: 4,
   },
 });

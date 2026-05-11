@@ -1,11 +1,12 @@
 import React from 'react';
 import { View, StyleSheet, TouchableOpacity } from 'react-native';
-import { Text, Card, ProgressBar } from 'react-native-paper';
 import { Ionicons } from '@expo/vector-icons';
 import { router } from 'expo-router';
 import { useAuthStore } from '../stores/authStore';
 import { getVerificationCriteria } from '../utils/membershipLimits';
-import { TarodanColors } from '../theme';
+import { theme, Text, Card, ProgressBar } from '@tarodan/ui-native';
+
+const { colors } = theme;
 
 interface VerificationStatusProps {
   compact?: boolean;
@@ -38,9 +39,9 @@ export default function VerificationStatus({ compact = false, showUpgradePrompt 
           <Ionicons
             name={isVerified ? 'shield-checkmark' : 'shield-outline'}
             size={20}
-            color={isVerified ? TarodanColors.success : TarodanColors.warning}
+            color={isVerified ? colors.success[600]! : colors.warning[600]!}
           />
-          <Text style={[styles.compactText, { color: isVerified ? TarodanColors.success : TarodanColors.warning }]}>
+          <Text style={[styles.compactText, { color: isVerified ? colors.success[600]! : colors.warning[600]! }]}>
             {isVerified ? 'Doğrulanmış Üye' : 'Doğrulama Bekliyor'}
           </Text>
         </View>
@@ -50,97 +51,95 @@ export default function VerificationStatus({ compact = false, showUpgradePrompt 
 
   return (
     <Card style={styles.card}>
-      <Card.Content>
-        <View style={styles.header}>
-          <Ionicons
-            name={isVerified ? 'shield-checkmark' : 'shield-half-outline'}
-            size={28}
-            color={isVerified ? TarodanColors.success : TarodanColors.primary}
-          />
-          <View style={styles.headerText}>
-            <Text variant="titleMedium">
-              {isVerified ? 'Doğrulanmış Üye' : 'Üye Doğrulama'}
-            </Text>
-            <Text variant="bodySmall" style={styles.subtitle}>
-              {isVerified 
-                ? 'Hesabınız doğrulandı!' 
-                : `${completedCount}/6 kriter tamamlandı`}
-            </Text>
-          </View>
+      <View style={styles.header}>
+        <Ionicons
+          name={isVerified ? 'shield-checkmark' : 'shield-half-outline'}
+          size={28}
+          color={isVerified ? colors.success[600]! : colors.primary[600]!}
+        />
+        <View style={styles.headerText}>
+          <Text style={styles.headerTitle}>
+            {isVerified ? 'Doğrulanmış Üye' : 'Üye Doğrulama'}
+          </Text>
+          <Text style={styles.subtitle}>
+            {isVerified
+              ? 'Hesabınız doğrulandı!'
+              : `${completedCount}/6 kriter tamamlandı`}
+          </Text>
         </View>
+      </View>
 
-        {!isVerified && (
-          <>
-            <ProgressBar progress={progress} color={TarodanColors.primary} style={styles.progressBar} />
+      {!isVerified && (
+        <>
+          <ProgressBar progress={progress} color={colors.primary[600]!} style={styles.progressBar} />
 
-            <View style={styles.criteriaList}>
-              <CriteriaItem
-                label="E-posta Doğrulama"
-                completed={criteria.emailVerified}
-              />
-              <CriteriaItem
-                label="Telefon Doğrulama"
-                completed={criteria.phoneVerified}
-              />
-              <CriteriaItem
-                label="İlk İşlem (Alış/Satış)"
-                completed={criteria.hasTransaction}
-              />
-              <CriteriaItem
-                label="Hesap Yaşı (30 gün)"
-                completed={criteria.accountAgeOk}
-                detail={`${user.accountAge} gün`}
-              />
-              <CriteriaItem
-                label="Şikayetsiz Hesap"
-                completed={criteria.noDisputes}
-              />
-              <CriteriaItem
-                label="Profil Tamamlama (%80+)"
-                completed={criteria.profileComplete}
-                detail={`%${user.profileCompletion}`}
-              />
-            </View>
-
-            <View style={styles.benefits}>
-              <Text variant="titleSmall" style={styles.benefitsTitle}>Doğrulama Avantajları:</Text>
-              <View style={styles.benefitItem}>
-                <Ionicons name="checkmark-circle" size={16} color={TarodanColors.success} />
-                <Text style={styles.benefitText}>Doğrulanmış Üye rozeti</Text>
-              </View>
-              <View style={styles.benefitItem}>
-                <Ionicons name="checkmark-circle" size={16} color={TarodanColors.success} />
-                <Text style={styles.benefitText}>5.000 TL'ye kadar ilan verme</Text>
-              </View>
-              <View style={styles.benefitItem}>
-                <Ionicons name="checkmark-circle" size={16} color={TarodanColors.success} />
-                <Text style={styles.benefitText}>Daha yüksek güven skoru</Text>
-              </View>
-            </View>
-          </>
-        )}
-
-        {isVerified && showUpgradePrompt && user.membershipTier === 'free' && (
-          <View style={styles.upgradePrompt}>
-            <Text variant="bodySmall" style={styles.upgradeText}>
-              Sınırsız ilan, takas ve Dijital Garaj için
-            </Text>
-            <TouchableOpacity onPress={() => router.push('/upgrade')}>
-              <Text style={styles.upgradeLink}>Premium'a Geç</Text>
-            </TouchableOpacity>
+          <View style={styles.criteriaList}>
+            <CriteriaItem
+              label="E-posta Doğrulama"
+              completed={criteria.emailVerified}
+            />
+            <CriteriaItem
+              label="Telefon Doğrulama"
+              completed={criteria.phoneVerified}
+            />
+            <CriteriaItem
+              label="İlk İşlem (Alış/Satış)"
+              completed={criteria.hasTransaction}
+            />
+            <CriteriaItem
+              label="Hesap Yaşı (30 gün)"
+              completed={criteria.accountAgeOk}
+              detail={`${user.accountAge} gün`}
+            />
+            <CriteriaItem
+              label="Şikayetsiz Hesap"
+              completed={criteria.noDisputes}
+            />
+            <CriteriaItem
+              label="Profil Tamamlama (%80+)"
+              completed={criteria.profileComplete}
+              detail={`%${user.profileCompletion}`}
+            />
           </View>
-        )}
-      </Card.Content>
+
+          <View style={styles.benefits}>
+            <Text style={styles.benefitsTitle}>Doğrulama Avantajları:</Text>
+            <View style={styles.benefitItem}>
+              <Ionicons name="checkmark-circle" size={16} color={colors.success[600]!} />
+              <Text style={styles.benefitText}>Doğrulanmış Üye rozeti</Text>
+            </View>
+            <View style={styles.benefitItem}>
+              <Ionicons name="checkmark-circle" size={16} color={colors.success[600]!} />
+              <Text style={styles.benefitText}>5.000 TL&apos;ye kadar ilan verme</Text>
+            </View>
+            <View style={styles.benefitItem}>
+              <Ionicons name="checkmark-circle" size={16} color={colors.success[600]!} />
+              <Text style={styles.benefitText}>Daha yüksek güven skoru</Text>
+            </View>
+          </View>
+        </>
+      )}
+
+      {isVerified && showUpgradePrompt && user.membershipTier === 'free' && (
+        <View style={styles.upgradePrompt}>
+          <Text style={styles.upgradeText}>
+            Sınırsız ilan, takas ve Dijital Garaj için
+          </Text>
+          <TouchableOpacity onPress={() => router.push('/upgrade')}>
+            <Text style={styles.upgradeLink}>Premium&apos;a Geç</Text>
+          </TouchableOpacity>
+        </View>
+      )}
     </Card>
   );
 }
 
-function CriteriaItem({ 
-  label, 
-  completed, 
-  detail 
-}: { 
-  label: string; 
+function CriteriaItem({
+  label,
+  completed,
+  detail
+}: {
+  label: string;
   completed: boolean;
   detail?: string;
 }) {
@@ -149,7 +148,7 @@ function CriteriaItem({
       <Ionicons
         name={completed ? 'checkmark-circle' : 'ellipse-outline'}
         size={20}
-        color={completed ? TarodanColors.success : TarodanColors.textLight}
+        color={completed ? colors.success[600]! : colors.text.subtle}
       />
       <Text style={[styles.criteriaLabel, completed && styles.criteriaLabelCompleted]}>
         {label}
@@ -164,7 +163,7 @@ function CriteriaItem({
 const styles = StyleSheet.create({
   card: {
     marginVertical: 8,
-    backgroundColor: TarodanColors.background,
+    backgroundColor: colors.surface.DEFAULT,
   },
   compactContainer: {
     flexDirection: 'row',
@@ -184,8 +183,14 @@ const styles = StyleSheet.create({
   headerText: {
     marginLeft: 12,
   },
+  headerTitle: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: colors.text.heading,
+  },
   subtitle: {
-    color: TarodanColors.textSecondary,
+    color: colors.text.muted,
+    fontSize: 12,
   },
   progressBar: {
     height: 8,
@@ -203,23 +208,25 @@ const styles = StyleSheet.create({
   criteriaLabel: {
     flex: 1,
     marginLeft: 12,
-    color: TarodanColors.textSecondary,
+    color: colors.text.muted,
   },
   criteriaLabelCompleted: {
-    color: TarodanColors.textPrimary,
+    color: colors.text.heading,
   },
   criteriaDetail: {
-    color: TarodanColors.textSecondary,
+    color: colors.text.muted,
     fontSize: 12,
   },
   benefits: {
-    backgroundColor: TarodanColors.success + '10',
+    backgroundColor: colors.success[50]!,
     padding: 12,
     borderRadius: 8,
   },
   benefitsTitle: {
     marginBottom: 8,
-    color: TarodanColors.success,
+    color: colors.success[600]!,
+    fontSize: 13,
+    fontWeight: '600',
   },
   benefitItem: {
     flexDirection: 'row',
@@ -228,7 +235,7 @@ const styles = StyleSheet.create({
   },
   benefitText: {
     marginLeft: 8,
-    color: TarodanColors.textPrimary,
+    color: colors.text.heading,
     fontSize: 13,
   },
   upgradePrompt: {
@@ -238,13 +245,14 @@ const styles = StyleSheet.create({
     marginTop: 12,
     paddingTop: 12,
     borderTopWidth: 1,
-    borderTopColor: TarodanColors.border,
+    borderTopColor: colors.border.DEFAULT,
   },
   upgradeText: {
-    color: TarodanColors.textSecondary,
+    color: colors.text.muted,
+    fontSize: 12,
   },
   upgradeLink: {
-    color: TarodanColors.primary,
+    color: colors.primary[600]!,
     fontWeight: '600',
   },
 });

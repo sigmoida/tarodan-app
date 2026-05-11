@@ -1,9 +1,9 @@
 import { View, StyleSheet } from 'react-native';
-import { Button } from 'react-native-paper';
-import { Text } from '../../src/components/common';
+import { theme, Button, Text } from '@tarodan/ui-native';
 import { router } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
-import { TarodanColors } from '../../src/theme';
+
+const { colors } = theme;
 
 export default function MembershipSuccessScreen() {
   return (
@@ -11,7 +11,7 @@ export default function MembershipSuccessScreen() {
       <View style={styles.content}>
         {/* Success Icon */}
         <View style={styles.iconContainer}>
-          <Ionicons name="checkmark-circle" size={100} color={TarodanColors.success} />
+          <Ionicons name="checkmark-circle" size={100} color={colors.success[600]!} />
         </View>
 
         {/* Title */}
@@ -25,19 +25,19 @@ export default function MembershipSuccessScreen() {
         {/* Features */}
         <View style={styles.features}>
           <View style={styles.featureItem}>
-            <Ionicons name="infinite" size={24} color={TarodanColors.primary} />
+            <Ionicons name="infinite" size={24} color={colors.primary[600]!} />
             <Text style={styles.featureText}>Sınırsız İlan</Text>
           </View>
           <View style={styles.featureItem}>
-            <Ionicons name="swap-horizontal" size={24} color={TarodanColors.primary} />
+            <Ionicons name="swap-horizontal" size={24} color={colors.primary[600]!} />
             <Text style={styles.featureText}>Takas Özelliği</Text>
           </View>
           <View style={styles.featureItem}>
-            <Ionicons name="car-sport" size={24} color={TarodanColors.primary} />
+            <Ionicons name="car-sport" size={24} color={colors.primary[600]!} />
             <Text style={styles.featureText}>Digital Garage</Text>
           </View>
           <View style={styles.featureItem}>
-            <Ionicons name="star" size={24} color={TarodanColors.primary} />
+            <Ionicons name="star" size={24} color={colors.primary[600]!} />
             <Text style={styles.featureText}>Öne Çıkan İlanlar</Text>
           </View>
         </View>
@@ -45,21 +45,17 @@ export default function MembershipSuccessScreen() {
         {/* Buttons */}
         <View style={styles.buttons}>
           <Button
-            mode="contained"
+            variant="primary"
+            title="Ana Sayfaya Git"
             onPress={() => router.replace('/(tabs)')}
             style={styles.primaryButton}
-            buttonColor={TarodanColors.primary}
-          >
-            Ana Sayfaya Git
-          </Button>
+          />
           <Button
-            mode="outlined"
+            variant="outline"
+            title="İlanlarımı Gör"
             onPress={() => router.push('/settings/my-listings')}
             style={styles.secondaryButton}
-            textColor={TarodanColors.primary}
-          >
-            İlanlarımı Gör
-          </Button>
+          />
         </View>
       </View>
     </View>
@@ -69,7 +65,7 @@ export default function MembershipSuccessScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: TarodanColors.background,
+    backgroundColor: colors.surface.DEFAULT,
   },
   content: {
     flex: 1,
@@ -83,19 +79,19 @@ const styles = StyleSheet.create({
   title: {
     fontSize: 28,
     fontWeight: 'bold',
-    color: TarodanColors.textPrimary,
+    color: colors.text.heading,
     marginBottom: 12,
   },
   description: {
     fontSize: 15,
-    color: TarodanColors.textSecondary,
+    color: colors.text.muted,
     textAlign: 'center',
     lineHeight: 22,
     marginBottom: 32,
   },
   features: {
     width: '100%',
-    backgroundColor: TarodanColors.surfaceVariant,
+    backgroundColor: colors.surface.alt,
     borderRadius: 16,
     padding: 20,
     marginBottom: 32,
@@ -108,7 +104,7 @@ const styles = StyleSheet.create({
   featureText: {
     marginLeft: 16,
     fontSize: 15,
-    color: TarodanColors.textPrimary,
+    color: colors.text.heading,
     fontWeight: '500',
   },
   buttons: {
@@ -117,10 +113,9 @@ const styles = StyleSheet.create({
   },
   primaryButton: {
     borderRadius: 12,
-    paddingVertical: 4,
   },
   secondaryButton: {
     borderRadius: 12,
-    borderColor: TarodanColors.primary,
+    borderColor: colors.primary[600]!,
   },
 });

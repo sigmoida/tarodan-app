@@ -1,10 +1,11 @@
 import React, { useEffect, useState } from 'react';
-import { View, StyleSheet, ActivityIndicator } from 'react-native';
+import { View, StyleSheet } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { ordersApi } from '../../services/api';
-import { TarodanColors } from '../../theme';
+import { theme, Spinner, Text } from '@tarodan/ui-native';
 import { formatPrice } from '../../utils/format';
-import { Text } from './PaperCompat';
+
+const { colors } = theme;
 
 interface CommissionPreviewProps {
   /** Kullanıcının girdiği fiyat (TL, string veya sayı). */
@@ -71,7 +72,7 @@ export function CommissionPreview({ amount, categoryId, debounceMs = 500 }: Comm
   if (loading && !data) {
     return (
       <View style={styles.card}>
-        <ActivityIndicator size="small" color={TarodanColors.primary} />
+        <Spinner size="lg" />
         <Text style={styles.loadingText}>Komisyon hesaplanıyor...</Text>
       </View>
     );
@@ -80,7 +81,7 @@ export function CommissionPreview({ amount, categoryId, debounceMs = 500 }: Comm
   if (error) {
     return (
       <View style={styles.card}>
-        <Ionicons name="information-circle-outline" size={16} color={TarodanColors.textTertiary} />
+        <Ionicons name="information-circle-outline" size={16} color={colors.text.subtle} />
         <Text style={styles.errorText}>Komisyon önizlemesi şu an görüntülenemiyor.</Text>
       </View>
     );
@@ -95,7 +96,7 @@ export function CommissionPreview({ amount, categoryId, debounceMs = 500 }: Comm
   return (
     <View style={styles.card}>
       <View style={styles.header}>
-        <Ionicons name="calculator-outline" size={16} color={TarodanColors.primary} />
+        <Ionicons name="calculator-outline" size={16} color={colors.primary[600]!} />
         <Text style={styles.headerText}>
           Fiyat: {formatPrice(numeric)}
           {rate !== null ? ` • Komisyon oranı: %${rate}` : ''}
@@ -103,7 +104,7 @@ export function CommissionPreview({ amount, categoryId, debounceMs = 500 }: Comm
       </View>
       <View style={styles.row}>
         <Text style={styles.label}>Platform komisyonu</Text>
-        <Text style={[styles.value, { color: TarodanColors.error }]}>
+        <Text style={[styles.value, { color: colors.danger[600]! }]}>
           - {formatPrice(commission)}
         </Text>
       </View>
@@ -117,12 +118,12 @@ export function CommissionPreview({ amount, categoryId, debounceMs = 500 }: Comm
 
 const styles = StyleSheet.create({
   card: {
-    backgroundColor: TarodanColors.primaryLight,
+    backgroundColor: colors.primary[50]!,
     borderRadius: 10,
     padding: 12,
     marginTop: 8,
     borderLeftWidth: 3,
-    borderLeftColor: TarodanColors.primary,
+    borderLeftColor: colors.primary[600]!,
   },
   header: {
     flexDirection: 'row',
@@ -132,7 +133,7 @@ const styles = StyleSheet.create({
   },
   headerText: {
     fontSize: 12,
-    color: TarodanColors.textSecondary,
+    color: colors.text.muted,
     fontWeight: '500',
     flex: 1,
   },
@@ -144,7 +145,7 @@ const styles = StyleSheet.create({
   },
   label: {
     fontSize: 13,
-    color: TarodanColors.textSecondary,
+    color: colors.text.muted,
   },
   value: {
     fontSize: 13,
@@ -154,26 +155,26 @@ const styles = StyleSheet.create({
     marginTop: 6,
     paddingTop: 8,
     borderTopWidth: StyleSheet.hairlineWidth,
-    borderTopColor: TarodanColors.primary + '40',
+    borderTopColor: colors.primary[200]!,
   },
   netLabel: {
     fontSize: 14,
     fontWeight: '700',
-    color: TarodanColors.textPrimary,
+    color: colors.text.heading,
   },
   netValue: {
     fontSize: 16,
     fontWeight: '800',
-    color: TarodanColors.primary,
+    color: colors.primary[600]!,
   },
   loadingText: {
     fontSize: 12,
-    color: TarodanColors.textSecondary,
+    color: colors.text.muted,
     marginLeft: 8,
   },
   errorText: {
     fontSize: 12,
-    color: TarodanColors.textTertiary,
+    color: colors.text.subtle,
     marginLeft: 6,
     flex: 1,
   },

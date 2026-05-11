@@ -1,12 +1,7 @@
 /**
  * Mobile common components — köprü dosyası.
- *
- * Migrasyon sırasında dokunulmamış ekranların import path'leri kırılmadan
- * çalışsın diye `@tarodan/ui-native`'den re-export ediyoruz. YENİ ekranlar
- * doğrudan `@tarodan/ui-native`'den import etmeli (lint kuralları zorlar).
- *
- * Hâlâ yerelde kalanlar (domain-specific): AuthRequiredSheet, CommissionPreview,
- * CityDistrictSelector, PaperCompat (Text/TextInput/Searchbar/CardCover wrapper).
+ * UI primitives re-exported from @tarodan/ui-native.
+ * Geriye sadece domain-specific component'ler kaldı.
  */
 
 export {
@@ -19,8 +14,3 @@ export {
 export { default as AuthRequiredSheet } from './AuthRequiredSheet';
 export { default as CommissionPreview } from './CommissionPreview';
 export { default as CityDistrictSelector } from './CityDistrictSelector';
-
-// Paper wrapper'ları — `react-native-paper` Text/TextInput/Searchbar/CardCover
-// için TS prop uyumluluğu. Migration ilerleyince bu da kalkacak.
-export { Text, TextInput, Searchbar, CardCover } from './PaperCompat';
-export type { TextProps, TextInputProps, SearchbarProps, CardCoverProps } from './PaperCompat';

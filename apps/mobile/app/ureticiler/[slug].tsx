@@ -5,8 +5,9 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { useLocalSearchParams } from 'expo-router';
 import { useQuery } from '@tanstack/react-query';
 import { manufacturersApi, productsApi } from '../../src/services/api';
-import { TarodanColors } from '../../src/theme';
-import { ScreenHeader, Text } from '../../src/components/common';
+import { theme, Text } from '@tarodan/ui-native';
+import { ScreenHeader } from '../../src/components/common';
+const { colors } = theme;
 import { ProductGrid } from '../../src/components/product';
 import type { ProductCardProduct } from '../../src/components/product';
 
@@ -94,18 +95,18 @@ export default function ManufacturerDetailScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: TarodanColors.backgroundSecondary,
+    backgroundColor: colors.surface.alt,
   },
   header: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 12,
     padding: 16,
-    backgroundColor: TarodanColors.background,
+    backgroundColor: colors.surface.DEFAULT,
     borderRadius: 12,
     marginBottom: 12,
     borderWidth: StyleSheet.hairlineWidth,
-    borderColor: TarodanColors.border,
+    borderColor: colors.border.DEFAULT,
   },
   logo: {
     width: 72,
@@ -115,14 +116,14 @@ const styles = StyleSheet.create({
     width: 72,
     height: 72,
     borderRadius: 12,
-    backgroundColor: TarodanColors.primaryLight,
+    backgroundColor: colors.primary[50]!,
     alignItems: 'center',
     justifyContent: 'center',
   },
   logoFallbackText: {
     fontSize: 28,
     fontWeight: '800',
-    color: TarodanColors.primary,
+    color: colors.primary[600]!,
   },
   headerText: {
     flex: 1,
@@ -130,11 +131,11 @@ const styles = StyleSheet.create({
   name: {
     fontSize: 20,
     fontWeight: '800',
-    color: TarodanColors.textPrimary,
+    color: colors.text.heading,
   },
   count: {
     fontSize: 13,
-    color: TarodanColors.textSecondary,
+    color: colors.text.muted,
     marginTop: 4,
   },
 });

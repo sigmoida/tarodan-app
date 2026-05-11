@@ -1,12 +1,12 @@
 import React, { useState } from 'react';
 import { View, StyleSheet, ScrollView, TouchableOpacity, Image, Alert } from 'react-native';
-import { Portal, Dialog, Button, ActivityIndicator } from 'react-native-paper';
 import { Ionicons } from '@expo/vector-icons';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { Text, TextInput } from '../common';
-import { TarodanColors } from '../../theme';
+import { theme, Text, Button, Modal, Input, Textarea, Spinner } from '@tarodan/ui-native';
 import { collectionsApi } from '../../services/api';
 import { transformImageUrl } from '../../utils/imageUrl';
+
+const { colors } = theme;
 
 interface AddToCollectionModalProps {
   visible: boolean;
@@ -117,165 +117,147 @@ export default function AddToCollectionModal({
   };
 
   return (
-    <Portal>
-      <Dialog visible={visible} onDismiss={handleClose} style={styles.dialog}>
-        <Dialog.Title>{creating ? 'Yeni Koleksiyon' : 'Koleksiyona Ekle'}</Dialog.Title>
-
-        {creating ? (
-          <Dialog.Content>
-            <TextInput
-              mode="outlined"
-              label="Koleksiyon Adı *"
-              value={newName}
-              onChangeText={setNewName}
-              maxLength={60}
-              outlineColor={TarodanColors.border}
-              activeOutlineColor={TarodanColors.primary}
-              style={styles.input}
+    <Modal isOpen={visible} onClose={handleClose} title={creating ? 'Yeni Koleksiyon' : 'Koleksiyona Ekle'}>
+      {creating ? (
+        <View>
+          <Input
+            label="Koleksiyon Adı *"
+            value={newName}
+            onChangeText={setNewName}
+            maxLength={60}
+            containerStyle={styles.input}
+          />
+          <Textarea
+            label="Açıklama (opsiyonel)"
+            value={newDescription}
+            onChangeText={setNewDescription}
+            rows={3}
+            maxLength={300}
+            containerStyle={styles.input}
+          />
+          <TouchableOpacity
+            style={styles.toggleRow}
+            onPress={() => setNewPublic((v) => !v)}
+          >
+            <Ionicons
+              name={newPublic ? 'eye-outline' : 'lock-closed-outline'}
+              size={18}
+              color={colors.text.muted}
             />
-            <TextInput
-              mode="outlined"
-              label="Açıklama (opsiyonel)"
-              value={newDescription}
-              onChangeText={setNewDescription}
-              multiline
-              numberOfLines={3}
-              maxLength={300}
-              outlineColor={TarodanColors.border}
-              activeOutlineColor={TarodanColors.primary}
-              style={styles.input}
+            <Text style={styles.toggleText}>
+              {newPublic
+                ? 'Herkese Açık (Diğer kullanıcılar görebilir)'
+                : 'Özel (Sadece siz görebilirsiniz)'}
+            </Text>
+            <Ionicons
+              name={newPublic ? 'toggle' : 'toggle-outline'}
+              size={26}
+              color={newPublic ? colors.primary[600]! : colors.text.subtle}
             />
-            <TouchableOpacity
-              style={styles.toggleRow}
-              onPress={() => setNewPublic((v) => !v)}
-            >
-              <Ionicons
-                name={newPublic ? 'eye-outline' : 'lock-closed-outline'}
-                size={18}
-                color={TarodanColors.textSecondary}
-              />
-              <Text style={styles.toggleText}>
-                {newPublic
-                  ? 'Herkese Açık (Diğer kullanıcılar görebilir)'
-                  : 'Özel (Sadece siz görebilirsiniz)'}
-              </Text>
-              <Ionicons
-                name={newPublic ? 'toggle' : 'toggle-outline'}
-                size={26}
-                color={newPublic ? TarodanColors.primary : TarodanColors.textTertiary}
-              />
-            </TouchableOpacity>
-          </Dialog.Content>
-        ) : (
-          <Dialog.ScrollArea style={styles.scrollArea}>
-            {myCollectionsQuery.isLoading ? (
-              <View style={styles.loading}>
-                <ActivityIndicator color={TarodanColors.primary} />
-              </View>
-            ) : (
-              <ScrollView keyboardShouldPersistTaps="handled">
-                <TouchableOpacity
-                  style={styles.createNewRow}
-                  onPress={() => setCreating(true)}
-                >
-                  <View style={styles.createIcon}>
-                    <Ionicons name="add" size={22} color={TarodanColors.primary} />
-                  </View>
-                  <Text style={styles.createText}>Yeni Koleksiyon Oluştur</Text>
-                </TouchableOpacity>
-
-                {collections.length === 0 ? (
-                  <View style={styles.empty}>
-                    <Ionicons
-                      name="albums-outline"
-                      size={48}
-                      color={TarodanColors.textTertiary}
-                    />
-                    <Text style={styles.emptyText}>
-                      Henüz koleksiyonunuz yok. İlk koleksiyonunuzu oluşturarak başlayın.
-                    </Text>
-                  </View>
-                ) : (
-                  collections.map((c) => (
-                    <TouchableOpacity
-                      key={c.id}
-                      style={styles.collectionRow}
-                      onPress={() =>
-                        addToCollectionMutation.mutate({ collectionId: c.id })
-                      }
-                      disabled={addToCollectionMutation.isPending}
-                    >
-                      <View style={styles.cover}>
-                        {c.coverImageUrl ? (
-                          <Image
-                            source={{ uri: transformImageUrl(c.coverImageUrl) }}
-                            style={styles.coverImage}
-                          />
-                        ) : (
-                          <Ionicons
-                            name="albums"
-                            size={22}
-                            color={TarodanColors.primary}
-                          />
-                        )}
-                      </View>
-                      <View style={{ flex: 1 }}>
-                        <Text style={styles.collectionName} numberOfLines={1}>
-                          {c.name}
-                        </Text>
-                        <Text style={styles.collectionMeta}>
-                          {c.itemCount ?? 0} ürün ·{' '}
-                          {c.isPublic ? 'Herkese açık' : 'Özel'}
-                        </Text>
-                      </View>
-                      <Ionicons
-                        name="chevron-forward"
-                        size={18}
-                        color={TarodanColors.textTertiary}
-                      />
-                    </TouchableOpacity>
-                  ))
-                )}
-              </ScrollView>
-            )}
-          </Dialog.ScrollArea>
-        )}
-
-        <Dialog.Actions>
-          {creating ? (
-            <>
-              <Button
-                onPress={() => setCreating(false)}
-                disabled={createCollectionMutation.isPending}
-              >
-                Geri
-              </Button>
-              <Button
-                mode="contained"
-                buttonColor={TarodanColors.primary}
-                onPress={handleCreateSubmit}
-                loading={createCollectionMutation.isPending}
-                disabled={!newName.trim() || createCollectionMutation.isPending}
-              >
-                Oluştur ve Ekle
-              </Button>
-            </>
+          </TouchableOpacity>
+        </View>
+      ) : (
+        <View style={styles.scrollArea}>
+          {myCollectionsQuery.isLoading ? (
+            <View style={styles.loading}>
+              <Spinner size="lg" />
+            </View>
           ) : (
-            <Button onPress={handleClose}>Kapat</Button>
+            <ScrollView keyboardShouldPersistTaps="handled">
+              <TouchableOpacity
+                style={styles.createNewRow}
+                onPress={() => setCreating(true)}
+              >
+                <View style={styles.createIcon}>
+                  <Ionicons name="add" size={22} color={colors.primary[600]!} />
+                </View>
+                <Text style={styles.createText}>Yeni Koleksiyon Oluştur</Text>
+              </TouchableOpacity>
+
+              {collections.length === 0 ? (
+                <View style={styles.empty}>
+                  <Ionicons
+                    name="albums-outline"
+                    size={48}
+                    color={colors.text.subtle}
+                  />
+                  <Text style={styles.emptyText}>
+                    Henüz koleksiyonunuz yok. İlk koleksiyonunuzu oluşturarak başlayın.
+                  </Text>
+                </View>
+              ) : (
+                collections.map((c) => (
+                  <TouchableOpacity
+                    key={c.id}
+                    style={styles.collectionRow}
+                    onPress={() =>
+                      addToCollectionMutation.mutate({ collectionId: c.id })
+                    }
+                    disabled={addToCollectionMutation.isPending}
+                  >
+                    <View style={styles.cover}>
+                      {c.coverImageUrl ? (
+                        <Image
+                          source={{ uri: transformImageUrl(c.coverImageUrl) }}
+                          style={styles.coverImage}
+                        />
+                      ) : (
+                        <Ionicons
+                          name="albums"
+                          size={22}
+                          color={colors.primary[600]!}
+                        />
+                      )}
+                    </View>
+                    <View style={{ flex: 1 }}>
+                      <Text style={styles.collectionName} numberOfLines={1}>
+                        {c.name}
+                      </Text>
+                      <Text style={styles.collectionMeta}>
+                        {c.itemCount ?? 0} ürün ·{' '}
+                        {c.isPublic ? 'Herkese açık' : 'Özel'}
+                      </Text>
+                    </View>
+                    <Ionicons
+                      name="chevron-forward"
+                      size={18}
+                      color={colors.text.subtle}
+                    />
+                  </TouchableOpacity>
+                ))
+              )}
+            </ScrollView>
           )}
-        </Dialog.Actions>
-      </Dialog>
-    </Portal>
+        </View>
+      )}
+
+      <View style={styles.actions}>
+        {creating ? (
+          <>
+            <Button
+              variant="ghost"
+              title="Geri"
+              onPress={() => setCreating(false)}
+              disabled={createCollectionMutation.isPending}
+            />
+            <Button
+              variant="primary"
+              title="Oluştur ve Ekle"
+              onPress={handleCreateSubmit}
+              isLoading={createCollectionMutation.isPending}
+              disabled={!newName.trim() || createCollectionMutation.isPending}
+            />
+          </>
+        ) : (
+          <Button variant="ghost" title="Kapat" onPress={handleClose} />
+        )}
+      </View>
+    </Modal>
   );
 }
 
 const styles = StyleSheet.create({
-  dialog: {
-    backgroundColor: TarodanColors.background,
-    maxHeight: '85%',
-  },
   scrollArea: {
-    paddingHorizontal: 0,
     maxHeight: 380,
   },
   loading: {
@@ -288,16 +270,16 @@ const styles = StyleSheet.create({
   },
   emptyText: {
     fontSize: 13,
-    color: TarodanColors.textSecondary,
+    color: colors.text.muted,
     textAlign: 'center',
     marginTop: 8,
   },
   createNewRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingHorizontal: 24,
+    paddingHorizontal: 16,
     paddingVertical: 14,
-    backgroundColor: TarodanColors.primaryLight,
+    backgroundColor: colors.primary[50]!,
   },
   createIcon: {
     width: 40,
@@ -305,27 +287,27 @@ const styles = StyleSheet.create({
     borderRadius: 20,
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: TarodanColors.background,
+    backgroundColor: colors.surface.DEFAULT,
     marginRight: 12,
   },
   createText: {
     fontSize: 14,
     fontWeight: '700',
-    color: TarodanColors.primary,
+    color: colors.primary[600]!,
   },
   collectionRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingHorizontal: 24,
+    paddingHorizontal: 16,
     paddingVertical: 14,
     borderBottomWidth: StyleSheet.hairlineWidth,
-    borderBottomColor: TarodanColors.borderLight,
+    borderBottomColor: colors.border.subtle,
   },
   cover: {
     width: 40,
     height: 40,
     borderRadius: 8,
-    backgroundColor: TarodanColors.surfaceVariant,
+    backgroundColor: colors.surface.alt,
     alignItems: 'center',
     justifyContent: 'center',
     marginRight: 12,
@@ -338,16 +320,15 @@ const styles = StyleSheet.create({
   collectionName: {
     fontSize: 14,
     fontWeight: '600',
-    color: TarodanColors.textPrimary,
+    color: colors.text.heading,
   },
   collectionMeta: {
     fontSize: 12,
-    color: TarodanColors.textSecondary,
+    color: colors.text.muted,
     marginTop: 2,
   },
   input: {
     marginBottom: 12,
-    backgroundColor: TarodanColors.background,
   },
   toggleRow: {
     flexDirection: 'row',
@@ -358,6 +339,12 @@ const styles = StyleSheet.create({
   toggleText: {
     flex: 1,
     fontSize: 13,
-    color: TarodanColors.textPrimary,
+    color: colors.text.heading,
+  },
+  actions: {
+    flexDirection: 'row',
+    justifyContent: 'flex-end',
+    gap: 8,
+    marginTop: 12,
   },
 });

@@ -19,30 +19,8 @@
  * Migrasyonla birlikte bu listeden çıkar. Yeni dosya EKLEME.
  */
 const MIGRATION_OVERRIDES = [
-  // tabs/* ve info pages migrate edildi — kalan: membership/newsletter/offers/index
-  'app/membership/**/*.{ts,tsx}',
-  'app/newsletter/**/*.{ts,tsx}',
-  'app/offers/index.tsx',
-  // Domain components — internal Paper usage, refactor sonra
-  'src/components/FeaturedListingsModal.tsx',
-  'src/components/PremiumBadge.tsx',
-  'src/components/RatingModal.tsx',
-  'src/components/ReportModal.tsx',
-  'src/components/ReputationBadge.tsx',
-  'src/components/ShareModal.tsx',
-  'src/components/SignupPrompt.tsx',
-  'src/components/UpgradePrompt.tsx',
-  'src/components/VerificationStatus.tsx',
-  'src/components/common/AuthRequiredSheet.tsx',
-  'src/components/common/CityDistrictSelector.tsx',
-  'src/components/common/CommissionPreview.tsx',
-  'src/components/common/PaperCompat.tsx',
-  'src/components/common/index.ts',
-  'src/components/product/AddToCollectionModal.tsx',
-  'src/components/product/MakeOfferModal.tsx',
-  // Tema bridge dosyaları — Paper'ı sarmaladıkları için tutuluyor
+  // Tüm ekranlar migrate edildi — sadece TarodanColors bridge dosyası kalıyor
   'src/theme/index.ts',
-  'src/types/paper-augmentation.d.ts',
 ];
 
 /** Hex (#fff, #FF8800, #ff88aa00) ve rgb()/rgba() literal regex */

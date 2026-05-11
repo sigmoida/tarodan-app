@@ -1,10 +1,10 @@
 import React from 'react';
 import { View, StyleSheet } from 'react-native';
-import { Portal, Modal, Button } from 'react-native-paper';
 import { Ionicons } from '@expo/vector-icons';
 import { router } from 'expo-router';
-import { TarodanColors } from '../../theme';
-import { Text } from './PaperCompat';
+import { theme, Button, Modal, Text } from '@tarodan/ui-native';
+
+const { colors } = theme;
 
 interface AuthRequiredSheetProps {
   visible: boolean;
@@ -39,88 +39,53 @@ export function AuthRequiredSheet({
   };
 
   return (
-    <Portal>
-      <Modal
-        visible={visible}
-        onDismiss={onDismiss}
-        contentContainerStyle={styles.modal}
-      >
+    <Modal isOpen={visible} onClose={onDismiss} title={title}>
+      <View style={styles.body}>
         <View style={styles.iconCircle}>
-          <Ionicons name="lock-closed-outline" size={32} color={TarodanColors.primary} />
+          <Ionicons name="lock-closed-outline" size={32} color={colors.primary[600]!} />
         </View>
-        <Text style={styles.title}>{title}</Text>
-        <Text style={styles.message}>{message}</Text>
+        <Text variant="body" tone="muted" style={styles.message}>
+          {message}
+        </Text>
 
         <Button
-          mode="contained"
-          buttonColor={TarodanColors.primary}
+          variant="primary"
+          title="Giriş Yap"
           onPress={goLogin}
-          style={styles.primaryBtn}
-          contentStyle={styles.btnContent}
-        >
-          Giriş Yap
-        </Button>
+          style={styles.fullWidth}
+        />
         <Button
-          mode="outlined"
+          variant="outline"
+          title="Hesap Oluştur"
           onPress={goRegister}
-          textColor={TarodanColors.primary}
-          style={styles.secondaryBtn}
-          contentStyle={styles.btnContent}
-        >
-          Hesap Oluştur
-        </Button>
-        <Button mode="text" onPress={onDismiss} textColor={TarodanColors.textSecondary}>
-          Vazgeç
-        </Button>
-      </Modal>
-    </Portal>
+          style={styles.fullWidth}
+        />
+        <Button variant="ghost" title="Vazgeç" onPress={onDismiss} style={styles.fullWidth} />
+      </View>
+    </Modal>
   );
 }
 
 const styles = StyleSheet.create({
-  modal: {
-    backgroundColor: TarodanColors.background,
-    marginHorizontal: 24,
-    borderRadius: 16,
-    padding: 24,
+  body: {
     alignItems: 'center',
+    gap: 8,
   },
   iconCircle: {
     width: 72,
     height: 72,
     borderRadius: 36,
-    backgroundColor: TarodanColors.primaryLight,
+    backgroundColor: colors.primary[50]!,
     alignItems: 'center',
     justifyContent: 'center',
     marginBottom: 16,
   },
-  title: {
-    fontSize: 20,
-    fontWeight: '700',
-    color: TarodanColors.textPrimary,
-    textAlign: 'center',
-  },
   message: {
-    fontSize: 14,
-    color: TarodanColors.textSecondary,
     textAlign: 'center',
-    marginTop: 8,
     marginBottom: 20,
-    lineHeight: 20,
   },
-  primaryBtn: {
+  fullWidth: {
     width: '100%',
-    borderRadius: 10,
-    marginBottom: 8,
-  },
-  secondaryBtn: {
-    width: '100%',
-    borderRadius: 10,
-    borderColor: TarodanColors.primary,
-    marginBottom: 8,
-  },
-  btnContent: {
-    paddingVertical: 4,
   },
 });
 

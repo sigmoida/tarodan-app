@@ -3,9 +3,11 @@ import { View, StyleSheet, TouchableOpacity, ScrollView } from 'react-native';
 
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
-import { TarodanColors } from '../../src/theme';
-import { ScreenHeader, Text } from '../../src/components/common';
+import { theme, Text } from '@tarodan/ui-native';
+import { ScreenHeader } from '../../src/components/common';
 import { useLanguage, localeNames, localeFlags, Locale } from '../../src/i18n/LanguageContext';
+
+const { colors } = theme;
 
 export default function LanguageSettingsScreen() {
   const { locale, setLocale, t } = useLanguage();
@@ -23,7 +25,7 @@ export default function LanguageSettingsScreen() {
 
       <ScrollView contentContainerStyle={styles.scrollBody}>
         <View style={styles.infoCard}>
-          <Ionicons name="language" size={18} color={TarodanColors.primary} />
+          <Ionicons name="language" size={18} color={colors.primary[600]!} />
           <Text style={styles.infoText}>
             {t('settings.languageInfo') ||
               'Uygulama dilini değiştirdiğinizde tüm menü ve bildirimler seçtiğiniz dile geçer.'}
@@ -42,7 +44,7 @@ export default function LanguageSettingsScreen() {
               {localeNames[l]}
             </Text>
             {locale === l ? (
-              <Ionicons name="checkmark-circle" size={22} color={TarodanColors.primary} />
+              <Ionicons name="checkmark-circle" size={22} color={colors.primary[600]!} />
             ) : (
               <View style={styles.emptyCheck} />
             )}
@@ -56,7 +58,7 @@ export default function LanguageSettingsScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: TarodanColors.backgroundSecondary,
+    backgroundColor: colors.surface.alt,
   },
   scrollBody: {
     padding: 16,
@@ -66,14 +68,14 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     gap: 8,
     alignItems: 'flex-start',
-    backgroundColor: TarodanColors.primaryLight,
+    backgroundColor: colors.primary[50]!,
     padding: 12,
     borderRadius: 10,
   },
   infoText: {
     flex: 1,
     fontSize: 13,
-    color: TarodanColors.textSecondary,
+    color: colors.text.muted,
     lineHeight: 18,
   },
   row: {
@@ -81,14 +83,14 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     gap: 12,
     padding: 14,
-    backgroundColor: TarodanColors.background,
+    backgroundColor: colors.surface.DEFAULT,
     borderRadius: 10,
     borderWidth: 1,
-    borderColor: TarodanColors.border,
+    borderColor: colors.border.DEFAULT,
   },
   rowActive: {
-    borderColor: TarodanColors.primary,
-    backgroundColor: TarodanColors.primaryLight,
+    borderColor: colors.primary[600]!,
+    backgroundColor: colors.primary[50]!,
   },
   flag: {
     fontSize: 24,
@@ -96,12 +98,12 @@ const styles = StyleSheet.create({
   name: {
     flex: 1,
     fontSize: 16,
-    color: TarodanColors.textPrimary,
+    color: colors.text.heading,
     fontWeight: '500',
   },
   nameActive: {
     fontWeight: '700',
-    color: TarodanColors.primary,
+    color: colors.primary[600]!,
   },
   emptyCheck: {
     width: 22,

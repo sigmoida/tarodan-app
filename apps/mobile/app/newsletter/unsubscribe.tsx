@@ -1,13 +1,14 @@
 import React, { useEffect, useState } from 'react';
 import { View, StyleSheet, Alert, KeyboardAvoidingView, Platform, ScrollView } from 'react-native';
-import { Button } from 'react-native-paper';
+import { theme, Button, Input, Text } from '@tarodan/ui-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { router, useLocalSearchParams } from 'expo-router';
 import { useMutation } from '@tanstack/react-query';
 import { guestApi } from '../../src/services/api';
-import { TarodanColors } from '../../src/theme';
-import { ScreenHeader, Text, TextInput } from '../../src/components/common';
+import { ScreenHeader } from '../../src/components/common';
+
+const { colors } = theme;
 
 export default function NewsletterUnsubscribeScreen() {
   const { token: tokenParam } = useLocalSearchParams<{ token?: string }>();
@@ -51,7 +52,7 @@ export default function NewsletterUnsubscribeScreen() {
             <Ionicons
               name={success ? 'checkmark-circle' : 'mail-unread-outline'}
               size={72}
-              color={success ? TarodanColors.success : TarodanColors.primary}
+              color={success ? colors.success[600]! : colors.primary[600]!}
             />
           </View>
 
@@ -62,13 +63,11 @@ export default function NewsletterUnsubscribeScreen() {
                 Artık bültenimizden e-posta almayacaksınız. Fikriniz değişirse tekrar abone olabilirsiniz.
               </Text>
               <Button
-                mode="contained"
-                buttonColor={TarodanColors.primary}
+                variant="primary"
+                title="Ana Sayfaya Dön"
                 onPress={() => router.replace('/')}
                 style={styles.btn}
-              >
-                Ana Sayfaya Dön
-              </Button>
+              />
             </>
           ) : (
             <>
@@ -77,37 +76,29 @@ export default function NewsletterUnsubscribeScreen() {
                 E-posta adresinizi girin, aboneliğinizi anında iptal edelim. Bağlantıyla geldiğiniz halde bu sayfayı görüyorsanız otomatik iptal başarısız olmuş olabilir.
               </Text>
 
-              <TextInput
-                mode="outlined"
+              <Input
                 label="E-posta *"
                 value={email}
                 onChangeText={setEmail}
                 keyboardType="email-address"
                 autoCapitalize="none"
-                style={styles.input}
-                outlineColor={TarodanColors.border}
-                activeOutlineColor={TarodanColors.primary}
+                containerStyle={styles.input}
               />
 
               <Button
-                mode="contained"
-                buttonColor={TarodanColors.error}
+                variant="danger"
+                title="Aboneliğimi İptal Et"
                 onPress={handleSubmit}
-                loading={unsubscribeMutation.isPending}
+                isLoading={unsubscribeMutation.isPending}
                 disabled={unsubscribeMutation.isPending || !email}
                 style={styles.btn}
-                contentStyle={{ paddingVertical: 4 }}
-              >
-                Aboneliğimi İptal Et
-              </Button>
+              />
 
               <Button
-                mode="text"
-                textColor={TarodanColors.textSecondary}
+                variant="ghost"
+                title="Vazgeç"
                 onPress={() => router.back()}
-              >
-                Vazgeç
-              </Button>
+              />
             </>
           )}
         </ScrollView>
@@ -119,7 +110,7 @@ export default function NewsletterUnsubscribeScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: TarodanColors.background,
+    backgroundColor: colors.surface.DEFAULT,
   },
   scrollBody: {
     padding: 24,
@@ -134,18 +125,18 @@ const styles = StyleSheet.create({
   title: {
     fontSize: 22,
     fontWeight: '800',
-    color: TarodanColors.textPrimary,
+    color: colors.text.heading,
     textAlign: 'center',
   },
   subtitle: {
     fontSize: 14,
-    color: TarodanColors.textSecondary,
+    color: colors.text.muted,
     textAlign: 'center',
     lineHeight: 20,
     marginBottom: 16,
   },
   input: {
-    backgroundColor: TarodanColors.background,
+    backgroundColor: colors.surface.DEFAULT,
   },
   btn: {
     borderRadius: 10,

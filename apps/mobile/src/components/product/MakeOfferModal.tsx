@@ -1,12 +1,12 @@
 import React, { useState } from 'react';
 import { View, StyleSheet, Alert } from 'react-native';
-import { Portal, Dialog, Button, ActivityIndicator } from 'react-native-paper';
 import { Ionicons } from '@expo/vector-icons';
 import { useMutation } from '@tanstack/react-query';
-import { Text, TextInput } from '../common';
-import { TarodanColors } from '../../theme';
+import { theme, Text, Button, Modal, Input, Textarea } from '@tarodan/ui-native';
 import { offersApi } from '../../services/api';
 import { formatPrice } from '../../utils/format';
+
+const { colors } = theme;
 
 interface MakeOfferModalProps {
   visible: boolean;
@@ -81,89 +81,78 @@ export default function MakeOfferModal({
   const discountPct = listPrice > 0 && numeric > 0 ? Math.round(((listPrice - numeric) / listPrice) * 100) : 0;
 
   return (
-    <Portal>
-      <Dialog visible={visible} onDismiss={handleClose} style={styles.dialog}>
-        <Dialog.Title>Teklif Ver</Dialog.Title>
-        <Dialog.Content>
-          <Text style={styles.productTitle} numberOfLines={2}>
-            {productTitle}
-          </Text>
-          <View style={styles.priceRow}>
-            <Text style={styles.priceLabel}>Liste fiyatı:</Text>
-            <Text style={styles.priceValue}>{formatPrice(listPrice)}</Text>
-          </View>
+    <Modal isOpen={visible} onClose={handleClose} title="Teklif Ver">
+      <View>
+        <Text style={styles.productTitle} numberOfLines={2}>
+          {productTitle}
+        </Text>
+        <View style={styles.priceRow}>
+          <Text style={styles.priceLabel}>Liste fiyatı:</Text>
+          <Text style={styles.priceValue}>{formatPrice(listPrice)}</Text>
+        </View>
 
-          <TextInput
-            testID="offer-amount-input"
-            mode="outlined"
-            label="Teklif tutarınız (TL) *"
-            value={amount}
-            onChangeText={(v: string) => setAmount(v.replace(/[^\d.,]/g, '').replace(',', '.'))}
-            keyboardType="numeric"
-            outlineColor={TarodanColors.border}
-            activeOutlineColor={TarodanColors.primary}
-            style={styles.input}
-            placeholder="Örn. 1500"
-          />
+        <Input
+          testID="offer-amount-input"
+          label="Teklif tutarınız (TL) *"
+          value={amount}
+          onChangeText={(v: string) => setAmount(v.replace(/[^\d.,]/g, '').replace(',', '.'))}
+          keyboardType="numeric"
+          containerStyle={styles.input}
+          placeholder="Örn. 1500"
+        />
 
-          {numeric > 0 && discount > 0 ? (
-            <View style={styles.discountInfo}>
-              <Ionicons name="trending-down" size={16} color={TarodanColors.success} />
-              <Text style={styles.discountText}>
-                Liste fiyatından {formatPrice(discount)} ({discountPct}%) daha düşük
-              </Text>
-            </View>
-          ) : null}
-
-          <TextInput
-            mode="outlined"
-            label="Mesaj (opsiyonel)"
-            value={message}
-            onChangeText={setMessage}
-            multiline
-            numberOfLines={3}
-            maxLength={500}
-            outlineColor={TarodanColors.border}
-            activeOutlineColor={TarodanColors.primary}
-            style={styles.input}
-            placeholder="Satıcıya bir mesaj ekleyin..."
-          />
-
-          <View style={styles.warning}>
-            <Ionicons name="information-circle-outline" size={16} color={TarodanColors.info} />
-            <Text style={styles.warningText}>
-              Teklifiniz satıcıya iletilir. Satıcı kabul ederse otomatik olarak siparişe dönüştürülür.
+        {numeric > 0 && discount > 0 ? (
+          <View style={styles.discountInfo}>
+            <Ionicons name="trending-down" size={16} color={colors.success[600]!} />
+            <Text style={styles.discountText}>
+              Liste fiyatından {formatPrice(discount)} ({discountPct}%) daha düşük
             </Text>
           </View>
-        </Dialog.Content>
-        <Dialog.Actions>
-          <Button onPress={handleClose} disabled={createOfferMutation.isPending}>
-            Vazgeç
-          </Button>
-          <Button
-            testID="offer-submit-button"
-            mode="contained"
-            buttonColor={TarodanColors.primary}
-            onPress={handleSubmit}
-            loading={createOfferMutation.isPending}
-            disabled={!numeric || createOfferMutation.isPending}
-          >
-            Teklif Gönder
-          </Button>
-        </Dialog.Actions>
-      </Dialog>
-    </Portal>
+        ) : null}
+
+        <Textarea
+          label="Mesaj (opsiyonel)"
+          value={message}
+          onChangeText={setMessage}
+          rows={3}
+          maxLength={500}
+          containerStyle={styles.input}
+          placeholder="Satıcıya bir mesaj ekleyin..."
+        />
+
+        <View style={styles.warning}>
+          <Ionicons name="information-circle-outline" size={16} color={colors.info[600]!} />
+          <Text style={styles.warningText}>
+            Teklifiniz satıcıya iletilir. Satıcı kabul ederse otomatik olarak siparişe dönüştürülür.
+          </Text>
+        </View>
+      </View>
+
+      <View style={styles.actions}>
+        <Button
+          variant="ghost"
+          title="Vazgeç"
+          onPress={handleClose}
+          disabled={createOfferMutation.isPending}
+        />
+        <Button
+          testID="offer-submit-button"
+          variant="primary"
+          title="Teklif Gönder"
+          onPress={handleSubmit}
+          isLoading={createOfferMutation.isPending}
+          disabled={!numeric || createOfferMutation.isPending}
+        />
+      </View>
+    </Modal>
   );
 }
 
 const styles = StyleSheet.create({
-  dialog: {
-    backgroundColor: TarodanColors.background,
-  },
   productTitle: {
     fontSize: 14,
     fontWeight: '600',
-    color: TarodanColors.textPrimary,
+    color: colors.text.heading,
     marginBottom: 8,
   },
   priceRow: {
@@ -171,27 +160,26 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     paddingVertical: 8,
     borderBottomWidth: StyleSheet.hairlineWidth,
-    borderBottomColor: TarodanColors.border,
+    borderBottomColor: colors.border.DEFAULT,
     marginBottom: 12,
   },
   priceLabel: {
     fontSize: 13,
-    color: TarodanColors.textSecondary,
+    color: colors.text.muted,
   },
   priceValue: {
     fontSize: 15,
     fontWeight: '700',
-    color: TarodanColors.textPrimary,
+    color: colors.text.heading,
   },
   input: {
     marginBottom: 10,
-    backgroundColor: TarodanColors.background,
   },
   discountInfo: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 6,
-    backgroundColor: TarodanColors.successLight,
+    backgroundColor: colors.success[50]!,
     padding: 8,
     borderRadius: 8,
     marginBottom: 12,
@@ -199,14 +187,14 @@ const styles = StyleSheet.create({
   discountText: {
     flex: 1,
     fontSize: 12,
-    color: TarodanColors.success,
+    color: colors.success[600]!,
     fontWeight: '600',
   },
   warning: {
     flexDirection: 'row',
     alignItems: 'flex-start',
     gap: 6,
-    backgroundColor: TarodanColors.infoLight,
+    backgroundColor: colors.info[50]!,
     padding: 10,
     borderRadius: 8,
     marginTop: 4,
@@ -214,7 +202,13 @@ const styles = StyleSheet.create({
   warningText: {
     flex: 1,
     fontSize: 12,
-    color: TarodanColors.info,
+    color: colors.info[600]!,
     lineHeight: 16,
+  },
+  actions: {
+    flexDirection: 'row',
+    justifyContent: 'flex-end',
+    gap: 8,
+    marginTop: 12,
   },
 });

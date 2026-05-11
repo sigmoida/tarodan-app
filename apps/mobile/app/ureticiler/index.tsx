@@ -1,13 +1,14 @@
 import React, { useMemo, useState } from 'react';
-import { View, StyleSheet, FlatList, TouchableOpacity, Image, TextInput } from 'react-native';
+import { View, StyleSheet, FlatList, TouchableOpacity, Image } from 'react-native';
 
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { router } from 'expo-router';
 import { useQuery } from '@tanstack/react-query';
 import { manufacturersApi } from '../../src/services/api';
-import { TarodanColors } from '../../src/theme';
-import { ScreenHeader, ScreenLoader, ErrorState, EmptyState, Text } from '../../src/components/common';
+import { theme, Text, Input } from '@tarodan/ui-native';
+import { ScreenHeader, ScreenLoader, ErrorState, EmptyState } from '../../src/components/common';
+const { colors } = theme;
 
 interface Manufacturer {
   id: string;
@@ -55,7 +56,7 @@ export default function ManufacturersScreen() {
           <Text style={styles.count}>{item.productCount} ürün</Text>
         ) : null}
       </View>
-      <Ionicons name="chevron-forward" size={18} color={TarodanColors.textTertiary} />
+      <Ionicons name="chevron-forward" size={18} color={colors.text.subtle} />
     </TouchableOpacity>
   );
 
@@ -64,19 +65,12 @@ export default function ManufacturersScreen() {
       <ScreenHeader title="Üreticiler" />
 
       <View style={styles.searchBar}>
-        <Ionicons name="search" size={18} color={TarodanColors.textSecondary} />
-        <TextInput
+        <Input
           value={search}
           onChangeText={setSearch}
           placeholder="Üretici ara..."
-          placeholderTextColor={TarodanColors.textTertiary}
-          style={styles.searchInput}
+          leftIconName="search"
         />
-        {search.length > 0 ? (
-          <TouchableOpacity onPress={() => setSearch('')}>
-            <Ionicons name="close-circle" size={18} color={TarodanColors.textTertiary} />
-          </TouchableOpacity>
-        ) : null}
       </View>
 
       {isLoading ? (
@@ -108,27 +102,12 @@ export default function ManufacturersScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: TarodanColors.backgroundSecondary,
+    backgroundColor: colors.surface.alt,
   },
   searchBar: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-    backgroundColor: TarodanColors.background,
     marginHorizontal: 16,
     marginTop: 12,
     marginBottom: 4,
-    paddingHorizontal: 12,
-    paddingVertical: 10,
-    borderRadius: 10,
-    borderWidth: StyleSheet.hairlineWidth,
-    borderColor: TarodanColors.border,
-  },
-  searchInput: {
-    flex: 1,
-    fontSize: 14,
-    color: TarodanColors.textPrimary,
-    padding: 0,
   },
   list: {
     padding: 16,
@@ -136,18 +115,18 @@ const styles = StyleSheet.create({
   card: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: TarodanColors.background,
+    backgroundColor: colors.surface.DEFAULT,
     borderRadius: 12,
     padding: 12,
     gap: 12,
     borderWidth: StyleSheet.hairlineWidth,
-    borderColor: TarodanColors.border,
+    borderColor: colors.border.DEFAULT,
   },
   logoWrap: {
     width: 52,
     height: 52,
     borderRadius: 10,
-    backgroundColor: TarodanColors.surfaceVariant,
+    backgroundColor: colors.surface.alt,
     alignItems: 'center',
     justifyContent: 'center',
   },
@@ -158,7 +137,7 @@ const styles = StyleSheet.create({
   logoFallback: {
     fontSize: 22,
     fontWeight: '800',
-    color: TarodanColors.primary,
+    color: colors.primary[600]!,
   },
   body: {
     flex: 1,
@@ -166,11 +145,11 @@ const styles = StyleSheet.create({
   name: {
     fontSize: 15,
     fontWeight: '600',
-    color: TarodanColors.textPrimary,
+    color: colors.text.heading,
   },
   count: {
     fontSize: 12,
-    color: TarodanColors.textSecondary,
+    color: colors.text.muted,
     marginTop: 2,
   },
 });

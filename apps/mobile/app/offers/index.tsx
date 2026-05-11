@@ -16,12 +16,14 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { router, useLocalSearchParams } from 'expo-router';
 import { useQueryClient } from '@tanstack/react-query';
 import { Ionicons } from '@expo/vector-icons';
-import { TarodanColors } from '../../src/theme/colors';
+import { theme } from '@tarodan/ui-native';
 import { useAuthStore } from '../../src/stores/authStore';
 import { offersApi, ordersApi } from '../../src/services/api';
 import { transformImageUrl } from '../../src/utils/imageUrl';
 import { formatApiErrorMessage } from '../../src/utils/formatApiErrorMessage';
 import { useTranslation } from '../../src/i18n/LanguageContext';
+
+const { colors } = theme;
 
 interface Offer {
   id: string;
@@ -50,12 +52,12 @@ type TabType = 'received' | 'sent';
 type OfferStatus = Offer['status'];
 
 const STATUS_CONFIG: Record<OfferStatus, { label: string; color: string; bg: string; icon: keyof typeof Ionicons.glyphMap }> = {
-  pending:   { label: 'Bekliyor',      color: '#D97706', bg: '#FEF3C7', icon: 'time-outline' },
-  accepted:  { label: 'Kabul Edildi',   color: '#059669', bg: '#D1FAE5', icon: 'checkmark-circle-outline' },
-  rejected:  { label: 'Reddedildi',     color: '#DC2626', bg: '#FEE2E2', icon: 'close-circle-outline' },
-  countered: { label: 'Karşı Teklif',   color: '#2563EB', bg: '#DBEAFE', icon: 'swap-horizontal-outline' },
-  cancelled: { label: 'İptal Edildi',   color: '#6B7280', bg: '#F3F4F6', icon: 'close-circle-outline' },
-  expired:   { label: 'Süresi Doldu',   color: '#6B7280', bg: '#F3F4F6', icon: 'alert-circle-outline' },
+  pending:   { label: 'Bekliyor',      color: colors.warning[600]!, bg: colors.warning[100]!, icon: 'time-outline' },
+  accepted:  { label: 'Kabul Edildi',   color: colors.success[600]!, bg: colors.success[100]!, icon: 'checkmark-circle-outline' },
+  rejected:  { label: 'Reddedildi',     color: colors.danger[600]!,  bg: colors.danger[100]!,  icon: 'close-circle-outline' },
+  countered: { label: 'Karşı Teklif',   color: colors.info[600]!,    bg: colors.info[100]!,    icon: 'swap-horizontal-outline' },
+  cancelled: { label: 'İptal Edildi',   color: colors.gray[500]!,    bg: colors.gray[100]!,    icon: 'close-circle-outline' },
+  expired:   { label: 'Süresi Doldu',   color: colors.gray[500]!,    bg: colors.gray[100]!,    icon: 'alert-circle-outline' },
 };
 
 function getProductImage(product: Offer['product']): string {
@@ -313,7 +315,7 @@ export default function OffersScreen() {
   if (authLoading) {
     return (
       <SafeAreaView style={styles.centered}>
-        <ActivityIndicator size="large" color={TarodanColors.primary} />
+        <ActivityIndicator size="large" color={colors.primary[600]!} />
       </SafeAreaView>
     );
   }
@@ -321,7 +323,7 @@ export default function OffersScreen() {
   if (!isAuthenticated) {
     return (
       <SafeAreaView style={styles.centered}>
-        <Ionicons name="pricetag-outline" size={64} color={TarodanColors.primary} />
+        <Ionicons name="pricetag-outline" size={64} color={colors.primary[600]!} />
         <Text style={styles.authTitle}>Tekliflerim</Text>
         <Text style={styles.authSubtitle}>Tekliflerinizi görmek için giriş yapın</Text>
         <TouchableOpacity style={styles.loginBtn} onPress={() => router.push('/(auth)/login')}>
@@ -386,7 +388,7 @@ export default function OffersScreen() {
 
           {timeRemaining && (
             <View style={styles.timeBox}>
-              <Ionicons name="time-outline" size={14} color="#D97706" />
+              <Ionicons name="time-outline" size={14} color={colors.warning[600]!} />
               <Text style={styles.timeText}>{timeRemaining} kaldı</Text>
             </View>
           )}
@@ -399,7 +401,7 @@ export default function OffersScreen() {
               <Image source={{ uri: transformImageUrl(otherUser.avatarUrl) }} style={styles.avatar} />
             ) : (
               <View style={[styles.avatar, styles.avatarPlaceholder]}>
-                <Ionicons name="person" size={16} color={TarodanColors.textTertiary} />
+                <Ionicons name="person" size={16} color={colors.text.subtle} />
               </View>
             )}
             <View>
@@ -414,14 +416,14 @@ export default function OffersScreen() {
         {/* Message */}
         {offer.message ? (
           <View style={styles.messageBox}>
-            <Ionicons name="chatbubble-outline" size={14} color={TarodanColors.textTertiary} style={{ marginTop: 2 }} />
+            <Ionicons name="chatbubble-outline" size={14} color={colors.text.subtle} style={{ marginTop: 2 }} />
             <Text style={styles.messageText}>"{offer.message}"</Text>
           </View>
         ) : null}
 
         {/* Date */}
         <View style={styles.dateRow}>
-          <Ionicons name="calendar-outline" size={14} color={TarodanColors.textTertiary} />
+          <Ionicons name="calendar-outline" size={14} color={colors.text.subtle} />
           <Text style={styles.dateText}>{formatTimeAgo(offer.createdAt, t)}</Text>
         </View>
 
@@ -430,7 +432,7 @@ export default function OffersScreen() {
           <View style={styles.actionsRow}>
             {activeTab === 'received' && offer.buyerMustAccept ? (
               <View style={styles.waitingBanner}>
-                <Ionicons name="time-outline" size={18} color="#B45309" />
+                <Ionicons name="time-outline" size={18} color={colors.warning[700]!} />
                 <Text style={styles.waitingBannerText}>
                   Alıcının karşı teklifinizi kabul veya reddetmesi bekleniyor.
                 </Text>
@@ -443,10 +445,10 @@ export default function OffersScreen() {
                   disabled={isActionLoading}
                 >
                   {isActionLoading ? (
-                    <ActivityIndicator size="small" color="#fff" />
+                    <ActivityIndicator size="small" color={colors.white} />
                   ) : (
                     <>
-                      <Ionicons name="checkmark" size={16} color="#fff" />
+                      <Ionicons name="checkmark" size={16} color={colors.white} />
                       <Text style={styles.actionBtnText}>Kabul Et</Text>
                     </>
                   )}
@@ -456,7 +458,7 @@ export default function OffersScreen() {
                   onPress={() => handleReject(offer.id)}
                   disabled={isActionLoading}
                 >
-                  <Ionicons name="close" size={16} color="#fff" />
+                  <Ionicons name="close" size={16} color={colors.white} />
                   <Text style={styles.actionBtnText}>Reddet</Text>
                 </TouchableOpacity>
                 <TouchableOpacity
@@ -464,7 +466,7 @@ export default function OffersScreen() {
                   onPress={() => openCounterModal(offer.id)}
                   disabled={isActionLoading}
                 >
-                  <Ionicons name="swap-horizontal" size={16} color="#fff" />
+                  <Ionicons name="swap-horizontal" size={16} color={colors.white} />
                   <Text style={styles.actionBtnText}>Karşı Teklif</Text>
                 </TouchableOpacity>
               </>
@@ -476,10 +478,10 @@ export default function OffersScreen() {
                   disabled={isActionLoading}
                 >
                   {isActionLoading ? (
-                    <ActivityIndicator size="small" color="#fff" />
+                    <ActivityIndicator size="small" color={colors.white} />
                   ) : (
                     <>
-                      <Ionicons name="checkmark" size={16} color="#fff" />
+                      <Ionicons name="checkmark" size={16} color={colors.white} />
                       <Text style={styles.actionBtnText}>Karşı teklifi kabul et</Text>
                     </>
                   )}
@@ -489,7 +491,7 @@ export default function OffersScreen() {
                   onPress={() => handleReject(offer.id)}
                   disabled={isActionLoading}
                 >
-                  <Ionicons name="close" size={16} color="#fff" />
+                  <Ionicons name="close" size={16} color={colors.white} />
                   <Text style={styles.actionBtnText}>Reddet</Text>
                 </TouchableOpacity>
                 <TouchableOpacity
@@ -497,7 +499,7 @@ export default function OffersScreen() {
                   onPress={() => openBuyerCounterModal(offer)}
                   disabled={isActionLoading}
                 >
-                  <Ionicons name="trending-down" size={16} color="#fff" />
+                  <Ionicons name="trending-down" size={16} color={colors.white} />
                   <Text style={styles.actionBtnText}>Daha düşük teklif</Text>
                 </TouchableOpacity>
               </>
@@ -508,10 +510,10 @@ export default function OffersScreen() {
                 disabled={isActionLoading}
               >
                 {isActionLoading ? (
-                  <ActivityIndicator size="small" color="#fff" />
+                  <ActivityIndicator size="small" color={colors.white} />
                 ) : (
                   <>
-                    <Ionicons name="close" size={16} color="#fff" />
+                    <Ionicons name="close" size={16} color={colors.white} />
                     <Text style={styles.actionBtnText}>İptal Et</Text>
                   </>
                 )}
@@ -526,7 +528,7 @@ export default function OffersScreen() {
             style={[styles.actionBtn, styles.orderBtn, { alignSelf: 'flex-start', marginTop: 12 }]}
             onPress={() => router.push(`/order-track?orderId=${offer.orderId}`)}
           >
-            <Ionicons name="cube-outline" size={16} color="#fff" />
+            <Ionicons name="cube-outline" size={16} color={colors.white} />
             <Text style={styles.actionBtnText}>Siparişi Görüntüle</Text>
           </TouchableOpacity>
         )}
@@ -541,7 +543,7 @@ export default function OffersScreen() {
         <Ionicons
           name={activeTab === 'received' ? 'mail-open-outline' : 'paper-plane-outline'}
           size={48}
-          color={TarodanColors.primary}
+          color={colors.primary[600]!}
         />
       </View>
       <Text style={styles.emptyTitle}>
@@ -553,7 +555,7 @@ export default function OffersScreen() {
           : 'İlanlara göz atın ve ilk teklifinizi yapın!'}
       </Text>
       <TouchableOpacity style={styles.browseBtn} onPress={() => router.push('/listings')}>
-        <Ionicons name="search-outline" size={18} color="#fff" />
+        <Ionicons name="search-outline" size={18} color={colors.white} />
         <Text style={styles.browseBtnText}>İlanlara Göz At</Text>
       </TouchableOpacity>
     </View>
@@ -564,7 +566,7 @@ export default function OffersScreen() {
       {/* Header */}
       <View style={styles.header}>
         <TouchableOpacity onPress={() => router.back()} style={styles.backBtn}>
-          <Ionicons name="arrow-back" size={24} color={TarodanColors.textPrimary} />
+          <Ionicons name="arrow-back" size={24} color={colors.text.heading} />
         </TouchableOpacity>
         <View style={{ flex: 1 }}>
           <Text style={styles.headerTitle}>Tekliflerim</Text>
@@ -581,7 +583,7 @@ export default function OffersScreen() {
           <Ionicons
             name="mail-open-outline"
             size={18}
-            color={activeTab === 'received' ? TarodanColors.primary : TarodanColors.textTertiary}
+            color={activeTab === 'received' ? colors.primary[600]! : colors.text.subtle}
           />
           <Text style={[styles.tabText, activeTab === 'received' && styles.tabTextActive]}>
             Gelen
@@ -594,7 +596,7 @@ export default function OffersScreen() {
           <Ionicons
             name="paper-plane-outline"
             size={18}
-            color={activeTab === 'sent' ? TarodanColors.primary : TarodanColors.textTertiary}
+            color={activeTab === 'sent' ? colors.primary[600]! : colors.text.subtle}
           />
           <Text style={[styles.tabText, activeTab === 'sent' && styles.tabTextActive]}>
             Gönderilen
@@ -605,7 +607,7 @@ export default function OffersScreen() {
       {/* Content */}
       {loading ? (
         <View style={styles.centered}>
-          <ActivityIndicator size="large" color={TarodanColors.primary} />
+          <ActivityIndicator size="large" color={colors.primary[600]!} />
           <Text style={styles.loadingText}>Teklifler yükleniyor...</Text>
         </View>
       ) : (
@@ -616,7 +618,7 @@ export default function OffersScreen() {
           ListEmptyComponent={renderEmpty}
           contentContainerStyle={offers.length === 0 ? { flex: 1 } : styles.listContent}
           refreshControl={
-            <RefreshControl refreshing={refreshing} onRefresh={onRefresh} colors={[TarodanColors.primary]} />
+            <RefreshControl refreshing={refreshing} onRefresh={onRefresh} colors={[colors.primary[600]!]} />
           }
         />
       )}
@@ -630,7 +632,7 @@ export default function OffersScreen() {
             <TextInput
               style={styles.modalInput}
               placeholder="Tutar (₺)"
-              placeholderTextColor={TarodanColors.textTertiary}
+              placeholderTextColor={colors.text.subtle}
               keyboardType="numeric"
               value={counterAmount}
               onChangeText={setCounterAmount}
@@ -671,7 +673,7 @@ export default function OffersScreen() {
             <TextInput
               style={styles.modalInput}
               placeholder="Yeni tutar (₺)"
-              placeholderTextColor={TarodanColors.textTertiary}
+              placeholderTextColor={colors.text.subtle}
               keyboardType="numeric"
               value={buyerCounterAmount}
               onChangeText={setBuyerCounterAmount}
@@ -698,44 +700,44 @@ export default function OffersScreen() {
 const styles = StyleSheet.create({
   safeArea: {
     flex: 1,
-    backgroundColor: TarodanColors.backgroundSecondary,
+    backgroundColor: colors.surface.alt,
   },
   centered: {
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
     padding: 24,
-    backgroundColor: TarodanColors.backgroundSecondary,
+    backgroundColor: colors.surface.alt,
   },
 
   // Auth gate
   authTitle: {
     fontSize: 22,
     fontWeight: '700',
-    color: TarodanColors.textPrimary,
+    color: colors.text.heading,
     marginTop: 16,
   },
   authSubtitle: {
     fontSize: 14,
-    color: TarodanColors.textSecondary,
+    color: colors.text.muted,
     marginTop: 8,
     marginBottom: 24,
     textAlign: 'center',
   },
   loginBtn: {
-    backgroundColor: TarodanColors.primary,
+    backgroundColor: colors.primary[600]!,
     paddingHorizontal: 32,
     paddingVertical: 14,
     borderRadius: 10,
     marginBottom: 12,
   },
   loginBtnText: {
-    color: '#fff',
+    color: colors.white,
     fontSize: 16,
     fontWeight: '600',
   },
   registerLink: {
-    color: TarodanColors.primary,
+    color: colors.primary[600]!,
     fontSize: 14,
     fontWeight: '600',
   },
@@ -746,9 +748,9 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     paddingHorizontal: 16,
     paddingVertical: 12,
-    backgroundColor: TarodanColors.background,
+    backgroundColor: colors.surface.elevated,
     borderBottomWidth: 1,
-    borderBottomColor: TarodanColors.border,
+    borderBottomColor: colors.border.DEFAULT,
   },
   backBtn: {
     marginRight: 12,
@@ -757,18 +759,18 @@ const styles = StyleSheet.create({
   headerTitle: {
     fontSize: 20,
     fontWeight: '700',
-    color: TarodanColors.textPrimary,
+    color: colors.text.heading,
   },
   headerSubtitle: {
     fontSize: 12,
-    color: TarodanColors.textTertiary,
+    color: colors.text.subtle,
     marginTop: 2,
   },
 
   // Tabs
   tabContainer: {
     flexDirection: 'row',
-    backgroundColor: TarodanColors.background,
+    backgroundColor: colors.surface.elevated,
     paddingHorizontal: 16,
     paddingBottom: 12,
     gap: 8,
@@ -781,20 +783,20 @@ const styles = StyleSheet.create({
     gap: 6,
     paddingVertical: 10,
     borderRadius: 10,
-    backgroundColor: TarodanColors.backgroundTertiary,
+    backgroundColor: colors.gray[100]!,
   },
   tabActive: {
-    backgroundColor: TarodanColors.primaryLight,
+    backgroundColor: colors.primary[50]!,
     borderWidth: 1,
-    borderColor: TarodanColors.primary,
+    borderColor: colors.primary[600]!,
   },
   tabText: {
     fontSize: 14,
     fontWeight: '600',
-    color: TarodanColors.textTertiary,
+    color: colors.text.subtle,
   },
   tabTextActive: {
-    color: TarodanColors.primary,
+    color: colors.primary[600]!,
   },
 
   // List
@@ -805,17 +807,17 @@ const styles = StyleSheet.create({
   loadingText: {
     marginTop: 12,
     fontSize: 14,
-    color: TarodanColors.textSecondary,
+    color: colors.text.muted,
   },
 
   // Card
   card: {
-    backgroundColor: TarodanColors.background,
+    backgroundColor: colors.surface.elevated,
     borderRadius: 12,
     padding: 14,
     marginBottom: 12,
     borderWidth: 1,
-    borderColor: TarodanColors.border,
+    borderColor: colors.border.DEFAULT,
   },
   cardRow: {
     flexDirection: 'row',
@@ -825,7 +827,7 @@ const styles = StyleSheet.create({
     width: 80,
     height: 80,
     borderRadius: 8,
-    backgroundColor: TarodanColors.backgroundTertiary,
+    backgroundColor: colors.gray[100]!,
   },
   cardContent: {
     flex: 1,
@@ -834,12 +836,12 @@ const styles = StyleSheet.create({
   productTitle: {
     fontSize: 15,
     fontWeight: '600',
-    color: TarodanColors.textPrimary,
+    color: colors.text.heading,
     lineHeight: 20,
   },
   originalPrice: {
     fontSize: 12,
-    color: TarodanColors.textTertiary,
+    color: colors.text.subtle,
     marginTop: 2,
   },
   strikethrough: {
@@ -871,27 +873,27 @@ const styles = StyleSheet.create({
     marginTop: 12,
   },
   amountBox: {
-    backgroundColor: TarodanColors.primaryLight,
+    backgroundColor: colors.primary[50]!,
     borderWidth: 1,
-    borderColor: TarodanColors.primaryMedium,
+    borderColor: colors.primary[100]!,
     borderRadius: 8,
     paddingHorizontal: 12,
     paddingVertical: 8,
   },
   amountLabel: {
     fontSize: 10,
-    color: TarodanColors.textTertiary,
+    color: colors.text.subtle,
     marginBottom: 2,
   },
   amountValue: {
     fontSize: 20,
     fontWeight: '700',
-    color: TarodanColors.primary,
+    color: colors.primary[600]!,
   },
   netBox: {
-    backgroundColor: '#D1FAE5',
+    backgroundColor: colors.success[100]!,
     borderWidth: 1,
-    borderColor: '#6EE7B7',
+    borderColor: colors.success[300]!,
     borderRadius: 8,
     paddingHorizontal: 12,
     paddingVertical: 8,
@@ -900,19 +902,19 @@ const styles = StyleSheet.create({
   },
   netLabel: {
     fontSize: 10,
-    color: TarodanColors.textTertiary,
+    color: colors.text.subtle,
     marginBottom: 2,
   },
   netValue: {
     fontSize: 16,
     fontWeight: '700',
-    color: '#059669',
+    color: colors.success[600]!,
   },
   timeBox: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 4,
-    backgroundColor: '#FEF3C7',
+    backgroundColor: colors.warning[100]!,
     paddingHorizontal: 10,
     paddingVertical: 6,
     borderRadius: 8,
@@ -920,7 +922,7 @@ const styles = StyleSheet.create({
   timeText: {
     fontSize: 12,
     fontWeight: '600',
-    color: '#D97706',
+    color: colors.warning[600]!,
   },
 
   // User
@@ -934,7 +936,7 @@ const styles = StyleSheet.create({
     width: 32,
     height: 32,
     borderRadius: 16,
-    backgroundColor: TarodanColors.backgroundTertiary,
+    backgroundColor: colors.gray[100]!,
   },
   avatarPlaceholder: {
     justifyContent: 'center',
@@ -942,19 +944,19 @@ const styles = StyleSheet.create({
   },
   userLabel: {
     fontSize: 10,
-    color: TarodanColors.textTertiary,
+    color: colors.text.subtle,
   },
   userName: {
     fontSize: 13,
     fontWeight: '600',
-    color: TarodanColors.textPrimary,
+    color: colors.text.heading,
   },
 
   // Message
   messageBox: {
     flexDirection: 'row',
     gap: 6,
-    backgroundColor: TarodanColors.backgroundSecondary,
+    backgroundColor: colors.surface.alt,
     borderRadius: 8,
     padding: 10,
     marginTop: 10,
@@ -962,7 +964,7 @@ const styles = StyleSheet.create({
   messageText: {
     flex: 1,
     fontSize: 13,
-    color: TarodanColors.textSecondary,
+    color: colors.text.muted,
     fontStyle: 'italic',
     lineHeight: 18,
   },
@@ -975,11 +977,11 @@ const styles = StyleSheet.create({
     marginTop: 10,
     paddingTop: 10,
     borderTopWidth: 1,
-    borderTopColor: TarodanColors.borderLight,
+    borderTopColor: colors.border.subtle,
   },
   dateText: {
     fontSize: 12,
-    color: TarodanColors.textTertiary,
+    color: colors.text.subtle,
   },
 
   // Actions
@@ -995,7 +997,7 @@ const styles = StyleSheet.create({
     gap: 8,
     flex: 1,
     minWidth: '100%',
-    backgroundColor: '#FEF3C7',
+    backgroundColor: colors.warning[100]!,
     paddingHorizontal: 12,
     paddingVertical: 10,
     borderRadius: 8,
@@ -1003,7 +1005,7 @@ const styles = StyleSheet.create({
   waitingBannerText: {
     flex: 1,
     fontSize: 13,
-    color: '#92400E',
+    color: colors.warning[800]!,
     lineHeight: 18,
   },
   actionBtn: {
@@ -1015,24 +1017,24 @@ const styles = StyleSheet.create({
     borderRadius: 8,
   },
   actionBtnText: {
-    color: '#fff',
+    color: colors.white,
     fontSize: 13,
     fontWeight: '600',
   },
   acceptBtn: {
-    backgroundColor: TarodanColors.success,
+    backgroundColor: colors.success[600]!,
   },
   rejectBtn: {
-    backgroundColor: TarodanColors.error,
+    backgroundColor: colors.danger[600]!,
   },
   counterBtn: {
-    backgroundColor: TarodanColors.info,
+    backgroundColor: colors.info[600]!,
   },
   cancelBtn: {
-    backgroundColor: '#6B7280',
+    backgroundColor: colors.gray[500]!,
   },
   orderBtn: {
-    backgroundColor: TarodanColors.primary,
+    backgroundColor: colors.primary[600]!,
   },
 
   // Empty
@@ -1046,7 +1048,7 @@ const styles = StyleSheet.create({
     width: 80,
     height: 80,
     borderRadius: 20,
-    backgroundColor: TarodanColors.primaryLight,
+    backgroundColor: colors.primary[50]!,
     justifyContent: 'center',
     alignItems: 'center',
     marginBottom: 16,
@@ -1054,13 +1056,13 @@ const styles = StyleSheet.create({
   emptyTitle: {
     fontSize: 18,
     fontWeight: '700',
-    color: TarodanColors.textPrimary,
+    color: colors.text.heading,
     marginBottom: 8,
     textAlign: 'center',
   },
   emptySubtitle: {
     fontSize: 14,
-    color: TarodanColors.textSecondary,
+    color: colors.text.muted,
     textAlign: 'center',
     lineHeight: 20,
     marginBottom: 20,
@@ -1069,13 +1071,13 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: 6,
-    backgroundColor: TarodanColors.primary,
+    backgroundColor: colors.primary[600]!,
     paddingHorizontal: 20,
     paddingVertical: 12,
     borderRadius: 10,
   },
   browseBtnText: {
-    color: '#fff',
+    color: colors.white,
     fontSize: 14,
     fontWeight: '600',
   },
@@ -1083,37 +1085,37 @@ const styles = StyleSheet.create({
   // Counter modal
   modalOverlay: {
     flex: 1,
-    backgroundColor: 'rgba(0,0,0,0.5)',
+    backgroundColor: colors.overlay.black50,
     justifyContent: 'center',
     alignItems: 'center',
     padding: 24,
   },
   modalContent: {
     width: '100%',
-    backgroundColor: TarodanColors.background,
+    backgroundColor: colors.surface.elevated,
     borderRadius: 16,
     padding: 24,
   },
   modalTitle: {
     fontSize: 18,
     fontWeight: '700',
-    color: TarodanColors.textPrimary,
+    color: colors.text.heading,
     marginBottom: 4,
   },
   modalSubtitle: {
     fontSize: 13,
-    color: TarodanColors.textSecondary,
+    color: colors.text.muted,
     marginBottom: 16,
   },
   modalInput: {
     borderWidth: 1,
-    borderColor: TarodanColors.border,
+    borderColor: colors.border.DEFAULT,
     borderRadius: 10,
     paddingHorizontal: 14,
     paddingVertical: 12,
     fontSize: 16,
-    color: TarodanColors.textPrimary,
-    backgroundColor: TarodanColors.backgroundSecondary,
+    color: colors.text.heading,
+    backgroundColor: colors.surface.alt,
     marginBottom: 20,
   },
   modalActions: {
@@ -1127,19 +1129,19 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   modalCancelBtn: {
-    backgroundColor: TarodanColors.backgroundTertiary,
+    backgroundColor: colors.gray[100]!,
   },
   modalCancelBtnText: {
     fontSize: 14,
     fontWeight: '600',
-    color: TarodanColors.textSecondary,
+    color: colors.text.muted,
   },
   modalConfirmBtn: {
-    backgroundColor: TarodanColors.primary,
+    backgroundColor: colors.primary[600]!,
   },
   modalConfirmBtnText: {
     fontSize: 14,
     fontWeight: '600',
-    color: '#fff',
+    color: colors.white,
   },
 });

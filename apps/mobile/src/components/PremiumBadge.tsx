@@ -1,8 +1,9 @@
 import React from 'react';
 import { View, StyleSheet, TouchableOpacity } from 'react-native';
-import { Text } from 'react-native-paper';
 import { MaterialCommunityIcons, Ionicons } from '@expo/vector-icons';
-import { TarodanColors } from '../theme';
+import { theme, Text } from '@tarodan/ui-native';
+
+const { colors } = theme;
 
 export type BadgeType = 'premium' | 'verified' | 'premium_verified';
 export type BadgeSize = 'small' | 'medium' | 'large';
@@ -19,22 +20,22 @@ const BADGE_CONFIG = {
     icon: 'crown',
     iconType: 'material' as const,
     label: 'Premium',
-    color: TarodanColors.primary,
-    backgroundColor: TarodanColors.primary + '15',
+    color: colors.primary[600]!,
+    backgroundColor: colors.primary[50]!,
   },
   verified: {
     icon: 'checkmark-shield',
     iconType: 'ionicons' as const,
     label: 'Onaylı',
-    color: TarodanColors.info,
-    backgroundColor: TarodanColors.info + '15',
+    color: colors.info[600]!,
+    backgroundColor: colors.info[50]!,
   },
   premium_verified: {
     icon: 'shield-crown',
     iconType: 'material' as const,
     label: 'Premium Onaylı',
-    color: '#9C27B0', // Purple for elite status
-    backgroundColor: '#9C27B0' + '15',
+    color: colors.primary[700]!,
+    backgroundColor: colors.primary[50]!,
   },
 };
 
@@ -143,7 +144,7 @@ export const InlinePremiumBadge: React.FC<InlinePremiumBadgeProps> = ({
         <MaterialCommunityIcons
           name="crown"
           size={iconSize}
-          color={TarodanColors.primary}
+          color={colors.primary[600]!}
           style={styles.inlineIcon}
         />
       )}
@@ -151,7 +152,7 @@ export const InlinePremiumBadge: React.FC<InlinePremiumBadgeProps> = ({
         <Ionicons
           name="checkmark-circle"
           size={iconSize}
-          color={TarodanColors.info}
+          color={colors.info[600]!}
           style={styles.inlineIcon}
         />
       )}
@@ -176,28 +177,28 @@ export const MembershipBadgeCard: React.FC<MembershipBadgeCardProps> = ({
   const tierInfo = {
     free: {
       name: 'Ücretsiz Üye',
-      color: TarodanColors.textSecondary,
+      color: colors.text.muted,
       icon: 'account',
     },
     basic: {
       name: 'Temel Üye',
-      color: TarodanColors.info,
+      color: colors.info[600]!,
       icon: 'account-check',
     },
     premium: {
       name: 'Premium Üye',
-      color: TarodanColors.primary,
+      color: colors.primary[600]!,
       icon: 'crown',
     },
     business: {
       name: 'Kurumsal',
-      color: '#9C27B0',
+      color: colors.primary[700]!,
       icon: 'domain',
     },
   }[membershipTier];
 
   return (
-    <View style={[styles.cardContainer, { borderColor: tierInfo.color + '40' }]}>
+    <View style={[styles.cardContainer, { borderColor: colors.border.DEFAULT }]}>
       <View style={styles.cardHeader}>
         <MaterialCommunityIcons
           name={tierInfo.icon as any}
@@ -211,16 +212,16 @@ export const MembershipBadgeCard: React.FC<MembershipBadgeCardProps> = ({
           <Ionicons
             name="checkmark-circle"
             size={18}
-            color={TarodanColors.success}
+            color={colors.success[600]!}
             style={{ marginLeft: 4 }}
           />
         )}
       </View>
-      
+
       {!isPremium && onUpgrade && (
         <TouchableOpacity style={styles.upgradeLink} onPress={onUpgrade}>
           <Text style={styles.upgradeLinkText}>Yükselt</Text>
-          <Ionicons name="chevron-forward" size={16} color={TarodanColors.primary} />
+          <Ionicons name="chevron-forward" size={16} color={colors.primary[600]!} />
         </TouchableOpacity>
       )}
     </View>
@@ -244,7 +245,7 @@ const styles = StyleSheet.create({
     marginHorizontal: 1,
   },
   cardContainer: {
-    backgroundColor: TarodanColors.background,
+    backgroundColor: colors.surface.DEFAULT,
     borderRadius: 12,
     padding: 12,
     borderWidth: 1,
@@ -265,7 +266,7 @@ const styles = StyleSheet.create({
     marginTop: 8,
   },
   upgradeLinkText: {
-    color: TarodanColors.primary,
+    color: colors.primary[600]!,
     fontWeight: '500',
     fontSize: 12,
   },

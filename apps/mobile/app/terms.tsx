@@ -1,9 +1,10 @@
 import { View, ScrollView, StyleSheet, TouchableOpacity } from 'react-native';
-import { Text } from '../src/components/common';
+import { theme, Text } from '@tarodan/ui-native';
 import { router } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
-import { TarodanColors } from '../src/theme';
 import { useTranslation } from '../src/i18n';
+
+const { colors } = theme;
 
 export default function TermsOfServiceScreen() {
   const { t } = useTranslation();
@@ -12,7 +13,7 @@ export default function TermsOfServiceScreen() {
       {/* Header */}
       <View style={styles.header}>
         <TouchableOpacity onPress={() => router.back()}>
-          <Ionicons name="arrow-back" size={24} color={TarodanColors.textOnPrimary} />
+          <Ionicons name="arrow-back" size={24} color={colors.white} />
         </TouchableOpacity>
         <Text style={styles.headerTitle}>{t('mobile.pageTerms')}</Text>
         <View style={{ width: 24 }} />
@@ -115,10 +116,10 @@ export default function TermsOfServiceScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: TarodanColors.background,
+    backgroundColor: colors.surface.DEFAULT,
   },
   header: {
-    backgroundColor: TarodanColors.primary,
+    backgroundColor: colors.primary[600]!,
     paddingTop: 50,
     paddingBottom: 16,
     paddingHorizontal: 20,
@@ -129,7 +130,7 @@ const styles = StyleSheet.create({
   headerTitle: {
     fontSize: 18,
     fontWeight: 'bold',
-    color: TarodanColors.textOnPrimary,
+    color: colors.white,
   },
   content: {
     flex: 1,
@@ -137,31 +138,31 @@ const styles = StyleSheet.create({
   },
   lastUpdated: {
     fontSize: 13,
-    color: TarodanColors.textSecondary,
+    color: colors.text.muted,
     marginBottom: 24,
   },
   sectionTitle: {
     fontSize: 18,
     fontWeight: 'bold',
-    color: TarodanColors.textPrimary,
+    color: colors.text.heading,
     marginTop: 24,
     marginBottom: 12,
   },
   paragraph: {
     fontSize: 14,
-    color: TarodanColors.textSecondary,
+    color: colors.text.muted,
     lineHeight: 22,
     marginBottom: 12,
   },
   listItem: {
     fontSize: 14,
-    color: TarodanColors.textSecondary,
+    color: colors.text.muted,
     lineHeight: 24,
     marginLeft: 8,
   },
   contactInfo: {
     fontSize: 14,
-    color: TarodanColors.primary,
+    color: colors.primary[600]!,
     marginBottom: 8,
   },
 });

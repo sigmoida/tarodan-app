@@ -1,13 +1,14 @@
 import React, { useState } from 'react';
 import { View, StyleSheet, Alert, KeyboardAvoidingView, Platform, ScrollView } from 'react-native';
-import { Button } from 'react-native-paper';
+import { theme, Button, Input, Text } from '@tarodan/ui-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { router } from 'expo-router';
 import { useMutation } from '@tanstack/react-query';
 import { guestApi } from '../../src/services/api';
-import { TarodanColors } from '../../src/theme';
-import { ScreenHeader, Text, TextInput } from '../../src/components/common';
+import { ScreenHeader } from '../../src/components/common';
+
+const { colors } = theme;
 
 export default function NewsletterScreen() {
   const [email, setEmail] = useState('');
@@ -49,7 +50,7 @@ export default function NewsletterScreen() {
       >
         <ScrollView contentContainerStyle={styles.scrollBody}>
           <View style={styles.iconWrap}>
-            <Ionicons name="mail-unread-outline" size={72} color={TarodanColors.primary} />
+            <Ionicons name="mail-unread-outline" size={72} color={colors.primary[600]!} />
           </View>
 
           <Text style={styles.title}>Yeniliklerden Haberdar Olun</Text>
@@ -57,46 +58,36 @@ export default function NewsletterScreen() {
             Yeni modeller, özel koleksiyonlar ve kampanyalar için bültenimize abone olun. İstediğiniz zaman aboneliğinizi iptal edebilirsiniz.
           </Text>
 
-          <TextInput
-            mode="outlined"
+          <Input
             label="Adınız (opsiyonel)"
             value={name}
             onChangeText={setName}
-            style={styles.input}
-            outlineColor={TarodanColors.border}
-            activeOutlineColor={TarodanColors.primary}
+            containerStyle={styles.input}
           />
-          <TextInput
-            mode="outlined"
+          <Input
             label="E-posta *"
             value={email}
             onChangeText={setEmail}
             keyboardType="email-address"
             autoCapitalize="none"
-            style={styles.input}
-            outlineColor={TarodanColors.border}
-            activeOutlineColor={TarodanColors.primary}
+            containerStyle={styles.input}
           />
 
           <Button
-            mode="contained"
-            buttonColor={TarodanColors.primary}
+            variant="primary"
+            title="Abone Ol"
             onPress={handleSubmit}
-            loading={subscribeMutation.isPending}
+            isLoading={subscribeMutation.isPending}
             disabled={subscribeMutation.isPending || !email}
             style={styles.btn}
-            contentStyle={{ paddingVertical: 4 }}
-          >
-            Abone Ol
-          </Button>
+          />
 
           <Button
-            mode="text"
-            textColor={TarodanColors.textSecondary}
+            variant="ghost"
+            title="Aboneliğimi İptal Etmek İstiyorum"
             onPress={() => router.push('/newsletter/unsubscribe' as any)}
-          >
-            Aboneliğimi İptal Etmek İstiyorum
-          </Button>
+          />
+
         </ScrollView>
       </KeyboardAvoidingView>
     </SafeAreaView>
@@ -106,7 +97,7 @@ export default function NewsletterScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: TarodanColors.background,
+    backgroundColor: colors.surface.DEFAULT,
   },
   scrollBody: {
     padding: 24,
@@ -120,18 +111,18 @@ const styles = StyleSheet.create({
   title: {
     fontSize: 22,
     fontWeight: '800',
-    color: TarodanColors.textPrimary,
+    color: colors.text.heading,
     textAlign: 'center',
   },
   subtitle: {
     fontSize: 14,
-    color: TarodanColors.textSecondary,
+    color: colors.text.muted,
     textAlign: 'center',
     marginBottom: 16,
     lineHeight: 20,
   },
   input: {
-    backgroundColor: TarodanColors.background,
+    backgroundColor: colors.surface.DEFAULT,
   },
   btn: {
     borderRadius: 10,

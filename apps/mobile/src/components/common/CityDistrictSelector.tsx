@@ -1,10 +1,10 @@
 import React, { useMemo, useState } from 'react';
 import { View, StyleSheet, FlatList, TouchableOpacity, Modal, Pressable } from 'react-native';
-// (TouchableOpacity is used both for the input rows and modal list rows.)
 import { Ionicons } from '@expo/vector-icons';
-import { TarodanColors } from '../../theme';
-import { Text, TextInput } from './PaperCompat';
+import { theme, Input, Text } from '@tarodan/ui-native';
 import { turkeyLocations, getDistrictsForCity } from '../../utils/turkeyLocations';
+
+const { colors } = theme;
 
 /**
  * Web `CityDistrictSelector` bileşeninin mobile karşılığı.
@@ -91,7 +91,7 @@ export function CityDistrictSelector({
             {city || 'Bir il seçin'}
           </Text>
         </View>
-        <Ionicons name="chevron-down" size={18} color={TarodanColors.textSecondary} />
+        <Ionicons name="chevron-down" size={18} color={colors.text.muted} />
       </TouchableOpacity>
 
       {!hideDistrict ? (
@@ -117,7 +117,7 @@ export function CityDistrictSelector({
               {district || (city ? 'Bir ilçe seçin' : 'Önce il seçin')}
             </Text>
           </View>
-          <Ionicons name="chevron-down" size={18} color={TarodanColors.textSecondary} />
+          <Ionicons name="chevron-down" size={18} color={colors.text.muted} />
         </TouchableOpacity>
       ) : null}
 
@@ -128,19 +128,15 @@ export function CityDistrictSelector({
           <View style={styles.sheetHeader}>
             <Text style={styles.sheetTitle}>İl Seç</Text>
             <TouchableOpacity onPress={() => setCityModal(false)}>
-              <Ionicons name="close" size={22} color={TarodanColors.textSecondary} />
+              <Ionicons name="close" size={22} color={colors.text.muted} />
             </TouchableOpacity>
           </View>
           <View style={styles.sheetSearch}>
-            <TextInput
-              mode="outlined"
+            <Input
               placeholder="İl ara…"
               value={citySearch}
               onChangeText={setCitySearch}
-              dense
-              outlineColor={TarodanColors.border}
-              activeOutlineColor={TarodanColors.primary}
-              left={<TextInput.Icon icon="magnify" />}
+              leftIconName="search"
             />
           </View>
           <FlatList
@@ -154,7 +150,7 @@ export function CityDistrictSelector({
               >
                 <Text style={styles.rowText}>{item.name}</Text>
                 {city === item.name ? (
-                  <Ionicons name="checkmark" size={18} color={TarodanColors.primary} />
+                  <Ionicons name="checkmark" size={18} color={colors.primary[600]!} />
                 ) : null}
               </TouchableOpacity>
             )}
@@ -169,19 +165,15 @@ export function CityDistrictSelector({
           <View style={styles.sheetHeader}>
             <Text style={styles.sheetTitle}>İlçe Seç ({city})</Text>
             <TouchableOpacity onPress={() => setDistrictModal(false)}>
-              <Ionicons name="close" size={22} color={TarodanColors.textSecondary} />
+              <Ionicons name="close" size={22} color={colors.text.muted} />
             </TouchableOpacity>
           </View>
           <View style={styles.sheetSearch}>
-            <TextInput
-              mode="outlined"
+            <Input
               placeholder="İlçe ara…"
               value={districtSearch}
               onChangeText={setDistrictSearch}
-              dense
-              outlineColor={TarodanColors.border}
-              activeOutlineColor={TarodanColors.primary}
-              left={<TextInput.Icon icon="magnify" />}
+              leftIconName="search"
             />
           </View>
           <FlatList
@@ -195,7 +187,7 @@ export function CityDistrictSelector({
               >
                 <Text style={styles.rowText}>{item}</Text>
                 {district === item ? (
-                  <Ionicons name="checkmark" size={18} color={TarodanColors.primary} />
+                  <Ionicons name="checkmark" size={18} color={colors.primary[600]!} />
                 ) : null}
               </TouchableOpacity>
             )}
@@ -209,14 +201,14 @@ export function CityDistrictSelector({
 const styles = StyleSheet.create({
   input: {
     marginBottom: 12,
-    backgroundColor: TarodanColors.background,
+    backgroundColor: colors.surface.DEFAULT,
   },
   fakeInput: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: TarodanColors.background,
+    backgroundColor: colors.surface.DEFAULT,
     borderWidth: 1,
-    borderColor: TarodanColors.border,
+    borderColor: colors.border.DEFAULT,
     borderRadius: 4,
     paddingHorizontal: 14,
     paddingVertical: 10,
@@ -224,27 +216,27 @@ const styles = StyleSheet.create({
     marginBottom: 12,
   },
   fakeInputError: {
-    borderColor: TarodanColors.error,
+    borderColor: colors.danger[600]!,
   },
   fakeInputDisabled: {
-    backgroundColor: TarodanColors.surfaceVariant,
+    backgroundColor: colors.surface.alt,
     opacity: 0.6,
   },
   fakeLabel: {
     fontSize: 11,
-    color: TarodanColors.textSecondary,
+    color: colors.text.muted,
     marginBottom: 2,
   },
   fakeValue: {
     fontSize: 15,
-    color: TarodanColors.textPrimary,
+    color: colors.text.heading,
   },
   fakePlaceholder: {
-    color: TarodanColors.textTertiary,
+    color: colors.text.subtle,
   },
   backdrop: {
     flex: 1,
-    backgroundColor: 'rgba(0,0,0,0.4)',
+    backgroundColor: colors.overlay.black50,
   },
   sheet: {
     position: 'absolute',
@@ -252,7 +244,7 @@ const styles = StyleSheet.create({
     left: 0,
     right: 0,
     maxHeight: '80%',
-    backgroundColor: TarodanColors.background,
+    backgroundColor: colors.surface.DEFAULT,
     borderTopLeftRadius: 16,
     borderTopRightRadius: 16,
     paddingBottom: 16,
@@ -264,12 +256,12 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
     paddingVertical: 14,
     borderBottomWidth: StyleSheet.hairlineWidth,
-    borderBottomColor: TarodanColors.border,
+    borderBottomColor: colors.border.DEFAULT,
   },
   sheetTitle: {
     fontSize: 16,
     fontWeight: '700',
-    color: TarodanColors.textPrimary,
+    color: colors.text.heading,
   },
   sheetSearch: {
     paddingHorizontal: 16,
@@ -282,14 +274,14 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
     paddingVertical: 14,
     borderBottomWidth: StyleSheet.hairlineWidth,
-    borderBottomColor: TarodanColors.borderLight,
+    borderBottomColor: colors.border.subtle,
   },
   rowSelected: {
-    backgroundColor: TarodanColors.primaryLight,
+    backgroundColor: colors.primary[50]!,
   },
   rowText: {
     fontSize: 14,
-    color: TarodanColors.textPrimary,
+    color: colors.text.heading,
   },
 });
 

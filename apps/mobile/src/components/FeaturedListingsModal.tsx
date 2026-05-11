@@ -1,11 +1,11 @@
-import React, { useState, useEffect } from 'react';
-import { View, ScrollView, StyleSheet, Image, Alert } from 'react-native';
-import { Modal, Portal, Button, Card, IconButton, Chip, Snackbar, ActivityIndicator, Divider } from 'react-native-paper';
-import { Text } from './common';
+import React, { useState } from 'react';
+import { View, ScrollView, StyleSheet, Image, Alert, Pressable } from 'react-native';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 import { api } from '../services/api';
-import { TarodanColors } from '../theme';
+import { theme, Text, Button, Card, Chip, IconButton, Snackbar, Spinner, Divider, Modal } from '@tarodan/ui-native';
+
+const { colors } = theme;
 
 interface Product {
   id: string;
@@ -74,8 +74,8 @@ export const FeaturedListingsModal: React.FC<FeaturedListingsModalProps> = ({
     queryKey: ['eligible-for-featured'],
     queryFn: async () => {
       try {
-        const response = await api.get('/products/my-listings', { 
-          params: { status: 'active', notFeatured: true } 
+        const response = await api.get('/products/my-listings', {
+          params: { status: 'active', notFeatured: true }
         });
         return response.data?.data || response.data || [];
       } catch (error) {
@@ -148,133 +148,132 @@ export const FeaturedListingsModal: React.FC<FeaturedListingsModalProps> = ({
     const expiry = new Date(expiresAt);
     const diffMs = expiry.getTime() - now.getTime();
     const diffDays = Math.ceil(diffMs / (1000 * 60 * 60 * 24));
-    
+
     if (diffDays <= 0) return 'Süresi doldu';
     if (diffDays === 1) return '1 gün kaldı';
     return `${diffDays} gün kaldı`;
   };
 
   return (
-    <Portal>
-      <Modal
-        visible={visible}
-        onDismiss={onDismiss}
-        contentContainerStyle={styles.modal}
-      >
-        <View style={styles.header}>
-          <View style={styles.headerTitle}>
-            <MaterialCommunityIcons name="star-circle" size={28} color={TarodanColors.primary} />
-            <Text variant="titleLarge" style={styles.title}>Öne Çıkan İlanlar</Text>
-          </View>
-          <IconButton icon="close" onPress={onDismiss} />
-        </View>
+    <Modal isOpen={visible} onClose={onDismiss} title="Öne Çıkan İlanlar">
+      <View style={styles.headerIcon}>
+        <MaterialCommunityIcons name="star-circle" size={28} color={colors.primary[600]!} />
+      </View>
 
-        {/* Slots Overview */}
-        <View style={styles.slotsOverview}>
-          <View style={styles.slotsInfo}>
-            <Text variant="bodyMedium">Kullanılan Slotlar</Text>
-            <Text variant="headlineSmall" style={styles.slotsCount}>
-              {usedSlots} / {maxSlots}
-            </Text>
-          </View>
-          <View style={styles.slotsIndicator}>
-            {[...Array(maxSlots)].map((_, index) => (
-              <View
-                key={index}
-                style={[
-                  styles.slotDot,
-                  index < usedSlots && styles.slotDotActive,
-                ]}
-              />
-            ))}
-          </View>
-        </View>
-
-        <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
-          {/* Current Featured Listings */}
-          <Text variant="titleSmall" style={styles.sectionTitle}>
-            Aktif Öne Çıkan İlanlarınız
+      {/* Slots Overview */}
+      <View style={styles.slotsOverview}>
+        <View style={styles.slotsInfo}>
+          <Text>Kullanılan Slotlar</Text>
+          <Text style={styles.slotsCount}>
+            {usedSlots} / {maxSlots}
           </Text>
+        </View>
+        <View style={styles.slotsIndicator}>
+          {[...Array(maxSlots)].map((_, index) => (
+            <View
+              key={index}
+              style={[
+                styles.slotDot,
+                index < usedSlots && styles.slotDotActive,
+              ]}
+            />
+          ))}
+        </View>
+      </View>
 
-          {loadingFeatured ? (
-            <ActivityIndicator style={{ marginVertical: 20 }} />
-          ) : featuredSlots?.length === 0 ? (
-            <Card style={styles.emptyCard}>
-              <Card.Content style={styles.emptyContent}>
-                <Ionicons name="star-outline" size={40} color={TarodanColors.textLight} />
-                <Text variant="bodyMedium" style={styles.emptyText}>
-                  Henüz öne çıkan ilanınız yok
-                </Text>
-              </Card.Content>
-            </Card>
-          ) : (
-            featuredSlots?.map((slot) => (
-              <Card key={slot.id} style={styles.featuredCard}>
-                <Card.Content style={styles.featuredContent}>
-                  <Image
-                    source={{ uri: slot.product.images?.[0]?.url || 'https://via.placeholder.com/60' }}
-                    style={styles.productImage}
-                  />
-                  <View style={styles.productInfo}>
-                    <Text variant="bodyMedium" numberOfLines={1} style={styles.productTitle}>
-                      {slot.product.title}
-                    </Text>
-                    <Text variant="bodySmall" style={styles.productPrice}>
-                      ₺{(slot.product?.price ?? 0).toLocaleString('tr-TR')}
-                    </Text>
-                    <Chip compact style={styles.expiryChip} textStyle={{ fontSize: 10 }}>
-                      {formatRemainingTime(slot.expiresAt)}
-                    </Chip>
-                  </View>
-                  <IconButton
-                    icon="close-circle"
-                    size={24}
-                    iconColor={TarodanColors.error}
-                    onPress={() => handleRemoveFeatured(slot.id, slot.product.title)}
-                  />
-                </Card.Content>
-              </Card>
-            ))
-          )}
+      <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
+        {/* Current Featured Listings */}
+        <Text style={styles.sectionTitle}>
+          Aktif Öne Çıkan İlanlarınız
+        </Text>
 
-          <Divider style={styles.divider} />
-
-          {/* Add New Featured */}
-          {availableSlots > 0 ? (
-            <>
-              <Text variant="titleSmall" style={styles.sectionTitle}>
-                İlan Öne Çıkar ({availableSlots} slot boş)
+        {loadingFeatured ? (
+          <View style={{ marginVertical: 20 }}>
+            <Spinner size="lg" />
+          </View>
+        ) : featuredSlots?.length === 0 ? (
+          <Card style={styles.emptyCard}>
+            <View style={styles.emptyContent}>
+              <Ionicons name="star-outline" size={40} color={colors.text.subtle} />
+              <Text style={styles.emptyText}>
+                Henüz öne çıkan ilanınız yok
               </Text>
+            </View>
+          </Card>
+        ) : (
+          featuredSlots?.map((slot) => (
+            <Card key={slot.id} style={styles.featuredCard}>
+              <View style={styles.featuredContent}>
+                <Image
+                  source={{ uri: slot.product.images?.[0]?.url || 'https://via.placeholder.com/60' }}
+                  style={styles.productImage}
+                />
+                <View style={styles.productInfo}>
+                  <Text numberOfLines={1} style={styles.productTitle}>
+                    {slot.product.title}
+                  </Text>
+                  <Text style={styles.productPrice}>
+                    ₺{(slot.product?.price ?? 0).toLocaleString('tr-TR')}
+                  </Text>
+                  <View style={{ alignSelf: 'flex-start', marginTop: 4 }}>
+                    <Chip label={formatRemainingTime(slot.expiresAt)} variant="warning" size="sm" />
+                  </View>
+                </View>
+                <IconButton
+                  icon="close-circle"
+                  size="md"
+                  accessibilityLabel="Öne çıkarmayı kaldır"
+                  color={colors.danger[600]!}
+                  onPress={() => handleRemoveFeatured(slot.id, slot.product.title)}
+                />
+              </View>
+            </Card>
+          ))
+        )}
 
-              {loadingProducts ? (
-                <ActivityIndicator style={{ marginVertical: 20 }} />
-              ) : eligibleProducts?.length === 0 ? (
-                <Card style={styles.emptyCard}>
-                  <Card.Content style={styles.emptyContent}>
-                    <Ionicons name="pricetag-outline" size={40} color={TarodanColors.textLight} />
-                    <Text variant="bodyMedium" style={styles.emptyText}>
-                      Öne çıkarılabilir ilan yok
-                    </Text>
-                  </Card.Content>
-                </Card>
-              ) : (
-                <>
-                  {eligibleProducts?.map((product) => (
+        <Divider style={styles.divider} />
+
+        {/* Add New Featured */}
+        {availableSlots > 0 ? (
+          <>
+            <Text style={styles.sectionTitle}>
+              İlan Öne Çıkar ({availableSlots} slot boş)
+            </Text>
+
+            {loadingProducts ? (
+              <View style={{ marginVertical: 20 }}>
+                <Spinner size="lg" />
+              </View>
+            ) : eligibleProducts?.length === 0 ? (
+              <Card style={styles.emptyCard}>
+                <View style={styles.emptyContent}>
+                  <Ionicons name="pricetag-outline" size={40} color={colors.text.subtle} />
+                  <Text style={styles.emptyText}>
+                    Öne çıkarılabilir ilan yok
+                  </Text>
+                </View>
+              </Card>
+            ) : (
+              <>
+                {eligibleProducts?.map((product) => (
+                  <Pressable
+                    key={product.id}
+                    onPress={() => setSelectedProductId(product.id)}
+                    style={({ pressed }) => ({ opacity: pressed ? 0.85 : 1 })}
+                  >
                     <Card
-                      key={product.id}
-                      style={[
-                        styles.selectableCard,
-                        selectedProductId === product.id && styles.selectedCard,
-                      ]}
-                      onPress={() => setSelectedProductId(product.id)}
+                      style={{
+                        ...styles.selectableCard,
+                        ...(selectedProductId === product.id ? styles.selectedCard : {}),
+                      }}
                     >
-                      <Card.Content style={styles.selectableContent}>
+                      <View style={styles.selectableContent}>
                         <View style={[
                           styles.radioCircle,
                           selectedProductId === product.id && styles.radioCircleSelected,
                         ]}>
                           {selectedProductId === product.id && (
-                            <Ionicons name="checkmark" size={14} color="#fff" />
+                            <Ionicons name="checkmark" size={14} color={colors.white} />
                           )}
                         </View>
                         <Image
@@ -282,98 +281,76 @@ export const FeaturedListingsModal: React.FC<FeaturedListingsModalProps> = ({
                           style={styles.selectableImage}
                         />
                         <View style={styles.selectableInfo}>
-                          <Text variant="bodyMedium" numberOfLines={1}>
+                          <Text numberOfLines={1}>
                             {product.title}
                           </Text>
-                          <Text variant="bodySmall" style={styles.productPrice}>
+                          <Text style={styles.productPrice}>
                             ₺{(product.price ?? 0).toLocaleString('tr-TR')}
                           </Text>
                         </View>
-                      </Card.Content>
+                      </View>
                     </Card>
-                  ))}
+                  </Pressable>
+                ))}
 
-                  <Button
-                    mode="contained"
-                    onPress={handleAddFeatured}
-                    loading={addFeaturedMutation.isPending}
-                    disabled={!selectedProductId || addFeaturedMutation.isPending}
-                    style={styles.addButton}
-                    icon="star"
-                  >
-                    Öne Çıkar
-                  </Button>
-                </>
-              )}
-            </>
-          ) : (
-            <Card style={styles.fullCard}>
-              <Card.Content style={styles.fullContent}>
-                <MaterialCommunityIcons name="star-check" size={40} color={TarodanColors.primary} />
-                <Text variant="bodyMedium" style={styles.fullText}>
-                  Tüm slotlarınız dolu!
-                </Text>
-                <Text variant="bodySmall" style={styles.fullHint}>
-                  Yeni bir ilan öne çıkarmak için mevcut bir öne çıkarmayı kaldırın.
-                </Text>
-              </Card.Content>
-            </Card>
-          )}
-
-          {/* Info Card */}
-          <Card style={styles.infoCard}>
-            <Card.Content>
-              <View style={styles.infoHeader}>
-                <Ionicons name="information-circle" size={20} color={TarodanColors.info} />
-                <Text variant="titleSmall" style={styles.infoTitle}>Öne Çıkan İlanlar Hakkında</Text>
-              </View>
-              <View style={styles.infoBullets}>
-                <Text style={styles.infoBullet}>• Premium üyeler {maxSlots} adet öne çıkan slot hakkına sahiptir</Text>
-                <Text style={styles.infoBullet}>• Öne çıkan ilanlar arama sonuçlarında üstte görünür</Text>
-                <Text style={styles.infoBullet}>• Her öne çıkarma 7 gün sürer</Text>
-                <Text style={styles.infoBullet}>• Ek öne çıkarma: 50 TRY/ilan/hafta</Text>
-              </View>
-            </Card.Content>
+                <Button
+                  variant="primary"
+                  title="Öne Çıkar"
+                  onPress={handleAddFeatured}
+                  isLoading={addFeaturedMutation.isPending}
+                  disabled={!selectedProductId || addFeaturedMutation.isPending}
+                  style={styles.addButton}
+                  icon="star"
+                />
+              </>
+            )}
+          </>
+        ) : (
+          <Card style={styles.fullCard}>
+            <View style={styles.fullContent}>
+              <MaterialCommunityIcons name="star-check" size={40} color={colors.primary[600]!} />
+              <Text style={styles.fullText}>
+                Tüm slotlarınız dolu!
+              </Text>
+              <Text style={styles.fullHint}>
+                Yeni bir ilan öne çıkarmak için mevcut bir öne çıkarmayı kaldırın.
+              </Text>
+            </View>
           </Card>
+        )}
 
-          <View style={{ height: 20 }} />
-        </ScrollView>
+        {/* Info Card */}
+        <Card style={styles.infoCard}>
+          <View style={styles.infoHeader}>
+            <Ionicons name="information-circle" size={20} color={colors.info[600]!} />
+            <Text style={styles.infoTitle}>Öne Çıkan İlanlar Hakkında</Text>
+          </View>
+          <View style={styles.infoBullets}>
+            <Text style={styles.infoBullet}>• Premium üyeler {maxSlots} adet öne çıkan slot hakkına sahiptir</Text>
+            <Text style={styles.infoBullet}>• Öne çıkan ilanlar arama sonuçlarında üstte görünür</Text>
+            <Text style={styles.infoBullet}>• Her öne çıkarma 7 gün sürer</Text>
+            <Text style={styles.infoBullet}>• Ek öne çıkarma: 50 TRY/ilan/hafta</Text>
+          </View>
+        </Card>
 
-        <Snackbar
-          visible={snackbar.visible}
-          onDismiss={() => setSnackbar({ ...snackbar, visible: false })}
-          duration={3000}
-        >
-          {snackbar.message}
-        </Snackbar>
-      </Modal>
-    </Portal>
+        <View style={{ height: 20 }} />
+      </ScrollView>
+
+      <Snackbar
+        visible={snackbar.visible}
+        onDismiss={() => setSnackbar({ ...snackbar, visible: false })}
+        duration={3000}
+      >
+        {snackbar.message}
+      </Snackbar>
+    </Modal>
   );
 };
 
 const styles = StyleSheet.create({
-  modal: {
-    backgroundColor: TarodanColors.background,
-    margin: 16,
-    borderRadius: 16,
-    maxHeight: '90%',
-  },
-  header: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
+  headerIcon: {
     alignItems: 'center',
-    paddingLeft: 16,
-    paddingRight: 4,
-    paddingTop: 8,
-  },
-  headerTitle: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-  },
-  title: {
-    fontWeight: 'bold',
-    color: TarodanColors.textPrimary,
+    marginBottom: 8,
   },
   slotsOverview: {
     flexDirection: 'row',
@@ -381,15 +358,15 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     paddingHorizontal: 16,
     paddingVertical: 12,
-    backgroundColor: TarodanColors.primary + '10',
-    marginHorizontal: 16,
+    backgroundColor: colors.primary[50]!,
     marginVertical: 8,
     borderRadius: 12,
   },
   slotsInfo: {},
   slotsCount: {
-    color: TarodanColors.primary,
+    color: colors.primary[600]!,
     fontWeight: 'bold',
+    fontSize: 18,
   },
   slotsIndicator: {
     flexDirection: 'row',
@@ -400,24 +377,26 @@ const styles = StyleSheet.create({
     height: 20,
     borderRadius: 10,
     borderWidth: 2,
-    borderColor: TarodanColors.primary + '40',
+    borderColor: colors.primary[200]!,
     backgroundColor: 'transparent',
   },
   slotDotActive: {
-    backgroundColor: TarodanColors.primary,
-    borderColor: TarodanColors.primary,
+    backgroundColor: colors.primary[600]!,
+    borderColor: colors.primary[600]!,
   },
   content: {
-    paddingHorizontal: 16,
+    maxHeight: 500,
   },
   sectionTitle: {
     marginTop: 8,
     marginBottom: 12,
-    color: TarodanColors.textPrimary,
+    color: colors.text.heading,
+    fontSize: 14,
+    fontWeight: '600',
   },
   emptyCard: {
     marginBottom: 12,
-    backgroundColor: TarodanColors.backgroundSecondary,
+    backgroundColor: colors.surface.alt,
   },
   emptyContent: {
     alignItems: 'center',
@@ -425,13 +404,13 @@ const styles = StyleSheet.create({
   },
   emptyText: {
     marginTop: 8,
-    color: TarodanColors.textSecondary,
+    color: colors.text.muted,
   },
   featuredCard: {
     marginBottom: 8,
-    backgroundColor: TarodanColors.primary + '08',
+    backgroundColor: colors.primary[50]!,
     borderWidth: 1,
-    borderColor: TarodanColors.primary + '30',
+    borderColor: colors.primary[200]!,
   },
   featuredContent: {
     flexDirection: 'row',
@@ -441,24 +420,19 @@ const styles = StyleSheet.create({
     width: 60,
     height: 60,
     borderRadius: 8,
-    backgroundColor: TarodanColors.border,
+    backgroundColor: colors.border.DEFAULT,
   },
   productInfo: {
     flex: 1,
     marginLeft: 12,
   },
   productTitle: {
-    color: TarodanColors.textPrimary,
+    color: colors.text.heading,
   },
   productPrice: {
-    color: TarodanColors.primary,
+    color: colors.primary[700]!,
     fontWeight: '600',
     marginTop: 2,
-  },
-  expiryChip: {
-    marginTop: 4,
-    alignSelf: 'flex-start',
-    backgroundColor: TarodanColors.warning + '20',
   },
   divider: {
     marginVertical: 16,
@@ -469,8 +443,8 @@ const styles = StyleSheet.create({
     borderColor: 'transparent',
   },
   selectedCard: {
-    borderColor: TarodanColors.primary,
-    backgroundColor: TarodanColors.primary + '08',
+    borderColor: colors.primary[600]!,
+    backgroundColor: colors.primary[50]!,
   },
   selectableContent: {
     flexDirection: 'row',
@@ -481,20 +455,20 @@ const styles = StyleSheet.create({
     height: 24,
     borderRadius: 12,
     borderWidth: 2,
-    borderColor: TarodanColors.border,
+    borderColor: colors.border.DEFAULT,
     justifyContent: 'center',
     alignItems: 'center',
     marginRight: 8,
   },
   radioCircleSelected: {
-    backgroundColor: TarodanColors.primary,
-    borderColor: TarodanColors.primary,
+    backgroundColor: colors.primary[600]!,
+    borderColor: colors.primary[600]!,
   },
   selectableImage: {
     width: 50,
     height: 50,
     borderRadius: 6,
-    backgroundColor: TarodanColors.border,
+    backgroundColor: colors.border.DEFAULT,
   },
   selectableInfo: {
     flex: 1,
@@ -502,13 +476,12 @@ const styles = StyleSheet.create({
   },
   addButton: {
     marginTop: 12,
-    backgroundColor: TarodanColors.primary,
   },
   fullCard: {
     marginBottom: 12,
-    backgroundColor: TarodanColors.success + '10',
+    backgroundColor: colors.success[50]!,
     borderWidth: 1,
-    borderColor: TarodanColors.success + '30',
+    borderColor: colors.success[200]!,
   },
   fullContent: {
     alignItems: 'center',
@@ -516,19 +489,19 @@ const styles = StyleSheet.create({
   },
   fullText: {
     marginTop: 8,
-    color: TarodanColors.success,
+    color: colors.success[600]!,
     fontWeight: '600',
   },
   fullHint: {
     marginTop: 4,
-    color: TarodanColors.textSecondary,
+    color: colors.text.muted,
     textAlign: 'center',
   },
   infoCard: {
     marginTop: 16,
-    backgroundColor: TarodanColors.info + '08',
+    backgroundColor: colors.info[50]!,
     borderWidth: 1,
-    borderColor: TarodanColors.info + '20',
+    borderColor: colors.info[200]!,
   },
   infoHeader: {
     flexDirection: 'row',
@@ -537,14 +510,15 @@ const styles = StyleSheet.create({
   },
   infoTitle: {
     marginLeft: 8,
-    color: TarodanColors.info,
+    color: colors.info[600]!,
+    fontWeight: '600',
   },
   infoBullets: {
     gap: 4,
   },
   infoBullet: {
     fontSize: 12,
-    color: TarodanColors.textSecondary,
+    color: colors.text.muted,
     lineHeight: 18,
   },
 });

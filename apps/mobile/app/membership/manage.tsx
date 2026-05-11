@@ -3,13 +3,13 @@ import { View, ScrollView, StyleSheet, Alert } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { router } from 'expo-router';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { Button, Card, ActivityIndicator, Snackbar, Switch, Divider } from 'react-native-paper';
+import { theme, Button, Card, Spinner, Snackbar, Switch, Divider, Text } from '@tarodan/ui-native';
 import { Ionicons } from '@expo/vector-icons';
 
-import { Text } from '../../src/components/common';
 import { ScreenHeader } from '../../src/components/common';
-import { TarodanColors } from '../../src/theme';
 import { membershipApi } from '../../src/services/api';
+
+const { colors } = theme;
 import { captureException } from '../../src/services/sentry';
 
 /**
@@ -135,7 +135,7 @@ export default function MembershipManageScreen() {
       <SafeAreaView style={styles.container} edges={['top']}>
         <ScreenHeader title="Üyelik Yönetimi" />
         <View style={styles.loadingBox}>
-          <ActivityIndicator color={TarodanColors.primary} />
+          <Spinner size="lg" />
         </View>
       </SafeAreaView>
     );
@@ -147,109 +147,98 @@ export default function MembershipManageScreen() {
       <ScrollView contentContainerStyle={styles.scrollBody}>
         {/* Current plan */}
         <Card style={styles.card}>
-          <Card.Content>
-            <View style={styles.headerRow}>
-              <View style={styles.tierBadge}>
-                <Ionicons name="sparkles-outline" size={16} color={TarodanColors.primary} />
-                <Text style={styles.tierText}>{tierName}</Text>
+          <View style={styles.headerRow}>
+            <View style={styles.tierBadge}>
+              <Ionicons name="sparkles-outline" size={16} color={colors.primary[600]!} />
+              <Text style={styles.tierText}>{tierName}</Text>
+            </View>
+            {isPaid ? (
+              <View style={styles.activeRow}>
+                <Ionicons name="checkmark-circle" size={18} color={colors.success[600]!} />
+                <Text style={styles.activeText}>Aktif</Text>
               </View>
-              {isPaid ? (
-                <View style={styles.activeRow}>
-                  <Ionicons name="checkmark-circle" size={18} color={TarodanColors.success} />
-                  <Text style={styles.activeText}>Aktif</Text>
+            ) : null}
+          </View>
+
+          {isPaid ? (
+            <>
+              <Divider style={{ marginVertical: 12 }} />
+              <View style={styles.kvRow}>
+                <Text style={styles.kvLabel}>Başlangıç</Text>
+                <Text style={styles.kvValue}>{formatDate(data?.currentPeriodStart)}</Text>
+              </View>
+              <View style={styles.kvRow}>
+                <Text style={styles.kvLabel}>Bitiş</Text>
+                <Text style={styles.kvValue}>{formatDate(data?.currentPeriodEnd)}</Text>
+              </View>
+              {data?.nextBillingDate ? (
+                <View style={styles.kvRow}>
+                  <Text style={styles.kvLabel}>Sonraki Ödeme</Text>
+                  <Text style={styles.kvValue}>
+                    {formatDate(data.nextBillingDate)}
+                    {data.nextBillingAmount != null ? ` · ${formatTL(data.nextBillingAmount)}` : ''}
+                  </Text>
                 </View>
               ) : null}
-            </View>
 
-            {isPaid ? (
-              <>
-                <Divider style={{ marginVertical: 12 }} />
-                <View style={styles.kvRow}>
-                  <Text style={styles.kvLabel}>Başlangıç</Text>
-                  <Text style={styles.kvValue}>{formatDate(data?.currentPeriodStart)}</Text>
-                </View>
-                <View style={styles.kvRow}>
-                  <Text style={styles.kvLabel}>Bitiş</Text>
-                  <Text style={styles.kvValue}>{formatDate(data?.currentPeriodEnd)}</Text>
-                </View>
-                {data?.nextBillingDate ? (
-                  <View style={styles.kvRow}>
-                    <Text style={styles.kvLabel}>Sonraki Ödeme</Text>
-                    <Text style={styles.kvValue}>
-                      {formatDate(data.nextBillingDate)}
-                      {data.nextBillingAmount != null ? ` · ${formatTL(data.nextBillingAmount)}` : ''}
-                    </Text>
-                  </View>
-                ) : null}
+              <Divider style={{ marginVertical: 12 }} />
 
-                <Divider style={{ marginVertical: 12 }} />
-
-                {/* Auto-renew toggle */}
-                <View style={styles.autoRow}>
-                  <View style={{ flex: 1 }}>
-                    <Text style={styles.autoTitle}>Otomatik Yenileme</Text>
-                    <Text style={styles.autoSub}>
-                      {autoRenew
-                        ? 'Üyeliğiniz dönem sonunda otomatik yenilenecek.'
-                        : 'Kapalı — dönem sonunda üyeliğiniz sona erecek.'}
-                    </Text>
-                  </View>
-                  <Switch
-                    value={autoRenew}
-                    onValueChange={handleToggleAutoRenew}
-                    disabled={autoRenewMutation.isPending}
-                    color={TarodanColors.primary}
-                  />
+              {/* Auto-renew toggle */}
+              <View style={styles.autoRow}>
+                <View style={{ flex: 1 }}>
+                  <Text style={styles.autoTitle}>Otomatik Yenileme</Text>
+                  <Text style={styles.autoSub}>
+                    {autoRenew
+                      ? 'Üyeliğiniz dönem sonunda otomatik yenilenecek.'
+                      : 'Kapalı — dönem sonunda üyeliğiniz sona erecek.'}
+                  </Text>
                 </View>
-              </>
-            ) : (
-              <Text style={styles.helperText}>
-                Şu anda ücretsiz üyeliği kullanıyorsunuz. Daha fazla özellik için planınızı yükseltin.
-              </Text>
-            )}
-          </Card.Content>
+                <Switch
+                  value={autoRenew}
+                  onValueChange={handleToggleAutoRenew}
+                  disabled={autoRenewMutation.isPending}
+                />
+              </View>
+            </>
+          ) : (
+            <Text style={styles.helperText}>
+              Şu anda ücretsiz üyeliği kullanıyorsunuz. Daha fazla özellik için planınızı yükseltin.
+            </Text>
+          )}
         </Card>
 
         {/* Actions */}
         {isPaid ? (
           <>
             <Button
-              mode="contained"
+              variant="primary"
+              title="Plan Değiştir"
               icon="swap-vertical"
-              buttonColor={TarodanColors.primary}
               onPress={() => router.push('/membership' as any)}
               style={styles.actionBtn}
-              contentStyle={{ paddingVertical: 4 }}
-            >
-              Plan Değiştir
-            </Button>
+            />
             <Button
-              mode="outlined"
+              variant="outline"
+              title="Üyeliği İptal Et"
               icon="close-circle-outline"
-              textColor={TarodanColors.error}
               onPress={handleCancel}
-              loading={cancelMutation.isPending}
+              isLoading={cancelMutation.isPending}
               disabled={cancelMutation.isPending}
-              style={[styles.actionBtn, { borderColor: TarodanColors.error }]}
-            >
-              Üyeliği İptal Et
-            </Button>
+              style={{ ...styles.actionBtn, borderColor: colors.danger[600]! }}
+            />
           </>
         ) : (
           <Button
-            mode="contained"
-            icon="arrow-up-bold"
-            buttonColor={TarodanColors.primary}
+            variant="primary"
+            title="Üyeliği Yükselt"
+            icon="arrow-up"
             onPress={() => router.push('/membership' as any)}
             style={styles.actionBtn}
-            contentStyle={{ paddingVertical: 4 }}
-          >
-            Üyeliği Yükselt
-          </Button>
+          />
         )}
 
         <View style={styles.helpBox}>
-          <Ionicons name="information-circle-outline" size={18} color={TarodanColors.info} />
+          <Ionicons name="information-circle-outline" size={18} color={colors.info[600]!} />
           <Text style={styles.helpText}>
             Üyelik ile ilgili sorularınız için destek ekibimizle iletişime geçebilirsiniz.
           </Text>
@@ -270,7 +259,7 @@ export default function MembershipManageScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: TarodanColors.backgroundSecondary,
+    backgroundColor: colors.surface.alt,
   },
   loadingBox: {
     flex: 1,
@@ -282,7 +271,7 @@ const styles = StyleSheet.create({
     gap: 12,
   },
   card: {
-    backgroundColor: TarodanColors.background,
+    backgroundColor: colors.surface.DEFAULT,
   },
   headerRow: {
     flexDirection: 'row',
@@ -293,13 +282,13 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: 6,
-    backgroundColor: TarodanColors.primary + '15',
+    backgroundColor: colors.primary[50]!,
     paddingHorizontal: 10,
     paddingVertical: 6,
     borderRadius: 999,
   },
   tierText: {
-    color: TarodanColors.primary,
+    color: colors.primary[600]!,
     fontWeight: '700',
   },
   activeRow: {
@@ -308,7 +297,7 @@ const styles = StyleSheet.create({
     gap: 4,
   },
   activeText: {
-    color: TarodanColors.success,
+    color: colors.success[600]!,
     fontWeight: '600',
     fontSize: 13,
   },
@@ -318,11 +307,11 @@ const styles = StyleSheet.create({
     paddingVertical: 4,
   },
   kvLabel: {
-    color: TarodanColors.textSecondary,
+    color: colors.text.muted,
     fontSize: 13,
   },
   kvValue: {
-    color: TarodanColors.textPrimary,
+    color: colors.text.heading,
     fontWeight: '600',
     fontSize: 13,
   },
@@ -333,17 +322,17 @@ const styles = StyleSheet.create({
   },
   autoTitle: {
     fontWeight: '700',
-    color: TarodanColors.textPrimary,
+    color: colors.text.heading,
     marginBottom: 2,
   },
   autoSub: {
     fontSize: 12,
-    color: TarodanColors.textSecondary,
+    color: colors.text.muted,
     lineHeight: 17,
   },
   helperText: {
     fontSize: 13,
-    color: TarodanColors.textSecondary,
+    color: colors.text.muted,
     marginTop: 12,
     lineHeight: 18,
   },
@@ -355,13 +344,13 @@ const styles = StyleSheet.create({
     alignItems: 'flex-start',
     gap: 8,
     padding: 12,
-    backgroundColor: TarodanColors.infoLight,
+    backgroundColor: colors.info[50]!,
     borderRadius: 10,
     marginTop: 4,
   },
   helpText: {
     flex: 1,
-    color: TarodanColors.info,
+    color: colors.info[600]!,
     fontSize: 12,
     lineHeight: 17,
   },

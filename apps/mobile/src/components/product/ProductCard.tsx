@@ -2,10 +2,9 @@ import React, { useState, useMemo } from 'react';
 import { View, StyleSheet, Image, TouchableOpacity, Pressable } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { router } from 'expo-router';
-import { TarodanColors } from '../../theme';
+import { theme, Text } from '@tarodan/ui-native';
 import { formatPrice } from '../../utils/format';
 import { transformImageUrl } from '../../utils/imageUrl';
-import { Text } from '../common/PaperCompat';
 import {
   ProductPriceFields,
   getProductEffectivePrice,
@@ -13,6 +12,8 @@ import {
   isProductOnSaleDisplay,
   getProductDiscountPercent,
 } from '../../utils/productPrice';
+
+const { colors } = theme;
 
 export interface ProductCardProduct extends ProductPriceFields {
   id: string;
@@ -115,7 +116,7 @@ export function ProductCard({
             </View>
             {ratingAvg !== null && ratingCount > 0 ? (
               <View style={styles.ratingRow}>
-                <Ionicons name="star" size={14} color={TarodanColors.star} />
+                <Ionicons name="star" size={14} color={colors.warning[500]!} />
                 <Text style={styles.ratingText}>{ratingAvg.toFixed(1)}</Text>
                 <Text style={styles.ratingCount}>({ratingCount})</Text>
               </View>
@@ -149,13 +150,13 @@ export function ProductCard({
           ) : null}
           {product.isLimited ? (
             <View style={[styles.badge, styles.limitedBadge]}>
-              <Ionicons name="star" size={10} color="#fff" />
+              <Ionicons name="star" size={10} color={colors.white} />
               <Text style={[styles.badgeText, { marginLeft: 4 }]}>LIMITED</Text>
             </View>
           ) : null}
           {product.isTradeEnabled ? (
             <View style={[styles.badge, styles.tradeBadge]}>
-              <Ionicons name="swap-horizontal" size={10} color="#fff" />
+              <Ionicons name="swap-horizontal" size={10} color={colors.white} />
               <Text style={[styles.badgeText, { marginLeft: 4 }]}>TAKAS</Text>
             </View>
           ) : null}
@@ -177,7 +178,7 @@ export function ProductCard({
               <Ionicons
                 name={isFavorite ? 'heart' : 'heart-outline'}
                 size={18}
-                color={isFavorite ? TarodanColors.error : TarodanColors.textPrimary}
+                color={isFavorite ? colors.danger[600]! : colors.text.heading}
               />
             </TouchableOpacity>
           ) : null}
@@ -194,7 +195,7 @@ export function ProductCard({
         <Text style={styles.price}>{formatPrice(effectivePrice)}</Text>
         {ratingAvg !== null && ratingCount > 0 ? (
           <View style={styles.ratingRow}>
-            <Ionicons name="star" size={12} color={TarodanColors.star} />
+            <Ionicons name="star" size={12} color={colors.warning[500]!} />
             <Text style={styles.ratingText}>{ratingAvg.toFixed(1)}</Text>
             <Text style={styles.ratingCount}>({ratingCount})</Text>
           </View>
@@ -208,15 +209,15 @@ const styles = StyleSheet.create({
   // ========== GRID ==========
   gridCard: {
     flex: 1,
-    backgroundColor: TarodanColors.background,
+    backgroundColor: colors.surface.DEFAULT,
     borderRadius: 12,
     overflow: 'hidden',
     borderWidth: StyleSheet.hairlineWidth,
-    borderColor: TarodanColors.border,
+    borderColor: colors.border.DEFAULT,
   },
   gridImageWrap: {
     aspectRatio: 1,
-    backgroundColor: TarodanColors.surfaceVariant,
+    backgroundColor: colors.surface.alt,
     position: 'relative',
   },
   gridImage: {
@@ -230,11 +231,11 @@ const styles = StyleSheet.create({
   // ========== LIST ==========
   listCard: {
     flexDirection: 'row',
-    backgroundColor: TarodanColors.background,
+    backgroundColor: colors.surface.DEFAULT,
     borderRadius: 12,
     overflow: 'hidden',
     borderWidth: StyleSheet.hairlineWidth,
-    borderColor: TarodanColors.border,
+    borderColor: colors.border.DEFAULT,
     padding: 10,
     gap: 12,
   },
@@ -243,7 +244,7 @@ const styles = StyleSheet.create({
     height: 110,
     borderRadius: 8,
     overflow: 'hidden',
-    backgroundColor: TarodanColors.surfaceVariant,
+    backgroundColor: colors.surface.alt,
   },
   listImage: {
     width: '100%',
@@ -264,23 +265,23 @@ const styles = StyleSheet.create({
   title: {
     fontSize: 14,
     fontWeight: '600',
-    color: TarodanColors.textPrimary,
+    color: colors.text.heading,
     lineHeight: 18,
   },
   meta: {
     fontSize: 12,
-    color: TarodanColors.textSecondary,
+    color: colors.text.muted,
     marginTop: 2,
   },
   price: {
     fontSize: 16,
     fontWeight: '800',
-    color: TarodanColors.price,
+    color: colors.primary[700]!,
     marginTop: 4,
   },
   priceOld: {
     fontSize: 12,
-    color: TarodanColors.priceOld,
+    color: colors.gray[400],
     textDecorationLine: 'line-through',
     marginTop: 4,
   },
@@ -310,31 +311,31 @@ const styles = StyleSheet.create({
     borderRadius: 4,
   },
   badgeText: {
-    color: '#fff',
+    color: colors.white,
     fontSize: 10,
     fontWeight: '700',
     letterSpacing: 0.3,
   },
   saleBadge: {
-    backgroundColor: TarodanColors.badgeDiscount,
+    backgroundColor: colors.danger[500]!,
   },
   preorderBadge: {
-    backgroundColor: TarodanColors.accent,
+    backgroundColor: colors.warning[500]!,
   },
   limitedBadge: {
-    backgroundColor: TarodanColors.badgePremium,
+    backgroundColor: colors.warning[500]!,
   },
   tradeBadge: {
-    backgroundColor: TarodanColors.badgeTrade,
+    backgroundColor: colors.info[600]!,
   },
   neutralBadge: {
-    backgroundColor: 'rgba(0,0,0,0.65)',
+    backgroundColor: colors.overlay.black70,
   },
   favBtn: {
     width: 30,
     height: 30,
     borderRadius: 15,
-    backgroundColor: 'rgba(255,255,255,0.9)',
+    backgroundColor: colors.overlay.white90,
     alignItems: 'center',
     justifyContent: 'center',
   },
@@ -349,12 +350,12 @@ const styles = StyleSheet.create({
   ratingText: {
     fontSize: 12,
     fontWeight: '600',
-    color: TarodanColors.textPrimary,
+    color: colors.text.heading,
     marginLeft: 2,
   },
   ratingCount: {
     fontSize: 11,
-    color: TarodanColors.textSecondary,
+    color: colors.text.muted,
     marginLeft: 2,
   },
 });
