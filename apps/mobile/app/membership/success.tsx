@@ -47,12 +47,14 @@ export default function MembershipSuccessScreen() {
           <Button
             variant="primary"
             title="Ana Sayfaya Git"
+            fullWidth
             onPress={() => router.replace('/(tabs)')}
             style={styles.primaryButton}
           />
           <Button
             variant="outline"
             title="İlanlarımı Gör"
+            fullWidth
             onPress={() => router.push('/settings/my-listings')}
             style={styles.secondaryButton}
           />

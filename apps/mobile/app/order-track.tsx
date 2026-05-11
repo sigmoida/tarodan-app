@@ -211,7 +211,7 @@ export default function OrderTrackScreen() {
                   <View style={styles.shippingRow}>
                     <Text style={styles.shippingLabel}>Kargo Firması</Text>
                     <Text style={styles.shippingValue}>
-                      {order.shipment.carrier === 'aras' ? 'Aras Kargo' : 'Yurtiçi Kargo'}
+                      {order.shipment.carrier === 'surat' ? 'Sürat Kargo' : order.shipment.carrier}
                     </Text>
                   </View>
                   {order.shipment.trackingNumber && (

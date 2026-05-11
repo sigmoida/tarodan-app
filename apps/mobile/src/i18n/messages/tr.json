@@ -1397,5 +1397,8 @@
       "similar": "Benzer ürünler",
       "empty": "Bu kategoride başka aktif ürün bulunamadı."
     }
+  },
+  "mobile": {
+    "tabBarSell": "İlan ver"
   }
 }

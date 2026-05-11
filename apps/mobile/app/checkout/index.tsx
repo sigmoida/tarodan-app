@@ -111,8 +111,10 @@ export default function CheckoutScreen() {
   const [billingAddress, setBillingAddress] = useState<ShippingAddressInput>(EMPTY_ADDRESS);
 
   // ---------- Kargo / Ödeme tercihleri ----------
-  const [selectedCarrier, setSelectedCarrier] = useState<'aras' | 'yurtici' | 'mng'>('aras');
-  const [paymentProvider, setPaymentProvider] = useState<'iyzico' | 'paytr'>('iyzico');
+  // Tek kargo firması: Sürat Kargo (web ile parite — apps/web/src/app/checkout/page.tsx).
+  const selectedCarrier: 'surat' = 'surat';
+  // Sadece PayTR kullanılıyor (iyzico kaldırıldı — web ile parite)
+  const paymentProvider: 'paytr' = 'paytr';
   const [shippingCost, setShippingCost] = useState(0);
   const [shippingLoading, setShippingLoading] = useState(false);
 
@@ -222,8 +224,7 @@ export default function CheckoutScreen() {
       } else {
         const isIstanbul = city.toLowerCase().includes('istanbul');
         const baseRate = isIstanbul ? 34.9 : 49.9;
-        const carrierExtra = selectedCarrier === 'yurtici' ? 5 : 0;
-        setShippingCost(baseRate + carrierExtra);
+        setShippingCost(baseRate);
       }
     } catch {
       setShippingCost(49.9);
@@ -852,32 +853,19 @@ export default function CheckoutScreen() {
                 <Text style={styles.sectionTitle}>Kargo Seçimi</Text>
               </View>
 
-              {(['aras', 'yurtici', 'mng'] as const).map(c => (
-                <TouchableOpacity
-                  key={c}
-                  style={[
-                    styles.optionCard,
-                    selectedCarrier === c && styles.optionCardActive,
-                  ]}
-                  onPress={() => setSelectedCarrier(c)}
-                >
-                  <Radio
-                    checked={selectedCarrier === c}
-                    onChange={() => setSelectedCarrier(c)}
-                  />
-                  <View style={styles.optionContent}>
-                    <Text style={styles.optionTitle}>
-                      {c === 'aras' ? 'Aras Kargo' : c === 'yurtici' ? 'Yurtiçi Kargo' : 'MNG Kargo'}
-                    </Text>
-                    <Text style={styles.optionDescription}>2-4 iş günü teslimat</Text>
-                  </View>
-                  {shippingLoading ? (
-                    <Spinner size="sm" />
-                  ) : (
-                    <Text style={styles.optionPrice}>{formatPrice(shippingCost)}</Text>
-                  )}
-                </TouchableOpacity>
-              ))}
+              {/* Tek kargo firması: Sürat Kargo (web ile parite — UI seçici yok) */}
+              <View style={[styles.optionCard, styles.optionCardActive]}>
+                <Radio checked onChange={() => {}} />
+                <View style={styles.optionContent}>
+                  <Text style={styles.optionTitle}>Sürat Kargo</Text>
+                  <Text style={styles.optionDescription}>2-4 iş günü teslimat</Text>
+                </View>
+                {shippingLoading ? (
+                  <Spinner size="sm" />
+                ) : (
+                  <Text style={styles.optionPrice}>{formatPrice(shippingCost)}</Text>
+                )}
+              </View>
             </View>
 
             {/* Ödeme Yöntemi */}
@@ -966,7 +954,7 @@ export default function CheckoutScreen() {
                     <View style={styles.optionContent}>
                       <Text style={styles.optionTitle}>Sağlayıcı Sayfasında Öde</Text>
                       <Text style={styles.optionDescription}>
-                        {paymentProvider === 'iyzico' ? 'iyzico' : 'PayTR'} 3DS sayfası
+                        PayTR 3DS sayfası
                       </Text>
                     </View>
                   </TouchableOpacity>
@@ -1043,31 +1031,7 @@ export default function CheckoutScreen() {
                 </View>
               ) : null}
 
-              {/* Provider seçimi */}
-              <View style={{ marginTop: 12 }}>
-                <Text style={styles.helperText}>Ödeme sağlayıcı:</Text>
-                <View style={{ flexDirection: 'row', gap: 8, marginTop: 6 }}>
-                  {(['iyzico', 'paytr'] as const).map(p => (
-                    <TouchableOpacity
-                      key={p}
-                      style={[
-                        styles.providerChip,
-                        paymentProvider === p && styles.providerChipActive,
-                      ]}
-                      onPress={() => setPaymentProvider(p)}
-                    >
-                      <Text
-                        style={[
-                          styles.providerChipText,
-                          paymentProvider === p && styles.providerChipTextActive,
-                        ]}
-                      >
-                        {p === 'iyzico' ? 'iyzico' : 'PayTR'}
-                      </Text>
-                    </TouchableOpacity>
-                  ))}
-                </View>
-              </View>
+              {/* Provider: sadece PayTR (iyzico kaldırıldı — web ile parite) */}
             </View>
 
             {/* Kupon */}
@@ -1163,15 +1127,7 @@ export default function CheckoutScreen() {
             <Text style={styles.orderSummaryValue}>{formatPrice(subtotal)}</Text>
           </View>
           <View style={styles.orderSummaryRow}>
-            <Text style={styles.orderSummaryLabel}>
-              Kargo (
-              {selectedCarrier === 'aras'
-                ? 'Aras'
-                : selectedCarrier === 'yurtici'
-                ? 'Yurtiçi'
-                : 'MNG'}
-              )
-            </Text>
+            <Text style={styles.orderSummaryLabel}>Kargo (Sürat)</Text>
             <Text style={styles.orderSummaryValue}>
               {effectiveShippingCity ? formatPrice(shippingCost) : 'İl seçin'}
             </Text>

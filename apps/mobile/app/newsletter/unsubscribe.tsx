@@ -65,6 +65,7 @@ export default function NewsletterUnsubscribeScreen() {
               <Button
                 variant="primary"
                 title="Ana Sayfaya Dön"
+                fullWidth
                 onPress={() => router.replace('/')}
                 style={styles.btn}
               />
@@ -88,6 +89,7 @@ export default function NewsletterUnsubscribeScreen() {
               <Button
                 variant="danger"
                 title="Aboneliğimi İptal Et"
+                fullWidth
                 onPress={handleSubmit}
                 isLoading={unsubscribeMutation.isPending}
                 disabled={unsubscribeMutation.isPending || !email}
@@ -97,6 +99,7 @@ export default function NewsletterUnsubscribeScreen() {
               <Button
                 variant="ghost"
                 title="Vazgeç"
+                fullWidth
                 onPress={() => router.back()}
               />
             </>

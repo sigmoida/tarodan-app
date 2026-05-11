@@ -64,6 +64,7 @@ export default function CheckoutSuccessScreen() {
           <Button
             variant="primary"
             title="Siparişlerimi Gör"
+            fullWidth
             onPress={() => router.replace('/orders')}
             style={styles.primaryButton}
             icon="cube-outline"
@@ -71,6 +72,7 @@ export default function CheckoutSuccessScreen() {
           <Button
             variant="outline"
             title="Alışverişe Devam Et"
+            fullWidth
             onPress={() => router.replace('/(tabs)')}
             style={styles.secondaryButton}
           />

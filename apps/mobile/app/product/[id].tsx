@@ -831,6 +831,9 @@ const styles = StyleSheet.create({
     fontWeight: 'bold',
     color: colors.primary[600]!,
     marginBottom: 12,
+    alignSelf: 'flex-start',
+    includeFontPadding: false,
+    paddingRight: 4,
   },
   quickInfo: {
     flexDirection: 'row',
@@ -1038,6 +1041,7 @@ const styles = StyleSheet.create({
   },
   bottomPrice: {
     marginRight: 16,
+    flexShrink: 0,
   },
   bottomPriceLabel: {
     fontSize: 12,
@@ -1047,6 +1051,9 @@ const styles = StyleSheet.create({
     fontSize: 20,
     fontWeight: 'bold',
     color: colors.text.heading,
+    flexShrink: 0,
+    includeFontPadding: false,
+    paddingRight: 2,
   },
   bottomButtons: {
     flex: 1,

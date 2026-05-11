@@ -98,7 +98,7 @@ export default function SalesScreen() {
         return ordersApi.markAsPreparing(orderId);
       }
       if (status === 'shipped') {
-        const created = await shippingApi.createShipment({ orderId, provider: 'aras' });
+        const created = await shippingApi.createShipment({ orderId, provider: 'surat' });
         const shipment = (created.data as any)?.data ?? (created.data as any);
         if (trackingNumber && shipment?.id) {
           await shippingApi.updateTracking(shipment.id, { trackingNumber });

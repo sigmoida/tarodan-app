@@ -1399,5 +1399,8 @@
       "similar": "Similar products",
       "empty": "No other active products found in this category."
     }
+  },
+  "mobile": {
+    "tabBarSell": "List item"
   }
 }

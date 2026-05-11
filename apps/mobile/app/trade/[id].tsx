@@ -1,4 +1,5 @@
 import { View, ScrollView, StyleSheet, Pressable, Image, Alert, Linking } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import {
   theme,
   Button,
@@ -10,6 +11,7 @@ import {
   Text,
   Input,
   StatusBadge,
+  ScreenHeader,
   tradeStatusConfig,
 } from '@tarodan/ui-native';
 import { useState } from 'react';
@@ -20,7 +22,7 @@ import { format } from 'date-fns';
 import { tr } from 'date-fns/locale';
 import { tradesApi, paymentsApi } from '../../src/services/api';
 import { useAuthStore } from '../../src/stores/authStore';
-import { useTranslation } from '../../src/i18n/LanguageContext';
+import { useTranslation } from '../../src/i18n';
 import { captureException } from '../../src/services/sentry';
 
 const { colors } = theme;
@@ -245,26 +247,38 @@ export default function TradeDetailScreen() {
     },
   });
 
+  const handleBack = () => {
+    if (router.canGoBack()) router.back();
+    else router.replace('/(tabs)' as never);
+  };
+
   if (isLoading) {
     return (
-      <View style={styles.loadingContainer}>
-        <Spinner size="lg" />
-      </View>
+      <SafeAreaView style={{ flex: 1, backgroundColor: colors.surface.alt }} edges={['top']}>
+        <ScreenHeader title="Takas Detayı" variant="light" onBack={handleBack} />
+        <View style={styles.loadingContainer}>
+          <Spinner size="lg" />
+        </View>
+      </SafeAreaView>
     );
   }
 
   if (!trade) {
     return (
-      <View style={styles.errorContainer}>
-        <Text>Takas bulunamadı</Text>
-        <Button variant="primary" title="Geri Dön" onPress={() => router.back()} />
-      </View>
+      <SafeAreaView style={{ flex: 1, backgroundColor: colors.surface.alt }} edges={['top']}>
+        <ScreenHeader title="Takas Detayı" variant="light" onBack={handleBack} />
+        <View style={styles.errorContainer}>
+          <Text>Takas bulunamadı</Text>
+          <Button variant="primary" title="Geri Dön" onPress={handleBack} />
+        </View>
+      </SafeAreaView>
     );
   }
 
   const isInitiator = user?.id === trade.initiatorId;
   const isReceiver = user?.id === trade.receiverId;
-  const otherParty = isInitiator ? trade.receiver : trade.initiator;
+  const otherPartyRaw = isInitiator ? trade.receiver : trade.initiator;
+  const otherParty = otherPartyRaw ?? { id: '', displayName: 'Kullanıcı', avatar: undefined };
   const statusInfoBase = TRADE_STATUSES[trade.status as keyof typeof TRADE_STATUSES] || TRADE_STATUSES.pending;
   // Localize labels for the new auto-shipping flow statuses (i18n.tradeStatus.*)
   const NEW_STATUS_KEYS: Record<string, string> = {
@@ -278,8 +292,9 @@ export default function TradeDetailScreen() {
     ? { ...statusInfoBase, label: t(NEW_STATUS_KEYS[trade.status]) }
     : statusInfoBase;
 
-  const initiatorItems = trade.items.filter(item => item.side === 'initiator');
-  const receiverItems = trade.items.filter(item => item.side === 'receiver');
+  const tradeItems: TradeItem[] = Array.isArray(trade.items) ? trade.items : [];
+  const initiatorItems = tradeItems.filter(item => item.side === 'initiator');
+  const receiverItems = tradeItems.filter(item => item.side === 'receiver');
 
   const myItems = isInitiator ? initiatorItems : receiverItems;
   const theirItems = isInitiator ? receiverItems : initiatorItems;
@@ -349,8 +364,13 @@ export default function TradeDetailScreen() {
   const hasBadge = !!tradeStatusConfig[trade.status];
 
   return (
-    <View style={styles.container}>
+    <SafeAreaView style={styles.container} edges={['top']}>
       <Stack.Screen options={{ title: `Takas #${trade.tradeNumber}` }} />
+      <ScreenHeader
+        title={`Takas #${trade.tradeNumber}`}
+        variant="light"
+        onBack={handleBack}
+      />
 
       <ScrollView style={styles.content}>
         {/* Status Banner */}
@@ -482,7 +502,7 @@ export default function TradeDetailScreen() {
             {trade.initiatorMessage && (
               <View style={styles.messageBox}>
                 <Text variant="caption" style={styles.messageSender}>
-                  {trade.initiator.displayName}:
+                  {trade.initiator?.displayName ?? 'Kullanıcı'}:
                 </Text>
                 <Text variant="body">{trade.initiatorMessage}</Text>
               </View>
@@ -490,7 +510,7 @@ export default function TradeDetailScreen() {
             {trade.receiverMessage && (
               <View style={styles.messageBox}>
                 <Text variant="caption" style={styles.messageSender}>
-                  {trade.receiver.displayName}:
+                  {trade.receiver?.displayName ?? 'Kullanıcı'}:
                 </Text>
                 <Text variant="body">{trade.receiverMessage}</Text>
               </View>
@@ -750,7 +770,7 @@ export default function TradeDetailScreen() {
       >
         {snackbar.message}
       </Snackbar>
-    </View>
+    </SafeAreaView>
   );
 }
 

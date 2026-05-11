@@ -91,6 +91,7 @@ export default function PaymentSuccessScreen() {
             <Button
               variant="primary"
               title="Siparişimi Gör"
+              fullWidth
               onPress={() => router.replace(`/orders/${orderId}` as any)}
               style={styles.btn}
             />
@@ -98,6 +99,7 @@ export default function PaymentSuccessScreen() {
           <Button
             variant="outline"
             title="Ana Sayfaya Dön"
+            fullWidth
             onPress={() => router.replace('/')}
             style={styles.btn}
           />

@@ -16,7 +16,7 @@ const { colors } = theme;
  *
  * Akış:
  *   1. Checkout ekranı sipariş oluşturur ve paymentId'yi elde eder.
- *   2. router.push('/payment/<paymentId>?orderId=...&provider=paytr|iyzico&guest=0|1')
+ *   2. router.push('/payment/<paymentId>?orderId=...&provider=paytr&guest=0|1')
  *   3. Bu ekran ilgili provider için initiate çağırıp dönen HTML/URL'yi WebView'e verir.
  *   4. Provider, 3DS işlemi bitince kendi callback URL'ine GET/POST yapar.
  *      WebView navigation değişikliklerini dinleriz; callback URL tespit edilince
@@ -27,14 +27,15 @@ export default function PaymentWebViewScreen() {
   const params = useLocalSearchParams<{
     id: string;
     orderId?: string;
-    provider?: 'paytr' | 'iyzico';
+    provider?: 'paytr';
     guest?: string;
     tradeCash?: string;
     bypass?: string;
   }>();
 
   const paymentId = params.id!;
-  const provider = (params.provider as 'paytr' | 'iyzico') || 'iyzico';
+  // Sadece PayTR kullanılıyor (iyzico kaldırıldı — web ile parite)
+  const provider: 'paytr' = 'paytr';
   const isGuest = params.guest === '1';
   const isTradeCash = params.tradeCash === '1';
 
@@ -193,7 +194,7 @@ export default function PaymentWebViewScreen() {
     <SafeAreaView style={styles.container} edges={['top']}>
       <ScreenHeader
         title="Güvenli Ödeme"
-        subtitle={provider === 'paytr' ? 'PayTR' : 'iyzico'}
+        subtitle="PayTR"
         onBack={handleCancel}
       />
 

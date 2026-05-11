@@ -475,9 +475,9 @@ export const addressesApi = {
 
 // Payments API - Web ile aynı endpoint'ler
 export const paymentsApi = {
-  initiate: (orderId: string | number, provider: 'paytr' | 'iyzico') =>
+  initiate: (orderId: string | number, provider: 'paytr' = 'paytr') =>
     api.post('/payments/initiate', { orderId, provider }),
-  initiateGuest: (orderId: string | number, provider: 'paytr' | 'iyzico') =>
+  initiateGuest: (orderId: string | number, provider: 'paytr' = 'paytr') =>
     guestApi.post('/payments/initiate-guest', { orderId, provider }),
   /** Takas nakit fark ödemesi başlat */
   initiateTradeCash: (tradeId: string) =>
@@ -569,7 +569,7 @@ export const membershipApi = {
   setAutoRenew: (autoRenew: boolean) =>
     api.patch('/membership/auto-renew', { autoRenew }),
   /** Üyelik ödemesini başlat — backend: POST /membership/payments/initiate */
-  initiatePayment: (data: { tierType: string; billingPeriod: 'monthly' | 'yearly'; provider?: 'paytr' | 'iyzico' }) =>
+  initiatePayment: (data: { tierType: string; billingPeriod: 'monthly' | 'yearly'; provider?: 'paytr' }) =>
     api.post('/membership/payments/initiate', data),
   /** İlan oluşturma sınırı kontrol — GET /membership/check/listing */
   checkListingLimit: () => api.get('/membership/check/listing'),
@@ -592,7 +592,9 @@ export const notificationsApi = {
 };
 
 // Shipping API — Backend `/shipping`
-export type ShippingProvider = 'aras' | 'yurtici' | 'mng';
+// Tek kargo firması: Sürat Kargo (backend enum'u diğer değerleri hala içerse de
+// uygulama yalnızca 'surat' ile çalışıyor — web ile parite).
+export type ShippingProvider = 'surat';
 
 export const shippingApi = {
   /** Şehir/firma için tek satır kargo ücreti (checkout / addresses) */
@@ -603,7 +605,7 @@ export const shippingApi = {
     api.get<{ rate: number } | any>('/shipping/rates', {
       params: {
         city: params.city ?? params.toCity ?? params.fromCity,
-        carrier: params.carrier ?? 'aras',
+        carrier: params.carrier ?? 'surat',
         weight: params.weight,
       },
     }),

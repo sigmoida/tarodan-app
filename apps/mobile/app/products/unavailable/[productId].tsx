@@ -6,7 +6,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { useQuery } from '@tanstack/react-query';
 import { ProductCard, type ProductCardProduct } from '../../../src/components/product/ProductCard';
 import { productsApi } from '../../../src/services/api';
-import { useTranslation } from '../../../src/i18n/LanguageContext';
+import { useTranslation } from '../../../src/i18n';
 
 const { colors } = theme;
 

@@ -89,6 +89,7 @@ export default function PaymentFailScreen() {
           <Button
             variant="primary"
             title="Tekrar Dene"
+            fullWidth
             onPress={handleRetry}
             isLoading={retrying}
             disabled={retrying || !paymentId}
@@ -98,6 +99,7 @@ export default function PaymentFailScreen() {
             <Button
               variant="outline"
               title="Sipariş Detayına Git"
+              fullWidth
               onPress={() => router.replace(`/orders/${orderId}` as any)}
               style={styles.btn}
             />
@@ -105,6 +107,7 @@ export default function PaymentFailScreen() {
           <Button
             variant="ghost"
             title="Ana Sayfaya Dön"
+            fullWidth
             onPress={() => router.replace('/')}
           />
         </View>

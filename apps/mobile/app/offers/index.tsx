@@ -21,7 +21,7 @@ import { useAuthStore } from '../../src/stores/authStore';
 import { offersApi, ordersApi } from '../../src/services/api';
 import { transformImageUrl } from '../../src/utils/imageUrl';
 import { formatApiErrorMessage } from '../../src/utils/formatApiErrorMessage';
-import { useTranslation } from '../../src/i18n/LanguageContext';
+import { useTranslation } from '../../src/i18n';
 
 const { colors } = theme;
 

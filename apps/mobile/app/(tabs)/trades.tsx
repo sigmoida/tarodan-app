@@ -1,5 +1,6 @@
 import { useState, useCallback } from 'react';
 import { Pressable, View, FlatList, RefreshControl } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { useQuery } from '@tanstack/react-query';
 import { router } from 'expo-router';
 import { format } from 'date-fns';
@@ -9,6 +10,7 @@ import {
   Card,
   Chip,
   type ChipVariant,
+  ScreenHeader,
   SegmentedButtons,
   Spinner,
   Text,
@@ -87,29 +89,36 @@ export default function TradesScreen() {
     setRefreshing(false);
   }, [refetch]);
 
+  const handleBack = () => {
+    if (router.canGoBack()) router.back();
+    else router.replace('/(tabs)');
+  };
+
   if (!isAuthenticated) {
     return (
-      <View
-        style={{
-          flex: 1,
-          justifyContent: 'center',
-          alignItems: 'center',
-          padding: spacing[8],
-          backgroundColor: colors.surface.DEFAULT,
-        }}
-      >
-        <Text variant="h2" align="center" style={{ marginBottom: spacing[4] }}>
-          Giriş Yapın
-        </Text>
-        <Text variant="body" tone="muted" align="center" style={{ marginBottom: spacing[6] }}>
-          Takaslarınızı görmek için giriş yapmanız gerekiyor
-        </Text>
-        <Button
-          variant="primary"
-          title="Giriş Yap"
-          onPress={() => router.push('/(auth)/login')}
-        />
-      </View>
+      <SafeAreaView style={{ flex: 1, backgroundColor: colors.surface.DEFAULT }} edges={['top']}>
+        <ScreenHeader title="Takaslarım" variant="light" onBack={handleBack} />
+        <View
+          style={{
+            flex: 1,
+            justifyContent: 'center',
+            alignItems: 'center',
+            padding: spacing[8],
+          }}
+        >
+          <Text variant="h2" align="center" style={{ marginBottom: spacing[4] }}>
+            Giriş Yapın
+          </Text>
+          <Text variant="body" tone="muted" align="center" style={{ marginBottom: spacing[6] }}>
+            Takaslarınızı görmek için giriş yapmanız gerekiyor
+          </Text>
+          <Button
+            variant="primary"
+            title="Giriş Yap"
+            onPress={() => router.push('/(auth)/login')}
+          />
+        </View>
+      </SafeAreaView>
     );
   }
 
@@ -117,7 +126,8 @@ export default function TradesScreen() {
     TRADE_STATUSES[status] || { label: status, variant: 'neutral' as ChipVariant };
 
   return (
-    <View style={{ flex: 1, backgroundColor: colors.surface.DEFAULT }}>
+    <SafeAreaView style={{ flex: 1, backgroundColor: colors.surface.DEFAULT }} edges={['top']}>
+      <ScreenHeader title="Takaslarım" variant="light" onBack={handleBack} />
       <View style={{ padding: spacing[4] }}>
         <SegmentedButtons
           value={filter}
@@ -221,6 +231,6 @@ export default function TradesScreen() {
           }
         />
       )}
-    </View>
+    </SafeAreaView>
   );
 }
