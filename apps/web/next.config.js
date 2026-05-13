@@ -11,7 +11,9 @@ const path = require('path');
 function getCacheHeaders() {
   const oneDay = 'public, max-age=86400, stale-while-revalidate=3600';
   const oneWeek = 'public, max-age=604800, stale-while-revalidate=86400';
+  const noindex = 'noindex, nofollow, noarchive, nosnippet, noimageindex';
   return [
+    { source: '/:path*', headers: [{ key: 'X-Robots-Tag', value: noindex }] },
     { source: '/favicon.ico', headers: [{ key: 'Cache-Control', value: oneDay }] },
     { source: '/tarodanfavicon.png', headers: [{ key: 'Cache-Control', value: oneWeek }] },
     { source: '/logo.svg', headers: [{ key: 'Cache-Control', value: oneWeek }] },
@@ -42,6 +44,10 @@ const nextConfig = {
   experimental: {
     outputFileTracingRoot: path.join(__dirname, '../../'),
     optimizePackageImports: ['@heroicons/react', '@heroicons/react/24/outline', '@heroicons/react/24/solid'],
+    // Next 14.2 strictly requires Suspense around useSearchParams() during
+    // prerender. With output: 'standalone' (server-rendered) this strict
+    // bailout adds no real safety. Disable to keep build green.
+    missingSuspenseWithCSRBailout: false,
   },
   async headers() {
     return getCacheHeaders();
