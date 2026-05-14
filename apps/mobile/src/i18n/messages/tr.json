@@ -544,6 +544,28 @@
     "confirmReceipt": {
       "waitingDelivered": "Kargonun teslim edildiği bilgisi bekleniyor."
     },
+    "cancel": {
+      "lockedHint": "Ürünlerden biri Tarodan deposuna ulaştı; iptal edilemez. Sorun varsa destek ile iletişime geçin.",
+      "offerCta": "Teklifi İptal Et",
+      "tradeCta": "Takası İptal Et"
+    },
+    "dispute": {
+      "openCta": "İtiraz Aç",
+      "hint": "Kargo kaybolduysa veya ürün sorunluysa itiraz açabilirsiniz.",
+      "modalTitle": "İtiraz Aç",
+      "modalIntro": "Yaşadığınız sorunu seçin ve kısaca açıklayın. Tarodan ekibi en kısa sürede inceleyecek.",
+      "reasonShipmentLost": "Kargo kayboldu / ulaşmadı",
+      "reasonShipmentDamaged": "Ürün hasarlı geldi",
+      "reasonWrongItem": "Beklediğim ürün gelmedi",
+      "reasonOther": "Diğer",
+      "descriptionLabel": "Açıklama",
+      "descriptionPlaceholder": "Sorunu detaylandırın (kargo tarihi, fotoğraf gönderebilirim, vb.)",
+      "minLengthError": "Açıklama en az 10 karakter olmalı",
+      "submitCta": "İtirazı Gönder",
+      "cancelCta": "Vazgeç",
+      "successMessage": "İtiraz açıldı; Tarodan ekibi en kısa sürede inceleyecek.",
+      "errorMessage": "İtiraz açılamadı"
+    },
     "tradeStatus": {
       "shipping_to_warehouse": "Depoya Gönderim",
       "at_warehouse": "Depoda",

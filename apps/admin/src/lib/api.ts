@@ -155,6 +155,8 @@ export const adminApi = {
     api.post(`/admin/trades/${tradeId}/mark-return-delivered`, { shipmentId }),
   retryTradeRefund: (tradeId: string) =>
     api.post(`/admin/trades/${tradeId}/retry-refund`),
+  resolveTradeCompensation: (tradeId: string, note?: string) =>
+    api.post(`/admin/trades/${tradeId}/resolve-compensation`, note ? { note } : {}),
   markTradeReturnLost: (
     tradeId: string,
     body: { shipmentId: string; reason: string; compensateUserId?: string },

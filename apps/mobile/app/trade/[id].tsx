@@ -267,13 +267,13 @@ export default function TradeDetailScreen() {
       setDisputeDescription('');
       setSnackbar({
         visible: true,
-        message: 'İtiraz açıldı; Tarodan ekibi en kısa sürede inceleyecek.',
+        message: t('trade.dispute.successMessage'),
       });
     },
     onError: (error: any) => {
       setSnackbar({
         visible: true,
-        message: error.response?.data?.message || 'İtiraz açılamadı',
+        message: error.response?.data?.message || t('trade.dispute.errorMessage'),
       });
     },
   });
@@ -700,7 +700,11 @@ export default function TradeDetailScreen() {
           {trade.canCancel && (isInitiator || isReceiver) && (
             <Button
               variant="outline"
-              title={trade.status === 'pending' ? 'Teklifi İptal Et' : 'Takası İptal Et'}
+              title={
+                trade.status === 'pending'
+                  ? t('trade.cancel.offerCta')
+                  : t('trade.cancel.tradeCta')
+              }
               onPress={handleCancel}
               isLoading={cancelMutation.isPending}
               style={{ ...styles.actionButton, borderColor: colors.danger[600]! }}
@@ -713,7 +717,7 @@ export default function TradeDetailScreen() {
             trade.firstWarehouseArrivalAt &&
             (isInitiator || isReceiver) && (
               <Text variant="caption" style={styles.confirmReceiptHint}>
-                Ürünlerden biri Tarodan deposuna ulaştı; iptal edilemez. Sorun varsa destek ile iletişime geçin.
+                {t('trade.cancel.lockedHint')}
               </Text>
             )}
 
@@ -760,12 +764,12 @@ export default function TradeDetailScreen() {
               <Button
                 testID="trade-raise-dispute-button"
                 variant="outline"
-                title="İtiraz Aç"
+                title={t('trade.dispute.openCta')}
                 onPress={() => setDisputeModalVisible(true)}
                 style={{ ...styles.actionButton, borderColor: colors.danger[600]! }}
               />
               <Text variant="caption" style={styles.confirmReceiptHint}>
-                Kargo kaybolduysa veya ürün sorunluysa itiraz açabilirsiniz.
+                {t('trade.dispute.hint')}
               </Text>
             </>
           )}
@@ -818,53 +822,52 @@ export default function TradeDetailScreen() {
       <Modal
         isOpen={disputeModalVisible}
         onClose={() => !disputeMutation.isPending && setDisputeModalVisible(false)}
-        title="İtiraz Aç"
+        title={t('trade.dispute.modalTitle')}
       >
         <Text variant="caption" style={{ marginBottom: 12 }}>
-          Yaşadığınız sorunu seçin ve kısaca açıklayın. Tarodan ekibi en kısa
-          sürede inceleyecek.
+          {t('trade.dispute.modalIntro')}
         </Text>
         <View style={{ marginBottom: 12 }}>
           {([
-            ['shipment_lost', 'Kargo kayboldu / ulaşmadı'],
-            ['shipment_damaged', 'Ürün hasarlı geldi'],
-            ['wrong_item', 'Beklediğim ürün gelmedi'],
-            ['other', 'Diğer'],
+            ['shipment_lost', t('trade.dispute.reasonShipmentLost')],
+            ['shipment_damaged', t('trade.dispute.reasonShipmentDamaged')],
+            ['wrong_item', t('trade.dispute.reasonWrongItem')],
+            ['other', t('trade.dispute.reasonOther')],
           ] as const).map(([value, label]) => (
             <Button
               key={value}
               variant={disputeReason === value ? 'primary' : 'outline'}
               title={label}
-              onPress={() => setDisputeReason(value)}
+              onPress={() => setDisputeReason(value as typeof disputeReason)}
               style={{ marginBottom: 6 }}
             />
           ))}
         </View>
         <Input
-          label="Açıklama"
+          label={t('trade.dispute.descriptionLabel')}
           value={disputeDescription}
           onChangeText={setDisputeDescription}
           multiline
           numberOfLines={4}
-          placeholder="Sorunu detaylandırın (kargo tarihi, fotoğraf gönderebilirim, vb.)"
+          placeholder={t('trade.dispute.descriptionPlaceholder')}
           containerStyle={{ marginBottom: 12 }}
           inputStyle={{ minHeight: 100 }}
         />
         <View style={styles.modalActions}>
           <Button
             variant="outline"
-            title="Vazgeç"
+            title={t('trade.dispute.cancelCta')}
             onPress={() => setDisputeModalVisible(false)}
             disabled={disputeMutation.isPending}
           />
           <Button
             variant="primary"
-            title="İtirazı Gönder"
+            title={t('trade.dispute.submitCta')}
             onPress={() => {
               if (disputeDescription.trim().length < 10) {
                 setSnackbar({
                   visible: true,
-                  message: 'Açıklama en az 10 karakter olmalı',
+                  message: t('trade.dispute.minLengthError'),
                 });
                 return;
               }

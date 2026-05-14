@@ -1077,6 +1077,26 @@ export class AdminController {
     return this.adminService.markReturnDelivered(adminId, id, body.shipmentId);
   }
 
+  @Post('trades/:id/resolve-compensation')
+  @Roles(AdminRole.super_admin, AdminRole.admin)
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({
+    summary:
+      'Close a pending compensation flag after settling the user out of band',
+  })
+  @ApiParam({ name: 'id', description: 'Trade ID' })
+  @ApiResponse({
+    status: HttpStatus.OK,
+    description: 'Compensation marker resolved; banner clears in admin UI',
+  })
+  async resolveTradeCompensation(
+    @Param('id') id: string,
+    @CurrentUser('id') adminId: string,
+    @Body() body: { note?: string },
+  ) {
+    return this.adminService.resolveTradeCompensation(adminId, id, body?.note);
+  }
+
   @Post('trades/:id/retry-refund')
   @Roles(AdminRole.super_admin, AdminRole.admin)
   @HttpCode(HttpStatus.OK)

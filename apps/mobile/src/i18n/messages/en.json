@@ -545,6 +545,28 @@
     "confirmReceipt": {
       "waitingDelivered": "Waiting for delivery confirmation."
     },
+    "cancel": {
+      "lockedHint": "One of the items has reached the Tarodan warehouse; cancel is no longer allowed. Contact support if something is wrong.",
+      "offerCta": "Cancel Offer",
+      "tradeCta": "Cancel Trade"
+    },
+    "dispute": {
+      "openCta": "Open a Dispute",
+      "hint": "Open a dispute if a shipment is lost or the item is faulty.",
+      "modalTitle": "Open a Dispute",
+      "modalIntro": "Pick the issue and describe it briefly. The Tarodan team will review it shortly.",
+      "reasonShipmentLost": "Shipment lost / undelivered",
+      "reasonShipmentDamaged": "Item arrived damaged",
+      "reasonWrongItem": "Wrong item received",
+      "reasonOther": "Other",
+      "descriptionLabel": "Description",
+      "descriptionPlaceholder": "Add details (shipping dates, photos available, etc.)",
+      "minLengthError": "Description must be at least 10 characters",
+      "submitCta": "Submit Dispute",
+      "cancelCta": "Cancel",
+      "successMessage": "Dispute opened; the Tarodan team will review it shortly.",
+      "errorMessage": "Failed to open dispute"
+    },
     "tradeStatus": {
       "shipping_to_warehouse": "Shipping to Warehouse",
       "at_warehouse": "At Warehouse",

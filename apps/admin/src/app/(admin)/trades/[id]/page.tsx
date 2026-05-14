@@ -157,6 +157,7 @@ export default function TradeDetailPage() {
   const [processingShipmentId, setProcessingShipmentId] = useState<string | null>(null);
 
   const [processingRetryRefund, setProcessingRetryRefund] = useState(false);
+  const [processingResolveCompensation, setProcessingResolveCompensation] = useState(false);
 
   const [markLostShipmentId, setMarkLostShipmentId] = useState<string | null>(null);
   const [markLostReason, setMarkLostReason] = useState('');
@@ -260,6 +261,21 @@ export default function TradeDetailPage() {
       toast.error(error.response?.data?.message || 'Onaylama başarısız');
     } finally {
       setProcessingApprove(false);
+    }
+  };
+
+  const handleResolveCompensation = async () => {
+    const note = window.prompt('Tazminat çözüm notu (opsiyonel):') ?? undefined;
+    if (note === null) return; // user cancelled
+    setProcessingResolveCompensation(true);
+    try {
+      await adminApi.resolveTradeCompensation(tradeId, note || undefined);
+      toast.success('Tazminat kapatıldı');
+      await loadTrade();
+    } catch (error: any) {
+      toast.error(error.response?.data?.message || 'İşlem başarısız');
+    } finally {
+      setProcessingResolveCompensation(false);
     }
   };
 
@@ -423,23 +439,35 @@ export default function TradeDetailPage() {
         {/* Compensation pending — manual settlement required for a user */}
         {trade.compensationPendingUserId && !trade.compensationResolvedAt && (
           <div className="bg-warning-50 border-2 border-warning-400 rounded-xl p-4 shadow-sm">
-            <div className="flex items-start gap-3">
-              <ExclamationTriangleIcon className="h-7 w-7 text-warning-700 flex-shrink-0" />
-              <div>
-                <h2 className="text-base font-semibold text-warning-900">
-                  Manuel Tazminat Bekleniyor
-                </h2>
-                <p className="text-sm text-warning-800 mt-1">
-                  Kullanıcı{' '}
-                  <span className="font-mono">
-                    {trade.compensationPendingUserId === trade.initiator.id
-                      ? `${trade.initiator.displayName} (teklif veren)`
-                      : trade.compensationPendingUserId === trade.receiver.id
-                      ? `${trade.receiver.displayName} (teklif alan)`
-                      : trade.compensationPendingUserId}
-                  </span>{' '}
-                  için platform tazminatı işaretlendi. Ödemeyi out-of-band yaptıktan sonra back-office'ten resolve edin.
-                </p>
+            <div className="flex items-start justify-between gap-4">
+              <div className="flex items-start gap-3">
+                <ExclamationTriangleIcon className="h-7 w-7 text-warning-700 flex-shrink-0" />
+                <div>
+                  <h2 className="text-base font-semibold text-warning-900">
+                    Manuel Tazminat Bekleniyor
+                  </h2>
+                  <p className="text-sm text-warning-800 mt-1">
+                    Kullanıcı{' '}
+                    <span className="font-mono">
+                      {trade.compensationPendingUserId === trade.initiator.id
+                        ? `${trade.initiator.displayName} (teklif veren)`
+                        : trade.compensationPendingUserId === trade.receiver.id
+                        ? `${trade.receiver.displayName} (teklif alan)`
+                        : trade.compensationPendingUserId}
+                    </span>{' '}
+                    için platform tazminatı işaretlendi. Ödemeyi out-of-band yaptıktan sonra "Kapatıldı" butonuna basın.
+                  </p>
+                </div>
+              </div>
+              <div className="flex-shrink-0">
+                <Button
+                  variant="primary"
+                  onClick={handleResolveCompensation}
+                  isLoading={processingResolveCompensation}
+                  disabled={processingResolveCompensation}
+                >
+                  Kapatıldı
+                </Button>
               </div>
             </div>
           </div>

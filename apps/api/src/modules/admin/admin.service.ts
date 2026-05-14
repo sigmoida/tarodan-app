@@ -5722,6 +5722,47 @@ export class AdminService {
   }
 
   /**
+   * Admin closes a pending compensation flag after settling the user out of
+   * band. Sets `compensationResolvedAt` so the banner disappears in the UI.
+   */
+  async resolveTradeCompensation(adminId: string, tradeId: string, note?: string) {
+    const trade = await this.prisma.trade.findUnique({
+      where: { id: tradeId },
+      select: {
+        id: true,
+        compensationPendingUserId: true,
+        compensationResolvedAt: true,
+      },
+    });
+    if (!trade) {
+      throw new NotFoundException('Takas bulunamadı');
+    }
+    if (!trade.compensationPendingUserId) {
+      throw new BadRequestException('Bu takasta açık tazminat işareti yok');
+    }
+    if (trade.compensationResolvedAt) {
+      throw new BadRequestException('Tazminat zaten kapatılmış');
+    }
+
+    const now = new Date();
+    await this.prisma.trade.update({
+      where: { id: tradeId },
+      data: { compensationResolvedAt: now },
+    });
+
+    await this.createAuditLog(
+      adminId,
+      'trade_compensation_resolved',
+      'Trade',
+      tradeId,
+      { compensationPendingUserId: trade.compensationPendingUserId },
+      { resolvedAt: now, note: note ?? null },
+    );
+
+    return { success: true, tradeId, resolvedAt: now };
+  }
+
+  /**
    * Admin manually retries a PayTR refund that failed during
    * `rejectWarehouseTrade` (or a previous retry). On success the failure
    * markers on the trade are cleared; on repeated failure the marker is
