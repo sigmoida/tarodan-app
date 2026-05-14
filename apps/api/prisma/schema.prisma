@@ -478,6 +478,14 @@ model Trade {
   completedAt          DateTime?         @map("completed_at")
   cancelledAt          DateTime?         @map("cancelled_at")
   cancelReason         String?           @map("cancel_reason")
+  // Stamped when the first to_warehouse shipment is delivered. Once non-null,
+  // user-side cancel is locked: only admin reject/force-cancel can resolve.
+  firstWarehouseArrivalAt DateTime?      @map("first_warehouse_arrival_at")
+  cancelLockedAt       DateTime?         @map("cancel_locked_at")
+  // Populated when an admin reject's PayTR refund fails. Surfaced in admin UI
+  // so the operator can retry the refund.
+  refundFailureReason  String?           @map("refund_failure_reason")
+  refundFailureAt      DateTime?         @map("refund_failure_at")
   createdAt            DateTime          @default(now()) @map("created_at")
   updatedAt            DateTime          @updatedAt @map("updated_at")
   version              Int               @default(1)

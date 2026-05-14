@@ -1075,6 +1075,26 @@ export class AdminController {
     return this.adminService.markReturnDelivered(adminId, id, body.shipmentId);
   }
 
+  @Post('trades/:id/retry-refund')
+  @Roles(AdminRole.super_admin, AdminRole.admin)
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({
+    summary:
+      'Retry a previously failed PayTR refund for a trade in returning/cancelled/disputed state',
+  })
+  @ApiParam({ name: 'id', description: 'Trade ID' })
+  @ApiResponse({
+    status: HttpStatus.OK,
+    description:
+      'Refund retried; failure flags cleared on success or updated on repeated failure',
+  })
+  async retryTradeRefund(
+    @Param('id') id: string,
+    @CurrentUser('id') adminId: string,
+  ) {
+    return this.adminService.retryTradeRefund(adminId, id);
+  }
+
   // ==================== MESSAGE MANAGEMENT ====================
 
   @Get('messages')

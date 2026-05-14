@@ -125,6 +125,8 @@ interface Trade {
   receiver: { id: string; displayName: string; avatar?: string };
   items: TradeItem[];
   shipments?: TradeShipment[];
+  canCancel?: boolean;
+  firstWarehouseArrivalAt?: string | null;
 }
 
 export default function TradeDetailScreen() {
@@ -665,16 +667,26 @@ export default function TradeDetailScreen() {
             </>
           )}
 
-          {/* Pending: Cancel for initiator */}
-          {trade.status === 'pending' && isInitiator && (
+          {/* Cancel — backend-derived: state eligible + not locked by warehouse arrival */}
+          {trade.canCancel && (isInitiator || isReceiver) && (
             <Button
               variant="outline"
-              title="Teklifi İptal Et"
+              title={trade.status === 'pending' ? 'Teklifi İptal Et' : 'Takası İptal Et'}
               onPress={handleCancel}
               isLoading={cancelMutation.isPending}
               style={{ ...styles.actionButton, borderColor: colors.danger[600]! }}
             />
           )}
+
+          {/* Cancel locked: surfaced when warehouse arrival removed the cancel option */}
+          {!trade.canCancel &&
+            trade.status === 'shipping_to_warehouse' &&
+            trade.firstWarehouseArrivalAt &&
+            (isInitiator || isReceiver) && (
+              <Text variant="caption" style={styles.confirmReceiptHint}>
+                Ürünlerden biri Tarodan deposuna ulaştı; iptal edilemez. Sorun varsa destek ile iletişime geçin.
+              </Text>
+            )}
 
           {/* awaiting_payment: cashPayer must initiate the cash payment */}
           {trade.status === 'awaiting_payment' && trade.cashPayerId === user?.id && (

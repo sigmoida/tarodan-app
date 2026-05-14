@@ -84,6 +84,10 @@ interface TradeDetail {
   warehouseReceivedAt?: string;
   completedAt?: string;
   cancelledAt?: string;
+  firstWarehouseArrivalAt?: string | null;
+  cancelLockedAt?: string | null;
+  refundFailureReason?: string | null;
+  refundFailureAt?: string | null;
 }
 
 type RawTradeItem = {
@@ -147,6 +151,8 @@ export default function TradeDetailPage() {
 
   // Per-shipment action loading
   const [processingShipmentId, setProcessingShipmentId] = useState<string | null>(null);
+
+  const [processingRetryRefund, setProcessingRetryRefund] = useState(false);
 
   useEffect(() => {
     if (tradeId) loadTrade();
@@ -239,6 +245,27 @@ export default function TradeDetailPage() {
     }
   };
 
+  const handleRetryRefund = async () => {
+    if (!confirm('PayTR iadesi yeniden denenecek. Devam edilsin mi?')) return;
+    setProcessingRetryRefund(true);
+    try {
+      const response = await adminApi.retryTradeRefund(tradeId);
+      const data = response.data?.data ?? response.data;
+      if (data?.refunded) {
+        toast.success('İade başarıyla tekrar gönderildi');
+      } else if (data?.skippedReason) {
+        toast.success(`İade atlandı: ${data.skippedReason}`);
+      } else {
+        toast.success('İade işlemi tamamlandı');
+      }
+      await loadTrade();
+    } catch (error: any) {
+      toast.error(error.response?.data?.message || 'İade yeniden denemesi başarısız');
+    } finally {
+      setProcessingRetryRefund(false);
+    }
+  };
+
   const handleReject = async () => {
     const reason = rejectReason.trim();
     if (reason.length < 10) {
@@ -322,6 +349,41 @@ export default function TradeDetailPage() {
             )}
           </div>
         </div>
+
+        {/* Refund failure banner — admin must retry the PayTR refund */}
+        {trade.refundFailureReason && (
+          <div className="bg-danger-50 border-2 border-danger-400 rounded-xl p-6 shadow-sm">
+            <div className="flex items-start justify-between gap-4">
+              <div className="flex items-start gap-3">
+                <ExclamationTriangleIcon className="h-8 w-8 text-danger-600 flex-shrink-0" />
+                <div>
+                  <h2 className="text-lg font-semibold text-danger-900">
+                    PayTR İadesi Başarısız
+                  </h2>
+                  <p className="text-sm text-danger-800 mt-1">
+                    {trade.refundFailureReason}
+                  </p>
+                  {trade.refundFailureAt && (
+                    <p className="text-xs text-danger-700 mt-1">
+                      Son hata: {new Date(trade.refundFailureAt).toLocaleString('tr-TR')}
+                    </p>
+                  )}
+                </div>
+              </div>
+              <div className="flex-shrink-0">
+                <Button
+                  variant="danger"
+                  onClick={handleRetryRefund}
+                  isLoading={processingRetryRefund}
+                  disabled={processingRetryRefund}
+                >
+                  <ArrowUturnLeftIcon className="h-5 w-5 mr-1" />
+                  İadeyi Tekrar Dene
+                </Button>
+              </div>
+            </div>
+          </div>
+        )}
 
         {/* Admin Action Panel (prominent for review queue) */}
         {canApproveReject && (

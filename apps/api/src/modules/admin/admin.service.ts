@@ -4428,7 +4428,13 @@ export class AdminService {
 
       const trade = await tx.trade.findUnique({
         where: { id: tradeId },
-        select: { id: true, status: true, initiatorId: true, receiverId: true },
+        select: {
+          id: true,
+          status: true,
+          initiatorId: true,
+          receiverId: true,
+          firstWarehouseArrivalAt: true,
+        },
       });
       if (!trade) {
         throw new NotFoundException('Takas bulunamadı');
@@ -4469,6 +4475,10 @@ export class AdminService {
         toWarehouseShipments.length >= 2 &&
         toWarehouseShipments.every((s) => s.deliveredAt !== null);
 
+      // Lock user-side cancel on the first warehouse arrival. From this point
+      // on, only admin can unwind the trade (reject or force-cancel-stuck).
+      const isFirstArrival = trade.firstWarehouseArrivalAt === null;
+
       let nextStatus: TradeStatus = trade.status;
       if (bothDelivered && trade.status !== TradeStatus.at_warehouse) {
         await tx.trade.update({
@@ -4476,9 +4486,21 @@ export class AdminService {
           data: {
             status: TradeStatus.at_warehouse,
             updatedAt: now,
+            ...(isFirstArrival
+              ? { firstWarehouseArrivalAt: now, cancelLockedAt: now }
+              : {}),
           },
         });
         nextStatus = TradeStatus.at_warehouse;
+      } else if (isFirstArrival) {
+        await tx.trade.update({
+          where: { id: tradeId },
+          data: {
+            firstWarehouseArrivalAt: now,
+            cancelLockedAt: now,
+            updatedAt: now,
+          },
+        });
       }
 
       await this.createAuditLog(
@@ -4487,7 +4509,12 @@ export class AdminService {
         'TradeShipment',
         shipmentId,
         shipment,
-        { ...updatedShipment, bothDelivered, tradeStatus: nextStatus },
+        {
+          ...updatedShipment,
+          bothDelivered,
+          tradeStatus: nextStatus,
+          firstArrival: isFirstArrival,
+        },
       );
 
       return {
@@ -4496,6 +4523,7 @@ export class AdminService {
         shipmentId,
         status: nextStatus,
         bothDelivered,
+        firstArrival: isFirstArrival,
       };
     });
   }
@@ -4881,14 +4909,38 @@ export class AdminService {
       };
     });
 
-    // After commit: refund cash payment (if completed) and notify parties
+    // After commit: refund cash payment (if completed) and notify parties.
+    // Refund failure does NOT roll back the reject: return shipments are
+    // already on their way back to users. Instead, the failure is persisted
+    // on the trade so the admin UI can surface a "retry refund" affordance.
+    let refundFailureMessage: string | null = null;
     if (result.shouldRefund) {
       try {
         await this.paymentService.refundTradeCashPaymentIfCompleted(tradeId);
+        // Clear any previous failure marker (e.g. retry after manual fix).
+        await this.prisma.trade.update({
+          where: { id: tradeId },
+          data: { refundFailureReason: null, refundFailureAt: null },
+        });
       } catch (err: any) {
+        refundFailureMessage =
+          err?.message ?? 'Bilinmeyen hata (PayTR iade başarısız)';
         this.logger.error(
-          `refundTradeCashPaymentIfCompleted failed for trade ${tradeId}: ${err?.message}`,
+          `refundTradeCashPaymentIfCompleted failed for trade ${tradeId}: ${refundFailureMessage}`,
         );
+        try {
+          await this.prisma.trade.update({
+            where: { id: tradeId },
+            data: {
+              refundFailureReason: refundFailureMessage.slice(0, 500),
+              refundFailureAt: new Date(),
+            },
+          });
+        } catch (persistErr: any) {
+          this.logger.error(
+            `Failed to persist refund failure for trade ${tradeId}: ${persistErr?.message}`,
+          );
+        }
       }
     }
 
@@ -4905,7 +4957,12 @@ export class AdminService {
       );
     }
 
-    return { success: true, tradeId, status: result.status };
+    return {
+      success: true,
+      tradeId,
+      status: result.status,
+      refundFailure: refundFailureMessage,
+    };
   }
 
   /**
@@ -5033,6 +5090,103 @@ export class AdminService {
         allDelivered,
       };
     });
+  }
+
+  /**
+   * Admin manually retries a PayTR refund that failed during
+   * `rejectWarehouseTrade` (or a previous retry). On success the failure
+   * markers on the trade are cleared; on repeated failure the marker is
+   * refreshed with the new error message.
+   */
+  async retryTradeRefund(adminId: string, tradeId: string) {
+    const trade = await this.prisma.trade.findUnique({
+      where: { id: tradeId },
+      select: {
+        id: true,
+        status: true,
+        refundFailureReason: true,
+        refundFailureAt: true,
+        cashPayment: {
+          select: { id: true, status: true },
+        },
+      },
+    });
+    if (!trade) {
+      throw new NotFoundException('Takas bulunamadı');
+    }
+
+    if (!trade.cashPayment || trade.cashPayment.status !== PaymentStatus.completed) {
+      throw new BadRequestException(
+        'İade edilebilecek tamamlanmış bir nakit ödeme yok',
+      );
+    }
+
+    const eligibleStatuses: TradeStatus[] = [
+      TradeStatus.returning,
+      TradeStatus.cancelled,
+      TradeStatus.disputed,
+    ];
+    if (!eligibleStatuses.includes(trade.status)) {
+      throw new BadRequestException(
+        `Takas durumu '${trade.status}' iade yeniden denemesi için uygun değil`,
+      );
+    }
+
+    if (!trade.refundFailureReason) {
+      throw new BadRequestException(
+        'Bu takasta kayıtlı bir iade hatası yok; yeniden deneme gerekmiyor',
+      );
+    }
+
+    try {
+      const result = await this.paymentService.refundTradeCashPaymentIfCompleted(tradeId);
+      await this.prisma.trade.update({
+        where: { id: tradeId },
+        data: { refundFailureReason: null, refundFailureAt: null },
+      });
+      await this.createAuditLog(
+        adminId,
+        'trade_refund_retry_success',
+        'Trade',
+        tradeId,
+        {
+          previousFailureReason: trade.refundFailureReason,
+          previousFailureAt: trade.refundFailureAt,
+        },
+        result,
+      );
+      return { success: true, tradeId, refunded: result.refunded, skippedReason: result.skippedReason };
+    } catch (err: any) {
+      const message = err?.message ?? 'Bilinmeyen hata (PayTR iade başarısız)';
+      this.logger.error(
+        `retryTradeRefund failed for trade ${tradeId}: ${message}`,
+      );
+      try {
+        await this.prisma.trade.update({
+          where: { id: tradeId },
+          data: {
+            refundFailureReason: message.slice(0, 500),
+            refundFailureAt: new Date(),
+          },
+        });
+      } catch (persistErr: any) {
+        this.logger.error(
+          `Failed to persist refund retry failure for trade ${tradeId}: ${persistErr?.message}`,
+        );
+      }
+      await this.createAuditLog(
+        adminId,
+        'trade_refund_retry_failure',
+        'Trade',
+        tradeId,
+        {
+          previousFailureReason: trade.refundFailureReason,
+          previousFailureAt: trade.refundFailureAt,
+        },
+        { message },
+      );
+      throw err;
+    }
   }
 
   // ==================== MESSAGE MANAGEMENT ====================

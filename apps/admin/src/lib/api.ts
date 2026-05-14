@@ -153,6 +153,8 @@ export const adminApi = {
     api.post(`/admin/trades/${tradeId}/reject`, { reason }),
   markReturnDelivered: (tradeId: string, shipmentId: string) =>
     api.post(`/admin/trades/${tradeId}/mark-return-delivered`, { shipmentId }),
+  retryTradeRefund: (tradeId: string) =>
+    api.post(`/admin/trades/${tradeId}/retry-refund`),
 
   // Trade shipments (cross-trade listing)
   getTradeShipments: (params?: any) => api.get('/admin/trade-shipments', { params }),

@@ -450,7 +450,6 @@ export class TradeService {
       TradeStatus.admin_reviewing,
       TradeStatus.shipping_to_recipients,
       TradeStatus.returning,
-      TradeStatus.cancelled,
     ],
     [TradeStatus.admin_reviewing]: [
       TradeStatus.shipping_to_recipients,
@@ -1279,11 +1278,19 @@ export class TradeService {
     userId: string,
     dto: CancelTradeDto,
   ): Promise<TradeResponseDto> {
+    let alreadyCancelled = false;
     await this.prisma.$transaction(async (tx) => {
       const trade = await this.getTradeWithLock(tradeId, tx);
 
       if (trade.initiatorId !== userId && trade.receiverId !== userId) {
         throw new ForbiddenException('Bu takası iptal etme yetkiniz yok');
+      }
+
+      // Idempotent: second cancel after the first already succeeded returns the
+      // existing trade instead of failing on the transition guard.
+      if (trade.status === TradeStatus.cancelled) {
+        alreadyCancelled = true;
+        return;
       }
 
       if (!this.canTransition(trade.status, TradeStatus.cancelled)) {
@@ -1312,6 +1319,18 @@ export class TradeService {
       ) {
         throw new BadRequestException(
           'Ürünler depoya ulaştıktan sonra sadece admin iptal edebilir',
+        );
+      }
+
+      // Partial warehouse arrival: if any to_warehouse shipment has already
+      // been received, the user can no longer cancel — admin must intervene
+      // (force-cancel-stuck or reject) so the arrived item is handled safely.
+      if (
+        trade.status === TradeStatus.shipping_to_warehouse &&
+        trade.firstWarehouseArrivalAt !== null
+      ) {
+        throw new BadRequestException(
+          'Ürünlerden biri Tarodan deposuna ulaştı; iptal edilemez. Sorun varsa itiraz açın veya destek ile iletişime geçin.',
         );
       }
 
@@ -1349,12 +1368,14 @@ export class TradeService {
       });
     });
 
-    await this.paymentService.refundTradeCashPaymentIfCompleted(tradeId);
+    if (!alreadyCancelled) {
+      await this.paymentService.refundTradeCashPaymentIfCompleted(tradeId);
 
-    // Cancel Sürat shipments if any (e.g. trades cancelled after admin approval)
-    await this.cancelSuratShipmentsForTrade(tradeId);
+      // Cancel Sürat shipments if any (e.g. trades cancelled after admin approval)
+      await this.cancelSuratShipmentsForTrade(tradeId);
 
-    await this.invalidateProductCachesForTrade(tradeId);
+      await this.invalidateProductCachesForTrade(tradeId);
+    }
 
     return this.getTradeById(tradeId, userId);
   }
@@ -1865,11 +1886,15 @@ export class TradeService {
       },
     });
 
-    // Safe-trade: shipping-to-warehouse timeout
+    // Safe-trade: shipping-to-warehouse timeout. Once any to_warehouse
+    // shipment has been received, an item is already in the warehouse and
+    // auto-cancel would orphan it. Admin must resolve those manually
+    // (reject or force-cancel-stuck).
     const expiredShippingTrades = await this.prisma.trade.findMany({
       where: {
         status: TradeStatus.shipping_to_warehouse,
         shippingDeadline: { lt: now },
+        firstWarehouseArrivalAt: null,
       },
     });
 
@@ -2362,9 +2387,32 @@ export class TradeService {
       completedAt: trade.completedAt || undefined,
       cancelledAt: trade.cancelledAt || undefined,
       cancelReason: trade.cancelReason || undefined,
+      firstWarehouseArrivalAt: trade.firstWarehouseArrivalAt ?? null,
+      canCancel: this.computeCanCancel(trade, viewerUserId),
       version: trade.version || undefined,
       createdAt: trade.createdAt,
       updatedAt: trade.updatedAt,
     };
+  }
+
+  private computeCanCancel(trade: any, viewerUserId?: string | null): boolean {
+    if (!viewerUserId) return false;
+    const isParticipant =
+      trade.initiatorId === viewerUserId || trade.receiverId === viewerUserId;
+    if (!isParticipant) return false;
+    const eligible: TradeStatus[] = [
+      TradeStatus.pending,
+      TradeStatus.accepted,
+      TradeStatus.awaiting_payment,
+      TradeStatus.shipping_to_warehouse,
+    ];
+    if (!eligible.includes(trade.status)) return false;
+    if (
+      trade.status === TradeStatus.shipping_to_warehouse &&
+      trade.firstWarehouseArrivalAt
+    ) {
+      return false;
+    }
+    return true;
   }
 }

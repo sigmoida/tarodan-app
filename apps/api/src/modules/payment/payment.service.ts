@@ -2110,7 +2110,12 @@ export class PaymentService {
     const oid =
       payment.providerConversationId?.trim() ||
       tradeId.replace(/-/g, '');
-    const amount = Number(payment.amount);
+    // Always refund the full charged amount (product + commission). PayTR was
+    // charged the totalAmount at capture time; partial commission retention
+    // would leave the payer short when the admin reject is no-fault.
+    const amount = Number(
+      payment.tradeCashPayment?.totalAmount ?? payment.amount,
+    );
 
     try {
       const refundResult = await this.paytrService.createRefund(oid, amount);
