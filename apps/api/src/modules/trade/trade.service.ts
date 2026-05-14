@@ -397,78 +397,7 @@ export class TradeService {
   // TRADE STATE MACHINE
   // Valid transitions as per SYSTEM_OPERATIONS_GUIDE.md
   // ==========================================================================
-  private readonly validTransitions: Record<TradeStatus, TradeStatus[]> = {
-    [TradeStatus.pending]: [
-      TradeStatus.accepted,
-      TradeStatus.awaiting_payment,
-      TradeStatus.shipping_to_warehouse,
-      TradeStatus.rejected,
-      TradeStatus.cancelled,
-    ],
-    // Legacy accepted state (peer-to-peer flow) — kept for backwards compat
-    [TradeStatus.accepted]: [
-      TradeStatus.initiator_shipped,
-      TradeStatus.receiver_shipped,
-      TradeStatus.awaiting_payment,
-      TradeStatus.shipping_to_warehouse,
-      TradeStatus.cancelled,
-    ],
-    [TradeStatus.rejected]: [], // Terminal state
-    // Legacy peer-to-peer shipping states
-    [TradeStatus.initiator_shipped]: [
-      TradeStatus.both_shipped,
-      TradeStatus.cancelled,
-    ],
-    [TradeStatus.receiver_shipped]: [
-      TradeStatus.both_shipped,
-      TradeStatus.cancelled,
-    ],
-    [TradeStatus.both_shipped]: [
-      TradeStatus.initiator_received,
-      TradeStatus.receiver_received,
-      TradeStatus.disputed,
-    ],
-    [TradeStatus.initiator_received]: [
-      TradeStatus.completed,
-      TradeStatus.disputed,
-    ],
-    [TradeStatus.receiver_received]: [
-      TradeStatus.completed,
-      TradeStatus.disputed,
-    ],
-    // New escrow flow states
-    [TradeStatus.awaiting_payment]: [
-      TradeStatus.shipping_to_warehouse,
-      TradeStatus.cancelled,
-    ],
-    [TradeStatus.shipping_to_warehouse]: [
-      TradeStatus.at_warehouse,
-      TradeStatus.cancelled,
-      TradeStatus.returning,
-    ],
-    [TradeStatus.at_warehouse]: [
-      TradeStatus.admin_reviewing,
-      TradeStatus.shipping_to_recipients,
-      TradeStatus.returning,
-    ],
-    [TradeStatus.admin_reviewing]: [
-      TradeStatus.shipping_to_recipients,
-      TradeStatus.returning,
-    ],
-    [TradeStatus.shipping_to_recipients]: [
-      TradeStatus.completed,
-      TradeStatus.disputed,
-    ],
-    [TradeStatus.returning]: [
-      TradeStatus.cancelled,
-    ],
-    [TradeStatus.completed]: [], // Terminal state
-    [TradeStatus.cancelled]: [], // Terminal state
-    [TradeStatus.disputed]: [
-      TradeStatus.completed,
-      TradeStatus.cancelled,
-    ],
-  };
+  private readonly validTransitions = TRADE_VALID_TRANSITIONS;
 
   private canTransition(from: TradeStatus, to: TradeStatus): boolean {
     return this.validTransitions[from]?.includes(to) ?? false;
@@ -1926,6 +1855,33 @@ export class TradeService {
       },
     });
 
+    // Stuck trades surface: deadline passed AND one item already arrived.
+    // These need manual admin action (force-cancel-stuck); we log them every
+    // run so they don't sit silent.
+    const stuckTrades = await this.prisma.trade.findMany({
+      where: {
+        status: TradeStatus.shipping_to_warehouse,
+        shippingDeadline: { lt: now },
+        firstWarehouseArrivalAt: { not: null },
+      },
+      select: {
+        id: true,
+        tradeNumber: true,
+        shippingDeadline: true,
+        firstWarehouseArrivalAt: true,
+      },
+    });
+    if (stuckTrades.length > 0) {
+      this.logger.warn(
+        `Stuck trades requiring admin force-cancel-stuck: ${stuckTrades
+          .map(
+            (t) =>
+              `${t.tradeNumber}(id=${t.id} arrived=${t.firstWarehouseArrivalAt?.toISOString()} deadline=${t.shippingDeadline?.toISOString()})`,
+          )
+          .join(', ')}`,
+      );
+    }
+
     let cancelledCount = 0;
 
     for (const trade of [
@@ -2427,6 +2383,82 @@ export class TradeService {
     return computeTradeCanCancel(trade, viewerUserId);
   }
 }
+
+/**
+ * Trade state machine — single source of truth for allowed transitions.
+ * Exported as a top-level const so unit tests can lock the rules without
+ * instantiating TradeService.
+ */
+export const TRADE_VALID_TRANSITIONS: Record<TradeStatus, TradeStatus[]> = {
+  [TradeStatus.pending]: [
+    TradeStatus.accepted,
+    TradeStatus.awaiting_payment,
+    TradeStatus.shipping_to_warehouse,
+    TradeStatus.rejected,
+    TradeStatus.cancelled,
+  ],
+  // Legacy accepted state (peer-to-peer flow) — kept for backwards compat
+  [TradeStatus.accepted]: [
+    TradeStatus.initiator_shipped,
+    TradeStatus.receiver_shipped,
+    TradeStatus.awaiting_payment,
+    TradeStatus.shipping_to_warehouse,
+    TradeStatus.cancelled,
+  ],
+  [TradeStatus.rejected]: [], // Terminal state
+  // Legacy peer-to-peer shipping states
+  [TradeStatus.initiator_shipped]: [
+    TradeStatus.both_shipped,
+    TradeStatus.cancelled,
+  ],
+  [TradeStatus.receiver_shipped]: [
+    TradeStatus.both_shipped,
+    TradeStatus.cancelled,
+  ],
+  [TradeStatus.both_shipped]: [
+    TradeStatus.initiator_received,
+    TradeStatus.receiver_received,
+    TradeStatus.disputed,
+  ],
+  [TradeStatus.initiator_received]: [
+    TradeStatus.completed,
+    TradeStatus.disputed,
+  ],
+  [TradeStatus.receiver_received]: [
+    TradeStatus.completed,
+    TradeStatus.disputed,
+  ],
+  // New escrow flow states
+  [TradeStatus.awaiting_payment]: [
+    TradeStatus.shipping_to_warehouse,
+    TradeStatus.cancelled,
+  ],
+  [TradeStatus.shipping_to_warehouse]: [
+    TradeStatus.at_warehouse,
+    TradeStatus.cancelled,
+    TradeStatus.returning,
+  ],
+  [TradeStatus.at_warehouse]: [
+    TradeStatus.admin_reviewing,
+    TradeStatus.shipping_to_recipients,
+    TradeStatus.returning,
+  ],
+  [TradeStatus.admin_reviewing]: [
+    TradeStatus.shipping_to_recipients,
+    TradeStatus.returning,
+  ],
+  [TradeStatus.shipping_to_recipients]: [
+    TradeStatus.completed,
+    TradeStatus.disputed,
+  ],
+  [TradeStatus.returning]: [TradeStatus.cancelled],
+  [TradeStatus.completed]: [], // Terminal state
+  [TradeStatus.cancelled]: [], // Terminal state
+  [TradeStatus.disputed]: [
+    TradeStatus.completed,
+    TradeStatus.cancelled,
+  ],
+};
 
 /**
  * Pure cancel-eligibility check shared by the service and unit tests.

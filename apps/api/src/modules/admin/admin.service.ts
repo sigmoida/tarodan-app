@@ -4413,6 +4413,55 @@ export class AdminService {
   }
 
   /**
+   * Sürat submit helper for the reject return leg. Falls back to an internal
+   * tracking number when the integration is disabled.
+   */
+  private async submitReturnToSuratForReject(
+    tradeId: string,
+    oid: string,
+    address: any,
+    user: any,
+  ): Promise<{ carrier: string; trackingNumber: string }> {
+    if (!this.suratCargoService || !this.suratCargoService.isIntegrationEnabled()) {
+      const fallbackTracking = `TRK${Date.now().toString(36).toUpperCase()}${Math.random()
+        .toString(36)
+        .substring(2, 6)
+        .toUpperCase()}`;
+      return { carrier: 'Tarodan Warehouse', trackingNumber: fallbackTracking };
+    }
+    const result = await this.suratCargoService.submitShipmentWithRetry({
+      idempotencyKey: `surat:trade-return:${oid}`,
+      correlationId: `trade-reject-${tradeId}`,
+      payload: {
+        KisiKurum: address.fullName || user?.displayName || 'Takas İade',
+        SahisBirim: 'Takas İade Gönderisi',
+        AliciAdresi: address.address,
+        Il: address.city,
+        Ilce: address.district,
+        TelefonCep: address.phone,
+        KargoTuru: SuratKargoTuru.Koli,
+        OdemeTipi: SuratOdemeTipi.Pesin,
+        OzelKargoTakipNo: oid,
+        Adet: 1,
+        BirimDesi: 1,
+        BirimKg: 1,
+        KapidanOdemeTahsilatTipi: 1,
+        TasimaSekli: SuratTasimaSekli.KaraYolu,
+        TeslimSekli: SuratTeslimSekli.AdreseTeslim,
+        GonderiSekli: SuratGonderiSekli.Standart,
+        Pazaryerimi: 0,
+        Iademi: true,
+      },
+    });
+    if (!result.ok) {
+      const r = result as any;
+      const errMsg = r.kind === 'business' ? r.suratMessage : `technical: ${r.code}`;
+      throw new BadRequestException(`Sürat iade kargo siparişi reddedildi: ${errMsg}`);
+    }
+    return { carrier: 'surat', trackingNumber: oid };
+  }
+
+  /**
    * Admin marks one of the two to_warehouse shipments as delivered to the
    * Tarodan warehouse. When both to_warehouse shipments are delivered, the
    * trade transitions to `at_warehouse` so admin review can begin.
@@ -4524,7 +4573,24 @@ export class AdminService {
         status: nextStatus,
         bothDelivered,
         firstArrival: isFirstArrival,
+        initiatorId: trade.initiatorId,
+        receiverId: trade.receiverId,
       };
+    }).then(async (res) => {
+      if (res.firstArrival) {
+        try {
+          await this.eventService.emitTradeCancelLocked({
+            tradeId: res.tradeId,
+            initiatorId: res.initiatorId,
+            receiverId: res.receiverId,
+          });
+        } catch (err) {
+          this.logger.error(
+            `Failed to emit trade.cancel-locked for trade ${res.tradeId}: ${err}`,
+          );
+        }
+      }
+      return res;
     });
   }
 
@@ -4738,6 +4804,34 @@ export class AdminService {
       throw new BadRequestException('Red nedeni zorunludur');
     }
 
+    // Idempotency: if the trade is already `returning` from a prior reject,
+    // return the existing result instead of re-running Sürat / refund.
+    const existing = await this.prisma.trade.findUnique({
+      where: { id: tradeId },
+      select: {
+        id: true,
+        status: true,
+        refundFailureReason: true,
+        shipments: { where: { leg: 'return' }, select: { id: true } },
+      },
+    });
+    if (!existing) {
+      throw new NotFoundException('Takas bulunamadı');
+    }
+    if (existing.status === TradeStatus.returning && existing.shipments.length >= 2) {
+      return {
+        success: true,
+        tradeId,
+        status: existing.status,
+        refundFailure: existing.refundFailureReason,
+        idempotent: true,
+      };
+    }
+
+    // 1) Transaction does ONLY DB state mutation: validate, create DRAFT
+    //    return shipments, flip status to `returning`. Sürat calls are
+    //    deliberately outside the transaction to avoid holding the trade
+    //    row lock across a slow third-party API.
     const result = await this.prisma.$transaction(async (tx) => {
       await tx.$queryRaw`SELECT id FROM trades WHERE id = ${tradeId} FOR UPDATE`;
 
@@ -4783,92 +4877,33 @@ export class AdminService {
       }
 
       const warehouseAddressId = await this.resolveWarehouseAddressId(tx);
-
-      const genTrackingNumber = () =>
-        `TRK${Date.now().toString(36).toUpperCase()}${Math.random()
-          .toString(36)
-          .substring(2, 6)
-          .toUpperCase()}`;
-
       const now = new Date();
 
-      // Submit return shipments to Sürat (each party gets their own items back)
       const initiatorReturnOid = `TRD-${trade.tradeNumber}-RET-INI`.replace(/[^a-zA-Z0-9-]/g, '').slice(0, 50);
       const receiverReturnOid = `TRD-${trade.tradeNumber}-RET-REC`.replace(/[^a-zA-Z0-9-]/g, '').slice(0, 50);
 
-      const initiatorUser = await tx.user.findUnique({ where: { id: trade.initiatorId } });
-      const receiverUser = await tx.user.findUnique({ where: { id: trade.receiverId } });
-
-      const submitReturnToSurat = async (oid: string, addr: any, user: any): Promise<{ carrier: string; trackingNumber: string }> => {
-        if (!this.suratCargoService || !this.suratCargoService.isIntegrationEnabled()) {
-          return { carrier: 'Tarodan Warehouse', trackingNumber: genTrackingNumber() };
-        }
-        try {
-          const result = await this.suratCargoService.submitShipmentWithRetry({
-            idempotencyKey: `surat:trade-return:${oid}`,
-            correlationId: `trade-reject-${tradeId}`,
-            payload: {
-              KisiKurum: addr.fullName || user?.displayName || 'Takas İade',
-              SahisBirim: 'Takas İade Gönderisi',
-              AliciAdresi: addr.address,
-              Il: addr.city,
-              Ilce: addr.district,
-              TelefonCep: addr.phone,
-              KargoTuru: SuratKargoTuru.Koli,
-              OdemeTipi: SuratOdemeTipi.Pesin,
-              OzelKargoTakipNo: oid,
-              Adet: 1,
-              BirimDesi: 1,
-              BirimKg: 1,
-              KapidanOdemeTahsilatTipi: 1,
-              TasimaSekli: SuratTasimaSekli.KaraYolu,
-              TeslimSekli: SuratTeslimSekli.AdreseTeslim,
-              GonderiSekli: SuratGonderiSekli.Standart,
-              Pazaryerimi: 0,
-              Iademi: true, // İade gönderisi
-            },
-          });
-          if (!result.ok) {
-            const r = result as any;
-            const errMsg = r.kind === 'business' ? r.suratMessage : `technical: ${r.code}`;
-            throw new BadRequestException(
-              `Sürat iade kargo siparişi reddedildi: ${errMsg}`,
-            );
-          }
-          return { carrier: 'surat', trackingNumber: oid };
-        } catch (error: any) {
-          this.logger.error(`Surat return shipment failed for trade ${tradeId}: ${error.message}`);
-          throw error;
-        }
-      };
-
-      const initiatorReturnResult = await submitReturnToSurat(initiatorReturnOid, initiatorAddress, initiatorUser);
-      const receiverReturnResult = await submitReturnToSurat(receiverReturnOid, receiverAddress, receiverUser);
-
+      // DRAFT rows — carrier/trackingNumber set after the Sürat call returns.
       const returnToInitiator = await tx.tradeShipment.create({
         data: {
           tradeId,
           shipperId: adminId,
           fromAddressId: warehouseAddressId,
-          carrier: initiatorReturnResult.carrier,
-          trackingNumber: initiatorReturnResult.trackingNumber,
-          status: ShipmentStatus.label_created,
-          shippedAt: now,
+          carrier: 'pending',
+          trackingNumber: null,
+          status: ShipmentStatus.pending,
           leg: 'return',
           recipientType: 'user',
           recipientUserId: trade.initiatorId,
         },
       });
-
       const returnToReceiver = await tx.tradeShipment.create({
         data: {
           tradeId,
           shipperId: adminId,
           fromAddressId: warehouseAddressId,
-          carrier: receiverReturnResult.carrier,
-          trackingNumber: receiverReturnResult.trackingNumber,
-          status: ShipmentStatus.label_created,
-          shippedAt: now,
+          carrier: 'pending',
+          trackingNumber: null,
+          status: ShipmentStatus.pending,
           leg: 'return',
           recipientType: 'user',
           recipientUserId: trade.receiverId,
@@ -4906,8 +4941,53 @@ export class AdminService {
         receiverId: trade.receiverId,
         status: updatedTrade.status,
         shouldRefund,
+        warehouseAddressId,
+        returnDrafts: [
+          {
+            id: returnToInitiator.id,
+            oid: initiatorReturnOid,
+            address: initiatorAddress,
+            recipientUserId: trade.initiatorId,
+          },
+          {
+            id: returnToReceiver.id,
+            oid: receiverReturnOid,
+            address: receiverAddress,
+            recipientUserId: trade.receiverId,
+          },
+        ],
       };
     });
+
+    // 2) Outside the tx: submit each DRAFT to Sürat. Sürat is idempotent on
+    //    OzelKargoTakipNo + idempotencyKey, so a retry after a partial
+    //    failure produces the same label without duplicating shipments.
+    for (const draft of result.returnDrafts) {
+      try {
+        const user = await this.prisma.user.findUnique({
+          where: { id: draft.recipientUserId },
+        });
+        const submitted = await this.submitReturnToSuratForReject(
+          tradeId,
+          draft.oid,
+          draft.address,
+          user,
+        );
+        await this.prisma.tradeShipment.update({
+          where: { id: draft.id },
+          data: {
+            carrier: submitted.carrier,
+            trackingNumber: submitted.trackingNumber,
+            status: ShipmentStatus.label_created,
+            shippedAt: new Date(),
+          },
+        });
+      } catch (err: any) {
+        this.logger.error(
+          `Sürat return submit failed for trade ${tradeId} draft ${draft.id}: ${err?.message}. DRAFT row preserved for retry.`,
+        );
+      }
+    }
 
     // After commit: refund cash payment (if completed) and notify parties.
     // Refund failure does NOT roll back the reject: return shipments are
@@ -4917,11 +4997,24 @@ export class AdminService {
     if (result.shouldRefund) {
       try {
         await this.paymentService.refundTradeCashPaymentIfCompleted(tradeId);
-        // Clear any previous failure marker (e.g. retry after manual fix).
         await this.prisma.trade.update({
           where: { id: tradeId },
           data: { refundFailureReason: null, refundFailureAt: null },
         });
+        try {
+          const cashPayment = await this.prisma.tradeCashPayment.findUnique({
+            where: { tradeId },
+            select: { payerId: true },
+          });
+          await this.eventService.emitTradeRefundCompleted({
+            tradeId,
+            cashPayerId: cashPayment?.payerId ?? null,
+          });
+        } catch (emitErr) {
+          this.logger.error(
+            `Failed to emit trade.refund-completed for trade ${tradeId}: ${emitErr}`,
+          );
+        }
       } catch (err: any) {
         refundFailureMessage =
           err?.message ?? 'Bilinmeyen hata (PayTR iade başarısız)';
@@ -4939,6 +5032,21 @@ export class AdminService {
         } catch (persistErr: any) {
           this.logger.error(
             `Failed to persist refund failure for trade ${tradeId}: ${persistErr?.message}`,
+          );
+        }
+        try {
+          const cashPayment = await this.prisma.tradeCashPayment.findUnique({
+            where: { tradeId },
+            select: { payerId: true },
+          });
+          await this.eventService.emitTradeRefundFailed({
+            tradeId,
+            cashPayerId: cashPayment?.payerId ?? null,
+            reason: refundFailureMessage,
+          });
+        } catch (emitErr) {
+          this.logger.error(
+            `Failed to emit trade.refund-failed for trade ${tradeId}: ${emitErr}`,
           );
         }
       }
@@ -5082,12 +5190,40 @@ export class AdminService {
         },
       );
 
+      const parties = await tx.trade.findUnique({
+        where: { id: tradeId },
+        select: { initiatorId: true, receiverId: true },
+      });
+
       return {
         success: true,
         tradeId,
         shipmentId,
         status: finalStatus,
         allDelivered,
+        initiatorId: parties!.initiatorId,
+        receiverId: parties!.receiverId,
+      };
+    }).then(async (res) => {
+      if (res.allDelivered && res.status === TradeStatus.cancelled) {
+        try {
+          await this.eventService.emitTradeReturnCompleted({
+            tradeId: res.tradeId,
+            initiatorId: res.initiatorId,
+            receiverId: res.receiverId,
+          });
+        } catch (err) {
+          this.logger.error(
+            `Failed to emit trade.return-completed for trade ${res.tradeId}: ${err}`,
+          );
+        }
+      }
+      return {
+        success: res.success,
+        tradeId: res.tradeId,
+        shipmentId: res.shipmentId,
+        status: res.status,
+        allDelivered: res.allDelivered,
       };
     });
   }
@@ -5561,6 +5697,26 @@ export class AdminService {
         shipmentId: dto.shipmentId,
         status: finalStatus,
         compensationUserId,
+        reason,
+      };
+    }).then(async (res) => {
+      try {
+        await this.eventService.emitTradeReturnLost({
+          tradeId: res.tradeId,
+          compensationUserId: res.compensationUserId,
+          reason: res.reason,
+        });
+      } catch (err) {
+        this.logger.error(
+          `Failed to emit trade.return-lost for trade ${res.tradeId}: ${err}`,
+        );
+      }
+      return {
+        success: res.success,
+        tradeId: res.tradeId,
+        shipmentId: res.shipmentId,
+        status: res.status,
+        compensationUserId: res.compensationUserId,
       };
     });
   }
@@ -5611,6 +5767,11 @@ export class AdminService {
       );
     }
 
+    const cashPayment = await this.prisma.tradeCashPayment.findUnique({
+      where: { tradeId },
+      select: { payerId: true },
+    });
+
     try {
       const result = await this.paymentService.refundTradeCashPaymentIfCompleted(tradeId);
       await this.prisma.trade.update({
@@ -5628,6 +5789,16 @@ export class AdminService {
         },
         result,
       );
+      try {
+        await this.eventService.emitTradeRefundCompleted({
+          tradeId,
+          cashPayerId: cashPayment?.payerId ?? null,
+        });
+      } catch (emitErr) {
+        this.logger.error(
+          `Failed to emit trade.refund-completed for trade ${tradeId}: ${emitErr}`,
+        );
+      }
       return { success: true, tradeId, refunded: result.refunded, skippedReason: result.skippedReason };
     } catch (err: any) {
       const message = err?.message ?? 'Bilinmeyen hata (PayTR iade başarısız)';
@@ -5658,6 +5829,17 @@ export class AdminService {
         },
         { message },
       );
+      try {
+        await this.eventService.emitTradeRefundFailed({
+          tradeId,
+          cashPayerId: cashPayment?.payerId ?? null,
+          reason: message,
+        });
+      } catch (emitErr) {
+        this.logger.error(
+          `Failed to emit trade.refund-failed for trade ${tradeId}: ${emitErr}`,
+        );
+      }
       throw err;
     }
   }

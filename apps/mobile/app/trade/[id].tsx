@@ -139,6 +139,11 @@ export default function TradeDetailScreen() {
   const [counterModalVisible, setCounterModalVisible] = useState(false);
   const [counterCashAmount, setCounterCashAmount] = useState('');
   const [counterMessage, setCounterMessage] = useState('');
+  const [disputeModalVisible, setDisputeModalVisible] = useState(false);
+  const [disputeReason, setDisputeReason] = useState<
+    'shipment_lost' | 'shipment_damaged' | 'wrong_item' | 'other'
+  >('shipment_lost');
+  const [disputeDescription, setDisputeDescription] = useState('');
 
   // Fetch trade details
   const { data: trade, isLoading } = useQuery<Trade>({
@@ -246,6 +251,30 @@ export default function TradeDetailScreen() {
     },
     onError: (error: any) => {
       setSnackbar({ visible: true, message: error.response?.data?.message || 'İşlem başarısız' });
+    },
+  });
+
+  const disputeMutation = useMutation({
+    mutationFn: () =>
+      tradesApi.raiseDispute(id as string, {
+        reason: disputeReason,
+        description: disputeDescription.trim(),
+      }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['trade', id] });
+      queryClient.invalidateQueries({ queryKey: ['trades'] });
+      setDisputeModalVisible(false);
+      setDisputeDescription('');
+      setSnackbar({
+        visible: true,
+        message: 'İtiraz açıldı; Tarodan ekibi en kısa sürede inceleyecek.',
+      });
+    },
+    onError: (error: any) => {
+      setSnackbar({
+        visible: true,
+        message: error.response?.data?.message || 'İtiraz açılamadı',
+      });
     },
   });
 
@@ -728,6 +757,16 @@ export default function TradeDetailScreen() {
                   {t('trade.confirmReceipt.waitingDelivered')}
                 </Text>
               )}
+              <Button
+                testID="trade-raise-dispute-button"
+                variant="outline"
+                title="İtiraz Aç"
+                onPress={() => setDisputeModalVisible(true)}
+                style={{ ...styles.actionButton, borderColor: colors.danger[600]! }}
+              />
+              <Text variant="caption" style={styles.confirmReceiptHint}>
+                Kargo kaybolduysa veya ürün sorunluysa itiraz açabilirsiniz.
+              </Text>
             </>
           )}
 
@@ -771,6 +810,67 @@ export default function TradeDetailScreen() {
             title="Gönder"
             onPress={() => counterMutation.mutate()}
             isLoading={counterMutation.isPending}
+          />
+        </View>
+      </Modal>
+
+      {/* Raise Dispute Modal */}
+      <Modal
+        isOpen={disputeModalVisible}
+        onClose={() => !disputeMutation.isPending && setDisputeModalVisible(false)}
+        title="İtiraz Aç"
+      >
+        <Text variant="caption" style={{ marginBottom: 12 }}>
+          Yaşadığınız sorunu seçin ve kısaca açıklayın. Tarodan ekibi en kısa
+          sürede inceleyecek.
+        </Text>
+        <View style={{ marginBottom: 12 }}>
+          {([
+            ['shipment_lost', 'Kargo kayboldu / ulaşmadı'],
+            ['shipment_damaged', 'Ürün hasarlı geldi'],
+            ['wrong_item', 'Beklediğim ürün gelmedi'],
+            ['other', 'Diğer'],
+          ] as const).map(([value, label]) => (
+            <Button
+              key={value}
+              variant={disputeReason === value ? 'primary' : 'outline'}
+              title={label}
+              onPress={() => setDisputeReason(value)}
+              style={{ marginBottom: 6 }}
+            />
+          ))}
+        </View>
+        <Input
+          label="Açıklama"
+          value={disputeDescription}
+          onChangeText={setDisputeDescription}
+          multiline
+          numberOfLines={4}
+          placeholder="Sorunu detaylandırın (kargo tarihi, fotoğraf gönderebilirim, vb.)"
+          containerStyle={{ marginBottom: 12 }}
+          inputStyle={{ minHeight: 100 }}
+        />
+        <View style={styles.modalActions}>
+          <Button
+            variant="outline"
+            title="Vazgeç"
+            onPress={() => setDisputeModalVisible(false)}
+            disabled={disputeMutation.isPending}
+          />
+          <Button
+            variant="primary"
+            title="İtirazı Gönder"
+            onPress={() => {
+              if (disputeDescription.trim().length < 10) {
+                setSnackbar({
+                  visible: true,
+                  message: 'Açıklama en az 10 karakter olmalı',
+                });
+                return;
+              }
+              disputeMutation.mutate();
+            }}
+            isLoading={disputeMutation.isPending}
           />
         </View>
       </Modal>
