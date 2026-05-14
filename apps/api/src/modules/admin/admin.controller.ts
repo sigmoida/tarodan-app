@@ -77,6 +77,8 @@ import {
   ApproveWarehouseTradeDto,
   RejectWarehouseTradeDto,
   MarkShipmentDto,
+  MarkReturnLostDto,
+  ForceCancelStuckDto,
   TradeShipmentQueryDto,
 } from './dto';
 
@@ -1093,6 +1095,48 @@ export class AdminController {
     @CurrentUser('id') adminId: string,
   ) {
     return this.adminService.retryTradeRefund(adminId, id);
+  }
+
+  @Post('trades/:id/mark-return-lost')
+  @Roles(AdminRole.super_admin)
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({
+    summary:
+      'Declare a return shipment lost; finalizes the trade when both returns are resolved and flags compensation',
+  })
+  @ApiParam({ name: 'id', description: 'Trade ID' })
+  @ApiResponse({
+    status: HttpStatus.OK,
+    description:
+      'Return shipment marked lost; trade cancelled with compensation flag if all returns resolved',
+  })
+  async markTradeReturnLost(
+    @Param('id') id: string,
+    @CurrentUser('id') adminId: string,
+    @Body() body: MarkReturnLostDto,
+  ) {
+    return this.adminService.markReturnShipmentLost(adminId, id, body);
+  }
+
+  @Post('trades/:id/force-cancel-stuck')
+  @Roles(AdminRole.super_admin, AdminRole.admin)
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({
+    summary:
+      'Force-cancel a warehouse-bound trade where one item arrived but the other is stuck',
+  })
+  @ApiParam({ name: 'id', description: 'Trade ID' })
+  @ApiResponse({
+    status: HttpStatus.OK,
+    description:
+      'Counterpart shipment cancelled in carrier, arrived item returned (optional), trade set to returning',
+  })
+  async forceCancelStuckTrade(
+    @Param('id') id: string,
+    @CurrentUser('id') adminId: string,
+    @Body() body: ForceCancelStuckDto,
+  ) {
+    return this.adminService.forceCancelStuckWarehouseTrade(adminId, id, body);
   }
 
   // ==================== MESSAGE MANAGEMENT ====================

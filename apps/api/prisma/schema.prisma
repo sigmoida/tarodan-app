@@ -486,6 +486,10 @@ model Trade {
   // so the operator can retry the refund.
   refundFailureReason  String?           @map("refund_failure_reason")
   refundFailureAt      DateTime?         @map("refund_failure_at")
+  // Flag set when an admin marks a return shipment lost and the affected user
+  // is owed manual compensation. Cleared by admin after settling out of band.
+  compensationPendingUserId String?       @map("compensation_pending_user_id")
+  compensationResolvedAt    DateTime?     @map("compensation_resolved_at")
   createdAt            DateTime          @default(now()) @map("created_at")
   updatedAt            DateTime          @updatedAt @map("updated_at")
   version              Int               @default(1)
@@ -531,6 +535,10 @@ model TradeShipment {
   shippedAt       DateTime?            @map("shipped_at")
   deliveredAt     DateTime?            @map("delivered_at")
   confirmedAt     DateTime?            @map("confirmed_at")
+  // Admin-set when a shipment is declared lost (typically a return leg that
+  // never arrived). Drives compensation flow on the parent trade.
+  lostAt          DateTime?            @map("lost_at")
+  lostReason      String?              @map("lost_reason")
   // Escrow: which leg of the journey this shipment represents
   leg             String               @default("to_warehouse")
   // Recipient of this shipment: null = warehouse, else initiator or receiver user id

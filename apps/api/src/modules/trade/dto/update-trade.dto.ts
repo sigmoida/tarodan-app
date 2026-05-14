@@ -104,7 +104,13 @@ export class RaiseTradeDisputeDto {
 }
 
 export class ResolveTradeDisputeDto {
-  @IsEnum(['complete_trade', 'cancel_trade', 'partial_refund'])
+  @IsEnum([
+    'complete_trade',
+    'cancel_trade',
+    'partial_refund',
+    'compensate_initiator',
+    'compensate_receiver',
+  ])
   resolution: string;
 
   @IsString()

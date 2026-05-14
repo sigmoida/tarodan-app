@@ -155,6 +155,19 @@ export const adminApi = {
     api.post(`/admin/trades/${tradeId}/mark-return-delivered`, { shipmentId }),
   retryTradeRefund: (tradeId: string) =>
     api.post(`/admin/trades/${tradeId}/retry-refund`),
+  markTradeReturnLost: (
+    tradeId: string,
+    body: { shipmentId: string; reason: string; compensateUserId?: string },
+  ) => api.post(`/admin/trades/${tradeId}/mark-return-lost`, body),
+  forceCancelStuckTrade: (
+    tradeId: string,
+    body: { reason: string; sendArrivedItemBack: boolean },
+  ) => api.post(`/admin/trades/${tradeId}/force-cancel-stuck`, body),
+  resolveTradeDispute: (
+    tradeId: string,
+    resolution: string,
+    notes: string,
+  ) => api.post(`/trades/${tradeId}/resolve-dispute`, { resolution, notes }),
 
   // Trade shipments (cross-trade listing)
   getTradeShipments: (params?: any) => api.get('/admin/trade-shipments', { params }),

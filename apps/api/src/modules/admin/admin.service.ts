@@ -5093,6 +5093,479 @@ export class AdminService {
   }
 
   /**
+   * Admin unblocks a `shipping_to_warehouse` trade where one item arrived at
+   * the warehouse but the counterpart shipment is stuck in transit. Cancels
+   * the stuck counterpart in the carrier, optionally opens a return for the
+   * arrived item, transitions the trade to `returning`, and refunds any
+   * completed cash payment. Stock reservations release when the return is
+   * marked delivered (or immediately if no return shipment is created).
+   */
+  async forceCancelStuckWarehouseTrade(
+    adminId: string,
+    tradeId: string,
+    dto: { reason: string; sendArrivedItemBack?: boolean },
+  ) {
+    const reason = dto?.reason?.trim();
+    if (!reason || reason.length < 10) {
+      throw new BadRequestException(
+        'İptal gerekçesi en az 10 karakter olmalıdır',
+      );
+    }
+    const sendArrivedItemBack = dto.sendArrivedItemBack !== false;
+
+    const txResult = await this.prisma.$transaction(async (tx) => {
+      await tx.$queryRaw`SELECT id FROM trades WHERE id = ${tradeId} FOR UPDATE`;
+
+      const trade = await tx.trade.findUnique({
+        where: { id: tradeId },
+        include: { cashPayment: true },
+      });
+      if (!trade) {
+        throw new NotFoundException('Takas bulunamadı');
+      }
+      if (trade.status !== TradeStatus.shipping_to_warehouse) {
+        throw new BadRequestException(
+          `Takas durumu '${trade.status}' force-cancel için uygun değil. Beklenen: shipping_to_warehouse.`,
+        );
+      }
+      if (!trade.firstWarehouseArrivalAt) {
+        throw new BadRequestException(
+          'Hiçbir ürün depoya ulaşmamış; bu endpoint sadece kısmen ulaşmış takaslar için.',
+        );
+      }
+
+      const toWarehouseShipments = await tx.tradeShipment.findMany({
+        where: { tradeId, leg: 'to_warehouse' },
+      });
+      const arrived = toWarehouseShipments.find((s) => s.deliveredAt !== null);
+      const stuck = toWarehouseShipments.find((s) => s.deliveredAt === null);
+      if (!arrived || !stuck) {
+        throw new BadRequestException(
+          'Hem ulaşmış hem de yolda olan bir kargo bulunamadı; force-cancel için durum uygun değil.',
+        );
+      }
+
+      const now = new Date();
+      let returnShipmentDraft: { id: string; recipientUserId: string; oid: string } | null = null;
+
+      if (sendArrivedItemBack && arrived.recipientUserId === null) {
+        // recipientUserId on arrived to_warehouse is the shipper (the original owner).
+      }
+      if (sendArrivedItemBack) {
+        const arrivedOwnerId = arrived.shipperId;
+        const warehouseAddressId = await this.resolveWarehouseAddressId(tx);
+        const oid = `TRD-${trade.tradeNumber}-RET-STK`
+          .replace(/[^a-zA-Z0-9-]/g, '')
+          .slice(0, 50);
+        const draft = await tx.tradeShipment.create({
+          data: {
+            tradeId,
+            shipperId: adminId,
+            fromAddressId: warehouseAddressId,
+            carrier: 'pending',
+            trackingNumber: null,
+            status: ShipmentStatus.pending,
+            leg: 'return',
+            recipientType: 'user',
+            recipientUserId: arrivedOwnerId,
+          },
+        });
+        returnShipmentDraft = { id: draft.id, recipientUserId: arrivedOwnerId, oid };
+      }
+
+      await tx.trade.update({
+        where: { id: tradeId },
+        data: {
+          status: returnShipmentDraft ? TradeStatus.returning : TradeStatus.cancelled,
+          cancelReason: `Admin force-cancel (stuck): ${reason}`,
+          ...(returnShipmentDraft ? {} : { cancelledAt: now }),
+          updatedAt: now,
+        },
+      });
+
+      // Stock release happens on markReturnDelivered (or immediately when no
+      // return shipment is created — the items are already with their owners).
+      if (!returnShipmentDraft) {
+        const items = await tx.tradeItem.findMany({
+          where: { tradeId },
+          select: { productId: true, quantity: true },
+        });
+        const byProduct = new Map<string, number>();
+        for (const item of items) {
+          byProduct.set(item.productId, (byProduct.get(item.productId) ?? 0) + item.quantity);
+        }
+        for (const [productId, qty] of byProduct) {
+          await tx.$queryRaw`SELECT id FROM products WHERE id = ${productId} FOR UPDATE`;
+          const prod = await tx.product.findUnique({
+            where: { id: productId },
+            select: { reservedQuantity: true },
+          });
+          if (prod) {
+            const newReserved = safeDecrementReserved(prod.reservedQuantity, qty);
+            await tx.product.update({
+              where: { id: productId },
+              data: {
+                reservedQuantity: newReserved,
+                status:
+                  newReserved > 0 ? ProductStatus.reserved : ProductStatus.active,
+              },
+            });
+          }
+        }
+      }
+
+      await this.createAuditLog(
+        adminId,
+        'trade_force_cancel_stuck',
+        'Trade',
+        tradeId,
+        trade,
+        {
+          reason,
+          stuckShipmentId: stuck.id,
+          arrivedShipmentId: arrived.id,
+          returnShipmentId: returnShipmentDraft?.id ?? null,
+          newStatus: returnShipmentDraft ? 'returning' : 'cancelled',
+        },
+      );
+
+      return {
+        arrivedOwnerId: arrived.shipperId,
+        stuckShipment: {
+          id: stuck.id,
+          trackingNumber: stuck.trackingNumber,
+          carrier: stuck.carrier,
+        },
+        returnShipmentDraft,
+        shouldRefund:
+          !!trade.cashPayment && trade.cashPayment.status === PaymentStatus.completed,
+        warehouseAddressId: returnShipmentDraft
+          ? await this.resolveWarehouseAddressId(tx)
+          : null,
+        initiatorId: trade.initiatorId,
+        receiverId: trade.receiverId,
+      };
+    });
+
+    // Side effects outside the transaction:
+    //   1) submit return shipment to Sürat (idempotent),
+    //   2) cancel the stuck counterpart shipment at Sürat (best-effort),
+    //   3) trigger refund.
+
+    if (txResult.returnShipmentDraft) {
+      try {
+        const arrivedUser = await this.prisma.user.findUnique({
+          where: { id: txResult.arrivedOwnerId },
+        });
+        const arrivedAddress = await this.prisma.address.findFirst({
+          where: { userId: txResult.arrivedOwnerId },
+          orderBy: { isDefault: 'desc' },
+        });
+        if (
+          arrivedAddress &&
+          this.suratCargoService &&
+          this.suratCargoService.isIntegrationEnabled()
+        ) {
+          const result = await this.suratCargoService.submitShipmentWithRetry({
+            idempotencyKey: `surat:trade-stuck-return:${txResult.returnShipmentDraft.oid}`,
+            correlationId: `trade-force-cancel-${tradeId}`,
+            payload: {
+              KisiKurum:
+                arrivedAddress.fullName || arrivedUser?.displayName || 'Takas İade',
+              SahisBirim: 'Takas Kayıp İade',
+              AliciAdresi: arrivedAddress.address,
+              Il: arrivedAddress.city,
+              Ilce: arrivedAddress.district,
+              TelefonCep: arrivedAddress.phone,
+              KargoTuru: SuratKargoTuru.Koli,
+              OdemeTipi: SuratOdemeTipi.Pesin,
+              OzelKargoTakipNo: txResult.returnShipmentDraft.oid,
+              Adet: 1,
+              BirimDesi: 1,
+              BirimKg: 1,
+              KapidanOdemeTahsilatTipi: 1,
+              TasimaSekli: SuratTasimaSekli.KaraYolu,
+              TeslimSekli: SuratTeslimSekli.AdreseTeslim,
+              GonderiSekli: SuratGonderiSekli.Standart,
+              Pazaryerimi: 0,
+              Iademi: true,
+            },
+          });
+          if (result.ok) {
+            await this.prisma.tradeShipment.update({
+              where: { id: txResult.returnShipmentDraft.id },
+              data: {
+                carrier: 'surat',
+                trackingNumber: txResult.returnShipmentDraft.oid,
+                status: ShipmentStatus.label_created,
+                shippedAt: new Date(),
+              },
+            });
+          } else {
+            const r = result as any;
+            const errMsg =
+              r.kind === 'business' ? r.suratMessage : `technical: ${r.code}`;
+            this.logger.error(
+              `Force-cancel return shipment submit failed for trade ${tradeId}: ${errMsg}`,
+            );
+          }
+        } else {
+          await this.prisma.tradeShipment.update({
+            where: { id: txResult.returnShipmentDraft.id },
+            data: {
+              carrier: 'Tarodan Warehouse',
+              trackingNumber: `TRK${Date.now()
+                .toString(36)
+                .toUpperCase()}${Math.random()
+                .toString(36)
+                .substring(2, 6)
+                .toUpperCase()}`,
+              status: ShipmentStatus.label_created,
+              shippedAt: new Date(),
+            },
+          });
+        }
+      } catch (err: any) {
+        this.logger.error(
+          `Force-cancel return submit unexpected error trade=${tradeId}: ${err?.message}`,
+        );
+      }
+    }
+
+    // Cancel the stuck counterpart shipment in Sürat (best-effort).
+    if (
+      txResult.stuckShipment.carrier === 'surat' &&
+      txResult.stuckShipment.trackingNumber &&
+      this.suratCargoService &&
+      this.suratCargoService.isIntegrationEnabled()
+    ) {
+      try {
+        await this.suratCargoService.cancelShipmentByOrderNumber(
+          txResult.stuckShipment.trackingNumber,
+        );
+        await this.prisma.tradeShipment.update({
+          where: { id: txResult.stuckShipment.id },
+          data: { status: 'cancelled' as any },
+        });
+      } catch (err: any) {
+        this.logger.error(
+          `Force-cancel stuck-shipment Sürat cancel failed trade=${tradeId}: ${err?.message}`,
+        );
+      }
+    }
+
+    if (txResult.shouldRefund) {
+      try {
+        await this.paymentService.refundTradeCashPaymentIfCompleted(tradeId);
+        await this.prisma.trade.update({
+          where: { id: tradeId },
+          data: { refundFailureReason: null, refundFailureAt: null },
+        });
+      } catch (err: any) {
+        const message =
+          err?.message ?? 'Bilinmeyen hata (PayTR iade başarısız)';
+        this.logger.error(
+          `forceCancelStuckWarehouseTrade refund failed for ${tradeId}: ${message}`,
+        );
+        try {
+          await this.prisma.trade.update({
+            where: { id: tradeId },
+            data: {
+              refundFailureReason: message.slice(0, 500),
+              refundFailureAt: new Date(),
+            },
+          });
+        } catch (persistErr: any) {
+          this.logger.error(
+            `Failed to persist refund failure (force-cancel) trade=${tradeId}: ${persistErr?.message}`,
+          );
+        }
+      }
+    }
+
+    return {
+      success: true,
+      tradeId,
+      status: txResult.returnShipmentDraft
+        ? TradeStatus.returning
+        : TradeStatus.cancelled,
+      arrivedOwnerId: txResult.arrivedOwnerId,
+      returnShipmentId: txResult.returnShipmentDraft?.id ?? null,
+    };
+  }
+
+  /**
+   * Admin declares a return shipment as lost in transit. Mirrors the
+   * markReturnDelivered finalization (stock release + trade cancel) but
+   * additionally flags `compensationPendingUserId` on the trade so ops can
+   * settle the affected user manually.
+   */
+  async markReturnShipmentLost(
+    adminId: string,
+    tradeId: string,
+    dto: { shipmentId: string; reason: string; compensateUserId?: string },
+  ) {
+    const reason = dto?.reason?.trim();
+    if (!reason || reason.length < 10) {
+      throw new BadRequestException(
+        'Kayıp gerekçesi en az 10 karakter olmalıdır',
+      );
+    }
+
+    return this.prisma.$transaction(async (tx) => {
+      await tx.$queryRaw`SELECT id FROM trades WHERE id = ${tradeId} FOR UPDATE`;
+
+      const trade = await tx.trade.findUnique({
+        where: { id: tradeId },
+        select: {
+          id: true,
+          status: true,
+          initiatorId: true,
+          receiverId: true,
+          compensationPendingUserId: true,
+        },
+      });
+      if (!trade) {
+        throw new NotFoundException('Takas bulunamadı');
+      }
+
+      const shipment = await tx.tradeShipment.findUnique({
+        where: { id: dto.shipmentId },
+      });
+      if (!shipment || shipment.tradeId !== tradeId) {
+        throw new NotFoundException('Gönderim bulunamadı');
+      }
+      if (shipment.leg !== 'return') {
+        throw new BadRequestException(
+          'Sadece iade gönderileri kayıp olarak işaretlenebilir',
+        );
+      }
+      if (shipment.deliveredAt) {
+        throw new BadRequestException(
+          'Bu gönderim zaten teslim edildi; kayıp işaretlenemez',
+        );
+      }
+      if (shipment.lostAt) {
+        throw new BadRequestException('Bu gönderim zaten kayıp işaretli');
+      }
+
+      const compensationUserId =
+        dto.compensateUserId ?? shipment.recipientUserId ?? null;
+      if (
+        compensationUserId &&
+        compensationUserId !== trade.initiatorId &&
+        compensationUserId !== trade.receiverId
+      ) {
+        throw new BadRequestException(
+          'Tazminat kullanıcısı bu takasın taraflarından biri olmalı',
+        );
+      }
+
+      const now = new Date();
+      const updatedShipment = await tx.tradeShipment.update({
+        where: { id: dto.shipmentId },
+        data: {
+          status: ShipmentStatus.failed,
+          lostAt: now,
+          lostReason: reason,
+        },
+      });
+
+      // If every return shipment has been resolved (delivered or lost),
+      // finalize the trade the same way markReturnDelivered would: release
+      // reservations, reactivate products, and cancel the trade.
+      const returnShipments = await tx.tradeShipment.findMany({
+        where: { tradeId, leg: 'return' },
+        select: { id: true, deliveredAt: true, lostAt: true },
+      });
+      const allResolved =
+        returnShipments.length >= 2 &&
+        returnShipments.every((s) => s.deliveredAt !== null || s.lostAt !== null);
+
+      let finalStatus: TradeStatus = trade.status;
+      if (allResolved && trade.status !== TradeStatus.cancelled) {
+        const items = await tx.tradeItem.findMany({
+          where: { tradeId },
+          select: { productId: true, quantity: true },
+        });
+        const byProduct = new Map<string, number>();
+        for (const item of items) {
+          byProduct.set(
+            item.productId,
+            (byProduct.get(item.productId) ?? 0) + item.quantity,
+          );
+        }
+        for (const [productId, qty] of byProduct) {
+          await tx.$queryRaw`SELECT id FROM products WHERE id = ${productId} FOR UPDATE`;
+          const prod = await tx.product.findUnique({
+            where: { id: productId },
+            select: { reservedQuantity: true },
+          });
+          if (prod) {
+            const newReserved = safeDecrementReserved(prod.reservedQuantity, qty);
+            await tx.product.update({
+              where: { id: productId },
+              data: {
+                reservedQuantity: newReserved,
+                status:
+                  newReserved > 0 ? ProductStatus.reserved : ProductStatus.active,
+              },
+            });
+          }
+        }
+
+        await tx.trade.update({
+          where: { id: tradeId },
+          data: {
+            status: TradeStatus.cancelled,
+            cancelledAt: now,
+            updatedAt: now,
+            ...(compensationUserId
+              ? {
+                  compensationPendingUserId: compensationUserId,
+                  compensationResolvedAt: null,
+                }
+              : {}),
+          },
+        });
+        finalStatus = TradeStatus.cancelled;
+      } else if (compensationUserId) {
+        await tx.trade.update({
+          where: { id: tradeId },
+          data: {
+            compensationPendingUserId: compensationUserId,
+            compensationResolvedAt: null,
+            updatedAt: now,
+          },
+        });
+      }
+
+      await this.createAuditLog(
+        adminId,
+        'trade_return_shipment_lost',
+        'TradeShipment',
+        dto.shipmentId,
+        shipment,
+        {
+          ...updatedShipment,
+          allResolved,
+          tradeStatus: finalStatus,
+          compensationUserId,
+          reason,
+        },
+      );
+
+      return {
+        success: true,
+        tradeId,
+        shipmentId: dto.shipmentId,
+        status: finalStatus,
+        compensationUserId,
+      };
+    });
+  }
+
+  /**
    * Admin manually retries a PayTR refund that failed during
    * `rejectWarehouseTrade` (or a previous retry). On success the failure
    * markers on the trade are cleared; on repeated failure the marker is

@@ -1703,6 +1703,10 @@ export class TradeService {
         TradeStatus.both_shipped,
         TradeStatus.initiator_received,
         TradeStatus.receiver_received,
+        // Safe-trade: once admin has shipped from warehouse, the only recourse
+        // is a dispute (item lost/damaged in transit, counterpart never
+        // received, etc.).
+        TradeStatus.shipping_to_recipients,
       ];
 
       if (!canDisputeStatuses.includes(trade.status)) {
@@ -1741,11 +1745,25 @@ export class TradeService {
     adminId: string,
     dto: ResolveTradeDisputeDto,
   ): Promise<TradeResponseDto> {
+    // Resolution → terminal status mapping. compensate_* resolutions cancel
+    // the trade (so refund + stock release happen) and additionally flag the
+    // user owed manual compensation. The admin settles the compensation out
+    // of band; the flag tells ops it's still pending.
     let newStatus: TradeStatus;
+    let compensationUserIdResolver:
+      | ((trade: { initiatorId: string; receiverId: string }) => string)
+      | null = null;
+
     if (dto.resolution === 'complete_trade') {
       newStatus = TradeStatus.completed;
     } else if (dto.resolution === 'cancel_trade') {
       newStatus = TradeStatus.cancelled;
+    } else if (dto.resolution === 'compensate_initiator') {
+      newStatus = TradeStatus.cancelled;
+      compensationUserIdResolver = (t) => t.initiatorId;
+    } else if (dto.resolution === 'compensate_receiver') {
+      newStatus = TradeStatus.cancelled;
+      compensationUserIdResolver = (t) => t.receiverId;
     } else {
       newStatus = TradeStatus.completed;
     }
@@ -1784,6 +1802,10 @@ export class TradeService {
         },
       });
 
+      const compensationUserId = compensationUserIdResolver
+        ? compensationUserIdResolver(trade)
+        : null;
+
       await tx.trade.update({
         where: { id: tradeId, version: trade.version },
         data: {
@@ -1794,6 +1816,12 @@ export class TradeService {
             newStatus === TradeStatus.cancelled
               ? `İtiraz çözümü: ${dto.resolution}`
               : null,
+          ...(compensationUserId
+            ? {
+                compensationPendingUserId: compensationUserId,
+                compensationResolvedAt: null,
+              }
+            : {}),
           version: { increment: 1 },
         },
       });
@@ -2396,23 +2424,40 @@ export class TradeService {
   }
 
   private computeCanCancel(trade: any, viewerUserId?: string | null): boolean {
-    if (!viewerUserId) return false;
-    const isParticipant =
-      trade.initiatorId === viewerUserId || trade.receiverId === viewerUserId;
-    if (!isParticipant) return false;
-    const eligible: TradeStatus[] = [
-      TradeStatus.pending,
-      TradeStatus.accepted,
-      TradeStatus.awaiting_payment,
-      TradeStatus.shipping_to_warehouse,
-    ];
-    if (!eligible.includes(trade.status)) return false;
-    if (
-      trade.status === TradeStatus.shipping_to_warehouse &&
-      trade.firstWarehouseArrivalAt
-    ) {
-      return false;
-    }
-    return true;
+    return computeTradeCanCancel(trade, viewerUserId);
   }
+}
+
+/**
+ * Pure cancel-eligibility check shared by the service and unit tests.
+ * Returns true when the viewer is a participant AND the trade is in a state
+ * where user-initiated cancel is still allowed (no warehouse arrival yet).
+ */
+export function computeTradeCanCancel(
+  trade: {
+    status: TradeStatus | string;
+    initiatorId: string;
+    receiverId: string;
+    firstWarehouseArrivalAt?: Date | string | null;
+  },
+  viewerUserId?: string | null,
+): boolean {
+  if (!viewerUserId) return false;
+  const isParticipant =
+    trade.initiatorId === viewerUserId || trade.receiverId === viewerUserId;
+  if (!isParticipant) return false;
+  const eligible: string[] = [
+    TradeStatus.pending,
+    TradeStatus.accepted,
+    TradeStatus.awaiting_payment,
+    TradeStatus.shipping_to_warehouse,
+  ];
+  if (!eligible.includes(trade.status as string)) return false;
+  if (
+    trade.status === TradeStatus.shipping_to_warehouse &&
+    trade.firstWarehouseArrivalAt
+  ) {
+    return false;
+  }
+  return true;
 }

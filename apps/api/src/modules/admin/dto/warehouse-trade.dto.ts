@@ -33,6 +33,50 @@ export class MarkShipmentDto {
   shipmentId: string;
 }
 
+export class MarkReturnLostDto {
+  @ApiProperty({
+    example: '550e8400-e29b-41d4-a716-446655440000',
+    description: 'ID of the return TradeShipment declared lost',
+  })
+  @IsString()
+  shipmentId: string;
+
+  @ApiProperty({
+    example: 'Kargo şubeden çıktıktan sonra teslim edilemedi, sürat takibinde kayıp',
+    description: 'Reason for declaring the return shipment lost (≥10 chars)',
+  })
+  @IsString()
+  @MaxLength(500)
+  reason: string;
+
+  @ApiPropertyOptional({
+    example: '550e8400-e29b-41d4-a716-446655440000',
+    description:
+      'Override the user owed compensation (defaults to the lost shipment recipient)',
+  })
+  @IsOptional()
+  @IsString()
+  compensateUserId?: string;
+}
+
+export class ForceCancelStuckDto {
+  @ApiProperty({
+    example: 'Karşı tarafın kargosu 14 gündür sürat şubesinde sıkıştı, gelen ürünü sahibine geri yolluyoruz',
+    description: 'Reason for force-cancelling a stuck warehouse-bound trade',
+  })
+  @IsString()
+  @MaxLength(500)
+  reason: string;
+
+  @ApiPropertyOptional({
+    example: true,
+    description:
+      'When true, opens a return shipment for the arrived item so it goes back to its owner',
+  })
+  @IsOptional()
+  sendArrivedItemBack?: boolean;
+}
+
 export class TradeShipmentQueryDto {
   @ApiPropertyOptional({ enum: ShipmentStatus, example: 'in_transit' })
   @IsOptional()
