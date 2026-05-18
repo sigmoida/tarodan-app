@@ -1422,5 +1422,14 @@
   },
   "mobile": {
     "tabBarSell": "İlan ver"
+  },
+  "refund": {
+    "cancel": {
+      "cta": "Talebi İptal Et",
+      "confirmTitle": "İade Talebini İptal Et",
+      "confirmBody": "İade talebiniz iptal edilecek. Devam edilsin mi?",
+      "successMessage": "İade talebi iptal edildi.",
+      "errorMessage": "İptal başarısız."
+    }
   }
 }

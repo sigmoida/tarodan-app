@@ -1424,5 +1424,14 @@
   },
   "mobile": {
     "tabBarSell": "List item"
+  },
+  "refund": {
+    "cancel": {
+      "cta": "Cancel Request",
+      "confirmTitle": "Cancel Refund Request",
+      "confirmBody": "Your refund request will be cancelled. Continue?",
+      "successMessage": "Refund request cancelled.",
+      "errorMessage": "Cancel failed."
+    }
   }
 }

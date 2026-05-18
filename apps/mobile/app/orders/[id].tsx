@@ -1,4 +1,4 @@
-import { View, ScrollView, StyleSheet, Pressable, Image, Linking } from 'react-native';
+import { View, ScrollView, StyleSheet, Pressable, Image, Linking, Alert } from 'react-native';
 import {
   Button,
   Card,
@@ -181,6 +181,52 @@ export default function OrderDetailScreen() {
       });
     },
   });
+
+  // Refund cancel mutation (only valid in pending_review / wait_for_delivery)
+  const cancelRefundMutation = useMutation({
+    mutationFn: async (refundId: string) => {
+      return refundsApi.cancel(refundId);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['order', id] });
+      queryClient.invalidateQueries({ queryKey: ['orders'] });
+      setSnackbar({ visible: true, message: 'İade talebi iptal edildi.', variant: 'success' });
+    },
+    onError: (err: any) => {
+      captureException(err, {
+        level: 'error',
+        tags: { flow: 'refund.cancel' },
+        extra: { orderId: String(id ?? '') },
+      });
+      const msg =
+        err?.response?.data?.message ||
+        (Array.isArray(err?.response?.data?.message)
+          ? err.response.data.message.join(', ')
+          : 'İptal başarısız.');
+      setSnackbar({
+        visible: true,
+        message: typeof msg === 'string' ? msg : 'İptal başarısız.',
+        variant: 'danger',
+      });
+    },
+  });
+
+  const handleCancelRefund = () => {
+    const rr = order?.activeRefundRequest;
+    if (!rr) return;
+    Alert.alert(
+      'İade Talebini İptal Et',
+      'İade talebiniz iptal edilecek. Devam edilsin mi?',
+      [
+        { text: 'Vazgeç', style: 'cancel' },
+        {
+          text: 'İptal Et',
+          style: 'destructive',
+          onPress: () => cancelRefundMutation.mutate(rr.id),
+        },
+      ],
+    );
+  };
 
   // Confirm delivery mutation
   const confirmDeliveryMutation = useMutation({
@@ -468,6 +514,20 @@ export default function OrderDetailScreen() {
                 ) : null}
               </View>
             ) : null}
+            {['pending_review', 'wait_for_delivery'].includes(
+              order.activeRefundRequest.status,
+            ) && (
+              <Button
+                testID="refund-cancel-button"
+                variant="outline"
+                icon="close-circle-outline"
+                title="Talebi İptal Et"
+                onPress={handleCancelRefund}
+                isLoading={cancelRefundMutation.isPending}
+                disabled={cancelRefundMutation.isPending}
+                style={{ marginTop: 12, borderColor: colors.danger[600]! }}
+              />
+            )}
           </Card>
         )}
 
