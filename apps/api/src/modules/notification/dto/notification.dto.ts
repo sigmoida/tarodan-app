@@ -41,6 +41,14 @@ export enum NotificationType {
   TRADE_COMPLETED = 'trade_completed',
   TRADE_AUTO_CANCELLED = 'trade_auto_cancelled',
 
+  // RefundRequest notifications (sipariş iadesi akışı)
+  REFUND_CANCELLED = 'refund_cancelled',
+  REFUND_APPROVED = 'refund_approved',
+  REFUND_REJECTED = 'refund_rejected',
+  REFUND_DISPUTED = 'refund_disputed',
+  REFUND_RETURN_OPENED = 'refund_return_opened',
+  REFUND_COMPLETED = 'refund_completed',
+
   // Cross-flow auto-rejection
   OFFER_AUTO_REJECTED = 'offer_auto_rejected',
   RESERVATION_EXPIRED = 'reservation_expired',

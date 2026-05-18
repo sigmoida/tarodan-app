@@ -28,6 +28,8 @@ import {
 } from '../surat-cargo/surat-cargo.types';
 import { CreateRefundRequestDto } from './dto/create-refund-request.dto';
 import { RejectRefundRequestDto } from './dto/reject-refund-request.dto';
+import { NotificationService } from '../notification/notification.service';
+import { NotificationType } from '../notification/dto/notification.dto';
 
 const COOLING_OFF_DAYS = 14;
 const SELLER_RESPONSE_DEADLINE_HOURS = 48;
@@ -47,7 +49,45 @@ export class RefundService {
     private readonly prisma: PrismaService,
     @Inject(forwardRef(() => PaymentService)) private readonly paymentService: PaymentService,
     private readonly suratCargoService: SuratCargoService,
+    private readonly notificationService: NotificationService,
   ) {}
+
+  /**
+   * Append a transition entry to RefundRequest.metadata.history. Used as a
+   * lightweight audit trail for buyer/seller actions (AuditLog requires an
+   * AdminUser FK and isn't applicable here).
+   */
+  private async appendHistory(
+    refundRequestId: string,
+    entry: { action: string; by: string; details?: Record<string, any> },
+  ): Promise<void> {
+    const current = await this.prisma.refundRequest.findUnique({
+      where: { id: refundRequestId },
+      select: { metadata: true },
+    });
+    const meta = (current?.metadata as Record<string, any>) || {};
+    const history = Array.isArray(meta.history) ? meta.history : [];
+    history.push({ ...entry, at: new Date().toISOString() });
+    await this.prisma.refundRequest.update({
+      where: { id: refundRequestId },
+      data: { metadata: { ...meta, history } },
+    });
+  }
+
+  /** Best-effort notification dispatch — failures are logged, never thrown. */
+  private async safeNotify(
+    userId: string,
+    type: NotificationType,
+    data?: Record<string, any>,
+  ): Promise<void> {
+    try {
+      await this.notificationService.createInAppNotification(userId, type, data);
+    } catch (err: any) {
+      this.logger.error(
+        `Notification ${type} → ${userId} failed: ${err?.message}`,
+      );
+    }
+  }
 
   async createRefundRequest(orderId: string, requesterId: string, dto: CreateRefundRequestDto) {
     const order = await this.prisma.order.findUnique({
@@ -124,7 +164,10 @@ export class RefundService {
   }
 
   async cancelRefundRequest(refundRequestId: string, requesterId: string) {
-    const rr = await this.prisma.refundRequest.findUnique({ where: { id: refundRequestId } });
+    const rr = await this.prisma.refundRequest.findUnique({
+      where: { id: refundRequestId },
+      include: { order: { select: { id: true, sellerId: true } } },
+    });
     if (!rr) throw new NotFoundException('İade talebi bulunamadı');
     if (rr.requesterId !== requesterId) {
       throw new ForbiddenException('Bu talebi iptal edemezsiniz');
@@ -137,10 +180,24 @@ export class RefundService {
         'Bu talep artık iptal edilemez (iade kargosu açılmış veya karara bağlanmış)',
       );
     }
-    return this.prisma.refundRequest.update({
+    const updated = await this.prisma.refundRequest.update({
       where: { id: refundRequestId },
-      data: { status: RefundRequestStatus.cancelled, decidedAt: new Date() },
+      data: {
+        status: RefundRequestStatus.cancelled,
+        decidedAt: new Date(),
+        decidedBy: requesterId,
+      },
     });
+    await this.appendHistory(refundRequestId, {
+      action: 'cancelled_by_buyer',
+      by: requesterId,
+      details: { previousStatus: rr.status },
+    });
+    await this.safeNotify(rr.order.sellerId, NotificationType.REFUND_CANCELLED, {
+      refundNumber: rr.refundNumber,
+      orderId: rr.order.id,
+    });
+    return updated;
   }
 
   async sellerAccept(refundRequestId: string, sellerId: string) {
@@ -157,11 +214,19 @@ export class RefundService {
     }
 
     if (rr.order.status === OrderStatus.delivered) {
+      // openReturnShipment notification'ı kendisi gönderir; ayrıca buyer'a
+      // genel "onaylandı" mesajını burada vermek istemiyoruz çünkü return
+      // opened mesajı zaten daha bilgilendirici.
       await this.openReturnShipment(rr.id);
+      await this.appendHistory(rr.id, {
+        action: 'accepted_by_seller',
+        by: sellerId,
+        details: { autoOpenedReturn: true },
+      });
       return this.prisma.refundRequest.findUnique({ where: { id: rr.id } });
     }
 
-    return this.prisma.refundRequest.update({
+    const updated = await this.prisma.refundRequest.update({
       where: { id: rr.id },
       data: {
         status: RefundRequestStatus.wait_for_delivery,
@@ -169,6 +234,16 @@ export class RefundService {
         decidedAt: new Date(),
       },
     });
+    await this.appendHistory(rr.id, {
+      action: 'accepted_by_seller',
+      by: sellerId,
+      details: { newStatus: 'wait_for_delivery' },
+    });
+    await this.safeNotify(rr.requesterId, NotificationType.REFUND_APPROVED, {
+      refundNumber: rr.refundNumber,
+      orderId: rr.orderId,
+    });
+    return updated;
   }
 
   async sellerReject(refundRequestId: string, sellerId: string, dto: RejectRefundRequestDto) {
@@ -184,7 +259,7 @@ export class RefundService {
       throw new BadRequestException('Bu talep zaten karara bağlanmış');
     }
 
-    return this.prisma.refundRequest.update({
+    const updated = await this.prisma.refundRequest.update({
       where: { id: rr.id },
       data: {
         status: RefundRequestStatus.disputed,
@@ -193,6 +268,37 @@ export class RefundService {
         decidedAt: new Date(),
       },
     });
+    await this.appendHistory(rr.id, {
+      action: 'rejected_by_seller',
+      by: sellerId,
+      details: { response: dto.response },
+    });
+    // Buyer'a reddedildi haberi
+    await this.safeNotify(rr.requesterId, NotificationType.REFUND_REJECTED, {
+      refundNumber: rr.refundNumber,
+      orderId: rr.orderId,
+      reason: dto.response,
+    });
+    // Admin role'üne dispute incelemesi sinyali — basit fan-out: aktif admin
+    // kullanıcılarını tarayıp tek tek bildir. Admin sayısı düşük olduğu için
+    // toplu sorgu yeterli.
+    try {
+      const admins = await this.prisma.adminUser.findMany({
+        where: { isActive: true },
+        select: { userId: true },
+      });
+      for (const a of admins) {
+        await this.safeNotify(a.userId, NotificationType.REFUND_DISPUTED, {
+          refundNumber: rr.refundNumber,
+          refundRequestId: rr.id,
+        });
+      }
+    } catch (err: any) {
+      this.logger.error(
+        `REFUND_DISPUTED admin fan-out failed for ${rr.id}: ${err?.message}`,
+      );
+    }
+    return updated;
   }
 
   async getById(refundRequestId: string, userId: string, isAdmin = false) {
@@ -284,7 +390,7 @@ export class RefundService {
 
     if (!this.suratCargoService.isIntegrationEnabled()) {
       this.logger.warn(`Surat integration disabled, marking ${rr.refundNumber} as return_shipment_open without provider call`);
-      return this.prisma.refundRequest.update({
+      const updated = await this.prisma.refundRequest.update({
         where: { id: rr.id },
         data: {
           status: RefundRequestStatus.return_shipment_open,
@@ -293,6 +399,17 @@ export class RefundService {
           returnCreatedAt: new Date(),
         },
       });
+      await this.appendHistory(rr.id, {
+        action: 'return_opened',
+        by: 'system',
+        details: { provider: 'manual', trackingNumber: rr.refundNumber },
+      });
+      await this.safeNotify(rr.requesterId, NotificationType.REFUND_RETURN_OPENED, {
+        refundNumber: rr.refundNumber,
+        orderId: rr.orderId,
+        trackingNumber: rr.refundNumber,
+      });
+      return updated;
     }
 
     const result = await this.suratCargoService.submitShipmentWithRetry({
@@ -326,7 +443,7 @@ export class RefundService {
       throw new BadRequestException(`Sürat iade kargosu açılamadı: ${errMsg}`);
     }
 
-    return this.prisma.refundRequest.update({
+    const updated = await this.prisma.refundRequest.update({
       where: { id: rr.id },
       data: {
         status: RefundRequestStatus.return_shipment_open,
@@ -336,6 +453,17 @@ export class RefundService {
         returnCreatedAt: new Date(),
       },
     });
+    await this.appendHistory(rr.id, {
+      action: 'return_opened',
+      by: 'system',
+      details: { provider: 'surat', trackingNumber: rr.refundNumber },
+    });
+    await this.safeNotify(rr.requesterId, NotificationType.REFUND_RETURN_OPENED, {
+      refundNumber: rr.refundNumber,
+      orderId: rr.orderId,
+      trackingNumber: rr.refundNumber,
+    });
+    return updated;
   }
 
   async finalizeRefundForReturnedShipment(refundRequestId: string) {
@@ -351,7 +479,7 @@ export class RefundService {
       Number(rr.amount),
     );
 
-    return this.prisma.refundRequest.update({
+    const updated = await this.prisma.refundRequest.update({
       where: { id: rr.id },
       data: {
         status: RefundRequestStatus.refunded,
@@ -360,6 +488,16 @@ export class RefundService {
         returnDeliveredAt: rr.returnDeliveredAt ?? new Date(),
       },
     });
+    await this.appendHistory(rr.id, {
+      action: 'refund_completed',
+      by: 'system',
+      details: { providerRefundId: refundResult.providerRefundId },
+    });
+    await this.safeNotify(rr.requesterId, NotificationType.REFUND_COMPLETED, {
+      refundNumber: rr.refundNumber,
+      orderId: rr.orderId,
+    });
+    return updated;
   }
 
   async findPendingDeliveryToOpenReturn(): Promise<string[]> {

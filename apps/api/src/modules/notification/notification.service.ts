@@ -363,6 +363,42 @@ const NOTIFICATION_TEMPLATES: Record<NotificationType, { title: string; message:
     icon: '⏰',
     link: '/orders',
   },
+  [NotificationType.REFUND_CANCELLED]: {
+    title: 'İade Talebi İptal Edildi',
+    message: 'Alıcı {{refundNumber}} numaralı iade talebini iptal etti.',
+    icon: '↩️',
+    link: '/orders/{{orderId}}',
+  },
+  [NotificationType.REFUND_APPROVED]: {
+    title: 'İade Talebiniz Onaylandı',
+    message: '{{refundNumber}} numaralı iade talebiniz onaylandı.',
+    icon: '✅',
+    link: '/orders/{{orderId}}',
+  },
+  [NotificationType.REFUND_REJECTED]: {
+    title: 'İade Talebiniz Reddedildi',
+    message: '{{refundNumber}} numaralı iade talebiniz reddedildi: {{reason}}',
+    icon: '❌',
+    link: '/orders/{{orderId}}',
+  },
+  [NotificationType.REFUND_DISPUTED]: {
+    title: 'İade İtirazı İnceleniyor',
+    message: '{{refundNumber}} numaralı iade talebine itiraz edildi; admin incelemesi bekleniyor.',
+    icon: '⚖️',
+    link: '/refund-requests/{{refundRequestId}}',
+  },
+  [NotificationType.REFUND_RETURN_OPENED]: {
+    title: 'İade Kargosu Hazır',
+    message: '{{trackingNumber}} numarasıyla ürünü en yakın Sürat şubesine teslim edebilirsiniz.',
+    icon: '📦',
+    link: '/orders/{{orderId}}',
+  },
+  [NotificationType.REFUND_COMPLETED]: {
+    title: 'İadeniz Tamamlandı',
+    message: '{{refundNumber}} numaralı iadeniz hesabınıza yansıtıldı.',
+    icon: '💰',
+    link: '/orders/{{orderId}}',
+  },
 };
 
 @Injectable()

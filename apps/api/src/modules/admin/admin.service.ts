@@ -68,6 +68,9 @@ import { CacheService } from '../cache/cache.service';
 import { DiscountService } from '../discount/discount.service';
 import { EventService } from '../events/event.service';
 import { RatingService } from '../rating/rating.service';
+import { RefundService } from '../refund/refund.service';
+import { NotificationService } from '../notification/notification.service';
+import { NotificationType } from '../notification/dto/notification.dto';
 import { SuratCargoService } from '../surat-cargo/surat-cargo.service';
 import {
   SuratKargoTuru,
@@ -91,6 +94,8 @@ export class AdminService {
     private readonly discountService: DiscountService,
     private readonly eventService: EventService,
     private readonly ratingService: RatingService,
+    private readonly refundService: RefundService,
+    private readonly notificationService: NotificationService,
     @Optional()
     private readonly storageService: StorageService,
     @Optional()
@@ -5725,6 +5730,237 @@ export class AdminService {
    * Admin closes a pending compensation flag after settling the user out of
    * band. Sets `compensationResolvedAt` so the banner disappears in the UI.
    */
+  // ==================== REFUND REQUEST ADMIN ====================
+
+  /**
+   * List refund requests for admin operations queue.
+   */
+  async listRefundRequests(query: {
+    status?: import('@prisma/client').RefundRequestStatus[];
+    userSearch?: string;
+    from?: string;
+    to?: string;
+    page?: number;
+    limit?: number;
+  }) {
+    const page = query.page ?? 1;
+    const limit = Math.min(query.limit ?? 20, 100);
+    const where: Prisma.RefundRequestWhereInput = {};
+    if (query.status && query.status.length > 0) {
+      where.status = { in: query.status };
+    }
+    if (query.from || query.to) {
+      where.createdAt = {};
+      if (query.from) where.createdAt.gte = new Date(query.from);
+      if (query.to) where.createdAt.lte = new Date(query.to);
+    }
+    if (query.userSearch && query.userSearch.trim().length > 0) {
+      const term = query.userSearch.trim();
+      where.OR = [
+        { requester: { displayName: { contains: term, mode: 'insensitive' } } },
+        { requester: { email: { contains: term, mode: 'insensitive' } } },
+        { order: { seller: { displayName: { contains: term, mode: 'insensitive' } } } },
+        { order: { seller: { email: { contains: term, mode: 'insensitive' } } } },
+        { refundNumber: { contains: term, mode: 'insensitive' } },
+      ];
+    }
+
+    const [items, total] = await Promise.all([
+      this.prisma.refundRequest.findMany({
+        where,
+        orderBy: { createdAt: 'desc' },
+        skip: (page - 1) * limit,
+        take: limit,
+        include: {
+          requester: { select: { id: true, displayName: true, email: true } },
+          order: {
+            select: {
+              id: true,
+              orderNumber: true,
+              totalAmount: true,
+              seller: { select: { id: true, displayName: true, email: true } },
+              product: { select: { id: true, title: true } },
+            },
+          },
+        },
+      }),
+      this.prisma.refundRequest.count({ where }),
+    ]);
+    return { items, total, page, limit };
+  }
+
+  async getRefundRequestDetail(refundRequestId: string) {
+    const rr = await this.prisma.refundRequest.findUnique({
+      where: { id: refundRequestId },
+      include: {
+        requester: {
+          select: { id: true, displayName: true, email: true, phone: true },
+        },
+        order: {
+          include: {
+            seller: {
+              select: { id: true, displayName: true, email: true, phone: true },
+            },
+            product: { include: { images: { orderBy: { sortOrder: 'asc' } } } },
+            payment: true,
+            shipment: true,
+          },
+        },
+      },
+    });
+    if (!rr) throw new NotFoundException('İade talebi bulunamadı');
+    return rr;
+  }
+
+  /**
+   * Admin resolves a disputed refund: either approves (opens return shipment)
+   * or rejects (closes the request without refund).
+   */
+  async resolveRefundDispute(
+    adminId: string,
+    refundRequestId: string,
+    dto: { resolution: 'approve' | 'reject'; notes: string },
+  ) {
+    const notes = dto?.notes?.trim();
+    if (!notes || notes.length < 10) {
+      throw new BadRequestException('Çözüm notu en az 10 karakter olmalıdır');
+    }
+
+    const rr = await this.prisma.refundRequest.findUnique({
+      where: { id: refundRequestId },
+      include: { order: true },
+    });
+    if (!rr) throw new NotFoundException('İade talebi bulunamadı');
+    if (rr.status !== 'disputed') {
+      throw new BadRequestException(
+        `Talep durumu '${rr.status}' itiraz çözümü için uygun değil. Beklenen: disputed`,
+      );
+    }
+
+    const previousMetadata = (rr.metadata as Record<string, any>) || {};
+    const history = Array.isArray(previousMetadata.history)
+      ? previousMetadata.history
+      : [];
+
+    if (dto.resolution === 'approve') {
+      // Approve → open return shipment (state geçişi RefundService içinde)
+      await this.refundService.openReturnShipment(rr.id);
+      await this.prisma.refundRequest.update({
+        where: { id: rr.id },
+        data: {
+          decidedBy: adminId,
+          decidedAt: new Date(),
+          metadata: {
+            ...previousMetadata,
+            history: [
+              ...history,
+              {
+                action: 'dispute_resolved_approve',
+                by: adminId,
+                at: new Date().toISOString(),
+                details: { notes },
+              },
+            ],
+          },
+        },
+      });
+      await this.createAuditLog(
+        adminId,
+        'refund_dispute_resolve_approve',
+        'RefundRequest',
+        rr.id,
+        { status: rr.status },
+        { resolution: 'approve', notes },
+      );
+      return { success: true, refundRequestId: rr.id, resolution: 'approve' };
+    }
+
+    // Reject: status → rejected, audit + buyer notification
+    const updated = await this.prisma.refundRequest.update({
+      where: { id: rr.id },
+      data: {
+        status: 'rejected',
+        decidedBy: adminId,
+        decidedAt: new Date(),
+        sellerResponse: rr.sellerResponse ?? notes,
+        metadata: {
+          ...previousMetadata,
+          history: [
+            ...history,
+            {
+              action: 'dispute_resolved_reject',
+              by: adminId,
+              at: new Date().toISOString(),
+              details: { notes },
+            },
+          ],
+        },
+      },
+    });
+    await this.createAuditLog(
+      adminId,
+      'refund_dispute_resolve_reject',
+      'RefundRequest',
+      rr.id,
+      { status: rr.status },
+      { resolution: 'reject', notes },
+    );
+    try {
+      await this.notificationService.createInAppNotification(
+        rr.requesterId,
+        NotificationType.REFUND_REJECTED,
+        {
+          refundNumber: rr.refundNumber,
+          orderId: rr.orderId,
+          reason: notes,
+        },
+      );
+    } catch (err: any) {
+      this.logger.error(
+        `REFUND_REJECTED notification failed for ${rr.id}: ${err?.message}`,
+      );
+    }
+    return {
+      success: true,
+      refundRequestId: rr.id,
+      resolution: 'reject',
+      status: updated.status,
+    };
+  }
+
+  /**
+   * Force-finalize a refund stuck in `return_delivered`: call the existing
+   * finalize logic + audit log. Idempotent (finalizeRefundForReturnedShipment
+   * returns the row unchanged if already refunded).
+   */
+  async forceFinalizeRefund(adminId: string, refundRequestId: string) {
+    const rr = await this.prisma.refundRequest.findUnique({
+      where: { id: refundRequestId },
+      select: { id: true, status: true, refundedAt: true },
+    });
+    if (!rr) throw new NotFoundException('İade talebi bulunamadı');
+    if (rr.refundedAt) {
+      throw new BadRequestException('Bu iade zaten tamamlanmış');
+    }
+    if (rr.status !== 'return_delivered') {
+      throw new BadRequestException(
+        `Talep durumu '${rr.status}' force-finalize için uygun değil. Beklenen: return_delivered`,
+      );
+    }
+    const result = await this.refundService.finalizeRefundForReturnedShipment(
+      rr.id,
+    );
+    await this.createAuditLog(
+      adminId,
+      'refund_force_finalize',
+      'RefundRequest',
+      rr.id,
+      { previousStatus: rr.status },
+      { newStatus: result.status, providerRefundId: result.providerRefundId },
+    );
+    return { success: true, refundRequestId: rr.id, status: result.status };
+  }
+
   async resolveTradeCompensation(adminId: string, tradeId: string, note?: string) {
     const trade = await this.prisma.trade.findUnique({
       where: { id: tradeId },

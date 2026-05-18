@@ -80,6 +80,8 @@ import {
   MarkReturnLostDto,
   ForceCancelStuckDto,
   TradeShipmentQueryDto,
+  ResolveRefundDisputeDto,
+  RefundRequestQueryDto,
 } from './dto';
 
 @ApiTags('admin')
@@ -1157,6 +1159,64 @@ export class AdminController {
     @Body() body: ForceCancelStuckDto,
   ) {
     return this.adminService.forceCancelStuckWarehouseTrade(adminId, id, body);
+  }
+
+  // ==================== REFUND REQUEST ADMIN ====================
+
+  @Get('refund-requests')
+  @Roles(AdminRole.super_admin, AdminRole.admin)
+  @ApiOperation({ summary: 'List refund requests for admin operations queue' })
+  @ApiResponse({ status: HttpStatus.OK, description: 'Paginated refund requests' })
+  async listRefundRequests(@Query() query: RefundRequestQueryDto) {
+    return this.adminService.listRefundRequests({
+      status: query.status,
+      userSearch: query.userSearch,
+      from: query.from,
+      to: query.to,
+      page: query.page,
+      limit: query.limit,
+    });
+  }
+
+  @Get('refund-requests/:id')
+  @Roles(AdminRole.super_admin, AdminRole.admin)
+  @ApiOperation({ summary: 'Get refund request detail with order/buyer/seller/tracking' })
+  @ApiParam({ name: 'id', description: 'RefundRequest ID' })
+  @ApiResponse({ status: HttpStatus.OK, description: 'Refund request detail' })
+  async getRefundRequestDetail(@Param('id') id: string) {
+    return this.adminService.getRefundRequestDetail(id);
+  }
+
+  @Post('refund-requests/:id/resolve-dispute')
+  @Roles(AdminRole.super_admin, AdminRole.admin)
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({
+    summary: 'Resolve a disputed refund: approve (open return) or reject (close)',
+  })
+  @ApiParam({ name: 'id', description: 'RefundRequest ID' })
+  @ApiResponse({ status: HttpStatus.OK, description: 'Dispute resolved' })
+  async resolveRefundDispute(
+    @Param('id') id: string,
+    @CurrentUser('id') adminId: string,
+    @Body() body: ResolveRefundDisputeDto,
+  ) {
+    return this.adminService.resolveRefundDispute(adminId, id, body);
+  }
+
+  @Post('refund-requests/:id/force-finalize')
+  @Roles(AdminRole.super_admin, AdminRole.admin)
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({
+    summary:
+      'Force-finalize a refund stuck in return_delivered (manual finalize + audit)',
+  })
+  @ApiParam({ name: 'id', description: 'RefundRequest ID' })
+  @ApiResponse({ status: HttpStatus.OK, description: 'Refund finalized' })
+  async forceFinalizeRefund(
+    @Param('id') id: string,
+    @CurrentUser('id') adminId: string,
+  ) {
+    return this.adminService.forceFinalizeRefund(adminId, id);
   }
 
   // ==================== MESSAGE MANAGEMENT ====================
