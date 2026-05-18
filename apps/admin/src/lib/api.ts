@@ -157,6 +157,17 @@ export const adminApi = {
     api.post(`/admin/trades/${tradeId}/retry-refund`),
   resolveTradeCompensation: (tradeId: string, note?: string) =>
     api.post(`/admin/trades/${tradeId}/resolve-compensation`, note ? { note } : {}),
+
+  // RefundRequest admin
+  getRefundRequests: (params?: any) =>
+    api.get('/admin/refund-requests', { params }),
+  getRefundRequest: (id: string) => api.get(`/admin/refund-requests/${id}`),
+  resolveRefundDispute: (
+    id: string,
+    body: { resolution: 'approve' | 'reject'; notes: string },
+  ) => api.post(`/admin/refund-requests/${id}/resolve-dispute`, body),
+  forceFinalizeRefund: (id: string) =>
+    api.post(`/admin/refund-requests/${id}/force-finalize`),
   markTradeReturnLost: (
     tradeId: string,
     body: { shipmentId: string; reason: string; compensateUserId?: string },
