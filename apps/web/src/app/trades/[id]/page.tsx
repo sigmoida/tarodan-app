@@ -115,6 +115,8 @@ interface Trade {
   cancelledAt?: string;
   cancelReason?: string;
   version?: number;
+  canCancel?: boolean;
+  firstWarehouseArrivalAt?: string | null;
 }
 
 const tradeStatusEnLabels: Record<string, string> = {
@@ -1047,10 +1049,25 @@ export default function TradeDetailPage() {
     "awaiting_payment",
     "shipping_to_warehouse",
   ]);
+  // Warehouse arrival → user cancel kilidi (1 kargo bile depoya ulaşırsa)
+  const cancelLockedByWarehouse =
+    trade.status === "shipping_to_warehouse" &&
+    !!trade.firstWarehouseArrivalAt;
+  // Backend `canCancel` field'ı (mapToResponseDto.computeTradeCanCancel) varsa
+  // onu kullan; yoksa local fallback.
   const canCancel =
     !!user &&
     (isInitiator || isReceiver) &&
-    cancellableStatuses.has(trade.status);
+    (typeof trade.canCancel === "boolean"
+      ? trade.canCancel
+      : cancellableStatuses.has(trade.status) && !cancelLockedByWarehouse);
+  // Buton görünür ama disabled — kullanıcı "neden iptal edemiyorum" diye
+  // bilmek için. Eligible bir state'teyiz ama warehouse arrival kilitlemiş.
+  const showCancelDisabled =
+    !!user &&
+    (isInitiator || isReceiver) &&
+    cancellableStatuses.has(trade.status) &&
+    !canCancel;
 
   const getItemImage = (item: TradeItem) => {
     const url =
@@ -2354,7 +2371,7 @@ export default function TradeDetailPage() {
         )}
 
         {/* Action Buttons */}
-        {(canAccept || canReject || canCounter || canCancel) && (
+        {(canAccept || canReject || canCounter || canCancel || showCancelDisabled) && (
           <div className="card p-6">
             <div className="flex flex-wrap gap-3">
               {canAccept && (
@@ -2406,6 +2423,28 @@ export default function TradeDetailPage() {
                 >
                   {locale === "en" ? "Cancel Trade" : "İptal Et"}
                 </Button>
+              )}
+              {showCancelDisabled && !canAccept && !canReject && (
+                <div className="flex-1 min-w-[120px] flex flex-col">
+                  <Button
+                    variant="secondary"
+                    size="lg"
+                    className="opacity-70 cursor-not-allowed"
+                    disabled
+                    title={
+                      locale === "en"
+                        ? "An item already reached the warehouse — cancel is no longer available. Open a dispute if needed."
+                        : "Ürünlerden biri Tarodan deposuna ulaştı; iptal edilemez. Sorun varsa itiraz açın."
+                    }
+                  >
+                    {locale === "en" ? "Cancel Locked" : "İptal Edilemez"}
+                  </Button>
+                  <span className="text-xs text-muted mt-1">
+                    {locale === "en"
+                      ? "An item reached the warehouse."
+                      : "Ürünlerden biri depoya ulaştı."}
+                  </span>
+                </div>
               )}
             </div>
           </div>

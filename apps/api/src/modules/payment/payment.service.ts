@@ -1890,25 +1890,42 @@ export class PaymentService {
       let refundResult: any;
 
       if (payment.provider === 'paytr') {
-        const paytrOid =
-          payment.providerConversationId?.trim() ||
-          orderId.replace(/-/g, '');
-        try {
-          refundResult = await this.paytrService.createRefund(paytrOid, amountToRefund);
-        } catch (err) {
-          const msg = (err as Error).message || '';
-          if (/odeme henuz siteye bildirilmemis|henuz siteye bildirilmemi/i.test(msg)) {
+        // PAYMENT_BYPASS: dev/test modunda PayTR callback olmadan ödeme tamamlandığı
+        // için PayTR tarafında oid kaydı yok. Refund'ı da bypass'la — DB'de payment
+        // direkt refunded olarak işaretlenir; provider çağrısı atlanır.
+        const bypassEnabled =
+          this.configService.get('PAYMENT_BYPASS') === 'true';
+        if (bypassEnabled) {
+          this.logger.warn(
+            `PAYMENT_BYPASS: PayTR refund atlandı payment=${payment.id} amount=${amountToRefund}`,
+          );
+          refundResult = {
+            status: 'success',
+            err_msg: null,
+            return_amount: amountToRefund,
+            bypass: true,
+          };
+        } else {
+          const paytrOid =
+            payment.providerConversationId?.trim() ||
+            orderId.replace(/-/g, '');
+          try {
+            refundResult = await this.paytrService.createRefund(paytrOid, amountToRefund);
+          } catch (err) {
+            const msg = (err as Error).message || '';
+            if (/odeme henuz siteye bildirilmemis|henuz siteye bildirilmemi/i.test(msg)) {
+              throw new BadRequestException(
+                'Ödeme yeni tamamlandı, PayTR henüz işlemi tam senkronize etmedi. Lütfen 1-2 dakika sonra tekrar deneyin.',
+              );
+            }
+            throw err;
+          }
+
+          if (refundResult.status !== 'success') {
             throw new BadRequestException(
-              'Ödeme yeni tamamlandı, PayTR henüz işlemi tam senkronize etmedi. Lütfen 1-2 dakika sonra tekrar deneyin.',
+              refundResult.err_msg || 'PayTR iade işlemi başarısız',
             );
           }
-          throw err;
-        }
-
-        if (refundResult.status !== 'success') {
-          throw new BadRequestException(
-            refundResult.err_msg || 'PayTR iade işlemi başarısız',
-          );
         }
       } else {
         throw new BadRequestException(`Bilinmeyen ödeme sağlayıcı: ${payment.provider}`);
@@ -2117,18 +2134,32 @@ export class PaymentService {
       payment.tradeCashPayment?.totalAmount ?? payment.amount,
     );
 
-    try {
-      const refundResult = await this.paytrService.createRefund(oid, amount);
-      if (refundResult.status !== 'success') {
-        throw new BadRequestException(
-          refundResult.err_msg || 'PayTR iade işlemi başarısız',
-        );
-      }
-    } catch (e: any) {
-      this.logger.error(
-        `refundTradeCashPaymentIfCompleted(tradeId=${tradeId}) PayTR error: ${e?.message}`,
+    // PAYMENT_BYPASS: dev/test modunda PayTR'a refund çağrısı yapma.
+    const bypassEnabled = this.configService.get('PAYMENT_BYPASS') === 'true';
+    if (bypassEnabled) {
+      this.logger.warn(
+        `PAYMENT_BYPASS: PayTR trade refund atlandı tradeId=${tradeId} amount=${amount}`,
       );
-      throw e;
+    } else {
+      try {
+        const refundResult = await this.paytrService.createRefund(oid, amount);
+        if (refundResult.status !== 'success') {
+          throw new BadRequestException(
+            refundResult.err_msg || 'PayTR iade işlemi başarısız',
+          );
+        }
+      } catch (e: any) {
+        const msg = (e as Error).message || '';
+        if (/odeme henuz siteye bildirilmemis|henuz siteye bildirilmemi/i.test(msg)) {
+          throw new BadRequestException(
+            'Ödeme yeni tamamlandı, PayTR henüz işlemi tam senkronize etmedi. Lütfen 1-2 dakika sonra tekrar deneyin.',
+          );
+        }
+        this.logger.error(
+          `refundTradeCashPaymentIfCompleted(tradeId=${tradeId}) PayTR error: ${e?.message}`,
+        );
+        throw e;
+      }
     }
 
     const existingMeta = (payment.metadata as Record<string, unknown>) || {};
