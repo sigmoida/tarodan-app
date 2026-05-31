@@ -31,6 +31,10 @@ export class ShippingWorker {
     private readonly suratTrackingService: SuratTrackingService,
   ) {}
 
+  private is48hWindowEnabled(): boolean {
+    return this.configService.get<string>('FEATURE_48H_CONFIRMATION_WINDOW') === 'true';
+  }
+
   @Process('create-shipment')
   async handleCreateShipment(job: Job<ShippingJobData>) {
     this.logger.log(`Processing create shipment job ${job.id} for order ${job.data.orderId}`);
@@ -130,19 +134,35 @@ export class ShippingWorker {
         },
       });
 
-      // If delivered, update order and release payment hold
+      // If delivered, branch on FEATURE_48H_CONFIRMATION_WINDOW
       if (newStatus === ShipmentStatus.delivered) {
-        await this.prisma.order.update({
-          where: { id: shipment.orderId },
-          data: {
-            status: OrderStatus.delivered,
-          },
-        });
-        try {
-          const released = await this.paymentService.releasePaymentIfHeld(shipment.orderId);
-          if (released) this.logger.log(`Payment hold released for order ${shipment.orderId} (track-update)`);
-        } catch (e: any) {
-          this.logger.warn(`Could not release payment for order ${shipment.orderId}: ${e?.message}`);
+        if (this.is48hWindowEnabled()) {
+          // Faz 3A: 48h alıcı kontrol penceresi başlat (hold release ETMEZ)
+          const deliveredAt = new Date();
+          const confirmationDeadline = new Date(deliveredAt.getTime() + 48 * 60 * 60 * 1000);
+          await this.prisma.order.update({
+            where: { id: shipment.orderId },
+            data: {
+              status: OrderStatus.awaiting_buyer_confirmation,
+              deliveredAt,
+              confirmationDeadline,
+            },
+          });
+          this.logger.log(
+            `Order ${shipment.orderId} entered 48h window (track-update); deadline=${confirmationDeadline.toISOString()}`,
+          );
+        } else {
+          // Legacy: delivered + immediate hold release
+          await this.prisma.order.update({
+            where: { id: shipment.orderId },
+            data: { status: OrderStatus.delivered },
+          });
+          try {
+            const released = await this.paymentService.releasePaymentIfHeld(shipment.orderId);
+            if (released) this.logger.log(`Payment hold released for order ${shipment.orderId} (track-update)`);
+          } catch (e: any) {
+            this.logger.warn(`Could not release payment for order ${shipment.orderId}: ${e?.message}`);
+          }
         }
       }
 
@@ -217,19 +237,35 @@ export class ShippingWorker {
         },
       });
 
-      // Handle delivery: update order and release payment hold
+      // Handle delivery: branch on FEATURE_48H_CONFIRMATION_WINDOW
       if (status === ShipmentStatus.delivered) {
-        await this.prisma.order.update({
-          where: { id: shipment.orderId },
-          data: {
-            status: OrderStatus.delivered,
-          },
-        });
-        try {
-          const released = await this.paymentService.releasePaymentIfHeld(shipment.orderId);
-          if (released) this.logger.log(`Payment hold released for order ${shipment.orderId} (webhook)`);
-        } catch (e: any) {
-          this.logger.warn(`Could not release payment for order ${shipment.orderId}: ${e?.message}`);
+        if (this.is48hWindowEnabled()) {
+          // Faz 3A: 48h alıcı kontrol penceresi başlat (hold release ETMEZ)
+          const deliveredAt = new Date();
+          const confirmationDeadline = new Date(deliveredAt.getTime() + 48 * 60 * 60 * 1000);
+          await this.prisma.order.update({
+            where: { id: shipment.orderId },
+            data: {
+              status: OrderStatus.awaiting_buyer_confirmation,
+              deliveredAt,
+              confirmationDeadline,
+            },
+          });
+          this.logger.log(
+            `Order ${shipment.orderId} entered 48h window (webhook); deadline=${confirmationDeadline.toISOString()}`,
+          );
+        } else {
+          // Legacy: delivered + immediate hold release
+          await this.prisma.order.update({
+            where: { id: shipment.orderId },
+            data: { status: OrderStatus.delivered },
+          });
+          try {
+            const released = await this.paymentService.releasePaymentIfHeld(shipment.orderId);
+            if (released) this.logger.log(`Payment hold released for order ${shipment.orderId} (webhook)`);
+          } catch (e: any) {
+            this.logger.warn(`Could not release payment for order ${shipment.orderId}: ${e?.message}`);
+          }
         }
       }
 
