@@ -985,6 +985,11 @@ model Order {
   preparingWarningSentAt DateTime?       @map("preparing_warning_sent_at")
   reservationReleasedAt  DateTime?       @map("reservation_released_at")
   paymentExpiresAt       DateTime        @map("payment_expires_at")
+  deliveredAt            DateTime?       @map("delivered_at")
+  confirmationDeadline   DateTime?       @map("confirmation_deadline")
+  buyerConfirmedAt       DateTime?       @map("buyer_confirmed_at")
+  buyerConfirmationType  BuyerConfirmationType? @map("buyer_confirmation_type")
+  completedAt            DateTime?       @map("completed_at")
   invoices               Invoice[]
   buyer                  User            @relation("BuyerOrders", fields: [buyerId], references: [id])
   offer                  Offer?          @relation(fields: [offerId], references: [id])
@@ -2011,4 +2016,10 @@ enum CommissionLedgerStatus {
   earned
   refunded
   waived
+}
+
+enum BuyerConfirmationType {
+  manual_ok
+  auto_timeout
+  admin_force
 }
