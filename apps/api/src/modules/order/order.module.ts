@@ -1,6 +1,8 @@
 import { Module, forwardRef } from '@nestjs/common';
+import { ScheduleModule } from '@nestjs/schedule';
 import { OrderController } from './order.controller';
 import { OrderService } from './order.service';
+import { OrderSchedulerService } from './order-scheduler.service';
 import { PrismaModule } from '../../prisma';
 import { EventModule } from '../events';
 import { NotificationModule } from '../notification/notification.module';
@@ -12,6 +14,7 @@ import { CommissionModule } from '../commission/commission.module';
 
 @Module({
   imports: [
+    ScheduleModule.forRoot(),
     PrismaModule,
     EventModule,
     forwardRef(() => NotificationModule),
@@ -22,7 +25,7 @@ import { CommissionModule } from '../commission/commission.module';
     CommissionModule,
   ],
   controllers: [OrderController],
-  providers: [OrderService],
+  providers: [OrderService, OrderSchedulerService],
   exports: [OrderService],
 })
 export class OrderModule {}
