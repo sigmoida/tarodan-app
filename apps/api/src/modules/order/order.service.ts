@@ -1914,6 +1914,7 @@ export class OrderService {
       [OrderStatus.delivered]: [
         { nextStatuses: [OrderStatus.completed], allowedBy: 'buyer' },
       ],
+      [OrderStatus.awaiting_buyer_confirmation]: [],
       [OrderStatus.completed]: [],
       [OrderStatus.cancelled]: [],
       [OrderStatus.refund_requested]: [
