@@ -373,16 +373,21 @@ const refundRequest = await tx.refundRequest.create({
 
 ```typescript
 {
-  name: "Platform Hizmet Bedeli",
+  id: 'buyer-fee-rule',
+  name: 'Platform Hizmet Bedeli (Alıcı)',
   ruleType: 'default',
   appliesTo: 'BUYER',
-  buyerRate: 0.03,
+  buyerRate: 3,        // yüzde tam sayı: 3 = %3
   buyerMin: null,
   buyerMax: null,
   priority: 0,
-  isActive: false,   // Faz 5'te true'ya çekilir
+  isActive: false,     // Faz 5'te true'ya çekilir
 }
 ```
+
+> **Not:** `CommissionRule.buyerRate` projede yüzde tam sayı olarak saklanır
+> (`5` = %5). `calculateCommission()` içinde `subtotal * buyerRate / 100`
+> formülü kullanılır.
 
 ### 8.2 Hesaplama
 
@@ -391,7 +396,8 @@ function calculateBuyerFee(productPrice: Decimal): Decimal {
   const rule = findActiveCommissionRule({ appliesTo: 'BUYER' });
   if (!rule || !rule.isActive) return new Decimal(0);
 
-  let fee = productPrice.mul(rule.buyerRate);
+  // buyerRate yüzde tam sayı (3 = %3) → /100 ile fraksiyona çevir
+  let fee = productPrice.mul(rule.buyerRate).div(100);
   if (rule.buyerMin && fee.lt(rule.buyerMin)) fee = rule.buyerMin;
   if (rule.buyerMax && fee.gt(rule.buyerMax)) fee = rule.buyerMax;
   return fee.toDP(2);
