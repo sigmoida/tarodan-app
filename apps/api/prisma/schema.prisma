@@ -1804,6 +1804,7 @@ enum OrderStatus {
   preparing
   shipped
   delivered
+  awaiting_buyer_confirmation
   completed
   cancelled
   refund_requested
