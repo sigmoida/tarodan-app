@@ -993,12 +993,36 @@ model Order {
   payment                Payment?
   shipment               Shipment?
   refundRequests         RefundRequest[]
+  commissionLedger       CommissionLedger?
 
   @@index([buyerId])
   @@index([sellerId])
   @@index([status])
   @@index([status, paymentExpiresAt])
   @@map("orders")
+}
+
+model CommissionLedger {
+  id                   String                 @id @default(uuid())
+  orderId              String                 @unique @map("order_id")
+  order                Order                  @relation(fields: [orderId], references: [id])
+
+  sellerCommission     Decimal                @map("seller_commission") @db.Decimal(10, 2)
+  buyerFee             Decimal                @map("buyer_fee") @db.Decimal(10, 2)
+  totalPlatformRevenue Decimal                @map("total_platform_revenue") @db.Decimal(10, 2)
+
+  status               CommissionLedgerStatus @default(pending)
+  earnedAt             DateTime?              @map("earned_at")
+  refundedAt           DateTime?              @map("refunded_at")
+  waivedAt             DateTime?              @map("waived_at")
+  waivedReason         String?                @map("waived_reason")
+
+  createdAt            DateTime               @default(now()) @map("created_at")
+  updatedAt            DateTime               @updatedAt @map("updated_at")
+
+  @@index([status])
+  @@index([earnedAt])
+  @@map("commission_ledger")
 }
 
 model Payment {
@@ -1980,4 +2004,11 @@ enum AdPosition {
   footer
   inline
   popup
+}
+
+enum CommissionLedgerStatus {
+  pending
+  earned
+  refunded
+  waived
 }
