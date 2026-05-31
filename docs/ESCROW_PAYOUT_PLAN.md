@@ -1,5 +1,15 @@
 # Escrow & Payout Sistemi — Kapsamli Uygulama Plani
 
+> **2026-05-31 — Sipariş Komisyon/İptal/İade Faz 1 tamamlandı:**
+> CommissionLedger modeli + Order buyer confirmation alanları + RefundRequest
+> policy alanları + enum genişlemeleri (OrderStatus.awaiting_buyer_confirmation,
+> RefundReason.counterfeit + lost_in_transit, ReturnShippingPayer) + backfill.
+> Mevcut sipariş verisi commission_ledger'a aktarıldı (17 pending, 5 waived,
+> 12 earned). Davranış değişmedi. Spec:
+> `docs/superpowers/specs/2026-05-31-order-commission-cancel-refund-design.md`.
+> Plan: `docs/superpowers/plans/2026-05-31-phase1-data-layer.md`.
+> Sonraki faz: buyer fee hesaplama altyapısı (Faz 2).
+
 ## Baglamm (Context)
 
 Tarodan marketplace'inde alicilar PayTR ile odeme yapiyor. Para PayTR uzerinden platform banka hesabina geliyor. Ancak saticicya gercek para transferi yapilmiyor — sadece DB'de "released" flag'i set ediliyor. Bu plan, uctan uca calisan profesyonel bir escrow + otomatik payout sistemi olusturmayi amacliyor.
