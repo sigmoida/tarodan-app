@@ -1211,6 +1211,13 @@ model RefundRequest {
   refundedAt       DateTime? @map("refunded_at")
   providerRefundId String?   @map("provider_refund_id")
 
+  refundProductAmount    Boolean              @default(true)  @map("refund_product_amount")
+  refundShippingFee      Boolean              @default(true)  @map("refund_shipping_fee")
+  refundBuyerFee         Boolean              @default(true)  @map("refund_buyer_fee")
+  refundSellerCommission Boolean              @default(true)  @map("refund_seller_commission")
+  returnShippingPayer    ReturnShippingPayer?                 @map("return_shipping_payer")
+  buyerInitiatedAmicable Boolean              @default(false) @map("buyer_initiated_amicable")
+
   metadata Json?
 
   createdAt DateTime @default(now()) @map("created_at")
@@ -1857,6 +1864,12 @@ enum RefundReason {
   counterfeit
   lost_in_transit
   other
+}
+
+enum ReturnShippingPayer {
+  buyer
+  seller
+  platform
 }
 
 enum RefundRequestStatus {
