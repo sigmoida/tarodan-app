@@ -20,6 +20,7 @@ import { ProductLockService } from '../product/product-lock.service';
 import { NotificationService } from '../notification/notification.service';
 import { NotificationType } from '../notification/dto/notification.dto';
 import { SuratCargoService } from '../surat-cargo/surat-cargo.service';
+import { CommissionLedgerService } from '../commission/commission-ledger.service';
 import { Request } from 'express';
 
 @Injectable()
@@ -37,6 +38,7 @@ export class PaymentService {
     private readonly productLockService: ProductLockService,
     private readonly notificationService: NotificationService,
     private readonly suratCargoService: SuratCargoService,
+    private readonly commissionLedger: CommissionLedgerService,
     private readonly moduleRef: ModuleRef,
   ) {
     this.holdDays = parseInt(this.configService.get('PAYMENT_HOLD_DAYS') || '7', 10);
@@ -1142,6 +1144,14 @@ export class PaymentService {
             status: PaymentHoldStatus.held,
             releaseAt,
           },
+        });
+
+        // CommissionLedger satırı — pending (Faz 3A.2). Spec Bölüm 5.1.
+        await this.commissionLedger.upsertPending({
+          orderId: payment.orderId,
+          sellerCommission: order.commissionAmount,
+          buyerFee: order.buyerFeeAmount,
+          tx,
         });
 
         this.logger.log(`Payment ${payment.id} completed, hold created for seller ${order.sellerId}`);
