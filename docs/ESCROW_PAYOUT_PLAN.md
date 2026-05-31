@@ -10,6 +10,15 @@
 > Plan: `docs/superpowers/plans/2026-05-31-phase1-data-layer.md`.
 > Sonraki faz: buyer fee hesaplama altyapısı (Faz 2).
 
+> **2026-05-31 — Faz 2 tamamlandı (kısıtlı):** Buyer fee CommissionRule kaydı
+> seed edildi (`id='buyer-fee-rule'`, `appliesTo='BUYER'`, `buyerRate=3.0000`,
+> `isActive=false`). Mevcut `calculateCommission()` tek-kural mimarisinde
+> çalıştığı için BUYER + SELLER rule **aynı anda** eşleştirilemiyor — Faz 5
+> aktivasyonundan önce iki ayrı lookup yapacak şekilde refactor edilmeli.
+> Detay: spec Bölüm 14.4. Davranış değişmedi (isActive=false). Plan:
+> `docs/superpowers/plans/2026-05-31-phase2-buyer-fee-infra.md`.
+> Sonraki faz: 48h pencere + CommissionLedger entegrasyonu (Faz 3).
+
 ## Baglamm (Context)
 
 Tarodan marketplace'inde alicilar PayTR ile odeme yapiyor. Para PayTR uzerinden platform banka hesabina geliyor. Ancak saticicya gercek para transferi yapilmiyor — sadece DB'de "released" flag'i set ediliyor. Bu plan, uctan uca calisan profesyonel bir escrow + otomatik payout sistemi olusturmayi amacliyor.

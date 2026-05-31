@@ -638,6 +638,47 @@ Sandbox test → bir hafta dual run → prod açılır.
 - Kategori bazlı buyer fee oranları
 - Membership tier bazlı buyer fee indirimi
 
+### 14.4 Faz 5 öncesi gerekli refactor (kritik bağımlılık)
+
+**Problem:** Mevcut `OrderService.calculateCommission` ve `findMatchingRule`
+**tek bir kural** dönderiyor: (category × sellerType) eşleşmesi sonucunda
+seçilen kuralın hem `sellerRate` hem `buyerRate` alanları kullanılıyor.
+`appliesTo` enum'u sadece hangi tarafın fee'sinin uygulanacağını belirliyor;
+ayrı bir BUYER rule + ayrı bir SELLER rule **aynı anda** eşleştirilemiyor.
+
+Bu spec'in vizyonu (kategori bağımsız %3 platform hizmet bedeli + kategoriye
+özgü satıcı komisyonu) bu mimariye uymuyor.
+
+**Çözüm (Faz 5'in ilk task'ı):** `calculateCommission` iki ayrı lookup
+yapacak şekilde refactor edilmeli:
+
+```typescript
+async calculateCommission(amount, sellerId, categoryId) {
+  const allRules = await prisma.commissionRule.findMany({ where: { isActive: true } });
+
+  // Satici tarafi: appliesTo IN (SELLER, BOTH) filtreli
+  const sellerRules = allRules.filter(r =>
+    r.appliesTo === 'SELLER' || r.appliesTo === 'BOTH'
+  );
+  const sellerRule = findMatchingRule(sellerRules, categoryId, sellerType);
+
+  // Alici tarafi: appliesTo IN (BUYER, BOTH) filtreli
+  const buyerRules = allRules.filter(r =>
+    r.appliesTo === 'BUYER' || r.appliesTo === 'BOTH'
+  );
+  const buyerRule = findMatchingRule(buyerRules, categoryId, sellerType);
+
+  // Iki ayri kuraldan hesaplanan fee'ler topla
+  const sellerFee = sellerRule ? calculateFee(sellerRule.sellerRate, amount, sellerRule.sellerMin, sellerRule.sellerMax) : 0;
+  const buyerFee = buyerRule ? calculateFee(buyerRule.buyerRate, amount, buyerRule.buyerMin, buyerRule.buyerMax) : 0;
+
+  return { buyerFeeAmount: buyerFee, sellerFeeAmount: sellerFee, ... };
+}
+```
+
+Test'ler refactor'le birlikte yazılacak. Faz 2'de sadece veri seed edildi
+(`isActive=false`), aktif kullanım yok → davranış değişmedi.
+
 ### 14.3 Mevcut takas (trade) akışı
 
 Bu spec **sipariş (sale)** akışını kapsar. Takas/escrow akışı `docs/trade-cancel-refund-runbook.md` altında ayrı yönetilir; bu spec onu **etkilemez**.
