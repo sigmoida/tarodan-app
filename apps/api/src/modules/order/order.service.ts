@@ -33,6 +33,7 @@ import { NotificationService } from '../notification/notification.service';
 import { NotificationType } from '../notification/dto';
 import { DiscountService, DiscountCalculator } from '../discount';
 import { SuratCargoService } from '../surat-cargo/surat-cargo.service';
+import { CommissionLedgerService } from '../commission/commission-ledger.service';
 import { mapSuratFailureToHttpException } from '../surat-cargo/surat-result.mapper';
 import type { SuratShipmentFailure } from '../surat-cargo/surat-cargo.types';
 import { SuratKargoTuru, SuratOdemeTipi, SuratTasimaSekli, SuratTeslimSekli, SuratGonderiSekli } from '../surat-cargo/surat-cargo.types';
@@ -71,6 +72,7 @@ export class OrderService {
     private readonly productLockService: ProductLockService,
     @Optional()
     private readonly storageService: StorageService,
+    private readonly commissionLedger: CommissionLedgerService,
   ) {}
 
   // Shipping cost defaults (overridden by PlatformSetting)
@@ -1914,7 +1916,11 @@ export class OrderService {
       [OrderStatus.delivered]: [
         { nextStatuses: [OrderStatus.completed], allowedBy: 'buyer' },
       ],
-      [OrderStatus.awaiting_buyer_confirmation]: [],
+      [OrderStatus.awaiting_buyer_confirmation]: [
+        { nextStatuses: [OrderStatus.completed], allowedBy: 'buyer' },   // manual_ok (confirmReceipt)
+        { nextStatuses: [OrderStatus.completed], allowedBy: 'system' },  // auto_timeout (cron)
+        { nextStatuses: [OrderStatus.refund_requested], allowedBy: 'buyer' },
+      ],
       [OrderStatus.completed]: [],
       [OrderStatus.cancelled]: [],
       [OrderStatus.refund_requested]: [
@@ -1969,6 +1975,107 @@ export class OrderService {
     });
 
     return await this.formatOrderResponse(updatedOrder, userId);
+  }
+
+  /**
+   * 48h pencere ortak tamamlama. Spec Bölüm 6.4.
+   * Atomik: status guard + ledger.markEarned + PaymentHold release.
+   */
+  async completeOrder(
+    orderId: string,
+    type: 'manual_ok' | 'auto_timeout' | 'admin_force',
+  ): Promise<{ completed: boolean }> {
+    return this.prisma.$transaction(async (tx) => {
+      const now = new Date();
+
+      const updated = await tx.order.updateMany({
+        where: { id: orderId, status: OrderStatus.awaiting_buyer_confirmation },
+        data: {
+          status: OrderStatus.completed,
+          completedAt: now,
+          buyerConfirmedAt: now,
+          buyerConfirmationType: type as any,
+        },
+      });
+
+      if (updated.count === 0) {
+        this.logger.warn(
+          `completeOrder noop: order ${orderId} not in awaiting_buyer_confirmation`,
+        );
+        return { completed: false };
+      }
+
+      const ledgerResult = await this.commissionLedger.markEarned(orderId, tx);
+      if (!ledgerResult.updated) {
+        this.logger.warn(
+          `completeOrder: ledger not in pending for order ${orderId}`,
+        );
+      }
+
+      const holdUpdate = await tx.paymentHold.updateMany({
+        where: { orderId, status: 'held' as any },
+        data: {
+          status: 'released' as any,
+          releasedAt: now,
+          releaseAt: now,
+        },
+      });
+
+      this.logger.log(
+        `Order ${orderId} completed (type=${type}); ledger=${ledgerResult.updated}, hold=${holdUpdate.count}`,
+      );
+      return { completed: true };
+    });
+  }
+
+  /**
+   * Alıcının "Sorun yok" erken onay endpoint'i. Spec Bölüm 6.2.
+   */
+  async confirmReceipt(
+    orderId: string,
+    userId: string,
+  ): Promise<{ completed: boolean }> {
+    const order = await this.prisma.order.findUnique({
+      where: { id: orderId },
+      select: { id: true, buyerId: true, status: true },
+    });
+
+    if (!order) {
+      throw new NotFoundException('Sipariş bulunamadı');
+    }
+    if (order.buyerId !== userId) {
+      throw new ForbiddenException('Bu siparişi onaylama yetkiniz yok');
+    }
+    if (order.status !== OrderStatus.awaiting_buyer_confirmation) {
+      throw new BadRequestException(
+        `Sipariş bu aşamada onaylanamaz (mevcut durum: ${order.status})`,
+      );
+    }
+
+    const openRefund = await this.prisma.refundRequest.findFirst({
+      where: {
+        orderId,
+        status: {
+          in: [
+            'pending_review',
+            'approved',
+            'wait_for_delivery',
+            'return_shipment_open',
+            'return_in_transit',
+            'return_delivered',
+            'disputed',
+          ] as any,
+        },
+      },
+      select: { id: true },
+    });
+    if (openRefund) {
+      throw new BadRequestException(
+        'Açık bir iade talebi var; önce sonuçlanması gerek',
+      );
+    }
+
+    return this.completeOrder(orderId, 'manual_ok');
   }
 
   /**

@@ -8,6 +8,7 @@ import { DiscountModule } from '../discount';
 import { StorageModule } from '../storage/storage.module';
 import { SuratCargoModule } from '../surat-cargo/surat-cargo.module';
 import { ProductModule } from '../product/product.module';
+import { CommissionModule } from '../commission/commission.module';
 
 @Module({
   imports: [
@@ -18,6 +19,7 @@ import { ProductModule } from '../product/product.module';
     StorageModule,
     SuratCargoModule,
     ProductModule,
+    CommissionModule,
   ],
   controllers: [OrderController],
   providers: [OrderService],
