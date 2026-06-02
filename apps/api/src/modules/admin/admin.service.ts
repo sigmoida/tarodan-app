@@ -130,6 +130,29 @@ export class AdminService {
     return this.orderService.extendConfirmation(orderId, adminId, hours, reason);
   }
 
+  // ---------- RefundRequest policy override (Faz 4B.1) ----------
+
+  async overrideRefundPolicy(
+    refundRequestId: string,
+    adminId: string,
+    payload: {
+      refundProductAmount?: boolean;
+      refundShippingFee?: boolean;
+      refundBuyerFee?: boolean;
+      refundSellerCommission?: boolean;
+    },
+  ) {
+    return this.refundService.overrideRefundPolicy(refundRequestId, adminId, payload);
+  }
+
+  async setReturnShippingPayer(
+    refundRequestId: string,
+    adminId: string,
+    payer: 'buyer' | 'seller' | 'platform',
+  ) {
+    return this.refundService.setReturnShippingPayer(refundRequestId, adminId, payer);
+  }
+
   private resolveProductImageUrl(imageKeyOrUrl: string | null | undefined): string | null {
     if (!imageKeyOrUrl) return null;
     if (imageKeyOrUrl.startsWith('http://') || imageKeyOrUrl.startsWith('https://') || imageKeyOrUrl.startsWith('/')) return imageKeyOrUrl;

@@ -745,4 +745,96 @@ export class RefundService {
       phone: String(j.phone),
     };
   }
+
+  /**
+   * Admin: RefundRequest policy override (Faz 4B.1).
+   * 4 boolean alandan herhangi biri/hepsi güncellenebilir.
+   */
+  async overrideRefundPolicy(
+    refundRequestId: string,
+    adminId: string,
+    payload: {
+      refundProductAmount?: boolean;
+      refundShippingFee?: boolean;
+      refundBuyerFee?: boolean;
+      refundSellerCommission?: boolean;
+    },
+  ) {
+    const before = await this.prisma.refundRequest.findUnique({
+      where: { id: refundRequestId },
+      select: {
+        id: true,
+        refundProductAmount: true,
+        refundShippingFee: true,
+        refundBuyerFee: true,
+        refundSellerCommission: true,
+      },
+    });
+    if (!before) {
+      throw new NotFoundException('İade talebi bulunamadı');
+    }
+
+    const data: Record<string, boolean> = {};
+    if (payload.refundProductAmount !== undefined)
+      data.refundProductAmount = payload.refundProductAmount;
+    if (payload.refundShippingFee !== undefined)
+      data.refundShippingFee = payload.refundShippingFee;
+    if (payload.refundBuyerFee !== undefined)
+      data.refundBuyerFee = payload.refundBuyerFee;
+    if (payload.refundSellerCommission !== undefined)
+      data.refundSellerCommission = payload.refundSellerCommission;
+
+    if (Object.keys(data).length === 0) {
+      throw new BadRequestException('En az bir alan değişmeli');
+    }
+
+    const updated = await this.prisma.refundRequest.update({
+      where: { id: refundRequestId },
+      data,
+    });
+
+    await this.appendHistory(refundRequestId, {
+      action: 'policy_overridden',
+      by: adminId,
+      details: { before, after: data },
+    });
+
+    this.logger.log(
+      `RefundRequest ${refundRequestId} policy overridden by admin ${adminId}`,
+    );
+    return updated;
+  }
+
+  /**
+   * Admin: İade kargosu kim öder (Faz 4B.1).
+   */
+  async setReturnShippingPayer(
+    refundRequestId: string,
+    adminId: string,
+    payer: 'buyer' | 'seller' | 'platform',
+  ) {
+    const before = await this.prisma.refundRequest.findUnique({
+      where: { id: refundRequestId },
+      select: { id: true, returnShippingPayer: true },
+    });
+    if (!before) {
+      throw new NotFoundException('İade talebi bulunamadı');
+    }
+
+    const updated = await this.prisma.refundRequest.update({
+      where: { id: refundRequestId },
+      data: { returnShippingPayer: payer as any },
+    });
+
+    await this.appendHistory(refundRequestId, {
+      action: 'return_shipping_payer_changed',
+      by: adminId,
+      details: { before: before.returnShippingPayer, after: payer },
+    });
+
+    this.logger.log(
+      `RefundRequest ${refundRequestId} returnShippingPayer set to ${payer} by admin ${adminId}`,
+    );
+    return updated;
+  }
 }

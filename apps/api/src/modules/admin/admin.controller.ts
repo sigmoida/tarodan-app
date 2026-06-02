@@ -39,6 +39,7 @@ import { AdminRoute } from '../auth/decorators/admin-route.decorator';
 import { Public } from '../auth/decorators/public.decorator';
 import { AdminRole } from '@prisma/client';
 import { ForceCompleteOrderDto, ExtendConfirmationDto } from '../order/dto';
+import { OverrideRefundPolicyDto, SetReturnShippingPayerDto } from '../refund/dto';
 import {
   CreateCommissionRuleDto,
   UpdateCommissionRuleDto,
@@ -1253,6 +1254,36 @@ export class AdminController {
     @CurrentUser('id') adminId: string,
   ) {
     return this.adminService.forceFinalizeRefund(adminId, id);
+  }
+
+  // ---------- RefundRequest policy override (Faz 4B.1) ----------
+
+  @Patch('refund-requests/:id/override-policy')
+  @Roles(AdminRole.super_admin, AdminRole.admin)
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({
+    summary: 'Override refund policy (4 boolean flags)',
+  })
+  @ApiParam({ name: 'id', description: 'RefundRequest ID' })
+  async overrideRefundPolicy(
+    @Param('id') id: string,
+    @CurrentUser('id') adminId: string,
+    @Body() dto: OverrideRefundPolicyDto,
+  ) {
+    return this.adminService.overrideRefundPolicy(id, adminId, dto);
+  }
+
+  @Patch('refund-requests/:id/set-shipping-payer')
+  @Roles(AdminRole.super_admin, AdminRole.admin)
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({ summary: 'Set return shipping payer (buyer/seller/platform)' })
+  @ApiParam({ name: 'id', description: 'RefundRequest ID' })
+  async setReturnShippingPayer(
+    @Param('id') id: string,
+    @CurrentUser('id') adminId: string,
+    @Body() dto: SetReturnShippingPayerDto,
+  ) {
+    return this.adminService.setReturnShippingPayer(id, adminId, dto.payer);
   }
 
   // ==================== MESSAGE MANAGEMENT ====================
