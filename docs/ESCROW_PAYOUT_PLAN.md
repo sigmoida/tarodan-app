@@ -19,6 +19,19 @@
 > `docs/superpowers/plans/2026-05-31-phase2-buyer-fee-infra.md`.
 > Sonraki faz: 48h pencere + CommissionLedger entegrasyonu (Faz 3).
 
+> **2026-06-01 — Faz 3A tamamlandı (çekirdek 48h pencere):**
+> CommissionLedgerService (upsertPending/markEarned/markRefunded/markWaived) +
+> PaymentService.processSuccessfulPayment → ledger.pending upsert +
+> shipping.worker delivered handler `FEATURE_48H_CONFIRMATION_WINDOW` flag
+> dallanması + OrderService.completeOrder/confirmReceipt +
+> POST /orders/:id/confirm-receipt endpoint + OrderSchedulerService
+> autoCompleteConfirmedOrders cron (10 dk). Flag OFF: davranış değişmiyor;
+> flag ON: delivery → awaiting_buyer_confirmation (48h) → completed
+> (manual_ok/auto_timeout) → ledger.earned + hold released. Plan:
+> `docs/superpowers/plans/2026-06-01-phase3a-48h-window-core.md`.
+> Sonraki: Faz 3B (admin endpoint'leri, bildirimler, refund→ledger.refunded,
+> Senaryo A cron).
+
 ## Baglamm (Context)
 
 Tarodan marketplace'inde alicilar PayTR ile odeme yapiyor. Para PayTR uzerinden platform banka hesabina geliyor. Ancak saticicya gercek para transferi yapilmiyor — sadece DB'de "released" flag'i set ediliyor. Bu plan, uctan uca calisan profesyonel bir escrow + otomatik payout sistemi olusturmayi amacliyor.
