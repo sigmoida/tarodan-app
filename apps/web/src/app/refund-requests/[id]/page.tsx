@@ -548,6 +548,24 @@ export default function RefundRequestDetailPage() {
           </div>
         )}
 
+        {/* Senaryo D bilgilendirme — sadece satıcıya pending_review'da görünür (Faz 4D) */}
+        {canSellerDecide &&
+          rr.buyerInitiatedAmicable &&
+          rr.reason === "changed_mind" && (
+            <div className="bg-info-50 border-2 border-info-300 rounded-xl p-5 mb-4">
+              <div className="font-semibold text-info-900 mb-2">
+                {locale === "en"
+                  ? "Buyer Changed Their Mind (Scenario D)"
+                  : "Alıcı Fikir Değiştirdi (Senaryo D)"}
+              </div>
+              <p className="text-sm text-info-800">
+                {locale === "en"
+                  ? "The buyer wants to return the product without a defect. By default, only the product amount is refunded — shipping cost and 3% platform fee stay with the buyer. If you accept, return shipping will be at the buyer's cost (admin can override). If you reject, the case goes to admin review."
+                  : "Alıcı kusursuz bir üründen vazgeçmek istiyor. Default'ta sadece ürün bedeli iade edilir — kargo ve %3 platform hizmet bedeli iade edilmez. Kabul edersen iade kargo bedelini alıcı öder (admin değiştirebilir). Reddedersen talep admin'e iletilir."}
+              </p>
+            </div>
+          )}
+
         {/* Actions */}
         {(canCancel || canSellerDecide) && (
           <div className="bg-surface-elevated rounded-xl shadow-sm p-5">
