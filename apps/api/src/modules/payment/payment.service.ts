@@ -3255,6 +3255,15 @@ export class PaymentService {
             data: { status: PaymentHoldStatus.cancelled },
           });
 
+          // Ledger: Senaryo A — komisyon waived (Faz 3B.7).
+          // processRefund sonradan markRefunded çağıracak ama status guard
+          // (sadece pending/earned) nedeniyle waived satıra dokunmaz.
+          await this.commissionLedger.markWaived(
+            order.id,
+            'seller_did_not_ship',
+            tx,
+          );
+
           // Re-stock: increment quantity and recalculate status
           const newQuantity = order.product.quantity !== null ? order.product.quantity + 1 : null;
           await tx.product.update({
@@ -3273,6 +3282,18 @@ export class PaymentService {
         } catch (refundError: any) {
           this.logger.error(
             `REFUND FAILED for expired preparing order ${order.orderNumber}: ${refundError.message}. MANUAL INTERVENTION REQUIRED.`,
+          );
+        }
+
+        // Senaryo A bildirimi (Faz 3B.7) — alıcıya "satıcı göndermedi" haberi
+        try {
+          await this.notificationService.notifySellerDidNotShipRefunded(
+            order.buyerId,
+            order.id,
+          );
+        } catch (notifyErr: any) {
+          this.logger.warn(
+            `notify seller-no-ship failed for ${order.id}: ${notifyErr?.message}`,
           );
         }
 
