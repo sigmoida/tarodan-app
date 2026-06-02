@@ -22,6 +22,10 @@ import {
   UserIcon,
 } from "@heroicons/react/24/outline";
 import toast from "react-hot-toast";
+import {
+  RefundPolicyCard,
+  type ReturnShippingPayer,
+} from "@/components/refunds/RefundPolicyCard";
 
 interface HistoryEntry {
   action: string;
@@ -50,12 +54,23 @@ interface RefundRequestDetail {
   refundedAt?: string | null;
   providerRefundId?: string | null;
   metadata?: { history?: HistoryEntry[] } | null;
+  // Policy override alanları (Faz 1.5)
+  refundProductAmount?: boolean;
+  refundShippingFee?: boolean;
+  refundBuyerFee?: boolean;
+  refundSellerCommission?: boolean;
+  returnShippingPayer?: "buyer" | "seller" | "platform" | null;
+  buyerInitiatedAmicable?: boolean;
   createdAt: string;
   requester: { id: string; displayName: string; email: string; phone?: string | null };
   order: {
     id: string;
     orderNumber: string;
     totalAmount: number | string;
+    subtotal?: number | string | null;
+    shippingCost?: number | string;
+    buyerFeeAmount?: number | string;
+    commissionAmount?: number | string;
     status: string;
     seller: { id: string; displayName: string; email: string; phone?: string | null };
     product: { id: string; title: string; images?: { url: string }[] };
@@ -129,6 +144,24 @@ export default function RefundRequestDetailPage() {
     }
   };
 
+  // Policy override (Faz 4B.3)
+  const handleSavePolicy = async (payload: {
+    refundProductAmount?: boolean;
+    refundShippingFee?: boolean;
+    refundBuyerFee?: boolean;
+    refundSellerCommission?: boolean;
+  }) => {
+    await adminApi.overrideRefundPolicy(id, payload);
+    toast.success("İade politikası güncellendi");
+    await load();
+  };
+
+  const handleSavePayer = async (payer: ReturnShippingPayer) => {
+    await adminApi.setReturnShippingPayer(id, payer);
+    toast.success("İade kargo tarafı güncellendi");
+    await load();
+  };
+
   if (loading) {
     return (
       <div className="flex justify-center py-12">
@@ -168,6 +201,36 @@ export default function RefundRequestDetailPage() {
         </div>
         <StatusBadge status={rr.status} config={refundRequestStatusConfig} />
       </div>
+
+      {/* counterfeit uyarısı (Faz 4B.3) */}
+      {rr.reason === "counterfeit" && (
+        <div className="bg-warning-50 border-2 border-warning-500 rounded-xl p-4">
+          <div className="flex items-start gap-3">
+            <ExclamationTriangleIcon className="h-6 w-6 text-warning-600 flex-shrink-0 mt-0.5" />
+            <div>
+              <div className="font-semibold text-warning-900">
+                Sahte ürün şikayeti
+              </div>
+              <div className="text-sm text-warning-800">
+                Satıcı yaptırımını değerlendirin (geçici askı, uyarı, fesh).
+                İade onaylandıktan sonra satıcının diğer ürünleri için risk
+                değerlendirmesi yapılmalı.
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Senaryo D (changed_mind + buyerInitiatedAmicable) rozeti (Faz 4B.3) */}
+      {rr.buyerInitiatedAmicable && (
+        <div className="bg-info-50 border border-info-300 rounded-xl p-4 text-sm">
+          <div className="font-semibold text-info-900">Senaryo D — Keyfi Vazgeçme</div>
+          <div className="text-info-800">
+            Alıcı fikrini değiştirdi. Default'ta sadece ürün bedeli iade edilir
+            (kargo + %3 fee alıcıda kalır). Satıcı onayı zorunlu.
+          </div>
+        </div>
+      )}
 
       {/* Action panels */}
       {isDisputed && (
@@ -380,6 +443,27 @@ export default function RefundRequestDetailPage() {
           </div>
         </div>
       )}
+
+      {/* İade Politikası Kartı (Faz 4B.3) */}
+      <RefundPolicyCard
+        initial={{
+          refundProductAmount: rr.refundProductAmount ?? true,
+          refundShippingFee: rr.refundShippingFee ?? true,
+          refundBuyerFee: rr.refundBuyerFee ?? true,
+          refundSellerCommission: rr.refundSellerCommission ?? true,
+          returnShippingPayer: rr.returnShippingPayer ?? null,
+        }}
+        order={{
+          subtotal:
+            rr.order.subtotal != null ? Number(rr.order.subtotal) : null,
+          shippingCost: Number(rr.order.shippingCost ?? 0),
+          buyerFeeAmount: Number(rr.order.buyerFeeAmount ?? 0),
+          commissionAmount: Number(rr.order.commissionAmount ?? 0),
+        }}
+        onSavePolicy={handleSavePolicy}
+        onSavePayer={handleSavePayer}
+        disabled={rr.status === "refunded" || rr.status === "cancelled"}
+      />
 
       {/* Audit timeline */}
       {history.length > 0 && (
