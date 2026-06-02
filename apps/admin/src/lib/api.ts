@@ -139,6 +139,13 @@ export const adminApi = {
   sendOrderNotification: (id: string, type: string, message?: string) =>
     api.post(`/admin/orders/${id}/notify`, { type, message }),
   getOrderInvoice: (id: string) => api.get(`/admin/orders/${id}/invoice`),
+  // 48h pencere (Faz 4A.1)
+  forceCompleteOrder: (id: string, reason?: string) =>
+    api.post(`/admin/orders/${id}/force-complete`, reason ? { reason } : {}),
+  extendOrderConfirmation: (
+    id: string,
+    payload: { hours: number; reason?: string },
+  ) => api.post(`/admin/orders/${id}/extend-confirmation`, payload),
 
   // Trades
   getTrades: (params?: any) => api.get('/admin/trades', { params }),
