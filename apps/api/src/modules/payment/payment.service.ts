@@ -1984,6 +1984,11 @@ export class PaymentService {
           });
         }
 
+        // Ledger: pending/earned → refunded (Faz 3B.6).
+        // markRefunded yalnızca pending/earned satırı varsa update eder; cancel
+        // akışından gelmişse Task 3B.5'te waived olur ve burada noop.
+        await this.commissionLedger.markRefunded(orderId, tx);
+
         // Update order status + restore stock on full refund.
         // Idempotent: skip stock restore if order is already cancelled (e.g.
         // handleExpiredPreparingOrders already restocked before calling us).
