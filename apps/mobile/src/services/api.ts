@@ -250,6 +250,9 @@ export const ordersApi = {
   /** Alıcı: teslim aldım onayı (backend: POST /orders/:id/confirm). */
   confirm: (id: string | number) =>
     api.post(`/orders/${id}/confirm`),
+  /** Alıcı: 48h pencerede erken onay (backend: POST /orders/:id/confirm-receipt) (Faz 4C). */
+  confirmReceipt: (id: string | number) =>
+    api.post(`/orders/${id}/confirm-receipt`),
   /** Satıcı: siparişi hazırlanıyor olarak işaretle (backend: POST /orders/:id/prepare) */
   markAsPreparing: (id: string | number) =>
     api.post(`/orders/${id}/prepare`),

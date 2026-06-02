@@ -19,6 +19,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { Ionicons } from '@expo/vector-icons';
 import { api, ordersApi, refundsApi } from '../../src/services/api';
 import RatingModal from '../../src/components/RatingModal';
+import { AwaitingConfirmationBanner } from '../../src/components/AwaitingConfirmationBanner';
 import { captureException } from '../../src/services/sentry';
 import { safeString } from '../../src/utils/safeString';
 import { apiStatusToUi, type UiOrderStatus } from '../../src/utils/orderStatus';
@@ -59,6 +60,10 @@ interface OrderDetail {
   shippedAt?: string;
   deliveredAt?: string;
   completedAt?: string;
+  // 48h pencere (Faz 1.2)
+  confirmationDeadline?: string;
+  buyerConfirmedAt?: string;
+  buyerConfirmationType?: string;
   hasProductRating?: boolean;
   hasSellerRating?: boolean;
   isBuyer?: boolean;
@@ -239,6 +244,20 @@ export default function OrderDetailScreen() {
     },
   });
 
+  // 48h pencere — alıcı erken onay (Faz 4C.4)
+  const confirmReceiptMutation = useMutation({
+    mutationFn: async () => ordersApi.confirmReceipt(id as string),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['order', id] });
+      queryClient.invalidateQueries({ queryKey: ['orders'] });
+      Alert.alert('Teşekkürler', 'Sipariş onaylandı. Satıcıya ödeme transferi tetiklendi.');
+    },
+    onError: (err: any) => {
+      const msg = err?.response?.data?.message || err?.message || 'Onay başarısız';
+      Alert.alert('Hata', msg);
+    },
+  });
+
   const formatDate = (dateString?: string) => {
     if (!dateString) return '-';
     return new Date(dateString).toLocaleDateString('tr-TR', {
@@ -289,6 +308,23 @@ export default function OrderDetailScreen() {
       </View>
 
       <ScrollView style={styles.content}>
+        {/* 48h pencere banner (Faz 4C.4) */}
+        {order.status === 'awaiting_buyer_confirmation' &&
+          order.confirmationDeadline &&
+          (order as any).isBuyer !== false && (
+            <AwaitingConfirmationBanner
+              confirmationDeadline={order.confirmationDeadline}
+              onConfirm={() => confirmReceiptMutation.mutate()}
+              onReportProblem={() =>
+                router.push({
+                  pathname: '/refund-requests/new',
+                  params: { orderId: order.id },
+                })
+              }
+              confirming={confirmReceiptMutation.isPending}
+            />
+          )}
+
         {/* Order Status */}
         <Card variant="elevated" style={styles.card}>
           <View style={styles.statusHeader}>
