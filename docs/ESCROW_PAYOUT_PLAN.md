@@ -32,6 +32,26 @@
 > Sonraki: Faz 3B (admin endpoint'leri, bildirimler, refund→ledger.refunded,
 > Senaryo A cron).
 
+> **2026-06-02 — Faz 3B tamamlandı (operasyon katmanı):**
+> 5 yeni NotificationType (ORDER_DELIVERED_CONFIRM, ORDER_AUTO_COMPLETED,
+> ORDER_MANUALLY_CONFIRMED, ORDER_FORCE_COMPLETED_BY_ADMIN,
+> SELLER_DID_NOT_SHIP_REFUNDED). shipping.worker delivery sonrası alıcıya
+> bildirim. completeOrder type'a göre post-commit bildirim dağıtımı.
+> Admin endpoint'leri: POST /admin/orders/:id/force-complete (super_admin),
+> POST /admin/orders/:id/extend-confirmation (admin/super_admin).
+> OrderService.cancel → ledger.markWaived('buyer_cancelled'),
+> PaymentService.processRefund → ledger.markRefunded,
+> handleExpiredPreparingOrders (Senaryo A) → ledger.markWaived
+> ('seller_did_not_ship') + alıcıya SELLER_DID_NOT_SHIP_REFUNDED bildirimi.
+> Plan: `docs/superpowers/plans/2026-06-01-phase3b-admin-and-notifications.md`.
+> Sonraki: Faz 4 (RefundRequest policy UI + Senaryo D satıcı onay akışı +
+> mobile/web 48h pencere ekranları).
+>
+> **Bilinen blocker:** Node 22 + Jest 29 + Nest CLI uyumsuzluğu yüzünden
+> build/test araçları sessizce takılıyor. Editör TypeScript service kodu
+> doğrular ama tsc/nest build çalışmıyor. Faz 4 öncesi toolchain düzeltmesi
+> (Node downgrade veya Jest/Nest CLI upgrade) yapılmalı.
+
 ## Baglamm (Context)
 
 Tarodan marketplace'inde alicilar PayTR ile odeme yapiyor. Para PayTR uzerinden platform banka hesabina geliyor. Ancak saticicya gercek para transferi yapilmiyor — sadece DB'de "released" flag'i set ediliyor. Bu plan, uctan uca calisan profesyonel bir escrow + otomatik payout sistemi olusturmayi amacliyor.
