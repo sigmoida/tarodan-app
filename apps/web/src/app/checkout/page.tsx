@@ -2054,9 +2054,24 @@ export default function CheckoutPage() {
                   </div>
 
                   {(quote?.pricing?.buyerFeeAmount ?? 0) > 0 && (
-                    <div className="flex justify-between">
-                      <span className="text-muted">
-                        {locale === "en" ? "Platform fee" : "Platform ücreti"}
+                    <div className="flex justify-between items-center">
+                      <span className="text-muted flex items-center gap-1">
+                        {locale === "en"
+                          ? "Platform Service Fee (3%)"
+                          : "Platform Hizmet Bedeli (%3)"}
+                        <a
+                          href="/platform-hizmet-bedeli"
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="text-info-600 hover:text-info-700 text-xs underline"
+                          title={
+                            locale === "en"
+                              ? "Learn more"
+                              : "Detaylı bilgi"
+                          }
+                        >
+                          ?
+                        </a>
                       </span>
                       <span className="font-medium">
                         {Number(quote!.pricing.buyerFeeAmount).toLocaleString(
