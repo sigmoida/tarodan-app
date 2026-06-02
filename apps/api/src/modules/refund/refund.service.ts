@@ -747,8 +747,9 @@ export class RefundService {
   }
 
   /**
-   * Admin: RefundRequest policy override (Faz 4B.1).
+   * Admin: RefundRequest policy override (Faz 4B.1 + 4F).
    * 4 boolean alandan herhangi biri/hepsi güncellenebilir.
+   * Yeni policy'ye göre RefundRequest.amount yeniden hesaplanır (Faz 4F).
    */
   async overrideRefundPolicy(
     refundRequestId: string,
@@ -762,47 +763,90 @@ export class RefundService {
   ) {
     const before = await this.prisma.refundRequest.findUnique({
       where: { id: refundRequestId },
-      select: {
-        id: true,
-        refundProductAmount: true,
-        refundShippingFee: true,
-        refundBuyerFee: true,
-        refundSellerCommission: true,
-      },
+      include: { order: true },
     });
     if (!before) {
       throw new NotFoundException('İade talebi bulunamadı');
     }
 
-    const data: Record<string, boolean> = {};
-    if (payload.refundProductAmount !== undefined)
-      data.refundProductAmount = payload.refundProductAmount;
-    if (payload.refundShippingFee !== undefined)
-      data.refundShippingFee = payload.refundShippingFee;
-    if (payload.refundBuyerFee !== undefined)
-      data.refundBuyerFee = payload.refundBuyerFee;
-    if (payload.refundSellerCommission !== undefined)
-      data.refundSellerCommission = payload.refundSellerCommission;
+    // Yeni policy değerleri (mevcut + payload merge)
+    const policy = {
+      refundProductAmount:
+        payload.refundProductAmount ?? before.refundProductAmount,
+      refundShippingFee:
+        payload.refundShippingFee ?? before.refundShippingFee,
+      refundBuyerFee: payload.refundBuyerFee ?? before.refundBuyerFee,
+      refundSellerCommission:
+        payload.refundSellerCommission ?? before.refundSellerCommission,
+    };
 
-    if (Object.keys(data).length === 0) {
-      throw new BadRequestException('En az bir alan değişmeli');
-    }
+    // Yeni iade tutarı (kısmi iade — Faz 4F)
+    const newAmount = this.computePartialRefundAmount(policy, before.order);
 
     const updated = await this.prisma.refundRequest.update({
       where: { id: refundRequestId },
-      data,
+      data: {
+        refundProductAmount: policy.refundProductAmount,
+        refundShippingFee: policy.refundShippingFee,
+        refundBuyerFee: policy.refundBuyerFee,
+        refundSellerCommission: policy.refundSellerCommission,
+        amount: newAmount,
+      },
     });
 
     await this.appendHistory(refundRequestId, {
       action: 'policy_overridden',
       by: adminId,
-      details: { before, after: data },
+      details: {
+        before: {
+          refundProductAmount: before.refundProductAmount,
+          refundShippingFee: before.refundShippingFee,
+          refundBuyerFee: before.refundBuyerFee,
+          refundSellerCommission: before.refundSellerCommission,
+          amount: before.amount,
+        },
+        after: { ...policy, amount: newAmount.toString() },
+      },
     });
 
     this.logger.log(
-      `RefundRequest ${refundRequestId} policy overridden by admin ${adminId}`,
+      `RefundRequest ${refundRequestId} policy overridden by admin ${adminId}; new amount=${newAmount}`,
     );
     return updated;
+  }
+
+  /**
+   * Kısmi iade tutarı hesaplaması (Faz 4F).
+   * Spec Bölüm 7 — policy boolean'larına göre order'ın
+   * subtotal/shipping/buyerFee toplamı.
+   *
+   * NOT: refundSellerCommission satıcıdan tahsil işidir; alıcının iade
+   * tutarına eklenmez. Satıcı tahsilatı PaymentHold / PayoutTransfer
+   * mahsuplaşmasıyla yapılır (kapsam dışı — Faz 5+).
+   */
+  private computePartialRefundAmount(
+    policy: {
+      refundProductAmount: boolean;
+      refundShippingFee: boolean;
+      refundBuyerFee: boolean;
+    },
+    order: {
+      subtotal: any | null;
+      shippingCost: any;
+      buyerFeeAmount: any;
+    },
+  ): any {
+    let amount = new (Prisma as any).Decimal(0);
+    if (policy.refundProductAmount && order.subtotal != null) {
+      amount = amount.add(new (Prisma as any).Decimal(order.subtotal));
+    }
+    if (policy.refundShippingFee) {
+      amount = amount.add(new (Prisma as any).Decimal(order.shippingCost));
+    }
+    if (policy.refundBuyerFee) {
+      amount = amount.add(new (Prisma as any).Decimal(order.buyerFeeAmount));
+    }
+    return amount;
   }
 
   /**
