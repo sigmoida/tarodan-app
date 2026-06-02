@@ -2258,6 +2258,12 @@ export class OrderService {
         });
       }
 
+      // Ledger: paid/preparing'den iptalse pending → waived (Faz 3B.5).
+      // pending_payment'da ledger henüz yaratılmamıştır (PaymentService.processSuccessfulPayment'da
+      // upsert ediliyor); markWaived noop döner. Spec Bölüm 7.4 (buyer-initiated)
+      // ile uyumlu — komisyon alınmaz çünkü iş tamamlanmadı.
+      await this.commissionLedger.markWaived(orderId, 'buyer_cancelled', tx);
+
       // Note: Refund will be handled by PaymentModule when status is 'refunded'
 
       return await this.formatOrderResponse(cancelledOrder, userId);
