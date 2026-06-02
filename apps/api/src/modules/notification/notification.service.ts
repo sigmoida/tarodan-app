@@ -797,6 +797,61 @@ export class NotificationService {
     });
   }
 
+  // ---------- 48h pencere (Faz 3B.1) ----------
+
+  async notifyOrderDeliveredConfirm(
+    buyerId: string,
+    orderId: string,
+    confirmationDeadline: Date,
+  ) {
+    return this.send({
+      userId: buyerId,
+      type: NotificationType.ORDER_DELIVERED_CONFIRM,
+      channels: [NotificationChannel.PUSH, NotificationChannel.IN_APP],
+      data: { orderId, confirmationDeadline: confirmationDeadline.toISOString() },
+    });
+  }
+
+  async notifyOrderAutoCompleted(userId: string, orderId: string) {
+    return this.send({
+      userId,
+      type: NotificationType.ORDER_AUTO_COMPLETED,
+      channels: [NotificationChannel.PUSH, NotificationChannel.IN_APP],
+      data: { orderId },
+    });
+  }
+
+  async notifyOrderManuallyConfirmed(sellerId: string, orderId: string) {
+    return this.send({
+      userId: sellerId,
+      type: NotificationType.ORDER_MANUALLY_CONFIRMED,
+      channels: [NotificationChannel.PUSH, NotificationChannel.IN_APP],
+      data: { orderId },
+    });
+  }
+
+  async notifyOrderForceCompletedByAdmin(
+    userId: string,
+    orderId: string,
+    reason?: string,
+  ) {
+    return this.send({
+      userId,
+      type: NotificationType.ORDER_FORCE_COMPLETED_BY_ADMIN,
+      channels: [NotificationChannel.PUSH, NotificationChannel.IN_APP],
+      data: { orderId, reason },
+    });
+  }
+
+  async notifySellerDidNotShipRefunded(buyerId: string, orderId: string) {
+    return this.send({
+      userId: buyerId,
+      type: NotificationType.SELLER_DID_NOT_SHIP_REFUNDED,
+      channels: [NotificationChannel.EMAIL, NotificationChannel.PUSH, NotificationChannel.IN_APP],
+      data: { orderId },
+    });
+  }
+
   /**
    * Send offer notification
    */
