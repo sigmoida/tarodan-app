@@ -46,11 +46,51 @@
 > Plan: `docs/superpowers/plans/2026-06-01-phase3b-admin-and-notifications.md`.
 > Sonraki: Faz 4 (RefundRequest policy UI + Senaryo D satıcı onay akışı +
 > mobile/web 48h pencere ekranları).
+
+> **2026-06-02 — Faz 4 tamamlandı (UI katmanı + kısmi iade hesaplaması):**
+>
+> **4A — Admin order detail:** AwaitingConfirmationCard (canlı geri sayım,
+> renk kodlu), ExtendConfirmationDialog, ForceCompleteDialog. orders/[id]
+> page entegrasyonu + statusOptions güncellemesi.
+>
+> **4B — Admin refund-requests detail:** Backend PATCH endpoint'leri
+> (override-policy + set-shipping-payer). RefundService overrideRefundPolicy
+> + setReturnShippingPayer. RefundPolicyCard (4 checkbox + radio + anlık
+> tutar). counterfeit uyarı bandı + Senaryo D rozeti.
+>
+> **4C — Mobile order detail:** AwaitingConfirmationBanner (30s tick,
+> seviye renkleri), ChangedMindWarningModal. orders/[id].tsx
+> entegrasyonu + ordersApi.confirmReceipt.
+>
+> **4D — Senaryo D banner (web):** canSellerDecide + buyerInitiatedAmicable +
+> changed_mind koşulunda satıcıya policy bilgilendirmesi. Backend sellerAccept/
+> sellerReject mantığı zaten Senaryo D'ye uyumlu.
+>
+> **4E — Web checkout:** Buyer fee satırı label zenginleştirildi
+> ('Platform Hizmet Bedeli (%3)') + tooltip link. /platform-hizmet-bedeli
+> yasal sayfası (kapsam, hesaplama, iade durumları, şeffaflık).
+>
+> **4F — Kısmi iade hesaplaması:** RefundService.computePartialRefundAmount
+> (subtotal/shippingCost/buyerFeeAmount toplamı, policy'ye göre).
+> overrideRefundPolicy → otomatik amount güncelleme. finalizeRefundForReturnedShipment
+> rr.amount üzerinden PayTR'ye doğru kısmi tutar gönderir.
+>
+> Plan: `docs/superpowers/plans/2026-06-02-phase4-ui-and-flows.md`.
+>
+> **Atlanmış scope:**
+> - Mobile RefundRequest detail/listing route'u yok → mobile satıcı karar
+>   ekranı ayrı iş paketi (Faz 4D scope dışı kabul edildi). Backend hazır,
+>   satıcılar web üzerinden karar verebilir.
+> - ChangedMindWarningModal yazıldı ama refund-request açma sayfasına
+>   entegre edilmedi (mobile akış değişikliği gerekir).
+>
+> Sonraki: Faz 5 (calculateCommission BUYER+SELLER ayrı lookup refactor,
+> unit test, kullanıcı duyurusu, CommissionRule.is_active=true flip).
 >
 > **Bilinen blocker:** Node 22 + Jest 29 + Nest CLI uyumsuzluğu yüzünden
 > build/test araçları sessizce takılıyor. Editör TypeScript service kodu
-> doğrular ama tsc/nest build çalışmıyor. Faz 4 öncesi toolchain düzeltmesi
-> (Node downgrade veya Jest/Nest CLI upgrade) yapılmalı.
+> doğrular ama tsc/nest build çalışmıyor. Faz 5 öncesi mutlaka toolchain
+> düzeltmesi yapılmalı (test'ler refactor sonrası çalıştırılacak).
 
 ## Baglamm (Context)
 
