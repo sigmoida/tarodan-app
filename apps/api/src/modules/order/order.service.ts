@@ -1985,7 +1985,7 @@ export class OrderService {
     orderId: string,
     type: 'manual_ok' | 'auto_timeout' | 'admin_force',
   ): Promise<{ completed: boolean }> {
-    return this.prisma.$transaction(async (tx) => {
+    const result = await this.prisma.$transaction(async (tx) => {
       const now = new Date();
 
       const updated = await tx.order.updateMany({
@@ -2026,6 +2026,53 @@ export class OrderService {
       );
       return { completed: true };
     });
+
+    // Tx commit sonrası bildirimler (non-blocking). Faz 3B.3.
+    if (result.completed) {
+      try {
+        const order = await this.prisma.order.findUnique({
+          where: { id: orderId },
+          select: { buyerId: true, sellerId: true },
+        });
+        if (order) {
+          if (type === 'manual_ok') {
+            await this.notificationService
+              .notifyOrderManuallyConfirmed(order.sellerId, orderId)
+              .catch((e) =>
+                this.logger.warn(`notify manual_ok failed: ${e.message}`),
+              );
+          } else if (type === 'auto_timeout') {
+            await Promise.allSettled([
+              this.notificationService.notifyOrderAutoCompleted(
+                order.buyerId,
+                orderId,
+              ),
+              this.notificationService.notifyOrderAutoCompleted(
+                order.sellerId,
+                orderId,
+              ),
+            ]);
+          } else if (type === 'admin_force') {
+            await Promise.allSettled([
+              this.notificationService.notifyOrderForceCompletedByAdmin(
+                order.buyerId,
+                orderId,
+              ),
+              this.notificationService.notifyOrderForceCompletedByAdmin(
+                order.sellerId,
+                orderId,
+              ),
+            ]);
+          }
+        }
+      } catch (e: any) {
+        this.logger.warn(
+          `completeOrder post-commit notify error for ${orderId}: ${e?.message}`,
+        );
+      }
+    }
+
+    return result;
   }
 
   /**
