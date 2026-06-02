@@ -21,6 +21,7 @@ import { PaymentModule } from '../modules/payment/payment.module';
 import { StorageModule } from '../modules/storage/storage.module';
 import { SearchModule } from '../modules/search/search.module';
 import { SuratCargoModule } from '../modules/surat-cargo/surat-cargo.module';
+import { NotificationModule } from '../modules/notification/notification.module';
 import { QUEUE_NAMES } from './constants';
 
 @Module({
@@ -31,6 +32,7 @@ import { QUEUE_NAMES } from './constants';
     StorageModule,
     SearchModule,
     SuratCargoModule,
+    NotificationModule,
     // Configure BullMQ with Redis connection
     BullModule.forRootAsync({
       imports: [ConfigModule],

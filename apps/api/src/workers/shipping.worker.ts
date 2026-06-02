@@ -9,6 +9,7 @@ import { ConfigService } from '@nestjs/config';
 import { PrismaService } from '../prisma';
 import { PaymentService } from '../modules/payment/payment.service';
 import { SuratTrackingService } from '../modules/surat-cargo/surat-tracking.service';
+import { NotificationService } from '../modules/notification/notification.service';
 import { ShipmentStatus, OrderStatus } from '@prisma/client';
 
 export interface ShippingJobData {
@@ -29,6 +30,7 @@ export class ShippingWorker {
     private readonly prisma: PrismaService,
     private readonly paymentService: PaymentService,
     private readonly suratTrackingService: SuratTrackingService,
+    private readonly notificationService: NotificationService,
   ) {}
 
   private is48hWindowEnabled(): boolean {
@@ -151,6 +153,23 @@ export class ShippingWorker {
           this.logger.log(
             `Order ${shipment.orderId} entered 48h window (track-update); deadline=${confirmationDeadline.toISOString()}`,
           );
+          try {
+            const o = await this.prisma.order.findUnique({
+              where: { id: shipment.orderId },
+              select: { buyerId: true },
+            });
+            if (o) {
+              await this.notificationService.notifyOrderDeliveredConfirm(
+                o.buyerId,
+                shipment.orderId,
+                confirmationDeadline,
+              );
+            }
+          } catch (e: any) {
+            this.logger.warn(
+              `notify delivered-confirm failed (track-update) for ${shipment.orderId}: ${e?.message}`,
+            );
+          }
         } else {
           // Legacy: delivered + immediate hold release
           await this.prisma.order.update({
@@ -254,6 +273,23 @@ export class ShippingWorker {
           this.logger.log(
             `Order ${shipment.orderId} entered 48h window (webhook); deadline=${confirmationDeadline.toISOString()}`,
           );
+          try {
+            const o = await this.prisma.order.findUnique({
+              where: { id: shipment.orderId },
+              select: { buyerId: true },
+            });
+            if (o) {
+              await this.notificationService.notifyOrderDeliveredConfirm(
+                o.buyerId,
+                shipment.orderId,
+                confirmationDeadline,
+              );
+            }
+          } catch (e: any) {
+            this.logger.warn(
+              `notify delivered-confirm failed (webhook) for ${shipment.orderId}: ${e?.message}`,
+            );
+          }
         } else {
           // Legacy: delivered + immediate hold release
           await this.prisma.order.update({
