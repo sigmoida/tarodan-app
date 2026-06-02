@@ -2126,6 +2126,55 @@ export class OrderService {
   }
 
   /**
+   * Admin force-complete: awaiting_buyer_confirmation → completed.
+   * Spec Bölüm 9.1. Audit log için reason parametresi.
+   */
+  async forceComplete(
+    orderId: string,
+    adminId: string,
+    reason?: string,
+  ): Promise<{ completed: boolean }> {
+    this.logger.log(
+      `Admin ${adminId} force-completing order ${orderId}. reason="${reason ?? ''}"`,
+    );
+    return this.completeOrder(orderId, 'admin_force');
+  }
+
+  /**
+   * Admin 48h penceresini uzatır.
+   * Spec Bölüm 9.1.
+   */
+  async extendConfirmation(
+    orderId: string,
+    adminId: string,
+    hours: number,
+    reason?: string,
+  ): Promise<{ newDeadline: Date }> {
+    const order = await this.prisma.order.findUnique({
+      where: { id: orderId },
+      select: { id: true, status: true, confirmationDeadline: true },
+    });
+    if (!order) throw new NotFoundException('Sipariş bulunamadı');
+    if (order.status !== OrderStatus.awaiting_buyer_confirmation) {
+      throw new BadRequestException(
+        'Sadece 48h penceresindeki siparişlerde uzatılabilir',
+      );
+    }
+
+    const base = order.confirmationDeadline ?? new Date();
+    const newDeadline = new Date(base.getTime() + hours * 3_600_000);
+    await this.prisma.order.update({
+      where: { id: orderId },
+      data: { confirmationDeadline: newDeadline },
+    });
+
+    this.logger.log(
+      `Admin ${adminId} extended confirmationDeadline of ${orderId} by ${hours}h → ${newDeadline.toISOString()} reason="${reason ?? ''}"`,
+    );
+    return { newDeadline };
+  }
+
+  /**
    * Cancel order
    * Business Rules:
    * - Only buyer can cancel

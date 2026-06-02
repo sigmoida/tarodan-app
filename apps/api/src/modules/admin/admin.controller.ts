@@ -38,6 +38,7 @@ import { CurrentUser } from '../auth/decorators/current-user.decorator';
 import { AdminRoute } from '../auth/decorators/admin-route.decorator';
 import { Public } from '../auth/decorators/public.decorator';
 import { AdminRole } from '@prisma/client';
+import { ForceCompleteOrderDto, ExtendConfirmationDto } from '../order/dto';
 import {
   CreateCommissionRuleDto,
   UpdateCommissionRuleDto,
@@ -459,6 +460,41 @@ export class AdminController {
     @Body() dto: { type: string; message?: string },
   ) {
     return this.adminService.sendOrderNotification(adminId, id, dto as any);
+  }
+
+  // ---------- 48h pencere admin müdahaleleri (Faz 3B.4) ----------
+
+  @Post('orders/:id/force-complete')
+  @Roles(AdminRole.super_admin)
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({
+    summary: 'Force-complete an awaiting_buyer_confirmation order (super_admin only)',
+  })
+  @ApiParam({ name: 'id', description: 'Order ID' })
+  async forceCompleteOrder(
+    @Param('id') id: string,
+    @CurrentUser('id') adminId: string,
+    @Body() dto: ForceCompleteOrderDto,
+  ) {
+    return this.adminService.forceCompleteOrder(id, adminId, dto.reason);
+  }
+
+  @Post('orders/:id/extend-confirmation')
+  @Roles(AdminRole.super_admin, AdminRole.admin)
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({ summary: 'Extend the 48h buyer-confirmation deadline' })
+  @ApiParam({ name: 'id', description: 'Order ID' })
+  async extendOrderConfirmation(
+    @Param('id') id: string,
+    @CurrentUser('id') adminId: string,
+    @Body() dto: ExtendConfirmationDto,
+  ) {
+    return this.adminService.extendOrderConfirmation(
+      id,
+      adminId,
+      dto.hours,
+      dto.reason,
+    );
   }
 
   @Get('orders/:id/invoice')

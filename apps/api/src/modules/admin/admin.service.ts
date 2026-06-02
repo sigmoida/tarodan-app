@@ -72,6 +72,7 @@ import { RefundService } from '../refund/refund.service';
 import { NotificationService } from '../notification/notification.service';
 import { NotificationType } from '../notification/dto/notification.dto';
 import { SuratCargoService } from '../surat-cargo/surat-cargo.service';
+import { OrderService } from '../order/order.service';
 import {
   SuratKargoTuru,
   SuratOdemeTipi,
@@ -100,7 +101,34 @@ export class AdminService {
     private readonly storageService: StorageService,
     @Optional()
     private readonly suratCargoService?: SuratCargoService,
+    @Optional()
+    private readonly orderService?: OrderService,
   ) { }
+
+  // ---------- Order 48h pencere admin müdahaleleri (Faz 3B.4) ----------
+
+  async forceCompleteOrder(
+    orderId: string,
+    adminId: string,
+    reason?: string,
+  ): Promise<{ completed: boolean }> {
+    if (!this.orderService) {
+      throw new Error('OrderService not available');
+    }
+    return this.orderService.forceComplete(orderId, adminId, reason);
+  }
+
+  async extendOrderConfirmation(
+    orderId: string,
+    adminId: string,
+    hours: number,
+    reason?: string,
+  ): Promise<{ newDeadline: Date }> {
+    if (!this.orderService) {
+      throw new Error('OrderService not available');
+    }
+    return this.orderService.extendConfirmation(orderId, adminId, hours, reason);
+  }
 
   private resolveProductImageUrl(imageKeyOrUrl: string | null | undefined): string | null {
     if (!imageKeyOrUrl) return null;
