@@ -84,6 +84,38 @@ const NOTIFICATION_TEMPLATES: Record<NotificationType, { title: string; message:
     link: '/orders/{{orderId}}',
   },
 
+  // 48h pencere (Faz 3B.1)
+  [NotificationType.ORDER_DELIVERED_CONFIRM]: {
+    title: 'Siparişin teslim edildi',
+    message: '48 saat içinde sorun varsa bildir veya "Sorun yok" ile onayla. Süre dolunca otomatik tamamlanacak.',
+    icon: '📦',
+    link: '/orders/{{orderId}}',
+  },
+  [NotificationType.ORDER_AUTO_COMPLETED]: {
+    title: 'Sipariş otomatik tamamlandı',
+    message: '48 saatlik kontrol süresi doldu; sipariş tamamlandı.',
+    icon: '✅',
+    link: '/orders/{{orderId}}',
+  },
+  [NotificationType.ORDER_MANUALLY_CONFIRMED]: {
+    title: 'Alıcı siparişini onayladı',
+    message: 'Alıcı siparişi erken onayladı. Ödemen kısa süre içinde hesabına transfer edilecek.',
+    icon: '💸',
+    link: '/orders/{{orderId}}',
+  },
+  [NotificationType.ORDER_FORCE_COMPLETED_BY_ADMIN]: {
+    title: 'Sipariş yönetici tarafından tamamlandı',
+    message: 'Bir yönetici siparişini manuel olarak tamamladı.',
+    icon: '🛡️',
+    link: '/orders/{{orderId}}',
+  },
+  [NotificationType.SELLER_DID_NOT_SHIP_REFUNDED]: {
+    title: 'Sipariş iptal edildi',
+    message: 'Satıcı belirlenen süre içinde kargoya vermediği için sipariş iptal edildi ve tam iade işlemi başlatıldı.',
+    icon: '↩️',
+    link: '/orders/{{orderId}}',
+  },
+
   // Offer notifications
   [NotificationType.OFFER_RECEIVED]: {
     title: 'Yeni Teklif Aldınız',
