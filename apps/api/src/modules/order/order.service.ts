@@ -449,22 +449,45 @@ export class OrderService {
     // Map User.sellerType to CommissionSellerType
     const commissionSellerType = this.mapSellerTypeForCommission(
       seller?.sellerType ?? null,
-      seller?.membership?.tier?.type ?? null
+      seller?.membership?.tier?.type ?? null,
     );
 
-    // Fetch all active commission rules
-    const rules = await this.prisma.commissionRule.findMany({
+    // Tüm aktif kuralları çek (Faz 5.1)
+    const allActive = await this.prisma.commissionRule.findMany({
       where: { isActive: true },
       include: { category: true },
     });
 
-    this.logger.debug(`Found ${rules.length} active commission rules`);
+    this.logger.debug(`Found ${allActive.length} active commission rules`);
 
-    // Match by specificity (deterministic order, priority within same specificity)
-    const matchedRule = this.findMatchingRule(rules, categoryId, commissionSellerType);
+    // SELLER tarafı: appliesTo IN (SELLER, BOTH)
+    const sellerRules = allActive.filter(
+      (r) =>
+        r.appliesTo === CommissionAppliesTo.SELLER ||
+        r.appliesTo === CommissionAppliesTo.BOTH,
+    );
+    const sellerMatch = this.findMatchingRule(
+      sellerRules,
+      categoryId,
+      commissionSellerType,
+    );
 
-    if (!matchedRule) {
-      this.logger.warn('No matching commission rule found; applying 0 commission fallback');
+    // BUYER tarafı: appliesTo IN (BUYER, BOTH)
+    const buyerRules = allActive.filter(
+      (r) =>
+        r.appliesTo === CommissionAppliesTo.BUYER ||
+        r.appliesTo === CommissionAppliesTo.BOTH,
+    );
+    const buyerMatch = this.findMatchingRule(
+      buyerRules,
+      categoryId,
+      commissionSellerType,
+    );
+
+    if (!sellerMatch && !buyerMatch) {
+      this.logger.warn(
+        'No matching commission rule found; applying 0 commission fallback',
+      );
       return {
         buyerFeeAmount: 0,
         sellerFeeAmount: 0,
@@ -474,52 +497,50 @@ export class OrderService {
       };
     }
 
-    // Calculate fees
     const subtotal = amount;
-    const rawSellerFee = matchedRule.sellerRate
-      ? subtotal * (Number(matchedRule.sellerRate) / 100)
-      : 0;
-    const rawBuyerFee = matchedRule.buyerRate
-      ? subtotal * (Number(matchedRule.buyerRate) / 100)
-      : 0;
 
-    // Clamp per side independently
-    let sellerFee = this.clampAmount(
-      rawSellerFee,
-      matchedRule.sellerMin ? Number(matchedRule.sellerMin) : null,
-      matchedRule.sellerMax ? Number(matchedRule.sellerMax) : null
-    );
-    let buyerFee = this.clampAmount(
-      rawBuyerFee,
-      matchedRule.buyerMin ? Number(matchedRule.buyerMin) : null,
-      matchedRule.buyerMax ? Number(matchedRule.buyerMax) : null
-    );
-
-    // Apply appliesTo
-    if (matchedRule.appliesTo === CommissionAppliesTo.SELLER) {
-      buyerFee = 0;
+    // Seller fee
+    let sellerFee = 0;
+    if (sellerMatch && sellerMatch.sellerRate) {
+      const raw = subtotal * (Number(sellerMatch.sellerRate) / 100);
+      sellerFee = this.clampAmount(
+        raw,
+        sellerMatch.sellerMin ? Number(sellerMatch.sellerMin) : null,
+        sellerMatch.sellerMax ? Number(sellerMatch.sellerMax) : null,
+      );
     }
-    if (matchedRule.appliesTo === CommissionAppliesTo.BUYER) {
-      sellerFee = 0;
+
+    // Buyer fee
+    let buyerFee = 0;
+    if (buyerMatch && buyerMatch.buyerRate) {
+      const raw = subtotal * (Number(buyerMatch.buyerRate) / 100);
+      buyerFee = this.clampAmount(
+        raw,
+        buyerMatch.buyerMin ? Number(buyerMatch.buyerMin) : null,
+        buyerMatch.buyerMax ? Number(buyerMatch.buyerMax) : null,
+      );
     }
 
     const totalCommission = sellerFee + buyerFee;
 
     this.logger.log(
-      `Commission calculated: amount=${amount}, ` +
-      `sellerFee=${sellerFee}, buyerFee=${buyerFee}, ` +
-      `total=${totalCommission}, rule=${matchedRule.name}`
+      `Commission: amount=${amount} sellerFee=${sellerFee} (rule=${sellerMatch?.id ?? 'none'}) buyerFee=${buyerFee} (rule=${buyerMatch?.id ?? 'none'})`,
     );
 
+    // ruleId/ruleName legacy alanları: seller match öncelikli, yoksa buyer
+    const primary = sellerMatch ?? buyerMatch;
     return {
       buyerFeeAmount: buyerFee,
       sellerFeeAmount: sellerFee,
       commissionAmount: totalCommission,
-      ruleId: matchedRule.id,
-      ruleName: matchedRule.name,
-      // Legacy fields for backward compatibility
-      ruleType: matchedRule.ruleType,
-      appliedRate: matchedRule.sellerRate ? Number(matchedRule.sellerRate) : (matchedRule.buyerRate ? Number(matchedRule.buyerRate) : 0),
+      ruleId: primary?.id ?? null,
+      ruleName: primary?.name ?? null,
+      ruleType: primary?.ruleType,
+      appliedRate: sellerMatch?.sellerRate
+        ? Number(sellerMatch.sellerRate)
+        : buyerMatch?.buyerRate
+          ? Number(buyerMatch.buyerRate)
+          : 0,
     };
   }
 
