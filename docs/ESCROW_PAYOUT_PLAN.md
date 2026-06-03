@@ -47,6 +47,48 @@
 > Sonraki: Faz 4 (RefundRequest policy UI + Senaryo D satıcı onay akışı +
 > mobile/web 48h pencere ekranları).
 
+> **2026-06-03 — Faz 5 tamamlandı (AKTİVASYON + proje teslim):**
+>
+> **5.0 Toolchain fix:** .nvmrc + engines (Node 20.19.5 sabit). `pnpm install
+> --force` ile fresh node_modules. NotificationType templates eksiği
+> düzeltildi. Sonuç: backfill 7/7 + 48h-window 10/10 + buyer-fee 7/7 = **24/24
+> test yeşil**.
+>
+> **5.1 calculateCommission refactor:** BUYER + SELLER ayrı `findMatchingRule`
+> çağrısı (spec Bölüm 14.4 gap kapandı). Her tarafın kendi min/max clamp'i;
+> ruleId/ruleName seller öncelikli legacy uyumu.
+>
+> **5.2 Unit test:** 7 senaryo — aktif rule yok, sadece SELLER, sadece BUYER,
+> her ikisi (AYNI ANDA UYGULANIR), min, max, isActive=false.
+>
+> **5.3 Pre-launch smoke:** Dev DB'de `buyer-fee-rule` is_active=false →
+> calculateCommission buyer=0 (refactor zarar vermedi).
+>
+> **5.4 Web banner duyurusu:** PlatformFeeAnnouncementBanner — 14 günlük
+> announcement, localStorage dismiss, /platform-hizmet-bedeli link.
+> (Mobile banner ayrı iş paketi.)
+>
+> **5.5 AKTİVASYON:** Migration `20260603114321_activate_buyer_fee_rule` —
+> UPDATE commission_rules SET is_active=true WHERE id='buyer-fee-rule'.
+> Doğrulama: pgsql SELECT is_active=t. Yeni siparişlerde Order.buyerFeeAmount
+> > 0 olur, checkout satırı görünür, CommissionLedger.buyerFee doldurulur.
+>
+> Plan: `docs/superpowers/plans/2026-06-02-phase5-activation.md`.
+>
+> 🎉 **Sipariş Komisyon/İptal/İade projesi TAMAMLANDI** — Spec başlık 1-7'de
+> belirtilen tüm gereksinimler karşılandı: komisyon kesinleşme (Ledger),
+> 7 durumlu Order akışı, 48h pencere, dispute (6 reason + counterfeit +
+> lost_in_transit), 4 senaryo (A/B/C/D), kargo + %3 platform hizmet bedeli.
+>
+> **Sonraki olası işler (kapsam dışı):**
+> - Mobile RefundRequest detail/listing + Senaryo D satıcı karar ekranı
+> - Mobile PlatformFee duyuru banner'ı
+> - Sahte ürün sonrası otomatik satıcı askıya alma
+> - Kargo şirketi tazminat akışı (lost_in_transit)
+> - Kategori bazlı buyer fee oranları
+> - Membership tier bazlı buyer fee indirimi
+> - Production deploy sonrası post-launch monitoring (Sentry + admin panel)
+
 > **2026-06-02 — Faz 4 tamamlandı (UI katmanı + kısmi iade hesaplaması):**
 >
 > **4A — Admin order detail:** AwaitingConfirmationCard (canlı geri sayım,
