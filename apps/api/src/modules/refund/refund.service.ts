@@ -90,6 +90,16 @@ export class RefundService {
   }
 
   async createRefundRequest(orderId: string, requesterId: string, dto: CreateRefundRequestDto) {
+    // Senaryo D kaldırıldı (Faz 5 sonrası karar): keyfi vazgeçme talebi
+    // kabul edilmiyor. Alıcı sadece somut bir sorun bildirebilir (hasar,
+    // yanlış ürün, eksik, sahte, kargoda kaybolma vb.). Cayma hakkı 14 günlük
+    // pencere içinde "not_as_described" veya "other" + açıklama ile değerlendirilir.
+    if ((dto.reason as any) === 'changed_mind') {
+      throw new BadRequestException(
+        'Keyfi vazgeçme iade gerekçesi olarak kabul edilmiyor. Ürünle ilgili somut bir sorun varsa lütfen uygun bir sebep seçin.',
+      );
+    }
+
     const order = await this.prisma.order.findUnique({
       where: { id: orderId },
       include: { payment: true, shipment: true, refundRequests: true },

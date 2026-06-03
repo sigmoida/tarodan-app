@@ -20,12 +20,14 @@ import { useEffect, useState } from "react";
 import toast from "react-hot-toast";
 
 const reasonLabel: Record<string, { tr: string; en: string }> = {
-  changed_mind: { tr: "Vazgeçtim (cayma hakkı)", en: "Changed mind" },
   damaged: { tr: "Hasarlı geldi", en: "Damaged" },
   wrong_item: { tr: "Yanlış ürün geldi", en: "Wrong item" },
   not_as_described: { tr: "Açıklamayla uyuşmuyor", en: "Not as described" },
   missing_parts: { tr: "Eksik parça", en: "Missing parts" },
+  counterfeit: { tr: "Sahte ürün", en: "Counterfeit" },
+  lost_in_transit: { tr: "Kargoda kayboldu", en: "Lost in transit" },
   other: { tr: "Diğer", en: "Other" },
+  // changed_mind kaldırıldı (Senaryo D)
 };
 
 const statusConfig: Record<
@@ -548,23 +550,7 @@ export default function RefundRequestDetailPage() {
           </div>
         )}
 
-        {/* Senaryo D bilgilendirme — sadece satıcıya pending_review'da görünür (Faz 4D) */}
-        {canSellerDecide &&
-          rr.buyerInitiatedAmicable &&
-          rr.reason === "changed_mind" && (
-            <div className="bg-info-50 border-2 border-info-300 rounded-xl p-5 mb-4">
-              <div className="font-semibold text-info-900 mb-2">
-                {locale === "en"
-                  ? "Buyer Changed Their Mind (Scenario D)"
-                  : "Alıcı Fikir Değiştirdi (Senaryo D)"}
-              </div>
-              <p className="text-sm text-info-800">
-                {locale === "en"
-                  ? "The buyer wants to return the product without a defect. By default, only the product amount is refunded — shipping cost and 3% platform fee stay with the buyer. If you accept, return shipping will be at the buyer's cost (admin can override). If you reject, the case goes to admin review."
-                  : "Alıcı kusursuz bir üründen vazgeçmek istiyor. Default'ta sadece ürün bedeli iade edilir — kargo ve %3 platform hizmet bedeli iade edilmez. Kabul edersen iade kargo bedelini alıcı öder (admin değiştirebilir). Reddedersen talep admin'e iletilir."}
-              </p>
-            </div>
-          )}
+        {/* Senaryo D banner kaldırıldı — changed_mind reason artık kabul edilmiyor */}
 
         {/* Actions */}
         {(canCancel || canSellerDecide) && (

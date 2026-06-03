@@ -221,16 +221,7 @@ export default function RefundRequestDetailPage() {
         </div>
       )}
 
-      {/* Senaryo D (changed_mind + buyerInitiatedAmicable) rozeti (Faz 4B.3) */}
-      {rr.buyerInitiatedAmicable && (
-        <div className="bg-info-50 border border-info-300 rounded-xl p-4 text-sm">
-          <div className="font-semibold text-info-900">Senaryo D — Keyfi Vazgeçme</div>
-          <div className="text-info-800">
-            Alıcı fikrini değiştirdi. Default'ta sadece ürün bedeli iade edilir
-            (kargo + %3 fee alıcıda kalır). Satıcı onayı zorunlu.
-          </div>
-        </div>
-      )}
+      {/* Senaryo D rozeti kaldırıldı — keyfi vazgeçme talebi artık kabul edilmiyor */}
 
       {/* Action panels */}
       {isDisputed && (

@@ -34,7 +34,7 @@ Tarodan marketplace'inde:
 | 48 saat penceresi UX | Pasif timeout + opsiyonel erken onay ("Sorun yok" butonu) |
 | Alıcı %3 fee gösterimi | Sepet/checkout'ta ayrı satır (şeffaf) |
 | Komisyon "kesinleşme" mantığı | Yeni `CommissionLedger` tablosu + 4 durum (pending/earned/refunded/waived) |
-| Senaryo D (keyfi vazgeçme) | Talep açılabilir, satıcı/admin onayı zorunlu; default'ta kargo + %3 fee iade edilmez |
+| Senaryo D (keyfi vazgeçme) | **TAMAMEN KALDIRILDI** — `changed_mind` reason kabul edilmiyor; talep açılamaz (proje teslim sonrası karar, 2026-06-03) |
 | Yeni RefundReason'lar | `counterfeit` + `lost_in_transit` eklensin |
 | Senaryo B'de alıcı %3 fee | İade edilir (alıcı kusursuz) |
 | Buyer fee baz tutarı | Sadece ürün fiyatı (kargo değil) |
@@ -295,6 +295,13 @@ Status ∈ `{pending_review, approved, wait_for_delivery, return_shipment_open, 
 
 ### 7.2 Senaryo B — Haklı dispute
 
+**Politika (proje teslim sonrası netleştirme, 2026-06-03):** Alıcı haklı bulunduğunda **alıcının ödediği TÜM PARA iade edilir** — istisnasız. Buna dahildir:
+- Ürün bedeli (subtotal)
+- Kargo bedeli
+- %3 Platform Hizmet Bedeli (buyerFeeAmount)
+
+Platform kendi komisyonundan (sellerCommission) da feragat eder (`CommissionLedger.status=refunded`); satıcı kargo bedelini üstlenir (`returnShippingPayer='seller'`).
+
 **Tetik:** Alıcı RefundRequest açar; admin onaylar.
 
 **Refund açma uygunluğu (timing matrix):**
@@ -321,7 +328,15 @@ Status ∈ `{pending_review, approved, wait_for_delivery, return_shipment_open, 
 
 Bölüm 6.3-6.4'te detaylandırıldı. Order completed + ledger earned + payout cron sonraki tick'te transferi başlatır.
 
-### 7.4 Senaryo D — Keyfi vazgeçme
+### 7.4 ~~Senaryo D — Keyfi vazgeçme~~ KALDIRILDI
+
+**Proje teslim sonrası karar (2026-06-03):** Keyfi vazgeçme (`changed_mind`) iade gerekçesi olarak kabul edilmiyor. RefundService.createRefundRequest gerekçenin `changed_mind` olması durumunda `BadRequestException` fırlatır. Web ve admin UI'larında bu sebep listelerden kaldırıldı. `buyerInitiatedAmicable` alanı schema'da kalıyor (legacy) ama her zaman `false`.
+
+Alıcı 14 günlük cayma hakkını `not_as_described` veya `other` + açıklama ile kullanabilir (manuel admin değerlendirmesi).
+
+**Aşağıdaki kısım tarihsel referans için bırakıldı:**
+
+
 
 **Tetik:** Alıcı `delivered` veya `awaiting_buyer_confirmation` durumunda `reason='changed_mind'` ile RefundRequest açar.
 
@@ -363,7 +378,7 @@ const refundRequest = await tx.refundRequest.create({
 | A — Satıcı göndermez | ✔ tam | ✔ | ✔ | waived | (gönderim yok) |
 | B — Haklı dispute | ✔ tam | ✔ | ✔ | refunded | satıcı |
 | C — 48h geçer | — | — | — | **earned** | — |
-| D — Keyfi vazgeçme | ✔ | ✘ default | ✘ default | waived | alıcı |
+| ~~D — Keyfi vazgeçme~~ | **KALDIRILDI** — `changed_mind` reason ile talep açılamaz (proje teslim sonrası karar, 2026-06-03) | | | | |
 | Kargoda kaybolma | ✔ tam | ✔ | ✔ | refunded | platform |
 | Sahte ürün | ✔ tam | ✔ | ✔ | refunded + yaptırım | satıcı |
 
