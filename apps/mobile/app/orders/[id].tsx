@@ -316,10 +316,12 @@ export default function OrderDetailScreen() {
               confirmationDeadline={order.confirmationDeadline}
               onConfirm={() => confirmReceiptMutation.mutate()}
               onReportProblem={() =>
-                router.push({
-                  pathname: '/refund-requests/new',
-                  params: { orderId: order.id },
-                })
+                // Refund request route henüz mobile'da yok; geçici olarak order detay'da kalır.
+                // Faz 4+ kapsamında mobile refund-request flow eklenince burası güncellenecek.
+                Alert.alert(
+                  'Sorun Bildirme',
+                  'Sorun bildirimi için lütfen profil > Yardım üzerinden iletişime geçin. (Mobile iade akışı yakında eklenecek.)',
+                )
               }
               confirming={confirmReceiptMutation.isPending}
             />

@@ -44,7 +44,7 @@ const levelStyles = {
   green: { bg: colors.success[50], border: colors.success[300], text: colors.success[900] },
   yellow: { bg: colors.warning[50], border: colors.warning[400], text: colors.warning[900] },
   red: { bg: colors.danger[50], border: colors.danger[400], text: colors.danger[900] },
-  expired: { bg: colors.neutral[100], border: colors.neutral[300], text: colors.neutral[700] },
+  expired: { bg: colors.gray[100], border: colors.gray[300], text: colors.gray[700] },
 } as const;
 
 export function AwaitingConfirmationBanner({
@@ -73,11 +73,11 @@ export function AwaitingConfirmationBanner({
         </Text>
       </View>
 
-      <Text variant="h3" style={{ color: styleSet.text, marginTop: spacing.sm }}>
+      <Text variant="h3" style={{ color: styleSet.text, marginTop: spacing[2] }}>
         {remaining.text}
       </Text>
 
-      <Text variant="caption" style={{ color: styleSet.text, marginTop: spacing.xs }}>
+      <Text variant="caption" style={{ color: styleSet.text, marginTop: spacing[1] }}>
         Ürünü kontrol et. Sorun yoksa hemen onayla; sorun varsa bildir.
         48 saat sonunda otomatik tamamlanır.
       </Text>
@@ -105,22 +105,22 @@ const styles = StyleSheet.create({
   card: {
     borderWidth: 2,
     borderRadius: radius.lg,
-    padding: spacing.md,
-    marginBottom: spacing.md,
+    padding: spacing[3],
+    marginBottom: spacing[3],
   },
   headerRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: spacing.sm,
+    gap: spacing[2],
   },
   actionRow: {
     flexDirection: 'row',
-    gap: spacing.sm,
-    marginTop: spacing.md,
+    gap: spacing[2],
+    marginTop: spacing[3],
   },
   reportLink: {
     alignSelf: 'center',
-    marginTop: spacing.sm,
-    padding: spacing.sm,
+    marginTop: spacing[2],
+    padding: spacing[2],
   },
 });
