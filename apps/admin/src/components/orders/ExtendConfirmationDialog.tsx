@@ -51,9 +51,8 @@ export function ExtendConfirmationDialog({
   };
 
   return (
-    <Dialog open={open} onOpenChange={(o) => !o && onClose()}>
+    <Dialog isOpen={open} onClose={onClose} title="Pencereyi Uzat">
       <div className="space-y-4">
-        <h2 className="text-lg font-semibold">Pencereyi Uzat</h2>
         <p className="text-sm text-gray-600">
           48 saatlik alıcı kontrol penceresinin son tarihini uzat.
         </p>

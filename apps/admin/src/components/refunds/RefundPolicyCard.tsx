@@ -232,7 +232,7 @@ function PolicyRow({
     <label className="flex items-center gap-2 cursor-pointer">
       <Checkbox
         checked={checked}
-        onCheckedChange={(c) => onChange(Boolean(c))}
+        onChange={(e) => onChange(e.target.checked)}
         disabled={disabled}
       />
       <span className="text-sm">{label}</span>

@@ -9,7 +9,6 @@ import {
   FormField,
   Alert,
 } from "@tarodan/ui";
-import { ExclamationTriangleIcon } from "@heroicons/react/24/outline";
 
 /**
  * Faz 4A.4 — Manuel tamamla dialog'u (super_admin).
@@ -42,14 +41,9 @@ export function ForceCompleteDialog({
   };
 
   return (
-    <Dialog open={open} onOpenChange={(o) => !o && onClose()}>
+    <Dialog isOpen={open} onClose={onClose} title="Manuel Tamamla">
       <div className="space-y-4">
-        <h2 className="text-lg font-semibold text-red-700 flex items-center gap-2">
-          <ExclamationTriangleIcon className="h-5 w-5" />
-          Manuel Tamamla
-        </h2>
-
-        <Alert variant="destructive">
+        <Alert variant="danger">
           Bu eylem siparişi <strong>hemen tamamlar</strong>; satıcıya ödeme
           transferi tetiklenir. <strong>Geri alınamaz</strong>. Yalnızca
           super_admin yetkisi gerektirir.
@@ -73,7 +67,7 @@ export function ForceCompleteDialog({
             Vazgeç
           </Button>
           <Button
-            variant="destructive"
+            variant="danger"
             onClick={handleSubmit}
             disabled={loading}
           >

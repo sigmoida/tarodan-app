@@ -133,7 +133,7 @@ export function AwaitingConfirmationCard({
             Pencereyi Uzat
           </Button>
           <Button
-            variant="destructive"
+            variant="danger"
             size="sm"
             onClick={onForceCompleteClick}
           >
