@@ -9,8 +9,16 @@ export enum NotificationType {
   ORDER_DELIVERED = 'order_delivered',
   ORDER_COMPLETED = 'order_completed',
   ORDER_CANCELLED = 'order_cancelled',
+  ORDER_CANCELLED_OUT_OF_STOCK = 'order_cancelled_out_of_stock',
   ORDER_REFUNDED = 'order_refunded',
   ORDER_PREPARING_DEADLINE_WARNING = 'order_preparing_deadline_warning',
+  ORDER_RESERVATION_RELEASED = 'order_reservation_released',
+  // 48h pencere (Faz 3B.1)
+  ORDER_DELIVERED_CONFIRM = 'order_delivered_confirm',
+  ORDER_AUTO_COMPLETED = 'order_auto_completed',
+  ORDER_MANUALLY_CONFIRMED = 'order_manually_confirmed',
+  ORDER_FORCE_COMPLETED_BY_ADMIN = 'order_force_completed_by_admin',
+  SELLER_DID_NOT_SHIP_REFUNDED = 'seller_did_not_ship_refunded',
 
   // Offer notifications
   OFFER_RECEIVED = 'offer_received',
@@ -19,6 +27,7 @@ export enum NotificationType {
   OFFER_COUNTER = 'offer_counter',
   OFFER_COUNTER_DECLINED = 'offer_counter_declined',
   OFFER_EXPIRED = 'offer_expired',
+  OFFER_CANCELLED_OUT_OF_STOCK = 'offer_cancelled_out_of_stock',
 
   // Product notifications
   PRODUCT_APPROVED = 'product_approved',
@@ -37,6 +46,14 @@ export enum NotificationType {
   TRADE_SHIPPED = 'trade_shipped',
   TRADE_COMPLETED = 'trade_completed',
   TRADE_AUTO_CANCELLED = 'trade_auto_cancelled',
+
+  // RefundRequest notifications (sipariş iadesi akışı)
+  REFUND_CANCELLED = 'refund_cancelled',
+  REFUND_APPROVED = 'refund_approved',
+  REFUND_REJECTED = 'refund_rejected',
+  REFUND_DISPUTED = 'refund_disputed',
+  REFUND_RETURN_OPENED = 'refund_return_opened',
+  REFUND_COMPLETED = 'refund_completed',
 
   // Cross-flow auto-rejection
   OFFER_AUTO_REJECTED = 'offer_auto_rejected',

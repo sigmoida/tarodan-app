@@ -77,6 +77,30 @@ export class AdminApiClient {
     return response.data;
   }
 
+  // 48h pencere müdahaleleri (Faz 4A.1)
+
+  async forceCompleteOrder(
+    id: string,
+    payload: { reason?: string } = {},
+  ): Promise<{ completed: boolean }> {
+    const response = await this.client.post<{ completed: boolean }>(
+      `/admin/orders/${id}/force-complete`,
+      payload,
+    );
+    return response.data;
+  }
+
+  async extendOrderConfirmation(
+    id: string,
+    payload: { hours: number; reason?: string },
+  ): Promise<{ newDeadline: string }> {
+    const response = await this.client.post<{ newDeadline: string }>(
+      `/admin/orders/${id}/extend-confirmation`,
+      payload,
+    );
+    return response.data;
+  }
+
   // Reports
   async getSalesReport(params?: { startDate?: string; endDate?: string }): Promise<SalesReport> {
     const response = await this.client.get<SalesReport>('/admin/reports/sales', { params });

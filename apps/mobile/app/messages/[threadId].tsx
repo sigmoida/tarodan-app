@@ -1,34 +1,36 @@
-import { View, ScrollView, StyleSheet, TouchableOpacity, KeyboardAvoidingView, Platform, TextInput as RNTextInput, Image, Alert } from 'react-native';
-import { Text, Avatar, IconButton, ActivityIndicator, Banner } from 'react-native-paper';
+import { View, ScrollView, StyleSheet, TouchableOpacity, KeyboardAvoidingView, Platform, TextInput as RNTextInput, Image as RNImage, Alert } from 'react-native';
+import { Avatar, IconButton, Spinner, Alert as UIAlert, Text, theme } from '@tarodan/ui-native';
 import { useState, useRef, useEffect, useCallback } from 'react';
 import { router, useLocalSearchParams, useFocusEffect } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import * as ImagePicker from 'expo-image-picker';
 import { useMessagesStore, Message } from '../../src/stores/messagesStore';
 import { useAuthStore } from '../../src/stores/authStore';
+import { detectViolations, getViolationMessage, parseMessageContent } from '../../src/utils/contentFilter';
 import { mediaApi } from '../../src/services/api';
-import { TarodanColors } from '../../src/theme';
+
+const { colors } = theme;
 
 export default function MessageThreadScreen() {
   const { threadId } = useLocalSearchParams<{ threadId: string }>();
   const { user, limits } = useAuthStore();
-  const { 
-    currentThread, 
-    messages, 
-    isLoadingMessages, 
-    fetchThread, 
-    fetchMessages, 
-    sendMessage, 
+  const {
+    currentThread,
+    messages,
+    isLoadingMessages,
+    fetchThread,
+    fetchMessages,
+    sendMessage,
     markAsRead,
     getOtherParticipant,
     canSendMessage,
     dailyMessageCount,
   } = useMessagesStore();
-  
+
   const [inputText, setInputText] = useState('');
   const [sending, setSending] = useState(false);
-  const [pendingImage, setPendingImage] = useState<string | null>(null);
-  const [imageUploading, setImageUploading] = useState(false);
+  const [uploadingImage, setUploadingImage] = useState(false);
+  const [filterWarning, setFilterWarning] = useState<string | null>(null);
   const scrollViewRef = useRef<ScrollView>(null);
 
   const messageLimit = limits?.maxMessagesPerDay || 50;
@@ -53,55 +55,78 @@ export default function MessageThreadScreen() {
     }, 100);
   }, [messages]);
 
-  const pickImage = async () => {
-    const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
-    if (status !== 'granted') {
-      Alert.alert('İzin Gerekli', 'Galeri erişimi için izin verin');
+  /**
+   * Resim seç → mediaApi.uploadMessageImage → "[IMG:url]" formatında mesaj gönder.
+   * Web `apps/web/src/app/messages/page.tsx:337` ile aynı akış.
+   */
+  const handleAttachImage = async () => {
+    if (!threadId || uploadingImage || !canSend) return;
+
+    // İzin iste
+    const perm = await ImagePicker.requestMediaLibraryPermissionsAsync();
+    if (!perm.granted) {
+      Alert.alert('İzin Gerekli', 'Resim göndermek için galeri erişim izni gerekli.');
       return;
     }
+
     const result = await ImagePicker.launchImageLibraryAsync({
       mediaTypes: ImagePicker.MediaTypeOptions.Images,
-      quality: 0.7,
-      allowsEditing: true,
+      allowsMultipleSelection: false,
+      quality: 0.8,
     });
-    if (!result.canceled && result.assets[0]) {
-      setPendingImage(result.assets[0].uri);
+
+    if (result.canceled || !result.assets?.[0]) return;
+
+    const asset = result.assets[0];
+    const filename = asset.uri.split('/').pop() || `image_${Date.now()}.jpg`;
+    const match = /\.(\w+)$/.exec(filename);
+    const type = asset.mimeType || (match ? `image/${match[1]}` : 'image/jpeg');
+
+    const file = {
+      uri: Platform.OS === 'ios' ? asset.uri.replace('file://', '') : asset.uri,
+      name: filename,
+      type,
+    };
+
+    setUploadingImage(true);
+    try {
+      const response = await mediaApi.uploadMessageImage(file as any);
+      const url = (response.data as any)?.url ?? (response.data as any)?.data?.url;
+      if (!url) throw new Error('Resim yüklendi fakat URL alınamadı.');
+
+      // Mevcut input metnini koru, sonuna [IMG:url] ekle
+      const base = inputText.trim();
+      const content = base ? `${base} [IMG:${url}]` : `[IMG:${url}]`;
+      const success = await sendMessage(threadId, content);
+      if (success) {
+        setInputText('');
+        scrollViewRef.current?.scrollToEnd({ animated: true });
+      }
+    } catch (e: any) {
+      Alert.alert('Hata', e?.response?.data?.message || 'Resim gönderilemedi.');
+    } finally {
+      setUploadingImage(false);
     }
   };
 
   const handleSend = async () => {
-    if ((!inputText.trim() && !pendingImage) || !threadId || sending || !canSend) return;
+    if (!inputText.trim() || !threadId || sending || !canSend) return;
 
-    setSending(true);
-    let messageContent = inputText.trim();
+    const trimmed = inputText.trim();
 
-    if (pendingImage) {
-      setImageUploading(true);
-      try {
-        const formData = new FormData();
-        const ext = pendingImage.split('.').pop() || 'jpg';
-        formData.append('file', { uri: pendingImage, name: `message_image.${ext}`, type: `image/${ext}` } as any);
-        const uploadRes = await mediaApi.uploadMessageImage(formData);
-        const imageUrl = uploadRes.data?.url || uploadRes.data?.data?.url;
-        if (imageUrl) {
-          messageContent = messageContent ? `[IMG:${imageUrl}] ${messageContent}` : `[IMG:${imageUrl}]`;
-        }
-      } catch {
-        Alert.alert('Hata', 'Görsel yüklenemedi');
-        setSending(false);
-        setImageUploading(false);
-        return;
-      }
-      setImageUploading(false);
+    // Platform dışı iletişim tespiti (telefon, email, IBAN, WhatsApp vs.)
+    const violations = detectViolations(trimmed);
+    if (violations.length > 0) {
+      setFilterWarning(getViolationMessage(violations));
+      setTimeout(() => setFilterWarning(null), 5000);
+      return;
     }
 
-    if (messageContent) {
-      const success = await sendMessage(threadId, messageContent);
-      if (success) {
-        setInputText('');
-        setPendingImage(null);
-        scrollViewRef.current?.scrollToEnd({ animated: true });
-      }
+    setSending(true);
+    const success = await sendMessage(threadId, trimmed);
+    if (success) {
+      setInputText('');
+      scrollViewRef.current?.scrollToEnd({ animated: true });
     }
     setSending(false);
   };
@@ -140,7 +165,7 @@ export default function MessageThreadScreen() {
   // Group messages by date
   const groupedMessages: { date: string; messages: Message[] }[] = [];
   let currentDate = '';
-  
+
   messages.forEach(message => {
     const messageDate = formatDate(message.createdAt);
     if (messageDate !== currentDate) {
@@ -154,7 +179,7 @@ export default function MessageThreadScreen() {
   const other = currentThread ? getOtherParticipant(currentThread) : null;
 
   return (
-    <KeyboardAvoidingView 
+    <KeyboardAvoidingView
       style={styles.container}
       behavior={Platform.OS === 'ios' ? 'padding' : undefined}
       keyboardVerticalOffset={0}
@@ -162,18 +187,18 @@ export default function MessageThreadScreen() {
       {/* Header */}
       <View style={styles.header}>
         <TouchableOpacity onPress={() => router.back()} style={styles.backButton}>
-          <Ionicons name="arrow-back" size={24} color={TarodanColors.textOnPrimary} />
+          <Ionicons name="arrow-back" size={24} color={colors.white} />
         </TouchableOpacity>
-        
-        <TouchableOpacity 
+
+        <TouchableOpacity
           style={styles.headerContent}
           onPress={() => other && router.push(`/seller/${other.id}`)}
         >
-          {other?.avatarUrl ? (
-            <Avatar.Image size={40} source={{ uri: other.avatarUrl }} />
-          ) : (
-            <Avatar.Text size={40} label={other?.displayName?.charAt(0) || '?'} />
-          )}
+          <Avatar
+            size="md"
+            source={other?.avatarUrl || undefined}
+            name={other?.displayName?.charAt(0) || '?'}
+          />
           <View style={styles.headerInfo}>
             <Text style={styles.headerTitle}>{other?.displayName || 'Yükleniyor...'}</Text>
             {currentThread?.product && (
@@ -185,44 +210,45 @@ export default function MessageThreadScreen() {
         </TouchableOpacity>
 
         <IconButton
-          icon="dots-vertical"
-          iconColor={TarodanColors.textOnPrimary}
+          icon="ellipsis-vertical"
+          accessibilityLabel="Daha fazla"
+          size="md"
           onPress={() => {}}
         />
       </View>
 
       {/* Product Banner */}
       {currentThread?.product && (
-        <TouchableOpacity 
+        <TouchableOpacity
           style={styles.productBanner}
           onPress={() => router.push(`/product/${currentThread.product?.id}`)}
         >
-          <Ionicons name="pricetag" size={16} color={TarodanColors.primary} />
+          <Ionicons name="pricetag" size={16} color={colors.primary[600]!} />
           <Text style={styles.productBannerText} numberOfLines={1}>
             {currentThread.product.title}
           </Text>
-          <Ionicons name="chevron-forward" size={16} color={TarodanColors.textSecondary} />
+          <Ionicons name="chevron-forward" size={16} color={colors.text.muted} />
         </TouchableOpacity>
       )}
 
       {/* Message Limit Warning */}
       {!isUnlimited && !canSend && (
-        <Banner
-          visible={true}
-          icon="alert-circle"
-          style={styles.limitBanner}
-          actions={[
-            { label: 'Premium\'a Geç', onPress: () => router.push('/upgrade') }
-          ]}
-        >
+        <UIAlert variant="warning">
           Günlük mesaj limitinize ulaştınız ({messageLimit} mesaj). Premium üyelikle sınırsız mesaj gönderin.
-        </Banner>
+        </UIAlert>
       )}
+
+      {/* İçerik filtresi uyarısı */}
+      {filterWarning ? (
+        <UIAlert variant="warning">
+          {filterWarning}
+        </UIAlert>
+      ) : null}
 
       {/* Messages */}
       {isLoadingMessages && messages.length === 0 ? (
         <View style={styles.loadingContainer}>
-          <ActivityIndicator size="large" color={TarodanColors.primary} />
+          <Spinner size="lg" />
         </View>
       ) : (
         <ScrollView
@@ -243,13 +269,13 @@ export default function MessageThreadScreen() {
               {group.messages.map((message, messageIndex) => {
                 const isOwn = message.senderId === user?.id;
                 const showAvatar = !isOwn && (
-                  messageIndex === 0 || 
+                  messageIndex === 0 ||
                   group.messages[messageIndex - 1]?.senderId !== message.senderId
                 );
 
                 return (
-                  <View 
-                    key={message.id} 
+                  <View
+                    key={message.id}
                     style={[
                       styles.messageRow,
                       isOwn ? styles.messageRowOwn : styles.messageRowOther,
@@ -257,35 +283,43 @@ export default function MessageThreadScreen() {
                   >
                     {!isOwn && (
                       <View style={styles.avatarPlaceholder}>
-                        {showAvatar && other?.avatarUrl ? (
-                          <Avatar.Image size={28} source={{ uri: other.avatarUrl }} />
-                        ) : showAvatar ? (
-                          <Avatar.Text size={28} label={other?.displayName?.charAt(0) || '?'} />
+                        {showAvatar ? (
+                          <Avatar
+                            size="sm"
+                            source={other?.avatarUrl || undefined}
+                            name={other?.displayName?.charAt(0) || '?'}
+                          />
                         ) : null}
                       </View>
                     )}
-                    
+
                     <View style={[
                       styles.messageBubble,
                       isOwn ? styles.messageBubbleOwn : styles.messageBubbleOther,
                     ]}>
                       {(() => {
-                        const imgMatch = message.content?.match(/\[IMG:(.*?)\]/);
-                        const textPart = message.content?.replace(/\[IMG:.*?\]\s*/g, '').trim();
+                        const parsed = parseMessageContent(message.content || '');
                         return (
                           <>
-                            {imgMatch && imgMatch[1] && (
-                              <Image
-                                source={{ uri: imgMatch[1] }}
-                                style={{ width: 200, height: 150, borderRadius: 8, marginBottom: textPart ? 6 : 0 }}
-                                resizeMode="cover"
-                              />
-                            )}
-                            {textPart ? (
+                            {parsed.images.length > 0 ? (
+                              <View style={styles.messageImagesWrap}>
+                                {parsed.images.map((img, idx) => (
+                                  <RNImage
+                                    key={`${message.id}-img-${idx}`}
+                                    source={{ uri: img }}
+                                    style={styles.messageImage}
+                                    resizeMode="cover"
+                                  />
+                                ))}
+                              </View>
+                            ) : null}
+                            {parsed.text ? (
                               <Text style={[
                                 styles.messageText,
                                 isOwn ? styles.messageTextOwn : styles.messageTextOther,
-                              ]}>{textPart}</Text>
+                              ]}>
+                                {parsed.text}
+                              </Text>
                             ) : null}
                           </>
                         );
@@ -314,21 +348,25 @@ export default function MessageThreadScreen() {
         </ScrollView>
       )}
 
-      {/* Pending Image Preview */}
-      {pendingImage && (
-        <View style={styles.imagePreviewBar}>
-          <Image source={{ uri: pendingImage }} style={styles.imagePreviewThumb} />
-          <Text style={{ flex: 1, fontSize: 12, color: TarodanColors.textSecondary, marginLeft: 8 }}>Görsel eklendi</Text>
-          <TouchableOpacity onPress={() => setPendingImage(null)}>
-            <Ionicons name="close-circle" size={24} color={TarodanColors.error} />
-          </TouchableOpacity>
-        </View>
-      )}
-
       {/* Input */}
       <View style={styles.inputContainer}>
-        <TouchableOpacity style={styles.imagePickButton} onPress={pickImage} disabled={sending || imageUploading}>
-          <Ionicons name="image-outline" size={24} color={canSend ? TarodanColors.primary : TarodanColors.textLight} />
+        <TouchableOpacity
+          style={[
+            styles.attachButton,
+            (!canSend || uploadingImage) && styles.attachButtonDisabled,
+          ]}
+          onPress={handleAttachImage}
+          disabled={!canSend || uploadingImage}
+        >
+          {uploadingImage ? (
+            <Spinner size="sm" />
+          ) : (
+            <Ionicons
+              name="image-outline"
+              size={24}
+              color={canSend ? colors.primary[600]! : colors.text.subtle}
+            />
+          )}
         </TouchableOpacity>
         <View style={styles.inputWrapper}>
           <RNTextInput
@@ -338,10 +376,10 @@ export default function MessageThreadScreen() {
             onChangeText={setInputText}
             multiline
             maxLength={1000}
-            editable={canSend}
+            editable={canSend && !uploadingImage}
           />
         </View>
-        <TouchableOpacity 
+        <TouchableOpacity
           style={[
             styles.sendButton,
             (!inputText.trim() || !canSend || sending) && styles.sendButtonDisabled,
@@ -349,10 +387,10 @@ export default function MessageThreadScreen() {
           onPress={handleSend}
           disabled={!inputText.trim() || !canSend || sending}
         >
-          <Ionicons 
-            name="send" 
-            size={24} 
-            color={(!inputText.trim() || !canSend) ? TarodanColors.textLight : TarodanColors.textOnPrimary} 
+          <Ionicons
+            name="send"
+            size={24}
+            color={(!inputText.trim() || !canSend) ? colors.text.subtle : colors.white}
           />
         </TouchableOpacity>
       </View>
@@ -363,10 +401,10 @@ export default function MessageThreadScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: TarodanColors.backgroundSecondary,
+    backgroundColor: colors.surface.alt,
   },
   header: {
-    backgroundColor: TarodanColors.primary,
+    backgroundColor: colors.primary[600]!,
     paddingTop: 50,
     paddingBottom: 12,
     paddingHorizontal: 8,
@@ -389,28 +427,25 @@ const styles = StyleSheet.create({
   headerTitle: {
     fontSize: 16,
     fontWeight: '600',
-    color: TarodanColors.textOnPrimary,
+    color: colors.white,
   },
   headerSubtitle: {
     fontSize: 12,
-    color: TarodanColors.textOnPrimary + 'CC',
+    color: colors.overlay.white85,
   },
   productBanner: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: TarodanColors.background,
+    backgroundColor: colors.surface.DEFAULT,
     padding: 12,
     borderBottomWidth: 1,
-    borderBottomColor: TarodanColors.border,
+    borderBottomColor: colors.border.DEFAULT,
   },
   productBannerText: {
     flex: 1,
     marginHorizontal: 8,
-    color: TarodanColors.textPrimary,
+    color: colors.text.heading,
     fontSize: 13,
-  },
-  limitBanner: {
-    backgroundColor: TarodanColors.warningLight,
   },
   loadingContainer: {
     flex: 1,
@@ -431,12 +466,12 @@ const styles = StyleSheet.create({
   dateDividerLine: {
     flex: 1,
     height: 1,
-    backgroundColor: TarodanColors.border,
+    backgroundColor: colors.border.DEFAULT,
   },
   dateDividerText: {
     paddingHorizontal: 12,
     fontSize: 12,
-    color: TarodanColors.textSecondary,
+    color: colors.text.muted,
   },
   messageRow: {
     flexDirection: 'row',
@@ -458,22 +493,34 @@ const styles = StyleSheet.create({
     borderRadius: 16,
   },
   messageBubbleOwn: {
-    backgroundColor: TarodanColors.primary,
+    backgroundColor: colors.primary[600]!,
     borderBottomRightRadius: 4,
   },
   messageBubbleOther: {
-    backgroundColor: TarodanColors.background,
+    backgroundColor: colors.surface.DEFAULT,
     borderBottomLeftRadius: 4,
+  },
+  messageImagesWrap: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 6,
+    marginBottom: 6,
+  },
+  messageImage: {
+    width: 160,
+    height: 160,
+    borderRadius: 8,
+    backgroundColor: colors.surface.alt,
   },
   messageText: {
     fontSize: 15,
     lineHeight: 20,
   },
   messageTextOwn: {
-    color: TarodanColors.textOnPrimary,
+    color: colors.white,
   },
   messageTextOther: {
-    color: TarodanColors.textPrimary,
+    color: colors.text.heading,
   },
   messageFooter: {
     flexDirection: 'row',
@@ -485,27 +532,27 @@ const styles = StyleSheet.create({
     fontSize: 11,
   },
   messageTimeOwn: {
-    color: TarodanColors.textOnPrimary + 'AA',
+    color: colors.overlay.white70,
   },
   messageTimeOther: {
-    color: TarodanColors.textSecondary,
+    color: colors.text.muted,
   },
   messageStatus: {
     marginLeft: 4,
     fontSize: 11,
-    color: TarodanColors.textOnPrimary + 'AA',
+    color: colors.overlay.white70,
   },
   inputContainer: {
     flexDirection: 'row',
     alignItems: 'flex-end',
     padding: 12,
-    backgroundColor: TarodanColors.background,
+    backgroundColor: colors.surface.DEFAULT,
     borderTopWidth: 1,
-    borderTopColor: TarodanColors.border,
+    borderTopColor: colors.border.DEFAULT,
   },
   inputWrapper: {
     flex: 1,
-    backgroundColor: TarodanColors.surfaceVariant,
+    backgroundColor: colors.surface.alt,
     borderRadius: 24,
     paddingHorizontal: 16,
     paddingVertical: 8,
@@ -514,39 +561,30 @@ const styles = StyleSheet.create({
   },
   textInput: {
     fontSize: 16,
-    color: TarodanColors.textPrimary,
+    color: colors.text.heading,
     maxHeight: 100,
   },
   sendButton: {
     width: 48,
     height: 48,
     borderRadius: 24,
-    backgroundColor: TarodanColors.primary,
+    backgroundColor: colors.primary[600]!,
     justifyContent: 'center',
     alignItems: 'center',
   },
   sendButtonDisabled: {
-    backgroundColor: TarodanColors.surfaceVariant,
+    backgroundColor: colors.surface.alt,
   },
-  imagePickButton: {
-    width: 40,
-    height: 48,
+  attachButton: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    backgroundColor: colors.surface.alt,
     justifyContent: 'center',
     alignItems: 'center',
-    marginRight: 4,
+    marginRight: 8,
   },
-  imagePreviewBar: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingHorizontal: 12,
-    paddingVertical: 8,
-    backgroundColor: TarodanColors.surfaceVariant,
-    borderTopWidth: 1,
-    borderTopColor: TarodanColors.border,
-  },
-  imagePreviewThumb: {
-    width: 40,
-    height: 40,
-    borderRadius: 6,
+  attachButtonDisabled: {
+    opacity: 0.5,
   },
 });

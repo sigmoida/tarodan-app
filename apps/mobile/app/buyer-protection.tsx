@@ -1,9 +1,11 @@
 import { View, ScrollView, StyleSheet } from 'react-native';
-import { Text, Card } from 'react-native-paper';
 import { Stack, router } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { TouchableOpacity } from 'react-native';
-import { TarodanColors } from '../src/theme';
+import { theme, Text, Card } from '@tarodan/ui-native';
+import { useTranslation } from '../src/i18n';
+
+const { colors } = theme;
 
 const sections = [
   {
@@ -44,12 +46,13 @@ const sections = [
 ];
 
 export default function BuyerProtectionScreen() {
+  const { t } = useTranslation();
   return (
     <View style={styles.container}>
-      <Stack.Screen options={{ title: 'Alıcı Koruma' }} />
+      <Stack.Screen options={{ title: t('mobile.pageBuyerProtection') }} />
 
       <View style={styles.hero}>
-        <Ionicons name="shield-checkmark" size={40} color="#fff" />
+        <Ionicons name="shield-checkmark" size={40} color={colors.white} />
         <Text style={styles.heroTitle}>Alıcı Koruma Programı</Text>
         <Text style={styles.heroDate}>Son güncelleme: 24 Ocak 2026</Text>
       </View>
@@ -57,28 +60,26 @@ export default function BuyerProtectionScreen() {
       <ScrollView contentContainerStyle={styles.content}>
         {sections.map((section, i) => (
           <Card key={i} style={styles.card}>
-            <Card.Content>
-              <View style={styles.sectionHeader}>
-                <Ionicons name={section.icon} size={20} color={TarodanColors.primary} />
-                <Text variant="titleSmall" style={styles.sectionTitle}>{section.title}</Text>
-              </View>
-              <Text variant="bodyMedium" style={styles.text}>{section.content}</Text>
-            </Card.Content>
+            <View style={styles.sectionHeader}>
+              <Ionicons name={section.icon} size={20} color={colors.primary[600]!} />
+              <Text variant="label" style={styles.sectionTitle}>{section.title}</Text>
+            </View>
+            <Text variant="body" style={styles.text}>{section.content}</Text>
           </Card>
         ))}
 
         <View style={styles.links}>
-          <TouchableOpacity style={styles.linkButton} onPress={() => router.push('/refund-policy')}>
+          <TouchableOpacity style={styles.linkButton} onPress={() => router.push('/refund-policy' as any)}>
             <Text style={styles.linkText}>İade Politikası</Text>
-            <Ionicons name="chevron-forward" size={18} color={TarodanColors.primary} />
+            <Ionicons name="chevron-forward" size={18} color={colors.primary[600]!} />
           </TouchableOpacity>
-          <TouchableOpacity style={styles.linkButton} onPress={() => router.push('/returns-exchanges')}>
+          <TouchableOpacity style={styles.linkButton} onPress={() => router.push('/returns-exchanges' as any)}>
             <Text style={styles.linkText}>İade ve Değişim</Text>
-            <Ionicons name="chevron-forward" size={18} color={TarodanColors.primary} />
+            <Ionicons name="chevron-forward" size={18} color={colors.primary[600]!} />
           </TouchableOpacity>
           <TouchableOpacity style={styles.linkButton} onPress={() => router.push('/terms')}>
             <Text style={styles.linkText}>Kullanım Şartları</Text>
-            <Ionicons name="chevron-forward" size={18} color={TarodanColors.primary} />
+            <Ionicons name="chevron-forward" size={18} color={colors.primary[600]!} />
           </TouchableOpacity>
         </View>
 
@@ -89,29 +90,29 @@ export default function BuyerProtectionScreen() {
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: TarodanColors.backgroundSecondary },
+  container: { flex: 1, backgroundColor: colors.surface.alt },
   hero: {
-    backgroundColor: '#1F2937',
+    backgroundColor: colors.gray[800],
     paddingVertical: 32,
     paddingHorizontal: 20,
     alignItems: 'center',
   },
-  heroTitle: { fontSize: 22, fontWeight: 'bold', color: '#fff', marginTop: 12 },
-  heroDate: { fontSize: 13, color: '#9CA3AF', marginTop: 6 },
+  heroTitle: { fontSize: 22, fontWeight: 'bold', color: colors.white, marginTop: 12 },
+  heroDate: { fontSize: 13, color: colors.gray[400], marginTop: 6 },
   content: { padding: 16 },
-  card: { marginBottom: 12, backgroundColor: TarodanColors.background },
+  card: { marginBottom: 12, backgroundColor: colors.surface.DEFAULT },
   sectionHeader: { flexDirection: 'row', alignItems: 'center', marginBottom: 10, gap: 8 },
-  sectionTitle: { fontWeight: '600', color: TarodanColors.textPrimary, flex: 1 },
-  text: { color: TarodanColors.textSecondary, lineHeight: 22 },
+  sectionTitle: { fontWeight: '600', color: colors.text.heading, flex: 1 },
+  text: { color: colors.text.muted, lineHeight: 22 },
   links: { marginTop: 8 },
   linkButton: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    backgroundColor: TarodanColors.background,
+    backgroundColor: colors.surface.DEFAULT,
     padding: 16,
     borderRadius: 12,
     marginBottom: 8,
   },
-  linkText: { fontSize: 15, color: TarodanColors.primary, fontWeight: '500' },
+  linkText: { fontSize: 15, color: colors.primary[600]!, fontWeight: '500' },
 });

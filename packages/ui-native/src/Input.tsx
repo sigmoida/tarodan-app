@@ -1,5 +1,7 @@
 import React, { useState } from 'react';
+import { Ionicons } from '@expo/vector-icons';
 import {
+  Pressable,
   StyleSheet,
   Text,
   TextInput,
@@ -10,12 +12,21 @@ import {
 } from 'react-native';
 import { theme } from './theme';
 
+type IoniconName = React.ComponentProps<typeof Ionicons>['name'];
+
 export interface InputProps extends TextInputProps {
   label?: string;
   error?: string;
   helperText?: string;
+  /** Pass a custom node. Takes precedence over `leftIconName`. */
   leftIcon?: React.ReactNode;
   rightIcon?: React.ReactNode;
+  /** Convenience: Ionicon by name on the left. */
+  leftIconName?: IoniconName;
+  /** Convenience: Ionicon by name on the right. */
+  rightIconName?: IoniconName;
+  /** When true and `secureTextEntry`, show a tap-to-toggle visibility eye on the right. */
+  togglePasswordVisibility?: boolean;
   inputSize?: 'sm' | 'md' | 'lg';
   containerStyle?: ViewStyle;
   inputStyle?: TextStyle;
@@ -29,12 +40,18 @@ const sizeStyle = {
   lg: { height: 52, font: typography.fontSize.lg },
 } as const;
 
+const iconSizePx = 20;
+
 export const Input: React.FC<InputProps> = ({
   label,
   error,
   helperText,
   leftIcon,
   rightIcon,
+  leftIconName,
+  rightIconName,
+  togglePasswordVisibility,
+  secureTextEntry,
   inputSize = 'md',
   containerStyle,
   inputStyle,
@@ -43,13 +60,42 @@ export const Input: React.FC<InputProps> = ({
   ...rest
 }) => {
   const [focused, setFocused] = useState(false);
+  const [passwordHidden, setPasswordHidden] = useState(true);
   const ss = sizeStyle[inputSize];
 
   const borderColor = error
     ? colors.danger[600]!
     : focused
       ? colors.primary[600]!
-      : colors.gray[300];
+      : colors.border.DEFAULT;
+
+  const resolvedLeftIcon =
+    leftIcon ??
+    (leftIconName ? (
+      <Ionicons name={leftIconName} size={iconSizePx} color={colors.text.muted} />
+    ) : null);
+
+  const showEye = togglePasswordVisibility && secureTextEntry;
+  const resolvedRightIcon =
+    rightIcon ??
+    (showEye ? (
+      <Pressable
+        onPress={() => setPasswordHidden((v) => !v)}
+        hitSlop={8}
+        accessibilityRole="button"
+        accessibilityLabel={passwordHidden ? 'Şifreyi göster' : 'Şifreyi gizle'}
+      >
+        <Ionicons
+          name={passwordHidden ? 'eye-outline' : 'eye-off-outline'}
+          size={iconSizePx}
+          color={colors.text.muted}
+        />
+      </Pressable>
+    ) : rightIconName ? (
+      <Ionicons name={rightIconName} size={iconSizePx} color={colors.text.muted} />
+    ) : null);
+
+  const effectiveSecure = secureTextEntry ? passwordHidden : false;
 
   return (
     <View style={[styles.container, containerStyle]}>
@@ -60,7 +106,7 @@ export const Input: React.FC<InputProps> = ({
           { height: ss.height, borderColor, backgroundColor: colors.white },
         ]}
       >
-        {leftIcon && <View style={styles.iconLeft}>{leftIcon}</View>}
+        {resolvedLeftIcon && <View style={styles.iconLeft}>{resolvedLeftIcon}</View>}
         <TextInput
           style={[
             styles.input,
@@ -68,6 +114,7 @@ export const Input: React.FC<InputProps> = ({
             inputStyle,
           ]}
           placeholderTextColor={colors.text.subtle}
+          secureTextEntry={effectiveSecure}
           onFocus={(e) => {
             setFocused(true);
             onFocus?.(e);
@@ -78,7 +125,7 @@ export const Input: React.FC<InputProps> = ({
           }}
           {...rest}
         />
-        {rightIcon && <View style={styles.iconRight}>{rightIcon}</View>}
+        {resolvedRightIcon && <View style={styles.iconRight}>{resolvedRightIcon}</View>}
       </View>
       {(error || helperText) && (
         <Text style={[styles.helper, error ? styles.errorText : null]}>

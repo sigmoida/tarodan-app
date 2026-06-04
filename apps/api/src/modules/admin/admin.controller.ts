@@ -38,6 +38,8 @@ import { CurrentUser } from '../auth/decorators/current-user.decorator';
 import { AdminRoute } from '../auth/decorators/admin-route.decorator';
 import { Public } from '../auth/decorators/public.decorator';
 import { AdminRole } from '@prisma/client';
+import { ForceCompleteOrderDto, ExtendConfirmationDto } from '../order/dto';
+import { OverrideRefundPolicyDto, SetReturnShippingPayerDto } from '../refund/dto';
 import {
   CreateCommissionRuleDto,
   UpdateCommissionRuleDto,
@@ -77,6 +79,11 @@ import {
   ApproveWarehouseTradeDto,
   RejectWarehouseTradeDto,
   MarkShipmentDto,
+  MarkReturnLostDto,
+  ForceCancelStuckDto,
+  TradeShipmentQueryDto,
+  ResolveRefundDisputeDto,
+  RefundRequestQueryDto,
 } from './dto';
 
 @ApiTags('admin')
@@ -454,6 +461,41 @@ export class AdminController {
     @Body() dto: { type: string; message?: string },
   ) {
     return this.adminService.sendOrderNotification(adminId, id, dto as any);
+  }
+
+  // ---------- 48h pencere admin müdahaleleri (Faz 3B.4) ----------
+
+  @Post('orders/:id/force-complete')
+  @Roles(AdminRole.super_admin)
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({
+    summary: 'Force-complete an awaiting_buyer_confirmation order (super_admin only)',
+  })
+  @ApiParam({ name: 'id', description: 'Order ID' })
+  async forceCompleteOrder(
+    @Param('id') id: string,
+    @CurrentUser('id') adminId: string,
+    @Body() dto: ForceCompleteOrderDto,
+  ) {
+    return this.adminService.forceCompleteOrder(id, adminId, dto.reason);
+  }
+
+  @Post('orders/:id/extend-confirmation')
+  @Roles(AdminRole.super_admin, AdminRole.admin)
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({ summary: 'Extend the 48h buyer-confirmation deadline' })
+  @ApiParam({ name: 'id', description: 'Order ID' })
+  async extendOrderConfirmation(
+    @Param('id') id: string,
+    @CurrentUser('id') adminId: string,
+    @Body() dto: ExtendConfirmationDto,
+  ) {
+    return this.adminService.extendOrderConfirmation(
+      id,
+      adminId,
+      dto.hours,
+      dto.reason,
+    );
   }
 
   @Get('orders/:id/invoice')
@@ -957,6 +999,14 @@ export class AdminController {
     });
   }
 
+  @Get('trade-shipments')
+  @Roles(AdminRole.super_admin, AdminRole.admin)
+  @ApiOperation({ summary: 'List trade shipments across all trades' })
+  @ApiResponse({ status: HttpStatus.OK, description: 'Paginated trade shipments' })
+  async getTradeShipments(@Query() query: TradeShipmentQueryDto) {
+    return this.adminService.findTradeShipments(query);
+  }
+
   @Get('trades/:id')
   @Roles(AdminRole.super_admin, AdminRole.admin)
   @ApiOperation({ summary: 'Get trade details by ID' })
@@ -1064,6 +1114,176 @@ export class AdminController {
     @Body() body: MarkShipmentDto,
   ) {
     return this.adminService.markReturnDelivered(adminId, id, body.shipmentId);
+  }
+
+  @Post('trades/:id/resolve-compensation')
+  @Roles(AdminRole.super_admin, AdminRole.admin)
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({
+    summary:
+      'Close a pending compensation flag after settling the user out of band',
+  })
+  @ApiParam({ name: 'id', description: 'Trade ID' })
+  @ApiResponse({
+    status: HttpStatus.OK,
+    description: 'Compensation marker resolved; banner clears in admin UI',
+  })
+  async resolveTradeCompensation(
+    @Param('id') id: string,
+    @CurrentUser('id') adminId: string,
+    @Body() body: { note?: string },
+  ) {
+    return this.adminService.resolveTradeCompensation(adminId, id, body?.note);
+  }
+
+  @Post('trades/:id/retry-refund')
+  @Roles(AdminRole.super_admin, AdminRole.admin)
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({
+    summary:
+      'Retry a previously failed PayTR refund for a trade in returning/cancelled/disputed state',
+  })
+  @ApiParam({ name: 'id', description: 'Trade ID' })
+  @ApiResponse({
+    status: HttpStatus.OK,
+    description:
+      'Refund retried; failure flags cleared on success or updated on repeated failure',
+  })
+  async retryTradeRefund(
+    @Param('id') id: string,
+    @CurrentUser('id') adminId: string,
+  ) {
+    return this.adminService.retryTradeRefund(adminId, id);
+  }
+
+  @Post('trades/:id/mark-return-lost')
+  @Roles(AdminRole.super_admin)
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({
+    summary:
+      'Declare a return shipment lost; finalizes the trade when both returns are resolved and flags compensation',
+  })
+  @ApiParam({ name: 'id', description: 'Trade ID' })
+  @ApiResponse({
+    status: HttpStatus.OK,
+    description:
+      'Return shipment marked lost; trade cancelled with compensation flag if all returns resolved',
+  })
+  async markTradeReturnLost(
+    @Param('id') id: string,
+    @CurrentUser('id') adminId: string,
+    @Body() body: MarkReturnLostDto,
+  ) {
+    return this.adminService.markReturnShipmentLost(adminId, id, body);
+  }
+
+  @Post('trades/:id/force-cancel-stuck')
+  @Roles(AdminRole.super_admin, AdminRole.admin)
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({
+    summary:
+      'Force-cancel a warehouse-bound trade where one item arrived but the other is stuck',
+  })
+  @ApiParam({ name: 'id', description: 'Trade ID' })
+  @ApiResponse({
+    status: HttpStatus.OK,
+    description:
+      'Counterpart shipment cancelled in carrier, arrived item returned (optional), trade set to returning',
+  })
+  async forceCancelStuckTrade(
+    @Param('id') id: string,
+    @CurrentUser('id') adminId: string,
+    @Body() body: ForceCancelStuckDto,
+  ) {
+    return this.adminService.forceCancelStuckWarehouseTrade(adminId, id, body);
+  }
+
+  // ==================== REFUND REQUEST ADMIN ====================
+
+  @Get('refund-requests')
+  @Roles(AdminRole.super_admin, AdminRole.admin)
+  @ApiOperation({ summary: 'List refund requests for admin operations queue' })
+  @ApiResponse({ status: HttpStatus.OK, description: 'Paginated refund requests' })
+  async listRefundRequests(@Query() query: RefundRequestQueryDto) {
+    return this.adminService.listRefundRequests({
+      status: query.status,
+      userSearch: query.userSearch,
+      from: query.from,
+      to: query.to,
+      page: query.page,
+      limit: query.limit,
+    });
+  }
+
+  @Get('refund-requests/:id')
+  @Roles(AdminRole.super_admin, AdminRole.admin)
+  @ApiOperation({ summary: 'Get refund request detail with order/buyer/seller/tracking' })
+  @ApiParam({ name: 'id', description: 'RefundRequest ID' })
+  @ApiResponse({ status: HttpStatus.OK, description: 'Refund request detail' })
+  async getRefundRequestDetail(@Param('id') id: string) {
+    return this.adminService.getRefundRequestDetail(id);
+  }
+
+  @Post('refund-requests/:id/resolve-dispute')
+  @Roles(AdminRole.super_admin, AdminRole.admin)
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({
+    summary: 'Resolve a disputed refund: approve (open return) or reject (close)',
+  })
+  @ApiParam({ name: 'id', description: 'RefundRequest ID' })
+  @ApiResponse({ status: HttpStatus.OK, description: 'Dispute resolved' })
+  async resolveRefundDispute(
+    @Param('id') id: string,
+    @CurrentUser('id') adminId: string,
+    @Body() body: ResolveRefundDisputeDto,
+  ) {
+    return this.adminService.resolveRefundDispute(adminId, id, body);
+  }
+
+  @Post('refund-requests/:id/force-finalize')
+  @Roles(AdminRole.super_admin, AdminRole.admin)
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({
+    summary:
+      'Force-finalize a refund stuck in return_delivered (manual finalize + audit)',
+  })
+  @ApiParam({ name: 'id', description: 'RefundRequest ID' })
+  @ApiResponse({ status: HttpStatus.OK, description: 'Refund finalized' })
+  async forceFinalizeRefund(
+    @Param('id') id: string,
+    @CurrentUser('id') adminId: string,
+  ) {
+    return this.adminService.forceFinalizeRefund(adminId, id);
+  }
+
+  // ---------- RefundRequest policy override (Faz 4B.1) ----------
+
+  @Patch('refund-requests/:id/override-policy')
+  @Roles(AdminRole.super_admin, AdminRole.admin)
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({
+    summary: 'Override refund policy (4 boolean flags)',
+  })
+  @ApiParam({ name: 'id', description: 'RefundRequest ID' })
+  async overrideRefundPolicy(
+    @Param('id') id: string,
+    @CurrentUser('id') adminId: string,
+    @Body() dto: OverrideRefundPolicyDto,
+  ) {
+    return this.adminService.overrideRefundPolicy(id, adminId, dto);
+  }
+
+  @Patch('refund-requests/:id/set-shipping-payer')
+  @Roles(AdminRole.super_admin, AdminRole.admin)
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({ summary: 'Set return shipping payer (buyer/seller/platform)' })
+  @ApiParam({ name: 'id', description: 'RefundRequest ID' })
+  async setReturnShippingPayer(
+    @Param('id') id: string,
+    @CurrentUser('id') adminId: string,
+    @Body() dto: SetReturnShippingPayerDto,
+  ) {
+    return this.adminService.setReturnShippingPayer(id, adminId, dto.payer);
   }
 
   // ==================== MESSAGE MANAGEMENT ====================

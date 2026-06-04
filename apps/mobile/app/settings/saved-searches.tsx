@@ -1,12 +1,22 @@
 import { View, ScrollView, StyleSheet, TouchableOpacity, Alert } from 'react-native';
-import { Text, Card, Button, IconButton, ActivityIndicator, Chip, Divider } from 'react-native-paper';
-import { useState, useCallback } from 'react';
+import {
+  Card,
+  Button,
+  IconButton,
+  Spinner,
+  Divider,
+  Text,
+  theme,
+} from '@tarodan/ui-native';
+import { useCallback } from 'react';
 import { router, useFocusEffect } from 'expo-router';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { Ionicons } from '@expo/vector-icons';
 import { api } from '../../src/services/api';
 import { useAuthStore } from '../../src/stores/authStore';
-import { TarodanColors } from '../../src/theme';
+import { useTranslation } from '../../src/i18n';
+
+const { colors } = theme;
 
 interface SavedSearch {
   id: string;
@@ -28,6 +38,7 @@ interface SavedSearch {
 }
 
 export default function SavedSearchesScreen() {
+  const { t } = useTranslation();
   const { isAuthenticated, limits } = useAuthStore();
   const queryClient = useQueryClient();
 
@@ -129,14 +140,12 @@ export default function SavedSearchesScreen() {
   if (!isAuthenticated) {
     return (
       <View style={styles.centeredContainer}>
-        <Ionicons name="search-outline" size={64} color={TarodanColors.primary} />
-        <Text variant="titleLarge" style={styles.title}>Kayıtlı Aramalar</Text>
-        <Text variant="bodyMedium" style={styles.subtitle}>
+        <Ionicons name="search-outline" size={64} color={colors.primary[600]!} />
+        <Text variant="h3" style={styles.title}>Kayıtlı Aramalar</Text>
+        <Text variant="body" style={styles.subtitle}>
           Aramalarınızı kaydetmek için giriş yapın
         </Text>
-        <Button mode="contained" onPress={() => router.push('/(auth)/login')}>
-          Giriş Yap
-        </Button>
+        <Button variant="primary" title="Giriş Yap" onPress={() => router.push('/(auth)/login')} />
       </View>
     );
   }
@@ -146,9 +155,9 @@ export default function SavedSearchesScreen() {
       {/* Header */}
       <View style={styles.header}>
         <TouchableOpacity onPress={() => router.back()}>
-          <Ionicons name="arrow-back" size={24} color={TarodanColors.textOnPrimary} />
+          <Ionicons name="arrow-back" size={24} color={colors.white} />
         </TouchableOpacity>
-        <Text style={styles.headerTitle}>Kayıtlı Aramalar</Text>
+        <Text style={styles.headerTitle}>{t('mobile.settingsSavedSearches')}</Text>
         <Text style={styles.headerCount}>
           {searches.length}/{maxSavedSearches === -1 ? '∞' : maxSavedSearches}
         </Text>
@@ -157,9 +166,9 @@ export default function SavedSearchesScreen() {
       {/* Limit Info */}
       {maxSavedSearches !== -1 && searches.length >= maxSavedSearches - 1 && (
         <View style={styles.limitBanner}>
-          <Ionicons name="information-circle" size={20} color={TarodanColors.warning} />
+          <Ionicons name="information-circle" size={20} color={colors.warning[600]!} />
           <Text style={styles.limitText}>
-            {searches.length >= maxSavedSearches 
+            {searches.length >= maxSavedSearches
               ? 'Arama limitine ulaştınız'
               : `${maxSavedSearches - searches.length} arama hakkı kaldı`}
           </Text>
@@ -172,86 +181,81 @@ export default function SavedSearchesScreen() {
       {/* Content */}
       {isLoading ? (
         <View style={styles.loadingContainer}>
-          <ActivityIndicator size="large" color={TarodanColors.primary} />
+          <Spinner size="lg" />
         </View>
       ) : searches.length === 0 ? (
         <View style={styles.emptyContainer}>
-          <Ionicons name="search-outline" size={80} color={TarodanColors.textLight} />
-          <Text variant="titleMedium" style={styles.emptyTitle}>Kayıtlı arama yok</Text>
-          <Text variant="bodyMedium" style={styles.emptySubtitle}>
+          <Ionicons name="search-outline" size={80} color={colors.text.subtle} />
+          <Text variant="h3" style={styles.emptyTitle}>Kayıtlı arama yok</Text>
+          <Text variant="body" style={styles.emptySubtitle}>
             Arama sayfasında arama yapıp "Aramayı Kaydet" butonuna tıklayın
           </Text>
-          <Button mode="contained" onPress={() => router.push('/(tabs)/search')}>
-            Aramaya Git
-          </Button>
+          <Button variant="primary" title="Aramaya Git" onPress={() => router.push('/(tabs)/search')} />
         </View>
       ) : (
         <ScrollView style={styles.content}>
           {searches.map((search) => (
             <Card key={search.id} style={styles.searchCard}>
-              <Card.Content>
-                <View style={styles.cardHeader}>
-                  <View style={styles.titleSection}>
-                    <Ionicons name="search" size={20} color={TarodanColors.primary} />
-                    <Text variant="titleSmall" style={styles.searchName}>{search.name}</Text>
-                  </View>
-                  <IconButton
-                    icon="delete"
-                    size={20}
-                    iconColor={TarodanColors.error}
-                    onPress={() => handleDelete(search)}
-                  />
+              <View style={styles.cardHeader}>
+                <View style={styles.titleSection}>
+                  <Ionicons name="search" size={20} color={colors.primary[600]!} />
+                  <Text variant="body" style={styles.searchName}>{search.name}</Text>
                 </View>
+                <IconButton
+                  icon="trash-outline"
+                  variant="danger"
+                  size="sm"
+                  accessibilityLabel="Aramayı sil"
+                  onPress={() => handleDelete(search)}
+                />
+              </View>
 
-                {search.query && (
-                  <Text variant="bodyMedium" style={styles.queryText}>
-                    "{search.query}"
-                  </Text>
-                )}
-
-                <Text variant="bodySmall" style={styles.filtersText}>
-                  {getFilterSummary(search.filters)}
+              {search.query && (
+                <Text variant="body" style={styles.queryText}>
+                  "{search.query}"
                 </Text>
+              )}
 
-                <Divider style={styles.divider} />
+              <Text variant="bodySm" style={styles.filtersText}>
+                {getFilterSummary(search.filters)}
+              </Text>
 
-                <View style={styles.cardFooter}>
-                  <View style={styles.metaInfo}>
-                    {search.resultCount !== undefined && (
-                      <Text variant="bodySmall" style={styles.metaText}>
-                        {search.resultCount} sonuç
-                      </Text>
-                    )}
-                    <Text variant="bodySmall" style={styles.metaText}>
-                      Oluşturulma: {formatDate(search.createdAt)}
+              <Divider style={styles.divider} />
+
+              <View style={styles.cardFooter}>
+                <View style={styles.metaInfo}>
+                  {search.resultCount !== undefined && (
+                    <Text variant="bodySm" style={styles.metaText}>
+                      {search.resultCount} sonuç
                     </Text>
-                  </View>
-                  <Button mode="contained" compact onPress={() => runSearch(search)}>
-                    Çalıştır
-                  </Button>
-                </View>
-
-                {/* Notification Toggle */}
-                <TouchableOpacity
-                  style={styles.notifyToggle}
-                  onPress={() => toggleNotificationMutation.mutate({
-                    searchId: search.id,
-                    notifyOnNew: !search.notifyOnNew,
-                  })}
-                >
-                  <Ionicons
-                    name={search.notifyOnNew ? 'notifications' : 'notifications-off-outline'}
-                    size={18}
-                    color={search.notifyOnNew ? TarodanColors.primary : TarodanColors.textSecondary}
-                  />
-                  <Text style={[
-                    styles.notifyText,
-                    search.notifyOnNew && styles.notifyTextActive
-                  ]}>
-                    Yeni ürünlerde bildir
+                  )}
+                  <Text variant="bodySm" style={styles.metaText}>
+                    Oluşturulma: {formatDate(search.createdAt)}
                   </Text>
-                </TouchableOpacity>
-              </Card.Content>
+                </View>
+                <Button variant="primary" size="sm" title="Çalıştır" onPress={() => runSearch(search)} />
+              </View>
+
+              {/* Notification Toggle */}
+              <TouchableOpacity
+                style={styles.notifyToggle}
+                onPress={() => toggleNotificationMutation.mutate({
+                  searchId: search.id,
+                  notifyOnNew: !search.notifyOnNew,
+                })}
+              >
+                <Ionicons
+                  name={search.notifyOnNew ? 'notifications' : 'notifications-off-outline'}
+                  size={18}
+                  color={search.notifyOnNew ? colors.primary[600]! : colors.text.muted}
+                />
+                <Text style={[
+                  styles.notifyText,
+                  search.notifyOnNew && styles.notifyTextActive,
+                ]}>
+                  Yeni ürünlerde bildir
+                </Text>
+              </TouchableOpacity>
             </Card>
           ))}
 
@@ -265,17 +269,17 @@ export default function SavedSearchesScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: TarodanColors.backgroundSecondary,
+    backgroundColor: colors.surface.alt,
   },
   centeredContainer: {
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
     padding: 32,
-    backgroundColor: TarodanColors.background,
+    backgroundColor: colors.surface.DEFAULT,
   },
   header: {
-    backgroundColor: TarodanColors.primary,
+    backgroundColor: colors.primary[600]!,
     paddingTop: 50,
     paddingBottom: 16,
     paddingHorizontal: 20,
@@ -286,10 +290,10 @@ const styles = StyleSheet.create({
   headerTitle: {
     fontSize: 18,
     fontWeight: 'bold',
-    color: TarodanColors.textOnPrimary,
+    color: colors.white,
   },
   headerCount: {
-    color: TarodanColors.textOnPrimary,
+    color: colors.white,
     opacity: 0.8,
   },
   title: {
@@ -299,22 +303,22 @@ const styles = StyleSheet.create({
   subtitle: {
     textAlign: 'center',
     marginBottom: 24,
-    color: TarodanColors.textSecondary,
+    color: colors.text.muted,
   },
   limitBanner: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: TarodanColors.warningLight,
+    backgroundColor: colors.warning[50]!,
     padding: 12,
     gap: 8,
   },
   limitText: {
     flex: 1,
-    color: TarodanColors.warning,
+    color: colors.warning[600]!,
     fontSize: 13,
   },
   upgradeLink: {
-    color: TarodanColors.primary,
+    color: colors.primary[600]!,
     fontWeight: '600',
   },
   loadingContainer: {
@@ -331,12 +335,12 @@ const styles = StyleSheet.create({
   emptyTitle: {
     marginTop: 16,
     marginBottom: 8,
-    color: TarodanColors.textPrimary,
+    color: colors.text.heading,
   },
   emptySubtitle: {
     textAlign: 'center',
     marginBottom: 24,
-    color: TarodanColors.textSecondary,
+    color: colors.text.muted,
   },
   content: {
     flex: 1,
@@ -344,7 +348,7 @@ const styles = StyleSheet.create({
   },
   searchCard: {
     marginBottom: 12,
-    backgroundColor: TarodanColors.background,
+    backgroundColor: colors.surface.DEFAULT,
   },
   cardHeader: {
     flexDirection: 'row',
@@ -360,12 +364,12 @@ const styles = StyleSheet.create({
     marginLeft: 8,
   },
   queryText: {
-    color: TarodanColors.textPrimary,
+    color: colors.text.heading,
     marginTop: 8,
     fontStyle: 'italic',
   },
   filtersText: {
-    color: TarodanColors.textSecondary,
+    color: colors.text.muted,
     marginTop: 4,
   },
   divider: {
@@ -380,7 +384,7 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   metaText: {
-    color: TarodanColors.textSecondary,
+    color: colors.text.muted,
   },
   notifyToggle: {
     flexDirection: 'row',
@@ -388,14 +392,14 @@ const styles = StyleSheet.create({
     marginTop: 12,
     paddingTop: 12,
     borderTopWidth: 1,
-    borderTopColor: TarodanColors.border,
+    borderTopColor: colors.border.DEFAULT,
   },
   notifyText: {
     marginLeft: 8,
-    color: TarodanColors.textSecondary,
+    color: colors.text.muted,
     fontSize: 13,
   },
   notifyTextActive: {
-    color: TarodanColors.primary,
+    color: colors.primary[600]!,
   },
 });

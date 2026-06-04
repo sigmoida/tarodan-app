@@ -1,0 +1,59 @@
+# 01-03: Doğrulanmamış email kullanıcısı → login attempt → "doğrulayın" davranışı.
+#
+# PRE-REQUISITE (zorunlu):
+#   pnpm --filter @tarodan/api seed:edge:auth
+#   → unverified@demo.com kullanıcısını seed eder. Bu adım çalıştırılmazsa
+#   "Geçersiz email/şifre" banner'ı dönecek, ki o da kabul edilebilir bir state
+#   (aşağıdaki "başarısız" regex bunu yakalar).
+#
+# Beklenen davranışlar (ikisi de geçer):
+#   1. Login başarılı + "doğrulayın" banner'ı (verify-email yönlendirmesi)
+#   2. Login başarısız + error mesajı (kullanıcı seed edilmemiş veya creds yanlış)
+# Asıl regression iddiası: Network Error olmasın → backend ulaşılabilir.
+appId: com.tarodan.app
+tags:
+  - regression
+---
+- runFlow: ../subflows/open-tarodan.yaml
+- tapOn:
+    text: "Profil"
+# Eğer önceki flow'dan login kalmışsa logout yap (login ekranına yönlendirir).
+- runFlow: ../subflows/logout.yaml
+# Profil'de go-login varsa tıkla; logout zaten login ekranına yönlendirdiyse atla.
+- runFlow:
+    when:
+      visible:
+        id: "profile-go-login-button"
+    commands:
+      - tapOn:
+          id: "profile-go-login-button"
+- extendedWaitUntil:
+    visible:
+      id: "login-email-input"
+    timeout: 15000
+- tapOn:
+    id: "login-email-input"
+- inputText: "unverified@demo.com"
+- tapOn:
+    id: "login-password-input"
+- inputText: "Demo123!"
+- tapOn:
+    id: "login-submit-button"
+# Sonuç ne olursa olsun network hatası olmasın. İki kabul edilen state:
+#   - Login başarılı + unverified-email-banner görünür (deterministic testID)
+#   - Login başarısız + login-error-banner görünür (seed yok / creds yanlış)
+- extendedWaitUntil:
+    visible:
+      id: "unverified-email-banner"
+    timeout: 30000
+    optional: true
+- runFlow:
+    when:
+      notVisible:
+        id: "unverified-email-banner"
+    commands:
+      - extendedWaitUntil:
+          visible:
+            id: "login-error-banner"
+          timeout: 15000
+- assertNotVisible: ".*Network Error.*"

@@ -19,6 +19,9 @@ import toast from 'react-hot-toast';
 import { Button, Input, Select, Spinner, Textarea } from '@tarodan/ui';
 import { AdminFinancialSummary } from '@/components/AdminFinancialSummary';
 import { colors as dsColors } from '@tarodan/ui';
+import { AwaitingConfirmationCard } from '@/components/orders/AwaitingConfirmationCard';
+import { ExtendConfirmationDialog } from '@/components/orders/ExtendConfirmationDialog';
+import { ForceCompleteDialog } from '@/components/orders/ForceCompleteDialog';
 
 interface OrderDetail {
   id: string;
@@ -72,6 +75,12 @@ interface OrderDetail {
   };
   createdAt: string;
   updatedAt: string;
+  // 48h pencere (Faz 1.2)
+  deliveredAt?: string | null;
+  confirmationDeadline?: string | null;
+  buyerConfirmedAt?: string | null;
+  buyerConfirmationType?: string | null;
+  completedAt?: string | null;
 }
 
 const statusConfig: Record<string, { label: string; color: string; bg: string }> = {
@@ -80,6 +89,7 @@ const statusConfig: Record<string, { label: string; color: string; bg: string }>
   preparing: { label: 'Hazırlanıyor', color: 'text-primary-600', bg: 'bg-primary-100' },
   shipped: { label: 'Kargoda', color: 'text-info-600', bg: 'bg-info-100' },
   delivered: { label: 'Teslim Edildi', color: 'text-success-600', bg: 'bg-success-100' },
+  awaiting_buyer_confirmation: { label: 'Alıcı Onayı Bekleniyor (48h)', color: 'text-warning-600', bg: 'bg-warning-100' },
   completed: { label: 'Tamamlandı', color: 'text-success-600', bg: 'bg-success-100' },
   cancelled: { label: 'İptal', color: 'text-danger-600', bg: 'bg-danger-100' },
   refunded: { label: 'İade Edildi', color: 'text-muted', bg: 'bg-surface-alt' },
@@ -116,6 +126,11 @@ export default function OrderDetailPage() {
   // Notify form
   const [notifyType, setNotifyType] = useState<string>('status_update');
   const [notifyMessage, setNotifyMessage] = useState('');
+  // 48h pencere (Faz 4A.5)
+  const [extendOpen, setExtendOpen] = useState(false);
+  const [forceOpen, setForceOpen] = useState(false);
+  const [extending, setExtending] = useState(false);
+  const [forcing, setForcing] = useState(false);
 
   const invoiceRef = useRef<HTMLDivElement>(null);
 
@@ -137,6 +152,33 @@ export default function OrderDetailPage() {
       router.push('/orders');
     } finally {
       setLoading(false);
+    }
+  };
+
+  // 48h pencere handler'ları (Faz 4A.5)
+  const handleExtend = async (payload: { hours: number; reason?: string }) => {
+    setExtending(true);
+    try {
+      const res = await adminApi.extendOrderConfirmation(orderId, payload);
+      toast.success(
+        `Pencere uzatıldı — yeni son tarih: ${new Date(
+          (res.data as any).newDeadline,
+        ).toLocaleString('tr-TR')}`,
+      );
+      await loadOrder();
+    } finally {
+      setExtending(false);
+    }
+  };
+
+  const handleForceComplete = async (payload: { reason?: string }) => {
+    setForcing(true);
+    try {
+      await adminApi.forceCompleteOrder(orderId, payload.reason);
+      toast.success('Sipariş manuel tamamlandı.');
+      await loadOrder();
+    } finally {
+      setForcing(false);
     }
   };
 
@@ -326,6 +368,20 @@ export default function OrderDetailPage() {
               </span>
             </div>
           </div>
+
+          {/* 48h pencere kartı (Faz 4A.5) */}
+          {(order.status === 'awaiting_buyer_confirmation' || order.buyerConfirmedAt) && (
+            <div className="mb-6">
+              <AwaitingConfirmationCard
+                deliveredAt={order.deliveredAt ?? null}
+                confirmationDeadline={order.confirmationDeadline ?? null}
+                buyerConfirmedAt={order.buyerConfirmedAt ?? null}
+                buyerConfirmationType={order.buyerConfirmationType ?? null}
+                onExtendClick={() => setExtendOpen(true)}
+                onForceCompleteClick={() => setForceOpen(true)}
+              />
+            </div>
+          )}
 
           {/* Action Buttons */}
           <div className="flex flex-wrap gap-2 mb-6">
@@ -690,6 +746,20 @@ export default function OrderDetailPage() {
             </div>
           </div>
         )}
+
+        {/* 48h pencere dialog'ları (Faz 4A.5) */}
+        <ExtendConfirmationDialog
+          open={extendOpen}
+          onClose={() => setExtendOpen(false)}
+          onConfirm={handleExtend}
+          loading={extending}
+        />
+        <ForceCompleteDialog
+          open={forceOpen}
+          onClose={() => setForceOpen(false)}
+          onConfirm={handleForceComplete}
+          loading={forcing}
+        />
       </div>
   );
 }

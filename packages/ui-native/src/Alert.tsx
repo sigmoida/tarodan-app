@@ -9,6 +9,8 @@ export interface AlertProps {
   title?: string;
   children?: React.ReactNode;
   icon?: React.ReactNode;
+  testID?: string;
+  style?: import('react-native').ViewStyle;
 }
 
 const { colors, radius, spacing, typography } = theme;
@@ -21,13 +23,22 @@ const variantStyle: Record<AlertVariant, { bg: string; border: string; text: str
   danger: { bg: colors.danger[50]!, border: colors.danger[200]!, text: colors.danger[800]! },
 };
 
-export const Alert: React.FC<AlertProps> = ({ variant = 'default', title, icon, children }) => {
+export const Alert: React.FC<AlertProps> = ({
+  variant = 'default',
+  title,
+  icon,
+  children,
+  testID,
+  style,
+}) => {
   const vs = variantStyle[variant];
   return (
     <View
+      testID={testID}
       style={[
         styles.base,
         { backgroundColor: vs.bg, borderColor: vs.border },
+        style,
       ]}
     >
       <View style={styles.row}>

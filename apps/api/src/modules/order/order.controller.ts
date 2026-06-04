@@ -302,6 +302,26 @@ export class OrderController {
   }
 
   /**
+   * POST /orders/:id/confirm-receipt — Alıcı 48h pencere içinde erken onay.
+   * Spec: Bölüm 6.2.
+   */
+  @Post(':id/confirm-receipt')
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth()
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({ summary: 'Siparişi alıcı olarak erken onayla (48h penceresi)' })
+  @ApiParam({ name: 'id', description: 'Order ID' })
+  @ApiResponse({ status: HttpStatus.OK, description: 'Sipariş tamamlandı' })
+  @ApiResponse({ status: HttpStatus.BAD_REQUEST, description: 'Onay için uygun değil' })
+  @ApiResponse({ status: HttpStatus.FORBIDDEN, description: 'Yetki yok' })
+  async confirmReceipt(
+    @Param('id') id: string,
+    @CurrentUser('id') userId: string,
+  ): Promise<{ completed: boolean }> {
+    return this.orderService.confirmReceipt(id, userId);
+  }
+
+  /**
    * POST /orders/:id/reactivate - Reactivate cancelled offer order so buyer can pay (buyer only)
    */
   @Post(':id/reactivate')

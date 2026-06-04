@@ -7,3 +7,4 @@ export * from './guest-send-verification-code.dto';
 export * from './direct-buy.dto';
 export * from './set-shipping-address.dto';
 export * from './checkout-quote.dto';
+export * from './admin-order-actions.dto';

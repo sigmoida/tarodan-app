@@ -49,6 +49,7 @@ const statusOptions = [
   { value: "preparing", label: "Hazırlanıyor" },
   { value: "shipped", label: "Kargoda" },
   { value: "delivered", label: "Teslim Edildi" },
+  { value: "awaiting_buyer_confirmation", label: "Alıcı Onayı Bekleniyor (48h)" },
   { value: "completed", label: "Tamamlandı" },
   { value: "cancelled", label: "İptal" },
 ];

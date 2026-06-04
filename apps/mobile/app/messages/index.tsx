@@ -1,13 +1,16 @@
-import { View, ScrollView, StyleSheet, TouchableOpacity, Image, RefreshControl } from 'react-native';
-import { Text, Avatar, Badge, FAB, ActivityIndicator, Searchbar, Divider } from 'react-native-paper';
+import { View, ScrollView, StyleSheet, TouchableOpacity, RefreshControl } from 'react-native';
+import { Avatar, Badge, FAB, Input, Spinner, Text, theme } from '@tarodan/ui-native';
 import { useState, useCallback } from 'react';
 import { router, useFocusEffect } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { useMessagesStore, MessageThread } from '../../src/stores/messagesStore';
 import { useAuthStore } from '../../src/stores/authStore';
-import { TarodanColors } from '../../src/theme';
+import { useTranslation } from '../../src/i18n';
+
+const { colors } = theme;
 
 export default function MessagesListScreen() {
+  const { t } = useTranslation();
   const { isAuthenticated, user, limits } = useAuthStore();
   const { threads, isLoading, fetchThreads, getUnreadCount, getOtherParticipant, dailyMessageCount } = useMessagesStore();
   const [refreshing, setRefreshing] = useState(false);
@@ -33,7 +36,7 @@ export default function MessagesListScreen() {
     const now = new Date();
     const diff = now.getTime() - date.getTime();
     const days = Math.floor(diff / (1000 * 60 * 60 * 24));
-    
+
     if (days === 0) {
       return date.toLocaleTimeString('tr-TR', { hour: '2-digit', minute: '2-digit' });
     } else if (days === 1) {
@@ -77,12 +80,12 @@ export default function MessagesListScreen() {
   if (!isAuthenticated) {
     return (
       <View style={styles.centeredContainer}>
-        <Ionicons name="chatbubbles-outline" size={64} color={TarodanColors.primary} />
-        <Text variant="titleLarge" style={styles.title}>Mesajlar</Text>
-        <Text variant="bodyMedium" style={styles.subtitle}>
+        <Ionicons name="chatbubbles-outline" size={64} color={colors.primary[600]!} />
+        <Text variant="h3" style={styles.title}>{t("mobile.messagesTitle")}</Text>
+        <Text variant="body" style={styles.subtitle}>
           Mesajlarınızı görmek için giriş yapın
         </Text>
-        <TouchableOpacity 
+        <TouchableOpacity
           style={styles.loginButton}
           onPress={() => router.push('/(auth)/login')}
         >
@@ -97,12 +100,12 @@ export default function MessagesListScreen() {
       {/* Header */}
       <View style={styles.header}>
         <TouchableOpacity onPress={() => router.back()}>
-          <Ionicons name="arrow-back" size={24} color={TarodanColors.textOnPrimary} />
+          <Ionicons name="arrow-back" size={24} color={colors.white} />
         </TouchableOpacity>
         <View style={styles.headerTitleContainer}>
-          <Text style={styles.headerTitle}>Mesajlar</Text>
+          <Text style={styles.headerTitle}>{t('mobile.messagesTitle')}</Text>
           {unreadCount > 0 && (
-            <Badge style={styles.headerBadge}>{unreadCount}</Badge>
+            <Badge variant="danger" style={styles.headerBadge}>{unreadCount}</Badge>
           )}
         </View>
         <View style={{ width: 24 }} />
@@ -111,7 +114,7 @@ export default function MessagesListScreen() {
       {/* Message Limit Banner */}
       {!isUnlimited && dailyMessageCount >= messageLimit - 10 && (
         <View style={styles.limitBanner}>
-          <Ionicons name="information-circle" size={20} color={TarodanColors.warning} />
+          <Ionicons name="information-circle" size={20} color={colors.warning[600]!} />
           <Text style={styles.limitText}>
             Günlük mesaj: {dailyMessageCount}/{messageLimit}
           </Text>
@@ -125,27 +128,27 @@ export default function MessagesListScreen() {
 
       {/* Search */}
       <View style={styles.searchContainer}>
-        <Searchbar
-          placeholder="Mesajlarda ara..."
+        <Input
+          placeholder={t("mobile.searchInMessages")}
           value={searchQuery}
           onChangeText={setSearchQuery}
-          style={styles.searchbar}
+          leftIconName="search"
         />
       </View>
 
       {/* Content */}
       {isLoading && threads.length === 0 ? (
         <View style={styles.loadingContainer}>
-          <ActivityIndicator size="large" color={TarodanColors.primary} />
+          <Spinner size="lg" />
         </View>
       ) : filteredThreads.length === 0 ? (
         <View style={styles.emptyContainer}>
-          <Ionicons name="chatbubble-ellipses-outline" size={80} color={TarodanColors.textLight} />
-          <Text variant="titleMedium" style={styles.emptyTitle}>
+          <Ionicons name="chatbubble-ellipses-outline" size={80} color={colors.text.subtle} />
+          <Text variant="h3" style={styles.emptyTitle}>
             {searchQuery ? 'Sonuç bulunamadı' : 'Henüz mesaj yok'}
           </Text>
-          <Text variant="bodyMedium" style={styles.emptySubtitle}>
-            {searchQuery 
+          <Text variant="body" style={styles.emptySubtitle}>
+            {searchQuery
               ? 'Farklı bir arama terimi deneyin'
               : 'Bir satıcıyla iletişime geçerek başlayın'}
           </Text>
@@ -154,13 +157,13 @@ export default function MessagesListScreen() {
         <ScrollView
           style={styles.threadsList}
           refreshControl={
-            <RefreshControl refreshing={refreshing} onRefresh={onRefresh} colors={[TarodanColors.primary]} />
+            <RefreshControl refreshing={refreshing} onRefresh={onRefresh} colors={[colors.primary[600]!]} />
           }
         >
           {filteredThreads.map((thread) => {
             const other = safeGetOther(thread);
             const hasUnread = thread.unreadCount > 0;
-            
+
             return (
               <TouchableOpacity
                 key={thread.id}
@@ -168,43 +171,43 @@ export default function MessagesListScreen() {
                 onPress={() => router.push(`/messages/${thread.id}`)}
               >
                 <View style={styles.avatarContainer}>
-                  {other.avatarUrl ? (
-                    <Avatar.Image size={50} source={{ uri: other.avatarUrl }} />
-                  ) : (
-                    <Avatar.Text size={50} label={other.displayName.charAt(0).toUpperCase()} />
-                  )}
+                  <Avatar
+                    size="md"
+                    source={other.avatarUrl || undefined}
+                    name={other.displayName.charAt(0).toUpperCase()}
+                  />
                   {hasUnread && (
                     <View style={styles.unreadDot} />
                   )}
                 </View>
-                
+
                 <View style={styles.threadContent}>
                   <View style={styles.threadHeader}>
-                    <Text 
-                      variant="titleSmall" 
+                    <Text
+                      variant="label"
                       style={[styles.participantName, hasUnread && styles.unreadText]}
                       numberOfLines={1}
                     >
                       {other.displayName}
                     </Text>
-                    <Text variant="bodySmall" style={styles.threadTime}>
+                    <Text variant="caption" style={styles.threadTime}>
                       {thread.lastMessage ? formatTime(thread.lastMessage.createdAt) : formatTime(thread.createdAt)}
                     </Text>
                   </View>
-                  
+
                   {/* Product reference */}
                   {thread.product && (
                     <View style={styles.productRef}>
-                      <Ionicons name="pricetag" size={12} color={TarodanColors.primary} />
-                      <Text variant="bodySmall" style={styles.productRefText} numberOfLines={1}>
+                      <Ionicons name="pricetag" size={12} color={colors.primary[600]!} />
+                      <Text variant="caption" style={styles.productRefText} numberOfLines={1}>
                         {thread.product.title}
                       </Text>
                     </View>
                   )}
-                  
+
                   {/* Last message preview */}
-                  <Text 
-                    variant="bodySmall" 
+                  <Text
+                    variant="caption"
                     style={[styles.lastMessage, hasUnread && styles.unreadText]}
                     numberOfLines={1}
                   >
@@ -214,7 +217,7 @@ export default function MessagesListScreen() {
                 </View>
 
                 {hasUnread && (
-                  <Badge style={styles.unreadBadge}>{thread.unreadCount}</Badge>
+                  <Badge variant="primary" style={styles.unreadBadge}>{thread.unreadCount}</Badge>
                 )}
               </TouchableOpacity>
             );
@@ -226,10 +229,10 @@ export default function MessagesListScreen() {
 
       {/* New Message FAB */}
       <FAB
-        icon="plus"
+        icon="add"
+        accessibilityLabel="Yeni mesaj"
         style={styles.fab}
         onPress={() => router.push('/messages/new')}
-        color={TarodanColors.textOnPrimary}
       />
     </View>
   );
@@ -238,7 +241,7 @@ export default function MessagesListScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: TarodanColors.background,
+    backgroundColor: colors.surface.DEFAULT,
   },
   centeredContainer: {
     flex: 1,
@@ -247,7 +250,7 @@ const styles = StyleSheet.create({
     padding: 32,
   },
   header: {
-    backgroundColor: TarodanColors.primary,
+    backgroundColor: colors.primary[600]!,
     paddingTop: 50,
     paddingBottom: 16,
     paddingHorizontal: 20,
@@ -262,11 +265,10 @@ const styles = StyleSheet.create({
   headerTitle: {
     fontSize: 18,
     fontWeight: 'bold',
-    color: TarodanColors.textOnPrimary,
+    color: colors.white,
   },
   headerBadge: {
     marginLeft: 8,
-    backgroundColor: TarodanColors.error,
   },
   title: {
     marginTop: 16,
@@ -275,41 +277,38 @@ const styles = StyleSheet.create({
   subtitle: {
     textAlign: 'center',
     marginBottom: 24,
-    color: TarodanColors.textSecondary,
+    color: colors.text.muted,
   },
   loginButton: {
-    backgroundColor: TarodanColors.primary,
+    backgroundColor: colors.primary[600]!,
     paddingHorizontal: 32,
     paddingVertical: 12,
     borderRadius: 8,
   },
   loginButtonText: {
-    color: TarodanColors.textOnPrimary,
+    color: colors.white,
     fontWeight: '600',
   },
   limitBanner: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: TarodanColors.warningLight,
+    backgroundColor: colors.warning[50]!,
     padding: 12,
     gap: 8,
   },
   limitText: {
     flex: 1,
-    color: TarodanColors.warning,
+    color: colors.warning[600]!,
     fontSize: 13,
   },
   upgradeLink: {
-    color: TarodanColors.primary,
+    color: colors.primary[600]!,
     fontWeight: '600',
     fontSize: 13,
   },
   searchContainer: {
     padding: 12,
-    backgroundColor: TarodanColors.background,
-  },
-  searchbar: {
-    backgroundColor: TarodanColors.surfaceVariant,
+    backgroundColor: colors.surface.DEFAULT,
   },
   loadingContainer: {
     flex: 1,
@@ -325,11 +324,11 @@ const styles = StyleSheet.create({
   emptyTitle: {
     marginTop: 16,
     marginBottom: 8,
-    color: TarodanColors.textPrimary,
+    color: colors.text.heading,
   },
   emptySubtitle: {
     textAlign: 'center',
-    color: TarodanColors.textSecondary,
+    color: colors.text.muted,
   },
   threadsList: {
     flex: 1,
@@ -339,11 +338,11 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     padding: 16,
     borderBottomWidth: 1,
-    borderBottomColor: TarodanColors.border,
-    backgroundColor: TarodanColors.background,
+    borderBottomColor: colors.border.DEFAULT,
+    backgroundColor: colors.surface.DEFAULT,
   },
   threadItemUnread: {
-    backgroundColor: TarodanColors.primaryLight + '10',
+    backgroundColor: colors.primary[50]!,
   },
   avatarContainer: {
     position: 'relative',
@@ -355,9 +354,9 @@ const styles = StyleSheet.create({
     width: 12,
     height: 12,
     borderRadius: 6,
-    backgroundColor: TarodanColors.primary,
+    backgroundColor: colors.primary[600]!,
     borderWidth: 2,
-    borderColor: TarodanColors.background,
+    borderColor: colors.surface.DEFAULT,
   },
   threadContent: {
     flex: 1,
@@ -370,10 +369,10 @@ const styles = StyleSheet.create({
   },
   participantName: {
     flex: 1,
-    color: TarodanColors.textPrimary,
+    color: colors.text.heading,
   },
   threadTime: {
-    color: TarodanColors.textSecondary,
+    color: colors.text.muted,
     marginLeft: 8,
   },
   productRef: {
@@ -382,26 +381,24 @@ const styles = StyleSheet.create({
     marginTop: 2,
   },
   productRefText: {
-    color: TarodanColors.primary,
+    color: colors.primary[600]!,
     marginLeft: 4,
     fontSize: 12,
   },
   lastMessage: {
-    color: TarodanColors.textSecondary,
+    color: colors.text.muted,
     marginTop: 4,
   },
   unreadText: {
     fontWeight: '600',
-    color: TarodanColors.textPrimary,
+    color: colors.text.heading,
   },
   unreadBadge: {
-    backgroundColor: TarodanColors.primary,
     marginLeft: 8,
   },
   fab: {
     position: 'absolute',
     right: 16,
     bottom: 24,
-    backgroundColor: TarodanColors.primary,
   },
 });

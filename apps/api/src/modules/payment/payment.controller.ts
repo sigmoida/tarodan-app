@@ -18,6 +18,7 @@ import {
 } from '@nestjs/common';
 import { Throttle } from '@nestjs/throttler';
 import { Request } from 'express';
+import { ConfigService } from '@nestjs/config';
 import {
   ApiTags,
   ApiOperation,
@@ -51,7 +52,21 @@ export class PaymentController {
   constructor(
     private readonly paymentService: PaymentService,
     private readonly jwtService: JwtService,
+    private readonly configService: ConfigService,
   ) { }
+
+  /**
+   * GET /payments/config — public, no auth.
+   * Lets mobile/web detect dev-mode flags so the UI can hide irrelevant
+   * fields (e.g., card form is meaningless when bypass is on).
+   */
+  @Get('config')
+  @Public()
+  getPublicConfig(): { bypassEnabled: boolean } {
+    return {
+      bypassEnabled: this.configService.get('PAYMENT_BYPASS') === 'true',
+    };
+  }
 
   /**
    * POST /payments/initiate - Initiate payment (works for both authenticated and guest users)

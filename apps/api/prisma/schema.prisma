@@ -478,6 +478,18 @@ model Trade {
   completedAt          DateTime?         @map("completed_at")
   cancelledAt          DateTime?         @map("cancelled_at")
   cancelReason         String?           @map("cancel_reason")
+  // Stamped when the first to_warehouse shipment is delivered. Once non-null,
+  // user-side cancel is locked: only admin reject/force-cancel can resolve.
+  firstWarehouseArrivalAt DateTime?      @map("first_warehouse_arrival_at")
+  cancelLockedAt       DateTime?         @map("cancel_locked_at")
+  // Populated when an admin reject's PayTR refund fails. Surfaced in admin UI
+  // so the operator can retry the refund.
+  refundFailureReason  String?           @map("refund_failure_reason")
+  refundFailureAt      DateTime?         @map("refund_failure_at")
+  // Flag set when an admin marks a return shipment lost and the affected user
+  // is owed manual compensation. Cleared by admin after settling out of band.
+  compensationPendingUserId String?       @map("compensation_pending_user_id")
+  compensationResolvedAt    DateTime?     @map("compensation_resolved_at")
   createdAt            DateTime          @default(now()) @map("created_at")
   updatedAt            DateTime          @updatedAt @map("updated_at")
   version              Int               @default(1)
@@ -523,6 +535,10 @@ model TradeShipment {
   shippedAt       DateTime?            @map("shipped_at")
   deliveredAt     DateTime?            @map("delivered_at")
   confirmedAt     DateTime?            @map("confirmed_at")
+  // Admin-set when a shipment is declared lost (typically a return leg that
+  // never arrived). Drives compensation flow on the parent trade.
+  lostAt          DateTime?            @map("lost_at")
+  lostReason      String?              @map("lost_reason")
   // Escrow: which leg of the journey this shipment represents
   leg             String               @default("to_warehouse")
   // Recipient of this shipment: null = warehouse, else initiator or receiver user id
@@ -967,6 +983,13 @@ model Order {
   cancelReason           String?         @map("cancel_reason")
   preparingDeadline      DateTime?       @map("preparing_deadline")
   preparingWarningSentAt DateTime?       @map("preparing_warning_sent_at")
+  reservationReleasedAt  DateTime?       @map("reservation_released_at")
+  paymentExpiresAt       DateTime        @map("payment_expires_at")
+  deliveredAt            DateTime?       @map("delivered_at")
+  confirmationDeadline   DateTime?       @map("confirmation_deadline")
+  buyerConfirmedAt       DateTime?       @map("buyer_confirmed_at")
+  buyerConfirmationType  BuyerConfirmationType? @map("buyer_confirmation_type")
+  completedAt            DateTime?       @map("completed_at")
   invoices               Invoice[]
   buyer                  User            @relation("BuyerOrders", fields: [buyerId], references: [id])
   offer                  Offer?          @relation(fields: [offerId], references: [id])
@@ -975,11 +998,36 @@ model Order {
   payment                Payment?
   shipment               Shipment?
   refundRequests         RefundRequest[]
+  commissionLedger       CommissionLedger?
 
   @@index([buyerId])
   @@index([sellerId])
   @@index([status])
+  @@index([status, paymentExpiresAt])
   @@map("orders")
+}
+
+model CommissionLedger {
+  id                   String                 @id @default(uuid())
+  orderId              String                 @unique @map("order_id")
+  order                Order                  @relation(fields: [orderId], references: [id])
+
+  sellerCommission     Decimal                @map("seller_commission") @db.Decimal(10, 2)
+  buyerFee             Decimal                @map("buyer_fee") @db.Decimal(10, 2)
+  totalPlatformRevenue Decimal                @map("total_platform_revenue") @db.Decimal(10, 2)
+
+  status               CommissionLedgerStatus @default(pending)
+  earnedAt             DateTime?              @map("earned_at")
+  refundedAt           DateTime?              @map("refunded_at")
+  waivedAt             DateTime?              @map("waived_at")
+  waivedReason         String?                @map("waived_reason")
+
+  createdAt            DateTime               @default(now()) @map("created_at")
+  updatedAt            DateTime               @updatedAt @map("updated_at")
+
+  @@index([status])
+  @@index([earnedAt])
+  @@map("commission_ledger")
 }
 
 model Payment {
@@ -1162,6 +1210,13 @@ model RefundRequest {
 
   refundedAt       DateTime? @map("refunded_at")
   providerRefundId String?   @map("provider_refund_id")
+
+  refundProductAmount    Boolean              @default(true)  @map("refund_product_amount")
+  refundShippingFee      Boolean              @default(true)  @map("refund_shipping_fee")
+  refundBuyerFee         Boolean              @default(true)  @map("refund_buyer_fee")
+  refundSellerCommission Boolean              @default(true)  @map("refund_seller_commission")
+  returnShippingPayer    ReturnShippingPayer?                 @map("return_shipping_payer")
+  buyerInitiatedAmicable Boolean              @default(false) @map("buyer_initiated_amicable")
 
   metadata Json?
 
@@ -1756,6 +1811,7 @@ enum OrderStatus {
   preparing
   shipped
   delivered
+  awaiting_buyer_confirmation
   completed
   cancelled
   refund_requested
@@ -1805,7 +1861,15 @@ enum RefundReason {
   wrong_item
   not_as_described
   missing_parts
+  counterfeit
+  lost_in_transit
   other
+}
+
+enum ReturnShippingPayer {
+  buyer
+  seller
+  platform
 }
 
 enum RefundRequestStatus {
@@ -1961,4 +2025,17 @@ enum AdPosition {
   footer
   inline
   popup
+}
+
+enum CommissionLedgerStatus {
+  pending
+  earned
+  refunded
+  waived
+}
+
+enum BuyerConfirmationType {
+  manual_ok
+  auto_timeout
+  admin_force
 }

@@ -20,12 +20,14 @@ import { useEffect, useState } from "react";
 import toast from "react-hot-toast";
 
 const reasonLabel: Record<string, { tr: string; en: string }> = {
-  changed_mind: { tr: "Vazgeçtim (cayma hakkı)", en: "Changed mind" },
   damaged: { tr: "Hasarlı geldi", en: "Damaged" },
   wrong_item: { tr: "Yanlış ürün geldi", en: "Wrong item" },
   not_as_described: { tr: "Açıklamayla uyuşmuyor", en: "Not as described" },
   missing_parts: { tr: "Eksik parça", en: "Missing parts" },
+  counterfeit: { tr: "Sahte ürün", en: "Counterfeit" },
+  lost_in_transit: { tr: "Kargoda kayboldu", en: "Lost in transit" },
   other: { tr: "Diğer", en: "Other" },
+  // changed_mind kaldırıldı (Senaryo D)
 };
 
 const statusConfig: Record<
@@ -547,6 +549,8 @@ export default function RefundRequestDetailPage() {
             </p>
           </div>
         )}
+
+        {/* Senaryo D banner kaldırıldı — changed_mind reason artık kabul edilmiyor */}
 
         {/* Actions */}
         {(canCancel || canSellerDecide) && (

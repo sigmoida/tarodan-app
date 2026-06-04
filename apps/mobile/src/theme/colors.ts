@@ -25,6 +25,7 @@ export const TarodanColors = {
   surfaceVariant: '#F9FAFB',
   
   // Text Colors - Better contrast
+  text: '#111827', // textPrimary alias for legacy refs
   textPrimary: '#111827', // Almost black for best readability
   textSecondary: '#4B5563', // Darker gray for secondary text
   textTertiary: '#9CA3AF', // Light gray for hints

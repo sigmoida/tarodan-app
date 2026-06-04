@@ -25,6 +25,13 @@
     "docker:up": "docker compose -f infrastructure/docker-compose.yml up -d",
     "docker:down": "docker compose -f infrastructure/docker-compose.yml down",
     "docker:prod": "docker compose -f infrastructure/docker-compose.prod.yml up -d",
+    "pm2:start": "pm2 start ecosystem.config.js",
+    "pm2:stop": "pm2 delete all",
+    "pm2:logs": "pm2 logs",
+    "pm2:status": "pm2 status",
+    "stack:up": "pnpm docker:up && pnpm pm2:start && echo '\\n✅ Tarodan stack ayağa kalktı: http://localhost:3000 (web), http://localhost:3001 (api), http://localhost:5601 (kibana), http://localhost:8025 (mailhog)'",
+    "stack:down": "pnpm pm2:stop; pnpm docker:down",
+    "stack:status": "pnpm pm2:status && docker compose -f infrastructure/docker-compose.yml ps",
     "ngrok": "./tools/ngrok http 3001",
     "postinstall": "echo Skipping husky"
   },
@@ -41,7 +48,7 @@
   },
   "packageManager": "pnpm@8.12.0",
   "engines": {
-    "node": ">=18.0.0",
+    "node": ">=20.0.0 <22.0.0",
     "pnpm": ">=8.0.0"
   },
   "lint-staged": {
@@ -63,6 +70,10 @@
           "@babel/types": "^7.28.0"
         }
       }
+    },
+    "overrides": {
+      "fast-xml-parser": ">=5.3.4",
+      "handlebars": ">=4.7.9"
     }
   }
 }

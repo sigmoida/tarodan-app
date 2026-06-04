@@ -1,0 +1,51 @@
+# F-23: Bypass mode'da uçtan uca: ürün → checkout → Ödemeyi Tamamla →
+# bypass-complete tetiklenir → /payment/success → Profil'de yeni sipariş.
+# Pre-req: PAYMENT_BYPASS=true (mobile EXPO_PUBLIC_PAYMENT_BYPASS) + saved address.
+appId: com.tarodan.app
+tags:
+  - smoke
+env:
+  EMAIL: zeynep@demo.com
+  PASSWORD: Demo123!
+---
+- runFlow: ../subflows/open-tarodan.yaml
+# Search → first product → Hemen Al
+- tapOn:
+    text: "Ara"
+- extendedWaitUntil:
+    visible:
+      id: "search-input"
+    timeout: 15000
+- tapOn:
+    id: "search-input"
+- inputText: "diecast"
+- tapOn:
+    text: "Filtrele"
+    optional: true
+- waitForAnimationToEnd:
+    timeout: 5000
+- tapOn:
+    text: ".*₺.*"
+    index: 0
+- extendedWaitUntil:
+    visible:
+      id: "product-detail-buy-button"
+    timeout: 15000
+- tapOn:
+    id: "product-detail-buy-button"
+# Checkout — assume default address selected; tap "Ödemeye Geç"
+- extendedWaitUntil:
+    visible:
+      text: "Ödemeye Geç|Ödemeyi Tamamla"
+    timeout: 20000
+- tapOn:
+    text: "Ödemeye Geç|Ödemeyi Tamamla"
+- extendedWaitUntil:
+    visible:
+      text: ".*başarı.*|Sipariş.*tamamland.*|Tamamlandı"
+    timeout: 30000
+- tapOn:
+    text: "Profil"
+- tapOn:
+    id: "profile-orders-link"
+- assertVisible: "ORD-"

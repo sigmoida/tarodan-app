@@ -4,31 +4,24 @@
     "slug": "tarodan",
     "version": "1.0.0",
     "orientation": "portrait",
-    "icon": "./assets/icon.png",
     "scheme": "tarodan",
     "userInterfaceStyle": "automatic",
-    "splash": {
-      "image": "./assets/splash.png",
-      "resizeMode": "contain",
-      "backgroundColor": "#E53935"
-    },
     "assetBundlePatterns": [
       "**/*"
     ],
     "ios": {
       "supportsTablet": true,
       "bundleIdentifier": "com.tarodan.app",
+      "buildNumber": "1",
       "infoPlist": {
         "NSCameraUsageDescription": "Ürün fotoğrafı çekmek için kamera erişimi gereklidir.",
-        "NSPhotoLibraryUsageDescription": "Ürün fotoğrafı seçmek için galeri erişimi gereklidir."
+        "NSPhotoLibraryUsageDescription": "Ürün fotoğrafı seçmek için galeri erişimi gereklidir.",
+        "ITSAppUsesNonExemptEncryption": false
       }
     },
     "android": {
-      "adaptiveIcon": {
-        "foregroundImage": "./assets/adaptive-icon.png",
-        "backgroundColor": "#E53935"
-      },
       "package": "com.tarodan.app",
+      "versionCode": 1,
       "permissions": [
         "CAMERA",
         "READ_EXTERNAL_STORAGE",
@@ -37,8 +30,7 @@
     },
     "web": {
       "bundler": "metro",
-      "output": "static",
-      "favicon": "./assets/favicon.png"
+      "output": "static"
     },
     "plugins": [
       "expo-router",
@@ -57,7 +49,6 @@
       [
         "expo-notifications",
         {
-          "icon": "./assets/notification-icon.png",
           "color": "#E53935"
         }
       ],
@@ -65,6 +56,11 @@
     ],
     "experiments": {
       "typedRoutes": true
+    },
+    "extra": {
+      "eas": {
+        "projectId": "REPLACE_WITH_EAS_PROJECT_ID"
+      }
     }
   }
 }

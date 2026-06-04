@@ -1,12 +1,34 @@
-import { View, ScrollView, StyleSheet, TouchableOpacity, Image, RefreshControl, Alert } from 'react-native';
-import { Text, Chip, ActivityIndicator, Card, Button, TextInput, Portal, Dialog } from 'react-native-paper';
+import { View, ScrollView, StyleSheet, Pressable, Image, RefreshControl, Alert } from 'react-native';
+import {
+  Button,
+  Card,
+  Chip,
+  Spinner,
+  Modal,
+  Input,
+  Text,
+  StatusBadge,
+  theme,
+} from '@tarodan/ui-native';
+import type { BadgeVariant } from '@tarodan/ui-native';
 import { useState, useCallback } from 'react';
 import { router, useFocusEffect } from 'expo-router';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { Ionicons } from '@expo/vector-icons';
-import { api } from '../../src/services/api';
+import { ordersApi, shippingApi } from '../../src/services/api';
 import { useAuthStore } from '../../src/stores/authStore';
-import { TarodanColors } from '../../src/theme';
+
+const { colors } = theme;
+
+const salesStatusConfig: Record<string, { label: string; variant: BadgeVariant }> = {
+  pending: { label: 'Ödeme Bekliyor', variant: 'warning' },
+  paid: { label: 'Ödendi - Hazırla', variant: 'success' },
+  processing: { label: 'Hazırlanıyor', variant: 'info' },
+  shipped: { label: 'Kargoda', variant: 'primary' },
+  delivered: { label: 'Teslim Edildi', variant: 'success' },
+  completed: { label: 'Tamamlandı', variant: 'success' },
+  cancelled: { label: 'İptal', variant: 'danger' },
+};
 
 interface Sale {
   id: string;
@@ -33,7 +55,7 @@ interface Sale {
 type FilterType = 'all' | 'paid' | 'processing' | 'shipped' | 'completed';
 
 export default function SalesScreen() {
-  const { isAuthenticated, user } = useAuthStore();
+  const { isAuthenticated } = useAuthStore();
   const queryClient = useQueryClient();
   const [filter, setFilter] = useState<FilterType>('all');
   const [refreshing, setRefreshing] = useState(false);
@@ -52,8 +74,8 @@ export default function SalesScreen() {
         if (filter !== 'all') {
           params.status = filter;
         }
-        const response = await api.get('/orders', { params });
-        return response.data?.data || response.data || [];
+        const response = await ordersApi.getAll(params);
+        return (response.data as any)?.data || response.data || [];
       } catch (error) {
         console.log('Failed to fetch sales');
         return [];
@@ -64,10 +86,26 @@ export default function SalesScreen() {
 
   const sales: Sale[] = salesData || [];
 
-  // Update status mutation
+  /**
+   * Backend'de tek "status update" endpoint'i yok; iki ayrı akış:
+   *   - "processing"  → POST /orders/:id/prepare         (markAsPreparing)
+   *   - "shipped"     → POST /shipping  + PATCH /shipping/:id/tracking
+   * Bu mutasyon hangi durumun istendiğine göre doğru endpoint'i çağırır.
+   */
   const updateStatusMutation = useMutation({
     mutationFn: async ({ orderId, status, trackingNumber }: { orderId: string; status: string; trackingNumber?: string }) => {
-      return api.patch(`/orders/${orderId}/status`, { status, trackingNumber });
+      if (status === 'processing' || status === 'preparing') {
+        return ordersApi.markAsPreparing(orderId);
+      }
+      if (status === 'shipped') {
+        const created = await shippingApi.createShipment({ orderId, provider: 'surat' });
+        const shipment = (created.data as any)?.data ?? (created.data as any);
+        if (trackingNumber && shipment?.id) {
+          await shippingApi.updateTracking(shipment.id, { trackingNumber });
+        }
+        return created;
+      }
+      throw new Error(`Desteklenmeyen sipariş durumu: ${status}`);
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['orders'] });
@@ -75,8 +113,8 @@ export default function SalesScreen() {
       setTrackingNumber('');
       Alert.alert('Başarılı', 'Sipariş durumu güncellendi');
     },
-    onError: () => {
-      Alert.alert('Hata', 'Durum güncellenemedi');
+    onError: (e: any) => {
+      Alert.alert('Hata', e?.response?.data?.message || e?.message || 'Durum güncellenemedi');
     },
   });
 
@@ -95,30 +133,9 @@ export default function SalesScreen() {
     setRefreshing(false);
   };
 
-  const getStatusColor = (status: Sale['status']) => {
-    switch (status) {
-      case 'pending': return TarodanColors.warning;
-      case 'paid': return TarodanColors.success;
-      case 'processing': return TarodanColors.info;
-      case 'shipped': return TarodanColors.primary;
-      case 'delivered': return TarodanColors.success;
-      case 'completed': return TarodanColors.success;
-      case 'cancelled': return TarodanColors.error;
-      default: return TarodanColors.textSecondary;
-    }
-  };
-
-  const getStatusText = (status: Sale['status']) => {
-    switch (status) {
-      case 'pending': return 'Ödeme Bekliyor';
-      case 'paid': return 'Ödendi - Hazırla';
-      case 'processing': return 'Hazırlanıyor';
-      case 'shipped': return 'Kargoda';
-      case 'delivered': return 'Teslim Edildi';
-      case 'completed': return 'Tamamlandı';
-      case 'cancelled': return 'İptal';
-      default: return status;
-    }
+  const getStatusLabel = (status: FilterType) => {
+    if (status === 'all') return 'Tümü';
+    return salesStatusConfig[status]?.label ?? status;
   };
 
   const formatDate = (dateString: string) => {
@@ -138,8 +155,8 @@ export default function SalesScreen() {
       'Siparişi hazırlamaya başladığınızı onaylıyor musunuz?',
       [
         { text: 'İptal', style: 'cancel' },
-        { 
-          text: 'Onayla', 
+        {
+          text: 'Onayla',
           onPress: () => updateStatusMutation.mutate({ orderId: order.id, status: 'processing' })
         },
       ]
@@ -173,14 +190,12 @@ export default function SalesScreen() {
   if (!isAuthenticated) {
     return (
       <View style={styles.centeredContainer}>
-        <Ionicons name="storefront-outline" size={64} color={TarodanColors.primary} />
-        <Text variant="titleLarge" style={styles.title}>Satışlarım</Text>
-        <Text variant="bodyMedium" style={styles.subtitle}>
+        <Ionicons name="storefront-outline" size={64} color={colors.primary[600]!} />
+        <Text variant="h2" style={styles.title}>Satışlarım</Text>
+        <Text variant="body" tone="muted" style={styles.subtitle}>
           Satışlarınızı görmek için giriş yapın
         </Text>
-        <Button mode="contained" onPress={() => router.push('/(auth)/login')}>
-          Giriş Yap
-        </Button>
+        <Button variant="primary" title="Giriş Yap" onPress={() => router.push('/(auth)/login')} />
       </View>
     );
   }
@@ -194,26 +209,26 @@ export default function SalesScreen() {
     <View style={styles.container}>
       {/* Header */}
       <View style={styles.header}>
-        <TouchableOpacity onPress={() => router.back()}>
-          <Ionicons name="arrow-back" size={24} color={TarodanColors.textOnPrimary} />
-        </TouchableOpacity>
+        <Pressable onPress={() => router.back()}>
+          <Ionicons name="arrow-back" size={24} color={colors.white} />
+        </Pressable>
         <Text style={styles.headerTitle}>Satışlarım</Text>
         <View style={{ width: 24 }} />
       </View>
 
       {/* Earnings Summary */}
-      <Card style={styles.earningsCard}>
-        <Card.Content style={styles.earningsContent}>
+      <Card variant="elevated" style={styles.earningsCard}>
+        <View style={styles.earningsContent}>
           <View style={styles.earningItem}>
-            <Text variant="bodySmall" style={styles.earningLabel}>Tamamlanan</Text>
-            <Text variant="titleMedium" style={styles.earningValue}>{formatPrice(totalEarnings)}</Text>
+            <Text variant="caption" style={styles.earningLabel}>Tamamlanan</Text>
+            <Text variant="h3" style={styles.earningValue}>{formatPrice(totalEarnings)}</Text>
           </View>
           <View style={styles.earningDivider} />
           <View style={styles.earningItem}>
-            <Text variant="bodySmall" style={styles.earningLabel}>Bekleyen</Text>
-            <Text variant="titleMedium" style={styles.earningValuePending}>{formatPrice(pendingEarnings)}</Text>
+            <Text variant="caption" style={styles.earningLabel}>Bekleyen</Text>
+            <Text variant="h3" style={styles.earningValuePending}>{formatPrice(pendingEarnings)}</Text>
           </View>
-        </Card.Content>
+        </View>
       </Card>
 
       {/* Filter Chips */}
@@ -222,13 +237,12 @@ export default function SalesScreen() {
           {(['all', 'paid', 'processing', 'shipped', 'completed'] as FilterType[]).map((f) => (
             <Chip
               key={f}
+              label={getStatusLabel(f)}
               selected={filter === f}
+              variant="primary"
               onPress={() => setFilter(f)}
-              style={[styles.filterChip, filter === f && styles.filterChipSelected]}
-              textStyle={filter === f ? styles.filterChipTextSelected : styles.filterChipText}
-            >
-              {f === 'all' ? 'Tümü' : getStatusText(f as Sale['status'])}
-            </Chip>
+              style={styles.filterChip}
+            />
           ))}
         </ScrollView>
       </View>
@@ -236,37 +250,31 @@ export default function SalesScreen() {
       {/* Sales */}
       {isLoading && sales.length === 0 ? (
         <View style={styles.loadingContainer}>
-          <ActivityIndicator size="large" color={TarodanColors.primary} />
+          <Spinner size="lg" />
         </View>
       ) : filteredSales.length === 0 ? (
         <View style={styles.emptyContainer}>
-          <Ionicons name="cart-outline" size={80} color={TarodanColors.textLight} />
-          <Text variant="titleMedium" style={styles.emptyTitle}>Henüz satışınız yok</Text>
-          <Text variant="bodyMedium" style={styles.emptySubtitle}>
+          <Ionicons name="cart-outline" size={80} color={colors.text.subtle} />
+          <Text variant="h3" style={styles.emptyTitle}>Henüz satışınız yok</Text>
+          <Text variant="body" tone="muted" style={styles.emptySubtitle}>
             İlan oluşturarak satışa başlayın
           </Text>
-          <Button mode="contained" onPress={() => router.push('/(tabs)/create')}>
-            İlan Oluştur
-          </Button>
+          <Button variant="primary" title="İlan Oluştur" onPress={() => router.push('/(tabs)/create')} />
         </View>
       ) : (
         <ScrollView
           style={styles.salesList}
           refreshControl={
-            <RefreshControl refreshing={refreshing} onRefresh={onRefresh} colors={[TarodanColors.primary]} />
+            <RefreshControl refreshing={refreshing} onRefresh={onRefresh} colors={[colors.primary[600]!]} />
           }
         >
           {filteredSales.map((sale) => (
-            <Card key={sale.id} style={styles.saleCard}>
+            <Card key={sale.id} variant="elevated" style={styles.saleCard}>
               <View style={styles.saleHeader}>
-                <Text variant="bodySmall" style={styles.orderNumber}>
+                <Text variant="caption" style={styles.orderNumber}>
                   #{sale.orderNumber}
                 </Text>
-                <View style={[styles.statusBadge, { backgroundColor: getStatusColor(sale.status) + '20' }]}>
-                  <Text style={[styles.statusText, { color: getStatusColor(sale.status) }]}>
-                    {getStatusText(sale.status)}
-                  </Text>
-                </View>
+                <StatusBadge status={sale.status} config={salesStatusConfig} size="sm" />
               </View>
 
               <View style={styles.saleContent}>
@@ -275,19 +283,19 @@ export default function SalesScreen() {
                   style={styles.productImage}
                 />
                 <View style={styles.saleInfo}>
-                  <Text variant="titleSmall" numberOfLines={1}>{sale.product.title}</Text>
-                  <Text variant="bodySmall" style={styles.buyerName}>
+                  <Text variant="label" numberOfLines={1}>{sale.product.title}</Text>
+                  <Text variant="caption" style={styles.buyerName}>
                     Alıcı: {sale.buyer.displayName}
                   </Text>
-                  <Text variant="bodySmall" style={styles.addressText} numberOfLines={1}>
+                  <Text variant="caption" style={styles.addressText} numberOfLines={1}>
                     📍 {sale.shippingAddress.city}
                   </Text>
                 </View>
                 <View style={styles.priceSection}>
-                  <Text variant="titleMedium" style={styles.price}>
+                  <Text variant="h3" style={styles.price}>
                     {formatPrice(sale.totalAmount)}
                   </Text>
-                  <Text variant="bodySmall" style={styles.dateText}>
+                  <Text variant="caption" style={styles.dateText}>
                     {formatDate(sale.createdAt)}
                   </Text>
                 </View>
@@ -297,25 +305,21 @@ export default function SalesScreen() {
               {sale.status === 'paid' && (
                 <View style={styles.actionButtons}>
                   <Button
-                    mode="contained"
-                    compact
+                    variant="primary"
+                    title="Hazırlanıyor Olarak İşaretle"
                     onPress={() => handleMarkAsProcessing(sale)}
-                    loading={updateStatusMutation.isPending}
-                  >
-                    Hazırlanıyor Olarak İşaretle
-                  </Button>
+                    isLoading={updateStatusMutation.isPending}
+                  />
                 </View>
               )}
 
               {sale.status === 'processing' && (
                 <View style={styles.actionButtons}>
                   <Button
-                    mode="contained"
-                    compact
+                    variant="primary"
+                    title="Kargoya Ver"
                     onPress={() => setShipDialog({ visible: true, order: sale })}
-                  >
-                    Kargoya Ver
-                  </Button>
+                  />
                 </View>
               )}
             </Card>
@@ -326,33 +330,34 @@ export default function SalesScreen() {
       )}
 
       {/* Ship Dialog */}
-      <Portal>
-        <Dialog visible={shipDialog.visible} onDismiss={() => setShipDialog({ visible: false, order: null })}>
-          <Dialog.Title>Kargo Bilgisi</Dialog.Title>
-          <Dialog.Content>
-            <Text variant="bodyMedium" style={{ marginBottom: 16 }}>
-              {shipDialog.order?.product.title}
-            </Text>
-            <TextInput
-              label="Kargo Takip Numarası"
-              value={trackingNumber}
-              onChangeText={setTrackingNumber}
-              mode="outlined"
-              placeholder="Örn: 1234567890"
-            />
-          </Dialog.Content>
-          <Dialog.Actions>
-            <Button onPress={() => setShipDialog({ visible: false, order: null })}>İptal</Button>
-            <Button 
-              mode="contained"
-              onPress={handleShip}
-              loading={updateStatusMutation.isPending}
-            >
-              Kargoya Verildi
-            </Button>
-          </Dialog.Actions>
-        </Dialog>
-      </Portal>
+      <Modal
+        isOpen={shipDialog.visible}
+        onClose={() => setShipDialog({ visible: false, order: null })}
+        title="Kargo Bilgisi"
+      >
+        <Text variant="body" style={{ marginBottom: 16 }}>
+          {shipDialog.order?.product.title}
+        </Text>
+        <Input
+          label="Kargo Takip Numarası"
+          value={trackingNumber}
+          onChangeText={setTrackingNumber}
+          placeholder="Örn: 1234567890"
+        />
+        <View style={styles.dialogActions}>
+          <Button
+            variant="ghost"
+            title="İptal"
+            onPress={() => setShipDialog({ visible: false, order: null })}
+          />
+          <Button
+            variant="primary"
+            title="Kargoya Verildi"
+            onPress={handleShip}
+            isLoading={updateStatusMutation.isPending}
+          />
+        </View>
+      </Modal>
     </View>
   );
 }
@@ -360,17 +365,17 @@ export default function SalesScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: TarodanColors.backgroundSecondary,
+    backgroundColor: colors.surface.alt,
   },
   centeredContainer: {
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
     padding: 32,
-    backgroundColor: TarodanColors.background,
+    backgroundColor: colors.surface.DEFAULT,
   },
   header: {
-    backgroundColor: TarodanColors.primary,
+    backgroundColor: colors.primary[600]!,
     paddingTop: 50,
     paddingBottom: 16,
     paddingHorizontal: 20,
@@ -381,7 +386,7 @@ const styles = StyleSheet.create({
   headerTitle: {
     fontSize: 18,
     fontWeight: 'bold',
-    color: TarodanColors.textOnPrimary,
+    color: colors.white,
   },
   title: {
     marginTop: 16,
@@ -390,12 +395,10 @@ const styles = StyleSheet.create({
   subtitle: {
     textAlign: 'center',
     marginBottom: 24,
-    color: TarodanColors.textSecondary,
   },
   earningsCard: {
     margin: 16,
     marginBottom: 8,
-    backgroundColor: TarodanColors.background,
   },
   earningsContent: {
     flexDirection: 'row',
@@ -406,41 +409,31 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   earningLabel: {
-    color: TarodanColors.textSecondary,
+    color: colors.text.muted,
     marginBottom: 4,
   },
   earningValue: {
-    color: TarodanColors.success,
+    color: colors.success[600]!,
     fontWeight: 'bold',
   },
   earningValuePending: {
-    color: TarodanColors.warning,
+    color: colors.warning[600]!,
     fontWeight: 'bold',
   },
   earningDivider: {
     width: 1,
     height: 40,
-    backgroundColor: TarodanColors.border,
+    backgroundColor: colors.border.DEFAULT,
   },
   filterContainer: {
-    backgroundColor: TarodanColors.background,
+    backgroundColor: colors.surface.DEFAULT,
     paddingVertical: 12,
     paddingHorizontal: 16,
     borderBottomWidth: 1,
-    borderBottomColor: TarodanColors.border,
+    borderBottomColor: colors.border.DEFAULT,
   },
   filterChip: {
     marginRight: 8,
-    backgroundColor: TarodanColors.surfaceVariant,
-  },
-  filterChipSelected: {
-    backgroundColor: TarodanColors.primary,
-  },
-  filterChipText: {
-    color: TarodanColors.textSecondary,
-  },
-  filterChipTextSelected: {
-    color: TarodanColors.textOnPrimary,
   },
   loadingContainer: {
     flex: 1,
@@ -456,12 +449,11 @@ const styles = StyleSheet.create({
   emptyTitle: {
     marginTop: 16,
     marginBottom: 8,
-    color: TarodanColors.textPrimary,
+    color: colors.text.heading,
   },
   emptySubtitle: {
     textAlign: 'center',
     marginBottom: 24,
-    color: TarodanColors.textSecondary,
   },
   salesList: {
     flex: 1,
@@ -469,8 +461,6 @@ const styles = StyleSheet.create({
   },
   saleCard: {
     marginBottom: 12,
-    backgroundColor: TarodanColors.background,
-    padding: 12,
   },
   saleHeader: {
     flexDirection: 'row',
@@ -479,16 +469,7 @@ const styles = StyleSheet.create({
     marginBottom: 12,
   },
   orderNumber: {
-    color: TarodanColors.textSecondary,
-  },
-  statusBadge: {
-    paddingHorizontal: 10,
-    paddingVertical: 4,
-    borderRadius: 12,
-  },
-  statusText: {
-    fontSize: 12,
-    fontWeight: '500',
+    color: colors.text.muted,
   },
   saleContent: {
     flexDirection: 'row',
@@ -498,35 +479,41 @@ const styles = StyleSheet.create({
     width: 60,
     height: 60,
     borderRadius: 8,
-    backgroundColor: TarodanColors.surfaceVariant,
+    backgroundColor: colors.surface.alt,
   },
   saleInfo: {
     flex: 1,
     marginLeft: 12,
   },
   buyerName: {
-    color: TarodanColors.textSecondary,
+    color: colors.text.muted,
     marginTop: 2,
   },
   addressText: {
-    color: TarodanColors.textSecondary,
+    color: colors.text.muted,
     marginTop: 2,
   },
   priceSection: {
     alignItems: 'flex-end',
   },
   price: {
-    color: TarodanColors.primary,
+    color: colors.primary[700]!,
     fontWeight: 'bold',
   },
   dateText: {
-    color: TarodanColors.textSecondary,
+    color: colors.text.muted,
     marginTop: 2,
   },
   actionButtons: {
     marginTop: 12,
     paddingTop: 12,
     borderTopWidth: 1,
-    borderTopColor: TarodanColors.border,
+    borderTopColor: colors.border.DEFAULT,
+  },
+  dialogActions: {
+    flexDirection: 'row',
+    justifyContent: 'flex-end',
+    gap: 8,
+    marginTop: 16,
   },
 });

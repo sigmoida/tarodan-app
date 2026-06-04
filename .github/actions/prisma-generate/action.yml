@@ -1,0 +1,21 @@
+name: 'Prisma Generate (with retry)'
+description: 'Run prisma generate, retrying on transient network errors (e.g. ECONNRESET fetching binaries).'
+
+runs:
+  using: 'composite'
+  steps:
+    - name: Run prisma generate (up to 3 attempts)
+      shell: bash
+      run: |
+        attempt=0
+        max_attempts=3
+        until pnpm --filter @tarodan/api prisma:generate; do
+          attempt=$((attempt + 1))
+          if [ $attempt -ge $max_attempts ]; then
+            echo "::error::prisma generate failed after $max_attempts attempts" >&2
+            exit 1
+          fi
+          backoff=$((attempt * 10))
+          echo "::warning::prisma generate failed (attempt $attempt/$max_attempts), retrying in ${backoff}s..."
+          sleep $backoff
+        done

@@ -6,6 +6,7 @@ import { ScheduleModule } from '@nestjs/schedule';
 import { PrismaModule } from '../../prisma';
 import { PaymentModule } from '../payment/payment.module';
 import { SuratCargoModule } from '../surat-cargo/surat-cargo.module';
+import { NotificationModule } from '../notification/notification.module';
 import { RefundController } from './refund.controller';
 import { RefundService } from './refund.service';
 import { RefundSchedulerService } from './refund-scheduler.service';
@@ -16,6 +17,7 @@ import { RefundSchedulerService } from './refund-scheduler.service';
     ConfigModule,
     SuratCargoModule,
     forwardRef(() => PaymentModule),
+    NotificationModule,
     ScheduleModule.forRoot(),
     JwtModule.registerAsync({
       imports: [ConfigModule],

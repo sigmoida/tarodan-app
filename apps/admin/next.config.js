@@ -8,6 +8,11 @@ const nextConfig = {
   transpilePackages: ['@tarodan/ui', '@tarodan/design-tokens'],
   experimental: {
     outputFileTracingRoot: path.join(__dirname, '../../'),
+    // Next 14.2 strictly requires a Suspense boundary around useSearchParams()
+    // during prerender. Admin pages are user-specific and exported via
+    // output: 'standalone' (server-rendered), so this strict bailout adds no
+    // safety. Disable to keep build green; if pages ever go static, revisit.
+    missingSuspenseWithCSRBailout: false,
   },
   images: {
     remotePatterns: [

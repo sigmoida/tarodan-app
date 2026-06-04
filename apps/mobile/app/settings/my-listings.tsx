@@ -1,12 +1,26 @@
-import { View, ScrollView, StyleSheet, TouchableOpacity, Image, RefreshControl, Alert } from 'react-native';
-import { Text, FAB, Chip, IconButton, Card, ProgressBar, Menu, Divider, Portal, Dialog, Button, ActivityIndicator } from 'react-native-paper';
+import { View, ScrollView, StyleSheet, Pressable, Image, RefreshControl, Alert } from 'react-native';
+import {
+  FAB,
+  Chip,
+  IconButton,
+  Card,
+  ProgressBar,
+  Divider,
+  Modal,
+  Button,
+  Spinner,
+  Text,
+  theme,
+} from '@tarodan/ui-native';
 import { useState, useCallback } from 'react';
 import { router, useFocusEffect } from 'expo-router';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
+import { Ionicons } from '@expo/vector-icons';
 import { productsApi } from '../../src/services/api';
 import { useAuthStore } from '../../src/stores/authStore';
-import { TarodanColors } from '../../src/theme';
+import { useTranslation } from '../../src/i18n';
+
+const { colors, spacing, radius } = theme;
 
 interface Listing {
   id: string;
@@ -26,11 +40,12 @@ interface Listing {
 type FilterType = 'all' | 'active' | 'pending' | 'sold' | 'expired' | 'inactive';
 
 export default function MyListingsScreen() {
+  const { t } = useTranslation();
   const queryClient = useQueryClient();
   const { user, limits, refreshUserData } = useAuthStore();
   const [filter, setFilter] = useState<FilterType>('all');
   const [refreshing, setRefreshing] = useState(false);
-  const [menuVisible, setMenuVisible] = useState<string | null>(null);
+  const [actionMenuListing, setActionMenuListing] = useState<Listing | null>(null);
   const [deleteDialogVisible, setDeleteDialogVisible] = useState(false);
   const [selectedListing, setSelectedListing] = useState<Listing | null>(null);
 
@@ -133,13 +148,13 @@ export default function MyListingsScreen() {
 
   const getStatusColor = (status: string) => {
     switch (status) {
-      case 'active': return TarodanColors.success;
-      case 'sold': return TarodanColors.info;
-      case 'pending': return TarodanColors.warning;
-      case 'rejected': return TarodanColors.error;
-      case 'expired': return TarodanColors.textSecondary;
-      case 'inactive': return TarodanColors.textLight;
-      default: return TarodanColors.textSecondary;
+      case 'active': return colors.success[600]!;
+      case 'sold': return colors.info[600]!;
+      case 'pending': return colors.warning[600]!;
+      case 'rejected': return colors.danger[600]!;
+      case 'expired': return colors.text.muted;
+      case 'inactive': return colors.text.subtle;
+      default: return colors.text.muted;
     }
   };
 
@@ -169,8 +184,8 @@ export default function MyListingsScreen() {
   const counts = getStatusCounts();
 
   const handleMenuAction = (action: string, listing: Listing) => {
-    setMenuVisible(null);
-    
+    setActionMenuListing(null);
+
     switch (action) {
       case 'edit':
         router.push(`/listing/${listing.id}/edit`);
@@ -230,196 +245,150 @@ export default function MyListingsScreen() {
   const currentCount = user?.listingCount || listings.filter(l => l.status === 'active' || l.status === 'pending').length;
   const canCreateNew = listingLimit === -1 || currentCount < listingLimit;
 
+  const progressColor =
+    listingLimit === -1
+      ? colors.primary[600]!
+      : currentCount >= listingLimit
+        ? colors.danger[600]!
+        : currentCount >= listingLimit - 2
+          ? colors.warning[600]!
+          : colors.primary[600]!;
+
   return (
     <View style={styles.container}>
       {/* Header */}
       <View style={styles.header}>
-        <TouchableOpacity onPress={() => router.back()}>
-          <Ionicons name="arrow-back" size={24} color={TarodanColors.textOnPrimary} />
-        </TouchableOpacity>
-        <Text style={styles.headerTitle}>İlanlarım</Text>
-        <TouchableOpacity onPress={() => router.push('/settings/analytics')}>
-          <Ionicons name="stats-chart" size={24} color={TarodanColors.textOnPrimary} />
-        </TouchableOpacity>
+        <Pressable onPress={() => router.back()}>
+          <Ionicons name="arrow-back" size={24} color={colors.white} />
+        </Pressable>
+        <Text style={styles.headerTitle}>{t('mobile.settingsMyListings')}</Text>
+        <Pressable onPress={() => router.push('/settings/analytics')}>
+          <Ionicons name="stats-chart" size={24} color={colors.white} />
+        </Pressable>
       </View>
 
       {/* Listing Limit Card */}
       <Card style={styles.limitCard}>
-        <Card.Content>
-          <View style={styles.limitHeader}>
-            <View>
-              <Text variant="titleSmall">İlan Kullanımı</Text>
-              <Text variant="bodySmall" style={{ color: TarodanColors.textSecondary }}>
-                {listingLimit === -1 ? 'Sınırsız' : `${currentCount}/${listingLimit} aktif ilan`}
-              </Text>
-            </View>
-            {listingLimit !== -1 && currentCount >= listingLimit - 2 && (
-              <TouchableOpacity onPress={() => router.push('/upgrade')}>
-                <Text style={styles.upgradeLink}>Premium'a Geç</Text>
-              </TouchableOpacity>
-            )}
+        <View style={styles.limitHeader}>
+          <View>
+            <Text variant="h3">İlan Kullanımı</Text>
+            <Text variant="bodySm" style={{ color: colors.text.muted }}>
+              {listingLimit === -1 ? 'Sınırsız' : `${currentCount}/${listingLimit} aktif ilan`}
+            </Text>
           </View>
-          {listingLimit !== -1 && (
-            <ProgressBar
-              progress={currentCount / listingLimit}
-              color={currentCount >= listingLimit ? TarodanColors.error : currentCount >= listingLimit - 2 ? TarodanColors.warning : TarodanColors.primary}
-              style={styles.progressBar}
-            />
+          {listingLimit !== -1 && currentCount >= listingLimit - 2 && (
+            <Pressable onPress={() => router.push('/upgrade')}>
+              <Text style={styles.upgradeLink}>Premium'a Geç</Text>
+            </Pressable>
           )}
-        </Card.Content>
+        </View>
+        {listingLimit !== -1 && (
+          <ProgressBar
+            progress={Math.min(currentCount / listingLimit, 1)}
+            color={progressColor}
+            style={styles.progressBar}
+          />
+        )}
       </Card>
 
       {/* Filter Chips */}
       <View style={styles.filterContainer}>
-        <ScrollView horizontal showsHorizontalScrollIndicator={false}>
+        <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.chipRow}>
           <Chip
+            label={`Tümü (${counts.all})`}
             selected={filter === 'all'}
+            variant={filter === 'all' ? 'primary' : 'neutral'}
             onPress={() => setFilter('all')}
-            style={[styles.filterChip, filter === 'all' && styles.filterChipSelected]}
-            textStyle={filter === 'all' ? styles.filterChipTextSelected : styles.filterChipText}
-          >
-            Tümü ({counts.all})
-          </Chip>
+          />
           <Chip
+            label={`Aktif (${counts.active})`}
             selected={filter === 'active'}
+            variant={filter === 'active' ? 'primary' : 'neutral'}
             onPress={() => setFilter('active')}
-            style={[styles.filterChip, filter === 'active' && styles.filterChipSelected]}
-            textStyle={filter === 'active' ? styles.filterChipTextSelected : styles.filterChipText}
-          >
-            Aktif ({counts.active})
-          </Chip>
+          />
           <Chip
+            label={`Beklemede (${counts.pending})`}
             selected={filter === 'pending'}
+            variant={filter === 'pending' ? 'primary' : 'neutral'}
             onPress={() => setFilter('pending')}
-            style={[styles.filterChip, filter === 'pending' && styles.filterChipSelected]}
-            textStyle={filter === 'pending' ? styles.filterChipTextSelected : styles.filterChipText}
-          >
-            Beklemede ({counts.pending})
-          </Chip>
+          />
           <Chip
+            label={`Satıldı (${counts.sold})`}
             selected={filter === 'sold'}
+            variant={filter === 'sold' ? 'primary' : 'neutral'}
             onPress={() => setFilter('sold')}
-            style={[styles.filterChip, filter === 'sold' && styles.filterChipSelected]}
-            textStyle={filter === 'sold' ? styles.filterChipTextSelected : styles.filterChipText}
-          >
-            Satıldı ({counts.sold})
-          </Chip>
+          />
           <Chip
+            label={`Süresi Doldu (${counts.expired})`}
             selected={filter === 'expired'}
+            variant={filter === 'expired' ? 'primary' : 'neutral'}
             onPress={() => setFilter('expired')}
-            style={[styles.filterChip, filter === 'expired' && styles.filterChipSelected]}
-            textStyle={filter === 'expired' ? styles.filterChipTextSelected : styles.filterChipText}
-          >
-            Süresi Doldu ({counts.expired})
-          </Chip>
+          />
           <Chip
+            label={`Deaktif (${counts.inactive})`}
             selected={filter === 'inactive'}
+            variant={filter === 'inactive' ? 'primary' : 'neutral'}
             onPress={() => setFilter('inactive')}
-            style={[styles.filterChip, filter === 'inactive' && styles.filterChipSelected]}
-            textStyle={filter === 'inactive' ? styles.filterChipTextSelected : styles.filterChipText}
-          >
-            Deaktif ({counts.inactive})
-          </Chip>
+          />
         </ScrollView>
       </View>
 
       {/* Listings */}
       {isLoading ? (
         <View style={styles.loadingContainer}>
-          <ActivityIndicator size="large" color={TarodanColors.primary} />
+          <Spinner size="lg" />
         </View>
       ) : isError ? (
         <View style={styles.loadingContainer}>
-          <Ionicons name="cloud-offline-outline" size={64} color={TarodanColors.textLight} />
-          <Text style={{ fontSize: 18, fontWeight: '600', marginTop: 16, color: TarodanColors.text }}>Yüklenemedi</Text>
-          <Text style={{ color: TarodanColors.textLight, marginTop: 8, textAlign: 'center' }}>İlanlarınız yüklenirken bir hata oluştu.</Text>
-          <Button mode="contained" onPress={() => refetch()} style={{ marginTop: 16, backgroundColor: TarodanColors.primary }}>
-            Tekrar Dene
-          </Button>
+          <Ionicons name="cloud-offline-outline" size={64} color={colors.text.subtle} />
+          <Text style={{ fontSize: 18, fontWeight: '600', marginTop: 16, color: colors.text.heading }}>Yüklenemedi</Text>
+          <Text style={{ color: colors.text.subtle, marginTop: 8, textAlign: 'center' }}>İlanlarınız yüklenirken bir hata oluştu.</Text>
+          <Button variant="primary" title="Tekrar Dene" onPress={() => refetch()} style={{ marginTop: 16 }} />
         </View>
       ) : (
-        <ScrollView 
-          style={styles.content} 
+        <ScrollView
+          style={styles.content}
           showsVerticalScrollIndicator={false}
           refreshControl={
-            <RefreshControl refreshing={refreshing} onRefresh={onRefresh} colors={[TarodanColors.primary]} />
+            <RefreshControl refreshing={refreshing} onRefresh={onRefresh} colors={[colors.primary[600]!]} />
           }
         >
           {filteredListings.map((listing) => {
             const daysUntilExpiry = getDaysUntilExpiry(listing.expiresAt);
-            
+
             return (
-              <TouchableOpacity
+              <Pressable
                 key={listing.id}
                 style={styles.listingCard}
                 onPress={() => router.push(`/product/${listing.id}`)}
               >
-                <Image 
-                  source={{ uri: listing.images?.[0]?.url || 'https://via.placeholder.com/100x100?text=No+Image' }} 
-                  style={styles.listingImage} 
+                <Image
+                  source={{ uri: listing.images?.[0]?.url || 'https://via.placeholder.com/100x100?text=No+Image' }}
+                  style={styles.listingImage}
                 />
                 <View style={styles.listingInfo}>
                   <View style={styles.listingHeader}>
                     <Text style={styles.listingTitle} numberOfLines={2}>{listing.title}</Text>
-                    <Menu
-                      visible={menuVisible === listing.id}
-                      onDismiss={() => setMenuVisible(null)}
-                      anchor={
-                        <IconButton
-                          icon="dots-vertical"
-                          size={20}
-                          onPress={() => setMenuVisible(listing.id)}
-                        />
-                      }
-                    >
-                      <Menu.Item 
-                        onPress={() => handleMenuAction('view', listing)} 
-                        title="Görüntüle"
-                        leadingIcon="eye"
-                      />
-                      {listing.status !== 'sold' && (
-                        <Menu.Item 
-                          onPress={() => handleMenuAction('edit', listing)} 
-                          title="Düzenle"
-                          leadingIcon="pencil"
-                        />
-                      )}
-                      {listing.status === 'active' && (
-                        <Menu.Item 
-                          onPress={() => handleMenuAction('deactivate', listing)} 
-                          title="Deaktif Et"
-                          leadingIcon="pause-circle"
-                        />
-                      )}
-                      {(listing.status === 'inactive' || listing.status === 'expired') && (
-                        <Menu.Item 
-                          onPress={() => handleMenuAction('relist', listing)} 
-                          title="Yeniden Yayınla"
-                          leadingIcon="refresh"
-                        />
-                      )}
-                      <Divider />
-                      <Menu.Item 
-                        onPress={() => handleMenuAction('delete', listing)} 
-                        title="Sil"
-                        leadingIcon="delete"
-                        titleStyle={{ color: TarodanColors.error }}
-                      />
-                    </Menu>
+                    <IconButton
+                      icon="ellipsis-vertical"
+                      size="sm"
+                      accessibilityLabel="İlan menüsü"
+                      onPress={() => setActionMenuListing(listing)}
+                    />
                   </View>
                   <Text style={styles.listingPrice}>₺{(listing.price ?? 0).toLocaleString('tr-TR')}</Text>
-                  
+
                   {/* Stats */}
                   <View style={styles.listingStats}>
                     <View style={styles.stat}>
-                      <Ionicons name="eye-outline" size={14} color={TarodanColors.textSecondary} />
+                      <Ionicons name="eye-outline" size={14} color={colors.text.muted} />
                       <Text style={styles.statText}>{listing.viewCount}</Text>
                     </View>
                     <View style={styles.stat}>
-                      <Ionicons name="heart-outline" size={14} color={TarodanColors.textSecondary} />
+                      <Ionicons name="heart-outline" size={14} color={colors.text.muted} />
                       <Text style={styles.statText}>{listing.favoriteCount || 0}</Text>
                     </View>
-                    <View style={[styles.statusBadge, { backgroundColor: getStatusColor(listing.status) + '20' }]}>
+                    <View style={[styles.statusBadge, { backgroundColor: colors.surface.alt }]}>
                       <View style={[styles.statusDot, { backgroundColor: getStatusColor(listing.status) }]} />
                       <Text style={[styles.statusText, { color: getStatusColor(listing.status) }]}>
                         {getStatusText(listing.status)}
@@ -430,7 +399,7 @@ export default function MyListingsScreen() {
                   {/* Expiry Warning */}
                   {listing.status === 'active' && daysUntilExpiry !== null && daysUntilExpiry <= 7 && daysUntilExpiry > 0 && (
                     <View style={styles.expiryWarning}>
-                      <Ionicons name="warning" size={14} color={TarodanColors.warning} />
+                      <Ionicons name="warning" size={14} color={colors.warning[600]!} />
                       <Text style={styles.expiryText}>{daysUntilExpiry} gün içinde süresi dolacak</Text>
                     </View>
                   )}
@@ -438,19 +407,19 @@ export default function MyListingsScreen() {
                   {/* Created Date */}
                   <Text style={styles.dateText}>Oluşturulma: {formatDate(listing.createdAt)}</Text>
                 </View>
-              </TouchableOpacity>
+              </Pressable>
             );
           })}
 
           {filteredListings.length === 0 && !isLoading && (
             <View style={styles.emptyState}>
-              <Ionicons name="pricetag-outline" size={64} color={TarodanColors.textLight} />
+              <Ionicons name="pricetag-outline" size={64} color={colors.text.subtle} />
               <Text style={styles.emptyTitle}>
                 {filter === 'all' ? 'Henüz ilan yok' : `${getStatusText(filter)} ilan yok`}
               </Text>
               <Text style={styles.emptyDesc}>
-                {filter === 'all' 
-                  ? 'İlk ilanınızı oluşturmak için + butonuna tıklayın' 
+                {filter === 'all'
+                  ? 'İlk ilanınızı oluşturmak için + butonuna tıklayın'
                   : 'Bu kategoride ilan bulunmuyor'}
               </Text>
             </View>
@@ -460,36 +429,72 @@ export default function MyListingsScreen() {
         </ScrollView>
       )}
 
+      {/* Action Menu Modal */}
+      <Modal
+        isOpen={actionMenuListing !== null}
+        onClose={() => setActionMenuListing(null)}
+        title="İşlemler"
+      >
+        {actionMenuListing && (
+          <View>
+            <Pressable style={styles.menuItem} onPress={() => handleMenuAction('view', actionMenuListing)}>
+              <Ionicons name="eye" size={20} color={colors.text.heading} />
+              <Text style={styles.menuItemText}>Görüntüle</Text>
+            </Pressable>
+            {actionMenuListing.status !== 'sold' && (
+              <Pressable style={styles.menuItem} onPress={() => handleMenuAction('edit', actionMenuListing)}>
+                <Ionicons name="pencil" size={20} color={colors.text.heading} />
+                <Text style={styles.menuItemText}>Düzenle</Text>
+              </Pressable>
+            )}
+            {actionMenuListing.status === 'active' && (
+              <Pressable style={styles.menuItem} onPress={() => handleMenuAction('deactivate', actionMenuListing)}>
+                <Ionicons name="pause-circle" size={20} color={colors.text.heading} />
+                <Text style={styles.menuItemText}>Deaktif Et</Text>
+              </Pressable>
+            )}
+            {(actionMenuListing.status === 'inactive' || actionMenuListing.status === 'expired') && (
+              <Pressable style={styles.menuItem} onPress={() => handleMenuAction('relist', actionMenuListing)}>
+                <Ionicons name="refresh" size={20} color={colors.text.heading} />
+                <Text style={styles.menuItemText}>Yeniden Yayınla</Text>
+              </Pressable>
+            )}
+            <Divider />
+            <Pressable style={styles.menuItem} onPress={() => handleMenuAction('delete', actionMenuListing)}>
+              <Ionicons name="trash" size={20} color={colors.danger[600]!} />
+              <Text style={[styles.menuItemText, { color: colors.danger[600]! }]}>Sil</Text>
+            </Pressable>
+          </View>
+        )}
+      </Modal>
+
       {/* Delete Confirmation Dialog */}
-      <Portal>
-        <Dialog visible={deleteDialogVisible} onDismiss={() => setDeleteDialogVisible(false)}>
-          <Dialog.Icon icon="alert" />
-          <Dialog.Title>İlanı Sil</Dialog.Title>
-          <Dialog.Content>
-            <Text>
-              "{selectedListing?.title}" ilanını silmek istediğinize emin misiniz? Bu işlem geri alınamaz.
-            </Text>
-          </Dialog.Content>
-          <Dialog.Actions>
-            <Button onPress={() => setDeleteDialogVisible(false)}>İptal</Button>
-            <Button 
-              textColor={TarodanColors.error}
-              loading={deleteMutation.isPending}
-              onPress={() => selectedListing && deleteMutation.mutate(selectedListing.id)}
-            >
-              Sil
-            </Button>
-          </Dialog.Actions>
-        </Dialog>
-      </Portal>
+      <Modal
+        isOpen={deleteDialogVisible}
+        onClose={() => setDeleteDialogVisible(false)}
+        title="İlanı Sil"
+      >
+        <Text style={{ marginBottom: 16, color: colors.text.body }}>
+          "{selectedListing?.title}" ilanını silmek istediğinize emin misiniz? Bu işlem geri alınamaz.
+        </Text>
+        <View style={styles.dialogActions}>
+          <Button variant="ghost" title="İptal" onPress={() => setDeleteDialogVisible(false)} />
+          <Button
+            variant="danger"
+            title="Sil"
+            isLoading={deleteMutation.isPending}
+            onPress={() => selectedListing && deleteMutation.mutate(selectedListing.id)}
+          />
+        </View>
+      </Modal>
 
       {/* FAB */}
       {canCreateNew && (
         <FAB
-          icon="plus"
+          icon="add"
+          accessibilityLabel="Yeni ilan oluştur"
           style={styles.fab}
           onPress={() => router.push('/(tabs)/create')}
-          color={TarodanColors.textOnPrimary}
         />
       )}
     </View>
@@ -499,10 +504,10 @@ export default function MyListingsScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: TarodanColors.backgroundSecondary,
+    backgroundColor: colors.surface.alt,
   },
   header: {
-    backgroundColor: TarodanColors.primary,
+    backgroundColor: colors.primary[600]!,
     paddingTop: 50,
     paddingBottom: 16,
     paddingHorizontal: 20,
@@ -513,7 +518,7 @@ const styles = StyleSheet.create({
   headerTitle: {
     fontSize: 18,
     fontWeight: 'bold',
-    color: TarodanColors.textOnPrimary,
+    color: colors.white,
   },
   limitCard: {
     margin: 16,
@@ -526,32 +531,22 @@ const styles = StyleSheet.create({
     marginBottom: 8,
   },
   upgradeLink: {
-    color: TarodanColors.primary,
+    color: colors.primary[600]!,
     fontWeight: '600',
   },
   progressBar: {
     height: 8,
-    borderRadius: 4,
+    borderRadius: radius.sm,
   },
   filterContainer: {
-    backgroundColor: TarodanColors.background,
+    backgroundColor: colors.white,
     paddingVertical: 12,
     paddingHorizontal: 16,
     borderBottomWidth: 1,
-    borderBottomColor: TarodanColors.border,
+    borderBottomColor: colors.border.DEFAULT,
   },
-  filterChip: {
-    marginRight: 8,
-    backgroundColor: TarodanColors.surfaceVariant,
-  },
-  filterChipSelected: {
-    backgroundColor: TarodanColors.primary,
-  },
-  filterChipText: {
-    color: TarodanColors.textSecondary,
-  },
-  filterChipTextSelected: {
-    color: TarodanColors.textOnPrimary,
+  chipRow: {
+    gap: 8,
   },
   loadingContainer: {
     flex: 1,
@@ -563,13 +558,13 @@ const styles = StyleSheet.create({
     padding: 16,
   },
   listingCard: {
-    backgroundColor: TarodanColors.background,
-    borderRadius: 12,
+    backgroundColor: colors.white,
+    borderRadius: radius.lg,
     padding: 12,
     flexDirection: 'row',
     marginBottom: 12,
     elevation: 2,
-    shadowColor: '#000',
+    shadowColor: colors.black,
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.1,
     shadowRadius: 4,
@@ -577,8 +572,8 @@ const styles = StyleSheet.create({
   listingImage: {
     width: 100,
     height: 100,
-    borderRadius: 8,
-    backgroundColor: TarodanColors.surfaceVariant,
+    borderRadius: radius.md,
+    backgroundColor: colors.surface.alt,
   },
   listingInfo: {
     flex: 1,
@@ -593,12 +588,12 @@ const styles = StyleSheet.create({
     flex: 1,
     fontSize: 14,
     fontWeight: '600',
-    color: TarodanColors.textPrimary,
+    color: colors.text.heading,
   },
   listingPrice: {
     fontSize: 16,
     fontWeight: 'bold',
-    color: TarodanColors.primary,
+    color: colors.primary[600]!,
     marginTop: 4,
   },
   listingStats: {
@@ -614,7 +609,7 @@ const styles = StyleSheet.create({
   },
   statText: {
     fontSize: 12,
-    color: TarodanColors.textSecondary,
+    color: colors.text.muted,
     marginLeft: 4,
   },
   statusBadge: {
@@ -622,7 +617,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     paddingHorizontal: 8,
     paddingVertical: 4,
-    borderRadius: 12,
+    borderRadius: radius.lg,
   },
   statusDot: {
     width: 6,
@@ -641,12 +636,12 @@ const styles = StyleSheet.create({
   },
   expiryText: {
     fontSize: 11,
-    color: TarodanColors.warning,
+    color: colors.warning[600]!,
     marginLeft: 4,
   },
   dateText: {
     fontSize: 11,
-    color: TarodanColors.textLight,
+    color: colors.text.subtle,
     marginTop: 4,
   },
   emptyState: {
@@ -657,12 +652,12 @@ const styles = StyleSheet.create({
   emptyTitle: {
     fontSize: 18,
     fontWeight: '600',
-    color: TarodanColors.textPrimary,
+    color: colors.text.heading,
     marginTop: 16,
   },
   emptyDesc: {
     fontSize: 14,
-    color: TarodanColors.textSecondary,
+    color: colors.text.muted,
     marginTop: 8,
     textAlign: 'center',
   },
@@ -670,6 +665,21 @@ const styles = StyleSheet.create({
     position: 'absolute',
     right: 16,
     bottom: 24,
-    backgroundColor: TarodanColors.primary,
+  },
+  menuItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: 12,
+    gap: 12,
+  },
+  menuItemText: {
+    fontSize: 15,
+    color: colors.text.heading,
+  },
+  dialogActions: {
+    flexDirection: 'row',
+    justifyContent: 'flex-end',
+    gap: 8,
+    marginTop: 12,
   },
 });

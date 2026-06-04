@@ -18,6 +18,7 @@ import { SendGridProvider } from './providers/sendgrid.provider';
 import { ExpoPushProvider } from './providers/expo-push.provider';
 import { SmsProvider } from './providers/sms.provider';
 import { SmtpProvider } from './providers/smtp.provider';
+import { StorageService } from '../storage/storage.service';
 
 // Notification templates (Turkish)
 const NOTIFICATION_TEMPLATES: Record<NotificationType, { title: string; message: string; icon?: string; link?: string }> = {
@@ -58,6 +59,12 @@ const NOTIFICATION_TEMPLATES: Record<NotificationType, { title: string; message:
     icon: '❌',
     link: '/orders/{{orderId}}',
   },
+  [NotificationType.ORDER_CANCELLED_OUT_OF_STOCK]: {
+    title: 'Siparişiniz iptal edildi: stok tükendi',
+    message: '{{productTitle}} adlı ürün başka bir alıcı tarafından satın alındı. Benzer ürünlere göz atabilirsiniz.',
+    icon: '❌',
+    link: '/products/unavailable/{{productId}}',
+  },
   [NotificationType.ORDER_REFUNDED]: {
     title: 'İade İşlemi Tamamlandı',
     message: 'Ödemeniz iade edildi. {{amount}} TL hesabınıza aktarılacak.',
@@ -68,6 +75,44 @@ const NOTIFICATION_TEMPLATES: Record<NotificationType, { title: string; message:
     title: 'Kargo Süresi Dolmak Üzere',
     message: '"{{productTitle}}" siparişini {{deadline}} tarihine kadar kargoya vermeniz gerekmektedir. Aksi halde sipariş otomatik iptal edilecektir.',
     icon: '⚠️',
+    link: '/orders/{{orderId}}',
+  },
+  [NotificationType.ORDER_RESERVATION_RELEASED]: {
+    title: 'Stok rezervasyonunuz kaldırıldı',
+    message: '{{productTitle}} için 30 dakika içinde ödeme tamamlanmadığı için stok rezervasyonu kaldırıldı. Ürün stoktaysa 24 saat içinde tekrar ödeme yapabilirsiniz.',
+    icon: '⏳',
+    link: '/orders/{{orderId}}',
+  },
+
+  // 48h pencere (Faz 3B.1)
+  [NotificationType.ORDER_DELIVERED_CONFIRM]: {
+    title: 'Siparişin teslim edildi',
+    message: '48 saat içinde sorun varsa bildir veya "Sorun yok" ile onayla. Süre dolunca otomatik tamamlanacak.',
+    icon: '📦',
+    link: '/orders/{{orderId}}',
+  },
+  [NotificationType.ORDER_AUTO_COMPLETED]: {
+    title: 'Sipariş otomatik tamamlandı',
+    message: '48 saatlik kontrol süresi doldu; sipariş tamamlandı.',
+    icon: '✅',
+    link: '/orders/{{orderId}}',
+  },
+  [NotificationType.ORDER_MANUALLY_CONFIRMED]: {
+    title: 'Alıcı siparişini onayladı',
+    message: 'Alıcı siparişi erken onayladı. Ödemen kısa süre içinde hesabına transfer edilecek.',
+    icon: '💸',
+    link: '/orders/{{orderId}}',
+  },
+  [NotificationType.ORDER_FORCE_COMPLETED_BY_ADMIN]: {
+    title: 'Sipariş yönetici tarafından tamamlandı',
+    message: 'Bir yönetici siparişini manuel olarak tamamladı.',
+    icon: '🛡️',
+    link: '/orders/{{orderId}}',
+  },
+  [NotificationType.SELLER_DID_NOT_SHIP_REFUNDED]: {
+    title: 'Sipariş iptal edildi',
+    message: 'Satıcı belirlenen süre içinde kargoya vermediği için sipariş iptal edildi ve tam iade işlemi başlatıldı.',
+    icon: '↩️',
     link: '/orders/{{orderId}}',
   },
 
@@ -107,6 +152,12 @@ const NOTIFICATION_TEMPLATES: Record<NotificationType, { title: string; message:
     message: '{{productTitle}} için teklifinizin süresi doldu.',
     icon: '⏰',
     link: '/listings/{{productId}}',
+  },
+  [NotificationType.OFFER_CANCELLED_OUT_OF_STOCK]: {
+    title: 'Teklifiniz iptal edildi: ürün stokta kalmadı',
+    message: '{{productTitle}} adlı ürün için verdiğiniz teklif, ürün satıldığı için iptal edildi.',
+    icon: '❌',
+    link: '/products/unavailable/{{productId}}',
   },
 
   // Product notifications
@@ -344,6 +395,42 @@ const NOTIFICATION_TEMPLATES: Record<NotificationType, { title: string; message:
     icon: '⏰',
     link: '/orders',
   },
+  [NotificationType.REFUND_CANCELLED]: {
+    title: 'İade Talebi İptal Edildi',
+    message: 'Alıcı {{refundNumber}} numaralı iade talebini iptal etti.',
+    icon: '↩️',
+    link: '/orders/{{orderId}}',
+  },
+  [NotificationType.REFUND_APPROVED]: {
+    title: 'İade Talebiniz Onaylandı',
+    message: '{{refundNumber}} numaralı iade talebiniz onaylandı.',
+    icon: '✅',
+    link: '/orders/{{orderId}}',
+  },
+  [NotificationType.REFUND_REJECTED]: {
+    title: 'İade Talebiniz Reddedildi',
+    message: '{{refundNumber}} numaralı iade talebiniz reddedildi: {{reason}}',
+    icon: '❌',
+    link: '/orders/{{orderId}}',
+  },
+  [NotificationType.REFUND_DISPUTED]: {
+    title: 'İade İtirazı İnceleniyor',
+    message: '{{refundNumber}} numaralı iade talebine itiraz edildi; admin incelemesi bekleniyor.',
+    icon: '⚖️',
+    link: '/refund-requests/{{refundRequestId}}',
+  },
+  [NotificationType.REFUND_RETURN_OPENED]: {
+    title: 'İade Kargosu Hazır',
+    message: '{{trackingNumber}} numarasıyla ürünü en yakın Sürat şubesine teslim edebilirsiniz.',
+    icon: '📦',
+    link: '/orders/{{orderId}}',
+  },
+  [NotificationType.REFUND_COMPLETED]: {
+    title: 'İadeniz Tamamlandı',
+    message: '{{refundNumber}} numaralı iadeniz hesabınıza yansıtıldı.',
+    icon: '💰',
+    link: '/orders/{{orderId}}',
+  },
 };
 
 @Injectable()
@@ -357,6 +444,7 @@ export class NotificationService {
     private readonly expoPushProvider: ExpoPushProvider,
     private readonly smsProvider: SmsProvider,
     private readonly smtpProvider: SmtpProvider,
+    private readonly storageService: StorageService,
   ) {}
 
   /**
@@ -741,6 +829,61 @@ export class NotificationService {
     });
   }
 
+  // ---------- 48h pencere (Faz 3B.1) ----------
+
+  async notifyOrderDeliveredConfirm(
+    buyerId: string,
+    orderId: string,
+    confirmationDeadline: Date,
+  ) {
+    return this.send({
+      userId: buyerId,
+      type: NotificationType.ORDER_DELIVERED_CONFIRM,
+      channels: [NotificationChannel.PUSH, NotificationChannel.IN_APP],
+      data: { orderId, confirmationDeadline: confirmationDeadline.toISOString() },
+    });
+  }
+
+  async notifyOrderAutoCompleted(userId: string, orderId: string) {
+    return this.send({
+      userId,
+      type: NotificationType.ORDER_AUTO_COMPLETED,
+      channels: [NotificationChannel.PUSH, NotificationChannel.IN_APP],
+      data: { orderId },
+    });
+  }
+
+  async notifyOrderManuallyConfirmed(sellerId: string, orderId: string) {
+    return this.send({
+      userId: sellerId,
+      type: NotificationType.ORDER_MANUALLY_CONFIRMED,
+      channels: [NotificationChannel.PUSH, NotificationChannel.IN_APP],
+      data: { orderId },
+    });
+  }
+
+  async notifyOrderForceCompletedByAdmin(
+    userId: string,
+    orderId: string,
+    reason?: string,
+  ) {
+    return this.send({
+      userId,
+      type: NotificationType.ORDER_FORCE_COMPLETED_BY_ADMIN,
+      channels: [NotificationChannel.PUSH, NotificationChannel.IN_APP],
+      data: { orderId, reason },
+    });
+  }
+
+  async notifySellerDidNotShipRefunded(buyerId: string, orderId: string) {
+    return this.send({
+      userId: buyerId,
+      type: NotificationType.SELLER_DID_NOT_SHIP_REFUNDED,
+      channels: [NotificationChannel.EMAIL, NotificationChannel.PUSH, NotificationChannel.IN_APP],
+      data: { orderId },
+    });
+  }
+
   /**
    * Send offer notification
    */
@@ -759,6 +902,181 @@ export class NotificationService {
       type: NotificationType.OFFER_ACCEPTED,
       channels: [NotificationChannel.EMAIL, NotificationChannel.PUSH, NotificationChannel.IN_APP],
       data: { productId, amount },
+    });
+  }
+
+  /**
+   * Stockout cancel + back-in-stock bildirimleri için ortak data payload'ı
+   * üretir. Frontend `/products/unavailable/[productId]` sayfasında ek fetch
+   * yapmadan thumbnail + kategori bilgisini render edebilsin diye burada
+   * tek seferde toparlanır.
+   */
+  private async buildStockoutData(productId: string): Promise<{
+    productId: string;
+    productTitle: string;
+    productImage: string | null;
+    categoryId: string | null;
+    categorySlug: string | null;
+    categoryName: string | null;
+  }> {
+    const product = await this.prisma.product.findUnique({
+      where: { id: productId },
+      select: {
+        title: true,
+        categoryId: true,
+        category: { select: { slug: true, name: true } },
+        images: {
+          orderBy: { sortOrder: 'asc' },
+          take: 1,
+          select: { cardKey: true },
+        },
+      },
+    });
+    const cardKey = product?.images[0]?.cardKey ?? null;
+    return {
+      productId,
+      productTitle: product?.title ?? '',
+      // Resolve to a public URL — clients (notification bell, unavailable
+      // page) can render <img src=...> directly. Without this, they'd get
+      // a raw S3 key like "products/abc/card.jpg" which won't load.
+      productImage: cardKey ? this.storageService.getPublicAssetUrl(cardKey) : null,
+      categoryId: product?.categoryId ?? null,
+      categorySlug: product?.category?.slug ?? null,
+      categoryName: product?.category?.name ?? null,
+    };
+  }
+
+  async notifyOrderCancelledOutOfStock(
+    buyerId: string, productId: string, _productTitle: string, _categoryId: string | null,
+  ) {
+    const data = await this.buildStockoutData(productId);
+    return this.send({
+      userId: buyerId,
+      type: NotificationType.ORDER_CANCELLED_OUT_OF_STOCK,
+      data,
+    });
+  }
+
+  async notifyOfferCancelledOutOfStock(
+    buyerId: string, productId: string, _productTitle: string, _categoryId: string | null,
+  ) {
+    const data = await this.buildStockoutData(productId);
+    return this.send({
+      userId: buyerId,
+      type: NotificationType.OFFER_CANCELLED_OUT_OF_STOCK,
+      channels: [NotificationChannel.IN_APP, NotificationChannel.PUSH],
+      data,
+    });
+  }
+
+  async notifyReservationReleased(
+    buyerId: string, orderId: string, productTitle: string,
+  ) {
+    return this.send({
+      userId: buyerId,
+      type: NotificationType.ORDER_RESERVATION_RELEASED,
+      channels: [NotificationChannel.IN_APP, NotificationChannel.PUSH],
+      data: { orderId, productTitle },
+    });
+  }
+
+  async notifyOrderPaymentExpired(
+    buyerId: string, orderId: string, productTitle: string,
+  ) {
+    return this.send({
+      userId: buyerId,
+      type: NotificationType.ORDER_CANCELLED,
+      data: { orderId, productTitle },
+    });
+  }
+
+  /**
+   * Fan-out helper: send BACK_IN_STOCK to wishlist users ∪ stockout-cancelled
+   * buyers (last 7 days). 24h per (user, product) debounce.
+   *
+   * Caller should only invoke this when product availability transitions
+   * from <=0 to >0 (admin restock, refund, payment failure release).
+   */
+  async broadcastBackInStock(productId: string, productTitle: string): Promise<void> {
+    const SEVEN_DAYS_AGO = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000);
+    const STOCKOUT_REASONS = [
+      'Stok tükendi',
+      'Stok tükendiği için otomatik iptal edildi',
+    ];
+
+    const [wishlistItems, cancelledOrders, cancelledOffers] = await Promise.all([
+      this.prisma.wishlistItem.findMany({
+        where: { productId },
+        include: { wishlist: { select: { userId: true } } },
+      }),
+      this.prisma.order.findMany({
+        where: {
+          productId,
+          status: 'cancelled' as any,
+          cancelReason: { in: STOCKOUT_REASONS },
+          updatedAt: { gte: SEVEN_DAYS_AGO },
+        },
+        select: { buyerId: true },
+      }),
+      this.prisma.offer.findMany({
+        where: {
+          productId,
+          status: 'cancelled' as any,
+          cancelReason: { in: STOCKOUT_REASONS },
+          updatedAt: { gte: SEVEN_DAYS_AGO },
+        },
+        select: { buyerId: true },
+      }),
+    ]);
+
+    const userIds = Array.from(
+      new Set(
+        [
+          ...wishlistItems.map((w) => w.wishlist.userId),
+          ...cancelledOrders.map((o) => o.buyerId),
+          ...cancelledOffers.map((o) => o.buyerId),
+        ].filter(Boolean),
+      ),
+    );
+    if (userIds.length === 0) return;
+
+    const since = new Date(Date.now() - 24 * 60 * 60 * 1000);
+    const recent = await this.prisma.notificationLog.findMany({
+      where: {
+        userId: { in: userIds },
+        type: NotificationType.BACK_IN_STOCK as any,
+        channel: 'in_app',
+        createdAt: { gte: since },
+      },
+      select: { userId: true, data: true },
+    });
+    const debounced = new Set(
+      recent
+        .filter((row) => (row.data as any)?.productId === productId)
+        .map((row) => row.userId),
+    );
+
+    for (const userId of userIds) {
+      if (debounced.has(userId)) continue;
+      try {
+        await this.notifyBackInStock(userId, productId, productTitle);
+      } catch (err: any) {
+        this.logger.warn(
+          `broadcastBackInStock failed for user ${userId} product ${productId}: ${err?.message}`,
+        );
+      }
+    }
+  }
+
+  async notifyBackInStock(userId: string, productId: string, _productTitle: string) {
+    // Enrich payload (productImage, categorySlug, ...) so the notification
+    // bell can render a thumbnail and the click-through can land on the
+    // unavailable-page back-in-stock variant without an extra fetch.
+    const data = await this.buildStockoutData(productId);
+    return this.send({
+      userId,
+      type: NotificationType.BACK_IN_STOCK,
+      data,
     });
   }
 

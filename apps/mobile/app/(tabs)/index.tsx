@@ -1,25 +1,23 @@
-import { View, ScrollView, RefreshControl, Dimensions, Image, TouchableOpacity, StyleSheet } from 'react-native';
-import { Text, Chip, Searchbar, ActivityIndicator, useTheme, Avatar, Badge, IconButton } from 'react-native-paper';
-import { useState, useCallback, useEffect, useMemo } from 'react';
+import { View, ScrollView, RefreshControl, Dimensions, Image, TouchableOpacity, StyleSheet, Pressable } from 'react-native';
+import React, { useState, useCallback, useEffect } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { router } from 'expo-router';
-import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
+import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
-import { api, productsApi, categoriesApi, collectionsApi, manufacturersApi } from '../../src/services/api';
-import { TarodanColors, SCALES, BRANDS } from '../../src/theme';
+import { Card, Input, Spinner, Text, theme } from '@tarodan/ui-native';
+import { api, productsApi, categoriesApi, collectionsApi } from '../../src/services/api';
+import { SCALES, BRANDS } from '../../src/theme';
 import { useAuthStore } from '../../src/stores/authStore';
 import { useGuestStore } from '../../src/stores/guestStore';
 import { SignupPrompt } from '../../src/components/SignupPrompt';
 import { getImageUrl as getImageUrlFromUtils } from '../../src/utils/imageUrl';
-import { safeString } from '../../src/utils/safeString';
-import { isProductTradeOpen } from '../../src/utils/isProductTradeOpen';
-import { getWebPublicAssetUrl } from '../../src/utils/webAssetUrl';
+
+const { colors, spacing, radius } = theme;
 
 const { width } = Dimensions.get('window');
-const CARD_WIDTH = (width - 28) / 2;
+const CARD_WIDTH = (width - 48) / 2;
 
 export default function HomeScreen() {
-  const theme = useTheme();
   const [searchQuery, setSearchQuery] = useState('');
   const [refreshing, setRefreshing] = useState(false);
   const [apiConnected, setApiConnected] = useState(false);
@@ -27,8 +25,7 @@ export default function HomeScreen() {
   const [promptType, setPromptType] = useState<'favorites' | 'message' | 'purchase' | null>(null);
   
   const { isAuthenticated } = useAuthStore();
-  const { incrementListingView } = useGuestStore();
-  const [failedBrandLogos, setFailedBrandLogos] = useState<Record<string, boolean>>({});
+  const { incrementListingView, getPromptType, setLastPromptShown, canShowPrompt } = useGuestStore();
 
   // Check API connection
   useEffect(() => {
@@ -41,27 +38,28 @@ export default function HomeScreen() {
     });
   }, []);
 
-  // Üye olmayan: kayıt teşviki (zustand fonksiyonlarını deps'e bağlamayın — her render'da effect tekrarlar ve Modal "hayalet" katman bırakabilir)
+  // Check for signup prompt (only for guests)
   useEffect(() => {
-    if (isAuthenticated) return;
-    const { getPromptType: getType, canShowPrompt: canShow, setLastPromptShown: markShown } =
-      useGuestStore.getState();
-    const type = getType();
-    if (!type || !canShow()) return;
-    const timer = setTimeout(() => {
-      setPromptType(type);
-      setShowPrompt(true);
-      markShown(type);
-    }, 3000);
-    return () => clearTimeout(timer);
-  }, [isAuthenticated]);
+    if (!isAuthenticated) {
+      const type = getPromptType();
+      if (type && canShowPrompt()) {
+        // Delay showing prompt
+        const timer = setTimeout(() => {
+          setPromptType(type);
+          setShowPrompt(true);
+          setLastPromptShown(type);
+        }, 3000);
+        return () => clearTimeout(timer);
+      }
+    }
+  }, [isAuthenticated, getPromptType, canShowPrompt, setLastPromptShown]);
 
   // Fetch products - web ile aynı endpoint: GET /products
   const { data: productsResponse, isLoading: loadingProducts, refetch: refetchProducts } = useQuery({
     queryKey: ['products'],
     queryFn: async () => {
       try {
-        const response = await productsApi.getAll({ limit: 100, page: 1 });
+        const response = await productsApi.getAll({ limit: 20 });
         // Web ile aynı response yapısını destekle
         const products = response.data.data || response.data.products || response.data || [];
         console.log('📦 Ürünler yüklendi:', Array.isArray(products) ? products.length : 0);
@@ -94,19 +92,6 @@ export default function HomeScreen() {
   });
 
   // Fetch collections - web ile aynı endpoint: GET /collections/browse
-  const { data: manufacturersRaw } = useQuery({
-    queryKey: ['manufacturers', 'home-marquee'],
-    queryFn: async () => {
-      try {
-        const res = await manufacturersApi.findAll();
-        const raw = res.data;
-        return Array.isArray(raw) ? raw : (raw?.data ?? []);
-      } catch {
-        return [];
-      }
-    },
-  });
-
   const { data: collectionsResponse } = useQuery({
     queryKey: ['collections', 'browse'],
     queryFn: async () => {
@@ -199,6 +184,10 @@ export default function HomeScreen() {
     router.push(`/search?scale=${scale}`);
   };
 
+  const handleBrandPress = (brandId: string) => {
+    router.push(`/search?brand=${brandId}`);
+  };
+
   const handleCategoryPress = (categoryId: string) => {
     router.push(`/search?categoryId=${categoryId}`);
   };
@@ -214,42 +203,7 @@ export default function HomeScreen() {
   const products = productsResponse && productsResponse.length > 0 ? productsResponse : [];
   const categories = categoriesResponse && categoriesResponse.length > 0 ? categoriesResponse : [];
   const collections = collectionsResponse || [];
-  const apiManufacturers = Array.isArray(manufacturersRaw) ? manufacturersRaw : [];
-
-  /** Web ana sayfa ile aynı: API üreticileri + eksikler için statik BRANDS */
-  const marqueeBrandItems = useMemo(() => {
-    const staticList = BRANDS.map((b) => ({ id: b.id, name: b.name, logoUrl: b.logoUrl }));
-    const apiNamesSet = new Set(
-      apiManufacturers.map((m: { name?: string }) => (m.name || '').toLowerCase())
-    );
-    const fallbackOnly = staticList.filter((b) => !apiNamesSet.has(b.name.toLowerCase()));
-    const fromApi = apiManufacturers.map((m: { id?: string; name?: string; logo?: string }, idx: number) => {
-      const fromStatic = staticList.find(
-        (b) => b.name.toLowerCase() === (m.name || '').toLowerCase()
-      );
-      const rawLogo = m.logo && String(m.logo).trim();
-      const imageUri = rawLogo
-        ? rawLogo.startsWith('http')
-          ? rawLogo
-          : getWebPublicAssetUrl(rawLogo.startsWith('/') ? rawLogo : `/${rawLogo}`)
-        : fromStatic?.logoUrl
-          ? getWebPublicAssetUrl(fromStatic.logoUrl)
-          : '';
-      return {
-        key: String(m.id || m.name || `mfr-${idx}`),
-        name: m.name || '',
-        imageUri,
-      };
-    });
-    const fromFallback = fallbackOnly.map((b) => ({
-      key: b.id,
-      name: b.name,
-      imageUri: b.logoUrl ? getWebPublicAssetUrl(b.logoUrl) : '',
-    }));
-    const merged = [...fromApi, ...fromFallback].filter((x) => x.name);
-    return merged.length > 0 ? merged : fromFallback;
-  }, [apiManufacturers]);
-
+  
   // Loading durumu
   const isLoading = loadingProducts;
 
@@ -259,99 +213,110 @@ export default function HomeScreen() {
   };
 
   const renderProductCard = (item: any, index: number) => {
+    // API response field isimleri: images, isTradeEnabled/trade_available, viewCount, favoriteCount
     const imageUrl = getImageUrl(item.images);
-    const isTradeEnabled = isProductTradeOpen(item);
+    const isTradeEnabled = item.isTradeEnabled || item.trade_available;
     const viewCount = item.viewCount || item.views || 0;
-    const brandLabel = safeString(item.brand, 'Marka');
-    const scaleLabel = safeString(item.scale, '1:64');
+    // brand/scale backend'den {id,name,slug} obje veya string gelebilir — Text'e gömülmeden önce düzleştir.
+    const brandLabel = typeof item.brand === 'object' && item.brand !== null
+      ? (item.brand.name ?? '')
+      : (item.brand ?? 'Marka');
+    const scaleLabel = typeof item.scale === 'object' && item.scale !== null
+      ? (item.scale.name ?? '')
+      : (item.scale ?? '1:64');
 
     return (
-      <TouchableOpacity
+      <Pressable
         key={item.id || index}
-        style={styles.productCard}
-        activeOpacity={0.85}
         onPress={() => handleProductPress(item.id)}
+        style={({ pressed }) => [styles.productCardWrapper, { opacity: pressed ? 0.85 : 1 }]}
       >
-        <View style={styles.productImageContainer}>
-          <Image source={{ uri: imageUrl }} style={styles.productImage} resizeMode="cover" />
-          {isTradeEnabled && (
-            <View style={[styles.badge, { backgroundColor: TarodanColors.success }]}>
-              <Ionicons name="swap-horizontal" size={10} color="#fff" />
-              <Text style={styles.badgeText}> Takas</Text>
+        <Card style={styles.productCard} padding={0}>
+          <View style={styles.productImageContainer}>
+            <Image source={{ uri: imageUrl }} style={styles.productImage} resizeMode="cover" />
+            {isTradeEnabled && (
+              <View style={[styles.badge, { backgroundColor: colors.success[600]! }]}>
+                <Ionicons name="swap-horizontal" size={10} color={colors.white} />
+                <Text variant="caption" tone="inverted" weight="bold">
+                  {' '}Takas
+                </Text>
+              </View>
+            )}
+            <View style={styles.likesContainer}>
+              <Ionicons name="eye-outline" size={14} color={colors.text.muted} />
+              <Text variant="caption" tone="muted" style={{ marginLeft: 2 }}>
+                {viewCount}
+              </Text>
             </View>
-          )}
-          <View style={styles.likesContainer}>
-            <Ionicons name="eye-outline" size={13} color={TarodanColors.textSecondary} />
-            <Text style={styles.likesText}>{viewCount}</Text>
-            <Ionicons name="heart-outline" size={13} color={TarodanColors.textSecondary} style={{ marginLeft: 6 }} />
-            <Text style={styles.likesText}>{item.likeCount || item.likes || 0}</Text>
           </View>
-        </View>
-        <View style={styles.productContent}>
-          <Text style={styles.productTitle} numberOfLines={2}>{item.title}</Text>
-          <Text style={styles.productMeta}>{brandLabel} • {scaleLabel}</Text>
-          <Text style={styles.productPrice}>₺{item.price?.toLocaleString('tr-TR') ?? '0'}</Text>
-        </View>
-      </TouchableOpacity>
+          <View style={styles.productContent}>
+            <Text variant="bodySm" weight="semibold" numberOfLines={2}>
+              {item.title}
+            </Text>
+            <Text variant="caption" tone="muted" style={{ marginTop: 2 }}>
+              {brandLabel} • {scaleLabel}
+            </Text>
+            <Text variant="h3" tone="primary" style={{ marginTop: 4 }}>
+              ₺{item.price?.toLocaleString('tr-TR') || 0}
+            </Text>
+          </View>
+        </Card>
+      </Pressable>
     );
   };
 
   return (
-    <View style={[styles.container, { backgroundColor: TarodanColors.background }]}>
+    <View style={[styles.container, { backgroundColor: colors.surface.DEFAULT }]}>
       {/* Header */}
       <View style={styles.header}>
         <View style={styles.headerTop}>
-          <TouchableOpacity style={styles.logoContainer} onPress={() => router.replace('/(tabs)')}>
+          <View style={styles.logoContainer}>
             <Image 
               source={require('../../assets/tarodan-logo.jpg')} 
               style={styles.logoImage}
               resizeMode="contain"
             />
-          </TouchableOpacity>
+          </View>
           <View style={styles.headerActions}>
             <TouchableOpacity 
               style={styles.headerIconBtn}
               onPress={() => router.push('/collections')}
             >
-              <Ionicons name="albums-outline" size={24} color="#fff" />
+              <Ionicons name="albums-outline" size={24} color={colors.white} />
             </TouchableOpacity>
-            <TouchableOpacity 
+            <TouchableOpacity
               style={styles.headerIconBtn}
               onPress={() => router.push('/favorites')}
             >
-              <Ionicons name="heart-outline" size={24} color="#fff" />
+              <Ionicons name="heart-outline" size={24} color={colors.white} />
             </TouchableOpacity>
-            <TouchableOpacity 
+            <TouchableOpacity
               style={styles.headerIconBtn}
               onPress={() => router.push('/cart')}
             >
-              <Ionicons name="cart-outline" size={24} color="#fff" />
+              <Ionicons name="cart-outline" size={24} color={colors.white} />
             </TouchableOpacity>
           </View>
         </View>
-        <Searchbar
+        <Input
           placeholder="Kategori, ürün, marka, koleksiyon ara"
           value={searchQuery}
           onChangeText={setSearchQuery}
           onSubmitEditing={handleSearch}
-          style={styles.searchBar}
-          inputStyle={styles.searchInput}
-          iconColor={TarodanColors.textSecondary}
+          leftIconName="search"
+          containerStyle={{ marginBottom: 0 }}
         />
       </View>
 
       <ScrollView
         style={styles.scrollView}
-        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} colors={[TarodanColors.primary]} />}
+        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} colors={[colors.primary[600]!]} />}
         showsVerticalScrollIndicator={false}
-        keyboardShouldPersistTaps="handled"
-        keyboardDismissMode="on-drag"
-        nestedScrollEnabled
       >
         {/* Hero Banner */}
         <View style={styles.heroBanner}>
           <LinearGradient
-            colors={['#FFF5F0', '#FFE8E0']}
+            colors={[colors.primary[50]!, colors.primary[100]!]}
             style={styles.heroGradient}
           >
             <View style={styles.heroContent}>
@@ -410,7 +375,7 @@ export default function HomeScreen() {
           </View>
         )}
 
-        {/* Markalar — web marquee: kutuda yalnızca logo veya (yoksa) isim; üretici filtresi */}
+        {/* Brands Section */}
         <View style={styles.section}>
           <View style={styles.sectionHeader}>
             <View style={styles.sectionTitleContainer}>
@@ -421,31 +386,15 @@ export default function HomeScreen() {
               <Text style={styles.seeAllText}>Tümünü gör {'>'}</Text>
             </TouchableOpacity>
           </View>
-          <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.brandsMarqueeScroll}>
-            {marqueeBrandItems.map((item) => (
+          <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.brandsScroll}>
+            {BRANDS.map((brand) => (
               <TouchableOpacity
-                key={item.key}
-                style={styles.brandMarqueeItem}
-                activeOpacity={0.85}
-                onPress={() =>
-                  router.push(`/search?manufacturer=${encodeURIComponent(item.name)}`)
-                }
+                key={brand.id}
+                style={styles.brandItem}
+                onPress={() => handleBrandPress(brand.id)}
               >
-                <View style={styles.brandMarqueeCell}>
-                  {item.imageUri && !failedBrandLogos[item.key] ? (
-                    <Image
-                      source={{ uri: item.imageUri }}
-                      style={styles.brandMarqueeImage}
-                      resizeMode="contain"
-                      onError={() =>
-                        setFailedBrandLogos((prev) => ({ ...prev, [item.key]: true }))
-                      }
-                    />
-                  ) : (
-                    <Text style={styles.brandMarqueeFallbackText} numberOfLines={2}>
-                      {item.name}
-                    </Text>
-                  )}
+                <View style={styles.brandLogo}>
+                  <Text style={styles.brandLogoText}>{brand.name}</Text>
                 </View>
               </TouchableOpacity>
             ))}
@@ -501,7 +450,7 @@ export default function HomeScreen() {
                     {featuredCollector.description || `${featuredCollector.itemCount || 0} araçlık koleksiyon`}
                   </Text>
                   <View style={styles.featuredStats}>
-                    <Ionicons name="thumbs-up" size={14} color={TarodanColors.primary} />
+                    <Ionicons name="thumbs-up" size={14} color={colors.primary[600]!} />
                     <Text style={styles.featuredStatText}>{featuredCollector.likeCount || 0}</Text>
                   </View>
                 </View>
@@ -526,7 +475,7 @@ export default function HomeScreen() {
               )}
               <TouchableOpacity 
                 style={styles.viewGarageBtn}
-                onPress={() => router.push(`/collections/${featuredCollector.id}`)}
+                onPress={() => router.push(`/collection/${featuredCollector.id}` as any)}
               >
                 <Text style={styles.viewGarageBtnText}>Garajını incele →</Text>
               </TouchableOpacity>
@@ -539,21 +488,21 @@ export default function HomeScreen() {
           <View style={styles.sectionHeader}>
             <View style={styles.sectionTitleContainer}>
               <View style={styles.sectionIndicator} />
-              <Text style={[styles.sectionTitle, { color: '#fff' }]}>Öne Çıkanlar</Text>
+              <Text style={[styles.sectionTitle, { color: colors.white }]}>Öne Çıkanlar</Text>
             </View>
             <TouchableOpacity onPress={() => router.push('/search')}>
-              <Text style={[styles.seeAllText, { color: '#fff' }]}>Tümünü gör {'>'}</Text>
+              <Text style={[styles.seeAllText, { color: colors.white }]}>Tümünü gör {'>'}</Text>
             </TouchableOpacity>
           </View>
-          
+
           {isLoading ? (
             <View style={styles.loadingContainer}>
-              <ActivityIndicator size="large" color="#fff" />
+              <Spinner size="lg" color={colors.white} />
               <Text style={styles.loadingText}>Ürünler yükleniyor...</Text>
             </View>
           ) : products.length === 0 ? (
             <View style={styles.emptyContainer}>
-              <Ionicons name="cube-outline" size={48} color="rgba(255,255,255,0.5)" />
+              <Ionicons name="cube-outline" size={48} color={colors.gray[300]} />
               <Text style={styles.emptyText}>Henüz ürün yok</Text>
               <Text style={styles.emptySubtext}>API bağlantısını kontrol edin</Text>
             </View>
@@ -591,7 +540,7 @@ export default function HomeScreen() {
           <View style={styles.companySection}>
             <View style={styles.sectionHeader}>
               <View style={styles.sectionTitleContainer}>
-                <View style={[styles.sectionIndicator, { backgroundColor: '#FFA500' }]} />
+                <View style={[styles.sectionIndicator, { backgroundColor: colors.warning[500]! }]} />
                 <Text style={styles.sectionTitle}>Haftanın Şirketi</Text>
                 <View style={styles.businessBadge}>
                   <Text style={styles.businessBadgeText}>👑 Business</Text>
@@ -611,7 +560,7 @@ export default function HomeScreen() {
                   />
                 ) : (
                   <LinearGradient
-                    colors={[TarodanColors.primary, '#FFA500']}
+                    colors={[colors.primary[600]!, colors.warning[500]!]}
                     style={styles.companyAvatarGradient}
                   >
                     <Text style={styles.companyAvatarText}>
@@ -625,7 +574,7 @@ export default function HomeScreen() {
                       {companyOfWeek.companyName || companyOfWeek.displayName || 'Şirket'}
                     </Text>
                     {companyOfWeek.isVerified && (
-                      <Ionicons name="checkmark-circle" size={18} color={TarodanColors.success} />
+                      <Ionicons name="checkmark-circle" size={18} color={colors.success[600]!} />
                     )}
                   </View>
                   <Text style={styles.companyBio}>
@@ -637,26 +586,26 @@ export default function HomeScreen() {
               {/* Company Stats - Web ile aynı */}
               {companyOfWeek.stats && (
                 <View style={styles.companyStatsGrid}>
-                  <View style={[styles.companyStat, { backgroundColor: '#FFF3E0' }]}>
-                    <Text style={[styles.companyStatValue, { color: TarodanColors.primary }]}>
+                  <View style={[styles.companyStat, { backgroundColor: colors.warning[50]! }]}>
+                    <Text style={[styles.companyStatValue, { color: colors.primary[600]! }]}>
                       {companyOfWeek.stats.totalProducts || 0}
                     </Text>
                     <Text style={styles.companyStatLabel}>Ürün</Text>
                   </View>
-                  <View style={[styles.companyStat, { backgroundColor: '#E8F5E9' }]}>
-                    <Text style={[styles.companyStatValue, { color: TarodanColors.success }]}>
+                  <View style={[styles.companyStat, { backgroundColor: colors.success[50]! }]}>
+                    <Text style={[styles.companyStatValue, { color: colors.success[600]! }]}>
                       {companyOfWeek.stats.totalSales || 0}
                     </Text>
                     <Text style={styles.companyStatLabel}>Satış</Text>
                   </View>
-                  <View style={[styles.companyStat, { backgroundColor: '#E3F2FD' }]}>
-                    <Text style={[styles.companyStatValue, { color: TarodanColors.info }]}>
+                  <View style={[styles.companyStat, { backgroundColor: colors.info[50]! }]}>
+                    <Text style={[styles.companyStatValue, { color: colors.info[600]! }]}>
                       {(companyOfWeek.stats.totalViews || 0).toLocaleString()}
                     </Text>
                     <Text style={styles.companyStatLabel}>Görüntülenme</Text>
                   </View>
-                  <View style={[styles.companyStat, { backgroundColor: '#FFEBEE' }]}>
-                    <Text style={[styles.companyStatValue, { color: TarodanColors.error }]}>
+                  <View style={[styles.companyStat, { backgroundColor: colors.danger[50]! }]}>
+                    <Text style={[styles.companyStatValue, { color: colors.danger[600]! }]}>
                       {(companyOfWeek.stats.totalLikes || 0).toLocaleString()}
                     </Text>
                     <Text style={styles.companyStatLabel}>Beğeni</Text>
@@ -667,7 +616,7 @@ export default function HomeScreen() {
               {/* Rating */}
               {companyOfWeek.stats?.averageRating > 0 && (
                 <View style={styles.companyRating}>
-                  <Ionicons name="star" size={18} color="#F59E0B" />
+                  <Ionicons name="star" size={18} color={colors.warning[500]!} />
                   <Text style={styles.companyRatingValue}>{companyOfWeek.stats.averageRating.toFixed(1)}</Text>
                   <Text style={styles.companyRatingCount}>({companyOfWeek.stats.totalRatings || 0} yorum)</Text>
                 </View>
@@ -688,7 +637,7 @@ export default function HomeScreen() {
                         style={styles.companyProductImage}
                       />
                       <View style={styles.companyProductLikes}>
-                        <Ionicons name="thumbs-up" size={12} color={TarodanColors.primary} />
+                        <Ionicons name="thumbs-up" size={12} color={colors.primary[600]!} />
                         <Text style={styles.companyProductLikesText}>{product.likeCount || 0}</Text>
                       </View>
                       <View style={styles.companyProductInfo}>
@@ -708,7 +657,7 @@ export default function HomeScreen() {
                     <TouchableOpacity 
                       key={collection.id} 
                       style={styles.companyCollectionCard}
-                      onPress={() => router.push(`/collections/${collection.id}`)}
+                      onPress={() => router.push(`/collection/${collection.id}` as any)}
                     >
                       {collection.coverImageUrl ? (
                         <Image
@@ -738,7 +687,7 @@ export default function HomeScreen() {
                 onPress={() => router.push(`/seller/${companyOfWeek.id}`)}
               >
                 <LinearGradient
-                  colors={[TarodanColors.primary, '#FFA500']}
+                  colors={[colors.primary[600]!, colors.warning[500]!]}
                   style={styles.viewStoreButtonGradient}
                   start={{ x: 0, y: 0 }}
                   end={{ x: 1, y: 0 }}
@@ -767,7 +716,7 @@ export default function HomeScreen() {
                 <TouchableOpacity 
                   key={collection.id} 
                   style={styles.collectionCard}
-                  onPress={() => router.push(`/collections/${collection.id}`)}
+                  onPress={() => router.push(`/collection/${collection.id}` as any)}
                 >
                   <Image 
                     source={{ uri: collection.coverImageUrl || 'https://placehold.co/200x150/f3f4f6/9ca3af?text=Koleksiyon' }} 
@@ -784,20 +733,17 @@ export default function HomeScreen() {
         )}
 
         {/* Footer Space */}
-        <View style={{ height: 72 }} />
+        <View style={{ height: 100 }} />
       </ScrollView>
 
-      {/* Modal yalnızca görünürken mount: görünmezken Android'de dokunuşları yutma riski */}
-      {showPrompt && promptType ? (
+      {/* Signup Prompt for Guests */}
+      {promptType && (
         <SignupPrompt
-          visible
-          onDismiss={() => {
-            setShowPrompt(false);
-            setPromptType(null);
-          }}
+          visible={showPrompt}
+          onDismiss={() => setShowPrompt(false)}
           type={promptType}
         />
-      ) : null}
+      )}
     </View>
   );
 }
@@ -805,57 +751,57 @@ export default function HomeScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: TarodanColors.background,
+    backgroundColor: colors.surface.DEFAULT,
   },
   header: {
-    backgroundColor: TarodanColors.primary,
-    paddingTop: 44,
+    backgroundColor: colors.primary[600]!,
+    paddingTop: 50,
     paddingHorizontal: 16,
-    paddingBottom: 14,
-    borderBottomLeftRadius: 6,
-    borderBottomRightRadius: 6,
+    paddingBottom: 20,
+    borderBottomLeftRadius: 24,
+    borderBottomRightRadius: 24,
   },
   headerTop: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    marginBottom: 12,
+    marginBottom: 16,
   },
   logo: {
     fontSize: 24,
     fontWeight: 'bold',
-    color: TarodanColors.textOnPrimary,
+    color: colors.white,
   },
   logoAccent: {
-    color: TarodanColors.secondary,
+    color: colors.gray[200],
   },
   headerActions: {
     flexDirection: 'row',
-    backgroundColor: 'rgba(255,255,255,0.16)',
-    borderRadius: 0,
-    padding: 4,
+    backgroundColor: colors.overlay.white20,
+    borderRadius: 14,
+    padding: 6,
     gap: 4,
   },
   headerIconBtn: {
-    width: 36,
-    height: 36,
-    borderRadius: 0,
+    width: 40,
+    height: 40,
+    borderRadius: 10,
     justifyContent: 'center',
     alignItems: 'center',
-    backgroundColor: 'rgba(255,255,255,0.14)',
+    backgroundColor: colors.overlay.white10,
   },
   searchBar: {
-    backgroundColor: TarodanColors.background,
-    borderRadius: 0,
+    backgroundColor: colors.surface.DEFAULT,
+    borderRadius: 12,
     elevation: 2,
-    shadowColor: '#000',
+    shadowColor: colors.black,
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.1,
     shadowRadius: 4,
   },
   searchInput: {
     fontSize: 14,
-    color: TarodanColors.textPrimary,
+    color: colors.text.heading,
   },
   scrollView: {
     flex: 1,
@@ -864,10 +810,10 @@ const styles = StyleSheet.create({
     marginHorizontal: 16,
     marginTop: -10,
     marginBottom: 8,
-    borderRadius: 0,
+    borderRadius: 20,
     overflow: 'hidden',
     elevation: 4,
-    shadowColor: '#000',
+    shadowColor: colors.black,
     shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.15,
     shadowRadius: 8,
@@ -885,18 +831,18 @@ const styles = StyleSheet.create({
   heroTitle: {
     fontSize: 16,
     fontWeight: '500',
-    color: TarodanColors.textSecondary,
+    color: colors.text.muted,
     marginBottom: 4,
   },
   heroSubtitle: {
     fontSize: 24,
     fontWeight: 'bold',
-    color: TarodanColors.textPrimary,
+    color: colors.text.heading,
     marginBottom: 10,
   },
   heroDescription: {
     fontSize: 13,
-    color: TarodanColors.textSecondary,
+    color: colors.text.muted,
     marginBottom: 20,
     lineHeight: 20,
   },
@@ -905,28 +851,28 @@ const styles = StyleSheet.create({
     gap: 10,
   },
   heroButtonPrimary: {
-    backgroundColor: TarodanColors.primary,
+    backgroundColor: colors.primary[600]!,
     paddingHorizontal: 18,
     paddingVertical: 12,
-    borderRadius: 0,
+    borderRadius: 10,
   },
   heroButtonPrimaryText: {
     fontSize: 13,
     fontWeight: '700',
-    color: '#FFFFFF',
+    color: colors.white,
   },
   heroButtonSecondary: {
-    backgroundColor: TarodanColors.background,
+    backgroundColor: colors.surface.DEFAULT,
     paddingHorizontal: 18,
     paddingVertical: 12,
-    borderRadius: 0,
+    borderRadius: 10,
     borderWidth: 1.5,
-    borderColor: TarodanColors.border,
+    borderColor: colors.border.DEFAULT,
   },
   heroButtonSecondaryText: {
     fontSize: 13,
     fontWeight: '600',
-    color: TarodanColors.textPrimary,
+    color: colors.text.heading,
   },
   heroImage: {
     width: 100,
@@ -949,69 +895,38 @@ const styles = StyleSheet.create({
   sectionIndicator: {
     width: 4,
     height: 24,
-    backgroundColor: TarodanColors.primary,
-    borderRadius: 0,
+    backgroundColor: colors.primary[600]!,
+    borderRadius: 2,
     marginRight: 10,
   },
   sectionTitle: {
     fontSize: 20,
     fontWeight: 'bold',
-    color: TarodanColors.textPrimary,
+    color: colors.text.heading,
     letterSpacing: -0.3,
   },
   seeAllText: {
     fontSize: 14,
-    color: TarodanColors.primary,
+    color: colors.primary[600]!,
     fontWeight: '600',
   },
   brandsScroll: {
     paddingLeft: 16,
   },
-  brandsMarqueeScroll: {
-    paddingLeft: 16,
-    paddingRight: 8,
-  },
-  brandMarqueeItem: {
-    marginRight: 10,
-  },
-  brandMarqueeCell: {
-    width: 96,
-    height: 56,
-    backgroundColor: TarodanColors.background,
-    borderWidth: 1,
-    borderColor: TarodanColors.border,
-    alignItems: 'center',
-    justifyContent: 'center',
-    padding: 8,
-    borderRadius: 4,
-  },
-  brandMarqueeImage: {
-    width: '100%',
-    height: '100%',
-  },
-  brandMarqueeFallbackText: {
-    fontSize: 11,
-    fontWeight: '600',
-    color: TarodanColors.textSecondary,
-    textAlign: 'center',
-    lineHeight: 14,
-  },
   brandItem: {
     marginRight: 10,
   },
   brandLogo: {
-    backgroundColor: TarodanColors.background,
+    backgroundColor: colors.surface.DEFAULT,
     borderWidth: 1.5,
-    borderColor: TarodanColors.border,
-    borderRadius: 0,
-    paddingHorizontal: 14,
-    paddingVertical: 8,
-    minWidth: 98,
-    minHeight: 64,
+    borderColor: colors.border.DEFAULT,
+    borderRadius: 12,
+    paddingHorizontal: 20,
+    paddingVertical: 14,
+    minWidth: 90,
     alignItems: 'center',
-    justifyContent: 'center',
     elevation: 1,
-    shadowColor: '#000',
+    shadowColor: colors.black,
     shadowOffset: { width: 0, height: 1 },
     shadowOpacity: 0.05,
     shadowRadius: 2,
@@ -1019,32 +934,32 @@ const styles = StyleSheet.create({
   brandLogoText: {
     fontSize: 13,
     fontWeight: '600',
-    color: TarodanColors.textPrimary,
+    color: colors.text.heading,
   },
   scalesScroll: {
     paddingLeft: 16,
   },
   scaleChip: {
-    backgroundColor: TarodanColors.primaryLight,
+    backgroundColor: colors.primary[50]!,
     borderWidth: 1.5,
-    borderColor: TarodanColors.primary,
-    borderRadius: 0,
+    borderColor: colors.primary[600]!,
+    borderRadius: 24,
     paddingHorizontal: 18,
     paddingVertical: 10,
     marginRight: 10,
   },
   scaleChipText: {
     fontSize: 14,
-    color: TarodanColors.primary,
+    color: colors.primary[600]!,
     fontWeight: '600',
   },
   collectorCard: {
-    backgroundColor: TarodanColors.background,
+    backgroundColor: colors.surface.DEFAULT,
     marginHorizontal: 16,
-    borderRadius: 0,
+    borderRadius: 12,
     padding: 16,
     borderWidth: 1,
-    borderColor: TarodanColors.border,
+    borderColor: colors.border.DEFAULT,
   },
   collectorInfo: {
     flexDirection: 'row',
@@ -1057,11 +972,11 @@ const styles = StyleSheet.create({
   collectorName: {
     fontSize: 16,
     fontWeight: 'bold',
-    color: TarodanColors.textPrimary,
+    color: colors.text.heading,
   },
   collectorDesc: {
     fontSize: 12,
-    color: TarodanColors.textSecondary,
+    color: colors.text.muted,
     marginTop: 4,
   },
   collectorStats: {
@@ -1071,7 +986,7 @@ const styles = StyleSheet.create({
   },
   collectorStatText: {
     fontSize: 12,
-    color: TarodanColors.textSecondary,
+    color: colors.text.muted,
     marginLeft: 4,
   },
   viewGarageButton: {
@@ -1079,11 +994,11 @@ const styles = StyleSheet.create({
   },
   viewGarageButtonText: {
     fontSize: 13,
-    color: TarodanColors.textPrimary,
+    color: colors.text.heading,
     fontWeight: '500',
     borderWidth: 1,
-    borderColor: TarodanColors.border,
-    borderRadius: 0,
+    borderColor: colors.border.DEFAULT,
+    borderRadius: 6,
     paddingHorizontal: 12,
     paddingVertical: 6,
     alignSelf: 'flex-start',
@@ -1092,31 +1007,34 @@ const styles = StyleSheet.create({
     marginTop: 8,
   },
   bestSellersSection: {
-    backgroundColor: TarodanColors.primary,
+    backgroundColor: colors.primary[600]!,
     paddingVertical: 24,
     borderRadius: 0,
   },
   productsScroll: {
-    paddingLeft: 8,
+    paddingLeft: 16,
+  },
+  productCardWrapper: {
+    width: CARD_WIDTH * 0.9,
+    marginRight: 14,
   },
   productCard: {
-    width: CARD_WIDTH * 0.9,
-    marginRight: 8,
-    backgroundColor: TarodanColors.background,
-    borderRadius: 2,
+    marginRight: 0,
+    backgroundColor: colors.surface.DEFAULT,
+    borderRadius: 16,
     overflow: 'hidden',
-    elevation: 0,
-    shadowOpacity: 0,
-    borderWidth: 1,
-    borderColor: TarodanColors.border,
+    elevation: 3,
+    shadowColor: colors.black,
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 6,
   },
   productImageContainer: {
     position: 'relative',
   },
   productImage: {
     height: 140,
-    backgroundColor: TarodanColors.backgroundTertiary,
-    borderRadius: 0,
+    backgroundColor: colors.gray[200],
   },
   badge: {
     position: 'absolute',
@@ -1124,64 +1042,51 @@ const styles = StyleSheet.create({
     left: 10,
     paddingHorizontal: 10,
     paddingVertical: 5,
-    borderRadius: 2,
+    borderRadius: 6,
     flexDirection: 'row',
     alignItems: 'center',
   },
   badgeText: {
     fontSize: 11,
     fontWeight: 'bold',
-    color: TarodanColors.textOnPrimary,
+    color: colors.white,
   },
   likesContainer: {
     position: 'absolute',
-    bottom: 8,
-    right: 8,
+    top: 10,
+    right: 10,
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: 'rgba(255,255,255,0.92)',
+    backgroundColor: colors.overlay.white95,
     paddingHorizontal: 8,
     paddingVertical: 4,
-    borderRadius: 2,
+    borderRadius: 8,
   },
   likesText: {
-    fontSize: 11,
-    color: TarodanColors.textSecondary,
-    marginLeft: 2,
+    fontSize: 12,
+    color: colors.text.muted,
+    marginLeft: 4,
     fontWeight: '500',
   },
   productContent: {
-    paddingHorizontal: 10,
-    paddingVertical: 8,
+    padding: 14,
   },
   productTitle: {
     fontSize: 14,
     fontWeight: '600',
-    color: TarodanColors.textPrimary,
+    color: colors.text.heading,
     marginBottom: 6,
     lineHeight: 20,
   },
   productMeta: {
     fontSize: 12,
-    color: TarodanColors.textSecondary,
+    color: colors.text.muted,
     marginBottom: 8,
   },
   productPrice: {
     fontSize: 18,
     fontWeight: 'bold',
-    color: TarodanColors.price,
-  },
-  companyCard: {
-    backgroundColor: TarodanColors.background,
-    marginHorizontal: 16,
-    borderRadius: 0,
-    padding: 16,
-    borderWidth: 1,
-    borderColor: TarodanColors.border,
-  },
-  companyInfo: {
-    flexDirection: 'row',
-    marginBottom: 16,
+    color: colors.primary[700]!,
   },
   companyDetails: {
     flex: 1,
@@ -1190,11 +1095,11 @@ const styles = StyleSheet.create({
   companyName: {
     fontSize: 16,
     fontWeight: 'bold',
-    color: TarodanColors.textPrimary,
+    color: colors.text.heading,
   },
   companyDesc: {
     fontSize: 12,
-    color: TarodanColors.textSecondary,
+    color: colors.text.muted,
     marginTop: 4,
   },
   companyMeta: {
@@ -1209,7 +1114,7 @@ const styles = StyleSheet.create({
   },
   ratingText: {
     fontSize: 12,
-    color: TarodanColors.textSecondary,
+    color: colors.text.muted,
     marginLeft: 4,
   },
   verifiedBadge: {
@@ -1218,7 +1123,7 @@ const styles = StyleSheet.create({
   },
   verifiedText: {
     fontSize: 12,
-    color: TarodanColors.info,
+    color: colors.info[600]!,
     marginLeft: 4,
   },
   companyProducts: {
@@ -1232,7 +1137,7 @@ const styles = StyleSheet.create({
   },
   categoryCount: {
     fontSize: 10,
-    color: TarodanColors.textSecondary,
+    color: colors.text.muted,
     marginTop: 2,
   },
   loadingContainer: {
@@ -1241,7 +1146,7 @@ const styles = StyleSheet.create({
     paddingVertical: 50,
   },
   loadingText: {
-    color: 'rgba(255,255,255,0.9)',
+    color: colors.overlay.white90,
     marginTop: 14,
     fontSize: 15,
     fontWeight: '500',
@@ -1252,34 +1157,34 @@ const styles = StyleSheet.create({
     paddingVertical: 50,
   },
   emptyText: {
-    color: 'rgba(255,255,255,0.9)',
+    color: colors.overlay.white90,
     marginTop: 14,
     fontSize: 18,
     fontWeight: '700',
   },
   emptySubtext: {
-    color: 'rgba(255,255,255,0.7)',
+    color: colors.overlay.white70,
     marginTop: 6,
     fontSize: 14,
   },
   productsGrid: {
     flexDirection: 'row',
     flexWrap: 'wrap',
-    paddingHorizontal: 8,
+    paddingHorizontal: 12,
     justifyContent: 'space-between',
   },
   gridItem: {
-    width: '49%',
-    marginBottom: 8,
+    width: '48%',
+    marginBottom: 14,
   },
   collectionCard: {
     width: 170,
     marginRight: 14,
-    backgroundColor: TarodanColors.background,
-    borderRadius: 0,
+    backgroundColor: colors.surface.DEFAULT,
+    borderRadius: 16,
     overflow: 'hidden',
     elevation: 3,
-    shadowColor: '#000',
+    shadowColor: colors.black,
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.08,
     shadowRadius: 6,
@@ -1287,7 +1192,7 @@ const styles = StyleSheet.create({
   collectionImage: {
     width: '100%',
     height: 110,
-    backgroundColor: TarodanColors.backgroundTertiary,
+    backgroundColor: colors.gray[200],
   },
   collectionInfo: {
     padding: 12,
@@ -1295,25 +1200,25 @@ const styles = StyleSheet.create({
   collectionName: {
     fontSize: 14,
     fontWeight: '600',
-    color: TarodanColors.textPrimary,
+    color: colors.text.heading,
   },
   collectionMeta: {
     fontSize: 12,
-    color: TarodanColors.textSecondary,
+    color: colors.text.muted,
     marginTop: 4,
   },
   featuredCard: {
-    backgroundColor: TarodanColors.background,
+    backgroundColor: colors.surface.DEFAULT,
     marginHorizontal: 16,
-    borderRadius: 0,
+    borderRadius: 20,
     padding: 18,
     elevation: 3,
-    shadowColor: '#000',
+    shadowColor: colors.black,
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.1,
     shadowRadius: 8,
     borderWidth: 1,
-    borderColor: TarodanColors.primaryMedium,
+    borderColor: colors.primary[200]!,
   },
   featuredHeader: {
     flexDirection: 'row',
@@ -1323,16 +1228,16 @@ const styles = StyleSheet.create({
     width: 60,
     height: 60,
     borderRadius: 30,
-    backgroundColor: TarodanColors.primary,
+    backgroundColor: colors.primary[600]!,
     justifyContent: 'center',
     alignItems: 'center',
     borderWidth: 3,
-    borderColor: TarodanColors.primaryMedium,
+    borderColor: colors.primary[200]!,
   },
   featuredAvatarText: {
     fontSize: 26,
     fontWeight: 'bold',
-    color: '#fff',
+    color: colors.white,
   },
   featuredInfo: {
     flex: 1,
@@ -1342,27 +1247,27 @@ const styles = StyleSheet.create({
   featuredName: {
     fontSize: 18,
     fontWeight: 'bold',
-    color: TarodanColors.textPrimary,
+    color: colors.text.heading,
   },
   featuredDesc: {
     fontSize: 13,
-    color: TarodanColors.textSecondary,
+    color: colors.text.muted,
     marginTop: 4,
   },
   featuredStats: {
     flexDirection: 'row',
     alignItems: 'center',
     marginTop: 8,
-    backgroundColor: TarodanColors.primaryLight,
+    backgroundColor: colors.primary[50]!,
     alignSelf: 'flex-start',
     paddingHorizontal: 10,
     paddingVertical: 4,
-    borderRadius: 0,
+    borderRadius: 8,
   },
   featuredStatText: {
     fontSize: 14,
     fontWeight: '700',
-    color: TarodanColors.primary,
+    color: colors.primary[600]!,
     marginLeft: 4,
   },
   featuredProducts: {
@@ -1371,40 +1276,40 @@ const styles = StyleSheet.create({
   featuredProductCard: {
     width: 140,
     marginRight: 12,
-    backgroundColor: TarodanColors.backgroundSecondary,
-    borderRadius: 0,
+    backgroundColor: colors.surface.alt,
+    borderRadius: 14,
     overflow: 'hidden',
   },
   featuredProductImage: {
     width: '100%',
     height: 110,
-    backgroundColor: TarodanColors.backgroundTertiary,
+    backgroundColor: colors.gray[200],
   },
   featuredProductTitle: {
     fontSize: 13,
     fontWeight: '500',
-    color: TarodanColors.textPrimary,
+    color: colors.text.heading,
     padding: 10,
     paddingBottom: 4,
   },
   featuredProductPrice: {
     fontSize: 16,
     fontWeight: 'bold',
-    color: TarodanColors.price,
+    color: colors.primary[700]!,
     paddingHorizontal: 10,
     paddingBottom: 10,
   },
   viewGarageBtn: {
     alignSelf: 'flex-start',
-    backgroundColor: TarodanColors.primaryLight,
+    backgroundColor: colors.primary[50]!,
     paddingHorizontal: 16,
     paddingVertical: 10,
-    borderRadius: 0,
+    borderRadius: 10,
   },
   viewGarageBtnText: {
     fontSize: 14,
     fontWeight: '700',
-    color: TarodanColors.primary,
+    color: colors.primary[600]!,
   },
   companyMetaRow: {
     flexDirection: 'row',
@@ -1419,7 +1324,7 @@ const styles = StyleSheet.create({
   ratingBadgeText: {
     fontSize: 13,
     fontWeight: '600',
-    color: TarodanColors.textPrimary,
+    color: colors.text.heading,
     marginLeft: 4,
   },
   verifiedBadgeSmall: {
@@ -1428,7 +1333,7 @@ const styles = StyleSheet.create({
   },
   verifiedBadgeSmallText: {
     fontSize: 12,
-    color: TarodanColors.success,
+    color: colors.success[600]!,
     marginLeft: 4,
   },
   // Logo styles
@@ -1443,34 +1348,34 @@ const styles = StyleSheet.create({
   },
   // Company Section styles - Modern design
   companySection: {
-    backgroundColor: TarodanColors.primaryLight,
+    backgroundColor: colors.primary[50]!,
     paddingVertical: 24,
     marginBottom: 24,
   },
   businessBadge: {
-    backgroundColor: TarodanColors.primary,
+    backgroundColor: colors.primary[600]!,
     paddingHorizontal: 10,
     paddingVertical: 5,
-    borderRadius: 0,
+    borderRadius: 14,
     marginLeft: 10,
   },
   businessBadgeText: {
     fontSize: 11,
     fontWeight: 'bold',
-    color: '#fff',
+    color: colors.white,
   },
   companyCard: {
-    backgroundColor: '#fff',
+    backgroundColor: colors.white,
     marginHorizontal: 16,
-    borderRadius: 0,
+    borderRadius: 20,
     padding: 20,
-    shadowColor: '#000',
+    shadowColor: colors.black,
     shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.12,
     shadowRadius: 12,
     elevation: 5,
     borderWidth: 1,
-    borderColor: TarodanColors.primaryMedium,
+    borderColor: colors.primary[200]!,
   },
   companyHeader: {
     flexDirection: 'row',
@@ -1481,7 +1386,7 @@ const styles = StyleSheet.create({
     height: 70,
     borderRadius: 35,
     borderWidth: 3,
-    borderColor: TarodanColors.primaryMedium,
+    borderColor: colors.primary[200]!,
   },
   companyAvatarGradient: {
     width: 70,
@@ -1490,12 +1395,12 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
     borderWidth: 3,
-    borderColor: TarodanColors.primaryMedium,
+    borderColor: colors.primary[200]!,
   },
   companyAvatarText: {
     fontSize: 28,
     fontWeight: 'bold',
-    color: '#fff',
+    color: colors.white,
   },
   companyInfo: {
     flex: 1,
@@ -1510,11 +1415,11 @@ const styles = StyleSheet.create({
   companyNameText: {
     fontSize: 20,
     fontWeight: 'bold',
-    color: TarodanColors.textPrimary,
+    color: colors.text.heading,
   },
   companyBio: {
     fontSize: 13,
-    color: TarodanColors.textSecondary,
+    color: colors.text.muted,
     marginTop: 6,
     lineHeight: 18,
   },
@@ -1527,7 +1432,7 @@ const styles = StyleSheet.create({
   companyStat: {
     flex: 1,
     minWidth: '45%',
-    borderRadius: 0,
+    borderRadius: 12,
     padding: 12,
     alignItems: 'center',
   },
@@ -1537,7 +1442,7 @@ const styles = StyleSheet.create({
   },
   companyStatLabel: {
     fontSize: 11,
-    color: TarodanColors.textSecondary,
+    color: colors.text.muted,
     marginTop: 4,
     fontWeight: '500',
   },
@@ -1545,27 +1450,27 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     marginBottom: 14,
-    backgroundColor: TarodanColors.warningLight,
+    backgroundColor: colors.warning[50]!,
     alignSelf: 'flex-start',
     paddingHorizontal: 12,
     paddingVertical: 6,
-    borderRadius: 4,
+    borderRadius: 10,
   },
   companyRatingValue: {
     fontSize: 15,
     fontWeight: 'bold',
-    color: TarodanColors.textPrimary,
+    color: colors.text.heading,
     marginLeft: 6,
   },
   companyRatingCount: {
     fontSize: 13,
-    color: TarodanColors.textSecondary,
+    color: colors.text.muted,
     marginLeft: 6,
   },
   companySectionTitle: {
     fontSize: 17,
     fontWeight: 'bold',
-    color: TarodanColors.textPrimary,
+    color: colors.text.heading,
     marginBottom: 14,
     marginTop: 12,
   },
@@ -1576,14 +1481,14 @@ const styles = StyleSheet.create({
   },
   companyProductCard: {
     width: '31%',
-    backgroundColor: TarodanColors.backgroundSecondary,
-    borderRadius: 4,
+    backgroundColor: colors.surface.alt,
+    borderRadius: 14,
     overflow: 'hidden',
   },
   companyProductImage: {
     width: '100%',
     height: 85,
-    backgroundColor: TarodanColors.backgroundTertiary,
+    backgroundColor: colors.gray[200],
   },
   companyProductLikes: {
     position: 'absolute',
@@ -1591,16 +1496,16 @@ const styles = StyleSheet.create({
     left: 6,
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: 'rgba(255,255,255,0.95)',
+    backgroundColor: colors.overlay.white95,
     paddingHorizontal: 8,
     paddingVertical: 3,
-    borderRadius: 0,
+    borderRadius: 6,
   },
   companyProductLikesText: {
     fontSize: 11,
     fontWeight: '700',
     marginLeft: 3,
-    color: TarodanColors.primary,
+    color: colors.primary[600]!,
   },
   companyProductInfo: {
     padding: 10,
@@ -1608,19 +1513,19 @@ const styles = StyleSheet.create({
   companyProductTitle: {
     fontSize: 12,
     fontWeight: '500',
-    color: TarodanColors.textPrimary,
+    color: colors.text.heading,
     marginBottom: 6,
     lineHeight: 16,
   },
   companyProductPrice: {
     fontSize: 14,
     fontWeight: 'bold',
-    color: TarodanColors.price,
+    color: colors.primary[700]!,
   },
   companyCollectionCard: {
     flexDirection: 'row',
-    backgroundColor: TarodanColors.backgroundSecondary,
-    borderRadius: 0,
+    backgroundColor: colors.surface.alt,
+    borderRadius: 14,
     padding: 14,
     marginBottom: 10,
     alignItems: 'center',
@@ -1628,14 +1533,14 @@ const styles = StyleSheet.create({
   companyCollectionImage: {
     width: 60,
     height: 60,
-    borderRadius: 0,
-    backgroundColor: TarodanColors.backgroundTertiary,
+    borderRadius: 10,
+    backgroundColor: colors.gray[200],
   },
   companyCollectionImagePlaceholder: {
     width: 60,
     height: 60,
-    borderRadius: 0,
-    backgroundColor: TarodanColors.backgroundTertiary,
+    borderRadius: 10,
+    backgroundColor: colors.gray[200],
     justifyContent: 'center',
     alignItems: 'center',
   },
@@ -1646,11 +1551,11 @@ const styles = StyleSheet.create({
   companyCollectionName: {
     fontSize: 15,
     fontWeight: '600',
-    color: TarodanColors.textPrimary,
+    color: colors.text.heading,
   },
   companyCollectionMeta: {
     fontSize: 13,
-    color: TarodanColors.textSecondary,
+    color: colors.text.muted,
     marginTop: 4,
   },
   companyCollectionStats: {
@@ -1660,12 +1565,12 @@ const styles = StyleSheet.create({
   },
   companyCollectionStatText: {
     fontSize: 12,
-    color: TarodanColors.info,
+    color: colors.info[600]!,
     fontWeight: '500',
   },
   companyCollectionStatTextRed: {
     fontSize: 12,
-    color: TarodanColors.error,
+    color: colors.danger[600]!,
     fontWeight: '500',
   },
   viewStoreButton: {
@@ -1673,12 +1578,12 @@ const styles = StyleSheet.create({
   },
   viewStoreButtonGradient: {
     paddingVertical: 14,
-    borderRadius: 0,
+    borderRadius: 12,
     alignItems: 'center',
   },
   viewStoreButtonText: {
     fontSize: 15,
     fontWeight: 'bold',
-    color: '#fff',
+    color: colors.white,
   },
 });

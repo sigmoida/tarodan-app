@@ -1,143 +1,100 @@
-import React, { useState, useEffect, useCallback } from 'react';
-import {
-  View,
-  Text,
-  FlatList,
-  TouchableOpacity,
-  StyleSheet,
-  ActivityIndicator,
-  TextInput,
-  RefreshControl,
-  Dimensions,
-} from 'react-native';
+import React, { useMemo, useState } from 'react';
+import { View, StyleSheet, FlatList, TouchableOpacity, Image } from 'react-native';
+
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { router } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
-import { TarodanColors } from '../../src/theme/colors';
+import { router } from 'expo-router';
+import { useQuery } from '@tanstack/react-query';
 import { manufacturersApi } from '../../src/services/api';
+import { theme, Text, Input } from '@tarodan/ui-native';
+import { ScreenHeader, ScreenLoader, ErrorState, EmptyState } from '../../src/components/common';
+const { colors } = theme;
 
-const { width } = Dimensions.get('window');
-const CARD_WIDTH = (width - 48) / 2;
+interface Manufacturer {
+  id: string;
+  name: string;
+  slug: string;
+  logo?: string | null;
+  productCount?: number;
+}
 
-export default function ManufacturersListScreen() {
-  const [manufacturers, setManufacturers] = useState<any[]>([]);
-  const [filtered, setFiltered] = useState<any[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [refreshing, setRefreshing] = useState(false);
+export default function ManufacturersScreen() {
   const [search, setSearch] = useState('');
 
-  const fetchManufacturers = useCallback(async () => {
-    try {
-      const res = await manufacturersApi.findAll();
-      const data = res.data?.data || res.data || [];
-      setManufacturers(data);
-      setFiltered(data);
-    } catch (err) {
-      console.log('Manufacturers fetch error:', err);
-    } finally {
-      setLoading(false);
-    }
-  }, []);
+  const { data, isLoading, error, refetch, isRefetching } = useQuery<Manufacturer[]>({
+    queryKey: ['manufacturers'],
+    queryFn: async () => {
+      const response = await manufacturersApi.findAll();
+      const payload = response.data?.data ?? response.data ?? [];
+      return Array.isArray(payload) ? payload : [];
+    },
+  });
 
-  useEffect(() => {
-    fetchManufacturers();
-  }, [fetchManufacturers]);
+  const items = useMemo(() => {
+    const all = data ?? [];
+    if (!search.trim()) return all;
+    const q = search.trim().toLowerCase();
+    return all.filter(m => m.name.toLowerCase().includes(q));
+  }, [data, search]);
 
-  useEffect(() => {
-    if (!search.trim()) {
-      setFiltered(manufacturers);
-    } else {
-      const q = search.toLowerCase();
-      setFiltered(manufacturers.filter((m: any) => m.name?.toLowerCase().includes(q)));
-    }
-  }, [search, manufacturers]);
-
-  const onRefresh = useCallback(async () => {
-    setRefreshing(true);
-    await fetchManufacturers();
-    setRefreshing(false);
-  }, [fetchManufacturers]);
-
-  const renderManufacturerCard = ({ item }: { item: any }) => (
+  const renderItem = ({ item }: { item: Manufacturer }) => (
     <TouchableOpacity
       style={styles.card}
-      activeOpacity={0.7}
-      onPress={() => router.push(`/ureticiler/${item.slug}`)}
+      onPress={() => router.push(`/ureticiler/${item.slug}` as any)}
+      activeOpacity={0.8}
     >
-      <View style={styles.cardIconContainer}>
-        <Ionicons name="construct" size={28} color={TarodanColors.primary} />
+      <View style={styles.logoWrap}>
+        {item.logo ? (
+          <Image source={{ uri: item.logo }} style={styles.logo} resizeMode="contain" />
+        ) : (
+          <Text style={styles.logoFallback}>{item.name.charAt(0).toUpperCase()}</Text>
+        )}
       </View>
-      <Text style={styles.cardName} numberOfLines={2}>{item.name}</Text>
-      <Text style={styles.cardCount}>
-        {item.productCount ?? item._count?.products ?? 0} ürün
-      </Text>
+      <View style={styles.body}>
+        <Text style={styles.name}>{item.name}</Text>
+        {typeof item.productCount === 'number' ? (
+          <Text style={styles.count}>{item.productCount} ürün</Text>
+        ) : null}
+      </View>
+      <Ionicons name="chevron-forward" size={18} color={colors.text.subtle} />
     </TouchableOpacity>
   );
 
-  if (loading) {
-    return (
-      <SafeAreaView style={styles.container} edges={['top']}>
-        <View style={styles.header}>
-          <TouchableOpacity onPress={() => router.back()} style={styles.headerBtn}>
-            <Ionicons name="arrow-back" size={24} color={TarodanColors.textOnPrimary} />
-          </TouchableOpacity>
-          <Text style={styles.headerTitle}>Üreticiler</Text>
-          <View style={styles.headerBtn} />
-        </View>
-        <View style={styles.centered}>
-          <ActivityIndicator size="large" color={TarodanColors.primary} />
-          <Text style={styles.loadingText}>Yükleniyor...</Text>
-        </View>
-      </SafeAreaView>
-    );
-  }
-
   return (
     <SafeAreaView style={styles.container} edges={['top']}>
-      <View style={styles.header}>
-        <TouchableOpacity onPress={() => router.back()} style={styles.headerBtn}>
-          <Ionicons name="arrow-back" size={24} color={TarodanColors.textOnPrimary} />
-        </TouchableOpacity>
-        <Text style={styles.headerTitle}>Üreticiler</Text>
-        <View style={styles.headerBtn} />
-      </View>
+      <ScreenHeader title="Üreticiler" />
 
-      <View style={styles.searchContainer}>
-        <Ionicons name="search" size={20} color={TarodanColors.textTertiary} style={styles.searchIcon} />
-        <TextInput
-          style={styles.searchInput}
-          placeholder="Üretici ara..."
-          placeholderTextColor={TarodanColors.textTertiary}
+      <View style={styles.searchBar}>
+        <Input
           value={search}
           onChangeText={setSearch}
+          placeholder="Üretici ara..."
+          leftIconName="search"
         />
-        {search.length > 0 && (
-          <TouchableOpacity onPress={() => setSearch('')}>
-            <Ionicons name="close-circle" size={20} color={TarodanColors.textTertiary} />
-          </TouchableOpacity>
-        )}
       </View>
 
-      <FlatList
-        data={filtered}
-        keyExtractor={(item) => String(item.id || item.slug)}
-        numColumns={2}
-        columnWrapperStyle={styles.row}
-        contentContainerStyle={styles.listContent}
-        renderItem={renderManufacturerCard}
-        refreshControl={
-          <RefreshControl refreshing={refreshing} onRefresh={onRefresh} colors={[TarodanColors.primary]} />
-        }
-        ListEmptyComponent={
-          <View style={styles.centered}>
-            <Ionicons name="construct-outline" size={64} color={TarodanColors.textTertiary} />
-            <Text style={styles.emptyTitle}>Üretici bulunamadı</Text>
-            <Text style={styles.emptySubtitle}>
-              {search ? 'Arama kriterlerinize uygun üretici yok' : 'Henüz üretici eklenmemiş'}
-            </Text>
-          </View>
-        }
-      />
+      {isLoading ? (
+        <ScreenLoader />
+      ) : error ? (
+        <ErrorState fullscreen onRetry={() => refetch()} />
+      ) : items.length === 0 ? (
+        <EmptyState
+          fullscreen
+          icon="business-outline"
+          title={search ? 'Sonuç bulunamadı' : 'Henüz üretici yok'}
+          subtitle={search ? 'Farklı bir anahtar kelime deneyin.' : undefined}
+        />
+      ) : (
+        <FlatList
+          data={items}
+          renderItem={renderItem}
+          keyExtractor={item => item.id}
+          contentContainerStyle={styles.list}
+          ItemSeparatorComponent={() => <View style={{ height: 8 }} />}
+          refreshing={isRefetching}
+          onRefresh={refetch}
+        />
+      )}
     </SafeAreaView>
   );
 }
@@ -145,108 +102,54 @@ export default function ManufacturersListScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: TarodanColors.backgroundSecondary,
+    backgroundColor: colors.surface.alt,
   },
-  header: {
-    backgroundColor: TarodanColors.primary,
-    paddingBottom: 16,
-    paddingHorizontal: 20,
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-  },
-  headerBtn: {
-    width: 32,
-    height: 32,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  headerTitle: {
-    fontSize: 18,
-    fontWeight: 'bold',
-    color: TarodanColors.textOnPrimary,
-  },
-  searchContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: TarodanColors.background,
-    margin: 16,
-    marginBottom: 8,
-    paddingHorizontal: 14,
-    borderRadius: 12,
-    borderWidth: 1,
-    borderColor: TarodanColors.border,
-    height: 48,
-  },
-  searchIcon: {
-    marginRight: 10,
-  },
-  searchInput: {
-    flex: 1,
-    fontSize: 15,
-    color: TarodanColors.textPrimary,
-  },
-  listContent: {
-    paddingHorizontal: 16,
-    paddingBottom: 32,
-  },
-  row: {
-    justifyContent: 'space-between',
-    marginBottom: 12,
-  },
-  card: {
-    width: CARD_WIDTH,
-    backgroundColor: TarodanColors.background,
-    borderRadius: 12,
-    padding: 20,
-    alignItems: 'center',
-    elevation: 2,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.1,
-    shadowRadius: 3,
-  },
-  cardIconContainer: {
-    width: 56,
-    height: 56,
-    borderRadius: 28,
-    backgroundColor: TarodanColors.primaryLight,
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginBottom: 12,
-  },
-  cardName: {
-    fontSize: 15,
-    fontWeight: '600',
-    color: TarodanColors.textPrimary,
-    textAlign: 'center',
+  searchBar: {
+    marginHorizontal: 16,
+    marginTop: 12,
     marginBottom: 4,
   },
-  cardCount: {
-    fontSize: 13,
-    color: TarodanColors.textSecondary,
+  list: {
+    padding: 16,
   },
-  centered: {
-    flex: 1,
-    justifyContent: 'center',
+  card: {
+    flexDirection: 'row',
     alignItems: 'center',
-    padding: 32,
+    backgroundColor: colors.surface.DEFAULT,
+    borderRadius: 12,
+    padding: 12,
+    gap: 12,
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: colors.border.DEFAULT,
   },
-  loadingText: {
-    marginTop: 12,
-    fontSize: 14,
-    color: TarodanColors.textSecondary,
+  logoWrap: {
+    width: 52,
+    height: 52,
+    borderRadius: 10,
+    backgroundColor: colors.surface.alt,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
-  emptyTitle: {
-    marginTop: 16,
-    fontSize: 18,
-    fontWeight: 'bold',
-    color: TarodanColors.textPrimary,
+  logo: {
+    width: 40,
+    height: 40,
   },
-  emptySubtitle: {
-    marginTop: 8,
-    fontSize: 14,
-    color: TarodanColors.textSecondary,
-    textAlign: 'center',
+  logoFallback: {
+    fontSize: 22,
+    fontWeight: '800',
+    color: colors.primary[600]!,
+  },
+  body: {
+    flex: 1,
+  },
+  name: {
+    fontSize: 15,
+    fontWeight: '600',
+    color: colors.text.heading,
+  },
+  count: {
+    fontSize: 12,
+    color: colors.text.muted,
+    marginTop: 2,
   },
 });

@@ -3,6 +3,7 @@ import {
   PaymentStatus,
   PaymentHoldStatus,
   PayoutStatus,
+  PrismaClient,
   TradeStatus,
   ShipmentStatus,
 } from '@prisma/client';
@@ -23,6 +24,28 @@ import { createAddress } from '../factories/address.factory';
 import { signCallback } from '../mocks/paytr.mock';
 import { PaymentService } from '../../src/modules/payment/payment.service';
 import { PayoutService } from '../../src/modules/payout/payout.service';
+
+/**
+ * Wait for the post-accept fire-and-forget inbound dispatch to settle.
+ */
+async function waitForInboundShipments(
+  prisma: PrismaClient,
+  tradeId: string,
+  expected = 2,
+  timeoutMs = 4_000,
+) {
+  const deadline = Date.now() + timeoutMs;
+  let rows = await prisma.tradeShipment.findMany({
+    where: { tradeId, leg: 'to_warehouse' },
+  });
+  while (rows.length < expected && Date.now() < deadline) {
+    await new Promise((r) => setTimeout(r, 50));
+    rows = await prisma.tradeShipment.findMany({
+      where: { tradeId, leg: 'to_warehouse' },
+    });
+  }
+  return rows;
+}
 
 async function configureWarehouseAddress(addressId: string): Promise<void> {
   const prisma = getPrisma();
@@ -395,21 +418,11 @@ describe('Payout Flow (E2E)', () => {
         }))
         .expect(200);
 
-      // Walk trade to completion
-      await request(ctx.app.getHttpServer())
-        .post(`/api/trades/${tradeId}/ship-to-warehouse`)
-        .set(authHeader(initiator))
-        .send({ fromAddressId: initiatorShip.id, carrier: 'Sürat' })
-        .expect(201);
-      await request(ctx.app.getHttpServer())
-        .post(`/api/trades/${tradeId}/ship-to-warehouse`)
-        .set(authHeader(receiver))
-        .send({ fromAddressId: receiverShip.id, carrier: 'Sürat' })
-        .expect(201);
-
-      const incoming = await prisma.tradeShipment.findMany({
-        where: { tradeId, leg: 'to_warehouse' },
-      });
+      // Walk trade to completion. Inbound shipments auto-created
+      // post-cash-payment; poll for the fire-and-forget dispatch.
+      void initiatorShip;
+      void receiverShip;
+      const incoming = await waitForInboundShipments(prisma, tradeId);
       for (const s of incoming) {
         await request(ctx.app.getHttpServer())
           .post(`/api/admin/trades/${tradeId}/mark-warehouse-received`)

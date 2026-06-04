@@ -1,12 +1,11 @@
-import { View, KeyboardAvoidingView, Platform } from 'react-native';
-import { Text, TextInput, Button, useTheme } from 'react-native-paper';
+import { useState } from 'react';
 import { useForm, Controller } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import { useMutation } from '@tanstack/react-query';
 import { router } from 'expo-router';
-import { useState } from 'react';
-import { api } from '../../src/services/api';
+import { Button, Input, Screen, Text, VStack } from '@tarodan/ui-native';
+import { authApi } from '../../src/services/api';
 
 const forgotSchema = z.object({
   email: z.string().email('Geçerli email girin'),
@@ -15,7 +14,6 @@ const forgotSchema = z.object({
 type ForgotForm = z.infer<typeof forgotSchema>;
 
 export default function ForgotPasswordScreen() {
-  const theme = useTheme();
   const [sent, setSent] = useState(false);
 
   const { control, handleSubmit, formState: { errors } } = useForm<ForgotForm>({
@@ -23,40 +21,41 @@ export default function ForgotPasswordScreen() {
   });
 
   const forgotMutation = useMutation({
-    mutationFn: (data: ForgotForm) => api.post('/auth/forgot-password', data),
-    onSuccess: () => {
-      setSent(true);
-    },
+    mutationFn: (data: ForgotForm) => authApi.forgotPassword(data.email),
+    onSuccess: () => setSent(true),
   });
 
-  const onSubmit = (data: ForgotForm) => {
-    forgotMutation.mutate(data);
-  };
+  const onSubmit = (data: ForgotForm) => forgotMutation.mutate(data);
 
   if (sent) {
     return (
-      <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', padding: 24, backgroundColor: theme.colors.background }}>
-        <Text variant="headlineSmall" style={{ marginBottom: 16 }}>Email Gönderildi</Text>
-        <Text variant="bodyMedium" style={{ textAlign: 'center', marginBottom: 24, color: theme.colors.outline }}>
-          Şifre sıfırlama linki email adresinize gönderildi. Lütfen gelen kutunuzu kontrol edin.
-        </Text>
-        <Button mode="contained" onPress={() => router.push('/(auth)/login')}>
-          Giriş Sayfasına Dön
-        </Button>
-      </View>
+      <Screen center>
+        <VStack gap={4} align="center">
+          <Text variant="h1" align="center">
+            Email Gönderildi
+          </Text>
+          <Text variant="body" tone="muted" align="center">
+            Şifre sıfırlama linki email adresinize gönderildi. Lütfen gelen kutunuzu kontrol edin.
+          </Text>
+          <Button
+            variant="primary"
+            size="lg"
+            fullWidth
+            title="Giriş Sayfasına Dön"
+            onPress={() => router.push('/(auth)/login')}
+          />
+        </VStack>
+      </Screen>
     );
   }
 
   return (
-    <KeyboardAvoidingView
-      behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-      style={{ flex: 1, backgroundColor: theme.colors.background }}
-    >
-      <View style={{ flex: 1, justifyContent: 'center', padding: 24 }}>
-        <Text variant="headlineSmall" style={{ textAlign: 'center', marginBottom: 8 }}>
+    <Screen center>
+      <VStack gap={4}>
+        <Text variant="h1" align="center">
           Şifremi Unuttum
         </Text>
-        <Text variant="bodyMedium" style={{ textAlign: 'center', marginBottom: 32, color: theme.colors.outline }}>
+        <Text variant="body" tone="muted" align="center">
           Email adresinizi girin, şifre sıfırlama linki göndereceğiz
         </Text>
 
@@ -64,43 +63,37 @@ export default function ForgotPasswordScreen() {
           control={control}
           name="email"
           render={({ field: { onChange, value } }) => (
-            <TextInput
+            <Input
+              testID="forgot-email-input"
               label="E-posta"
               value={value}
               onChangeText={onChange}
               keyboardType="email-address"
               autoCapitalize="none"
-              error={!!errors.email}
-              style={{ marginBottom: 8 }}
+              error={errors.email?.message}
             />
           )}
         />
-        {errors.email && (
-          <Text variant="bodySmall" style={{ color: theme.colors.error, marginBottom: 16 }}>
-            {errors.email.message}
-          </Text>
-        )}
 
-        {forgotMutation.isError && (
-          <Text variant="bodySmall" style={{ color: theme.colors.error, marginBottom: 16, textAlign: 'center' }}>
+        {forgotMutation.isError ? (
+          <Text variant="bodySm" tone="danger" align="center">
             Bir hata oluştu. Lütfen tekrar deneyin.
           </Text>
-        )}
+        ) : null}
 
         <Button
-          mode="contained"
+          testID="forgot-submit-button"
+          variant="primary"
+          size="lg"
+          fullWidth
+          title="Şifre Sıfırlama Linki Gönder"
           onPress={handleSubmit(onSubmit)}
-          loading={forgotMutation.isPending}
+          isLoading={forgotMutation.isPending}
           disabled={forgotMutation.isPending}
-          style={{ marginBottom: 16 }}
-        >
-          Şifre Sıfırlama Linki Gönder
-        </Button>
+        />
 
-        <Button mode="text" onPress={() => router.back()}>
-          Geri Dön
-        </Button>
-      </View>
-    </KeyboardAvoidingView>
+        <Button variant="ghost" fullWidth title="Geri Dön" onPress={() => router.back()} />
+      </VStack>
+    </Screen>
   );
 }

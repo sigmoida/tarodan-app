@@ -1,29 +1,42 @@
-import { View, FlatList, RefreshControl } from 'react-native';
-import { Text, Card, Chip, Button, ActivityIndicator, useTheme, SegmentedButtons } from 'react-native-paper';
 import { useState, useCallback } from 'react';
+import { Pressable, View, FlatList, RefreshControl } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { useQuery } from '@tanstack/react-query';
 import { router } from 'expo-router';
 import { format } from 'date-fns';
 import { tr } from 'date-fns/locale';
+import {
+  Button,
+  Card,
+  Chip,
+  type ChipVariant,
+  ScreenHeader,
+  SegmentedButtons,
+  Spinner,
+  Text,
+  VStack,
+  theme,
+} from '@tarodan/ui-native';
 import { tradesApi } from '../../src/services/api';
 import { useAuthStore } from '../../src/stores/authStore';
 
-const TRADE_STATUSES: Record<string, { label: string; color: string }> = {
-  pending: { label: 'Bekliyor', color: '#FFC107' },
-  accepted: { label: 'Kabul Edildi', color: '#4CAF50' },
-  rejected: { label: 'Reddedildi', color: '#F44336' },
-  initiator_shipped: { label: 'Kargoda', color: '#2196F3' },
-  receiver_shipped: { label: 'Kargoda', color: '#2196F3' },
-  both_shipped: { label: 'Kargoda', color: '#2196F3' },
-  initiator_received: { label: 'Teslim', color: '#9C27B0' },
-  receiver_received: { label: 'Teslim', color: '#9C27B0' },
-  completed: { label: 'Tamamlandı', color: '#4CAF50' },
-  cancelled: { label: 'İptal', color: '#9E9E9E' },
-  disputed: { label: 'İtiraz', color: '#FF5722' },
-  countered: { label: 'Karşı Teklif', color: '#2563EB' },
+const { colors, spacing } = theme;
+
+const TRADE_STATUSES: Record<string, { label: string; variant: ChipVariant }> = {
+  pending: { label: 'Bekliyor', variant: 'warning' },
+  accepted: { label: 'Kabul Edildi', variant: 'success' },
+  rejected: { label: 'Reddedildi', variant: 'danger' },
+  initiator_shipped: { label: 'Kargoda', variant: 'info' },
+  receiver_shipped: { label: 'Kargoda', variant: 'info' },
+  both_shipped: { label: 'Kargoda', variant: 'info' },
+  initiator_received: { label: 'Teslim', variant: 'primary' },
+  receiver_received: { label: 'Teslim', variant: 'primary' },
+  completed: { label: 'Tamamlandı', variant: 'success' },
+  cancelled: { label: 'İptal', variant: 'neutral' },
+  disputed: { label: 'İtiraz', variant: 'danger' },
+  countered: { label: 'Karşı Teklif', variant: 'info' },
 };
 
-/** API TradeStatus ile uyumlu; shipped/confirmed yok (400 veriyordu) */
 const SHIPPING_STATUSES = new Set([
   'initiator_shipped',
   'receiver_shipped',
@@ -34,13 +47,22 @@ const SHIPPING_STATUSES = new Set([
 
 type TradesTabFilter = 'all' | 'pending' | 'shipping' | 'completed';
 
+interface TradeItem {
+  id: string | number;
+  status: string;
+  createdAt: string;
+  cashAmount?: number | string | null;
+  deadline?: string | null;
+  responseDeadline?: string | null;
+  initiatorItems?: Array<{ productTitle?: string }>;
+  receiverItems?: Array<{ productTitle?: string }>;
+}
+
 export default function TradesScreen() {
-  const theme = useTheme();
   const { isAuthenticated } = useAuthStore();
   const [filter, setFilter] = useState<TradesTabFilter>('all');
   const [refreshing, setRefreshing] = useState(false);
 
-  // GET /trades → { trades, total, page, pageSize } (data değil)
   const { data: tradesPayload, isLoading, isError, refetch } = useQuery({
     queryKey: ['trades', filter],
     queryFn: async () => {
@@ -48,20 +70,18 @@ export default function TradesScreen() {
       if (filter === 'pending') params.status = 'pending';
       if (filter === 'completed') params.status = 'completed';
       const res = await tradesApi.getAll(params);
-      const body = res.data as { trades?: unknown[]; data?: unknown[] } | undefined;
-      let list = body?.trades ?? body?.data ?? [];
+      const body = res.data as { trades?: TradeItem[]; data?: TradeItem[] } | undefined;
+      let list: TradeItem[] = body?.trades ?? body?.data ?? [];
       if (!Array.isArray(list)) list = [];
       if (filter === 'shipping') {
-        list = list.filter(
-          (t: { status?: string }) => t?.status && SHIPPING_STATUSES.has(t.status),
-        );
+        list = list.filter((t) => t?.status && SHIPPING_STATUSES.has(t.status));
       }
       return { trades: list };
     },
     enabled: isAuthenticated,
   });
 
-  const tradesList = tradesPayload?.trades ?? [];
+  const tradesList: TradeItem[] = tradesPayload?.trades ?? [];
 
   const onRefresh = useCallback(async () => {
     setRefreshing(true);
@@ -69,32 +89,50 @@ export default function TradesScreen() {
     setRefreshing(false);
   }, [refetch]);
 
+  const handleBack = () => {
+    if (router.canGoBack()) router.back();
+    else router.replace('/(tabs)');
+  };
+
   if (!isAuthenticated) {
     return (
-      <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', padding: 32 }}>
-        <Text variant="titleLarge" style={{ marginBottom: 16 }}>Giriş Yapın</Text>
-        <Text variant="bodyMedium" style={{ textAlign: 'center', marginBottom: 24, color: theme.colors.outline }}>
-          Takaslarınızı görmek için giriş yapmanız gerekiyor
-        </Text>
-        <Button mode="contained" onPress={() => router.push('/(auth)/login')}>
-          Giriş Yap
-        </Button>
-      </View>
+      <SafeAreaView style={{ flex: 1, backgroundColor: colors.surface.DEFAULT }} edges={['top']}>
+        <ScreenHeader title="Takaslarım" variant="light" onBack={handleBack} />
+        <View
+          style={{
+            flex: 1,
+            justifyContent: 'center',
+            alignItems: 'center',
+            padding: spacing[8],
+          }}
+        >
+          <Text variant="h2" align="center" style={{ marginBottom: spacing[4] }}>
+            Giriş Yapın
+          </Text>
+          <Text variant="body" tone="muted" align="center" style={{ marginBottom: spacing[6] }}>
+            Takaslarınızı görmek için giriş yapmanız gerekiyor
+          </Text>
+          <Button
+            variant="primary"
+            title="Giriş Yap"
+            onPress={() => router.push('/(auth)/login')}
+          />
+        </View>
+      </SafeAreaView>
     );
   }
 
-  const getStatusInfo = (status: string) => {
-    return TRADE_STATUSES[status] || { label: status, color: '#9E9E9E' };
-  };
+  const getStatusInfo = (status: string) =>
+    TRADE_STATUSES[status] || { label: status, variant: 'neutral' as ChipVariant };
 
   return (
-    <View style={{ flex: 1, backgroundColor: theme.colors.background }}>
-      {/* Filter */}
-      <View style={{ padding: 16 }}>
+    <SafeAreaView style={{ flex: 1, backgroundColor: colors.surface.DEFAULT }} edges={['top']}>
+      <ScreenHeader title="Takaslarım" variant="light" onBack={handleBack} />
+      <View style={{ padding: spacing[4] }}>
         <SegmentedButtons
           value={filter}
           onValueChange={(v) => setFilter(v as TradesTabFilter)}
-          buttons={[
+          options={[
             { value: 'all', label: 'Tümü' },
             { value: 'pending', label: 'Bekleyen' },
             { value: 'shipping', label: 'Kargoda' },
@@ -105,20 +143,18 @@ export default function TradesScreen() {
       </View>
 
       {isError ? (
-        <View style={{ padding: 24, alignItems: 'center' }}>
-          <Text variant="bodyMedium" style={{ textAlign: 'center', marginBottom: 8 }}>
+        <VStack gap={2} align="center" padding={6}>
+          <Text variant="body" align="center">
             Takaslar yüklenemedi. Çekerek yenileyin.
           </Text>
-          <Button mode="contained" onPress={() => refetch()}>
-            Yeniden dene
-          </Button>
-        </View>
+          <Button variant="primary" title="Yeniden dene" onPress={() => refetch()} />
+        </VStack>
       ) : isLoading ? (
-        <ActivityIndicator style={{ marginTop: 32 }} />
+        <Spinner style={{ marginTop: spacing[8] }} />
       ) : (
         <FlatList
           data={tradesList}
-          contentContainerStyle={{ padding: 16 }}
+          contentContainerStyle={{ padding: spacing[4] }}
           refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} />}
           keyExtractor={(item) => item.id.toString()}
           renderItem={({ item }) => {
@@ -128,51 +164,73 @@ export default function TradesScreen() {
             const myTitle = ini[0]?.productTitle || 'Ürün';
             const theirTitle = rec[0]?.productTitle || 'Ürün';
             return (
-              <Card
-                style={{ marginBottom: 12 }}
+              <Pressable
                 onPress={() => router.push(`/trade/${item.id}`)}
+                style={({ pressed }) => ({ opacity: pressed ? 0.85 : 1 })}
               >
-                <Card.Content>
-                  <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
-                    <Chip style={{ backgroundColor: statusInfo.color }} textStyle={{ color: '#fff' }}>
-                      {statusInfo.label}
-                    </Chip>
-                    <Text variant="bodySmall" style={{ color: theme.colors.outline }}>
-                      {format(new Date(item.createdAt), 'dd MMM yyyy', { locale: tr })}
-                    </Text>
-                  </View>
-                  
-                  <Text variant="titleMedium" numberOfLines={1}>{myTitle}</Text>
-                  <Text variant="bodySmall" style={{ color: theme.colors.outline }}>↔</Text>
-                  <Text variant="titleMedium" numberOfLines={1}>{theirTitle}</Text>
-                  
-                  {item.cashAmount != null && Number(item.cashAmount) !== 0 && (
-                    <Text variant="bodyMedium" style={{ color: theme.colors.primary, marginTop: 8 }}>
-                      Nakit fark: ₺{Math.abs(Number(item.cashAmount)).toLocaleString('tr-TR')}
-                    </Text>
-                  )}
+              <Card style={{ marginBottom: spacing[3] }}>
+                <View
+                  style={{
+                    flexDirection: 'row',
+                    justifyContent: 'space-between',
+                    alignItems: 'center',
+                    marginBottom: spacing[2],
+                  }}
+                >
+                  <Chip label={statusInfo.label} variant={statusInfo.variant} size="sm" />
+                  <Text variant="caption" tone="muted">
+                    {format(new Date(item.createdAt), 'dd MMM yyyy', { locale: tr })}
+                  </Text>
+                </View>
 
-                  {(item.deadline || item.responseDeadline) && (
-                    <Text variant="bodySmall" style={{ color: theme.colors.error, marginTop: 4 }}>
-                      Son: {format(new Date(item.deadline || item.responseDeadline), 'dd MMM HH:mm', { locale: tr })}
-                    </Text>
-                  )}
-                </Card.Content>
+                <Text variant="h3" numberOfLines={1}>
+                  {myTitle}
+                </Text>
+                <Text variant="caption" tone="muted">
+                  ↔
+                </Text>
+                <Text variant="h3" numberOfLines={1}>
+                  {theirTitle}
+                </Text>
+
+                {item.cashAmount != null && Number(item.cashAmount) !== 0 && (
+                  <Text
+                    variant="body"
+                    tone="primary"
+                    style={{ marginTop: spacing[2] }}
+                  >
+                    Nakit fark: ₺{Math.abs(Number(item.cashAmount)).toLocaleString('tr-TR')}
+                  </Text>
+                )}
+
+                {(item.deadline || item.responseDeadline) && (
+                  <Text variant="caption" tone="danger" style={{ marginTop: spacing[1] }}>
+                    Son:{' '}
+                    {format(
+                      new Date(item.deadline || item.responseDeadline!),
+                      'dd MMM HH:mm',
+                      { locale: tr },
+                    )}
+                  </Text>
+                )}
               </Card>
+              </Pressable>
             );
           }}
           ListEmptyComponent={
-            <View style={{ alignItems: 'center', marginTop: 32 }}>
-              <Text variant="bodyLarge" style={{ color: theme.colors.outline }}>
+            <VStack gap={4} align="center" style={{ marginTop: spacing[8] }}>
+              <Text variant="body" tone="muted">
                 Henüz takas yok
               </Text>
-              <Button mode="contained" style={{ marginTop: 16 }} onPress={() => router.push('/search')}>
-                İlan Ara
-              </Button>
-            </View>
+              <Button
+                variant="primary"
+                title="İlan Ara"
+                onPress={() => router.push('/search')}
+              />
+            </VStack>
           }
         />
       )}
-    </View>
+    </SafeAreaView>
   );
 }

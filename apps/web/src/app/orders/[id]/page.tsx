@@ -33,7 +33,6 @@ import CityDistrictSelector from "@/components/CityDistrictSelector";
 import UserAvatar from "@/components/UserAvatar";
 import {
   Button,
-  Checkbox,
   Input,
   Modal,
   Radio,
@@ -163,7 +162,6 @@ export default function OrderDetailPage() {
   const [downloadingInvoice, setDownloadingInvoice] = useState(false);
   const [paymentLoading, setPaymentLoading] = useState(false);
   const [reactivateLoading, setReactivateLoading] = useState(false);
-  const [cardError, setCardError] = useState<string | null>(null);
   const [addressLoading, setAddressLoading] = useState(false);
   const [savedAddresses, setSavedAddresses] = useState<any[]>([]);
   const [selectedAddressId, setSelectedAddressId] = useState<string | null>(
@@ -180,27 +178,6 @@ export default function OrderDetailPage() {
     zipCode: "",
   });
 
-  // Card states (mirrors checkout)
-  const [savedCards, setSavedCards] = useState<
-    Array<{
-      id: string;
-      cardBrand: string;
-      lastFour: string;
-      expiryMonth: number;
-      expiryYear: number;
-      isDefault?: boolean;
-    }>
-  >([]);
-  const [selectedSavedCard, setSelectedSavedCard] = useState<string | null>(
-    null,
-  );
-  const [useNewCard, setUseNewCard] = useState(false);
-  const [cardName, setCardName] = useState("");
-  const [cardNumber, setCardNumber] = useState("");
-  const [cardExpiry, setCardExpiry] = useState("");
-  const [cardCvc, setCardCvc] = useState("");
-  const [saveCard, setSaveCard] = useState(false);
-  const [cardsFetched, setCardsFetched] = useState(false);
 
   const [showReviewModal, setShowReviewModal] = useState(false);
   const [reviewScore, setReviewScore] = useState(5);
@@ -397,27 +374,9 @@ export default function OrderDetailPage() {
         });
     }
 
-    if (!cardsFetched) {
-      api
-        .get("/payments/methods")
-        .then((res) => {
-          const cards = res.data?.methods || res.data || [];
-          setSavedCards(cards);
-          const defaultCard = cards.find((c: any) => c.isDefault);
-          if (defaultCard) setSelectedSavedCard(defaultCard.id);
-          else if (cards.length > 0) setSelectedSavedCard(cards[0].id);
-          if (cards.length === 0) setUseNewCard(true);
-          setCardsFetched(true);
-        })
-        .catch(() => {
-          setUseNewCard(true);
-          setCardsFetched(true);
-        });
-    }
   }, [
     isPendingPaymentBuyer,
     addressesFetched,
-    cardsFetched,
     hasShippingAddress,
     order,
   ]);
@@ -528,19 +487,6 @@ export default function OrderDetailPage() {
 
       // PayTR mode: redirect
       if (data?.paymentUrl) {
-        // Save card before redirecting
-        if (saveCard && useNewCard && cardNumber && cardExpiry) {
-          try {
-            const [month, year] = cardExpiry.split("/");
-            await api.post("/payments/methods", {
-              cardNumber: cardNumber.replace(/\s/g, ""),
-              cardHolder: cardName,
-              expiryMonth: parseInt(month),
-              expiryYear: parseInt("20" + year),
-              cvv: cardCvc,
-            });
-          } catch {}
-        }
         window.location.href = data.paymentUrl;
         return;
       }
@@ -1166,13 +1112,6 @@ export default function OrderDetailPage() {
                 </div>
 
                 <div className="p-6 space-y-6">
-                  {cardError && (
-                    <div className="flex items-center gap-2 p-3 bg-danger-50 border border-danger-200 rounded-lg text-sm text-danger-700">
-                      <span aria-hidden>!</span>
-                      {cardError}
-                    </div>
-                  )}
-
                   {/* Section 1: Teslimat Adresi - kayıtlı adreslerden seç veya yeni adres ekle (normal ödeme gibi) */}
                   <div>
                     <div className="flex items-center gap-2 mb-3">
@@ -1354,230 +1293,27 @@ export default function OrderDetailPage() {
                     )}
                   </div>
 
-                  {/* Section 2: Card Information */}
+                  {/* Section 2: Secure payment via PayTR (kart bilgileri PayTR sayfasında alınır) */}
                   <div>
                     <div className="flex items-center gap-2 mb-3">
                       <span className="flex items-center justify-center w-6 h-6 rounded-full bg-primary-100 text-primary-700 text-xs font-bold">
                         2
                       </span>
                       <h3 className="font-semibold text-heading flex items-center gap-2">
-                        <CreditCardIcon className="w-5 h-5 text-primary-500" />
+                        <ShieldCheckIcon className="w-5 h-5 text-success-500" />
                         {locale === "en"
-                          ? "Card Information"
-                          : "Kart Bilgileri"}
+                          ? "Secure Payment"
+                          : "Güvenli Ödeme"}
                       </h3>
                     </div>
 
-                    <div className="p-4 bg-surface border border-border rounded-lg">
-                      {/* Saved Cards */}
-                      {savedCards.length > 0 && (
-                        <div className="mb-4">
-                          <p className="text-sm font-medium text-body mb-3">
-                            {locale === "en"
-                              ? "My Saved Cards"
-                              : "Kayıtlı Kartlarım"}
-                          </p>
-                          <div className="space-y-2">
-                            {savedCards.map((card) => (
-                              <label
-                                key={card.id}
-                                className={`flex items-center gap-3 p-3 border-2 rounded-lg cursor-pointer transition-all ${
-                                  !useNewCard && selectedSavedCard === card.id
-                                    ? "border-primary-500 bg-primary-50"
-                                    : "border-border hover:border-border"
-                                }`}
-                              >
-                                <Radio
-                                  name="savedCard"
-                                  checked={
-                                    !useNewCard && selectedSavedCard === card.id
-                                  }
-                                  onChange={() => {
-                                    setSelectedSavedCard(card.id);
-                                    setUseNewCard(false);
-                                  }}
-                                  className="text-primary-500"
-                                />
-                                <div className="flex-1">
-                                  <p className="font-medium text-heading">
-                                    {card.cardBrand} •••• {card.lastFour}
-                                  </p>
-                                  <p className="text-sm text-muted">
-                                    {card.expiryMonth
-                                      .toString()
-                                      .padStart(2, "0")}
-                                    /{card.expiryYear}
-                                  </p>
-                                </div>
-                                {card.isDefault && (
-                                  <span className="text-xs px-2 py-1 bg-primary-100 text-primary-700 rounded-sm">
-                                    {locale === "en" ? "Default" : "Varsayılan"}
-                                  </span>
-                                )}
-                              </label>
-                            ))}
-
-                            {/* New Card Option */}
-                            <label
-                              className={`flex items-center gap-3 p-3 border-2 rounded-lg cursor-pointer transition-all ${
-                                useNewCard
-                                  ? "border-primary-500 bg-primary-50"
-                                  : "border-border hover:border-border"
-                              }`}
-                            >
-                              <Radio
-                                name="savedCard"
-                                checked={useNewCard}
-                                onChange={() => setUseNewCard(true)}
-                                className="text-primary-500"
-                              />
-                              <div className="flex items-center gap-2">
-                                <PlusIcon className="w-5 h-5 text-muted" />
-                                <span className="font-medium text-heading">
-                                  {locale === "en"
-                                    ? "Pay with New Card"
-                                    : "Yeni Kart ile Öde"}
-                                </span>
-                              </div>
-                            </label>
-                          </div>
-                        </div>
-                      )}
-
-                      {/* New Card Form */}
-                      {(savedCards.length === 0 || useNewCard) && (
-                        <div className="space-y-4">
-                          <div>
-                            <label className="block text-sm font-medium text-body mb-1">
-                              {locale === "en"
-                                ? "Name on Card"
-                                : "Kart Üzerindeki İsim"}
-                            </label>
-                            <Input
-                              type="text"
-                              value={cardName}
-                              onChange={(e) =>
-                                setCardName(e.target.value.toUpperCase())
-                              }
-                              placeholder="AD SOYAD"
-                              className="h-12 px-4"
-                            />
-                          </div>
-                          <div>
-                            <label className="block text-sm font-medium text-body mb-1">
-                              {locale === "en"
-                                ? "Card Number"
-                                : "Kart Numarası"}
-                            </label>
-                            <Input
-                              type="text"
-                              value={cardNumber}
-                              onChange={(e) => {
-                                setCardError(null);
-                                const value = e.target.value
-                                  .replace(/\D/g, "")
-                                  .slice(0, 16);
-                                const formatted = value.replace(
-                                  /(\d{4})(?=\d)/g,
-                                  "$1 ",
-                                );
-                                setCardNumber(formatted);
-                              }}
-                              placeholder="4508 3456 7890 1234"
-                              className="h-12 px-4 font-mono"
-                            />
-                          </div>
-                          <div className="grid grid-cols-2 gap-4">
-                            <div>
-                              <label className="block text-sm font-medium text-body mb-1">
-                                {locale === "en"
-                                  ? "Expiry Date"
-                                  : "Son Kullanma Tarihi"}
-                              </label>
-                              <Input
-                                type="text"
-                                value={cardExpiry}
-                                onChange={(e) => {
-                                  const value = e.target.value
-                                    .replace(/\D/g, "")
-                                    .slice(0, 4);
-                                  if (value.length >= 2) {
-                                    setCardExpiry(
-                                      value.slice(0, 2) + "/" + value.slice(2),
-                                    );
-                                  } else {
-                                    setCardExpiry(value);
-                                  }
-                                }}
-                                placeholder="AA/YY"
-                                maxLength={5}
-                                className="h-12 px-4 font-mono"
-                              />
-                            </div>
-                            <div>
-                              <label className="block text-sm font-medium text-body mb-1">
-                                CVV/CVC
-                              </label>
-                              <Input
-                                type="password"
-                                value={cardCvc}
-                                onChange={(e) =>
-                                  setCardCvc(
-                                    e.target.value
-                                      .replace(/\D/g, "")
-                                      .slice(0, 3),
-                                  )
-                                }
-                                placeholder="•••"
-                                maxLength={3}
-                                className="h-12 px-4 font-mono"
-                              />
-                            </div>
-                          </div>
-
-                          <Checkbox
-                            checked={saveCard}
-                            onChange={(e) => setSaveCard(e.target.checked)}
-                            label={
-                              locale === "en"
-                                ? "Save this card for future purchases"
-                                : "Bu kartı gelecekteki alışverişlerim için kaydet"
-                            }
-                          />
-                        </div>
-                      )}
-
-                      {/* CVV for saved card */}
-                      {!useNewCard && selectedSavedCard && (
-                        <div className="mt-4">
-                          <label className="block text-sm font-medium text-body mb-1">
-                            CVV/CVC (
-                            {locale === "en"
-                              ? "Re-enter for security"
-                              : "Güvenlik için tekrar girin"}
-                            )
-                          </label>
-                          <Input
-                            type="password"
-                            value={cardCvc}
-                            onChange={(e) =>
-                              setCardCvc(
-                                e.target.value.replace(/\D/g, "").slice(0, 3),
-                              )
-                            }
-                            placeholder="•••"
-                            maxLength={3}
-                            className="w-32 h-12 px-4 font-mono"
-                          />
-                        </div>
-                      )}
-
-                      <div className="mt-4 flex items-center gap-2 text-xs text-muted">
-                        <ShieldCheckIcon className="w-4 h-4 text-success-500" />
+                    <div className="p-4 bg-surface border border-border rounded-lg flex items-start gap-3">
+                      <ShieldCheckIcon className="w-5 h-5 text-success-500 mt-0.5 flex-shrink-0" />
+                      <p className="text-sm text-muted">
                         {locale === "en"
-                          ? "256-bit SSL encrypted secure payment"
-                          : "256-bit SSL ile şifrelenmiş güvenli ödeme"}
-                      </div>
+                          ? "You will be redirected to the PayTR secure payment page to enter your card details. Your card information is never stored on our servers."
+                          : "Kart bilgilerinizi girmek için PayTR güvenli ödeme sayfasına yönlendirileceksiniz. Kart bilgileriniz sunucularımızda saklanmaz."}
+                      </p>
                     </div>
                   </div>
 

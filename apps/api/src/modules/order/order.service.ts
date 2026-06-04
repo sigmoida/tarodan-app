@@ -33,6 +33,7 @@ import { NotificationService } from '../notification/notification.service';
 import { NotificationType } from '../notification/dto';
 import { DiscountService, DiscountCalculator } from '../discount';
 import { SuratCargoService } from '../surat-cargo/surat-cargo.service';
+import { CommissionLedgerService } from '../commission/commission-ledger.service';
 import { mapSuratFailureToHttpException } from '../surat-cargo/surat-result.mapper';
 import type { SuratShipmentFailure } from '../surat-cargo/surat-cargo.types';
 import { SuratKargoTuru, SuratOdemeTipi, SuratTasimaSekli, SuratTeslimSekli, SuratGonderiSekli } from '../surat-cargo/surat-cargo.types';
@@ -71,6 +72,7 @@ export class OrderService {
     private readonly productLockService: ProductLockService,
     @Optional()
     private readonly storageService: StorageService,
+    private readonly commissionLedger: CommissionLedgerService,
   ) {}
 
   // Shipping cost defaults (overridden by PlatformSetting)
@@ -447,22 +449,45 @@ export class OrderService {
     // Map User.sellerType to CommissionSellerType
     const commissionSellerType = this.mapSellerTypeForCommission(
       seller?.sellerType ?? null,
-      seller?.membership?.tier?.type ?? null
+      seller?.membership?.tier?.type ?? null,
     );
 
-    // Fetch all active commission rules
-    const rules = await this.prisma.commissionRule.findMany({
+    // Tüm aktif kuralları çek (Faz 5.1)
+    const allActive = await this.prisma.commissionRule.findMany({
       where: { isActive: true },
       include: { category: true },
     });
 
-    this.logger.debug(`Found ${rules.length} active commission rules`);
+    this.logger.debug(`Found ${allActive.length} active commission rules`);
 
-    // Match by specificity (deterministic order, priority within same specificity)
-    const matchedRule = this.findMatchingRule(rules, categoryId, commissionSellerType);
+    // SELLER tarafı: appliesTo IN (SELLER, BOTH)
+    const sellerRules = allActive.filter(
+      (r) =>
+        r.appliesTo === CommissionAppliesTo.SELLER ||
+        r.appliesTo === CommissionAppliesTo.BOTH,
+    );
+    const sellerMatch = this.findMatchingRule(
+      sellerRules,
+      categoryId,
+      commissionSellerType,
+    );
 
-    if (!matchedRule) {
-      this.logger.warn('No matching commission rule found; applying 0 commission fallback');
+    // BUYER tarafı: appliesTo IN (BUYER, BOTH)
+    const buyerRules = allActive.filter(
+      (r) =>
+        r.appliesTo === CommissionAppliesTo.BUYER ||
+        r.appliesTo === CommissionAppliesTo.BOTH,
+    );
+    const buyerMatch = this.findMatchingRule(
+      buyerRules,
+      categoryId,
+      commissionSellerType,
+    );
+
+    if (!sellerMatch && !buyerMatch) {
+      this.logger.warn(
+        'No matching commission rule found; applying 0 commission fallback',
+      );
       return {
         buyerFeeAmount: 0,
         sellerFeeAmount: 0,
@@ -472,52 +497,50 @@ export class OrderService {
       };
     }
 
-    // Calculate fees
     const subtotal = amount;
-    const rawSellerFee = matchedRule.sellerRate
-      ? subtotal * (Number(matchedRule.sellerRate) / 100)
-      : 0;
-    const rawBuyerFee = matchedRule.buyerRate
-      ? subtotal * (Number(matchedRule.buyerRate) / 100)
-      : 0;
 
-    // Clamp per side independently
-    let sellerFee = this.clampAmount(
-      rawSellerFee,
-      matchedRule.sellerMin ? Number(matchedRule.sellerMin) : null,
-      matchedRule.sellerMax ? Number(matchedRule.sellerMax) : null
-    );
-    let buyerFee = this.clampAmount(
-      rawBuyerFee,
-      matchedRule.buyerMin ? Number(matchedRule.buyerMin) : null,
-      matchedRule.buyerMax ? Number(matchedRule.buyerMax) : null
-    );
-
-    // Apply appliesTo
-    if (matchedRule.appliesTo === CommissionAppliesTo.SELLER) {
-      buyerFee = 0;
+    // Seller fee
+    let sellerFee = 0;
+    if (sellerMatch && sellerMatch.sellerRate) {
+      const raw = subtotal * (Number(sellerMatch.sellerRate) / 100);
+      sellerFee = this.clampAmount(
+        raw,
+        sellerMatch.sellerMin ? Number(sellerMatch.sellerMin) : null,
+        sellerMatch.sellerMax ? Number(sellerMatch.sellerMax) : null,
+      );
     }
-    if (matchedRule.appliesTo === CommissionAppliesTo.BUYER) {
-      sellerFee = 0;
+
+    // Buyer fee
+    let buyerFee = 0;
+    if (buyerMatch && buyerMatch.buyerRate) {
+      const raw = subtotal * (Number(buyerMatch.buyerRate) / 100);
+      buyerFee = this.clampAmount(
+        raw,
+        buyerMatch.buyerMin ? Number(buyerMatch.buyerMin) : null,
+        buyerMatch.buyerMax ? Number(buyerMatch.buyerMax) : null,
+      );
     }
 
     const totalCommission = sellerFee + buyerFee;
 
     this.logger.log(
-      `Commission calculated: amount=${amount}, ` +
-      `sellerFee=${sellerFee}, buyerFee=${buyerFee}, ` +
-      `total=${totalCommission}, rule=${matchedRule.name}`
+      `Commission: amount=${amount} sellerFee=${sellerFee} (rule=${sellerMatch?.id ?? 'none'}) buyerFee=${buyerFee} (rule=${buyerMatch?.id ?? 'none'})`,
     );
 
+    // ruleId/ruleName legacy alanları: seller match öncelikli, yoksa buyer
+    const primary = sellerMatch ?? buyerMatch;
     return {
       buyerFeeAmount: buyerFee,
       sellerFeeAmount: sellerFee,
       commissionAmount: totalCommission,
-      ruleId: matchedRule.id,
-      ruleName: matchedRule.name,
-      // Legacy fields for backward compatibility
-      ruleType: matchedRule.ruleType,
-      appliedRate: matchedRule.sellerRate ? Number(matchedRule.sellerRate) : (matchedRule.buyerRate ? Number(matchedRule.buyerRate) : 0),
+      ruleId: primary?.id ?? null,
+      ruleName: primary?.name ?? null,
+      ruleType: primary?.ruleType,
+      appliedRate: sellerMatch?.sellerRate
+        ? Number(sellerMatch.sellerRate)
+        : buyerMatch?.buyerRate
+          ? Number(buyerMatch.buyerRate)
+          : 0,
     };
   }
 
@@ -991,6 +1014,7 @@ export class OrderService {
           buyerFeeAmount: commissionResult.buyerFeeAmount,
           sellerFeeAmount: commissionResult.sellerFeeAmount,
           status: OrderStatus.pending_payment,
+          paymentExpiresAt: new Date(Date.now() + 24 * 60 * 60 * 1000),
           shippingAddressId: shippingAddressId,
           shippingAddress: shippingAddressJson as Prisma.InputJsonValue,
         },
@@ -1209,6 +1233,7 @@ export class OrderService {
           buyerFeeAmount: commissionResult.buyerFeeAmount,
           sellerFeeAmount: commissionResult.sellerFeeAmount,
           status: OrderStatus.pending_payment,
+          paymentExpiresAt: new Date(Date.now() + 24 * 60 * 60 * 1000),
           shippingAddressId: dto.shippingAddressId,
           shippingAddress: offerShippingJson as Prisma.InputJsonValue | undefined,
         },
@@ -1626,6 +1651,7 @@ export class OrderService {
           buyerFeeAmount: commissionResult.buyerFeeAmount,
           sellerFeeAmount: commissionResult.sellerFeeAmount,
           status: OrderStatus.pending_payment,
+          paymentExpiresAt: new Date(Date.now() + 24 * 60 * 60 * 1000),
           shippingAddress: guestShippingJson as Prisma.InputJsonValue,
         },
         include: {
@@ -1911,6 +1937,11 @@ export class OrderService {
       [OrderStatus.delivered]: [
         { nextStatuses: [OrderStatus.completed], allowedBy: 'buyer' },
       ],
+      [OrderStatus.awaiting_buyer_confirmation]: [
+        { nextStatuses: [OrderStatus.completed], allowedBy: 'buyer' },   // manual_ok (confirmReceipt)
+        { nextStatuses: [OrderStatus.completed], allowedBy: 'system' },  // auto_timeout (cron)
+        { nextStatuses: [OrderStatus.refund_requested], allowedBy: 'buyer' },
+      ],
       [OrderStatus.completed]: [],
       [OrderStatus.cancelled]: [],
       [OrderStatus.refund_requested]: [
@@ -1965,6 +1996,203 @@ export class OrderService {
     });
 
     return await this.formatOrderResponse(updatedOrder, userId);
+  }
+
+  /**
+   * 48h pencere ortak tamamlama. Spec Bölüm 6.4.
+   * Atomik: status guard + ledger.markEarned + PaymentHold release.
+   */
+  async completeOrder(
+    orderId: string,
+    type: 'manual_ok' | 'auto_timeout' | 'admin_force',
+  ): Promise<{ completed: boolean }> {
+    const result = await this.prisma.$transaction(async (tx) => {
+      const now = new Date();
+
+      const updated = await tx.order.updateMany({
+        where: { id: orderId, status: OrderStatus.awaiting_buyer_confirmation },
+        data: {
+          status: OrderStatus.completed,
+          completedAt: now,
+          buyerConfirmedAt: now,
+          buyerConfirmationType: type as any,
+        },
+      });
+
+      if (updated.count === 0) {
+        this.logger.warn(
+          `completeOrder noop: order ${orderId} not in awaiting_buyer_confirmation`,
+        );
+        return { completed: false };
+      }
+
+      const ledgerResult = await this.commissionLedger.markEarned(orderId, tx);
+      if (!ledgerResult.updated) {
+        this.logger.warn(
+          `completeOrder: ledger not in pending for order ${orderId}`,
+        );
+      }
+
+      const holdUpdate = await tx.paymentHold.updateMany({
+        where: { orderId, status: 'held' as any },
+        data: {
+          status: 'released' as any,
+          releasedAt: now,
+          releaseAt: now,
+        },
+      });
+
+      this.logger.log(
+        `Order ${orderId} completed (type=${type}); ledger=${ledgerResult.updated}, hold=${holdUpdate.count}`,
+      );
+      return { completed: true };
+    });
+
+    // Tx commit sonrası bildirimler (non-blocking). Faz 3B.3.
+    if (result.completed) {
+      try {
+        const order = await this.prisma.order.findUnique({
+          where: { id: orderId },
+          select: { buyerId: true, sellerId: true },
+        });
+        if (order) {
+          if (type === 'manual_ok') {
+            await this.notificationService
+              .notifyOrderManuallyConfirmed(order.sellerId, orderId)
+              .catch((e) =>
+                this.logger.warn(`notify manual_ok failed: ${e.message}`),
+              );
+          } else if (type === 'auto_timeout') {
+            await Promise.allSettled([
+              this.notificationService.notifyOrderAutoCompleted(
+                order.buyerId,
+                orderId,
+              ),
+              this.notificationService.notifyOrderAutoCompleted(
+                order.sellerId,
+                orderId,
+              ),
+            ]);
+          } else if (type === 'admin_force') {
+            await Promise.allSettled([
+              this.notificationService.notifyOrderForceCompletedByAdmin(
+                order.buyerId,
+                orderId,
+              ),
+              this.notificationService.notifyOrderForceCompletedByAdmin(
+                order.sellerId,
+                orderId,
+              ),
+            ]);
+          }
+        }
+      } catch (e: any) {
+        this.logger.warn(
+          `completeOrder post-commit notify error for ${orderId}: ${e?.message}`,
+        );
+      }
+    }
+
+    return result;
+  }
+
+  /**
+   * Alıcının "Sorun yok" erken onay endpoint'i. Spec Bölüm 6.2.
+   */
+  async confirmReceipt(
+    orderId: string,
+    userId: string,
+  ): Promise<{ completed: boolean }> {
+    const order = await this.prisma.order.findUnique({
+      where: { id: orderId },
+      select: { id: true, buyerId: true, status: true },
+    });
+
+    if (!order) {
+      throw new NotFoundException('Sipariş bulunamadı');
+    }
+    if (order.buyerId !== userId) {
+      throw new ForbiddenException('Bu siparişi onaylama yetkiniz yok');
+    }
+    if (order.status !== OrderStatus.awaiting_buyer_confirmation) {
+      throw new BadRequestException(
+        `Sipariş bu aşamada onaylanamaz (mevcut durum: ${order.status})`,
+      );
+    }
+
+    const openRefund = await this.prisma.refundRequest.findFirst({
+      where: {
+        orderId,
+        status: {
+          in: [
+            'pending_review',
+            'approved',
+            'wait_for_delivery',
+            'return_shipment_open',
+            'return_in_transit',
+            'return_delivered',
+            'disputed',
+          ] as any,
+        },
+      },
+      select: { id: true },
+    });
+    if (openRefund) {
+      throw new BadRequestException(
+        'Açık bir iade talebi var; önce sonuçlanması gerek',
+      );
+    }
+
+    return this.completeOrder(orderId, 'manual_ok');
+  }
+
+  /**
+   * Admin force-complete: awaiting_buyer_confirmation → completed.
+   * Spec Bölüm 9.1. Audit log için reason parametresi.
+   */
+  async forceComplete(
+    orderId: string,
+    adminId: string,
+    reason?: string,
+  ): Promise<{ completed: boolean }> {
+    this.logger.log(
+      `Admin ${adminId} force-completing order ${orderId}. reason="${reason ?? ''}"`,
+    );
+    return this.completeOrder(orderId, 'admin_force');
+  }
+
+  /**
+   * Admin 48h penceresini uzatır.
+   * Spec Bölüm 9.1.
+   */
+  async extendConfirmation(
+    orderId: string,
+    adminId: string,
+    hours: number,
+    reason?: string,
+  ): Promise<{ newDeadline: Date }> {
+    const order = await this.prisma.order.findUnique({
+      where: { id: orderId },
+      select: { id: true, status: true, confirmationDeadline: true },
+    });
+    if (!order) throw new NotFoundException('Sipariş bulunamadı');
+    if (order.status !== OrderStatus.awaiting_buyer_confirmation) {
+      throw new BadRequestException(
+        'Sadece 48h penceresindeki siparişlerde uzatılabilir',
+      );
+    }
+
+    const base = order.confirmationDeadline ?? new Date();
+    const newDeadline = new Date(base.getTime() + hours * 3_600_000);
+    await this.prisma.order.update({
+      where: { id: orderId },
+      data: { confirmationDeadline: newDeadline },
+    });
+
+    this.logger.log(
+      `Admin ${adminId} extended confirmationDeadline of ${orderId} by ${hours}h → ${newDeadline.toISOString()} reason="${reason ?? ''}"`,
+    );
+    return { newDeadline };
   }
 
   /**
@@ -2050,6 +2278,12 @@ export class OrderService {
           data: { status: OfferStatus.cancelled },
         });
       }
+
+      // Ledger: paid/preparing'den iptalse pending → waived (Faz 3B.5).
+      // pending_payment'da ledger henüz yaratılmamıştır (PaymentService.processSuccessfulPayment'da
+      // upsert ediliyor); markWaived noop döner. Spec Bölüm 7.4 (buyer-initiated)
+      // ile uyumlu — komisyon alınmaz çünkü iş tamamlanmadı.
+      await this.commissionLedger.markWaived(orderId, 'buyer_cancelled', tx);
 
       // Note: Refund will be handled by PaymentModule when status is 'refunded'
 

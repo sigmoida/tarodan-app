@@ -1,335 +1,343 @@
-import React, { useState, useEffect, useCallback } from 'react';
-import {
-  View,
-  Text,
-  FlatList,
-  TouchableOpacity,
-  StyleSheet,
-  ActivityIndicator,
-  Image,
-  RefreshControl,
-  Dimensions,
-} from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
-import { router, useLocalSearchParams } from 'expo-router';
+import React from 'react';
+import { View, ScrollView, StyleSheet, Image, TouchableOpacity, Dimensions } from 'react-native';
+import { theme, Spinner, Text, EmptyState } from '@tarodan/ui-native';
+import { useLocalSearchParams, router } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
-import { TarodanColors, CONDITIONS } from '../../src/theme/colors';
-import { api, productsApi } from '../../src/services/api';
+import { useQuery } from '@tanstack/react-query';
+import { ScreenHeader } from '../../src/components/common';
+import { CONDITIONS } from '../../src/theme';
+import { carModelsApi, productsApi } from '../../src/services/api';
 import { transformImageUrl } from '../../src/utils/imageUrl';
+import { formatPrice } from '../../src/utils/format';
 
+const { colors } = theme;
 const { width } = Dimensions.get('window');
-const CARD_WIDTH = (width - 48) / 2;
+const CARD_WIDTH = (width - 16 * 2 - 12) / 2; // 2 sütun, 16 padding, 12 gap
 
-const getConditionInfo = (condition: string) => {
-  const found = CONDITIONS.find((c) => c.id === condition);
-  return found || { name: condition || 'Belirtilmemiş', color: TarodanColors.textTertiary };
-};
+/**
+ * Tek bir araba modelinin detayı + bu modele ait ürünler.
+ * Web `apps/web/src/app/models/[slug]/page.tsx` paritesi.
+ */
+
+interface Brand {
+  id: string;
+  name: string;
+  slug: string;
+  logo?: string | null;
+  country?: string | null;
+}
+
+interface CarModelDetail {
+  id: string;
+  name: string;
+  slug: string;
+  image?: string | null;
+  description?: string | null;
+  yearStart?: number | null;
+  yearEnd?: number | null;
+  brand: Brand;
+  productCount?: number;
+}
+
+interface Product {
+  id: string;
+  title: string;
+  price: number;
+  originalPrice?: number;
+  salePrice?: number;
+  images?: Array<{ url: string } | string>;
+  condition?: string;
+  seller?: { displayName?: string };
+}
 
 export default function ModelDetailScreen() {
   const { slug } = useLocalSearchParams<{ slug: string }>();
-  const [model, setModel] = useState<any>(null);
-  const [products, setProducts] = useState<any[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [refreshing, setRefreshing] = useState(false);
+  const slugStr = String(slug ?? '');
 
-  const fetchData = useCallback(async () => {
-    if (!slug) return;
-    try {
-      const [modelRes, productsRes] = await Promise.all([
-        api.get(`/car-models/slug/${slug}`),
-        productsApi.getAll({ carModelSlug: slug }),
-      ]);
-      setModel(modelRes.data?.data || modelRes.data);
-      setProducts(productsRes.data?.data || productsRes.data?.products || []);
-    } catch (err) {
-      console.log('Model detail fetch error:', err);
-    } finally {
-      setLoading(false);
-    }
-  }, [slug]);
+  const modelQuery = useQuery({
+    queryKey: ['car-model', slugStr],
+    queryFn: async () => {
+      const response = await carModelsApi.findBySlug(slugStr);
+      return (response.data as any) as CarModelDetail | null;
+    },
+    enabled: !!slugStr,
+  });
 
-  useEffect(() => {
-    fetchData();
-  }, [fetchData]);
+  const productsQuery = useQuery({
+    queryKey: ['model-products', slugStr],
+    queryFn: async () => {
+      try {
+        const response = await productsApi.getAll({ carModel: slugStr, limit: 50 });
+        const data: any = response.data;
+        const items: Product[] = data?.items ?? data?.data ?? data ?? [];
+        return Array.isArray(items) ? items : [];
+      } catch {
+        return [];
+      }
+    },
+    enabled: !!slugStr,
+  });
 
-  const onRefresh = useCallback(async () => {
-    setRefreshing(true);
-    await fetchData();
-    setRefreshing(false);
-  }, [fetchData]);
+  const model = modelQuery.data;
+  const products = productsQuery.data ?? [];
 
-  const getImageUrl = (item: any) => {
-    const img = Array.isArray(item.images) ? item.images[0] : item.images;
-    return transformImageUrl(img);
+  const getImageUri = (p: Product) => {
+    const first = p.images?.[0];
+    if (!first) return undefined;
+    const url = typeof first === 'string' ? first : first.url;
+    return transformImageUrl(url);
   };
 
-  const renderProductCard = ({ item }: { item: any }) => {
-    const condition = getConditionInfo(item.condition);
+  const conditionLabel = (c?: string) =>
+    CONDITIONS.find((x) => x.id === c)?.name ?? c ?? '';
+
+  if (modelQuery.isLoading) {
     return (
-      <TouchableOpacity
-        style={styles.productCard}
-        activeOpacity={0.7}
-        onPress={() => router.push(`/product/${item.id}`)}
-      >
-        <View style={styles.productImageContainer}>
-          <Image source={{ uri: getImageUrl(item) }} style={styles.productImage} />
-          <View style={[styles.conditionBadge, { backgroundColor: condition.color }]}>
-            <Text style={styles.conditionText}>{condition.name}</Text>
-          </View>
+      <View style={styles.container}>
+        <ScreenHeader title="Model" />
+        <View style={styles.loading}>
+          <Spinner size="lg" />
         </View>
-        <View style={styles.productContent}>
-          <Text style={styles.productTitle} numberOfLines={2}>{item.title}</Text>
-          <Text style={styles.productPrice}>₺{item.price?.toLocaleString('tr-TR')}</Text>
-        </View>
-      </TouchableOpacity>
+      </View>
     );
-  };
+  }
 
-  const ListHeader = () => (
-    <View style={styles.modelInfo}>
-      <View style={styles.modelIconContainer}>
-        <Ionicons name="car-sport" size={32} color={TarodanColors.primary} />
-      </View>
-      <Text style={styles.modelName}>{model?.name || 'Model'}</Text>
-      {model?.brand?.name ? (
-        <View style={styles.brandRow}>
-          <Ionicons name="pricetag-outline" size={16} color={TarodanColors.textSecondary} />
-          <Text style={styles.brandText}>{model.brand.name}</Text>
-        </View>
-      ) : null}
-      {model?.description ? (
-        <Text style={styles.modelDescription}>{model.description}</Text>
-      ) : null}
-      <View style={styles.modelStats}>
-        <View style={styles.statItem}>
-          <Ionicons name="cube-outline" size={18} color={TarodanColors.primary} />
-          <Text style={styles.statText}>{products.length} ürün</Text>
-        </View>
-      </View>
-      <Text style={styles.sectionTitle}>Ürünler</Text>
-    </View>
-  );
-
-  if (loading) {
+  if (modelQuery.isError || !model) {
     return (
-      <SafeAreaView style={styles.container} edges={['top']}>
-        <View style={styles.header}>
-          <TouchableOpacity onPress={() => router.back()} style={styles.headerBtn}>
-            <Ionicons name="arrow-back" size={24} color={TarodanColors.textOnPrimary} />
-          </TouchableOpacity>
-          <Text style={styles.headerTitle}>Model</Text>
-          <View style={styles.headerBtn} />
-        </View>
-        <View style={styles.centered}>
-          <ActivityIndicator size="large" color={TarodanColors.primary} />
-          <Text style={styles.loadingText}>Yükleniyor...</Text>
-        </View>
-      </SafeAreaView>
+      <View style={styles.container}>
+        <ScreenHeader title="Model" />
+        <EmptyState
+          icon="sad-outline"
+          title="Model bulunamadı"
+          subtitle="Aradığınız model mevcut değil."
+          actionLabel="Modellere Dön"
+          onAction={() => router.replace('/models' as any)}
+        />
+      </View>
     );
   }
 
   return (
-    <SafeAreaView style={styles.container} edges={['top']}>
-      <View style={styles.header}>
-        <TouchableOpacity onPress={() => router.back()} style={styles.headerBtn}>
-          <Ionicons name="arrow-back" size={24} color={TarodanColors.textOnPrimary} />
-        </TouchableOpacity>
-        <Text style={styles.headerTitle} numberOfLines={1}>{model?.name || 'Model'}</Text>
-        <View style={styles.headerBtn} />
-      </View>
+    <View style={styles.container}>
+      <ScreenHeader title={model.name} subtitle={model.brand?.name} />
 
-      <FlatList
-        data={products}
-        keyExtractor={(item) => String(item.id)}
-        numColumns={2}
-        columnWrapperStyle={styles.row}
-        contentContainerStyle={styles.listContent}
-        renderItem={renderProductCard}
-        ListHeaderComponent={ListHeader}
-        refreshControl={
-          <RefreshControl refreshing={refreshing} onRefresh={onRefresh} colors={[TarodanColors.primary]} />
-        }
-        ListEmptyComponent={
-          <View style={styles.emptyContainer}>
-            <Ionicons name="cube-outline" size={64} color={TarodanColors.textTertiary} />
-            <Text style={styles.emptyTitle}>Ürün bulunamadı</Text>
-            <Text style={styles.emptySubtitle}>Bu modelde henüz ürün yok</Text>
+      <ScrollView contentContainerStyle={{ paddingBottom: 32 }}>
+        {/* Hero */}
+        <View style={styles.hero}>
+          {model.image ? (
+            <Image source={{ uri: transformImageUrl(model.image) }} style={styles.heroImage} resizeMode="cover" />
+          ) : (
+            <View style={[styles.heroImage, styles.heroFallback]}>
+              <Ionicons name="car-sport" size={64} color={colors.text.subtle} />
+            </View>
+          )}
+          <View style={styles.heroOverlay}>
+            <View style={styles.brandRow}>
+              {model.brand?.logo ? (
+                <Image
+                  source={{ uri: transformImageUrl(model.brand.logo) }}
+                  style={styles.brandLogo}
+                />
+              ) : null}
+              <Text style={styles.brandName}>{model.brand?.name}</Text>
+            </View>
+            <Text style={styles.modelName}>{model.name}</Text>
+            {(model.yearStart || model.yearEnd) ? (
+              <Text style={styles.yearLabel}>
+                {model.yearStart ?? '?'}{model.yearEnd ? ` - ${model.yearEnd}` : ' - günümüz'}
+              </Text>
+            ) : null}
           </View>
-        }
-      />
-    </SafeAreaView>
+        </View>
+
+        {model.description ? (
+          <View style={styles.descriptionWrap}>
+            <Text style={styles.description}>{model.description}</Text>
+          </View>
+        ) : null}
+
+        {/* Ürünler */}
+        <View style={styles.productsSection}>
+          <View style={styles.productsHeader}>
+            <Text style={styles.sectionTitle}>{model.name} İçin Diecast Modeller</Text>
+            <Text style={styles.productCount}>
+              {productsQuery.isLoading ? '...' : `${products.length} ürün`}
+            </Text>
+          </View>
+
+          {productsQuery.isLoading ? (
+            <Spinner size="lg" />
+          ) : products.length === 0 ? (
+            <EmptyState
+              icon="cube-outline"
+              title="Henüz ürün yok"
+              subtitle="Bu model için henüz diecast ürün listelenmemiş."
+            />
+          ) : (
+            <View style={styles.productsGrid}>
+              {products.map((p) => (
+                <TouchableOpacity
+                  key={p.id}
+                  style={styles.productCard}
+                  onPress={() => router.push({ pathname: '/product/[id]', params: { id: p.id } } as any)}
+                >
+                  {getImageUri(p) ? (
+                    <Image source={{ uri: getImageUri(p) }} style={styles.productImage} />
+                  ) : (
+                    <View style={[styles.productImage, styles.productImageFallback]}>
+                      <Ionicons name="cube-outline" size={32} color={colors.text.subtle} />
+                    </View>
+                  )}
+                  <View style={styles.productBody}>
+                    <Text style={styles.productTitle} numberOfLines={2}>
+                      {p.title}
+                    </Text>
+                    <Text style={styles.productPrice}>{formatPrice(p.salePrice ?? p.price)}</Text>
+                    {p.condition ? (
+                      <Text style={styles.productCondition}>{conditionLabel(p.condition)}</Text>
+                    ) : null}
+                  </View>
+                </TouchableOpacity>
+              ))}
+            </View>
+          )}
+        </View>
+      </ScrollView>
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: TarodanColors.backgroundSecondary,
+    backgroundColor: colors.surface.alt,
   },
-  header: {
-    backgroundColor: TarodanColors.primary,
-    paddingBottom: 16,
-    paddingHorizontal: 20,
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-  },
-  headerBtn: {
-    width: 32,
-    height: 32,
+  loading: {
+    flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
   },
-  headerTitle: {
-    fontSize: 18,
-    fontWeight: 'bold',
-    color: TarodanColors.textOnPrimary,
-    maxWidth: width * 0.6,
+  hero: {
+    position: 'relative',
+    backgroundColor: colors.gray[50],
   },
-  modelInfo: {
-    backgroundColor: TarodanColors.background,
-    padding: 24,
+  heroImage: {
+    width: '100%',
+    aspectRatio: 16 / 9,
+  },
+  heroFallback: {
     alignItems: 'center',
-    marginBottom: 8,
-  },
-  modelIconContainer: {
-    width: 72,
-    height: 72,
-    borderRadius: 36,
-    backgroundColor: TarodanColors.primaryLight,
     justifyContent: 'center',
-    alignItems: 'center',
-    marginBottom: 12,
   },
-  modelName: {
-    fontSize: 22,
-    fontWeight: 'bold',
-    color: TarodanColors.textPrimary,
-    textAlign: 'center',
+  heroOverlay: {
+    position: 'absolute',
+    left: 0,
+    right: 0,
+    bottom: 0,
+    padding: 16,
+    backgroundColor: colors.overlay.black50,
   },
   brandRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginTop: 6,
-    gap: 6,
+    gap: 8,
+    marginBottom: 4,
   },
-  brandText: {
-    fontSize: 14,
-    color: TarodanColors.textSecondary,
+  brandLogo: {
+    width: 24,
+    height: 24,
+    borderRadius: 12,
+    backgroundColor: colors.white,
   },
-  modelDescription: {
-    fontSize: 14,
-    color: TarodanColors.textSecondary,
-    textAlign: 'center',
-    marginTop: 8,
-    lineHeight: 20,
-    paddingHorizontal: 16,
-  },
-  modelStats: {
-    flexDirection: 'row',
-    marginTop: 16,
-    paddingTop: 16,
-    borderTopWidth: 1,
-    borderTopColor: TarodanColors.border,
-    width: '100%',
-    justifyContent: 'center',
-  },
-  statItem: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 6,
-  },
-  statText: {
-    fontSize: 14,
+  brandName: {
+    fontSize: 13,
+    color: colors.white,
     fontWeight: '600',
-    color: TarodanColors.textSecondary,
+    opacity: 0.9,
+  },
+  modelName: {
+    fontSize: 24,
+    fontWeight: 'bold',
+    color: colors.white,
+  },
+  yearLabel: {
+    fontSize: 13,
+    color: colors.white,
+    opacity: 0.8,
+    marginTop: 2,
+  },
+  descriptionWrap: {
+    backgroundColor: colors.surface.DEFAULT,
+    padding: 16,
+    marginBottom: 12,
+  },
+  description: {
+    fontSize: 14,
+    lineHeight: 20,
+    color: colors.text.heading,
+  },
+  productsSection: {
+    backgroundColor: colors.surface.DEFAULT,
+    paddingVertical: 12,
+  },
+  productsHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingHorizontal: 16,
+    marginBottom: 12,
   },
   sectionTitle: {
+    flex: 1,
     fontSize: 16,
-    fontWeight: 'bold',
-    color: TarodanColors.textPrimary,
-    alignSelf: 'flex-start',
-    marginTop: 24,
+    fontWeight: '700',
+    color: colors.text.heading,
   },
-  listContent: {
+  productCount: {
+    fontSize: 12,
+    color: colors.text.muted,
+    fontWeight: '500',
+  },
+  productsGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
     paddingHorizontal: 16,
-    paddingBottom: 32,
-  },
-  row: {
-    justifyContent: 'space-between',
-    marginBottom: 12,
+    gap: 12,
   },
   productCard: {
     width: CARD_WIDTH,
-    backgroundColor: TarodanColors.background,
-    borderRadius: 12,
+    backgroundColor: colors.gray[50],
+    borderRadius: 10,
     overflow: 'hidden',
-    elevation: 2,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.1,
-    shadowRadius: 3,
-  },
-  productImageContainer: {
-    position: 'relative',
+    marginBottom: 12,
   },
   productImage: {
     width: '100%',
-    height: CARD_WIDTH * 0.9,
-    backgroundColor: TarodanColors.surfaceVariant,
+    aspectRatio: 1,
+    backgroundColor: colors.border.subtle,
   },
-  conditionBadge: {
-    position: 'absolute',
-    top: 8,
-    left: 8,
-    paddingHorizontal: 8,
-    paddingVertical: 3,
-    borderRadius: 6,
+  productImageFallback: {
+    alignItems: 'center',
+    justifyContent: 'center',
   },
-  conditionText: {
-    fontSize: 10,
-    fontWeight: 'bold',
-    color: '#fff',
-  },
-  productContent: {
-    padding: 12,
+  productBody: {
+    padding: 10,
   },
   productTitle: {
     fontSize: 13,
-    fontWeight: '600',
-    color: TarodanColors.textPrimary,
-    marginBottom: 6,
+    fontWeight: '500',
+    color: colors.text.heading,
+    minHeight: 34,
   },
   productPrice: {
-    fontSize: 16,
+    fontSize: 15,
     fontWeight: 'bold',
-    color: TarodanColors.price,
+    color: colors.primary[600]!,
+    marginTop: 4,
   },
-  centered: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-    padding: 32,
-  },
-  loadingText: {
-    marginTop: 12,
-    fontSize: 14,
-    color: TarodanColors.textSecondary,
-  },
-  emptyContainer: {
-    paddingVertical: 60,
-    alignItems: 'center',
-  },
-  emptyTitle: {
-    marginTop: 16,
-    fontSize: 18,
-    fontWeight: 'bold',
-    color: TarodanColors.textPrimary,
-  },
-  emptySubtitle: {
-    marginTop: 8,
-    fontSize: 14,
-    color: TarodanColors.textSecondary,
-    textAlign: 'center',
+  productCondition: {
+    fontSize: 11,
+    color: colors.text.muted,
+    marginTop: 2,
   },
 });

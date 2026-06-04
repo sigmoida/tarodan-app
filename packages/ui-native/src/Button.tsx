@@ -1,4 +1,5 @@
 import React from 'react';
+import { Ionicons } from '@expo/vector-icons';
 import {
   ActivityIndicator,
   Pressable,
@@ -10,6 +11,8 @@ import {
   type ViewStyle,
 } from 'react-native';
 import { theme } from './theme';
+
+type IoniconName = React.ComponentProps<typeof Ionicons>['name'];
 
 export type ButtonVariant =
   | 'primary'
@@ -24,8 +27,12 @@ export interface ButtonProps extends Omit<PressableProps, 'style'> {
   variant?: ButtonVariant;
   size?: ButtonSize;
   isLoading?: boolean;
+  /** Pass a custom node (e.g. an SVG). Takes precedence over `icon`. */
   leftIcon?: React.ReactNode;
   rightIcon?: React.ReactNode;
+  /** Convenience: render an Ionicon by name. Position controlled by `iconPosition`. */
+  icon?: IoniconName;
+  iconPosition?: 'left' | 'right';
   fullWidth?: boolean;
   children?: React.ReactNode;
   /** Button label. Alias for children; useful when passing icons via slots. */
@@ -51,6 +58,8 @@ const sizeStyle: Record<ButtonSize, { height: number; px: number; font: number }
   lg: { height: 52, px: spacing[6], font: typography.fontSize.lg },
 };
 
+const iconSizeMap: Record<ButtonSize, number> = { sm: 16, md: 18, lg: 20 };
+
 export const Button: React.FC<ButtonProps> = ({
   variant = 'primary',
   size = 'md',
@@ -58,6 +67,8 @@ export const Button: React.FC<ButtonProps> = ({
   disabled,
   leftIcon,
   rightIcon,
+  icon,
+  iconPosition = 'left',
   children,
   title,
   style,
@@ -68,6 +79,11 @@ export const Button: React.FC<ButtonProps> = ({
   const vs = variantStyle[variant];
   const ss = sizeStyle[size];
   const label = title ?? children;
+  const ionIconNode = icon ? (
+    <Ionicons name={icon} size={iconSizeMap[size]} color={vs.text} />
+  ) : null;
+  const resolvedLeftIcon = leftIcon ?? (iconPosition === 'left' ? ionIconNode : null);
+  const resolvedRightIcon = rightIcon ?? (iconPosition === 'right' ? ionIconNode : null);
 
   return (
     <Pressable
@@ -92,7 +108,7 @@ export const Button: React.FC<ButtonProps> = ({
         <ActivityIndicator color={vs.text} />
       ) : (
         <View style={styles.row}>
-          {leftIcon && <View style={styles.iconLeft}>{leftIcon}</View>}
+          {resolvedLeftIcon && <View style={styles.iconLeft}>{resolvedLeftIcon}</View>}
           {typeof label === 'string' ? (
             <Text
               style={[
@@ -106,7 +122,7 @@ export const Button: React.FC<ButtonProps> = ({
           ) : (
             label
           )}
-          {rightIcon && <View style={styles.iconRight}>{rightIcon}</View>}
+          {resolvedRightIcon && <View style={styles.iconRight}>{resolvedRightIcon}</View>}
         </View>
       )}
     </Pressable>

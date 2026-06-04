@@ -18,9 +18,12 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import * as ImagePicker from 'expo-image-picker';
 import { router } from 'expo-router';
-import { TarodanColors } from '../../src/theme/colors';
+import { theme } from '@tarodan/ui-native';
+
+const { colors } = theme;
 import { useAuthStore } from '../../src/stores/authStore';
-import { api, productsApi, categoriesApi, mediaApi, listingsApi } from '../../src/services/api';
+// listingsApi → productsApi alias (parite migrasyonu)
+import { api, productsApi, productsApi as listingsApi, categoriesApi, mediaApi } from '../../src/services/api';
 
 // ---------------------------------------------------------------------------
 // Types
@@ -259,7 +262,8 @@ export default function SellScreen() {
   const fetchFilters = async () => {
     setBrandsLoading(true);
     try {
-      const res = await listingsApi.getFilters();
+      // listingsApi.getFilters yok; web ile aynı: GET /products/filters
+      const res = await api.get('/products/filters');
       const data = res.data as {
         scales?: string[];
         materials?: MaterialOption[];
@@ -374,7 +378,10 @@ export default function SellScreen() {
         } as any);
       });
 
-      const res = await mediaApi.uploadProductImages(formData);
+      // mediaApi.uploadProductImages now expects RNFile[]; bu ekran hâlâ FormData üretiyor → raw axios fallback.
+      const res = await api.post('/media/upload/product', formData, {
+        headers: { 'Content-Type': 'multipart/form-data' },
+      });
       const uploaded = Array.isArray(res.data) ? res.data : [res.data];
 
       const newKeys = uploaded.map((r: any) => ({
@@ -570,7 +577,7 @@ export default function SellScreen() {
               <TextInput
                 style={styles.modalSearch}
                 placeholder="Ara..."
-                placeholderTextColor={TarodanColors.textTertiary}
+                placeholderTextColor={colors.text.subtle}
                 value={searchValue}
                 onChangeText={onSearchChange}
                 autoCorrect={false}
@@ -578,7 +585,7 @@ export default function SellScreen() {
             )}
 
             {loading ? (
-              <ActivityIndicator size="large" color={TarodanColors.primary} style={{ marginTop: 32 }} />
+              <ActivityIndicator size="large" color={colors.primary[600]!} style={{ marginTop: 32 }} />
             ) : (
               <FlatList
                 data={filtered}
@@ -623,7 +630,7 @@ export default function SellScreen() {
   if (authLoading) {
     return (
       <SafeAreaView style={styles.centered}>
-        <ActivityIndicator size="large" color={TarodanColors.primary} />
+        <ActivityIndicator size="large" color={colors.primary[600]!} />
       </SafeAreaView>
     );
   }
@@ -665,7 +672,7 @@ export default function SellScreen() {
           {/* Listing Limits */}
           {limitsLoading ? (
             <View style={styles.limitsPlaceholder}>
-              <ActivityIndicator size="small" color={TarodanColors.primary} />
+              <ActivityIndicator size="small" color={colors.primary[600]!} />
             </View>
           ) : listingLimits ? (
             <View
@@ -744,7 +751,7 @@ export default function SellScreen() {
                 disabled={uploadingImages}
               >
                 {uploadingImages ? (
-                  <ActivityIndicator size="small" color={TarodanColors.primary} />
+                  <ActivityIndicator size="small" color={colors.primary[600]!} />
                 ) : (
                   <>
                     <Text style={styles.imageUploadIcon}>📷</Text>
@@ -799,7 +806,7 @@ export default function SellScreen() {
               value={title}
               onChangeText={setTitle}
               placeholder="Örn: Hot Wheels '69 Camaro Z28"
-              placeholderTextColor={TarodanColors.textTertiary}
+              placeholderTextColor={colors.text.subtle}
               maxLength={200}
             />
             <Text style={styles.charCount}>{title.length}/200</Text>
@@ -811,7 +818,7 @@ export default function SellScreen() {
               value={description}
               onChangeText={setDescription}
               placeholder="Ürün hakkında detaylı bilgi..."
-              placeholderTextColor={TarodanColors.textTertiary}
+              placeholderTextColor={colors.text.subtle}
               multiline
               maxLength={5000}
               textAlignVertical="top"
@@ -1011,8 +1018,8 @@ export default function SellScreen() {
                 <Switch
                   value={isTradeEnabled}
                   onValueChange={setIsTradeEnabled}
-                  trackColor={{ false: '#D1D5DB', true: TarodanColors.accent }}
-                  thumbColor="#fff"
+                  trackColor={{ false: colors.gray[300], true: colors.warning[500]! }}
+                  thumbColor={colors.white}
                 />
               ) : (
                 <TouchableOpacity onPress={() => router.push('/(tabs)/profile')}>
@@ -1032,8 +1039,8 @@ export default function SellScreen() {
               <Switch
                 value={isSet}
                 onValueChange={setIsSet}
-                trackColor={{ false: '#D1D5DB', true: TarodanColors.accentBlue }}
-                thumbColor="#fff"
+                trackColor={{ false: colors.gray[300], true: colors.info[600]! }}
+                thumbColor={colors.white}
               />
             </View>
           </View>
@@ -1053,7 +1060,7 @@ export default function SellScreen() {
               value={price}
               onChangeText={setPrice}
               placeholder="0.00"
-              placeholderTextColor={TarodanColors.textTertiary}
+              placeholderTextColor={colors.text.subtle}
               keyboardType="decimal-pad"
             />
 
@@ -1064,7 +1071,7 @@ export default function SellScreen() {
               value={quantity}
               onChangeText={setQuantity}
               placeholder="Sınırsız"
-              placeholderTextColor={TarodanColors.textTertiary}
+              placeholderTextColor={colors.text.subtle}
               keyboardType="number-pad"
             />
             <Text style={styles.hint}>Boş bırakırsanız sınırsız stok</Text>
@@ -1076,7 +1083,7 @@ export default function SellScreen() {
                 {commissionLoading ? (
                   <ActivityIndicator
                     size="small"
-                    color={TarodanColors.textTertiary}
+                    color={colors.text.subtle}
                     style={{ marginTop: 4 }}
                   />
                 ) : commissionPreview ? (
@@ -1120,7 +1127,7 @@ export default function SellScreen() {
               disabled={isSubmitting}
             >
               {isSubmitting ? (
-                <ActivityIndicator size="small" color="#fff" />
+                <ActivityIndicator size="small" color={colors.white} />
               ) : (
                 <Text style={styles.submitButtonText}>İlanı Oluştur</Text>
               )}
@@ -1231,18 +1238,18 @@ export default function SellScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: TarodanColors.backgroundSecondary,
+    backgroundColor: colors.surface.alt,
   },
   centered: {
     flex: 1,
-    backgroundColor: TarodanColors.background,
+    backgroundColor: colors.surface.DEFAULT,
     justifyContent: 'center',
     alignItems: 'center',
     padding: 24,
   },
   authText: {
     fontSize: 16,
-    color: TarodanColors.textSecondary,
+    color: colors.text.muted,
     marginBottom: 16,
     textAlign: 'center',
   },
@@ -1256,18 +1263,18 @@ const styles = StyleSheet.create({
   pageTitle: {
     fontSize: 22,
     fontWeight: '700',
-    color: TarodanColors.textPrimary,
+    color: colors.text.heading,
   },
   pageSubtitle: {
     fontSize: 14,
-    color: TarodanColors.textSecondary,
+    color: colors.text.muted,
     marginTop: 4,
     marginBottom: 16,
   },
 
   // Limits
   limitsPlaceholder: {
-    backgroundColor: TarodanColors.backgroundTertiary,
+    backgroundColor: colors.gray[200],
     borderRadius: 10,
     padding: 16,
     marginBottom: 16,
@@ -1280,16 +1287,16 @@ const styles = StyleSheet.create({
     borderWidth: 1,
   },
   limitsOk: {
-    backgroundColor: '#F0FDF4',
-    borderColor: '#BBF7D0',
+    backgroundColor: colors.success[50]!,
+    borderColor: colors.success[200]!,
   },
   limitsExceeded: {
-    backgroundColor: '#FEF2F2',
-    borderColor: '#FECACA',
+    backgroundColor: colors.danger[50]!,
+    borderColor: colors.danger[200]!,
   },
   limitsPremium: {
-    backgroundColor: '#FFFBEB',
-    borderColor: '#FDE68A',
+    backgroundColor: colors.warning[50]!,
+    borderColor: colors.warning[200]!,
   },
   limitsRow: {
     flexDirection: 'row',
@@ -1300,28 +1307,28 @@ const styles = StyleSheet.create({
     fontSize: 14,
     fontWeight: '600',
   },
-  limitsTitleOk: { color: '#166534' },
-  limitsTitleExceeded: { color: '#991B1B' },
-  limitsTitlePremium: { color: '#92400E' },
+  limitsTitleOk: { color: colors.success[800]! },
+  limitsTitleExceeded: { color: colors.danger[800]! },
+  limitsTitlePremium: { color: colors.warning[800]! },
   limitsRemaining: {
     fontSize: 12,
-    color: TarodanColors.textTertiary,
+    color: colors.text.subtle,
     marginTop: 2,
   },
   upgradeButton: {
-    backgroundColor: TarodanColors.primary,
+    backgroundColor: colors.primary[600]!,
     paddingHorizontal: 14,
     paddingVertical: 8,
     borderRadius: 8,
   },
   upgradeButtonText: {
-    color: '#fff',
+    color: colors.white,
     fontSize: 13,
     fontWeight: '600',
   },
   progressBar: {
     height: 6,
-    backgroundColor: '#E5E7EB',
+    backgroundColor: colors.gray[200],
     borderRadius: 3,
     marginTop: 10,
     overflow: 'hidden',
@@ -1330,20 +1337,20 @@ const styles = StyleSheet.create({
     height: '100%',
     borderRadius: 3,
   },
-  progressFillOk: { backgroundColor: TarodanColors.accent },
-  progressFillExceeded: { backgroundColor: TarodanColors.error },
+  progressFillOk: { backgroundColor: colors.warning[500]! },
+  progressFillExceeded: { backgroundColor: colors.danger[600]! },
 
   // Card
   card: {
-    backgroundColor: '#fff',
+    backgroundColor: colors.white,
     borderRadius: 12,
     padding: 16,
     marginBottom: 16,
     borderWidth: 1,
-    borderColor: TarodanColors.borderLight,
+    borderColor: colors.border.subtle,
     ...Platform.select({
       ios: {
-        shadowColor: '#000',
+        shadowColor: colors.black,
         shadowOffset: { width: 0, height: 1 },
         shadowOpacity: 0.06,
         shadowRadius: 4,
@@ -1356,7 +1363,7 @@ const styles = StyleSheet.create({
   sectionHeader: {
     fontSize: 12,
     fontWeight: '700',
-    color: TarodanColors.textSecondary,
+    color: colors.text.muted,
     letterSpacing: 1,
     marginBottom: 14,
   },
@@ -1365,34 +1372,34 @@ const styles = StyleSheet.create({
   label: {
     fontSize: 14,
     fontWeight: '600',
-    color: TarodanColors.textSecondary,
+    color: colors.text.muted,
     marginBottom: 6,
   },
   required: {
-    color: TarodanColors.error,
+    color: colors.danger[600]!,
   },
   charCount: {
     fontSize: 11,
-    color: TarodanColors.textTertiary,
+    color: colors.text.subtle,
     textAlign: 'right',
     marginTop: 2,
   },
   hint: {
     fontSize: 12,
-    color: TarodanColors.textTertiary,
+    color: colors.text.subtle,
     marginTop: 4,
   },
 
   // Inputs
   input: {
     borderWidth: 1,
-    borderColor: TarodanColors.border,
+    borderColor: colors.border.DEFAULT,
     borderRadius: 10,
     paddingHorizontal: 14,
     paddingVertical: 12,
     fontSize: 15,
-    color: TarodanColors.textPrimary,
-    backgroundColor: '#fff',
+    color: colors.text.heading,
+    backgroundColor: colors.white,
   },
   textArea: {
     minHeight: 100,
@@ -1402,32 +1409,32 @@ const styles = StyleSheet.create({
   // Picker button
   pickerButton: {
     borderWidth: 1,
-    borderColor: TarodanColors.border,
+    borderColor: colors.border.DEFAULT,
     borderRadius: 10,
     paddingHorizontal: 14,
     paddingVertical: 13,
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    backgroundColor: '#fff',
+    backgroundColor: colors.white,
   },
   pickerDisabled: {
-    backgroundColor: TarodanColors.backgroundSecondary,
+    backgroundColor: colors.surface.alt,
     opacity: 0.6,
   },
   pickerValue: {
     fontSize: 15,
-    color: TarodanColors.textPrimary,
+    color: colors.text.heading,
     flex: 1,
   },
   pickerPlaceholder: {
     fontSize: 15,
-    color: TarodanColors.textTertiary,
+    color: colors.text.subtle,
     flex: 1,
   },
   pickerArrow: {
     fontSize: 20,
-    color: TarodanColors.textTertiary,
+    color: colors.text.subtle,
     marginLeft: 8,
   },
 
@@ -1441,33 +1448,33 @@ const styles = StyleSheet.create({
     paddingVertical: 9,
     borderRadius: 20,
     borderWidth: 1,
-    borderColor: TarodanColors.border,
+    borderColor: colors.border.DEFAULT,
     marginRight: 8,
-    backgroundColor: '#fff',
+    backgroundColor: colors.white,
   },
   chipActive: {
-    backgroundColor: TarodanColors.primary,
-    borderColor: TarodanColors.primary,
+    backgroundColor: colors.primary[600]!,
+    borderColor: colors.primary[600]!,
   },
   chipText: {
     fontSize: 13,
-    color: TarodanColors.textSecondary,
+    color: colors.text.muted,
     fontWeight: '500',
   },
   chipTextActive: {
-    color: '#fff',
+    color: colors.white,
   },
 
   // Images
   imageUploadArea: {
     borderWidth: 2,
-    borderColor: TarodanColors.border,
+    borderColor: colors.border.DEFAULT,
     borderStyle: 'dashed',
     borderRadius: 12,
     paddingVertical: 28,
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: TarodanColors.backgroundSecondary,
+    backgroundColor: colors.surface.alt,
   },
   imageUploadIcon: {
     fontSize: 28,
@@ -1476,24 +1483,24 @@ const styles = StyleSheet.create({
   imageUploadLabel: {
     fontSize: 14,
     fontWeight: '500',
-    color: TarodanColors.textSecondary,
+    color: colors.text.muted,
   },
   imageUploadCount: {
     fontSize: 12,
-    color: TarodanColors.textTertiary,
+    color: colors.text.subtle,
     marginTop: 4,
   },
   imageMaxReached: {
     paddingVertical: 14,
     borderRadius: 10,
     borderWidth: 1,
-    borderColor: '#BBF7D0',
-    backgroundColor: '#F0FDF4',
+    borderColor: colors.success[200]!,
+    backgroundColor: colors.success[50]!,
     alignItems: 'center',
   },
   imageMaxReachedText: {
     fontSize: 13,
-    color: '#166534',
+    color: colors.success[800]!,
   },
   imageRow: {
     marginTop: 12,
@@ -1505,7 +1512,7 @@ const styles = StyleSheet.create({
     borderRadius: 10,
     overflow: 'hidden',
     borderWidth: 1,
-    borderColor: TarodanColors.border,
+    borderColor: colors.border.DEFAULT,
   },
   imageThumb: {
     width: '100%',
@@ -1515,7 +1522,7 @@ const styles = StyleSheet.create({
     position: 'absolute',
     top: 4,
     right: 4,
-    backgroundColor: TarodanColors.error,
+    backgroundColor: colors.danger[600]!,
     width: 22,
     height: 22,
     borderRadius: 11,
@@ -1523,7 +1530,7 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   imageRemoveText: {
-    color: '#fff',
+    color: colors.white,
     fontSize: 12,
     fontWeight: '700',
   },
@@ -1537,54 +1544,54 @@ const styles = StyleSheet.create({
     borderWidth: 1,
   },
   toggleRowEnabled: {
-    backgroundColor: '#F0FDF4',
-    borderColor: '#BBF7D0',
+    backgroundColor: colors.success[50]!,
+    borderColor: colors.success[200]!,
   },
   toggleRowDisabled: {
-    backgroundColor: TarodanColors.backgroundSecondary,
-    borderColor: TarodanColors.border,
+    backgroundColor: colors.surface.alt,
+    borderColor: colors.border.DEFAULT,
   },
   toggleLabel: {
     fontSize: 15,
     fontWeight: '600',
-    color: TarodanColors.textPrimary,
+    color: colors.text.heading,
   },
   toggleHint: {
     fontSize: 12,
-    color: TarodanColors.textSecondary,
+    color: colors.text.muted,
     marginTop: 2,
   },
   upgradeLinkText: {
     fontSize: 13,
     fontWeight: '600',
-    color: TarodanColors.primary,
+    color: colors.primary[600]!,
   },
 
   // Commission
   commissionCard: {
     marginTop: 16,
     padding: 12,
-    backgroundColor: TarodanColors.backgroundSecondary,
+    backgroundColor: colors.surface.alt,
     borderRadius: 10,
     borderWidth: 1,
-    borderColor: TarodanColors.borderLight,
+    borderColor: colors.border.subtle,
   },
   commissionTitle: {
     fontSize: 13,
     fontWeight: '600',
-    color: TarodanColors.textSecondary,
+    color: colors.text.muted,
   },
   commissionRow: {
     marginTop: 6,
   },
   commissionFee: {
     fontSize: 13,
-    color: TarodanColors.textSecondary,
+    color: colors.text.muted,
   },
   commissionNet: {
     fontSize: 13,
     fontWeight: '600',
-    color: '#166534',
+    color: colors.success[800]!,
     marginTop: 2,
   },
 
@@ -1599,20 +1606,20 @@ const styles = StyleSheet.create({
     paddingVertical: 14,
     borderRadius: 10,
     borderWidth: 1,
-    borderColor: TarodanColors.border,
+    borderColor: colors.border.DEFAULT,
     alignItems: 'center',
-    backgroundColor: '#fff',
+    backgroundColor: colors.white,
   },
   cancelButtonText: {
     fontSize: 15,
     fontWeight: '600',
-    color: TarodanColors.textSecondary,
+    color: colors.text.muted,
   },
   submitButton: {
     flex: 1,
     paddingVertical: 14,
     borderRadius: 10,
-    backgroundColor: TarodanColors.primary,
+    backgroundColor: colors.primary[600]!,
     alignItems: 'center',
     justifyContent: 'center',
   },
@@ -1622,16 +1629,16 @@ const styles = StyleSheet.create({
   submitButtonText: {
     fontSize: 15,
     fontWeight: '700',
-    color: '#fff',
+    color: colors.white,
   },
   primaryButton: {
-    backgroundColor: TarodanColors.primary,
+    backgroundColor: colors.primary[600]!,
     paddingHorizontal: 28,
     paddingVertical: 14,
     borderRadius: 10,
   },
   primaryButtonText: {
-    color: '#fff',
+    color: colors.white,
     fontSize: 16,
     fontWeight: '700',
   },
@@ -1639,11 +1646,11 @@ const styles = StyleSheet.create({
   // Modal
   modalOverlay: {
     flex: 1,
-    backgroundColor: 'rgba(0,0,0,0.5)',
+    backgroundColor: colors.overlay.black50,
     justifyContent: 'flex-end',
   },
   modalContent: {
-    backgroundColor: '#fff',
+    backgroundColor: colors.white,
     borderTopLeftRadius: 20,
     borderTopRightRadius: 20,
     maxHeight: '75%',
@@ -1656,16 +1663,16 @@ const styles = StyleSheet.create({
     paddingHorizontal: 20,
     paddingVertical: 16,
     borderBottomWidth: 1,
-    borderBottomColor: TarodanColors.borderLight,
+    borderBottomColor: colors.border.subtle,
   },
   modalTitle: {
     fontSize: 17,
     fontWeight: '700',
-    color: TarodanColors.textPrimary,
+    color: colors.text.heading,
   },
   modalClose: {
     fontSize: 20,
-    color: TarodanColors.textTertiary,
+    color: colors.text.subtle,
     fontWeight: '600',
   },
   modalSearch: {
@@ -1673,13 +1680,13 @@ const styles = StyleSheet.create({
     marginTop: 12,
     marginBottom: 8,
     borderWidth: 1,
-    borderColor: TarodanColors.border,
+    borderColor: colors.border.DEFAULT,
     borderRadius: 10,
     paddingHorizontal: 14,
     paddingVertical: 10,
     fontSize: 15,
-    color: TarodanColors.textPrimary,
-    backgroundColor: TarodanColors.backgroundSecondary,
+    color: colors.text.heading,
+    backgroundColor: colors.surface.alt,
   },
   modalItem: {
     flexDirection: 'row',
@@ -1688,27 +1695,27 @@ const styles = StyleSheet.create({
     paddingHorizontal: 20,
     paddingVertical: 14,
     borderBottomWidth: StyleSheet.hairlineWidth,
-    borderBottomColor: TarodanColors.borderLight,
+    borderBottomColor: colors.border.subtle,
   },
   modalItemSelected: {
-    backgroundColor: TarodanColors.primaryLight,
+    backgroundColor: colors.primary[50]!,
   },
   modalItemText: {
     fontSize: 15,
-    color: TarodanColors.textPrimary,
+    color: colors.text.heading,
   },
   modalItemTextSelected: {
-    color: TarodanColors.primary,
+    color: colors.primary[600]!,
     fontWeight: '600',
   },
   checkMark: {
     fontSize: 16,
-    color: TarodanColors.primary,
+    color: colors.primary[600]!,
     fontWeight: '700',
   },
   emptyText: {
     textAlign: 'center',
-    color: TarodanColors.textTertiary,
+    color: colors.text.subtle,
     fontSize: 14,
     marginTop: 32,
     marginBottom: 32,

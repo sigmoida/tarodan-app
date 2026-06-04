@@ -1,6 +1,7 @@
 import * as Device from 'expo-device';
 import { Platform } from 'react-native';
 import Constants from 'expo-constants';
+import { router } from 'expo-router';
 import { api } from './api';
 
 // Conditionally import notifications - only in development builds, not Expo Go
@@ -65,12 +66,12 @@ export async function registerForPushNotifications(): Promise<string | null> {
     });
     token = tokenResponse.data;
 
-    // Register token with backend
-    await api.post('/notifications/register-device', {
+    // Register token with backend (POST /notifications/push-token)
+    await api.post('/notifications/push-token', {
       token,
       platform: Platform.OS,
       deviceName: Device.modelName,
-    }).catch((err) => {
+    }).catch((err: any) => {
       console.log('Failed to register push token with backend:', err.message);
     });
 
@@ -124,9 +125,13 @@ export async function unregisterPushNotifications(): Promise<void> {
   }
   try {
     const tokenResponse = await Notifications.getExpoPushTokenAsync();
-    await api.delete('/notifications/register-device', {
-      data: { token: tokenResponse.data },
-    });
+    // Backend tarafında push-token kaydı: POST /notifications/push-token
+    // Bir DELETE muadili yok; "boş token" göndererek mevcut kayıt işaretlenebilir,
+    // ya da kullanıcı logout sırasında security/tokens DELETE ile temizleniyor.
+    await api.post('/notifications/push-token', {
+      token: tokenResponse.data,
+      revoke: true,
+    }).catch(() => null);
   } catch (error) {
     console.error('Error unregistering push token:', error);
   }
@@ -148,4 +153,85 @@ export function addNotificationResponseReceivedListener(
     return { remove: () => {} };
   }
   return Notifications.addNotificationResponseReceivedListener(callback);
+}
+
+/**
+ * Resolve a push payload (`notification.request.content.data`) into a route
+ * and navigate via Expo Router. Backend persists `notification.link` (e.g.
+ * `/products/unavailable/<id>`); we honor that first, then fall back to the
+ * known `type` enum so missing-link payloads still route correctly.
+ */
+export function routeFromNotification(data: any): void {
+  try {
+    if (data?.link && typeof data.link === 'string') {
+      router.push(data.link as any);
+      return;
+    }
+    switch (data?.type) {
+      case 'order_cancelled_out_of_stock':
+      case 'offer_cancelled_out_of_stock':
+      case 'back_in_stock': {
+        const productId = data?.productId ?? data?.product_id;
+        if (productId) {
+          router.push(`/products/unavailable/${productId}` as any);
+        } else {
+          router.push('/(tabs)/notifications' as any);
+        }
+        return;
+      }
+      case 'order_reservation_released':
+      case 'order_cancelled': {
+        const orderId = data?.orderId ?? data?.order_id;
+        if (orderId) {
+          router.push(`/orders/${orderId}` as any);
+        } else {
+          router.push('/orders' as any);
+        }
+        return;
+      }
+      default:
+        router.push('/(tabs)/notifications' as any);
+    }
+  } catch (err) {
+    console.log('routeFromNotification failed:', (err as any)?.message);
+  }
+}
+
+/**
+ * Wires Expo notification listeners (tap + foreground-received) to the
+ * deep-link router above. Returns a teardown that removes both listeners.
+ * Safe to call in Expo Go (no-op).
+ */
+export function setupPushNotificationRouting(): () => void {
+  if (isExpoGo || !Notifications) {
+    return () => {};
+  }
+
+  // 1) User taps an OS-level notification
+  const responseSub = Notifications.addNotificationResponseReceivedListener(
+    (response: any) => {
+      const data = response?.notification?.request?.content?.data;
+      routeFromNotification(data);
+    },
+  );
+
+  // 2) Notification arrives while app is foregrounded — handle any pre-resolved
+  //    "auto-open" flag (data.autoOpen === true). Otherwise let the user tap.
+  const receivedSub = Notifications.addNotificationReceivedListener(
+    (notification: any) => {
+      const data = notification?.request?.content?.data;
+      if (data?.autoOpen === true || data?.auto_open === true) {
+        routeFromNotification(data);
+      }
+    },
+  );
+
+  return () => {
+    try {
+      responseSub?.remove?.();
+      receivedSub?.remove?.();
+    } catch {
+      /* noop */
+    }
+  };
 }

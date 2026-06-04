@@ -83,6 +83,7 @@ export { Skeleton, SkeletonText, SkeletonCard, SkeletonAvatar, type SkeletonProp
 export {
   orderStatusConfig,
   tradeStatusConfig,
+  refundRequestStatusConfig,
   offerStatusConfig,
   paymentStatusConfig,
   productStatusConfig,

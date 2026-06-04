@@ -1,267 +1,301 @@
-import React, { useState, useEffect, useCallback } from 'react';
-import {
-  View,
-  Text,
-  FlatList,
-  TouchableOpacity,
-  StyleSheet,
-  ActivityIndicator,
-  TextInput,
-  RefreshControl,
-} from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import React, { useMemo, useState } from 'react';
+import { View, ScrollView, StyleSheet, TouchableOpacity, Image } from 'react-native';
+import { theme, Chip, Spinner, Text, Input, EmptyState } from '@tarodan/ui-native';
 import { router } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
-import { TarodanColors } from '../../src/theme/colors';
+import { useQuery } from '@tanstack/react-query';
+import { ScreenHeader } from '../../src/components/common';
 import { carModelsApi } from '../../src/services/api';
+import { transformImageUrl } from '../../src/utils/imageUrl';
 
-export default function ModelsListScreen() {
-  const [models, setModels] = useState<any[]>([]);
-  const [filtered, setFiltered] = useState<any[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [refreshing, setRefreshing] = useState(false);
+const { colors } = theme;
+
+/**
+ * Araba modeli tarama (web `apps/web/src/app/models/page.tsx` paritesi).
+ * - GET /car-models → tüm modelleri çeker
+ * - Marka filtresi + arama
+ * - Markaya göre gruplanır
+ */
+
+interface Brand {
+  id: string;
+  name: string;
+  slug: string;
+  logo?: string | null;
+  country?: string | null;
+}
+
+interface CarModel {
+  id: string;
+  name: string;
+  slug: string;
+  image?: string | null;
+  description?: string | null;
+  yearStart?: number | null;
+  yearEnd?: number | null;
+  brand: Brand;
+  productCount?: number;
+}
+
+export default function ModelsScreen() {
   const [search, setSearch] = useState('');
+  const [selectedBrand, setSelectedBrand] = useState<string>('all');
 
-  const fetchModels = useCallback(async () => {
-    try {
-      const res = await carModelsApi.findAll();
-      const data = res.data?.data || res.data || [];
-      setModels(data);
-      setFiltered(data);
-    } catch (err) {
-      console.log('Models fetch error:', err);
-    } finally {
-      setLoading(false);
-    }
-  }, []);
+  const { data, isLoading } = useQuery({
+    queryKey: ['car-models'],
+    queryFn: async () => {
+      const response = await carModelsApi.findAll();
+      const items: CarModel[] = (response.data as any) ?? [];
+      return Array.isArray(items) ? items : [];
+    },
+  });
 
-  useEffect(() => {
-    fetchModels();
-  }, [fetchModels]);
+  const models = data ?? [];
 
-  useEffect(() => {
-    if (!search.trim()) {
-      setFiltered(models);
-    } else {
-      const q = search.toLowerCase();
-      setFiltered(
-        models.filter(
-          (m: any) =>
-            m.name?.toLowerCase().includes(q) ||
-            m.brand?.name?.toLowerCase().includes(q)
-        )
-      );
-    }
-  }, [search, models]);
+  const brands = useMemo(() => {
+    const map = new Map<string, Brand>();
+    models.forEach((m) => {
+      if (m.brand && !map.has(m.brand.slug)) map.set(m.brand.slug, m.brand);
+    });
+    return Array.from(map.values()).sort((a, b) => a.name.localeCompare(b.name));
+  }, [models]);
 
-  const onRefresh = useCallback(async () => {
-    setRefreshing(true);
-    await fetchModels();
-    setRefreshing(false);
-  }, [fetchModels]);
+  const filtered = useMemo(() => {
+    const q = search.trim().toLowerCase();
+    return models.filter((m) => {
+      const matchBrand = selectedBrand === 'all' || m.brand?.slug === selectedBrand;
+      const matchSearch =
+        !q ||
+        m.name.toLowerCase().includes(q) ||
+        m.brand?.name?.toLowerCase().includes(q);
+      return matchBrand && matchSearch;
+    });
+  }, [models, search, selectedBrand]);
 
-  const renderModelItem = ({ item }: { item: any }) => (
-    <TouchableOpacity
-      style={styles.modelItem}
-      activeOpacity={0.7}
-      onPress={() => router.push(`/models/${item.slug}`)}
-    >
-      <View style={styles.modelIconContainer}>
-        <Ionicons name="car-sport" size={24} color={TarodanColors.primary} />
-      </View>
-      <View style={styles.modelInfo}>
-        <Text style={styles.modelName} numberOfLines={1}>{item.name}</Text>
-        <Text style={styles.modelBrand} numberOfLines={1}>
-          {item.brand?.name || item.brandName || 'Marka'}
-        </Text>
-      </View>
-      <View style={styles.modelMeta}>
-        <Text style={styles.modelCount}>
-          {item.productCount ?? item._count?.products ?? 0} ürün
-        </Text>
-        <Ionicons name="chevron-forward" size={20} color={TarodanColors.textTertiary} />
-      </View>
-    </TouchableOpacity>
-  );
-
-  if (loading) {
-    return (
-      <SafeAreaView style={styles.container} edges={['top']}>
-        <View style={styles.header}>
-          <TouchableOpacity onPress={() => router.back()} style={styles.headerBtn}>
-            <Ionicons name="arrow-back" size={24} color={TarodanColors.textOnPrimary} />
-          </TouchableOpacity>
-          <Text style={styles.headerTitle}>Modeller</Text>
-          <View style={styles.headerBtn} />
-        </View>
-        <View style={styles.centered}>
-          <ActivityIndicator size="large" color={TarodanColors.primary} />
-          <Text style={styles.loadingText}>Yükleniyor...</Text>
-        </View>
-      </SafeAreaView>
-    );
-  }
+  const grouped = useMemo(() => {
+    const map = new Map<string, { brand: Brand; models: CarModel[] }>();
+    filtered.forEach((m) => {
+      if (!m.brand) return;
+      const slug = m.brand.slug;
+      if (!map.has(slug)) {
+        map.set(slug, { brand: m.brand, models: [] });
+      }
+      map.get(slug)!.models.push(m);
+    });
+    return Array.from(map.values()).sort((a, b) => a.brand.name.localeCompare(b.brand.name));
+  }, [filtered]);
 
   return (
-    <SafeAreaView style={styles.container} edges={['top']}>
-      <View style={styles.header}>
-        <TouchableOpacity onPress={() => router.back()} style={styles.headerBtn}>
-          <Ionicons name="arrow-back" size={24} color={TarodanColors.textOnPrimary} />
-        </TouchableOpacity>
-        <Text style={styles.headerTitle}>Modeller</Text>
-        <View style={styles.headerBtn} />
-      </View>
+    <View style={styles.container}>
+      <ScreenHeader title="Araba Modelleri" />
 
-      <View style={styles.searchContainer}>
-        <Ionicons name="search" size={20} color={TarodanColors.textTertiary} style={styles.searchIcon} />
-        <TextInput
-          style={styles.searchInput}
+      <View style={styles.searchWrap}>
+        <Input
           placeholder="Model veya marka ara..."
-          placeholderTextColor={TarodanColors.textTertiary}
           value={search}
           onChangeText={setSearch}
+          leftIconName="search"
         />
-        {search.length > 0 && (
-          <TouchableOpacity onPress={() => setSearch('')}>
-            <Ionicons name="close-circle" size={20} color={TarodanColors.textTertiary} />
-          </TouchableOpacity>
-        )}
       </View>
 
-      <FlatList
-        data={filtered}
-        keyExtractor={(item) => String(item.id || item.slug)}
-        contentContainerStyle={styles.listContent}
-        renderItem={renderModelItem}
-        ItemSeparatorComponent={() => <View style={styles.separator} />}
-        refreshControl={
-          <RefreshControl refreshing={refreshing} onRefresh={onRefresh} colors={[TarodanColors.primary]} />
-        }
-        ListEmptyComponent={
-          <View style={styles.centered}>
-            <Ionicons name="car-sport-outline" size={64} color={TarodanColors.textTertiary} />
-            <Text style={styles.emptyTitle}>Model bulunamadı</Text>
-            <Text style={styles.emptySubtitle}>
-              {search ? 'Arama kriterlerinize uygun model yok' : 'Henüz model eklenmemiş'}
-            </Text>
-          </View>
-        }
-      />
-    </SafeAreaView>
+      <ScrollView
+        horizontal
+        showsHorizontalScrollIndicator={false}
+        style={styles.brandFilterScroll}
+        contentContainerStyle={styles.brandFilterRow}
+      >
+        <Chip
+          label="Tüm Markalar"
+          selected={selectedBrand === 'all'}
+          onPress={() => setSelectedBrand('all')}
+          variant="primary"
+        />
+        {brands.map((b) => (
+          <Chip
+            key={b.slug}
+            label={b.name}
+            selected={selectedBrand === b.slug}
+            onPress={() => setSelectedBrand(b.slug)}
+            variant="primary"
+          />
+        ))}
+      </ScrollView>
+
+      {isLoading ? (
+        <View style={styles.loading}>
+          <Spinner size="lg" />
+        </View>
+      ) : grouped.length === 0 ? (
+        <EmptyState
+          icon="car-outline"
+          title="Model bulunamadı"
+          subtitle={search ? 'Farklı bir arama deneyin.' : 'Henüz araba modeli eklenmemiş.'}
+        />
+      ) : (
+        <ScrollView
+          style={styles.list}
+          contentContainerStyle={{ paddingBottom: 32 }}
+          showsVerticalScrollIndicator={false}
+        >
+          {grouped.map(({ brand, models: brandModels }) => (
+            <View key={brand.slug} style={styles.brandSection}>
+              <View style={styles.brandHeader}>
+                {brand.logo ? (
+                  <Image source={{ uri: transformImageUrl(brand.logo) }} style={styles.brandLogo} />
+                ) : (
+                  <View style={[styles.brandLogo, styles.brandLogoFallback]}>
+                    <Ionicons name="car-sport-outline" size={18} color={colors.primary[600]!} />
+                  </View>
+                )}
+                <View style={{ flex: 1 }}>
+                  <Text style={styles.brandName}>{brand.name}</Text>
+                  <Text style={styles.brandMeta}>
+                    {brandModels.length} model
+                    {brand.country ? ` · ${brand.country}` : ''}
+                  </Text>
+                </View>
+              </View>
+
+              <View style={styles.modelsGrid}>
+                {brandModels.map((m) => (
+                  <TouchableOpacity
+                    key={m.id}
+                    style={styles.modelCard}
+                    onPress={() => router.push({ pathname: '/models/[slug]', params: { slug: m.slug } } as any)}
+                  >
+                    {m.image ? (
+                      <Image source={{ uri: transformImageUrl(m.image) }} style={styles.modelImage} />
+                    ) : (
+                      <View style={[styles.modelImage, styles.modelImageFallback]}>
+                        <Ionicons name="car-outline" size={36} color={colors.text.subtle} />
+                      </View>
+                    )}
+                    <View style={styles.modelBody}>
+                      <Text style={styles.modelName} numberOfLines={1}>
+                        {m.name}
+                      </Text>
+                      {(m.yearStart || m.yearEnd) ? (
+                        <Text style={styles.modelYears}>
+                          {m.yearStart ?? '?'}{m.yearEnd ? ` - ${m.yearEnd}` : ' - günümüz'}
+                        </Text>
+                      ) : null}
+                      {typeof m.productCount === 'number' ? (
+                        <Text style={styles.modelCount}>{m.productCount} ürün</Text>
+                      ) : null}
+                    </View>
+                  </TouchableOpacity>
+                ))}
+              </View>
+            </View>
+          ))}
+        </ScrollView>
+      )}
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: TarodanColors.backgroundSecondary,
+    backgroundColor: colors.surface.alt,
   },
-  header: {
-    backgroundColor: TarodanColors.primary,
-    paddingBottom: 16,
-    paddingHorizontal: 20,
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-  },
-  headerBtn: {
-    width: 32,
-    height: 32,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  headerTitle: {
-    fontSize: 18,
-    fontWeight: 'bold',
-    color: TarodanColors.textOnPrimary,
-  },
-  searchContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: TarodanColors.background,
-    margin: 16,
-    marginBottom: 8,
-    paddingHorizontal: 14,
-    borderRadius: 12,
-    borderWidth: 1,
-    borderColor: TarodanColors.border,
-    height: 48,
-  },
-  searchIcon: {
-    marginRight: 10,
-  },
-  searchInput: {
-    flex: 1,
-    fontSize: 15,
-    color: TarodanColors.textPrimary,
-  },
-  listContent: {
+  searchWrap: {
+    backgroundColor: colors.surface.DEFAULT,
     paddingHorizontal: 16,
-    paddingBottom: 32,
+    paddingVertical: 8,
+    borderBottomWidth: 1,
+    borderBottomColor: colors.border.subtle,
   },
-  modelItem: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: TarodanColors.background,
-    padding: 16,
-    borderRadius: 12,
+  brandFilterScroll: {
+    backgroundColor: colors.surface.DEFAULT,
+    maxHeight: 60,
+    borderBottomWidth: 1,
+    borderBottomColor: colors.border.subtle,
   },
-  modelIconContainer: {
-    width: 48,
-    height: 48,
-    borderRadius: 24,
-    backgroundColor: TarodanColors.primaryLight,
+  brandFilterRow: {
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    gap: 8,
+  },
+  loading: {
+    flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
-    marginRight: 14,
   },
-  modelInfo: {
+  list: {
     flex: 1,
   },
-  modelName: {
-    fontSize: 15,
-    fontWeight: '600',
-    color: TarodanColors.textPrimary,
+  brandSection: {
+    backgroundColor: colors.surface.DEFAULT,
+    marginTop: 12,
+    paddingVertical: 12,
   },
-  modelBrand: {
-    fontSize: 13,
-    color: TarodanColors.textSecondary,
+  brandHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 16,
+    marginBottom: 12,
+    gap: 12,
+  },
+  brandLogo: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    backgroundColor: colors.gray[50],
+  },
+  brandLogoFallback: {
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  brandName: {
+    fontSize: 16,
+    fontWeight: '700',
+    color: colors.text.heading,
+  },
+  brandMeta: {
+    fontSize: 12,
+    color: colors.text.muted,
     marginTop: 2,
   },
-  modelMeta: {
+  modelsGrid: {
     flexDirection: 'row',
+    flexWrap: 'wrap',
+    paddingHorizontal: 12,
+    gap: 8,
+  },
+  modelCard: {
+    width: '48%',
+    backgroundColor: colors.gray[50],
+    borderRadius: 10,
+    overflow: 'hidden',
+    marginBottom: 8,
+  },
+  modelImage: {
+    width: '100%',
+    aspectRatio: 16 / 10,
+    backgroundColor: colors.border.subtle,
+  },
+  modelImageFallback: {
     alignItems: 'center',
-    gap: 4,
+    justifyContent: 'center',
+  },
+  modelBody: {
+    padding: 10,
+  },
+  modelName: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: colors.text.heading,
+  },
+  modelYears: {
+    fontSize: 11,
+    color: colors.text.muted,
+    marginTop: 2,
   },
   modelCount: {
-    fontSize: 13,
-    color: TarodanColors.textSecondary,
-  },
-  separator: {
-    height: 8,
-  },
-  centered: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-    padding: 32,
-    paddingTop: 80,
-  },
-  loadingText: {
-    marginTop: 12,
-    fontSize: 14,
-    color: TarodanColors.textSecondary,
-  },
-  emptyTitle: {
-    marginTop: 16,
-    fontSize: 18,
-    fontWeight: 'bold',
-    color: TarodanColors.textPrimary,
-  },
-  emptySubtitle: {
-    marginTop: 8,
-    fontSize: 14,
-    color: TarodanColors.textSecondary,
-    textAlign: 'center',
+    fontSize: 11,
+    color: colors.primary[600]!,
+    fontWeight: '600',
+    marginTop: 2,
   },
 });

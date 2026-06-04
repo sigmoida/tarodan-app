@@ -1,5 +1,5 @@
-import { View, ScrollView, StyleSheet, TouchableOpacity, Image, Alert } from 'react-native';
-import { Text, TextInput, Button, Switch, Card, SegmentedButtons, Snackbar, IconButton } from 'react-native-paper';
+import { View, ScrollView, StyleSheet, TouchableOpacity, Image } from 'react-native';
+import { theme, Button, Switch, Snackbar, IconButton, Text, Input, Textarea } from '@tarodan/ui-native';
 import { useState } from 'react';
 import { router } from 'expo-router';
 import { useForm, Controller } from 'react-hook-form';
@@ -10,8 +10,9 @@ import * as ImagePicker from 'expo-image-picker';
 import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 import { api } from '../../src/services/api';
 import { useAuthStore } from '../../src/stores/authStore';
-import { TarodanColors } from '../../src/theme';
-import { canPerformAction, getUpgradeMessage } from '../../src/utils/membershipLimits';
+import { getUpgradeMessage } from '../../src/utils/membershipLimits';
+
+const { colors } = theme;
 
 const collectionSchema = z.object({
   name: z.string().min(3, 'Koleksiyon adı en az 3 karakter olmalı').max(100),
@@ -33,7 +34,7 @@ const COLLECTION_TEMPLATES = [
 export default function NewCollectionScreen() {
   const { isAuthenticated, limits } = useAuthStore();
   const queryClient = useQueryClient();
-  
+
   const [coverImage, setCoverImage] = useState<string | null>(null);
   const [selectedTemplate, setSelectedTemplate] = useState<string | null>(null);
   const [snackbar, setSnackbar] = useState({ visible: false, message: '' });
@@ -55,7 +56,7 @@ export default function NewCollectionScreen() {
       formData.append('name', data.name);
       if (data.description) formData.append('description', data.description);
       formData.append('isPublic', String(data.isPublic));
-      
+
       if (coverImage) {
         formData.append('coverImage', {
           uri: coverImage,
@@ -110,42 +111,38 @@ export default function NewCollectionScreen() {
       <View style={styles.container}>
         <View style={styles.header}>
           <TouchableOpacity onPress={() => router.back()}>
-            <Ionicons name="arrow-back" size={24} color={TarodanColors.textOnPrimary} />
+            <Ionicons name="arrow-back" size={24} color={colors.white} />
           </TouchableOpacity>
           <Text style={styles.headerTitle}>Dijital Garaj</Text>
           <View style={{ width: 24 }} />
         </View>
-        
+
         <View style={styles.premiumRequired}>
-          <MaterialCommunityIcons name="garage" size={80} color={TarodanColors.primary} />
-          <Text variant="headlineSmall" style={styles.premiumTitle}>{upgradeInfo.title}</Text>
-          <Text variant="bodyMedium" style={styles.premiumSubtitle}>{upgradeInfo.message}</Text>
-          
+          <MaterialCommunityIcons name="garage" size={80} color={colors.primary[600]!} />
+          <Text variant="h2" style={styles.premiumTitle}>{upgradeInfo.title}</Text>
+          <Text variant="body" style={styles.premiumSubtitle}>{upgradeInfo.message}</Text>
+
           <View style={styles.premiumFeatures}>
             <View style={styles.premiumFeature}>
-              <Ionicons name="checkmark-circle" size={20} color={TarodanColors.success} />
+              <Ionicons name="checkmark-circle" size={20} color={colors.success[600]!} />
               <Text style={styles.premiumFeatureText}>Sınırsız koleksiyon oluşturun</Text>
             </View>
             <View style={styles.premiumFeature}>
-              <Ionicons name="checkmark-circle" size={20} color={TarodanColors.success} />
+              <Ionicons name="checkmark-circle" size={20} color={colors.success[600]!} />
               <Text style={styles.premiumFeatureText}>Koleksiyonlarınızı paylaşın</Text>
             </View>
             <View style={styles.premiumFeature}>
-              <Ionicons name="checkmark-circle" size={20} color={TarodanColors.success} />
+              <Ionicons name="checkmark-circle" size={20} color={colors.success[600]!} />
               <Text style={styles.premiumFeatureText}>QR kod ve sosyal medya paylaşımı</Text>
             </View>
             <View style={styles.premiumFeature}>
-              <Ionicons name="checkmark-circle" size={20} color={TarodanColors.success} />
+              <Ionicons name="checkmark-circle" size={20} color={colors.success[600]!} />
               <Text style={styles.premiumFeatureText}>Koleksiyoncu Vitrini'nde yer alın</Text>
             </View>
           </View>
-          
-          <Button mode="contained" onPress={() => router.push('/upgrade')} style={styles.upgradeButton}>
-            Premium'a Yükselt
-          </Button>
-          <Button mode="text" onPress={() => router.back()}>
-            Geri Dön
-          </Button>
+
+          <Button variant="primary" title="Premium'a Yükselt" onPress={() => router.push('/upgrade')} style={styles.upgradeButton} />
+          <Button variant="ghost" title="Geri Dön" onPress={() => router.back()} />
         </View>
       </View>
     );
@@ -154,13 +151,11 @@ export default function NewCollectionScreen() {
   if (!isAuthenticated) {
     return (
       <View style={styles.centeredContainer}>
-        <Text variant="titleLarge">Giriş Yapın</Text>
-        <Text variant="bodyMedium" style={styles.subtitle}>
+        <Text variant="h2">Giriş Yapın</Text>
+        <Text variant="body" style={styles.subtitle}>
           Koleksiyon oluşturmak için giriş yapmalısınız
         </Text>
-        <Button mode="contained" onPress={() => router.push('/(auth)/login')}>
-          Giriş Yap
-        </Button>
+        <Button variant="primary" title="Giriş Yap" onPress={() => router.push('/(auth)/login')} />
       </View>
     );
   }
@@ -170,7 +165,7 @@ export default function NewCollectionScreen() {
       {/* Header */}
       <View style={styles.header}>
         <TouchableOpacity onPress={() => router.back()}>
-          <Ionicons name="arrow-back" size={24} color={TarodanColors.textOnPrimary} />
+          <Ionicons name="arrow-back" size={24} color={colors.white} />
         </TouchableOpacity>
         <Text style={styles.headerTitle}>Yeni Koleksiyon</Text>
         <View style={{ width: 24 }} />
@@ -183,8 +178,8 @@ export default function NewCollectionScreen() {
             <Image source={{ uri: coverImage }} style={styles.coverImage} />
           ) : (
             <View style={styles.coverImagePlaceholder}>
-              <Ionicons name="image-outline" size={48} color={TarodanColors.textSecondary} />
-              <Text variant="bodyMedium" style={styles.coverImageText}>
+              <Ionicons name="image-outline" size={48} color={colors.text.muted} />
+              <Text variant="body" style={styles.coverImageText}>
                 Kapak fotoğrafı ekle
               </Text>
             </View>
@@ -192,143 +187,128 @@ export default function NewCollectionScreen() {
           {coverImage && (
             <IconButton
               icon="close-circle"
-              size={24}
+              accessibilityLabel="Kapak fotoğrafını kaldır"
+              size="md"
               style={styles.removeCoverButton}
-              iconColor="#fff"
               onPress={() => setCoverImage(null)}
             />
           )}
         </TouchableOpacity>
 
         {/* Templates */}
-        <Card style={styles.card}>
-          <Card.Content>
-            <Text variant="titleMedium" style={styles.sectionTitle}>Şablon Seçin</Text>
-            <View style={styles.templatesGrid}>
-              {COLLECTION_TEMPLATES.map((template) => (
-                <TouchableOpacity
-                  key={template.id}
-                  style={[
-                    styles.templateItem,
-                    selectedTemplate === template.id && styles.templateItemSelected,
-                  ]}
-                  onPress={() => selectTemplate(template)}
-                >
-                  <Text style={styles.templateIcon}>{template.icon}</Text>
-                  <Text variant="bodySmall" style={styles.templateName} numberOfLines={1}>
-                    {template.name}
-                  </Text>
-                </TouchableOpacity>
-              ))}
-            </View>
-          </Card.Content>
-        </Card>
+        <View style={styles.card}>
+          <Text variant="h3" style={styles.sectionTitle}>Şablon Seçin</Text>
+          <View style={styles.templatesGrid}>
+            {COLLECTION_TEMPLATES.map((template) => (
+              <TouchableOpacity
+                key={template.id}
+                style={[
+                  styles.templateItem,
+                  selectedTemplate === template.id && styles.templateItemSelected,
+                ]}
+                onPress={() => selectTemplate(template)}
+              >
+                <Text style={styles.templateIcon}>{template.icon}</Text>
+                <Text variant="bodySm" style={styles.templateName} numberOfLines={1}>
+                  {template.name}
+                </Text>
+              </TouchableOpacity>
+            ))}
+          </View>
+        </View>
 
         {/* Collection Details */}
-        <Card style={styles.card}>
-          <Card.Content>
-            <Text variant="titleMedium" style={styles.sectionTitle}>Koleksiyon Bilgileri</Text>
-            
-            <Controller
-              control={control}
-              name="name"
-              render={({ field: { onChange, value } }) => (
-                <TextInput
-                  label="Koleksiyon Adı *"
-                  value={value}
-                  onChangeText={onChange}
-                  error={!!errors.name}
-                  mode="outlined"
-                  style={styles.input}
-                  placeholder="örn: Ferrari 1:18 Koleksiyonum"
-                />
-              )}
-            />
-            {errors.name && (
-              <Text variant="bodySmall" style={styles.errorText}>{errors.name.message}</Text>
-            )}
+        <View style={styles.card}>
+          <Text variant="h3" style={styles.sectionTitle}>Koleksiyon Bilgileri</Text>
 
-            <Controller
-              control={control}
-              name="description"
-              render={({ field: { onChange, value } }) => (
-                <TextInput
-                  label="Açıklama"
-                  value={value}
-                  onChangeText={onChange}
-                  multiline
-                  numberOfLines={3}
-                  mode="outlined"
-                  style={styles.input}
-                  placeholder="Koleksiyonunuz hakkında birkaç cümle..."
-                />
-              )}
-            />
-            {errors.description && (
-              <Text variant="bodySmall" style={styles.errorText}>{errors.description.message}</Text>
+          <Controller
+            control={control}
+            name="name"
+            render={({ field: { onChange, value } }) => (
+              <Input
+                label="Koleksiyon Adı *"
+                value={value}
+                onChangeText={onChange}
+                error={errors.name?.message}
+                placeholder="örn: Ferrari 1:18 Koleksiyonum"
+                containerStyle={styles.input}
+              />
             )}
-          </Card.Content>
-        </Card>
+          />
+
+          <Controller
+            control={control}
+            name="description"
+            render={({ field: { onChange, value } }) => (
+              <Textarea
+                label="Açıklama"
+                value={value}
+                onChangeText={onChange}
+                rows={3}
+                error={errors.description?.message}
+                placeholder="Koleksiyonunuz hakkında birkaç cümle..."
+                containerStyle={styles.input}
+              />
+            )}
+          />
+        </View>
 
         {/* Privacy Settings */}
-        <Card style={styles.card}>
-          <Card.Content>
-            <Text variant="titleMedium" style={styles.sectionTitle}>Gizlilik</Text>
-            
-            <View style={styles.privacyOption}>
-              <View style={styles.privacyInfo}>
-                <Ionicons name="globe-outline" size={24} color={TarodanColors.primary} />
-                <View style={styles.privacyText}>
-                  <Text variant="bodyMedium">Herkese Açık</Text>
-                  <Text variant="bodySmall" style={styles.privacyDesc}>
-                    Herkes koleksiyonunuzu görebilir
-                  </Text>
-                </View>
-              </View>
-              <Controller
-                control={control}
-                name="isPublic"
-                render={({ field: { onChange, value } }) => (
-                  <Switch value={value} onValueChange={onChange} />
-                )}
-              />
-            </View>
-            
-            {!watch('isPublic') && (
-              <View style={styles.privateNote}>
-                <Ionicons name="lock-closed" size={16} color={TarodanColors.textSecondary} />
-                <Text variant="bodySmall" style={styles.privateNoteText}>
-                  Özel koleksiyonlar sadece siz görebilirsiniz
+        <View style={styles.card}>
+          <Text variant="h3" style={styles.sectionTitle}>Gizlilik</Text>
+
+          <View style={styles.privacyOption}>
+            <View style={styles.privacyInfo}>
+              <Ionicons name="globe-outline" size={24} color={colors.primary[600]!} />
+              <View style={styles.privacyText}>
+                <Text variant="body">Herkese Açık</Text>
+                <Text variant="bodySm" style={styles.privacyDesc}>
+                  Herkes koleksiyonunuzu görebilir
                 </Text>
               </View>
-            )}
-          </Card.Content>
-        </Card>
+            </View>
+            <Controller
+              control={control}
+              name="isPublic"
+              render={({ field: { onChange, value } }) => (
+                <Switch value={value} onValueChange={onChange} />
+              )}
+            />
+          </View>
+
+          {!watch('isPublic') && (
+            <View style={styles.privateNote}>
+              <Ionicons name="lock-closed" size={16} color={colors.text.muted} />
+              <Text variant="bodySm" style={styles.privateNoteText}>
+                Özel koleksiyonlar sadece siz görebilirsiniz
+              </Text>
+            </View>
+          )}
+        </View>
 
         {/* Tips */}
-        <Card style={styles.tipCard}>
-          <Card.Content style={styles.tipContent}>
-            <Ionicons name="bulb" size={24} color={TarodanColors.warning} />
+        <View style={styles.tipCard}>
+          <View style={styles.tipContent}>
+            <Ionicons name="bulb" size={24} color={colors.warning[600]!} />
             <View style={styles.tipText}>
-              <Text variant="titleSmall">İpucu</Text>
-              <Text variant="bodySmall" style={styles.tipDesc}>
+              <Text variant="label">İpucu</Text>
+              <Text variant="bodySm" style={styles.tipDesc}>
                 Koleksiyonunuzu oluşturduktan sonra ürünlerinizi ekleyebilir, düzenleyebilir ve paylaşabilirsiniz.
               </Text>
             </View>
-          </Card.Content>
-        </Card>
+          </View>
+        </View>
 
         {/* Submit Button */}
         <Button
-          mode="contained"
+          variant="primary"
+          title="Koleksiyon Oluştur"
           onPress={handleSubmit(onSubmit)}
-          loading={createMutation.isPending}
+          isLoading={createMutation.isPending}
           disabled={createMutation.isPending}
+          icon="checkmark"
           style={styles.submitButton}
-          icon="check"
-        >
-          Koleksiyon Oluştur
-        </Button>
+        />
 
         <View style={{ height: 50 }} />
       </ScrollView>
@@ -347,7 +327,7 @@ export default function NewCollectionScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: TarodanColors.backgroundSecondary,
+    backgroundColor: colors.surface.alt,
   },
   centeredContainer: {
     flex: 1,
@@ -356,7 +336,7 @@ const styles = StyleSheet.create({
     padding: 32,
   },
   header: {
-    backgroundColor: TarodanColors.primary,
+    backgroundColor: colors.primary[600]!,
     paddingTop: 50,
     paddingBottom: 16,
     paddingHorizontal: 20,
@@ -367,12 +347,12 @@ const styles = StyleSheet.create({
   headerTitle: {
     fontSize: 18,
     fontWeight: 'bold',
-    color: TarodanColors.textOnPrimary,
+    color: colors.white,
   },
   subtitle: {
     textAlign: 'center',
     marginVertical: 16,
-    color: TarodanColors.textSecondary,
+    color: colors.text.muted,
   },
   content: {
     flex: 1,
@@ -384,7 +364,7 @@ const styles = StyleSheet.create({
     borderRadius: 12,
     overflow: 'hidden',
     marginBottom: 16,
-    backgroundColor: TarodanColors.background,
+    backgroundColor: colors.surface.DEFAULT,
   },
   coverImage: {
     width: '100%',
@@ -395,27 +375,29 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
     borderWidth: 2,
-    borderColor: TarodanColors.border,
+    borderColor: colors.border.DEFAULT,
     borderStyle: 'dashed',
     borderRadius: 12,
   },
   coverImageText: {
     marginTop: 8,
-    color: TarodanColors.textSecondary,
+    color: colors.text.muted,
   },
   removeCoverButton: {
     position: 'absolute',
     top: 8,
     right: 8,
-    backgroundColor: 'rgba(0,0,0,0.5)',
+    backgroundColor: colors.overlay.black50,
   },
   card: {
     marginBottom: 16,
-    backgroundColor: TarodanColors.background,
+    backgroundColor: colors.surface.DEFAULT,
+    padding: 16,
+    borderRadius: 12,
   },
   sectionTitle: {
     marginBottom: 16,
-    color: TarodanColors.textPrimary,
+    color: colors.text.heading,
   },
   templatesGrid: {
     flexDirection: 'row',
@@ -428,12 +410,12 @@ const styles = StyleSheet.create({
     padding: 12,
     borderRadius: 8,
     borderWidth: 2,
-    borderColor: TarodanColors.border,
-    backgroundColor: TarodanColors.backgroundSecondary,
+    borderColor: colors.border.DEFAULT,
+    backgroundColor: colors.surface.alt,
   },
   templateItemSelected: {
-    borderColor: TarodanColors.primary,
-    backgroundColor: TarodanColors.primary + '10',
+    borderColor: colors.primary[600]!,
+    backgroundColor: colors.primary[50]!,
   },
   templateIcon: {
     fontSize: 24,
@@ -441,16 +423,10 @@ const styles = StyleSheet.create({
   },
   templateName: {
     textAlign: 'center',
-    color: TarodanColors.textPrimary,
+    color: colors.text.heading,
   },
   input: {
     marginBottom: 12,
-    backgroundColor: TarodanColors.background,
-  },
-  errorText: {
-    color: TarodanColors.error,
-    marginBottom: 8,
-    marginTop: -8,
   },
   privacyOption: {
     flexDirection: 'row',
@@ -466,7 +442,7 @@ const styles = StyleSheet.create({
     marginLeft: 12,
   },
   privacyDesc: {
-    color: TarodanColors.textSecondary,
+    color: colors.text.muted,
   },
   privateNote: {
     flexDirection: 'row',
@@ -474,17 +450,19 @@ const styles = StyleSheet.create({
     marginTop: 12,
     paddingTop: 12,
     borderTopWidth: 1,
-    borderTopColor: TarodanColors.border,
+    borderTopColor: colors.border.DEFAULT,
   },
   privateNoteText: {
     marginLeft: 8,
-    color: TarodanColors.textSecondary,
+    color: colors.text.muted,
   },
   tipCard: {
     marginBottom: 16,
-    backgroundColor: TarodanColors.warning + '15',
+    backgroundColor: colors.warning[50]!,
     borderWidth: 1,
-    borderColor: TarodanColors.warning + '40',
+    borderColor: colors.warning[200]!,
+    padding: 16,
+    borderRadius: 12,
   },
   tipContent: {
     flexDirection: 'row',
@@ -495,31 +473,28 @@ const styles = StyleSheet.create({
     marginLeft: 12,
   },
   tipDesc: {
-    color: TarodanColors.textSecondary,
+    color: colors.text.muted,
     marginTop: 2,
   },
   submitButton: {
     marginBottom: 16,
-    backgroundColor: TarodanColors.primary,
-    borderRadius: 8,
-    paddingVertical: 4,
   },
   premiumRequired: {
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
     padding: 32,
-    backgroundColor: TarodanColors.background,
+    backgroundColor: colors.surface.DEFAULT,
   },
   premiumTitle: {
     marginTop: 24,
     textAlign: 'center',
-    color: TarodanColors.textPrimary,
+    color: colors.text.heading,
   },
   premiumSubtitle: {
     marginTop: 8,
     textAlign: 'center',
-    color: TarodanColors.textSecondary,
+    color: colors.text.muted,
   },
   premiumFeatures: {
     marginTop: 24,
@@ -533,11 +508,10 @@ const styles = StyleSheet.create({
   },
   premiumFeatureText: {
     marginLeft: 12,
-    color: TarodanColors.textPrimary,
+    color: colors.text.heading,
   },
   upgradeButton: {
     marginTop: 24,
-    backgroundColor: TarodanColors.primary,
     width: '100%',
   },
 });

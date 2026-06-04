@@ -234,6 +234,26 @@ export class ProductController {
   }
 
   /**
+   * GET /products/:id/similar
+   * Aynı kategoriden, aktif ve stoklu ürünler. Stockout sonrası
+   * "alternatif ürünler" sayfası tarafından kullanılır.
+   */
+  @Get(':id/similar')
+  @Public()
+  @ApiOperation({ summary: 'Benzer ürünler (aynı kategori, aktif)' })
+  @ApiParam({ name: 'id', description: 'Product ID (UUID)' })
+  async getSimilar(
+    @Param('id', new ParseUUIDPipe({
+      errorHttpStatusCode: 400,
+      exceptionFactory: () => new BadRequestException('Geçersiz ürün ID formatı'),
+    })) id: string,
+    @Query('limit') limit?: string,
+  ) {
+    const n = limit ? Math.min(parseInt(limit, 10) || 12, 24) : 12;
+    return this.productService.findSimilarProducts(id, n);
+  }
+
+  /**
    * POST /products
    * Create new product (seller only)
    */

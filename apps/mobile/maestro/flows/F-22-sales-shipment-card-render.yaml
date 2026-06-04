@@ -1,0 +1,27 @@
+# F-22: Satıcı sipariş detayında auto-Sürat tracking kartının render
+# olduğunu doğrular. Pre-req: zeynep'in en az bir sales (satılan) order'ı.
+appId: com.tarodan.app
+tags:
+  - regression
+---
+- runFlow: ../subflows/open-tarodan.yaml
+- tapOn:
+    text: "Profil"
+- runFlow:
+    when:
+      visible: "Satışlarım"
+    commands:
+      - tapOn: "Satışlarım"
+- extendedWaitUntil:
+    visible:
+      text: "Sipariş"
+    timeout: 15000
+# Tap first sales row (no testID exists for rows; fallback to scroll+first cell)
+- tapOn:
+    text: "ORD-"
+    index: 0
+    optional: true
+- assertVisible:
+    id: "sales-shipment-card"
+- assertVisible:
+    id: "sales-tracking-number"

@@ -153,6 +153,8 @@ export const listingsApi = {
     api.get('/products', { params, headers: { 'Cache-Control': 'no-cache', Pragma: 'no-cache' } }),
   getOne: (id: string | number) => api.get(`/products/${id}`),
   getById: (id: string | number) => api.get(`/products/${id}`),
+  getSimilar: (id: string, limit = 12) =>
+    api.get(`/products/${id}/similar`, { params: { limit } }),
   create: (data: Record<string, any>) =>
     api.post('/products', data),
   update: (id: string | number, data: Record<string, any>) =>
@@ -186,8 +188,6 @@ export const tradesApi = {
     api.post(`/trades/${id}/cancel`, { reason }),
   ship: (id: string | number, data: { fromAddressId: string; carrier: string }) =>
     api.post(`/trades/${id}/ship`, data),
-  shipToWarehouse: (tradeId: string, data: { carrier: string; fromAddressId: string; trackingNumber?: string }) =>
-    api.post(`/trades/${tradeId}/ship-to-warehouse`, data),
   confirmReceipt: (id: string | number) =>
     api.post(`/trades/${id}/confirm-receipt`),
   raiseDispute: (id: string | number, data: { reason: string; description: string; evidenceUrls?: string[] }) =>

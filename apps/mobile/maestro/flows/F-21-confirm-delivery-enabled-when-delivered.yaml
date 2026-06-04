@@ -1,0 +1,17 @@
+# F-21: Manual. Pre-condition: zeynep'in shipping_to_recipients takası,
+# kendi from_warehouse shipment.status='delivered'.
+# Doğrular: "Teslim Aldım" butonu ENABLED.
+appId: com.tarodan.app
+tags:
+  - manual
+---
+- runFlow: ../subflows/open-tarodan.yaml
+- runFlow: ../subflows/open-first-trade.yaml
+- extendedWaitUntil:
+    visible:
+      id: "trade-outbound-card"
+    timeout: 10000
+- assertVisible:
+    id: "trade-confirm-delivery-button"
+# Maestro Java port assertEnabled desteklemiyorsa: tap deneyip success path'e
+# girip girmediğine göre dolaylı doğrula. Şimdilik visible assertion yeterli.

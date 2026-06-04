@@ -1,8 +1,9 @@
 import React from 'react';
 import { View, StyleSheet, TouchableOpacity } from 'react-native';
-import { Text, Tooltip } from 'react-native-paper';
 import { MaterialCommunityIcons, Ionicons } from '@expo/vector-icons';
-import { TarodanColors } from '../theme';
+import { theme, Text } from '@tarodan/ui-native';
+
+const { colors } = theme;
 
 // Reputation levels based on users.txt
 export type ReputationLevel = 'rising_star' | 'trusted_seller' | 'elite_collector' | 'hall_of_fame';
@@ -27,32 +28,32 @@ const REPUTATION_CONFIG: Record<ReputationLevel, {
     icon: 'star-rising',
     label: 'Yükselen Yıldız',
     description: '10-50 başarılı işlem, 4.5+ puan',
-    color: '#4CAF50',
-    backgroundColor: '#4CAF50' + '15',
+    color: colors.success[600]!,
+    backgroundColor: colors.success[50]!,
     criteria: '10-50 işlem, 4.5+',
   },
   trusted_seller: {
     icon: 'shield-check',
     label: 'Güvenilir Satıcı',
     description: '50-200 başarılı işlem, 4.7+ puan',
-    color: '#2196F3',
-    backgroundColor: '#2196F3' + '15',
+    color: colors.info[600]!,
+    backgroundColor: colors.info[50]!,
     criteria: '50-200 işlem, 4.7+',
   },
   elite_collector: {
     icon: 'trophy',
     label: 'Elite Koleksiyoner',
     description: '200+ başarılı işlem, 4.8+ puan',
-    color: '#9C27B0',
-    backgroundColor: '#9C27B0' + '15',
+    color: colors.primary[700]!,
+    backgroundColor: colors.primary[50]!,
     criteria: '200+ işlem, 4.8+',
   },
   hall_of_fame: {
     icon: 'crown',
     label: 'Şöhretler Salonu',
     description: '500+ işlem, 4.9+ puan, 2+ yıl üyelik',
-    color: '#FF9800',
-    backgroundColor: '#FF9800' + '15',
+    color: colors.warning[600]!,
+    backgroundColor: colors.warning[50]!,
     criteria: '500+ işlem, 4.9+, 2+ yıl',
   },
 };
@@ -125,35 +126,35 @@ const RECOGNITION_CONFIG: Record<SpecialRecognition, {
     iconType: 'ionicons',
     label: 'Hızlı Gönderici',
     description: '95%+ ürünler 24 saat içinde gönderildi',
-    color: '#2196F3',
+    color: colors.info[600]!,
   },
   fair_trader: {
     icon: 'handshake',
     iconType: 'material',
     label: 'Adil Takas',
     description: '90%+ takas memnuniyeti',
-    color: '#4CAF50',
+    color: colors.success[600]!,
   },
   responsive: {
     icon: 'chatbubbles',
     iconType: 'ionicons',
     label: 'Hızlı Yanıt',
     description: 'Ortalama yanıt süresi < 2 saat',
-    color: '#9C27B0',
+    color: colors.primary[700]!,
   },
   collector_expert: {
     icon: 'school',
     iconType: 'material',
     label: 'Uzman Koleksiyoner',
     description: 'Belirli marka/kategoride uzmanlaşma',
-    color: '#FF9800',
+    color: colors.warning[600]!,
   },
   community_champion: {
     icon: 'people',
     iconType: 'ionicons',
     label: 'Topluluk Şampiyonu',
     description: 'Yüksek topluluk katılımı',
-    color: '#E91E63',
+    color: colors.danger[600]!,
   },
 };
 
@@ -165,7 +166,7 @@ export const SpecialRecognitionBadge: React.FC<SpecialRecognitionBadgeProps> = (
   const iconSize = size === 'small' ? 14 : 18;
 
   return (
-    <View style={[styles.recognitionBadge, { borderColor: config.color + '40' }]}>
+    <View style={[styles.recognitionBadge, { borderColor: colors.border.subtle }]}>
       {config.iconType === 'material' ? (
         <MaterialCommunityIcons name={config.icon as any} size={iconSize} color={config.color} />
       ) : (
@@ -200,15 +201,15 @@ export const ReputationScore: React.FC<ReputationScoreProps> = ({
     for (let i = 0; i < 5; i++) {
       if (i < fullStars) {
         stars.push(
-          <Ionicons key={i} name="star" size={18} color="#FFD700" />
+          <Ionicons key={i} name="star" size={18} color={colors.warning[500]!} />
         );
       } else if (i === fullStars && hasHalfStar) {
         stars.push(
-          <Ionicons key={i} name="star-half" size={18} color="#FFD700" />
+          <Ionicons key={i} name="star-half" size={18} color={colors.warning[500]!} />
         );
       } else {
         stars.push(
-          <Ionicons key={i} name="star-outline" size={18} color="#FFD700" />
+          <Ionicons key={i} name="star-outline" size={18} color={colors.warning[500]!} />
         );
       }
     }
@@ -301,7 +302,7 @@ const styles = StyleSheet.create({
     paddingVertical: 4,
     borderRadius: 8,
     borderWidth: 1,
-    backgroundColor: TarodanColors.background,
+    backgroundColor: colors.surface.DEFAULT,
     marginRight: 6,
     marginBottom: 6,
   },
@@ -311,7 +312,7 @@ const styles = StyleSheet.create({
     marginLeft: 4,
   },
   scoreContainer: {
-    backgroundColor: TarodanColors.background,
+    backgroundColor: colors.surface.DEFAULT,
     borderRadius: 12,
     padding: 12,
   },
@@ -326,12 +327,12 @@ const styles = StyleSheet.create({
     marginLeft: 8,
     fontSize: 18,
     fontWeight: 'bold',
-    color: TarodanColors.textPrimary,
+    color: colors.text.heading,
   },
   reviewCount: {
     marginLeft: 4,
     fontSize: 12,
-    color: TarodanColors.textSecondary,
+    color: colors.text.muted,
   },
   levelContainer: {
     marginTop: 8,
@@ -352,32 +353,32 @@ const styles = StyleSheet.create({
   breakdownLabel: {
     width: 100,
     fontSize: 12,
-    color: TarodanColors.textSecondary,
+    color: colors.text.muted,
   },
   breakdownBarContainer: {
     flex: 1,
     height: 8,
-    backgroundColor: TarodanColors.border,
+    backgroundColor: colors.border.DEFAULT,
     borderRadius: 4,
     marginHorizontal: 8,
     overflow: 'hidden',
   },
   breakdownBar: {
     height: '100%',
-    backgroundColor: '#FFD700',
+    backgroundColor: colors.warning[500]!,
     borderRadius: 4,
   },
   breakdownValue: {
     width: 30,
     fontSize: 12,
     fontWeight: '600',
-    color: TarodanColors.textPrimary,
+    color: colors.text.heading,
     textAlign: 'right',
   },
   breakdownWeight: {
     width: 40,
     fontSize: 10,
-    color: TarodanColors.textSecondary,
+    color: colors.text.muted,
     textAlign: 'right',
   },
 });

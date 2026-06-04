@@ -1,0 +1,62 @@
+# D-01: Checkout girişi smoke + B-001 koruma (kısmi).
+# Login → Ara tab → ilk ürün → Hemen Al → Teslimat Bilgileri → Ödeme adımı yüklenir.
+#
+# Tam B-001 (bypass payment chain) regression API-level test'te kapsanıyor
+# (apps/api/test/e2e/payment-bypass.e2e-spec.ts). Bu UI flow checkout chain'in
+# açılıp Ödeme adımına geçtiğini + bypass modunda kart formunun gizli olduğunu
+# (commit f9f3a81 ile getirildi) doğrular.
+appId: com.tarodan.app
+tags:
+  - smoke
+env:
+  EMAIL: zeynep@demo.com
+  PASSWORD: Demo123!
+---
+- runFlow: ../subflows/open-tarodan.yaml
+- tapOn:
+    text: "Profil"
+- runFlow:
+    when:
+      visible: "Çıkış Yap"
+    file: ../subflows/logout.yaml
+- runFlow: ../subflows/login-as.yaml
+- tapOn:
+    text: "Ara"
+- extendedWaitUntil:
+    visible:
+      text: ".*sonuç bulundu.*"
+    timeout: 30000
+- tapOn:
+    text: ".*₺.*"
+    index: 0
+- extendedWaitUntil:
+    visible: "Hemen Al"
+    timeout: 30000
+- tapOn: "Hemen Al"
+# Step 1 - Adres ekranı yüklendi
+- extendedWaitUntil:
+    visible: "Teslimat Bilgileri"
+    timeout: 15000
+- assertVisible: "Teslimat Bilgileri"
+- assertVisible: "Teslimat Adresi"
+- tapOn:
+    text: "Devam Et.*"
+# Step 2 - Ödeme adımı yüklendi. Bypass aktif → kart formu gizli, bilgi notice'i görünür.
+- extendedWaitUntil:
+    visible: "Kargo"
+    timeout: 15000
+- assertVisible: "Kargo"
+- assertVisible:
+    text: ".*Geliştirici modu.*"
+# Regression assertions (B-001):
+# 1. Kart numarası alanı bypass modunda render edilmemeli.
+- assertNotVisible: "Kart Bilgileri"
+- assertNotVisible:
+    text: ".*Kart Numaras.*"
+- assertNotVisible:
+    text: ".*[Cc]ard [Nn]umber.*"
+# 2. "Ödemeyi Tamamla" CTA görünür olmalı (bypass yine de bir submit butonu sunar).
+- assertVisible:
+    text: ".*Ödeme.*Tamamla.*|.*Ödemeyi.*"
+- assertNotVisible: ".*Network Error.*"
+- assertNotVisible: ".*Bir hata oluştu.*"

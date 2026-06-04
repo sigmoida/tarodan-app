@@ -32,6 +32,7 @@
     "prisma:push": "prisma db push",
     "prisma:seed": "prisma db seed",
     "prisma:studio": "prisma studio",
+    "seed:edge:auth": "ts-node -r tsconfig-paths/register prisma/seed-edge/auth-states.ts",
     "add-images": "ts-node -r tsconfig-paths/register scripts/add-images-to-products.ts",
     "fix-premium-trade": "ts-node -r tsconfig-paths/register scripts/fix-premium-trade.ts",
     "fix-user-membership": "ts-node -r tsconfig-paths/register scripts/fix-user-membership.ts",

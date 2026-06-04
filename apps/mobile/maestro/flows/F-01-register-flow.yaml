@@ -1,0 +1,61 @@
+# F-01: Register form happy path → login screen redirect.
+# Backend redirects to /(auth)/login on successful register; verify e-postanız doğrulayın
+# UI normalde verify-email ekranında çıkar. Bu flow form gönderimini ve form sonrası
+# auth navigasyonunu kapsar.
+# Email çakışmasından kaçınmak için timestamp tabanlı email gerekir; manual tag
+# kullanıyoruz çünkü her run benzersiz değer istemek için override edilmeli.
+appId: com.tarodan.app
+tags:
+  - manual
+env:
+  REG_EMAIL: e2e-${maestro.timestamp}@demo.com
+  REG_PASSWORD: Demo123!Demo
+  REG_NAME: E2E User
+---
+- runFlow: ../subflows/open-tarodan.yaml
+- tapOn:
+    text: "Profil"
+- runFlow:
+    when:
+      visible: "Çıkış Yap"
+    file: ../subflows/logout.yaml
+- runFlow:
+    when:
+      visible:
+        id: "profile-go-login-button"
+    commands:
+      - tapOn:
+          id: "profile-go-login-button"
+- extendedWaitUntil:
+    visible:
+      id: "login-email-input"
+    timeout: 15000
+- tapOn:
+    text: "Üye Ol|Kayıt Ol|Hesap Oluştur"
+- extendedWaitUntil:
+    visible:
+      id: "register-displayName-input"
+    timeout: 15000
+- tapOn:
+    id: "register-displayName-input"
+- inputText: ${REG_NAME}
+- tapOn:
+    id: "register-email-input"
+- inputText: ${REG_EMAIL}
+- tapOn:
+    id: "register-password-input"
+- inputText: ${REG_PASSWORD}
+- tapOn:
+    text: "Şifre Tekrar"
+- inputText: ${REG_PASSWORD}
+- tapOn:
+    text: "Kullanım koşullarını"
+- tapOn:
+    id: "register-submit-button"
+# Başarılı: login ekranına yönlendirilir VEYA verify-email gate çıkar.
+- extendedWaitUntil:
+    visible:
+      text: ".*doğrula.*|.*Giriş.*|.*E-posta.*"
+    timeout: 30000
+- assertNotVisible: ".*Network Error.*"
+- assertNotVisible: ".*Kayıt başarısız.*"

@@ -3,6 +3,8 @@ name: CI
 on:
   push:
     branches: [development]
+  pull_request:
+    branches: [development, master, main]
   workflow_dispatch:
     inputs:
       run_integration:
@@ -47,7 +49,7 @@ jobs:
           node-version: 20
           cache: pnpm
       - run: pnpm install --frozen-lockfile
-      - run: pnpm --filter @tarodan/api prisma:generate
+      - uses: ./.github/actions/prisma-generate
       - run: pnpm typecheck
 
   build:
@@ -63,7 +65,7 @@ jobs:
           node-version: 20
           cache: pnpm
       - run: pnpm install --frozen-lockfile
-      - run: pnpm --filter @tarodan/api prisma:generate
+      - uses: ./.github/actions/prisma-generate
       - run: pnpm build
 
   unit-test:
@@ -79,7 +81,7 @@ jobs:
           node-version: 20
           cache: pnpm
       - run: pnpm install --frozen-lockfile
-      - run: pnpm --filter @tarodan/api prisma:generate
+      - uses: ./.github/actions/prisma-generate
       - run: pnpm --filter @tarodan/api test
 
   e2e-test:
@@ -136,7 +138,7 @@ jobs:
           node-version: 20
           cache: pnpm
       - run: pnpm install --frozen-lockfile
-      - run: pnpm --filter @tarodan/api prisma:generate
+      - uses: ./.github/actions/prisma-generate
       - run: pnpm --filter @tarodan/api test:e2e:setup
       - run: pnpm --filter @tarodan/api test:e2e
 
@@ -155,7 +157,7 @@ jobs:
           node-version: 20
           cache: pnpm
       - run: pnpm install --frozen-lockfile
-      - run: pnpm --filter @tarodan/api prisma:generate
+      - uses: ./.github/actions/prisma-generate
       - run: pnpm --filter @tarodan/api test:integration
         env:
           PAYTR_MERCHANT_ID: ${{ secrets.PAYTR_MERCHANT_ID }}

@@ -1,0 +1,26 @@
+# E-07: Bildirimler tab smoke — login → Bildirimler tab → liste yüklenir.
+# Best-effort: stockout thumbnail spesifik testi fixture'a bağlı; bu yüzden
+# burada sadece tab'in açıldığı + en az bir bildirim kartı görünür olduğu doğrulanır.
+appId: com.tarodan.app
+tags:
+  - regression
+env:
+  EMAIL: zeynep@demo.com
+  PASSWORD: Demo123!
+---
+- runFlow: ../subflows/open-tarodan.yaml
+- tapOn:
+    text: "Profil"
+- runFlow:
+    when:
+      visible: "Çıkış Yap"
+    file: ../subflows/logout.yaml
+- runFlow: ../subflows/login-as.yaml
+- tapOn:
+    text: "Bildirimler"
+- waitForAnimationToEnd
+- extendedWaitUntil:
+    visible: "Bildirimler"
+    timeout: 30000
+- assertNotVisible: ".*Network Error.*"
+- assertNotVisible: ".*Bir hata oluştu.*"

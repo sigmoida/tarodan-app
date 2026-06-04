@@ -1,229 +1,282 @@
-import React, { useState, useCallback } from 'react';
+import React, { useState } from 'react';
+import { View, StyleSheet, ScrollView, Alert } from 'react-native';
 import {
-  View,
+  Button,
+  Card,
+  Modal,
+  FAB,
+  IconButton,
+  Input,
   Text,
-  FlatList,
-  TouchableOpacity,
-  StyleSheet,
-  ActivityIndicator,
-  Alert,
-  RefreshControl,
-} from 'react-native';
+  theme,
+} from '@tarodan/ui-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { router, useFocusEffect } from 'expo-router';
-import { Ionicons } from '@expo/vector-icons';
-import { TarodanColors } from '../../src/theme';
-import { useAuthStore } from '../../src/stores/authStore';
+import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
+import { router } from 'expo-router';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { paymentsApi } from '../../src/services/api';
+import { ScreenHeader, ScreenLoader, EmptyState } from '../../src/components/common';
+import { useAuthStore } from '../../src/stores/authStore';
+
+const { colors } = theme;
 
 interface PaymentMethod {
-  id: string;
-  last4: string;
-  brand: string;
-  expiryMonth: number;
-  expiryYear: number;
-  isDefault: boolean;
-  cardHolder?: string;
+  cardToken: string;
+  cardAlias?: string;
+  cardHolderName?: string;
+  lastFourDigits?: string;
+  cardBrand?: string;
+  binNumber?: string;
+  expireMonth?: string;
+  expireYear?: string;
+  isDefault?: boolean;
 }
 
-const BRAND_ICONS: Record<string, { icon: string; color: string }> = {
-  visa: { icon: 'card', color: '#1A1F71' },
-  mastercard: { icon: 'card', color: '#EB001B' },
-  amex: { icon: 'card', color: '#006FCF' },
-  troy: { icon: 'card', color: '#00427A' },
-};
-
-function getBrandDisplay(brand: string): { icon: string; color: string; label: string } {
-  const key = brand?.toLowerCase() || '';
-  const cfg = BRAND_ICONS[key] || { icon: 'card-outline', color: TarodanColors.textSecondary };
-  const labels: Record<string, string> = {
-    visa: 'Visa',
-    mastercard: 'Mastercard',
-    amex: 'American Express',
-    troy: 'Troy',
-  };
-  return { ...cfg, label: labels[key] || brand || 'Kart' };
+function brandIcon(brand?: string): React.ComponentProps<typeof MaterialCommunityIcons>['name'] {
+  const lower = (brand || '').toLowerCase();
+  if (lower.includes('visa')) return 'credit-card';
+  if (lower.includes('master')) return 'credit-card';
+  if (lower.includes('amex') || lower.includes('american')) return 'credit-card';
+  return 'credit-card-outline';
 }
 
 export default function PaymentMethodsScreen() {
   const { isAuthenticated } = useAuthStore();
-  const [methods, setMethods] = useState<PaymentMethod[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
-  const [isRefreshing, setIsRefreshing] = useState(false);
-  const [deletingId, setDeletingId] = useState<string | null>(null);
+  const queryClient = useQueryClient();
+  const [dialogOpen, setDialogOpen] = useState(false);
+  const [form, setForm] = useState({
+    cardHolderName: '',
+    cardNumber: '',
+    expireMonth: '',
+    expireYear: '',
+    cvc: '',
+    cardAlias: '',
+  });
 
-  const fetchMethods = useCallback(async (showRefresh = false) => {
-    if (!isAuthenticated) return;
-    if (showRefresh) setIsRefreshing(true);
-    else setIsLoading(true);
+  const { data, isLoading } = useQuery({
+    queryKey: ['payment-methods'],
+    queryFn: async () => {
+      const response = await paymentsApi.getPaymentMethods();
+      const payload = response.data?.data ?? response.data ?? [];
+      return Array.isArray(payload) ? payload : [];
+    },
+    enabled: isAuthenticated,
+  });
 
-    try {
-      const res = await paymentsApi.getMethods();
-      setMethods(res.data?.data || res.data || []);
-    } catch {
-      if (!showRefresh) {
-        Alert.alert('Hata', 'Ödeme yöntemleri yüklenirken bir hata oluştu.');
-      }
-    } finally {
-      setIsLoading(false);
-      setIsRefreshing(false);
-    }
-  }, [isAuthenticated]);
+  const methods: PaymentMethod[] = data ?? [];
 
-  useFocusEffect(
-    useCallback(() => {
-      fetchMethods();
-    }, [fetchMethods])
-  );
-
-  const handleDelete = (method: PaymentMethod) => {
-    const brandInfo = getBrandDisplay(method.brand);
-    Alert.alert(
-      'Kartı Sil',
-      `${brandInfo.label} •••• ${method.last4} kartını silmek istediğinize emin misiniz?`,
-      [
-        { text: 'Vazgeç', style: 'cancel' },
-        {
-          text: 'Sil',
-          style: 'destructive',
-          onPress: async () => {
-            setDeletingId(method.id);
-            try {
-              await paymentsApi.deleteMethod(method.id);
-              setMethods((prev) => prev.filter((m) => m.id !== method.id));
-            } catch {
-              Alert.alert('Hata', 'Kart silinirken bir hata oluştu.');
-            } finally {
-              setDeletingId(null);
-            }
-          },
+  const addMutation = useMutation({
+    mutationFn: () =>
+      paymentsApi.addPaymentMethod({
+        card: {
+          cardHolderName: form.cardHolderName.trim(),
+          cardNumber: form.cardNumber.replace(/\s/g, ''),
+          expireMonth: form.expireMonth.trim(),
+          expireYear: form.expireYear.trim(),
+          cvc: form.cvc.trim(),
+          cardAlias: form.cardAlias.trim() || undefined,
         },
-      ]
-    );
+      }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['payment-methods'] });
+      resetForm();
+      setDialogOpen(false);
+      Alert.alert('Başarılı', 'Kart başarıyla kaydedildi.');
+    },
+    onError: (e: any) =>
+      Alert.alert('Hata', e?.response?.data?.message || 'Kart kaydedilemedi.'),
+  });
+
+  const deleteMutation = useMutation({
+    mutationFn: (cardToken: string) => paymentsApi.deletePaymentMethod(cardToken),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['payment-methods'] });
+    },
+    onError: () => Alert.alert('Hata', 'Kart silinemedi.'),
+  });
+
+  const resetForm = () =>
+    setForm({
+      cardHolderName: '',
+      cardNumber: '',
+      expireMonth: '',
+      expireYear: '',
+      cvc: '',
+      cardAlias: '',
+    });
+
+  const handleAdd = () => {
+    if (!form.cardHolderName.trim()) return Alert.alert('Eksik bilgi', 'Kart sahibi gerekli.');
+    const cleanNumber = form.cardNumber.replace(/\s/g, '');
+    if (cleanNumber.length < 15 || cleanNumber.length > 19)
+      return Alert.alert('Eksik bilgi', 'Geçerli bir kart numarası girin.');
+    if (!/^\d{1,2}$/.test(form.expireMonth) || parseInt(form.expireMonth, 10) < 1 || parseInt(form.expireMonth, 10) > 12)
+      return Alert.alert('Eksik bilgi', 'Geçerli ay (1-12) girin.');
+    if (!/^\d{2,4}$/.test(form.expireYear))
+      return Alert.alert('Eksik bilgi', 'Geçerli yıl girin.');
+    if (!/^\d{3,4}$/.test(form.cvc))
+      return Alert.alert('Eksik bilgi', 'Geçerli CVC girin.');
+    addMutation.mutate();
   };
 
-  const handleAddCard = () => {
-    Alert.alert('Yakında', 'Yeni kart ekleme özelliği yakında aktif olacaktır.');
-  };
-
-  const renderMethodItem = ({ item }: { item: PaymentMethod }) => {
-    const brandInfo = getBrandDisplay(item.brand);
-    const isDeleting = deletingId === item.id;
-
-    return (
-      <View style={styles.cardItem}>
-        <View style={[styles.cardIconContainer, { backgroundColor: brandInfo.color + '12' }]}>
-          <Ionicons name={brandInfo.icon as any} size={24} color={brandInfo.color} />
-        </View>
-
-        <View style={styles.cardInfo}>
-          <View style={styles.cardNameRow}>
-            <Text style={styles.cardBrand}>{brandInfo.label}</Text>
-            {item.isDefault && (
-              <View style={styles.defaultBadge}>
-                <Text style={styles.defaultBadgeText}>Varsayılan</Text>
-              </View>
-            )}
-          </View>
-          <Text style={styles.cardNumber}>•••• •••• •••• {item.last4}</Text>
-          <Text style={styles.cardExpiry}>
-            Son kullanma: {String(item.expiryMonth).padStart(2, '0')}/{item.expiryYear}
-          </Text>
-        </View>
-
-        <TouchableOpacity
-          style={styles.deleteBtn}
-          onPress={() => handleDelete(item)}
-          disabled={isDeleting}
-          hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
-        >
-          {isDeleting ? (
-            <ActivityIndicator size="small" color={TarodanColors.error} />
-          ) : (
-            <Ionicons name="trash-outline" size={20} color={TarodanColors.error} />
-          )}
-        </TouchableOpacity>
-      </View>
-    );
+  const handleDelete = (m: PaymentMethod) => {
+    Alert.alert('Kartı Sil', 'Bu kartı silmek istediğinize emin misiniz?', [
+      { text: 'Vazgeç', style: 'cancel' },
+      {
+        text: 'Sil',
+        style: 'destructive',
+        onPress: () => deleteMutation.mutate(m.cardToken),
+      },
+    ]);
   };
 
   if (!isAuthenticated) {
     return (
       <SafeAreaView style={styles.container} edges={['top']}>
-        <View style={styles.header}>
-          <TouchableOpacity onPress={() => router.back()} style={styles.headerBackBtn}>
-            <Ionicons name="arrow-back" size={24} color={TarodanColors.textOnPrimary} />
-          </TouchableOpacity>
-          <Text style={styles.headerTitle}>Ödeme Yöntemleri</Text>
-          <View style={styles.headerPlaceholder} />
-        </View>
-        <View style={styles.centeredContainer}>
-          <Ionicons name="log-in-outline" size={48} color={TarodanColors.textTertiary} />
-          <Text style={styles.emptyTitle}>Giriş Yapın</Text>
-          <Text style={styles.emptySubtitle}>Ödeme yöntemlerinizi yönetmek için giriş yapın</Text>
-          <TouchableOpacity style={styles.primaryButton} onPress={() => router.push('/(auth)/login')}>
-            <Text style={styles.primaryButtonText}>Giriş Yap</Text>
-          </TouchableOpacity>
-        </View>
+        <ScreenHeader title="Ödeme Yöntemleri" />
+        <EmptyState
+          fullscreen
+          icon="card-outline"
+          title="Kaydedilmiş kartları görmek için giriş yapın"
+          actionLabel="Giriş Yap"
+          onAction={() => router.push('/(auth)/login')}
+        />
       </SafeAreaView>
     );
   }
 
   return (
     <SafeAreaView style={styles.container} edges={['top']}>
-      <View style={styles.header}>
-        <TouchableOpacity onPress={() => router.back()} style={styles.headerBackBtn}>
-          <Ionicons name="arrow-back" size={24} color={TarodanColors.textOnPrimary} />
-        </TouchableOpacity>
-        <Text style={styles.headerTitle}>Ödeme Yöntemleri</Text>
-        <View style={styles.headerPlaceholder} />
-      </View>
+      <ScreenHeader title="Ödeme Yöntemleri" />
 
       {isLoading ? (
-        <View style={styles.centeredContainer}>
-          <ActivityIndicator size="large" color={TarodanColors.primary} />
-        </View>
-      ) : (
-        <FlatList
-          data={methods}
-          keyExtractor={(item) => item.id}
-          renderItem={renderMethodItem}
-          contentContainerStyle={methods.length === 0 ? styles.emptyListContainer : styles.listContent}
-          ItemSeparatorComponent={() => <View style={styles.separator} />}
-          refreshControl={
-            <RefreshControl
-              refreshing={isRefreshing}
-              onRefresh={() => fetchMethods(true)}
-              colors={[TarodanColors.primary]}
-              tintColor={TarodanColors.primary}
-            />
-          }
-          ListHeaderComponent={
-            methods.length > 0 ? (
-              <TouchableOpacity style={styles.addCardButton} onPress={handleAddCard} activeOpacity={0.7}>
-                <View style={styles.addCardIconCircle}>
-                  <Ionicons name="add" size={22} color={TarodanColors.primary} />
-                </View>
-                <Text style={styles.addCardText}>Yeni Kart Ekle</Text>
-                <Ionicons name="chevron-forward" size={20} color={TarodanColors.textTertiary} />
-              </TouchableOpacity>
-            ) : null
-          }
-          ListEmptyComponent={
-            <View style={styles.emptyContainer}>
-              <View style={styles.emptyIconCircle}>
-                <Ionicons name="card-outline" size={48} color={TarodanColors.textTertiary} />
-              </View>
-              <Text style={styles.emptyTitle}>Kayıtlı ödeme yönteminiz yok</Text>
-              <Text style={styles.emptySubtitle}>Hızlı ödeme için kart ekleyebilirsiniz</Text>
-              <TouchableOpacity style={styles.primaryButton} onPress={handleAddCard}>
-                <Ionicons name="add-circle-outline" size={18} color={TarodanColors.textOnPrimary} />
-                <Text style={styles.primaryButtonText}>Kart Ekle</Text>
-              </TouchableOpacity>
-            </View>
-          }
+        <ScreenLoader />
+      ) : methods.length === 0 ? (
+        <EmptyState
+          fullscreen
+          icon="card-outline"
+          title="Kayıtlı kart yok"
+          subtitle="Kayıtlı bir kart eklerseniz sonraki ödemelerinizde hızlıca kullanabilirsiniz."
+          actionLabel="Kart Ekle"
+          onAction={() => setDialogOpen(true)}
         />
+      ) : (
+        <ScrollView contentContainerStyle={styles.list}>
+          {methods.map(m => (
+            <Card key={m.cardToken} style={styles.cardItem}>
+              <View style={styles.cardContent}>
+                <View style={styles.cardIconWrap}>
+                  <MaterialCommunityIcons
+                    name={brandIcon(m.cardBrand)}
+                    size={28}
+                    color={colors.primary[600]!}
+                  />
+                </View>
+                <View style={styles.cardBody}>
+                  <Text style={styles.cardAlias}>{m.cardAlias || 'Kart'}</Text>
+                  <Text style={styles.cardNumber}>
+                    {m.cardBrand ? `${m.cardBrand} ` : ''}•••• {m.lastFourDigits || '****'}
+                  </Text>
+                  {m.expireMonth && m.expireYear ? (
+                    <Text style={styles.cardExpiry}>
+                      Son Kullanım: {m.expireMonth}/{m.expireYear}
+                    </Text>
+                  ) : null}
+                  {m.cardHolderName ? (
+                    <Text style={styles.cardHolder}>{m.cardHolderName}</Text>
+                  ) : null}
+                </View>
+                <IconButton
+                  icon="trash-outline"
+                  variant="danger"
+                  accessibilityLabel="Kartı sil"
+                  onPress={() => handleDelete(m)}
+                />
+              </View>
+            </Card>
+          ))}
+
+          <View style={styles.secNote}>
+            <Ionicons name="lock-closed" size={14} color={colors.success[600]!} />
+            <Text style={styles.secNoteText}>
+              Kart bilgileriniz PCI-DSS uyumlu ödeme sağlayıcıda saklanır; Tarodan'da tam kart numarası bulunmaz.
+            </Text>
+          </View>
+        </ScrollView>
       )}
+
+      {methods.length > 0 ? (
+        <FAB
+          icon="add"
+          accessibilityLabel="Yeni kart ekle"
+          style={styles.fab}
+          onPress={() => setDialogOpen(true)}
+        />
+      ) : null}
+
+      <Modal isOpen={dialogOpen} onClose={() => setDialogOpen(false)} title="Yeni Kart">
+        <ScrollView>
+          <Input
+            label="Kart Takma Adı (ör. 'İş Kartım')"
+            value={form.cardAlias}
+            onChangeText={(v: string) => setForm(f => ({ ...f, cardAlias: v }))}
+            containerStyle={styles.input}
+          />
+          <Input
+            label="Kart Sahibi"
+            value={form.cardHolderName}
+            onChangeText={(v: string) => setForm(f => ({ ...f, cardHolderName: v }))}
+            containerStyle={styles.input}
+          />
+          <Input
+            label="Kart Numarası"
+            value={form.cardNumber}
+            onChangeText={(v: string) => setForm(f => ({ ...f, cardNumber: v.replace(/[^\d\s]/g, '') }))}
+            keyboardType="number-pad"
+            maxLength={19}
+            containerStyle={styles.input}
+          />
+          <View style={styles.row}>
+            <Input
+              label="Ay"
+              placeholder="MM"
+              value={form.expireMonth}
+              onChangeText={(v: string) => setForm(f => ({ ...f, expireMonth: v.replace(/[^\d]/g, '') }))}
+              keyboardType="number-pad"
+              maxLength={2}
+              containerStyle={styles.rowItem}
+            />
+            <Input
+              label="Yıl"
+              placeholder="YY"
+              value={form.expireYear}
+              onChangeText={(v: string) => setForm(f => ({ ...f, expireYear: v.replace(/[^\d]/g, '') }))}
+              keyboardType="number-pad"
+              maxLength={4}
+              containerStyle={styles.rowItem}
+            />
+            <Input
+              label="CVC"
+              value={form.cvc}
+              onChangeText={(v: string) => setForm(f => ({ ...f, cvc: v.replace(/[^\d]/g, '') }))}
+              keyboardType="number-pad"
+              maxLength={4}
+              secureTextEntry
+              containerStyle={styles.rowItem}
+            />
+          </View>
+          <View style={styles.dialogActions}>
+            <Button variant="ghost" title="Vazgeç" onPress={() => setDialogOpen(false)} />
+            <Button
+              variant="primary"
+              title="Kaydet"
+              onPress={handleAdd}
+              isLoading={addMutation.isPending}
+              disabled={addMutation.isPending}
+            />
+          </View>
+        </ScrollView>
+      </Modal>
     </SafeAreaView>
   );
 }
@@ -231,164 +284,86 @@ export default function PaymentMethodsScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: TarodanColors.backgroundSecondary,
+    backgroundColor: colors.surface.alt,
   },
-  header: {
-    backgroundColor: TarodanColors.primary,
-    paddingBottom: 16,
-    paddingHorizontal: 20,
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-  },
-  headerBackBtn: {
-    padding: 4,
-  },
-  headerTitle: {
-    fontSize: 18,
-    fontWeight: 'bold',
-    color: TarodanColors.textOnPrimary,
-  },
-  headerPlaceholder: {
-    width: 32,
-  },
-  centeredContainer: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-    padding: 32,
-  },
-  listContent: {
+  list: {
     padding: 16,
-  },
-  emptyListContainer: {
-    flexGrow: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-    padding: 32,
-  },
-  addCardButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: TarodanColors.background,
-    borderRadius: 12,
-    padding: 16,
-    marginBottom: 12,
-    borderWidth: 1,
-    borderColor: TarodanColors.primary + '30',
-    borderStyle: 'dashed',
-  },
-  addCardIconCircle: {
-    width: 36,
-    height: 36,
-    borderRadius: 18,
-    backgroundColor: TarodanColors.primary + '12',
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginRight: 12,
-  },
-  addCardText: {
-    flex: 1,
-    fontSize: 15,
-    fontWeight: '600',
-    color: TarodanColors.primary,
+    gap: 10,
   },
   cardItem: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: TarodanColors.background,
+    backgroundColor: colors.surface.DEFAULT,
     borderRadius: 12,
-    padding: 16,
   },
-  cardIconContainer: {
-    width: 44,
-    height: 44,
-    borderRadius: 22,
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginRight: 12,
-  },
-  cardInfo: {
-    flex: 1,
-  },
-  cardNameRow: {
+  cardContent: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginBottom: 2,
+    gap: 10,
+    paddingVertical: 8,
   },
-  cardBrand: {
+  cardIconWrap: {
+    width: 48,
+    height: 48,
+    borderRadius: 10,
+    backgroundColor: colors.primary[50]!,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  cardBody: {
+    flex: 1,
+    gap: 2,
+  },
+  cardAlias: {
     fontSize: 15,
-    fontWeight: '600',
-    color: TarodanColors.textPrimary,
-  },
-  defaultBadge: {
-    backgroundColor: TarodanColors.primary + '15',
-    paddingHorizontal: 8,
-    paddingVertical: 2,
-    borderRadius: 8,
-    marginLeft: 8,
-  },
-  defaultBadgeText: {
-    fontSize: 11,
-    fontWeight: '600',
-    color: TarodanColors.primary,
+    fontWeight: '700',
+    color: colors.text.heading,
   },
   cardNumber: {
-    fontSize: 14,
-    color: TarodanColors.textSecondary,
+    fontSize: 13,
+    color: colors.text.muted,
     letterSpacing: 1,
-    marginBottom: 2,
   },
   cardExpiry: {
     fontSize: 12,
-    color: TarodanColors.textTertiary,
+    color: colors.text.subtle,
   },
-  deleteBtn: {
-    padding: 8,
-    marginLeft: 8,
+  cardHolder: {
+    fontSize: 12,
+    color: colors.text.subtle,
   },
-  separator: {
-    height: 8,
-  },
-  emptyContainer: {
-    alignItems: 'center',
-    paddingVertical: 40,
-  },
-  emptyIconCircle: {
-    width: 80,
-    height: 80,
-    borderRadius: 40,
-    backgroundColor: TarodanColors.backgroundTertiary,
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginBottom: 16,
-  },
-  emptyTitle: {
-    fontSize: 17,
-    fontWeight: '600',
-    color: TarodanColors.textPrimary,
-    marginTop: 8,
-    marginBottom: 6,
-  },
-  emptySubtitle: {
-    fontSize: 14,
-    color: TarodanColors.textSecondary,
-    textAlign: 'center',
-    marginBottom: 20,
-  },
-  primaryButton: {
+  secNote: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: TarodanColors.primary,
-    paddingHorizontal: 24,
-    paddingVertical: 12,
-    borderRadius: 10,
     gap: 6,
-    marginTop: 4,
+    padding: 12,
+    backgroundColor: colors.success[50]!,
+    borderRadius: 10,
+    marginTop: 8,
   },
-  primaryButtonText: {
-    color: TarodanColors.textOnPrimary,
-    fontSize: 15,
-    fontWeight: '600',
+  secNoteText: {
+    flex: 1,
+    fontSize: 12,
+    color: colors.success[600]!,
+  },
+  fab: {
+    position: 'absolute',
+    right: 16,
+    bottom: 24,
+  },
+  input: {
+    marginBottom: 12,
+  },
+  row: {
+    flexDirection: 'row',
+    gap: 8,
+  },
+  rowItem: {
+    flex: 1,
+    marginBottom: 12,
+  },
+  dialogActions: {
+    flexDirection: 'row',
+    justifyContent: 'flex-end',
+    gap: 8,
+    marginTop: 8,
   },
 });

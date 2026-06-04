@@ -1,16 +1,17 @@
 import { useEffect } from 'react';
 import { View, ScrollView, StyleSheet, TouchableOpacity, Image } from 'react-native';
-import { Text, Button, IconButton, Divider } from 'react-native-paper';
+import { Button, IconButton, Divider, Text, theme } from '@tarodan/ui-native';
 import { router } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
-import { TarodanColors } from '../src/theme';
 import { useCartStore } from '../src/stores/cartStore';
 import { transformImageUrl } from '../src/utils/imageUrl';
-import { safeString } from '../src/utils/safeString';
+import { asLabel } from '../src/utils/format';
+
+const { colors } = theme;
 
 export default function CartScreen() {
   const { items, getSubtotal, getItemCount, removeItem, updateQuantity, cleanExpiredItems } = useCartStore();
-  
+
   // Clean expired items on mount
   useEffect(() => {
     cleanExpiredItems();
@@ -37,26 +38,24 @@ export default function CartScreen() {
       <View style={styles.emptyContainer}>
         <View style={styles.header}>
           <TouchableOpacity onPress={() => router.back()}>
-            <Ionicons name="arrow-back" size={24} color={TarodanColors.textOnPrimary} />
+            <Ionicons name="arrow-back" size={24} color={colors.white} />
           </TouchableOpacity>
           <Text style={styles.headerTitle}>Sepetim</Text>
           <View style={{ width: 24 }} />
         </View>
-        
+
         <View style={styles.emptyContent}>
-          <Ionicons name="cart-outline" size={80} color={TarodanColors.textSecondary} />
+          <Ionicons name="cart-outline" size={80} color={colors.text.muted} />
           <Text style={styles.emptyTitle}>Sepetiniz Boş</Text>
           <Text style={styles.emptySubtitle}>
             İlanlara göz atın ve beğendiklerinizi sepete ekleyin
           </Text>
           <Button
-            mode="contained"
-            buttonColor={TarodanColors.primary}
+            variant="primary"
+            title="İlanlara Göz At"
             onPress={() => router.replace('/')}
             style={{ marginTop: 24 }}
-          >
-            İlanlara Göz At
-          </Button>
+          />
         </View>
       </View>
     );
@@ -67,7 +66,7 @@ export default function CartScreen() {
       {/* Header */}
       <View style={styles.header}>
         <TouchableOpacity onPress={() => router.back()}>
-          <Ionicons name="arrow-back" size={24} color={TarodanColors.textOnPrimary} />
+          <Ionicons name="arrow-back" size={24} color={colors.white} />
         </TouchableOpacity>
         <Text style={styles.headerTitle}>Sepetim ({itemCount})</Text>
         <View style={{ width: 24 }} />
@@ -75,7 +74,7 @@ export default function CartScreen() {
 
       {/* Expiry Notice */}
       <View style={styles.expiryNotice}>
-        <Ionicons name="time-outline" size={16} color={TarodanColors.warning} />
+        <Ionicons name="time-outline" size={16} color={colors.warning[600]!} />
         <Text style={styles.expiryText}>
           Sepetinizdeki ürünler 24 saat sonra otomatik olarak silinir
         </Text>
@@ -84,41 +83,41 @@ export default function CartScreen() {
       <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
         {/* Cart Items */}
         {items.map((item) => (
-          <View key={item.id} style={styles.cartItem}>
+          <View key={item.id} testID="cart-item-row" style={styles.cartItem}>
             <TouchableOpacity onPress={() => router.push(`/product/${item.productId}`)}>
-              <Image 
-                source={{ uri: transformImageUrl(item.imageUrl) || 'https://placehold.co/100x100/f3f4f6/9ca3af?text=Ürün' }} 
-                style={styles.itemImage} 
+              <Image
+                source={{ uri: transformImageUrl(item.imageUrl) || 'https://placehold.co/100x100/f3f4f6/9ca3af?text=Ürün' }}
+                style={styles.itemImage}
               />
             </TouchableOpacity>
             <View style={styles.itemInfo}>
               <TouchableOpacity onPress={() => router.push(`/product/${item.productId}`)}>
                 <Text style={styles.itemTitle} numberOfLines={2}>{item.title}</Text>
               </TouchableOpacity>
-              <Text style={styles.itemMeta}>{safeString(item.brand, 'Marka')} • {safeString(item.scale, '1:64')}</Text>
-              <Text style={styles.itemSeller}>Satıcı: {item.seller?.displayName || 'Satıcı'}</Text>
-              <Text style={styles.itemPrice}>₺{(item.price ?? 0).toLocaleString('tr-TR')}</Text>
+              <Text style={styles.itemMeta}>{asLabel(item.brand, 'Marka')} • {asLabel(item.scale, '1:64')}</Text>
+              <Text style={styles.itemSeller}>Satıcı: {item.seller.displayName}</Text>
+              <Text style={styles.itemPrice}>₺{item.price.toLocaleString('tr-TR')}</Text>
             </View>
             <View style={styles.itemActions}>
               <IconButton
-                icon="trash-can-outline"
-                size={20}
-                iconColor={TarodanColors.error}
+                icon="trash-outline"
+                accessibilityLabel="Ürünü sepetten kaldır"
+                size="md"
                 onPress={() => handleRemove(item.id)}
               />
               <View style={styles.quantityControl}>
-                <TouchableOpacity 
+                <TouchableOpacity
                   style={styles.quantityButton}
                   onPress={() => handleQuantityChange(item.id, -1)}
                 >
-                  <Ionicons name="remove" size={16} color={TarodanColors.textPrimary} />
+                  <Ionicons name="remove" size={16} color={colors.text.heading} />
                 </TouchableOpacity>
                 <Text style={styles.quantityText}>{item.quantity}</Text>
-                <TouchableOpacity 
+                <TouchableOpacity
                   style={styles.quantityButton}
                   onPress={() => handleQuantityChange(item.id, 1)}
                 >
-                  <Ionicons name="add" size={16} color={TarodanColors.textPrimary} />
+                  <Ionicons name="add" size={16} color={colors.text.heading} />
                 </TouchableOpacity>
               </View>
             </View>
@@ -145,7 +144,7 @@ export default function CartScreen() {
 
         {/* Guest Checkout Info */}
         <View style={styles.guestInfo}>
-          <Ionicons name="information-circle-outline" size={20} color={TarodanColors.info} />
+          <Ionicons name="information-circle-outline" size={20} color={colors.info[600]!} />
           <Text style={styles.guestInfoText}>
             Üye olmadan da alışveriş yapabilirsiniz. Siparişinizi e-posta ile takip edebilirsiniz.
           </Text>
@@ -161,13 +160,12 @@ export default function CartScreen() {
           <Text style={styles.checkoutPrice}>₺{total.toLocaleString('tr-TR')}</Text>
         </View>
         <Button
-          mode="contained"
+          testID="cart-checkout-button"
+          variant="primary"
+          title="Satın Al"
           style={styles.checkoutButton}
-          buttonColor={TarodanColors.primary}
           onPress={() => router.push('/checkout')}
-        >
-          Satın Al
-        </Button>
+        />
       </View>
     </View>
   );
@@ -176,11 +174,11 @@ export default function CartScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: TarodanColors.backgroundSecondary,
+    backgroundColor: colors.surface.alt,
   },
   emptyContainer: {
     flex: 1,
-    backgroundColor: TarodanColors.backgroundSecondary,
+    backgroundColor: colors.surface.alt,
   },
   emptyContent: {
     flex: 1,
@@ -191,17 +189,17 @@ const styles = StyleSheet.create({
   emptyTitle: {
     fontSize: 20,
     fontWeight: 'bold',
-    color: TarodanColors.textPrimary,
+    color: colors.text.heading,
     marginTop: 16,
   },
   emptySubtitle: {
     fontSize: 14,
-    color: TarodanColors.textSecondary,
+    color: colors.text.muted,
     textAlign: 'center',
     marginTop: 8,
   },
   header: {
-    backgroundColor: TarodanColors.primary,
+    backgroundColor: colors.primary[600]!,
     paddingTop: 50,
     paddingBottom: 16,
     paddingHorizontal: 20,
@@ -212,21 +210,21 @@ const styles = StyleSheet.create({
   headerTitle: {
     fontSize: 18,
     fontWeight: 'bold',
-    color: TarodanColors.textOnPrimary,
+    color: colors.white,
   },
   expiryNotice: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#FFF8E1',
+    backgroundColor: colors.warning[50]!,
     paddingHorizontal: 16,
     paddingVertical: 10,
     borderBottomWidth: 1,
-    borderBottomColor: TarodanColors.border,
+    borderBottomColor: colors.border.DEFAULT,
   },
   expiryText: {
     flex: 1,
     fontSize: 12,
-    color: '#F57C00',
+    color: colors.warning[700]!,
     marginLeft: 8,
   },
   content: {
@@ -234,13 +232,13 @@ const styles = StyleSheet.create({
     padding: 16,
   },
   cartItem: {
-    backgroundColor: TarodanColors.background,
+    backgroundColor: colors.surface.DEFAULT,
     borderRadius: 12,
     padding: 12,
     flexDirection: 'row',
     marginBottom: 12,
     elevation: 2,
-    shadowColor: '#000',
+    shadowColor: colors.black,
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.1,
     shadowRadius: 4,
@@ -249,7 +247,7 @@ const styles = StyleSheet.create({
     width: 80,
     height: 80,
     borderRadius: 8,
-    backgroundColor: TarodanColors.surfaceVariant,
+    backgroundColor: colors.surface.alt,
   },
   itemInfo: {
     flex: 1,
@@ -258,22 +256,22 @@ const styles = StyleSheet.create({
   itemTitle: {
     fontSize: 14,
     fontWeight: '600',
-    color: TarodanColors.textPrimary,
+    color: colors.text.heading,
   },
   itemMeta: {
     fontSize: 12,
-    color: TarodanColors.textSecondary,
+    color: colors.text.muted,
     marginTop: 2,
   },
   itemSeller: {
     fontSize: 12,
-    color: TarodanColors.textSecondary,
+    color: colors.text.muted,
     marginTop: 2,
   },
   itemPrice: {
     fontSize: 16,
     fontWeight: 'bold',
-    color: TarodanColors.primary,
+    color: colors.primary[600]!,
     marginTop: 8,
   },
   itemActions: {
@@ -283,7 +281,7 @@ const styles = StyleSheet.create({
   quantityControl: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: TarodanColors.surfaceVariant,
+    backgroundColor: colors.surface.alt,
     borderRadius: 8,
     padding: 4,
   },
@@ -294,10 +292,10 @@ const styles = StyleSheet.create({
     fontSize: 14,
     fontWeight: '600',
     paddingHorizontal: 12,
-    color: TarodanColors.textPrimary,
+    color: colors.text.heading,
   },
   summary: {
-    backgroundColor: TarodanColors.background,
+    backgroundColor: colors.surface.DEFAULT,
     borderRadius: 12,
     padding: 16,
     marginTop: 8,
@@ -305,7 +303,7 @@ const styles = StyleSheet.create({
   summaryTitle: {
     fontSize: 16,
     fontWeight: 'bold',
-    color: TarodanColors.textPrimary,
+    color: colors.text.heading,
     marginBottom: 16,
   },
   summaryRow: {
@@ -315,25 +313,25 @@ const styles = StyleSheet.create({
   },
   summaryLabel: {
     fontSize: 14,
-    color: TarodanColors.textSecondary,
+    color: colors.text.muted,
   },
   summaryValue: {
     fontSize: 14,
-    color: TarodanColors.textPrimary,
+    color: colors.text.heading,
   },
   totalLabel: {
     fontSize: 16,
     fontWeight: 'bold',
-    color: TarodanColors.textPrimary,
+    color: colors.text.heading,
   },
   totalValue: {
     fontSize: 18,
     fontWeight: 'bold',
-    color: TarodanColors.primary,
+    color: colors.primary[600]!,
   },
   guestInfo: {
     flexDirection: 'row',
-    backgroundColor: '#E3F2FD',
+    backgroundColor: colors.info[50]!,
     padding: 12,
     borderRadius: 8,
     marginTop: 16,
@@ -341,28 +339,28 @@ const styles = StyleSheet.create({
   guestInfoText: {
     flex: 1,
     fontSize: 13,
-    color: '#1565C0',
+    color: colors.info[700]!,
     marginLeft: 8,
   },
   checkoutBar: {
-    backgroundColor: TarodanColors.background,
+    backgroundColor: colors.surface.DEFAULT,
     padding: 16,
     flexDirection: 'row',
     alignItems: 'center',
     borderTopWidth: 1,
-    borderTopColor: TarodanColors.border,
+    borderTopColor: colors.border.DEFAULT,
   },
   checkoutTotal: {
     flex: 1,
   },
   checkoutLabel: {
     fontSize: 12,
-    color: TarodanColors.textSecondary,
+    color: colors.text.muted,
   },
   checkoutPrice: {
     fontSize: 20,
     fontWeight: 'bold',
-    color: TarodanColors.textPrimary,
+    color: colors.text.heading,
   },
   checkoutButton: {
     borderRadius: 12,

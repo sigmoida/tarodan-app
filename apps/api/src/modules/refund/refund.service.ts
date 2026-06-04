@@ -28,6 +28,8 @@ import {
 } from '../surat-cargo/surat-cargo.types';
 import { CreateRefundRequestDto } from './dto/create-refund-request.dto';
 import { RejectRefundRequestDto } from './dto/reject-refund-request.dto';
+import { NotificationService } from '../notification/notification.service';
+import { NotificationType } from '../notification/dto/notification.dto';
 
 const COOLING_OFF_DAYS = 14;
 const SELLER_RESPONSE_DEADLINE_HOURS = 48;
@@ -47,9 +49,57 @@ export class RefundService {
     private readonly prisma: PrismaService,
     @Inject(forwardRef(() => PaymentService)) private readonly paymentService: PaymentService,
     private readonly suratCargoService: SuratCargoService,
+    private readonly notificationService: NotificationService,
   ) {}
 
+  /**
+   * Append a transition entry to RefundRequest.metadata.history. Used as a
+   * lightweight audit trail for buyer/seller actions (AuditLog requires an
+   * AdminUser FK and isn't applicable here).
+   */
+  private async appendHistory(
+    refundRequestId: string,
+    entry: { action: string; by: string; details?: Record<string, any> },
+  ): Promise<void> {
+    const current = await this.prisma.refundRequest.findUnique({
+      where: { id: refundRequestId },
+      select: { metadata: true },
+    });
+    const meta = (current?.metadata as Record<string, any>) || {};
+    const history = Array.isArray(meta.history) ? meta.history : [];
+    history.push({ ...entry, at: new Date().toISOString() });
+    await this.prisma.refundRequest.update({
+      where: { id: refundRequestId },
+      data: { metadata: { ...meta, history } },
+    });
+  }
+
+  /** Best-effort notification dispatch — failures are logged, never thrown. */
+  private async safeNotify(
+    userId: string,
+    type: NotificationType,
+    data?: Record<string, any>,
+  ): Promise<void> {
+    try {
+      await this.notificationService.createInAppNotification(userId, type, data);
+    } catch (err: any) {
+      this.logger.error(
+        `Notification ${type} → ${userId} failed: ${err?.message}`,
+      );
+    }
+  }
+
   async createRefundRequest(orderId: string, requesterId: string, dto: CreateRefundRequestDto) {
+    // Senaryo D kaldırıldı (Faz 5 sonrası karar): keyfi vazgeçme talebi
+    // kabul edilmiyor. Alıcı sadece somut bir sorun bildirebilir (hasar,
+    // yanlış ürün, eksik, sahte, kargoda kaybolma vb.). Cayma hakkı 14 günlük
+    // pencere içinde "not_as_described" veya "other" + açıklama ile değerlendirilir.
+    if ((dto.reason as any) === 'changed_mind') {
+      throw new BadRequestException(
+        'Keyfi vazgeçme iade gerekçesi olarak kabul edilmiyor. Ürünle ilgili somut bir sorun varsa lütfen uygun bir sebep seçin.',
+      );
+    }
+
     const order = await this.prisma.order.findUnique({
       where: { id: orderId },
       include: { payment: true, shipment: true, refundRequests: true },
@@ -124,7 +174,10 @@ export class RefundService {
   }
 
   async cancelRefundRequest(refundRequestId: string, requesterId: string) {
-    const rr = await this.prisma.refundRequest.findUnique({ where: { id: refundRequestId } });
+    const rr = await this.prisma.refundRequest.findUnique({
+      where: { id: refundRequestId },
+      include: { order: { select: { id: true, sellerId: true } } },
+    });
     if (!rr) throw new NotFoundException('İade talebi bulunamadı');
     if (rr.requesterId !== requesterId) {
       throw new ForbiddenException('Bu talebi iptal edemezsiniz');
@@ -137,10 +190,24 @@ export class RefundService {
         'Bu talep artık iptal edilemez (iade kargosu açılmış veya karara bağlanmış)',
       );
     }
-    return this.prisma.refundRequest.update({
+    const updated = await this.prisma.refundRequest.update({
       where: { id: refundRequestId },
-      data: { status: RefundRequestStatus.cancelled, decidedAt: new Date() },
+      data: {
+        status: RefundRequestStatus.cancelled,
+        decidedAt: new Date(),
+        decidedBy: requesterId,
+      },
     });
+    await this.appendHistory(refundRequestId, {
+      action: 'cancelled_by_buyer',
+      by: requesterId,
+      details: { previousStatus: rr.status },
+    });
+    await this.safeNotify(rr.order.sellerId, NotificationType.REFUND_CANCELLED, {
+      refundNumber: rr.refundNumber,
+      orderId: rr.order.id,
+    });
+    return updated;
   }
 
   async sellerAccept(refundRequestId: string, sellerId: string) {
@@ -157,11 +224,19 @@ export class RefundService {
     }
 
     if (rr.order.status === OrderStatus.delivered) {
+      // openReturnShipment notification'ı kendisi gönderir; ayrıca buyer'a
+      // genel "onaylandı" mesajını burada vermek istemiyoruz çünkü return
+      // opened mesajı zaten daha bilgilendirici.
       await this.openReturnShipment(rr.id);
+      await this.appendHistory(rr.id, {
+        action: 'accepted_by_seller',
+        by: sellerId,
+        details: { autoOpenedReturn: true },
+      });
       return this.prisma.refundRequest.findUnique({ where: { id: rr.id } });
     }
 
-    return this.prisma.refundRequest.update({
+    const updated = await this.prisma.refundRequest.update({
       where: { id: rr.id },
       data: {
         status: RefundRequestStatus.wait_for_delivery,
@@ -169,6 +244,16 @@ export class RefundService {
         decidedAt: new Date(),
       },
     });
+    await this.appendHistory(rr.id, {
+      action: 'accepted_by_seller',
+      by: sellerId,
+      details: { newStatus: 'wait_for_delivery' },
+    });
+    await this.safeNotify(rr.requesterId, NotificationType.REFUND_APPROVED, {
+      refundNumber: rr.refundNumber,
+      orderId: rr.orderId,
+    });
+    return updated;
   }
 
   async sellerReject(refundRequestId: string, sellerId: string, dto: RejectRefundRequestDto) {
@@ -184,7 +269,7 @@ export class RefundService {
       throw new BadRequestException('Bu talep zaten karara bağlanmış');
     }
 
-    return this.prisma.refundRequest.update({
+    const updated = await this.prisma.refundRequest.update({
       where: { id: rr.id },
       data: {
         status: RefundRequestStatus.disputed,
@@ -193,6 +278,37 @@ export class RefundService {
         decidedAt: new Date(),
       },
     });
+    await this.appendHistory(rr.id, {
+      action: 'rejected_by_seller',
+      by: sellerId,
+      details: { response: dto.response },
+    });
+    // Buyer'a reddedildi haberi
+    await this.safeNotify(rr.requesterId, NotificationType.REFUND_REJECTED, {
+      refundNumber: rr.refundNumber,
+      orderId: rr.orderId,
+      reason: dto.response,
+    });
+    // Admin role'üne dispute incelemesi sinyali — basit fan-out: aktif admin
+    // kullanıcılarını tarayıp tek tek bildir. Admin sayısı düşük olduğu için
+    // toplu sorgu yeterli.
+    try {
+      const admins = await this.prisma.adminUser.findMany({
+        where: { isActive: true },
+        select: { userId: true },
+      });
+      for (const a of admins) {
+        await this.safeNotify(a.userId, NotificationType.REFUND_DISPUTED, {
+          refundNumber: rr.refundNumber,
+          refundRequestId: rr.id,
+        });
+      }
+    } catch (err: any) {
+      this.logger.error(
+        `REFUND_DISPUTED admin fan-out failed for ${rr.id}: ${err?.message}`,
+      );
+    }
+    return updated;
   }
 
   async getById(refundRequestId: string, userId: string, isAdmin = false) {
@@ -284,7 +400,7 @@ export class RefundService {
 
     if (!this.suratCargoService.isIntegrationEnabled()) {
       this.logger.warn(`Surat integration disabled, marking ${rr.refundNumber} as return_shipment_open without provider call`);
-      return this.prisma.refundRequest.update({
+      const updated = await this.prisma.refundRequest.update({
         where: { id: rr.id },
         data: {
           status: RefundRequestStatus.return_shipment_open,
@@ -293,6 +409,17 @@ export class RefundService {
           returnCreatedAt: new Date(),
         },
       });
+      await this.appendHistory(rr.id, {
+        action: 'return_opened',
+        by: 'system',
+        details: { provider: 'manual', trackingNumber: rr.refundNumber },
+      });
+      await this.safeNotify(rr.requesterId, NotificationType.REFUND_RETURN_OPENED, {
+        refundNumber: rr.refundNumber,
+        orderId: rr.orderId,
+        trackingNumber: rr.refundNumber,
+      });
+      return updated;
     }
 
     const result = await this.suratCargoService.submitShipmentWithRetry({
@@ -326,7 +453,7 @@ export class RefundService {
       throw new BadRequestException(`Sürat iade kargosu açılamadı: ${errMsg}`);
     }
 
-    return this.prisma.refundRequest.update({
+    const updated = await this.prisma.refundRequest.update({
       where: { id: rr.id },
       data: {
         status: RefundRequestStatus.return_shipment_open,
@@ -336,6 +463,17 @@ export class RefundService {
         returnCreatedAt: new Date(),
       },
     });
+    await this.appendHistory(rr.id, {
+      action: 'return_opened',
+      by: 'system',
+      details: { provider: 'surat', trackingNumber: rr.refundNumber },
+    });
+    await this.safeNotify(rr.requesterId, NotificationType.REFUND_RETURN_OPENED, {
+      refundNumber: rr.refundNumber,
+      orderId: rr.orderId,
+      trackingNumber: rr.refundNumber,
+    });
+    return updated;
   }
 
   async finalizeRefundForReturnedShipment(refundRequestId: string) {
@@ -351,7 +489,7 @@ export class RefundService {
       Number(rr.amount),
     );
 
-    return this.prisma.refundRequest.update({
+    const updated = await this.prisma.refundRequest.update({
       where: { id: rr.id },
       data: {
         status: RefundRequestStatus.refunded,
@@ -360,6 +498,16 @@ export class RefundService {
         returnDeliveredAt: rr.returnDeliveredAt ?? new Date(),
       },
     });
+    await this.appendHistory(rr.id, {
+      action: 'refund_completed',
+      by: 'system',
+      details: { providerRefundId: refundResult.providerRefundId },
+    });
+    await this.safeNotify(rr.requesterId, NotificationType.REFUND_COMPLETED, {
+      refundNumber: rr.refundNumber,
+      orderId: rr.orderId,
+    });
+    return updated;
   }
 
   async findPendingDeliveryToOpenReturn(): Promise<string[]> {
@@ -606,5 +754,141 @@ export class RefundService {
       district: String(j.district),
       phone: String(j.phone),
     };
+  }
+
+  /**
+   * Admin: RefundRequest policy override (Faz 4B.1 + 4F).
+   * 4 boolean alandan herhangi biri/hepsi güncellenebilir.
+   * Yeni policy'ye göre RefundRequest.amount yeniden hesaplanır (Faz 4F).
+   */
+  async overrideRefundPolicy(
+    refundRequestId: string,
+    adminId: string,
+    payload: {
+      refundProductAmount?: boolean;
+      refundShippingFee?: boolean;
+      refundBuyerFee?: boolean;
+      refundSellerCommission?: boolean;
+    },
+  ) {
+    const before = await this.prisma.refundRequest.findUnique({
+      where: { id: refundRequestId },
+      include: { order: true },
+    });
+    if (!before) {
+      throw new NotFoundException('İade talebi bulunamadı');
+    }
+
+    // Yeni policy değerleri (mevcut + payload merge)
+    const policy = {
+      refundProductAmount:
+        payload.refundProductAmount ?? before.refundProductAmount,
+      refundShippingFee:
+        payload.refundShippingFee ?? before.refundShippingFee,
+      refundBuyerFee: payload.refundBuyerFee ?? before.refundBuyerFee,
+      refundSellerCommission:
+        payload.refundSellerCommission ?? before.refundSellerCommission,
+    };
+
+    // Yeni iade tutarı (kısmi iade — Faz 4F)
+    const newAmount = this.computePartialRefundAmount(policy, before.order);
+
+    const updated = await this.prisma.refundRequest.update({
+      where: { id: refundRequestId },
+      data: {
+        refundProductAmount: policy.refundProductAmount,
+        refundShippingFee: policy.refundShippingFee,
+        refundBuyerFee: policy.refundBuyerFee,
+        refundSellerCommission: policy.refundSellerCommission,
+        amount: newAmount,
+      },
+    });
+
+    await this.appendHistory(refundRequestId, {
+      action: 'policy_overridden',
+      by: adminId,
+      details: {
+        before: {
+          refundProductAmount: before.refundProductAmount,
+          refundShippingFee: before.refundShippingFee,
+          refundBuyerFee: before.refundBuyerFee,
+          refundSellerCommission: before.refundSellerCommission,
+          amount: before.amount,
+        },
+        after: { ...policy, amount: newAmount.toString() },
+      },
+    });
+
+    this.logger.log(
+      `RefundRequest ${refundRequestId} policy overridden by admin ${adminId}; new amount=${newAmount}`,
+    );
+    return updated;
+  }
+
+  /**
+   * Kısmi iade tutarı hesaplaması (Faz 4F).
+   * Spec Bölüm 7 — policy boolean'larına göre order'ın
+   * subtotal/shipping/buyerFee toplamı.
+   *
+   * NOT: refundSellerCommission satıcıdan tahsil işidir; alıcının iade
+   * tutarına eklenmez. Satıcı tahsilatı PaymentHold / PayoutTransfer
+   * mahsuplaşmasıyla yapılır (kapsam dışı — Faz 5+).
+   */
+  private computePartialRefundAmount(
+    policy: {
+      refundProductAmount: boolean;
+      refundShippingFee: boolean;
+      refundBuyerFee: boolean;
+    },
+    order: {
+      subtotal: any | null;
+      shippingCost: any;
+      buyerFeeAmount: any;
+    },
+  ): any {
+    let amount = new (Prisma as any).Decimal(0);
+    if (policy.refundProductAmount && order.subtotal != null) {
+      amount = amount.add(new (Prisma as any).Decimal(order.subtotal));
+    }
+    if (policy.refundShippingFee) {
+      amount = amount.add(new (Prisma as any).Decimal(order.shippingCost));
+    }
+    if (policy.refundBuyerFee) {
+      amount = amount.add(new (Prisma as any).Decimal(order.buyerFeeAmount));
+    }
+    return amount;
+  }
+
+  /**
+   * Admin: İade kargosu kim öder (Faz 4B.1).
+   */
+  async setReturnShippingPayer(
+    refundRequestId: string,
+    adminId: string,
+    payer: 'buyer' | 'seller' | 'platform',
+  ) {
+    const before = await this.prisma.refundRequest.findUnique({
+      where: { id: refundRequestId },
+      select: { id: true, returnShippingPayer: true },
+    });
+    if (!before) {
+      throw new NotFoundException('İade talebi bulunamadı');
+    }
+
+    const updated = await this.prisma.refundRequest.update({
+      where: { id: refundRequestId },
+      data: { returnShippingPayer: payer as any },
+    });
+
+    await this.appendHistory(refundRequestId, {
+      action: 'return_shipping_payer_changed',
+      by: adminId,
+      details: { before: before.returnShippingPayer, after: payer },
+    });
+
+    this.logger.log(
+      `RefundRequest ${refundRequestId} returnShippingPayer set to ${payer} by admin ${adminId}`,
+    );
+    return updated;
   }
 }

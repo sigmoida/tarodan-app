@@ -1,0 +1,1161 @@
+# Page snapshot
+
+```yaml
+- generic [active] [ref=e1]:
+  - navigation [ref=e2]:
+    - generic [ref=e4]:
+      - link "Tarodan Logo" [ref=e5] [cursor=pointer]:
+        - /url: /
+        - img "Tarodan Logo" [ref=e6]
+      - generic [ref=e9]:
+        - generic:
+          - img
+        - textbox "Search category, product, brand, collection" [ref=e10]
+      - generic [ref=e11]:
+        - link "Create Listing" [ref=e12] [cursor=pointer]:
+          - /url: /listings/new
+          - img [ref=e13]
+          - generic [ref=e15]: Create Listing
+        - button "Login" [ref=e17] [cursor=pointer]:
+          - img [ref=e18]
+          - generic [ref=e20]: Login
+          - img [ref=e21]
+        - link "Cart" [ref=e23] [cursor=pointer]:
+          - /url: /cart
+          - img [ref=e24]
+          - generic [ref=e26]: Cart
+  - navigation [ref=e28]:
+    - generic [ref=e30]:
+      - button "Categories" [ref=e32] [cursor=pointer]:
+        - text: Categories
+        - img [ref=e33]
+      - link "New Arrivals" [ref=e36] [cursor=pointer]:
+        - /url: /listings?sortBy=created_desc
+      - link "Best Sellers" [ref=e38] [cursor=pointer]:
+        - /url: /listings?sortBy=view_count_desc
+      - link "On Sale" [ref=e40] [cursor=pointer]:
+        - /url: /listings?discountOnly=true
+      - link "Collections" [ref=e42] [cursor=pointer]:
+        - /url: /collections
+      - link "Manufacturers" [ref=e44] [cursor=pointer]:
+        - /url: /ureticiler
+      - button "Scale" [ref=e46] [cursor=pointer]:
+        - text: Scale
+        - img [ref=e47]
+  - main [ref=e49]:
+    - generic [ref=e50]:
+      - heading "Products" [level=1] [ref=e51]
+      - generic [ref=e54]:
+        - generic [ref=e56]:
+          - heading "All Listings" [level=2] [ref=e57]:
+            - generic [ref=e59]: All Listings
+          - paragraph [ref=e60]: 51 products found
+        - generic [ref=e61]:
+          - generic [ref=e62]:
+            - button "3'lü" [ref=e63] [cursor=pointer]:
+              - img [ref=e64]
+            - button "4'lü" [ref=e66] [cursor=pointer]:
+              - img [ref=e67]
+            - button "6'şarlı" [ref=e69] [cursor=pointer]:
+              - img [ref=e70]
+            - button "Liste" [ref=e72] [cursor=pointer]:
+              - img [ref=e73]
+          - combobox [ref=e75]:
+            - option "Newest" [selected]
+            - option "Oldest"
+            - option "Popular"
+            - 'option "Price: Low to High"'
+            - 'option "Price: High to Low"'
+            - option "Highest Rating"
+            - option "A-Z"
+            - option "Z-A"
+      - generic [ref=e77]:
+        - generic [ref=e80]:
+          - generic [ref=e82]:
+            - img [ref=e83]
+            - generic [ref=e85]: Filters
+          - generic [ref=e86]:
+            - generic [ref=e87]:
+              - button "Vehicle Type" [ref=e88] [cursor=pointer]:
+                - generic [ref=e89]: Vehicle Type
+                - img [ref=e90]
+              - generic [ref=e92]:
+                - button "Araba" [ref=e93] [cursor=pointer]:
+                  - generic [ref=e94]: Araba
+                - button "Motosiklet" [ref=e95] [cursor=pointer]:
+                  - generic [ref=e96]: Motosiklet
+                - button "Uçak" [ref=e97] [cursor=pointer]:
+                  - generic [ref=e98]: Uçak
+                - button "Gemi" [ref=e99] [cursor=pointer]:
+                  - generic [ref=e100]: Gemi
+                - button "Tren" [ref=e101] [cursor=pointer]:
+                  - generic [ref=e102]: Tren
+                - button "Kamyon / İş Makinesi" [ref=e103] [cursor=pointer]:
+                  - generic [ref=e104]: Kamyon / İş Makinesi
+                - button "Motorspor" [ref=e105] [cursor=pointer]:
+                  - generic [ref=e106]: Motorspor
+                - button "Set / Diğer" [ref=e107] [cursor=pointer]:
+                  - generic [ref=e108]: Set / Diğer
+            - generic [ref=e109]:
+              - button "Brand" [ref=e110] [cursor=pointer]:
+                - generic [ref=e111]: Brand
+                - img [ref=e112]
+              - generic [ref=e114]:
+                - textbox "Search brands..." [ref=e115]
+                - generic [ref=e116]:
+                  - generic [ref=e117] [cursor=pointer]:
+                    - radio "Alfa Romeo" [ref=e118]
+                    - generic [ref=e119]: Alfa Romeo
+                  - generic [ref=e120] [cursor=pointer]:
+                    - radio "Aston Martin" [ref=e121]
+                    - generic [ref=e122]: Aston Martin
+                  - generic [ref=e123] [cursor=pointer]:
+                    - radio "BMW" [ref=e124]
+                    - generic [ref=e125]: BMW
+                  - generic [ref=e126] [cursor=pointer]:
+                    - radio "Chevrolet" [ref=e127]
+                    - generic [ref=e128]: Chevrolet
+                  - generic [ref=e129] [cursor=pointer]:
+                    - radio "Dodge" [ref=e130]
+                    - generic [ref=e131]: Dodge
+                  - generic [ref=e132] [cursor=pointer]:
+                    - radio "Ducati" [ref=e133]
+                    - generic [ref=e134]: Ducati
+                  - generic [ref=e135] [cursor=pointer]:
+                    - radio "Ferrari" [ref=e136]
+                    - generic [ref=e137]: Ferrari
+                  - generic [ref=e138] [cursor=pointer]:
+                    - radio "Ford" [ref=e139]
+                    - generic [ref=e140]: Ford
+                  - generic [ref=e141] [cursor=pointer]:
+                    - radio "Harley-Davidson" [ref=e142]
+                    - generic [ref=e143]: Harley-Davidson
+                  - generic [ref=e144] [cursor=pointer]:
+                    - radio "Honda" [ref=e145]
+                    - generic [ref=e146]: Honda
+                  - generic [ref=e147] [cursor=pointer]:
+                    - radio "Jeep" [ref=e148]
+                    - generic [ref=e149]: Jeep
+                  - generic [ref=e150] [cursor=pointer]:
+                    - radio "Kawasaki" [ref=e151]
+                    - generic [ref=e152]: Kawasaki
+                  - generic [ref=e153] [cursor=pointer]:
+                    - radio "Lamborghini" [ref=e154]
+                    - generic [ref=e155]: Lamborghini
+                  - generic [ref=e156] [cursor=pointer]:
+                    - radio "Land Rover" [ref=e157]
+                    - generic [ref=e158]: Land Rover
+                  - generic [ref=e159] [cursor=pointer]:
+                    - radio "Mazda" [ref=e160]
+                    - generic [ref=e161]: Mazda
+                  - generic [ref=e162] [cursor=pointer]:
+                    - radio "McLaren" [ref=e163]
+                    - generic [ref=e164]: McLaren
+                  - generic [ref=e165] [cursor=pointer]:
+                    - radio "Mercedes-Benz" [ref=e166]
+                    - generic [ref=e167]: Mercedes-Benz
+                  - generic [ref=e168] [cursor=pointer]:
+                    - radio "Nissan" [ref=e169]
+                    - generic [ref=e170]: Nissan
+                  - generic [ref=e171] [cursor=pointer]:
+                    - radio "Plymouth" [ref=e172]
+                    - generic [ref=e173]: Plymouth
+                  - generic [ref=e174] [cursor=pointer]:
+                    - radio "Pontiac" [ref=e175]
+                    - generic [ref=e176]: Pontiac
+                  - generic [ref=e177] [cursor=pointer]:
+                    - radio "Porsche" [ref=e178]
+                    - generic [ref=e179]: Porsche
+                  - generic [ref=e180] [cursor=pointer]:
+                    - radio "Toyota" [ref=e181]
+                    - generic [ref=e182]: Toyota
+                  - generic [ref=e183] [cursor=pointer]:
+                    - radio "Volkswagen" [ref=e184]
+                    - generic [ref=e185]: Volkswagen
+            - generic [ref=e186]:
+              - button "Model" [ref=e187] [cursor=pointer]:
+                - generic [ref=e188]: Model
+                - img [ref=e189]
+              - generic [ref=e191]:
+                - textbox "Search models..." [ref=e192]
+                - generic [ref=e193]:
+                  - generic [ref=e194] [cursor=pointer]:
+                    - radio "Barracuda" [ref=e195]
+                    - generic [ref=e196]: Barracuda
+                  - generic [ref=e197] [cursor=pointer]:
+                    - radio "Beetle" [ref=e198]
+                    - generic [ref=e199]: Beetle
+                  - generic [ref=e200] [cursor=pointer]:
+                    - radio "Skyline GT-R R34" [ref=e201]
+                    - generic [ref=e202]: Skyline GT-R R34
+                  - generic [ref=e203] [cursor=pointer]:
+                    - radio "GT-R R35" [ref=e204]
+                    - generic [ref=e205]: GT-R R35
+                  - generic [ref=e206] [cursor=pointer]:
+                    - radio "Fat Boy" [ref=e207]
+                    - generic [ref=e208]: Fat Boy
+                  - generic [ref=e209] [cursor=pointer]:
+                    - radio "M4" [ref=e210]
+                    - generic [ref=e211]: M4
+                  - generic [ref=e212] [cursor=pointer]:
+                    - radio "R1250GS Adventure" [ref=e213]
+                    - generic [ref=e214]: R1250GS Adventure
+                  - generic [ref=e215] [cursor=pointer]:
+                    - radio "Aventador" [ref=e216]
+                    - generic [ref=e217]: Aventador
+                  - generic [ref=e218] [cursor=pointer]:
+                    - radio "Huracan" [ref=e219]
+                    - generic [ref=e220]: Huracan
+                  - generic [ref=e221] [cursor=pointer]:
+                    - radio "Challenger R/T" [ref=e222]
+                    - generic [ref=e223]: Challenger R/T
+                  - generic [ref=e224] [cursor=pointer]:
+                    - radio "Charger" [ref=e225]
+                    - generic [ref=e226]: Charger
+                  - generic [ref=e227] [cursor=pointer]:
+                    - radio "DB5" [ref=e228]
+                    - generic [ref=e229]: DB5
+                  - generic [ref=e230] [cursor=pointer]:
+                    - radio "Thunderbird" [ref=e231]
+                    - generic [ref=e232]: Thunderbird
+                  - generic [ref=e233] [cursor=pointer]:
+                    - radio "Mustang Mach 1" [ref=e234]
+                    - generic [ref=e235]: Mustang Mach 1
+                  - generic [ref=e236] [cursor=pointer]:
+                    - radio "Mustang Boss 429" [ref=e237]
+                    - generic [ref=e238]: Mustang Boss 429
+                  - generic [ref=e239] [cursor=pointer]:
+                    - radio "Mustang Shelby GT500" [ref=e240]
+                    - generic [ref=e241]: Mustang Shelby GT500
+                  - generic [ref=e242] [cursor=pointer]:
+                    - radio "F-150 Raptor" [ref=e243]
+                    - generic [ref=e244]: F-150 Raptor
+                  - generic [ref=e245] [cursor=pointer]:
+                    - radio "356 Speedster" [ref=e246]
+                    - generic [ref=e247]: 356 Speedster
+                  - generic [ref=e248] [cursor=pointer]:
+                    - radio "911 GT3 RS" [ref=e249]
+                    - generic [ref=e250]: 911 GT3 RS
+                  - generic [ref=e251] [cursor=pointer]:
+                    - radio "911 Turbo" [ref=e252]
+                    - generic [ref=e253]: 911 Turbo
+                  - generic [ref=e254] [cursor=pointer]:
+                    - radio "917K" [ref=e255]
+                    - generic [ref=e256]: 917K
+                  - generic [ref=e257] [cursor=pointer]:
+                    - radio "GTO Judge" [ref=e258]
+                    - generic [ref=e259]: GTO Judge
+                  - generic [ref=e260] [cursor=pointer]:
+                    - radio "2000GT" [ref=e261]
+                    - generic [ref=e262]: 2000GT
+                  - generic [ref=e263] [cursor=pointer]:
+                    - radio "Supra MK4" [ref=e264]
+                    - generic [ref=e265]: Supra MK4
+                  - generic [ref=e266] [cursor=pointer]:
+                    - radio "Land Cruiser J70" [ref=e267]
+                    - generic [ref=e268]: Land Cruiser J70
+                  - generic [ref=e269] [cursor=pointer]:
+                    - radio "Hilux" [ref=e270]
+                    - generic [ref=e271]: Hilux
+                  - generic [ref=e272] [cursor=pointer]:
+                    - radio "AE86 Sprinter Trueno" [ref=e273]
+                    - generic [ref=e274]: AE86 Sprinter Trueno
+                  - generic [ref=e275] [cursor=pointer]:
+                    - radio "P1" [ref=e276]
+                    - generic [ref=e277]: P1
+                  - generic [ref=e278] [cursor=pointer]:
+                    - radio "Ninja ZX-10R" [ref=e279]
+                    - generic [ref=e280]: Ninja ZX-10R
+                  - generic [ref=e281] [cursor=pointer]:
+                    - radio "Corvette Stingray C2" [ref=e282]
+                    - generic [ref=e283]: Corvette Stingray C2
+                  - generic [ref=e284] [cursor=pointer]:
+                    - radio "Corvette C8" [ref=e285]
+                    - generic [ref=e286]: Corvette C8
+                  - generic [ref=e287] [cursor=pointer]:
+                    - radio "Camaro SS" [ref=e288]
+                    - generic [ref=e289]: Camaro SS
+                  - generic [ref=e290] [cursor=pointer]:
+                    - radio "Chevelle SS" [ref=e291]
+                    - generic [ref=e292]: Chevelle SS
+                  - generic [ref=e293] [cursor=pointer]:
+                    - radio "Silverado" [ref=e294]
+                    - generic [ref=e295]: Silverado
+                  - generic [ref=e296] [cursor=pointer]:
+                    - radio "Impala" [ref=e297]
+                    - generic [ref=e298]: Impala
+                  - generic [ref=e299] [cursor=pointer]:
+                    - radio "Defender 90" [ref=e300]
+                    - generic [ref=e301]: Defender 90
+                  - generic [ref=e302] [cursor=pointer]:
+                    - radio "RX-7 FD" [ref=e303]
+                    - generic [ref=e304]: RX-7 FD
+                  - generic [ref=e305] [cursor=pointer]:
+                    - radio "Giulia Sprint GTA" [ref=e306]
+                    - generic [ref=e307]: Giulia Sprint GTA
+                  - generic [ref=e308] [cursor=pointer]:
+                    - radio "Wrangler Rubicon" [ref=e309]
+                    - generic [ref=e310]: Wrangler Rubicon
+                  - generic [ref=e311] [cursor=pointer]:
+                    - radio "275 GTB" [ref=e312]
+                    - generic [ref=e313]: 275 GTB
+                  - generic [ref=e314] [cursor=pointer]:
+                    - radio "F8 Tributo" [ref=e315]
+                    - generic [ref=e316]: F8 Tributo
+                  - generic [ref=e317] [cursor=pointer]:
+                    - radio "Panigale V4" [ref=e318]
+                    - generic [ref=e319]: Panigale V4
+                  - generic [ref=e320] [cursor=pointer]:
+                    - radio "300SL Gullwing" [ref=e321]
+                    - generic [ref=e322]: 300SL Gullwing
+                  - generic [ref=e323] [cursor=pointer]:
+                    - radio "G-Class G63 AMG" [ref=e324]
+                    - generic [ref=e325]: G-Class G63 AMG
+                  - generic [ref=e326] [cursor=pointer]:
+                    - radio "NSX Type-R" [ref=e327]
+                    - generic [ref=e328]: NSX Type-R
+                  - generic [ref=e329] [cursor=pointer]:
+                    - radio "CBR1000RR Fireblade" [ref=e330]
+                    - generic [ref=e331]: CBR1000RR Fireblade
+                  - generic [ref=e332] [cursor=pointer]:
+                    - radio "Civic" [ref=e333]
+                    - generic [ref=e334]: Civic
+            - generic [ref=e335]:
+              - button "Scale" [ref=e336] [cursor=pointer]:
+                - generic [ref=e337]: Scale
+                - img [ref=e338]
+              - generic [ref=e340]:
+                - button "1:18" [ref=e341] [cursor=pointer]
+                - button "1:24" [ref=e342] [cursor=pointer]
+                - button "1:43" [ref=e343] [cursor=pointer]
+                - button "1:64" [ref=e344] [cursor=pointer]
+                - button "1:72" [ref=e345] [cursor=pointer]
+                - button "1:160" [ref=e346] [cursor=pointer]
+                - button "1:350" [ref=e347] [cursor=pointer]
+                - button "1:400" [ref=e348] [cursor=pointer]
+                - button "1:700" [ref=e349] [cursor=pointer]
+            - generic [ref=e350]:
+              - button "Material" [ref=e351] [cursor=pointer]:
+                - generic [ref=e352]: Material
+                - img [ref=e353]
+              - generic [ref=e355]:
+                - button "Diecast Metal" [ref=e356] [cursor=pointer]
+                - button "Resin" [ref=e357] [cursor=pointer]
+                - button "Plastik" [ref=e358] [cursor=pointer]
+                - button "Karışık (Metal+Plastik)" [ref=e359] [cursor=pointer]
+            - generic [ref=e360]:
+              - button "Manufacturer" [ref=e361] [cursor=pointer]:
+                - generic [ref=e362]: Manufacturer
+                - img [ref=e363]
+              - generic [ref=e365]:
+                - textbox "Search manufacturers..." [ref=e366]
+                - generic [ref=e367]:
+                  - generic [ref=e368] [cursor=pointer]:
+                    - radio "Hot Wheels" [ref=e369]
+                    - generic [ref=e370]: Hot Wheels
+                  - generic [ref=e371] [cursor=pointer]:
+                    - radio "Matchbox" [ref=e372]
+                    - generic [ref=e373]: Matchbox
+                  - generic [ref=e374] [cursor=pointer]:
+                    - radio "Majorette" [ref=e375]
+                    - generic [ref=e376]: Majorette
+                  - generic [ref=e377] [cursor=pointer]:
+                    - radio "Tomica" [ref=e378]
+                    - generic [ref=e379]: Tomica
+                  - generic [ref=e380] [cursor=pointer]:
+                    - radio "Bburago" [ref=e381]
+                    - generic [ref=e382]: Bburago
+                  - generic [ref=e383] [cursor=pointer]:
+                    - radio "Maisto" [ref=e384]
+                    - generic [ref=e385]: Maisto
+                  - generic [ref=e386] [cursor=pointer]:
+                    - radio "AUTOart" [ref=e387]
+                    - generic [ref=e388]: AUTOart
+                  - generic [ref=e389] [cursor=pointer]:
+                    - radio "Minichamps" [ref=e390]
+                    - generic [ref=e391]: Minichamps
+                  - generic [ref=e392] [cursor=pointer]:
+                    - radio "Kyosho" [ref=e393]
+                    - generic [ref=e394]: Kyosho
+                  - generic [ref=e395] [cursor=pointer]:
+                    - radio "CMC" [ref=e396]
+                    - generic [ref=e397]: CMC
+                  - generic [ref=e398] [cursor=pointer]:
+                    - radio "GT Spirit" [ref=e399]
+                    - generic [ref=e400]: GT Spirit
+                  - generic [ref=e401] [cursor=pointer]:
+                    - radio "Almost Real" [ref=e402]
+                    - generic [ref=e403]: Almost Real
+                  - generic [ref=e404] [cursor=pointer]:
+                    - radio "Spark" [ref=e405]
+                    - generic [ref=e406]: Spark
+                  - generic [ref=e407] [cursor=pointer]:
+                    - radio "Schuco" [ref=e408]
+                    - generic [ref=e409]: Schuco
+                  - generic [ref=e410] [cursor=pointer]:
+                    - radio "Norev" [ref=e411]
+                    - generic [ref=e412]: Norev
+                  - generic [ref=e413] [cursor=pointer]:
+                    - radio "Oxford Diecast" [ref=e414]
+                    - generic [ref=e415]: Oxford Diecast
+                  - generic [ref=e416] [cursor=pointer]:
+                    - radio "Greenlight" [ref=e417]
+                    - generic [ref=e418]: Greenlight
+                  - generic [ref=e419] [cursor=pointer]:
+                    - radio "ERTL" [ref=e420]
+                    - generic [ref=e421]: ERTL
+                  - generic [ref=e422] [cursor=pointer]:
+                    - radio "Tamiya" [ref=e423]
+                    - generic [ref=e424]: Tamiya
+                  - generic [ref=e425] [cursor=pointer]:
+                    - radio "Welly" [ref=e426]
+                    - generic [ref=e427]: Welly
+                  - generic [ref=e428] [cursor=pointer]:
+                    - radio "MINI GT" [ref=e429]
+                    - generic [ref=e430]: MINI GT
+            - generic [ref=e431]:
+              - button "Condition" [ref=e432] [cursor=pointer]:
+                - generic [ref=e433]: Condition
+                - img [ref=e434]
+              - generic [ref=e436]:
+                - generic [ref=e437] [cursor=pointer]:
+                  - radio "New" [ref=e438]
+                  - generic [ref=e439]: New
+                - generic [ref=e440] [cursor=pointer]:
+                  - radio "Like New" [ref=e441]
+                  - generic [ref=e442]: Like New
+                - generic [ref=e443] [cursor=pointer]:
+                  - radio "Very Good" [ref=e444]
+                  - generic [ref=e445]: Very Good
+                - generic [ref=e446] [cursor=pointer]:
+                  - radio "Good" [ref=e447]
+                  - generic [ref=e448]: Good
+                - generic [ref=e449] [cursor=pointer]:
+                  - radio "Fair" [ref=e450]
+                  - generic [ref=e451]: Fair
+            - generic [ref=e452]:
+              - button "Price" [ref=e453] [cursor=pointer]:
+                - generic [ref=e454]: Price
+                - img [ref=e455]
+              - generic [ref=e457]:
+                - generic [ref=e458]:
+                  - spinbutton [ref=e459]
+                  - generic [ref=e460]: "-"
+                  - spinbutton [ref=e461]
+                - generic [ref=e462]:
+                  - button "₺0-100" [ref=e463] [cursor=pointer]
+                  - button "₺100-500" [ref=e464] [cursor=pointer]
+                  - button "₺500-1000" [ref=e465] [cursor=pointer]
+                  - button "₺1000+" [ref=e466] [cursor=pointer]
+            - generic [ref=e467]:
+              - button "Options" [ref=e468] [cursor=pointer]:
+                - generic [ref=e469]: Options
+                - img [ref=e470]
+              - generic [ref=e473] [cursor=pointer]:
+                - checkbox "Trade Available Only show items available for trade" [ref=e474]
+                - generic [ref=e475]:
+                  - text: Trade Available
+                  - paragraph [ref=e476]: Only show items available for trade
+        - generic [ref=e477]:
+          - generic [ref=e478]:
+            - link "denemedeneme1 Trade denemedeneme1 · 1:64 Very Good 200 ₺" [ref=e480] [cursor=pointer]:
+              - /url: /listings/0ed4ba40-ce42-48d1-b2f2-b5e89567f1e2
+              - generic [ref=e481]:
+                - generic [ref=e482]:
+                  - img "denemedeneme1" [ref=e483]
+                  - generic [ref=e484]:
+                    - img [ref=e485]
+                    - generic [ref=e487]: Trade
+                - generic [ref=e488]:
+                  - heading "denemedeneme1" [level=3] [ref=e489]
+                  - paragraph [ref=e490]: · 1:64
+                  - generic [ref=e491]:
+                    - generic [ref=e492]: Very Good
+                    - paragraph [ref=e493]: 200 ₺
+            - link "aaasasas Trade aaasasas · 1:64 Very Good 200 ₺" [ref=e495] [cursor=pointer]:
+              - /url: /listings/7a307769-2a32-49b9-bb1c-f73777066e60
+              - generic [ref=e496]:
+                - generic [ref=e497]:
+                  - img "aaasasas" [ref=e498]
+                  - generic [ref=e499]:
+                    - img [ref=e500]
+                    - generic [ref=e502]: Trade
+                - generic [ref=e503]:
+                  - heading "aaasasas" [level=3] [ref=e504]
+                  - paragraph [ref=e505]: · 1:64
+                  - generic [ref=e506]:
+                    - generic [ref=e507]: Very Good
+                    - paragraph [ref=e508]: 200 ₺
+            - link "adadadw Trade adadadw Alfa Romeo · 1:64 Very Good 200 ₺" [ref=e510] [cursor=pointer]:
+              - /url: /listings/1cd0706e-04f8-4d48-a477-0e942ef642b0
+              - generic [ref=e511]:
+                - generic [ref=e512]:
+                  - img "adadadw" [ref=e513]
+                  - generic [ref=e514]:
+                    - img [ref=e515]
+                    - generic [ref=e517]: Trade
+                - generic [ref=e518]:
+                  - heading "adadadw" [level=3] [ref=e519]
+                  - paragraph [ref=e520]: Alfa Romeo · 1:64
+                  - generic [ref=e521]:
+                    - generic [ref=e522]: Very Good
+                    - paragraph [ref=e523]: 200 ₺
+            - link "testtest2 testtest2 New 100 ₺" [ref=e525] [cursor=pointer]:
+              - /url: /listings/bea104c2-51e6-480f-b822-71642dcf6dd5
+              - generic [ref=e526]:
+                - img "testtest2" [ref=e528]
+                - generic [ref=e529]:
+                  - heading "testtest2" [level=3] [ref=e530]
+                  - paragraph
+                  - generic [ref=e531]:
+                    - generic [ref=e532]: New
+                    - paragraph [ref=e533]: 100 ₺
+            - link "testtest1 testtest1 New 100 ₺" [ref=e535] [cursor=pointer]:
+              - /url: /listings/944eb6bd-48f2-4742-b3bf-1b65e7f9676b
+              - generic [ref=e536]:
+                - img "testtest1" [ref=e538]
+                - generic [ref=e539]:
+                  - heading "testtest1" [level=3] [ref=e540]
+                  - paragraph
+                  - generic [ref=e541]:
+                    - generic [ref=e542]: New
+                    - paragraph [ref=e543]: 100 ₺
+            - link "test uno test uno · 1:64 Very Good 200 ₺" [ref=e545] [cursor=pointer]:
+              - /url: /listings/41dc4f79-9cf0-43ee-af1c-1443e20bb2a0
+              - generic [ref=e546]:
+                - img "test uno" [ref=e548]
+                - generic [ref=e549]:
+                  - heading "test uno" [level=3] [ref=e550]
+                  - paragraph [ref=e551]: · 1:64
+                  - generic [ref=e552]:
+                    - generic [ref=e553]: Very Good
+                    - paragraph [ref=e554]: 200 ₺
+            - link "bbbbbb bbbbbb · 1:64 Very Good 200 ₺" [ref=e556] [cursor=pointer]:
+              - /url: /listings/f20e6242-23cf-4932-b600-efc677b13cdc
+              - generic [ref=e557]:
+                - img "bbbbbb" [ref=e559]
+                - generic [ref=e560]:
+                  - heading "bbbbbb" [level=3] [ref=e561]
+                  - paragraph [ref=e562]: · 1:64
+                  - generic [ref=e563]:
+                    - generic [ref=e564]: Very Good
+                    - paragraph [ref=e565]: 200 ₺
+            - link "aaaaaaa aaaaaaa · 1:64 Very Good 200 ₺" [ref=e567] [cursor=pointer]:
+              - /url: /listings/21023822-f811-4a55-8cfe-ca8a538301bd
+              - generic [ref=e568]:
+                - img "aaaaaaa" [ref=e570]
+                - generic [ref=e571]:
+                  - heading "aaaaaaa" [level=3] [ref=e572]
+                  - paragraph [ref=e573]: · 1:64
+                  - generic [ref=e574]:
+                    - generic [ref=e575]: Very Good
+                    - paragraph [ref=e576]: 200 ₺
+            - link "test ürün 3 Trade test ürün 3 · 1:64 Very Good 300 ₺" [ref=e578] [cursor=pointer]:
+              - /url: /listings/a8ec17eb-35e5-40a7-a1bc-c5e2ad9d629c
+              - generic [ref=e579]:
+                - generic [ref=e580]:
+                  - img "test ürün 3" [ref=e581]
+                  - generic [ref=e582]:
+                    - img [ref=e583]
+                    - generic [ref=e585]: Trade
+                - generic [ref=e586]:
+                  - heading "test ürün 3" [level=3] [ref=e587]
+                  - paragraph [ref=e588]: · 1:64
+                  - generic [ref=e589]:
+                    - generic [ref=e590]: Very Good
+                    - paragraph [ref=e591]: 300 ₺
+            - link "aaaaaaa Trade aaaaaaa · 1:64 Very Good 300 ₺" [ref=e593] [cursor=pointer]:
+              - /url: /listings/3de11d3d-d95c-4984-85f2-a6e5266057c6
+              - generic [ref=e594]:
+                - generic [ref=e595]:
+                  - img "aaaaaaa" [ref=e596]
+                  - generic [ref=e597]:
+                    - img [ref=e598]
+                    - generic [ref=e600]: Trade
+                - generic [ref=e601]:
+                  - heading "aaaaaaa" [level=3] [ref=e602]
+                  - paragraph [ref=e603]: · 1:64
+                  - generic [ref=e604]:
+                    - generic [ref=e605]: Very Good
+                    - paragraph [ref=e606]: 300 ₺
+            - link "Test ürün 2 Trade Test ürün 2 · 1:64 Very Good 300 ₺" [ref=e608] [cursor=pointer]:
+              - /url: /listings/b83e9b89-f0ed-4b7d-89d2-0ced9d526775
+              - generic [ref=e609]:
+                - generic [ref=e610]:
+                  - img "Test ürün 2" [ref=e611]
+                  - generic [ref=e612]:
+                    - img [ref=e613]
+                    - generic [ref=e615]: Trade
+                - generic [ref=e616]:
+                  - heading "Test ürün 2" [level=3] [ref=e617]
+                  - paragraph [ref=e618]: · 1:64
+                  - generic [ref=e619]:
+                    - generic [ref=e620]: Very Good
+                    - paragraph [ref=e621]: 300 ₺
+            - link "Type VII U-Boot Denizaltı 1:350 Type VII U-Boot Denizaltı 1:350 · 1:350 · 1940 New 382 ₺" [ref=e623] [cursor=pointer]:
+              - /url: /listings/36c988c4-26f5-44da-8f67-6485695f8523
+              - generic [ref=e624]:
+                - img "Type VII U-Boot Denizaltı 1:350" [ref=e626]
+                - generic [ref=e627]:
+                  - heading "Type VII U-Boot Denizaltı 1:350" [level=3] [ref=e628]
+                  - paragraph [ref=e629]: · 1:350 · 1940
+                  - generic [ref=e630]:
+                    - generic [ref=e631]: New
+                    - paragraph [ref=e632]: 382 ₺
+            - link "Welly Honda CBR1000RR Repsol 1:18 Trade Welly Honda CBR1000RR Repsol 1:18 Honda · 1:18 · 2020 New 403 ₺" [ref=e634] [cursor=pointer]:
+              - /url: /listings/1dc16edf-7312-49d6-b0fc-551228dc7457
+              - generic [ref=e635]:
+                - generic [ref=e636]:
+                  - img "Welly Honda CBR1000RR Repsol 1:18" [ref=e637]
+                  - generic [ref=e638]:
+                    - img [ref=e639]
+                    - generic [ref=e641]: Trade
+                - generic [ref=e642]:
+                  - heading "Welly Honda CBR1000RR Repsol 1:18" [level=3] [ref=e643]
+                  - paragraph [ref=e644]: Honda · 1:18 · 2020
+                  - generic [ref=e645]:
+                    - generic [ref=e646]: New
+                    - paragraph [ref=e647]: 403 ₺
+            - link "Matchbox Land Rover Defender 90 Matchbox Land Rover Defender 90 Land Rover · 1:64 · 2020 4.0 (1) New 172 ₺" [ref=e649] [cursor=pointer]:
+              - /url: /listings/04cd95eb-c832-4914-8f00-36869dea53b7
+              - generic [ref=e650]:
+                - img "Matchbox Land Rover Defender 90" [ref=e652]
+                - generic [ref=e653]:
+                  - heading "Matchbox Land Rover Defender 90" [level=3] [ref=e654]
+                  - paragraph [ref=e655]: Land Rover · 1:64 · 2020
+                  - generic [ref=e656]:
+                    - img [ref=e657]
+                    - generic [ref=e659]: "4.0"
+                    - generic [ref=e660]: (1)
+                  - generic [ref=e661]:
+                    - generic [ref=e662]: New
+                    - paragraph [ref=e663]: 172 ₺
+            - link "Hot Wheels Ford F-150 Raptor 2023 Trade Hot Wheels Ford F-150 Raptor 2023 Ford · 1:64 · 2023 New 162 ₺" [ref=e665] [cursor=pointer]:
+              - /url: /listings/a4ba1a10-770d-41b3-9e78-5f5b87dea79a
+              - generic [ref=e666]:
+                - generic [ref=e667]:
+                  - img "Hot Wheels Ford F-150 Raptor 2023" [ref=e668]
+                  - generic [ref=e669]:
+                    - img [ref=e670]
+                    - generic [ref=e672]: Trade
+                - generic [ref=e673]:
+                  - heading "Hot Wheels Ford F-150 Raptor 2023" [level=3] [ref=e674]
+                  - paragraph [ref=e675]: Ford · 1:64 · 2023
+                  - generic [ref=e676]:
+                    - generic [ref=e677]: New
+                    - paragraph [ref=e678]: 162 ₺
+            - link "Cutty Sark Yelkenli Gemi 1:350 Cutty Sark Yelkenli Gemi 1:350 · 1:350 · 1869 New 464 ₺" [ref=e680] [cursor=pointer]:
+              - /url: /listings/e568025c-4549-461f-80ca-5f9c7cd22011
+              - generic [ref=e681]:
+                - img "Cutty Sark Yelkenli Gemi 1:350" [ref=e683]
+                - generic [ref=e684]:
+                  - heading "Cutty Sark Yelkenli Gemi 1:350" [level=3] [ref=e685]
+                  - paragraph [ref=e686]: · 1:350 · 1869
+                  - generic [ref=e687]:
+                    - generic [ref=e688]: New
+                    - paragraph [ref=e689]: 464 ₺
+            - link "F-14 Tomcat Navy Fighter 1:72 Trade F-14 Tomcat Navy Fighter 1:72 · 1:72 · 1974 New 349 ₺" [ref=e691] [cursor=pointer]:
+              - /url: /listings/9fd22472-cc39-4065-9047-c80c75bf6baf
+              - generic [ref=e692]:
+                - generic [ref=e693]:
+                  - img "F-14 Tomcat Navy Fighter 1:72" [ref=e694]
+                  - generic [ref=e695]:
+                    - img [ref=e696]
+                    - generic [ref=e698]: Trade
+                - generic [ref=e699]:
+                  - heading "F-14 Tomcat Navy Fighter 1:72" [level=3] [ref=e700]
+                  - paragraph [ref=e701]: · 1:72 · 1974
+                  - generic [ref=e702]:
+                    - generic [ref=e703]: New
+                    - paragraph [ref=e704]: 349 ₺
+            - link "Tamiya F1 Mercedes AMG 1:24 Tamiya F1 Mercedes AMG 1:24 Mercedes-Benz · 1:24 · 2023 New 674 ₺" [ref=e706] [cursor=pointer]:
+              - /url: /listings/1ff9fede-ea9a-4fdb-af2f-a04af89def85
+              - generic [ref=e707]:
+                - img "Tamiya F1 Mercedes AMG 1:24" [ref=e709]
+                - generic [ref=e710]:
+                  - heading "Tamiya F1 Mercedes AMG 1:24" [level=3] [ref=e711]
+                  - paragraph [ref=e712]: Mercedes-Benz · 1:24 · 2023
+                  - generic [ref=e713]:
+                    - generic [ref=e714]: New
+                    - paragraph [ref=e715]: 674 ₺
+            - link "Union Pacific Big Boy 4014 1:160 Union Pacific Big Boy 4014 1:160 · 1:160 · 1941 New 979 ₺" [ref=e717] [cursor=pointer]:
+              - /url: /listings/adc27622-798b-47a5-955f-65bb379ba45a
+              - generic [ref=e718]:
+                - img "Union Pacific Big Boy 4014 1:160" [ref=e720]
+                - generic [ref=e721]:
+                  - heading "Union Pacific Big Boy 4014 1:160" [level=3] [ref=e722]
+                  - paragraph [ref=e723]: · 1:160 · 1941
+                  - generic [ref=e724]:
+                    - generic [ref=e725]: New
+                    - paragraph [ref=e726]: 979 ₺
+            - link "RMS Titanic Model Gemi 1:700 Trade RMS Titanic Model Gemi 1:700 · 1:700 · 1912 New 634 ₺" [ref=e728] [cursor=pointer]:
+              - /url: /listings/86388c9e-cfb6-4309-9528-cad54b2c6242
+              - generic [ref=e729]:
+                - generic [ref=e730]:
+                  - img "RMS Titanic Model Gemi 1:700" [ref=e731]
+                  - generic [ref=e732]:
+                    - img [ref=e733]
+                    - generic [ref=e735]: Trade
+                - generic [ref=e736]:
+                  - heading "RMS Titanic Model Gemi 1:700" [level=3] [ref=e737]
+                  - paragraph [ref=e738]: · 1:700 · 1912
+                  - generic [ref=e739]:
+                    - generic [ref=e740]: New
+                    - paragraph [ref=e741]: 634 ₺
+            - link "Tamiya 1950s Vintage Classic Tamiya 1950s Vintage Classic · 1:24 · 1955 5.0 (1) Good 385 ₺" [ref=e743] [cursor=pointer]:
+              - /url: /listings/87643cd8-aa46-4e60-971c-391670864962
+              - generic [ref=e744]:
+                - img "Tamiya 1950s Vintage Classic" [ref=e746]
+                - generic [ref=e747]:
+                  - heading "Tamiya 1950s Vintage Classic" [level=3] [ref=e748]
+                  - paragraph [ref=e749]: · 1:24 · 1955
+                  - generic [ref=e750]:
+                    - img [ref=e751]
+                    - generic [ref=e753]: "5.0"
+                    - generic [ref=e754]: (1)
+                  - generic [ref=e755]:
+                    - generic [ref=e756]: Good
+                    - paragraph [ref=e757]: 385 ₺
+            - link "Matchbox 007 Aston Martin DB5 Trade Matchbox 007 Aston Martin DB5 Aston Martin · 1:64 · 1965 4.0 (1) Good 1.056 ₺" [ref=e759] [cursor=pointer]:
+              - /url: /listings/bbe53878-2548-49e3-b03c-7feb8571056a
+              - generic [ref=e760]:
+                - generic [ref=e761]:
+                  - img "Matchbox 007 Aston Martin DB5" [ref=e762]
+                  - generic [ref=e763]:
+                    - img [ref=e764]
+                    - generic [ref=e766]: Trade
+                - generic [ref=e767]:
+                  - heading "Matchbox 007 Aston Martin DB5" [level=3] [ref=e768]
+                  - paragraph [ref=e769]: Aston Martin · 1:64 · 1965
+                  - generic [ref=e770]:
+                    - img [ref=e771]
+                    - generic [ref=e773]: "4.0"
+                    - generic [ref=e774]: (1)
+                  - generic [ref=e775]:
+                    - generic [ref=e776]: Good
+                    - paragraph [ref=e777]: 1.056 ₺
+            - link "Kyosho Porsche 356 Speedster 1:18 Trade Kyosho Porsche 356 Speedster 1:18 Porsche · 1:18 · 1956 4.0 (1) Like New 1.642 ₺" [ref=e779] [cursor=pointer]:
+              - /url: /listings/8fce5202-73df-4562-a4c9-b2b88cd9fbd3
+              - generic [ref=e780]:
+                - generic [ref=e781]:
+                  - img "Kyosho Porsche 356 Speedster 1:18" [ref=e782]
+                  - generic [ref=e783]:
+                    - img [ref=e784]
+                    - generic [ref=e786]: Trade
+                - generic [ref=e787]:
+                  - heading "Kyosho Porsche 356 Speedster 1:18" [level=3] [ref=e788]
+                  - paragraph [ref=e789]: Porsche · 1:18 · 1956
+                  - generic [ref=e790]:
+                    - img [ref=e791]
+                    - generic [ref=e793]: "4.0"
+                    - generic [ref=e794]: (1)
+                  - generic [ref=e795]:
+                    - generic [ref=e796]: Like New
+                    - paragraph [ref=e797]: 1.642 ₺
+            - link "Motorsport Efsaneleri Seti Motorsport Efsaneleri Seti · 1:64 · 2024 New 391 ₺" [ref=e799] [cursor=pointer]:
+              - /url: /listings/04e01f1a-f1c6-473e-93ea-11124c594222
+              - generic [ref=e800]:
+                - img "Motorsport Efsaneleri Seti" [ref=e802]
+                - generic [ref=e803]:
+                  - heading "Motorsport Efsaneleri Seti" [level=3] [ref=e804]
+                  - paragraph [ref=e805]: · 1:64 · 2024
+                  - generic [ref=e806]:
+                    - generic [ref=e807]: New
+                    - paragraph [ref=e808]: 391 ₺
+            - link "Acil Durum Araçları Seti Acil Durum Araçları Seti · 1:64 · 2024 New 325 ₺" [ref=e810] [cursor=pointer]:
+              - /url: /listings/bfd683e2-4c77-44c4-839a-56eae1d9539e
+              - generic [ref=e811]:
+                - img "Acil Durum Araçları Seti" [ref=e813]
+                - generic [ref=e814]:
+                  - heading "Acil Durum Araçları Seti" [level=3] [ref=e815]
+                  - paragraph [ref=e816]: · 1:64 · 2024
+                  - generic [ref=e817]:
+                    - generic [ref=e818]: New
+                    - paragraph [ref=e819]: 325 ₺
+            - link "Orient Express Buharlı Lokomotif 1:160 Orient Express Buharlı Lokomotif 1:160 · 1:160 · 1883 New 599 ₺" [ref=e821] [cursor=pointer]:
+              - /url: /listings/fcff0af6-5ab4-4ed6-a2f3-2fc047e88966
+              - generic [ref=e822]:
+                - img "Orient Express Buharlı Lokomotif 1:160" [ref=e824]
+                - generic [ref=e825]:
+                  - heading "Orient Express Buharlı Lokomotif 1:160" [level=3] [ref=e826]
+                  - paragraph [ref=e827]: · 1:160 · 1883
+                  - generic [ref=e828]:
+                    - generic [ref=e829]: New
+                    - paragraph [ref=e830]: 599 ₺
+            - link "Tomica Toyota Hilux Trade Tomica Toyota Hilux Toyota · 1:64 · 2020 New 72 ₺" [ref=e832] [cursor=pointer]:
+              - /url: /listings/ec8e7fca-7902-4683-b3b6-55d1f8d4240d
+              - generic [ref=e833]:
+                - generic [ref=e834]:
+                  - img "Tomica Toyota Hilux" [ref=e835]
+                  - generic [ref=e836]:
+                    - img [ref=e837]
+                    - generic [ref=e839]: Trade
+                - generic [ref=e840]:
+                  - heading "Tomica Toyota Hilux" [level=3] [ref=e841]
+                  - paragraph [ref=e842]: Toyota · 1:64 · 2020
+                  - generic [ref=e843]:
+                    - generic [ref=e844]: New
+                    - paragraph [ref=e845]: 72 ₺
+            - link "Boeing 747 Lufthansa 1:400 Trade Boeing 747 Lufthansa 1:400 · 1:400 · 1969 New 296 ₺" [ref=e847] [cursor=pointer]:
+              - /url: /listings/b919350e-001f-4801-a879-edf843e8b722
+              - generic [ref=e848]:
+                - generic [ref=e849]:
+                  - img "Boeing 747 Lufthansa 1:400" [ref=e850]
+                  - generic [ref=e851]:
+                    - img [ref=e852]
+                    - generic [ref=e854]: Trade
+                - generic [ref=e855]:
+                  - heading "Boeing 747 Lufthansa 1:400" [level=3] [ref=e856]
+                  - paragraph [ref=e857]: · 1:400 · 1969
+                  - generic [ref=e858]:
+                    - generic [ref=e859]: New
+                    - paragraph [ref=e860]: 296 ₺
+            - link "Minichamps F1 Williams 1:43 Minichamps F1 Williams 1:43 · 1:43 · 2023 New 430 ₺" [ref=e862] [cursor=pointer]:
+              - /url: /listings/45afaa5b-5271-4692-87e1-0833e1a61cfd
+              - generic [ref=e863]:
+                - img "Minichamps F1 Williams 1:43" [ref=e865]
+                - generic [ref=e866]:
+                  - heading "Minichamps F1 Williams 1:43" [level=3] [ref=e867]
+                  - paragraph [ref=e868]: · 1:43 · 2023
+                  - generic [ref=e869]:
+                    - generic [ref=e870]: New
+                    - paragraph [ref=e871]: 430 ₺
+            - link "Hot Wheels Lamborghini Aventador Hot Wheels Lamborghini Aventador Lamborghini · 1:64 · 2011 4.0 (1) New 239 ₺" [ref=e873] [cursor=pointer]:
+              - /url: /listings/59816148-62d4-46df-879d-58c44e426367
+              - generic [ref=e874]:
+                - img "Hot Wheels Lamborghini Aventador" [ref=e876]
+                - generic [ref=e877]:
+                  - heading "Hot Wheels Lamborghini Aventador" [level=3] [ref=e878]
+                  - paragraph [ref=e879]: Lamborghini · 1:64 · 2011
+                  - generic [ref=e880]:
+                    - img [ref=e881]
+                    - generic [ref=e883]: "4.0"
+                    - generic [ref=e884]: (1)
+                  - generic [ref=e885]:
+                    - generic [ref=e886]: New
+                    - paragraph [ref=e887]: 239 ₺
+            - link "Hot Wheels 5'li Egzotik Spor Araba Seti Hot Wheels 5'li Egzotik Spor Araba Seti · 1:64 · 2024 New 298 ₺" [ref=e889] [cursor=pointer]:
+              - /url: /listings/95db5c62-4ccf-4851-841d-0ea9ec5597c9
+              - generic [ref=e890]:
+                - img "Hot Wheels 5'li Egzotik Spor Araba Seti" [ref=e892]
+                - generic [ref=e893]:
+                  - heading "Hot Wheels 5'li Egzotik Spor Araba Seti" [level=3] [ref=e894]
+                  - paragraph [ref=e895]: · 1:64 · 2024
+                  - generic [ref=e896]:
+                    - generic [ref=e897]: New
+                    - paragraph [ref=e898]: 298 ₺
+            - link "Fokker Dr.I Red Baron Triplane 1:72 Fokker Dr.I Red Baron Triplane 1:72 · 1:72 · 1917 New 410 ₺" [ref=e900] [cursor=pointer]:
+              - /url: /listings/353599dd-4463-4524-add6-9d46835dd562
+              - generic [ref=e901]:
+                - img "Fokker Dr.I Red Baron Triplane 1:72" [ref=e903]
+                - generic [ref=e904]:
+                  - heading "Fokker Dr.I Red Baron Triplane 1:72" [level=3] [ref=e905]
+                  - paragraph [ref=e906]: · 1:72 · 1917
+                  - generic [ref=e907]:
+                    - generic [ref=e908]: New
+                    - paragraph [ref=e909]: 410 ₺
+            - link "Bburago Alfa Romeo Giulia GTA 1:24 Bburago Alfa Romeo Giulia GTA 1:24 Alfa Romeo · 1:24 · 1965 Good 514 ₺" [ref=e911] [cursor=pointer]:
+              - /url: /listings/86ccf45f-c42d-429c-ab7c-89fadb67b51e
+              - generic [ref=e912]:
+                - img "Bburago Alfa Romeo Giulia GTA 1:24" [ref=e914]
+                - generic [ref=e915]:
+                  - heading "Bburago Alfa Romeo Giulia GTA 1:24" [level=3] [ref=e916]
+                  - paragraph [ref=e917]: Alfa Romeo · 1:24 · 1965
+                  - generic [ref=e918]:
+                    - generic [ref=e919]: Good
+                    - paragraph [ref=e920]: 514 ₺
+            - link "Kyosho F1 Aston Martin 1:18 Trade Kyosho F1 Aston Martin 1:18 Aston Martin · 1:18 · 2023 New 3.799 ₺" [ref=e922] [cursor=pointer]:
+              - /url: /listings/c76dab3b-fb7c-4562-941e-77d7819beda0
+              - generic [ref=e923]:
+                - generic [ref=e924]:
+                  - img "Kyosho F1 Aston Martin 1:18" [ref=e925]
+                  - generic [ref=e926]:
+                    - img [ref=e927]
+                    - generic [ref=e929]: Trade
+                - generic [ref=e930]:
+                  - heading "Kyosho F1 Aston Martin 1:18" [level=3] [ref=e931]
+                  - paragraph [ref=e932]: Aston Martin · 1:18 · 2023
+                  - generic [ref=e933]:
+                    - generic [ref=e934]: New
+                    - paragraph [ref=e935]: 3.799 ₺
+            - link "Klasik Otomobil Koleksiyon Seti Trade Klasik Otomobil Koleksiyon Seti · 1:64 · 2024 New 380 ₺" [ref=e937] [cursor=pointer]:
+              - /url: /listings/94f94ec9-e221-4ba8-8095-5cb20d201d59
+              - generic [ref=e938]:
+                - generic [ref=e939]:
+                  - img "Klasik Otomobil Koleksiyon Seti" [ref=e940]
+                  - generic [ref=e941]:
+                    - img [ref=e942]
+                    - generic [ref=e944]: Trade
+                - generic [ref=e945]:
+                  - heading "Klasik Otomobil Koleksiyon Seti" [level=3] [ref=e946]
+                  - paragraph [ref=e947]: · 1:64 · 2024
+                  - generic [ref=e948]:
+                    - generic [ref=e949]: New
+                    - paragraph [ref=e950]: 380 ₺
+            - link "Greenlight Pontiac GTO Judge Trade Greenlight Pontiac GTO Judge Pontiac · 1:64 · 1969 New 216 ₺" [ref=e952] [cursor=pointer]:
+              - /url: /listings/b5c7e0fe-6365-48ec-a7dc-b3820492e54a
+              - generic [ref=e953]:
+                - generic [ref=e954]:
+                  - img "Greenlight Pontiac GTO Judge" [ref=e955]
+                  - generic [ref=e956]:
+                    - img [ref=e957]
+                    - generic [ref=e959]: Trade
+                - generic [ref=e960]:
+                  - heading "Greenlight Pontiac GTO Judge" [level=3] [ref=e961]
+                  - paragraph [ref=e962]: Pontiac · 1:64 · 1969
+                  - generic [ref=e963]:
+                    - generic [ref=e964]: New
+                    - paragraph [ref=e965]: 216 ₺
+            - link "Tomica Honda NSX Type-R Trade Tomica Honda NSX Type-R Honda · 1:64 · 2002 4.0 (1) New 162 ₺" [ref=e967] [cursor=pointer]:
+              - /url: /listings/a4288825-6b8c-4c41-b8d9-3031a1a4f901
+              - generic [ref=e968]:
+                - generic [ref=e969]:
+                  - img "Tomica Honda NSX Type-R" [ref=e970]
+                  - generic [ref=e971]:
+                    - img [ref=e972]
+                    - generic [ref=e974]: Trade
+                - generic [ref=e975]:
+                  - heading "Tomica Honda NSX Type-R" [level=3] [ref=e976]
+                  - paragraph [ref=e977]: Honda · 1:64 · 2002
+                  - generic [ref=e978]:
+                    - img [ref=e979]
+                    - generic [ref=e981]: "4.0"
+                    - generic [ref=e982]: (1)
+                  - generic [ref=e983]:
+                    - generic [ref=e984]: New
+                    - paragraph [ref=e985]: 162 ₺
+            - link "AUTOart Mercedes 300SL Gullwing 1:18 Trade AUTOart Mercedes 300SL Gullwing 1:18 Mercedes-Benz · 1:18 · 1955 3.5 (2) Like New 3.692 ₺" [ref=e987] [cursor=pointer]:
+              - /url: /listings/c3b4fb06-fda0-4616-af41-8973cb646485
+              - generic [ref=e988]:
+                - generic [ref=e989]:
+                  - img "AUTOart Mercedes 300SL Gullwing 1:18" [ref=e990]
+                  - generic [ref=e991]:
+                    - img [ref=e992]
+                    - generic [ref=e994]: Trade
+                - generic [ref=e995]:
+                  - heading "AUTOart Mercedes 300SL Gullwing 1:18" [level=3] [ref=e996]
+                  - paragraph [ref=e997]: Mercedes-Benz · 1:18 · 1955
+                  - generic [ref=e998]:
+                    - img [ref=e999]
+                    - generic [ref=e1001]: "3.5"
+                    - generic [ref=e1002]: (2)
+                  - generic [ref=e1003]:
+                    - generic [ref=e1004]: Like New
+                    - paragraph [ref=e1005]: 3.692 ₺
+            - link "Maisto 1969 Camaro SS 1:24 Maisto 1969 Camaro SS 1:24 Chevrolet · 1:24 · 1969 Like New 415 ₺" [ref=e1007] [cursor=pointer]:
+              - /url: /listings/87f6de02-9f63-4242-8d30-7bfd5ff208a5
+              - generic [ref=e1008]:
+                - img "Maisto 1969 Camaro SS 1:24" [ref=e1010]
+                - generic [ref=e1011]:
+                  - heading "Maisto 1969 Camaro SS 1:24" [level=3] [ref=e1012]
+                  - paragraph [ref=e1013]: Chevrolet · 1:24 · 1969
+                  - generic [ref=e1014]:
+                    - generic [ref=e1015]: Like New
+                    - paragraph [ref=e1016]: 415 ₺
+            - link "Minichamps BMW M4 1:43 Minichamps BMW M4 1:43 BMW · 1:43 · 2021 5.0 (1) New 770 ₺" [ref=e1018] [cursor=pointer]:
+              - /url: /listings/60f1bc61-3cac-467e-98b2-765a032fb4da
+              - generic [ref=e1019]:
+                - img "Minichamps BMW M4 1:43" [ref=e1021]
+                - generic [ref=e1022]:
+                  - heading "Minichamps BMW M4 1:43" [level=3] [ref=e1023]
+                  - paragraph [ref=e1024]: BMW · 1:43 · 2021
+                  - generic [ref=e1025]:
+                    - img [ref=e1026]
+                    - generic [ref=e1028]: "5.0"
+                    - generic [ref=e1029]: (1)
+                  - generic [ref=e1030]:
+                    - generic [ref=e1031]: New
+                    - paragraph [ref=e1032]: 770 ₺
+            - link "AUTOart Ford F-150 Raptor 1:18 AUTOart Ford F-150 Raptor 1:18 Ford · 1:18 · 2021 New 4.652 ₺" [ref=e1034] [cursor=pointer]:
+              - /url: /listings/92ddff39-67ec-4473-a0ae-7b8864b2920d
+              - generic [ref=e1035]:
+                - img "AUTOart Ford F-150 Raptor 1:18" [ref=e1037]
+                - generic [ref=e1038]:
+                  - heading "AUTOart Ford F-150 Raptor 1:18" [level=3] [ref=e1039]
+                  - paragraph [ref=e1040]: Ford · 1:18 · 2021
+                  - generic [ref=e1041]:
+                    - generic [ref=e1042]: New
+                    - paragraph [ref=e1043]: 4.652 ₺
+            - link "Greenlight Chevrolet Chevelle SS Trade Greenlight Chevrolet Chevelle SS Chevrolet · 1:64 · 1970 Like New 162 ₺" [ref=e1045] [cursor=pointer]:
+              - /url: /listings/3e8ce637-30d7-4e26-9a4a-b6e4c8af6e80
+              - generic [ref=e1046]:
+                - generic [ref=e1047]:
+                  - img "Greenlight Chevrolet Chevelle SS" [ref=e1048]
+                  - generic [ref=e1049]:
+                    - img [ref=e1050]
+                    - generic [ref=e1052]: Trade
+                - generic [ref=e1053]:
+                  - heading "Greenlight Chevrolet Chevelle SS" [level=3] [ref=e1054]
+                  - paragraph [ref=e1055]: Chevrolet · 1:64 · 1970
+                  - generic [ref=e1056]:
+                    - generic [ref=e1057]: Like New
+                    - paragraph [ref=e1058]: 162 ₺
+            - link "Kyosho Ford Mustang Shelby GT500 1:18 Kyosho Ford Mustang Shelby GT500 1:18 Ford · 1:18 · 1967 3.0 (1) New 3.811 ₺" [ref=e1060] [cursor=pointer]:
+              - /url: /listings/22edf0b8-12f4-4054-8664-94804364ec67
+              - generic [ref=e1061]:
+                - img "Kyosho Ford Mustang Shelby GT500 1:18" [ref=e1063]
+                - generic [ref=e1064]:
+                  - heading "Kyosho Ford Mustang Shelby GT500 1:18" [level=3] [ref=e1065]
+                  - paragraph [ref=e1066]: Ford · 1:18 · 1967
+                  - generic [ref=e1067]:
+                    - img [ref=e1068]
+                    - generic [ref=e1070]: "3.0"
+                    - generic [ref=e1071]: (1)
+                  - generic [ref=e1072]:
+                    - generic [ref=e1073]: New
+                    - paragraph [ref=e1074]: 3.811 ₺
+            - link "Maisto Ducati Panigale V4 1:18 Maisto Ducati Panigale V4 1:18 Ducati · 1:18 · 2018 New 799 ₺" [ref=e1076] [cursor=pointer]:
+              - /url: /listings/7970444c-5373-4857-9bfa-c7fa7ad59101
+              - generic [ref=e1077]:
+                - img "Maisto Ducati Panigale V4 1:18" [ref=e1079]
+                - generic [ref=e1080]:
+                  - heading "Maisto Ducati Panigale V4 1:18" [level=3] [ref=e1081]
+                  - paragraph [ref=e1082]: Ducati · 1:18 · 2018
+                  - generic [ref=e1083]:
+                    - generic [ref=e1084]: New
+                    - paragraph [ref=e1085]: 799 ₺
+            - link "Matchbox Custom Rat Rod Matchbox Custom Rat Rod · 1:64 · 1932 New 127 ₺" [ref=e1087] [cursor=pointer]:
+              - /url: /listings/bf97a6a8-64e6-4295-a705-546586ec9228
+              - generic [ref=e1088]:
+                - img "Matchbox Custom Rat Rod" [ref=e1090]
+                - generic [ref=e1091]:
+                  - heading "Matchbox Custom Rat Rod" [level=3] [ref=e1092]
+                  - paragraph [ref=e1093]: · 1:64 · 1932
+                  - generic [ref=e1094]:
+                    - generic [ref=e1095]: New
+                    - paragraph [ref=e1096]: 127 ₺
+            - link "P-51 Mustang WWII Fighter 1:72 P-51 Mustang WWII Fighter 1:72 · 1:72 · 1944 New 535 ₺" [ref=e1098] [cursor=pointer]:
+              - /url: /listings/dd8f22de-26d0-47fa-8dee-b21f67787239
+              - generic [ref=e1099]:
+                - img "P-51 Mustang WWII Fighter 1:72" [ref=e1101]
+                - generic [ref=e1102]:
+                  - heading "P-51 Mustang WWII Fighter 1:72" [level=3] [ref=e1103]
+                  - paragraph [ref=e1104]: · 1:72 · 1944
+                  - generic [ref=e1105]:
+                    - generic [ref=e1106]: New
+                    - paragraph [ref=e1107]: 535 ₺
+            - link "Maisto Harley-Davidson Fat Boy 1:18 Trade Maisto Harley-Davidson Fat Boy 1:18 Harley-Davidson · 1:18 · 2018 New 482 ₺" [ref=e1109] [cursor=pointer]:
+              - /url: /listings/080253dd-fc5a-4341-a258-202c5ebfbf70
+              - generic [ref=e1110]:
+                - generic [ref=e1111]:
+                  - img "Maisto Harley-Davidson Fat Boy 1:18" [ref=e1112]
+                  - generic [ref=e1113]:
+                    - img [ref=e1114]
+                    - generic [ref=e1116]: Trade
+                - generic [ref=e1117]:
+                  - heading "Maisto Harley-Davidson Fat Boy 1:18" [level=3] [ref=e1118]
+                  - paragraph [ref=e1119]: Harley-Davidson · 1:18 · 2018
+                  - generic [ref=e1120]:
+                    - generic [ref=e1121]: New
+                    - paragraph [ref=e1122]: 482 ₺
+            - link "Bburago F1 Lotus JPS 1:43 Trade Bburago F1 Lotus JPS 1:43 · 1:43 · 1978 New 415 ₺" [ref=e1124] [cursor=pointer]:
+              - /url: /listings/74db3dc4-4e46-4969-a561-abd7d510fb7b
+              - generic [ref=e1125]:
+                - generic [ref=e1126]:
+                  - img "Bburago F1 Lotus JPS 1:43" [ref=e1127]
+                  - generic [ref=e1128]:
+                    - img [ref=e1129]
+                    - generic [ref=e1131]: Trade
+                - generic [ref=e1132]:
+                  - heading "Bburago F1 Lotus JPS 1:43" [level=3] [ref=e1133]
+                  - paragraph [ref=e1134]: · 1:43 · 1978
+                  - generic [ref=e1135]:
+                    - generic [ref=e1136]: New
+                    - paragraph [ref=e1137]: 415 ₺
+          - generic [ref=e1138]:
+            - generic [ref=e1139]: Showing 1-48 of 51 products
+            - generic [ref=e1140]:
+              - button "Previous" [disabled]
+              - generic [ref=e1141]:
+                - button "1" [ref=e1142] [cursor=pointer]
+                - button "2" [ref=e1143] [cursor=pointer]
+              - button "Next" [ref=e1144] [cursor=pointer]
+  - contentinfo [ref=e1145]:
+    - generic [ref=e1146]:
+      - generic [ref=e1147]:
+        - generic [ref=e1148]:
+          - link "Tarodan Logo" [ref=e1149] [cursor=pointer]:
+            - /url: /
+            - img "Tarodan Logo" [ref=e1150]
+          - paragraph [ref=e1151]: Tarodan is Turkey's largest model car marketplace. Buy, sell and trade diecast model cars.
+          - generic [ref=e1152]:
+            - link "Twitter" [ref=e1153] [cursor=pointer]:
+              - /url: "#"
+              - img [ref=e1154]
+            - link "Instagram" [ref=e1156] [cursor=pointer]:
+              - /url: "#"
+              - img [ref=e1157]
+        - generic [ref=e1159]:
+          - heading "Marketplace" [level=3] [ref=e1160]
+          - list [ref=e1161]:
+            - listitem [ref=e1162]:
+              - link "Listings" [ref=e1163] [cursor=pointer]:
+                - /url: /listings
+            - listitem [ref=e1164]:
+              - link "Trades" [ref=e1165] [cursor=pointer]:
+                - /url: /trades
+            - listitem [ref=e1166]:
+              - link "Collections" [ref=e1167] [cursor=pointer]:
+                - /url: /collections
+            - listitem [ref=e1168]:
+              - link "Membership Plans" [ref=e1169] [cursor=pointer]:
+                - /url: /pricing
+        - generic [ref=e1170]:
+          - heading "Support" [level=3] [ref=e1171]
+          - list [ref=e1172]:
+            - listitem [ref=e1173]:
+              - link "About Us" [ref=e1174] [cursor=pointer]:
+                - /url: /about
+            - listitem [ref=e1175]:
+              - link "Help Center" [ref=e1176] [cursor=pointer]:
+                - /url: /help
+            - listitem [ref=e1177]:
+              - link "Contact" [ref=e1178] [cursor=pointer]:
+                - /url: /contact
+            - listitem [ref=e1179]:
+              - link "FAQ" [ref=e1180] [cursor=pointer]:
+                - /url: /faq
+        - generic [ref=e1181]:
+          - heading "Legal" [level=3] [ref=e1182]
+          - list [ref=e1183]:
+            - listitem [ref=e1184]:
+              - link "Terms of Service" [ref=e1185] [cursor=pointer]:
+                - /url: /terms
+            - listitem [ref=e1186]:
+              - link "Privacy Policy" [ref=e1187] [cursor=pointer]:
+                - /url: /privacy
+            - listitem [ref=e1188]:
+              - link "Cookie Policy" [ref=e1189] [cursor=pointer]:
+                - /url: /cookies
+            - listitem [ref=e1190]:
+              - button "Cookie Settings" [ref=e1191] [cursor=pointer]
+        - generic [ref=e1192]:
+          - heading "Language" [level=3] [ref=e1193]
+          - button "🇬🇧 English" [ref=e1195] [cursor=pointer]:
+            - img [ref=e1196]
+            - generic [ref=e1198]: 🇬🇧 English
+            - img [ref=e1199]
+      - generic [ref=e1201]:
+        - paragraph [ref=e1202]: © 2026 TARODAN. All rights reserved.
+        - generic [ref=e1203]:
+          - generic [ref=e1204]: PayTR
+          - generic [ref=e1205]: SSL
+  - generic [ref=e1210]:
+    - img [ref=e1212]
+    - generic [ref=e1214]:
+      - heading "🍪 Çerez Kullanımı" [level=3] [ref=e1215]
+      - paragraph [ref=e1216]:
+        - text: Sitemizde deneyiminizi geliştirmek, trafiği analiz etmek ve size kişiselleştirilmiş içerik sunmak için çerezler kullanıyoruz. Detaylı bilgi için
+        - link "Çerez Politikamızı" [ref=e1217] [cursor=pointer]:
+          - /url: /cookies
+        - text: inceleyebilirsiniz.
+      - generic [ref=e1218]:
+        - button "Tümünü Kabul Et" [ref=e1219] [cursor=pointer]:
+          - img [ref=e1220]
+          - text: Tümünü Kabul Et
+        - button "Sadece Gerekli Olanlar" [ref=e1222] [cursor=pointer]
+        - button "Ayarlar" [ref=e1223] [cursor=pointer]:
+          - img [ref=e1224]
+          - text: Ayarlar
+  - alert [ref=e1227]
+```
