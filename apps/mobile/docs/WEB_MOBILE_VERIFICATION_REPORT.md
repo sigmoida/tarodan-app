@@ -108,7 +108,7 @@ Mobilin kullandığı tam yol gerçek isteklerle koşuldu:
 | BUG | Akış | Önem | Web'de | Kanıt | Önerilen düzeltme |
 |-----|------|------|--------|-------|-------------------|
 | BUG-001 | Üyelik | **KRİTİK** | ✅ gerçek ödeme | `membership/checkout.tsx:80-86` setTimeout simülasyon; `index.tsx:160` buraya yönlendiriyor | ✅ **DÜZELTİLDİ** — `checkout.tsx handlePayment` artık `membershipApi.initiatePayment` → `useBypass` ise `bypassComplete` → `refreshUserData` → `/membership/success`; değilse `/payment/[id]` WebView. Sipariş checkout'u ile aynı desen. tsc temiz; Maestro/manuel UI 🕓 (simülatör) |
-| BUG-002 | İade | Orta | ✅ satıcı accept/reject | mobil grep boş; `/refund-requests/seller` UI yok | Satıcı iade listesi + accept/reject ekranı ekle |
+| BUG-002 | İade | Orta | ✅ satıcı accept/reject | mobil grep boş; `/refund-requests/seller` UI yok | ✅ **DÜZELTİLDİ** — `refundsApi.getSeller/accept/reject` + `app/refund-requests/seller.tsx` (liste + kabul/reddet) + dashboard linki. tsc temiz, API 200, ekran render teyitli (commit `db335356`) |
 | BUG-003 | Ödeme | Düşük | ✅ `payments/{id}/verify` | `src/services/api.ts` verify yok | Gerçek PayTR confirm için verify ekle (bypass modunda gereksiz) |
 | BUG-004 | Bildirim | Düşük (web) | ⚠️ `PATCH /notifications/read-all` swagger'da yok | `/tmp/tarodan-routes.txt` | Web'i `POST /notifications/mark-all-read`'e hizala |
 | BUG-005 | Kargo | Düşük (UX) | aynı | carrier hardcoded `'surat'`, UI çok seçenek gösteriyor | UI'ı tek aktif carrier'a indir veya gerçek çoklu carrier desteği |
@@ -153,11 +153,10 @@ Mobilin kullandığı tam yol gerçek isteklerle koşuldu:
 - Maestro smoke ✅, F-18 ✅; buy-flow'lar test-drift nedeniyle ❌ (app değil, test bayat).
 - **BUG-001 (kritik) bulundu + düzeltildi** (kod + API doğrulandı).
 
-**Skor:** 9 akış ✅ (API+parity), 1 ✅-düzeltildi (üyelik), 1 ⚠️ (iade — satıcı tarafı mobilde yok). Toplam 8 bulgu (1 kritik düzeltildi, 1 orta açık [BUG-002], 6 düşük).
+**Skor:** 9 akış ✅ (API+parity), 2 ✅-düzeltildi (üyelik + iade satıcı tarafı). Toplam 8 bulgu — **2 düzeltildi (BUG-001 kritik, BUG-002 orta)**, 6 düşük açık.
 
 **Açık kalan iş (öncelik sırası):**
-1. BUG-002 (orta): mobilde satıcı iade accept/reject ekranı.
-2. BUG-007 (test bakım): Maestro buy-flow'larını güncel testID'lere taşı → full suite koşulabilir.
-3. BUG-003/004/005/006/008 (düşük): tek tek ele alınabilir.
+1. BUG-007 (test bakım): Maestro buy-flow'larını güncel testID'lere (`product-detail-add-to-cart-button`) taşı → full suite koşulabilir.
+2. BUG-003/004/005/006/008 (düşük): tek tek ele alınabilir.
 
 **Not (ortam):** Doğrulama için `apps/api/.env` → `PAYMENT_BYPASS=true` yapıldı (commit edilmedi). Doğrulama bitti; üretim davranışı için `false`'a geri alınıp API yeniden başlatılmalı.
