@@ -823,7 +823,7 @@ export const uploadApi = {
 // REFUND REQUESTS API
 // =============================================================================
 /**
- * Buyer-side refund request endpoints.
+ * Buyer + seller refund request endpoints (web ile parite).
  * Backend module: apps/api/src/modules/refund (RefundController).
  * Reasons (Prisma enum RefundReason): changed_mind | damaged | wrong_item |
  * not_as_described | missing_parts | other.
@@ -838,8 +838,15 @@ export const refundsApi = {
   getById: (id: string) => api.get(`/refund-requests/${id}`),
   /** GET /refund-requests/me — buyer's own refund requests */
   getMine: () => api.get('/refund-requests/me'),
+  /** GET /refund-requests/seller — seller'a gelen iade talepleri */
+  getSeller: () => api.get('/refund-requests/seller'),
   /** POST /refund-requests/:id/cancel */
   cancel: (id: string) => api.post(`/refund-requests/${id}/cancel`),
+  /** POST /refund-requests/:id/accept — satıcı iadeyi kabul eder */
+  accept: (id: string) => api.post(`/refund-requests/${id}/accept`),
+  /** POST /refund-requests/:id/reject — satıcı iadeyi reddeder (gerekçe) */
+  reject: (id: string, response: string) =>
+    api.post(`/refund-requests/${id}/reject`, { response }),
 };
 
 // =============================================================================
