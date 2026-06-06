@@ -16,7 +16,7 @@
 | 1 | Auth | ✅ | 🕓 | 🕓 |
 | 2 | Arama & filtre & kategori | ✅ | 🕓 | 🕓 |
 | 3 | Ürün detay & favori | ✅ | 🕓 | 🕓 |
-| 4 | Sepet & Checkout & Ödeme | ✅ (bypass çalışıyor) · ⚠️ verify yok | 🕓 | 🕓 |
+| 4 | Sepet & Checkout & Ödeme | ✅ **canlı E2E geçti** · ⚠️ verify yok | 🕓 | 🕓 |
 | 5 | Kargo / teslimat | ✅ (stub) | 🕓 | 🕓 |
 | 6 | Takas (ürün + nakit) | ✅ | 🕓 | 🕓 |
 | 7 | Teklif (offers) | ✅ | 🕓 | 🕓 |
@@ -26,6 +26,15 @@
 | 11 | Satıcı paneli | ✅ | 🕓 | 🕓 |
 
 **Durum kodları:** ✅ tam · ⚠️ kısmi · ❌ bozuk · ⛔ eksik · 🕓 beklemede (simülatör)
+
+## Canlı uçtan uca testler (API, PAYMENT_BYPASS=true)
+
+Mobilin kullandığı tam yol gerçek isteklerle koşuldu:
+
+1. **Sipariş ödemesi** — `POST /orders/buy` (ORD-2026-000018) → `POST /payments/initiate` (`useBypass:true`) → `POST /payments/{id}/bypass-complete` (`{"success":true}`, 201). Sonuç: ürün **stok 1→0, status active→inactive**; sipariş **pending_payment→preparing**; komisyon 20.52 hesaplandı. ✅ (Gözlem: `buyerFeeAmount:0` — alıcı bedeli bu siparişte 0, manuel kontrol notu.)
+2. **Üyelik ödemesi** — `POST /membership/payments/initiate` (premium/monthly, `useBypass:true`) → `bypass-complete` (`{"success":true}`, 201). Sonuç: `GET /membership/me` artık **tier: premium, status: active**. ✅ Backend üyelik satın alma **çalışıyor** → BUG-001 yalnızca mobil UI kaynaklı.
+
+> Not: Bu testler yerel seed DB'sinde gerçek kayıt oluşturdu (1 ödenmiş sipariş + ahmet@demo.com premium oldu). Dev verisi; geri alınmadı.
 
 ## Akış Detayları
 
@@ -45,7 +54,8 @@
 - Mobil kod: `product/[id].tsx` + `favoritesStore.ts` wishlistApi — web ile tam parity.
 - Maestro 🕓: F-08. Manuel 🕓: favori toggle → listede görünme.
 
-### 4. Sepet & Checkout & Ödeme — ✅ (bypass çalışıyor) / ⚠️ küçük gap
+### 4. Sepet & Checkout & Ödeme — ✅ (canlı E2E geçti) / ⚠️ küçük gap
+- **Canlı E2E:** orders/buy → initiate (useBypass) → bypass-complete → stok 1→0, sipariş preparing (yukarı bkz). Mobilin tam yolu doğrulandı.
 - API: `POST /orders/quote` · `/orders/commission-preview` · `/orders/buy` · `/payments/initiate` · `/payments/{id}/bypass-complete` · `/payments/{id}/status` · `/payments/methods` · `/users/me/addresses` · `/shipping/rates` — hepsi swagger'da mevcut.
 - Mobil kod: checkout `apps/mobile/app/checkout/index.tsx` → `payment/[id].tsx:93 paymentsApi.bypassComplete` (PAYMENT_BYPASS akışı mobilde **çalışıyor**). Sepet localStorage (cartStore), web ile aynı yaklaşım. billingAddress UI mevcut, kayıtlı kart endpoint'leri mevcut.
 - **Gap (⚠️ BUG-003):** Mobilde `/payments/{id}/verify` çağrısı yok (web `payment/success`'te var, gerçek PayTR confirm için). Bypass modunda etkisiz; düşük öncelik.
@@ -71,6 +81,7 @@
 - API: `/membership/tiers`, `/membership/me`, `/membership/subscribe`, `/membership/payments/initiate`, `/membership/cancel`, `/membership/auto-renew` — hepsi mevcut ve çalışır.
 - **BUG-001 (KRİTİK):** Ana satın alma akışı sahte. `membership/index.tsx:160` "Satın Al" → `membership/checkout.tsx`. `checkout.tsx:80-86 handlePayment` yalnızca `setTimeout(2000)` → `router.replace('/membership/success')`. **Hiç API çağrısı yok** — ödeme almadan, abone etmeden "başarılı" diyor. Web gerçek `membershipApi.subscribe()` + payment initiate yapıyor (apps/web/src/app/membership/checkout/page.tsx).
 - Not: `upgrade.tsx`'te gerçek akış (`subscribe` + `Linking.openURL(paymentUrl)`) **var** ama ana ekran (`index.tsx`) onu kullanmıyor; sahte `checkout.tsx`'e yönlendiriyor.
+- **Kanıt (canlı):** Backend üyelik ödemesi API'de tam çalışıyor — `membership/payments/initiate` + `bypass-complete` → `membership/me` premium/active döndü. Yani kusur **yalnızca mobil UI**: `checkout.tsx` bu çalışan API'yi hiç çağırmıyor.
 - Maestro 🕓: D-02, E-05 (geçse bile sahte success'i yakalamaz — manuel doğrulama şart).
 
 ### 9. Mesajlar & bildirim — ✅
