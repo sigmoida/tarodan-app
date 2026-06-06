@@ -15,6 +15,16 @@ const CARD_PLACEHOLDERS = [
   'https://placehold.co/400x400/fff8e1/f57f17?text=Rare+Model',
 ];
 
+/**
+ * Flattened attribute entry as returned by /products/* endpoints (formatProductResponse).
+ * `slug` is the Attribute.slug (e.g. 'treasure-hunt'); `groupSlug` is AttributeGroup.slug
+ * (e.g. 'hw-rarity'). HW rarity badge derives from these.
+ */
+interface ProductAttributeEntry {
+  slug?: string;
+  groupSlug?: string;
+}
+
 interface ProductCardProduct {
   id: string;
   title: string;
@@ -26,6 +36,27 @@ interface ProductCardProduct {
   isLimited?: boolean;
   condition?: string;
   rating?: { average: number | null; count: number };
+  /**
+   * Flattened attributes from API. Used to derive Hot Wheels rarity badge in-component.
+   * Products without HW data simply won't render a rarity badge.
+   */
+  attributes?: ProductAttributeEntry[];
+}
+
+/** Returns the HW rarity tier for a product, or undefined if none. */
+function deriveHwRarity(
+  attributes: ProductAttributeEntry[] | undefined,
+): 'treasure-hunt' | 'super-treasure-hunt' | 'chase' | undefined {
+  if (!attributes?.length) return undefined;
+  const rarityAttr = attributes.find((a) => a.groupSlug === 'hw-rarity')?.slug;
+  if (
+    rarityAttr === 'treasure-hunt' ||
+    rarityAttr === 'super-treasure-hunt' ||
+    rarityAttr === 'chase'
+  ) {
+    return rarityAttr;
+  }
+  return undefined;
 }
 
 interface ProductCardProps {
@@ -57,6 +88,7 @@ export default function ProductCard({
   const fallbackIdx = product.id ? product.id.charCodeAt(0) % CARD_PLACEHOLDERS.length : 0;
   const [imgSrc, setImgSrc] = useState(imageUrl || CARD_PLACEHOLDERS[fallbackIdx]);
   const handleImgError = () => setImgSrc(CARD_PLACEHOLDERS[fallbackIdx]);
+  const hwRarity = deriveHwRarity(product.attributes);
 
   const formatCurrency = (n: number) =>
     n.toLocaleString('tr-TR', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + ' \u20BA';
@@ -161,6 +193,22 @@ export default function ProductCard({
                 <StarIcon className="w-3 h-3 text-inverted" />
                 {locale === 'en' ? 'LIMITED' : 'LIMITED'}
               </Badge>
+            )}
+            {hwRarity === 'super-treasure-hunt' && (
+              // $TH — Super Treasure Hunt, highest-tier HW rarity. Distinct from regular TH.
+              <Badge variant="rare">
+                <StarIcon className="w-3 h-3 text-inverted" />
+                $TH
+              </Badge>
+            )}
+            {hwRarity === 'treasure-hunt' && (
+              <Badge variant="rare">
+                <StarIcon className="w-3 h-3 text-inverted" />
+                TH
+              </Badge>
+            )}
+            {hwRarity === 'chase' && (
+              <Badge variant="rare">CHASE</Badge>
             )}
           </div>
           {isOnSale && discountPercent && (

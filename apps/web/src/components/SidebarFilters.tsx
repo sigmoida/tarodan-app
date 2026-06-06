@@ -32,6 +32,13 @@ interface ManufacturerItem {
     _count?: { products: number };
 }
 
+interface CustomAttributeGroup {
+    slug: string;
+    name: string;
+    manufacturerSlug: string | null;
+    attributes: Array<{ slug: string; label: string; color?: string | null }>;
+}
+
 interface SidebarFiltersProps {
     filters: {
         brand: string;
@@ -48,6 +55,11 @@ interface SidebarFiltersProps {
         category?: string;
         manufacturer?: string;
         manufacturerId?: string;
+        /**
+         * Manufacturer-scoped attribute selections: groupSlug -> selected attribute slugs.
+         * Only populated when a manufacturer with scoped attribute groups is selected (e.g. Hot Wheels).
+         */
+        customAttributes?: Record<string, string[]>;
     };
     onFilterChange: (filters: any) => void;
     activeFilterCount: number;
@@ -82,6 +94,11 @@ export default function SidebarFilters({
     const [scaleList, setScaleList] = useState<string[]>([]);
     const [materialList, setMaterialList] = useState<Array<{ slug: string; label: string }>>([]);
     const [carModelList, setCarModelList] = useState<Array<{ id: string; name: string; slug: string; brandId: string }>>([]);
+
+    // Manufacturer-scoped custom attribute groups (e.g. Hot Wheels Segment/Assortment/...).
+    // Re-fetched whenever the selected manufacturer changes.
+    const [customAttrGroups, setCustomAttrGroups] = useState<CustomAttributeGroup[]>([]);
+    const [customAttrSearch, setCustomAttrSearch] = useState<Record<string, string>>({});
 
     useEffect(() => {
         const fetchCategories = async () => {
@@ -132,6 +149,40 @@ export default function SidebarFilters({
         };
         fetchFilters();
     }, []);
+
+    // Re-fetch manufacturer-scoped attribute groups whenever manufacturer changes.
+    // When no manufacturer is selected, customAttrGroups stays empty — HW blocks vanish.
+    // Resolves slug from the manufacturerList lookup (DB-authoritative) so accented or
+    // special-character names don't produce mismatched ad-hoc slugs.
+    useEffect(() => {
+        let slug: string | undefined;
+        if (filters.manufacturerId) {
+            slug = manufacturerList.find((m) => m.id === filters.manufacturerId)?.slug;
+        } else if (filters.manufacturer) {
+            slug = manufacturerList.find(
+                (m) => m.name.toLowerCase() === filters.manufacturer!.toLowerCase(),
+            )?.slug;
+        }
+        if (!slug) {
+            setCustomAttrGroups([]);
+            return;
+        }
+        let cancelled = false;
+        (async () => {
+            try {
+                const response = await listingsApi.getFilters({ manufacturer: slug });
+                if (cancelled) return;
+                const data = response.data as { customAttributes?: CustomAttributeGroup[] };
+                setCustomAttrGroups(data.customAttributes ?? []);
+            } catch (error) {
+                console.error('Failed to fetch manufacturer-scoped filters:', error);
+                if (!cancelled) setCustomAttrGroups([]);
+            }
+        })();
+        return () => {
+            cancelled = true;
+        };
+    }, [filters.manufacturer, filters.manufacturerId, manufacturerList]);
 
     // Collapsed state for each section
     const [collapsedSections, setCollapsedSections] = useState<Record<string, boolean>>({
@@ -208,10 +259,26 @@ export default function SidebarFilters({
 
     const handleManufacturerChange = (manufacturerId: string, manufacturerName: string) => {
         if (filters.manufacturerId === manufacturerId) {
-            onFilterChange({ ...filters, manufacturerId: '', manufacturer: '' });
+            // Clearing manufacturer also clears any custom attribute selections — they only make
+            // sense in the context of the selected manufacturer.
+            onFilterChange({ ...filters, manufacturerId: '', manufacturer: '', customAttributes: {} });
         } else {
-            onFilterChange({ ...filters, manufacturerId, manufacturer: manufacturerName });
+            onFilterChange({ ...filters, manufacturerId, manufacturer: manufacturerName, customAttributes: {} });
         }
+    };
+
+    const toggleCustomAttribute = (groupSlug: string, attrSlug: string) => {
+        const current = filters.customAttributes?.[groupSlug] ?? [];
+        const next = current.includes(attrSlug)
+            ? current.filter((s) => s !== attrSlug)
+            : [...current, attrSlug];
+        const nextMap = { ...(filters.customAttributes ?? {}) };
+        if (next.length === 0) {
+            delete nextMap[groupSlug];
+        } else {
+            nextMap[groupSlug] = next;
+        }
+        onFilterChange({ ...filters, customAttributes: nextMap });
     };
 
     // Category change - update URL with categoryId
@@ -492,6 +559,85 @@ export default function SidebarFilters({
                         </div>
                     )}
                 </div>
+
+                {/* Manufacturer-scoped custom attribute groups (e.g. Hot Wheels Segment/Assortment/Wheel Type/...) */}
+                {customAttrGroups.map((group) => {
+                    const sectionKey = `customAttr:${group.slug}`;
+                    const isCollapsed = collapsedSections[sectionKey] ?? false;
+                    const selected = new Set(filters.customAttributes?.[group.slug] ?? []);
+                    const searchTerm = customAttrSearch[group.slug] ?? '';
+                    const filteredAttrs = searchTerm
+                        ? group.attributes.filter((a) =>
+                            a.label.toLowerCase().includes(searchTerm.toLowerCase())
+                          )
+                        : group.attributes;
+                    // Long lists (designer, assortment, wheel-type) get a search input; short ones don't.
+                    const showSearch = group.attributes.length > 15;
+                    return (
+                        <div key={group.slug} className="py-3 px-4">
+                            <Button variant="secondary" onClick={() => toggleSection(sectionKey)}
+                                className="flex items-center justify-between w-full text-left">
+                                <span className="font-medium text-heading">
+                                    {group.name}
+                                    {selected.size > 0 && (
+                                        <span className="ml-2 px-1.5 py-0.5 bg-primary-500 text-inverted text-xs font-bold rounded-sm">
+                                            {selected.size}
+                                        </span>
+                                    )}
+                                </span>
+                                {isCollapsed ? (
+                                    <ChevronDownIcon className="w-5 h-5 text-subtle" />
+                                ) : (
+                                    <ChevronUpIcon className="w-5 h-5 text-subtle" />
+                                )}
+                            </Button>
+                            {!isCollapsed && (
+                                <div className="mt-3">
+                                    {showSearch && (
+                                        <Input
+                                            type="text"
+                                            placeholder={locale === 'en' ? `Search ${group.name}...` : `${group.name} ara...`}
+                                            value={searchTerm}
+                                            onChange={(e) =>
+                                                setCustomAttrSearch((s) => ({ ...s, [group.slug]: e.target.value }))
+                                            }
+                                            inputSize="sm"
+                                            className="rounded border-border focus:border-primary-400 mb-2"
+                                        />
+                                    )}
+                                    <div className={`space-y-1 ${group.attributes.length > 15 ? 'max-h-64 overflow-y-auto' : ''}`}>
+                                        {filteredAttrs.map((attr) => {
+                                            const isSelected = selected.has(attr.slug);
+                                            return (
+                                                <label
+                                                    key={attr.slug}
+                                                    className={`flex items-center gap-2 px-2 py-1.5 rounded cursor-pointer transition-colors ${isSelected
+                                                        ? 'bg-primary-100 text-primary-700'
+                                                        : 'text-body hover:bg-surface'
+                                                        }`}
+                                                >
+                                                    <Checkbox
+                                                        checked={isSelected}
+                                                        onChange={() => toggleCustomAttribute(group.slug, attr.slug)}
+                                                        className="w-4 h-4"
+                                                    />
+                                                    {attr.color && (
+                                                        <span
+                                                            className="w-3 h-3 rounded-full border border-border-subtle flex-shrink-0"
+                                                            style={{ backgroundColor: attr.color }}
+                                                            aria-hidden="true"
+                                                        />
+                                                    )}
+                                                    <span className="text-sm">{attr.label}</span>
+                                                </label>
+                                            );
+                                        })}
+                                    </div>
+                                </div>
+                            )}
+                        </div>
+                    );
+                })}
 
                 {/* Durum */}
                 <div className="py-3 px-4">

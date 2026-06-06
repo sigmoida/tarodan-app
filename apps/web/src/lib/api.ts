@@ -146,7 +146,10 @@ export const authApi = {
 
 // Products (was Listings - endpoint is /products in backend)
 export const listingsApi = {
-  getFilters: () => api.get('/products/filters'),
+  getFilters: (params?: { manufacturer?: string }) =>
+    api.get('/products/filters', { params }),
+  getAttributeGroups: (params?: { manufacturer?: string }) =>
+    api.get('/products/attribute-groups', { params }),
   getPopular: (params?: { limit?: number; page?: number }) =>
     api.get('/products/popular', { params: { limit: 20, page: 1, ...params }, headers: { 'Cache-Control': 'no-cache', Pragma: 'no-cache' } }),
   getAll: (params?: Record<string, any>) =>

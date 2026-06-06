@@ -139,6 +139,20 @@ export default function SellScreen() {
   const [materialList, setMaterialList] = useState<MaterialOption[]>([]);
   const [manufacturerList, setManufacturerList] = useState<Manufacturer[]>([]);
 
+  // Manufacturer-scoped extra attributes (e.g. Hot Wheels Segment/Assortment/Wheel Type/...).
+  // groupSlug -> selected attribute slugs. Populated only for manufacturers that have scoped groups.
+  const [customAttributes, setCustomAttributes] = useState<Record<string, string[]>>({});
+  const [manufacturerAttrGroups, setManufacturerAttrGroups] = useState<
+    Array<{
+      slug: string;
+      name: string;
+      manufacturerSlug: string | null;
+      isRequired: boolean;
+      attributes: Array<{ slug: string; label: string; color?: string | null }>;
+    }>
+  >([]);
+  const [showAttrGroupPicker, setShowAttrGroupPicker] = useState<string | null>(null);
+
   // Loading flags
   const [brandsLoading, setBrandsLoading] = useState(true);
   const [modelsLoading, setModelsLoading] = useState(false);
@@ -210,6 +224,46 @@ export default function SellScreen() {
       setModels([]);
     }
   }, [brandId, brands]);
+
+  // -----------------------------------------------------------------------
+  // Fetch manufacturer-scoped attribute groups when manufacturer changes
+  // -----------------------------------------------------------------------
+  useEffect(() => {
+    const selected = manufacturerList.find((m) => m.id === manufacturerId);
+    if (!selected) {
+      setManufacturerAttrGroups([]);
+      setCustomAttributes({});
+      return;
+    }
+    let cancelled = false;
+    (async () => {
+      try {
+        const res = await api.get('/products/attribute-groups', {
+          params: { manufacturer: selected.slug },
+        });
+        if (cancelled) return;
+        const groups = (res.data ?? []) as Array<{
+          slug: string;
+          name: string;
+          manufacturerSlug: string | null;
+          isRequired: boolean;
+          attributes: Array<{ slug: string; label: string; color?: string | null }>;
+        }>;
+        // Render only scoped groups; global ones (scale, material) have dedicated form fields.
+        setManufacturerAttrGroups(groups.filter((g) => g.manufacturerSlug === selected.slug));
+        setCustomAttributes({});
+      } catch (error) {
+        if (__DEV__) console.error('Failed to fetch manufacturer attribute groups:', error);
+        if (!cancelled) {
+          setManufacturerAttrGroups([]);
+          setCustomAttributes({});
+        }
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [manufacturerId, manufacturerList]);
 
   // -----------------------------------------------------------------------
   // Commission preview when price changes
@@ -463,6 +517,9 @@ export default function SellScreen() {
 
     setIsSubmitting(true);
     try {
+      // Flatten manufacturer-scoped selections into the flat slug array the API expects.
+      const customAttributeSlugs = Object.values(customAttributes).flat().filter(Boolean);
+
       const payload: Record<string, any> = {
         title,
         description: description || undefined,
@@ -480,6 +537,7 @@ export default function SellScreen() {
         isSet,
         quantity: quantity ? Number(quantity) : undefined,
         images: imageKeys.length > 0 ? imageKeys : undefined,
+        attributes: customAttributeSlugs.length > 0 ? customAttributeSlugs : undefined,
       };
 
       await productsApi.create(payload);
@@ -991,6 +1049,37 @@ export default function SellScreen() {
               </Text>
               <Text style={styles.pickerArrow}>›</Text>
             </TouchableOpacity>
+
+            {/* Manufacturer-scoped extra attribute groups (e.g. Hot Wheels Segment/...) */}
+            {manufacturerAttrGroups.map((group) => {
+              const selected = customAttributes[group.slug] ?? [];
+              const summary =
+                selected.length === 0
+                  ? `${group.name} seçin`
+                  : selected.length === 1
+                  ? group.attributes.find((a) => a.slug === selected[0])?.label ?? `1 seçili`
+                  : `${selected.length} seçili`;
+              return (
+                <View key={group.slug}>
+                  <Text style={[styles.label, { marginTop: 16 }]}>{group.name}</Text>
+                  <TouchableOpacity
+                    style={styles.pickerButton}
+                    onPress={() => setShowAttrGroupPicker(group.slug)}
+                  >
+                    <Text
+                      style={
+                        selected.length > 0
+                          ? styles.pickerValue
+                          : styles.pickerPlaceholder
+                      }
+                    >
+                      {summary}
+                    </Text>
+                    <Text style={styles.pickerArrow}>›</Text>
+                  </TouchableOpacity>
+                </View>
+              );
+            })}
           </View>
 
           {/* ============================================================= */}
@@ -1227,6 +1316,35 @@ export default function SellScreen() {
         keyExtractor: (item: number) => String(item),
         labelExtractor: (item: number) => String(item),
         emptyText: 'Yıl bulunamadı',
+      })}
+
+      {/* Manufacturer-scoped attribute group picker (single-select per group on mobile).
+          User can re-open to change selection; clearing is done by selecting the same item again. */}
+      {manufacturerAttrGroups.map((group) => {
+        const selected = customAttributes[group.slug] ?? [];
+        return renderPickerModal({
+          visible: showAttrGroupPicker === group.slug,
+          onClose: () => setShowAttrGroupPicker(null),
+          title: `${group.name} Seçin`,
+          data: group.attributes,
+          onSelect: (item: { slug: string; label: string }) => {
+            setCustomAttributes((prev) => {
+              const next = { ...prev };
+              const current = next[group.slug] ?? [];
+              // Tapping the already-selected single item clears it.
+              if (current.length === 1 && current[0] === item.slug) {
+                delete next[group.slug];
+              } else {
+                next[group.slug] = [item.slug];
+              }
+              return next;
+            });
+          },
+          selectedId: selected[0] ?? '',
+          keyExtractor: (item: { slug: string }) => item.slug,
+          labelExtractor: (item: { label: string }) => item.label,
+          emptyText: 'Sonuç bulunamadı',
+        });
       })}
     </SafeAreaView>
   );

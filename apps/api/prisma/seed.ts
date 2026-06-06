@@ -466,6 +466,10 @@ async function main() {
 
   console.log(`✅ Created attribute groups (${scaleValues.length} scales, ${materialValues.length} materials, ${vehicleTypeValues.length} vehicle types)`);
 
+  console.log('Seeding Hot Wheels-specific attribute groups...');
+  const { seedHotWheelsAttributes } = await import('./seed-hw-attributes');
+  await seedHotWheelsAttributes(prisma);
+
   // Map seed category slug (cat) -> vehicle_type attribute slug for product attributes
   const catToVehicleTypeSlug: Record<string, string> = {
     araba: 'car',

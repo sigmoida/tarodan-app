@@ -78,6 +78,19 @@ export default function ListingsPage() {
   const [currentPage, setCurrentPage] = useState(1);
   const pageLimit = 48;
 
+  // Manufacturer-scoped custom attributes are URL-encoded as `attr.<groupSlug>=<a,b,c>`.
+  // Example: ?attr.hw-rarity=treasure-hunt&attr.hw-segment=mainline,premium
+  const parseCustomAttrsFromUrl = (): Record<string, string[]> => {
+    const out: Record<string, string[]> = {};
+    searchParams.forEach((value, key) => {
+      if (!key.startsWith('attr.') || !value) return;
+      const groupSlug = key.slice('attr.'.length);
+      if (!groupSlug) return;
+      out[groupSlug] = value.split(',').filter(Boolean);
+    });
+    return out;
+  };
+
   const [filters, setFilters] = useState({
     search: autoDetectedBrand ? '' : urlSearch,
     brand: searchParams.get('brand') || autoDetectedBrand || '',
@@ -99,6 +112,7 @@ export default function ListingsPage() {
     categoryId: searchParams.get('categoryId') || '',
     manufacturer: searchParams.get('manufacturer') || '',
     manufacturerId: searchParams.get('manufacturerId') || '',
+    customAttributes: parseCustomAttrsFromUrl(),
   });
 
   const searchString = searchParams.toString();
@@ -130,6 +144,12 @@ export default function ListingsPage() {
     if (f.categoryId) params.set('categoryId', f.categoryId);
     if (f.manufacturer) params.set('manufacturer', f.manufacturer);
     if (f.manufacturerId) params.set('manufacturerId', f.manufacturerId);
+    // Encode manufacturer-scoped attribute selections as attr.<groupSlug>=a,b,c
+    if (f.customAttributes) {
+      for (const [groupSlug, slugs] of Object.entries(f.customAttributes)) {
+        if (slugs && slugs.length > 0) params.set(`attr.${groupSlug}`, slugs.join(','));
+      }
+    }
     if (page > 1) params.set('page', page.toString());
     return params;
   };
@@ -235,6 +255,18 @@ export default function ListingsPage() {
         if (filters.limited) p.limited = true;
         if (filters.set) p.set = true;
         if (filters.sortBy) p.sortBy = filters.sortBy;
+        // Manufacturer-scoped attribute selections, sent group-aware so backend can apply
+        // OR-within-group + AND-across-groups semantics. Empty groups are dropped.
+        if (filters.customAttributes) {
+          const nonEmpty = Object.fromEntries(
+            Object.entries(filters.customAttributes).filter(
+              ([, slugs]) => Array.isArray(slugs) && slugs.length > 0,
+            ),
+          );
+          if (Object.keys(nonEmpty).length > 0) {
+            p.attrGroups = JSON.stringify(nonEmpty);
+          }
+        }
         return p;
       };
 

@@ -203,7 +203,13 @@ export class ProductService implements OnModuleInit {
       });
 
       // Link scale and material (attributes) so they show on detail and in filters
-      await this.linkProductAttributes(product.id, dto.scale, dto.attributeIds, dto.material);
+      await this.linkProductAttributes(
+        product.id,
+        dto.scale,
+        dto.attributeIds,
+        dto.material,
+        dto.attributes,
+      );
 
       // Invalidate product list cache
       await this.cache.delPattern('products:list:*');
@@ -249,13 +255,17 @@ export class ProductService implements OnModuleInit {
   }
 
   /**
-   * Link scale (1:64), material (slug), and attributeIds to product via ProductAttribute.
+   * Link scale (1:64), material (slug), attributeIds, and attribute slugs to product via ProductAttribute.
+   * attributeSlugs: opaque list of Attribute.slug values from any group (used for Hot Wheels extras
+   * like 'mainline', 'treasure-hunt', 'red'). Slugs are resolved server-side to attribute IDs.
+   * Unknown slugs are silently dropped (logged in dev).
    */
   private async linkProductAttributes(
     productId: string,
     scale?: string,
     attributeIds?: string[],
     materialSlug?: string,
+    attributeSlugs?: string[],
   ) {
     const toLink: string[] = [];
 
@@ -286,6 +296,27 @@ export class ProductService implements OnModuleInit {
       if (materialAttr) toLink.push(materialAttr.id);
     }
     if (attributeIds?.length) toLink.push(...attributeIds);
+
+    if (attributeSlugs?.length) {
+      // Resolve slug -> attribute id. Slugs are unique within a group; the same slug could
+      // theoretically exist under multiple groups, so we accept all matches.
+      const resolved = await this.prisma.attribute.findMany({
+        where: {
+          slug: { in: attributeSlugs.map((s) => s.trim()).filter(Boolean) },
+          isActive: true,
+          group: { isActive: true },
+        },
+        select: { id: true, slug: true },
+      });
+      const resolvedSlugs = new Set(resolved.map((r) => r.slug));
+      const unknown = attributeSlugs.filter((s) => !resolvedSlugs.has(s));
+      if (unknown.length > 0 && process.env.NODE_ENV === 'development') {
+        this.logger.warn(
+          `Unknown attribute slug(s) ignored for product ${productId}: ${unknown.join(', ')}`,
+        );
+      }
+      toLink.push(...resolved.map((r) => r.id));
+    }
 
     for (const attributeId of toLink) {
       await this.prisma.productAttribute.upsert({
@@ -336,6 +367,8 @@ export class ProductService implements OnModuleInit {
       tradeOnly, discountOnly, preOrder, limited,
       set: query.set,
       minPrice, maxPrice, sortBy, page, limit, carModelId,
+      attributeSlugs: query.attributeSlugs,
+      attrGroups: query.attrGroups,
     })}`;
 
     const hasSearch = !!(search && String(search).trim());
@@ -1036,7 +1069,12 @@ export class ProductService implements OnModuleInit {
         },
       });
 
-      if (dto.scale !== undefined || dto.attributeIds !== undefined || dto.material !== undefined) {
+      if (
+        dto.scale !== undefined ||
+        dto.attributeIds !== undefined ||
+        dto.material !== undefined ||
+        dto.attributes !== undefined
+      ) {
         const scaleMaterialAttrIds = await this.prisma.attribute.findMany({
           where: { group: { slug: { in: ['scale', 'material'] } } },
           select: { id: true },
@@ -1046,7 +1084,26 @@ export class ProductService implements OnModuleInit {
             where: { productId: id, attributeId: { in: scaleMaterialAttrIds } },
           });
         }
-        await this.linkProductAttributes(id, dto.scale, dto.attributeIds, dto.material);
+        // Also clear any prior manufacturer-scoped attribute selections so the user can
+        // replace them via the update payload (matches POST create semantics).
+        if (dto.attributes !== undefined) {
+          const scopedAttrIds = await this.prisma.attribute.findMany({
+            where: { group: { manufacturerSlug: { not: null } } },
+            select: { id: true },
+          }).then((a) => a.map((x) => x.id));
+          if (scopedAttrIds.length > 0) {
+            await this.prisma.productAttribute.deleteMany({
+              where: { productId: id, attributeId: { in: scopedAttrIds } },
+            });
+          }
+        }
+        await this.linkProductAttributes(
+          id,
+          dto.scale,
+          dto.attributeIds,
+          dto.material,
+          dto.attributes,
+        );
         // Reindex in ES so search/list shows updated scale/material
         if (this.searchService.isAvailable()) {
           this.searchService.indexProduct(id).catch((err) => this.logger.warn(`ES index update failed for ${id}:`, err));
@@ -1484,9 +1541,12 @@ Bu ürünü istek listenizden kaldırmak için ürün sayfasına gidip "İstek L
         .map((pa: any) => ({
           id: pa.attribute.id,
           name: pa.attribute.slug,
+          slug: pa.attribute.slug,
           label: pa.attribute.group.name,
           value: pa.attribute.displayValue || pa.attribute.value,
           group: pa.attribute.group.name,
+          groupSlug: pa.attribute.group.slug,
+          manufacturerSlug: pa.attribute.group.manufacturerSlug ?? null,
         }));
       const scaleFromGroup = this.getAttributeValueByGroup(productAttributes, 'scale', 'Ölçek');
       const scaleFromAttrs = attributes.find((a) => a.group === 'Ölçek' || a.label === 'Ölçek')?.value;
@@ -2007,9 +2067,51 @@ Bu ürünü istek listenizden kaldırmak için ürün sayfasına gidip "İstek L
   }
 
   /**
-   * Get dynamic filters (categories, brands, etc.)
+   * Get attribute groups applicable to a manufacturer (or global only if no manufacturer).
+   * Used by listing forms to render conditional fields (e.g. Hot Wheels-only filters).
+   *
+   * Returns global groups (manufacturerSlug=null) always; adds manufacturer-scoped
+   * groups when manufacturer slug is provided.
    */
-  async getFilters() {
+  async getAttributeGroupsForManufacturer(manufacturer?: string) {
+    const groups = await this.prisma.attributeGroup.findMany({
+      where: {
+        isActive: true,
+        OR: [
+          { manufacturerSlug: null },
+          ...(manufacturer ? [{ manufacturerSlug: manufacturer }] : []),
+        ],
+      },
+      include: {
+        attributes: {
+          where: { isActive: true },
+          select: { slug: true, value: true, displayValue: true, color: true, sortOrder: true },
+          orderBy: { sortOrder: 'asc' },
+        },
+      },
+      orderBy: { sortOrder: 'asc' },
+    });
+
+    return groups.map((g) => ({
+      slug: g.slug,
+      name: g.name,
+      description: g.description,
+      isRequired: g.isRequired,
+      manufacturerSlug: g.manufacturerSlug,
+      attributes: g.attributes.map((a) => ({
+        slug: a.slug,
+        label: a.displayValue || a.value,
+        color: a.color,
+      })),
+    }));
+  }
+
+  /**
+   * Get dynamic filters (categories, brands, etc.)
+   * When `manufacturer` slug is provided, also returns manufacturer-scoped attribute
+   * groups in `customAttributes` (e.g. Hot Wheels Segment/Assortment/Wheel Type).
+   */
+  async getFilters(manufacturer?: string) {
     // 1. Categories
     const categories = await this.prisma.category.findMany({
       where: { isActive: true },
@@ -2069,6 +2171,23 @@ Bu ürünü istek listenizden kaldırmak için ürün sayfasına gidip "İstek L
       orderBy: [{ brandId: 'asc' }, { sortOrder: 'asc' }, { name: 'asc' }],
     });
 
+    // 6. Manufacturer-scoped custom attribute groups (e.g. Hot Wheels).
+    //    Empty array when no manufacturer or no scoped groups exist.
+    //    Global groups (scale, material) are NOT duplicated here — they're already above.
+    const customAttributes = manufacturer
+      ? await this.prisma.attributeGroup.findMany({
+          where: { isActive: true, manufacturerSlug: manufacturer },
+          include: {
+            attributes: {
+              where: { isActive: true },
+              select: { slug: true, value: true, displayValue: true, color: true },
+              orderBy: { sortOrder: 'asc' },
+            },
+          },
+          orderBy: { sortOrder: 'asc' },
+        })
+      : [];
+
     return {
       categories: categories.map(c => ({ value: c.id, label: c.name, slug: c.slug, parentId: c.parentId })),
       brands: brands.map((b) => ({ id: b.id, name: b.name, slug: b.slug })),
@@ -2081,6 +2200,16 @@ Bu ürünü istek listenizden kaldırmak için ürün sayfasına gidip "İstek L
         { slug: 'composite', label: 'Composite (Kompozit)' },
         { slug: 'plastic', label: 'Plastic (Plastik)' },
       ],
+      customAttributes: customAttributes.map((g) => ({
+        slug: g.slug,
+        name: g.name,
+        manufacturerSlug: g.manufacturerSlug,
+        attributes: g.attributes.map((a) => ({
+          slug: a.slug,
+          label: a.displayValue || a.value,
+          color: a.color,
+        })),
+      })),
     };
   }
 }
