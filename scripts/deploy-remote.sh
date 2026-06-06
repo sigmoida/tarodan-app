@@ -25,13 +25,20 @@ fi
 echo "==> Pulling images"
 docker compose -f "$COMPOSE_FILE" pull api web admin
 
-echo "==> Migration drift check (status only)"
-# The api container runs `migrate deploy` on start; here we fail fast if the
-# new image's migrations cannot apply cleanly. Run status inside a throwaway
-# api container against the live DB.
-if ! docker compose -f "$COMPOSE_FILE" run --rm --no-deps api \
-      sh -c "npx prisma migrate status --schema=prisma/schema.prisma"; then
-  echo "::migration-status reported pending/failed migrations — proceeding to migrate-on-start, but review output above."
+echo "==> Ensuring database is up (needed for migrations)"
+docker compose -f "$COMPOSE_FILE" up -d postgres redis
+
+echo "==> Applying migrations (blocking gate)"
+# Run migrate deploy with the NEW image BEFORE swapping app containers, so a
+# failed/divergent migration aborts the deploy while the old containers keep
+# serving. We override --entrypoint because the api image's ENTRYPOINT
+# (entrypoint.sh) starts the server and would otherwise ignore this command.
+# The app containers' own entrypoint re-runs migrate deploy on start; once
+# applied here it is a harmless no-op.
+if ! docker compose -f "$COMPOSE_FILE" run --rm --no-deps --entrypoint sh api \
+      -c "npx prisma migrate deploy --schema=prisma/schema.prisma"; then
+  echo "❌ Migration failed — aborting deploy (app containers unchanged)"
+  exit 1
 fi
 
 echo "==> Bringing up new containers"

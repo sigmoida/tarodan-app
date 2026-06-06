@@ -45,6 +45,11 @@ servisi `api` ile aynı imajı paylaşır.
 drift kontrolü → `up -d` → smoke (`/health`, web, admin) → fail ise önceki
 tag'e otomatik rollback.
 
+> ⚠️ **Migration uyarısı:** Rollback yalnızca **image** tag'ini geri alır; uygulanmış
+> DB migration'ları geri almaz (forward-only). Eski image yeni şemaya karşı çalışır.
+> Şema geri alımı gerekiyorsa production'da deploy öncesi alınan yedeği (`scripts/backup.sh`)
+> manuel restore edin.
+
 ## Rollback (manuel)
 
 ```bash

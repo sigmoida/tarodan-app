@@ -173,6 +173,10 @@ jobs:
   coverage:
     name: Coverage
     runs-on: ubuntu-latest
+    # Job-level env so the step-level `if` can read it (step env is not in
+    # scope at if-evaluation time, but job env is).
+    env:
+      CODECOV_TOKEN: ${{ secrets.CODECOV_TOKEN }}
     steps:
       - uses: actions/checkout@v4
       - uses: pnpm/action-setup@v4
@@ -195,9 +199,8 @@ jobs:
       - name: Upload to Codecov (skipped if no token)
         if: ${{ env.CODECOV_TOKEN != '' }}
         uses: codecov/codecov-action@v4
-        env:
-          CODECOV_TOKEN: ${{ secrets.CODECOV_TOKEN }}
         with:
+          token: ${{ env.CODECOV_TOKEN }}
           files: apps/api/coverage/lcov.info
           flags: api
           fail_ci_if_error: false
