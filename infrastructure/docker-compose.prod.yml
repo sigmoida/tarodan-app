@@ -158,9 +158,7 @@ services:
 
   # API Server (Replicas: 2)
   api:
-    build:
-      context: ../apps/api
-      dockerfile: Dockerfile
+    image: ${REGISTRY:-ghcr.io/sigmoida}/tarodan-api:${IMAGE_TAG:-latest}
     container_name: tarodan-api
     restart: unless-stopped
     environment:
@@ -200,8 +198,6 @@ services:
       - "traefik.http.services.api.loadbalancer.healthCheck.path=/health"
       - "traefik.http.services.api.loadbalancer.healthCheck.interval=10s"
     deploy:
-      mode: replicated
-      replicas: 2
       resources:
         limits:
           memory: 2G
@@ -210,9 +206,7 @@ services:
 
   # Background Worker (Replicas: 2)
   worker:
-    build:
-      context: ../apps/api
-      dockerfile: Dockerfile
+    image: ${REGISTRY:-ghcr.io/sigmoida}/tarodan-api:${IMAGE_TAG:-latest}
     container_name: tarodan-worker
     restart: unless-stopped
     command: node dist/worker.js
@@ -237,8 +231,6 @@ services:
     networks:
       - tarodan-network
     deploy:
-      mode: replicated
-      replicas: 2
       resources:
         limits:
           memory: 1G
@@ -247,9 +239,7 @@ services:
 
   # Web Frontend (Replicas: 2)
   web:
-    build:
-      context: ../apps/web
-      dockerfile: Dockerfile
+    image: ${REGISTRY:-ghcr.io/sigmoida}/tarodan-web:${IMAGE_TAG:-latest}
     container_name: tarodan-web
     restart: unless-stopped
     environment:
@@ -273,8 +263,6 @@ services:
       - "traefik.http.middlewares.www-redirect.redirectregex.replacement=https://$${1}"
       - "traefik.http.middlewares.www-redirect.redirectregex.permanent=true"
     deploy:
-      mode: replicated
-      replicas: 2
       resources:
         limits:
           memory: 1G
@@ -283,9 +271,7 @@ services:
 
   # Admin Frontend (Replicas: 1)
   admin:
-    build:
-      context: ../apps/admin
-      dockerfile: Dockerfile
+    image: ${REGISTRY:-ghcr.io/sigmoida}/tarodan-admin:${IMAGE_TAG:-latest}
     container_name: tarodan-admin
     restart: unless-stopped
     environment:
@@ -301,8 +287,6 @@ services:
       - "traefik.http.routers.admin.middlewares=rate-limit,security-headers,compress"
       - "traefik.http.services.admin.loadbalancer.server.port=3002"
     deploy:
-      mode: replicated
-      replicas: 1
       resources:
         limits:
           memory: 1G
