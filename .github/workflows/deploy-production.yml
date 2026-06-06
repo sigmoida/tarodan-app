@@ -1,0 +1,49 @@
+name: Deploy Production
+
+on:
+  workflow_run:
+    workflows: [Build Images]
+    types: [completed]
+    branches: [master]
+  workflow_dispatch:
+    inputs:
+      image_tag:
+        description: 'Image tag to deploy (e.g. sha-abc123def456 or latest)'
+        required: false
+        default: 'latest'
+
+concurrency:
+  group: deploy-production
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    name: Deploy to Production
+    if: ${{ github.event_name == 'workflow_dispatch' || github.event.workflow_run.conclusion == 'success' }}
+    runs-on: ubuntu-latest
+    # `production` environment has required reviewers => manual approval gate.
+    environment: production
+    steps:
+      - name: Resolve image tag
+        id: tag
+        run: |
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            echo "tag=${{ github.event.inputs.image_tag }}" >> "$GITHUB_OUTPUT"
+          else
+            echo "tag=sha-${GITHUB_SHA::12}" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Backup DB then deploy over SSH
+        uses: appleboy/ssh-action@v1
+        with:
+          host: ${{ secrets.PROD_HOST }}
+          username: ${{ secrets.PROD_USER }}
+          key: ${{ secrets.PROD_SSH_KEY }}
+          command_timeout: 30m
+          script: |
+            set -e
+            cd /opt/tarodan
+            git fetch origin master && git checkout master && git pull --ff-only
+            echo "==> Pre-deploy DB backup"
+            bash scripts/backup.sh || { echo "Backup failed — aborting deploy"; exit 1; }
+            ./scripts/deploy-remote.sh ${{ steps.tag.outputs.tag }}
