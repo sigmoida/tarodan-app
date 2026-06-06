@@ -171,6 +171,16 @@ export const authApi = {
 export const productsApi = {
   getAll: (params?: Record<string, any>) =>
     api.get('/products', { params }),
+  /** Dinamik filtre seçenekleri — web SidebarFilters ile aynı kaynak. Backend: GET /products/filters */
+  getFilters: () =>
+    api.get<{
+      categories: Array<{ value: string; label: string; slug: string; parentId: string | null }>;
+      brands: Array<{ id: string; name: string; slug: string }>;
+      carModels: Array<{ id: string; name: string; slug: string; brandId: string }>;
+      scales: string[];
+      manufacturers: Array<{ id: string; name: string; slug: string }>;
+      materials: Array<{ slug: string; label: string }>;
+    }>('/products/filters'),
   getOne: (id: string | number) => 
     api.get(`/products/${id}`),
   create: (data: Record<string, any>) =>
