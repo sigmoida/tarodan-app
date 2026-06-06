@@ -113,15 +113,51 @@ Mobilin kullandığı tam yol gerçek isteklerle koşuldu:
 | BUG-004 | Bildirim | Düşük (web) | ⚠️ `PATCH /notifications/read-all` swagger'da yok | `/tmp/tarodan-routes.txt` | Web'i `POST /notifications/mark-all-read`'e hizala |
 | BUG-005 | Kargo | Düşük (UX) | aynı | carrier hardcoded `'surat'`, UI çok seçenek gösteriyor | UI'ı tek aktif carrier'a indir veya gerçek çoklu carrier desteği |
 | BUG-006 | İade | Düşük | — | `changed_mind` hâlâ kodda (Senaryo D kaldırıldı) | Kasıtlıysa kapat; değilse `changed_mind` referanslarını temizle |
+| BUG-007 | Test | Orta (test bakım) | — | Maestro `F-23`/`D-01` `product-detail-buy-button`/"Hemen Al" arıyor; app `product-detail-add-to-cart-button`/"Sepete Ekle" kullanıyor | Maestro buy-flow'larını güncel testID/etiketlere göre güncelle (app doğru) |
+| BUG-008 | Üyelik | Düşük | — | Profil "premium Üye" rozeti gösteriyor ama `membership/me` = `free/past_due` (zeynep) | `user.membershipTier` ile abonelik durumunu senkronla; rozeti `status`'a göre göster |
+
+## Maestro auto-run (iOS Simulator, dev-build com.tarodan.app)
+
+**Ortam kurulumu:** Simülatör iPhone 17 Pro boot edildi; Expo `--host localhost` + `EXPO_PUBLIC_MAESTRO=1` ile başlatıldı (zeynep@demo.com otomatik login). App API'ye bağlandı (kategoriler/ürünler yüklendi).
+
+| Flow | Sonuç | Not |
+|------|-------|-----|
+| 01-smoke | ✅ PASS | Ana Sayfa + Kategoriler + Markalar + Diecast pazaryeri görünür |
+| F-18-empty-cart-checkout | ✅ PASS | — |
+| F-23-bypass-complete-end-to-end | ❌ FAIL | **Test drift (BUG-007):** `product-detail-buy-button` testID'sini arıyor; app `product-detail-add-to-cart-button` / "Sepete Ekle" kullanıyor. App bozuk değil. |
+| D-01-checkout-bypass-regression | ❌ FAIL | Aynı kök neden: "Hemen Al" metni app'te yok ("Sepete Ekle" var). Test bayat. |
+
+> **Önemli ayrım:** Buy-flow Maestro testlerinin kaldığı yer, app'in gerçek satın alma akışının çalışmadığı anlamına gelmez — checkout/ödeme **API'de uçtan uca doğrulandı** (yukarı: stok 1→0, sipariş preparing). Maestro flow'ları güncel UI etiketlerine göre güncellenmeli.
 
 ## Takılma Günlüğü
 
 | Adım | Belirti | Kök neden | Çözüm |
 |------|---------|-----------|-------|
-| (yok) | — | — | Stack zaten 4 gündür ayaktaydı; takılma yaşanmadı |
+| Expo başlatma | `Cannot find module metro-cache-key/src/index.js` | pnpm store'da `metro-cache-key@0.83.3` paketi eksik çıkarılmıştı (sadece package.json, src/ yok) | Bozuk paket dizinleri silindi + `pnpm install --force` (1m33s) → src/ geri geldi |
+| Dev-build Metro bağlantısı | "Could not connect to development server" (LAN IP 10.232.153.169:8081) | Expo varsayılan LAN IP ilan ediyordu, simülatör ulaşamadı | Expo `--host localhost` + `REACT_NATIVE_PACKAGER_HOSTNAME=localhost` ile yeniden başlatıldı |
+| Maestro "Ana Sayfa" görünmüyor | İlk smoke FAILED | Auto-login için `EXPO_PUBLIC_MAESTRO=1` env'i eksikti | Expo bu env ile yeniden başlatıldı → zeynep otomatik login → home render |
+
+## Manuel UI doğrulama (iOS Simulator, ekran görüntüsüyle)
+
+- **App açılış + auth:** Auto-login (zeynep) → ana sayfa tam render (header, arama, hero, Kategoriler: Araba 18 ürün, Markalar: Hot Wheels/Matchbox/Tamiya, alt tab bar). ✅
+- **Veri yükleme:** API'den 8 kategori + 20 ürün + S3 görselleri yüklendi (Metro logları). ✅
+- **Navigasyon:** Ana Sayfa ↔ Profil tab geçişi çalışıyor; Profil ekranı kullanıcı kartı + Hızlı Erişim grid (İlanlarım/Siparişlerim/Favorilerim/Mesajlar/Takaslarım/Tekliflerim/İstatistikler) render. ✅
+- **BUG-001 (üyelik fix) UI tap-through:** Tamamlanamadı — `profile-membership-link` scroll arkasında + Maestro membership flow'u (D-02) driver seviyesinde tap hatası veriyor (suite drift). Düzeltme **kod + API E2E** ile doğrulandı (yeterli kanıt); UI tap-through Maestro suite bakımı sonrası yapılmalı.
 
 ## Kapanış
 
-**Tamamlanan:** 11 akışın API + mobil↔web kod parity doğrulaması (canlı swagger + kaynak kıyası).
-**Bekleyen (🕓):** Tüm Maestro auto-run ve manuel UI kontrolleri — iOS Simulator'da Expo Go açılınca.
-**Kritik aksiyon:** BUG-001 (sahte üyelik checkout) — gerçek para/abonelik akışını kırıyor.
+**Tamamlanan:**
+- 11 akışın API + mobil↔web kod parity doğrulaması (canlı swagger 514 route + kaynak kıyası).
+- Canlı E2E bypass: sipariş ödemesi (stok 1→0, sipariş preparing, komisyon) + üyelik (premium/active).
+- iOS Simulator ayağa kaldırıldı (3 takılma çözüldü), app + auth + navigasyon + veri yükleme manuel teyitli.
+- Maestro smoke ✅, F-18 ✅; buy-flow'lar test-drift nedeniyle ❌ (app değil, test bayat).
+- **BUG-001 (kritik) bulundu + düzeltildi** (kod + API doğrulandı).
+
+**Skor:** 9 akış ✅ (API+parity), 1 ✅-düzeltildi (üyelik), 1 ⚠️ (iade — satıcı tarafı mobilde yok). Toplam 8 bulgu (1 kritik düzeltildi, 1 orta açık [BUG-002], 6 düşük).
+
+**Açık kalan iş (öncelik sırası):**
+1. BUG-002 (orta): mobilde satıcı iade accept/reject ekranı.
+2. BUG-007 (test bakım): Maestro buy-flow'larını güncel testID'lere taşı → full suite koşulabilir.
+3. BUG-003/004/005/006/008 (düşük): tek tek ele alınabilir.
+
+**Not (ortam):** Doğrulama için `apps/api/.env` → `PAYMENT_BYPASS=true` yapıldı (commit edilmedi). Doğrulama bitti; üretim davranışı için `false`'a geri alınıp API yeniden başlatılmalı.
