@@ -20,7 +20,7 @@
 | 5 | Kargo / teslimat | ✅ (stub) | 🕓 | 🕓 |
 | 6 | Takas (ürün + nakit) | ✅ | 🕓 | 🕓 |
 | 7 | Teklif (offers) | ✅ | 🕓 | 🕓 |
-| 8 | Üyelik satın alma | ❌ **KRİTİK (sahte checkout)** | 🕓 | 🕓 |
+| 8 | Üyelik satın alma | ✅ **DÜZELTİLDİ** (sahte checkout → gerçek API) | 🕓 | 🕓 |
 | 9 | Mesajlar & bildirim | ✅ | 🕓 | 🕓 |
 | 10 | İade / dispute | ⚠️ (satıcı tarafı mobilde yok) | 🕓 | 🕓 |
 | 11 | Satıcı paneli | ✅ | 🕓 | 🕓 |
@@ -107,7 +107,7 @@ Mobilin kullandığı tam yol gerçek isteklerle koşuldu:
 
 | BUG | Akış | Önem | Web'de | Kanıt | Önerilen düzeltme |
 |-----|------|------|--------|-------|-------------------|
-| BUG-001 | Üyelik | **KRİTİK** | ✅ gerçek ödeme | `membership/checkout.tsx:80-86` setTimeout simülasyon; `index.tsx:160` buraya yönlendiriyor | `index.tsx` akışını `upgrade.tsx`'teki gerçek `subscribe()`+`Linking` akışına bağla **veya** `checkout.tsx handlePayment`'a gerçek `membershipApi.subscribe()`/`payments.initiate` + bypass desteği ekle |
+| BUG-001 | Üyelik | **KRİTİK** | ✅ gerçek ödeme | `membership/checkout.tsx:80-86` setTimeout simülasyon; `index.tsx:160` buraya yönlendiriyor | ✅ **DÜZELTİLDİ** — `checkout.tsx handlePayment` artık `membershipApi.initiatePayment` → `useBypass` ise `bypassComplete` → `refreshUserData` → `/membership/success`; değilse `/payment/[id]` WebView. Sipariş checkout'u ile aynı desen. tsc temiz; Maestro/manuel UI 🕓 (simülatör) |
 | BUG-002 | İade | Orta | ✅ satıcı accept/reject | mobil grep boş; `/refund-requests/seller` UI yok | Satıcı iade listesi + accept/reject ekranı ekle |
 | BUG-003 | Ödeme | Düşük | ✅ `payments/{id}/verify` | `src/services/api.ts` verify yok | Gerçek PayTR confirm için verify ekle (bypass modunda gereksiz) |
 | BUG-004 | Bildirim | Düşük (web) | ⚠️ `PATCH /notifications/read-all` swagger'da yok | `/tmp/tarodan-routes.txt` | Web'i `POST /notifications/mark-all-read`'e hizala |
