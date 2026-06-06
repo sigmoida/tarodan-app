@@ -109,12 +109,12 @@ Mobilin kullandığı tam yol gerçek isteklerle koşuldu:
 |-----|------|------|--------|-------|-------------------|
 | BUG-001 | Üyelik | **KRİTİK** | ✅ gerçek ödeme | `membership/checkout.tsx:80-86` setTimeout simülasyon; `index.tsx:160` buraya yönlendiriyor | ✅ **DÜZELTİLDİ** — `checkout.tsx handlePayment` artık `membershipApi.initiatePayment` → `useBypass` ise `bypassComplete` → `refreshUserData` → `/membership/success`; değilse `/payment/[id]` WebView. Sipariş checkout'u ile aynı desen. tsc temiz; Maestro/manuel UI 🕓 (simülatör) |
 | BUG-002 | İade | Orta | ✅ satıcı accept/reject | mobil grep boş; `/refund-requests/seller` UI yok | ✅ **DÜZELTİLDİ** — `refundsApi.getSeller/accept/reject` + `app/refund-requests/seller.tsx` (liste + kabul/reddet) + dashboard linki. tsc temiz, API 200, ekran render teyitli (commit `db335356`) |
-| BUG-003 | Ödeme | Düşük | ✅ `payments/{id}/verify` | `src/services/api.ts` verify yok | Gerçek PayTR confirm için verify ekle (bypass modunda gereksiz) |
-| BUG-004 | Bildirim | Düşük (web) | ⚠️ `PATCH /notifications/read-all` swagger'da yok | `/tmp/tarodan-routes.txt` | Web'i `POST /notifications/mark-all-read`'e hizala |
-| BUG-005 | Kargo | Düşük (UX) | aynı | carrier hardcoded `'surat'`, UI çok seçenek gösteriyor | UI'ı tek aktif carrier'a indir veya gerçek çoklu carrier desteği |
-| BUG-006 | İade | Düşük | — | `changed_mind` hâlâ kodda (Senaryo D kaldırıldı) | Kasıtlıysa kapat; değilse `changed_mind` referanslarını temizle |
-| BUG-007 | Test | Orta (test bakım) | — | Maestro `F-23`/`D-01` `product-detail-buy-button`/"Hemen Al" arıyor; app `product-detail-add-to-cart-button`/"Sepete Ekle" kullanıyor | Maestro buy-flow'larını güncel testID/etiketlere göre güncelle (app doğru) |
-| BUG-008 | Üyelik | Düşük | — | Profil "premium Üye" rozeti gösteriyor ama `membership/me` = `free/past_due` (zeynep) | `user.membershipTier` ile abonelik durumunu senkronla; rozeti `status`'a göre göster |
+| BUG-003 | Ödeme | Düşük | ✅ `payments/{id}/verify` | `src/services/api.ts` verify yok | ✅ **DÜZELTİLDİ** — `paymentsApi.verify` eklendi (web ile parite) |
+| BUG-004 | Bildirim | Düşük (web) | ⚠️ `PATCH /notifications/read-all` swagger'da yok | `/tmp/tarodan-routes.txt` | ✅ **DÜZELTİLDİ** — web `markAllAsRead` → `POST /notifications/mark-all-read` |
+| BUG-005 | Kargo | Düşük (UX) | aynı (web+mobil) | carrier hardcoded `'surat'`, UI çok seçenek gösteriyor | ⏸️ **Parity OK** — hem web hem mobil aynı (`'surat'`); backend tek-carrier varsayımı. Çoklu carrier ürün kararı, kapsam dışı |
+| BUG-006 | İade | Düşük | aynı (web+mobil) | `changed_mind` hâlâ kodda (Senaryo D kaldırıldı) | ⏸️ **Parity OK / kasıtlı** — `changed_mind` Senaryo D'den bağımsız geçerli bir iade sebebi; web'de de var |
+| BUG-007 | Test | Orta (test bakım) | — | Maestro `F-23`/`D-01` `product-detail-buy-button`/"Hemen Al" arıyor; app `product-detail-add-to-cart-button`/"Sepete Ekle" kullanıyor | ✅ **DÜZELTİLDİ** — flow'lar gerçek sepet akışına taşındı (D-01 smoke geçti) |
+| BUG-008 | Üyelik | Düşük | ✅ web efektif tier okuyor | Profil "premium Üye" rozeti `user.membershipTier` (bayat) kullanıyor; `membership/me` = `free/past_due` | ✅ **DÜZELTİLDİ** — profil rozeti/ikonu `membership/me` efektif tier'ı kullanıyor (web ile parite) |
 
 ## Maestro auto-run (iOS Simulator, dev-build com.tarodan.app)
 
@@ -153,10 +153,11 @@ Mobilin kullandığı tam yol gerçek isteklerle koşuldu:
 - Maestro smoke ✅, F-18 ✅; buy-flow'lar test-drift nedeniyle ❌ (app değil, test bayat).
 - **BUG-001 (kritik) bulundu + düzeltildi** (kod + API doğrulandı).
 
-**Skor:** 9 akış ✅ (API+parity), 2 ✅-düzeltildi (üyelik + iade satıcı tarafı). Toplam 8 bulgu — **2 düzeltildi (BUG-001 kritik, BUG-002 orta)**, 6 düşük açık.
+**Skor:** 11 akış ✅/düzeltildi. Toplam 8 bulgu — **6 düzeltildi** (BUG-001 kritik, BUG-002 orta, BUG-003/004/007/008 düşük-orta), **2 parity-OK/kasıtlı** (BUG-005 carrier, BUG-006 changed_mind — hem web hem mobil aynı).
 
-**Açık kalan iş (öncelik sırası):**
-1. BUG-007 (test bakım): Maestro buy-flow'larını güncel testID'lere (`product-detail-add-to-cart-button`) taşı → full suite koşulabilir.
-2. BUG-003/004/005/006/008 (düşük): tek tek ele alınabilir.
+**Açık kalan iş:** Yok (kod). Notlar:
+- BUG-005/006 ürün kararları (parity zaten var); istenirse ayrı iş olarak ele alınır.
+- `apps/api/.env` `PAYMENT_BYPASS=false`'a alındı; çalışan API'ye uygulanması için bir restart gerekir.
+- Maestro full suite: D-01/F-23 düzeltildi; diğer flow'lar da benzer testID drift'i taşıyorsa aynı yöntemle güncellenebilir (gerektikçe).
 
 **Not (ortam):** Doğrulama için `apps/api/.env` → `PAYMENT_BYPASS=true` yapıldı (commit edilmedi). Doğrulama bitti; üretim davranışı için `false`'a geri alınıp API yeniden başlatılmalı.
