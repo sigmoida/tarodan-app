@@ -487,6 +487,9 @@ export const paymentsApi = {
     api.post('/payments/initiate-trade-cash', { tradeId }),
   getStatus: (paymentId: string) =>
     api.get(`/payments/${paymentId}`),
+  /** POST /payments/:id/verify — PayTR ödemesini aktif doğrula (web ile parite) */
+  verify: (paymentId: string) =>
+    api.post(`/payments/${paymentId}/verify`),
   getStatusLight: (paymentId: string) =>
     api.get(`/payments/${paymentId}/status`),
   getStatusLightGuest: (paymentId: string) =>
