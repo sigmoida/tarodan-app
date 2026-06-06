@@ -146,7 +146,7 @@ Mobilin kullandığı tam yol gerçek isteklerle koşuldu:
 | F-16-language-toggle | Profil menüsünde **"Dil/Ayarlar" item'i yok** → ulaşılamıyor (language ekranı `/settings/language` ama profilden link yok) |
 | F-17-notification-prefs | `scrollUntilVisible "Bildirim"` takılıyor (item "Bildirim Ayarları" var; scroll mekaniği) |
 | F-18-empty-cart-checkout | "Sepetim" görünmüyor → sepete giriş drift (önceki bir koşuda geçmişti = kısmen flaky) |
-| F-22-sales-shipment-card-render | open-tarodan "Ana Sayfa" assert FAILED — 20 flow aynı assert'i geçti → **flakiness** (re-run gerek) |
+| F-22-sales-shipment-card-render | **Re-run ile doğrulandı:** ilk "Ana Sayfa" fail = flaky (re-run'da geçti). Asıl blocker **fixture+nav**: profilde "Satışlarım" text'i doğrudan yok (SKIPPED) + zeynep'in satılmış siparişi yok → "Sipariş" assert FAILED. Düzeltme: nav ("Satışlarım" erişimi) + zeynep sales fixture gerekir. |
 | F-23-bypass-complete-end-to-end | search-input yolu sonrası add-to-cart-button bulunamadı (nav farkı; D-01'in "Ara→ilk ₺" yolu çalışıyor) |
 
 **Sonuç:** Maestro suite'in çekirdeği sağlam (19/29). Kalan 10 flow eski F-serisi UI etiketleri/scroll mekaniği/flakiness; düzeltilmesi ayrı bir test-bakım turu (her flow için doğru etiket + yeniden doğrulama). Bazı düzeltmeler app tarafında küçük eklemeler ister (örn. zil ikonuna testID, profile "Dil" linki).
