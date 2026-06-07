@@ -296,6 +296,7 @@ export default function ListingsPage() {
       search: '', brand: '', brandId: '', carModelId: '', carModel: '', scale: '', material: '', condition: '', minPrice: '', maxPrice: '',
       tradeOnly: false, discountOnly: false, preOrder: false, limited: false, set: false,
       sortBy: 'relevance', category: '', categoryId: '', manufacturer: '', manufacturerId: '',
+      customAttributes: {},
     });
     setCurrentPage(1);
     // URL sync is handled by useEffect [filters, currentPage]

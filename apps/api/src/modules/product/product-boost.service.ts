@@ -183,6 +183,7 @@ export class ProductBoostService {
           commissionAmount: 0,
           shippingCost: 0,
           status: OrderStatus.pending_payment,
+          paymentExpiresAt: new Date(Date.now() + 24 * 60 * 60 * 1000),
           shippingAddress: { type: 'boost', boostId: boost.id } as any,
         },
       });

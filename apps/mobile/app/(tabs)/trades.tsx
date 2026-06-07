@@ -25,24 +25,30 @@ const { colors, spacing } = theme;
 const TRADE_STATUSES: Record<string, { label: string; variant: ChipVariant }> = {
   pending: { label: 'Bekliyor', variant: 'warning' },
   accepted: { label: 'Kabul Edildi', variant: 'success' },
+  awaiting_payment: { label: 'Ödeme Bekleniyor', variant: 'warning' },
+  shipping_to_warehouse: { label: 'Depoya Gönderim', variant: 'info' },
+  at_warehouse: { label: 'Depoda', variant: 'primary' },
+  admin_reviewing: { label: 'İnceleniyor', variant: 'info' },
+  shipping_to_recipients: { label: 'Size Gönderiliyor', variant: 'primary' },
   rejected: { label: 'Reddedildi', variant: 'danger' },
+  completed: { label: 'Tamamlandı', variant: 'success' },
+  cancelled: { label: 'İptal', variant: 'neutral' },
+  disputed: { label: 'İtiraz', variant: 'danger' },
+  countered: { label: 'Karşı Teklif', variant: 'info' },
+  // Legacy escrow statuses (pre-warehouse flow) kept for old trades
   initiator_shipped: { label: 'Kargoda', variant: 'info' },
   receiver_shipped: { label: 'Kargoda', variant: 'info' },
   both_shipped: { label: 'Kargoda', variant: 'info' },
   initiator_received: { label: 'Teslim', variant: 'primary' },
   receiver_received: { label: 'Teslim', variant: 'primary' },
-  completed: { label: 'Tamamlandı', variant: 'success' },
-  cancelled: { label: 'İptal', variant: 'neutral' },
-  disputed: { label: 'İtiraz', variant: 'danger' },
-  countered: { label: 'Karşı Teklif', variant: 'info' },
 };
 
+// "Kargoda" filtresi — yeni depo-escrow akışı statüleri
 const SHIPPING_STATUSES = new Set([
-  'initiator_shipped',
-  'receiver_shipped',
-  'both_shipped',
-  'initiator_received',
-  'receiver_received',
+  'shipping_to_warehouse',
+  'at_warehouse',
+  'admin_reviewing',
+  'shipping_to_recipients',
 ]);
 
 type TradesTabFilter = 'all' | 'pending' | 'shipping' | 'completed';
