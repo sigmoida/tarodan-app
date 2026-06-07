@@ -14,7 +14,6 @@ import {
   XCircleIcon,
   TruckIcon,
   ChatBubbleLeftRightIcon,
-  PlusIcon,
   TrashIcon,
   CheckIcon,
   CreditCardIcon,
@@ -26,7 +25,6 @@ import {
   listingsApi,
   userApi,
   addressesApi,
-  api,
   paymentsApi,
 } from "@/lib/api";
 import { getProductEffectivePrice } from "@/lib/productPrice";
@@ -34,7 +32,6 @@ import { useTranslation } from "@/i18n/LanguageContext";
 import { ShieldCheckIcon } from "@heroicons/react/24/outline";
 import {
   Button,
-  Checkbox,
   Input,
   Modal,
   Radio,
@@ -118,6 +115,8 @@ interface Trade {
   cancelledAt?: string;
   cancelReason?: string;
   version?: number;
+  canCancel?: boolean;
+  firstWarehouseArrivalAt?: string | null;
 }
 
 const tradeStatusEnLabels: Record<string, string> = {
@@ -259,6 +258,45 @@ const getTradeStatusMeta = (
   },
 });
 
+const SHIPMENT_STATUS_CHIP: Record<
+  string,
+  { label: string; className: string; icon?: string }
+> = {
+  label_created: {
+    label: "Etiket Hazır",
+    className: "bg-surface-muted text-muted border border-border-subtle",
+  },
+  pending: {
+    label: "Bekleniyor",
+    className: "bg-surface-muted text-muted border border-border-subtle",
+  },
+  in_transit: {
+    label: "Yolda",
+    className: "bg-info-50 text-info-700 border border-info-200",
+  },
+  delivered: {
+    label: "Depoya Ulaştı",
+    className: "bg-success-50 text-success-700 border border-success-200",
+    icon: "✓",
+  },
+};
+
+function ShipmentStatusChip({ status }: { status?: string | null }) {
+  const meta =
+    (status && SHIPMENT_STATUS_CHIP[status]) || {
+      label: "Beklemede",
+      className: "bg-surface-muted text-muted border border-border-subtle",
+    };
+  return (
+    <span
+      className={`inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-xs font-medium ${meta.className}`}
+    >
+      {meta.icon ? <span>{meta.icon}</span> : null}
+      {meta.label}
+    </span>
+  );
+}
+
 export default function TradeDetailPage() {
   const params = useParams();
   const router = useRouter();
@@ -291,30 +329,6 @@ export default function TradeDetailPage() {
   const [isLoadingCounterData, setIsLoadingCounterData] = useState(false);
   const [shipAddressId, setShipAddressId] = useState("");
   const [shipCarrier, setShipCarrier] = useState("aras");
-  const [shipTrackingNumber, setShipTrackingNumber] = useState("");
-
-  // Card states for inline cash payment checkout
-  const [cardError, setCardError] = useState<string | null>(null);
-  const [savedCards, setSavedCards] = useState<
-    Array<{
-      id: string;
-      cardBrand: string;
-      lastFour: string;
-      expiryMonth: number;
-      expiryYear: number;
-      isDefault?: boolean;
-    }>
-  >([]);
-  const [selectedSavedCard, setSelectedSavedCard] = useState<string | null>(
-    null,
-  );
-  const [useNewCard, setUseNewCard] = useState(false);
-  const [cardName, setCardName] = useState("");
-  const [cardNumber, setCardNumber] = useState("");
-  const [cardExpiry, setCardExpiry] = useState("");
-  const [cardCvc, setCardCvc] = useState("");
-  const [saveCard, setSaveCard] = useState(false);
-  const [cardsFetched, setCardsFetched] = useState(false);
 
   useEffect(() => {
     if (authLoading) return;
@@ -365,25 +379,6 @@ export default function TradeDetailPage() {
     trade?.cashPayment?.status !== "completed";
   const isCashPayer = !!(trade && user && trade.cashPayerId === user.id);
 
-  useEffect(() => {
-    if (!cashPaymentPending || !isCashPayer || cardsFetched) return;
-    api
-      .get("/payments/methods")
-      .then((res) => {
-        const cards = res.data?.methods || res.data || [];
-        setSavedCards(cards);
-        const defaultCard = cards.find((c: any) => c.isDefault);
-        if (defaultCard) setSelectedSavedCard(defaultCard.id);
-        else if (cards.length > 0) setSelectedSavedCard(cards[0].id);
-        if (cards.length === 0) setUseNewCard(true);
-        setCardsFetched(true);
-      })
-      .catch(() => {
-        setUseNewCard(true);
-        setCardsFetched(true);
-      });
-  }, [cashPaymentPending, isCashPayer, cardsFetched]);
-
   const needToShip =
     trade &&
     user &&
@@ -432,50 +427,6 @@ export default function TradeDetailPage() {
       )
     : undefined;
 
-  const needToShipToWarehouse =
-    !!trade &&
-    !!user &&
-    trade.status === "shipping_to_warehouse" &&
-    (user.id === trade.initiatorId || user.id === trade.receiverId) &&
-    (!myToWarehouseShipment || !myToWarehouseShipment.shippedAt);
-
-  // Fallback for older API payloads where `shipments` is missing.
-  const fallbackMyWarehouseShipment =
-    trade && user
-      ? user.id === trade.initiatorId
-        ? trade.initiatorShipment
-        : trade.receiverShipment
-      : undefined;
-  const fallbackOtherWarehouseShipment =
-    trade && user
-      ? user.id === trade.initiatorId
-        ? trade.receiverShipment
-        : trade.initiatorShipment
-      : undefined;
-
-  const myWarehouseShipped =
-    !!(myToWarehouseShipment?.shippedAt || fallbackMyWarehouseShipment?.shippedAt);
-  const otherWarehouseShipped =
-    !!(
-      otherToWarehouseShipment?.shippedAt || fallbackOtherWarehouseShipment?.shippedAt
-    );
-
-  const warehouseProgressText = myWarehouseShipped
-    ? otherWarehouseShipped
-      ? locale === "en"
-        ? "Both shipments are on the way to the warehouse. Waiting for warehouse delivery confirmation."
-        : "Her iki gönderi depoya yolda. Depo teslim teyidi bekleniyor."
-      : locale === "en"
-        ? "Your shipment is submitted. Waiting for the other party to ship to the warehouse."
-        : "Gönderiniz alındı. Karşı tarafın depoya gönderimi bekleniyor."
-    : otherWarehouseShipped
-      ? locale === "en"
-        ? "The other party has shipped. Please submit your shipment to the warehouse."
-        : "Karşı taraf gönderdi. Lütfen siz de depoya gönderimi tamamlayın."
-      : locale === "en"
-        ? "Both parties must submit shipment details to send items to the warehouse."
-        : "Ürünlerin depoya ulaşması için her iki tarafın da gönderim yapması gerekiyor.";
-
   const addressesQuery = useQuery({
     queryKey: ["addresses"],
     queryFn: async () => {
@@ -483,7 +434,7 @@ export default function TradeDetailPage() {
       const list = res.data?.data ?? res.data?.addresses ?? res.data ?? [];
       return Array.isArray(list) ? list : [];
     },
-    enabled: !!needToShip || !!needToShipToWarehouse,
+    enabled: !!needToShip,
     meta: { page: "trade-ship-addresses" },
   });
   const addresses = addressesQuery.data ?? [];
@@ -497,7 +448,6 @@ export default function TradeDetailPage() {
   const handleCashPayment = async () => {
     if (!trade) return;
     setCashPaymentLoading(true);
-    setCardError(null);
     try {
       const res = await paymentsApi.initiateTradeCash(trade.id);
       const data = res.data?.data ?? res.data;
@@ -526,18 +476,6 @@ export default function TradeDetailPage() {
       }
 
       if (data?.paymentUrl) {
-        if (saveCard && useNewCard && cardNumber && cardExpiry) {
-          try {
-            const [month, year] = cardExpiry.split("/");
-            await api.post("/payments/methods", {
-              cardNumber: cardNumber.replace(/\s/g, ""),
-              cardHolder: cardName,
-              expiryMonth: parseInt(month),
-              expiryYear: parseInt("20" + year),
-              cvv: cardCvc,
-            });
-          } catch {}
-        }
         window.location.href = data.paymentUrl;
         return;
       }
@@ -588,47 +526,6 @@ export default function TradeDetailPage() {
     } catch (error: any) {
       if (process.env.NODE_ENV === "development")
         console.error("Failed to submit shipping:", error);
-      toast.error(
-        error.response?.data?.message ||
-          (locale === "en"
-            ? "Failed to submit shipping"
-            : "Kargo bilgisi gönderilemedi"),
-      );
-    } finally {
-      setIsActionLoading(false);
-    }
-  };
-
-  const handleShipToWarehouseSubmit = async () => {
-    if (!trade || !shipAddressId || !shipCarrier) {
-      toast.error(
-        locale === "en"
-          ? "Please select address and carrier"
-          : "Lütfen adres ve kargo firması seçin",
-      );
-      return;
-    }
-    setIsActionLoading(true);
-    try {
-      await tradesApi.shipToWarehouse(trade.id, {
-        fromAddressId: shipAddressId,
-        carrier: shipCarrier,
-        ...(shipTrackingNumber.trim()
-          ? { trackingNumber: shipTrackingNumber.trim() }
-          : {}),
-      });
-      toast.success(
-        locale === "en"
-          ? "Shipping info submitted"
-          : "Kargo bilgisi gönderildi",
-      );
-      setShipAddressId("");
-      setShipCarrier("aras");
-      setShipTrackingNumber("");
-      await invalidateTrade();
-    } catch (error: any) {
-      if (process.env.NODE_ENV === "development")
-        console.error("Failed to submit shipping-to-warehouse:", error);
       toast.error(
         error.response?.data?.message ||
           (locale === "en"
@@ -1153,10 +1050,25 @@ export default function TradeDetailPage() {
     "awaiting_payment",
     "shipping_to_warehouse",
   ]);
+  // Warehouse arrival → user cancel kilidi (1 kargo bile depoya ulaşırsa)
+  const cancelLockedByWarehouse =
+    trade.status === "shipping_to_warehouse" &&
+    !!trade.firstWarehouseArrivalAt;
+  // Backend `canCancel` field'ı (mapToResponseDto.computeTradeCanCancel) varsa
+  // onu kullan; yoksa local fallback.
   const canCancel =
     !!user &&
     (isInitiator || isReceiver) &&
-    cancellableStatuses.has(trade.status);
+    (typeof trade.canCancel === "boolean"
+      ? trade.canCancel
+      : cancellableStatuses.has(trade.status) && !cancelLockedByWarehouse);
+  // Buton görünür ama disabled — kullanıcı "neden iptal edemiyorum" diye
+  // bilmek için. Eligible bir state'teyiz ama warehouse arrival kilitlemiş.
+  const showCancelDisabled =
+    !!user &&
+    (isInitiator || isReceiver) &&
+    cancellableStatuses.has(trade.status) &&
+    !canCancel;
 
   const getItemImage = (item: TradeItem) => {
     const url =
@@ -1559,6 +1471,120 @@ export default function TradeDetailPage() {
             )}
         </div>
 
+        {/* Visual Progress Timeline (only for active safe-trade flow) */}
+        {[
+          "accepted",
+          "awaiting_payment",
+          "shipping_to_warehouse",
+          "at_warehouse",
+          "admin_reviewing",
+          "shipping_to_recipients",
+          "completed",
+          "returning",
+        ].includes(trade.status) &&
+          (() => {
+            const hasCash = !!trade.cashAmount;
+            const isReturning = trade.status === "returning";
+            const steps: { key: string; label: string }[] = [
+              { key: "accepted", label: locale === "en" ? "Accepted" : "Kabul Edildi" },
+              ...(hasCash
+                ? [
+                    {
+                      key: "awaiting_payment",
+                      label: locale === "en" ? "Payment" : "Ödeme",
+                    },
+                  ]
+                : []),
+              {
+                key: "shipping_to_warehouse",
+                label: locale === "en" ? "Ship to Warehouse" : "Depoya Kargolanıyor",
+              },
+              {
+                key: "at_warehouse",
+                label: locale === "en" ? "At Warehouse" : "Depoda",
+              },
+              {
+                key: "shipping_to_recipients",
+                label: locale === "en" ? "Shipping to You" : "Size Kargolanıyor",
+              },
+              {
+                key: "completed",
+                label: locale === "en" ? "Completed" : "Tamamlandı",
+              },
+            ];
+            const order: Record<string, number> = {
+              accepted: 0,
+              awaiting_payment: 1,
+              shipping_to_warehouse: hasCash ? 2 : 1,
+              at_warehouse: hasCash ? 3 : 2,
+              admin_reviewing: hasCash ? 3 : 2,
+              shipping_to_recipients: hasCash ? 4 : 3,
+              completed: hasCash ? 5 : 4,
+            };
+            const currentIdx = order[trade.status] ?? 0;
+
+            return (
+              <div className="card p-4 sm:p-6 mb-6 bg-surface-elevated">
+                <h3 className="text-sm font-semibold text-heading mb-4">
+                  {locale === "en" ? "Trade Progress" : "Takas Aşamaları"}
+                </h3>
+                {isReturning ? (
+                  <p className="text-sm text-warning-700 bg-warning-50 border border-warning-200 rounded p-3">
+                    {locale === "en"
+                      ? "Trade was rejected at warehouse. Items are being returned to senders."
+                      : "Takas depoda reddedildi. Ürünler göndericilere iade ediliyor."}
+                  </p>
+                ) : (
+                  <div className="flex items-start justify-between gap-2 overflow-x-auto pb-2">
+                    {steps.map((step, idx) => {
+                      const isPast = idx < currentIdx;
+                      const isCurrent = idx === currentIdx;
+                      const isFuture = idx > currentIdx;
+                      return (
+                        <div
+                          key={step.key}
+                          className="flex-1 min-w-[80px] flex flex-col items-center text-center relative"
+                        >
+                          {idx > 0 && (
+                            <div
+                              className={`absolute top-3 left-0 -translate-x-1/2 right-1/2 h-0.5 ${
+                                isPast || isCurrent
+                                  ? "bg-primary-500"
+                                  : "bg-border-default"
+                              }`}
+                            />
+                          )}
+                          <div
+                            className={`relative z-10 w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold ${
+                              isPast
+                                ? "bg-primary-500 text-inverted"
+                                : isCurrent
+                                  ? "bg-primary-500 text-inverted ring-4 ring-primary-100"
+                                  : "bg-surface-alt text-muted border border-border-default"
+                            }`}
+                          >
+                            {isPast ? "✓" : idx + 1}
+                          </div>
+                          <p
+                            className={`mt-2 text-xs leading-tight ${
+                              isCurrent
+                                ? "font-semibold text-primary-700"
+                                : isPast
+                                  ? "text-body"
+                                  : "text-muted"
+                            }`}
+                          >
+                            {step.label}
+                          </p>
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
+              </div>
+            );
+          })()}
+
         {/* Completed Trade Summary - only when status is completed */}
         {trade.status === "completed" && (
           <div className="card p-6 mb-6 bg-success-50 border-2 border-success-200 rounded-xl">
@@ -1922,234 +1948,6 @@ export default function TradeDetailPage() {
                     </p>
                   </div>
 
-                  {cardError && (
-                    <div className="flex items-center gap-2 p-3 bg-danger-50 border border-danger-200 rounded-lg text-sm text-danger-700">
-                      <span aria-hidden>!</span>
-                      {cardError}
-                    </div>
-                  )}
-
-                  {/* Card Information */}
-                  <div>
-                    <div className="flex items-center gap-2 mb-3">
-                      <span className="flex items-center justify-center w-6 h-6 rounded-full bg-primary-100 text-primary-700 text-xs font-bold">
-                        1
-                      </span>
-                      <h4 className="font-semibold text-heading flex items-center gap-2">
-                        <CreditCardIcon className="w-5 h-5 text-primary-500" />
-                        {locale === "en"
-                          ? "Card Information"
-                          : "Kart Bilgileri"}
-                      </h4>
-                    </div>
-
-                    <div className="p-4 bg-surface border border-border rounded-lg">
-                      {savedCards.length > 0 && (
-                        <div className="mb-4">
-                          <p className="text-sm font-medium text-body mb-3">
-                            {locale === "en"
-                              ? "My Saved Cards"
-                              : "Kayıtlı Kartlarım"}
-                          </p>
-                          <div className="space-y-2">
-                            {savedCards.map((card) => (
-                              <label
-                                key={card.id}
-                                className={`flex items-center gap-3 p-3 border-2 rounded-lg cursor-pointer transition-all ${
-                                  !useNewCard && selectedSavedCard === card.id
-                                    ? "border-primary-500 bg-primary-50"
-                                    : "border-border hover:border-border"
-                                }`}
-                              >
-                                <Radio
-                                  name="tradeCard"
-                                  checked={
-                                    !useNewCard && selectedSavedCard === card.id
-                                  }
-                                  onChange={() => {
-                                    setSelectedSavedCard(card.id);
-                                    setUseNewCard(false);
-                                  }}
-                                  className="text-primary-500"
-                                />
-                                <div className="flex-1">
-                                  <p className="font-medium text-heading">
-                                    {card.cardBrand} •••• {card.lastFour}
-                                  </p>
-                                  <p className="text-sm text-muted">
-                                    {card.expiryMonth
-                                      .toString()
-                                      .padStart(2, "0")}
-                                    /{card.expiryYear}
-                                  </p>
-                                </div>
-                                {card.isDefault && (
-                                  <span className="text-xs px-2 py-1 bg-primary-100 text-primary-700 rounded-sm">
-                                    {locale === "en" ? "Default" : "Varsayılan"}
-                                  </span>
-                                )}
-                              </label>
-                            ))}
-                            <label
-                              className={`flex items-center gap-3 p-3 border-2 rounded-lg cursor-pointer transition-all ${
-                                useNewCard
-                                  ? "border-primary-500 bg-primary-50"
-                                  : "border-border hover:border-border"
-                              }`}
-                            >
-                              <Radio
-                                name="tradeCard"
-                                checked={useNewCard}
-                                onChange={() => setUseNewCard(true)}
-                                className="text-primary-500"
-                              />
-                              <div className="flex items-center gap-2">
-                                <PlusIcon className="w-5 h-5 text-muted" />
-                                <span className="font-medium text-heading">
-                                  {locale === "en"
-                                    ? "Pay with New Card"
-                                    : "Yeni Kart ile Öde"}
-                                </span>
-                              </div>
-                            </label>
-                          </div>
-                        </div>
-                      )}
-
-                      {(savedCards.length === 0 || useNewCard) && (
-                        <div className="space-y-4">
-                          <div>
-                            <label className="block text-sm font-medium text-body mb-1">
-                              {locale === "en"
-                                ? "Name on Card"
-                                : "Kart Üzerindeki İsim"}
-                            </label>
-                            <Input
-                              type="text"
-                              value={cardName}
-                              onChange={(e) =>
-                                setCardName(e.target.value.toUpperCase())
-                              }
-                              placeholder="AD SOYAD"
-                              className="h-12 px-4"
-                            />
-                          </div>
-                          <div>
-                            <label className="block text-sm font-medium text-body mb-1">
-                              {locale === "en"
-                                ? "Card Number"
-                                : "Kart Numarası"}
-                            </label>
-                            <Input
-                              type="text"
-                              value={cardNumber}
-                              onChange={(e) => {
-                                setCardError(null);
-                                const value = e.target.value
-                                  .replace(/\D/g, "")
-                                  .slice(0, 16);
-                                const formatted = value.replace(
-                                  /(\d{4})(?=\d)/g,
-                                  "$1 ",
-                                );
-                                setCardNumber(formatted);
-                              }}
-                              placeholder="4508 3456 7890 1234"
-                              className="h-12 px-4 font-mono"
-                            />
-                          </div>
-                          <div className="grid grid-cols-2 gap-4">
-                            <div>
-                              <label className="block text-sm font-medium text-body mb-1">
-                                {locale === "en"
-                                  ? "Expiry Date"
-                                  : "Son Kullanma Tarihi"}
-                              </label>
-                              <Input
-                                type="text"
-                                value={cardExpiry}
-                                onChange={(e) => {
-                                  const value = e.target.value
-                                    .replace(/\D/g, "")
-                                    .slice(0, 4);
-                                  if (value.length >= 2) {
-                                    setCardExpiry(
-                                      value.slice(0, 2) + "/" + value.slice(2),
-                                    );
-                                  } else {
-                                    setCardExpiry(value);
-                                  }
-                                }}
-                                placeholder="AA/YY"
-                                maxLength={5}
-                                className="h-12 px-4 font-mono"
-                              />
-                            </div>
-                            <div>
-                              <label className="block text-sm font-medium text-body mb-1">
-                                CVV/CVC
-                              </label>
-                              <Input
-                                type="password"
-                                value={cardCvc}
-                                onChange={(e) =>
-                                  setCardCvc(
-                                    e.target.value
-                                      .replace(/\D/g, "")
-                                      .slice(0, 3),
-                                  )
-                                }
-                                placeholder="•••"
-                                maxLength={3}
-                                className="h-12 px-4 font-mono"
-                              />
-                            </div>
-                          </div>
-                          <Checkbox
-                            checked={saveCard}
-                            onChange={(e) => setSaveCard(e.target.checked)}
-                            label={
-                              locale === "en"
-                                ? "Save this card for future purchases"
-                                : "Bu kartı gelecekteki alışverişlerim için kaydet"
-                            }
-                          />
-                        </div>
-                      )}
-
-                      {!useNewCard && selectedSavedCard && (
-                        <div className="mt-4">
-                          <label className="block text-sm font-medium text-body mb-1">
-                            CVV/CVC (
-                            {locale === "en"
-                              ? "Re-enter for security"
-                              : "Güvenlik için tekrar girin"}
-                            )
-                          </label>
-                          <Input
-                            type="password"
-                            value={cardCvc}
-                            onChange={(e) =>
-                              setCardCvc(
-                                e.target.value.replace(/\D/g, "").slice(0, 3),
-                              )
-                            }
-                            placeholder="•••"
-                            maxLength={3}
-                            className="w-32 h-12 px-4 font-mono"
-                          />
-                        </div>
-                      )}
-
-                      <div className="mt-4 flex items-center gap-2 text-xs text-muted">
-                        <ShieldCheckIcon className="w-4 h-4 text-success-500" />
-                        {locale === "en"
-                          ? "256-bit SSL encrypted secure payment"
-                          : "256-bit SSL ile şifrelenmiş güvenli ödeme"}
-                      </div>
-                    </div>
-                  </div>
-
                   {/* Pay Button */}
                   <Button
                     variant="success"
@@ -2269,219 +2067,110 @@ export default function TradeDetailPage() {
           </div>
         )}
 
-        {/* Ship to warehouse form (safe-trade escrow flow) */}
+        {/* Inbound shipment info card (auto-tracking, Sürat Kargo) */}
         {trade.status === "shipping_to_warehouse" &&
           user &&
           (user.id === trade.initiatorId || user.id === trade.receiverId) && (
-            <div className="card p-6 mb-6 bg-primary-50 border-primary-200">
-              <h2 className="text-lg font-semibold text-heading mb-4 flex items-center gap-2">
+            <div className="bg-surface-elevated border border-border rounded-xl p-6 mb-6">
+              <h3 className="text-lg font-semibold text-heading mb-2 flex items-center gap-2">
                 <TruckIcon className="w-5 h-5 text-primary-600" />
                 {locale === "en"
-                  ? "Ship to Tarodan Warehouse"
-                  : "Tarodan Deposuna Gönder"}
-              </h2>
-
-              {/* Both parties shipment status */}
-              <div className="mb-4 p-3 bg-surface-elevated/70 rounded-lg text-sm text-body">
-                <p>
-                  <span className="font-medium">
-                    {locale === "en" ? "You: " : "Siz: "}
-                  </span>
-                  {myWarehouseShipped
-                    ? locale === "en"
-                      ? "Shipped"
-                      : "Gönderildi"
-                    : locale === "en"
-                      ? "Pending"
-                      : "Bekleniyor"}
-                  {" · "}
-                  <span className="font-medium">
-                    {locale === "en" ? "Other party: " : "Karşı taraf: "}
-                  </span>
-                  {otherWarehouseShipped
-                    ? locale === "en"
-                      ? "Shipped"
-                      : "Gönderildi"
-                    : locale === "en"
-                      ? "Pending"
-                      : "Bekleniyor"}
+                  ? "Shipping to Tarodan Warehouse"
+                  : "Tarodan Deposuna Gönderim"}
+              </h3>
+              <p className="text-sm text-subtle mb-5">
+                {locale === "en"
+                  ? "The system has issued a Sürat Kargo tracking number for both parties. Take your item to the nearest Sürat branch with the number below."
+                  : "Sistem her iki tarafa Sürat Kargo takip numarası tahsis etti. Aşağıdaki numara ile en yakın Sürat şubesine giderek ürününüzü teslim edin."}
+              </p>
+              {/* Tek kart: yalnız kullanıcının kendi gönderisi. Karşı tarafın
+                 numarası gösterilmez; sadece "kargoya verdi mi" durumu altta
+                 küçük bir satırla bilgi olarak yazılır. */}
+              <div className="border border-border-subtle rounded-lg p-4">
+                <p className="text-xs uppercase text-subtle mb-1">
+                  {locale === "en" ? "Your shipment" : "Sizin gönderiniz"}
                 </p>
-              </div>
-
-              {/* Otomatik atanan depo etiketin (kabulde oluşur) — teslimden ÖNCE de görünür */}
-              {(myToWarehouseShipment?.trackingNumber ||
-                fallbackMyWarehouseShipment?.trackingNumber) && (
-                <div className="mb-4 p-3 bg-surface-elevated rounded-lg border border-primary-200">
-                  <p className="text-xs text-muted mb-0.5">
-                    {locale === "en" ? "YOUR SHIPMENT" : "SİZİN GÖNDERİNİZ"}
-                  </p>
-                  <p className="font-mono font-semibold text-heading">
-                    {myToWarehouseShipment?.trackingNumber ||
-                      fallbackMyWarehouseShipment?.trackingNumber}
-                  </p>
-                  <p className="text-xs text-success-700 mt-1">
-                    {myWarehouseShipped
-                      ? locale === "en"
-                        ? "Dropped off at carrier"
-                        : "Kargoya verildi"
-                      : locale === "en"
-                        ? "Label ready — drop off your item at the nearest Sürat branch"
-                        : "Etiket hazır — ürününü en yakın Sürat şubesine teslim et"}
-                  </p>
+                <p className="font-mono text-base font-bold text-heading break-all">
+                  {myToWarehouseShipment?.trackingNumber ?? "—"}
+                </p>
+                <p className="text-xs text-muted mt-2">
+                  {locale === "en"
+                    ? "Take this number to the nearest Sürat Kargo branch and hand in your item."
+                    : "Bu numarayla Sürat Kargo şubesine gidip ürününüzü teslim edin."}
+                </p>
+                <div className="mt-3">
+                  <ShipmentStatusChip status={myToWarehouseShipment?.status} />
                 </div>
-              )}
-
-              <div className="mb-4 p-3 bg-info-50 border border-info-200 rounded-lg">
-                <p className="text-sm text-info-900">{warehouseProgressText}</p>
               </div>
 
-              {myWarehouseShipped ? (
-                <div className="flex items-center gap-3 p-3 bg-surface-elevated rounded-lg border border-primary-200">
-                  <CheckCircleIcon className="w-5 h-5 text-success-600" />
-                  <div className="text-sm text-body">
-                    <p className="font-medium">
+              {/* Karşı tarafın durumu — numara YOK, sadece tek satırlık ipucu.
+                 ShipmentStatus enum'undaki tüm değerleri açıkça karşıla; aksi
+                 hâlde cancelled/failed/returned gibi terminal durumlar yanlış
+                 "bekleniyor" mesajına düşer. */}
+              <div className="mt-3 flex items-center gap-2 text-sm text-subtle">
+                {(() => {
+                  const s = otherToWarehouseShipment?.status;
+                  if (s === "delivered") {
+                    return (
+                      <span className="inline-flex items-center gap-2 text-success-700">
+                        ✓
+                        {locale === "en"
+                          ? "The other party's shipment has reached the warehouse."
+                          : "Karşı tarafın gönderisi de depoya ulaştı."}
+                      </span>
+                    );
+                  }
+                  if (
+                    s === "picked_up" ||
+                    s === "in_transit" ||
+                    s === "at_delivery_branch" ||
+                    s === "out_for_delivery"
+                  ) {
+                    return (
+                      <span>
+                        {locale === "en"
+                          ? "The other party's shipment is on the way."
+                          : "Karşı tarafın gönderisi yolda."}
+                      </span>
+                    );
+                  }
+                  if (s === "cancelled") {
+                    return (
+                      <span className="text-warning-700">
+                        {locale === "en"
+                          ? "The other party's shipment was cancelled. Admin will follow up."
+                          : "Karşı tarafın gönderisi iptal edildi; yetkili ekibimiz devreye girecek."}
+                      </span>
+                    );
+                  }
+                  if (s === "failed") {
+                    return (
+                      <span className="text-warning-700">
+                        {locale === "en"
+                          ? "The other party's shipment failed. Admin will follow up."
+                          : "Karşı tarafın gönderisinde bir aksaklık oluştu; yetkili ekibimiz inceliyor."}
+                      </span>
+                    );
+                  }
+                  if (s === "returned" || s === "return_in_progress") {
+                    return (
+                      <span className="text-warning-700">
+                        {locale === "en"
+                          ? "The other party's shipment was returned."
+                          : "Karşı tarafın gönderisi iade edildi."}
+                      </span>
+                    );
+                  }
+                  // pending | label_created | undefined → henüz kargoya verilmedi
+                  return (
+                    <span>
                       {locale === "en"
-                        ? "Your shipping info is saved"
-                        : "Kargo bilginiz kaydedildi"}
-                    </p>
-                    {((myToWarehouseShipment?.carrier ||
-                      fallbackMyWarehouseShipment?.carrier) ||
-                      (myToWarehouseShipment?.trackingNumber ||
-                        fallbackMyWarehouseShipment?.trackingNumber)) && (
-                      <p className="text-xs text-muted mt-1">
-                        {myToWarehouseShipment?.carrier ||
-                          fallbackMyWarehouseShipment?.carrier}
-                        {(myToWarehouseShipment?.trackingNumber ||
-                          fallbackMyWarehouseShipment?.trackingNumber)
-                          ? ` · ${
-                              myToWarehouseShipment?.trackingNumber ||
-                              fallbackMyWarehouseShipment?.trackingNumber
-                            }`
-                          : ""}
-                      </p>
-                    )}
-                  </div>
-                </div>
-              ) : (
-                <>
-                  <p className="text-muted text-sm mb-4">
-                    {locale === "en"
-                      ? "Select the address you will ship from and the carrier. Items will be reviewed at our warehouse."
-                      : "Gönderim yapacağınız adresi ve kargo firmasını seçin. Ürünler depomuzda incelenecek."}
-                  </p>
-                  <div className="space-y-4">
-                    <div>
-                      <label className="block text-sm font-medium text-body mb-2">
-                        {locale === "en"
-                          ? "Shipping address"
-                          : "Gönderim adresi"}
-                      </label>
-                      <Select
-                        value={shipAddressId}
-                        onChange={(e) => setShipAddressId(e.target.value)}
-                        className="rounded-xl"
-                      >
-                        <option value="">
-                          {addressesQuery.isLoading
-                            ? locale === "en"
-                              ? "Loading..."
-                              : "Yükleniyor..."
-                            : locale === "en"
-                              ? "Select address"
-                              : "Adres seçin"}
-                        </option>
-                        {addresses.map((addr: any) => (
-                          <option key={addr.id} value={addr.id}>
-                            {addr.fullName || addr.title} – {addr.city} /{" "}
-                            {addr.district}{" "}
-                            {addr.address ? `– ${addr.address}` : ""}
-                          </option>
-                        ))}
-                      </Select>
-                      {addresses.length === 0 && !addressesQuery.isLoading && (
-                        <p className="text-sm text-warning-600 mt-2">
-                          {locale === "en"
-                            ? "No saved addresses. Add one in "
-                            : "Kayıtlı adres yok. "}
-                          <Link
-                            href="/profile/addresses"
-                            className="underline font-medium"
-                          >
-                            {locale === "en"
-                              ? "Profile → Addresses"
-                              : "Profil → Adresler"}
-                          </Link>
-                          {locale === "en"
-                            ? ""
-                            : " bölümünden ekleyebilirsiniz."}
-                        </p>
-                      )}
-                    </div>
-                    <div>
-                      <label className="block text-sm font-medium text-body mb-2">
-                        {locale === "en" ? "Carrier" : "Kargo firması"}
-                      </label>
-                      <Select
-                        value={shipCarrier}
-                        onChange={(e) => setShipCarrier(e.target.value)}
-                        className="rounded-xl"
-                      >
-                        <option value="aras">Aras Kargo</option>
-                        <option value="yurtici">Yurtiçi Kargo</option>
-                        <option value="mng">MNG Kargo</option>
-                      </Select>
-                    </div>
-                    <div>
-                      <label className="block text-sm font-medium text-body mb-2">
-                        {locale === "en"
-                          ? "Tracking number (optional)"
-                          : "Takip numarası (opsiyonel)"}
-                      </label>
-                      <Input
-                        type="text"
-                        value={shipTrackingNumber}
-                        onChange={(e) => setShipTrackingNumber(e.target.value)}
-                        placeholder={
-                          locale === "en"
-                            ? "e.g. 1234567890"
-                            : "örn. 1234567890"
-                        }
-                        className="h-12 px-4 rounded-xl"
-                      />
-                    </div>
-                    <Button
-                      variant="primary"
-                      size="lg"
-                      className="w-full flex items-center justify-center gap-2"
-                      onClick={handleShipToWarehouseSubmit}
-                      disabled={
-                        isActionLoading ||
-                        !shipAddressId ||
-                        addresses.length === 0
-                      }
-                    >
-                      {isActionLoading ? (
-                        <>
-                          <Spinner
-                            size="sm"
-                            color="border-surface-elevated border-t-transparent"
-                          />
-                          {locale === "en"
-                            ? "Submitting..."
-                            : "Gönderiliyor..."}
-                        </>
-                      ) : (
-                        <>
-                          <TruckIcon className="w-5 h-5" />
-                          {locale === "en"
-                            ? "Ship to Warehouse"
-                            : "Depoya Gönder"}
-                        </>
-                      )}
-                    </Button>
-                  </div>
-                </>
-              )}
+                        ? "Waiting for the other party to hand in their shipment."
+                        : "Karşı tarafın kargoya teslim etmesi bekleniyor."}
+                    </span>
+                  );
+                })()}
+              </div>
             </div>
           )}
 
@@ -2505,11 +2194,27 @@ export default function TradeDetailPage() {
                       : "Size gönderilen kargo"}
                   </p>
                   <p className="font-medium text-heading">
-                    {myFromWarehouseShipment.carrier || "—"}
+                    {myFromWarehouseShipment.carrier === "surat"
+                      ? "Sürat Kargo"
+                      : myFromWarehouseShipment.carrier || "—"}
                     {myFromWarehouseShipment.trackingNumber
                       ? ` · ${myFromWarehouseShipment.trackingNumber}`
                       : ""}
                   </p>
+                  {myFromWarehouseShipment.carrier === "surat" &&
+                    myFromWarehouseShipment.trackingNumber && (
+                      <a
+                        href={`https://www.suratkargo.com.tr/KargoTakip/?kargotakipno=${encodeURIComponent(myFromWarehouseShipment.trackingNumber)}`}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="inline-flex items-center gap-1 mt-2 text-sm text-primary-600 hover:text-primary-700 font-medium"
+                      >
+                        <TruckIcon className="w-4 h-4" />
+                        {locale === "en"
+                          ? "Track on Sürat"
+                          : "Sürat'ta Takip Et"}
+                      </a>
+                    )}
                 </div>
               ) : (
                 <div className="p-4 bg-surface-elevated rounded-lg border border-info-200 mb-4">
@@ -2529,7 +2234,9 @@ export default function TradeDetailPage() {
                       : "Karşı tarafın kargosu"}
                   </p>
                   <p>
-                    {otherFromWarehouseShipment.carrier || "—"}
+                    {otherFromWarehouseShipment.carrier === "surat"
+                      ? "Sürat Kargo"
+                      : otherFromWarehouseShipment.carrier || "—"}
                     {otherFromWarehouseShipment.trackingNumber
                       ? ` · ${otherFromWarehouseShipment.trackingNumber}`
                       : ""}
@@ -2542,7 +2249,10 @@ export default function TradeDetailPage() {
                 size="lg"
                 className="w-full flex items-center justify-center gap-2"
                 onClick={handleConfirmReceipt}
-                disabled={isActionLoading}
+                disabled={
+                  isActionLoading ||
+                  myFromWarehouseShipment?.status !== "delivered"
+                }
               >
                 {isActionLoading ? (
                   <>
@@ -2559,6 +2269,13 @@ export default function TradeDetailPage() {
                   </>
                 )}
               </Button>
+              {myFromWarehouseShipment?.status !== "delivered" && (
+                <p className="text-xs text-muted mt-2 text-center">
+                  {locale === "en"
+                    ? "Waiting for the carrier to mark the shipment as delivered."
+                    : "Kargonun teslim edildiği bilgisi bekleniyor."}
+                </p>
+              )}
             </div>
           )}
 
@@ -2570,11 +2287,25 @@ export default function TradeDetailPage() {
               {locale === "en" ? "Return Shipment" : "İade Kargosu"}
             </h3>
             <p className="text-sm text-body">
-              {myReturnShipment.carrier || "—"}
+              {myReturnShipment.carrier === "surat"
+                ? "Sürat Kargo"
+                : myReturnShipment.carrier || "—"}
               {myReturnShipment.trackingNumber
                 ? ` · ${myReturnShipment.trackingNumber}`
                 : ""}
             </p>
+            {myReturnShipment.carrier === "surat" &&
+              myReturnShipment.trackingNumber && (
+                <a
+                  href={`https://www.suratkargo.com.tr/KargoTakip/?kargotakipno=${encodeURIComponent(myReturnShipment.trackingNumber)}`}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="inline-flex items-center gap-1 mt-2 text-sm text-primary-600 hover:text-primary-700 font-medium"
+                >
+                  <TruckIcon className="w-4 h-4" />
+                  {locale === "en" ? "Track on Sürat" : "Sürat'ta Takip Et"}
+                </a>
+              )}
           </div>
         )}
 
@@ -2641,7 +2372,7 @@ export default function TradeDetailPage() {
         )}
 
         {/* Action Buttons */}
-        {(canAccept || canReject || canCounter || canCancel) && (
+        {(canAccept || canReject || canCounter || canCancel || showCancelDisabled) && (
           <div className="card p-6">
             <div className="flex flex-wrap gap-3">
               {canAccept && (
@@ -2693,6 +2424,28 @@ export default function TradeDetailPage() {
                 >
                   {locale === "en" ? "Cancel Trade" : "İptal Et"}
                 </Button>
+              )}
+              {showCancelDisabled && !canAccept && !canReject && (
+                <div className="flex-1 min-w-[120px] flex flex-col">
+                  <Button
+                    variant="secondary"
+                    size="lg"
+                    className="opacity-70 cursor-not-allowed"
+                    disabled
+                    title={
+                      locale === "en"
+                        ? "An item already reached the warehouse — cancel is no longer available. Open a dispute if needed."
+                        : "Ürünlerden biri Tarodan deposuna ulaştı; iptal edilemez. Sorun varsa itiraz açın."
+                    }
+                  >
+                    {locale === "en" ? "Cancel Locked" : "İptal Edilemez"}
+                  </Button>
+                  <span className="text-xs text-muted mt-1">
+                    {locale === "en"
+                      ? "An item reached the warehouse."
+                      : "Ürünlerden biri depoya ulaştı."}
+                  </span>
+                </div>
               )}
             </div>
           </div>

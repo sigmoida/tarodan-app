@@ -31,3 +31,16 @@ export {
   type GuestCheckoutInput,
   type InitiatePaymentInput,
 } from './schemas/order';
+
+// Listing extras (manufacturer-aware attribute selection)
+export {
+  attributeSelectionSchema,
+  hwAttributesSchema,
+  listingExtrasSchema,
+  HW_ATTRIBUTE_GROUP_SLUGS,
+  flattenHwAttributes,
+  type AttributeSelection,
+  type HwAttributes,
+  type HwAttributeGroupSlug,
+  type ListingExtras,
+} from './schemas/listing';

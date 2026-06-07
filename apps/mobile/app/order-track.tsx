@@ -1,10 +1,11 @@
 import { useState } from 'react';
 import { View, ScrollView, StyleSheet, TouchableOpacity } from 'react-native';
-import { Text, TextInput, Button, Divider, ActivityIndicator, Card } from 'react-native-paper';
 import { router } from 'expo-router';
-import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
-import { TarodanColors } from '../src/theme';
+import { Ionicons } from '@expo/vector-icons';
+import { theme, Text, Input, Button, Divider } from '@tarodan/ui-native';
 import { api } from '../src/services/api';
+
+const { colors } = theme;
 
 interface OrderStatus {
   id: string;
@@ -26,14 +27,14 @@ interface OrderStatus {
 }
 
 const STATUS_MAP: Record<string, { label: string; color: string; icon: string }> = {
-  pending_payment: { label: 'Ödeme Bekleniyor', color: '#FFC107', icon: 'time-outline' },
-  paid: { label: 'Ödeme Alındı', color: '#4CAF50', icon: 'checkmark-circle-outline' },
-  preparing: { label: 'Hazırlanıyor', color: '#2196F3', icon: 'construct-outline' },
-  shipped: { label: 'Kargoya Verildi', color: '#9C27B0', icon: 'car-outline' },
-  delivered: { label: 'Teslim Edildi', color: '#4CAF50', icon: 'checkmark-done-outline' },
-  completed: { label: 'Tamamlandı', color: '#4CAF50', icon: 'trophy-outline' },
-  cancelled: { label: 'İptal Edildi', color: '#F44336', icon: 'close-circle-outline' },
-  refunded: { label: 'İade Edildi', color: '#FF9800', icon: 'return-down-back-outline' },
+  pending_payment: { label: 'Ödeme Bekleniyor', color: colors.warning[500]!, icon: 'time-outline' },
+  paid: { label: 'Ödeme Alındı', color: colors.success[600]!, icon: 'checkmark-circle-outline' },
+  preparing: { label: 'Hazırlanıyor', color: colors.info[600]!, icon: 'construct-outline' },
+  shipped: { label: 'Kargoya Verildi', color: colors.info[700]!, icon: 'car-outline' },
+  delivered: { label: 'Teslim Edildi', color: colors.success[600]!, icon: 'checkmark-done-outline' },
+  completed: { label: 'Tamamlandı', color: colors.success[600]!, icon: 'trophy-outline' },
+  cancelled: { label: 'İptal Edildi', color: colors.danger[600]!, icon: 'close-circle-outline' },
+  refunded: { label: 'İade Edildi', color: colors.warning[600]!, icon: 'return-down-back-outline' },
 };
 
 export default function OrderTrackScreen() {
@@ -77,7 +78,7 @@ export default function OrderTrackScreen() {
   };
 
   const getStatusInfo = (status: string) => {
-    return STATUS_MAP[status] || { label: status, color: '#757575', icon: 'help-circle-outline' };
+    return STATUS_MAP[status] || { label: status, color: colors.gray[500]!, icon: 'help-circle-outline' };
   };
 
   const formatDate = (dateString: string) => {
@@ -96,7 +97,7 @@ export default function OrderTrackScreen() {
       {/* Header */}
       <View style={styles.header}>
         <TouchableOpacity onPress={() => router.back()}>
-          <Ionicons name="arrow-back" size={24} color={TarodanColors.textOnPrimary} />
+          <Ionicons name="arrow-back" size={24} color={colors.white} />
         </TouchableOpacity>
         <Text style={styles.headerTitle}>Sipariş Takip</Text>
         <View style={{ width: 24 }} />
@@ -106,7 +107,7 @@ export default function OrderTrackScreen() {
         {/* Track Form */}
         <View style={styles.formCard}>
           <View style={styles.formHeader}>
-            <Ionicons name="search-outline" size={24} color={TarodanColors.primary} />
+            <Ionicons name="search-outline" size={24} color={colors.primary[600]!} />
             <Text style={styles.formTitle}>Siparişinizi Sorgulayın</Text>
           </View>
 
@@ -114,55 +115,47 @@ export default function OrderTrackScreen() {
             Sipariş numaranız ve e-posta adresinizle siparişinizin durumunu öğrenebilirsiniz.
           </Text>
 
-          <TextInput
+          <Input
             label="Sipariş Numarası"
             value={orderNumber}
             onChangeText={(text) => {
               setOrderNumber(text);
               setError('');
             }}
-            mode="outlined"
             style={styles.input}
             placeholder="ORD-XXXXXX"
             autoCapitalize="characters"
-            outlineColor={TarodanColors.border}
-            activeOutlineColor={TarodanColors.primary}
           />
 
-          <TextInput
+          <Input
             label="E-posta Adresi"
             value={email}
             onChangeText={(text) => {
               setEmail(text);
               setError('');
             }}
-            mode="outlined"
             style={styles.input}
             keyboardType="email-address"
             autoCapitalize="none"
             placeholder="ornek@email.com"
-            outlineColor={TarodanColors.border}
-            activeOutlineColor={TarodanColors.primary}
           />
 
           {error ? (
             <View style={styles.errorBox}>
-              <Ionicons name="alert-circle-outline" size={20} color={TarodanColors.error} />
+              <Ionicons name="alert-circle-outline" size={20} color={colors.danger[600]!} />
               <Text style={styles.errorText}>{error}</Text>
             </View>
           ) : null}
 
           <Button
-            mode="contained"
-            buttonColor={TarodanColors.primary}
+            variant="primary"
+            title="Sipariş Sorgula"
             onPress={handleTrack}
-            loading={loading}
+            isLoading={loading}
             disabled={loading}
             style={styles.trackButton}
-            icon="magnify"
-          >
-            Sipariş Sorgula
-          </Button>
+            icon="search"
+          />
         </View>
 
         {/* Order Result */}
@@ -174,10 +167,10 @@ export default function OrderTrackScreen() {
                 <Text style={styles.orderDate}>{formatDate(order.createdAt)}</Text>
               </View>
               <View style={[styles.statusBadge, { backgroundColor: getStatusInfo(order.status).color }]}>
-                <Ionicons 
-                  name={getStatusInfo(order.status).icon as any} 
-                  size={16} 
-                  color="#fff" 
+                <Ionicons
+                  name={getStatusInfo(order.status).icon as any}
+                  size={16}
+                  color={colors.white}
                 />
                 <Text style={styles.statusText}>{getStatusInfo(order.status).label}</Text>
               </View>
@@ -218,7 +211,7 @@ export default function OrderTrackScreen() {
                   <View style={styles.shippingRow}>
                     <Text style={styles.shippingLabel}>Kargo Firması</Text>
                     <Text style={styles.shippingValue}>
-                      {order.shipment.carrier === 'aras' ? 'Aras Kargo' : 'Yurtiçi Kargo'}
+                      {order.shipment.carrier === 'surat' ? 'Sürat Kargo' : order.shipment.carrier}
                     </Text>
                   </View>
                   {order.shipment.trackingNumber && (
@@ -249,26 +242,26 @@ export default function OrderTrackScreen() {
                   const statusInfo = getStatusInfo(status);
                   const isActive = getStatusSteps(order.status) >= index;
                   const isCurrent = order.status === status;
-                  
+
                   return (
                     <View key={status} style={styles.timelineItem}>
                       <View style={[
                         styles.timelineDot,
-                        isActive && { backgroundColor: TarodanColors.primary },
+                        isActive && { backgroundColor: colors.primary[600]! },
                         isCurrent && styles.timelineDotCurrent,
                       ]}>
                         {isActive && (
-                          <Ionicons 
-                            name={isCurrent ? statusInfo.icon as any : 'checkmark'} 
-                            size={12} 
-                            color="#fff" 
+                          <Ionicons
+                            name={isCurrent ? statusInfo.icon as any : 'checkmark'}
+                            size={12}
+                            color={colors.white}
                           />
                         )}
                       </View>
                       {index < 4 && (
                         <View style={[
                           styles.timelineLine,
-                          isActive && { backgroundColor: TarodanColors.primary },
+                          isActive && { backgroundColor: colors.primary[600]! },
                         ]} />
                       )}
                       <Text style={[
@@ -288,18 +281,18 @@ export default function OrderTrackScreen() {
 
         {/* Help Section */}
         <View style={styles.helpSection}>
-          <Ionicons name="help-circle-outline" size={24} color={TarodanColors.primary} />
+          <Ionicons name="help-circle-outline" size={24} color={colors.primary[600]!} />
           <View style={styles.helpContent}>
             <Text style={styles.helpTitle}>Yardım mı gerekiyor?</Text>
             <Text style={styles.helpText}>
               Siparişinizle ilgili sorunuz varsa destek ekibimizle iletişime geçebilirsiniz.
             </Text>
-            <TouchableOpacity 
+            <TouchableOpacity
               style={styles.helpButton}
               onPress={() => router.push('/help')}
             >
               <Text style={styles.helpButtonText}>Destek Al</Text>
-              <Ionicons name="arrow-forward" size={16} color={TarodanColors.primary} />
+              <Ionicons name="arrow-forward" size={16} color={colors.primary[600]!} />
             </TouchableOpacity>
           </View>
         </View>
@@ -325,10 +318,10 @@ function getStatusSteps(status: string): number {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: TarodanColors.backgroundSecondary,
+    backgroundColor: colors.surface.alt,
   },
   header: {
-    backgroundColor: TarodanColors.primary,
+    backgroundColor: colors.primary[600]!,
     paddingTop: 50,
     paddingBottom: 16,
     paddingHorizontal: 20,
@@ -339,14 +332,14 @@ const styles = StyleSheet.create({
   headerTitle: {
     fontSize: 18,
     fontWeight: 'bold',
-    color: TarodanColors.textOnPrimary,
+    color: colors.white,
   },
   content: {
     flex: 1,
     padding: 16,
   },
   formCard: {
-    backgroundColor: TarodanColors.background,
+    backgroundColor: colors.surface.DEFAULT,
     borderRadius: 12,
     padding: 20,
     marginBottom: 16,
@@ -359,23 +352,22 @@ const styles = StyleSheet.create({
   formTitle: {
     fontSize: 18,
     fontWeight: 'bold',
-    color: TarodanColors.textPrimary,
+    color: colors.text.heading,
     marginLeft: 12,
   },
   formDescription: {
     fontSize: 14,
-    color: TarodanColors.textSecondary,
+    color: colors.text.muted,
     marginBottom: 20,
     lineHeight: 20,
   },
   input: {
     marginBottom: 12,
-    backgroundColor: TarodanColors.background,
   },
   errorBox: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#FFEBEE',
+    backgroundColor: colors.danger[50]!,
     padding: 12,
     borderRadius: 8,
     marginBottom: 16,
@@ -383,7 +375,7 @@ const styles = StyleSheet.create({
   errorText: {
     flex: 1,
     fontSize: 14,
-    color: TarodanColors.error,
+    color: colors.danger[600]!,
     marginLeft: 8,
   },
   trackButton: {
@@ -391,7 +383,7 @@ const styles = StyleSheet.create({
     marginTop: 8,
   },
   resultCard: {
-    backgroundColor: TarodanColors.background,
+    backgroundColor: colors.surface.DEFAULT,
     borderRadius: 12,
     padding: 20,
     marginBottom: 16,
@@ -404,11 +396,11 @@ const styles = StyleSheet.create({
   orderNumber: {
     fontSize: 18,
     fontWeight: 'bold',
-    color: TarodanColors.textPrimary,
+    color: colors.text.heading,
   },
   orderDate: {
     fontSize: 13,
-    color: TarodanColors.textSecondary,
+    color: colors.text.muted,
     marginTop: 4,
   },
   statusBadge: {
@@ -421,13 +413,13 @@ const styles = StyleSheet.create({
   statusText: {
     fontSize: 12,
     fontWeight: '600',
-    color: '#fff',
+    color: colors.white,
     marginLeft: 6,
   },
   sectionTitle: {
     fontSize: 14,
     fontWeight: '600',
-    color: TarodanColors.textSecondary,
+    color: colors.text.muted,
     marginBottom: 8,
   },
   productSection: {
@@ -436,10 +428,10 @@ const styles = StyleSheet.create({
   productTitle: {
     fontSize: 16,
     fontWeight: '500',
-    color: TarodanColors.textPrimary,
+    color: colors.text.heading,
   },
   priceSection: {
-    backgroundColor: TarodanColors.surfaceVariant,
+    backgroundColor: colors.surface.alt,
     borderRadius: 8,
     padding: 12,
     marginBottom: 16,
@@ -451,27 +443,27 @@ const styles = StyleSheet.create({
   },
   priceLabel: {
     fontSize: 14,
-    color: TarodanColors.textSecondary,
+    color: colors.text.muted,
   },
   priceValue: {
     fontSize: 14,
-    color: TarodanColors.textPrimary,
+    color: colors.text.heading,
   },
   totalLabel: {
     fontSize: 16,
     fontWeight: 'bold',
-    color: TarodanColors.textPrimary,
+    color: colors.text.heading,
   },
   totalValue: {
     fontSize: 16,
     fontWeight: 'bold',
-    color: TarodanColors.primary,
+    color: colors.primary[600]!,
   },
   shippingSection: {
     marginBottom: 16,
   },
   shippingInfo: {
-    backgroundColor: TarodanColors.surfaceVariant,
+    backgroundColor: colors.surface.alt,
     borderRadius: 8,
     padding: 12,
   },
@@ -482,15 +474,15 @@ const styles = StyleSheet.create({
   },
   shippingLabel: {
     fontSize: 14,
-    color: TarodanColors.textSecondary,
+    color: colors.text.muted,
   },
   shippingValue: {
     fontSize: 14,
-    color: TarodanColors.textPrimary,
+    color: colors.text.heading,
     fontWeight: '500',
   },
   trackingNumber: {
-    color: TarodanColors.primary,
+    color: colors.primary[600]!,
     fontFamily: 'monospace',
   },
   timelineSection: {
@@ -509,7 +501,7 @@ const styles = StyleSheet.create({
     width: 24,
     height: 24,
     borderRadius: 12,
-    backgroundColor: TarodanColors.border,
+    backgroundColor: colors.border.DEFAULT,
     justifyContent: 'center',
     alignItems: 'center',
   },
@@ -518,7 +510,7 @@ const styles = StyleSheet.create({
     height: 28,
     borderRadius: 14,
     borderWidth: 2,
-    borderColor: TarodanColors.primaryLight,
+    borderColor: colors.primary[50]!,
   },
   timelineLine: {
     position: 'absolute',
@@ -526,24 +518,24 @@ const styles = StyleSheet.create({
     right: -20,
     width: 40,
     height: 2,
-    backgroundColor: TarodanColors.border,
+    backgroundColor: colors.border.DEFAULT,
   },
   timelineLabel: {
     fontSize: 10,
-    color: TarodanColors.textSecondary,
+    color: colors.text.muted,
     textAlign: 'center',
     marginTop: 8,
   },
   timelineLabelActive: {
-    color: TarodanColors.textPrimary,
+    color: colors.text.heading,
   },
   timelineLabelCurrent: {
     fontWeight: 'bold',
-    color: TarodanColors.primary,
+    color: colors.primary[600]!,
   },
   helpSection: {
     flexDirection: 'row',
-    backgroundColor: TarodanColors.background,
+    backgroundColor: colors.surface.DEFAULT,
     borderRadius: 12,
     padding: 16,
   },
@@ -554,11 +546,11 @@ const styles = StyleSheet.create({
   helpTitle: {
     fontSize: 16,
     fontWeight: '600',
-    color: TarodanColors.textPrimary,
+    color: colors.text.heading,
   },
   helpText: {
     fontSize: 13,
-    color: TarodanColors.textSecondary,
+    color: colors.text.muted,
     marginTop: 4,
     lineHeight: 18,
   },
@@ -570,7 +562,7 @@ const styles = StyleSheet.create({
   helpButtonText: {
     fontSize: 14,
     fontWeight: '600',
-    color: TarodanColors.primary,
+    color: colors.primary[600]!,
     marginRight: 4,
   },
 });

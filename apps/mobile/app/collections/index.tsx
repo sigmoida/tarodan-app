@@ -1,31 +1,35 @@
 import { useState } from 'react';
-import { View, ScrollView, StyleSheet, TouchableOpacity, FlatList, Image, Dimensions } from 'react-native';
-import { Text, Searchbar, Card, Avatar, Chip, ActivityIndicator } from 'react-native-paper';
+import { View, ScrollView, StyleSheet, TouchableOpacity, FlatList, Image, Dimensions, RefreshControl } from 'react-native';
+import { theme, Avatar, Chip, Spinner, Text, Input } from '@tarodan/ui-native';
 import { useQuery } from '@tanstack/react-query';
 import { router } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { api } from '../../src/services/api';
-import { TarodanColors } from '../../src/theme';
 import { transformImageUrl } from '../../src/utils/imageUrl';
 
+const { colors } = theme;
 const { width } = Dimensions.get('window');
 
-
+// Mock collections for demo
 export default function CollectionsScreen() {
   const [searchQuery, setSearchQuery] = useState('');
   const [activeFilter, setActiveFilter] = useState<'all' | 'popular' | 'recent'>('all');
 
-  const { data: apiCollections, isLoading } = useQuery({
+  const { data: apiCollections, isLoading, refetch, isRefetching } = useQuery({
     queryKey: ['collections', searchQuery, activeFilter],
     queryFn: async () => {
-      const response = await api.get('/collections/browse', {
-        params: {
-          q: searchQuery || undefined,
-          sort: activeFilter === 'popular' ? 'popular' : activeFilter === 'recent' ? 'newest' : undefined,
-        },
-      });
-      const d = response.data;
-      return d?.collections || d?.data || (Array.isArray(d) ? d : []);
+      try {
+        const response = await api.get('/collections/browse', {
+          params: {
+            q: searchQuery || undefined,
+            sort: activeFilter === 'popular' ? 'popular' : activeFilter === 'recent' ? 'newest' : undefined,
+          },
+        });
+        // API şekli: { collections, total, page, pageSize }
+        return response.data?.collections ?? response.data?.data ?? (Array.isArray(response.data) ? response.data : []);
+      } catch {
+        return null;
+      }
     },
   });
 
@@ -42,19 +46,19 @@ export default function CollectionsScreen() {
       onPress={() => router.push(`/collections/${item.id}`)}
     >
       <Image
-        source={{ uri: transformImageUrl(item.coverImageUrl || item.coverImage) }}
+        source={{ uri: transformImageUrl(item.coverImageUrl ?? item.coverImage) }}
         style={styles.collectionImage}
         resizeMode="cover"
       />
       <View style={styles.collectionOverlay}>
         <View style={styles.collectionStats}>
           <View style={styles.collectionStat}>
-            <Ionicons name="images-outline" size={14} color="#fff" />
-            <Text style={styles.collectionStatText}>{item.itemCount ?? 0}</Text>
+            <Ionicons name="images-outline" size={14} color={colors.white} />
+            <Text style={styles.collectionStatText}>{item.itemCount}</Text>
           </View>
           <View style={styles.collectionStat}>
-            <Ionicons name="heart" size={14} color="#fff" />
-            <Text style={styles.collectionStatText}>{item.likeCount ?? 0}</Text>
+            <Ionicons name="heart" size={14} color={colors.white} />
+            <Text style={styles.collectionStatText}>{item.likeCount}</Text>
           </View>
         </View>
       </View>
@@ -64,12 +68,14 @@ export default function CollectionsScreen() {
           {item.description}
         </Text>
         <View style={styles.ownerRow}>
-          <Avatar.Text
-            size={24}
-            label={(item.user?.displayName || item.owner?.displayName || item.userName || 'U').substring(0, 2).toUpperCase()}
-            style={{ backgroundColor: TarodanColors.primary }}
+          <Avatar
+            size="sm"
+            name={item.owner?.displayName || 'U'}
           />
-          <Text style={styles.ownerName}>{item.user?.displayName || item.owner?.displayName || item.userName || ''}</Text>
+          <Text style={styles.ownerName}>{item.owner?.displayName}</Text>
+          {item.owner?.verified && (
+            <Ionicons name="checkmark-circle" size={14} color={colors.warning[500]!} />
+          )}
         </View>
       </View>
     </TouchableOpacity>
@@ -80,7 +86,7 @@ export default function CollectionsScreen() {
       {/* Header */}
       <View style={styles.header}>
         <TouchableOpacity onPress={() => router.back()}>
-          <Ionicons name="arrow-back" size={24} color={TarodanColors.textOnPrimary} />
+          <Ionicons name="arrow-back" size={24} color={colors.white} />
         </TouchableOpacity>
         <Text style={styles.headerTitle}>Koleksiyonlar</Text>
         <View style={{ width: 24 }} />
@@ -88,50 +94,53 @@ export default function CollectionsScreen() {
 
       {/* Search */}
       <View style={styles.searchSection}>
-        <Searchbar
+        <Input
           placeholder="Koleksiyon ara..."
           value={searchQuery}
           onChangeText={setSearchQuery}
-          style={styles.searchBar}
+          leftIconName="search"
         />
       </View>
 
       {/* Filters */}
       <View style={styles.filterRow}>
         <Chip
+          label="Tümü"
           selected={activeFilter === 'all'}
           onPress={() => setActiveFilter('all')}
-          style={[styles.filterChip, activeFilter === 'all' && styles.filterChipActive]}
-          textStyle={activeFilter === 'all' ? styles.filterChipTextActive : undefined}
-        >
-          Tümü
-        </Chip>
+          variant="primary"
+        />
         <Chip
+          label="Popüler"
           selected={activeFilter === 'popular'}
           onPress={() => setActiveFilter('popular')}
-          style={[styles.filterChip, activeFilter === 'popular' && styles.filterChipActive]}
-          textStyle={activeFilter === 'popular' ? styles.filterChipTextActive : undefined}
-          icon="fire"
-        >
-          Popüler
-        </Chip>
+          variant="primary"
+        />
         <Chip
+          label="Yeni"
           selected={activeFilter === 'recent'}
           onPress={() => setActiveFilter('recent')}
-          style={[styles.filterChip, activeFilter === 'recent' && styles.filterChipActive]}
-          textStyle={activeFilter === 'recent' ? styles.filterChipTextActive : undefined}
-          icon="clock-outline"
-        >
-          Yeni
-        </Chip>
+          variant="primary"
+        />
       </View>
 
-      <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
+      <ScrollView
+        style={styles.content}
+        showsVerticalScrollIndicator={false}
+        refreshControl={
+          <RefreshControl
+            refreshing={isRefetching}
+            onRefresh={refetch}
+            colors={[colors.primary[600]!]}
+            tintColor={colors.primary[600]!}
+          />
+        }
+      >
         {/* Collections Grid */}
         <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Koleksiyonlar</Text>
+          <Text style={styles.sectionTitle}>📚 Koleksiyonlar</Text>
           {isLoading ? (
-            <ActivityIndicator size="large" color={TarodanColors.primary} style={{ marginTop: 40 }} />
+            <Spinner size="lg" />
           ) : (
             <FlatList
               data={filteredCollections}
@@ -142,7 +151,7 @@ export default function CollectionsScreen() {
               scrollEnabled={false}
               ListEmptyComponent={
                 <View style={styles.emptyContainer}>
-                  <Ionicons name="albums-outline" size={64} color={TarodanColors.textLight} />
+                  <Ionicons name="albums-outline" size={64} color={colors.gray[500]} />
                   <Text style={styles.emptyTitle}>Koleksiyon Bulunamadı</Text>
                   <Text style={styles.emptySubtitle}>
                     Farklı arama terimleri deneyin
@@ -155,16 +164,16 @@ export default function CollectionsScreen() {
 
         {/* Info Card */}
         <View style={styles.infoCard}>
-          <Ionicons name="information-circle" size={24} color={TarodanColors.info} />
+          <Ionicons name="information-circle" size={24} color={colors.info[600]!} />
           <View style={styles.infoContent}>
             <Text style={styles.infoTitle}>Digital Garage Nedir?</Text>
             <Text style={styles.infoText}>
-              Koleksiyonunuzu sergileyin, diğer koleksiyonerleri keşfedin ve ilham alın. 
+              Koleksiyonunuzu sergileyin, diğer koleksiyonerleri keşfedin ve ilham alın.
               Premium üyeler kendi garajlarını oluşturabilir.
             </Text>
             <TouchableOpacity style={styles.infoButton} onPress={() => router.push('/(auth)/register')}>
               <Text style={styles.infoButtonText}>Premium Üye Ol</Text>
-              <Ionicons name="arrow-forward" size={16} color={TarodanColors.primary} />
+              <Ionicons name="arrow-forward" size={16} color={colors.primary[600]!} />
             </TouchableOpacity>
           </View>
         </View>
@@ -178,10 +187,10 @@ export default function CollectionsScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: TarodanColors.backgroundSecondary,
+    backgroundColor: colors.surface.alt,
   },
   header: {
-    backgroundColor: TarodanColors.primary,
+    backgroundColor: colors.primary[600]!,
     paddingTop: 50,
     paddingBottom: 16,
     paddingHorizontal: 20,
@@ -192,34 +201,20 @@ const styles = StyleSheet.create({
   headerTitle: {
     fontSize: 18,
     fontWeight: 'bold',
-    color: TarodanColors.textOnPrimary,
+    color: colors.white,
   },
   searchSection: {
     padding: 16,
-    backgroundColor: TarodanColors.background,
-  },
-  searchBar: {
-    backgroundColor: TarodanColors.surfaceVariant,
-    elevation: 0,
-    borderRadius: 12,
+    backgroundColor: colors.surface.DEFAULT,
   },
   filterRow: {
     flexDirection: 'row',
     paddingHorizontal: 16,
     paddingVertical: 12,
-    backgroundColor: TarodanColors.background,
+    backgroundColor: colors.surface.DEFAULT,
     borderBottomWidth: 1,
-    borderBottomColor: TarodanColors.border,
+    borderBottomColor: colors.border.DEFAULT,
     gap: 8,
-  },
-  filterChip: {
-    backgroundColor: TarodanColors.surfaceVariant,
-  },
-  filterChipActive: {
-    backgroundColor: TarodanColors.primary,
-  },
-  filterChipTextActive: {
-    color: '#fff',
   },
   content: {
     flex: 1,
@@ -236,24 +231,77 @@ const styles = StyleSheet.create({
   sectionTitle: {
     fontSize: 18,
     fontWeight: 'bold',
-    color: TarodanColors.textPrimary,
+    color: colors.text.heading,
     marginBottom: 16,
   },
   seeAll: {
     fontSize: 14,
-    color: TarodanColors.primary,
+    color: colors.primary[600]!,
     fontWeight: '500',
+  },
+  garageCard: {
+    backgroundColor: colors.surface.DEFAULT,
+    borderRadius: 16,
+    padding: 16,
+    marginRight: 12,
+    width: 160,
+    alignItems: 'center',
+    shadowColor: colors.black,
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 2,
+  },
+  garageHeader: {
+    position: 'relative',
+  },
+  verifiedBadge: {
+    position: 'absolute',
+    bottom: 0,
+    right: -4,
+    backgroundColor: colors.surface.DEFAULT,
+    borderRadius: 10,
+  },
+  garageName: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: colors.text.heading,
+    marginTop: 12,
+  },
+  garageStats: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginTop: 4,
+  },
+  garageStatText: {
+    fontSize: 12,
+    color: colors.text.muted,
+  },
+  garageStatDot: {
+    marginHorizontal: 4,
+    color: colors.text.muted,
+  },
+  garageLikes: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginTop: 8,
+    gap: 4,
+  },
+  garageLikesText: {
+    fontSize: 13,
+    fontWeight: '600',
+    color: colors.text.heading,
   },
   collectionRow: {
     justifyContent: 'space-between',
   },
   collectionCard: {
     width: (width - 48) / 2,
-    backgroundColor: TarodanColors.background,
+    backgroundColor: colors.surface.DEFAULT,
     borderRadius: 12,
     marginBottom: 16,
     overflow: 'hidden',
-    shadowColor: '#000',
+    shadowColor: colors.black,
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.1,
     shadowRadius: 4,
@@ -269,7 +317,7 @@ const styles = StyleSheet.create({
     left: 0,
     right: 0,
     height: 120,
-    backgroundColor: 'rgba(0,0,0,0.2)',
+    backgroundColor: colors.overlay.black20,
     justifyContent: 'flex-end',
     padding: 8,
   },
@@ -284,7 +332,7 @@ const styles = StyleSheet.create({
   },
   collectionStatText: {
     fontSize: 12,
-    color: '#fff',
+    color: colors.white,
     fontWeight: '600',
   },
   collectionInfo: {
@@ -293,12 +341,12 @@ const styles = StyleSheet.create({
   collectionName: {
     fontSize: 14,
     fontWeight: '600',
-    color: TarodanColors.textPrimary,
+    color: colors.text.heading,
     marginBottom: 4,
   },
   collectionDescription: {
     fontSize: 12,
-    color: TarodanColors.textSecondary,
+    color: colors.text.muted,
     marginBottom: 8,
     lineHeight: 16,
   },
@@ -309,7 +357,7 @@ const styles = StyleSheet.create({
   },
   ownerName: {
     fontSize: 12,
-    color: TarodanColors.textSecondary,
+    color: colors.text.muted,
   },
   emptyContainer: {
     alignItems: 'center',
@@ -318,17 +366,17 @@ const styles = StyleSheet.create({
   emptyTitle: {
     fontSize: 18,
     fontWeight: 'bold',
-    color: TarodanColors.textPrimary,
+    color: colors.text.heading,
     marginTop: 16,
   },
   emptySubtitle: {
     fontSize: 14,
-    color: TarodanColors.textSecondary,
+    color: colors.text.muted,
     marginTop: 8,
   },
   infoCard: {
     flexDirection: 'row',
-    backgroundColor: '#E3F2FD',
+    backgroundColor: colors.info[50]!,
     marginHorizontal: 16,
     borderRadius: 12,
     padding: 16,
@@ -340,11 +388,11 @@ const styles = StyleSheet.create({
   infoTitle: {
     fontSize: 14,
     fontWeight: '600',
-    color: TarodanColors.info,
+    color: colors.info[600]!,
   },
   infoText: {
     fontSize: 13,
-    color: '#1565C0',
+    color: colors.info[800]!,
     marginTop: 4,
     lineHeight: 18,
   },
@@ -357,6 +405,6 @@ const styles = StyleSheet.create({
   infoButtonText: {
     fontSize: 14,
     fontWeight: '600',
-    color: TarodanColors.primary,
+    color: colors.primary[600]!,
   },
 });

@@ -1,0 +1,17 @@
+# Profil → Takaslarım → ilk takas kartını aç.
+# Pre-req: kullanıcı login + en az bir takas seed'li.
+appId: com.tarodan.app
+---
+- tapOn:
+    text: "Profil"
+- extendedWaitUntil:
+    visible:
+      id: "profile-trades-link"
+    timeout: 15000
+- tapOn:
+    id: "profile-trades-link"
+- waitForAnimationToEnd
+- extendedWaitUntil:
+    visible:
+      text: ".*Takas.*|.*takas.*"
+    timeout: 30000

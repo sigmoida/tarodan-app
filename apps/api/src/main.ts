@@ -19,9 +19,30 @@ import { AppModule } from './app.module';
 import { NestExpressApplication } from '@nestjs/platform-express';
 import { json, urlencoded } from 'express';
 
+/**
+ * Hard guard: PAYMENT_BYPASS allows completing payments without going through
+ * PayTR — useful for dev/test, catastrophic in production. If both flags
+ * are on at the same time, refuse to start so a misconfiguration cannot
+ * silently leak free orders/memberships.
+ */
+function assertPaymentBypassNotInProduction(logger: Logger): void {
+  const isProduction = process.env.NODE_ENV === 'production';
+  const bypassEnabled = process.env.PAYMENT_BYPASS === 'true';
+  if (isProduction && bypassEnabled) {
+    logger.error(
+      'FATAL: PAYMENT_BYPASS=true cannot be set when NODE_ENV=production. ' +
+        'This would let clients complete payments without provider charge. ' +
+        'Set PAYMENT_BYPASS=false (or unset) in the production environment.',
+    );
+    process.exit(1);
+  }
+}
+
 async function bootstrap() {
   const logger = new Logger('Bootstrap');
   try {
+    assertPaymentBypassNotInProduction(logger);
+
     // IMPORTANT: Disable default body parser so custom parsers work for payment callbacks
     const app = await NestFactory.create<NestExpressApplication>(AppModule, {
       bodyParser: false, // Disable default parser
@@ -96,7 +117,8 @@ async function bootstrap() {
     SwaggerModule.setup('api/docs', app, document);
 
     const port = process.env.PORT || 3000;
-    await app.listen(port);
+    // 0.0.0.0 — telefonun LAN IP üzerinden erişebilmesi için tüm arayüzleri dinle.
+    await app.listen(port, '0.0.0.0');
     logger.log(`Application running on port ${port}`);
     logger.log(`Swagger docs available at http://localhost:${port}/api/docs`);
   } catch (error) {

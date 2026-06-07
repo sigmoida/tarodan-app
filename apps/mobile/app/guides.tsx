@@ -1,9 +1,11 @@
 import { useState } from 'react';
 import { View, ScrollView, StyleSheet, TouchableOpacity } from 'react-native';
-import { Text } from 'react-native-paper';
 import { router } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
-import { TarodanColors } from '../src/theme';
+import { theme, Text } from '@tarodan/ui-native';
+import { useTranslation } from '../src/i18n';
+
+const { colors } = theme;
 
 const GUIDES = [
   {
@@ -91,15 +93,16 @@ const GUIDES = [
 ];
 
 export default function GuidesScreen() {
+  const { t } = useTranslation();
   const [expandedIndex, setExpandedIndex] = useState<number | null>(0);
 
   return (
     <View style={styles.container}>
       <View style={styles.header}>
         <TouchableOpacity onPress={() => router.back()}>
-          <Ionicons name="arrow-back" size={24} color={TarodanColors.textOnPrimary} />
+          <Ionicons name="arrow-back" size={24} color={colors.white} />
         </TouchableOpacity>
-        <Text style={styles.headerTitle}>Rehberler</Text>
+        <Text style={styles.headerTitle}>{t('mobile.pageGuides')}</Text>
         <View style={{ width: 24 }} />
       </View>
 
@@ -119,14 +122,14 @@ export default function GuidesScreen() {
               >
                 <View style={styles.guideHeaderLeft}>
                   <View style={styles.guideIconContainer}>
-                    <Ionicons name={guide.icon} size={24} color={TarodanColors.primary} />
+                    <Ionicons name={guide.icon} size={24} color={colors.primary[600]!} />
                   </View>
                   <Text style={styles.guideTitle}>{guide.title}</Text>
                 </View>
                 <Ionicons
                   name={isExpanded ? 'chevron-up' : 'chevron-down'}
                   size={20}
-                  color={TarodanColors.textSecondary}
+                  color={colors.text.muted}
                 />
               </TouchableOpacity>
 
@@ -155,10 +158,10 @@ export default function GuidesScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: TarodanColors.background,
+    backgroundColor: colors.surface.DEFAULT,
   },
   header: {
-    backgroundColor: TarodanColors.primary,
+    backgroundColor: colors.primary[600]!,
     paddingTop: 50,
     paddingBottom: 16,
     paddingHorizontal: 20,
@@ -169,7 +172,7 @@ const styles = StyleSheet.create({
   headerTitle: {
     fontSize: 18,
     fontWeight: 'bold',
-    color: TarodanColors.textOnPrimary,
+    color: colors.white,
   },
   content: {
     flex: 1,
@@ -177,12 +180,12 @@ const styles = StyleSheet.create({
   },
   intro: {
     fontSize: 14,
-    color: TarodanColors.textSecondary,
+    color: colors.text.muted,
     lineHeight: 22,
     marginBottom: 20,
   },
   guideCard: {
-    backgroundColor: TarodanColors.backgroundSecondary,
+    backgroundColor: colors.surface.alt,
     borderRadius: 12,
     marginBottom: 12,
     overflow: 'hidden',
@@ -202,7 +205,7 @@ const styles = StyleSheet.create({
     width: 40,
     height: 40,
     borderRadius: 20,
-    backgroundColor: TarodanColors.primaryLight,
+    backgroundColor: colors.primary[50]!,
     justifyContent: 'center',
     alignItems: 'center',
     marginRight: 12,
@@ -210,14 +213,14 @@ const styles = StyleSheet.create({
   guideTitle: {
     fontSize: 15,
     fontWeight: '600',
-    color: TarodanColors.textPrimary,
+    color: colors.text.heading,
     flex: 1,
   },
   guideContent: {
     paddingHorizontal: 16,
     paddingBottom: 16,
     borderTopWidth: 1,
-    borderTopColor: TarodanColors.border,
+    borderTopColor: colors.border.DEFAULT,
     paddingTop: 12,
   },
   stepRow: {
@@ -229,7 +232,7 @@ const styles = StyleSheet.create({
     width: 24,
     height: 24,
     borderRadius: 12,
-    backgroundColor: TarodanColors.primary,
+    backgroundColor: colors.primary[600]!,
     justifyContent: 'center',
     alignItems: 'center',
     marginRight: 10,
@@ -238,12 +241,12 @@ const styles = StyleSheet.create({
   stepNumberText: {
     fontSize: 12,
     fontWeight: 'bold',
-    color: TarodanColors.textOnPrimary,
+    color: colors.white,
   },
   stepText: {
     flex: 1,
     fontSize: 13,
-    color: TarodanColors.textSecondary,
+    color: colors.text.muted,
     lineHeight: 20,
   },
 });

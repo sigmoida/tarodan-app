@@ -1,11 +1,12 @@
 import React from 'react';
 import { View, StyleSheet, TouchableOpacity } from 'react-native';
-import { Text, Card, Button, IconButton } from 'react-native-paper';
 import { Ionicons } from '@expo/vector-icons';
 import { router } from 'expo-router';
-import { TarodanColors } from '../theme';
+import { theme, Text, Card, Button, IconButton } from '@tarodan/ui-native';
 
-type PromptType = 
+const { colors } = theme;
+
+type PromptType =
   | 'listingLimit'
   | 'tradeFeature'
   | 'collectionFeature'
@@ -64,9 +65,9 @@ const PROMPT_CONFIG: Record<PromptType, {
   },
 };
 
-export default function UpgradePrompt({ 
-  type, 
-  onDismiss, 
+export default function UpgradePrompt({
+  type,
+  onDismiss,
   dismissable = true,
   compact = false,
 }: UpgradePromptProps) {
@@ -74,75 +75,73 @@ export default function UpgradePrompt({
 
   if (compact) {
     return (
-      <TouchableOpacity 
+      <TouchableOpacity
         style={styles.compactContainer}
         onPress={() => router.push('/upgrade')}
       >
-        <Ionicons name={config.icon as any} size={18} color={TarodanColors.primary} />
+        <Ionicons name={config.icon as any} size={18} color={colors.primary[600]!} />
         <Text style={styles.compactText}>{config.benefit}</Text>
-        <Ionicons name="chevron-forward" size={18} color={TarodanColors.primary} />
+        <Ionicons name="chevron-forward" size={18} color={colors.primary[600]!} />
       </TouchableOpacity>
     );
   }
 
   return (
     <Card style={styles.card}>
-      <Card.Content>
-        {dismissable && onDismiss && (
-          <IconButton
-            icon="close"
-            size={20}
-            style={styles.closeButton}
-            onPress={onDismiss}
-          />
-        )}
-        
-        <View style={styles.iconContainer}>
-          <View style={styles.iconCircle}>
-            <Ionicons name={config.icon as any} size={32} color={TarodanColors.primary} />
-          </View>
+      {dismissable && onDismiss && (
+        <IconButton
+          icon="close"
+          size="sm"
+          accessibilityLabel="Kapat"
+          style={styles.closeButton}
+          onPress={onDismiss}
+        />
+      )}
+
+      <View style={styles.iconContainer}>
+        <View style={styles.iconCircle}>
+          <Ionicons name={config.icon as any} size={32} color={colors.primary[600]!} />
         </View>
+      </View>
 
-        <Text variant="titleMedium" style={styles.title}>{config.title}</Text>
-        <Text variant="bodyMedium" style={styles.message}>{config.message}</Text>
-        
-        <View style={styles.benefitContainer}>
-          <Ionicons name="diamond" size={18} color={TarodanColors.primary} />
-          <Text style={styles.benefitText}>{config.benefit}</Text>
+      <Text style={styles.title}>{config.title}</Text>
+      <Text style={styles.message}>{config.message}</Text>
+
+      <View style={styles.benefitContainer}>
+        <Ionicons name="diamond" size={18} color={colors.primary[600]!} />
+        <Text style={styles.benefitText}>{config.benefit}</Text>
+      </View>
+
+      <View style={styles.features}>
+        <Text style={styles.featuresTitle}>Premium ile:</Text>
+        <View style={styles.featureRow}>
+          <Ionicons name="checkmark" size={16} color={colors.success[600]!} />
+          <Text style={styles.featureText}>Sınırsız ilan</Text>
         </View>
-
-        <View style={styles.features}>
-          <Text variant="bodySmall" style={styles.featuresTitle}>Premium ile:</Text>
-          <View style={styles.featureRow}>
-            <Ionicons name="checkmark" size={16} color={TarodanColors.success} />
-            <Text style={styles.featureText}>Sınırsız ilan</Text>
-          </View>
-          <View style={styles.featureRow}>
-            <Ionicons name="checkmark" size={16} color={TarodanColors.success} />
-            <Text style={styles.featureText}>Takas özelliği</Text>
-          </View>
-          <View style={styles.featureRow}>
-            <Ionicons name="checkmark" size={16} color={TarodanColors.success} />
-            <Text style={styles.featureText}>Dijital Garaj</Text>
-          </View>
-          <View style={styles.featureRow}>
-            <Ionicons name="checkmark" size={16} color={TarodanColors.success} />
-            <Text style={styles.featureText}>Reklamsız deneyim</Text>
-          </View>
+        <View style={styles.featureRow}>
+          <Ionicons name="checkmark" size={16} color={colors.success[600]!} />
+          <Text style={styles.featureText}>Takas özelliği</Text>
         </View>
+        <View style={styles.featureRow}>
+          <Ionicons name="checkmark" size={16} color={colors.success[600]!} />
+          <Text style={styles.featureText}>Dijital Garaj</Text>
+        </View>
+        <View style={styles.featureRow}>
+          <Ionicons name="checkmark" size={16} color={colors.success[600]!} />
+          <Text style={styles.featureText}>Reklamsız deneyim</Text>
+        </View>
+      </View>
 
-        <Button 
-          mode="contained" 
-          onPress={() => router.push('/upgrade')}
-          style={styles.upgradeButton}
-        >
-          Premium'a Geç - 99 TL/ay
-        </Button>
+      <Button
+        variant="primary"
+        title="Premium'a Geç - 99 TL/ay"
+        onPress={() => router.push('/upgrade')}
+        style={styles.upgradeButton}
+      />
 
-        <Text style={styles.priceNote}>
-          Yıllık planda 2 ay bedava!
-        </Text>
-      </Card.Content>
+      <Text style={styles.priceNote}>
+        Yıllık planda 2 ay bedava!
+      </Text>
     </Card>
   );
 }
@@ -150,9 +149,9 @@ export default function UpgradePrompt({
 const styles = StyleSheet.create({
   card: {
     margin: 16,
-    backgroundColor: TarodanColors.background,
+    backgroundColor: colors.surface.DEFAULT,
     borderWidth: 1,
-    borderColor: TarodanColors.primary + '30',
+    borderColor: colors.border.DEFAULT,
   },
   closeButton: {
     position: 'absolute',
@@ -167,40 +166,44 @@ const styles = StyleSheet.create({
     width: 64,
     height: 64,
     borderRadius: 32,
-    backgroundColor: TarodanColors.primary + '15',
+    backgroundColor: colors.primary[50]!,
     justifyContent: 'center',
     alignItems: 'center',
   },
   title: {
     textAlign: 'center',
     marginBottom: 8,
-    color: TarodanColors.textPrimary,
+    color: colors.text.heading,
+    fontSize: 16,
+    fontWeight: '600',
   },
   message: {
     textAlign: 'center',
-    color: TarodanColors.textSecondary,
+    color: colors.text.muted,
     marginBottom: 16,
+    fontSize: 14,
   },
   benefitContainer: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: TarodanColors.primary + '10',
+    backgroundColor: colors.primary[50]!,
     padding: 12,
     borderRadius: 8,
     marginBottom: 16,
   },
   benefitText: {
     marginLeft: 8,
-    color: TarodanColors.primary,
+    color: colors.primary[600]!,
     fontWeight: '600',
   },
   features: {
     marginBottom: 16,
   },
   featuresTitle: {
-    color: TarodanColors.textSecondary,
+    color: colors.text.muted,
     marginBottom: 8,
+    fontSize: 12,
   },
   featureRow: {
     flexDirection: 'row',
@@ -209,23 +212,23 @@ const styles = StyleSheet.create({
   },
   featureText: {
     marginLeft: 8,
-    color: TarodanColors.textPrimary,
+    color: colors.text.heading,
     fontSize: 13,
   },
   upgradeButton: {
-    backgroundColor: TarodanColors.primary,
+    backgroundColor: colors.primary[600]!,
   },
   priceNote: {
     textAlign: 'center',
     marginTop: 8,
-    color: TarodanColors.success,
+    color: colors.success[600]!,
     fontSize: 12,
     fontWeight: '500',
   },
   compactContainer: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: TarodanColors.primary + '10',
+    backgroundColor: colors.primary[50]!,
     padding: 12,
     borderRadius: 8,
     margin: 16,
@@ -233,7 +236,7 @@ const styles = StyleSheet.create({
   },
   compactText: {
     flex: 1,
-    color: TarodanColors.primary,
+    color: colors.primary[600]!,
     fontWeight: '500',
     fontSize: 13,
   },

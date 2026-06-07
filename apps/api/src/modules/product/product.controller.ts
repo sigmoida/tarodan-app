@@ -99,14 +99,30 @@ export class ProductController {
 
   /**
    * GET /products/filters
-   * Get dynamic filters (categories, brands, scales, manufacturers)
+   * Get dynamic filters (categories, brands, scales, manufacturers).
+   * Optional ?manufacturer=<slug> adds manufacturer-scoped attribute groups
+   * (e.g. Hot Wheels Segment/Assortment/Wheel Type/etc.) to customAttributes.
    */
   @Get('filters')
   @Public()
   @ApiOperation({ summary: 'Filtre seçenekleri (Categoriler, Markalar, vb.)' })
   @ApiResponse({ status: 200, description: 'Filtre listeleri' })
-  async getFilters() {
-    return this.productService.getFilters();
+  async getFilters(@Query('manufacturer') manufacturer?: string) {
+    return this.productService.getFilters(manufacturer);
+  }
+
+  /**
+   * GET /products/attribute-groups?manufacturer=<slug>
+   * Returns attribute groups (with attributes) applicable to the given manufacturer.
+   * Always includes global groups (manufacturerSlug=null) PLUS manufacturer-scoped groups.
+   * Used by listing creation forms to render conditional fields.
+   */
+  @Get('attribute-groups')
+  @Public()
+  @ApiOperation({ summary: 'Manufacturer-aware attribute group listesi (form için)' })
+  @ApiResponse({ status: 200, description: 'Form alan grupları' })
+  async getAttributeGroups(@Query('manufacturer') manufacturer?: string) {
+    return this.productService.getAttributeGroupsForManufacturer(manufacturer);
   }
 
   /**
@@ -264,6 +280,26 @@ export class ProductController {
     })) id: string,
   ) {
     return this.productService.findOne(id);
+  }
+
+  /**
+   * GET /products/:id/similar
+   * Aynı kategoriden, aktif ve stoklu ürünler. Stockout sonrası
+   * "alternatif ürünler" sayfası tarafından kullanılır.
+   */
+  @Get(':id/similar')
+  @Public()
+  @ApiOperation({ summary: 'Benzer ürünler (aynı kategori, aktif)' })
+  @ApiParam({ name: 'id', description: 'Product ID (UUID)' })
+  async getSimilar(
+    @Param('id', new ParseUUIDPipe({
+      errorHttpStatusCode: 400,
+      exceptionFactory: () => new BadRequestException('Geçersiz ürün ID formatı'),
+    })) id: string,
+    @Query('limit') limit?: string,
+  ) {
+    const n = limit ? Math.min(parseInt(limit, 10) || 12, 24) : 12;
+    return this.productService.findSimilarProducts(id, n);
   }
 
   /**

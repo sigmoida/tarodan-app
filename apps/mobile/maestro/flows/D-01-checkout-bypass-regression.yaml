@@ -1,0 +1,51 @@
+# D-01: Checkout girişi smoke.
+# Login → Ara → ilk ürün → Sepete Ekle → Sepete Git → Satın Al → Teslimat Bilgileri.
+#
+# NOT (BUG-007 düzeltmesi): App sepet-tabanlı bir akış kullanıyor; eski "Hemen Al"
+# direkt-al butonu yok. Doğru zincir: product-detail-add-to-cart-button →
+# Sepete Git → cart-checkout-button → checkout (Teslimat Bilgileri).
+# Tam bypass payment chain API-level test'te kapsanıyor
+# (apps/api/test/e2e/payment-bypass.e2e-spec.ts).
+appId: com.tarodan.app
+tags:
+  - smoke
+env:
+  EMAIL: zeynep@demo.com
+  PASSWORD: Demo123!
+---
+- runFlow: ../subflows/open-tarodan.yaml
+- tapOn:
+    text: "Ara"
+- extendedWaitUntil:
+    visible:
+      text: ".*sonuç bulundu.*|.*₺.*"
+    timeout: 30000
+- tapOn:
+    text: ".*₺.*"
+    index: 0
+# Ürün detay → Sepete Ekle
+- extendedWaitUntil:
+    visible:
+      id: "product-detail-add-to-cart-button"
+    timeout: 20000
+- tapOn:
+    id: "product-detail-add-to-cart-button"
+# Sepete Git (snackbar aksiyonu) → cart
+- tapOn:
+    text: "Sepete Git"
+    optional: true
+# Cart → Satın Al → checkout
+- extendedWaitUntil:
+    visible:
+      id: "cart-checkout-button"
+    timeout: 15000
+- tapOn:
+    id: "cart-checkout-button"
+# Checkout Step 1 — Teslimat Bilgileri yüklendi
+- extendedWaitUntil:
+    visible: "Teslimat Bilgileri"
+    timeout: 15000
+- assertVisible: "Teslimat Bilgileri"
+- assertVisible: "Teslimat Adresi"
+- assertNotVisible: ".*Network Error.*"
+- assertNotVisible: ".*Bir hata oluştu.*"

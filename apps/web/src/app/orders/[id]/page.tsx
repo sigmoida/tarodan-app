@@ -15,6 +15,7 @@ import {
   mediaApi,
   supportApi,
 } from "@/lib/api";
+import RefundRequestModal from "@/components/RefundRequestModal";
 import {
   ArrowLeftIcon,
   TruckIcon,
@@ -33,7 +34,6 @@ import CityDistrictSelector from "@/components/CityDistrictSelector";
 import UserAvatar from "@/components/UserAvatar";
 import {
   Button,
-  Checkbox,
   Input,
   Modal,
   Radio,
@@ -109,6 +109,17 @@ interface OrderDetail {
     status: string;
     cost?: number;
   };
+  activeRefundRequest?: {
+    id: string;
+    refundNumber: string;
+    status: string;
+    reason?: string;
+    returnTrackingNumber?: string | null;
+    returnProvider?: string | null;
+    returnStatus?: string | null;
+    createdAt: string;
+    refundedAt?: string | null;
+  } | null;
   isBuyer: boolean;
   isSeller: boolean;
   hasProductRating?: boolean;
@@ -153,7 +164,6 @@ export default function OrderDetailPage() {
   const [downloadingInvoice, setDownloadingInvoice] = useState(false);
   const [paymentLoading, setPaymentLoading] = useState(false);
   const [reactivateLoading, setReactivateLoading] = useState(false);
-  const [cardError, setCardError] = useState<string | null>(null);
   const [addressLoading, setAddressLoading] = useState(false);
   const [savedAddresses, setSavedAddresses] = useState<any[]>([]);
   const [selectedAddressId, setSelectedAddressId] = useState<string | null>(
@@ -170,27 +180,6 @@ export default function OrderDetailPage() {
     zipCode: "",
   });
 
-  // Card states (mirrors checkout)
-  const [savedCards, setSavedCards] = useState<
-    Array<{
-      id: string;
-      cardBrand: string;
-      lastFour: string;
-      expiryMonth: number;
-      expiryYear: number;
-      isDefault?: boolean;
-    }>
-  >([]);
-  const [selectedSavedCard, setSelectedSavedCard] = useState<string | null>(
-    null,
-  );
-  const [useNewCard, setUseNewCard] = useState(false);
-  const [cardName, setCardName] = useState("");
-  const [cardNumber, setCardNumber] = useState("");
-  const [cardExpiry, setCardExpiry] = useState("");
-  const [cardCvc, setCardCvc] = useState("");
-  const [saveCard, setSaveCard] = useState(false);
-  const [cardsFetched, setCardsFetched] = useState(false);
 
   const [showReviewModal, setShowReviewModal] = useState(false);
   const [reviewScore, setReviewScore] = useState(5);
@@ -392,27 +381,9 @@ export default function OrderDetailPage() {
         });
     }
 
-    if (!cardsFetched) {
-      api
-        .get("/payments/methods")
-        .then((res) => {
-          const cards = res.data?.methods || res.data || [];
-          setSavedCards(cards);
-          const defaultCard = cards.find((c: any) => c.isDefault);
-          if (defaultCard) setSelectedSavedCard(defaultCard.id);
-          else if (cards.length > 0) setSelectedSavedCard(cards[0].id);
-          if (cards.length === 0) setUseNewCard(true);
-          setCardsFetched(true);
-        })
-        .catch(() => {
-          setUseNewCard(true);
-          setCardsFetched(true);
-        });
-    }
   }, [
     isPendingPaymentBuyer,
     addressesFetched,
-    cardsFetched,
     hasShippingAddress,
     order,
   ]);
@@ -523,19 +494,6 @@ export default function OrderDetailPage() {
 
       // PayTR mode: redirect
       if (data?.paymentUrl) {
-        // Save card before redirecting
-        if (saveCard && useNewCard && cardNumber && cardExpiry) {
-          try {
-            const [month, year] = cardExpiry.split("/");
-            await api.post("/payments/methods", {
-              cardNumber: cardNumber.replace(/\s/g, ""),
-              cardHolder: cardName,
-              expiryMonth: parseInt(month),
-              expiryYear: parseInt("20" + year),
-              cvv: cardCvc,
-            });
-          } catch {}
-        }
         window.location.href = data.paymentUrl;
         return;
       }
@@ -589,94 +547,28 @@ export default function OrderDetailPage() {
   };
 
   const handleRefund = () => {
-    setRefundReason(
-      locale === "en" ? "Damaged/defective item" : "Hasarlı/kusurlu ürün geldi",
-    );
-    setRefundDescription("");
-    setRefundImages([]);
-    setRefundImagePreviews([]);
+    if (!order) return;
+    if (order.status === "pending_payment") {
+      toast(
+        locale === "en"
+          ? "This order is not paid; cancel it instead"
+          : "Bu sipariş henüz ödenmemiş, iptal etmelisiniz",
+      );
+      return;
+    }
     setShowRefundModal(true);
   };
-  const handleRefundImageAdd = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const files = Array.from(e.target.files || []);
-    const remaining = 5 - refundImages.length;
-    const newFiles = files.slice(0, remaining);
-    if (newFiles.length === 0) return;
-    setRefundImages((prev) => [...prev, ...newFiles]);
-    newFiles.forEach((file) => {
-      const reader = new FileReader();
-      reader.onload = (ev) =>
-        setRefundImagePreviews((prev) => [
-          ...prev,
-          ev.target?.result as string,
-        ]);
-      reader.readAsDataURL(file);
-    });
-    e.target.value = "";
-  };
-  const removeRefundImage = (index: number) => {
-    setRefundImages((prev) => prev.filter((_, i) => i !== index));
-    setRefundImagePreviews((prev) => prev.filter((_, i) => i !== index));
-  };
-  // Satıcı henüz kargoya vermediyse (ödeme alındı / hazırlanıyor) iade anında iptal+iade
-  // olarak işlenebilir. Kargoya verildikten sonra kanıt fotoğraflı talep gerekir.
-  const sellerNotShippedYet =
-    order?.status === "paid" || order?.status === "preparing";
 
-  const submitReturnRequest = async () => {
-    if (!order || submittingRefund) return;
-    setSubmittingRefund(true);
-    try {
-      const reasonText =
-        refundReason + (refundDescription ? ` — ${refundDescription}` : "");
-
-      // Satıcı kargoya vermediyse → mevcut iptal/iade akışı (anında iade).
-      if (sellerNotShippedYet) {
-        await api.post(`/orders/${order.id}/cancel`, { reason: reasonText });
-        toast.success(
-          locale === "en"
-            ? "Your return was processed and a refund has been started."
-            : "İadeniz işleme alındı; iade süreci başlatıldı.",
-        );
-        setShowRefundModal(false);
-        await invalidateOrder();
-        return;
-      }
-
-      // Kargoya verildikten sonra: kanıt fotoğraflı iade talebi (doğrudan yükleme).
-      let imageUrls: string[] = [];
-      if (refundImages.length > 0) {
-        const results = await Promise.all(
-          refundImages.map((file) => mediaApi.uploadReviewImage(file)),
-        );
-        imageUrls = results
-          .map((r) => r.data?.url)
-          .filter(Boolean) as string[];
-      }
-      const orderNo = order.orderNumber || order.id;
-      await supportApi.createTicket({
-        subject:
-          (locale === "en" ? "Return request - " : "İade Talebi - ") + orderNo,
-        category: "product",
-        message:
-          (locale === "en" ? "Return reason: " : "İade sebebi: ") + reasonText,
-        orderId: order.id,
-        attachments: imageUrls.length > 0 ? imageUrls : undefined,
-      });
-      toast.success(
-        locale === "en"
-          ? "Your return request has been submitted."
-          : "İade talebiniz oluşturuldu.",
-      );
-      setShowRefundModal(false);
-    } catch (error: any) {
-      toast.error(
-        error?.response?.data?.message ||
-          (locale === "en" ? "Operation failed" : "İşlem başarısız"),
-      );
-    } finally {
-      setSubmittingRefund(false);
+  const inferRefundPhase = (): "preparing" | "in_cooling_off" | "past_cooling_off" => {
+    if (!order) return "preparing";
+    const shipmentStatus = order.shipment?.status;
+    if (
+      (order.status === "paid" || order.status === "preparing") &&
+      (!shipmentStatus || shipmentStatus === "pending")
+    ) {
+      return "preparing";
     }
+    return "in_cooling_off";
   };
 
   const handleReactivate = async () => {
@@ -897,69 +789,236 @@ export default function OrderDetailPage() {
               </div>
             </div>
 
-            {/* Shipping Info */}
-            {order.shipment && (
-              <div className="bg-surface-elevated rounded-xl shadow-sm p-6">
-                <h2 className="text-lg font-semibold text-heading mb-4 flex items-center gap-2">
-                  <TruckIcon className="w-5 h-5" />
-                  {locale === "en" ? "Shipping Information" : "Kargo Bilgileri"}
-                </h2>
-                <div className="space-y-3">
-                  <div className="flex justify-between">
-                    <span className="text-muted">
-                      {locale === "en" ? "Carrier:" : "Kargo Firması:"}
-                    </span>
-                    <span className="font-medium capitalize">
-                      {order.shipment.provider === "surat" ? "Sürat Kargo" : order.shipment.provider}
+            {/* Active Refund Request Banner */}
+            {order.activeRefundRequest && (() => {
+              const rr = order.activeRefundRequest;
+              const isRefunded = rr.status === "refunded";
+              const isReturnReady =
+                rr.status === "return_shipment_open" && !!rr.returnTrackingNumber;
+              const labelMap: Record<string, { tr: string; en: string }> = {
+                pending_review: { tr: "Talep İnceleniyor", en: "Under Review" },
+                approved: { tr: "Onaylandı, İşleniyor", en: "Approved, Processing" },
+                wait_for_delivery: {
+                  tr: "Ürün Tesliminden Sonra İade Açılacak",
+                  en: "Awaiting Delivery",
+                },
+                return_shipment_open: {
+                  tr: "İade Kargonuz Hazır",
+                  en: "Return Shipment Ready",
+                },
+                return_in_transit: {
+                  tr: "İade Yolda",
+                  en: "Return In Transit",
+                },
+                return_delivered: {
+                  tr: "Satıcıya Ulaştı, Para İadesi Yapılıyor",
+                  en: "Delivered, Refund Processing",
+                },
+                refunded: { tr: "İade Tamamlandı", en: "Refunded" },
+                disputed: { tr: "İtirazlı (İnceleniyor)", en: "Under Dispute" },
+              };
+              const lbl = labelMap[rr.status] ?? { tr: rr.status, en: rr.status };
+              return (
+                <div
+                  className={`rounded-xl shadow-sm p-6 border-2 ${
+                    isRefunded
+                      ? "bg-success-50 border-success-200"
+                      : "bg-info-50 border-info-200"
+                  }`}
+                >
+                  <div className="flex items-start justify-between gap-3 mb-3">
+                    <div>
+                      <h2
+                        className={`text-lg font-semibold flex items-center gap-2 ${
+                          isRefunded ? "text-success-800" : "text-info-800"
+                        }`}
+                      >
+                        <ArrowUturnLeftIcon className="w-5 h-5" />
+                        {locale === "en" ? "Refund Request" : "İade Talebi"}
+                      </h2>
+                      <p className="text-sm text-muted mt-1">
+                        {rr.refundNumber} ·{" "}
+                        {new Date(rr.createdAt).toLocaleDateString(
+                          locale === "en" ? "en-US" : "tr-TR",
+                        )}
+                      </p>
+                    </div>
+                    <span
+                      className={`inline-flex items-center px-3 py-1 rounded-full text-sm font-medium border ${
+                        isRefunded
+                          ? "bg-success-100 text-success-800 border-success-300"
+                          : "bg-info-100 text-info-800 border-info-300"
+                      }`}
+                    >
+                      {locale === "en" ? lbl.en : lbl.tr}
                     </span>
                   </div>
-                  {order.shipment.trackingNumber ? (
-                    <div className="flex justify-between items-center">
-                      <span className="text-muted">
-                        {locale === "en" ? "Tracking Number:" : "Takip Numarası:"}
-                      </span>
-                      <span className="font-mono bg-surface-alt px-2 py-1 rounded">
-                        {order.shipment.trackingNumber}
-                      </span>
-                    </div>
-                  ) : (
-                    <div className="bg-info-50 border border-info-200 rounded-lg p-3 text-sm text-info-700">
-                      {locale === "en"
-                        ? "The tracking number will appear here once the seller drops the package at the cargo branch."
-                        : "Takip numarası, satıcı paketinizi kargo şubesine teslim ettiğinde burada görünecektir."}
+
+                  {isReturnReady && (
+                    <div className="bg-surface-elevated rounded-lg p-4 mb-3">
+                      <p className="text-sm text-body mb-2">
+                        {locale === "en"
+                          ? "Drop the package off at any Sürat branch with this number:"
+                          : "Bu numarayı paketle birlikte herhangi bir Sürat şubesine bırakın:"}
+                      </p>
+                      <div className="flex items-center justify-between gap-3">
+                        <span className="font-mono text-lg font-bold text-heading break-all">
+                          {rr.returnTrackingNumber}
+                        </span>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            navigator.clipboard.writeText(rr.returnTrackingNumber!);
+                            toast.success(locale === "en" ? "Copied" : "Kopyalandı");
+                          }}
+                          className="text-sm text-primary-600 hover:text-primary-700 font-medium"
+                        >
+                          {locale === "en" ? "Copy" : "Kopyala"}
+                        </button>
+                      </div>
                     </div>
                   )}
-                  <div className="flex justify-between">
-                    <span className="text-muted">
-                      {locale === "en" ? "Shipping Status:" : "Kargo Durumu:"}
-                    </span>
-                    <span className="font-medium">{order.shipment.status}</span>
-                  </div>
-                  {order.isBuyer && order.shipment.trackingNumber && (
-                    <div className="flex flex-col sm:flex-row gap-2 mt-3">
-                      {order.shipment.provider === "surat" && (
-                        <a
-                          href={`https://www.suratkargo.com.tr/KargoTakip/?kargotakipno=${encodeURIComponent(order.shipment.trackingNumber)}`}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          className="inline-flex items-center justify-center gap-2 px-4 py-2 bg-primary-600 hover:bg-primary-700 text-inverted rounded-lg text-sm font-medium transition-colors"
-                        >
-                          <TruckIcon className="w-4 h-4" />
-                          {locale === "en" ? "Track on Sürat" : "Sürat'ta Takip Et"}
-                        </a>
+
+                  {rr.returnProvider === "surat" && rr.returnTrackingNumber && (
+                    <a
+                      href={`https://www.suratkargo.com.tr/KargoTakip/?kargotakipno=${encodeURIComponent(rr.returnTrackingNumber)}`}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="inline-flex items-center gap-1 text-sm text-primary-600 hover:text-primary-700 font-medium mr-4"
+                    >
+                      <TruckIcon className="w-4 h-4" />
+                      {locale === "en" ? "Track on Sürat" : "Sürat'ta Takip Et"}
+                    </a>
+                  )}
+
+                  <Link
+                    href={`/refund-requests/${rr.id}`}
+                    className="inline-flex items-center gap-1 text-sm text-primary-600 hover:text-primary-700 font-medium"
+                  >
+                    {locale === "en" ? "View Details →" : "Detayı Gör →"}
+                  </Link>
+                </div>
+              );
+            })()}
+
+            {/* Shipping Info — alıcı için her zaman, satıcı için yalnızca kargo gerçekten
+                yola çıktıktan sonra (pending durumunda satıcının zaten 'Kargo Referans Numarası'
+                kartı var, çift bilgi olmasın) */}
+            {order.shipment && (() => {
+              const s = order.shipment.status;
+              const isPending = s === "pending";
+              const isCancelled = s === "cancelled" || s === "failed";
+              const isShippedActive =
+                s === "label_created" ||
+                s === "picked_up" ||
+                s === "in_transit" ||
+                s === "at_delivery_branch" ||
+                s === "out_for_delivery";
+              const isDelivered = s === "delivered";
+
+              // Satıcı için pending durumunda kartı tamamen gizle —
+              // 'Kargo Referans Numarası' aksiyon kartı zaten görünüyor
+              if (isPending && order.isSeller && !order.isBuyer) {
+                return null;
+              }
+
+              const statusLabelMap: Record<string, { tr: string; en: string }> = {
+                pending: { tr: "Satıcı Hazırlıyor", en: "Preparing" },
+                label_created: { tr: "Kargo Etiketi Oluşturuldu", en: "Label Created" },
+                picked_up: { tr: "Şubeye Teslim Edildi", en: "Picked Up" },
+                in_transit: { tr: "Yolda", en: "In Transit" },
+                at_delivery_branch: { tr: "Dağıtım Şubesinde", en: "At Delivery Branch" },
+                out_for_delivery: { tr: "Dağıtıma Çıktı", en: "Out For Delivery" },
+                delivered: { tr: "Teslim Edildi", en: "Delivered" },
+                failed: { tr: "Teslim Edilemedi", en: "Failed" },
+                return_in_progress: { tr: "İade Yolda", en: "Return In Progress" },
+                returned: { tr: "İade Tamamlandı", en: "Returned" },
+                cancelled: { tr: "İptal Edildi", en: "Cancelled" },
+              };
+              const statusLbl = statusLabelMap[s] ?? { tr: s, en: s };
+
+              return (
+                <div className="bg-surface-elevated rounded-xl shadow-sm p-6">
+                  <h2 className="text-lg font-semibold text-heading mb-4 flex items-center gap-2">
+                    <TruckIcon className="w-5 h-5" />
+                    {locale === "en" ? "Shipping Information" : "Kargo Bilgileri"}
+                  </h2>
+
+                  {isPending && order.isBuyer && (
+                    <div className="bg-info-50 border border-info-200 rounded-lg p-4 text-sm text-info-800">
+                      {locale === "en"
+                        ? "The seller is preparing your package. Tracking details will appear here once it's handed over to Sürat."
+                        : "Satıcı paketinizi hazırlıyor. Sürat şubesine teslim edildiği anda takip bilgileri burada görünecek."}
+                    </div>
+                  )}
+
+                  {isCancelled && (
+                    <div className="bg-danger-50 border border-danger-200 rounded-lg p-4 text-sm text-danger-800">
+                      {locale === "en"
+                        ? "This shipment has been cancelled."
+                        : "Bu kargo iptal edildi."}
+                    </div>
+                  )}
+
+                  {(isShippedActive || isDelivered) && (
+                    <div className="space-y-3">
+                      <div className="flex justify-between">
+                        <span className="text-muted">
+                          {locale === "en" ? "Carrier:" : "Kargo Firması:"}
+                        </span>
+                        <span className="font-medium">
+                          {order.shipment.provider === "surat"
+                            ? "Sürat Kargo"
+                            : order.shipment.provider}
+                        </span>
+                      </div>
+                      {order.shipment.trackingNumber && (
+                        <div className="flex justify-between items-center">
+                          <span className="text-muted">
+                            {locale === "en" ? "Tracking Number:" : "Takip Numarası:"}
+                          </span>
+                          <span className="font-mono bg-surface-alt px-2 py-1 rounded text-sm">
+                            {order.shipment.trackingNumber}
+                          </span>
+                        </div>
                       )}
-                      <Link
-                        href={`/track-order?orderNumber=${encodeURIComponent(order.orderNumber)}&email=${encodeURIComponent(user?.email || "")}`}
-                        className="inline-flex items-center justify-center gap-2 px-4 py-2 bg-info-600 hover:bg-info-700 text-inverted rounded-lg text-sm font-medium transition-colors"
-                      >
-                        <TruckIcon className="w-4 h-4" />
-                        {locale === "en" ? "Track on Tarodan" : "Tarodan'da Takip Et"}
-                      </Link>
+                      <div className="flex justify-between">
+                        <span className="text-muted">
+                          {locale === "en" ? "Status:" : "Durum:"}
+                        </span>
+                        <span
+                          className={`font-medium ${isDelivered ? "text-success-700" : "text-info-700"}`}
+                        >
+                          {locale === "en" ? statusLbl.en : statusLbl.tr}
+                        </span>
+                      </div>
+                      {order.isBuyer && order.shipment.trackingNumber && (
+                        <div className="flex flex-col sm:flex-row gap-2 mt-3 pt-3 border-t border-border-default">
+                          {order.shipment.provider === "surat" && (
+                            <a
+                              href={`https://www.suratkargo.com.tr/KargoTakip/?kargotakipno=${encodeURIComponent(order.shipment.trackingNumber)}`}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="inline-flex items-center justify-center gap-2 px-4 py-2 bg-primary-600 hover:bg-primary-700 text-inverted rounded-lg text-sm font-medium transition-colors"
+                            >
+                              <TruckIcon className="w-4 h-4" />
+                              {locale === "en" ? "Track on Sürat" : "Sürat'ta Takip Et"}
+                            </a>
+                          )}
+                          <Link
+                            href={`/track-order?orderNumber=${encodeURIComponent(order.orderNumber)}&email=${encodeURIComponent(user?.email || "")}`}
+                            className="inline-flex items-center justify-center gap-2 px-4 py-2 bg-info-600 hover:bg-info-700 text-inverted rounded-lg text-sm font-medium transition-colors"
+                          >
+                            <TruckIcon className="w-4 h-4" />
+                            {locale === "en" ? "Track on Tarodan" : "Tarodan'da Takip Et"}
+                          </Link>
+                        </div>
+                      )}
                     </div>
                   )}
                 </div>
-              </div>
-            )}
+              );
+            })()}
 
             {/* Shipping Address - sadece ödeme bekleyen alıcı değilse göster (alıcı için adres ödeme kartının içinde) */}
             {order.shippingAddress &&
@@ -1060,13 +1119,6 @@ export default function OrderDetailPage() {
                 </div>
 
                 <div className="p-6 space-y-6">
-                  {cardError && (
-                    <div className="flex items-center gap-2 p-3 bg-danger-50 border border-danger-200 rounded-lg text-sm text-danger-700">
-                      <span aria-hidden>!</span>
-                      {cardError}
-                    </div>
-                  )}
-
                   {/* Section 1: Teslimat Adresi - kayıtlı adreslerden seç veya yeni adres ekle (normal ödeme gibi) */}
                   <div>
                     <div className="flex items-center gap-2 mb-3">
@@ -1248,230 +1300,27 @@ export default function OrderDetailPage() {
                     )}
                   </div>
 
-                  {/* Section 2: Card Information */}
+                  {/* Section 2: Secure payment via PayTR (kart bilgileri PayTR sayfasında alınır) */}
                   <div>
                     <div className="flex items-center gap-2 mb-3">
                       <span className="flex items-center justify-center w-6 h-6 rounded-full bg-primary-100 text-primary-700 text-xs font-bold">
                         2
                       </span>
                       <h3 className="font-semibold text-heading flex items-center gap-2">
-                        <CreditCardIcon className="w-5 h-5 text-primary-500" />
+                        <ShieldCheckIcon className="w-5 h-5 text-success-500" />
                         {locale === "en"
-                          ? "Card Information"
-                          : "Kart Bilgileri"}
+                          ? "Secure Payment"
+                          : "Güvenli Ödeme"}
                       </h3>
                     </div>
 
-                    <div className="p-4 bg-surface border border-border rounded-lg">
-                      {/* Saved Cards */}
-                      {savedCards.length > 0 && (
-                        <div className="mb-4">
-                          <p className="text-sm font-medium text-body mb-3">
-                            {locale === "en"
-                              ? "My Saved Cards"
-                              : "Kayıtlı Kartlarım"}
-                          </p>
-                          <div className="space-y-2">
-                            {savedCards.map((card) => (
-                              <label
-                                key={card.id}
-                                className={`flex items-center gap-3 p-3 border-2 rounded-lg cursor-pointer transition-all ${
-                                  !useNewCard && selectedSavedCard === card.id
-                                    ? "border-primary-500 bg-primary-50"
-                                    : "border-border hover:border-border"
-                                }`}
-                              >
-                                <Radio
-                                  name="savedCard"
-                                  checked={
-                                    !useNewCard && selectedSavedCard === card.id
-                                  }
-                                  onChange={() => {
-                                    setSelectedSavedCard(card.id);
-                                    setUseNewCard(false);
-                                  }}
-                                  className="text-primary-500"
-                                />
-                                <div className="flex-1">
-                                  <p className="font-medium text-heading">
-                                    {card.cardBrand} •••• {card.lastFour}
-                                  </p>
-                                  <p className="text-sm text-muted">
-                                    {card.expiryMonth
-                                      .toString()
-                                      .padStart(2, "0")}
-                                    /{card.expiryYear}
-                                  </p>
-                                </div>
-                                {card.isDefault && (
-                                  <span className="text-xs px-2 py-1 bg-primary-100 text-primary-700 rounded-sm">
-                                    {locale === "en" ? "Default" : "Varsayılan"}
-                                  </span>
-                                )}
-                              </label>
-                            ))}
-
-                            {/* New Card Option */}
-                            <label
-                              className={`flex items-center gap-3 p-3 border-2 rounded-lg cursor-pointer transition-all ${
-                                useNewCard
-                                  ? "border-primary-500 bg-primary-50"
-                                  : "border-border hover:border-border"
-                              }`}
-                            >
-                              <Radio
-                                name="savedCard"
-                                checked={useNewCard}
-                                onChange={() => setUseNewCard(true)}
-                                className="text-primary-500"
-                              />
-                              <div className="flex items-center gap-2">
-                                <PlusIcon className="w-5 h-5 text-muted" />
-                                <span className="font-medium text-heading">
-                                  {locale === "en"
-                                    ? "Pay with New Card"
-                                    : "Yeni Kart ile Öde"}
-                                </span>
-                              </div>
-                            </label>
-                          </div>
-                        </div>
-                      )}
-
-                      {/* New Card Form */}
-                      {(savedCards.length === 0 || useNewCard) && (
-                        <div className="space-y-4">
-                          <div>
-                            <label className="block text-sm font-medium text-body mb-1">
-                              {locale === "en"
-                                ? "Name on Card"
-                                : "Kart Üzerindeki İsim"}
-                            </label>
-                            <Input
-                              type="text"
-                              value={cardName}
-                              onChange={(e) =>
-                                setCardName(e.target.value.toUpperCase())
-                              }
-                              placeholder="AD SOYAD"
-                              className="h-12 px-4"
-                            />
-                          </div>
-                          <div>
-                            <label className="block text-sm font-medium text-body mb-1">
-                              {locale === "en"
-                                ? "Card Number"
-                                : "Kart Numarası"}
-                            </label>
-                            <Input
-                              type="text"
-                              value={cardNumber}
-                              onChange={(e) => {
-                                setCardError(null);
-                                const value = e.target.value
-                                  .replace(/\D/g, "")
-                                  .slice(0, 16);
-                                const formatted = value.replace(
-                                  /(\d{4})(?=\d)/g,
-                                  "$1 ",
-                                );
-                                setCardNumber(formatted);
-                              }}
-                              placeholder="4508 3456 7890 1234"
-                              className="h-12 px-4 font-mono"
-                            />
-                          </div>
-                          <div className="grid grid-cols-2 gap-4">
-                            <div>
-                              <label className="block text-sm font-medium text-body mb-1">
-                                {locale === "en"
-                                  ? "Expiry Date"
-                                  : "Son Kullanma Tarihi"}
-                              </label>
-                              <Input
-                                type="text"
-                                value={cardExpiry}
-                                onChange={(e) => {
-                                  const value = e.target.value
-                                    .replace(/\D/g, "")
-                                    .slice(0, 4);
-                                  if (value.length >= 2) {
-                                    setCardExpiry(
-                                      value.slice(0, 2) + "/" + value.slice(2),
-                                    );
-                                  } else {
-                                    setCardExpiry(value);
-                                  }
-                                }}
-                                placeholder="AA/YY"
-                                maxLength={5}
-                                className="h-12 px-4 font-mono"
-                              />
-                            </div>
-                            <div>
-                              <label className="block text-sm font-medium text-body mb-1">
-                                CVV/CVC
-                              </label>
-                              <Input
-                                type="password"
-                                value={cardCvc}
-                                onChange={(e) =>
-                                  setCardCvc(
-                                    e.target.value
-                                      .replace(/\D/g, "")
-                                      .slice(0, 3),
-                                  )
-                                }
-                                placeholder="•••"
-                                maxLength={3}
-                                className="h-12 px-4 font-mono"
-                              />
-                            </div>
-                          </div>
-
-                          <Checkbox
-                            checked={saveCard}
-                            onChange={(e) => setSaveCard(e.target.checked)}
-                            label={
-                              locale === "en"
-                                ? "Save this card for future purchases"
-                                : "Bu kartı gelecekteki alışverişlerim için kaydet"
-                            }
-                          />
-                        </div>
-                      )}
-
-                      {/* CVV for saved card */}
-                      {!useNewCard && selectedSavedCard && (
-                        <div className="mt-4">
-                          <label className="block text-sm font-medium text-body mb-1">
-                            CVV/CVC (
-                            {locale === "en"
-                              ? "Re-enter for security"
-                              : "Güvenlik için tekrar girin"}
-                            )
-                          </label>
-                          <Input
-                            type="password"
-                            value={cardCvc}
-                            onChange={(e) =>
-                              setCardCvc(
-                                e.target.value.replace(/\D/g, "").slice(0, 3),
-                              )
-                            }
-                            placeholder="•••"
-                            maxLength={3}
-                            className="w-32 h-12 px-4 font-mono"
-                          />
-                        </div>
-                      )}
-
-                      <div className="mt-4 flex items-center gap-2 text-xs text-muted">
-                        <ShieldCheckIcon className="w-4 h-4 text-success-500" />
+                    <div className="p-4 bg-surface border border-border rounded-lg flex items-start gap-3">
+                      <ShieldCheckIcon className="w-5 h-5 text-success-500 mt-0.5 flex-shrink-0" />
+                      <p className="text-sm text-muted">
                         {locale === "en"
-                          ? "256-bit SSL encrypted secure payment"
-                          : "256-bit SSL ile şifrelenmiş güvenli ödeme"}
-                      </div>
+                          ? "You will be redirected to the PayTR secure payment page to enter your card details. Your card information is never stored on our servers."
+                          : "Kart bilgilerinizi girmek için PayTR güvenli ödeme sayfasına yönlendirileceksiniz. Kart bilgileriniz sunucularımızda saklanmaz."}
+                      </p>
                     </div>
                   </div>
 
@@ -1551,7 +1400,10 @@ export default function OrderDetailPage() {
             {/* Refund Button for Completed Payments - Only buyer can request refund */}
             {order.payment &&
               order.payment.status === "completed" &&
-              order.isBuyer && (
+              order.isBuyer &&
+              order.status !== "cancelled" &&
+              order.status !== "refunded" &&
+              !order.activeRefundRequest && (
                 <div className="bg-surface-elevated rounded-xl shadow-sm p-6">
                   <h2 className="text-lg font-semibold text-heading mb-4">
                     {locale === "en" ? "Refund" : "İade İşlemi"}
@@ -1806,13 +1658,14 @@ export default function OrderDetailPage() {
                     ? "Report Order Issue"
                     : "Sipariş Sorunu Bildir"}
                 </Button>
-                <Button
-                  variant="secondary"
-                  onClick={handleRefund}
-                  className="w-full text-left px-4 py-2 text-muted hover:bg-surface rounded-lg transition-colors"
+                <Link
+                  href="/refund-requests"
+                  className="block w-full text-left px-4 py-2 text-muted hover:bg-surface rounded-lg transition-colors"
                 >
-                  {locale === "en" ? "Request Refund" : "İade Talebi Oluştur"}
-                </Button>
+                  {locale === "en"
+                    ? "My Refund Requests"
+                    : "İade Taleplerim"}
+                </Link>
                 <Link
                   href="/support"
                   className="block w-full text-left px-4 py-2 text-muted hover:bg-surface rounded-lg transition-colors"
@@ -2086,139 +1939,18 @@ export default function OrderDetailPage() {
           </div>
         </Modal>
 
-        {/* İade Talebi Modal */}
-        <Modal
-          isOpen={showRefundModal && !!order}
-          onClose={() => setShowRefundModal(false)}
-          title={locale === "en" ? "Create Return Request" : "İade Talebi Oluştur"}
-          maxWidth="max-w-lg"
-        >
-          {order && (
-            <div className="space-y-4">
-              <div className="text-sm text-muted">
-                {locale === "en" ? "Order" : "Sipariş"}:{" "}
-                <span className="font-medium text-heading">
-                  {order.orderNumber || order.id}
-                </span>
-              </div>
-
-              <div className="bg-info-50 border border-info-200 rounded-lg p-3 text-sm text-info-800">
-                {sellerNotShippedYet
-                  ? locale === "en"
-                    ? "The seller hasn't shipped yet — your return will be processed instantly and refunded."
-                    : "Satıcı henüz kargoya vermedi — iadeniz anında işlenip ücretiniz iade edilecek."
-                  : locale === "en"
-                    ? "Add photos of the issue so we can process your request faster."
-                    : "Talebinizi daha hızlı sonuçlandırabilmemiz için sorunun fotoğraflarını ekleyin."}
-              </div>
-
-              <div>
-                <label className="block text-sm font-medium text-body mb-1">
-                  {locale === "en" ? "Reason" : "Sebep"}
-                </label>
-                <Select
-                  value={refundReason}
-                  onChange={(e) => setRefundReason(e.target.value)}
-                  options={
-                    locale === "en"
-                      ? [
-                          { value: "Damaged/defective item", label: "Damaged/defective item" },
-                          { value: "Wrong item received", label: "Wrong item received" },
-                          { value: "Item not as described", label: "Item not as described" },
-                          { value: "Changed my mind (right of withdrawal)", label: "Changed my mind (right of withdrawal)" },
-                          { value: "Other", label: "Other" },
-                        ]
-                      : [
-                          { value: "Hasarlı/kusurlu ürün geldi", label: "Hasarlı/kusurlu ürün geldi" },
-                          { value: "Yanlış ürün geldi", label: "Yanlış ürün geldi" },
-                          { value: "Ürün açıklamayla uyuşmuyor", label: "Ürün açıklamayla uyuşmuyor" },
-                          { value: "Cayma hakkı (fikrimi değiştirdim)", label: "Cayma hakkı (fikrimi değiştirdim)" },
-                          { value: "Diğer", label: "Diğer" },
-                        ]
-                  }
-                />
-              </div>
-
-              <div>
-                <label className="block text-sm font-medium text-body mb-1">
-                  {locale === "en" ? "Description" : "Açıklama"}
-                </label>
-                <Textarea
-                  value={refundDescription}
-                  onChange={(e) => setRefundDescription(e.target.value)}
-                  placeholder={locale === "en" ? "Optional" : "Opsiyonel"}
-                  rows={3}
-                  className="px-4"
-                  maxLength={1000}
-                />
-              </div>
-
-              {/* Doğrudan fotoğraf yükleme — sadece kargoya verildikten sonra (kanıt için) */}
-              {!sellerNotShippedYet && (
-              <div>
-                <label className="block text-sm font-medium text-body mb-1">
-                  {locale === "en"
-                    ? "Evidence photos (optional, max 5)"
-                    : "Kanıt fotoğrafları (opsiyonel, maks 5)"}
-                </label>
-                <div className="flex flex-wrap gap-2">
-                  {refundImagePreviews.map((src, idx) => (
-                    <div
-                      key={idx}
-                      className="relative w-16 h-16 rounded-lg overflow-hidden border border-border"
-                    >
-                      <img src={src} alt="" className="w-full h-full object-cover" />
-                      <Button
-                        variant="secondary"
-                        type="button"
-                        onClick={() => removeRefundImage(idx)}
-                        className="absolute top-0 right-0 bg-danger-500 text-inverted rounded-bl-lg w-5 h-5 flex items-center justify-center text-xs"
-                      >
-                        ×
-                      </Button>
-                    </div>
-                  ))}
-                  {refundImages.length < 5 && (
-                    <label className="w-16 h-16 border-2 border-dashed flex items-center justify-center cursor-pointer hover:border-primary-400 rounded-lg">
-                      <span className="text-2xl text-subtle">+</span>
-                      <Input
-                        type="file"
-                        accept="image/*"
-                        onChange={handleRefundImageAdd}
-                        className="hidden"
-                      />
-                    </label>
-                  )}
-                </div>
-              </div>
-              )}
-
-              <div className="flex gap-3 pt-2">
-                <Button
-                  variant="secondary"
-                  size="md"
-                  className="flex-1"
-                  onClick={() => setShowRefundModal(false)}
-                >
-                  {t("common.cancel")}
-                </Button>
-                <Button
-                  variant="primary"
-                  size="md"
-                  className="flex-1"
-                  onClick={submitReturnRequest}
-                  disabled={submittingRefund || !refundReason}
-                >
-                  {submittingRefund
-                    ? t("common.sending")
-                    : locale === "en"
-                      ? "Create Request"
-                      : "Talep Oluştur"}
-                </Button>
-              </div>
-            </div>
-          )}
-        </Modal>
+        {order && (
+          <RefundRequestModal
+            isOpen={showRefundModal}
+            onClose={() => setShowRefundModal(false)}
+            orderId={order.id}
+            orderNumber={order.orderNumber}
+            phase={inferRefundPhase()}
+            onSuccess={() => {
+              queryClient.invalidateQueries({ queryKey: ["order", orderId] });
+            }}
+          />
+        )}
       </main>
     </div>
   );

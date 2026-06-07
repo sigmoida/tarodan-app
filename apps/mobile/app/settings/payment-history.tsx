@@ -14,7 +14,7 @@ import { router, useFocusEffect } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { TarodanColors } from '../../src/theme';
 import { useAuthStore } from '../../src/stores/authStore';
-import { api, membershipApi } from '../../src/services/api';
+import { api, paymentsApi } from '../../src/services/api';
 
 interface Payment {
   id: string;
@@ -65,8 +65,10 @@ export default function PaymentHistoryScreen() {
         const res = await api.get('/payments/history');
         data = res.data?.data || res.data || [];
       } catch {
-        const res = await membershipApi.getBillingHistory();
-        data = res.data?.data || res.data || [];
+        // Backend'de membership/billing-history endpoint'i yok; web ile aynı: paymentsApi.getMyPayments
+        const res = await paymentsApi.getMyPayments({ limit: 50 });
+        const raw: any = res.data;
+        data = raw?.payments || raw?.data || raw || [];
       }
       setPayments(data);
     } catch (err: any) {

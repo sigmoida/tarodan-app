@@ -72,6 +72,7 @@ model User {
   wishlist                Wishlist?
   bankAccount             SellerBankAccount?
   payoutTransfers         PayoutTransfer[]         @relation("SellerPayoutTransfers")
+  refundRequests          RefundRequest[]          @relation("UserRefundRequests")
 
   @@index([email])
   @@index([isSeller])
@@ -405,6 +406,10 @@ model Product {
   qualityScore        Int                @default(0) @map("quality_score")
   rankTier            Int                @default(0) @map("rank_tier")
   relevanceScore      Int?               @map("relevance_score")
+  /// Denormalized concat of title + description + attribute display values.
+  /// Maintained by Postgres triggers; never write directly from application code.
+  /// Used for full-text search via the GIN index `products_search_text_fts_idx`.
+  searchText          String?            @map("search_text")
   cartItems           CartItem[]
   collectionItems     CollectionItem[]
   offers              Offer[]
@@ -507,6 +512,18 @@ model Trade {
   completedAt          DateTime?         @map("completed_at")
   cancelledAt          DateTime?         @map("cancelled_at")
   cancelReason         String?           @map("cancel_reason")
+  // Stamped when the first to_warehouse shipment is delivered. Once non-null,
+  // user-side cancel is locked: only admin reject/force-cancel can resolve.
+  firstWarehouseArrivalAt DateTime?      @map("first_warehouse_arrival_at")
+  cancelLockedAt       DateTime?         @map("cancel_locked_at")
+  // Populated when an admin reject's PayTR refund fails. Surfaced in admin UI
+  // so the operator can retry the refund.
+  refundFailureReason  String?           @map("refund_failure_reason")
+  refundFailureAt      DateTime?         @map("refund_failure_at")
+  // Flag set when an admin marks a return shipment lost and the affected user
+  // is owed manual compensation. Cleared by admin after settling out of band.
+  compensationPendingUserId String?       @map("compensation_pending_user_id")
+  compensationResolvedAt    DateTime?     @map("compensation_resolved_at")
   createdAt            DateTime          @default(now()) @map("created_at")
   updatedAt            DateTime          @updatedAt @map("updated_at")
   version              Int               @default(1)
@@ -553,6 +570,10 @@ model TradeShipment {
   shippedAt       DateTime?            @map("shipped_at")
   deliveredAt     DateTime?            @map("delivered_at")
   confirmedAt     DateTime?            @map("confirmed_at")
+  // Admin-set when a shipment is declared lost (typically a return leg that
+  // never arrived). Drives compensation flow on the parent trade.
+  lostAt          DateTime?            @map("lost_at")
+  lostReason      String?              @map("lost_reason")
   // Escrow: which leg of the journey this shipment represents
   leg             String               @default("to_warehouse")
   // Recipient of this shipment: null = warehouse, else initiator or receiver user id
@@ -583,23 +604,23 @@ model TradeShipmentEvent {
 }
 
 model TradeCashPayment {
-  id                String        @id @default(uuid())
-  tradeId           String        @unique @map("trade_id")
-  payerId           String        @map("payer_id")
-  recipientId       String        @map("recipient_id")
-  amount            Decimal       @db.Decimal(10, 2)
-  commission        Decimal       @db.Decimal(10, 2)
-  totalAmount       Decimal       @map("total_amount") @db.Decimal(10, 2)
+  id                String           @id @default(uuid())
+  tradeId           String           @unique @map("trade_id")
+  payerId           String           @map("payer_id")
+  recipientId       String           @map("recipient_id")
+  amount            Decimal          @db.Decimal(10, 2)
+  commission        Decimal          @db.Decimal(10, 2)
+  totalAmount       Decimal          @map("total_amount") @db.Decimal(10, 2)
   provider          String
-  providerPaymentId String?       @map("provider_payment_id")
-  status            PaymentStatus @default(pending)
-  paidAt            DateTime?     @map("paid_at")
+  providerPaymentId String?          @map("provider_payment_id")
+  status            PaymentStatus    @default(pending)
+  paidAt            DateTime?        @map("paid_at")
   // Escrow hold: set when trade completes; released when holdReleaseAt passes
-  holdReleaseAt     DateTime?     @map("hold_release_at")
-  releasedAt        DateTime?     @map("released_at")
-  refundedAt        DateTime?     @map("refunded_at")
-  createdAt         DateTime      @default(now()) @map("created_at")
-  updatedAt         DateTime      @updatedAt @map("updated_at")
+  holdReleaseAt     DateTime?        @map("hold_release_at")
+  releasedAt        DateTime?        @map("released_at")
+  refundedAt        DateTime?        @map("refunded_at")
+  createdAt         DateTime         @default(now()) @map("created_at")
+  updatedAt         DateTime         @updatedAt @map("updated_at")
   trade             Trade            @relation(fields: [tradeId], references: [id], onDelete: Cascade)
   payment           Payment?
   payoutTransfers   PayoutTransfer[] @relation("TradeCashPayoutTransfers")
@@ -788,23 +809,23 @@ model Collection {
 }
 
 model CollectionItem {
-  id                String     @id @default(uuid())
-  collectionId      String     @map("collection_id")
-  productId         String?    @map("product_id")
-  sortOrder         Int        @default(0) @map("sort_order")
-  isFeatured        Boolean    @default(false) @map("is_featured")
-  addedAt           DateTime   @default(now()) @map("added_at")
-  customBrand         String?    @map("custom_brand")
-  customDescription   String?    @map("custom_description")
-  customImageUrl      String?    @map("custom_image_url")
-  customModel         String?    @map("custom_model")
-  customScale         String?    @map("custom_scale")
-  customTitle         String?    @map("custom_title")
-  customYear          Int?       @map("custom_year")
-  customManufacturer  String?    @map("custom_manufacturer")
-  customMaterial      String?    @map("custom_material")
-  collection        Collection @relation(fields: [collectionId], references: [id], onDelete: Cascade)
-  product           Product?   @relation(fields: [productId], references: [id], onDelete: Cascade)
+  id                 String     @id @default(uuid())
+  collectionId       String     @map("collection_id")
+  productId          String?    @map("product_id")
+  sortOrder          Int        @default(0) @map("sort_order")
+  isFeatured         Boolean    @default(false) @map("is_featured")
+  addedAt            DateTime   @default(now()) @map("added_at")
+  customBrand        String?    @map("custom_brand")
+  customDescription  String?    @map("custom_description")
+  customImageUrl     String?    @map("custom_image_url")
+  customModel        String?    @map("custom_model")
+  customScale        String?    @map("custom_scale")
+  customTitle        String?    @map("custom_title")
+  customYear         Int?       @map("custom_year")
+  customManufacturer String?    @map("custom_manufacturer")
+  customMaterial     String?    @map("custom_material")
+  collection         Collection @relation(fields: [collectionId], references: [id], onDelete: Cascade)
+  product            Product?   @relation(fields: [productId], references: [id], onDelete: Cascade)
 
   @@unique([collectionId, productId])
   @@index([collectionId])
@@ -857,19 +878,21 @@ model ProductTag {
 }
 
 model AttributeGroup {
-  id          String      @id @default(uuid())
-  name        String      @unique
-  slug        String      @unique
-  description String?
-  isRequired  Boolean     @default(false) @map("is_required")
-  isActive    Boolean     @default(true) @map("is_active")
-  sortOrder   Int         @default(0) @map("sort_order")
-  createdAt   DateTime    @default(now()) @map("created_at")
-  updatedAt   DateTime    @updatedAt @map("updated_at")
-  attributes  Attribute[]
+  id               String      @id @default(uuid())
+  name             String      @unique
+  slug             String      @unique
+  description      String?
+  isRequired       Boolean     @default(false) @map("is_required")
+  isActive         Boolean     @default(true) @map("is_active")
+  sortOrder        Int         @default(0) @map("sort_order")
+  manufacturerSlug String?     @map("manufacturer_slug")
+  createdAt        DateTime    @default(now()) @map("created_at")
+  updatedAt        DateTime    @updatedAt @map("updated_at")
+  attributes       Attribute[]
 
   @@index([isActive])
   @@index([sortOrder])
+  @@index([manufacturerSlug])
   @@map("attribute_groups")
 }
 
@@ -948,24 +971,24 @@ model TicketMessage {
 }
 
 model Offer {
-  id        String      @id @default(uuid())
-  productId String      @map("product_id")
-  buyerId   String      @map("buyer_id")
-  sellerId  String      @map("seller_id")
-  amount    Decimal     @db.Decimal(10, 2)
-  message   String?
-  status    OfferStatus @default(pending)
+  id              String      @id @default(uuid())
+  productId       String      @map("product_id")
+  buyerId         String      @map("buyer_id")
+  sellerId        String      @map("seller_id")
+  amount          Decimal     @db.Decimal(10, 2)
+  message         String?
+  status          OfferStatus @default(pending)
   /// Satıcı karşı teklifinden sonra: kabul/red için sıra alıcıda (buyerId)
-  buyerMustAccept Boolean @default(false) @map("buyer_must_accept")
-  expiresAt DateTime    @map("expires_at")
-  createdAt DateTime    @default(now()) @map("created_at")
-  updatedAt DateTime    @updatedAt @map("updated_at")
-  version      Int         @default(1)
-  cancelReason String?     @map("cancel_reason")
-  buyer        User        @relation("BuyerOffers", fields: [buyerId], references: [id])
-  product      Product     @relation(fields: [productId], references: [id])
-  seller       User        @relation("SellerOffers", fields: [sellerId], references: [id])
-  order        Order?
+  buyerMustAccept Boolean     @default(false) @map("buyer_must_accept")
+  expiresAt       DateTime    @map("expires_at")
+  createdAt       DateTime    @default(now()) @map("created_at")
+  updatedAt       DateTime    @updatedAt @map("updated_at")
+  version         Int         @default(1)
+  cancelReason    String?     @map("cancel_reason")
+  buyer           User        @relation("BuyerOffers", fields: [buyerId], references: [id])
+  product         Product     @relation(fields: [productId], references: [id])
+  seller          User        @relation("SellerOffers", fields: [sellerId], references: [id])
+  order           Order?
 
   @@index([productId])
   @@index([status])
@@ -973,42 +996,75 @@ model Offer {
 }
 
 model Order {
-  id                String      @id @default(uuid())
-  orderNumber       String      @unique @map("order_number")
-  buyerId           String      @map("buyer_id")
-  sellerId          String      @map("seller_id")
-  productId         String      @map("product_id")
-  offerId           String?     @unique @map("offer_id")
-  shippingAddressId String?     @map("shipping_address_id")
-  totalAmount       Decimal     @map("total_amount") @db.Decimal(10, 2)
-  shippingCost      Decimal     @default(0) @map("shipping_cost") @db.Decimal(10, 2)
-  commissionAmount  Decimal     @map("commission_amount") @db.Decimal(10, 2)
-  status            OrderStatus @default(pending_payment)
-  shippingAddress   Json?       @map("shipping_address")
-  createdAt         DateTime    @default(now()) @map("created_at")
-  updatedAt         DateTime    @updatedAt @map("updated_at")
-  version           Int         @default(1)
-  buyerFeeAmount    Decimal     @default(0) @map("buyer_fee_amount") @db.Decimal(10, 2)
-  sellerFeeAmount   Decimal     @default(0) @map("seller_fee_amount") @db.Decimal(10, 2)
-  discountAmount    Decimal     @default(0) @map("discount_amount") @db.Decimal(10, 2)
-  discountBreakdown Json?       @map("discount_breakdown")
-  discountCode      String?     @map("discount_code")
-  subtotal          Decimal?    @db.Decimal(10, 2)
-  cancelReason             String?     @map("cancel_reason")
-  preparingDeadline        DateTime?   @map("preparing_deadline")
-  preparingWarningSentAt   DateTime?   @map("preparing_warning_sent_at")
-  invoices                 Invoice[]
-  buyer             User        @relation("BuyerOrders", fields: [buyerId], references: [id])
-  offer             Offer?      @relation(fields: [offerId], references: [id])
-  product           Product     @relation(fields: [productId], references: [id])
-  seller            User        @relation("SellerOrders", fields: [sellerId], references: [id])
-  payment           Payment?
-  shipment          Shipment?
+  id                     String          @id @default(uuid())
+  orderNumber            String          @unique @map("order_number")
+  buyerId                String          @map("buyer_id")
+  sellerId               String          @map("seller_id")
+  productId              String          @map("product_id")
+  offerId                String?         @unique @map("offer_id")
+  shippingAddressId      String?         @map("shipping_address_id")
+  totalAmount            Decimal         @map("total_amount") @db.Decimal(10, 2)
+  shippingCost           Decimal         @default(0) @map("shipping_cost") @db.Decimal(10, 2)
+  commissionAmount       Decimal         @map("commission_amount") @db.Decimal(10, 2)
+  status                 OrderStatus     @default(pending_payment)
+  shippingAddress        Json?           @map("shipping_address")
+  createdAt              DateTime        @default(now()) @map("created_at")
+  updatedAt              DateTime        @updatedAt @map("updated_at")
+  version                Int             @default(1)
+  buyerFeeAmount         Decimal         @default(0) @map("buyer_fee_amount") @db.Decimal(10, 2)
+  sellerFeeAmount        Decimal         @default(0) @map("seller_fee_amount") @db.Decimal(10, 2)
+  discountAmount         Decimal         @default(0) @map("discount_amount") @db.Decimal(10, 2)
+  discountBreakdown      Json?           @map("discount_breakdown")
+  discountCode           String?         @map("discount_code")
+  subtotal               Decimal?        @db.Decimal(10, 2)
+  cancelReason           String?         @map("cancel_reason")
+  preparingDeadline      DateTime?       @map("preparing_deadline")
+  preparingWarningSentAt DateTime?       @map("preparing_warning_sent_at")
+  reservationReleasedAt  DateTime?       @map("reservation_released_at")
+  paymentExpiresAt       DateTime        @map("payment_expires_at")
+  deliveredAt            DateTime?       @map("delivered_at")
+  confirmationDeadline   DateTime?       @map("confirmation_deadline")
+  buyerConfirmedAt       DateTime?       @map("buyer_confirmed_at")
+  buyerConfirmationType  BuyerConfirmationType? @map("buyer_confirmation_type")
+  completedAt            DateTime?       @map("completed_at")
+  invoices               Invoice[]
+  buyer                  User            @relation("BuyerOrders", fields: [buyerId], references: [id])
+  offer                  Offer?          @relation(fields: [offerId], references: [id])
+  product                Product         @relation(fields: [productId], references: [id])
+  seller                 User            @relation("SellerOrders", fields: [sellerId], references: [id])
+  payment                Payment?
+  shipment               Shipment?
+  refundRequests         RefundRequest[]
+  commissionLedger       CommissionLedger?
 
   @@index([buyerId])
   @@index([sellerId])
   @@index([status])
+  @@index([status, paymentExpiresAt])
   @@map("orders")
+}
+
+model CommissionLedger {
+  id                   String                 @id @default(uuid())
+  orderId              String                 @unique @map("order_id")
+  order                Order                  @relation(fields: [orderId], references: [id])
+
+  sellerCommission     Decimal                @map("seller_commission") @db.Decimal(10, 2)
+  buyerFee             Decimal                @map("buyer_fee") @db.Decimal(10, 2)
+  totalPlatformRevenue Decimal                @map("total_platform_revenue") @db.Decimal(10, 2)
+
+  status               CommissionLedgerStatus @default(pending)
+  earnedAt             DateTime?              @map("earned_at")
+  refundedAt           DateTime?              @map("refunded_at")
+  waivedAt             DateTime?              @map("waived_at")
+  waivedReason         String?                @map("waived_reason")
+
+  createdAt            DateTime               @default(now()) @map("created_at")
+  updatedAt            DateTime               @updatedAt @map("updated_at")
+
+  @@index([status])
+  @@index([earnedAt])
+  @@map("commission_ledger")
 }
 
 model Payment {
@@ -1035,19 +1091,19 @@ model Payment {
 }
 
 model PaymentHold {
-  id         String            @id @default(uuid())
-  paymentId  String            @unique @map("payment_id")
-  orderId    String            @map("order_id")
-  sellerId   String            @map("seller_id")
-  amount     Decimal           @db.Decimal(10, 2)
-  status     PaymentHoldStatus @default(held)
-  releaseAt  DateTime?         @map("release_at")
-  releasedAt DateTime?         @map("released_at")
-  createdAt  DateTime          @default(now()) @map("created_at")
-  updatedAt  DateTime          @updatedAt @map("updated_at")
-  payment         Payment           @relation(fields: [paymentId], references: [id])
-  seller          User              @relation(fields: [sellerId], references: [id])
-  payoutTransfer  PayoutTransfer?   @relation("HoldPayoutTransfer")
+  id             String            @id @default(uuid())
+  paymentId      String            @unique @map("payment_id")
+  orderId        String            @map("order_id")
+  sellerId       String            @map("seller_id")
+  amount         Decimal           @db.Decimal(10, 2)
+  status         PaymentHoldStatus @default(held)
+  releaseAt      DateTime?         @map("release_at")
+  releasedAt     DateTime?         @map("released_at")
+  createdAt      DateTime          @default(now()) @map("created_at")
+  updatedAt      DateTime          @updatedAt @map("updated_at")
+  payment        Payment           @relation(fields: [paymentId], references: [id])
+  seller         User              @relation(fields: [sellerId], references: [id])
+  payoutTransfer PayoutTransfer?   @relation("HoldPayoutTransfer")
 
   @@map("payment_holds")
 }
@@ -1130,26 +1186,26 @@ model Invoice {
 }
 
 model Shipment {
-  id                  String          @id @default(uuid())
-  orderId             String          @unique @map("order_id")
-  provider            String
-  trackingNumber      String?         @map("tracking_number")
-  trackingUrl         String?         @map("tracking_url")
-  labelUrl            String?         @map("label_url")
-  cost                Decimal?        @db.Decimal(10, 2)
-  status              ShipmentStatus  @default(pending)
-  estimatedDelivery   DateTime?       @map("estimated_delivery")
-  shippedAt           DateTime?       @map("shipped_at")
-  deliveredAt         DateTime?       @map("delivered_at")
-  providerTrackingId  String?         @map("provider_tracking_id")
-  providerStatusCode  Int?            @map("provider_status_code")
-  providerRawStatus   String?         @map("provider_raw_status")
-  receivedBy          String?         @map("received_by")
-  returnReason        String?         @map("return_reason")
-  createdAt           DateTime        @default(now()) @map("created_at")
-  updatedAt           DateTime        @updatedAt @map("updated_at")
-  events              ShipmentEvent[]
-  order               Order           @relation(fields: [orderId], references: [id])
+  id                 String          @id @default(uuid())
+  orderId            String          @unique @map("order_id")
+  provider           String
+  trackingNumber     String?         @map("tracking_number")
+  trackingUrl        String?         @map("tracking_url")
+  labelUrl           String?         @map("label_url")
+  cost               Decimal?        @db.Decimal(10, 2)
+  status             ShipmentStatus  @default(pending)
+  estimatedDelivery  DateTime?       @map("estimated_delivery")
+  shippedAt          DateTime?       @map("shipped_at")
+  deliveredAt        DateTime?       @map("delivered_at")
+  providerTrackingId String?         @map("provider_tracking_id")
+  providerStatusCode Int?            @map("provider_status_code")
+  providerRawStatus  String?         @map("provider_raw_status")
+  receivedBy         String?         @map("received_by")
+  returnReason       String?         @map("return_reason")
+  createdAt          DateTime        @default(now()) @map("created_at")
+  updatedAt          DateTime        @updatedAt @map("updated_at")
+  events             ShipmentEvent[]
+  order              Order           @relation(fields: [orderId], references: [id])
 
   @@map("shipments")
 }
@@ -1165,6 +1221,53 @@ model ShipmentEvent {
   shipment    Shipment @relation(fields: [shipmentId], references: [id], onDelete: Cascade)
 
   @@map("shipment_events")
+}
+
+model RefundRequest {
+  id                String              @id @default(uuid())
+  refundNumber      String              @unique @map("refund_number")
+  orderId           String              @map("order_id")
+  requesterId       String              @map("requester_id")
+  reason            RefundReason
+  description       String?
+  evidencePhotoUrls String[]            @default([]) @map("evidence_photo_urls")
+  amount            Decimal             @db.Decimal(10, 2)
+  status            RefundRequestStatus @default(pending_review)
+
+  sellerResponse String?   @map("seller_response")
+  decidedBy      String?   @map("decided_by")
+  decidedAt      DateTime? @map("decided_at")
+
+  returnProvider       String?         @map("return_provider")
+  returnTrackingNumber String?         @map("return_tracking_number")
+  returnStatus         ShipmentStatus? @map("return_status")
+  returnShippedAt      DateTime?       @map("return_shipped_at")
+  returnDeliveredAt    DateTime?       @map("return_delivered_at")
+  returnCreatedAt      DateTime?       @map("return_created_at")
+
+  refundedAt       DateTime? @map("refunded_at")
+  providerRefundId String?   @map("provider_refund_id")
+
+  refundProductAmount    Boolean              @default(true)  @map("refund_product_amount")
+  refundShippingFee      Boolean              @default(true)  @map("refund_shipping_fee")
+  refundBuyerFee         Boolean              @default(true)  @map("refund_buyer_fee")
+  refundSellerCommission Boolean              @default(true)  @map("refund_seller_commission")
+  returnShippingPayer    ReturnShippingPayer?                 @map("return_shipping_payer")
+  buyerInitiatedAmicable Boolean              @default(false) @map("buyer_initiated_amicable")
+
+  metadata Json?
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  order     Order @relation(fields: [orderId], references: [id])
+  requester User  @relation("UserRefundRequests", fields: [requesterId], references: [id])
+
+  @@index([orderId])
+  @@index([requesterId])
+  @@index([status])
+  @@index([refundNumber])
+  @@map("refund_requests")
 }
 
 model CommissionRule {
@@ -1753,6 +1856,7 @@ enum OrderStatus {
   preparing
   shipped
   delivered
+  awaiting_buyer_confirmation
   completed
   cancelled
   refund_requested
@@ -1793,6 +1897,36 @@ enum ShipmentStatus {
   failed
   return_in_progress
   returned
+  cancelled
+}
+
+enum RefundReason {
+  changed_mind
+  damaged
+  wrong_item
+  not_as_described
+  missing_parts
+  counterfeit
+  lost_in_transit
+  other
+}
+
+enum ReturnShippingPayer {
+  buyer
+  seller
+  platform
+}
+
+enum RefundRequestStatus {
+  pending_review
+  approved
+  wait_for_delivery
+  return_shipment_open
+  return_in_transit
+  return_delivered
+  refunded
+  rejected
+  disputed
   cancelled
 }
 
@@ -1936,4 +2070,17 @@ enum AdPosition {
   footer
   inline
   popup
+}
+
+enum CommissionLedgerStatus {
+  pending
+  earned
+  refunded
+  waived
+}
+
+enum BuyerConfirmationType {
+  manual_ok
+  auto_timeout
+  admin_force
 }

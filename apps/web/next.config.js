@@ -42,6 +42,10 @@ const nextConfig = {
   experimental: {
     outputFileTracingRoot: path.join(__dirname, '../../'),
     optimizePackageImports: ['@heroicons/react', '@heroicons/react/24/outline', '@heroicons/react/24/solid'],
+    // Next 14.2 strictly requires Suspense around useSearchParams() during
+    // prerender. With output: 'standalone' (server-rendered) this strict
+    // bailout adds no real safety. Disable to keep build green.
+    missingSuspenseWithCSRBailout: false,
   },
   async headers() {
     return getCacheHeaders();

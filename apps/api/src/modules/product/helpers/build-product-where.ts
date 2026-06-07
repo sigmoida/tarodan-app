@@ -23,6 +23,19 @@ export interface ProductFilterParams {
   set?: boolean;
   minPrice?: number;
   maxPrice?: number;
+  /**
+   * DEPRECATED. Comma-separated attribute slugs, AND-combined.
+   * Use `attrGroups` for OR-within-group / AND-across-groups semantics.
+   */
+  attributeSlugs?: string;
+
+  /**
+   * Group-aware attribute filter. Map of attribute group slug -> selected attribute slugs.
+   * - Within a single group: OR (any of the selected slugs matches).
+   * - Across groups: AND (every group must have at least one match).
+   * Accepts either the parsed object or its JSON string form (controller-friendly).
+   */
+  attrGroups?: Record<string, string[]> | string;
 }
 
 export interface BuildWhereOptions {
@@ -50,7 +63,7 @@ export function buildProductWhere(
     search, categoryId, sellerId, brandId, condition,
     brand, scale, material, manufacturer, manufacturerId,
     carModelId, tradeOnly, boostedOnly, preOrder, limited,
-    set: setFilter, minPrice, maxPrice,
+    set: setFilter, minPrice, maxPrice, attributeSlugs, attrGroups,
   } = params;
 
   const andConditions: Prisma.ProductWhereInput[] = [
@@ -145,6 +158,72 @@ export function buildProductWhere(
         },
       },
     });
+  }
+
+  // Manufacturer-scoped attribute filter — group-aware (preferred).
+  //
+  // Semantic: OR within a group, AND across groups.
+  // Example: { 'hw-rarity': ['treasure-hunt', 'super-treasure-hunt'], 'hw-body-color': ['red'] }
+  //   → (rarity ∈ {TH, sTH}) AND (body-color = red)
+  //
+  // Each group becomes one `some` clause whose inner `attribute` filter uses both
+  // `group.slug = <groupSlug>` AND `slug IN [...]`. Constraining to the group's own slug
+  // prevents accidental matches if the same Attribute.slug ever exists under multiple groups.
+  let parsedAttrGroups: Record<string, string[]> | null = null;
+  if (attrGroups) {
+    if (typeof attrGroups === 'string') {
+      try {
+        const parsed = JSON.parse(attrGroups);
+        if (parsed && typeof parsed === 'object' && !Array.isArray(parsed)) {
+          parsedAttrGroups = parsed as Record<string, string[]>;
+        }
+      } catch {
+        // Malformed JSON — ignore rather than 400; caller can rely on `attributeSlugs` fallback.
+        parsedAttrGroups = null;
+      }
+    } else {
+      parsedAttrGroups = attrGroups;
+    }
+  }
+
+  if (parsedAttrGroups) {
+    for (const [groupSlug, slugs] of Object.entries(parsedAttrGroups)) {
+      const cleaned = Array.isArray(slugs)
+        ? slugs.map((s) => String(s).trim()).filter(Boolean)
+        : [];
+      if (cleaned.length === 0) continue;
+      andConditions.push({
+        productAttributes: {
+          some: {
+            attribute: {
+              isActive: true,
+              slug: { in: cleaned },
+              group: { isActive: true, slug: groupSlug },
+            },
+          },
+        },
+      });
+    }
+  } else if (attributeSlugs) {
+    // Legacy/fallback path — flat slug list, all AND-combined.
+    // Use only when `attrGroups` is absent.
+    const slugs = attributeSlugs
+      .split(',')
+      .map((s) => s.trim())
+      .filter(Boolean);
+    for (const slug of slugs) {
+      andConditions.push({
+        productAttributes: {
+          some: {
+            attribute: {
+              isActive: true,
+              slug,
+              group: { isActive: true },
+            },
+          },
+        },
+      });
+    }
   }
 
   where.AND = andConditions;

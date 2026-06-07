@@ -764,6 +764,146 @@ export class EventService {
   }
 
   /**
+   * Emit trade.cancel-locked event — fired the moment the first
+   * to_warehouse shipment is received. Notifies the counterpart that the
+   * user-side cancel option is gone and only admin can unwind from here.
+   */
+  async emitTradeCancelLocked(payload: {
+    tradeId: string;
+    initiatorId: string;
+    receiverId: string;
+  }): Promise<void> {
+    this.logger.log(`Emitting trade.cancel-locked for trade ${payload.tradeId}`);
+
+    for (const userId of [payload.initiatorId, payload.receiverId]) {
+      await this.pushQueue.add(
+        'send-notification',
+        {
+          userId,
+          title: 'Takas Depoda',
+          body: 'Ürünlerden biri Tarodan deposuna ulaştı. Bu noktadan sonra iptal yapılamaz; sorun varsa itiraz açın.',
+          data: {
+            type: 'trade_cancel_locked',
+            tradeId: payload.tradeId,
+          },
+        },
+        { priority: 3 },
+      );
+    }
+  }
+
+  /**
+   * Emit trade.return-completed — both return shipments arrived; the trade
+   * is now fully cancelled.
+   */
+  async emitTradeReturnCompleted(payload: {
+    tradeId: string;
+    initiatorId: string;
+    receiverId: string;
+  }): Promise<void> {
+    this.logger.log(`Emitting trade.return-completed for trade ${payload.tradeId}`);
+
+    for (const userId of [payload.initiatorId, payload.receiverId]) {
+      await this.pushQueue.add(
+        'send-notification',
+        {
+          userId,
+          title: 'İade Tamamlandı',
+          body: 'Ürününüz size geri ulaştı; takas iptal edildi.',
+          data: {
+            type: 'trade_return_completed',
+            tradeId: payload.tradeId,
+          },
+        },
+        { priority: 3 },
+      );
+    }
+  }
+
+  /**
+   * Emit trade.return-lost — a return shipment was declared lost in transit
+   * and the affected user is owed manual compensation.
+   */
+  async emitTradeReturnLost(payload: {
+    tradeId: string;
+    compensationUserId: string | null;
+    reason: string;
+  }): Promise<void> {
+    this.logger.log(`Emitting trade.return-lost for trade ${payload.tradeId}`);
+
+    if (!payload.compensationUserId) return;
+    await this.pushQueue.add(
+      'send-notification',
+      {
+        userId: payload.compensationUserId,
+        title: 'İade Kargosu Kayıp',
+        body: `İade gönderiniz kayıp olarak işaretlendi. Tarodan ekibi sizinle iletişime geçecek.`,
+        data: {
+          type: 'trade_return_lost',
+          tradeId: payload.tradeId,
+          reason: payload.reason,
+        },
+      },
+      { priority: 3 },
+    );
+  }
+
+  /**
+   * Emit trade.refund-failed — PayTR refund call failed during/after reject.
+   * Notifies admin channels (via worker) and the cash payer.
+   */
+  async emitTradeRefundFailed(payload: {
+    tradeId: string;
+    cashPayerId: string | null;
+    reason: string;
+  }): Promise<void> {
+    this.logger.log(`Emitting trade.refund-failed for trade ${payload.tradeId}`);
+
+    if (payload.cashPayerId) {
+      await this.pushQueue.add(
+        'send-notification',
+        {
+          userId: payload.cashPayerId,
+          title: 'İade Gecikti',
+          body: 'Otomatik iadeniz tamamlanamadı. Tarodan ekibi durumu inceliyor; en kısa sürede çözeceğiz.',
+          data: {
+            type: 'trade_refund_failed',
+            tradeId: payload.tradeId,
+            reason: payload.reason,
+          },
+        },
+        { priority: 4 },
+      );
+    }
+  }
+
+  /**
+   * Emit trade.refund-completed — successful PayTR refund (initial or retry).
+   */
+  async emitTradeRefundCompleted(payload: {
+    tradeId: string;
+    cashPayerId: string | null;
+  }): Promise<void> {
+    this.logger.log(`Emitting trade.refund-completed for trade ${payload.tradeId}`);
+
+    if (payload.cashPayerId) {
+      await this.pushQueue.add(
+        'send-notification',
+        {
+          userId: payload.cashPayerId,
+          title: 'İade Tamamlandı',
+          body: 'Nakit fark ödemeniz PayTR üzerinden iade edildi.',
+          data: {
+            type: 'trade_refund_completed',
+            tradeId: payload.tradeId,
+          },
+        },
+        { priority: 3 },
+      );
+    }
+  }
+
+  /**
    * Emit reservation.expired event — sent to buyer whose order timed out.
    */
   async emitReservationExpired(payload: {

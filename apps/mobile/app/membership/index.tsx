@@ -3,18 +3,21 @@ import { View, Text, ScrollView, TouchableOpacity, StyleSheet, ActivityIndicator
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { router } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
-import { TarodanColors } from '../../src/theme/colors';
+import { theme } from '@tarodan/ui-native';
 import { useAuthStore } from '../../src/stores/authStore';
 import { api, membershipApi } from '../../src/services/api';
+import { useTranslation } from '../../src/i18n';
+
+const { colors } = theme;
 
 const TIER_ORDER = ['free', 'basic', 'premium', 'business'] as const;
 type TierType = (typeof TIER_ORDER)[number];
 
 const TIER_COLORS: Record<TierType, string> = {
-  free: '#6B7280',
-  basic: '#3B82F6',
-  premium: '#8B5CF6',
-  business: '#F59E0B',
+  free: colors.gray[500]!,
+  basic: colors.info[600]!,
+  premium: colors.primary[600]!,
+  business: colors.warning[500]!,
 };
 
 const TIER_ICONS: Record<TierType, keyof typeof Ionicons.glyphMap> = {
@@ -66,8 +69,10 @@ interface PlatformSettings {
 }
 
 export default function MembershipScreen() {
+  const { t } = useTranslation();
   const { isAuthenticated, user } = useAuthStore();
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
   const [membership, setMembership] = useState<MembershipDetails | null>(null);
   const [settings, setSettings] = useState<PlatformSettings>({});
   const [billingPeriod, setBillingPeriod] = useState<'monthly' | 'yearly'>('monthly');
@@ -82,18 +87,23 @@ export default function MembershipScreen() {
 
   const fetchData = async () => {
     setLoading(true);
-    try {
-      const [membershipRes, settingsRes] = await Promise.all([
-        membershipApi.getCurrentMembership(),
-        api.get('/admin/settings/public'),
-      ]);
-      setMembership(membershipRes.data);
-      setSettings(settingsRes.data || {});
-    } catch (err: any) {
-      console.error('Failed to load membership data:', err);
-    } finally {
-      setLoading(false);
+    setError(null);
+    // allSettled: biri başarısız olsa diğeri (fiyatlar/üyelik) yine yüklensin.
+    const [membershipRes, settingsRes] = await Promise.allSettled([
+      membershipApi.getCurrentMembership(),
+      api.get('/admin/settings/public'),
+    ]);
+    if (membershipRes.status === 'fulfilled') {
+      setMembership(membershipRes.value.data);
     }
+    if (settingsRes.status === 'fulfilled') {
+      setSettings(settingsRes.value.data || {});
+    }
+    if (membershipRes.status === 'rejected' && settingsRes.status === 'rejected') {
+      console.error('Failed to load membership data:', membershipRes.reason);
+      setError('Üyelik bilgileri yüklenemedi. Lütfen tekrar deneyin.');
+    }
+    setLoading(false);
   };
 
   const currentTier: TierType = (membership?.tier?.type as TierType) || 'free';
@@ -163,13 +173,13 @@ export default function MembershipScreen() {
       <SafeAreaView style={styles.container}>
         <View style={styles.header}>
           <TouchableOpacity onPress={() => router.back()} hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}>
-            <Ionicons name="arrow-back" size={24} color={TarodanColors.textOnPrimary} />
+            <Ionicons name="arrow-back" size={24} color={colors.white} />
           </TouchableOpacity>
-          <Text style={styles.headerTitle}>Üyelik</Text>
+          <Text style={styles.headerTitle}>{t('mobile.membershipTitle')}</Text>
           <View style={{ width: 24 }} />
         </View>
         <View style={styles.loadingContainer}>
-          <ActivityIndicator size="large" color={TarodanColors.primary} />
+          <ActivityIndicator size="large" color={colors.primary[600]!} />
           <Text style={styles.loadingText}>Yükleniyor...</Text>
         </View>
       </SafeAreaView>
@@ -180,13 +190,20 @@ export default function MembershipScreen() {
     <SafeAreaView style={styles.container} edges={['top']}>
       <View style={styles.header}>
         <TouchableOpacity onPress={() => router.back()} hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}>
-          <Ionicons name="arrow-back" size={24} color={TarodanColors.textOnPrimary} />
+          <Ionicons name="arrow-back" size={24} color={colors.white} />
         </TouchableOpacity>
-        <Text style={styles.headerTitle}>Üyelik</Text>
+        <Text style={styles.headerTitle}>{t('mobile.membershipTitle')}</Text>
         <View style={{ width: 24 }} />
       </View>
 
       <ScrollView style={styles.scrollView} showsVerticalScrollIndicator={false}>
+        {error ? (
+          <TouchableOpacity style={styles.errorBanner} onPress={fetchData} activeOpacity={0.8}>
+            <Ionicons name="alert-circle" size={18} color={colors.danger[600]!} />
+            <Text style={styles.errorBannerText}>{error}</Text>
+            <Text style={styles.errorBannerRetry}>Tekrar dene</Text>
+          </TouchableOpacity>
+        ) : null}
         {/* Pending Payment Banner */}
         {hasPendingPayment && (
           <TouchableOpacity
@@ -197,14 +214,14 @@ export default function MembershipScreen() {
               )
             }
           >
-            <Ionicons name="warning" size={22} color="#92400E" />
+            <Ionicons name="warning" size={22} color={colors.warning[800]!} />
             <View style={styles.pendingBannerText}>
               <Text style={styles.pendingTitle}>
                 Ödeme Bekleniyor – {membership?.pendingPayment?.tierName || membership?.pendingTierName || 'Plan'}
               </Text>
               <Text style={styles.pendingSubtitle}>Ödemeyi tamamlamak için dokunun</Text>
             </View>
-            <Ionicons name="chevron-forward" size={20} color="#92400E" />
+            <Ionicons name="chevron-forward" size={20} color={colors.warning[800]!} />
           </TouchableOpacity>
         )}
 
@@ -275,7 +292,7 @@ export default function MembershipScreen() {
                 {/* Current plan badge */}
                 {isCurrent && (
                   <View style={[styles.currentBadge, { backgroundColor: color }]}>
-                    <Ionicons name="checkmark-circle" size={14} color="#FFF" />
+                    <Ionicons name="checkmark-circle" size={14} color={colors.white} />
                     <Text style={styles.currentBadgeText}>Mevcut Plan</Text>
                   </View>
                 )}
@@ -323,7 +340,7 @@ export default function MembershipScreen() {
                       ? { backgroundColor: color + '15', borderColor: color, borderWidth: 1 }
                       : isUpgrade
                         ? { backgroundColor: color }
-                        : { backgroundColor: TarodanColors.backgroundTertiary },
+                        : { backgroundColor: colors.gray[100]! },
                   ]}
                   onPress={() => handleTierAction(tier)}
                   disabled={isCurrent || tier === 'free'}
@@ -334,8 +351,8 @@ export default function MembershipScreen() {
                       isCurrent
                         ? { color }
                         : isUpgrade
-                          ? { color: '#FFF' }
-                          : { color: TarodanColors.textTertiary },
+                          ? { color: colors.white }
+                          : { color: colors.text.subtle },
                     ]}
                   >
                     {isCurrent ? 'Mevcut Plan' : isUpgrade ? 'Yükselt' : 'Mevcut'}
@@ -355,10 +372,10 @@ export default function MembershipScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: TarodanColors.backgroundSecondary,
+    backgroundColor: colors.surface.alt,
   },
   header: {
-    backgroundColor: TarodanColors.primary,
+    backgroundColor: colors.primary[600]!,
     paddingVertical: 14,
     paddingHorizontal: 16,
     flexDirection: 'row',
@@ -368,7 +385,7 @@ const styles = StyleSheet.create({
   headerTitle: {
     fontSize: 18,
     fontWeight: '700',
-    color: TarodanColors.textOnPrimary,
+    color: colors.white,
   },
   loadingContainer: {
     flex: 1,
@@ -376,9 +393,30 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     gap: 12,
   },
+  errorBanner: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    margin: 16,
+    padding: 12,
+    borderRadius: 10,
+    backgroundColor: colors.danger[50]!,
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: colors.danger[600]!,
+  },
+  errorBannerText: {
+    flex: 1,
+    fontSize: 13,
+    color: colors.danger[600]!,
+  },
+  errorBannerRetry: {
+    fontSize: 13,
+    fontWeight: '700',
+    color: colors.danger[600]!,
+  },
   loadingText: {
     fontSize: 14,
-    color: TarodanColors.textSecondary,
+    color: colors.text.muted,
   },
   scrollView: {
     flex: 1,
@@ -388,8 +426,8 @@ const styles = StyleSheet.create({
   pendingBanner: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#FEF3C7',
-    borderColor: '#F59E0B',
+    backgroundColor: colors.warning[100]!,
+    borderColor: colors.warning[500]!,
     borderWidth: 1,
     marginHorizontal: 16,
     marginTop: 16,
@@ -403,23 +441,23 @@ const styles = StyleSheet.create({
   pendingTitle: {
     fontSize: 14,
     fontWeight: '600',
-    color: '#92400E',
+    color: colors.warning[800]!,
   },
   pendingSubtitle: {
     fontSize: 12,
-    color: '#A16207',
+    color: colors.warning[700]!,
     marginTop: 2,
   },
 
   // Current Plan Card
   currentPlanCard: {
-    backgroundColor: TarodanColors.background,
+    backgroundColor: colors.surface.elevated,
     marginHorizontal: 16,
     marginTop: 16,
     borderRadius: 16,
     padding: 20,
     alignItems: 'center',
-    shadowColor: '#000',
+    shadowColor: colors.black,
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.06,
     shadowRadius: 8,
@@ -435,7 +473,7 @@ const styles = StyleSheet.create({
   },
   currentPlanLabel: {
     fontSize: 13,
-    color: TarodanColors.textSecondary,
+    color: colors.text.muted,
     marginBottom: 4,
   },
   currentPlanName: {
@@ -444,19 +482,19 @@ const styles = StyleSheet.create({
   },
   currentPlanExpiry: {
     fontSize: 12,
-    color: TarodanColors.textTertiary,
+    color: colors.text.subtle,
     marginTop: 6,
   },
 
   // Toggle
   toggleContainer: {
     flexDirection: 'row',
-    backgroundColor: TarodanColors.background,
+    backgroundColor: colors.surface.elevated,
     marginHorizontal: 16,
     marginTop: 20,
     borderRadius: 12,
     padding: 4,
-    shadowColor: '#000',
+    shadowColor: colors.black,
     shadowOffset: { width: 0, height: 1 },
     shadowOpacity: 0.04,
     shadowRadius: 4,
@@ -472,18 +510,18 @@ const styles = StyleSheet.create({
     gap: 6,
   },
   toggleButtonActive: {
-    backgroundColor: TarodanColors.primary,
+    backgroundColor: colors.primary[600]!,
   },
   toggleText: {
     fontSize: 14,
     fontWeight: '600',
-    color: TarodanColors.textSecondary,
+    color: colors.text.muted,
   },
   toggleTextActive: {
-    color: '#FFF',
+    color: colors.white,
   },
   discountBadge: {
-    backgroundColor: '#D1FAE5',
+    backgroundColor: colors.success[100]!,
     paddingHorizontal: 6,
     paddingVertical: 2,
     borderRadius: 6,
@@ -491,7 +529,7 @@ const styles = StyleSheet.create({
   discountBadgeText: {
     fontSize: 10,
     fontWeight: '700',
-    color: '#065F46',
+    color: colors.success[800]!,
   },
 
   // Tier Cards
@@ -503,12 +541,12 @@ const styles = StyleSheet.create({
   },
   tierCard: {
     width: 280,
-    backgroundColor: TarodanColors.background,
+    backgroundColor: colors.surface.elevated,
     borderRadius: 16,
     padding: 20,
     borderWidth: 1,
-    borderColor: TarodanColors.border,
-    shadowColor: '#000',
+    borderColor: colors.border.DEFAULT,
+    shadowColor: colors.black,
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.06,
     shadowRadius: 8,
@@ -525,7 +563,7 @@ const styles = StyleSheet.create({
     borderBottomLeftRadius: 12,
   },
   popularBadgeText: {
-    color: '#FFF',
+    color: colors.white,
     fontSize: 11,
     fontWeight: '700',
   },
@@ -542,7 +580,7 @@ const styles = StyleSheet.create({
     borderBottomRightRadius: 12,
   },
   currentBadgeText: {
-    color: '#FFF',
+    color: colors.white,
     fontSize: 11,
     fontWeight: '700',
   },
@@ -568,26 +606,26 @@ const styles = StyleSheet.create({
   tierPriceFree: {
     fontSize: 24,
     fontWeight: '700',
-    color: TarodanColors.textPrimary,
+    color: colors.text.heading,
   },
   tierPrice: {
     fontSize: 24,
     fontWeight: '700',
-    color: TarodanColors.textPrimary,
+    color: colors.text.heading,
   },
   tierPricePeriod: {
     fontSize: 14,
-    color: TarodanColors.textSecondary,
+    color: colors.text.muted,
     marginLeft: 2,
   },
   tierMonthlyEquiv: {
     fontSize: 12,
-    color: TarodanColors.textTertiary,
+    color: colors.text.subtle,
     marginBottom: 2,
   },
   tierDivider: {
     height: 1,
-    backgroundColor: TarodanColors.border,
+    backgroundColor: colors.border.DEFAULT,
     marginVertical: 14,
   },
   tierFeatures: {
@@ -600,7 +638,7 @@ const styles = StyleSheet.create({
   },
   tierFeatureText: {
     fontSize: 13,
-    color: TarodanColors.textPrimary,
+    color: colors.text.heading,
     flex: 1,
   },
   tierButton: {

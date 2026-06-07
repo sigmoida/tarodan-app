@@ -1,225 +1,164 @@
 import React, { useState } from 'react';
-import { View, Text, ScrollView, TouchableOpacity, StyleSheet, ActivityIndicator, Alert, TextInput, KeyboardAvoidingView, Platform } from 'react-native';
+import { View, StyleSheet, ScrollView, Alert, KeyboardAvoidingView, Platform } from 'react-native';
+import { Button, Input, Text, theme } from '@tarodan/ui-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 import { router } from 'expo-router';
-import { Ionicons } from '@expo/vector-icons';
-import { TarodanColors } from '../../src/theme/colors';
+import { useMutation } from '@tanstack/react-query';
+import { userApi } from '../../src/services/api';
+import { ScreenHeader, EmptyState } from '../../src/components/common';
 import { useAuthStore } from '../../src/stores/authStore';
-import { api } from '../../src/services/api';
+
+const { colors } = theme;
 
 export default function SellerRegisterScreen() {
-  const { isAuthenticated } = useAuthStore();
-  const [loading, setLoading] = useState(false);
-  const [acceptedTerms, setAcceptedTerms] = useState(false);
-  const [form, setForm] = useState({
-    storeName: '',
-    description: '',
-    returnPolicy: '',
-    phone: '',
+  const { isAuthenticated, user, refreshUserData } = useAuthStore();
+
+  const [companyName, setCompanyName] = useState('');
+  const [taxId, setTaxId] = useState('');
+  const [taxOffice, setTaxOffice] = useState('');
+  const [companyPhone, setCompanyPhone] = useState('');
+
+  const upgradeMutation = useMutation({
+    mutationFn: async () => {
+      return userApi.updateProfile({
+        companyName: companyName.trim(),
+        taxId: taxId.trim(),
+        taxOffice: taxOffice.trim(),
+        phone: companyPhone.trim() || undefined,
+        sellerType: 'corporate',
+      } as any);
+    },
+    onSuccess: async () => {
+      if (refreshUserData) await refreshUserData();
+      Alert.alert(
+        'Başarılı',
+        'İşletme bilgileriniz kaydedildi. Kurumsal üyelik avantajlarına yakında erişeceksiniz.',
+        [{ text: 'Tamam', onPress: () => router.replace('/seller/dashboard') }],
+      );
+    },
+    onError: (e: any) =>
+      Alert.alert('Hata', e?.response?.data?.message || 'İşlem tamamlanamadı.'),
   });
-  const [errors, setErrors] = useState<Record<string, string>>({});
-
-  const updateField = (field: string, value: string) => {
-    setForm(prev => ({ ...prev, [field]: value }));
-    if (errors[field]) {
-      setErrors(prev => {
-        const next = { ...prev };
-        delete next[field];
-        return next;
-      });
-    }
-  };
-
-  const validate = (): boolean => {
-    const newErrors: Record<string, string> = {};
-    if (!form.storeName.trim()) newErrors.storeName = 'Mağaza adı gerekli';
-    if (form.storeName.trim().length < 3) newErrors.storeName = 'Mağaza adı en az 3 karakter olmalı';
-    if (!form.description.trim()) newErrors.description = 'Açıklama gerekli';
-    if (!form.phone.trim()) newErrors.phone = 'Telefon numarası gerekli';
-    if (form.phone.trim().length < 10) newErrors.phone = 'Geçerli bir telefon numarası girin';
-    if (!acceptedTerms) newErrors.terms = 'Satıcı sözleşmesini kabul etmelisiniz';
-    setErrors(newErrors);
-    return Object.keys(newErrors).length === 0;
-  };
-
-  const handleSubmit = async () => {
-    if (!validate()) return;
-
-    setLoading(true);
-    try {
-      await api.post('/seller/register', {
-        storeName: form.storeName.trim(),
-        description: form.description.trim(),
-        returnPolicy: form.returnPolicy.trim(),
-        phone: form.phone.trim(),
-      });
-      Alert.alert('Başarılı', 'Satıcı kaydınız tamamlandı!', [
-        { text: 'Tamam', onPress: () => router.replace('/seller/dashboard') },
-      ]);
-    } catch (error: any) {
-      const message = error?.response?.data?.message || 'Kayıt sırasında bir hata oluştu';
-      Alert.alert('Hata', message);
-    } finally {
-      setLoading(false);
-    }
-  };
 
   if (!isAuthenticated) {
     return (
-      <SafeAreaView style={styles.container}>
-        <View style={styles.centeredContainer}>
-          <Ionicons name="storefront-outline" size={64} color={TarodanColors.primary} />
-          <Text style={styles.emptyTitle}>Satıcı Ol</Text>
-          <Text style={styles.emptySubtitle}>Satıcı olmak için önce giriş yapmalısınız</Text>
-          <TouchableOpacity style={styles.primaryButton} onPress={() => router.push('/(auth)/login')}>
-            <Text style={styles.primaryButtonText}>Giriş Yap</Text>
-          </TouchableOpacity>
-        </View>
+      <SafeAreaView style={styles.container} edges={['top']}>
+        <ScreenHeader title="İşletme Hesabı" />
+        <EmptyState
+          fullscreen
+          icon="briefcase-outline"
+          title="İşletme hesabı için önce giriş yapın"
+          actionLabel="Giriş Yap"
+          onAction={() => router.push('/(auth)/login')}
+        />
       </SafeAreaView>
     );
   }
 
+  const isBusiness = user?.membershipTier === 'business';
+
+  const handleSubmit = () => {
+    if (!companyName.trim()) return Alert.alert('Eksik', 'Şirket adı gerekli.');
+    if (!/^\d{10,11}$/.test(taxId.trim()))
+      return Alert.alert('Eksik', 'Geçerli bir vergi / TC kimlik numarası girin (10 veya 11 hane).');
+    upgradeMutation.mutate();
+  };
+
   return (
     <SafeAreaView style={styles.container} edges={['top']}>
-      {/* Header */}
-      <View style={styles.header}>
-        <TouchableOpacity onPress={() => router.back()} style={styles.headerBackBtn}>
-          <Ionicons name="arrow-back" size={24} color={TarodanColors.textOnPrimary} />
-        </TouchableOpacity>
-        <Text style={styles.headerTitle}>Satıcı Ol</Text>
-        <View style={{ width: 40 }} />
-      </View>
-
+      <ScreenHeader title="İşletme Hesabı" />
       <KeyboardAvoidingView
-        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
         style={{ flex: 1 }}
+        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+        keyboardVerticalOffset={80}
       >
-        <ScrollView
-          style={styles.scrollView}
-          contentContainerStyle={styles.scrollContent}
-          keyboardShouldPersistTaps="handled"
-          showsVerticalScrollIndicator={false}
-        >
-          {/* Intro */}
-          <View style={styles.introSection}>
-            <View style={styles.introIconWrap}>
-              <Ionicons name="storefront" size={40} color={TarodanColors.primary} />
+        <ScrollView contentContainerStyle={styles.scrollBody}>
+          {isBusiness ? (
+            <View style={styles.infoCard}>
+              <Ionicons name="checkmark-circle" size={22} color={colors.success[600]!} />
+              <Text style={styles.infoCardText}>
+                Hesabınız zaten kurumsal (Business) üyelik olarak işaretli. Bilgilerinizi burada güncelleyebilirsiniz.
+              </Text>
             </View>
-            <Text style={styles.introTitle}>Mağazanızı Açın</Text>
-            <Text style={styles.introSubtitle}>
-              Koleksiyonlarınızı satışa sunun ve binlerce koleksiyoncuya ulaşın
+          ) : null}
+
+          <View style={styles.benefitsCard}>
+            <Text style={styles.benefitsTitle}>Kurumsal Satıcı Avantajları</Text>
+            <View style={styles.benefitRow}>
+              <Ionicons name="checkmark-circle" size={18} color={colors.success[600]!} />
+              <Text style={styles.benefitText}>Sınırsız ilan ve daha düşük komisyon oranı</Text>
+            </View>
+            <View style={styles.benefitRow}>
+              <Ionicons name="checkmark-circle" size={18} color={colors.success[600]!} />
+              <Text style={styles.benefitText}>Arama sonuçlarında öncelikli gösterim</Text>
+            </View>
+            <View style={styles.benefitRow}>
+              <Ionicons name="checkmark-circle" size={18} color={colors.success[600]!} />
+              <Text style={styles.benefitText}>Fatura düzenleme ve toplu yükleme</Text>
+            </View>
+            <View style={styles.benefitRow}>
+              <Ionicons name="checkmark-circle" size={18} color={colors.success[600]!} />
+              <Text style={styles.benefitText}>Kurumsal rozet ve istatistik paneli</Text>
+            </View>
+          </View>
+
+          <Text style={styles.sectionTitle}>Şirket Bilgileri</Text>
+
+          <Input
+            label="Şirket / İşletme Adı *"
+            value={companyName}
+            onChangeText={setCompanyName}
+            containerStyle={styles.input}
+            leftIconName="business-outline"
+          />
+          <Input
+            label="Vergi No / T.C. Kimlik *"
+            value={taxId}
+            onChangeText={(v: string) => setTaxId(v.replace(/[^\d]/g, ''))}
+            keyboardType="number-pad"
+            maxLength={11}
+            containerStyle={styles.input}
+            leftIconName="card-outline"
+          />
+          <Input
+            label="Vergi Dairesi"
+            value={taxOffice}
+            onChangeText={setTaxOffice}
+            containerStyle={styles.input}
+            leftIconName="business-outline"
+          />
+          <Input
+            label="İşletme Telefonu"
+            value={companyPhone}
+            onChangeText={setCompanyPhone}
+            keyboardType="phone-pad"
+            placeholder="+90 5XX XXX XX XX"
+            containerStyle={styles.input}
+            leftIconName="call-outline"
+          />
+
+          <View style={styles.noteCard}>
+            <MaterialCommunityIcons name="shield-check-outline" size={18} color={colors.info[600]!} />
+            <Text style={styles.noteText}>
+              Vergi ve şirket bilgilerin resmi belgelerle doğrulanacak. Hatalı veya yanıltıcı bilgi, hesabın askıya alınmasına yol açabilir.
             </Text>
           </View>
 
-          {/* Store Name */}
-          <View style={styles.inputGroup}>
-            <Text style={styles.inputLabel}>Mağaza Adı *</Text>
-            <View style={[styles.inputWrapper, errors.storeName ? styles.inputError : null]}>
-              <Ionicons name="business-outline" size={20} color={TarodanColors.textSecondary} style={styles.inputIcon} />
-              <TextInput
-                style={styles.textInput}
-                placeholder="Mağazanızın adı"
-                placeholderTextColor={TarodanColors.textTertiary}
-                value={form.storeName}
-                onChangeText={(v) => updateField('storeName', v)}
-                maxLength={50}
-              />
-            </View>
-            {errors.storeName && <Text style={styles.errorText}>{errors.storeName}</Text>}
-          </View>
-
-          {/* Description */}
-          <View style={styles.inputGroup}>
-            <Text style={styles.inputLabel}>Mağaza Açıklaması *</Text>
-            <View style={[styles.inputWrapper, styles.textAreaWrapper, errors.description ? styles.inputError : null]}>
-              <TextInput
-                style={[styles.textInput, styles.textArea]}
-                placeholder="Mağazanız hakkında kısa bir açıklama yazın"
-                placeholderTextColor={TarodanColors.textTertiary}
-                value={form.description}
-                onChangeText={(v) => updateField('description', v)}
-                multiline
-                numberOfLines={4}
-                textAlignVertical="top"
-                maxLength={500}
-              />
-            </View>
-            <Text style={styles.charCount}>{form.description.length}/500</Text>
-            {errors.description && <Text style={styles.errorText}>{errors.description}</Text>}
-          </View>
-
-          {/* Return Policy */}
-          <View style={styles.inputGroup}>
-            <Text style={styles.inputLabel}>İade Politikası</Text>
-            <View style={[styles.inputWrapper, styles.textAreaWrapper]}>
-              <TextInput
-                style={[styles.textInput, styles.textArea]}
-                placeholder="İade ve değişim koşullarınızı belirtin (opsiyonel)"
-                placeholderTextColor={TarodanColors.textTertiary}
-                value={form.returnPolicy}
-                onChangeText={(v) => updateField('returnPolicy', v)}
-                multiline
-                numberOfLines={3}
-                textAlignVertical="top"
-                maxLength={300}
-              />
-            </View>
-          </View>
-
-          {/* Phone */}
-          <View style={styles.inputGroup}>
-            <Text style={styles.inputLabel}>Telefon Numarası *</Text>
-            <View style={[styles.inputWrapper, errors.phone ? styles.inputError : null]}>
-              <Ionicons name="call-outline" size={20} color={TarodanColors.textSecondary} style={styles.inputIcon} />
-              <TextInput
-                style={styles.textInput}
-                placeholder="05XX XXX XX XX"
-                placeholderTextColor={TarodanColors.textTertiary}
-                value={form.phone}
-                onChangeText={(v) => updateField('phone', v)}
-                keyboardType="phone-pad"
-                maxLength={15}
-              />
-            </View>
-            {errors.phone && <Text style={styles.errorText}>{errors.phone}</Text>}
-          </View>
-
-          {/* Terms */}
-          <View style={styles.termsSection}>
-            <TouchableOpacity
-              style={styles.termsRow}
-              onPress={() => setAcceptedTerms(!acceptedTerms)}
-              activeOpacity={0.7}
-            >
-              <View style={[styles.checkbox, acceptedTerms && styles.checkboxChecked]}>
-                {acceptedTerms && <Ionicons name="checkmark" size={16} color={TarodanColors.textOnPrimary} />}
-              </View>
-              <Text style={styles.termsText}>
-                <Text style={styles.termsLink} onPress={() => router.push('/terms')}>Satıcı Sözleşmesi</Text>
-                'ni okudum ve kabul ediyorum
-              </Text>
-            </TouchableOpacity>
-            {errors.terms && <Text style={styles.errorText}>{errors.terms}</Text>}
-          </View>
-
-          {/* Submit */}
-          <TouchableOpacity
-            style={[styles.submitButton, loading && styles.submitButtonDisabled]}
+          <Button
+            variant="primary"
+            title="Bilgileri Kaydet"
             onPress={handleSubmit}
-            disabled={loading}
-            activeOpacity={0.8}
-          >
-            {loading ? (
-              <ActivityIndicator color={TarodanColors.textOnPrimary} />
-            ) : (
-              <>
-                <Ionicons name="storefront" size={20} color={TarodanColors.textOnPrimary} />
-                <Text style={styles.submitButtonText}>Satıcı Ol</Text>
-              </>
-            )}
-          </TouchableOpacity>
+            isLoading={upgradeMutation.isPending}
+            disabled={upgradeMutation.isPending}
+            style={styles.submitBtn}
+          />
 
-          <View style={{ height: 40 }} />
+          <Button
+            variant="ghost"
+            title="Vazgeç"
+            onPress={() => router.back()}
+          />
         </ScrollView>
       </KeyboardAvoidingView>
     </SafeAreaView>
@@ -229,185 +168,73 @@ export default function SellerRegisterScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: TarodanColors.backgroundSecondary,
+    backgroundColor: colors.surface.alt,
   },
-  centeredContainer: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-    padding: 32,
+  scrollBody: {
+    padding: 16,
+    gap: 12,
+    paddingBottom: 40,
   },
-  header: {
-    backgroundColor: TarodanColors.primary,
-    paddingVertical: 16,
-    paddingHorizontal: 20,
+  infoCard: {
     flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
+    gap: 8,
+    alignItems: 'flex-start',
+    backgroundColor: colors.success[50]!,
+    padding: 12,
+    borderRadius: 10,
   },
-  headerBackBtn: {
-    width: 40,
-    height: 40,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  headerTitle: {
-    fontSize: 18,
-    fontWeight: 'bold',
-    color: TarodanColors.textOnPrimary,
-  },
-  scrollView: {
+  infoCardText: {
     flex: 1,
+    fontSize: 13,
+    color: colors.success[600]!,
   },
-  scrollContent: {
-    padding: 20,
-  },
-  introSection: {
-    alignItems: 'center',
-    marginBottom: 28,
-  },
-  introIconWrap: {
-    width: 72,
-    height: 72,
-    borderRadius: 36,
-    backgroundColor: TarodanColors.primaryLight,
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginBottom: 16,
-  },
-  introTitle: {
-    fontSize: 22,
-    fontWeight: 'bold',
-    color: TarodanColors.textPrimary,
-    marginBottom: 8,
-  },
-  introSubtitle: {
-    fontSize: 14,
-    color: TarodanColors.textSecondary,
-    textAlign: 'center',
-    lineHeight: 20,
-  },
-  inputGroup: {
-    marginBottom: 18,
-  },
-  inputLabel: {
-    fontSize: 14,
-    fontWeight: '600',
-    color: TarodanColors.textPrimary,
-    marginBottom: 8,
-  },
-  inputWrapper: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: TarodanColors.background,
-    borderWidth: 1,
-    borderColor: TarodanColors.border,
+  benefitsCard: {
+    backgroundColor: colors.primary[50]!,
     borderRadius: 12,
-    paddingHorizontal: 14,
+    padding: 14,
+    gap: 8,
   },
-  textAreaWrapper: {
-    alignItems: 'flex-start',
-    paddingVertical: 10,
-  },
-  inputError: {
-    borderColor: TarodanColors.error,
-  },
-  inputIcon: {
-    marginRight: 10,
-  },
-  textInput: {
-    flex: 1,
+  benefitsTitle: {
     fontSize: 15,
-    color: TarodanColors.textPrimary,
-    paddingVertical: 14,
+    fontWeight: '700',
+    color: colors.primary[600]!,
+    marginBottom: 4,
   },
-  textArea: {
-    minHeight: 80,
-    paddingVertical: 0,
-  },
-  charCount: {
-    fontSize: 12,
-    color: TarodanColors.textTertiary,
-    textAlign: 'right',
-    marginTop: 4,
-  },
-  errorText: {
-    fontSize: 12,
-    color: TarodanColors.error,
-    marginTop: 4,
-  },
-  termsSection: {
-    marginTop: 8,
-    marginBottom: 24,
-  },
-  termsRow: {
+  benefitRow: {
     flexDirection: 'row',
-    alignItems: 'flex-start',
-  },
-  checkbox: {
-    width: 24,
-    height: 24,
-    borderRadius: 6,
-    borderWidth: 2,
-    borderColor: TarodanColors.border,
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginRight: 12,
-    marginTop: 2,
-  },
-  checkboxChecked: {
-    backgroundColor: TarodanColors.primary,
-    borderColor: TarodanColors.primary,
-  },
-  termsText: {
-    flex: 1,
-    fontSize: 14,
-    color: TarodanColors.textSecondary,
-    lineHeight: 20,
-  },
-  termsLink: {
-    color: TarodanColors.primary,
-    fontWeight: '600',
-  },
-  submitButton: {
-    backgroundColor: TarodanColors.primary,
-    paddingVertical: 16,
-    borderRadius: 14,
-    flexDirection: 'row',
-    justifyContent: 'center',
     alignItems: 'center',
     gap: 8,
   },
-  submitButtonDisabled: {
-    opacity: 0.6,
+  benefitText: {
+    flex: 1,
+    fontSize: 13,
+    color: colors.text.heading,
   },
-  submitButtonText: {
-    color: TarodanColors.textOnPrimary,
-    fontSize: 16,
-    fontWeight: '700',
-  },
-  emptyTitle: {
-    fontSize: 20,
-    fontWeight: 'bold',
-    color: TarodanColors.textPrimary,
-    marginTop: 16,
-    marginBottom: 8,
-  },
-  emptySubtitle: {
+  sectionTitle: {
     fontSize: 14,
-    color: TarodanColors.textSecondary,
-    textAlign: 'center',
-    marginBottom: 24,
-  },
-  primaryButton: {
-    backgroundColor: TarodanColors.primary,
-    paddingHorizontal: 32,
-    paddingVertical: 14,
-    borderRadius: 12,
-  },
-  primaryButtonText: {
-    color: TarodanColors.textOnPrimary,
-    fontSize: 16,
     fontWeight: '700',
+    color: colors.text.heading,
+    marginTop: 6,
+  },
+  input: {
+    backgroundColor: colors.surface.DEFAULT,
+  },
+  noteCard: {
+    flexDirection: 'row',
+    gap: 8,
+    alignItems: 'flex-start',
+    backgroundColor: colors.info[50]!,
+    padding: 12,
+    borderRadius: 10,
+  },
+  noteText: {
+    flex: 1,
+    fontSize: 12,
+    color: colors.info[600]!,
+    lineHeight: 17,
+  },
+  submitBtn: {
+    borderRadius: 10,
+    marginTop: 8,
   },
 });

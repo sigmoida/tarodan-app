@@ -1,5 +1,16 @@
-import { View, ScrollView, Image, StyleSheet, Alert, TouchableOpacity } from 'react-native';
-import { Text, TextInput, Button, SegmentedButtons, Switch, useTheme, Snackbar, IconButton, Card, Chip, ActivityIndicator } from 'react-native-paper';
+import { View, ScrollView, Image, StyleSheet, Alert, Pressable } from 'react-native';
+import {
+  Button,
+  Switch,
+  Snackbar,
+  IconButton,
+  Chip,
+  Spinner,
+  Input,
+  Textarea,
+  Text,
+  theme,
+} from '@tarodan/ui-native';
 import { useState, useEffect } from 'react';
 import { useForm, Controller } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
@@ -10,7 +21,9 @@ import * as ImagePicker from 'expo-image-picker';
 import { Ionicons } from '@expo/vector-icons';
 import { api } from '../../../src/services/api';
 import { useAuthStore } from '../../../src/stores/authStore';
-import { TarodanColors } from '../../../src/theme';
+import { CommissionPreview } from '../../../src/components/common';
+
+const { colors } = theme;
 
 const listingSchema = z.object({
   title: z.string().min(5, 'Başlık en az 5 karakter olmalı').max(200, 'Başlık en fazla 200 karakter olabilir'),
@@ -64,7 +77,6 @@ interface Category {
 }
 
 export default function EditListingScreen() {
-  const theme = useTheme();
   const { id } = useLocalSearchParams();
   const queryClient = useQueryClient();
   const { limits } = useAuthStore();
@@ -216,7 +228,7 @@ export default function EditListingScreen() {
   if (listingLoading) {
     return (
       <View style={styles.loadingContainer}>
-        <ActivityIndicator size="large" color={TarodanColors.primary} />
+        <Spinner size="lg" />
         <Text style={{ marginTop: 16 }}>İlan yükleniyor...</Text>
       </View>
     );
@@ -225,9 +237,9 @@ export default function EditListingScreen() {
   if (!listing) {
     return (
       <View style={styles.loadingContainer}>
-        <Ionicons name="alert-circle-outline" size={64} color={TarodanColors.error} />
+        <Ionicons name="alert-circle-outline" size={64} color={colors.danger[600]!} />
         <Text style={{ marginTop: 16 }}>İlan bulunamadı</Text>
-        <Button mode="contained" onPress={() => router.back()} style={{ marginTop: 16 }}>
+        <Button variant="primary" onPress={() => router.back()} style={{ marginTop: 16 }}>
           Geri Dön
         </Button>
       </View>
@@ -238,16 +250,16 @@ export default function EditListingScreen() {
     <View style={styles.container}>
       {/* Header */}
       <View style={styles.header}>
-        <TouchableOpacity onPress={() => router.back()}>
-          <Ionicons name="arrow-back" size={24} color={TarodanColors.textOnPrimary} />
-        </TouchableOpacity>
+        <Pressable onPress={() => router.back()} hitSlop={8} accessibilityRole="button" accessibilityLabel="Geri">
+          <Ionicons name="arrow-back" size={24} color={colors.white} />
+        </Pressable>
         <Text style={styles.headerTitle}>İlanı Düzenle</Text>
         <View style={{ width: 24 }} />
       </View>
 
       <ScrollView style={styles.content}>
         {/* Images */}
-        <Text variant="titleMedium" style={styles.sectionTitle}>Fotoğraflar</Text>
+        <Text style={styles.sectionTitle}>Fotoğraflar</Text>
         <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.imageScrollView}>
           {images.map((uri, index) => (
             <View key={index} style={styles.imageContainer}>
@@ -259,34 +271,35 @@ export default function EditListingScreen() {
               )}
               <IconButton
                 icon="close-circle"
-                size={24}
-                iconColor="#fff"
+                size="sm"
+                color={colors.white}
                 style={styles.removeImageButton}
                 onPress={() => removeImage(index)}
+                accessibilityLabel="Fotoğrafı kaldır"
               />
             </View>
           ))}
           {images.length < maxImages && (
-            <TouchableOpacity style={styles.addImageButton} onPress={pickImage}>
-              <Ionicons name="add" size={32} color={TarodanColors.primary} />
-              <Text variant="bodySmall">Ekle</Text>
-            </TouchableOpacity>
+            <Pressable style={styles.addImageButton} onPress={pickImage}>
+              <Ionicons name="add" size={32} color={colors.primary[600]!} />
+              <Text style={styles.addImageText}>Ekle</Text>
+            </Pressable>
           )}
         </ScrollView>
-        <Text variant="bodySmall" style={styles.imageCounter}>{images.length}/{maxImages} fotoğraf</Text>
+        <Text style={styles.imageCounter}>{images.length}/{maxImages} fotoğraf</Text>
 
         {/* Title */}
         <Controller
           control={control}
           name="title"
           render={({ field: { onChange, value } }) => (
-            <TextInput
+            <Input
               label="Başlık *"
               value={value}
               onChangeText={onChange}
-              error={!!errors.title}
-              style={styles.input}
+              error={errors.title ? ' ' : undefined}
               maxLength={200}
+              containerStyle={styles.input}
             />
           )}
         />
@@ -297,14 +310,13 @@ export default function EditListingScreen() {
           control={control}
           name="description"
           render={({ field: { onChange, value } }) => (
-            <TextInput
+            <Textarea
               label="Açıklama"
               value={value}
               onChangeText={onChange}
-              multiline
-              numberOfLines={4}
-              style={styles.input}
+              rows={4}
               maxLength={5000}
+              containerStyle={styles.input}
             />
           )}
         />
@@ -314,91 +326,83 @@ export default function EditListingScreen() {
           control={control}
           name="price"
           render={({ field: { onChange, value } }) => (
-            <TextInput
+            <Input
               label="Fiyat (₺) *"
               value={value}
               onChangeText={onChange}
               keyboardType="numeric"
-              error={!!errors.price}
-              style={styles.input}
-              left={<TextInput.Affix text="₺" />}
+              error={errors.price ? ' ' : undefined}
+              containerStyle={styles.input}
             />
           )}
         />
         {errors.price && <Text style={styles.errorText}>{errors.price.message}</Text>}
+        <CommissionPreview amount={watch('price')} categoryId={watch('categoryId')} />
 
         {/* Category */}
-        <Text variant="titleSmall" style={styles.fieldLabel}>Kategori *</Text>
+        <Text style={styles.fieldLabel}>Kategori *</Text>
         <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.chipScrollView}>
           {categories.map((cat) => (
-            <Chip
-              key={cat.id}
-              selected={selectedCategory === cat.id}
-              onPress={() => {
-                setSelectedCategory(cat.id);
-                setValue('categoryId', cat.id);
-              }}
-              style={styles.chip}
-              mode={selectedCategory === cat.id ? 'flat' : 'outlined'}
-            >
-              {cat.name}
-            </Chip>
+            <View key={cat.id} style={styles.chipWrap}>
+              <Chip
+                label={cat.name}
+                selected={selectedCategory === cat.id}
+                onPress={() => {
+                  setSelectedCategory(cat.id);
+                  setValue('categoryId', cat.id);
+                }}
+              />
+            </View>
           ))}
         </ScrollView>
 
         {/* Brand */}
-        <Text variant="titleSmall" style={styles.fieldLabel}>Marka *</Text>
+        <Text style={styles.fieldLabel}>Marka *</Text>
         <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.chipScrollView}>
           {BRANDS.map((brand) => (
-            <Chip
-              key={brand.id}
-              selected={watch('brand') === brand.id}
-              onPress={() => setValue('brand', brand.id)}
-              style={styles.chip}
-              mode={watch('brand') === brand.id ? 'flat' : 'outlined'}
-            >
-              {brand.name}
-            </Chip>
+            <View key={brand.id} style={styles.chipWrap}>
+              <Chip
+                label={brand.name}
+                selected={watch('brand') === brand.id}
+                onPress={() => setValue('brand', brand.id)}
+              />
+            </View>
           ))}
         </ScrollView>
 
         {/* Scale */}
-        <Text variant="titleSmall" style={styles.fieldLabel}>Ölçek *</Text>
+        <Text style={styles.fieldLabel}>Ölçek *</Text>
         <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.chipScrollView}>
           {SCALES.map((scale) => (
-            <Chip
-              key={scale.id}
-              selected={watch('scale') === scale.id}
-              onPress={() => setValue('scale', scale.id)}
-              style={styles.chip}
-              mode={watch('scale') === scale.id ? 'flat' : 'outlined'}
-            >
-              {scale.name}
-            </Chip>
+            <View key={scale.id} style={styles.chipWrap}>
+              <Chip
+                label={scale.name}
+                selected={watch('scale') === scale.id}
+                onPress={() => setValue('scale', scale.id)}
+              />
+            </View>
           ))}
         </ScrollView>
 
         {/* Condition */}
-        <Text variant="titleSmall" style={styles.fieldLabel}>Durum *</Text>
+        <Text style={styles.fieldLabel}>Durum *</Text>
         <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.chipScrollView}>
           {CONDITIONS.map((condition) => (
-            <Chip
-              key={condition.id}
-              selected={watch('condition') === condition.id}
-              onPress={() => setValue('condition', condition.id)}
-              style={styles.chip}
-              mode={watch('condition') === condition.id ? 'flat' : 'outlined'}
-            >
-              {condition.name}
-            </Chip>
+            <View key={condition.id} style={styles.chipWrap}>
+              <Chip
+                label={condition.name}
+                selected={watch('condition') === condition.id}
+                onPress={() => setValue('condition', condition.id)}
+              />
+            </View>
           ))}
         </ScrollView>
 
         {/* Trade Available */}
         <View style={styles.tradeSection}>
           <View style={styles.tradeContent}>
-            <Text variant="titleSmall">Takas Kabul</Text>
-            <Text variant="bodySmall" style={styles.tradeSubtitle}>
+            <Text style={styles.tradeTitle}>Takas Kabul</Text>
+            <Text style={styles.tradeSubtitle}>
               {canTrade ? 'Takas tekliflerine açık mısınız?' : 'Premium üyelere özel'}
             </Text>
           </View>
@@ -406,8 +410,8 @@ export default function EditListingScreen() {
             control={control}
             name="isTradeEnabled"
             render={({ field: { value } }) => (
-              <Switch 
-                value={value} 
+              <Switch
+                value={value}
                 onValueChange={handleTradeToggle}
                 disabled={!canTrade}
               />
@@ -417,18 +421,20 @@ export default function EditListingScreen() {
 
         {/* Submit */}
         <Button
-          mode="contained"
+          variant="primary"
           onPress={handleSubmit(onSubmit)}
-          loading={updateMutation.isPending}
+          isLoading={updateMutation.isPending}
           disabled={updateMutation.isPending}
+          fullWidth
           style={styles.submitButton}
         >
           Değişiklikleri Kaydet
         </Button>
 
         <Button
-          mode="text"
+          variant="ghost"
           onPress={() => router.back()}
+          fullWidth
           style={styles.cancelButton}
         >
           İptal
@@ -451,7 +457,7 @@ export default function EditListingScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: TarodanColors.background,
+    backgroundColor: colors.white,
   },
   loadingContainer: {
     flex: 1,
@@ -459,7 +465,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   header: {
-    backgroundColor: TarodanColors.primary,
+    backgroundColor: colors.primary[600]!,
     paddingTop: 50,
     paddingBottom: 16,
     paddingHorizontal: 20,
@@ -470,13 +476,15 @@ const styles = StyleSheet.create({
   headerTitle: {
     fontSize: 18,
     fontWeight: 'bold',
-    color: TarodanColors.textOnPrimary,
+    color: colors.white,
   },
   content: {
     flex: 1,
     padding: 16,
   },
   sectionTitle: {
+    fontSize: 16,
+    fontWeight: '600',
     marginBottom: 8,
   },
   imageScrollView: {
@@ -495,13 +503,13 @@ const styles = StyleSheet.create({
     position: 'absolute',
     bottom: 4,
     left: 4,
-    backgroundColor: TarodanColors.primary,
+    backgroundColor: colors.primary[600]!,
     paddingHorizontal: 6,
     paddingVertical: 2,
     borderRadius: 4,
   },
   coverBadgeText: {
-    color: '#fff',
+    color: colors.white,
     fontSize: 10,
     fontWeight: 'bold',
   },
@@ -509,39 +517,44 @@ const styles = StyleSheet.create({
     position: 'absolute',
     top: -8,
     right: -8,
-    backgroundColor: 'rgba(0,0,0,0.5)',
+    backgroundColor: colors.overlay.black50,
   },
   addImageButton: {
     width: 100,
     height: 100,
     borderWidth: 2,
-    borderColor: TarodanColors.outline,
+    borderColor: colors.border.DEFAULT,
     borderStyle: 'dashed',
     borderRadius: 8,
     justifyContent: 'center',
     alignItems: 'center',
   },
+  addImageText: {
+    fontSize: 12,
+  },
   imageCounter: {
-    color: TarodanColors.textSecondary,
+    color: colors.text.muted,
     marginBottom: 16,
+    fontSize: 12,
   },
   input: {
     marginBottom: 8,
-    backgroundColor: '#fff',
   },
   errorText: {
-    color: TarodanColors.error,
+    color: colors.danger[600]!,
     fontSize: 12,
     marginBottom: 8,
   },
   fieldLabel: {
     marginTop: 16,
     marginBottom: 8,
+    fontSize: 14,
+    fontWeight: '600',
   },
   chipScrollView: {
     marginBottom: 8,
   },
-  chip: {
+  chipWrap: {
     marginRight: 8,
     marginBottom: 8,
   },
@@ -549,16 +562,23 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     padding: 16,
-    backgroundColor: '#fff',
+    backgroundColor: colors.white,
     borderRadius: 8,
     marginTop: 16,
     marginBottom: 24,
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: colors.border.DEFAULT,
   },
   tradeContent: {
     flex: 1,
   },
+  tradeTitle: {
+    fontSize: 14,
+    fontWeight: '600',
+  },
   tradeSubtitle: {
-    color: TarodanColors.textSecondary,
+    color: colors.text.muted,
+    fontSize: 12,
   },
   submitButton: {
     marginTop: 16,

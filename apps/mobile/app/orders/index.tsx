@@ -1,15 +1,25 @@
-import { View, ScrollView, StyleSheet, TouchableOpacity, Image, RefreshControl } from 'react-native';
-import { Text, Chip, ActivityIndicator, Card, Button, Badge } from 'react-native-paper';
+import { View, ScrollView, StyleSheet, Pressable, Image, RefreshControl } from 'react-native';
+import {
+  Button,
+  Chip,
+  Spinner,
+  Card,
+  StatusBadge,
+  Text,
+  theme,
+} from '@tarodan/ui-native';
 import { useState, useCallback } from 'react';
 import { router, useFocusEffect } from 'expo-router';
 import { useQuery } from '@tanstack/react-query';
 import { Ionicons } from '@expo/vector-icons';
+import type { BadgeVariant } from '@tarodan/ui-native';
 import { ordersApi } from '../../src/services/api';
 import { useAuthStore } from '../../src/stores/authStore';
-import { TarodanColors } from '../../src/theme';
 import RatingModal from '../../src/components/RatingModal';
 import { apiStatusToUi, uiFilterToApiStatusParam, type UiOrderStatus } from '../../src/utils/orderStatus';
 import { getOrderProductImageUri } from '../../src/utils/orderProductImage';
+
+const { colors, spacing, radius } = theme;
 
 interface Order {
   id: string;
@@ -33,6 +43,21 @@ interface Order {
 }
 
 type FilterType = 'all' | 'pending' | 'processing' | 'shipped' | 'delivered' | 'completed';
+
+// UI status keys -> StatusBadge config (matches semantic Badge variants)
+const uiOrderStatusConfig: Record<string, { label: string; variant: BadgeVariant }> = {
+  pending: { label: 'Ödeme bekliyor', variant: 'warning' },
+  paid: { label: 'Ödendi', variant: 'info' },
+  processing: { label: 'Hazırlanıyor', variant: 'info' },
+  shipped: { label: 'Kargoda', variant: 'primary' },
+  delivered: { label: 'Teslim Edildi', variant: 'success' },
+  completed: { label: 'Tamamlandı', variant: 'success' },
+  cancelled: { label: 'İptal', variant: 'danger' },
+  refunded: { label: 'İade', variant: 'secondary' },
+};
+
+const getStatusText = (status: UiOrderStatus) =>
+  uiOrderStatusConfig[status]?.label ?? String(status);
 
 export default function OrdersScreen() {
   const { isAuthenticated } = useAuthStore();
@@ -95,34 +120,6 @@ export default function OrdersScreen() {
     setRefreshing(false);
   };
 
-  const getStatusColor = (status: UiOrderStatus) => {
-    switch (status) {
-      case 'pending': return TarodanColors.warning;
-      case 'paid': return TarodanColors.info;
-      case 'processing': return TarodanColors.info;
-      case 'shipped': return TarodanColors.primary;
-      case 'delivered': return TarodanColors.success;
-      case 'completed': return TarodanColors.success;
-      case 'cancelled': return TarodanColors.error;
-      case 'refunded': return TarodanColors.textSecondary;
-      default: return TarodanColors.textSecondary;
-    }
-  };
-
-  const getStatusText = (status: UiOrderStatus) => {
-    switch (status) {
-      case 'pending': return 'Ödeme bekliyor';
-      case 'paid': return 'Ödendi';
-      case 'processing': return 'Hazırlanıyor';
-      case 'shipped': return 'Kargoda';
-      case 'delivered': return 'Teslim Edildi';
-      case 'completed': return 'Tamamlandı';
-      case 'cancelled': return 'İptal';
-      case 'refunded': return 'İade';
-      default: return status;
-    }
-  };
-
   const formatDate = (dateString: string) => {
     return new Date(dateString).toLocaleDateString('tr-TR', {
       day: 'numeric',
@@ -143,14 +140,12 @@ export default function OrdersScreen() {
   if (!isAuthenticated) {
     return (
       <View style={styles.centeredContainer}>
-        <Ionicons name="receipt-outline" size={64} color={TarodanColors.primary} />
-        <Text variant="titleLarge" style={styles.title}>Siparişlerim</Text>
-        <Text variant="bodyMedium" style={styles.subtitle}>
+        <Ionicons name="receipt-outline" size={64} color={colors.primary[600]!} />
+        <Text variant="h2" style={styles.title}>Siparişlerim</Text>
+        <Text style={styles.subtitle}>
           Siparişlerinizi görmek için giriş yapın
         </Text>
-        <Button mode="contained" onPress={() => router.push('/(auth)/login')}>
-          Giriş Yap
-        </Button>
+        <Button variant="primary" title="Giriş Yap" onPress={() => router.push('/(auth)/login')} />
       </View>
     );
   }
@@ -159,9 +154,9 @@ export default function OrdersScreen() {
     <View style={styles.container}>
       {/* Header */}
       <View style={styles.header}>
-        <TouchableOpacity onPress={() => router.back()}>
-          <Ionicons name="arrow-back" size={24} color={TarodanColors.textOnPrimary} />
-        </TouchableOpacity>
+        <Pressable onPress={() => router.back()}>
+          <Ionicons name="arrow-back" size={24} color={colors.white} />
+        </Pressable>
         <Text style={styles.headerTitle}>{role === 'buyer' ? 'Siparişlerim' : 'Satışlarım'}</Text>
         <View style={{ width: 24 }} />
       </View>
@@ -169,19 +164,15 @@ export default function OrdersScreen() {
       {/* Role Toggle */}
       <View style={{ flexDirection: 'row', paddingHorizontal: 16, paddingTop: 12, gap: 8 }}>
         <Chip
+          label="Aldıklarım"
           selected={role === 'buyer'}
           onPress={() => { setRole('buyer'); setFilter('all'); }}
-          icon="cart-outline"
-          style={role === 'buyer' ? styles.filterChipSelected : styles.filterChip}
-          textStyle={role === 'buyer' ? styles.filterChipTextSelected : styles.filterChipText}
-        >Aldıklarım</Chip>
+        />
         <Chip
+          label="Sattıklarım"
           selected={role === 'seller'}
           onPress={() => { setRole('seller'); setFilter('all'); }}
-          icon="storefront-outline"
-          style={role === 'seller' ? styles.filterChipSelected : styles.filterChip}
-          textStyle={role === 'seller' ? styles.filterChipTextSelected : styles.filterChipText}
-        >Sattıklarım</Chip>
+        />
       </View>
 
       {/* Filter Chips */}
@@ -190,13 +181,11 @@ export default function OrdersScreen() {
           {(['all', 'pending', 'processing', 'shipped', 'delivered', 'completed'] as FilterType[]).map((f) => (
             <Chip
               key={f}
+              label={f === 'all' ? 'Tümü' : getStatusText(f as UiOrderStatus)}
               selected={filter === f}
               onPress={() => setFilter(f)}
-              style={[styles.filterChip, filter === f && styles.filterChipSelected]}
-              textStyle={filter === f ? styles.filterChipTextSelected : styles.filterChipText}
-            >
-              {f === 'all' ? 'Tümü' : getStatusText(f as UiOrderStatus)}
-            </Chip>
+              style={styles.filterChipSpacing}
+            />
           ))}
         </ScrollView>
       </View>
@@ -204,49 +193,41 @@ export default function OrdersScreen() {
       {/* Orders */}
       {ordersError ? (
         <View style={styles.emptyContainer}>
-          <Text variant="bodyMedium" style={styles.emptySubtitle}>
+          <Text style={styles.emptySubtitle}>
             Siparişler yüklenemedi. Lütfen tekrar deneyin.
           </Text>
-          <Button mode="contained" onPress={() => refetch()} style={{ marginTop: 12 }}>
-            Yenile
-          </Button>
+          <Button variant="primary" title="Yenile" onPress={() => refetch()} style={{ marginTop: 12 }} />
         </View>
       ) : isLoading && orders.length === 0 ? (
         <View style={styles.loadingContainer}>
-          <ActivityIndicator size="large" color={TarodanColors.primary} />
+          <Spinner size="lg" />
         </View>
       ) : orders.length === 0 ? (
         <View style={styles.emptyContainer}>
-          <Ionicons name="receipt-outline" size={80} color={TarodanColors.textLight} />
-          <Text variant="titleMedium" style={styles.emptyTitle}>
+          <Ionicons name="receipt-outline" size={80} color={colors.text.subtle} />
+          <Text variant="h3" style={styles.emptyTitle}>
             {filter === 'all' ? 'Henüz siparişiniz yok' : `${getStatusText(filter as UiOrderStatus)} siparişiniz yok`}
           </Text>
-          <Text variant="bodyMedium" style={styles.emptySubtitle}>
+          <Text style={styles.emptySubtitle}>
             Alışverişe başlayın!
           </Text>
-          <Button mode="contained" onPress={() => router.push('/(tabs)/search')}>
-            Ürünleri Keşfet
-          </Button>
+          <Button variant="primary" title="Ürünleri Keşfet" onPress={() => router.push('/(tabs)/search')} />
         </View>
       ) : (
         <ScrollView
           style={styles.ordersList}
           refreshControl={
-            <RefreshControl refreshing={refreshing} onRefresh={onRefresh} colors={[TarodanColors.primary]} />
+            <RefreshControl refreshing={refreshing} onRefresh={onRefresh} colors={[colors.primary[600]!]} />
           }
         >
           {orders.map((order) => (
-            <Card key={order.id} style={styles.orderCard}>
-              <TouchableOpacity onPress={() => router.push(`/orders/${order.id}`)}>
+            <Card key={order.id} variant="elevated" padding={0} style={styles.orderCard}>
+              <Pressable onPress={() => router.push(`/orders/${order.id}`)}>
                 <View style={styles.orderHeader}>
-                  <Text variant="bodySmall" style={styles.orderNumber}>
+                  <Text variant="caption" style={styles.orderNumber}>
                     Sipariş #{order.orderNumber}
                   </Text>
-                  <View style={[styles.statusBadge, { backgroundColor: getStatusColor(order.status) + '20' }]}>
-                    <Text style={[styles.statusText, { color: getStatusColor(order.status) }]}>
-                      {getStatusText(order.status)}
-                    </Text>
-                  </View>
+                  <StatusBadge status={order.status} config={uiOrderStatusConfig} size="sm" />
                 </View>
 
                 <View style={styles.orderContent}>
@@ -255,66 +236,64 @@ export default function OrdersScreen() {
                     style={styles.productImage}
                   />
                   <View style={styles.productInfo}>
-                    <Text variant="titleSmall" numberOfLines={2}>{order.product.title}</Text>
-                    <Text variant="bodySmall" style={styles.sellerName}>
+                    <Text variant="label" numberOfLines={2}>{order.product.title}</Text>
+                    <Text variant="caption" style={styles.sellerName}>
                       Satıcı: {order.seller.displayName}
                     </Text>
-                    <Text variant="titleMedium" style={styles.price}>
+                    <Text variant="h3" style={styles.price}>
                       {formatPrice(order.totalAmount)}
                     </Text>
                   </View>
                 </View>
 
                 <View style={styles.orderFooter}>
-                  <Text variant="bodySmall" style={styles.dateText}>
+                  <Text variant="caption" style={styles.dateText}>
                     {formatDate(order.createdAt)}
                   </Text>
 
                   {/* Tracking */}
                   {order.trackingNumber && order.status === 'shipped' && (
-                    <TouchableOpacity 
+                    <Pressable
                       style={styles.trackButton}
                       onPress={() => router.push(`/order-track?orderNumber=${order.orderNumber}`)}
                     >
-                      <Ionicons name="location" size={14} color={TarodanColors.primary} />
+                      <Ionicons name="location" size={14} color={colors.primary[600]!} />
                       <Text style={styles.trackButtonText}>Takip Et</Text>
-                    </TouchableOpacity>
+                    </Pressable>
                   )}
                 </View>
-              </TouchableOpacity>
+              </Pressable>
 
               {/* Rating buttons for completed orders */}
               {canRate(order) && (
                 <View style={styles.ratingSection}>
                   {!order.hasProductRating && (
                     <Button
-                      mode="outlined"
-                      compact
+                      variant="outline"
+                      size="sm"
                       icon="star"
+                      title="Ürünü Değerlendir"
                       onPress={() => setRatingModal({
                         visible: true,
                         type: 'product',
                         order,
                       })}
                       style={styles.rateButton}
-                    >
-                      Ürünü Değerlendir
-                    </Button>
+                    />
                   )}
                   {!order.hasSellerRating && (
                     <Button
-                      mode="outlined"
-                      compact
-                      icon="account-star"
+                      variant="outline"
+                      size="sm"
+                      icon="person"
+                      title="Satıcıyı Değerlendir"
                       onPress={() => setRatingModal({
                         visible: true,
                         type: 'seller',
                         order,
                       })}
                       style={styles.rateButton}
-                    >
-                      Satıcıyı Değerlendir
-                    </Button>
+                    />
                   )}
                 </View>
               )}
@@ -344,17 +323,17 @@ export default function OrdersScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: TarodanColors.backgroundSecondary,
+    backgroundColor: colors.surface.alt,
   },
   centeredContainer: {
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
     padding: 32,
-    backgroundColor: TarodanColors.background,
+    backgroundColor: colors.surface.DEFAULT,
   },
   header: {
-    backgroundColor: TarodanColors.primary,
+    backgroundColor: colors.primary[600]!,
     paddingTop: 50,
     paddingBottom: 16,
     paddingHorizontal: 20,
@@ -365,7 +344,7 @@ const styles = StyleSheet.create({
   headerTitle: {
     fontSize: 18,
     fontWeight: 'bold',
-    color: TarodanColors.textOnPrimary,
+    color: colors.white,
   },
   title: {
     marginTop: 16,
@@ -374,27 +353,17 @@ const styles = StyleSheet.create({
   subtitle: {
     textAlign: 'center',
     marginBottom: 24,
-    color: TarodanColors.textSecondary,
+    color: colors.text.muted,
   },
   filterContainer: {
-    backgroundColor: TarodanColors.background,
+    backgroundColor: colors.surface.DEFAULT,
     paddingVertical: 12,
     paddingHorizontal: 16,
     borderBottomWidth: 1,
-    borderBottomColor: TarodanColors.border,
+    borderBottomColor: colors.border.DEFAULT,
   },
-  filterChip: {
+  filterChipSpacing: {
     marginRight: 8,
-    backgroundColor: TarodanColors.surfaceVariant,
-  },
-  filterChipSelected: {
-    backgroundColor: TarodanColors.primary,
-  },
-  filterChipText: {
-    color: TarodanColors.textSecondary,
-  },
-  filterChipTextSelected: {
-    color: TarodanColors.textOnPrimary,
   },
   loadingContainer: {
     flex: 1,
@@ -410,12 +379,11 @@ const styles = StyleSheet.create({
   emptyTitle: {
     marginTop: 16,
     marginBottom: 8,
-    color: TarodanColors.textPrimary,
   },
   emptySubtitle: {
     textAlign: 'center',
     marginBottom: 24,
-    color: TarodanColors.textSecondary,
+    color: colors.text.muted,
   },
   ordersList: {
     flex: 1,
@@ -423,7 +391,6 @@ const styles = StyleSheet.create({
   },
   orderCard: {
     marginBottom: 12,
-    backgroundColor: TarodanColors.background,
   },
   orderHeader: {
     flexDirection: 'row',
@@ -433,16 +400,7 @@ const styles = StyleSheet.create({
     paddingBottom: 8,
   },
   orderNumber: {
-    color: TarodanColors.textSecondary,
-  },
-  statusBadge: {
-    paddingHorizontal: 10,
-    paddingVertical: 4,
-    borderRadius: 12,
-  },
-  statusText: {
-    fontSize: 12,
-    fontWeight: '500',
+    color: colors.text.muted,
   },
   orderContent: {
     flexDirection: 'row',
@@ -452,19 +410,19 @@ const styles = StyleSheet.create({
   productImage: {
     width: 80,
     height: 80,
-    borderRadius: 8,
-    backgroundColor: TarodanColors.surfaceVariant,
+    borderRadius: radius.md,
+    backgroundColor: colors.surface.alt,
   },
   productInfo: {
     flex: 1,
     marginLeft: 12,
   },
   sellerName: {
-    color: TarodanColors.textSecondary,
+    color: colors.text.muted,
     marginTop: 4,
   },
   price: {
-    color: TarodanColors.primary,
+    color: colors.primary[600]!,
     fontWeight: 'bold',
     marginTop: 4,
   },
@@ -475,19 +433,19 @@ const styles = StyleSheet.create({
     paddingHorizontal: 12,
     paddingBottom: 12,
     borderTopWidth: 1,
-    borderTopColor: TarodanColors.border,
+    borderTopColor: colors.border.DEFAULT,
     marginTop: 8,
     paddingTop: 8,
   },
   dateText: {
-    color: TarodanColors.textSecondary,
+    color: colors.text.muted,
   },
   trackButton: {
     flexDirection: 'row',
     alignItems: 'center',
   },
   trackButtonText: {
-    color: TarodanColors.primary,
+    color: colors.primary[600]!,
     marginLeft: 4,
     fontWeight: '500',
   },
@@ -499,6 +457,6 @@ const styles = StyleSheet.create({
     flexWrap: 'wrap',
   },
   rateButton: {
-    borderColor: TarodanColors.primary,
+    borderColor: colors.primary[600]!,
   },
 });

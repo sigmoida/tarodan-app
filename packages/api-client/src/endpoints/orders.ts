@@ -76,4 +76,14 @@ export class OrderEndpoints {
     const response = await this.client.post<Order>(`/orders/${id}/confirm-delivery`);
     return response.data;
   }
+
+  /**
+   * 48h pencere — alıcı erken onay (Faz 4C.1).
+   */
+  async confirmReceipt(id: string): Promise<{ completed: boolean }> {
+    const response = await this.client.post<{ completed: boolean }>(
+      `/orders/${id}/confirm-receipt`,
+    );
+    return response.data;
+  }
 }

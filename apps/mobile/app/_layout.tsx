@@ -1,17 +1,21 @@
-import 'react-native-gesture-handler';
 import { useEffect } from 'react';
 import { Stack } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import { PaperProvider } from 'react-native-paper';
-import { useColorScheme, StyleSheet } from 'react-native';
-import { GestureHandlerRootView } from 'react-native-gesture-handler';
-import { SafeAreaProvider } from 'react-native-safe-area-context';
 import * as SplashScreen from 'expo-splash-screen';
 import Constants from 'expo-constants';
+import { theme } from '@tarodan/ui-native';
 import { useAuthStore } from '../src/stores/authStore';
-import { registerForPushNotifications } from '../src/services/push';
-import { TarodanLightTheme, TarodanDarkTheme } from '../src/theme';
+import { registerForPushNotifications, setupPushNotificationRouting } from '../src/services/push';
+import { LanguageProvider } from '../src/i18n';
+import { initSentry } from '../src/services/sentry';
+
+const { colors } = theme;
+
+// Initialize Sentry as early as possible. Currently a stub (no-op until
+// `@sentry/react-native` is installed and SENTRY_PACKAGE_LOADED is flipped
+// to true in services/sentry.ts). Calling here ensures the wiring exists.
+initSentry();
 
 // Conditionally import notifications - only in development builds, not Expo Go
 let Notifications: any = null;
@@ -54,8 +58,6 @@ if (!isExpoGo && Notifications) {
 }
 
 export default function RootLayout() {
-  const colorScheme = useColorScheme();
-  const theme = colorScheme === 'dark' ? TarodanDarkTheme : TarodanLightTheme;
   const { loadToken, isAuthenticated } = useAuthStore();
 
   useEffect(() => {
@@ -79,30 +81,31 @@ export default function RootLayout() {
     prepare();
   }, []);
 
+  // Wire push notification deep-link routing (tap + foreground-received).
+  // Safe in Expo Go (no-op when expo-notifications isn't available).
+  useEffect(() => {
+    const teardown = setupPushNotificationRouting();
+    return () => {
+      teardown();
+    };
+  }, []);
+
   return (
-    <GestureHandlerRootView style={styles.root}>
-      <SafeAreaProvider>
-        <QueryClientProvider client={queryClient}>
-          <PaperProvider theme={theme}>
-            <StatusBar style="auto" />
-            <Stack
-              screenOptions={{
-                headerStyle: { backgroundColor: theme.colors.primary },
-                headerTintColor: '#fff',
-                headerTitleStyle: { fontWeight: 'bold' },
-                headerShown: false,
-              }}
-            >
-              <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
-              <Stack.Screen name="(auth)" options={{ headerShown: false }} />
-            </Stack>
-          </PaperProvider>
-        </QueryClientProvider>
-      </SafeAreaProvider>
-    </GestureHandlerRootView>
+    <QueryClientProvider client={queryClient}>
+      <LanguageProvider>
+        <StatusBar style="auto" />
+        <Stack
+          screenOptions={{
+            headerStyle: { backgroundColor: colors.primary[600]! },
+            headerTintColor: colors.white,
+            headerTitleStyle: { fontWeight: 'bold' },
+            headerShown: false,
+          }}
+        >
+          <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
+          <Stack.Screen name="(auth)" options={{ headerShown: false }} />
+        </Stack>
+      </LanguageProvider>
+    </QueryClientProvider>
   );
 }
-
-const styles = StyleSheet.create({
-  root: { flex: 1 },
-});

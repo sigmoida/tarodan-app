@@ -36,6 +36,7 @@ interface CartState {
   // Computed
   getSubtotal: () => number;
   getItemCount: () => number;
+  isInCart: (productId: string) => boolean;
 }
 
 const CART_EXPIRY_HOURS = 24;
@@ -141,6 +142,10 @@ export const useCartStore = create<CartState>()(
 
       getItemCount: () => {
         return get().items.reduce((sum, item) => sum + item.quantity, 0);
+      },
+
+      isInCart: (productId: string) => {
+        return get().items.some((item) => item.productId === productId);
       },
     }),
     {

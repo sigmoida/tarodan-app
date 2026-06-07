@@ -78,8 +78,9 @@ export const useTradesStore = create<TradesState>((set, get) => ({
     set({ isLoading: true, error: null });
     
     try {
-      const response = await api.getTrades({ status });
-      set({ trades: response.trades, isLoading: false });
+      const axiosResponse = await api.get('/trades', { params: status ? { status } : undefined });
+      const response: any = axiosResponse.data?.data ?? axiosResponse.data ?? { trades: [] };
+      set({ trades: response.trades ?? response ?? [], isLoading: false });
     } catch (error: any) {
       set({
         error: error.response?.data?.message || 'Takaslar yüklenemedi',
@@ -92,8 +93,9 @@ export const useTradesStore = create<TradesState>((set, get) => ({
     set({ isLoading: true, error: null, currentTrade: null });
     
     try {
-      const response = await api.getTrade(id);
-      set({ currentTrade: response.trade, isLoading: false });
+      const axiosResponse = await api.get(`/trades/${id}`);
+      const response: any = axiosResponse.data?.data ?? axiosResponse.data ?? {};
+      set({ currentTrade: response.trade ?? response, isLoading: false });
     } catch (error: any) {
       set({
         error: error.response?.data?.message || 'Takas yüklenemedi',
@@ -106,7 +108,7 @@ export const useTradesStore = create<TradesState>((set, get) => ({
     set({ isLoading: true, error: null });
     
     try {
-      await api.createTrade(data);
+      await api.post('/trades', data);
       set({ isLoading: false });
       get().fetchTrades();
     } catch (error: any) {
@@ -122,7 +124,7 @@ export const useTradesStore = create<TradesState>((set, get) => ({
     set({ isLoading: true, error: null });
     
     try {
-      await api.acceptTrade(id);
+      await api.post(`/trades/${id}/accept`);
       get().fetchTrade(id);
     } catch (error: any) {
       set({
@@ -137,7 +139,7 @@ export const useTradesStore = create<TradesState>((set, get) => ({
     set({ isLoading: true, error: null });
     
     try {
-      await api.rejectTrade(id, reason);
+      await api.post(`/trades/${id}/reject`, reason ? { reason } : {});
       get().fetchTrade(id);
     } catch (error: any) {
       set({
@@ -168,7 +170,7 @@ export const useTradesStore = create<TradesState>((set, get) => ({
     set({ isLoading: true, error: null });
     
     try {
-      await api.shipTrade(id, trackingNumber, provider);
+      await api.post(`/trades/${id}/ship`, { trackingNumber, provider });
       get().fetchTrade(id);
     } catch (error: any) {
       set({
@@ -183,7 +185,7 @@ export const useTradesStore = create<TradesState>((set, get) => ({
     set({ isLoading: true, error: null });
     
     try {
-      await api.confirmTradeReceipt(id);
+      await api.post(`/trades/${id}/confirm-receipt`);
       get().fetchTrade(id);
     } catch (error: any) {
       set({

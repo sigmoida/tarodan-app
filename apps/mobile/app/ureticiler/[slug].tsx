@@ -1,154 +1,92 @@
-import React, { useState, useEffect, useCallback } from 'react';
-import {
-  View,
-  Text,
-  FlatList,
-  TouchableOpacity,
-  StyleSheet,
-  ActivityIndicator,
-  Image,
-  RefreshControl,
-  Dimensions,
-} from 'react-native';
+import React from 'react';
+import { View, StyleSheet, Image } from 'react-native';
+
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { router, useLocalSearchParams } from 'expo-router';
-import { Ionicons } from '@expo/vector-icons';
-import { TarodanColors, CONDITIONS } from '../../src/theme/colors';
+import { useLocalSearchParams } from 'expo-router';
+import { useQuery } from '@tanstack/react-query';
 import { manufacturersApi, productsApi } from '../../src/services/api';
-import { transformImageUrl } from '../../src/utils/imageUrl';
+import { theme, Text } from '@tarodan/ui-native';
+import { ScreenHeader } from '../../src/components/common';
+const { colors } = theme;
+import { ProductGrid } from '../../src/components/product';
+import type { ProductCardProduct } from '../../src/components/product';
+import { resolveImageUrl } from '../../src/utils/imageUrl';
 
-const { width } = Dimensions.get('window');
-const CARD_WIDTH = (width - 48) / 2;
-
-const getConditionInfo = (condition: string) => {
-  const found = CONDITIONS.find((c) => c.id === condition);
-  return found || { name: condition || 'Belirtilmemiş', color: TarodanColors.textTertiary };
-};
+interface Manufacturer {
+  id: string;
+  name: string;
+  slug: string;
+  logo?: string | null;
+  description?: string;
+  productCount?: number;
+}
 
 export default function ManufacturerDetailScreen() {
   const { slug } = useLocalSearchParams<{ slug: string }>();
-  const [manufacturer, setManufacturer] = useState<any>(null);
-  const [products, setProducts] = useState<any[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [refreshing, setRefreshing] = useState(false);
 
-  const fetchData = useCallback(async () => {
-    if (!slug) return;
-    try {
-      const [mfgRes, productsRes] = await Promise.all([
-        manufacturersApi.findBySlug(slug),
-        productsApi.getAll({ manufacturerSlug: slug }),
-      ]);
-      setManufacturer(mfgRes.data?.data || mfgRes.data);
-      setProducts(productsRes.data?.data || productsRes.data?.products || []);
-    } catch (err) {
-      console.log('Manufacturer detail fetch error:', err);
-    } finally {
-      setLoading(false);
-    }
-  }, [slug]);
+  const { data: manufacturer, isLoading: loadingManufacturer } = useQuery<Manufacturer | null>({
+    queryKey: ['manufacturer', slug],
+    queryFn: async () => {
+      if (!slug) return null;
+      const response = await manufacturersApi.findBySlug(slug);
+      return response.data?.data ?? response.data ?? null;
+    },
+    enabled: !!slug,
+  });
 
-  useEffect(() => {
-    fetchData();
-  }, [fetchData]);
+  const {
+    data: productsData,
+    isLoading: loadingProducts,
+    error,
+    refetch,
+    isRefetching,
+  } = useQuery({
+    queryKey: ['manufacturer-products', slug],
+    queryFn: async () => {
+      if (!slug) return [];
+      const response = await productsApi.getAll({ manufacturer: slug, status: 'active' });
+      const payload = response.data?.data ?? response.data ?? [];
+      return Array.isArray(payload) ? payload : payload?.products ?? [];
+    },
+    enabled: !!slug,
+  });
 
-  const onRefresh = useCallback(async () => {
-    setRefreshing(true);
-    await fetchData();
-    setRefreshing(false);
-  }, [fetchData]);
-
-  const getImageUrl = (item: any) => {
-    const img = Array.isArray(item.images) ? item.images[0] : item.images;
-    return transformImageUrl(img);
-  };
-
-  const renderProductCard = ({ item }: { item: any }) => {
-    const condition = getConditionInfo(item.condition);
-    return (
-      <TouchableOpacity
-        style={styles.productCard}
-        activeOpacity={0.7}
-        onPress={() => router.push(`/product/${item.id}`)}
-      >
-        <View style={styles.productImageContainer}>
-          <Image source={{ uri: getImageUrl(item) }} style={styles.productImage} />
-          <View style={[styles.conditionBadge, { backgroundColor: condition.color }]}>
-            <Text style={styles.conditionText}>{condition.name}</Text>
-          </View>
-        </View>
-        <View style={styles.productContent}>
-          <Text style={styles.productTitle} numberOfLines={2}>{item.title}</Text>
-          <Text style={styles.productPrice}>₺{item.price?.toLocaleString('tr-TR')}</Text>
-        </View>
-      </TouchableOpacity>
-    );
-  };
-
-  const ListHeader = () => (
-    <View style={styles.mfgInfo}>
-      <View style={styles.mfgIconContainer}>
-        <Ionicons name="construct" size={32} color={TarodanColors.primary} />
-      </View>
-      <Text style={styles.mfgName}>{manufacturer?.name || 'Üretici'}</Text>
-      {manufacturer?.description ? (
-        <Text style={styles.mfgDescription}>{manufacturer.description}</Text>
-      ) : null}
-      <View style={styles.mfgStats}>
-        <View style={styles.statItem}>
-          <Ionicons name="cube-outline" size={18} color={TarodanColors.primary} />
-          <Text style={styles.statText}>{products.length} ürün</Text>
-        </View>
-      </View>
-      <Text style={styles.sectionTitle}>Ürünler</Text>
-    </View>
-  );
-
-  if (loading) {
-    return (
-      <SafeAreaView style={styles.container} edges={['top']}>
-        <View style={styles.header}>
-          <TouchableOpacity onPress={() => router.back()} style={styles.headerBtn}>
-            <Ionicons name="arrow-back" size={24} color={TarodanColors.textOnPrimary} />
-          </TouchableOpacity>
-          <Text style={styles.headerTitle}>Üretici</Text>
-          <View style={styles.headerBtn} />
-        </View>
-        <View style={styles.centered}>
-          <ActivityIndicator size="large" color={TarodanColors.primary} />
-          <Text style={styles.loadingText}>Yükleniyor...</Text>
-        </View>
-      </SafeAreaView>
-    );
-  }
+  const products: ProductCardProduct[] = productsData ?? [];
 
   return (
     <SafeAreaView style={styles.container} edges={['top']}>
-      <View style={styles.header}>
-        <TouchableOpacity onPress={() => router.back()} style={styles.headerBtn}>
-          <Ionicons name="arrow-back" size={24} color={TarodanColors.textOnPrimary} />
-        </TouchableOpacity>
-        <Text style={styles.headerTitle} numberOfLines={1}>{manufacturer?.name || 'Üretici'}</Text>
-        <View style={styles.headerBtn} />
-      </View>
+      <ScreenHeader title={manufacturer?.name || 'Üretici'} />
 
-      <FlatList
-        data={products}
-        keyExtractor={(item) => String(item.id)}
-        numColumns={2}
-        columnWrapperStyle={styles.row}
-        contentContainerStyle={styles.listContent}
-        renderItem={renderProductCard}
-        ListHeaderComponent={ListHeader}
-        refreshControl={
-          <RefreshControl refreshing={refreshing} onRefresh={onRefresh} colors={[TarodanColors.primary]} />
-        }
-        ListEmptyComponent={
-          <View style={styles.emptyContainer}>
-            <Ionicons name="cube-outline" size={64} color={TarodanColors.textTertiary} />
-            <Text style={styles.emptyTitle}>Ürün bulunamadı</Text>
-            <Text style={styles.emptySubtitle}>Bu üreticide henüz ürün yok</Text>
-          </View>
+      <ProductGrid
+        items={products}
+        loading={loadingProducts}
+        refreshing={isRefetching}
+        onRefresh={refetch}
+        errorMessage={error ? 'Ürünler yüklenemedi.' : null}
+        onRetry={refetch}
+        emptyTitle="Bu üreticiye ait ürün yok"
+        emptySubtitle="Yakında yeni ürünler eklenecek."
+        emptyIcon="business-outline"
+        ListHeaderComponent={
+          loadingManufacturer ? null : manufacturer ? (
+            <View style={styles.header}>
+              {manufacturer.logo ? (
+                <Image source={{ uri: resolveImageUrl(manufacturer.logo) }} style={styles.logo} resizeMode="contain" />
+              ) : (
+                <View style={styles.logoFallback}>
+                  <Text style={styles.logoFallbackText}>
+                    {manufacturer.name.charAt(0).toUpperCase()}
+                  </Text>
+                </View>
+              )}
+              <View style={styles.headerText}>
+                <Text style={styles.name}>{manufacturer.name}</Text>
+                {typeof manufacturer.productCount === 'number' ? (
+                  <Text style={styles.count}>{manufacturer.productCount} ürün</Text>
+                ) : null}
+              </View>
+            </View>
+          ) : null
         }
       />
     </SafeAreaView>
@@ -158,162 +96,47 @@ export default function ManufacturerDetailScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: TarodanColors.backgroundSecondary,
+    backgroundColor: colors.surface.alt,
   },
   header: {
-    backgroundColor: TarodanColors.primary,
-    paddingBottom: 16,
-    paddingHorizontal: 20,
     flexDirection: 'row',
-    justifyContent: 'space-between',
     alignItems: 'center',
+    gap: 12,
+    padding: 16,
+    backgroundColor: colors.surface.DEFAULT,
+    borderRadius: 12,
+    marginBottom: 12,
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: colors.border.DEFAULT,
   },
-  headerBtn: {
-    width: 32,
-    height: 32,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  headerTitle: {
-    fontSize: 18,
-    fontWeight: 'bold',
-    color: TarodanColors.textOnPrimary,
-    maxWidth: width * 0.6,
-  },
-  mfgInfo: {
-    backgroundColor: TarodanColors.background,
-    padding: 24,
-    alignItems: 'center',
-    marginBottom: 8,
-  },
-  mfgIconContainer: {
+  logo: {
     width: 72,
     height: 72,
-    borderRadius: 36,
-    backgroundColor: TarodanColors.primaryLight,
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginBottom: 12,
   },
-  mfgName: {
-    fontSize: 22,
-    fontWeight: 'bold',
-    color: TarodanColors.textPrimary,
-    textAlign: 'center',
-  },
-  mfgDescription: {
-    fontSize: 14,
-    color: TarodanColors.textSecondary,
-    textAlign: 'center',
-    marginTop: 8,
-    lineHeight: 20,
-    paddingHorizontal: 16,
-  },
-  mfgStats: {
-    flexDirection: 'row',
-    marginTop: 16,
-    paddingTop: 16,
-    borderTopWidth: 1,
-    borderTopColor: TarodanColors.border,
-    width: '100%',
-    justifyContent: 'center',
-  },
-  statItem: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 6,
-  },
-  statText: {
-    fontSize: 14,
-    fontWeight: '600',
-    color: TarodanColors.textSecondary,
-  },
-  sectionTitle: {
-    fontSize: 16,
-    fontWeight: 'bold',
-    color: TarodanColors.textPrimary,
-    alignSelf: 'flex-start',
-    marginTop: 24,
-  },
-  listContent: {
-    paddingHorizontal: 16,
-    paddingBottom: 32,
-  },
-  row: {
-    justifyContent: 'space-between',
-    marginBottom: 12,
-  },
-  productCard: {
-    width: CARD_WIDTH,
-    backgroundColor: TarodanColors.background,
+  logoFallback: {
+    width: 72,
+    height: 72,
     borderRadius: 12,
-    overflow: 'hidden',
-    elevation: 2,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.1,
-    shadowRadius: 3,
-  },
-  productImageContainer: {
-    position: 'relative',
-  },
-  productImage: {
-    width: '100%',
-    height: CARD_WIDTH * 0.9,
-    backgroundColor: TarodanColors.surfaceVariant,
-  },
-  conditionBadge: {
-    position: 'absolute',
-    top: 8,
-    left: 8,
-    paddingHorizontal: 8,
-    paddingVertical: 3,
-    borderRadius: 6,
-  },
-  conditionText: {
-    fontSize: 10,
-    fontWeight: 'bold',
-    color: '#fff',
-  },
-  productContent: {
-    padding: 12,
-  },
-  productTitle: {
-    fontSize: 13,
-    fontWeight: '600',
-    color: TarodanColors.textPrimary,
-    marginBottom: 6,
-  },
-  productPrice: {
-    fontSize: 16,
-    fontWeight: 'bold',
-    color: TarodanColors.price,
-  },
-  centered: {
-    flex: 1,
+    backgroundColor: colors.primary[50]!,
+    alignItems: 'center',
     justifyContent: 'center',
-    alignItems: 'center',
-    padding: 32,
   },
-  loadingText: {
-    marginTop: 12,
-    fontSize: 14,
-    color: TarodanColors.textSecondary,
+  logoFallbackText: {
+    fontSize: 28,
+    fontWeight: '800',
+    color: colors.primary[600]!,
   },
-  emptyContainer: {
-    paddingVertical: 60,
-    alignItems: 'center',
+  headerText: {
+    flex: 1,
   },
-  emptyTitle: {
-    marginTop: 16,
-    fontSize: 18,
-    fontWeight: 'bold',
-    color: TarodanColors.textPrimary,
+  name: {
+    fontSize: 20,
+    fontWeight: '800',
+    color: colors.text.heading,
   },
-  emptySubtitle: {
-    marginTop: 8,
-    fontSize: 14,
-    color: TarodanColors.textSecondary,
-    textAlign: 'center',
+  count: {
+    fontSize: 13,
+    color: colors.text.muted,
+    marginTop: 4,
   },
 });

@@ -1,6 +1,7 @@
 import { create } from 'zustand';
 import * as SecureStore from 'expo-secure-store';
 import { authApi, userApi } from '../services/api';
+import { setUser as setSentryUser, captureException } from '../services/sentry';
 
 // Membership tier types
 export type MembershipTier = 'free' | 'basic' | 'premium' | 'business';
@@ -307,6 +308,12 @@ export const useAuthStore = create<AuthState>((set, get) => ({
     const limits = TIER_LIMITS[mappedUser.membershipTier];
     console.log('🔐 Auth stored - Tier:', mappedUser.membershipTier);
     set({ isAuthenticated: true, token, user: mappedUser, limits });
+    // Tag every subsequent Sentry event with the active user.
+    setSentryUser({
+      id: mappedUser.id,
+      email: mappedUser.email,
+      username: mappedUser.displayName,
+    });
   },
 
   // Web ile aynı endpoint: POST /auth/logout
@@ -314,11 +321,14 @@ export const useAuthStore = create<AuthState>((set, get) => ({
     try {
       await authApi.logout();
     } catch (error) {
-      // Ignore logout errors
+      // Best-effort: report logout failures so we don't lose them silently
+      // (no-op in dev/Expo Go).
+      captureException(error, { level: 'warning', tags: { flow: 'logout' } });
     }
     await SecureStore.deleteItemAsync('accessToken');
     await SecureStore.deleteItemAsync('refreshToken');
     set({ isAuthenticated: false, token: null, user: null, limits: null });
+    setSentryUser(null);
   },
 
   loadToken: async () => {
@@ -336,11 +346,47 @@ export const useAuthStore = create<AuthState>((set, get) => ({
           limits,
           isLoading: false,
         });
+      } else if (process.env.EXPO_PUBLIC_MAESTRO === '1') {
+        // Maestro test bypass: auto-login with seeded credentials so that
+        // e2e flows skip the login UI entirely. Code path is gated behind
+        // EXPO_PUBLIC_MAESTRO and excluded from prod bundles by Expo's
+        // compile-time env replacement (env var unset → branch dead-code
+        // eliminated).
+        try {
+          const email = process.env.EXPO_PUBLIC_MAESTRO_EMAIL || 'zeynep@demo.com';
+          const password = process.env.EXPO_PUBLIC_MAESTRO_PASSWORD || 'Demo123!';
+          console.log('🤖 Maestro auto-login as', email);
+          const response = await authApi.login(email, password);
+          const data: any = response.data;
+          const accessToken = data.tokens?.accessToken || data.accessToken;
+          const refreshToken = data.tokens?.refreshToken || data.refreshToken;
+          const user = data.user;
+          if (accessToken && user) {
+            await get().login(accessToken, user, refreshToken);
+            set({ isLoading: false });
+          } else {
+            set({ isLoading: false });
+          }
+        } catch (autoLoginError) {
+          captureException(autoLoginError, {
+            level: 'warning',
+            tags: { flow: 'auth.maestroAutoLogin' },
+          });
+          set({
+            isAuthenticated: false,
+            token: null,
+            user: null,
+            limits: null,
+            isLoading: false,
+          });
+        }
       } else {
         set({ isLoading: false });
       }
     } catch (error) {
-      // Token invalid or expired
+      // Token invalid or expired — usually 401 (expected). Report only once,
+      // tagged so dashboards can filter expected vs unexpected.
+      captureException(error, { level: 'warning', tags: { flow: 'auth.loadToken' } });
       await SecureStore.deleteItemAsync('accessToken');
       await SecureStore.deleteItemAsync('refreshToken');
       set({ isAuthenticated: false, token: null, user: null, limits: null, isLoading: false });
@@ -365,6 +411,7 @@ export const useAuthStore = create<AuthState>((set, get) => ({
       set({ user: mappedUser, limits });
     } catch (error) {
       console.error('Failed to refresh user data:', error);
+      captureException(error, { level: 'warning', tags: { flow: 'auth.refreshUserData' } });
     }
   },
 

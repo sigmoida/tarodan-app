@@ -48,6 +48,23 @@ export const tradeStatusConfig: Record<string, StatusConfig> = {
 };
 
 /**
+ * RefundRequest status → Badge mapping
+ * Used in: admin refund-requests page, mobile order detail refund banner
+ */
+export const refundRequestStatusConfig: Record<string, StatusConfig> = {
+  pending_review: { label: 'İnceleniyor', variant: 'warning' },
+  approved: { label: 'Onaylandı', variant: 'success' },
+  wait_for_delivery: { label: 'Ürün Teslimi Bekleniyor', variant: 'info' },
+  return_shipment_open: { label: 'İade Kargosu Hazır', variant: 'info' },
+  return_in_transit: { label: 'İade Yolda', variant: 'info' },
+  return_delivered: { label: 'İade Ulaştı', variant: 'info' },
+  refunded: { label: 'Para İade Edildi', variant: 'success' },
+  rejected: { label: 'Reddedildi', variant: 'danger' },
+  disputed: { label: 'İtirazlı', variant: 'destructive' },
+  cancelled: { label: 'İptal Edildi', variant: 'secondary' },
+};
+
+/**
  * Offer status → Badge mapping
  * Used in: offers page
  */

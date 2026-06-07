@@ -4,7 +4,7 @@ import { ApiProperty } from '@nestjs/swagger';
 export class GuestOrderTrackDto {
   @ApiProperty({
     description: 'Order number to track',
-    example: 'ORD-20250116-ABC123',
+    example: 'ORD-K7X9M2QF3N',
   })
   @IsString()
   orderNumber: string;

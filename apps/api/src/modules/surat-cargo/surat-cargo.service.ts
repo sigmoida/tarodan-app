@@ -143,6 +143,25 @@ export class SuratCargoService {
       };
     }
 
+    // Idempotency: retry sonrası "Bu gönderi daha önce oluşturulmuş" yanıtı,
+    // ilk denemenin Sürat'ta gönderiyi gerçekten oluşturduğu anlamına gelir →
+    // başarı say (cancel yolundaki "Bulunamadi = başarı" mantığıyla simetrik).
+    // Türkçe karakter varyasyonlarına toleranslı (gonderi/gönderi, olustur/oluştur).
+    if (/daha\s*[öo]nce\s*olu[şs]turul/i.test(normalized)) {
+      this.logger.warn({
+        msg: 'Surat shipment already exists (idempotent success)',
+        correlationId,
+        idempotencyKey,
+        suratMessage: normalized,
+      });
+      return {
+        ok: true,
+        suratMessage: 'Tamam',
+        correlationId,
+        idempotencyKey,
+      };
+    }
+
     this.logger.warn({
       msg: 'Surat business failure',
       correlationId,
@@ -181,9 +200,13 @@ export class SuratCargoService {
       const raw = await this.soapClient.callGonderiSil(ozelKargoTakipNo, { timeoutMs });
       const normalized = (raw || '').trim();
 
-      // "Tamam" = cancelled, "Pasif Edilecek Gonderi Bulunamadi!" = already gone (idempotent OK)
+      // Success patterns: "Tamam", "Gönderiniz başarı ile pasif edilmiştir.",
+      // "Pasif Edilecek Gonderi Bulunamadi!" (already gone, idempotent OK)
       if (
         normalized === 'Tamam' ||
+        /başarı\s*ile\s*pasif/i.test(normalized) ||
+        /basari\s*ile\s*pasif/i.test(normalized) ||
+        /pasif\s*edil(miş|mistir|miştir|mis)/i.test(normalized) ||
         /pasif edilecek gonderi bulunamadi/i.test(normalized) ||
         /bulunamadi/i.test(normalized)
       ) {

@@ -1,191 +1,149 @@
-import { View, ScrollView, StyleSheet, TouchableOpacity, Image, Dimensions, RefreshControl } from 'react-native';
-import { Text, Card, Searchbar, ActivityIndicator, Chip, IconButton, Menu, Divider } from 'react-native-paper';
-import { useState, useCallback, useMemo, useEffect } from 'react';
+import {
+  View,
+  FlatList,
+  StyleSheet,
+  TouchableOpacity,
+  Image,
+  Dimensions,
+  Modal,
+} from 'react-native';
+import { theme, Text, Input, Chip, Spinner, Radio } from '@tarodan/ui-native';
+import { useState, useMemo } from 'react';
 import { useInfiniteQuery } from '@tanstack/react-query';
 import { router, useLocalSearchParams } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { productsApi } from '../src/services/api';
-import { TarodanColors, BRANDS, SCALES } from '../src/theme';
 import { getImageUrl as getImageUrlFromUtils } from '../src/utils/imageUrl';
-import { safeString } from '../src/utils/safeString';
-import { isProductTradeOpen } from '../src/utils/isProductTradeOpen';
-import { buildProductListQueryParams } from '../src/utils/buildProductListQueryParams';
-import { formatApiErrorMessage } from '../src/utils/formatApiErrorMessage';
+import { asLabel } from '../src/utils/format';
+import ProductFilterSheet from '../src/components/ProductFilterSheet';
+import { useProductFilterOptions } from '../src/hooks/useProductFilterOptions';
+import {
+  EMPTY_FILTERS,
+  SORT_OPTIONS,
+  CONDITION_OPTIONS,
+  buildListParams,
+  countActiveFilters,
+  extractListings,
+  extractMeta,
+  type ProductFilters,
+} from '../src/utils/productFilters';
 
+const { colors, spacing } = theme;
 const { width } = Dimensions.get('window');
 const CARD_WIDTH = (width - 48) / 2;
+const PAGE_SIZE = 24;
 
-const CONDITIONS = [
-  { id: 'new', name: 'Yeni' },
-  { id: 'very_good', name: 'Mükemmel' },
-  { id: 'good', name: 'İyi' },
-  { id: 'fair', name: 'Orta' },
-];
-
-const PAGE_SIZE = 100;
-
-const SORT_OPTIONS = [
-  { id: 'created_desc', name: 'En Yeni' },
-  { id: 'created_asc', name: 'En Eski' },
-  { id: 'price_asc', name: 'Fiyat: Düşükten Yükseğe' },
-  { id: 'price_desc', name: 'Fiyat: Yüksekten Düşüğe' },
-  { id: 'title_asc', name: 'A-Z' },
-  { id: 'title_desc', name: 'Z-A' },
-];
+const conditionLabel = (v: string) =>
+  CONDITION_OPTIONS.find((c) => c.value === v)?.label || v;
 
 export default function ListingsScreen() {
-  const params = useLocalSearchParams<{ 
-    brand?: string; 
-    scale?: string; 
+  const params = useLocalSearchParams<{
+    brand?: string;
+    scale?: string;
     categoryId?: string;
+    category?: string;
+    manufacturer?: string;
     search?: string;
   }>();
-  
-  const [searchQuery, setSearchQuery] = useState(params.search || '');
-  const [debouncedSearch, setDebouncedSearch] = useState(() =>
-    String(params.search || '').trim()
-  );
-  const [showFilters, setShowFilters] = useState(false);
-  const [sortMenuVisible, setSortMenuVisible] = useState(false);
-  const [refreshing, setRefreshing] = useState(false);
-  
-  const [filters, setFilters] = useState({
+
+  const [filters, setFilters] = useState<ProductFilters>(() => ({
+    ...EMPTY_FILTERS,
+    search: params.search || '',
     brand: params.brand || '',
     scale: params.scale || '',
-    condition: '',
-    minPrice: '',
-    maxPrice: '',
-    tradeOnly: false,
-    sortBy: 'created_desc',
-  });
+    categoryId: params.categoryId || '',
+    category: params.category || '',
+    manufacturer: params.manufacturer || '',
+  }));
 
-  useEffect(() => {
-    const t = setTimeout(() => setDebouncedSearch(searchQuery.trim()), 400);
-    return () => clearTimeout(t);
-  }, [searchQuery]);
+  const [searchQuery, setSearchQuery] = useState(filters.search);
+  const [filterModalVisible, setFilterModalVisible] = useState(false);
+  const [sortMenuVisible, setSortMenuVisible] = useState(false);
 
-  const categoryIdParam = Array.isArray(params.categoryId)
-    ? params.categoryId[0]
-    : params.categoryId;
+  const options = useProductFilterOptions();
+
+  const applySearch = () =>
+    setFilters((prev) => ({ ...prev, search: searchQuery.trim() }));
 
   const {
     data,
     isLoading,
-    isFetchingNextPage,
-    hasNextPage,
     fetchNextPage,
+    hasNextPage,
+    isFetchingNextPage,
     refetch,
-    isError,
-    error,
+    isRefetching,
   } = useInfiniteQuery({
-    queryKey: ['listings', debouncedSearch, filters, categoryIdParam],
+    queryKey: ['listings', filters],
     initialPageParam: 1,
     queryFn: async ({ pageParam }) => {
-      const queryParams = buildProductListQueryParams({
-        page: pageParam as number,
-        limit: PAGE_SIZE,
-        search: debouncedSearch,
-        categoryId: categoryIdParam,
-        filters,
-      });
-
-      const response = await productsApi.getAll(queryParams);
-      const body = response.data as {
-        data?: unknown[];
-        products?: unknown[];
-        meta?: { total?: number; totalPages?: number; page?: number; limit?: number };
-      };
-      const rawItems = body?.data ?? body?.products ?? [];
-      const items = Array.isArray(rawItems) ? rawItems : [];
-      const meta = body?.meta;
-      const totalPages = meta?.totalPages;
-      const nextPage =
-        totalPages != null
-          ? pageParam < totalPages
-            ? pageParam + 1
-            : undefined
-          : items.length >= PAGE_SIZE
-            ? pageParam + 1
-            : undefined;
+      const listParams = buildListParams(filters, pageParam as number, PAGE_SIZE);
+      const res = await productsApi.getAll(listParams);
       return {
-        items,
-        nextPage,
-        total: meta?.total,
+        items: extractListings(res.data),
+        meta: extractMeta(res.data, pageParam as number, PAGE_SIZE),
       };
     },
-    getNextPageParam: (lastPage) => lastPage.nextPage,
+    getNextPageParam: (last) =>
+      last.meta.page < last.meta.totalPages ? last.meta.page + 1 : undefined,
   });
 
-  const listings = useMemo(
+  const listings: any[] = useMemo(
     () => data?.pages.flatMap((p) => p.items) ?? [],
-    [data?.pages]
+    [data],
   );
-  const totalCount = data?.pages[0]?.total;
-
-  const onRefresh = useCallback(async () => {
-    setRefreshing(true);
-    await refetch();
-    setRefreshing(false);
-  }, [refetch]);
-
-  const listingsErrorMessage = isError
-    ? formatApiErrorMessage(error, 'İlanlar yüklenirken bir hata oluştu.')
-    : null;
-
-  const handleSearch = useCallback(() => {
-    setDebouncedSearch(searchQuery.trim());
-  }, [searchQuery]);
+  const total = data?.pages[0]?.meta.total ?? 0;
+  const activeFilterCount = useMemo(() => countActiveFilters(filters), [filters]);
 
   const clearFilters = () => {
-    setFilters({
-      brand: '',
-      scale: '',
-      condition: '',
-      minPrice: '',
-      maxPrice: '',
-      tradeOnly: false,
-      sortBy: 'created_desc',
-    });
+    setFilters({ ...EMPTY_FILTERS });
+    setSearchQuery('');
   };
 
-  const activeFilterCount = [
-    filters.brand,
-    filters.scale,
-    filters.condition,
-    filters.minPrice,
-    filters.maxPrice,
-    filters.tradeOnly,
-  ].filter(Boolean).length;
+  const getSortLabel = () =>
+    SORT_OPTIONS.find((o) => o.value === filters.sortBy)?.label || 'Sırala';
 
-  const getImageUrl = (item: any) => {
-    return getImageUrlFromUtils(item.images);
-  };
+  // Aktif filtre çipleri
+  const activeChips: { key: string; label: string; onRemove: () => void }[] = [];
+  if (filters.category) activeChips.push({ key: 'cat', label: filters.category, onRemove: () => setFilters({ ...filters, category: '', categoryId: '' }) });
+  if (filters.brand) activeChips.push({ key: 'brand', label: filters.brand, onRemove: () => setFilters({ ...filters, brand: '', brandId: '', carModel: '', carModelId: '' }) });
+  if (filters.carModel) activeChips.push({ key: 'model', label: filters.carModel, onRemove: () => setFilters({ ...filters, carModel: '', carModelId: '' }) });
+  if (filters.manufacturer) activeChips.push({ key: 'manuf', label: filters.manufacturer, onRemove: () => setFilters({ ...filters, manufacturer: '', manufacturerId: '' }) });
+  if (filters.scale) activeChips.push({ key: 'scale', label: filters.scale, onRemove: () => setFilters({ ...filters, scale: '' }) });
+  if (filters.material) activeChips.push({ key: 'mat', label: filters.material, onRemove: () => setFilters({ ...filters, material: '' }) });
+  if (filters.condition) activeChips.push({ key: 'cond', label: conditionLabel(filters.condition), onRemove: () => setFilters({ ...filters, condition: '' }) });
+  if (filters.minPrice || filters.maxPrice) activeChips.push({ key: 'price', label: `₺${filters.minPrice || '0'} - ₺${filters.maxPrice || '∞'}`, onRemove: () => setFilters({ ...filters, minPrice: '', maxPrice: '' }) });
+  if (filters.tradeOnly) activeChips.push({ key: 'trade', label: 'Takaslı', onRemove: () => setFilters({ ...filters, tradeOnly: false }) });
+  if (filters.discountOnly) activeChips.push({ key: 'disc', label: 'İndirimli', onRemove: () => setFilters({ ...filters, discountOnly: false }) });
+  if (filters.preOrder) activeChips.push({ key: 'pre', label: 'Ön Sipariş', onRemove: () => setFilters({ ...filters, preOrder: false }) });
+  if (filters.limited) activeChips.push({ key: 'lim', label: 'Limited', onRemove: () => setFilters({ ...filters, limited: false }) });
+  if (filters.set) activeChips.push({ key: 'set', label: 'Set', onRemove: () => setFilters({ ...filters, set: false }) });
 
-  const renderProductCard = (item: any) => {
-    const isTradeEnabled = isProductTradeOpen(item);
-
+  const renderProductCard = ({ item }: { item: any }) => {
+    const isTradeEnabled = item.isTradeEnabled || item.trade_available || item.tradeAvailable;
     return (
       <TouchableOpacity
-        key={item.id}
         style={styles.productCard}
         onPress={() => router.push(`/product/${item.id}`)}
       >
         <View style={styles.productImageContainer}>
-          <Image source={{ uri: getImageUrl(item) }} style={styles.productImage} />
+          <Image source={{ uri: getImageUrlFromUtils(item.images) }} style={styles.productImage} />
           {isTradeEnabled && (
             <View style={styles.tradeBadge}>
-              <Ionicons name="swap-horizontal" size={12} color="#fff" />
+              <Ionicons name="swap-horizontal" size={12} color={colors.white} />
               <Text style={styles.tradeBadgeText}>Takas</Text>
             </View>
           )}
         </View>
         <View style={styles.productContent}>
           <Text style={styles.productTitle} numberOfLines={2}>{item.title}</Text>
-          <Text style={styles.productMeta}>{safeString(item.brand, 'Marka')} • {safeString(item.scale, '1:64')}</Text>
+          <Text style={styles.productMeta}>
+            {asLabel(item.brand, 'Marka')} • {asLabel(item.scale, '1:64')}
+          </Text>
           <View style={styles.priceRow}>
             <Text style={styles.productPrice}>₺{item.price?.toLocaleString('tr-TR')}</Text>
             {item.condition && (
-              <Text style={styles.conditionBadge}>{safeString(item.condition)}</Text>
+              <Text style={styles.conditionBadge}>{conditionLabel(item.condition)}</Text>
             )}
           </View>
         </View>
@@ -193,16 +151,12 @@ export default function ListingsScreen() {
     );
   };
 
-  const getSortLabel = () => {
-    return SORT_OPTIONS.find(o => o.id === filters.sortBy)?.name || 'Sırala';
-  };
-
   return (
     <View style={styles.container}>
       {/* Header */}
       <View style={styles.header}>
         <TouchableOpacity onPress={() => router.back()}>
-          <Ionicons name="arrow-back" size={24} color={TarodanColors.textOnPrimary} />
+          <Ionicons name="arrow-back" size={24} color={colors.white} />
         </TouchableOpacity>
         <Text style={styles.headerTitle}>İlanlar</Text>
         <View style={{ width: 24 }} />
@@ -210,196 +164,140 @@ export default function ListingsScreen() {
 
       {/* Search & Sort */}
       <View style={styles.searchSection}>
-        <Searchbar
+        <Input
           placeholder="Model, marka ara..."
           value={searchQuery}
           onChangeText={setSearchQuery}
-          onSubmitEditing={handleSearch}
-          style={styles.searchBar}
+          onSubmitEditing={applySearch}
+          leftIconName="search"
+          containerStyle={styles.searchBar}
         />
         <View style={styles.actionRow}>
-          <Menu
-            visible={sortMenuVisible}
-            onDismiss={() => setSortMenuVisible(false)}
-            anchor={
-              <TouchableOpacity 
-                style={styles.sortButton}
-                onPress={() => setSortMenuVisible(true)}
-              >
-                <Ionicons name="swap-vertical" size={18} color={TarodanColors.textSecondary} />
-                <Text style={styles.sortButtonText}>{getSortLabel()}</Text>
-              </TouchableOpacity>
-            }
-          >
-            {SORT_OPTIONS.map((option) => (
-              <Menu.Item
-                key={option.id}
-                onPress={() => {
-                  setFilters({ ...filters, sortBy: option.id });
-                  setSortMenuVisible(false);
-                }}
-                title={option.name}
-                leadingIcon={filters.sortBy === option.id ? 'check' : undefined}
-              />
-            ))}
-          </Menu>
+          <TouchableOpacity style={styles.sortButton} onPress={() => setSortMenuVisible(true)}>
+            <Ionicons name="swap-vertical" size={18} color={colors.text.muted} />
+            <Text style={styles.sortButtonText}>{getSortLabel()}</Text>
+          </TouchableOpacity>
 
-          <TouchableOpacity
-            style={[styles.filterButton, showFilters && styles.filterButtonActive]}
-            onPress={() => setShowFilters(!showFilters)}
-          >
-            <Ionicons 
-              name="options-outline" 
-              size={18} 
-              color={showFilters ? '#fff' : TarodanColors.textSecondary} 
-            />
-            <Text style={[styles.filterButtonText, showFilters && styles.filterButtonTextActive]}>
-              Filtreler
-            </Text>
+          <TouchableOpacity style={styles.filterButton} onPress={() => setFilterModalVisible(true)}>
+            <Ionicons name="options-outline" size={18} color={colors.text.muted} />
+            <Text style={styles.filterButtonText}>Filtreler</Text>
             {activeFilterCount > 0 && (
-              <View style={[styles.filterBadge, showFilters && styles.filterBadgeActive]}>
-                <Text style={[styles.filterBadgeText, showFilters && styles.filterBadgeTextActive]}>
-                  {activeFilterCount}
-                </Text>
+              <View style={styles.filterBadge}>
+                <Text style={styles.filterBadgeText}>{activeFilterCount}</Text>
               </View>
             )}
           </TouchableOpacity>
         </View>
       </View>
 
-      {/* Filters Panel */}
-      {showFilters && (
-        <View style={styles.filtersPanel}>
-          <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.filterChips}>
-            {/* Brand Filter */}
-            {BRANDS.slice(0, 6).map((brand) => (
-              <Chip
-                key={brand.id}
-                selected={filters.brand === brand.name}
-                onPress={() => setFilters({ ...filters, brand: filters.brand === brand.name ? '' : brand.name })}
-                style={styles.filterChip}
-                textStyle={filters.brand === brand.name ? styles.filterChipTextActive : undefined}
-              >
-                {brand.name}
-              </Chip>
-            ))}
-          </ScrollView>
-          
-          <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.filterChips}>
-            {/* Scale Filter */}
-            {SCALES.map((scale) => (
-              <Chip
-                key={scale.id}
-                selected={filters.scale === scale.id}
-                onPress={() => setFilters({ ...filters, scale: filters.scale === scale.id ? '' : scale.id })}
-                style={styles.filterChip}
-                textStyle={filters.scale === scale.id ? styles.filterChipTextActive : undefined}
-              >
-                {scale.name}
-              </Chip>
-            ))}
-          </ScrollView>
-
-          <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.filterChips}>
-            {/* Condition Filter */}
-            {CONDITIONS.map((cond) => (
-              <Chip
-                key={cond.id}
-                selected={filters.condition === cond.id}
-                onPress={() => setFilters({ ...filters, condition: filters.condition === cond.id ? '' : cond.id })}
-                style={styles.filterChip}
-                textStyle={filters.condition === cond.id ? styles.filterChipTextActive : undefined}
-              >
-                {cond.name}
-              </Chip>
-            ))}
-            
-            {/* Trade Only */}
-            <Chip
-              selected={filters.tradeOnly}
-              onPress={() => setFilters({ ...filters, tradeOnly: !filters.tradeOnly })}
-              style={styles.filterChip}
-              icon="swap-horizontal"
-              textStyle={filters.tradeOnly ? styles.filterChipTextActive : undefined}
-            >
-              Sadece Takas
-            </Chip>
-          </ScrollView>
-
-          {activeFilterCount > 0 && (
-            <TouchableOpacity style={styles.clearFiltersBtn} onPress={clearFilters}>
-              <Ionicons name="close-circle" size={16} color={TarodanColors.primary} />
-              <Text style={styles.clearFiltersText}>Filtreleri Temizle</Text>
-            </TouchableOpacity>
+      {/* Active Filter Chips */}
+      {activeChips.length > 0 && (
+        <FlatList
+          horizontal
+          data={activeChips}
+          keyExtractor={(c) => c.key}
+          showsHorizontalScrollIndicator={false}
+          style={styles.chipsRow}
+          contentContainerStyle={styles.chipsContent}
+          renderItem={({ item }) => (
+            <Chip label={`${item.label} ✕`} variant="primary" onPress={item.onRemove} />
           )}
-        </View>
+          ListFooterComponent={
+            <Chip label="Temizle ✕" variant="neutral" onPress={clearFilters} />
+          }
+        />
       )}
 
+      {/* Sort Modal */}
+      <Modal visible={sortMenuVisible} transparent animationType="slide" onRequestClose={() => setSortMenuVisible(false)}>
+        <TouchableOpacity style={styles.sortBackdrop} activeOpacity={1} onPress={() => setSortMenuVisible(false)}>
+          <View style={styles.sortSheet}>
+            <View style={styles.sortHandle} />
+            <Text variant="h2" style={styles.sortTitle}>Sırala</Text>
+            {SORT_OPTIONS.map((option) => {
+              const isSelected = filters.sortBy === option.value;
+              return (
+                <TouchableOpacity
+                  key={option.value}
+                  style={styles.sortOption}
+                  onPress={() => {
+                    setFilters({ ...filters, sortBy: option.value });
+                    setSortMenuVisible(false);
+                  }}
+                >
+                  <Text style={styles.sortOptionText}>{option.label}</Text>
+                  <Radio checked={isSelected} onChange={() => {
+                    setFilters({ ...filters, sortBy: option.value });
+                    setSortMenuVisible(false);
+                  }} />
+                </TouchableOpacity>
+              );
+            })}
+          </View>
+        </TouchableOpacity>
+      </Modal>
+
+      {/* Filter Sheet */}
+      <ProductFilterSheet
+        visible={filterModalVisible}
+        onClose={() => setFilterModalVisible(false)}
+        filters={filters}
+        onChange={setFilters}
+        onClear={clearFilters}
+        options={options}
+        resultCount={total}
+      />
+
       {/* Listings */}
-      {listingsErrorMessage ? (
-        <View style={styles.emptyContainer}>
-          <Ionicons name="cloud-offline-outline" size={64} color={TarodanColors.error} />
-          <Text style={styles.emptyTitle}>Liste alınamadı</Text>
-          <Text style={styles.emptySubtitle}>{listingsErrorMessage}</Text>
-          <TouchableOpacity style={styles.retryBtn} onPress={() => refetch()}>
-            <Text style={styles.retryBtnText}>Tekrar dene</Text>
-          </TouchableOpacity>
-        </View>
-      ) : isLoading ? (
+      {isLoading ? (
         <View style={styles.loadingContainer}>
-          <ActivityIndicator size="large" color={TarodanColors.primary} />
+          <Spinner size="lg" />
           <Text style={styles.loadingText}>İlanlar yükleniyor...</Text>
         </View>
-      ) : !listings || listings.length === 0 ? (
-        <View style={styles.emptyContainer}>
-          <Ionicons name="pricetag-outline" size={64} color={TarodanColors.textLight} />
-          <Text style={styles.emptyTitle}>İlan bulunamadı</Text>
-          <Text style={styles.emptySubtitle}>Farklı filtreler deneyebilirsiniz</Text>
-        </View>
       ) : (
-        <ScrollView
-          style={styles.listingsContainer}
+        <FlatList
+          data={listings}
+          numColumns={2}
+          keyExtractor={(item, index) => `${item.id}-${index}`}
+          renderItem={renderProductCard}
+          columnWrapperStyle={styles.listRow}
           contentContainerStyle={styles.listingsContent}
-          refreshControl={
-            <RefreshControl refreshing={refreshing} onRefresh={onRefresh} colors={[TarodanColors.primary]} />
+          showsVerticalScrollIndicator={false}
+          refreshing={isRefetching}
+          onRefresh={refetch}
+          onEndReached={() => {
+            if (hasNextPage && !isFetchingNextPage) fetchNextPage();
+          }}
+          onEndReachedThreshold={0.5}
+          ListHeaderComponent={
+            <Text style={styles.resultsCount}>{total} ilan bulundu</Text>
           }
-        >
-          <Text style={styles.resultsCount}>
-            {listings.length} ilan gösteriliyor
-            {typeof totalCount === 'number' && totalCount > listings.length
-              ? ` (toplam ${totalCount})`
-              : ''}
-          </Text>
-          <View style={styles.productsGrid}>
-            {listings.map((item: any) => renderProductCard(item))}
-          </View>
-          {hasNextPage ? (
-            <TouchableOpacity
-              style={styles.loadMoreBtn}
-              onPress={() => fetchNextPage()}
-              disabled={isFetchingNextPage}
-            >
-              {isFetchingNextPage ? (
-                <ActivityIndicator color={TarodanColors.primary} />
-              ) : (
-                <Text style={styles.loadMoreText}>Daha fazla yükle</Text>
-              )}
-            </TouchableOpacity>
-          ) : null}
-          <View style={{ height: 100 }} />
-        </ScrollView>
+          ListFooterComponent={
+            isFetchingNextPage ? (
+              <View style={{ paddingVertical: spacing[4] }}>
+                <Spinner size="md" color={colors.primary[600]!} />
+              </View>
+            ) : (
+              <View style={{ height: 60 }} />
+            )
+          }
+          ListEmptyComponent={
+            <View style={styles.emptyContainer}>
+              <Ionicons name="pricetag-outline" size={64} color={colors.text.subtle} />
+              <Text style={styles.emptyTitle}>İlan bulunamadı</Text>
+              <Text style={styles.emptySubtitle}>Farklı filtreler deneyebilirsiniz</Text>
+            </View>
+          }
+        />
       )}
     </View>
   );
 }
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: TarodanColors.backgroundSecondary,
-  },
+  container: { flex: 1, backgroundColor: colors.surface.alt },
   header: {
-    backgroundColor: TarodanColors.primary,
+    backgroundColor: colors.primary[600]!,
     paddingTop: 50,
     paddingBottom: 16,
     paddingHorizontal: 20,
@@ -407,240 +305,113 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     alignItems: 'center',
   },
-  headerTitle: {
-    fontSize: 18,
-    fontWeight: 'bold',
-    color: TarodanColors.textOnPrimary,
-  },
+  headerTitle: { fontSize: 18, fontWeight: 'bold', color: colors.white },
   searchSection: {
-    backgroundColor: TarodanColors.background,
+    backgroundColor: colors.surface.DEFAULT,
     paddingHorizontal: 16,
     paddingVertical: 12,
     borderBottomWidth: 1,
-    borderBottomColor: TarodanColors.border,
+    borderBottomColor: colors.border.DEFAULT,
   },
-  searchBar: {
-    backgroundColor: TarodanColors.surfaceVariant,
-    elevation: 0,
-    borderRadius: 8,
-    marginBottom: 12,
-  },
-  actionRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-  },
+  searchBar: { marginBottom: 12 },
+  actionRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
   sortButton: {
     flexDirection: 'row',
     alignItems: 'center',
     paddingVertical: 8,
     paddingHorizontal: 12,
     borderRadius: 8,
-    backgroundColor: TarodanColors.surfaceVariant,
+    backgroundColor: colors.surface.alt,
   },
-  sortButtonText: {
-    marginLeft: 6,
-    fontSize: 13,
-    color: TarodanColors.textSecondary,
-  },
+  sortButtonText: { marginLeft: 6, fontSize: 13, color: colors.text.muted },
   filterButton: {
     flexDirection: 'row',
     alignItems: 'center',
     paddingVertical: 8,
     paddingHorizontal: 12,
     borderRadius: 8,
-    backgroundColor: TarodanColors.surfaceVariant,
+    backgroundColor: colors.surface.alt,
   },
-  filterButtonActive: {
-    backgroundColor: TarodanColors.primary,
-  },
-  filterButtonText: {
-    marginLeft: 6,
-    fontSize: 13,
-    color: TarodanColors.textSecondary,
-  },
-  filterButtonTextActive: {
-    color: '#fff',
-  },
+  filterButtonText: { marginLeft: 6, fontSize: 13, color: colors.text.muted },
   filterBadge: {
     marginLeft: 6,
-    backgroundColor: TarodanColors.primary,
+    backgroundColor: colors.primary[600]!,
     borderRadius: 10,
     paddingHorizontal: 6,
     paddingVertical: 2,
   },
-  filterBadgeActive: {
-    backgroundColor: '#fff',
+  filterBadgeText: { fontSize: 11, fontWeight: 'bold', color: colors.white },
+  chipsRow: { backgroundColor: colors.surface.DEFAULT, maxHeight: 56, flexGrow: 0 },
+  chipsContent: { paddingHorizontal: 16, paddingVertical: 12, gap: 8, alignItems: 'center' },
+  sortBackdrop: { flex: 1, backgroundColor: colors.overlay.black50, justifyContent: 'flex-end' },
+  sortSheet: {
+    backgroundColor: colors.surface.DEFAULT,
+    borderTopLeftRadius: 20,
+    borderTopRightRadius: 20,
+    padding: 20,
+    paddingBottom: 40,
   },
-  filterBadgeText: {
-    fontSize: 11,
-    fontWeight: 'bold',
-    color: '#fff',
+  sortHandle: {
+    width: 40,
+    height: 4,
+    backgroundColor: colors.border.DEFAULT,
+    borderRadius: 2,
+    alignSelf: 'center',
+    marginBottom: 16,
   },
-  filterBadgeTextActive: {
-    color: TarodanColors.primary,
-  },
-  filtersPanel: {
-    backgroundColor: TarodanColors.background,
-    paddingVertical: 12,
-    borderBottomWidth: 1,
-    borderBottomColor: TarodanColors.border,
-  },
-  filterChips: {
-    paddingHorizontal: 16,
-    marginBottom: 8,
-  },
-  filterChip: {
-    marginRight: 8,
-    backgroundColor: TarodanColors.surfaceVariant,
-  },
-  filterChipTextActive: {
-    color: '#fff',
-  },
-  clearFiltersBtn: {
+  sortTitle: { fontSize: 18, fontWeight: 'bold', color: colors.text.heading, marginBottom: 8 },
+  sortOption: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingHorizontal: 16,
-    paddingTop: 8,
-  },
-  clearFiltersText: {
-    marginLeft: 6,
-    fontSize: 13,
-    color: TarodanColors.primary,
-    fontWeight: '500',
-  },
-  loadingContainer: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  loadingText: {
-    marginTop: 12,
-    color: TarodanColors.textSecondary,
-  },
-  emptyContainer: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-    padding: 32,
-  },
-  emptyTitle: {
-    marginTop: 16,
-    fontSize: 18,
-    fontWeight: 'bold',
-    color: TarodanColors.textPrimary,
-  },
-  emptySubtitle: {
-    marginTop: 8,
-    fontSize: 14,
-    color: TarodanColors.textSecondary,
-    textAlign: 'center',
-  },
-  retryBtn: {
-    marginTop: 16,
-    paddingHorizontal: 20,
-    paddingVertical: 12,
-    backgroundColor: TarodanColors.primary,
-    borderRadius: 8,
-  },
-  retryBtnText: {
-    color: '#fff',
-    fontWeight: '600',
-  },
-  loadMoreBtn: {
-    marginTop: 16,
-    paddingVertical: 14,
-    alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: TarodanColors.surfaceVariant,
-    borderRadius: 8,
-  },
-  loadMoreText: {
-    fontSize: 15,
-    fontWeight: '600',
-    color: TarodanColors.primary,
-  },
-  listingsContainer: {
-    flex: 1,
-  },
-  listingsContent: {
-    padding: 16,
-  },
-  resultsCount: {
-    fontSize: 13,
-    color: TarodanColors.textSecondary,
-    marginBottom: 12,
-  },
-  productsGrid: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
     justifyContent: 'space-between',
+    paddingVertical: 14,
+    borderBottomWidth: 1,
+    borderBottomColor: colors.border.subtle,
   },
+  sortOptionText: { fontSize: 15, color: colors.text.heading },
+  loadingContainer: { flex: 1, justifyContent: 'center', alignItems: 'center' },
+  loadingText: { marginTop: 12, color: colors.text.muted },
+  emptyContainer: { flex: 1, justifyContent: 'center', alignItems: 'center', padding: 32, paddingTop: 80 },
+  emptyTitle: { marginTop: 16, fontSize: 18, fontWeight: 'bold', color: colors.text.heading },
+  emptySubtitle: { marginTop: 8, fontSize: 14, color: colors.text.muted, textAlign: 'center' },
+  listingsContent: { padding: 16 },
+  listRow: { justifyContent: 'space-between' },
+  resultsCount: { fontSize: 13, color: colors.text.muted, marginBottom: 12 },
   productCard: {
     width: CARD_WIDTH,
-    backgroundColor: TarodanColors.background,
+    backgroundColor: colors.surface.DEFAULT,
     borderRadius: 12,
     overflow: 'hidden',
     marginBottom: 16,
     elevation: 2,
-    shadowColor: '#000',
+    shadowColor: colors.black,
     shadowOffset: { width: 0, height: 1 },
     shadowOpacity: 0.1,
     shadowRadius: 2,
   },
-  productImageContainer: {
-    position: 'relative',
-  },
-  productImage: {
-    width: '100%',
-    height: CARD_WIDTH * 0.9,
-    backgroundColor: TarodanColors.surfaceVariant,
-  },
+  productImageContainer: { position: 'relative' },
+  productImage: { width: '100%', height: CARD_WIDTH * 0.9, backgroundColor: colors.surface.alt },
   tradeBadge: {
     position: 'absolute',
     top: 8,
     left: 8,
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: TarodanColors.success,
+    backgroundColor: colors.success[600]!,
     paddingHorizontal: 8,
     paddingVertical: 4,
     borderRadius: 4,
   },
-  tradeBadgeText: {
-    marginLeft: 4,
-    fontSize: 11,
-    fontWeight: 'bold',
-    color: '#fff',
-  },
-  productContent: {
-    padding: 12,
-  },
-  productTitle: {
-    fontSize: 13,
-    fontWeight: '600',
-    color: TarodanColors.textPrimary,
-    marginBottom: 4,
-  },
-  productMeta: {
-    fontSize: 11,
-    color: TarodanColors.textSecondary,
-    marginBottom: 8,
-  },
-  priceRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-  },
-  productPrice: {
-    fontSize: 16,
-    fontWeight: 'bold',
-    color: TarodanColors.primary,
-  },
+  tradeBadgeText: { marginLeft: 4, fontSize: 11, fontWeight: 'bold', color: colors.white },
+  productContent: { padding: 12 },
+  productTitle: { fontSize: 13, fontWeight: '600', color: colors.text.heading, marginBottom: 4 },
+  productMeta: { fontSize: 11, color: colors.text.muted, marginBottom: 8 },
+  priceRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
+  productPrice: { fontSize: 16, fontWeight: 'bold', color: colors.primary[600]! },
   conditionBadge: {
     fontSize: 10,
-    color: TarodanColors.textSecondary,
-    backgroundColor: TarodanColors.surfaceVariant,
+    color: colors.text.muted,
+    backgroundColor: colors.surface.alt,
     paddingHorizontal: 6,
     paddingVertical: 2,
     borderRadius: 4,

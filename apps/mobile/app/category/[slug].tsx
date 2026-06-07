@@ -1,14 +1,16 @@
 import { useState, useCallback } from 'react';
 import { View, ScrollView, StyleSheet, TouchableOpacity, Image, Dimensions, RefreshControl } from 'react-native';
-import { Text, Card, Searchbar, ActivityIndicator, Chip, Menu } from 'react-native-paper';
+import { theme, Chip, Spinner, Text, Input, Modal } from '@tarodan/ui-native';
 import { useQuery } from '@tanstack/react-query';
 import { router, useLocalSearchParams } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { productsApi, categoriesApi } from '../../src/services/api';
-import { TarodanColors, SCALES } from '../../src/theme';
+import { SCALES } from '../../src/theme';
 import { getImageUrl as getImageUrlFromUtils } from '../../src/utils/imageUrl';
+import { isProductTradeOpen } from '../../src/utils/isProductTradeOpen';
 import { safeString } from '../../src/utils/safeString';
 
+const { colors } = theme;
 const { width } = Dimensions.get('window');
 const CARD_WIDTH = (width - 48) / 2;
 
@@ -54,7 +56,7 @@ export default function CategoryScreen() {
         };
         if (searchQuery) params.search = searchQuery;
         if (selectedScale) params.scale = selectedScale;
-        
+
         const response = await productsApi.getAll(params);
         return response.data.data || response.data.products || [];
       } catch (error) {
@@ -92,12 +94,12 @@ export default function CategoryScreen() {
           <Image source={{ uri: getImageUrl(item) }} style={styles.productImage} />
           {isTradeEnabled && (
             <View style={styles.tradeBadge}>
-              <Ionicons name="swap-horizontal" size={12} color="#fff" />
+              <Ionicons name="swap-horizontal" size={12} color={colors.white} />
               <Text style={styles.tradeBadgeText}>Takas</Text>
             </View>
           )}
           <View style={styles.likesContainer}>
-            <Ionicons name="eye-outline" size={14} color={TarodanColors.textSecondary} />
+            <Ionicons name="eye-outline" size={14} color={colors.text.muted} />
             <Text style={styles.likesText}>{item.viewCount || 0}</Text>
           </View>
         </View>
@@ -115,7 +117,7 @@ export default function CategoryScreen() {
       {/* Header */}
       <View style={styles.header}>
         <TouchableOpacity onPress={() => router.back()}>
-          <Ionicons name="arrow-back" size={24} color={TarodanColors.textOnPrimary} />
+          <Ionicons name="arrow-back" size={24} color={colors.white} />
         </TouchableOpacity>
         <Text style={styles.headerTitle}>{category?.name || 'Kategori'}</Text>
         <View style={{ width: 24 }} />
@@ -123,59 +125,64 @@ export default function CategoryScreen() {
 
       {/* Search & Filters */}
       <View style={styles.filterSection}>
-        <Searchbar
+        <Input
           placeholder="Ara..."
           value={searchQuery}
           onChangeText={setSearchQuery}
-          style={styles.searchBar}
+          leftIconName="search"
+          containerStyle={styles.searchBar}
         />
-        
+
         <View style={styles.filterRow}>
-          <Menu
-            visible={sortMenuVisible}
-            onDismiss={() => setSortMenuVisible(false)}
-            anchor={
-              <TouchableOpacity 
-                style={styles.sortButton}
-                onPress={() => setSortMenuVisible(true)}
-              >
-                <Ionicons name="swap-vertical" size={18} color={TarodanColors.textSecondary} />
-                <Text style={styles.sortButtonText}>{getSortLabel()}</Text>
-              </TouchableOpacity>
-            }
+          <TouchableOpacity
+            style={styles.sortButton}
+            onPress={() => setSortMenuVisible(true)}
           >
-            {SORT_OPTIONS.map((option) => (
-              <Menu.Item
-                key={option.id}
-                onPress={() => {
-                  setSortBy(option.id);
-                  setSortMenuVisible(false);
-                }}
-                title={option.name}
-                leadingIcon={sortBy === option.id ? 'check' : undefined}
-              />
-            ))}
-          </Menu>
+            <Ionicons name="swap-vertical" size={18} color={colors.text.muted} />
+            <Text style={styles.sortButtonText}>{getSortLabel()}</Text>
+          </TouchableOpacity>
         </View>
+
+        <Modal
+          isOpen={sortMenuVisible}
+          onClose={() => setSortMenuVisible(false)}
+          title="Sırala"
+        >
+          {SORT_OPTIONS.map((option) => (
+            <TouchableOpacity
+              key={option.id}
+              style={styles.menuItem}
+              onPress={() => {
+                setSortBy(option.id);
+                setSortMenuVisible(false);
+              }}
+            >
+              {sortBy === option.id ? (
+                <Ionicons name="checkmark" size={20} color={colors.primary[600]!} />
+              ) : (
+                <View style={{ width: 20 }} />
+              )}
+              <Text style={styles.menuItemText}>{option.name}</Text>
+            </TouchableOpacity>
+          ))}
+        </Modal>
 
         {/* Scale Filter Chips */}
         <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.scaleChips}>
           <Chip
+            label="Tümü"
             selected={!selectedScale}
             onPress={() => setSelectedScale('')}
-            style={styles.scaleChip}
-          >
-            Tümü
-          </Chip>
+            variant="primary"
+          />
           {SCALES.slice(0, 6).map((scale) => (
             <Chip
               key={scale.id}
+              label={scale.name}
               selected={selectedScale === scale.id}
               onPress={() => setSelectedScale(selectedScale === scale.id ? '' : scale.id)}
-              style={styles.scaleChip}
-            >
-              {scale.name}
-            </Chip>
+              variant="primary"
+            />
           ))}
         </ScrollView>
       </View>
@@ -183,12 +190,12 @@ export default function CategoryScreen() {
       {/* Products */}
       {isLoading ? (
         <View style={styles.loadingContainer}>
-          <ActivityIndicator size="large" color={TarodanColors.primary} />
+          <Spinner size="lg" />
           <Text style={styles.loadingText}>Yükleniyor...</Text>
         </View>
       ) : !products || products.length === 0 ? (
         <View style={styles.emptyContainer}>
-          <Ionicons name="cube-outline" size={64} color={TarodanColors.textLight} />
+          <Ionicons name="cube-outline" size={64} color={colors.gray[500]} />
           <Text style={styles.emptyTitle}>Ürün bulunamadı</Text>
           <Text style={styles.emptySubtitle}>Bu kategoride henüz ürün yok</Text>
         </View>
@@ -197,7 +204,7 @@ export default function CategoryScreen() {
           style={styles.productsContainer}
           contentContainerStyle={styles.productsContent}
           refreshControl={
-            <RefreshControl refreshing={refreshing} onRefresh={onRefresh} colors={[TarodanColors.primary]} />
+            <RefreshControl refreshing={refreshing} onRefresh={onRefresh} colors={[colors.primary[600]!]} />
           }
         >
           <Text style={styles.resultsCount}>{products.length} ürün bulundu</Text>
@@ -214,10 +221,10 @@ export default function CategoryScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: TarodanColors.backgroundSecondary,
+    backgroundColor: colors.surface.alt,
   },
   header: {
-    backgroundColor: TarodanColors.primary,
+    backgroundColor: colors.primary[600]!,
     paddingTop: 50,
     paddingBottom: 16,
     paddingHorizontal: 20,
@@ -228,18 +235,15 @@ const styles = StyleSheet.create({
   headerTitle: {
     fontSize: 18,
     fontWeight: 'bold',
-    color: TarodanColors.textOnPrimary,
+    color: colors.white,
   },
   filterSection: {
-    backgroundColor: TarodanColors.background,
+    backgroundColor: colors.surface.DEFAULT,
     padding: 16,
     borderBottomWidth: 1,
-    borderBottomColor: TarodanColors.border,
+    borderBottomColor: colors.border.DEFAULT,
   },
   searchBar: {
-    backgroundColor: TarodanColors.surfaceVariant,
-    elevation: 0,
-    borderRadius: 8,
     marginBottom: 12,
   },
   filterRow: {
@@ -253,19 +257,25 @@ const styles = StyleSheet.create({
     paddingVertical: 8,
     paddingHorizontal: 12,
     borderRadius: 8,
-    backgroundColor: TarodanColors.surfaceVariant,
+    backgroundColor: colors.gray[50],
   },
   sortButtonText: {
     marginLeft: 6,
     fontSize: 13,
-    color: TarodanColors.textSecondary,
+    color: colors.text.muted,
+  },
+  menuItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: 12,
+    gap: 12,
+  },
+  menuItemText: {
+    fontSize: 15,
+    color: colors.text.heading,
   },
   scaleChips: {
     marginBottom: 4,
-  },
-  scaleChip: {
-    marginRight: 8,
-    backgroundColor: TarodanColors.surfaceVariant,
   },
   loadingContainer: {
     flex: 1,
@@ -274,7 +284,7 @@ const styles = StyleSheet.create({
   },
   loadingText: {
     marginTop: 12,
-    color: TarodanColors.textSecondary,
+    color: colors.text.muted,
   },
   emptyContainer: {
     flex: 1,
@@ -286,12 +296,12 @@ const styles = StyleSheet.create({
     marginTop: 16,
     fontSize: 18,
     fontWeight: 'bold',
-    color: TarodanColors.textPrimary,
+    color: colors.text.heading,
   },
   emptySubtitle: {
     marginTop: 8,
     fontSize: 14,
-    color: TarodanColors.textSecondary,
+    color: colors.text.muted,
     textAlign: 'center',
   },
   productsContainer: {
@@ -302,7 +312,7 @@ const styles = StyleSheet.create({
   },
   resultsCount: {
     fontSize: 13,
-    color: TarodanColors.textSecondary,
+    color: colors.text.muted,
     marginBottom: 12,
   },
   productsGrid: {
@@ -312,12 +322,12 @@ const styles = StyleSheet.create({
   },
   productCard: {
     width: CARD_WIDTH,
-    backgroundColor: TarodanColors.background,
+    backgroundColor: colors.surface.DEFAULT,
     borderRadius: 12,
     overflow: 'hidden',
     marginBottom: 16,
     elevation: 2,
-    shadowColor: '#000',
+    shadowColor: colors.black,
     shadowOffset: { width: 0, height: 1 },
     shadowOpacity: 0.1,
     shadowRadius: 2,
@@ -328,7 +338,7 @@ const styles = StyleSheet.create({
   productImage: {
     width: '100%',
     height: CARD_WIDTH * 0.9,
-    backgroundColor: TarodanColors.surfaceVariant,
+    backgroundColor: colors.gray[50],
   },
   tradeBadge: {
     position: 'absolute',
@@ -336,7 +346,7 @@ const styles = StyleSheet.create({
     left: 8,
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: TarodanColors.success,
+    backgroundColor: colors.success[600]!,
     paddingHorizontal: 8,
     paddingVertical: 4,
     borderRadius: 4,
@@ -345,7 +355,7 @@ const styles = StyleSheet.create({
     marginLeft: 4,
     fontSize: 11,
     fontWeight: 'bold',
-    color: '#fff',
+    color: colors.white,
   },
   likesContainer: {
     position: 'absolute',
@@ -353,7 +363,7 @@ const styles = StyleSheet.create({
     right: 8,
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: 'rgba(255,255,255,0.9)',
+    backgroundColor: colors.overlay.white90,
     paddingHorizontal: 6,
     paddingVertical: 3,
     borderRadius: 4,
@@ -361,7 +371,7 @@ const styles = StyleSheet.create({
   likesText: {
     marginLeft: 4,
     fontSize: 11,
-    color: TarodanColors.textSecondary,
+    color: colors.text.muted,
   },
   productContent: {
     padding: 12,
@@ -369,17 +379,17 @@ const styles = StyleSheet.create({
   productTitle: {
     fontSize: 13,
     fontWeight: '600',
-    color: TarodanColors.textPrimary,
+    color: colors.text.heading,
     marginBottom: 4,
   },
   productMeta: {
     fontSize: 11,
-    color: TarodanColors.textSecondary,
+    color: colors.text.muted,
     marginBottom: 8,
   },
   productPrice: {
     fontSize: 16,
     fontWeight: 'bold',
-    color: TarodanColors.primary,
+    color: colors.primary[600]!,
   },
 });

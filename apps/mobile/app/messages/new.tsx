@@ -1,5 +1,5 @@
 import { View, StyleSheet, TouchableOpacity, TextInput as RNTextInput, KeyboardAvoidingView, Platform } from 'react-native';
-import { Text, Searchbar, Avatar, ActivityIndicator, Button } from 'react-native-paper';
+import { Avatar, Button, Input, Spinner, Text, theme } from '@tarodan/ui-native';
 import { useState } from 'react';
 import { router, useLocalSearchParams } from 'expo-router';
 import { useQuery } from '@tanstack/react-query';
@@ -7,7 +7,9 @@ import { Ionicons } from '@expo/vector-icons';
 import { api } from '../../src/services/api';
 import { useMessagesStore } from '../../src/stores/messagesStore';
 import { useAuthStore } from '../../src/stores/authStore';
-import { TarodanColors } from '../../src/theme';
+import { useTranslation } from '../../src/i18n';
+
+const { colors } = theme;
 
 interface User {
   id: string;
@@ -17,17 +19,18 @@ interface User {
 }
 
 export default function NewMessageScreen() {
+  const { t } = useTranslation();
   const { sellerId, productId, productTitle } = useLocalSearchParams<{ sellerId?: string; productId?: string; productTitle?: string }>();
   const { canSendMessage, createThread } = useMessagesStore();
   const { limits } = useAuthStore();
-  
+
   const decodedProductTitle = productTitle ? decodeURIComponent(productTitle) : '';
-  
+
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedUser, setSelectedUser] = useState<User | null>(null);
   const [messageText, setMessageText] = useState(
     // Pre-fill message if coming from a product page
-    productId && decodedProductTitle 
+    productId && decodedProductTitle
       ? `Merhaba, "${decodedProductTitle}" ilanı hakkında bilgi almak istiyorum.\n\n`
       : ''
   );
@@ -91,11 +94,11 @@ export default function NewMessageScreen() {
 
     setSending(true);
     const threadId = await createThread(
-      selectedUser.id, 
-      messageText.trim(), 
+      selectedUser.id,
+      messageText.trim(),
       productId || undefined
     );
-    
+
     if (threadId) {
       router.replace(`/messages/${threadId}`);
     } else {
@@ -109,16 +112,16 @@ export default function NewMessageScreen() {
   };
 
   return (
-    <KeyboardAvoidingView 
+    <KeyboardAvoidingView
       style={styles.container}
       behavior={Platform.OS === 'ios' ? 'padding' : undefined}
     >
       {/* Header */}
       <View style={styles.header}>
         <TouchableOpacity onPress={() => router.back()}>
-          <Ionicons name="arrow-back" size={24} color={TarodanColors.textOnPrimary} />
+          <Ionicons name="arrow-back" size={24} color={colors.white} />
         </TouchableOpacity>
-        <Text style={styles.headerTitle}>Yeni Mesaj</Text>
+        <Text style={styles.headerTitle}>{t('mobile.messagesNew')}</Text>
         <View style={{ width: 24 }} />
       </View>
 
@@ -127,17 +130,17 @@ export default function NewMessageScreen() {
         {/* Recipient Selection */}
         {!selectedUser ? (
           <View style={styles.recipientSection}>
-            <Text variant="titleSmall" style={styles.sectionTitle}>Alıcı</Text>
-            <Searchbar
+            <Text variant="label" style={styles.sectionTitle}>Alıcı</Text>
+            <Input
               placeholder="Kullanıcı ara..."
               value={searchQuery}
               onChangeText={setSearchQuery}
-              style={styles.searchbar}
+              leftIconName="search"
             />
-            
+
             {searchLoading && (
               <View style={styles.loadingContainer}>
-                <ActivityIndicator size="small" color={TarodanColors.primary} />
+                <Spinner size="sm" />
               </View>
             )}
 
@@ -149,15 +152,15 @@ export default function NewMessageScreen() {
                     style={styles.userItem}
                     onPress={() => handleSelectUser(user)}
                   >
-                    {user.avatarUrl ? (
-                      <Avatar.Image size={40} source={{ uri: user.avatarUrl }} />
-                    ) : (
-                      <Avatar.Text size={40} label={user.displayName.charAt(0)} />
-                    )}
+                    <Avatar
+                      size="md"
+                      source={user.avatarUrl}
+                      name={user.displayName.charAt(0)}
+                    />
                     <View style={styles.userInfo}>
-                      <Text variant="bodyMedium">{user.displayName}</Text>
+                      <Text variant="body">{user.displayName}</Text>
                       {user.isSeller && (
-                        <Text variant="bodySmall" style={styles.sellerBadge}>Satıcı</Text>
+                        <Text variant="caption" style={styles.sellerBadge}>Satıcı</Text>
                       )}
                     </View>
                   </TouchableOpacity>
@@ -171,18 +174,18 @@ export default function NewMessageScreen() {
           </View>
         ) : (
           <View style={styles.selectedRecipient}>
-            <Text variant="titleSmall" style={styles.sectionTitle}>Alıcı</Text>
+            <Text variant="label" style={styles.sectionTitle}>Alıcı</Text>
             <View style={styles.recipientCard}>
-              {selectedUser.avatarUrl ? (
-                <Avatar.Image size={40} source={{ uri: selectedUser.avatarUrl }} />
-              ) : (
-                <Avatar.Text size={40} label={selectedUser.displayName.charAt(0)} />
-              )}
-              <Text variant="bodyMedium" style={styles.recipientName}>
+              <Avatar
+                size="md"
+                source={selectedUser.avatarUrl}
+                name={selectedUser.displayName.charAt(0)}
+              />
+              <Text variant="body" style={styles.recipientName}>
                 {selectedUser.displayName}
               </Text>
               <TouchableOpacity onPress={() => setSelectedUser(null)}>
-                <Ionicons name="close-circle" size={24} color={TarodanColors.textSecondary} />
+                <Ionicons name="close-circle" size={24} color={colors.text.muted} />
               </TouchableOpacity>
             </View>
           </View>
@@ -191,12 +194,12 @@ export default function NewMessageScreen() {
         {/* Product Reference */}
         {(product || (productId && decodedProductTitle)) && (
           <View style={styles.productSection}>
-            <Text variant="titleSmall" style={styles.sectionTitle}>Ürün Hakkında</Text>
-            <TouchableOpacity 
+            <Text variant="label" style={styles.sectionTitle}>Ürün Hakkında</Text>
+            <TouchableOpacity
               style={styles.productCard}
               onPress={() => router.push(`/product/${product?.id || productId}`)}
             >
-              <Ionicons name="pricetag" size={20} color={TarodanColors.primary} />
+              <Ionicons name="pricetag" size={20} color={colors.primary[600]!} />
               <Text style={styles.productTitle} numberOfLines={1}>
                 {product?.title || decodedProductTitle}
               </Text>
@@ -209,7 +212,7 @@ export default function NewMessageScreen() {
 
         {/* Message Input */}
         <View style={styles.messageSection}>
-          <Text variant="titleSmall" style={styles.sectionTitle}>Mesaj</Text>
+          <Text variant="label" style={styles.sectionTitle}>Mesaj</Text>
           <View style={styles.messageInputContainer}>
             <RNTextInput
               style={styles.messageInput}
@@ -227,7 +230,7 @@ export default function NewMessageScreen() {
         {/* Daily Limit Warning */}
         {!canSend && (
           <View style={styles.limitWarning}>
-            <Ionicons name="warning" size={20} color={TarodanColors.warning} />
+            <Ionicons name="warning" size={20} color={colors.warning[600]!} />
             <Text style={styles.limitWarningText}>
               Günlük mesaj limitinize ulaştınız ({limits?.maxMessagesPerDay || 50} mesaj)
             </Text>
@@ -241,15 +244,13 @@ export default function NewMessageScreen() {
       {/* Send Button */}
       <View style={styles.footer}>
         <Button
-          mode="contained"
+          variant="primary"
+          title="Gönder"
           onPress={handleSend}
           disabled={!selectedUser || !messageText.trim() || !canSend || sending}
-          loading={sending}
+          isLoading={sending}
           style={styles.sendButton}
-          contentStyle={styles.sendButtonContent}
-        >
-          Gönder
-        </Button>
+        />
       </View>
     </KeyboardAvoidingView>
   );
@@ -258,10 +259,10 @@ export default function NewMessageScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: TarodanColors.background,
+    backgroundColor: colors.surface.DEFAULT,
   },
   header: {
-    backgroundColor: TarodanColors.primary,
+    backgroundColor: colors.primary[600]!,
     paddingTop: 50,
     paddingBottom: 16,
     paddingHorizontal: 20,
@@ -272,7 +273,7 @@ const styles = StyleSheet.create({
   headerTitle: {
     fontSize: 18,
     fontWeight: 'bold',
-    color: TarodanColors.textOnPrimary,
+    color: colors.white,
   },
   content: {
     flex: 1,
@@ -280,13 +281,10 @@ const styles = StyleSheet.create({
   },
   sectionTitle: {
     marginBottom: 8,
-    color: TarodanColors.textPrimary,
+    color: colors.text.heading,
   },
   recipientSection: {
     marginBottom: 24,
-  },
-  searchbar: {
-    backgroundColor: TarodanColors.surfaceVariant,
   },
   loadingContainer: {
     padding: 16,
@@ -295,7 +293,7 @@ const styles = StyleSheet.create({
   searchResults: {
     marginTop: 8,
     borderRadius: 8,
-    backgroundColor: TarodanColors.surfaceVariant,
+    backgroundColor: colors.surface.alt,
     overflow: 'hidden',
   },
   userItem: {
@@ -303,18 +301,18 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     padding: 12,
     borderBottomWidth: 1,
-    borderBottomColor: TarodanColors.border,
+    borderBottomColor: colors.border.DEFAULT,
   },
   userInfo: {
     marginLeft: 12,
   },
   sellerBadge: {
-    color: TarodanColors.primary,
+    color: colors.primary[600]!,
   },
   noResults: {
     textAlign: 'center',
     marginTop: 16,
-    color: TarodanColors.textSecondary,
+    color: colors.text.muted,
   },
   selectedRecipient: {
     marginBottom: 24,
@@ -323,7 +321,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     padding: 12,
-    backgroundColor: TarodanColors.surfaceVariant,
+    backgroundColor: colors.surface.alt,
     borderRadius: 8,
   },
   recipientName: {
@@ -337,24 +335,24 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     padding: 12,
-    backgroundColor: TarodanColors.primaryLight + '20',
+    backgroundColor: colors.primary[50]!,
     borderRadius: 8,
   },
   productTitle: {
     flex: 1,
     marginHorizontal: 8,
-    color: TarodanColors.textPrimary,
+    color: colors.text.heading,
   },
   productPrice: {
     fontWeight: '600',
-    color: TarodanColors.primary,
+    color: colors.primary[600]!,
   },
   messageSection: {
     flex: 1,
   },
   messageInputContainer: {
     flex: 1,
-    backgroundColor: TarodanColors.surfaceVariant,
+    backgroundColor: colors.surface.alt,
     borderRadius: 8,
     padding: 12,
     minHeight: 150,
@@ -363,18 +361,18 @@ const styles = StyleSheet.create({
     flex: 1,
     fontSize: 16,
     textAlignVertical: 'top',
-    color: TarodanColors.textPrimary,
+    color: colors.text.heading,
   },
   charCount: {
     textAlign: 'right',
     fontSize: 12,
-    color: TarodanColors.textSecondary,
+    color: colors.text.muted,
     marginTop: 8,
   },
   limitWarning: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: TarodanColors.warningLight,
+    backgroundColor: colors.warning[50]!,
     padding: 12,
     borderRadius: 8,
     marginTop: 12,
@@ -382,23 +380,20 @@ const styles = StyleSheet.create({
   },
   limitWarningText: {
     flex: 1,
-    color: TarodanColors.warning,
+    color: colors.warning[600]!,
     fontSize: 13,
   },
   upgradeLink: {
-    color: TarodanColors.primary,
+    color: colors.primary[600]!,
     fontWeight: '600',
   },
   footer: {
     padding: 16,
     borderTopWidth: 1,
-    borderTopColor: TarodanColors.border,
-    backgroundColor: TarodanColors.background,
+    borderTopColor: colors.border.DEFAULT,
+    backgroundColor: colors.surface.DEFAULT,
   },
   sendButton: {
     borderRadius: 8,
-  },
-  sendButtonContent: {
-    paddingVertical: 8,
   },
 });

@@ -65,15 +65,16 @@ export const useListingsStore = create<ListingsState>((set, get) => ({
     set({ isLoading: true, error: null });
     
     try {
-      const response = await api.getListings({
-        page: currentPage,
-        ...filters,
+      const axiosResponse = await api.get('/products', {
+        params: { page: currentPage, ...filters },
       });
-      
+      const response: any = axiosResponse.data?.data ?? axiosResponse.data ?? { listings: [] };
+      const fetched: any[] = response.listings ?? response.products ?? [];
+
       set({
-        listings: reset ? response.listings : [...listings, ...response.listings],
+        listings: reset ? fetched : [...listings, ...fetched],
         page: currentPage + 1,
-        hasMore: response.listings.length >= 20,
+        hasMore: fetched.length >= 20,
         isLoading: false,
       });
     } catch (error: any) {
@@ -88,8 +89,9 @@ export const useListingsStore = create<ListingsState>((set, get) => ({
     set({ isLoading: true, error: null, currentListing: null });
     
     try {
-      const response = await api.getListing(id);
-      set({ currentListing: response.listing, isLoading: false });
+      const axiosResponse = await api.get(`/products/${id}`);
+      const response: any = axiosResponse.data?.data ?? axiosResponse.data ?? {};
+      set({ currentListing: response.listing ?? response, isLoading: false });
     } catch (error: any) {
       set({
         error: error.response?.data?.message || 'İlan yüklenemedi',
@@ -102,7 +104,9 @@ export const useListingsStore = create<ListingsState>((set, get) => ({
     set({ isLoading: true, error: null });
     
     try {
-      await api.createListing(data);
+      await api.post('/products', data, {
+        headers: { 'Content-Type': 'multipart/form-data' },
+      });
       set({ isLoading: false });
       // Refresh listings
       get().fetchListings(true);

@@ -146,13 +146,18 @@ export const authApi = {
 
 // Products (was Listings - endpoint is /products in backend)
 export const listingsApi = {
-  getFilters: () => api.get('/products/filters'),
+  getFilters: (params?: { manufacturer?: string }) =>
+    api.get('/products/filters', { params }),
+  getAttributeGroups: (params?: { manufacturer?: string }) =>
+    api.get('/products/attribute-groups', { params }),
   getPopular: (params?: { limit?: number; page?: number }) =>
     api.get('/products/popular', { params: { limit: 20, page: 1, ...params }, headers: { 'Cache-Control': 'no-cache', Pragma: 'no-cache' } }),
   getAll: (params?: Record<string, any>) =>
     api.get('/products', { params, headers: { 'Cache-Control': 'no-cache', Pragma: 'no-cache' } }),
   getOne: (id: string | number) => api.get(`/products/${id}`),
   getById: (id: string | number) => api.get(`/products/${id}`),
+  getSimilar: (id: string, limit = 12) =>
+    api.get(`/products/${id}/similar`, { params: { limit } }),
   create: (data: Record<string, any>) =>
     api.post('/products', data),
   update: (id: string | number, data: Record<string, any>) =>
@@ -186,8 +191,6 @@ export const tradesApi = {
     api.post(`/trades/${id}/cancel`, { reason }),
   ship: (id: string | number, data: { fromAddressId: string; carrier: string }) =>
     api.post(`/trades/${id}/ship`, data),
-  shipToWarehouse: (tradeId: string, data: { carrier: string; fromAddressId: string; trackingNumber?: string }) =>
-    api.post(`/trades/${tradeId}/ship-to-warehouse`, data),
   confirmReceipt: (id: string | number) =>
     api.post(`/trades/${id}/confirm-receipt`),
   raiseDispute: (id: string | number, data: { reason: string; description: string; evidenceUrls?: string[] }) =>
@@ -351,6 +354,28 @@ export const paymentsApi = {
   }) => api.post('/payments/methods', data),
 
   deletePaymentMethod: (paymentMethodId: string) => api.delete(`/payments/methods/${paymentMethodId}`),
+};
+
+export type RefundReason =
+  | 'changed_mind'
+  | 'damaged'
+  | 'wrong_item'
+  | 'not_as_described'
+  | 'missing_parts'
+  | 'other';
+
+export const refundsApi = {
+  create: (
+    orderId: string,
+    body: { reason: RefundReason; description?: string; evidencePhotoUrls?: string[] },
+  ) => api.post(`/orders/${orderId}/refund-requests`, body),
+  myRequests: () => api.get('/refund-requests/me'),
+  sellerRequests: () => api.get('/refund-requests/seller'),
+  getById: (id: string) => api.get(`/refund-requests/${id}`),
+  cancel: (id: string) => api.post(`/refund-requests/${id}/cancel`),
+  accept: (id: string) => api.post(`/refund-requests/${id}/accept`),
+  reject: (id: string, response: string) =>
+    api.post(`/refund-requests/${id}/reject`, { response }),
 };
 
 // Addresses
@@ -518,7 +543,7 @@ export const membershipApi = {
 export const notificationsApi = {
   getAll: (params?: Record<string, any>) => api.get('/notifications', { params }),
   markAsRead: (id: string) => api.patch(`/notifications/${id}/read`),
-  markAllAsRead: () => api.patch('/notifications/read-all'),
+  markAllAsRead: () => api.post('/notifications/mark-all-read'),
   getUnreadCount: () => api.get('/notifications/unread-count'),
 };
 

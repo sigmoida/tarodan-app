@@ -2,7 +2,7 @@ import { Injectable, Logger } from '@nestjs/common';
 import { ModuleRef } from '@nestjs/core';
 import { ConfigService } from '@nestjs/config';
 import { PrismaService } from '../../prisma';
-import { ShipmentStatus, OrderStatus } from '@prisma/client';
+import { ShipmentStatus, OrderStatus, TradeStatus } from '@prisma/client';
 import type { SuratTakipResponse, SuratTakipGonderi } from './surat-cargo.types';
 import {
   mapSuratStatusToShipmentStatus,
@@ -295,7 +295,284 @@ export class SuratTrackingService {
     if (ddmmyyyy) {
       return new Date(`${ddmmyyyy[3]}-${ddmmyyyy[2]}-${ddmmyyyy[1]}T00:00:00.000Z`);
     }
-    // Fall back to ISO parse
     return new Date(dateStr);
+  }
+
+  /**
+   * Sync all active refund return shipments (alıcı → satıcı).
+   * Refund returns are tracked separately on RefundRequest, not on Shipment.
+   */
+  async syncAllActiveRefundReturns(): Promise<{ synced: number; failed: number }> {
+    const activeReturns = await this.prisma.refundRequest.findMany({
+      where: {
+        returnProvider: 'surat',
+        status: {
+          in: ['return_shipment_open', 'return_in_transit'],
+        },
+        returnTrackingNumber: { not: null },
+      },
+    });
+
+    let synced = 0;
+    let failed = 0;
+    for (const rr of activeReturns) {
+      try {
+        const ok = await this.syncRefundReturnTracking(rr.id);
+        if (ok) synced++;
+        else failed++;
+      } catch (error: any) {
+        this.logger.error(`Failed to sync refund return ${rr.id}: ${error.message}`);
+        failed++;
+      }
+    }
+    return { synced, failed };
+  }
+
+  async syncRefundReturnTracking(refundRequestId: string): Promise<boolean> {
+    const rr = await this.prisma.refundRequest.findUnique({
+      where: { id: refundRequestId },
+    });
+    if (!rr || rr.returnProvider !== 'surat' || !rr.returnTrackingNumber) {
+      return false;
+    }
+
+    const data = await this.fetchTrackingInfo(rr.returnTrackingNumber);
+    if (!data || data.Gonderiler.length === 0) return false;
+
+    const gonderi = data.Gonderiler[0];
+    const newStatus = mapSuratStatusToShipmentStatus(gonderi.KargonunDurumuSayi);
+    const isDelivered = isSuratDelivered(gonderi.KargonunDurumuSayi);
+
+    const { RefundService } = await import('../refund/refund.service');
+    const refundService = this.moduleRef.get(RefundService, { strict: false });
+    if (!refundService) {
+      this.logger.warn(`RefundService not resolvable when syncing ${refundRequestId}`);
+      return false;
+    }
+
+    await refundService.applyReturnTrackingUpdate(refundRequestId, {
+      status: newStatus,
+      deliveredAt:
+        isDelivered && gonderi.TeslimTarihi
+          ? this.parseSuratDate(gonderi.TeslimTarihi)
+          : undefined,
+    });
+
+    if (isDelivered) {
+      try {
+        await refundService.finalizeRefundForReturnedShipment(refundRequestId);
+        this.logger.log(
+          `Auto-refunded RefundRequest ${refundRequestId} after Sürat return delivery`,
+        );
+      } catch (error: any) {
+        this.logger.error(
+          `Failed to finalize refund ${refundRequestId}: ${error.message}`,
+        );
+      }
+    }
+
+    return true;
+  }
+
+  /**
+   * Sync a single TradeShipment row from Sürat Kargo tracking API.
+   * Updates status / deliveredAt and, when both `to_warehouse` legs of the
+   * parent Trade are delivered, transitions the Trade to `at_warehouse`.
+   */
+  async syncTradeShipmentTracking(tradeShipmentId: string): Promise<boolean> {
+    const tradeShipment = await this.prisma.tradeShipment.findUnique({
+      where: { id: tradeShipmentId },
+    });
+
+    if (!tradeShipment || tradeShipment.carrier !== 'surat') {
+      return false;
+    }
+
+    // For TradeShipment we don't store a providerTrackingId column, so the
+    // tracking reference is the trackingNumber we recorded at label creation.
+    const webSiparisKodu = tradeShipment.trackingNumber;
+    if (!webSiparisKodu) {
+      return false;
+    }
+
+    const data = await this.fetchTrackingInfo(webSiparisKodu);
+    if (!data || data.Gonderiler.length === 0) {
+      return false;
+    }
+
+    const gonderi = data.Gonderiler[0];
+    const newStatus = mapSuratStatusToShipmentStatus(gonderi.KargonunDurumuSayi);
+    const isDelivered = isSuratDelivered(gonderi.KargonunDurumuSayi);
+
+    const updateData: Record<string, any> = {
+      status: newStatus,
+    };
+
+    // Trust Sürat-issued tracking number if we don't yet have one (label just opened)
+    if (!tradeShipment.trackingNumber && gonderi.KargoTakipNo) {
+      updateData.trackingNumber = gonderi.KargoTakipNo;
+    }
+
+    if (isDelivered && !tradeShipment.deliveredAt) {
+      updateData.deliveredAt = gonderi.TeslimTarihi
+        ? this.parseSuratDate(gonderi.TeslimTarihi)
+        : new Date();
+    }
+
+    await this.prisma.tradeShipment.update({
+      where: { id: tradeShipment.id },
+      data: updateData,
+    });
+
+    await this.syncTradeShipmentEvents(tradeShipment.id, gonderi);
+
+    // Critical transition: when this is a `to_warehouse` leg and it just
+    // became delivered, check whether the OTHER to_warehouse leg of the same
+    // trade is also delivered. If so, transition the parent Trade.
+    if (
+      isDelivered &&
+      tradeShipment.leg === 'to_warehouse' &&
+      tradeShipment.recipientType === 'warehouse'
+    ) {
+      await this.maybeTransitionTradeToAtWarehouse(tradeShipment.tradeId);
+    }
+
+    this.logger.log(
+      `TradeShipment ${tradeShipment.id} synced: status=${newStatus} suratCode=${gonderi.KargonunDurumuSayi} (${gonderi.KargonunDurumu})`,
+    );
+
+    return true;
+  }
+
+  /**
+   * Sync all active TradeShipments shipped via Sürat. Mirrors
+   * {@link syncAllActiveShipments} but operates on the TradeShipment table.
+   */
+  async syncAllActiveTradeShipments(): Promise<{ synced: number; failed: number }> {
+    const activeTradeShipments = await this.prisma.tradeShipment.findMany({
+      where: {
+        carrier: 'surat',
+        status: {
+          in: [
+            ShipmentStatus.label_created,
+            ShipmentStatus.pending,
+            ShipmentStatus.in_transit,
+          ],
+        },
+        trackingNumber: { not: null },
+      },
+    });
+
+    let synced = 0;
+    let failed = 0;
+
+    for (const ts of activeTradeShipments) {
+      try {
+        const success = await this.syncTradeShipmentTracking(ts.id);
+        if (success) synced++;
+        else failed++;
+      } catch (error: any) {
+        this.logger.error(
+          `Failed to sync trade-shipment ${ts.id}: ${error.message}`,
+        );
+        failed++;
+      }
+    }
+
+    this.logger.log(
+      `Surat trade-shipment sync: ${synced} synced, ${failed} failed out of ${activeTradeShipments.length}`,
+    );
+    return { synced, failed };
+  }
+
+  /**
+   * Best-effort dedupe + insert of Sürat Hareketler rows into TradeShipmentEvent.
+   */
+  private async syncTradeShipmentEvents(
+    tradeShipmentId: string,
+    gonderi: SuratTakipGonderi,
+  ): Promise<void> {
+    if (!gonderi.Hareketler || gonderi.Hareketler.length === 0) return;
+
+    const existingEvents = await this.prisma.tradeShipmentEvent.findMany({
+      where: { tradeShipmentId },
+      select: { eventTime: true, status: true },
+    });
+
+    const existingSet = new Set(
+      existingEvents.map((e) => `${e.eventTime.toISOString()}|${e.status}`),
+    );
+
+    const newEvents = gonderi.Hareketler.filter((h) => {
+      const key = `${new Date(h.IslemTarihi).toISOString()}|${h.Islem}`;
+      return !existingSet.has(key);
+    });
+
+    if (newEvents.length === 0) return;
+
+    await this.prisma.tradeShipmentEvent.createMany({
+      data: newEvents.map((h) => ({
+        tradeShipmentId,
+        status: h.Islem,
+        description: h.Aciklama,
+        location: h.HareketYeri,
+        eventTime: new Date(h.IslemTarihi),
+      })),
+    });
+  }
+
+  /**
+   * If both to_warehouse legs of the trade are delivered and the trade is
+   * still pre-warehouse, atomically flip Trade.status -> at_warehouse and
+   * write a TradeShipmentEvent on each leg recording the auto-transition.
+   */
+  private async maybeTransitionTradeToAtWarehouse(tradeId: string): Promise<void> {
+    await this.prisma.$transaction(async (tx) => {
+      // Lock the trade row to avoid racing with admin manual transition.
+      await tx.$queryRaw`SELECT id FROM trades WHERE id = ${tradeId} FOR UPDATE`;
+
+      const trade = await tx.trade.findUnique({
+        where: { id: tradeId },
+        select: { id: true, status: true },
+      });
+      if (!trade) return;
+      if (trade.status === TradeStatus.at_warehouse) return;
+
+      const toWarehouseShipments = await tx.tradeShipment.findMany({
+        where: { tradeId, leg: 'to_warehouse' },
+        select: { id: true, status: true, deliveredAt: true },
+      });
+
+      const bothDelivered =
+        toWarehouseShipments.length >= 2 &&
+        toWarehouseShipments.every(
+          (s) =>
+            s.deliveredAt !== null || s.status === ShipmentStatus.delivered,
+        );
+
+      if (!bothDelivered) return;
+
+      const now = new Date();
+      await tx.trade.update({
+        where: { id: tradeId },
+        data: { status: TradeStatus.at_warehouse, updatedAt: now },
+      });
+
+      // Log the transition on each to_warehouse shipment so it surfaces in
+      // the trade event timeline (no admin user, so no AuditLog row).
+      await tx.tradeShipmentEvent.createMany({
+        data: toWarehouseShipments.map((s) => ({
+          tradeShipmentId: s.id,
+          status: 'auto_at_warehouse',
+          description:
+            'Both to_warehouse legs delivered; trade auto-transitioned to at_warehouse',
+          eventTime: now,
+        })),
+      });
+
+      this.logger.log(
+        `Trade ${tradeId} auto-transitioned to at_warehouse after Sürat reported both to_warehouse legs delivered`,
+      );
+    });
   }
 }

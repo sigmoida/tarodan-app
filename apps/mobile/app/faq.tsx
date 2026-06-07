@@ -1,9 +1,11 @@
 import { useState } from 'react';
 import { View, ScrollView, StyleSheet, TouchableOpacity } from 'react-native';
-import { Text } from 'react-native-paper';
 import { router } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
-import { TarodanColors } from '../src/theme';
+import { theme, Text } from '@tarodan/ui-native';
+import { useTranslation } from '../src/i18n';
+
+const { colors } = theme;
 
 const FAQ_ITEMS = [
   {
@@ -119,6 +121,7 @@ const FAQ_ITEMS = [
 ];
 
 export default function FAQScreen() {
+  const { t } = useTranslation();
   const [expandedIndex, setExpandedIndex] = useState<number | null>(null);
 
   let globalIndex = -1;
@@ -127,9 +130,9 @@ export default function FAQScreen() {
     <View style={styles.container}>
       <View style={styles.header}>
         <TouchableOpacity onPress={() => router.back()}>
-          <Ionicons name="arrow-back" size={24} color={TarodanColors.textOnPrimary} />
+          <Ionicons name="arrow-back" size={24} color={colors.white} />
         </TouchableOpacity>
-        <Text style={styles.headerTitle}>Sıkça Sorulan Sorular</Text>
+        <Text style={styles.headerTitle}>{t('mobile.pageFaq')}</Text>
         <View style={{ width: 24 }} />
       </View>
 
@@ -152,7 +155,7 @@ export default function FAQScreen() {
                     <Ionicons
                       name={isExpanded ? 'chevron-up' : 'chevron-down'}
                       size={20}
-                      color={TarodanColors.primary}
+                      color={colors.primary[600]!}
                     />
                   </TouchableOpacity>
                   {isExpanded && (
@@ -174,7 +177,7 @@ export default function FAQScreen() {
             style={styles.contactButton}
             onPress={() => router.push('/support')}
           >
-            <Ionicons name="chatbubble-ellipses-outline" size={18} color={TarodanColors.textOnPrimary} />
+            <Ionicons name="chatbubble-ellipses-outline" size={18} color={colors.white} />
             <Text style={styles.contactButtonText}>Destek Ekibine Yazın</Text>
           </TouchableOpacity>
         </View>
@@ -188,10 +191,10 @@ export default function FAQScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: TarodanColors.background,
+    backgroundColor: colors.surface.DEFAULT,
   },
   header: {
-    backgroundColor: TarodanColors.primary,
+    backgroundColor: colors.primary[600]!,
     paddingTop: 50,
     paddingBottom: 16,
     paddingHorizontal: 20,
@@ -202,7 +205,7 @@ const styles = StyleSheet.create({
   headerTitle: {
     fontSize: 18,
     fontWeight: 'bold',
-    color: TarodanColors.textOnPrimary,
+    color: colors.white,
   },
   content: {
     flex: 1,
@@ -214,11 +217,11 @@ const styles = StyleSheet.create({
   sectionTitle: {
     fontSize: 17,
     fontWeight: 'bold',
-    color: TarodanColors.textPrimary,
+    color: colors.text.heading,
     marginBottom: 12,
   },
   questionCard: {
-    backgroundColor: TarodanColors.backgroundSecondary,
+    backgroundColor: colors.surface.alt,
     borderRadius: 10,
     marginBottom: 8,
     overflow: 'hidden',
@@ -233,18 +236,18 @@ const styles = StyleSheet.create({
     flex: 1,
     fontSize: 14,
     fontWeight: '500',
-    color: TarodanColors.textPrimary,
+    color: colors.text.heading,
     marginRight: 12,
   },
   answerContainer: {
     paddingHorizontal: 14,
     paddingBottom: 14,
     borderTopWidth: 1,
-    borderTopColor: TarodanColors.border,
+    borderTopColor: colors.border.DEFAULT,
   },
   answerText: {
     fontSize: 13,
-    color: TarodanColors.textSecondary,
+    color: colors.text.muted,
     lineHeight: 20,
     paddingTop: 12,
   },
@@ -252,18 +255,18 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     paddingVertical: 24,
     borderTopWidth: 1,
-    borderTopColor: TarodanColors.border,
+    borderTopColor: colors.border.DEFAULT,
     marginTop: 8,
   },
   footerText: {
     fontSize: 14,
-    color: TarodanColors.textSecondary,
+    color: colors.text.muted,
     marginBottom: 12,
   },
   contactButton: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: TarodanColors.primary,
+    backgroundColor: colors.primary[600]!,
     paddingHorizontal: 20,
     paddingVertical: 12,
     borderRadius: 10,
@@ -272,6 +275,6 @@ const styles = StyleSheet.create({
   contactButtonText: {
     fontSize: 14,
     fontWeight: '600',
-    color: TarodanColors.textOnPrimary,
+    color: colors.white,
   },
 });

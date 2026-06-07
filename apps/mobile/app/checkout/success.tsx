@@ -1,8 +1,9 @@
 import { View, StyleSheet, ScrollView } from 'react-native';
-import { Text, Button, Card } from 'react-native-paper';
+import { Button, Card, Text, theme } from '@tarodan/ui-native';
 import { router, useLocalSearchParams } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
-import { TarodanColors } from '../../src/theme';
+
+const { colors } = theme;
 
 export default function CheckoutSuccessScreen() {
   const { orderId } = useLocalSearchParams<{ orderId?: string }>();
@@ -13,7 +14,7 @@ export default function CheckoutSuccessScreen() {
         {/* Success Animation/Icon */}
         <View style={styles.iconContainer}>
           <View style={styles.iconCircle}>
-            <Ionicons name="checkmark" size={60} color="#fff" />
+            <Ionicons name="checkmark" size={60} color={colors.white} />
           </View>
         </View>
 
@@ -35,50 +36,46 @@ export default function CheckoutSuccessScreen() {
 
         {/* Info Card */}
         <Card style={styles.infoCard}>
-          <Card.Content>
-            <View style={styles.infoItem}>
-              <Ionicons name="mail-outline" size={24} color={TarodanColors.primary} />
-              <View style={styles.infoContent}>
-                <Text style={styles.infoTitle}>E-posta Bildirimi</Text>
-                <Text style={styles.infoText}>Sipariş detayları e-posta adresinize gönderildi.</Text>
-              </View>
+          <View style={styles.infoItem}>
+            <Ionicons name="mail-outline" size={24} color={colors.primary[600]!} />
+            <View style={styles.infoContent}>
+              <Text style={styles.infoTitle}>E-posta Bildirimi</Text>
+              <Text style={styles.infoText}>Sipariş detayları e-posta adresinize gönderildi.</Text>
             </View>
-            <View style={styles.infoItem}>
-              <Ionicons name="location-outline" size={24} color={TarodanColors.primary} />
-              <View style={styles.infoContent}>
-                <Text style={styles.infoTitle}>Kargo Takibi</Text>
-                <Text style={styles.infoText}>Kargo bilgileri satıcı tarafından girildiğinde bilgilendirileceksiniz.</Text>
-              </View>
+          </View>
+          <View style={styles.infoItem}>
+            <Ionicons name="location-outline" size={24} color={colors.primary[600]!} />
+            <View style={styles.infoContent}>
+              <Text style={styles.infoTitle}>Kargo Takibi</Text>
+              <Text style={styles.infoText}>Kargo bilgileri satıcı tarafından girildiğinde bilgilendirileceksiniz.</Text>
             </View>
-            <View style={styles.infoItem}>
-              <Ionicons name="chatbubble-outline" size={24} color={TarodanColors.primary} />
-              <View style={styles.infoContent}>
-                <Text style={styles.infoTitle}>Satıcı İletişimi</Text>
-                <Text style={styles.infoText}>Mesajlar bölümünden satıcıyla iletişime geçebilirsiniz.</Text>
-              </View>
+          </View>
+          <View style={styles.infoItem}>
+            <Ionicons name="chatbubble-outline" size={24} color={colors.primary[600]!} />
+            <View style={styles.infoContent}>
+              <Text style={styles.infoTitle}>Satıcı İletişimi</Text>
+              <Text style={styles.infoText}>Mesajlar bölümünden satıcıyla iletişime geçebilirsiniz.</Text>
             </View>
-          </Card.Content>
+          </View>
         </Card>
 
         {/* Buttons */}
         <View style={styles.buttons}>
           <Button
-            mode="contained"
+            variant="primary"
+            title="Siparişlerimi Gör"
+            fullWidth
             onPress={() => router.replace('/orders')}
             style={styles.primaryButton}
-            buttonColor={TarodanColors.primary}
-            icon="package-variant"
-          >
-            Siparişlerimi Gör
-          </Button>
+            icon="cube-outline"
+          />
           <Button
-            mode="outlined"
+            variant="outline"
+            title="Alışverişe Devam Et"
+            fullWidth
             onPress={() => router.replace('/(tabs)')}
             style={styles.secondaryButton}
-            textColor={TarodanColors.primary}
-          >
-            Alışverişe Devam Et
-          </Button>
+          />
         </View>
 
         {/* Support Link */}
@@ -96,7 +93,7 @@ export default function CheckoutSuccessScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: TarodanColors.background,
+    backgroundColor: colors.surface.DEFAULT,
   },
   scrollContent: {
     flexGrow: 1,
@@ -111,14 +108,14 @@ const styles = StyleSheet.create({
     width: 100,
     height: 100,
     borderRadius: 50,
-    backgroundColor: TarodanColors.success,
+    backgroundColor: colors.success[600]!,
     justifyContent: 'center',
     alignItems: 'center',
   },
   title: {
     fontSize: 28,
     fontWeight: 'bold',
-    color: TarodanColors.textPrimary,
+    color: colors.text.heading,
     textAlign: 'center',
     marginBottom: 12,
   },
@@ -128,24 +125,24 @@ const styles = StyleSheet.create({
   },
   orderIdLabel: {
     fontSize: 13,
-    color: TarodanColors.textSecondary,
+    color: colors.text.muted,
   },
   orderIdValue: {
     fontSize: 18,
     fontWeight: 'bold',
-    color: TarodanColors.primary,
+    color: colors.primary[600]!,
     marginTop: 4,
   },
   description: {
     fontSize: 15,
-    color: TarodanColors.textSecondary,
+    color: colors.text.muted,
     textAlign: 'center',
     lineHeight: 22,
     marginBottom: 32,
   },
   infoCard: {
     marginBottom: 32,
-    backgroundColor: TarodanColors.surfaceVariant,
+    backgroundColor: colors.surface.alt,
   },
   infoItem: {
     flexDirection: 'row',
@@ -158,12 +155,12 @@ const styles = StyleSheet.create({
   infoTitle: {
     fontSize: 15,
     fontWeight: '600',
-    color: TarodanColors.textPrimary,
+    color: colors.text.heading,
     marginBottom: 4,
   },
   infoText: {
     fontSize: 13,
-    color: TarodanColors.textSecondary,
+    color: colors.text.muted,
     lineHeight: 18,
   },
   buttons: {
@@ -176,15 +173,15 @@ const styles = StyleSheet.create({
   },
   secondaryButton: {
     borderRadius: 12,
-    borderColor: TarodanColors.primary,
+    borderColor: colors.primary[600]!,
   },
   supportText: {
     fontSize: 14,
-    color: TarodanColors.textSecondary,
+    color: colors.text.muted,
     textAlign: 'center',
   },
   supportLink: {
-    color: TarodanColors.primary,
+    color: colors.primary[600]!,
     fontWeight: '500',
   },
 });

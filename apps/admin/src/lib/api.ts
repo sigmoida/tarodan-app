@@ -139,6 +139,29 @@ export const adminApi = {
   sendOrderNotification: (id: string, type: string, message?: string) =>
     api.post(`/admin/orders/${id}/notify`, { type, message }),
   getOrderInvoice: (id: string) => api.get(`/admin/orders/${id}/invoice`),
+  // 48h pencere (Faz 4A.1)
+  forceCompleteOrder: (id: string, reason?: string) =>
+    api.post(`/admin/orders/${id}/force-complete`, reason ? { reason } : {}),
+  extendOrderConfirmation: (
+    id: string,
+    payload: { hours: number; reason?: string },
+  ) => api.post(`/admin/orders/${id}/extend-confirmation`, payload),
+
+  // RefundRequest policy override (Faz 4B.1)
+  overrideRefundPolicy: (
+    id: string,
+    payload: {
+      refundProductAmount?: boolean;
+      refundShippingFee?: boolean;
+      refundBuyerFee?: boolean;
+      refundSellerCommission?: boolean;
+    },
+  ) => api.patch(`/admin/refund-requests/${id}/override-policy`, payload),
+
+  setReturnShippingPayer: (
+    id: string,
+    payer: 'buyer' | 'seller' | 'platform',
+  ) => api.patch(`/admin/refund-requests/${id}/set-shipping-payer`, { payer }),
 
   // Trades
   getTrades: (params?: any) => api.get('/admin/trades', { params }),
@@ -153,6 +176,37 @@ export const adminApi = {
     api.post(`/admin/trades/${tradeId}/reject`, { reason }),
   markReturnDelivered: (tradeId: string, shipmentId: string) =>
     api.post(`/admin/trades/${tradeId}/mark-return-delivered`, { shipmentId }),
+  retryTradeRefund: (tradeId: string) =>
+    api.post(`/admin/trades/${tradeId}/retry-refund`),
+  resolveTradeCompensation: (tradeId: string, note?: string) =>
+    api.post(`/admin/trades/${tradeId}/resolve-compensation`, note ? { note } : {}),
+
+  // RefundRequest admin
+  getRefundRequests: (params?: any) =>
+    api.get('/admin/refund-requests', { params }),
+  getRefundRequest: (id: string) => api.get(`/admin/refund-requests/${id}`),
+  resolveRefundDispute: (
+    id: string,
+    body: { resolution: 'approve' | 'reject'; notes: string },
+  ) => api.post(`/admin/refund-requests/${id}/resolve-dispute`, body),
+  forceFinalizeRefund: (id: string) =>
+    api.post(`/admin/refund-requests/${id}/force-finalize`),
+  markTradeReturnLost: (
+    tradeId: string,
+    body: { shipmentId: string; reason: string; compensateUserId?: string },
+  ) => api.post(`/admin/trades/${tradeId}/mark-return-lost`, body),
+  forceCancelStuckTrade: (
+    tradeId: string,
+    body: { reason: string; sendArrivedItemBack: boolean },
+  ) => api.post(`/admin/trades/${tradeId}/force-cancel-stuck`, body),
+  resolveTradeDispute: (
+    tradeId: string,
+    resolution: string,
+    notes: string,
+  ) => api.post(`/trades/${tradeId}/resolve-dispute`, { resolution, notes }),
+
+  // Trade shipments (cross-trade listing)
+  getTradeShipments: (params?: any) => api.get('/admin/trade-shipments', { params }),
 
   // Messages
   getMessages: (params?: any) => api.get('/admin/messages', { params }),

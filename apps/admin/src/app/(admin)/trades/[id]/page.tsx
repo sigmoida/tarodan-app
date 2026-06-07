@@ -16,6 +16,7 @@ import {
 } from '@heroicons/react/24/outline';
 import { adminApi } from '@/lib/api';
 import { getProductEffectivePrice } from '@/lib/productPrice';
+import { cancelReasonLabel } from '@/lib/utils';
 import { Button, Modal, Select, Spinner, StatusBadge, Textarea, cn, tradeStatusConfig } from '@tarodan/ui';
 import toast from 'react-hot-toast';
 
@@ -30,6 +31,8 @@ interface TradeShipment {
   status?: string;
   deliveredAt?: string | null;
   shippedAt?: string | null;
+  lostAt?: string | null;
+  lostReason?: string | null;
   sender?: { id: string; displayName: string } | null;
   recipient?: { id: string; displayName: string } | null;
 }
@@ -77,6 +80,7 @@ interface TradeDetail {
   adminNotes?: string;
   rejectionReason?: string;
   cancellationReason?: string;
+  cancelReason?: string;
   createdAt: string;
   acceptedAt?: string;
   approvedAt?: string;
@@ -84,6 +88,12 @@ interface TradeDetail {
   warehouseReceivedAt?: string;
   completedAt?: string;
   cancelledAt?: string;
+  firstWarehouseArrivalAt?: string | null;
+  cancelLockedAt?: string | null;
+  refundFailureReason?: string | null;
+  refundFailureAt?: string | null;
+  compensationPendingUserId?: string | null;
+  compensationResolvedAt?: string | null;
 }
 
 type RawTradeItem = {
@@ -148,6 +158,18 @@ export default function TradeDetailPage() {
   // Per-shipment action loading
   const [processingShipmentId, setProcessingShipmentId] = useState<string | null>(null);
 
+  const [processingRetryRefund, setProcessingRetryRefund] = useState(false);
+  const [processingResolveCompensation, setProcessingResolveCompensation] = useState(false);
+
+  const [markLostShipmentId, setMarkLostShipmentId] = useState<string | null>(null);
+  const [markLostReason, setMarkLostReason] = useState('');
+  const [processingMarkLost, setProcessingMarkLost] = useState(false);
+
+  const [showForceCancelModal, setShowForceCancelModal] = useState(false);
+  const [forceCancelReason, setForceCancelReason] = useState('');
+  const [forceCancelSendBack, setForceCancelSendBack] = useState(true);
+  const [processingForceCancel, setProcessingForceCancel] = useState(false);
+
   useEffect(() => {
     if (tradeId) loadTrade();
   }, [tradeId]);
@@ -181,9 +203,14 @@ export default function TradeDetailPage() {
   };
 
   const handleResolve = async () => {
+    const notes = resolveNote.trim();
+    if (notes.length < 10) {
+      toast.error('Çözüm notu en az 10 karakter olmalıdır');
+      return;
+    }
     setProcessingResolve(true);
     try {
-      await adminApi.resolveTrade(tradeId, { resolution, note: resolveNote });
+      await adminApi.resolveTradeDispute(tradeId, resolution, notes);
       toast.success('Takas çözümlendi');
       setShowResolveModal(false);
       setResolution('complete_trade');
@@ -239,6 +266,90 @@ export default function TradeDetailPage() {
     }
   };
 
+  const handleResolveCompensation = async () => {
+    const note = window.prompt('Tazminat çözüm notu (opsiyonel):') ?? undefined;
+    if (note === null) return; // user cancelled
+    setProcessingResolveCompensation(true);
+    try {
+      await adminApi.resolveTradeCompensation(tradeId, note || undefined);
+      toast.success('Tazminat kapatıldı');
+      await loadTrade();
+    } catch (error: any) {
+      toast.error(error.response?.data?.message || 'İşlem başarısız');
+    } finally {
+      setProcessingResolveCompensation(false);
+    }
+  };
+
+  const handleRetryRefund = async () => {
+    if (!confirm('PayTR iadesi yeniden denenecek. Devam edilsin mi?')) return;
+    setProcessingRetryRefund(true);
+    try {
+      const response = await adminApi.retryTradeRefund(tradeId);
+      const data = response.data?.data ?? response.data;
+      if (data?.refunded) {
+        toast.success('İade başarıyla tekrar gönderildi');
+      } else if (data?.skippedReason) {
+        toast.success(`İade atlandı: ${data.skippedReason}`);
+      } else {
+        toast.success('İade işlemi tamamlandı');
+      }
+      await loadTrade();
+    } catch (error: any) {
+      toast.error(error.response?.data?.message || 'İade yeniden denemesi başarısız');
+    } finally {
+      setProcessingRetryRefund(false);
+    }
+  };
+
+  const handleMarkReturnLost = async () => {
+    if (!markLostShipmentId) return;
+    const reason = markLostReason.trim();
+    if (reason.length < 10) {
+      toast.error('Kayıp gerekçesi en az 10 karakter olmalıdır');
+      return;
+    }
+    setProcessingMarkLost(true);
+    try {
+      await adminApi.markTradeReturnLost(tradeId, {
+        shipmentId: markLostShipmentId,
+        reason,
+      });
+      toast.success('İade gönderisi kayıp olarak işaretlendi');
+      setMarkLostShipmentId(null);
+      setMarkLostReason('');
+      await loadTrade();
+    } catch (error: any) {
+      toast.error(error.response?.data?.message || 'İşlem başarısız');
+    } finally {
+      setProcessingMarkLost(false);
+    }
+  };
+
+  const handleForceCancel = async () => {
+    const reason = forceCancelReason.trim();
+    if (reason.length < 10) {
+      toast.error('İptal gerekçesi en az 10 karakter olmalıdır');
+      return;
+    }
+    setProcessingForceCancel(true);
+    try {
+      await adminApi.forceCancelStuckTrade(tradeId, {
+        reason,
+        sendArrivedItemBack: forceCancelSendBack,
+      });
+      toast.success('Sıkışmış takas çözüldü');
+      setShowForceCancelModal(false);
+      setForceCancelReason('');
+      setForceCancelSendBack(true);
+      await loadTrade();
+    } catch (error: any) {
+      toast.error(error.response?.data?.message || 'İşlem başarısız');
+    } finally {
+      setProcessingForceCancel(false);
+    }
+  };
+
   const handleReject = async () => {
     const reason = rejectReason.trim();
     if (reason.length < 10) {
@@ -290,6 +401,10 @@ export default function TradeDetailPage() {
   const canApproveReject = trade.status === 'at_warehouse' || trade.status === 'admin_reviewing';
   const isShippingToRecipients = trade.status === 'shipping_to_recipients';
   const isReturning = trade.status === 'returning';
+  const canForceCancelStuck =
+    trade.status === 'shipping_to_warehouse' &&
+    !!trade.firstWarehouseArrivalAt &&
+    toWarehouseShipments.some((s) => !s.deliveredAt);
 
   return (
     <div className="min-h-screen bg-surface">
@@ -322,6 +437,107 @@ export default function TradeDetailPage() {
             )}
           </div>
         </div>
+
+        {/* Compensation pending — manual settlement required for a user */}
+        {trade.compensationPendingUserId && !trade.compensationResolvedAt && (
+          <div className="bg-warning-50 border-2 border-warning-400 rounded-xl p-4 shadow-sm">
+            <div className="flex items-start justify-between gap-4">
+              <div className="flex items-start gap-3">
+                <ExclamationTriangleIcon className="h-7 w-7 text-warning-700 flex-shrink-0" />
+                <div>
+                  <h2 className="text-base font-semibold text-warning-900">
+                    Manuel Tazminat Bekleniyor
+                  </h2>
+                  <p className="text-sm text-warning-800 mt-1">
+                    Kullanıcı{' '}
+                    <span className="font-mono">
+                      {trade.compensationPendingUserId === trade.initiator.id
+                        ? `${trade.initiator.displayName} (teklif veren)`
+                        : trade.compensationPendingUserId === trade.receiver.id
+                        ? `${trade.receiver.displayName} (teklif alan)`
+                        : trade.compensationPendingUserId}
+                    </span>{' '}
+                    için platform tazminatı işaretlendi. Ödemeyi out-of-band yaptıktan sonra "Kapatıldı" butonuna basın.
+                  </p>
+                </div>
+              </div>
+              <div className="flex-shrink-0">
+                <Button
+                  variant="primary"
+                  onClick={handleResolveCompensation}
+                  isLoading={processingResolveCompensation}
+                  disabled={processingResolveCompensation}
+                >
+                  Kapatıldı
+                </Button>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Refund failure banner — admin must retry the PayTR refund */}
+        {trade.refundFailureReason && (
+          <div className="bg-danger-50 border-2 border-danger-400 rounded-xl p-6 shadow-sm">
+            <div className="flex items-start justify-between gap-4">
+              <div className="flex items-start gap-3">
+                <ExclamationTriangleIcon className="h-8 w-8 text-danger-600 flex-shrink-0" />
+                <div>
+                  <h2 className="text-lg font-semibold text-danger-900">
+                    PayTR İadesi Başarısız
+                  </h2>
+                  <p className="text-sm text-danger-800 mt-1">
+                    {trade.refundFailureReason}
+                  </p>
+                  {trade.refundFailureAt && (
+                    <p className="text-xs text-danger-700 mt-1">
+                      Son hata: {new Date(trade.refundFailureAt).toLocaleString('tr-TR')}
+                    </p>
+                  )}
+                </div>
+              </div>
+              <div className="flex-shrink-0">
+                <Button
+                  variant="danger"
+                  onClick={handleRetryRefund}
+                  isLoading={processingRetryRefund}
+                  disabled={processingRetryRefund}
+                >
+                  <ArrowUturnLeftIcon className="h-5 w-5 mr-1" />
+                  İadeyi Tekrar Dene
+                </Button>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Stuck partial-arrival panel — one item delivered, counterpart in transit */}
+        {canForceCancelStuck && (
+          <div className="bg-warning-50 border-2 border-warning-400 rounded-xl p-6 shadow-sm">
+            <div className="flex items-start justify-between gap-4">
+              <div className="flex items-start gap-3">
+                <ClockIcon className="h-8 w-8 text-warning-700 flex-shrink-0" />
+                <div>
+                  <h2 className="text-lg font-semibold text-warning-900">
+                    Sıkışmış Takas
+                  </h2>
+                  <p className="text-sm text-warning-800 mt-1">
+                    Bir ürün depoya ulaştı ({new Date(trade.firstWarehouseArrivalAt!).toLocaleString('tr-TR')}) ama
+                    karşı tarafın kargosu hâlâ yolda. Manuel müdahale gerekiyor:
+                    karşı kargoyu iptal edip ulaşan ürünü sahibine geri yollayabilirsin.
+                  </p>
+                </div>
+              </div>
+              <div className="flex-shrink-0">
+                <Button
+                  variant="danger"
+                  onClick={() => setShowForceCancelModal(true)}
+                >
+                  Sıkışmış Takası Çöz
+                </Button>
+              </div>
+            </div>
+          </div>
+        )}
 
         {/* Admin Action Panel (prominent for review queue) */}
         {canApproveReject && (
@@ -497,21 +713,37 @@ export default function TradeDetailPage() {
                 actionLabel={isReturning ? 'Teslim Edildi' : null}
                 onAction={isReturning ? handleMarkReturnDelivered : null}
                 processingShipmentId={processingShipmentId}
+                secondaryActionLabel={isReturning ? 'Kayıp İşaretle' : undefined}
+                onSecondaryAction={isReturning ? setMarkLostShipmentId : undefined}
               />
             )}
           </div>
         )}
 
         {/* Rejection / cancellation reason */}
-        {(trade.rejectionReason || trade.cancellationReason) && (
+        {(trade.rejectionReason || trade.cancellationReason || trade.cancelReason) && (
           <div className="bg-danger-50 border border-danger-200 rounded-xl p-6">
             <h2 className="text-lg font-semibold text-danger-900 mb-2 flex items-center gap-2">
               <XCircleIcon className="w-5 h-5" />
               {trade.rejectionReason ? 'Red Sebebi' : 'İptal Sebebi'}
             </h2>
-            <p className="text-sm text-danger-800 whitespace-pre-wrap">
-              {trade.rejectionReason || trade.cancellationReason}
-            </p>
+            {(() => {
+              const raw =
+                trade.rejectionReason ||
+                trade.cancellationReason ||
+                trade.cancelReason;
+              const short = trade.rejectionReason
+                ? null
+                : cancelReasonLabel(trade.cancellationReason || trade.cancelReason);
+              return (
+                <>
+                  {short && short !== raw && (
+                    <p className="text-sm font-medium text-danger-700 mb-1">{short}</p>
+                  )}
+                  <p className="text-sm text-danger-800 whitespace-pre-wrap">{raw}</p>
+                </>
+              );
+            })()}
           </div>
         )}
 
@@ -680,19 +912,23 @@ export default function TradeDetailPage() {
               disabled={processingResolve}
             >
               <option value="complete_trade">Takası Tamamla</option>
-              <option value="cancel">Takası İptal Et</option>
-              <option value="favor_initiator">Teklif Veren Lehine</option>
-              <option value="favor_receiver">Teklif Alan Lehine</option>
+              <option value="cancel_trade">Takası İptal Et (iade tetiklenir)</option>
+              <option value="compensate_initiator">
+                Teklif Verene Tazminat (iptal + iade + tazminat işareti)
+              </option>
+              <option value="compensate_receiver">
+                Teklif Alana Tazminat (iptal + iade + tazminat işareti)
+              </option>
             </Select>
           </div>
           <div>
             <label className="block text-sm font-medium text-body mb-2">
-              Not (Opsiyonel)
+              Çözüm Notu (en az 10 karakter)
             </label>
             <Textarea value={resolveNote}
               onChange={(e) => setResolveNote(e.target.value)}
               rows={3}
-              placeholder="Çözüm notu..."
+              placeholder="Çözüm gerekçesini özetleyin (kargo kayıp, hasar, vs.)..."
               disabled={processingResolve} />
           </div>
           <div className="flex gap-3">
@@ -715,6 +951,113 @@ export default function TradeDetailPage() {
           </div>
         </div>
       </Modal>
+
+      {/* Mark Return Lost Modal */}
+      <Modal
+        isOpen={!!markLostShipmentId}
+        onClose={() =>
+          !processingMarkLost && (setMarkLostShipmentId(null), setMarkLostReason(''))
+        }
+        title="İade Gönderisini Kayıp İşaretle"
+      >
+        <div className="space-y-4">
+          <p className="text-sm text-body">
+            Bu gönderi kayıp olarak işaretlenecek. Eğer her iki iade kargosu da
+            çözümlendi sayılırsa (teslim veya kayıp) takas iptal edilir ve etkilenen
+            kullanıcı için tazminat bekliyor olarak işaretlenir.
+          </p>
+          <div>
+            <label className="block text-sm font-medium text-body mb-2">
+              Kayıp Gerekçesi (en az 10 karakter)
+            </label>
+            <Textarea
+              value={markLostReason}
+              onChange={(e) => setMarkLostReason(e.target.value)}
+              rows={3}
+              placeholder="Örn. Kargo şubeden çıktıktan sonra teslim edilemedi, sürat takibinde kayıp"
+              disabled={processingMarkLost}
+            />
+          </div>
+          <div className="flex gap-3">
+            <Button
+              variant="outline"
+              className="flex-1"
+              onClick={() => {
+                setMarkLostShipmentId(null);
+                setMarkLostReason('');
+              }}
+              disabled={processingMarkLost}
+            >
+              İptal
+            </Button>
+            <Button
+              variant="danger"
+              className="flex-1"
+              onClick={handleMarkReturnLost}
+              isLoading={processingMarkLost}
+            >
+              Kayıp İşaretle
+            </Button>
+          </div>
+        </div>
+      </Modal>
+
+      {/* Force-Cancel Stuck Modal */}
+      <Modal
+        isOpen={showForceCancelModal}
+        onClose={() =>
+          !processingForceCancel && setShowForceCancelModal(false)
+        }
+        title="Sıkışmış Takası Çöz"
+      >
+        <div className="space-y-4">
+          <p className="text-sm text-body">
+            Karşı tarafın kargosu Sürat'ta iptal edilecek. Ulaşan ürün (depoda)
+            sahibine geri kargolanacak; nakit fark varsa ödeyen kişiye iade
+            edilir.
+          </p>
+          <div>
+            <label className="block text-sm font-medium text-body mb-2">
+              İptal Gerekçesi (en az 10 karakter)
+            </label>
+            <Textarea
+              value={forceCancelReason}
+              onChange={(e) => setForceCancelReason(e.target.value)}
+              rows={3}
+              placeholder="Örn. Karşı tarafın kargosu 14 gündür sürat şubesinde sıkıştı, gelen ürünü sahibine iade ediyoruz"
+              disabled={processingForceCancel}
+            />
+          </div>
+          <label className="flex items-center gap-2 text-sm text-body">
+            <input
+              type="checkbox"
+              checked={forceCancelSendBack}
+              onChange={(e) => setForceCancelSendBack(e.target.checked)}
+              disabled={processingForceCancel}
+              className="rounded"
+            />
+            Ulaşan ürünü sahibine geri yolla (önerilen)
+          </label>
+          <div className="flex gap-3">
+            <Button
+              variant="outline"
+              className="flex-1"
+              onClick={() => setShowForceCancelModal(false)}
+              disabled={processingForceCancel}
+            >
+              İptal
+            </Button>
+            <Button
+              variant="danger"
+              className="flex-1"
+              onClick={handleForceCancel}
+              isLoading={processingForceCancel}
+            >
+              Sıkışmış Takası Çöz
+            </Button>
+          </div>
+        </div>
+      </Modal>
     </div>
   );
 }
@@ -728,6 +1071,8 @@ interface ShipmentLegCardProps {
   onAction: ((shipmentId: string) => void) | null;
   processingShipmentId: string | null;
   infoMessage?: string;
+  secondaryActionLabel?: string;
+  onSecondaryAction?: (shipmentId: string) => void;
 }
 
 function ShipmentLegCard({
@@ -738,6 +1083,8 @@ function ShipmentLegCard({
   onAction,
   processingShipmentId,
   infoMessage,
+  secondaryActionLabel,
+  onSecondaryAction,
 }: ShipmentLegCardProps) {
   return (
     <div className="bg-surface-elevated rounded-xl shadow-sm p-6">
@@ -818,7 +1165,12 @@ function ShipmentLegCard({
                   )}
                 </div>
                 <div className="flex flex-col gap-2 items-end">
-                  {delivered ? (
+                  {s.lostAt ? (
+                    <span className="inline-flex items-center gap-1 text-danger-700 text-sm font-medium">
+                      <XCircleIcon className="w-5 h-5" />
+                      Kayıp
+                    </span>
+                  ) : delivered ? (
                     <span className="inline-flex items-center gap-1 text-success-700 text-sm font-medium">
                       <CheckCircleIcon className="w-5 h-5" />
                       Teslim Edildi
@@ -834,6 +1186,15 @@ function ShipmentLegCard({
                     </Button>
                   ) : (
                     <span className="text-xs text-muted">Beklemede</span>
+                  )}
+                  {!s.lostAt && !delivered && secondaryActionLabel && onSecondaryAction && (
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => onSecondaryAction(s.id)}
+                    >
+                      {secondaryActionLabel}
+                    </Button>
                   )}
                 </div>
               </div>

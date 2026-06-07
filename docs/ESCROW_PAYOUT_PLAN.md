@@ -1,5 +1,139 @@
 # Escrow & Payout Sistemi — Kapsamli Uygulama Plani
 
+> **2026-05-31 — Sipariş Komisyon/İptal/İade Faz 1 tamamlandı:**
+> CommissionLedger modeli + Order buyer confirmation alanları + RefundRequest
+> policy alanları + enum genişlemeleri (OrderStatus.awaiting_buyer_confirmation,
+> RefundReason.counterfeit + lost_in_transit, ReturnShippingPayer) + backfill.
+> Mevcut sipariş verisi commission_ledger'a aktarıldı (17 pending, 5 waived,
+> 12 earned). Davranış değişmedi. Spec:
+> `docs/superpowers/specs/2026-05-31-order-commission-cancel-refund-design.md`.
+> Plan: `docs/superpowers/plans/2026-05-31-phase1-data-layer.md`.
+> Sonraki faz: buyer fee hesaplama altyapısı (Faz 2).
+
+> **2026-05-31 — Faz 2 tamamlandı (kısıtlı):** Buyer fee CommissionRule kaydı
+> seed edildi (`id='buyer-fee-rule'`, `appliesTo='BUYER'`, `buyerRate=3.0000`,
+> `isActive=false`). Mevcut `calculateCommission()` tek-kural mimarisinde
+> çalıştığı için BUYER + SELLER rule **aynı anda** eşleştirilemiyor — Faz 5
+> aktivasyonundan önce iki ayrı lookup yapacak şekilde refactor edilmeli.
+> Detay: spec Bölüm 14.4. Davranış değişmedi (isActive=false). Plan:
+> `docs/superpowers/plans/2026-05-31-phase2-buyer-fee-infra.md`.
+> Sonraki faz: 48h pencere + CommissionLedger entegrasyonu (Faz 3).
+
+> **2026-06-01 — Faz 3A tamamlandı (çekirdek 48h pencere):**
+> CommissionLedgerService (upsertPending/markEarned/markRefunded/markWaived) +
+> PaymentService.processSuccessfulPayment → ledger.pending upsert +
+> shipping.worker delivered handler `FEATURE_48H_CONFIRMATION_WINDOW` flag
+> dallanması + OrderService.completeOrder/confirmReceipt +
+> POST /orders/:id/confirm-receipt endpoint + OrderSchedulerService
+> autoCompleteConfirmedOrders cron (10 dk). Flag OFF: davranış değişmiyor;
+> flag ON: delivery → awaiting_buyer_confirmation (48h) → completed
+> (manual_ok/auto_timeout) → ledger.earned + hold released. Plan:
+> `docs/superpowers/plans/2026-06-01-phase3a-48h-window-core.md`.
+> Sonraki: Faz 3B (admin endpoint'leri, bildirimler, refund→ledger.refunded,
+> Senaryo A cron).
+
+> **2026-06-02 — Faz 3B tamamlandı (operasyon katmanı):**
+> 5 yeni NotificationType (ORDER_DELIVERED_CONFIRM, ORDER_AUTO_COMPLETED,
+> ORDER_MANUALLY_CONFIRMED, ORDER_FORCE_COMPLETED_BY_ADMIN,
+> SELLER_DID_NOT_SHIP_REFUNDED). shipping.worker delivery sonrası alıcıya
+> bildirim. completeOrder type'a göre post-commit bildirim dağıtımı.
+> Admin endpoint'leri: POST /admin/orders/:id/force-complete (super_admin),
+> POST /admin/orders/:id/extend-confirmation (admin/super_admin).
+> OrderService.cancel → ledger.markWaived('buyer_cancelled'),
+> PaymentService.processRefund → ledger.markRefunded,
+> handleExpiredPreparingOrders (Senaryo A) → ledger.markWaived
+> ('seller_did_not_ship') + alıcıya SELLER_DID_NOT_SHIP_REFUNDED bildirimi.
+> Plan: `docs/superpowers/plans/2026-06-01-phase3b-admin-and-notifications.md`.
+> Sonraki: Faz 4 (RefundRequest policy UI + Senaryo D satıcı onay akışı +
+> mobile/web 48h pencere ekranları).
+
+> **2026-06-03 — Faz 5 tamamlandı (AKTİVASYON + proje teslim):**
+>
+> **5.0 Toolchain fix:** .nvmrc + engines (Node 20.19.5 sabit). `pnpm install
+> --force` ile fresh node_modules. NotificationType templates eksiği
+> düzeltildi. Sonuç: backfill 7/7 + 48h-window 10/10 + buyer-fee 7/7 = **24/24
+> test yeşil**.
+>
+> **5.1 calculateCommission refactor:** BUYER + SELLER ayrı `findMatchingRule`
+> çağrısı (spec Bölüm 14.4 gap kapandı). Her tarafın kendi min/max clamp'i;
+> ruleId/ruleName seller öncelikli legacy uyumu.
+>
+> **5.2 Unit test:** 7 senaryo — aktif rule yok, sadece SELLER, sadece BUYER,
+> her ikisi (AYNI ANDA UYGULANIR), min, max, isActive=false.
+>
+> **5.3 Pre-launch smoke:** Dev DB'de `buyer-fee-rule` is_active=false →
+> calculateCommission buyer=0 (refactor zarar vermedi).
+>
+> **5.4 Web banner duyurusu:** PlatformFeeAnnouncementBanner — 14 günlük
+> announcement, localStorage dismiss, /platform-hizmet-bedeli link.
+> (Mobile banner ayrı iş paketi.)
+>
+> **5.5 AKTİVASYON:** Migration `20260603114321_activate_buyer_fee_rule` —
+> UPDATE commission_rules SET is_active=true WHERE id='buyer-fee-rule'.
+> Doğrulama: pgsql SELECT is_active=t. Yeni siparişlerde Order.buyerFeeAmount
+> > 0 olur, checkout satırı görünür, CommissionLedger.buyerFee doldurulur.
+>
+> Plan: `docs/superpowers/plans/2026-06-02-phase5-activation.md`.
+>
+> 🎉 **Sipariş Komisyon/İptal/İade projesi TAMAMLANDI** — Spec başlık 1-7'de
+> belirtilen tüm gereksinimler karşılandı: komisyon kesinleşme (Ledger),
+> 7 durumlu Order akışı, 48h pencere, dispute (6 reason + counterfeit +
+> lost_in_transit), 4 senaryo (A/B/C/D), kargo + %3 platform hizmet bedeli.
+>
+> **Sonraki olası işler (kapsam dışı):**
+> - Mobile RefundRequest detail/listing + Senaryo D satıcı karar ekranı
+> - Mobile PlatformFee duyuru banner'ı
+> - Sahte ürün sonrası otomatik satıcı askıya alma
+> - Kargo şirketi tazminat akışı (lost_in_transit)
+> - Kategori bazlı buyer fee oranları
+> - Membership tier bazlı buyer fee indirimi
+> - Production deploy sonrası post-launch monitoring (Sentry + admin panel)
+
+> **2026-06-02 — Faz 4 tamamlandı (UI katmanı + kısmi iade hesaplaması):**
+>
+> **4A — Admin order detail:** AwaitingConfirmationCard (canlı geri sayım,
+> renk kodlu), ExtendConfirmationDialog, ForceCompleteDialog. orders/[id]
+> page entegrasyonu + statusOptions güncellemesi.
+>
+> **4B — Admin refund-requests detail:** Backend PATCH endpoint'leri
+> (override-policy + set-shipping-payer). RefundService overrideRefundPolicy
+> + setReturnShippingPayer. RefundPolicyCard (4 checkbox + radio + anlık
+> tutar). counterfeit uyarı bandı + Senaryo D rozeti.
+>
+> **4C — Mobile order detail:** AwaitingConfirmationBanner (30s tick,
+> seviye renkleri), ChangedMindWarningModal. orders/[id].tsx
+> entegrasyonu + ordersApi.confirmReceipt.
+>
+> **4D — Senaryo D banner (web):** canSellerDecide + buyerInitiatedAmicable +
+> changed_mind koşulunda satıcıya policy bilgilendirmesi. Backend sellerAccept/
+> sellerReject mantığı zaten Senaryo D'ye uyumlu.
+>
+> **4E — Web checkout:** Buyer fee satırı label zenginleştirildi
+> ('Platform Hizmet Bedeli (%3)') + tooltip link. /platform-hizmet-bedeli
+> yasal sayfası (kapsam, hesaplama, iade durumları, şeffaflık).
+>
+> **4F — Kısmi iade hesaplaması:** RefundService.computePartialRefundAmount
+> (subtotal/shippingCost/buyerFeeAmount toplamı, policy'ye göre).
+> overrideRefundPolicy → otomatik amount güncelleme. finalizeRefundForReturnedShipment
+> rr.amount üzerinden PayTR'ye doğru kısmi tutar gönderir.
+>
+> Plan: `docs/superpowers/plans/2026-06-02-phase4-ui-and-flows.md`.
+>
+> **Atlanmış scope:**
+> - Mobile RefundRequest detail/listing route'u yok → mobile satıcı karar
+>   ekranı ayrı iş paketi (Faz 4D scope dışı kabul edildi). Backend hazır,
+>   satıcılar web üzerinden karar verebilir.
+> - ChangedMindWarningModal yazıldı ama refund-request açma sayfasına
+>   entegre edilmedi (mobile akış değişikliği gerekir).
+>
+> Sonraki: Faz 5 (calculateCommission BUYER+SELLER ayrı lookup refactor,
+> unit test, kullanıcı duyurusu, CommissionRule.is_active=true flip).
+>
+> **Bilinen blocker:** Node 22 + Jest 29 + Nest CLI uyumsuzluğu yüzünden
+> build/test araçları sessizce takılıyor. Editör TypeScript service kodu
+> doğrular ama tsc/nest build çalışmıyor. Faz 5 öncesi mutlaka toolchain
+> düzeltmesi yapılmalı (test'ler refactor sonrası çalıştırılacak).
+
 ## Baglamm (Context)
 
 Tarodan marketplace'inde alicilar PayTR ile odeme yapiyor. Para PayTR uzerinden platform banka hesabina geliyor. Ancak saticicya gercek para transferi yapilmiyor — sadece DB'de "released" flag'i set ediliyor. Bu plan, uctan uca calisan profesyonel bir escrow + otomatik payout sistemi olusturmayi amacliyor.

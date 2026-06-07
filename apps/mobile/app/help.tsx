@@ -1,9 +1,11 @@
 import { useState } from 'react';
 import { View, ScrollView, StyleSheet, TouchableOpacity, Linking } from 'react-native';
-import { Text, Searchbar, List, TextInput, Button, Snackbar, Divider } from 'react-native-paper';
+import { theme, Text, Input, Textarea, Button, Snackbar, Divider } from '@tarodan/ui-native';
 import { router } from 'expo-router';
-import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
-import { TarodanColors } from '../src/theme';
+import { Ionicons } from '@expo/vector-icons';
+import { useTranslation } from '../src/i18n';
+
+const { colors } = theme;
 
 const FAQ_CATEGORIES = [
   {
@@ -136,6 +138,7 @@ const CONTACT_OPTIONS = [
 ];
 
 export default function HelpScreen() {
+  const { t } = useTranslation();
   const [searchQuery, setSearchQuery] = useState('');
   const [expandedCategory, setExpandedCategory] = useState<string | null>('general');
   const [expandedQuestion, setExpandedQuestion] = useState<string | null>(null);
@@ -173,7 +176,7 @@ export default function HelpScreen() {
       setSnackbarVisible(true);
       return;
     }
-    
+
     // Submit contact form (mock)
     setContactName('');
     setContactEmail('');
@@ -187,9 +190,9 @@ export default function HelpScreen() {
       {/* Header */}
       <View style={styles.header}>
         <TouchableOpacity onPress={() => router.back()}>
-          <Ionicons name="arrow-back" size={24} color={TarodanColors.textOnPrimary} />
+          <Ionicons name="arrow-back" size={24} color={colors.white} />
         </TouchableOpacity>
-        <Text style={styles.headerTitle}>Yardım Merkezi</Text>
+        <Text style={styles.headerTitle}>{t('mobile.pageHelpCenter')}</Text>
         <View style={{ width: 24 }} />
       </View>
 
@@ -197,35 +200,35 @@ export default function HelpScreen() {
         {/* Search */}
         <View style={styles.searchSection}>
           <Text style={styles.searchTitle}>Nasıl yardımcı olabiliriz?</Text>
-          <Searchbar
+          <Input
             placeholder="Soru veya konu ara..."
             value={searchQuery}
             onChangeText={handleSearch}
-            style={styles.searchBar}
+            leftIconName="search"
           />
         </View>
 
         {/* Quick Links */}
         <View style={styles.quickLinks}>
-          <TouchableOpacity 
+          <TouchableOpacity
             style={styles.quickLink}
             onPress={() => router.push('/order-track')}
           >
-            <Ionicons name="location-outline" size={28} color={TarodanColors.primary} />
+            <Ionicons name="location-outline" size={28} color={colors.primary[600]!} />
             <Text style={styles.quickLinkText}>Sipariş Takip</Text>
           </TouchableOpacity>
-          <TouchableOpacity 
+          <TouchableOpacity
             style={styles.quickLink}
             onPress={() => router.push('/(auth)/login')}
           >
-            <Ionicons name="person-outline" size={28} color={TarodanColors.primary} />
+            <Ionicons name="person-outline" size={28} color={colors.primary[600]!} />
             <Text style={styles.quickLinkText}>Giriş Yap</Text>
           </TouchableOpacity>
-          <TouchableOpacity 
+          <TouchableOpacity
             style={styles.quickLink}
             onPress={() => setExpandedCategory('selling')}
           >
-            <Ionicons name="pricetag-outline" size={28} color={TarodanColors.primary} />
+            <Ionicons name="pricetag-outline" size={28} color={colors.primary[600]!} />
             <Text style={styles.quickLinkText}>Satış Yap</Text>
           </TouchableOpacity>
         </View>
@@ -233,7 +236,7 @@ export default function HelpScreen() {
         {/* FAQ Section */}
         <View style={styles.faqSection}>
           <Text style={styles.sectionTitle}>Sıkça Sorulan Sorular</Text>
-          
+
           {filteredFAQs.map(category => (
             <View key={category.id} style={styles.faqCategory}>
               <TouchableOpacity
@@ -243,20 +246,20 @@ export default function HelpScreen() {
                 )}
               >
                 <View style={styles.categoryTitle}>
-                  <Ionicons 
-                    name={category.icon as any} 
-                    size={24} 
-                    color={TarodanColors.primary} 
+                  <Ionicons
+                    name={category.icon as any}
+                    size={24}
+                    color={colors.primary[600]!}
                   />
                   <Text style={styles.categoryTitleText}>{category.title}</Text>
                   <View style={styles.questionCount}>
                     <Text style={styles.questionCountText}>{category.questions.length}</Text>
                   </View>
                 </View>
-                <Ionicons 
-                  name={expandedCategory === category.id ? 'chevron-up' : 'chevron-down'} 
-                  size={20} 
-                  color={TarodanColors.textSecondary} 
+                <Ionicons
+                  name={expandedCategory === category.id ? 'chevron-up' : 'chevron-down'}
+                  size={20}
+                  color={colors.text.muted}
                 />
               </TouchableOpacity>
 
@@ -267,16 +270,16 @@ export default function HelpScreen() {
                       <TouchableOpacity
                         style={styles.questionHeader}
                         onPress={() => setExpandedQuestion(
-                          expandedQuestion === `${category.id}-${index}` 
-                            ? null 
+                          expandedQuestion === `${category.id}-${index}`
+                            ? null
                             : `${category.id}-${index}`
                         )}
                       >
                         <Text style={styles.questionText}>{item.q}</Text>
-                        <Ionicons 
-                          name={expandedQuestion === `${category.id}-${index}` ? 'remove' : 'add'} 
-                          size={20} 
-                          color={TarodanColors.primary} 
+                        <Ionicons
+                          name={expandedQuestion === `${category.id}-${index}` ? 'remove' : 'add'}
+                          size={20}
+                          color={colors.primary[600]!}
                         />
                       </TouchableOpacity>
                       {expandedQuestion === `${category.id}-${index}` && (
@@ -295,7 +298,7 @@ export default function HelpScreen() {
         {/* Contact Section */}
         <View style={styles.contactSection}>
           <Text style={styles.sectionTitle}>Bize Ulaşın</Text>
-          
+
           <View style={styles.contactOptions}>
             {CONTACT_OPTIONS.map(option => (
               <TouchableOpacity
@@ -304,13 +307,13 @@ export default function HelpScreen() {
                 onPress={option.action}
               >
                 <View style={styles.contactIcon}>
-                  <Ionicons name={option.icon as any} size={24} color={TarodanColors.primary} />
+                  <Ionicons name={option.icon as any} size={24} color={colors.primary[600]!} />
                 </View>
                 <View style={styles.contactInfo}>
                   <Text style={styles.contactTitle}>{option.title}</Text>
                   <Text style={styles.contactSubtitle}>{option.subtitle}</Text>
                 </View>
-                <Ionicons name="chevron-forward" size={20} color={TarodanColors.textSecondary} />
+                <Ionicons name="chevron-forward" size={20} color={colors.text.muted} />
               </TouchableOpacity>
             ))}
           </View>
@@ -318,46 +321,34 @@ export default function HelpScreen() {
           {/* Contact Form */}
           <View style={styles.contactForm}>
             <Text style={styles.formTitle}>Mesaj Gönderin</Text>
-            <TextInput
+            <Input
               label="Adınız"
               value={contactName}
               onChangeText={setContactName}
-              mode="outlined"
-              style={styles.input}
-              outlineColor={TarodanColors.border}
-              activeOutlineColor={TarodanColors.primary}
+              containerStyle={styles.input}
             />
-            <TextInput
+            <Input
               label="E-posta"
               value={contactEmail}
               onChangeText={setContactEmail}
-              mode="outlined"
-              style={styles.input}
               keyboardType="email-address"
               autoCapitalize="none"
-              outlineColor={TarodanColors.border}
-              activeOutlineColor={TarodanColors.primary}
+              containerStyle={styles.input}
             />
-            <TextInput
+            <Textarea
               label="Mesajınız"
               value={contactMessage}
               onChangeText={setContactMessage}
-              mode="outlined"
-              style={styles.input}
-              multiline
-              numberOfLines={4}
-              outlineColor={TarodanColors.border}
-              activeOutlineColor={TarodanColors.primary}
+              rows={4}
+              containerStyle={styles.input}
             />
             <Button
-              mode="contained"
-              buttonColor={TarodanColors.primary}
+              variant="primary"
+              title="Gönder"
+              icon="send"
               onPress={handleSubmitContact}
               style={styles.submitButton}
-              icon="send"
-            >
-              Gönder
-            </Button>
+            />
           </View>
         </View>
 
@@ -382,7 +373,7 @@ export default function HelpScreen() {
         visible={snackbarVisible}
         onDismiss={() => setSnackbarVisible(false)}
         duration={3000}
-        style={{ backgroundColor: snackbarMessage.includes('gönderildi') ? TarodanColors.success : TarodanColors.error }}
+        variant={snackbarMessage.includes('gönderildi') ? 'success' : 'danger'}
       >
         {snackbarMessage}
       </Snackbar>
@@ -393,10 +384,10 @@ export default function HelpScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: TarodanColors.backgroundSecondary,
+    backgroundColor: colors.surface.alt,
   },
   header: {
-    backgroundColor: TarodanColors.primary,
+    backgroundColor: colors.primary[600]!,
     paddingTop: 50,
     paddingBottom: 16,
     paddingHorizontal: 20,
@@ -407,13 +398,13 @@ const styles = StyleSheet.create({
   headerTitle: {
     fontSize: 18,
     fontWeight: 'bold',
-    color: TarodanColors.textOnPrimary,
+    color: colors.white,
   },
   content: {
     flex: 1,
   },
   searchSection: {
-    backgroundColor: TarodanColors.primary,
+    backgroundColor: colors.primary[600]!,
     paddingHorizontal: 16,
     paddingBottom: 24,
     borderBottomLeftRadius: 24,
@@ -422,24 +413,19 @@ const styles = StyleSheet.create({
   searchTitle: {
     fontSize: 20,
     fontWeight: 'bold',
-    color: TarodanColors.textOnPrimary,
+    color: colors.white,
     marginBottom: 16,
     textAlign: 'center',
-  },
-  searchBar: {
-    backgroundColor: TarodanColors.background,
-    elevation: 0,
-    borderRadius: 12,
   },
   quickLinks: {
     flexDirection: 'row',
     justifyContent: 'space-around',
     paddingVertical: 20,
-    backgroundColor: TarodanColors.background,
+    backgroundColor: colors.surface.DEFAULT,
     marginHorizontal: 16,
     marginTop: -16,
     borderRadius: 16,
-    shadowColor: '#000',
+    shadowColor: colors.black,
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.1,
     shadowRadius: 4,
@@ -451,7 +437,7 @@ const styles = StyleSheet.create({
   quickLinkText: {
     marginTop: 8,
     fontSize: 12,
-    color: TarodanColors.textPrimary,
+    color: colors.text.heading,
     fontWeight: '500',
   },
   faqSection: {
@@ -460,11 +446,11 @@ const styles = StyleSheet.create({
   sectionTitle: {
     fontSize: 18,
     fontWeight: 'bold',
-    color: TarodanColors.textPrimary,
+    color: colors.text.heading,
     marginBottom: 16,
   },
   faqCategory: {
-    backgroundColor: TarodanColors.background,
+    backgroundColor: colors.surface.DEFAULT,
     borderRadius: 12,
     marginBottom: 12,
     overflow: 'hidden',
@@ -483,25 +469,25 @@ const styles = StyleSheet.create({
   categoryTitleText: {
     fontSize: 16,
     fontWeight: '600',
-    color: TarodanColors.textPrimary,
+    color: colors.text.heading,
   },
   questionCount: {
-    backgroundColor: TarodanColors.surfaceVariant,
+    backgroundColor: colors.surface.alt,
     paddingHorizontal: 8,
     paddingVertical: 2,
     borderRadius: 10,
   },
   questionCountText: {
     fontSize: 12,
-    color: TarodanColors.textSecondary,
+    color: colors.text.muted,
   },
   questionsList: {
     borderTopWidth: 1,
-    borderTopColor: TarodanColors.border,
+    borderTopColor: colors.border.DEFAULT,
   },
   questionItem: {
     borderBottomWidth: 1,
-    borderBottomColor: TarodanColors.border,
+    borderBottomColor: colors.border.DEFAULT,
   },
   questionHeader: {
     flexDirection: 'row',
@@ -513,17 +499,17 @@ const styles = StyleSheet.create({
   questionText: {
     flex: 1,
     fontSize: 14,
-    color: TarodanColors.textPrimary,
+    color: colors.text.heading,
     marginRight: 12,
   },
   answerText: {
     fontSize: 14,
-    color: TarodanColors.textSecondary,
+    color: colors.text.muted,
     lineHeight: 20,
     padding: 16,
     paddingTop: 0,
     paddingLeft: 20,
-    backgroundColor: TarodanColors.surfaceVariant,
+    backgroundColor: colors.surface.alt,
   },
   divider: {
     marginVertical: 16,
@@ -532,7 +518,7 @@ const styles = StyleSheet.create({
     padding: 16,
   },
   contactOptions: {
-    backgroundColor: TarodanColors.background,
+    backgroundColor: colors.surface.DEFAULT,
     borderRadius: 12,
     marginBottom: 16,
   },
@@ -541,13 +527,13 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     padding: 16,
     borderBottomWidth: 1,
-    borderBottomColor: TarodanColors.border,
+    borderBottomColor: colors.border.DEFAULT,
   },
   contactIcon: {
     width: 48,
     height: 48,
     borderRadius: 24,
-    backgroundColor: TarodanColors.primaryLight,
+    backgroundColor: colors.primary[50]!,
     justifyContent: 'center',
     alignItems: 'center',
   },
@@ -558,27 +544,26 @@ const styles = StyleSheet.create({
   contactTitle: {
     fontSize: 15,
     fontWeight: '600',
-    color: TarodanColors.textPrimary,
+    color: colors.text.heading,
   },
   contactSubtitle: {
     fontSize: 13,
-    color: TarodanColors.textSecondary,
+    color: colors.text.muted,
     marginTop: 2,
   },
   contactForm: {
-    backgroundColor: TarodanColors.background,
+    backgroundColor: colors.surface.DEFAULT,
     borderRadius: 12,
     padding: 16,
   },
   formTitle: {
     fontSize: 16,
     fontWeight: '600',
-    color: TarodanColors.textPrimary,
+    color: colors.text.heading,
     marginBottom: 16,
   },
   input: {
     marginBottom: 12,
-    backgroundColor: TarodanColors.background,
   },
   submitButton: {
     borderRadius: 12,
@@ -590,7 +575,7 @@ const styles = StyleSheet.create({
   },
   appInfoText: {
     fontSize: 13,
-    color: TarodanColors.textSecondary,
+    color: colors.text.muted,
   },
   appLinks: {
     flexDirection: 'row',
@@ -599,10 +584,10 @@ const styles = StyleSheet.create({
   },
   appLink: {
     fontSize: 13,
-    color: TarodanColors.primary,
+    color: colors.primary[600]!,
   },
   appLinkDivider: {
     marginHorizontal: 8,
-    color: TarodanColors.textSecondary,
+    color: colors.text.muted,
   },
 });

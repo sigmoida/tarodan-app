@@ -1,5 +1,5 @@
 import { View, ScrollView, StyleSheet, TouchableOpacity, Image, Alert } from 'react-native';
-import { Text, TextInput, Button, Switch, Card, Divider, Snackbar, IconButton, ActivityIndicator, List } from 'react-native-paper';
+import { theme, Button, Switch, Snackbar, IconButton, Spinner, Text, Input, Textarea } from '@tarodan/ui-native';
 import { useState, useEffect } from 'react';
 import { router, useLocalSearchParams, Stack } from 'expo-router';
 import { useForm, Controller } from 'react-hook-form';
@@ -10,7 +10,9 @@ import * as ImagePicker from 'expo-image-picker';
 import { Ionicons } from '@expo/vector-icons';
 import { api } from '../../../src/services/api';
 import { useAuthStore } from '../../../src/stores/authStore';
-import { TarodanColors } from '../../../src/theme';
+import { resolveImageUrl } from '../../../src/utils/imageUrl';
+
+const { colors } = theme;
 
 const collectionSchema = z.object({
   name: z.string().min(3, 'Koleksiyon adı en az 3 karakter olmalı').max(100),
@@ -29,6 +31,8 @@ interface Collection {
   isPublic: boolean;
   viewCount: number;
   likeCount: number;
+  userId?: string;
+  ownerId?: string;
   items: Array<{
     id: string;
     product: {
@@ -44,7 +48,7 @@ export default function EditCollectionScreen() {
   const { id } = useLocalSearchParams();
   const { user } = useAuthStore();
   const queryClient = useQueryClient();
-  
+
   const [coverImage, setCoverImage] = useState<string | null>(null);
   const [snackbar, setSnackbar] = useState({ visible: false, message: '' });
 
@@ -86,7 +90,7 @@ export default function EditCollectionScreen() {
       formData.append('name', data.name);
       if (data.description) formData.append('description', data.description);
       formData.append('isPublic', String(data.isPublic));
-      
+
       if (coverImage && coverImage !== collection?.coverImageUrl) {
         formData.append('coverImage', {
           uri: coverImage,
@@ -178,7 +182,7 @@ export default function EditCollectionScreen() {
   if (isLoading) {
     return (
       <View style={styles.loadingContainer}>
-        <ActivityIndicator size="large" color={TarodanColors.primary} />
+        <Spinner size="lg" />
       </View>
     );
   }
@@ -187,7 +191,7 @@ export default function EditCollectionScreen() {
     return (
       <View style={styles.errorContainer}>
         <Text>Koleksiyon bulunamadı</Text>
-        <Button mode="contained" onPress={() => router.back()}>Geri Dön</Button>
+        <Button variant="primary" title="Geri Dön" onPress={() => router.back()} />
       </View>
     );
   }
@@ -197,7 +201,7 @@ export default function EditCollectionScreen() {
     return (
       <View style={styles.errorContainer}>
         <Text>Bu koleksiyonu düzenleme yetkiniz yok</Text>
-        <Button mode="contained" onPress={() => router.back()}>Geri Dön</Button>
+        <Button variant="primary" title="Geri Dön" onPress={() => router.back()} />
       </View>
     );
   }
@@ -213,15 +217,15 @@ export default function EditCollectionScreen() {
             <Image source={{ uri: coverImage }} style={styles.coverImage} />
           ) : (
             <View style={styles.coverImagePlaceholder}>
-              <Ionicons name="image-outline" size={48} color={TarodanColors.textSecondary} />
-              <Text variant="bodyMedium" style={styles.coverImageText}>
+              <Ionicons name="image-outline" size={48} color={colors.text.muted} />
+              <Text variant="body" style={styles.coverImageText}>
                 Kapak fotoğrafı ekle
               </Text>
             </View>
           )}
           {coverImage && (
             <View style={styles.coverOverlay}>
-              <Ionicons name="camera" size={24} color="#fff" />
+              <Ionicons name="camera" size={24} color={colors.white} />
               <Text style={styles.coverOverlayText}>Değiştir</Text>
             </View>
           )}
@@ -230,169 +234,154 @@ export default function EditCollectionScreen() {
         {/* Stats */}
         <View style={styles.statsRow}>
           <View style={styles.statItem}>
-            <Ionicons name="eye" size={20} color={TarodanColors.textSecondary} />
-            <Text variant="bodyMedium">{collection.viewCount} görüntülenme</Text>
+            <Ionicons name="eye" size={20} color={colors.text.muted} />
+            <Text variant="body">{collection.viewCount} görüntülenme</Text>
           </View>
           <View style={styles.statItem}>
-            <Ionicons name="heart" size={20} color={TarodanColors.error} />
-            <Text variant="bodyMedium">{collection.likeCount} beğeni</Text>
+            <Ionicons name="heart" size={20} color={colors.danger[600]!} />
+            <Text variant="body">{collection.likeCount} beğeni</Text>
           </View>
           <View style={styles.statItem}>
-            <Ionicons name="pricetag" size={20} color={TarodanColors.primary} />
-            <Text variant="bodyMedium">{collection.items?.length || 0} ürün</Text>
+            <Ionicons name="pricetag" size={20} color={colors.primary[600]!} />
+            <Text variant="body">{collection.items?.length || 0} ürün</Text>
           </View>
         </View>
 
         {/* Collection Details */}
-        <Card style={styles.card}>
-          <Card.Content>
-            <Text variant="titleMedium" style={styles.sectionTitle}>Koleksiyon Bilgileri</Text>
-            
-            <Controller
-              control={control}
-              name="name"
-              render={({ field: { onChange, value } }) => (
-                <TextInput
-                  label="Koleksiyon Adı *"
-                  value={value}
-                  onChangeText={onChange}
-                  error={!!errors.name}
-                  mode="outlined"
-                  style={styles.input}
-                />
-              )}
-            />
-            {errors.name && (
-              <Text variant="bodySmall" style={styles.errorText}>{errors.name.message}</Text>
-            )}
+        <View style={styles.card}>
+          <Text variant="h3" style={styles.sectionTitle}>Koleksiyon Bilgileri</Text>
 
-            <Controller
-              control={control}
-              name="description"
-              render={({ field: { onChange, value } }) => (
-                <TextInput
-                  label="Açıklama"
-                  value={value}
-                  onChangeText={onChange}
-                  multiline
-                  numberOfLines={3}
-                  mode="outlined"
-                  style={styles.input}
-                />
-              )}
-            />
-          </Card.Content>
-        </Card>
+          <Controller
+            control={control}
+            name="name"
+            render={({ field: { onChange, value } }) => (
+              <Input
+                label="Koleksiyon Adı *"
+                value={value}
+                onChangeText={onChange}
+                error={errors.name?.message}
+                containerStyle={styles.input}
+              />
+            )}
+          />
+
+          <Controller
+            control={control}
+            name="description"
+            render={({ field: { onChange, value } }) => (
+              <Textarea
+                label="Açıklama"
+                value={value}
+                onChangeText={onChange}
+                rows={3}
+                containerStyle={styles.input}
+              />
+            )}
+          />
+        </View>
 
         {/* Privacy Settings */}
-        <Card style={styles.card}>
-          <Card.Content>
-            <Text variant="titleMedium" style={styles.sectionTitle}>Gizlilik Ayarları</Text>
-            
-            <View style={styles.privacyOption}>
-              <View style={styles.privacyInfo}>
-                <Ionicons 
-                  name={watch('isPublic') ? 'globe-outline' : 'lock-closed'} 
-                  size={24} 
-                  color={TarodanColors.primary} 
-                />
-                <View style={styles.privacyText}>
-                  <Text variant="bodyMedium">
-                    {watch('isPublic') ? 'Herkese Açık' : 'Gizli'}
-                  </Text>
-                  <Text variant="bodySmall" style={styles.privacyDesc}>
-                    {watch('isPublic') 
-                      ? 'Herkes koleksiyonunuzu görebilir' 
-                      : 'Sadece siz görebilirsiniz'}
-                  </Text>
-                </View>
-              </View>
-              <Controller
-                control={control}
-                name="isPublic"
-                render={({ field: { onChange, value } }) => (
-                  <Switch value={value} onValueChange={onChange} />
-                )}
-              />
-            </View>
-          </Card.Content>
-        </Card>
+        <View style={styles.card}>
+          <Text variant="h3" style={styles.sectionTitle}>Gizlilik Ayarları</Text>
 
-        {/* Collection Items */}
-        <Card style={styles.card}>
-          <Card.Content>
-            <View style={styles.itemsHeader}>
-              <Text variant="titleMedium" style={styles.sectionTitle}>
-                Koleksiyondaki Ürünler ({collection.items?.length || 0})
-              </Text>
-              <Button 
-                mode="outlined" 
-                compact 
-                onPress={() => router.push(`/collections/${id}/add-items`)}
-                icon="plus"
-              >
-                Ekle
-              </Button>
-            </View>
-            
-            {collection.items?.length === 0 ? (
-              <View style={styles.emptyItems}>
-                <Ionicons name="images-outline" size={48} color={TarodanColors.textLight} />
-                <Text variant="bodyMedium" style={styles.emptyText}>
-                  Henüz ürün eklenmemiş
+          <View style={styles.privacyOption}>
+            <View style={styles.privacyInfo}>
+              <Ionicons
+                name={watch('isPublic') ? 'globe-outline' : 'lock-closed'}
+                size={24}
+                color={colors.primary[600]!}
+              />
+              <View style={styles.privacyText}>
+                <Text variant="body">
+                  {watch('isPublic') ? 'Herkese Açık' : 'Gizli'}
+                </Text>
+                <Text variant="bodySm" style={styles.privacyDesc}>
+                  {watch('isPublic')
+                    ? 'Herkes koleksiyonunuzu görebilir'
+                    : 'Sadece siz görebilirsiniz'}
                 </Text>
               </View>
-            ) : (
-              collection.items?.map((item) => (
-                <View key={item.id} style={styles.collectionItem}>
-                  <TouchableOpacity
-                    style={styles.itemContent}
-                    onPress={() => router.push(`/product/${item.product.id}`)}
-                  >
-                    <Image
-                      source={{ uri: item.product.images?.[0]?.url || 'https://via.placeholder.com/50' }}
-                      style={styles.itemImage}
-                    />
-                    <Text variant="bodyMedium" style={styles.itemTitle} numberOfLines={1}>
-                      {item.product.title}
-                    </Text>
-                  </TouchableOpacity>
-                  <IconButton
-                    icon="close"
-                    size={20}
-                    onPress={() => handleRemoveItem(item.id, item.product.title)}
+            </View>
+            <Controller
+              control={control}
+              name="isPublic"
+              render={({ field: { onChange, value } }) => (
+                <Switch value={value} onValueChange={onChange} />
+              )}
+            />
+          </View>
+        </View>
+
+        {/* Collection Items */}
+        <View style={styles.card}>
+          <View style={styles.itemsHeader}>
+            <Text variant="h3" style={styles.sectionTitle}>
+              Koleksiyondaki Ürünler ({collection.items?.length || 0})
+            </Text>
+            <Button
+              variant="outline"
+              title="Ekle"
+              onPress={() => router.push(`/collections/${id}/add-items`)}
+              icon="add"
+              size="sm"
+            />
+          </View>
+
+          {collection.items?.length === 0 ? (
+            <View style={styles.emptyItems}>
+              <Ionicons name="images-outline" size={48} color={colors.gray[500]} />
+              <Text variant="body" style={styles.emptyText}>
+                Henüz ürün eklenmemiş
+              </Text>
+            </View>
+          ) : (
+            collection.items?.map((item) => (
+              <View key={item.id} style={styles.collectionItem}>
+                <TouchableOpacity
+                  style={styles.itemContent}
+                  onPress={() => router.push(`/product/${item.product.id}`)}
+                >
+                  <Image
+                    source={{ uri: resolveImageUrl(item.product.images) }}
+                    style={styles.itemImage}
                   />
-                </View>
-              ))
-            )}
-          </Card.Content>
-        </Card>
+                  <Text variant="body" style={styles.itemTitle} numberOfLines={1}>
+                    {item.product.title}
+                  </Text>
+                </TouchableOpacity>
+                <IconButton
+                  icon="close"
+                  accessibilityLabel="Ürünü kaldır"
+                  size="sm"
+                  onPress={() => handleRemoveItem(item.id, item.product.title)}
+                />
+              </View>
+            ))
+          )}
+        </View>
 
         {/* Actions */}
         <Button
-          mode="contained"
+          variant="primary"
+          title="Değişiklikleri Kaydet"
           onPress={handleSubmit(onSubmit)}
-          loading={updateMutation.isPending}
+          isLoading={updateMutation.isPending}
           disabled={updateMutation.isPending}
+          icon="checkmark"
           style={styles.saveButton}
-          icon="check"
-        >
-          Değişiklikleri Kaydet
-        </Button>
+        />
 
         {/* Danger Zone */}
-        <Card style={styles.dangerCard}>
-          <Card.Content>
-            <Text variant="titleMedium" style={styles.dangerTitle}>Tehlikeli Bölge</Text>
-            <List.Item
-              title="Koleksiyonu Sil"
-              description="Bu işlem geri alınamaz"
-              titleStyle={{ color: TarodanColors.error }}
-              left={props => <List.Icon {...props} icon="delete" color={TarodanColors.error} />}
-              onPress={handleDelete}
-            />
-          </Card.Content>
-        </Card>
+        <View style={styles.dangerCard}>
+          <Text variant="h3" style={styles.dangerTitle}>Tehlikeli Bölge</Text>
+          <TouchableOpacity onPress={handleDelete} style={styles.dangerItem}>
+            <Ionicons name="trash" size={24} color={colors.danger[600]!} />
+            <View style={{ flex: 1, marginLeft: 12 }}>
+              <Text style={styles.dangerItemTitle}>Koleksiyonu Sil</Text>
+              <Text style={styles.dangerItemDesc}>Bu işlem geri alınamaz</Text>
+            </View>
+          </TouchableOpacity>
+        </View>
 
         <View style={{ height: 50 }} />
       </ScrollView>
@@ -411,7 +400,7 @@ export default function EditCollectionScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: TarodanColors.backgroundSecondary,
+    backgroundColor: colors.surface.alt,
   },
   loadingContainer: {
     flex: 1,
@@ -434,7 +423,7 @@ const styles = StyleSheet.create({
     borderRadius: 12,
     overflow: 'hidden',
     marginBottom: 16,
-    backgroundColor: TarodanColors.background,
+    backgroundColor: colors.surface.DEFAULT,
   },
   coverImage: {
     width: '100%',
@@ -445,33 +434,33 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
     borderWidth: 2,
-    borderColor: TarodanColors.border,
+    borderColor: colors.border.DEFAULT,
     borderStyle: 'dashed',
     borderRadius: 12,
   },
   coverImageText: {
     marginTop: 8,
-    color: TarodanColors.textSecondary,
+    color: colors.text.muted,
   },
   coverOverlay: {
     position: 'absolute',
     bottom: 0,
     left: 0,
     right: 0,
-    backgroundColor: 'rgba(0,0,0,0.5)',
+    backgroundColor: colors.overlay.black50,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
     padding: 8,
   },
   coverOverlayText: {
-    color: '#fff',
+    color: colors.white,
     marginLeft: 8,
   },
   statsRow: {
     flexDirection: 'row',
     justifyContent: 'space-around',
-    backgroundColor: TarodanColors.background,
+    backgroundColor: colors.surface.DEFAULT,
     padding: 16,
     borderRadius: 12,
     marginBottom: 16,
@@ -483,20 +472,16 @@ const styles = StyleSheet.create({
   },
   card: {
     marginBottom: 16,
-    backgroundColor: TarodanColors.background,
+    backgroundColor: colors.surface.DEFAULT,
+    padding: 16,
+    borderRadius: 12,
   },
   sectionTitle: {
     marginBottom: 16,
-    color: TarodanColors.textPrimary,
+    color: colors.text.heading,
   },
   input: {
     marginBottom: 12,
-    backgroundColor: TarodanColors.background,
-  },
-  errorText: {
-    color: TarodanColors.error,
-    marginBottom: 8,
-    marginTop: -8,
   },
   privacyOption: {
     flexDirection: 'row',
@@ -512,7 +497,7 @@ const styles = StyleSheet.create({
     marginLeft: 12,
   },
   privacyDesc: {
-    color: TarodanColors.textSecondary,
+    color: colors.text.muted,
   },
   itemsHeader: {
     flexDirection: 'row',
@@ -526,14 +511,14 @@ const styles = StyleSheet.create({
   },
   emptyText: {
     marginTop: 8,
-    color: TarodanColors.textSecondary,
+    color: colors.text.muted,
   },
   collectionItem: {
     flexDirection: 'row',
     alignItems: 'center',
     paddingVertical: 8,
     borderBottomWidth: 1,
-    borderBottomColor: TarodanColors.border,
+    borderBottomColor: colors.border.DEFAULT,
   },
   itemContent: {
     flexDirection: 'row',
@@ -544,26 +529,40 @@ const styles = StyleSheet.create({
     width: 50,
     height: 50,
     borderRadius: 6,
-    backgroundColor: TarodanColors.border,
+    backgroundColor: colors.border.DEFAULT,
   },
   itemTitle: {
     flex: 1,
     marginLeft: 12,
-    color: TarodanColors.textPrimary,
+    color: colors.text.heading,
   },
   saveButton: {
     marginBottom: 16,
-    backgroundColor: TarodanColors.primary,
-    borderRadius: 8,
   },
   dangerCard: {
     marginBottom: 16,
-    backgroundColor: TarodanColors.error + '08',
+    backgroundColor: colors.danger[50]!,
     borderWidth: 1,
-    borderColor: TarodanColors.error + '30',
+    borderColor: colors.danger[200]!,
+    padding: 16,
+    borderRadius: 12,
   },
   dangerTitle: {
     marginBottom: 8,
-    color: TarodanColors.error,
+    color: colors.danger[600]!,
+  },
+  dangerItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: 8,
+  },
+  dangerItemTitle: {
+    color: colors.danger[600]!,
+    fontWeight: '600',
+  },
+  dangerItemDesc: {
+    color: colors.text.muted,
+    fontSize: 12,
+    marginTop: 2,
   },
 });

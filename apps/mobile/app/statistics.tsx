@@ -1,28 +1,33 @@
 import { View, StyleSheet } from 'react-native';
-import { Text } from 'react-native-paper';
 import { Stack, router } from 'expo-router';
-import { Button } from 'react-native-paper';
-import { TarodanColors } from '../src/theme';
+import { theme, Text, Button } from '@tarodan/ui-native';
+import { useTranslation } from '../src/i18n';
+
+const { colors } = theme;
 
 export default function StatisticsScreen() {
+  const { t } = useTranslation();
   return (
     <View style={styles.container}>
-      <Stack.Screen options={{ title: 'İstatistikler' }} />
+      <Stack.Screen options={{ title: t('mobile.pageStatistics') }} />
       <View style={styles.content}>
-        <Text variant="bodyLarge" style={styles.text}>
+        <Text variant="body" style={styles.text}>
           Detaylı istatistikler için Analytics sayfasını kullanabilirsiniz.
         </Text>
-        <Button mode="contained" onPress={() => router.push('/settings/analytics')} style={styles.button}>
-          Analytics'e Git
-        </Button>
+        <Button
+          variant="primary"
+          title="Analytics'e Git"
+          onPress={() => router.push('/settings/analytics')}
+          style={styles.button}
+        />
       </View>
     </View>
   );
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: TarodanColors.background },
+  container: { flex: 1, backgroundColor: colors.surface.DEFAULT },
   content: { flex: 1, justifyContent: 'center', alignItems: 'center', padding: 24 },
-  text: { textAlign: 'center', color: TarodanColors.textSecondary },
+  text: { textAlign: 'center', color: colors.text.muted },
   button: { marginTop: 16 },
 });

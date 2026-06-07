@@ -5,6 +5,7 @@ import {
   ForbiddenException,
   Logger,
 } from '@nestjs/common';
+import { ModuleRef } from '@nestjs/core';
 import { ConfigService } from '@nestjs/config';
 import { PrismaService } from '../../prisma';
 import { CacheService } from '../cache/cache.service';
@@ -21,6 +22,7 @@ import { ProductLockService } from '../product/product-lock.service';
 import { NotificationService } from '../notification/notification.service';
 import { NotificationType } from '../notification/dto/notification.dto';
 import { SuratCargoService } from '../surat-cargo/surat-cargo.service';
+import { CommissionLedgerService } from '../commission/commission-ledger.service';
 import { Request } from 'express';
 
 @Injectable()
@@ -38,6 +40,8 @@ export class PaymentService {
     private readonly productLockService: ProductLockService,
     private readonly notificationService: NotificationService,
     private readonly suratCargoService: SuratCargoService,
+    private readonly commissionLedger: CommissionLedgerService,
+    private readonly moduleRef: ModuleRef,
   ) {
     this.holdDays = parseInt(this.configService.get('PAYMENT_HOLD_DAYS') || '7', 10);
   }
@@ -144,6 +148,13 @@ export class PaymentService {
 
     if (order.status !== OrderStatus.pending_payment) {
       throw new BadRequestException('Bu sipariş için ödeme beklenmiyor');
+    }
+
+    // 24h kill-switch: defense in depth in case the cron hasn't run yet.
+    if (order.paymentExpiresAt && order.paymentExpiresAt.getTime() < Date.now()) {
+      throw new BadRequestException(
+        'Ödeme süresi doldu. Lütfen yeni bir sipariş oluşturun.',
+      );
     }
 
     return this.processPaymentInitiation(order, dto, req);
@@ -357,31 +368,88 @@ export class PaymentService {
     });
 
     if (existingPayment) {
-      // Eski hata mesajını temizle; kullanıcı yeni deneme yapıyor
-      if (existingPayment.failureReason) {
-        await this.prisma.payment.update({
-          where: { id: existingPayment.id },
-          data: { failureReason: null },
+      const bypassEnabled = this.configService.get('PAYMENT_BYPASS') === 'true';
+
+      // Reset row before reuse: PayTR iframe tokens are single-use, so we must
+      // mint a fresh one on every retry (otherwise iframe shows
+      // "Bu ödeme sayfası artık geçersiz").
+      await this.prisma.payment.update({
+        where: { id: existingPayment.id },
+        data: {
+          status: PaymentStatus.pending,
+          failureReason: null,
+          providerPaymentId: null,
+        },
+      });
+
+      // 30-min cron released the reservation; re-acquire it before letting
+      // the buyer retry. CAS-gate on reservationReleasedAt: only the request
+      // that flips it null actually re-reserves, so concurrent double-clicks
+      // can't both increment reservedQuantity.
+      if (order.reservationReleasedAt) {
+        await this.prisma.$transaction(async (tx) => {
+          const claimed = await tx.order.updateMany({
+            where: { id: order.id, reservationReleasedAt: { not: null } },
+            data: { reservationReleasedAt: null },
+          });
+          if (claimed.count === 0) return; // another concurrent retry already won
+          await this.productLockService.checkAndReserve(tx, order.productId, 1);
         });
+        this.logger.log(
+          `Re-reserved 1 unit for order ${order.id} after 30-min release (retry)`,
+        );
       }
 
-      const bypassEnabled = this.configService.get('PAYMENT_BYPASS') === 'true';
-      return {
-        paymentId: existingPayment.id,
-        paymentUrl: bypassEnabled ? undefined : `${this.configService.get('FRONTEND_URL') || (this.configService.get('NODE_ENV') === 'production' ? 'https://tarodan.com' : 'http://localhost:3000')}/payment/${existingPayment.id}`,
-        provider: existingPayment.provider,
-        expiresIn: 300,
-        ...(bypassEnabled ? { useBypass: true } : {}),
-      };
+      if (bypassEnabled) {
+        return {
+          paymentId: existingPayment.id,
+          orderId: order.id,
+          amount: Number(order.totalAmount),
+          provider: existingPayment.provider,
+          expiresIn: 300,
+          useBypass: true,
+        };
+      }
+
+      try {
+        const result = await this.initializePayTRPayment(
+          { ...existingPayment, providerPaymentId: null },
+          order,
+          this.getClientIp(req),
+        );
+        return {
+          paymentId: existingPayment.id,
+          paymentUrl: result.paymentUrl,
+          paymentHtml: result.paymentHtml,
+          provider: existingPayment.provider,
+          expiresIn: 300,
+        };
+      } catch (error: any) {
+        throw new BadRequestException(error.message || 'PayTR ödeme başlatılamadı');
+      }
     }
 
-    // Offer-based order ise: ödeme başlatılırken stok rezerve et
-    // Direct buy'da reserve zaten createDirectBuyOrder'da yapıldı
-    if (order.offerId) {
+    // Offer-based order ise: ödeme başlatılırken stok rezerve et.
+    // Direct buy'da reserve zaten createDirectBuyOrder'da yapıldı, AMA cron
+    // 30-dk sonunda serbest bıraktıysa retry'da yeniden almak gerekir.
+    if (order.offerId && !order.reservationReleasedAt) {
+      // First-time payment for an offer-flow order — straightforward reserve.
       await this.prisma.$transaction(async (tx) => {
         await this.productLockService.checkAndReserve(tx, order.productId, 1);
       });
       this.logger.log(`Reserved 1 unit for offer-based order ${order.id} (product ${order.productId})`);
+    } else if (order.reservationReleasedAt) {
+      // Retry after 30-min release. CAS-gate on the flag so concurrent
+      // initiate calls can't both increment reservedQuantity.
+      await this.prisma.$transaction(async (tx) => {
+        const claimed = await tx.order.updateMany({
+          where: { id: order.id, reservationReleasedAt: { not: null } },
+          data: { reservationReleasedAt: null },
+        });
+        if (claimed.count === 0) return;
+        await this.productLockService.checkAndReserve(tx, order.productId, 1);
+      });
+      this.logger.log(`Re-reserved 1 unit for order ${order.id} after release`);
     }
 
     // Create payment record
@@ -678,6 +746,15 @@ export class PaymentService {
   async handlePayTRCallback(dto: PayTRCallbackDto) {
     this.logger.log('PayTR callback received');
 
+    // PayTR keeps retrying unless we reply with literal "OK". Always return
+    // "OK" — even on bad/missing payloads — and just log the issue.
+    if (!dto.merchant_oid || !dto.status || !dto.total_amount || !dto.hash) {
+      this.logger.warn(
+        `PayTR callback missing required fields: merchant_oid=${dto.merchant_oid} status=${dto.status} total_amount=${dto.total_amount} hash=${dto.hash ? 'present' : 'missing'}`,
+      );
+      return 'OK';
+    }
+
     const isValid = this.paytrService.verifyCallback({
       merchant_oid: dto.merchant_oid,
       status: dto.status as 'success' | 'failed',
@@ -694,7 +771,8 @@ export class PaymentService {
     const payment = await this.findPaymentForPaytrCallback(dto.merchant_oid);
 
     if (!payment) {
-      throw new NotFoundException('Payment not found');
+      this.logger.warn(`PayTR callback: payment not found for merchant_oid=${dto.merchant_oid}`);
+      return 'OK';
     }
 
     if (dto.status === 'success') {
@@ -802,6 +880,16 @@ export class PaymentService {
     if (payment.tradeCashPaymentId && !payment.orderId) {
       return this.processSuccessfulTradeCashPayment(payment, transactionId);
     }
+
+    let cancelledOrders: {
+      buyerId: string;
+      productId: string;
+      productTitle: string;
+      offerId: string | null;
+      hadPayment: boolean;
+    }[] = [];
+    let cancelledOffers: { buyerId: string; productId: string; productTitle: string }[] = [];
+    let stockoutCategoryId: string | null = null;
 
     const result = await this.prisma.$transaction(async (tx) => {
       const oldStatus = payment.status;
@@ -1053,7 +1141,49 @@ export class PaymentService {
           data: updateData,
         });
 
-        // Invalidation YAPILMIYOR — cron (sweepOutOfStockProducts) halledecek.
+        // Stockout cascade: if this purchase drained the last available unit,
+        // cancel other open offers/orders for the same product within the same
+        // transaction so no other buyer can complete a payment that would push
+        // stock negative. The order matters: invalidate pending orders FIRST
+        // (so their linked offers chain-cancel atomically), then sweep any
+        // remaining standalone offers. Both helpers are idempotent w.r.t.
+        // already-terminal rows, and the order helper now safely clamps the
+        // reservedQuantity decrement.
+        const refreshed = await tx.product.findUnique({
+          where: { id: payment.order.productId },
+          select: { quantity: true, reservedQuantity: true, categoryId: true },
+        });
+        const available =
+          (refreshed?.quantity ?? 0) - (refreshed?.reservedQuantity ?? 0);
+        if (refreshed && refreshed.quantity !== null && available <= 0) {
+          stockoutCategoryId = refreshed.categoryId ?? null;
+          const orderResult = await this.productLockService.invalidatePendingOrdersForProduct(
+            tx,
+            payment.order.productId,
+            'Stok tükendi',
+          );
+          const offerResult = await this.productLockService.invalidateRelatedOffers(
+            tx,
+            payment.order.productId,
+          );
+          cancelledOrders.push(
+            ...orderResult.cancelledOrders.map((o) => ({
+              buyerId: o.buyerId,
+              productId: o.productId,
+              productTitle: o.productTitle,
+              offerId: o.offerId,
+              hadPayment: o.hadPayment,
+            })),
+          );
+          cancelledOffers.push(
+            ...offerResult.rejectedOffers.map((o) => ({
+              buyerId: o.buyerId,
+              productId: o.productId,
+              productTitle: o.productTitle,
+            })),
+          );
+        }
+
         this.logger.log(
           `Product ${payment.order.productId} stock updated: quantity=${newQuantity}, reserved=${updateData.reservedQuantity}`,
         );
@@ -1093,6 +1223,14 @@ export class PaymentService {
           },
         });
 
+        // CommissionLedger satırı — pending (Faz 3A.2). Spec Bölüm 5.1.
+        await this.commissionLedger.upsertPending({
+          orderId: payment.orderId,
+          sellerCommission: order.commissionAmount,
+          buyerFee: order.buyerFeeAmount,
+          tx,
+        });
+
         this.logger.log(`Payment ${payment.id} completed, hold created for seller ${order.sellerId}`);
       } else {
         this.logger.log(`Virtual order payment ${payment.id} (membership/boost) completed, no hold needed`);
@@ -1127,6 +1265,38 @@ export class PaymentService {
     const resultOrder = result.order;
     for (const productId of result.productIdsToInvalidate) {
       await this.cache.del(`products:detail:${productId}`);
+    }
+
+    // Stockout cascade notifications: dispatch AFTER tx commits so failures
+    // here don't roll back the payment. One notification per buyer.
+    //
+    // An accepted-but-unpaid offer creates a pending_payment Order with no
+    // Payment row and no stock reservation (offer.service.ts acceptOffer). When
+    // stock runs out that Order is cancelled — but since the buyer never paid,
+    // it is really a cancelled OFFER, so we send "Teklifiniz iptal edildi"
+    // rather than the misleading "Siparişiniz iptal edildi". Direct-buy orders
+    // (no offer) and orders whose payment was already initiated keep the
+    // order-cancelled message.
+    const notifiedBuyers = new Set<string>();
+    for (const o of cancelledOrders) {
+      if (notifiedBuyers.has(o.buyerId)) continue;
+      notifiedBuyers.add(o.buyerId);
+      const isUnpaidOffer = o.offerId !== null && !o.hadPayment;
+      const notify = isUnpaidOffer
+        ? this.notificationService.notifyOfferCancelledOutOfStock(o.buyerId, o.productId, o.productTitle, stockoutCategoryId)
+        : this.notificationService.notifyOrderCancelledOutOfStock(o.buyerId, o.productId, o.productTitle, stockoutCategoryId);
+      await notify.catch((err) =>
+        this.logger.warn(`stockout-notify (${isUnpaidOffer ? 'offer' : 'order'}) failed for ${o.buyerId}: ${err.message}`),
+      );
+    }
+    for (const o of cancelledOffers) {
+      if (notifiedBuyers.has(o.buyerId)) continue;
+      notifiedBuyers.add(o.buyerId);
+      await this.notificationService
+        .notifyOfferCancelledOutOfStock(o.buyerId, o.productId, o.productTitle, stockoutCategoryId)
+        .catch((err) =>
+          this.logger.warn(`stockout-notify (offer) failed for ${o.buyerId}: ${err.message}`),
+        );
     }
 
     // Emit order.paid event AFTER transaction commits (only for regular product orders, not membership/boost)
@@ -1244,15 +1414,17 @@ export class PaymentService {
       });
       if (!order || order.status !== OrderStatus.pending_payment || !order.productId) return;
 
-      const product = await this.prisma.product.findUnique({
+      const before = await this.prisma.product.findUnique({
         where: { id: order.productId },
-        select: { reservedQuantity: true, status: true },
+        select: { quantity: true, reservedQuantity: true, title: true, status: true },
       });
+      const beforeAvailable = (before?.quantity ?? 0) - (before?.reservedQuantity ?? 0);
+
       const updateData: { reservedQuantity?: number; status?: ProductStatus } = {};
-      if (product) {
-        const newReserved = safeDecrementReserved(product.reservedQuantity, 1);
+      if (before) {
+        const newReserved = safeDecrementReserved(before.reservedQuantity, 1);
         updateData.reservedQuantity = newReserved;
-        if (product.status === ProductStatus.reserved && newReserved === 0) {
+        if (before.status === ProductStatus.reserved && newReserved === 0) {
           updateData.status = ProductStatus.active;
         }
       }
@@ -1262,7 +1434,7 @@ export class PaymentService {
           where: { id: orderId },
           data: { status: OrderStatus.cancelled },
         }),
-        ...(product && Object.keys(updateData).length > 0
+        ...(before && Object.keys(updateData).length > 0
           ? [
               this.prisma.product.update({
                 where: { id: order.productId },
@@ -1282,10 +1454,34 @@ export class PaymentService {
       ]);
       this.logger.log(`Order ${orderId} cancelled and product ${order.productId} reservation released after payment failure`);
       await this.cache.del(`products:detail:${order.productId}`);
+
+      // BACK_IN_STOCK dispatch: only when availability transitioned from <=0 to >0.
+      const after = await this.prisma.product.findUnique({
+        where: { id: order.productId },
+        select: { quantity: true, reservedQuantity: true },
+      });
+      const afterAvailable = (after?.quantity ?? 0) - (after?.reservedQuantity ?? 0);
+      if (beforeAvailable <= 0 && afterAvailable > 0 && before?.title) {
+        await this.dispatchBackInStock(order.productId, before.title).catch((err: any) =>
+          this.logger.warn(`back-in-stock dispatch failed: ${err?.message}`),
+        );
+      }
     } catch (error: any) {
       this.logger.error(`Failed to release product for order ${orderId}: ${error?.message}`);
     }
   }
+
+  /**
+   * Notify all wishlist users for a product that just transitioned from
+   * unavailable -> available. Debounced 24h per (userId, productId) so
+   * repeated payment failures don't spam wishlists.
+   */
+  private async dispatchBackInStock(productId: string, productTitle: string): Promise<void> {
+    // Delegated to NotificationService.broadcastBackInStock — kept here only
+    // as a thin wrapper to preserve the existing call site contract.
+    return this.notificationService.broadcastBackInStock(productId, productTitle);
+  }
+
 
   /**
    * Process failed payment
@@ -1455,6 +1651,33 @@ export class PaymentService {
       } catch (error) {
         // Log but don't fail - payment was already completed
         this.logger.error(`Failed to emit trade.ready-for-shipping event: ${error}`);
+      }
+
+      // Auto-create the two `to_warehouse` Sürat shipments now that the cash
+      // trade has cleared payment and entered `shipping_to_warehouse`. Mirrors
+      // the non-cash hook in TradeService.acceptTrade. We resolve TradeService
+      // lazily via ModuleRef + a runtime require to avoid the Trade<>Payment
+      // module circular import (Membership eagerly imports Payment; Trade
+      // imports Payment; Payment can't statically import Trade).
+      try {
+        // eslint-disable-next-line @typescript-eslint/no-var-requires
+        const { TradeService } = require('../trade/trade.service');
+        const tradeService = this.moduleRef.get(TradeService, { strict: false });
+        if (tradeService && typeof tradeService.createInboundTradeShipments === 'function') {
+          tradeService.createInboundTradeShipments(result.trade.id).catch((err: any) =>
+            this.logger.error(
+              `createInboundTradeShipments crashed for cash-trade ${result.trade!.id}: ${err?.message ?? err}`,
+            ),
+          );
+        } else {
+          this.logger.warn(
+            `TradeService.createInboundTradeShipments not available; inbound shipments NOT auto-created for cash-trade ${result.trade.id}`,
+          );
+        }
+      } catch (err: any) {
+        this.logger.error(
+          `Failed to resolve TradeService for cash-trade inbound shipments: ${err?.message ?? err}`,
+        );
       }
     }
 
@@ -1764,10 +1987,8 @@ export class PaymentService {
 
     const amountToRefund = refundAmount || Number(payment.amount);
 
-    // Cancel any active Surat shipment before processing the refund (best-effort)
-    await this.cancelSuratShipmentIfExists(orderId, payment.order.orderNumber);
-
-    // Race condition guard: if a payout transfer is already completed/processing, block refund
+    // Race condition guard: if a payout transfer is already completed/processing, block refund.
+    // Check this BEFORE touching PayTR or Sürat so we don't half-cancel.
     const existingPayout = await this.prisma.payoutTransfer.findFirst({
       where: {
         paymentHold: { orderId },
@@ -1783,15 +2004,42 @@ export class PaymentService {
       let refundResult: any;
 
       if (payment.provider === 'paytr') {
-        const paytrOid =
-          payment.providerConversationId?.trim() ||
-          orderId.replace(/-/g, '');
-        refundResult = await this.paytrService.createRefund(paytrOid, amountToRefund);
-
-        if (refundResult.status !== 'success') {
-          throw new BadRequestException(
-            refundResult.err_msg || 'PayTR iade işlemi başarısız',
+        // PAYMENT_BYPASS: dev/test modunda PayTR callback olmadan ödeme tamamlandığı
+        // için PayTR tarafında oid kaydı yok. Refund'ı da bypass'la — DB'de payment
+        // direkt refunded olarak işaretlenir; provider çağrısı atlanır.
+        const bypassEnabled =
+          this.configService.get('PAYMENT_BYPASS') === 'true';
+        if (bypassEnabled) {
+          this.logger.warn(
+            `PAYMENT_BYPASS: PayTR refund atlandı payment=${payment.id} amount=${amountToRefund}`,
           );
+          refundResult = {
+            status: 'success',
+            err_msg: null,
+            return_amount: amountToRefund,
+            bypass: true,
+          };
+        } else {
+          const paytrOid =
+            payment.providerConversationId?.trim() ||
+            orderId.replace(/-/g, '');
+          try {
+            refundResult = await this.paytrService.createRefund(paytrOid, amountToRefund);
+          } catch (err) {
+            const msg = (err as Error).message || '';
+            if (/odeme henuz siteye bildirilmemis|henuz siteye bildirilmemi/i.test(msg)) {
+              throw new BadRequestException(
+                'Ödeme yeni tamamlandı, PayTR henüz işlemi tam senkronize etmedi. Lütfen 1-2 dakika sonra tekrar deneyin.',
+              );
+            }
+            throw err;
+          }
+
+          if (refundResult.status !== 'success') {
+            throw new BadRequestException(
+              refundResult.err_msg || 'PayTR iade işlemi başarısız',
+            );
+          }
         }
       } else {
         throw new BadRequestException(`Bilinmeyen ödeme sağlayıcı: ${payment.provider}`);
@@ -1840,12 +2088,43 @@ export class PaymentService {
           });
         }
 
-        // Update order status if full refund
+        // Ledger: pending/earned → refunded (Faz 3B.6).
+        // markRefunded yalnızca pending/earned satırı varsa update eder; cancel
+        // akışından gelmişse Task 3B.5'te waived olur ve burada noop.
+        await this.commissionLedger.markRefunded(orderId, tx);
+
+        // Update order status + restore stock on full refund.
+        // Idempotent: skip stock restore if order is already cancelled (e.g.
+        // handleExpiredPreparingOrders already restocked before calling us).
         if (amountToRefund >= Number(payment.amount)) {
+          const orderRow = await tx.order.findUnique({
+            where: { id: orderId },
+            select: { status: true, productId: true },
+          });
+          const alreadyCancelled = orderRow?.status === OrderStatus.cancelled;
+
           await tx.order.update({
             where: { id: orderId },
             data: { status: OrderStatus.cancelled },
           });
+
+          if (!alreadyCancelled && orderRow?.productId) {
+            const product = await tx.product.findUnique({
+              where: { id: orderRow.productId },
+              select: { quantity: true },
+            });
+            if (product?.quantity !== null && product?.quantity !== undefined) {
+              const newQty = product.quantity + 1;
+              await tx.product.update({
+                where: { id: orderRow.productId },
+                data: {
+                  quantity: { increment: 1 },
+                  status: getProductStatusFromQuantity(newQty),
+                },
+              });
+              this.logger.log(`Restored stock for product ${orderRow.productId} after refund of order ${orderId}`);
+            }
+          }
         }
 
         this.logger.log(`Refund processed for payment ${payment.id}: ${amountToRefund} TRY`);
@@ -1892,6 +2171,17 @@ export class PaymentService {
         }
 
         return refundResponse;
+      }).then(async (response) => {
+        // After PayTR refund + DB updates succeed, cancel the Sürat shipment.
+        // Best-effort: a failure here doesn't undo the refund (money is already back).
+        try {
+          await this.cancelSuratShipmentIfExists(orderId, payment.order.orderNumber);
+        } catch (err) {
+          this.logger.error(
+            `Sürat cancel failed after successful refund for order ${orderId}: ${(err as Error).message}. Manual cleanup may be needed.`,
+          );
+        }
+        return response;
       });
     } catch (error: any) {
       this.logger.error(`Refund error for payment ${payment.id}: ${error.message}`);
@@ -1956,20 +2246,39 @@ export class PaymentService {
     const oid =
       payment.providerConversationId?.trim() ||
       tradeId.replace(/-/g, '');
-    const amount = Number(payment.amount);
+    // Always refund the full charged amount (product + commission). PayTR was
+    // charged the totalAmount at capture time; partial commission retention
+    // would leave the payer short when the admin reject is no-fault.
+    const amount = Number(
+      payment.tradeCashPayment?.totalAmount ?? payment.amount,
+    );
 
-    try {
-      const refundResult = await this.paytrService.createRefund(oid, amount);
-      if (refundResult.status !== 'success') {
-        throw new BadRequestException(
-          refundResult.err_msg || 'PayTR iade işlemi başarısız',
-        );
-      }
-    } catch (e: any) {
-      this.logger.error(
-        `refundTradeCashPaymentIfCompleted(tradeId=${tradeId}) PayTR error: ${e?.message}`,
+    // PAYMENT_BYPASS: dev/test modunda PayTR'a refund çağrısı yapma.
+    const bypassEnabled = this.configService.get('PAYMENT_BYPASS') === 'true';
+    if (bypassEnabled) {
+      this.logger.warn(
+        `PAYMENT_BYPASS: PayTR trade refund atlandı tradeId=${tradeId} amount=${amount}`,
       );
-      throw e;
+    } else {
+      try {
+        const refundResult = await this.paytrService.createRefund(oid, amount);
+        if (refundResult.status !== 'success') {
+          throw new BadRequestException(
+            refundResult.err_msg || 'PayTR iade işlemi başarısız',
+          );
+        }
+      } catch (e: any) {
+        const msg = (e as Error).message || '';
+        if (/odeme henuz siteye bildirilmemis|henuz siteye bildirilmemi/i.test(msg)) {
+          throw new BadRequestException(
+            'Ödeme yeni tamamlandı, PayTR henüz işlemi tam senkronize etmedi. Lütfen 1-2 dakika sonra tekrar deneyin.',
+          );
+        }
+        this.logger.error(
+          `refundTradeCashPaymentIfCompleted(tradeId=${tradeId}) PayTR error: ${e?.message}`,
+        );
+        throw e;
+      }
     }
 
     const existingMeta = (payment.metadata as Record<string, unknown>) || {};
@@ -2663,8 +2972,11 @@ export class PaymentService {
   }
 
   /**
-   * Sipariş bazlı zaman aşımı: pending_payment siparişler X dakika (varsayılan 30) içinde ödenmezse
-   * ürünü tekrar active yapar, siparişi iptal eder. "Öde"ye hiç basılmadan çıkılan siparişler için.
+   * 30-dk rezervasyon serbest bırakma. pending_payment siparişler PAYMENT_TIMEOUT_MINUTES
+   * (varsayılan 30) içinde ödenmediyse stok rezervasyonu kaldırılır, AMA sipariş yaşamaya
+   * devam eder (status pending_payment kalır, reservationReleasedAt set edilir). Alıcı
+   * 24 saat içinde tekrar payment-initiate çağırırsa stok varsa yeniden rezerv alınır.
+   * 24h kill-switch'i için ayrı method: expireUnpaidOrders.
    */
   async releaseExpiredOrderReservations(): Promise<{ count: number }> {
     const timeoutMinutes = parseInt(
@@ -2674,57 +2986,162 @@ export class PaymentService {
     const cutoff = new Date();
     cutoff.setMinutes(cutoff.getMinutes() - timeoutMinutes);
 
-    // Include ALL pending_payment orders (both direct-buy and offer-based)
     const expiredOrders = await this.prisma.order.findMany({
       where: {
         status: OrderStatus.pending_payment,
         createdAt: { lt: cutoff },
+        reservationReleasedAt: null,
       },
-      select: { id: true, productId: true, orderNumber: true, offerId: true },
+      select: {
+        id: true,
+        productId: true,
+        orderNumber: true,
+        buyerId: true,
+        product: { select: { title: true } },
+      },
     });
 
     let released = 0;
+    const dispatched: { buyerId: string; orderId: string; productTitle: string }[] = [];
     for (const order of expiredOrders) {
       if (!order.productId) continue;
       try {
         await this.prisma.$transaction(async (tx) => {
-          // FOR UPDATE: sipariş satırını kilitle — aynı anda ödeme gelmesini engeller
           await tx.$queryRaw`SELECT id FROM orders WHERE id = ${order.id} FOR UPDATE`;
-
-          // Kilitleme sonrası statüyü tekrar kontrol et
           const freshOrder = await tx.order.findUnique({
             where: { id: order.id },
-            select: { status: true },
+            select: { status: true, reservationReleasedAt: true },
           });
-          if (!freshOrder || freshOrder.status !== OrderStatus.pending_payment) {
-            // Başka bir akış (ödeme webhook'u vb.) zaten işledi, atla
+          if (
+            !freshOrder ||
+            freshOrder.status !== OrderStatus.pending_payment ||
+            freshOrder.reservationReleasedAt !== null
+          ) {
             return;
           }
 
-          // Ürün satırını kilitle ve rezervasyonu kaldır
           await tx.$queryRaw`SELECT id FROM products WHERE id = ${order.productId} FOR UPDATE`;
           const product = await tx.product.findUnique({
             where: { id: order.productId },
-            select: { reservedQuantity: true, status: true },
+            select: { reservedQuantity: true, quantity: true, status: true },
           });
 
           if (product) {
             const newReserved = safeDecrementReserved(product.reservedQuantity, 1);
+            const remaining = (product.quantity ?? 0) - newReserved;
             await tx.product.update({
               where: { id: order.productId },
               data: {
                 reservedQuantity: newReserved,
-                status: newReserved > 0 ? ProductStatus.reserved : ProductStatus.active,
+                status:
+                  newReserved > 0
+                    ? ProductStatus.reserved
+                    : remaining > 0
+                      ? ProductStatus.active
+                      : ProductStatus.reserved,
               },
             });
           }
 
+          // Mark the reservation as released; order stays pending_payment so
+          // the buyer can re-initiate within paymentExpiresAt (24h window).
           await tx.order.update({
             where: { id: order.id },
-            data: { status: OrderStatus.cancelled },
+            data: { reservationReleasedAt: new Date() },
+          });
+        });
+        await this.cache.del(`products:detail:${order.productId}`);
+        released++;
+        dispatched.push({
+          buyerId: order.buyerId,
+          orderId: order.id,
+          productTitle: order.product?.title ?? 'Ürün',
+        });
+        this.logger.log(`Released reservation for order ${order.orderNumber} (product ${order.productId})`);
+      } catch (error: any) {
+        this.logger.error(`Failed to release expired order ${order.id}: ${error?.message}`);
+      }
+    }
+
+    for (const d of dispatched) {
+      await this.notificationService
+        .notifyReservationReleased(d.buyerId, d.orderId, d.productTitle)
+        .catch((err) =>
+          this.logger.warn(`reservation-released notify failed for ${d.buyerId}: ${err.message}`),
+        );
+    }
+
+    return { count: released };
+  }
+
+  /**
+   * 24h kill-switch: pending_payment siparişleri paymentExpiresAt geçtiğinde
+   * iptal eder. Eğer rezerv hâlâ tutuluyorsa (cron 30dk pas'ı kaçırdıysa) önce
+   * onu serbest bırakır. Bağlı offer payment_expired olur.
+   */
+  async expireUnpaidOrders(): Promise<{ count: number }> {
+    const now = new Date();
+    const expired = await this.prisma.order.findMany({
+      where: {
+        status: OrderStatus.pending_payment,
+        paymentExpiresAt: { lt: now },
+      },
+      select: {
+        id: true,
+        productId: true,
+        offerId: true,
+        buyerId: true,
+        orderNumber: true,
+        reservationReleasedAt: true,
+        product: { select: { title: true } },
+      },
+    });
+
+    let cancelled = 0;
+    const dispatched: { buyerId: string; orderId: string; productTitle: string }[] = [];
+    for (const order of expired) {
+      try {
+        await this.prisma.$transaction(async (tx) => {
+          await tx.$queryRaw`SELECT id FROM orders WHERE id = ${order.id} FOR UPDATE`;
+          const fresh = await tx.order.findUnique({
+            where: { id: order.id },
+            select: { status: true },
+          });
+          if (!fresh || fresh.status !== OrderStatus.pending_payment) return;
+
+          // Rezerv hâlâ canlıysa serbest bırak (rare: 30dk cron'u kaçırdı)
+          if (!order.reservationReleasedAt && order.productId) {
+            await tx.$queryRaw`SELECT id FROM products WHERE id = ${order.productId} FOR UPDATE`;
+            const product = await tx.product.findUnique({
+              where: { id: order.productId },
+              select: { reservedQuantity: true, quantity: true },
+            });
+            if (product) {
+              const newReserved = safeDecrementReserved(product.reservedQuantity, 1);
+              const remaining = (product.quantity ?? 0) - newReserved;
+              await tx.product.update({
+                where: { id: order.productId },
+                data: {
+                  reservedQuantity: newReserved,
+                  status:
+                    newReserved > 0
+                      ? ProductStatus.reserved
+                      : remaining > 0
+                        ? ProductStatus.active
+                        : ProductStatus.reserved,
+                },
+              });
+            }
+          }
+
+          await tx.order.update({
+            where: { id: order.id },
+            data: {
+              status: OrderStatus.cancelled,
+              cancelReason: 'Ödeme süresi (24 saat) doldu',
+            },
           });
 
-          // Offer-based ise: payment_expired yap (tekrar ödenebilir)
           if (order.offerId) {
             await tx.offer.update({
               where: { id: order.offerId },
@@ -2732,24 +3149,38 @@ export class PaymentService {
             });
           }
 
-          // Mark payment as failed INSIDE the transaction to prevent race condition
-          // with PayTR callback arriving between order cancel and payment update.
           await tx.payment.updateMany({
             where: { orderId: order.id, status: PaymentStatus.pending },
             data: {
               status: PaymentStatus.failed,
-              failureReason: `Ödeme ${timeoutMinutes} dakika içinde tamamlanmadığı için otomatik iptal`,
+              failureReason: 'Sipariş 24 saat içinde ödenmediği için iptal edildi',
             },
           });
         });
-        await this.cache.del(`products:detail:${order.productId}`);
-        released++;
-        this.logger.log(`Released reservation for order ${order.orderNumber} (product ${order.productId})`);
-      } catch (error: any) {
-        this.logger.error(`Failed to release expired order ${order.id}: ${error?.message}`);
+        if (order.productId) {
+          await this.cache.del(`products:detail:${order.productId}`);
+        }
+        cancelled++;
+        dispatched.push({
+          buyerId: order.buyerId,
+          orderId: order.id,
+          productTitle: order.product?.title ?? 'Ürün',
+        });
+        this.logger.log(`Expired unpaid order ${order.orderNumber} (24h TTL)`);
+      } catch (err: any) {
+        this.logger.error(`expireUnpaidOrders failed for ${order.id}: ${err.message}`);
       }
     }
-    return { count: released };
+
+    for (const d of dispatched) {
+      await this.notificationService
+        .notifyOrderPaymentExpired(d.buyerId, d.orderId, d.productTitle)
+        .catch((err) =>
+          this.logger.warn(`order-expired notify failed for ${d.buyerId}: ${err.message}`),
+        );
+    }
+
+    return { count: cancelled };
   }
 
   /**
@@ -2785,7 +3216,15 @@ export class PaymentService {
 
     for (const payment of expiredPayments) {
       try {
-        // Update payment status to failed
+        // Split-window contract: if the parent order is still in pending_payment
+        // and its 24h paymentExpiresAt has not yet passed, only fail the Payment
+        // row. The order stays alive so the buyer can hit initiate again and a
+        // new Payment row is created. The 30-min reservation cron and the 24h
+        // kill-switch handle stock + order state independently.
+        const orderStillAlive =
+          payment.order.status === OrderStatus.pending_payment &&
+          payment.order.paymentExpiresAt > new Date();
+
         await this.prisma.payment.update({
           where: { id: payment.id },
           data: {
@@ -2794,11 +3233,11 @@ export class PaymentService {
           },
         });
 
-        // Siparişi iptal et ve ürünü tekrar satışa aç
-        await this.releaseProductForFailedPayment(payment.orderId);
-
-        // Cancel any auto-created Surat shipment for this expired order
-        await this.cancelSuratShipmentIfExists(payment.orderId, payment.order.orderNumber);
+        if (!orderStillAlive) {
+          // Order has been cancelled (or 24h passed): release stock + cleanup.
+          await this.releaseProductForFailedPayment(payment.orderId);
+          await this.cancelSuratShipmentIfExists(payment.orderId, payment.order.orderNumber);
+        }
 
         // Emit payment.failed event
         try {
@@ -2920,6 +3359,15 @@ export class PaymentService {
             data: { status: PaymentHoldStatus.cancelled },
           });
 
+          // Ledger: Senaryo A — komisyon waived (Faz 3B.7).
+          // processRefund sonradan markRefunded çağıracak ama status guard
+          // (sadece pending/earned) nedeniyle waived satıra dokunmaz.
+          await this.commissionLedger.markWaived(
+            order.id,
+            'seller_did_not_ship',
+            tx,
+          );
+
           // Re-stock: increment quantity and recalculate status
           const newQuantity = order.product.quantity !== null ? order.product.quantity + 1 : null;
           await tx.product.update({
@@ -2938,6 +3386,18 @@ export class PaymentService {
         } catch (refundError: any) {
           this.logger.error(
             `REFUND FAILED for expired preparing order ${order.orderNumber}: ${refundError.message}. MANUAL INTERVENTION REQUIRED.`,
+          );
+        }
+
+        // Senaryo A bildirimi (Faz 3B.7) — alıcıya "satıcı göndermedi" haberi
+        try {
+          await this.notificationService.notifySellerDidNotShipRefunded(
+            order.buyerId,
+            order.id,
+          );
+        } catch (notifyErr: any) {
+          this.logger.warn(
+            `notify seller-no-ship failed for ${order.id}: ${notifyErr?.message}`,
           );
         }
 

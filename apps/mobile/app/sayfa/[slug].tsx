@@ -1,10 +1,11 @@
 import { useEffect, useState } from 'react';
-import { View, ScrollView, StyleSheet, TouchableOpacity, ActivityIndicator } from 'react-native';
-import { Text } from 'react-native-paper';
+import { View, ScrollView, StyleSheet, TouchableOpacity } from 'react-native';
+import { theme, Spinner, Text } from '@tarodan/ui-native';
 import { router, useLocalSearchParams } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
-import { TarodanColors } from '../../src/theme';
 import { pagesApi } from '../../src/services/api';
+
+const { colors } = theme;
 
 interface PageData {
   title: string;
@@ -25,7 +26,7 @@ export default function DynamicCMSPage() {
       setLoading(true);
       setError('');
       try {
-        const response = await pagesApi.getBySlug(slug);
+        const response: any = await pagesApi.getBySlug(slug);
         const data = response.data?.data || response.data;
         setPage(data);
       } catch (err: any) {
@@ -60,13 +61,13 @@ export default function DynamicCMSPage() {
       <View style={styles.container}>
         <View style={styles.header}>
           <TouchableOpacity onPress={() => router.back()}>
-            <Ionicons name="arrow-back" size={24} color={TarodanColors.textOnPrimary} />
+            <Ionicons name="arrow-back" size={24} color={colors.white} />
           </TouchableOpacity>
           <Text style={styles.headerTitle}>Yükleniyor...</Text>
           <View style={{ width: 24 }} />
         </View>
         <View style={styles.loadingContainer}>
-          <ActivityIndicator size="large" color={TarodanColors.primary} />
+          <Spinner size="lg" />
           <Text style={styles.loadingText}>Sayfa yükleniyor...</Text>
         </View>
       </View>
@@ -78,13 +79,13 @@ export default function DynamicCMSPage() {
       <View style={styles.container}>
         <View style={styles.header}>
           <TouchableOpacity onPress={() => router.back()}>
-            <Ionicons name="arrow-back" size={24} color={TarodanColors.textOnPrimary} />
+            <Ionicons name="arrow-back" size={24} color={colors.white} />
           </TouchableOpacity>
           <Text style={styles.headerTitle}>Hata</Text>
           <View style={{ width: 24 }} />
         </View>
         <View style={styles.errorContainer}>
-          <Ionicons name="alert-circle-outline" size={56} color={TarodanColors.error} />
+          <Ionicons name="alert-circle-outline" size={56} color={colors.danger[600]!} />
           <Text style={styles.errorTitle}>{error}</Text>
           <TouchableOpacity
             style={styles.retryButton}
@@ -92,12 +93,12 @@ export default function DynamicCMSPage() {
               setLoading(true);
               setError('');
               pagesApi.getBySlug(slug!)
-                .then((res) => setPage(res.data?.data || res.data))
+                .then((res: any) => setPage(res.data?.data || res.data))
                 .catch(() => setError('Sayfa yüklenirken bir hata oluştu.'))
                 .finally(() => setLoading(false));
             }}
           >
-            <Ionicons name="refresh" size={18} color={TarodanColors.textOnPrimary} />
+            <Ionicons name="refresh" size={18} color={colors.white} />
             <Text style={styles.retryButtonText}>Tekrar Dene</Text>
           </TouchableOpacity>
           <TouchableOpacity style={styles.goBackLink} onPress={() => router.back()}>
@@ -112,7 +113,7 @@ export default function DynamicCMSPage() {
     <View style={styles.container}>
       <View style={styles.header}>
         <TouchableOpacity onPress={() => router.back()}>
-          <Ionicons name="arrow-back" size={24} color={TarodanColors.textOnPrimary} />
+          <Ionicons name="arrow-back" size={24} color={colors.white} />
         </TouchableOpacity>
         <Text style={styles.headerTitle} numberOfLines={1}>
           {page?.title || 'Sayfa'}
@@ -139,10 +140,10 @@ export default function DynamicCMSPage() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: TarodanColors.background,
+    backgroundColor: colors.surface.DEFAULT,
   },
   header: {
-    backgroundColor: TarodanColors.primary,
+    backgroundColor: colors.primary[600]!,
     paddingTop: 50,
     paddingBottom: 16,
     paddingHorizontal: 20,
@@ -153,7 +154,7 @@ const styles = StyleSheet.create({
   headerTitle: {
     fontSize: 18,
     fontWeight: 'bold',
-    color: TarodanColors.textOnPrimary,
+    color: colors.white,
     flex: 1,
     textAlign: 'center',
     marginHorizontal: 8,
@@ -164,18 +165,18 @@ const styles = StyleSheet.create({
   },
   lastUpdated: {
     fontSize: 13,
-    color: TarodanColors.textSecondary,
+    color: colors.text.muted,
     marginBottom: 16,
   },
   pageTitle: {
     fontSize: 22,
     fontWeight: 'bold',
-    color: TarodanColors.textPrimary,
+    color: colors.text.heading,
     marginBottom: 16,
   },
   pageContent: {
     fontSize: 14,
-    color: TarodanColors.textSecondary,
+    color: colors.text.muted,
     lineHeight: 24,
   },
   loadingContainer: {
@@ -186,7 +187,7 @@ const styles = StyleSheet.create({
   },
   loadingText: {
     fontSize: 14,
-    color: TarodanColors.textSecondary,
+    color: colors.text.muted,
   },
   errorContainer: {
     flex: 1,
@@ -198,13 +199,13 @@ const styles = StyleSheet.create({
   errorTitle: {
     fontSize: 16,
     fontWeight: '600',
-    color: TarodanColors.textPrimary,
+    color: colors.text.heading,
     marginTop: 8,
   },
   retryButton: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: TarodanColors.primary,
+    backgroundColor: colors.primary[600]!,
     paddingHorizontal: 20,
     paddingVertical: 12,
     borderRadius: 10,
@@ -214,14 +215,14 @@ const styles = StyleSheet.create({
   retryButtonText: {
     fontSize: 14,
     fontWeight: '600',
-    color: TarodanColors.textOnPrimary,
+    color: colors.white,
   },
   goBackLink: {
     marginTop: 12,
   },
   goBackText: {
     fontSize: 14,
-    color: TarodanColors.primary,
+    color: colors.primary[600]!,
     fontWeight: '500',
   },
 });

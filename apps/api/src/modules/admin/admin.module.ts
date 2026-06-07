@@ -17,6 +17,9 @@ import { EventModule } from '../events/event.module';
 import { StorageModule } from '../storage/storage.module';
 import { RatingModule } from '../rating/rating.module';
 import { SuratCargoModule } from '../surat-cargo/surat-cargo.module';
+import { RefundModule } from '../refund/refund.module';
+import { NotificationModule } from '../notification/notification.module';
+import { OrderModule } from '../order/order.module';
 
 @Module({
   imports: [
@@ -35,6 +38,9 @@ import { SuratCargoModule } from '../surat-cargo/surat-cargo.module';
     StorageModule,
     RatingModule,
     SuratCargoModule,
+    RefundModule,
+    NotificationModule,
+    OrderModule,
   ],
   controllers: [AdminController],
   providers: [AdminService, ScheduledNotificationScheduler],

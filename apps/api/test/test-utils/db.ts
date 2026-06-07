@@ -20,6 +20,7 @@ export async function disconnectPrisma(): Promise<void> {
 }
 
 const TABLES_TO_TRUNCATE = [
+  'commission_ledger',
   'payout_transfers',
   'seller_bank_accounts',
   'trade_shipment_events',

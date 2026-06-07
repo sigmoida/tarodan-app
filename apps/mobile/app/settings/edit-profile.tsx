@@ -1,5 +1,15 @@
-import { View, ScrollView, StyleSheet, TouchableOpacity, Image, Alert, Linking } from 'react-native';
-import { Text, TextInput, Button, Card, Switch, Divider, Snackbar, ActivityIndicator, Avatar, IconButton, List } from 'react-native-paper';
+import { View, ScrollView, StyleSheet, TouchableOpacity, Image, Alert } from 'react-native';
+import {
+  Button,
+  Card,
+  Switch,
+  Divider,
+  Snackbar,
+  Avatar,
+  Input,
+  Text,
+  theme,
+} from '@tarodan/ui-native';
 import { useState, useEffect } from 'react';
 import { router } from 'expo-router';
 import { useForm, Controller } from 'react-hook-form';
@@ -10,9 +20,11 @@ import * as ImagePicker from 'expo-image-picker';
 import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 import { api } from '../../src/services/api';
 import { useAuthStore } from '../../src/stores/authStore';
-import { TarodanColors } from '../../src/theme';
-import { PremiumBadge, MembershipBadgeCard } from '../../src/components/PremiumBadge';
-import { ReputationScore } from '../../src/components/ReputationBadge';
+import { MembershipBadgeCard } from '../../src/components/PremiumBadge';
+import { useTranslation } from '../../src/i18n';
+import { resolveImageUrl } from '../../src/utils/imageUrl';
+
+const { colors, radius } = theme;
 
 // Free: 500 chars, Premium: 2000 chars
 const getMaxBioLength = (isPremium: boolean) => isPremium ? 2000 : 500;
@@ -20,6 +32,8 @@ const getMaxBioLength = (isPremium: boolean) => isPremium ? 2000 : 500;
 const createProfileSchema = (isPremium: boolean) => z.object({
   displayName: z.string().min(2, 'İsim en az 2 karakter olmalı').max(50),
   bio: z.string().max(getMaxBioLength(isPremium), `Biyografi en fazla ${getMaxBioLength(isPremium)} karakter olabilir`).optional(),
+  phone: z.string().max(20).optional().or(z.literal('')),
+  birthDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'Tarih YYYY-AA-GG formatında olmalı').optional().or(z.literal('')),
   // Premium features
   websiteUrl: z.string().url('Geçerli bir URL girin').optional().or(z.literal('')),
   twitterHandle: z.string().max(50).optional(),
@@ -27,6 +41,11 @@ const createProfileSchema = (isPremium: boolean) => z.object({
   facebookUrl: z.string().url('Geçerli bir URL girin').optional().or(z.literal('')),
   youtubeUrl: z.string().url('Geçerli bir URL girin').optional().or(z.literal('')),
   customProfileSlug: z.string().min(3).max(30).regex(/^[a-z0-9-]+$/, 'Sadece küçük harf, rakam ve tire kullanın').optional(),
+  // Kurumsal (business tier) — web ile parite
+  companyName: z.string().max(120).optional().or(z.literal('')),
+  taxId: z.string().max(20).optional().or(z.literal('')),
+  taxOffice: z.string().max(120).optional().or(z.literal('')),
+  isCorporateSeller: z.boolean().optional(),
   // Preferences
   showEmail: z.boolean(),
   showPhone: z.boolean(),
@@ -36,20 +55,31 @@ const createProfileSchema = (isPremium: boolean) => z.object({
 type ProfileForm = z.infer<ReturnType<typeof createProfileSchema>>;
 
 export default function EditProfileScreen() {
+  const { t } = useTranslation();
   const { user, isAuthenticated, limits, updateUser } = useAuthStore();
   const queryClient = useQueryClient();
-  
+
   const [avatar, setAvatar] = useState<string | null>(null);
-  const [snackbar, setSnackbar] = useState({ visible: false, message: '' });
+  const [snackbar, setSnackbar] = useState<{ visible: boolean; message: string; variant?: 'default' | 'success' | 'danger' }>({
+    visible: false,
+    message: '',
+  });
 
   const isPremium = limits?.maxListings === -1;
+  const isBusinessTier = (user as any)?.membershipTier === 'business';
   const maxBioLength = getMaxBioLength(isPremium);
 
-  const { control, handleSubmit, formState: { errors }, watch, setValue } = useForm<ProfileForm>({
+  const { control, handleSubmit, formState: { errors }, watch } = useForm<ProfileForm>({
     resolver: zodResolver(createProfileSchema(isPremium)),
     defaultValues: {
       displayName: user?.displayName || '',
       bio: user?.bio || '',
+      phone: (user as any)?.phone || '',
+      birthDate: (user as any)?.birthDate ? new Date((user as any).birthDate).toISOString().split('T')[0] : '',
+      companyName: (user as any)?.companyName || '',
+      taxId: (user as any)?.taxId || '',
+      taxOffice: (user as any)?.taxOffice || '',
+      isCorporateSeller: (user as any)?.isCorporateSeller ?? !!(user as any)?.companyName,
       websiteUrl: user?.websiteUrl || '',
       twitterHandle: user?.twitterHandle || '',
       instagramHandle: user?.instagramHandle || '',
@@ -71,8 +101,17 @@ export default function EditProfileScreen() {
   const updateMutation = useMutation({
     mutationFn: async (data: ProfileForm) => {
       const formData = new FormData();
-      
-      Object.entries(data).forEach(([key, value]) => {
+
+      const payload: Record<string, any> = { ...data };
+      // Kurumsal alanlar yalnızca business tier'da gönderilir (web ile parite)
+      if (!isBusinessTier) {
+        delete payload.companyName;
+        delete payload.taxId;
+        delete payload.taxOffice;
+        delete payload.isCorporateSeller;
+      }
+
+      Object.entries(payload).forEach(([key, value]) => {
         if (value !== undefined && value !== '') {
           formData.append(key, typeof value === 'boolean' ? String(value) : value);
         }
@@ -93,10 +132,14 @@ export default function EditProfileScreen() {
     onSuccess: (response) => {
       updateUser(response.data);
       queryClient.invalidateQueries({ queryKey: ['user'] });
-      setSnackbar({ visible: true, message: 'Profil güncellendi!' });
+      setSnackbar({ visible: true, message: 'Profil güncellendi!', variant: 'success' });
     },
     onError: (error: any) => {
-      setSnackbar({ visible: true, message: error.response?.data?.message || 'Güncelleme başarısız' });
+      setSnackbar({
+        visible: true,
+        message: error.response?.data?.message || 'Güncelleme başarısız',
+        variant: 'danger',
+      });
     },
   });
 
@@ -122,10 +165,8 @@ export default function EditProfileScreen() {
   if (!isAuthenticated) {
     return (
       <View style={styles.centeredContainer}>
-        <Text variant="titleLarge">Giriş Yapın</Text>
-        <Button mode="contained" onPress={() => router.push('/(auth)/login')}>
-          Giriş Yap
-        </Button>
+        <Text variant="h3">Giriş Yapın</Text>
+        <Button variant="primary" title="Giriş Yap" onPress={() => router.push('/(auth)/login')} />
       </View>
     );
   }
@@ -135,11 +176,11 @@ export default function EditProfileScreen() {
       {/* Header */}
       <View style={styles.header}>
         <TouchableOpacity onPress={() => router.back()}>
-          <Ionicons name="arrow-back" size={24} color={TarodanColors.textOnPrimary} />
+          <Ionicons name="arrow-back" size={24} color={colors.white} />
         </TouchableOpacity>
-        <Text style={styles.headerTitle}>Profili Düzenle</Text>
+        <Text style={styles.headerTitle}>{t('mobile.settingsEditProfile')}</Text>
         <TouchableOpacity onPress={handleSubmit(onSubmit)}>
-          <Text style={styles.saveButton}>Kaydet</Text>
+          <Text style={styles.saveButton}>{t('mobile.save')}</Text>
         </TouchableOpacity>
       </View>
 
@@ -148,16 +189,15 @@ export default function EditProfileScreen() {
         <View style={styles.avatarSection}>
           <TouchableOpacity onPress={pickAvatar}>
             {avatar ? (
-              <Image source={{ uri: avatar }} style={styles.avatar} />
+              <Image source={{ uri: resolveImageUrl(avatar) }} style={styles.avatar} />
             ) : (
-              <Avatar.Text
-                size={100}
-                label={user?.displayName?.substring(0, 2).toUpperCase() || 'U'}
-                style={styles.avatarPlaceholder}
+              <Avatar
+                size="xl"
+                name={user?.displayName || 'U'}
               />
             )}
             <View style={styles.avatarEditBadge}>
-              <Ionicons name="camera" size={18} color="#fff" />
+              <Ionicons name="camera" size={18} color={colors.white} />
             </View>
           </TouchableOpacity>
         </View>
@@ -173,308 +213,376 @@ export default function EditProfileScreen() {
 
         {/* Basic Info */}
         <Card style={styles.card}>
-          <Card.Content>
-            <Text variant="titleMedium" style={styles.sectionTitle}>Temel Bilgiler</Text>
-            
-            <Controller
-              control={control}
-              name="displayName"
-              render={({ field: { onChange, value } }) => (
-                <TextInput
-                  label="Görünen İsim *"
-                  value={value}
-                  onChangeText={onChange}
-                  error={!!errors.displayName}
-                  mode="outlined"
-                  style={styles.input}
-                />
-              )}
-            />
-            {errors.displayName && (
-              <Text variant="bodySmall" style={styles.errorText}>{errors.displayName.message}</Text>
+          <Text variant="h3" style={styles.sectionTitle}>Temel Bilgiler</Text>
+
+          <Controller
+            control={control}
+            name="displayName"
+            render={({ field: { onChange, value } }) => (
+              <Input
+                label="Görünen İsim *"
+                value={value}
+                onChangeText={onChange}
+                error={errors.displayName?.message}
+                containerStyle={styles.input}
+              />
             )}
+          />
+
+          <Controller
+            control={control}
+            name="bio"
+            render={({ field: { onChange, value } }) => (
+              <Input
+                label={`Hakkımda (${bioLength}/${maxBioLength})`}
+                value={value}
+                onChangeText={onChange}
+                multiline
+                numberOfLines={4}
+                containerStyle={styles.input}
+                placeholder={t("mobile.bioPlaceholder")}
+                error={errors.bio?.message}
+              />
+            )}
+          />
+
+          <Controller
+            control={control}
+            name="phone"
+            render={({ field: { onChange, value } }) => (
+              <Input
+                label="Telefon"
+                value={value}
+                onChangeText={onChange}
+                keyboardType="phone-pad"
+                placeholder="+90 5XX XXX XX XX"
+                containerStyle={styles.input}
+                error={errors.phone?.message}
+              />
+            )}
+          />
+
+          <Controller
+            control={control}
+            name="birthDate"
+            render={({ field: { onChange, value } }) => (
+              <Input
+                label="Doğum Tarihi (YYYY-AA-GG)"
+                value={value}
+                onChangeText={onChange}
+                placeholder="1990-01-31"
+                keyboardType="numbers-and-punctuation"
+                containerStyle={styles.input}
+                error={errors.birthDate?.message}
+              />
+            )}
+          />
+
+          {!isPremium && (
+            <TouchableOpacity
+              style={styles.upgradeHint}
+              onPress={() => router.push('/upgrade')}
+            >
+              <Ionicons name="diamond" size={16} color={colors.primary[600]!} />
+              <Text variant="bodySm" style={styles.upgradeHintText}>
+                Premium ile 2000 karaktere kadar biyografi yazabilirsiniz
+              </Text>
+            </TouchableOpacity>
+          )}
+        </Card>
+
+        {/* Kurumsal Bilgiler (Business tier) — web ile parite */}
+        {isBusinessTier && (
+          <Card style={styles.card}>
+            <View style={styles.premiumFeatureHeader}>
+              <MaterialCommunityIcons name="office-building" size={20} color={colors.primary[600]!} />
+              <Text variant="h3" style={styles.premiumFeatureTitle}>Kurumsal Bilgiler</Text>
+            </View>
 
             <Controller
               control={control}
-              name="bio"
+              name="companyName"
               render={({ field: { onChange, value } }) => (
-                <TextInput
-                  label={`Hakkımda (${bioLength}/${maxBioLength})`}
+                <Input
+                  label="Firma Adı"
                   value={value}
                   onChangeText={onChange}
-                  multiline
-                  numberOfLines={4}
-                  mode="outlined"
-                  style={styles.input}
-                  placeholder="Kendinizi kısaca tanıtın..."
-                  error={!!errors.bio}
+                  containerStyle={styles.input}
+                  error={errors.companyName?.message}
                 />
               )}
             />
-            {errors.bio && (
-              <Text variant="bodySmall" style={styles.errorText}>{errors.bio.message}</Text>
-            )}
-            
-            {!isPremium && (
-              <TouchableOpacity 
-                style={styles.upgradeHint}
-                onPress={() => router.push('/upgrade')}
-              >
-                <Ionicons name="diamond" size={16} color={TarodanColors.primary} />
-                <Text variant="bodySmall" style={styles.upgradeHintText}>
-                  Premium ile 2000 karaktere kadar biyografi yazabilirsiniz
+
+            <Controller
+              control={control}
+              name="taxId"
+              render={({ field: { onChange, value } }) => (
+                <Input
+                  label="Vergi No"
+                  value={value}
+                  onChangeText={onChange}
+                  keyboardType="number-pad"
+                  containerStyle={styles.input}
+                  error={errors.taxId?.message}
+                />
+              )}
+            />
+
+            <Controller
+              control={control}
+              name="taxOffice"
+              render={({ field: { onChange, value } }) => (
+                <Input
+                  label="Vergi Dairesi"
+                  value={value}
+                  onChangeText={onChange}
+                  containerStyle={styles.input}
+                  error={errors.taxOffice?.message}
+                />
+              )}
+            />
+
+            <View style={styles.switchRow}>
+              <View style={styles.switchInfo}>
+                <Text variant="body">Kurumsal Satıcı</Text>
+                <Text variant="bodySm" style={styles.switchHint}>
+                  Faturalar firma bilgilerinizle düzenlensin
                 </Text>
-              </TouchableOpacity>
-            )}
-          </Card.Content>
-        </Card>
+              </View>
+              <Controller
+                control={control}
+                name="isCorporateSeller"
+                render={({ field: { onChange, value } }) => (
+                  <Switch value={!!value} onValueChange={onChange} />
+                )}
+              />
+            </View>
+          </Card>
+        )}
 
         {/* Custom URL (Premium Only) */}
         {isPremium && (
           <Card style={styles.card}>
-            <Card.Content>
-              <View style={styles.premiumFeatureHeader}>
-                <MaterialCommunityIcons name="crown" size={20} color={TarodanColors.primary} />
-                <Text variant="titleMedium" style={styles.premiumFeatureTitle}>Özel Profil URL</Text>
-              </View>
-              
-              <View style={styles.urlPreview}>
-                <Text variant="bodySmall" style={styles.urlPrefix}>tarodan.com/</Text>
-                <Controller
-                  control={control}
-                  name="customProfileSlug"
-                  render={({ field: { onChange, value } }) => (
-                    <TextInput
-                      value={value}
-                      onChangeText={onChange}
-                      mode="outlined"
-                      dense
-                      style={styles.slugInput}
-                      placeholder="kullanici-adi"
-                      error={!!errors.customProfileSlug}
-                    />
-                  )}
-                />
-              </View>
-              {errors.customProfileSlug && (
-                <Text variant="bodySmall" style={styles.errorText}>{errors.customProfileSlug.message}</Text>
-              )}
-              <Text variant="bodySmall" style={styles.hintText}>
-                Sadece küçük harfler, rakamlar ve tire (-) kullanabilirsiniz
-              </Text>
-            </Card.Content>
+            <View style={styles.premiumFeatureHeader}>
+              <MaterialCommunityIcons name="crown" size={20} color={colors.primary[600]!} />
+              <Text variant="h3" style={styles.premiumFeatureTitle}>Özel Profil URL</Text>
+            </View>
+
+            <View style={styles.urlPreview}>
+              <Text variant="bodySm" style={styles.urlPrefix}>tarodan.com/</Text>
+              <Controller
+                control={control}
+                name="customProfileSlug"
+                render={({ field: { onChange, value } }) => (
+                  <Input
+                    value={value}
+                    onChangeText={onChange}
+                    inputSize="sm"
+                    containerStyle={styles.slugInput}
+                    placeholder="kullanici-adi"
+                    error={errors.customProfileSlug?.message}
+                  />
+                )}
+              />
+            </View>
+            <Text variant="bodySm" style={styles.hintText}>
+              Sadece küçük harfler, rakamlar ve tire (-) kullanabilirsiniz
+            </Text>
           </Card>
         )}
 
         {/* Social Links (Premium Only) */}
         {isPremium ? (
           <Card style={styles.card}>
-            <Card.Content>
-              <View style={styles.premiumFeatureHeader}>
-                <MaterialCommunityIcons name="crown" size={20} color={TarodanColors.primary} />
-                <Text variant="titleMedium" style={styles.premiumFeatureTitle}>Sosyal Medya Bağlantıları</Text>
-              </View>
-              
-              <Controller
-                control={control}
-                name="websiteUrl"
-                render={({ field: { onChange, value } }) => (
-                  <TextInput
-                    label="Web Sitesi"
-                    value={value}
-                    onChangeText={onChange}
-                    mode="outlined"
-                    style={styles.input}
-                    placeholder="https://websitem.com"
-                    left={<TextInput.Icon icon="web" />}
-                    error={!!errors.websiteUrl}
-                  />
-                )}
-              />
-              
-              <Controller
-                control={control}
-                name="instagramHandle"
-                render={({ field: { onChange, value } }) => (
-                  <TextInput
-                    label="Instagram"
-                    value={value}
-                    onChangeText={onChange}
-                    mode="outlined"
-                    style={styles.input}
-                    placeholder="kullanici_adi"
-                    left={<TextInput.Icon icon="instagram" />}
-                  />
-                )}
-              />
-              
-              <Controller
-                control={control}
-                name="twitterHandle"
-                render={({ field: { onChange, value } }) => (
-                  <TextInput
-                    label="Twitter / X"
-                    value={value}
-                    onChangeText={onChange}
-                    mode="outlined"
-                    style={styles.input}
-                    placeholder="kullanici_adi"
-                    left={<TextInput.Icon icon="twitter" />}
-                  />
-                )}
-              />
-              
-              <Controller
-                control={control}
-                name="youtubeUrl"
-                render={({ field: { onChange, value } }) => (
-                  <TextInput
-                    label="YouTube"
-                    value={value}
-                    onChangeText={onChange}
-                    mode="outlined"
-                    style={styles.input}
-                    placeholder="https://youtube.com/@kanal"
-                    left={<TextInput.Icon icon="youtube" />}
-                    error={!!errors.youtubeUrl}
-                  />
-                )}
-              />
-            </Card.Content>
+            <View style={styles.premiumFeatureHeader}>
+              <MaterialCommunityIcons name="crown" size={20} color={colors.primary[600]!} />
+              <Text variant="h3" style={styles.premiumFeatureTitle}>Sosyal Medya Bağlantıları</Text>
+            </View>
+
+            <Controller
+              control={control}
+              name="websiteUrl"
+              render={({ field: { onChange, value } }) => (
+                <Input
+                  label="Web Sitesi"
+                  value={value}
+                  onChangeText={onChange}
+                  containerStyle={styles.input}
+                  placeholder="https://websitem.com"
+                  leftIconName="globe-outline"
+                  error={errors.websiteUrl?.message}
+                />
+              )}
+            />
+
+            <Controller
+              control={control}
+              name="instagramHandle"
+              render={({ field: { onChange, value } }) => (
+                <Input
+                  label="Instagram"
+                  value={value}
+                  onChangeText={onChange}
+                  containerStyle={styles.input}
+                  placeholder="kullanici_adi"
+                  leftIconName="logo-instagram"
+                />
+              )}
+            />
+
+            <Controller
+              control={control}
+              name="twitterHandle"
+              render={({ field: { onChange, value } }) => (
+                <Input
+                  label="Twitter / X"
+                  value={value}
+                  onChangeText={onChange}
+                  containerStyle={styles.input}
+                  placeholder="kullanici_adi"
+                  leftIconName="logo-twitter"
+                />
+              )}
+            />
+
+            <Controller
+              control={control}
+              name="youtubeUrl"
+              render={({ field: { onChange, value } }) => (
+                <Input
+                  label="YouTube"
+                  value={value}
+                  onChangeText={onChange}
+                  containerStyle={styles.input}
+                  placeholder="https://youtube.com/@kanal"
+                  leftIconName="logo-youtube"
+                  error={errors.youtubeUrl?.message}
+                />
+              )}
+            />
           </Card>
         ) : (
           <Card style={styles.lockedCard}>
-            <Card.Content style={styles.lockedContent}>
-              <Ionicons name="lock-closed" size={24} color={TarodanColors.textSecondary} />
-              <Text variant="titleSmall" style={styles.lockedTitle}>Sosyal Medya Bağlantıları</Text>
-              <Text variant="bodySmall" style={styles.lockedText}>
+            <View style={styles.lockedContent}>
+              <Ionicons name="lock-closed" size={24} color={colors.text.muted} />
+              <Text variant="body" style={styles.lockedTitle}>Sosyal Medya Bağlantıları</Text>
+              <Text variant="bodySm" style={styles.lockedText}>
                 Premium üyeler profillerine sosyal medya bağlantıları ekleyebilir
               </Text>
-              <Button mode="outlined" onPress={() => router.push('/upgrade')} style={styles.lockedButton}>
-                Premium'a Geç
-              </Button>
-            </Card.Content>
+              <Button variant="outline" title="Premium'a Geç" onPress={() => router.push('/upgrade')} style={styles.lockedButton} />
+            </View>
           </Card>
         )}
 
         {/* Privacy Settings */}
         <Card style={styles.card}>
-          <Card.Content>
-            <Text variant="titleMedium" style={styles.sectionTitle}>Gizlilik Ayarları</Text>
-            
-            <View style={styles.switchRow}>
-              <View style={styles.switchInfo}>
-                <Text variant="bodyMedium">E-posta Göster</Text>
-                <Text variant="bodySmall" style={styles.switchHint}>
-                  E-postanız profilinizde görünsün mü?
-                </Text>
-              </View>
-              <Controller
-                control={control}
-                name="showEmail"
-                render={({ field: { onChange, value } }) => (
-                  <Switch value={value} onValueChange={onChange} />
-                )}
-              />
+          <Text variant="h3" style={styles.sectionTitle}>Gizlilik Ayarları</Text>
+
+          <View style={styles.switchRow}>
+            <View style={styles.switchInfo}>
+              <Text variant="body">E-posta Göster</Text>
+              <Text variant="bodySm" style={styles.switchHint}>
+                E-postanız profilinizde görünsün mü?
+              </Text>
             </View>
-            
-            <Divider style={styles.switchDivider} />
-            
-            <View style={styles.switchRow}>
-              <View style={styles.switchInfo}>
-                <Text variant="bodyMedium">Telefon Göster</Text>
-                <Text variant="bodySmall" style={styles.switchHint}>
-                  Telefonunuz profilinizde görünsün mü?
-                </Text>
-              </View>
-              <Controller
-                control={control}
-                name="showPhone"
-                render={({ field: { onChange, value } }) => (
-                  <Switch value={value} onValueChange={onChange} />
-                )}
-              />
+            <Controller
+              control={control}
+              name="showEmail"
+              render={({ field: { onChange, value } }) => (
+                <Switch value={value} onValueChange={onChange} />
+              )}
+            />
+          </View>
+
+          <Divider style={styles.switchDivider} />
+
+          <View style={styles.switchRow}>
+            <View style={styles.switchInfo}>
+              <Text variant="body">Telefon Göster</Text>
+              <Text variant="bodySm" style={styles.switchHint}>
+                Telefonunuz profilinizde görünsün mü?
+              </Text>
             </View>
-            
-            <Divider style={styles.switchDivider} />
-            
-            <View style={styles.switchRow}>
-              <View style={styles.switchInfo}>
-                <Text variant="bodyMedium">Mesaj Almaya İzin Ver</Text>
-                <Text variant="bodySmall" style={styles.switchHint}>
-                  Diğer üyeler size mesaj gönderebilsin mi?
-                </Text>
-              </View>
-              <Controller
-                control={control}
-                name="allowMessages"
-                render={({ field: { onChange, value } }) => (
-                  <Switch value={value} onValueChange={onChange} />
-                )}
-              />
+            <Controller
+              control={control}
+              name="showPhone"
+              render={({ field: { onChange, value } }) => (
+                <Switch value={value} onValueChange={onChange} />
+              )}
+            />
+          </View>
+
+          <Divider style={styles.switchDivider} />
+
+          <View style={styles.switchRow}>
+            <View style={styles.switchInfo}>
+              <Text variant="body">Mesaj Almaya İzin Ver</Text>
+              <Text variant="bodySm" style={styles.switchHint}>
+                Diğer üyeler size mesaj gönderebilsin mi?
+              </Text>
             </View>
-          </Card.Content>
+            <Controller
+              control={control}
+              name="allowMessages"
+              render={({ field: { onChange, value } }) => (
+                <Switch value={value} onValueChange={onChange} />
+              )}
+            />
+          </View>
         </Card>
 
         {/* Verification Status */}
         <Card style={styles.card}>
-          <Card.Content>
-            <Text variant="titleMedium" style={styles.sectionTitle}>Doğrulama Durumu</Text>
-            
-            <View style={styles.verificationItem}>
-              <Ionicons 
-                name={user?.isEmailVerified ? 'checkmark-circle' : 'ellipse-outline'} 
-                size={24} 
-                color={user?.isEmailVerified ? TarodanColors.success : TarodanColors.textSecondary} 
-              />
-              <Text variant="bodyMedium" style={styles.verificationText}>
-                E-posta Doğrulandı
-              </Text>
-              {!user?.isEmailVerified && (
-                <Button compact mode="text" onPress={() => {}}>
-                  Doğrula
-                </Button>
-              )}
-            </View>
-            
-            <View style={styles.verificationItem}>
-              <Ionicons 
-                name={user?.isPhoneVerified ? 'checkmark-circle' : 'ellipse-outline'} 
-                size={24} 
-                color={user?.isPhoneVerified ? TarodanColors.success : TarodanColors.textSecondary} 
-              />
-              <Text variant="bodyMedium" style={styles.verificationText}>
-                Telefon Doğrulandı
-              </Text>
-              {!user?.isPhoneVerified && (
-                <Button compact mode="text" onPress={() => {}}>
-                  Doğrula
-                </Button>
-              )}
-            </View>
-            
-            {user?.isVerified && (
-              <View style={styles.verifiedBanner}>
-                <Ionicons name="shield-checkmark" size={24} color={TarodanColors.success} />
-                <Text variant="bodyMedium" style={styles.verifiedText}>
-                  {isPremium ? 'Doğrulanmış Premium Koleksiyoner' : 'Doğrulanmış Üye'}
-                </Text>
-              </View>
+          <Text variant="h3" style={styles.sectionTitle}>Doğrulama Durumu</Text>
+
+          <View style={styles.verificationItem}>
+            <Ionicons
+              name={user?.isEmailVerified ? 'checkmark-circle' : 'ellipse-outline'}
+              size={24}
+              color={user?.isEmailVerified ? colors.success[600]! : colors.text.muted}
+            />
+            <Text variant="body" style={styles.verificationText}>
+              E-posta Doğrulandı
+            </Text>
+            {!user?.isEmailVerified && (
+              <Button variant="ghost" size="sm" title="Doğrula" onPress={() => {}} />
             )}
-          </Card.Content>
+          </View>
+
+          <View style={styles.verificationItem}>
+            <Ionicons
+              name={user?.isPhoneVerified ? 'checkmark-circle' : 'ellipse-outline'}
+              size={24}
+              color={user?.isPhoneVerified ? colors.success[600]! : colors.text.muted}
+            />
+            <Text variant="body" style={styles.verificationText}>
+              Telefon Doğrulandı
+            </Text>
+            {!user?.isPhoneVerified && (
+              <Button variant="ghost" size="sm" title="Doğrula" onPress={() => {}} />
+            )}
+          </View>
+
+          {user?.isVerified && (
+            <View style={styles.verifiedBanner}>
+              <Ionicons name="shield-checkmark" size={24} color={colors.success[600]!} />
+              <Text variant="body" style={styles.verifiedText}>
+                {isPremium ? 'Doğrulanmış Premium Koleksiyoner' : 'Doğrulanmış Üye'}
+              </Text>
+            </View>
+          )}
         </Card>
 
         {/* Submit Button */}
         <Button
-          mode="contained"
+          variant="primary"
+          title="Değişiklikleri Kaydet"
+          icon="checkmark"
           onPress={handleSubmit(onSubmit)}
-          loading={updateMutation.isPending}
+          isLoading={updateMutation.isPending}
           disabled={updateMutation.isPending}
           style={styles.submitButton}
-          icon="check"
-        >
-          Değişiklikleri Kaydet
-        </Button>
+        />
 
         <View style={{ height: 50 }} />
       </ScrollView>
@@ -483,6 +591,7 @@ export default function EditProfileScreen() {
         visible={snackbar.visible}
         onDismiss={() => setSnackbar({ ...snackbar, visible: false })}
         duration={3000}
+        variant={snackbar.variant ?? 'default'}
       >
         {snackbar.message}
       </Snackbar>
@@ -493,7 +602,7 @@ export default function EditProfileScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: TarodanColors.backgroundSecondary,
+    backgroundColor: colors.surface.alt,
   },
   centeredContainer: {
     flex: 1,
@@ -502,7 +611,7 @@ const styles = StyleSheet.create({
     gap: 16,
   },
   header: {
-    backgroundColor: TarodanColors.primary,
+    backgroundColor: colors.primary[600]!,
     paddingTop: 50,
     paddingBottom: 16,
     paddingHorizontal: 20,
@@ -513,10 +622,10 @@ const styles = StyleSheet.create({
   headerTitle: {
     fontSize: 18,
     fontWeight: 'bold',
-    color: TarodanColors.textOnPrimary,
+    color: colors.white,
   },
   saveButton: {
-    color: TarodanColors.textOnPrimary,
+    color: colors.white,
     fontWeight: '600',
     fontSize: 16,
   },
@@ -533,57 +642,48 @@ const styles = StyleSheet.create({
     height: 100,
     borderRadius: 50,
   },
-  avatarPlaceholder: {
-    backgroundColor: TarodanColors.primaryLight,
-  },
   avatarEditBadge: {
     position: 'absolute',
     bottom: 0,
     right: 0,
-    backgroundColor: TarodanColors.primary,
+    backgroundColor: colors.primary[600]!,
     width: 32,
     height: 32,
     borderRadius: 16,
     justifyContent: 'center',
     alignItems: 'center',
     borderWidth: 2,
-    borderColor: TarodanColors.background,
+    borderColor: colors.surface.elevated,
   },
   membershipSection: {
     marginBottom: 16,
   },
   card: {
     marginBottom: 16,
-    backgroundColor: TarodanColors.background,
+    backgroundColor: colors.surface.DEFAULT,
   },
   sectionTitle: {
     marginBottom: 16,
-    color: TarodanColors.textPrimary,
+    color: colors.text.heading,
   },
   input: {
     marginBottom: 12,
-    backgroundColor: TarodanColors.background,
-  },
-  errorText: {
-    color: TarodanColors.error,
-    marginBottom: 8,
-    marginTop: -8,
   },
   hintText: {
-    color: TarodanColors.textSecondary,
+    color: colors.text.muted,
     marginTop: 4,
   },
   upgradeHint: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: TarodanColors.primary + '10',
+    backgroundColor: colors.primary[50]!,
     padding: 8,
-    borderRadius: 8,
+    borderRadius: radius.md,
     marginTop: 8,
   },
   upgradeHintText: {
     marginLeft: 8,
-    color: TarodanColors.primary,
+    color: colors.primary[700]!,
     flex: 1,
   },
   premiumFeatureHeader: {
@@ -593,25 +693,24 @@ const styles = StyleSheet.create({
   },
   premiumFeatureTitle: {
     marginLeft: 8,
-    color: TarodanColors.primary,
+    color: colors.primary[700]!,
   },
   urlPreview: {
     flexDirection: 'row',
     alignItems: 'center',
   },
   urlPrefix: {
-    color: TarodanColors.textSecondary,
+    color: colors.text.muted,
     marginRight: 4,
   },
   slugInput: {
     flex: 1,
-    backgroundColor: TarodanColors.background,
   },
   lockedCard: {
     marginBottom: 16,
-    backgroundColor: TarodanColors.backgroundSecondary,
+    backgroundColor: colors.surface.alt,
     borderWidth: 1,
-    borderColor: TarodanColors.border,
+    borderColor: colors.border.DEFAULT,
     borderStyle: 'dashed',
   },
   lockedContent: {
@@ -620,11 +719,12 @@ const styles = StyleSheet.create({
   },
   lockedTitle: {
     marginTop: 8,
-    color: TarodanColors.textPrimary,
+    color: colors.text.heading,
+    fontWeight: '600',
   },
   lockedText: {
     marginTop: 4,
-    color: TarodanColors.textSecondary,
+    color: colors.text.muted,
     textAlign: 'center',
   },
   lockedButton: {
@@ -640,7 +740,7 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   switchHint: {
-    color: TarodanColors.textSecondary,
+    color: colors.text.muted,
     marginTop: 2,
   },
   switchDivider: {
@@ -654,24 +754,22 @@ const styles = StyleSheet.create({
   verificationText: {
     flex: 1,
     marginLeft: 12,
-    color: TarodanColors.textPrimary,
+    color: colors.text.heading,
   },
   verifiedBanner: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: TarodanColors.success + '15',
+    backgroundColor: colors.success[50]!,
     padding: 12,
-    borderRadius: 8,
+    borderRadius: radius.md,
     marginTop: 8,
   },
   verifiedText: {
     marginLeft: 8,
-    color: TarodanColors.success,
+    color: colors.success[700]!,
     fontWeight: '500',
   },
   submitButton: {
     marginTop: 8,
-    backgroundColor: TarodanColors.primary,
-    borderRadius: 8,
   },
 });

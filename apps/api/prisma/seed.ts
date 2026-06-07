@@ -54,9 +54,11 @@ function initStorageService(): StorageService | null {
 const randomPrice = (min: number, max: number) => 
   Math.round((Math.random() * (max - min) + min) * 100) / 100;
 
-// Helper to generate order number
-const generateOrderNumber = () => 
-  `ORD-${Date.now().toString(36).toUpperCase()}-${Math.random().toString(36).substring(2, 6).toUpperCase()}`;
+// Helper to generate order number (matches the runtime ORD-XXXXXXXXXX format;
+// non-ambiguous alphabet, dev/seed data only)
+const REF_ALPHABET = '23456789ABCDEFGHJKMNPQRSTVWXYZ';
+const generateOrderNumber = () =>
+  `ORD-${Array.from({ length: 10 }, () => REF_ALPHABET[Math.floor(Math.random() * REF_ALPHABET.length)]).join('')}`;
 
 // Helper to generate trade number
 const generateTradeNumber = () => 
@@ -466,6 +468,10 @@ async function main() {
 
   console.log(`✅ Created attribute groups (${scaleValues.length} scales, ${materialValues.length} materials, ${vehicleTypeValues.length} vehicle types)`);
 
+  console.log('Seeding Hot Wheels-specific attribute groups...');
+  const { seedHotWheelsAttributes } = await import('./seed-hw-attributes');
+  await seedHotWheelsAttributes(prisma);
+
   // Map seed category slug (cat) -> vehicle_type attribute slug for product attributes
   const catToVehicleTypeSlug: Record<string, string> = {
     araba: 'car',
@@ -796,6 +802,38 @@ async function main() {
       isActive: true,
     },
   });
+
+  // Tarodan central warehouse address — required for safe-trade escrow.
+  // admin.service.ts → resolveWarehouseAddressId reads the
+  // `warehouse_address_id` platform setting; without it, approveWarehouseTrade
+  // throws BadRequestException("Depo adresi yapılandırılmamış").
+  const existingWarehouseAddr = await prisma.address.findFirst({
+    where: { userId: superAdmin.id, title: 'Tarodan Deposu' },
+  });
+  const warehouseAddress = existingWarehouseAddr ?? await prisma.address.create({
+    data: {
+      userId: superAdmin.id,
+      title: 'Tarodan Deposu',
+      fullName: 'Tarodan Lojistik',
+      phone: '+905000000000',
+      city: 'İstanbul',
+      district: 'Kadıköy',
+      address: 'Tarodan Depo, Hasanpaşa Mah., Test Sok. No:1',
+      zipCode: '34722',
+      isDefault: false,
+    },
+  });
+  await prisma.platformSetting.upsert({
+    where: { settingKey: 'warehouse_address_id' },
+    update: { settingValue: warehouseAddress.id },
+    create: {
+      settingKey: 'warehouse_address_id',
+      settingValue: warehouseAddress.id,
+      settingType: 'string',
+      description: 'Tarodan central warehouse address ID for safe-trade escrow',
+    },
+  });
+  console.log(`✅ Warehouse address ready: ${warehouseAddress.id}`);
 
   // Platform Seller
   const platformSeller = await prisma.user.upsert({
@@ -1453,6 +1491,7 @@ async function main() {
           shippingCost: 30,
           commissionAmount: commission,
           status: status,
+          paymentExpiresAt: new Date(Date.now() + 24 * 60 * 60 * 1000),
           shippingAddress: buyerAddress ? {
             fullName: buyerAddress.fullName,
             phone: buyerAddress.phone,

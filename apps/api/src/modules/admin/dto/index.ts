@@ -49,3 +49,6 @@ export * from './rating-admin.dto';
 
 // Safe-trade (warehouse escrow) admin actions
 export * from './warehouse-trade.dto';
+
+// RefundRequest admin actions
+export * from './refund-request.dto';

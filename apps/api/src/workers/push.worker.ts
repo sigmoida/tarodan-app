@@ -266,6 +266,11 @@ export class PushWorker {
     let link: string | undefined;
     if (data?.orderId) {
       link = `/orders/${data.orderId}`;
+    } else if (data?.offerId) {
+      // Teklif bildirimleri (örn. offer_received) gelen teklifler listesine gitmeli,
+      // ürün detayına değil. orderId'den sonra gelir ki offer_accepted (orderId+offerId)
+      // /orders/... olarak kalsın.
+      link = `/offers?tab=received`;
     } else if (data?.productId) {
       link = `/listings/${data.productId}`;
     } else if (data?.tradeId) {

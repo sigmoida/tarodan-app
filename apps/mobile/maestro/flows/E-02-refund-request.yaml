@@ -1,0 +1,41 @@
+# E-02: Refund request flow — login → Profil → Siparişlerim → ilk paid order →
+# "İade Talep Et" → modal → "Hasarlı geldi" → submit → Snackbar success.
+#
+# Pre-req: Zeynep'in seed'inde en az bir `payment.status = completed`, status != cancelled/refunded
+# sipariş bulunmalı. Aksi halde "İade Talep Et" butonu render edilmez ve flow fail eder.
+# Backend seed: pnpm db:seed (default seed orders dahil).
+appId: com.tarodan.app
+tags:
+  - manual
+env:
+  EMAIL: zeynep@demo.com
+  PASSWORD: Demo123!
+---
+- runFlow: ../subflows/open-tarodan.yaml
+- tapOn:
+    text: "Profil"
+- runFlow:
+    when:
+      visible: "Çıkış Yap"
+    file: ../subflows/logout.yaml
+- runFlow: ../subflows/login-as.yaml
+- runFlow: ../subflows/open-first-order.yaml
+# Refund request button
+- scrollUntilVisible:
+    element:
+      id: "refund-request-button"
+    direction: DOWN
+    timeout: 15000
+    visibilityPercentage: 30
+- tapOn:
+    id: "refund-request-button"
+- extendedWaitUntil:
+    visible: "İade Talebi Oluştur"
+    timeout: 10000
+- tapOn: "Hasarlı geldi"
+- tapOn: "Talebi Gönder"
+- extendedWaitUntil:
+    visible:
+      text: ".*İade.*olu.*|.*talebi.*"
+    timeout: 15000
+- assertNotVisible: ".*Network Error.*"

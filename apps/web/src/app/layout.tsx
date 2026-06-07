@@ -3,6 +3,7 @@ import { Toaster } from 'react-hot-toast';
 import './globals.css';
 import LayoutShell from '@/components/layout/LayoutShell';
 import CookieConsentBanner from '@/components/CookieConsentBanner';
+import { PlatformFeeAnnouncementBanner } from '@/components/banners/PlatformFeeAnnouncementBanner';
 import { LanguageProvider } from '@/i18n/LanguageContext';
 import QueryProvider from './QueryProvider';
 
@@ -50,6 +51,7 @@ export default function RootLayout({
       <body className="min-h-screen flex flex-col" suppressHydrationWarning>
         <LanguageProvider>
           <QueryProvider>
+            <PlatformFeeAnnouncementBanner />
             <LayoutShell>
               {children}
             </LayoutShell>

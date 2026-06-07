@@ -1,89 +1,22 @@
-import { useMemo, useState } from 'react';
-import { View, ScrollView, StyleSheet, TouchableOpacity, Image, Dimensions, FlatList, Share } from 'react-native';
-import { Text, Avatar, Button, Chip, Divider, ActivityIndicator, IconButton, Card } from 'react-native-paper';
-import { useQuery } from '@tanstack/react-query';
+import { useState, useEffect } from 'react';
+import { View, ScrollView, StyleSheet, TouchableOpacity, Image, Dimensions, Share } from 'react-native';
+import { theme, Avatar, Button, Chip, Divider, Spinner, Text } from '@tarodan/ui-native';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useLocalSearchParams, router } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
-import { api } from '../../../src/services/api';
-import { TarodanColors } from '../../../src/theme';
+import { api, collectionsApi } from '../../../src/services/api';
+import { useAuthStore } from '../../../src/stores/authStore';
 import { transformImageUrl } from '../../../src/utils/imageUrl';
-import { safeString } from '../../../src/utils/safeString';
 
+const { colors } = theme;
 const { width } = Dimensions.get('window');
-
-// Mock collection for demo
-const MOCK_COLLECTION = {
-  id: 'c1',
-  name: 'Ferrari Koleksiyonu',
-  description: 'Klasik ve modern Ferrari modelleri. 1960\'lardan günümüze, F1 yarış arabalarından süper otomobillere kadar geniş bir yelpazede Ferrari modelleri.',
-  coverImage: 'https://placehold.co/800x400/e74c3c/ffffff?text=Ferrari+Collection',
-  isPublic: true,
-  itemCount: 24,
-  viewCount: 1250,
-  likeCount: 89,
-  shareCount: 34,
-  createdAt: '2024-01-15',
-  updatedAt: '2024-01-20',
-  estimatedValue: 45000,
-  owner: {
-    id: 'u1',
-    displayName: 'Premium Collector',
-    avatarUrl: null,
-    verified: true,
-    memberSince: '2023-01-15',
-  },
-  items: [
-    { 
-      id: 'i1', 
-      title: 'Ferrari F40', 
-      brand: 'Kyosho', 
-      scale: '1:18', 
-      year: '1987',
-      acquiredDate: '2023-06-15',
-      notes: 'Pristine condition, original box',
-      imageUrl: 'https://placehold.co/200x200/e74c3c/ffffff?text=F40',
-      estimatedValue: 3500,
-    },
-    { 
-      id: 'i2', 
-      title: 'Ferrari 250 GTO', 
-      brand: 'CMC', 
-      scale: '1:18',
-      year: '1962',
-      acquiredDate: '2022-11-20',
-      notes: 'Limited edition #456/1000',
-      imageUrl: 'https://placehold.co/200x200/e74c3c/ffffff?text=250+GTO',
-      estimatedValue: 8500,
-    },
-    { 
-      id: 'i3', 
-      title: 'Ferrari 488 GTB', 
-      brand: 'Bburago', 
-      scale: '1:18',
-      year: '2015',
-      acquiredDate: '2023-01-10',
-      notes: 'Signature Series',
-      imageUrl: 'https://placehold.co/200x200/e74c3c/ffffff?text=488',
-      estimatedValue: 1200,
-    },
-    { 
-      id: 'i4', 
-      title: 'Ferrari SF90 Stradale', 
-      brand: 'BBR', 
-      scale: '1:18',
-      year: '2019',
-      acquiredDate: '2024-01-05',
-      notes: 'New acquisition',
-      imageUrl: 'https://placehold.co/200x200/e74c3c/ffffff?text=SF90',
-      estimatedValue: 4500,
-    },
-  ],
-  tags: ['Ferrari', 'Italian', 'Supercar', '1:18', 'Premium'],
-};
 
 export default function CollectionDetailScreen() {
   const { id } = useLocalSearchParams();
+  const queryClient = useQueryClient();
+  const { isAuthenticated } = useAuthStore();
   const [isLiked, setIsLiked] = useState(false);
+  const [likeCount, setLikeCount] = useState(0);
 
   const { data: apiCollection, isLoading } = useQuery({
     queryKey: ['collection', id],
@@ -97,54 +30,22 @@ export default function CollectionDetailScreen() {
     },
   });
 
-  const collection = useMemo(() => {
-    const raw = apiCollection;
-    if (!raw) return null;
-    const c = raw.collection || raw.data || raw;
-    if (!c) return null;
-    return {
-      ...c,
-      owner: c.owner || c.user || {
-        id: c.userId,
-        displayName: c.userName || c.user?.displayName || 'Kullanıcı',
-        verified: !!c.user?.isVerified,
-      },
-      coverImage: c.coverImage || c.coverImageUrl,
-    };
+  const collection = apiCollection;
+  const items = collection?.items || [];
+
+  // Beğeni durumu/sayısını server'dan senkronize et (web ile parite)
+  useEffect(() => {
+    if (apiCollection) {
+      setIsLiked(!!apiCollection.isLiked);
+      setLikeCount(apiCollection.likeCount ?? 0);
+    }
   }, [apiCollection]);
 
-  const items = useMemo(() => {
-    const srcItems = collection?.items || collection?.collectionItems || [];
-    if (!Array.isArray(srcItems)) return [];
-    return srcItems.map((it: any) => {
-      const p = it.product || it;
-      return {
-        id: it.id || p.id,
-        title: p.title || it.productTitle || 'Ürün',
-        brand: p.brand || it.brand,
-        scale: p.scale || it.scale,
-        year: p.year || it.year,
-        notes: it.notes || p.notes,
-        estimatedValue: it.estimatedValue || p.estimatedValue || p.price,
-        imageUrl:
-          it.imageUrl ||
-          it.productImage ||
-          p.imageUrl ||
-          p.coverImage ||
-          p.cardUrl ||
-          p.detailUrl ||
-          p.images?.[0]?.cardUrl ||
-          p.images?.[0]?.detailUrl ||
-          p.images?.[0]?.url ||
-          (typeof p.images?.[0] === 'string' ? p.images?.[0] : null),
-      };
-    });
-  }, [collection]);
-
   const handleShare = async () => {
+    if (!collection) return;
     try {
       await Share.share({
-        message: `${collection.name}\n\n${collection.description}\n\nTarodan'da bu koleksiyona göz atın!`,
+        message: `${collection.name}\n\n${collection.description ?? ''}\n\nTarodan'da bu koleksiyona göz atın!`,
         title: collection.name,
       });
     } catch (error) {
@@ -152,15 +53,50 @@ export default function CollectionDetailScreen() {
     }
   };
 
-  const handleLike = () => {
-    setIsLiked(!isLiked);
+  const handleLike = async () => {
+    if (!isAuthenticated) {
+      router.push('/(auth)/login');
+      return;
+    }
+    const next = !isLiked;
+    // Optimistic
+    setIsLiked(next);
+    setLikeCount((c) => Math.max(0, c + (next ? 1 : -1)));
+    try {
+      if (next) await collectionsApi.like(String(id));
+      else await collectionsApi.unlike(String(id));
+      // NOT: ['collection', id] invalidate ETME — GET /collections/:id her çağrıda
+      // viewCount'u artırıyor; refetch görüntülenmeyi şişirir. Optimistic local state yeter.
+      queryClient.invalidateQueries({ queryKey: ['collections'] });
+      queryClient.invalidateQueries({ queryKey: ['liked-collections'] });
+      queryClient.invalidateQueries({ queryKey: ['myCollections'] });
+    } catch {
+      // Rollback
+      setIsLiked(!next);
+      setLikeCount((c) => Math.max(0, c + (next ? -1 : 1)));
+    }
   };
 
-  if (isLoading && !collection) {
+  if (isLoading) {
     return (
       <View style={styles.loadingContainer}>
-        <ActivityIndicator size="large" color={TarodanColors.primary} />
+        <Spinner size="lg" />
         <Text style={styles.loadingText}>Yükleniyor...</Text>
+      </View>
+    );
+  }
+
+  if (!collection) {
+    return (
+      <View style={styles.loadingContainer}>
+        <Ionicons name="albums-outline" size={64} color={colors.text.muted} />
+        <Text style={styles.loadingText}>Koleksiyon bulunamadı</Text>
+        <Button
+          variant="primary"
+          title="Geri Dön"
+          onPress={() => router.back()}
+          style={{ marginTop: 16 }}
+        />
       </View>
     );
   }
@@ -169,25 +105,25 @@ export default function CollectionDetailScreen() {
     <View style={styles.container}>
       {/* Header Image */}
       <Image
-        source={{ uri: transformImageUrl((collection?.coverImage || MOCK_COLLECTION.coverImage) as any) }}
+        source={{ uri: transformImageUrl(collection.coverImageUrl ?? collection.coverImage) }}
         style={styles.coverImage}
         resizeMode="cover"
       />
-      
+
       {/* Header Buttons */}
       <View style={styles.headerButtons}>
         <TouchableOpacity style={styles.headerButton} onPress={() => router.back()}>
-          <Ionicons name="arrow-back" size={24} color="#fff" />
+          <Ionicons name="arrow-back" size={24} color={colors.white} />
         </TouchableOpacity>
         <View style={styles.headerActions}>
           <TouchableOpacity style={styles.headerButton} onPress={handleShare}>
-            <Ionicons name="share-outline" size={24} color="#fff" />
+            <Ionicons name="share-outline" size={24} color={colors.white} />
           </TouchableOpacity>
           <TouchableOpacity style={styles.headerButton} onPress={handleLike}>
-            <Ionicons 
-              name={isLiked ? "heart" : "heart-outline"} 
-              size={24} 
-              color={isLiked ? TarodanColors.error : "#fff"} 
+            <Ionicons
+              name={isLiked ? 'heart' : 'heart-outline'}
+              size={24}
+              color={isLiked ? colors.danger[600]! : colors.white}
             />
           </TouchableOpacity>
         </View>
@@ -196,88 +132,86 @@ export default function CollectionDetailScreen() {
       <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
         {/* Collection Info */}
         <View style={styles.infoSection}>
-          <Text style={styles.collectionName}>{collection?.name || MOCK_COLLECTION.name}</Text>
-          
+          <Text style={styles.collectionName}>{collection.name}</Text>
+
           {/* Owner */}
-          <TouchableOpacity 
+          <TouchableOpacity
             style={styles.ownerRow}
-            onPress={() => router.push(`/seller/${collection?.owner?.id || MOCK_COLLECTION.owner.id}`)}
+            onPress={() => router.push(`/seller/${collection.owner?.id}`)}
           >
-            <Avatar.Text
-              size={40}
-              label={(collection?.owner?.displayName || MOCK_COLLECTION.owner.displayName).substring(0, 2).toUpperCase()}
-              style={{ backgroundColor: TarodanColors.primary }}
+            <Avatar
+              size="md"
+              name={collection.owner?.displayName || 'U'}
             />
             <View style={styles.ownerInfo}>
               <View style={styles.ownerNameRow}>
-                <Text style={styles.ownerName}>{collection?.owner?.displayName || MOCK_COLLECTION.owner.displayName}</Text>
-                {(collection?.owner?.verified || MOCK_COLLECTION.owner.verified) && (
-                  <Ionicons name="checkmark-circle" size={16} color={TarodanColors.accent} />
+                <Text style={styles.ownerName}>{collection.owner?.displayName}</Text>
+                {collection.owner?.verified && (
+                  <Ionicons name="checkmark-circle" size={16} color={colors.warning[500]!} />
                 )}
               </View>
-              <Text style={styles.ownerSince}>
-                Üye: {new Date((collection?.owner as any)?.memberSince || MOCK_COLLECTION.owner.memberSince).toLocaleDateString('tr-TR', { month: 'short', year: 'numeric' })}
-              </Text>
+              {collection.owner?.memberSince ? (
+                <Text style={styles.ownerSince}>
+                  Üye: {new Date(collection.owner.memberSince).toLocaleDateString('tr-TR', { month: 'short', year: 'numeric' })}
+                </Text>
+              ) : null}
             </View>
-            <Ionicons name="chevron-forward" size={20} color={TarodanColors.textSecondary} />
+            <Ionicons name="chevron-forward" size={20} color={colors.text.muted} />
           </TouchableOpacity>
 
           {/* Stats */}
           <View style={styles.statsRow}>
             <View style={styles.statItem}>
-              <Ionicons name="images-outline" size={20} color={TarodanColors.textSecondary} />
-              <Text style={styles.statValue}>{collection?.itemCount ?? items.length}</Text>
+              <Ionicons name="images-outline" size={20} color={colors.text.muted} />
+              <Text style={styles.statValue}>{collection.itemCount}</Text>
               <Text style={styles.statLabel}>Model</Text>
             </View>
             <View style={styles.statItem}>
-              <Ionicons name="eye-outline" size={20} color={TarodanColors.textSecondary} />
-              <Text style={styles.statValue}>{collection?.viewCount ?? 0}</Text>
+              <Ionicons name="eye-outline" size={20} color={colors.text.muted} />
+              <Text style={styles.statValue}>{collection.viewCount}</Text>
               <Text style={styles.statLabel}>Görüntülenme</Text>
             </View>
             <View style={styles.statItem}>
-              <Ionicons name="heart" size={20} color={TarodanColors.error} />
-              <Text style={styles.statValue}>{isLiked ? (collection?.likeCount ?? 0) + 1 : (collection?.likeCount ?? 0)}</Text>
+              <Ionicons name="heart" size={20} color={colors.danger[600]!} />
+              <Text style={styles.statValue}>{likeCount}</Text>
               <Text style={styles.statLabel}>Beğeni</Text>
             </View>
             <View style={styles.statItem}>
-              <Ionicons name="share-social-outline" size={20} color={TarodanColors.textSecondary} />
-              <Text style={styles.statValue}>{collection?.shareCount ?? 0}</Text>
+              <Ionicons name="share-social-outline" size={20} color={colors.text.muted} />
+              <Text style={styles.statValue}>{collection.shareCount}</Text>
               <Text style={styles.statLabel}>Paylaşım</Text>
             </View>
           </View>
 
           {/* Estimated Value */}
-          {(collection?.estimatedValue || 0) > 0 && (
+          {collection.estimatedValue && (
             <View style={styles.valueCard}>
-              <Ionicons name="diamond-outline" size={24} color={TarodanColors.primary} />
+              <Ionicons name="diamond-outline" size={24} color={colors.primary[600]!} />
               <View style={styles.valueInfo}>
                 <Text style={styles.valueLabel}>Tahmini Koleksiyon Değeri</Text>
                 <Text style={styles.valueAmount}>
-                  ₺{(collection?.estimatedValue ?? 0).toLocaleString('tr-TR')}
+                  ₺{collection.estimatedValue.toLocaleString('tr-TR')}
                 </Text>
               </View>
             </View>
           )}
 
           {/* Description */}
-          <Text style={styles.description}>{collection?.description || MOCK_COLLECTION.description}</Text>
+          <Text style={styles.description}>{collection.description}</Text>
 
           {/* Tags */}
-          {collection?.tags && collection.tags.length > 0 && (
+          {collection.tags && collection.tags.length > 0 && (
             <View style={styles.tagsRow}>
               {collection.tags.map((tag: string, index: number) => (
-                <Chip 
-                  key={index} 
-                  style={styles.tag}
-                  textStyle={styles.tagText}
-                >
-                  {tag}
-                </Chip>
+                <Chip
+                  key={index}
+                  label={tag}
+                />
               ))}
             </View>
           )}
 
-          <Divider style={styles.divider} />
+          <Divider />
 
           {/* Items Section */}
           <View style={styles.itemsHeader}>
@@ -285,57 +219,56 @@ export default function CollectionDetailScreen() {
             <Text style={styles.itemsCount}>{items.length} model</Text>
           </View>
 
-          {/* Items Grid */}
-          <View style={styles.itemsGrid}>
-            {items.map((item: any) => (
-              <TouchableOpacity 
-                key={item.id} 
-                style={styles.itemCard}
-              >
-                <Image
-                  source={{ uri: transformImageUrl(item.imageUrl) }}
-                  style={styles.itemImage}
-                  resizeMode="cover"
-                />
-                <View style={styles.itemInfo}>
-                  <Text style={styles.itemTitle} numberOfLines={2}>{item.title}</Text>
-                  <Text style={styles.itemMeta}>{safeString(item.brand, 'Marka')} • {safeString(item.scale, '1:64')}</Text>
-                  {item.year && (
-                    <Text style={styles.itemYear}>Model: {item.year}</Text>
-                  )}
-                  {item.estimatedValue && (
-                    <Text style={styles.itemValue}>
-                      ≈ ₺{item.estimatedValue.toLocaleString('tr-TR')}
+          {/* Items Grid — API item şekli: { productId, productTitle, productImage, productPrice, productStatus } */}
+          {items.length === 0 ? (
+            <View style={styles.itemsEmpty}>
+              <Ionicons name="cube-outline" size={40} color={colors.text.muted} />
+              <Text style={styles.itemsEmptyText}>Bu koleksiyonda henüz ürün yok</Text>
+            </View>
+          ) : (
+            <View style={styles.itemsGrid}>
+              {items.map((item: any) => (
+                <TouchableOpacity
+                  key={item.id}
+                  style={styles.itemCard}
+                  onPress={() => item.productId && router.push(`/product/${item.productId}`)}
+                >
+                  <Image
+                    source={{ uri: transformImageUrl(item.productImage ?? item.imageUrl) }}
+                    style={styles.itemImage}
+                    resizeMode="cover"
+                  />
+                  <View style={styles.itemInfo}>
+                    <Text style={styles.itemTitle} numberOfLines={2}>
+                      {item.productTitle ?? item.title ?? 'Ürün'}
                     </Text>
-                  )}
-                  {item.notes && (
-                    <Text style={styles.itemNotes} numberOfLines={2}>
-                      📝 {item.notes}
-                    </Text>
-                  )}
-                </View>
-              </TouchableOpacity>
-            ))}
-          </View>
+                    {(item.productPrice ?? item.price) != null && (
+                      <Text style={styles.itemValue}>
+                        ₺{Number(item.productPrice ?? item.price).toLocaleString('tr-TR')}
+                      </Text>
+                    )}
+                  </View>
+                </TouchableOpacity>
+              ))}
+            </View>
+          )}
         </View>
 
         {/* Guest Notice */}
         <View style={styles.guestNotice}>
-          <Ionicons name="lock-closed-outline" size={24} color={TarodanColors.textSecondary} />
+          <Ionicons name="lock-closed-outline" size={24} color={colors.text.muted} />
           <View style={styles.noticeContent}>
             <Text style={styles.noticeTitle}>Kendi Koleksiyonunuzu Oluşturun</Text>
             <Text style={styles.noticeText}>
-              Premium üye olarak kendi Digital Garage'ınızı oluşturabilir, 
+              Premium üye olarak kendi Digital Garage'ınızı oluşturabilir,
               koleksiyonlarınızı sergileyebilirsiniz.
             </Text>
-            <Button 
-              mode="contained" 
-              buttonColor={TarodanColors.primary}
+            <Button
+              variant="primary"
+              title="Premium Üye Ol"
               onPress={() => router.push('/(auth)/register')}
               style={styles.noticeButton}
-            >
-              Premium Üye Ol
-            </Button>
+            />
           </View>
         </View>
 
@@ -348,20 +281,20 @@ export default function CollectionDetailScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: TarodanColors.background,
+    backgroundColor: colors.surface.DEFAULT,
   },
   loadingContainer: {
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
-    backgroundColor: TarodanColors.background,
+    backgroundColor: colors.surface.DEFAULT,
   },
   loadingText: {
     marginTop: 16,
-    color: TarodanColors.textSecondary,
+    color: colors.text.muted,
   },
   coverImage: {
-    width: width,
+    width,
     height: 200,
   },
   headerButtons: {
@@ -377,7 +310,7 @@ const styles = StyleSheet.create({
     width: 40,
     height: 40,
     borderRadius: 20,
-    backgroundColor: 'rgba(0,0,0,0.4)',
+    backgroundColor: colors.overlay.black50,
     justifyContent: 'center',
     alignItems: 'center',
   },
@@ -394,13 +327,13 @@ const styles = StyleSheet.create({
   collectionName: {
     fontSize: 24,
     fontWeight: 'bold',
-    color: TarodanColors.textPrimary,
+    color: colors.text.heading,
     marginBottom: 16,
   },
   ownerRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: TarodanColors.surfaceVariant,
+    backgroundColor: colors.gray[50],
     padding: 12,
     borderRadius: 12,
     marginBottom: 16,
@@ -417,17 +350,17 @@ const styles = StyleSheet.create({
   ownerName: {
     fontSize: 16,
     fontWeight: '600',
-    color: TarodanColors.textPrimary,
+    color: colors.text.heading,
   },
   ownerSince: {
     fontSize: 12,
-    color: TarodanColors.textSecondary,
+    color: colors.text.muted,
     marginTop: 2,
   },
   statsRow: {
     flexDirection: 'row',
     justifyContent: 'space-around',
-    backgroundColor: TarodanColors.surfaceVariant,
+    backgroundColor: colors.gray[50],
     borderRadius: 12,
     padding: 16,
     marginBottom: 16,
@@ -438,17 +371,17 @@ const styles = StyleSheet.create({
   statValue: {
     fontSize: 18,
     fontWeight: 'bold',
-    color: TarodanColors.textPrimary,
+    color: colors.text.heading,
     marginTop: 4,
   },
   statLabel: {
     fontSize: 12,
-    color: TarodanColors.textSecondary,
+    color: colors.text.muted,
   },
   valueCard: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: TarodanColors.primaryLight,
+    backgroundColor: colors.primary[50]!,
     borderRadius: 12,
     padding: 16,
     marginBottom: 16,
@@ -458,17 +391,17 @@ const styles = StyleSheet.create({
   },
   valueLabel: {
     fontSize: 12,
-    color: TarodanColors.textSecondary,
+    color: colors.text.muted,
   },
   valueAmount: {
     fontSize: 20,
     fontWeight: 'bold',
-    color: TarodanColors.primary,
+    color: colors.primary[600]!,
   },
   description: {
     fontSize: 15,
     lineHeight: 22,
-    color: TarodanColors.textPrimary,
+    color: colors.text.heading,
     marginBottom: 16,
   },
   tagsRow: {
@@ -477,36 +410,36 @@ const styles = StyleSheet.create({
     gap: 8,
     marginBottom: 16,
   },
-  tag: {
-    backgroundColor: TarodanColors.surfaceVariant,
-  },
-  tagText: {
-    fontSize: 12,
-  },
-  divider: {
-    marginVertical: 16,
-  },
   itemsHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    marginBottom: 16,
+    marginVertical: 16,
   },
   itemsTitle: {
     fontSize: 18,
     fontWeight: 'bold',
-    color: TarodanColors.textPrimary,
+    color: colors.text.heading,
   },
   itemsCount: {
     fontSize: 14,
-    color: TarodanColors.textSecondary,
+    color: colors.text.muted,
   },
   itemsGrid: {
     gap: 12,
   },
+  itemsEmpty: {
+    alignItems: 'center',
+    paddingVertical: 32,
+    gap: 8,
+  },
+  itemsEmptyText: {
+    color: colors.text.muted,
+    fontSize: 14,
+  },
   itemCard: {
     flexDirection: 'row',
-    backgroundColor: TarodanColors.surfaceVariant,
+    backgroundColor: colors.gray[50],
     borderRadius: 12,
     overflow: 'hidden',
   },
@@ -521,33 +454,33 @@ const styles = StyleSheet.create({
   itemTitle: {
     fontSize: 14,
     fontWeight: '600',
-    color: TarodanColors.textPrimary,
+    color: colors.text.heading,
     marginBottom: 4,
   },
   itemMeta: {
     fontSize: 12,
-    color: TarodanColors.textSecondary,
+    color: colors.text.muted,
   },
   itemYear: {
     fontSize: 12,
-    color: TarodanColors.textSecondary,
+    color: colors.text.muted,
     marginTop: 2,
   },
   itemValue: {
     fontSize: 13,
     fontWeight: '600',
-    color: TarodanColors.primary,
+    color: colors.primary[600]!,
     marginTop: 4,
   },
   itemNotes: {
     fontSize: 11,
-    color: TarodanColors.textSecondary,
+    color: colors.text.muted,
     marginTop: 4,
     fontStyle: 'italic',
   },
   guestNotice: {
     flexDirection: 'row',
-    backgroundColor: TarodanColors.surfaceVariant,
+    backgroundColor: colors.gray[50],
     margin: 16,
     borderRadius: 12,
     padding: 16,
@@ -559,16 +492,15 @@ const styles = StyleSheet.create({
   noticeTitle: {
     fontSize: 16,
     fontWeight: '600',
-    color: TarodanColors.textPrimary,
+    color: colors.text.heading,
   },
   noticeText: {
     fontSize: 13,
-    color: TarodanColors.textSecondary,
+    color: colors.text.muted,
     marginTop: 4,
     lineHeight: 18,
   },
   noticeButton: {
     marginTop: 12,
-    borderRadius: 8,
   },
 });

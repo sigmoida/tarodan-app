@@ -1,5 +1,7 @@
 import { Stack } from 'expo-router';
-import { TarodanColors } from '../../src/theme';
+import { theme } from '@tarodan/ui-native';
+
+const { colors } = theme;
 
 export default function CheckoutLayout() {
   return (
@@ -7,7 +9,7 @@ export default function CheckoutLayout() {
       screenOptions={{
         headerShown: false,
         contentStyle: {
-          backgroundColor: TarodanColors.background,
+          backgroundColor: colors.surface.DEFAULT,
         },
       }}
     />

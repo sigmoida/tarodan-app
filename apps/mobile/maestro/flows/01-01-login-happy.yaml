@@ -1,0 +1,25 @@
+# 01-01: Login happy path — Zeynep (FREE seed user).
+# Önce logout dener (varsa), sonra login. Profil ekranında kullanıcı bilgisi görünür.
+appId: com.tarodan.app
+tags:
+  - smoke
+env:
+  EMAIL: zeynep@demo.com
+  PASSWORD: Demo123!
+---
+- runFlow: ../subflows/open-tarodan.yaml
+- tapOn:
+    text: "Profil"
+- runFlow:
+    when:
+      visible: "Çıkış Yap"
+    file: ../subflows/logout.yaml
+- runFlow: ../subflows/login-as.yaml
+- tapOn:
+    text: "Profil"
+# Login başarılı → kullanıcının email'i profilde görünür.
+- extendedWaitUntil:
+    visible: "zeynep@demo.com"
+    timeout: 15000
+- assertVisible: "zeynep@demo.com"
+- assertNotVisible: ".*Network Error.*"

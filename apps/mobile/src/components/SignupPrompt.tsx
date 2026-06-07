@@ -1,8 +1,9 @@
-import { View, StyleSheet, Modal, TouchableOpacity, Image } from 'react-native';
-import { Text, Button } from 'react-native-paper';
+import { View, StyleSheet, Modal as RNModal, TouchableOpacity } from 'react-native';
 import { router } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
-import { TarodanColors } from '../theme';
+import { theme, Text, Button } from '@tarodan/ui-native';
+
+const { colors } = theme;
 
 interface SignupPromptProps {
   visible: boolean;
@@ -79,7 +80,7 @@ export function SignupPrompt({ visible, onDismiss, type }: SignupPromptProps) {
   const config = PROMPT_CONFIG[type];
 
   return (
-    <Modal
+    <RNModal
       visible
       transparent
       animationType="fade"
@@ -89,12 +90,12 @@ export function SignupPrompt({ visible, onDismiss, type }: SignupPromptProps) {
         <View style={styles.container}>
           {/* Close Button */}
           <TouchableOpacity style={styles.closeButton} onPress={onDismiss}>
-            <Ionicons name="close" size={24} color={TarodanColors.textSecondary} />
+            <Ionicons name="close" size={24} color={colors.text.muted} />
           </TouchableOpacity>
 
           {/* Icon */}
           <View style={styles.iconContainer}>
-            <Ionicons name={config.icon as any} size={48} color={TarodanColors.primary} />
+            <Ionicons name={config.icon as any} size={48} color={colors.primary[600]!} />
           </View>
 
           {/* Title & Description */}
@@ -105,7 +106,7 @@ export function SignupPrompt({ visible, onDismiss, type }: SignupPromptProps) {
           <View style={styles.benefitsList}>
             {config.benefits.map((benefit, index) => (
               <View key={index} style={styles.benefitItem}>
-                <Ionicons name="checkmark-circle" size={20} color={TarodanColors.success} />
+                <Ionicons name="checkmark-circle" size={20} color={colors.success[600]!} />
                 <Text style={styles.benefitText}>{benefit}</Text>
               </View>
             ))}
@@ -113,19 +114,17 @@ export function SignupPrompt({ visible, onDismiss, type }: SignupPromptProps) {
 
           {/* Buttons */}
           <Button
-            mode="contained"
-            buttonColor={TarodanColors.primary}
+            variant="primary"
+            title={config.primaryButton}
             onPress={() => {
               onDismiss();
               config.primaryAction();
             }}
             style={styles.primaryButton}
-          >
-            {config.primaryButton}
-          </Button>
+          />
 
           {type !== 'message' && (
-            <TouchableOpacity 
+            <TouchableOpacity
               style={styles.loginLink}
               onPress={() => {
                 onDismiss();
@@ -143,20 +142,20 @@ export function SignupPrompt({ visible, onDismiss, type }: SignupPromptProps) {
           </TouchableOpacity>
         </View>
       </View>
-    </Modal>
+    </RNModal>
   );
 }
 
 const styles = StyleSheet.create({
   backdrop: {
     flex: 1,
-    backgroundColor: 'rgba(0, 0, 0, 0.6)',
+    backgroundColor: colors.overlay.black50,
     justifyContent: 'center',
     alignItems: 'center',
     padding: 20,
   },
   container: {
-    backgroundColor: TarodanColors.background,
+    backgroundColor: colors.surface.DEFAULT,
     borderRadius: 20,
     padding: 24,
     width: '100%',
@@ -173,7 +172,7 @@ const styles = StyleSheet.create({
     width: 80,
     height: 80,
     borderRadius: 40,
-    backgroundColor: TarodanColors.primaryLight,
+    backgroundColor: colors.primary[50]!,
     justifyContent: 'center',
     alignItems: 'center',
     marginBottom: 16,
@@ -181,13 +180,13 @@ const styles = StyleSheet.create({
   title: {
     fontSize: 22,
     fontWeight: 'bold',
-    color: TarodanColors.textPrimary,
+    color: colors.text.heading,
     textAlign: 'center',
     marginBottom: 8,
   },
   description: {
     fontSize: 14,
-    color: TarodanColors.textSecondary,
+    color: colors.text.muted,
     textAlign: 'center',
     lineHeight: 20,
     marginBottom: 20,
@@ -204,7 +203,7 @@ const styles = StyleSheet.create({
   },
   benefitText: {
     fontSize: 14,
-    color: TarodanColors.textPrimary,
+    color: colors.text.heading,
     flex: 1,
   },
   primaryButton: {
@@ -217,15 +216,15 @@ const styles = StyleSheet.create({
   },
   loginLinkText: {
     fontSize: 14,
-    color: TarodanColors.textSecondary,
+    color: colors.text.muted,
   },
   loginLinkBold: {
-    color: TarodanColors.primary,
+    color: colors.primary[600]!,
     fontWeight: '600',
   },
   skipText: {
     fontSize: 14,
-    color: TarodanColors.textSecondary,
+    color: colors.text.muted,
   },
 });
 

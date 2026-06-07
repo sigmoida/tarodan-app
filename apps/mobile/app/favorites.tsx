@@ -1,13 +1,14 @@
 import { View, ScrollView, StyleSheet, TouchableOpacity, Image, RefreshControl } from 'react-native';
-import { Text, Card, IconButton, Button, ActivityIndicator, Snackbar, FAB } from 'react-native-paper';
-import { useState, useCallback, useEffect } from 'react';
+import { useState, useCallback } from 'react';
 import { router, useFocusEffect } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
+import { theme, Text, Card, IconButton, Button, Spinner, Snackbar } from '@tarodan/ui-native';
 import { useFavoritesStore, WishlistItem } from '../src/stores/favoritesStore';
 import { useAuthStore } from '../src/stores/authStore';
 import { useCartStore } from '../src/stores/cartStore';
-import { TarodanColors } from '../src/theme';
 import { getImageUrl as getImageUrlFromUtils } from '../src/utils/imageUrl';
+
+const { colors } = theme;
 
 export default function FavoritesScreen() {
   const { isAuthenticated } = useAuthStore();
@@ -64,17 +65,13 @@ export default function FavoritesScreen() {
   if (!isAuthenticated) {
     return (
       <View style={styles.centeredContainer}>
-        <Ionicons name="heart-outline" size={64} color={TarodanColors.primary} />
-        <Text variant="titleLarge" style={styles.title}>Favorilerim</Text>
-        <Text variant="bodyMedium" style={styles.subtitle}>
+        <Ionicons name="heart-outline" size={64} color={colors.primary[600]!} />
+        <Text variant="h2" style={styles.title}>Favorilerim</Text>
+        <Text variant="body" style={styles.subtitle}>
           Favorilerinizi görmek için giriş yapın
         </Text>
-        <Button mode="contained" onPress={() => router.push('/(auth)/login')} style={styles.button}>
-          Giriş Yap
-        </Button>
-        <Button mode="text" onPress={() => router.push('/(auth)/register')}>
-          Hesap Oluştur
-        </Button>
+        <Button variant="primary" title="Giriş Yap" onPress={() => router.push('/(auth)/login')} style={styles.button} />
+        <Button variant="ghost" title="Hesap Oluştur" onPress={() => router.push('/(auth)/register')} />
       </View>
     );
   }
@@ -82,7 +79,7 @@ export default function FavoritesScreen() {
   if (isLoading && items.length === 0) {
     return (
       <View style={styles.centeredContainer}>
-        <ActivityIndicator size="large" color={TarodanColors.primary} />
+        <Spinner size="lg" />
         <Text style={{ marginTop: 16 }}>Favoriler yükleniyor...</Text>
       </View>
     );
@@ -91,12 +88,10 @@ export default function FavoritesScreen() {
   if (error && items.length === 0) {
     return (
       <View style={styles.centeredContainer}>
-        <Ionicons name="cloud-offline-outline" size={64} color={TarodanColors.textLight} />
-        <Text style={{ marginTop: 16, fontSize: 16, fontWeight: '600', color: TarodanColors.text }}>Yüklenemedi</Text>
-        <Text style={{ marginTop: 8, color: TarodanColors.textLight, textAlign: 'center' }}>Favorileriniz yüklenirken bir hata oluştu.</Text>
-        <Button mode="contained" onPress={() => fetchFavorites()} style={{ marginTop: 16, backgroundColor: TarodanColors.primary }}>
-          Tekrar Dene
-        </Button>
+        <Ionicons name="cloud-offline-outline" size={64} color={colors.text.subtle} />
+        <Text style={{ marginTop: 16, fontSize: 16, fontWeight: '600', color: colors.text.heading }}>Yüklenemedi</Text>
+        <Text style={{ marginTop: 8, color: colors.text.subtle, textAlign: 'center' }}>Favorileriniz yüklenirken bir hata oluştu.</Text>
+        <Button variant="primary" title="Tekrar Dene" onPress={() => fetchFavorites()} style={{ marginTop: 16 }} />
       </View>
     );
   }
@@ -106,7 +101,7 @@ export default function FavoritesScreen() {
       {/* Header */}
       <View style={styles.header}>
         <TouchableOpacity onPress={() => router.back()}>
-          <Ionicons name="arrow-back" size={24} color={TarodanColors.textOnPrimary} />
+          <Ionicons name="arrow-back" size={24} color={colors.white} />
         </TouchableOpacity>
         <Text style={styles.headerTitle}>Favorilerim ({getFavoriteCount()})</Text>
         <View style={{ width: 24 }} />
@@ -115,67 +110,67 @@ export default function FavoritesScreen() {
       {/* Content */}
       {items.length === 0 ? (
         <View style={styles.emptyContainer}>
-          <Ionicons name="heart-outline" size={80} color={TarodanColors.textLight} />
-          <Text variant="titleMedium" style={styles.emptyTitle}>Henüz favori yok</Text>
-          <Text variant="bodyMedium" style={styles.emptySubtitle}>
+          <Ionicons name="heart-outline" size={80} color={colors.text.subtle} />
+          <Text variant="h3" style={styles.emptyTitle}>Henüz favori yok</Text>
+          <Text variant="body" style={styles.emptySubtitle}>
             Beğendiğiniz ürünleri favorilere ekleyerek kolayca takip edin
           </Text>
-          <Button mode="contained" onPress={() => router.push('/(tabs)/search')} style={styles.browseButton}>
-            Ürünleri Keşfet
-          </Button>
+          <Button variant="primary" title="Ürünleri Keşfet" onPress={() => router.push('/(tabs)/search')} style={styles.browseButton} />
         </View>
       ) : (
         <ScrollView
           style={styles.scrollView}
           contentContainerStyle={styles.scrollContent}
           refreshControl={
-            <RefreshControl refreshing={refreshing} onRefresh={onRefresh} colors={[TarodanColors.primary]} />
+            <RefreshControl refreshing={refreshing} onRefresh={onRefresh} colors={[colors.primary[600]!]} />
           }
         >
           {items.map((item) => (
-            <Card key={item.id} style={styles.card}>
-              <TouchableOpacity 
+            <Card key={item.id} padding={0} style={styles.card}>
+              <TouchableOpacity
                 style={styles.cardContent}
                 onPress={() => router.push(`/product/${item.productId}`)}
               >
-                <Image 
-                  source={{ uri: getImageUrl(item.product) }} 
+                <Image
+                  source={{ uri: getImageUrl(item.product) }}
                   style={styles.productImage}
                 />
                 <View style={styles.productInfo}>
-                  <Text variant="titleSmall" numberOfLines={2} style={styles.productTitle}>
+                  <Text variant="label" numberOfLines={2} style={styles.productTitle}>
                     {item.product.title}
                   </Text>
-                  <Text variant="bodySmall" style={styles.sellerName}>
+                  <Text variant="caption" style={styles.sellerName}>
                     {item.product.seller?.displayName || 'Satıcı'}
                   </Text>
-                  <Text variant="titleMedium" style={styles.price}>
+                  <Text variant="h3" style={styles.price}>
                     {formatPrice(item.product.price)}
                   </Text>
-                  
+
                   {/* Status indicator */}
                   {item.product.status !== 'active' && (
-                    <View style={[styles.statusBadge, { backgroundColor: TarodanColors.warning + '20' }]}>
-                      <Text style={{ color: TarodanColors.warning, fontSize: 11 }}>
+                    <View style={[styles.statusBadge, { backgroundColor: colors.warning[50]! }]}>
+                      <Text style={{ color: colors.warning[600]!, fontSize: 11 }}>
                         {item.product.status === 'sold' ? 'Satıldı' : 'Aktif değil'}
                       </Text>
                     </View>
                   )}
                 </View>
-                
+
                 {/* Actions */}
                 <View style={styles.actions}>
                   <IconButton
                     icon="heart"
-                    iconColor={TarodanColors.error}
-                    size={24}
+                    accessibilityLabel="Favorilerden çıkar"
+                    size="md"
+                    color={colors.danger[600]!}
                     onPress={() => handleRemove(item.productId)}
                   />
                   {item.product.status === 'active' && (
                     <IconButton
-                      icon="cart-plus"
-                      iconColor={TarodanColors.primary}
-                      size={24}
+                      icon="cart-outline"
+                      accessibilityLabel="Sepete ekle"
+                      size="md"
+                      color={colors.primary[600]!}
                       onPress={() => handleAddToCart(item)}
                     />
                   )}
@@ -186,10 +181,8 @@ export default function FavoritesScreen() {
 
           {/* Recommendations Section */}
           <View style={styles.recommendationsSection}>
-            <Text variant="titleMedium" style={styles.sectionTitle}>Beğenebileceğiniz</Text>
-            <Button mode="outlined" onPress={() => router.push('/(tabs)/search')}>
-              Daha Fazla Ürün Keşfet
-            </Button>
+            <Text variant="h3" style={styles.sectionTitle}>Beğenebileceğiniz</Text>
+            <Button variant="outline" title="Daha Fazla Ürün Keşfet" onPress={() => router.push('/(tabs)/search')} />
           </View>
 
           <View style={{ height: 100 }} />
@@ -215,17 +208,17 @@ export default function FavoritesScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: TarodanColors.backgroundSecondary,
+    backgroundColor: colors.surface.alt,
   },
   centeredContainer: {
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
     padding: 32,
-    backgroundColor: TarodanColors.background,
+    backgroundColor: colors.surface.DEFAULT,
   },
   header: {
-    backgroundColor: TarodanColors.primary,
+    backgroundColor: colors.primary[600]!,
     paddingTop: 50,
     paddingBottom: 16,
     paddingHorizontal: 20,
@@ -236,7 +229,7 @@ const styles = StyleSheet.create({
   headerTitle: {
     fontSize: 18,
     fontWeight: 'bold',
-    color: TarodanColors.textOnPrimary,
+    color: colors.white,
   },
   title: {
     marginTop: 16,
@@ -245,7 +238,7 @@ const styles = StyleSheet.create({
   subtitle: {
     textAlign: 'center',
     marginBottom: 24,
-    color: TarodanColors.textSecondary,
+    color: colors.text.muted,
   },
   button: {
     marginBottom: 8,
@@ -260,12 +253,12 @@ const styles = StyleSheet.create({
   emptyTitle: {
     marginTop: 16,
     marginBottom: 8,
-    color: TarodanColors.textPrimary,
+    color: colors.text.heading,
   },
   emptySubtitle: {
     textAlign: 'center',
     marginBottom: 24,
-    color: TarodanColors.textSecondary,
+    color: colors.text.muted,
     paddingHorizontal: 16,
   },
   browseButton: {
@@ -279,7 +272,7 @@ const styles = StyleSheet.create({
   },
   card: {
     marginBottom: 12,
-    backgroundColor: TarodanColors.background,
+    backgroundColor: colors.surface.DEFAULT,
   },
   cardContent: {
     flexDirection: 'row',
@@ -289,7 +282,7 @@ const styles = StyleSheet.create({
     width: 100,
     height: 100,
     borderRadius: 8,
-    backgroundColor: TarodanColors.surfaceVariant,
+    backgroundColor: colors.surface.alt,
   },
   productInfo: {
     flex: 1,
@@ -297,15 +290,15 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   productTitle: {
-    color: TarodanColors.textPrimary,
+    color: colors.text.heading,
     marginBottom: 4,
   },
   sellerName: {
-    color: TarodanColors.textSecondary,
+    color: colors.text.muted,
     marginBottom: 4,
   },
   price: {
-    color: TarodanColors.primary,
+    color: colors.primary[600]!,
     fontWeight: 'bold',
   },
   statusBadge: {
@@ -321,10 +314,11 @@ const styles = StyleSheet.create({
   },
   recommendationsSection: {
     marginTop: 24,
+    width: '100%',
     alignItems: 'center',
   },
   sectionTitle: {
     marginBottom: 12,
-    color: TarodanColors.textPrimary,
+    color: colors.text.heading,
   },
 });

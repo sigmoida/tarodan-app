@@ -1,17 +1,49 @@
-import { useState, useEffect, useCallback } from 'react';
-import { View, ScrollView, StyleSheet, TouchableOpacity, Image, KeyboardAvoidingView, Platform, Alert, ActivityIndicator, TextInput, Linking } from 'react-native';
-import { Text } from 'react-native';
-import { router, useLocalSearchParams } from 'expo-router';
-import { Ionicons } from '@expo/vector-icons';
-import { TarodanColors } from '../../src/theme/colors';
+import { useState, useEffect, useMemo } from 'react';
+import {
+  View,
+  ScrollView,
+  StyleSheet,
+  TouchableOpacity,
+  Image,
+  KeyboardAvoidingView,
+  Platform,
+  Alert,
+} from 'react-native';
+import {
+  Button,
+  Divider,
+  Snackbar,
+  Spinner,
+  Switch,
+  Text,
+  Input,
+  Radio,
+  theme,
+} from '@tarodan/ui-native';
+import {
+  CityDistrictSelector,
+  ScreenHeader,
+} from '../../src/components/common';
+import { router } from 'expo-router';
+import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
+import { useQuery } from '@tanstack/react-query';
 import { useCartStore } from '../../src/stores/cartStore';
-import { useAuthStore } from '../../src/stores/authStore';
-import { api, ordersApi, addressesApi, paymentsApi, productsApi } from '../../src/services/api';
+import { captureException } from '../../src/services/sentry';
+import {
+  ordersApi,
+  paymentsApi,
+  shippingApi,
+  addressesApi,
+  discountsApi,
+  type OrderAddressInput,
+} from '../../src/services/api';
 import { transformImageUrl } from '../../src/utils/imageUrl';
-import { safeString } from '../../src/utils/safeString';
-import { formatApiErrorMessage } from '../../src/utils/formatApiErrorMessage';
+import { useAuthStore } from '../../src/stores/authStore';
+import { formatPrice, asLabel } from '../../src/utils/format';
 
-interface ShippingAddress {
+const { colors } = theme;
+
+interface ShippingAddressInput {
   fullName: string;
   phone: string;
   city: string;
@@ -32,1133 +64,1052 @@ interface SavedAddress {
   isDefault?: boolean;
 }
 
-interface QuoteData {
-  subtotal: number;
-  shipping: number;
-  buyerFee: number;
-  total: number;
+interface SavedCard {
+  cardToken: string;
+  cardAlias?: string;
+  cardHolderName?: string;
+  lastFourDigits?: string;
+  cardBrand?: string;
 }
 
-interface DirectProduct {
-  id: string;
-  title: string;
-  price: number;
-  images?: any[];
-  imageUrl?: string;
-  brand?: string;
-  scale?: string;
-  seller?: { id: string; displayName: string };
-}
+const STOCKOUT_KEYWORDS = [
+  'satışta değil',
+  'stokta yok',
+  'başkası tarafından',
+  'başka alıcıya satıldı',
+];
 
-const TURKISH_CITIES = ['Adana', 'Adıyaman', 'Afyonkarahisar', 'Ağrı', 'Aksaray', 'Amasya', 'Ankara', 'Antalya', 'Artvin', 'Aydın', 'Balıkesir', 'Bartın', 'Batman', 'Bayburt', 'Bilecik', 'Bingöl', 'Bitlis', 'Bolu', 'Burdur', 'Bursa', 'Çanakkale', 'Çankırı', 'Çorum', 'Denizli', 'Diyarbakır', 'Düzce', 'Edirne', 'Elazığ', 'Erzincan', 'Erzurum', 'Eskişehir', 'Gaziantep', 'Giresun', 'Gümüşhane', 'Hakkari', 'Hatay', 'Iğdır', 'Isparta', 'İstanbul', 'İzmir', 'Kahramanmaraş', 'Karabük', 'Karaman', 'Kars', 'Kastamonu', 'Kayseri', 'Kırıkkale', 'Kırklareli', 'Kırşehir', 'Kilis', 'Kocaeli', 'Konya', 'Kütahya', 'Malatya', 'Manisa', 'Mardin', 'Mersin', 'Muğla', 'Muş', 'Nevşehir', 'Niğde', 'Ordu', 'Osmaniye', 'Rize', 'Sakarya', 'Samsun', 'Şanlıurfa', 'Siirt', 'Sinop', 'Şırnak', 'Sivas', 'Tekirdağ', 'Tokat', 'Trabzon', 'Tunceli', 'Uşak', 'Van', 'Yalova', 'Yozgat', 'Zonguldak'];
+const EMPTY_ADDRESS: ShippingAddressInput = {
+  fullName: '',
+  phone: '',
+  city: '',
+  district: '',
+  address: '',
+  zipCode: '',
+};
 
 export default function CheckoutScreen() {
-  const params = useLocalSearchParams<{ productId?: string }>();
   const { items, getSubtotal, clearCart } = useCartStore();
   const { isAuthenticated, user } = useAuthStore();
 
-  const isDirectBuy = !!params.productId;
+  // ---------- Step ----------
+  const [step, setStep] = useState(1); // 1: Adres, 2: Ödeme, 3: Onay
 
-  // Step: 1=Address, 2=Payment, 3=Confirmation
-  const [step, setStep] = useState(1);
-
-  // Direct buy product
-  const [directProduct, setDirectProduct] = useState<DirectProduct | null>(null);
-  const [productLoading, setProductLoading] = useState(false);
-
-  // Saved addresses (authenticated)
-  const [savedAddresses, setSavedAddresses] = useState<SavedAddress[]>([]);
-  const [selectedAddressId, setSelectedAddressId] = useState<string | null>(null);
-  const [addressesLoading, setAddressesLoading] = useState(false);
-  const [showNewAddressForm, setShowNewAddressForm] = useState(false);
-
-  // Guest info
+  // ---------- Konuk bilgileri (yalnızca isAuthenticated === false) ----------
   const [guestName, setGuestName] = useState('');
   const [guestEmail, setGuestEmail] = useState('');
   const [guestPhone, setGuestPhone] = useState('');
-  const [guestEmailVerificationCode, setGuestEmailVerificationCode] = useState('');
-  const [guestOtpSending, setGuestOtpSending] = useState(false);
 
-  // New address form (for both guest and authenticated "add new")
-  const [shippingAddress, setShippingAddress] = useState<ShippingAddress>({
-    fullName: '',
-    phone: '',
-    city: '',
-    district: '',
-    address: '',
-    zipCode: '',
-  });
-  const [citySearch, setCitySearch] = useState('');
-  const [showCityPicker, setShowCityPicker] = useState(false);
+  // ---------- Adres seçimi ----------
+  /** Üye için kayıtlı adresten seçim. 'new' = yeni adres formu. */
+  const [selectedAddressId, setSelectedAddressId] = useState<string | 'new'>('new');
+  const [shippingAddress, setShippingAddress] = useState<ShippingAddressInput>(EMPTY_ADDRESS);
 
-  // Carrier & shipping
-  const [selectedCarrier, setSelectedCarrier] = useState<'aras' | 'yurtici'>('aras');
+  /** Fatura adresi: teslimat ile aynı mı? */
+  const [billingDifferent, setBillingDifferent] = useState(false);
+  const [selectedBillingAddressId, setSelectedBillingAddressId] = useState<string | 'new'>('new');
+  const [billingAddress, setBillingAddress] = useState<ShippingAddressInput>(EMPTY_ADDRESS);
+
+  // ---------- Kargo / Ödeme tercihleri ----------
+  // Tek kargo firması: Sürat Kargo (web ile parite — apps/web/src/app/checkout/page.tsx).
+  const selectedCarrier: 'surat' = 'surat';
+  // Sadece PayTR kullanılıyor (iyzico kaldırıldı — web ile parite)
+  const paymentProvider: 'paytr' = 'paytr';
   const [shippingCost, setShippingCost] = useState(0);
   const [shippingLoading, setShippingLoading] = useState(false);
 
-  // Payment
-  const [cardNumber, setCardNumber] = useState('');
-  const [cardHolder, setCardHolder] = useState('');
-  const [cardExpiry, setCardExpiry] = useState('');
-  const [cardCvv, setCardCvv] = useState('');
+  // ---------- Kayıtlı kart / yeni kart ----------
+  const [selectedCardToken, setSelectedCardToken] = useState<string | 'new' | 'webview'>(
+    'webview', // varsayılan: WebView 3DS akışı
+  );
+  const [cardForm, setCardForm] = useState({
+    cardHolderName: '',
+    cardNumber: '',
+    expireMonth: '',
+    expireYear: '',
+    cvc: '',
+    cardAlias: '',
+    saveCard: true,
+  });
 
-  // Quote
-  const [quote, setQuote] = useState<QuoteData | null>(null);
-  const [quoteLoading, setQuoteLoading] = useState(false);
+  // ---------- Kupon / İndirim ----------
+  const [couponCode, setCouponCode] = useState('');
+  const [appliedDiscount, setAppliedDiscount] = useState<{ code: string; amount: number } | null>(
+    null,
+  );
+  const [couponLoading, setCouponLoading] = useState(false);
 
-  // UI
+  // ---------- UI ----------
   const [loading, setLoading] = useState(false);
+  const [snackbar, setSnackbar] = useState<{ visible: boolean; message: string }>({
+    visible: false,
+    message: '',
+  });
 
-  // Derived
-  const checkoutItems = isDirectBuy && directProduct
-    ? [{ productId: directProduct.id, title: directProduct.title, price: directProduct.price, quantity: 1, imageUrl: directProduct.images?.[0] || directProduct.imageUrl, brand: directProduct.brand, scale: directProduct.scale }]
-    : items.map(i => ({ productId: i.productId, title: i.title, price: i.price, quantity: i.quantity, imageUrl: i.imageUrl, brand: i.brand, scale: i.scale }));
+  const subtotal = getSubtotal();
+  const total = subtotal + shippingCost - (appliedDiscount?.amount ?? 0);
 
-  const subtotal = quote?.subtotal ?? (isDirectBuy && directProduct ? directProduct.price : getSubtotal());
-  const buyerFee = quote?.buyerFee ?? 0;
-  const totalShipping = quote?.shipping ?? shippingCost;
-  const total = quote?.total ?? (subtotal + totalShipping + buyerFee);
+  // ---------- Üye için kayıtlı adresler ----------
+  const addressesQuery = useQuery({
+    queryKey: ['my-addresses'],
+    queryFn: async () => {
+      const response = await addressesApi.getAll();
+      const list: SavedAddress[] = (response.data as any)?.data ?? response.data ?? [];
+      return Array.isArray(list) ? list : [];
+    },
+    enabled: isAuthenticated,
+  });
+  const addresses = addressesQuery.data ?? [];
 
-  // ─── Effects ────────────────────────────────────────────────────────
+  // İlk yüklemede varsayılan / ilk adresi seç
+  useEffect(() => {
+    if (!isAuthenticated || addresses.length === 0) return;
+    if (selectedAddressId !== 'new') return;
+    const def = addresses.find(a => a.isDefault) ?? addresses[0];
+    setSelectedAddressId(def.id);
+  }, [isAuthenticated, addresses]);
+
+  // ---------- Üye için kayıtlı kartlar ----------
+  const cardsQuery = useQuery({
+    queryKey: ['my-payment-methods'],
+    queryFn: async () => {
+      const response = await paymentsApi.getPaymentMethods();
+      const list: SavedCard[] = (response.data as any)?.data ?? response.data ?? [];
+      return Array.isArray(list) ? list : [];
+    },
+    enabled: isAuthenticated,
+  });
+  const cards = cardsQuery.data ?? [];
 
   useEffect(() => {
-    if (isDirectBuy && params.productId) {
-      fetchDirectProduct(params.productId);
+    if (!isAuthenticated) {
+      setSelectedCardToken('webview');
+      return;
     }
-  }, [params.productId]);
+    // Üye + en az 1 kart var → varsayılan olarak ilk kartı seç
+    if (cards.length > 0 && selectedCardToken === 'webview') {
+      setSelectedCardToken(cards[0].cardToken);
+    }
+    // Üye + hiç kart yok → PayTR WebView akışı varsayılan (manuel kart girişi yok)
+    if (cards.length === 0 && selectedCardToken !== 'webview') {
+      setSelectedCardToken('webview');
+    }
+  }, [isAuthenticated, cards]);
+
+  // ---------- Kargo ücreti hesaplama ----------
+  const effectiveShippingCity = useMemo(() => {
+    if (isAuthenticated && selectedAddressId !== 'new') {
+      const a = addresses.find(x => x.id === selectedAddressId);
+      return a?.city ?? '';
+    }
+    return shippingAddress.city;
+  }, [isAuthenticated, selectedAddressId, addresses, shippingAddress.city]);
 
   useEffect(() => {
-    if (isAuthenticated) {
-      fetchSavedAddresses();
+    if (effectiveShippingCity) {
+      calculateShipping(effectiveShippingCity);
+    } else {
+      setShippingCost(0);
     }
-  }, [isAuthenticated]);
-
-  const fetchQuote = useCallback(async () => {
-    const productIds =
-      isDirectBuy && params.productId
-        ? [{ productId: String(params.productId), quantity: 1 }]
-        : items.map((i) => ({ productId: i.productId, quantity: i.quantity }));
-
-    if (productIds.length === 0) return;
-
-    setQuoteLoading(true);
-    try {
-      const res = await ordersApi.getQuote({ items: productIds });
-      const q = res.data?.data || res.data;
-      const pricing = q?.pricing;
-      if (pricing) {
-        setQuote({
-          subtotal: pricing.subtotal ?? pricing.itemsSubtotal ?? 0,
-          shipping: pricing.shippingAmount ?? pricing.shipping ?? 0,
-          buyerFee: pricing.buyerFeeAmount ?? pricing.buyerFee ?? 0,
-          total: pricing.totalAmount ?? pricing.total ?? 0,
-        });
-      } else if (q) {
-        setQuote({
-          subtotal: q.itemsSubtotal ?? q.subtotal ?? 0,
-          shipping: q.shippingAmount ?? q.shipping ?? 0,
-          buyerFee: q.buyerFeeAmount ?? q.buyerFee ?? 0,
-          total: q.totalAmount ?? q.total ?? 0,
-        });
-      }
-    } catch {
-      // quote is optional, fall back to local calc
-    } finally {
-      setQuoteLoading(false);
-    }
-  }, [isDirectBuy, params.productId, items]);
-
-  useEffect(() => {
-    if (checkoutItems.length > 0) {
-      fetchQuote();
-    }
-  }, [checkoutItems.length, directProduct?.id, fetchQuote]);
-
-  useEffect(() => {
-    const city = getActiveCity();
-    if (city) {
-      calculateShipping(city);
-    }
-  }, [selectedAddressId, shippingAddress.city, selectedCarrier, savedAddresses]);
-
-  // ─── Data Fetchers ──────────────────────────────────────────────────
-
-  const fetchDirectProduct = async (productId: string) => {
-    setProductLoading(true);
-    try {
-      const res = await productsApi.getOne(productId);
-      const p = res.data?.data || res.data;
-      setDirectProduct(p);
-    } catch (err: any) {
-      Alert.alert('Hata', 'Ürün bulunamadı');
-      router.back();
-    } finally {
-      setProductLoading(false);
-    }
-  };
-
-  const fetchSavedAddresses = async () => {
-    setAddressesLoading(true);
-    try {
-      const res = await addressesApi.getAll();
-      const list: SavedAddress[] = res.data?.data || res.data || [];
-      setSavedAddresses(list);
-      const defaultAddr = list.find(a => a.isDefault) || list[0];
-      if (defaultAddr) {
-        setSelectedAddressId(defaultAddr.id);
-      }
-    } catch {
-      // silent
-    } finally {
-      setAddressesLoading(false);
-    }
-  };
-
-  const getActiveCity = (): string | null => {
-    if (isAuthenticated && selectedAddressId && !showNewAddressForm) {
-      const addr = savedAddresses.find(a => a.id === selectedAddressId);
-      return addr?.city || null;
-    }
-    return shippingAddress.city || null;
-  };
+  }, [effectiveShippingCity, selectedCarrier]);
 
   const calculateShipping = async (city: string) => {
     setShippingLoading(true);
     try {
-      const response = await api.get('/shipping/rates', {
-        params: { city, carrier: selectedCarrier, weight: 0.5 },
-      }).catch(() => null);
-
+      const response = await shippingApi
+        .getRatesByCity({ city, carrier: selectedCarrier, weight: 0.5 })
+        .catch(() => null);
       if (response?.data?.rate) {
         setShippingCost(response.data.rate);
       } else {
         const isIstanbul = city.toLowerCase().includes('istanbul');
-        const baseRate = isIstanbul ? 34.90 : 49.90;
-        const carrierExtra = selectedCarrier === 'yurtici' ? 5 : 0;
-        setShippingCost(baseRate + carrierExtra);
+        const baseRate = isIstanbul ? 34.9 : 49.9;
+        setShippingCost(baseRate);
       }
     } catch {
-      setShippingCost(49.90);
+      setShippingCost(49.9);
     } finally {
       setShippingLoading(false);
     }
   };
 
-  // ─── Validation ─────────────────────────────────────────────────────
-
-  const validateStep1 = (): boolean => {
-    if (isAuthenticated) {
-      if (showNewAddressForm) {
-        return validateAddressForm();
+  // ---------- Kupon doğrulama ----------
+  const handleApplyCoupon = async () => {
+    if (!couponCode.trim()) return;
+    setCouponLoading(true);
+    try {
+      const response = await discountsApi.validate({
+        code: couponCode.trim(),
+        cartItems: items.map(it => ({
+          productId: it.productId,
+          quantity: it.quantity,
+          price: it.price,
+        })),
+      });
+      const data: any = (response.data as any)?.data ?? response.data;
+      const discountAmount = Number(data?.discountAmount ?? data?.amount ?? 0);
+      if (discountAmount > 0) {
+        setAppliedDiscount({ code: couponCode.trim(), amount: discountAmount });
+        showSnackbar(`Kupon uygulandı: -${formatPrice(discountAmount)}`);
+      } else {
+        showSnackbar(data?.message || 'Kupon geçerli ama indirim hesaplanamadı.');
       }
-      if (!selectedAddressId) {
-        Alert.alert('Uyarı', 'Lütfen bir teslimat adresi seçin');
-        return false;
+    } catch (e: any) {
+      showSnackbar(e?.response?.data?.message || 'Kupon geçersiz.');
+    } finally {
+      setCouponLoading(false);
+    }
+  };
+
+  // ---------- Validasyonlar ----------
+  const showSnackbar = (message: string) =>
+    setSnackbar({ visible: true, message });
+
+  const validateGuest = () => {
+    if (!guestName.trim()) return 'Lütfen adınızı girin';
+    if (!/^\S+@\S+\.\S+$/.test(guestEmail.trim())) return 'Geçerli bir e-posta adresi girin';
+    if (guestPhone.trim().length < 10) return 'Geçerli bir telefon numarası girin';
+    return null;
+  };
+
+  const validateInlineAddress = (a: ShippingAddressInput, label = 'Teslimat') => {
+    if (!a.fullName.trim()) return `${label} adresi için ad soyad gerekli`;
+    if (!a.phone.trim() || a.phone.trim().length < 10)
+      return `${label} adresi için telefon numarası gerekli`;
+    if (!a.city.trim()) return `${label} adresi için il seçin`;
+    if (!a.district.trim()) return `${label} adresi için ilçe seçin`;
+    if (!a.address.trim()) return `${label} adresi için açık adres girin`;
+    return null;
+  };
+
+  const validateStep1 = (): string | null => {
+    // Konuk
+    if (!isAuthenticated) {
+      const guestErr = validateGuest();
+      if (guestErr) return guestErr;
+    }
+    // Adres
+    if (isAuthenticated && selectedAddressId !== 'new') {
+      // Kayıtlı adres seçildi → her şey OK
+    } else {
+      // Yeni adres formu (üye veya konuk)
+      const phone = shippingAddress.phone.trim() || guestPhone.trim();
+      const inlineAddress: ShippingAddressInput = { ...shippingAddress, phone };
+      const err = validateInlineAddress(inlineAddress);
+      if (err) return err;
+    }
+    // Billing (eğer farklı seçildiyse)
+    if (billingDifferent) {
+      if (isAuthenticated && selectedBillingAddressId !== 'new') {
+        // Kayıtlı seçildi → OK
+      } else {
+        const err = validateInlineAddress(billingAddress, 'Fatura');
+        if (err) return err;
       }
-      return true;
     }
-
-    // Guest validation
-    if (!guestName.trim()) {
-      Alert.alert('Uyarı', 'Lütfen adınızı girin');
-      return false;
-    }
-    if (!guestEmail.trim() || !guestEmail.includes('@')) {
-      Alert.alert('Uyarı', 'Geçerli bir e-posta adresi girin');
-      return false;
-    }
-    if (!guestPhone.trim() || guestPhone.length < 10) {
-      Alert.alert('Uyarı', 'Geçerli bir telefon numarası girin');
-      return false;
-    }
-    if (!/^\d{6}$/.test(guestEmailVerificationCode.replace(/\D/g, ''))) {
-      Alert.alert('Uyarı', 'E-posta doğrulama kodunu girin (6 hane)');
-      return false;
-    }
-    return validateAddressForm();
+    return null;
   };
-
-  const validateAddressForm = (): boolean => {
-    if (!shippingAddress.fullName.trim()) {
-      Alert.alert('Uyarı', 'Teslimat adresi için ad soyad girin');
-      return false;
-    }
-    if (!shippingAddress.phone.trim() || shippingAddress.phone.length < 10) {
-      Alert.alert('Uyarı', 'Teslimat adresi için telefon numarası girin');
-      return false;
-    }
-    if (!shippingAddress.city.trim()) {
-      Alert.alert('Uyarı', 'Şehir seçin');
-      return false;
-    }
-    if (!shippingAddress.district.trim()) {
-      Alert.alert('Uyarı', 'İlçe girin');
-      return false;
-    }
-    if (!shippingAddress.address.trim()) {
-      Alert.alert('Uyarı', 'Açık adres girin');
-      return false;
-    }
-    return true;
-  };
-
-  const validateStep2 = (): boolean => {
-    if (!cardNumber.trim()) {
-      Alert.alert('Uyarı', 'Kart numarasını girin');
-      return false;
-    }
-    return true;
-  };
-
-  // ─── Actions ────────────────────────────────────────────────────────
 
   const handleNextStep = () => {
-    if (step === 1 && validateStep1()) {
+    if (step === 1) {
+      const err = validateStep1();
+      if (err) return showSnackbar(err);
       setStep(2);
-    } else if (step === 2 && validateStep2()) {
+      return;
+    }
+    if (step === 2) {
+      // Kart seçim doğrulaması
+      if (isAuthenticated && selectedCardToken === 'new') {
+        const c = cardForm;
+        if (!c.cardHolderName.trim()) return showSnackbar('Kart sahibi adını girin');
+        const cleanNumber = c.cardNumber.replace(/\s/g, '');
+        if (cleanNumber.length < 15 || cleanNumber.length > 19)
+          return showSnackbar('Geçerli bir kart numarası girin');
+        const month = parseInt(c.expireMonth, 10);
+        if (isNaN(month) || month < 1 || month > 12)
+          return showSnackbar('Geçerli son kullanma ayı girin (1-12)');
+        if (!/^\d{2,4}$/.test(c.expireYear)) return showSnackbar('Geçerli son kullanma yılı girin');
+        if (!/^\d{3,4}$/.test(c.cvc)) return showSnackbar('Geçerli CVC girin');
+      }
       setStep(3);
+      return;
     }
   };
 
-  const handleSaveNewAddress = async () => {
-    if (!validateAddressForm()) return;
-    try {
-      const res = await addressesApi.create({
+  // ---------- Address payload helper'ları ----------
+  const buildShippingPayload = (): { id?: string; inline?: OrderAddressInput } => {
+    if (isAuthenticated && selectedAddressId !== 'new') {
+      return { id: selectedAddressId };
+    }
+    const phone = shippingAddress.phone.trim() || guestPhone.trim();
+    return {
+      inline: {
         fullName: shippingAddress.fullName.trim(),
-        phone: shippingAddress.phone.trim(),
+        phone,
         city: shippingAddress.city.trim(),
         district: shippingAddress.district.trim(),
         address: shippingAddress.address.trim(),
         zipCode: shippingAddress.zipCode?.trim() || undefined,
-      });
-      const newAddr = res.data?.data || res.data;
-      if (newAddr?.id) {
-        setSavedAddresses(prev => [...prev, newAddr]);
-        setSelectedAddressId(newAddr.id);
-        setShowNewAddressForm(false);
-        setShippingAddress({ fullName: '', phone: '', city: '', district: '', address: '', zipCode: '' });
-      }
-    } catch (err: unknown) {
-      Alert.alert('Hata', formatApiErrorMessage(err, 'Adres kaydedilemedi'));
+      },
+    };
+  };
+
+  const buildBillingPayload = (): { id?: string; inline?: OrderAddressInput } | null => {
+    if (!billingDifferent) return null;
+    if (isAuthenticated && selectedBillingAddressId !== 'new') {
+      return { id: selectedBillingAddressId };
     }
+    return {
+      inline: {
+        fullName: billingAddress.fullName.trim(),
+        phone: billingAddress.phone.trim(),
+        city: billingAddress.city.trim(),
+        district: billingAddress.district.trim(),
+        address: billingAddress.address.trim(),
+        zipCode: billingAddress.zipCode?.trim() || undefined,
+      },
+    };
   };
 
-  const resolveOrderIdFromResponse = (orderRes: { data?: Record<string, unknown> }): string | null => {
-    const root = orderRes.data;
-    const d = (root?.data ?? root) as Record<string, unknown> | undefined;
-    if (!d || typeof d !== 'object') return null;
-    const orderObj = d.order as { id?: string } | undefined;
-    const id = d.orderId ?? d.id ?? orderObj?.id;
-    return typeof id === 'string' ? id : null;
-  };
-
-  /** Web `checkout/page.tsx` ile aynı: her sepet satırı için sipariş oluştur; ödeme yanıtında çıkılır (çoğu ortamda tek ödeme oturumu). */
+  // ---------- Checkout ----------
   const handleCheckout = async () => {
-    if (checkoutItems.length === 0) {
-      Alert.alert('Hata', 'Sepetiniz boş');
+    if (items.length === 0) {
+      showSnackbar('Sepetiniz boş');
       return;
+    }
+    for (const item of items) {
+      if (!item.productId || typeof item.productId !== 'string' || item.productId.length < 10) {
+        Alert.alert('Hata', `Geçersiz ürün ID: ${item.title}`);
+        return;
+      }
     }
 
     setLoading(true);
     try {
-      for (const line of checkoutItems) {
-        const productId = line.productId;
-        let orderId: string | null = null;
+      const shipping = buildShippingPayload();
+      const billing = buildBillingPayload();
 
-        if (isAuthenticated) {
-          const orderPayload: Record<string, unknown> = { productId };
-          if (selectedAddressId && !showNewAddressForm) {
-            orderPayload.shippingAddressId = selectedAddressId;
-          } else {
-            orderPayload.shippingAddress = {
-              fullName: shippingAddress.fullName.trim(),
-              phone: shippingAddress.phone.trim(),
-              city: shippingAddress.city.trim(),
-              district: shippingAddress.district.trim(),
-              address: shippingAddress.address.trim(),
-              zipCode: shippingAddress.zipCode?.trim() || undefined,
-            };
-          }
-          const orderRes = await ordersApi.directBuy(orderPayload as Parameters<typeof ordersApi.directBuy>[0]);
-          orderId = resolveOrderIdFromResponse(orderRes);
+      let firstOrderId: string | null = null;
+
+      // Sepetteki her ürün için ayrı sipariş yaratılır (web pattern'i)
+      for (const item of items) {
+        if (isAuthenticated && user) {
+          const response = await ordersApi.directBuy({
+            productId: item.productId,
+            shippingAddressId: shipping.id,
+            shippingAddress: shipping.inline,
+            billingAddressId: billing?.id,
+            billingAddress: billing?.inline,
+          });
+          const data: any = (response.data as any)?.data ?? response.data;
+          const orderId = data?.id || data?.orderId || data?.order?.id;
+          if (!firstOrderId && orderId) firstOrderId = orderId;
         } else {
-          const orderPayload = {
-            productId,
+          const response = await ordersApi.createGuest({
+            productId: item.productId,
             email: guestEmail.trim().toLowerCase(),
             phone: guestPhone.trim(),
             guestName: guestName.trim(),
-            emailVerificationCode: guestEmailVerificationCode.replace(/\D/g, '').slice(0, 6),
-            shippingAddress: {
-              fullName: shippingAddress.fullName.trim(),
-              phone: (shippingAddress.phone?.trim() || guestPhone.trim()),
-              city: shippingAddress.city.trim(),
-              district: shippingAddress.district.trim(),
-              address: shippingAddress.address.trim(),
-              zipCode: shippingAddress.zipCode?.trim() || undefined,
-            },
-          };
-          const orderRes = await ordersApi.createGuest(orderPayload);
-          orderId = resolveOrderIdFromResponse(orderRes);
+            shippingAddress: shipping.inline!,
+            billingAddress: billing?.inline,
+          });
+          const data: any = (response.data as any)?.data ?? response.data;
+          const orderId = data?.id || data?.orderId || data?.order?.id;
+          if (!firstOrderId && orderId) firstOrderId = orderId;
         }
+      }
 
-        if (!orderId) {
-          Alert.alert(
-            'Hata',
-            'Sipariş oluşturuldu ancak ödeme başlatılamadı. Siparişlerim sayfasından ödemeyi tamamlayabilirsiniz.',
-          );
-          router.replace('/orders');
-          return;
-        }
-
-        const payRes = await paymentsApi.initiate(orderId, 'paytr');
-        const payData = (payRes.data as Record<string, unknown> | undefined)?.data ?? payRes.data;
-        const paymentId =
-          (payData as Record<string, unknown> | undefined)?.paymentId ??
-          (payData as Record<string, unknown> | undefined)?.id;
-        const paymentUrl = (payData as Record<string, unknown> | undefined)?.paymentUrl as string | undefined;
-
-        if (paymentUrl && paymentUrl.startsWith('http')) {
-          if (!isDirectBuy) clearCart();
-          await Linking.openURL(paymentUrl);
-          return;
-        }
-
-        if (!isDirectBuy) clearCart();
-        if (paymentId) {
-          const guestQ = !isAuthenticated ? '?guest=true' : '';
-          router.replace(`/payment/${paymentId}${guestQ}` as any);
-          return;
-        }
-
-        Alert.alert('Sipariş Oluşturuldu', 'Siparişiniz başarıyla alındı.', [
-          { text: 'Tamam', onPress: () => router.replace('/') },
-        ]);
+      if (!firstOrderId) {
+        Alert.alert(
+          'Hata',
+          'Sipariş oluşturuldu fakat ödeme başlatılamadı. Siparişlerim sayfasından devam edebilirsiniz.',
+        );
+        clearCart();
+        router.replace('/orders' as any);
         return;
       }
-    } catch (error: unknown) {
-      Alert.alert('Hata', formatApiErrorMessage(error, 'Sipariş oluşturulamadı'));
+
+      // Üye + kayıtlı kart seçimi → processDirect (tek tık akışı)
+      if (
+        isAuthenticated &&
+        selectedCardToken !== 'webview' &&
+        selectedCardToken !== 'new'
+      ) {
+        try {
+          const directResp: any = await paymentsApi.processDirect({
+            orderId: firstOrderId,
+            cardToken: selectedCardToken,
+            provider: paymentProvider,
+          });
+          const directData: any = directResp.data?.data ?? directResp.data ?? {};
+          const status = directData.status || directData.payment?.status;
+          const paymentId = directData.paymentId || directData.id || directData.payment?.id;
+          // 3DS gerekiyorsa veya hala pending ise WebView akışına geç
+          if (status === 'paid' || status === 'success' || status === 'completed') {
+            clearCart();
+            router.replace({
+              pathname: '/payment/success',
+              params: { paymentId, orderId: firstOrderId },
+            } as any);
+            return;
+          }
+          // Aksi halde WebView akışına geçilir
+          clearCart();
+          router.replace({
+            pathname: '/payment/[id]',
+            params: {
+              id: paymentId || firstOrderId,
+              orderId: firstOrderId,
+              provider: paymentProvider,
+              guest: '0',
+            },
+          } as any);
+          return;
+        } catch (directErr: any) {
+          // Direct ödeme başarısızsa, WebView akışına düşer
+          console.warn('processDirect failed, falling back to WebView:', directErr?.message);
+        }
+      }
+
+      // Üye + yeni kart formu → backend kart bilgisini alır + 3DS WebView'i açar
+      if (isAuthenticated && selectedCardToken === 'new') {
+        try {
+          const directResp: any = await paymentsApi.processDirect({
+            orderId: firstOrderId,
+            card: {
+              cardHolderName: cardForm.cardHolderName.trim(),
+              cardNumber: cardForm.cardNumber.replace(/\s/g, ''),
+              expireMonth: cardForm.expireMonth,
+              expireYear: cardForm.expireYear,
+              cvc: cardForm.cvc,
+              cardAlias: cardForm.cardAlias.trim() || undefined,
+            },
+            saveCard: cardForm.saveCard,
+            provider: paymentProvider,
+          });
+          const directData: any = directResp.data?.data ?? directResp.data ?? {};
+          const paymentId = directData.paymentId || directData.id || directData.payment?.id;
+          clearCart();
+          router.replace({
+            pathname: '/payment/[id]',
+            params: {
+              id: paymentId || firstOrderId,
+              orderId: firstOrderId,
+              provider: paymentProvider,
+              guest: '0',
+            },
+          } as any);
+          return;
+        } catch (newCardErr: any) {
+          console.warn('processDirect (new card) failed, fallback to WebView:', newCardErr?.message);
+        }
+      }
+
+      // WebView akışı (default) — konuk veya kart akışı başarısız oldu
+      try {
+        const initResp: any = isAuthenticated
+          ? await paymentsApi.initiate(firstOrderId, paymentProvider)
+          : await paymentsApi.initiateGuest(firstOrderId, paymentProvider);
+        const initData = initResp.data?.data ?? initResp.data ?? {};
+        const paymentId =
+          initData.paymentId || initData.id || initData.payment?.id || firstOrderId;
+
+        // PAYMENT_BYPASS=true ortamında API gerçek PayTR token üretmez; bunun
+        // yerine `useBypass: true` döner ve istemcinin POST
+        // /payments/:id/bypass-complete çağırması beklenir. Aksi halde WebView
+        // boş iframe ile çakılır (B-001).
+        if (initData.useBypass === true) {
+          try {
+            await paymentsApi.bypassComplete(paymentId);
+          } catch (bypassErr: any) {
+            captureException(bypassErr, {
+              level: 'error',
+              tags: { flow: 'checkout.bypassComplete' },
+              extra: { paymentId, orderId: firstOrderId },
+            });
+          }
+          clearCart();
+          router.replace({
+            pathname: '/payment/success',
+            params: { paymentId, orderId: firstOrderId },
+          } as any);
+          return;
+        }
+
+        clearCart();
+        router.replace({
+          pathname: '/payment/[id]',
+          params: {
+            id: paymentId,
+            orderId: firstOrderId,
+            provider: paymentProvider,
+            guest: isAuthenticated ? '0' : '1',
+          },
+        } as any);
+      } catch (payErr: any) {
+        const msg =
+          payErr?.response?.data?.message ||
+          'Ödeme başlatılamadı. Siparişinizi daha sonra siparişlerim üzerinden tamamlayabilirsiniz.';
+        const status = payErr?.response?.status;
+        const isStockout =
+          (status === 400 || status === 409) &&
+          typeof msg === 'string' &&
+          STOCKOUT_KEYWORDS.some((kw) => msg.toLowerCase().includes(kw.toLowerCase()));
+        if (isStockout) {
+          const productId = items[0]?.productId;
+          if (productId) {
+            router.replace({
+              pathname: '/products/unavailable/[productId]',
+              params: { productId },
+            } as any);
+            return;
+          }
+        }
+        Alert.alert('Ödeme Başlatılamadı', msg, [
+          { text: 'Tamam', onPress: () => router.replace(isAuthenticated ? '/orders' : '/' as any) },
+        ]);
+      }
+    } catch (error: any) {
+      console.error('Checkout error:', error);
+      captureException(error, {
+        level: 'error',
+        tags: { flow: 'checkout' },
+        extra: { status: error?.response?.status },
+      });
+      const errorMessage =
+        error.response?.data?.message ||
+        error.response?.data?.error ||
+        (Array.isArray(error.response?.data?.message)
+          ? error.response?.data?.message.join(', ')
+          : 'Sipariş oluşturulamadı');
+      const status = error?.response?.status;
+      const isStockout =
+        (status === 400 || status === 409) &&
+        typeof errorMessage === 'string' &&
+        STOCKOUT_KEYWORDS.some((kw) => errorMessage.toLowerCase().includes(kw.toLowerCase()));
+      if (isStockout) {
+        const productId = items[0]?.productId;
+        if (productId) {
+          router.replace({
+            pathname: '/products/unavailable/[productId]',
+            params: { productId },
+          } as any);
+          return;
+        }
+      }
+      Alert.alert('Hata', errorMessage);
     } finally {
       setLoading(false);
     }
   };
 
-  // ─── Helpers ────────────────────────────────────────────────────────
-
-  const getShippingRate = (carrier: 'aras' | 'yurtici'): number => {
-    const city = getActiveCity();
-    const isIstanbul = city?.toLowerCase().includes('istanbul');
-    const baseRate = isIstanbul ? 34.90 : 49.90;
-    return carrier === 'yurtici' ? baseRate + 5 : baseRate;
-  };
-
-  const getSelectedAddressSummary = (): string => {
-    if (isAuthenticated && selectedAddressId && !showNewAddressForm) {
-      const addr = savedAddresses.find(a => a.id === selectedAddressId);
-      if (addr) return `${addr.fullName}, ${addr.address}, ${addr.district}/${addr.city}`;
-    }
-    if (shippingAddress.address) {
-      return `${shippingAddress.fullName}, ${shippingAddress.address}, ${shippingAddress.district}/${shippingAddress.city}`;
-    }
-    return '';
-  };
-
-  const filteredCities = citySearch
-    ? TURKISH_CITIES.filter(c => c.toLowerCase().includes(citySearch.toLowerCase()))
-    : TURKISH_CITIES;
-
-  const formatPrice = (price: number): string => {
-    return (price ?? 0).toLocaleString('tr-TR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
-  };
-
-  // ─── Loading States ─────────────────────────────────────────────────
-
-  if (productLoading) {
+  // ---------- Erken çıkışlar ----------
+  if (items.length === 0) {
     return (
-      <View style={styles.centerContainer}>
-        <ActivityIndicator size="large" color={TarodanColors.primary} />
-        <Text style={styles.loadingText}>Ürün yükleniyor...</Text>
-      </View>
-    );
-  }
-
-  if (!isDirectBuy && items.length === 0) {
-    return (
-      <View style={styles.centerContainer}>
-        <Ionicons name="cart-outline" size={80} color={TarodanColors.textSecondary} />
+      <View style={styles.emptyContainer}>
+        <Ionicons name="cart-outline" size={80} color={colors.text.muted} />
         <Text style={styles.emptyTitle}>Sepetiniz Boş</Text>
         <Text style={styles.emptySubtitle}>Ödeme yapabilmek için sepetinize ürün ekleyin</Text>
-        <TouchableOpacity style={styles.primaryButton} onPress={() => router.replace('/')}>
-          <Text style={styles.primaryButtonText}>Alışverişe Başla</Text>
-        </TouchableOpacity>
+        <Button
+          variant="primary"
+          title="Alışverişe Başla"
+          onPress={() => router.replace('/' as any)}
+          style={{ marginTop: 20 }}
+        />
       </View>
     );
   }
 
-  if (isDirectBuy && !directProduct) {
+  // ---------- Adres seçim UI'ı ----------
+  const renderAddressSelector = (
+    isBilling = false,
+  ) => {
+    const selectedId = isBilling ? selectedBillingAddressId : selectedAddressId;
+    const setSelectedId = isBilling ? setSelectedBillingAddressId : setSelectedAddressId;
+    const inline = isBilling ? billingAddress : shippingAddress;
+    const setInline = isBilling ? setBillingAddress : setShippingAddress;
+
     return (
-      <View style={styles.centerContainer}>
-        <Ionicons name="alert-circle-outline" size={80} color={TarodanColors.error} />
-        <Text style={styles.emptyTitle}>Ürün Bulunamadı</Text>
-        <TouchableOpacity style={styles.primaryButton} onPress={() => router.back()}>
-          <Text style={styles.primaryButtonText}>Geri Dön</Text>
-        </TouchableOpacity>
-      </View>
-    );
-  }
-
-  // ─── Render Helpers ─────────────────────────────────────────────────
-
-  const renderSavedAddresses = () => (
-    <View>
-      {addressesLoading ? (
-        <ActivityIndicator size="small" color={TarodanColors.primary} style={{ marginVertical: 16 }} />
-      ) : (
-        <>
-          {savedAddresses.map((addr) => (
-            <TouchableOpacity
-              key={addr.id}
-              style={[styles.addressCard, selectedAddressId === addr.id && !showNewAddressForm && styles.addressCardSelected]}
-              onPress={() => { setSelectedAddressId(addr.id); setShowNewAddressForm(false); }}
-            >
-              <View style={[styles.radioOuter, selectedAddressId === addr.id && !showNewAddressForm && styles.radioOuterActive]}>
-                {selectedAddressId === addr.id && !showNewAddressForm && <View style={styles.radioInner} />}
-              </View>
-              <View style={styles.addressCardContent}>
-                <View style={styles.addressCardHeader}>
-                  <Text style={styles.addressCardName}>{addr.fullName}</Text>
-                  {addr.isDefault && (
-                    <View style={styles.defaultBadge}>
-                      <Text style={styles.defaultBadgeText}>Varsayılan</Text>
-                    </View>
-                  )}
-                </View>
-                {addr.title ? <Text style={styles.addressCardTitle}>{addr.title}</Text> : null}
-                <Text style={styles.addressCardDetail} numberOfLines={2}>{addr.address}</Text>
-                <Text style={styles.addressCardCity}>{addr.district}/{addr.city}</Text>
-                <Text style={styles.addressCardPhone}>{addr.phone}</Text>
-              </View>
-            </TouchableOpacity>
-          ))}
-
-          <TouchableOpacity
-            style={[styles.addAddressButton, showNewAddressForm && styles.addAddressButtonActive]}
-            onPress={() => setShowNewAddressForm(true)}
-          >
-            <Ionicons name="add-circle-outline" size={22} color={showNewAddressForm ? TarodanColors.primary : TarodanColors.textSecondary} />
-            <Text style={[styles.addAddressText, showNewAddressForm && { color: TarodanColors.primary, fontWeight: '600' }]}>
-              Yeni Adres Ekle
-            </Text>
-          </TouchableOpacity>
-
-          {showNewAddressForm && (
-            <View style={styles.newAddressForm}>
-              {renderAddressForm()}
-              <TouchableOpacity style={styles.saveAddressButton} onPress={handleSaveNewAddress}>
-                <Ionicons name="checkmark-circle" size={20} color="#fff" />
-                <Text style={styles.saveAddressButtonText}>Adresi Kaydet</Text>
-              </TouchableOpacity>
-            </View>
-          )}
-        </>
-      )}
-    </View>
-  );
-
-  const renderAddressForm = () => (
-    <View>
-      <Text style={styles.inputLabel}>Ad Soyad *</Text>
-      <TextInput
-        style={styles.textInput}
-        value={shippingAddress.fullName}
-        onChangeText={(t) => setShippingAddress(s => ({ ...s, fullName: t }))}
-        placeholder="Ad Soyad"
-        placeholderTextColor={TarodanColors.textTertiary}
-      />
-
-      <Text style={styles.inputLabel}>Telefon *</Text>
-      <TextInput
-        style={styles.textInput}
-        value={shippingAddress.phone}
-        onChangeText={(t) => setShippingAddress(s => ({ ...s, phone: t }))}
-        placeholder="+90 5XX XXX XX XX"
-        placeholderTextColor={TarodanColors.textTertiary}
-        keyboardType="phone-pad"
-      />
-
-      <Text style={styles.inputLabel}>Şehir *</Text>
-      <TouchableOpacity
-        style={styles.cityPickerButton}
-        onPress={() => setShowCityPicker(!showCityPicker)}
-      >
-        <Text style={shippingAddress.city ? styles.cityPickerText : styles.cityPickerPlaceholder}>
-          {shippingAddress.city || 'Şehir seçin'}
-        </Text>
-        <Ionicons name={showCityPicker ? 'chevron-up' : 'chevron-down'} size={20} color={TarodanColors.textSecondary} />
-      </TouchableOpacity>
-
-      {showCityPicker && (
-        <View style={styles.cityDropdown}>
-          <TextInput
-            style={styles.citySearchInput}
-            value={citySearch}
-            onChangeText={setCitySearch}
-            placeholder="Şehir ara..."
-            placeholderTextColor={TarodanColors.textTertiary}
-          />
-          <ScrollView
-            style={styles.cityList}
-            nestedScrollEnabled
-            keyboardShouldPersistTaps="handled"
-            showsVerticalScrollIndicator
-          >
-            {filteredCities.map((city) => (
+      <View>
+        {isAuthenticated && addresses.length > 0 ? (
+          <View style={{ marginBottom: 12 }}>
+            {addresses.map(a => (
               <TouchableOpacity
-                key={city}
-                style={[styles.cityItem, shippingAddress.city === city && styles.cityItemActive]}
-                onPress={() => {
-                  setShippingAddress((s) => ({ ...s, city }));
-                  setShowCityPicker(false);
-                  setCitySearch('');
-                }}
+                key={a.id}
+                style={[
+                  styles.savedAddressRow,
+                  selectedId === a.id && styles.savedAddressRowActive,
+                ]}
+                onPress={() => setSelectedId(a.id)}
               >
-                <Text style={[styles.cityItemText, shippingAddress.city === city && styles.cityItemTextActive]}>
-                  {city}
-                </Text>
-                {shippingAddress.city === city && (
-                  <Ionicons name="checkmark" size={18} color={TarodanColors.primary} />
-                )}
+                <Radio
+                  checked={selectedId === a.id}
+                  onChange={() => setSelectedId(a.id)}
+                />
+                <View style={{ flex: 1 }}>
+                  <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+                    <Text style={styles.addressTitle}>{a.title || a.fullName}</Text>
+                    {a.isDefault ? (
+                      <Text style={styles.defaultBadge}> · Varsayılan</Text>
+                    ) : null}
+                  </View>
+                  <Text style={styles.addressLine} numberOfLines={2}>
+                    {a.fullName} · {a.phone}
+                  </Text>
+                  <Text style={styles.addressLine} numberOfLines={2}>
+                    {a.address}, {a.district}/{a.city}
+                  </Text>
+                </View>
               </TouchableOpacity>
             ))}
-          </ScrollView>
-        </View>
-      )}
-
-      <Text style={styles.inputLabel}>İlçe *</Text>
-      <TextInput
-        style={styles.textInput}
-        value={shippingAddress.district}
-        onChangeText={(t) => setShippingAddress(s => ({ ...s, district: t }))}
-        placeholder="İlçe"
-        placeholderTextColor={TarodanColors.textTertiary}
-      />
-
-      <Text style={styles.inputLabel}>Açık Adres *</Text>
-      <TextInput
-        style={[styles.textInput, styles.textArea]}
-        value={shippingAddress.address}
-        onChangeText={(t) => setShippingAddress(s => ({ ...s, address: t }))}
-        placeholder="Mahalle, cadde, sokak, bina no, daire no"
-        placeholderTextColor={TarodanColors.textTertiary}
-        multiline
-        numberOfLines={3}
-        textAlignVertical="top"
-      />
-
-      <Text style={styles.inputLabel}>Posta Kodu</Text>
-      <TextInput
-        style={styles.textInput}
-        value={shippingAddress.zipCode}
-        onChangeText={(t) => setShippingAddress(s => ({ ...s, zipCode: t }))}
-        placeholder="34000"
-        placeholderTextColor={TarodanColors.textTertiary}
-        keyboardType="number-pad"
-      />
-    </View>
-  );
-
-  const renderGuestForm = () => (
-    <View>
-      <View style={styles.guestNotice}>
-        <Ionicons name="information-circle-outline" size={20} color={TarodanColors.warning} />
-        <Text style={styles.guestNoticeText}>
-          Üye olmadan alışveriş yapıyorsunuz. Siparişinizi takip etmek için e-posta adresinizi girin.
-        </Text>
-      </View>
-
-      <Text style={styles.inputLabel}>Ad Soyad *</Text>
-      <TextInput
-        style={styles.textInput}
-        value={guestName}
-        onChangeText={setGuestName}
-        placeholder="Ad Soyad"
-        placeholderTextColor={TarodanColors.textTertiary}
-      />
-
-      <Text style={styles.inputLabel}>E-posta *</Text>
-      <TextInput
-        style={styles.textInput}
-        value={guestEmail}
-        onChangeText={setGuestEmail}
-        placeholder="ornek@email.com"
-        placeholderTextColor={TarodanColors.textTertiary}
-        keyboardType="email-address"
-        autoCapitalize="none"
-      />
-
-      <Text style={styles.inputLabel}>E-posta doğrulama *</Text>
-      <TouchableOpacity
-        style={[styles.secondaryButton, guestOtpSending && { opacity: 0.6 }]}
-        disabled={guestOtpSending || !guestEmail.trim()}
-        onPress={async () => {
-          const em = guestEmail.trim().toLowerCase();
-          if (!em.includes('@')) {
-            Alert.alert('Uyarı', 'Geçerli bir e-posta girin');
-            return;
-          }
-          setGuestOtpSending(true);
-          try {
-            await ordersApi.sendGuestVerificationCode({
-              email: em,
-              expectedCheckoutCount: Math.max(1, checkoutItems.length),
-            });
-            Alert.alert('Bilgi', 'Doğrulama kodu e-postanıza gönderildi.');
-          } catch (err: unknown) {
-            Alert.alert('Hata', formatApiErrorMessage(err, 'Kod gönderilemedi'));
-          } finally {
-            setGuestOtpSending(false);
-          }
-        }}
-      >
-        <Text style={styles.secondaryButtonText}>
-          {guestOtpSending ? 'Gönderiliyor…' : 'Kod gönder'}
-        </Text>
-      </TouchableOpacity>
-      <TextInput
-        style={[styles.textInput, { marginTop: 8, letterSpacing: 4 }]}
-        value={guestEmailVerificationCode}
-        onChangeText={(t) => setGuestEmailVerificationCode(t.replace(/\D/g, '').slice(0, 6))}
-        placeholder="6 haneli kod"
-        placeholderTextColor={TarodanColors.textTertiary}
-        keyboardType="number-pad"
-        maxLength={6}
-      />
-
-      <Text style={styles.inputLabel}>Telefon *</Text>
-      <TextInput
-        style={styles.textInput}
-        value={guestPhone}
-        onChangeText={setGuestPhone}
-        placeholder="+90 5XX XXX XX XX"
-        placeholderTextColor={TarodanColors.textTertiary}
-        keyboardType="phone-pad"
-      />
-
-      <View style={styles.divider} />
-
-      <View style={styles.sectionHeader}>
-        <Ionicons name="location-outline" size={24} color={TarodanColors.primary} />
-        <Text style={styles.sectionTitle}>Teslimat Adresi</Text>
-      </View>
-
-      {renderAddressForm()}
-
-      <TouchableOpacity style={styles.loginLink} onPress={() => router.push('/(auth)/login')}>
-        <Ionicons name="log-in-outline" size={18} color={TarodanColors.primary} />
-        <Text style={styles.loginLinkText}>Üye misiniz? Giriş yapın</Text>
-      </TouchableOpacity>
-    </View>
-  );
-
-  const renderOrderItems = () => (
-    <View>
-      {checkoutItems.map((item, index) => (
-        <View key={`${item.productId}-${index}`} style={styles.orderItem}>
-          <Image source={{ uri: transformImageUrl(item.imageUrl) }} style={styles.orderItemImage} />
-          <View style={styles.orderItemInfo}>
-            <Text style={styles.orderItemTitle} numberOfLines={2}>{item.title}</Text>
-            {(item.brand || item.scale) && (
-              <Text style={styles.orderItemMeta}>
-                {[safeString(item.brand), safeString(item.scale), `x${item.quantity}`].filter(Boolean).join(' · ')}
-              </Text>
-            )}
+            <TouchableOpacity
+              style={[styles.savedAddressRow, selectedId === 'new' && styles.savedAddressRowActive]}
+              onPress={() => setSelectedId('new')}
+            >
+              <Radio
+                checked={selectedId === 'new'}
+                onChange={() => setSelectedId('new')}
+              />
+              <View style={{ flex: 1, flexDirection: 'row', alignItems: 'center' }}>
+                <Ionicons name="add-circle-outline" size={18} color={colors.primary[600]!} />
+                <Text style={[styles.addressTitle, { marginLeft: 8 }]}>Yeni Adres Ekle</Text>
+              </View>
+            </TouchableOpacity>
           </View>
-          <Text style={styles.orderItemPrice}>₺{formatPrice(item.price * item.quantity)}</Text>
-        </View>
-      ))}
-    </View>
-  );
+        ) : null}
 
-  // ─── Main Render ────────────────────────────────────────────────────
+        {/* Yeni adres formu (konuk veya üye + 'new' seçildi) */}
+        {selectedId === 'new' ? (
+          <View>
+            <Input
+              label="Ad Soyad *"
+              value={inline.fullName}
+              onChangeText={(text: string) => setInline({ ...inline, fullName: text })}
+              containerStyle={styles.input}
+            />
+            <Input
+              label="Telefon *"
+              value={inline.phone}
+              onChangeText={(text: string) => setInline({ ...inline, phone: text })}
+              keyboardType="phone-pad"
+              placeholder="+90 5XX XXX XX XX"
+              containerStyle={styles.input}
+            />
+            <CityDistrictSelector
+              city={inline.city}
+              district={inline.district}
+              onChangeCity={(city) => setInline({ ...inline, city })}
+              onChangeDistrict={(district) => setInline({ ...inline, district })}
+            />
+            <Input
+              label="Açık Adres *"
+              value={inline.address}
+              onChangeText={(text: string) => setInline({ ...inline, address: text })}
+              multiline
+              numberOfLines={3}
+              containerStyle={styles.input}
+            />
+            <Input
+              label="Posta Kodu"
+              value={inline.zipCode || ''}
+              onChangeText={(text: string) => setInline({ ...inline, zipCode: text })}
+              keyboardType="number-pad"
+              maxLength={5}
+              containerStyle={styles.input}
+            />
+          </View>
+        ) : null}
+      </View>
+    );
+  };
 
   return (
     <KeyboardAvoidingView
       style={styles.container}
       behavior={Platform.OS === 'ios' ? 'padding' : undefined}
     >
-      {/* Header */}
-      <View style={styles.header}>
-        <TouchableOpacity onPress={() => step > 1 ? setStep(step - 1) : router.back()} style={styles.headerBack}>
-          <Ionicons name="arrow-back" size={24} color={TarodanColors.textOnPrimary} />
-        </TouchableOpacity>
-        <Text style={styles.headerTitle}>
-          {step === 1 ? 'Teslimat Bilgileri' : step === 2 ? 'Ödeme' : 'Sipariş Onayı'}
-        </Text>
-        <View style={{ width: 40 }} />
-      </View>
+      <ScreenHeader
+        title={
+          step === 1 ? 'Teslimat Bilgileri' : step === 2 ? 'Ödeme' : 'Sipariş Onayı'
+        }
+        onBack={() => (step > 1 ? setStep(step - 1) : router.back())}
+      />
 
       {/* Progress Steps */}
       <View style={styles.progressContainer}>
-        {[1, 2, 3].map((s) => (
+        {[1, 2, 3].map(s => (
           <View key={s} style={styles.progressStep}>
             <View style={[styles.progressCircle, step >= s && styles.progressCircleActive]}>
               {step > s ? (
-                <Ionicons name="checkmark" size={16} color="#fff" />
+                <Ionicons name="checkmark" size={16} color={colors.white} />
               ) : (
-                <Text style={[styles.progressNumber, step >= s && styles.progressNumberActive]}>{s}</Text>
+                <Text style={[styles.progressNumber, step >= s && styles.progressNumberActive]}>
+                  {s}
+                </Text>
               )}
             </View>
             <Text style={[styles.progressLabel, step >= s && styles.progressLabelActive]}>
               {s === 1 ? 'Adres' : s === 2 ? 'Ödeme' : 'Onay'}
             </Text>
-            {s < 3 && <View style={[styles.progressLine, step > s && styles.progressLineActive]} />}
+            {s < 3 ? (
+              <View style={[styles.progressLine, step > s && styles.progressLineActive]} />
+            ) : null}
           </View>
         ))}
       </View>
 
-      <ScrollView style={styles.content} showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">
+      <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
+        {/* Step 1: Adres */}
+        {step === 1 ? (
+          <>
+            {/* Konuk uyarısı */}
+            {!isAuthenticated ? (
+              <View style={styles.section}>
+                <View style={styles.sectionHeader}>
+                  <Ionicons name="person-outline" size={24} color={colors.primary[600]!} />
+                  <Text style={styles.sectionTitle}>İletişim Bilgileri</Text>
+                </View>
+                <View style={styles.guestNotice}>
+                  <Ionicons
+                    name="information-circle-outline"
+                    size={20}
+                    color={colors.warning[600]!}
+                  />
+                  <Text style={styles.guestNoticeText}>
+                    Üye olmadan alışveriş yapıyorsunuz. Siparişinizi takip etmek için e-posta
+                    adresinizi girin.
+                  </Text>
+                </View>
+                <Input
+                  label="Ad Soyad *"
+                  value={guestName}
+                  onChangeText={setGuestName}
+                  containerStyle={styles.input}
+                />
+                <Input
+                  label="E-posta *"
+                  value={guestEmail}
+                  onChangeText={setGuestEmail}
+                  keyboardType="email-address"
+                  autoCapitalize="none"
+                  containerStyle={styles.input}
+                />
+                <Input
+                  label="Telefon *"
+                  value={guestPhone}
+                  onChangeText={setGuestPhone}
+                  keyboardType="phone-pad"
+                  placeholder="+90 5XX XXX XX XX"
+                  containerStyle={styles.input}
+                />
+                <TouchableOpacity
+                  style={styles.loginLink}
+                  onPress={() => router.push('/(auth)/login' as any)}
+                >
+                  <Text style={styles.loginLinkText}>Üye misiniz? Giriş yapın →</Text>
+                </TouchableOpacity>
+              </View>
+            ) : null}
 
-        {/* ────── Step 1: Address ────── */}
-        {step === 1 && (
-          <View style={styles.section}>
-            <View style={styles.sectionHeader}>
-              <Ionicons name={isAuthenticated ? 'location-outline' : 'person-outline'} size={24} color={TarodanColors.primary} />
-              <Text style={styles.sectionTitle}>
-                {isAuthenticated ? 'Teslimat Adresi' : 'İletişim Bilgileri'}
-              </Text>
-            </View>
-
-            {isAuthenticated ? (
-              <>
-                {user && (
-                  <View style={styles.userBanner}>
-                    <Ionicons name="person-circle-outline" size={20} color={TarodanColors.accent} />
-                    <Text style={styles.userBannerText}>
-                      {user.displayName} olarak giriş yapıldı
-                    </Text>
-                  </View>
-                )}
-                {renderSavedAddresses()}
-              </>
-            ) : (
-              renderGuestForm()
-            )}
-          </View>
-        )}
-
-        {/* ────── Step 2: Payment ────── */}
-        {step === 2 && (
-          <View>
-            {/* Carrier Selection */}
+            {/* Teslimat Adresi */}
             <View style={styles.section}>
               <View style={styles.sectionHeader}>
-                <Ionicons name="car-outline" size={24} color={TarodanColors.primary} />
+                <Ionicons name="location-outline" size={24} color={colors.primary[600]!} />
+                <Text style={styles.sectionTitle}>Teslimat Adresi</Text>
+              </View>
+              {renderAddressSelector(false)}
+            </View>
+
+            {/* Fatura Adresi (toggle) */}
+            <View style={styles.section}>
+              <View style={[styles.sectionHeader, { justifyContent: 'space-between' }]}>
+                <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+                  <Ionicons name="receipt-outline" size={24} color={colors.primary[600]!} />
+                  <Text style={styles.sectionTitle}>Fatura Adresi</Text>
+                </View>
+                <Switch
+                  value={billingDifferent}
+                  onValueChange={setBillingDifferent}
+                />
+              </View>
+              {billingDifferent ? (
+                renderAddressSelector(true)
+              ) : (
+                <Text style={styles.helperText}>
+                  Teslimat adresi ile aynı kullanılacak.
+                </Text>
+              )}
+            </View>
+          </>
+        ) : null}
+
+        {/* Step 2: Ödeme */}
+        {step === 2 ? (
+          <>
+            {/* Kargo Seçimi */}
+            <View style={styles.section}>
+              <View style={styles.sectionHeader}>
+                <Ionicons name="car-outline" size={24} color={colors.primary[600]!} />
                 <Text style={styles.sectionTitle}>Kargo Seçimi</Text>
               </View>
 
-              <TouchableOpacity
-                style={[styles.optionCard, selectedCarrier === 'aras' && styles.optionCardActive]}
-                onPress={() => setSelectedCarrier('aras')}
-              >
-                <View style={[styles.radioOuter, selectedCarrier === 'aras' && styles.radioOuterActive]}>
-                  {selectedCarrier === 'aras' && <View style={styles.radioInner} />}
-                </View>
+              {/* Tek kargo firması: Sürat Kargo (web ile parite — UI seçici yok) */}
+              <View style={[styles.optionCard, styles.optionCardActive]}>
+                <Radio checked onChange={() => {}} />
                 <View style={styles.optionContent}>
-                  <Text style={styles.optionTitle}>Aras Kargo</Text>
-                  <Text style={styles.optionDescription}>2-3 iş günü teslimat</Text>
-                </View>
-                <Text style={styles.optionPrice}>
-                  {shippingLoading ? '...' : `₺${formatPrice(getShippingRate('aras'))}`}
-                </Text>
-              </TouchableOpacity>
-
-              <TouchableOpacity
-                style={[styles.optionCard, selectedCarrier === 'yurtici' && styles.optionCardActive]}
-                onPress={() => setSelectedCarrier('yurtici')}
-              >
-                <View style={[styles.radioOuter, selectedCarrier === 'yurtici' && styles.radioOuterActive]}>
-                  {selectedCarrier === 'yurtici' && <View style={styles.radioInner} />}
-                </View>
-                <View style={styles.optionContent}>
-                  <Text style={styles.optionTitle}>Yurtiçi Kargo</Text>
+                  <Text style={styles.optionTitle}>Sürat Kargo</Text>
                   <Text style={styles.optionDescription}>2-4 iş günü teslimat</Text>
                 </View>
-                <Text style={styles.optionPrice}>
-                  {shippingLoading ? '...' : `₺${formatPrice(getShippingRate('yurtici'))}`}
-                </Text>
-              </TouchableOpacity>
-            </View>
-
-            {/* Card Input */}
-            <View style={styles.section}>
-              <View style={styles.sectionHeader}>
-                <Ionicons name="card-outline" size={24} color={TarodanColors.primary} />
-                <Text style={styles.sectionTitle}>Kart Bilgileri</Text>
-              </View>
-
-              <Text style={styles.inputLabel}>Kart Üzerindeki İsim</Text>
-              <TextInput
-                style={styles.textInput}
-                value={cardHolder}
-                onChangeText={setCardHolder}
-                placeholder="AD SOYAD"
-                placeholderTextColor={TarodanColors.textTertiary}
-                autoCapitalize="characters"
-              />
-
-              <Text style={styles.inputLabel}>Kart Numarası</Text>
-              <TextInput
-                style={styles.textInput}
-                value={cardNumber}
-                onChangeText={setCardNumber}
-                placeholder="0000 0000 0000 0000"
-                placeholderTextColor={TarodanColors.textTertiary}
-                keyboardType="number-pad"
-                maxLength={19}
-              />
-              <Text style={styles.cardHint}>
-                Test modu: 0000000000000000
-              </Text>
-
-              <View style={{ flexDirection: 'row', gap: 12 }}>
-                <View style={{ flex: 1 }}>
-                  <Text style={styles.inputLabel}>Son Kullanma</Text>
-                  <TextInput
-                    style={styles.textInput}
-                    value={cardExpiry}
-                    onChangeText={(t) => {
-                      const cleaned = t.replace(/[^0-9]/g, '');
-                      if (cleaned.length <= 2) setCardExpiry(cleaned);
-                      else setCardExpiry(cleaned.slice(0, 2) + '/' + cleaned.slice(2, 4));
-                    }}
-                    placeholder="AA/YY"
-                    placeholderTextColor={TarodanColors.textTertiary}
-                    keyboardType="number-pad"
-                    maxLength={5}
-                  />
-                </View>
-                <View style={{ flex: 1 }}>
-                  <Text style={styles.inputLabel}>CVV</Text>
-                  <TextInput
-                    style={styles.textInput}
-                    value={cardCvv}
-                    onChangeText={setCardCvv}
-                    placeholder="***"
-                    placeholderTextColor={TarodanColors.textTertiary}
-                    keyboardType="number-pad"
-                    maxLength={4}
-                    secureTextEntry
-                  />
-                </View>
-              </View>
-
-              <View style={styles.securityNotice}>
-                <Ionicons name="shield-checkmark" size={20} color={TarodanColors.success} />
-                <Text style={styles.securityText}>
-                  Ödemeniz şifreli olarak iletilir ve güvende tutulur.
-                </Text>
-              </View>
-            </View>
-          </View>
-        )}
-
-        {/* ────── Step 3: Confirmation ────── */}
-        {step === 3 && (
-          <View>
-            <View style={styles.section}>
-              <View style={styles.sectionHeader}>
-                <Ionicons name="receipt-outline" size={24} color={TarodanColors.primary} />
-                <Text style={styles.sectionTitle}>Sipariş Özeti</Text>
-              </View>
-
-              {renderOrderItems()}
-
-              <View style={styles.divider} />
-
-              {/* Delivery Summary */}
-              <View style={styles.summaryCard}>
-                <View style={styles.summaryRow}>
-                  <Ionicons name="location-outline" size={20} color={TarodanColors.textSecondary} />
-                  <View style={styles.summaryContent}>
-                    <Text style={styles.summaryLabel}>Teslimat Adresi</Text>
-                    <Text style={styles.summaryValue}>{getSelectedAddressSummary()}</Text>
-                  </View>
-                </View>
-
-                {!isAuthenticated && (
-                  <View style={styles.summaryRow}>
-                    <Ionicons name="mail-outline" size={20} color={TarodanColors.textSecondary} />
-                    <View style={styles.summaryContent}>
-                      <Text style={styles.summaryLabel}>E-posta</Text>
-                      <Text style={styles.summaryValue}>{guestEmail}</Text>
-                    </View>
-                  </View>
+                {shippingLoading ? (
+                  <Spinner size="sm" />
+                ) : (
+                  <Text style={styles.optionPrice}>{formatPrice(shippingCost)}</Text>
                 )}
+              </View>
+            </View>
 
-                <View style={styles.summaryRow}>
-                  <Ionicons name="car-outline" size={20} color={TarodanColors.textSecondary} />
-                  <View style={styles.summaryContent}>
-                    <Text style={styles.summaryLabel}>Kargo</Text>
-                    <Text style={styles.summaryValue}>
-                      {selectedCarrier === 'aras' ? 'Aras Kargo' : 'Yurtiçi Kargo'}
-                    </Text>
-                  </View>
-                </View>
-
-                <View style={styles.summaryRow}>
-                  <Ionicons name="card-outline" size={20} color={TarodanColors.textSecondary} />
-                  <View style={styles.summaryContent}>
-                    <Text style={styles.summaryLabel}>Kart</Text>
-                    <Text style={styles.summaryValue}>
-                      •••• •••• •••• {cardNumber.replace(/\s/g, '').slice(-4) || '****'}
-                    </Text>
-                  </View>
-                </View>
+            {/* Ödeme Yöntemi */}
+            <View style={styles.section}>
+              <View style={styles.sectionHeader}>
+                <Ionicons name="card-outline" size={24} color={colors.primary[600]!} />
+                <Text style={styles.sectionTitle}>Ödeme Yöntemi</Text>
               </View>
 
-              <View style={styles.securityNotice}>
-                <Ionicons name="shield-checkmark" size={20} color={TarodanColors.success} />
+              {/* Üye + kayıtlı kart varsa */}
+              {isAuthenticated && cards.length > 0 ? (
+                <View style={{ marginBottom: 8 }}>
+                  {cards.map(card => (
+                    <TouchableOpacity
+                      key={card.cardToken}
+                      style={[
+                        styles.optionCard,
+                        selectedCardToken === card.cardToken && styles.optionCardActive,
+                      ]}
+                      onPress={() => setSelectedCardToken(card.cardToken)}
+                    >
+                      <Radio
+                        checked={selectedCardToken === card.cardToken}
+                        onChange={() => setSelectedCardToken(card.cardToken)}
+                      />
+                      <MaterialCommunityIcons
+                        name="credit-card"
+                        size={22}
+                        color={colors.primary[600]!}
+                        style={{ marginRight: 6 }}
+                      />
+                      <View style={styles.optionContent}>
+                        <Text style={styles.optionTitle}>
+                          {card.cardAlias || card.cardBrand || 'Kart'} ····{' '}
+                          {card.lastFourDigits || '****'}
+                        </Text>
+                        <Text style={styles.optionDescription}>
+                          {card.cardHolderName || 'Tek tıkla öde'}
+                        </Text>
+                      </View>
+                    </TouchableOpacity>
+                  ))}
+
+                  {/* WebView (provider-hosted) seçeneği */}
+                  <TouchableOpacity
+                    style={[
+                      styles.optionCard,
+                      selectedCardToken === 'webview' && styles.optionCardActive,
+                    ]}
+                    onPress={() => setSelectedCardToken('webview')}
+                  >
+                    <Radio
+                      checked={selectedCardToken === 'webview'}
+                      onChange={() => setSelectedCardToken('webview')}
+                    />
+                    <MaterialCommunityIcons
+                      name="shield-key-outline"
+                      size={22}
+                      color={colors.primary[600]!}
+                      style={{ marginRight: 6 }}
+                    />
+                    <View style={styles.optionContent}>
+                      <Text style={styles.optionTitle}>Sağlayıcı Sayfasında Öde</Text>
+                      <Text style={styles.optionDescription}>
+                        PayTR 3DS sayfası
+                      </Text>
+                    </View>
+                  </TouchableOpacity>
+                </View>
+              ) : null}
+
+              {/* PayTR bilgilendirme — kart bilgisi uygulamaya girilmez (PCI). */}
+              <View style={styles.paytrNotice}>
+                <Ionicons name="lock-closed" size={18} color={colors.success[600]!} />
+                <Text style={styles.paytrNoticeText}>
+                  Ödemeniz PayTR güvenli altyapısı üzerinden alınır. Kart bilgileriniz Tarodan'a
+                  kaydedilmez; bir sonraki adımda PayTR'nin 3D Secure ödeme sayfası açılır.
+                </Text>
+              </View>
+
+              {/* Provider: sadece PayTR (iyzico kaldırıldı — web ile parite) */}
+            </View>
+
+            {/* Kupon */}
+            <View style={styles.section}>
+              <View style={styles.sectionHeader}>
+                <Ionicons name="pricetag-outline" size={22} color={colors.primary[600]!} />
+                <Text style={styles.sectionTitle}>İndirim Kuponu</Text>
+              </View>
+              {appliedDiscount ? (
+                <View style={styles.appliedCoupon}>
+                  <Ionicons name="checkmark-circle" size={18} color={colors.success[600]!} />
+                  <View style={{ flex: 1, marginLeft: 8 }}>
+                    <Text style={styles.optionTitle}>
+                      {appliedDiscount.code} · -{formatPrice(appliedDiscount.amount)}
+                    </Text>
+                  </View>
+                  <Button
+                    variant="ghost"
+                    title="Kaldır"
+                    onPress={() => setAppliedDiscount(null)}
+                  />
+                </View>
+              ) : (
+                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+                  <Input
+                    placeholder="Kupon kodu"
+                    value={couponCode}
+                    onChangeText={(v: string) => setCouponCode(v.toUpperCase())}
+                    autoCapitalize="characters"
+                    containerStyle={{ ...styles.input, flex: 1, marginBottom: 0 }}
+                  />
+                  <Button
+                    variant="primary"
+                    title="Uygula"
+                    onPress={handleApplyCoupon}
+                    isLoading={couponLoading}
+                    disabled={!couponCode.trim() || couponLoading}
+                  />
+                </View>
+              )}
+            </View>
+          </>
+        ) : null}
+
+        {/* Step 3: Onay */}
+        {step === 3 ? (
+          <View style={styles.section}>
+            <View style={styles.sectionHeader}>
+              <Ionicons name="receipt-outline" size={24} color={colors.primary[600]!} />
+              <Text style={styles.sectionTitle}>Sipariş Özeti</Text>
+            </View>
+
+            {items.map(item => (
+              <View key={item.id} style={styles.orderItem}>
+                <Image
+                  source={{ uri: transformImageUrl(item.imageUrl) }}
+                  style={styles.orderItemImage}
+                />
+                <View style={styles.orderItemInfo}>
+                  <Text style={styles.orderItemTitle} numberOfLines={2}>
+                    {item.title}
+                  </Text>
+                  <Text style={styles.orderItemMeta}>
+                    {asLabel(item.brand)} · {asLabel(item.scale)} · x{item.quantity}
+                  </Text>
+                </View>
+                <Text style={styles.orderItemPrice}>
+                  {formatPrice(item.price * item.quantity)}
+                </Text>
+              </View>
+            ))}
+
+            <Divider style={{ marginVertical: 12 }} />
+
+            <View style={styles.securityNotice}>
+              <Ionicons name="shield-checkmark" size={20} color={colors.success[600]!} />
+              <View style={styles.securityContent}>
+                <Text style={styles.securityTitle}>Güvenli Alışveriş</Text>
                 <Text style={styles.securityText}>
-                  Güvenli alışveriş. Ödemeniz ürün elinize ulaşana kadar güvende tutulur.
+                  Ödemeniz şifreli olarak iletilir. Ürün elinize ulaşana kadar paranız güvende
+                  tutulur.
                 </Text>
               </View>
             </View>
           </View>
-        )}
+        ) : null}
 
-        {/* ────── Order Summary (always) ────── */}
+        {/* Sipariş Özeti — her adımda görünür */}
         <View style={styles.orderSummary}>
           <Text style={styles.orderSummaryTitle}>Ödeme Detayı</Text>
-
           <View style={styles.orderSummaryRow}>
-            <Text style={styles.orderSummaryLabel}>Ara Toplam ({checkoutItems.length} ürün)</Text>
+            <Text style={styles.orderSummaryLabel}>Ara Toplam ({items.length} ürün)</Text>
+            <Text style={styles.orderSummaryValue}>{formatPrice(subtotal)}</Text>
+          </View>
+          <View style={styles.orderSummaryRow}>
+            <Text style={styles.orderSummaryLabel}>Kargo (Sürat)</Text>
             <Text style={styles.orderSummaryValue}>
-              {quoteLoading ? '...' : `₺${formatPrice(subtotal)}`}
+              {effectiveShippingCity ? formatPrice(shippingCost) : 'İl seçin'}
             </Text>
           </View>
-
-          <View style={styles.orderSummaryRow}>
-            <Text style={styles.orderSummaryLabel}>
-              Kargo ({selectedCarrier === 'aras' ? 'Aras' : 'Yurtiçi'})
-            </Text>
-            <Text style={styles.orderSummaryValue}>
-              {shippingLoading ? '...' : totalShipping > 0 ? `₺${formatPrice(totalShipping)}` : 'Adres seçin'}
-            </Text>
-          </View>
-
-          {buyerFee > 0 && (
+          {appliedDiscount ? (
             <View style={styles.orderSummaryRow}>
-              <Text style={styles.orderSummaryLabel}>Hizmet Bedeli</Text>
-              <Text style={styles.orderSummaryValue}>₺{formatPrice(buyerFee)}</Text>
+              <Text style={styles.orderSummaryLabel}>Kupon ({appliedDiscount.code})</Text>
+              <Text style={[styles.orderSummaryValue, { color: colors.success[600]! }]}>
+                -{formatPrice(appliedDiscount.amount)}
+              </Text>
             </View>
-          )}
-
-          <View style={styles.totalDivider} />
-
+          ) : null}
+          <Divider style={{ marginVertical: 12 }} />
           <View style={styles.orderSummaryRow}>
             <Text style={styles.orderTotalLabel}>Toplam</Text>
-            <Text style={styles.orderTotalValue}>₺{formatPrice(total)}</Text>
+            <Text style={styles.orderTotalValue}>{formatPrice(total)}</Text>
           </View>
         </View>
 
         <View style={{ height: 120 }} />
       </ScrollView>
 
-      {/* Bottom Action Bar */}
+      {/* Bottom Action */}
       <View style={styles.bottomBar}>
         {step < 3 ? (
-          <TouchableOpacity style={styles.primaryButton} onPress={handleNextStep}>
-            <Text style={styles.primaryButtonText}>Devam Et</Text>
-            <Ionicons name="arrow-forward" size={20} color="#fff" />
-          </TouchableOpacity>
+          <Button
+            variant="primary"
+            title="Devam Et"
+            onPress={handleNextStep}
+            style={styles.actionButton}
+          />
         ) : (
-          <TouchableOpacity
-            style={[styles.primaryButton, loading && styles.primaryButtonDisabled]}
+          <Button
+            variant="primary"
+            title={loading ? 'İşleniyor...' : `Onayla ve Öde (${formatPrice(total)})`}
             onPress={handleCheckout}
+            isLoading={loading}
             disabled={loading}
-          >
-            {loading ? (
-              <ActivityIndicator size="small" color="#fff" />
-            ) : (
-              <>
-                <Ionicons name="lock-closed" size={18} color="#fff" />
-                <Text style={styles.primaryButtonText}>
-                  Onayla ve Öde (₺{formatPrice(total)})
-                </Text>
-              </>
-            )}
-          </TouchableOpacity>
+            style={styles.actionButton}
+            icon="card-outline"
+          />
         )}
       </View>
+
+      <Snackbar
+        visible={snackbar.visible}
+        onDismiss={() => setSnackbar({ visible: false, message: '' })}
+        duration={3000}
+        variant="danger"
+      >
+        {snackbar.message}
+      </Snackbar>
     </KeyboardAvoidingView>
   );
 }
 
-// ─── Styles ───────────────────────────────────────────────────────────
-
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: TarodanColors.backgroundSecondary,
+    backgroundColor: colors.surface.alt,
   },
-
-  // Center / Empty
-  centerContainer: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-    backgroundColor: TarodanColors.backgroundSecondary,
-    padding: 20,
-  },
-  loadingText: {
-    marginTop: 12,
-    fontSize: 15,
-    color: TarodanColors.textSecondary,
-  },
-  emptyTitle: {
-    fontSize: 20,
-    fontWeight: 'bold',
-    color: TarodanColors.textPrimary,
-    marginTop: 16,
-  },
-  emptySubtitle: {
-    fontSize: 14,
-    color: TarodanColors.textSecondary,
-    textAlign: 'center',
-    marginTop: 8,
-    maxWidth: 260,
-  },
-
-  // Header
-  header: {
-    backgroundColor: TarodanColors.primary,
-    paddingTop: Platform.OS === 'ios' ? 54 : 44,
-    paddingBottom: 16,
-    paddingHorizontal: 16,
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-  },
-  headerBack: {
-    width: 40,
-    height: 40,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  headerTitle: {
-    fontSize: 18,
-    fontWeight: 'bold',
-    color: TarodanColors.textOnPrimary,
-  },
-
-  // Progress
   progressContainer: {
     flexDirection: 'row',
     justifyContent: 'center',
     alignItems: 'center',
-    paddingVertical: 18,
-    backgroundColor: TarodanColors.background,
-    borderBottomWidth: 1,
-    borderBottomColor: TarodanColors.borderLight,
+    paddingVertical: 20,
+    backgroundColor: colors.surface.DEFAULT,
   },
   progressStep: {
     flexDirection: 'row',
@@ -1168,47 +1119,45 @@ const styles = StyleSheet.create({
     width: 32,
     height: 32,
     borderRadius: 16,
-    backgroundColor: TarodanColors.border,
+    backgroundColor: colors.border.DEFAULT,
     justifyContent: 'center',
     alignItems: 'center',
   },
   progressCircleActive: {
-    backgroundColor: TarodanColors.primary,
+    backgroundColor: colors.primary[600]!,
   },
   progressNumber: {
     fontSize: 14,
     fontWeight: 'bold',
-    color: TarodanColors.textSecondary,
+    color: colors.text.muted,
   },
   progressNumberActive: {
-    color: '#fff',
+    color: colors.white,
   },
   progressLabel: {
     fontSize: 12,
-    color: TarodanColors.textSecondary,
-    marginLeft: 6,
+    color: colors.text.muted,
+    marginLeft: 8,
   },
   progressLabelActive: {
-    color: TarodanColors.primary,
+    color: colors.primary[600]!,
     fontWeight: '600',
   },
   progressLine: {
     width: 30,
     height: 2,
-    backgroundColor: TarodanColors.border,
+    backgroundColor: colors.border.DEFAULT,
     marginHorizontal: 8,
   },
   progressLineActive: {
-    backgroundColor: TarodanColors.primary,
+    backgroundColor: colors.primary[600]!,
   },
-
-  // Content
   content: {
     flex: 1,
     padding: 16,
   },
   section: {
-    backgroundColor: TarodanColors.background,
+    backgroundColor: colors.surface.DEFAULT,
     borderRadius: 12,
     padding: 16,
     marginBottom: 16,
@@ -1221,155 +1170,12 @@ const styles = StyleSheet.create({
   sectionTitle: {
     fontSize: 18,
     fontWeight: 'bold',
-    color: TarodanColors.textPrimary,
-    marginLeft: 10,
-  },
-
-  // User banner (authenticated)
-  userBanner: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: TarodanColors.accentLight,
-    paddingHorizontal: 12,
-    paddingVertical: 10,
-    borderRadius: 8,
-    marginBottom: 16,
-  },
-  userBannerText: {
-    marginLeft: 8,
-    fontSize: 14,
-    color: TarodanColors.accent,
-    fontWeight: '500',
-  },
-
-  // Saved Addresses
-  addressCard: {
-    flexDirection: 'row',
-    alignItems: 'flex-start',
-    padding: 14,
-    backgroundColor: TarodanColors.surfaceVariant,
-    borderRadius: 10,
-    marginBottom: 10,
-    borderWidth: 2,
-    borderColor: 'transparent',
-  },
-  addressCardSelected: {
-    borderColor: TarodanColors.primary,
-    backgroundColor: TarodanColors.primaryLight,
-  },
-  addressCardContent: {
-    flex: 1,
+    color: colors.text.heading,
     marginLeft: 12,
   },
-  addressCardHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginBottom: 2,
-  },
-  addressCardName: {
-    fontSize: 15,
-    fontWeight: '600',
-    color: TarodanColors.textPrimary,
-  },
-  addressCardTitle: {
-    fontSize: 12,
-    color: TarodanColors.primary,
-    fontWeight: '500',
-    marginBottom: 2,
-  },
-  addressCardDetail: {
-    fontSize: 13,
-    color: TarodanColors.textSecondary,
-    marginTop: 2,
-    lineHeight: 18,
-  },
-  addressCardCity: {
-    fontSize: 13,
-    color: TarodanColors.textSecondary,
-    marginTop: 1,
-  },
-  addressCardPhone: {
-    fontSize: 13,
-    color: TarodanColors.textTertiary,
-    marginTop: 2,
-  },
-  defaultBadge: {
-    backgroundColor: TarodanColors.primaryMedium,
-    paddingHorizontal: 8,
-    paddingVertical: 2,
-    borderRadius: 10,
-    marginLeft: 8,
-  },
-  defaultBadgeText: {
-    fontSize: 11,
-    color: TarodanColors.primaryDark,
-    fontWeight: '600',
-  },
-  addAddressButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    paddingVertical: 14,
-    borderRadius: 10,
-    borderWidth: 1,
-    borderStyle: 'dashed',
-    borderColor: TarodanColors.border,
-    marginBottom: 8,
-  },
-  addAddressButtonActive: {
-    borderColor: TarodanColors.primary,
-    backgroundColor: TarodanColors.primaryLight,
-  },
-  addAddressText: {
-    marginLeft: 8,
-    fontSize: 14,
-    color: TarodanColors.textSecondary,
-  },
-  newAddressForm: {
-    marginTop: 8,
-    paddingTop: 8,
-  },
-  saveAddressButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: TarodanColors.accent,
-    paddingVertical: 12,
-    borderRadius: 10,
-    marginTop: 12,
-  },
-  saveAddressButtonText: {
-    color: '#fff',
-    fontSize: 15,
-    fontWeight: '600',
-    marginLeft: 6,
-  },
-
-  // Radio
-  radioOuter: {
-    width: 22,
-    height: 22,
-    borderRadius: 11,
-    borderWidth: 2,
-    borderColor: TarodanColors.border,
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginTop: 2,
-  },
-  radioOuterActive: {
-    borderColor: TarodanColors.primary,
-  },
-  radioInner: {
-    width: 12,
-    height: 12,
-    borderRadius: 6,
-    backgroundColor: TarodanColors.primary,
-  },
-
-  // Guest form
   guestNotice: {
     flexDirection: 'row',
-    backgroundColor: TarodanColors.warningLight,
+    backgroundColor: colors.warning[50]!,
     padding: 12,
     borderRadius: 8,
     marginBottom: 16,
@@ -1377,191 +1183,140 @@ const styles = StyleSheet.create({
   guestNoticeText: {
     flex: 1,
     fontSize: 13,
-    color: '#B45309',
+    color: colors.warning[600]!,
     marginLeft: 8,
-    lineHeight: 18,
   },
-  secondaryButton: {
-    alignSelf: 'flex-start',
-    paddingVertical: 10,
-    paddingHorizontal: 16,
-    borderRadius: 10,
-    borderWidth: 1,
-    borderColor: TarodanColors.primary,
-    backgroundColor: TarodanColors.surfaceVariant,
-    marginTop: 4,
+  input: {
+    marginBottom: 12,
+    backgroundColor: colors.surface.DEFAULT,
   },
-  secondaryButtonText: {
-    color: TarodanColors.primary,
-    fontSize: 14,
-    fontWeight: '600',
+  helperText: {
+    fontSize: 13,
+    color: colors.text.muted,
   },
   loginLink: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginTop: 16,
-    paddingVertical: 10,
+    marginTop: 8,
   },
   loginLinkText: {
-    color: TarodanColors.primary,
+    color: colors.primary[600]!,
     fontSize: 14,
-    fontWeight: '500',
-    marginLeft: 6,
   },
-
-  // Inputs
-  inputLabel: {
-    fontSize: 13,
-    fontWeight: '600',
-    color: TarodanColors.textSecondary,
-    marginBottom: 6,
-    marginTop: 12,
-  },
-  textInput: {
-    borderWidth: 1,
-    borderColor: TarodanColors.border,
-    borderRadius: 10,
-    paddingHorizontal: 14,
-    paddingVertical: Platform.OS === 'ios' ? 14 : 10,
-    fontSize: 15,
-    color: TarodanColors.textPrimary,
-    backgroundColor: TarodanColors.surfaceVariant,
-  },
-  textArea: {
-    minHeight: 80,
-    paddingTop: 12,
-  },
-
-  // City Picker
-  cityPickerButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    borderWidth: 1,
-    borderColor: TarodanColors.border,
-    borderRadius: 10,
-    paddingHorizontal: 14,
-    paddingVertical: Platform.OS === 'ios' ? 14 : 10,
-    backgroundColor: TarodanColors.surfaceVariant,
-  },
-  cityPickerText: {
-    fontSize: 15,
-    color: TarodanColors.textPrimary,
-  },
-  cityPickerPlaceholder: {
-    fontSize: 15,
-    color: TarodanColors.textTertiary,
-  },
-  cityDropdown: {
-    borderWidth: 1,
-    borderColor: TarodanColors.border,
-    borderRadius: 10,
-    marginTop: 4,
-    backgroundColor: TarodanColors.background,
-    maxHeight: 220,
-    overflow: 'hidden',
-  },
-  citySearchInput: {
-    borderBottomWidth: 1,
-    borderBottomColor: TarodanColors.borderLight,
-    paddingHorizontal: 14,
-    paddingVertical: 10,
-    fontSize: 14,
-    color: TarodanColors.textPrimary,
-  },
-  cityList: {
-    maxHeight: 170,
-  },
-  cityItem: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    paddingHorizontal: 14,
-    paddingVertical: 11,
-    borderBottomWidth: StyleSheet.hairlineWidth,
-    borderBottomColor: TarodanColors.borderLight,
-  },
-  cityItemActive: {
-    backgroundColor: TarodanColors.primaryLight,
-  },
-  cityItemText: {
-    fontSize: 14,
-    color: TarodanColors.textPrimary,
-  },
-  cityItemTextActive: {
-    color: TarodanColors.primary,
-    fontWeight: '600',
-  },
-
-  // Divider
-  divider: {
-    height: 1,
-    backgroundColor: TarodanColors.border,
-    marginVertical: 20,
-  },
-
-  // Carrier / Option cards
   optionCard: {
     flexDirection: 'row',
     alignItems: 'center',
-    padding: 16,
-    backgroundColor: TarodanColors.surfaceVariant,
+    padding: 12,
+    backgroundColor: colors.surface.alt,
     borderRadius: 12,
     marginBottom: 10,
     borderWidth: 2,
     borderColor: 'transparent',
   },
   optionCardActive: {
-    borderColor: TarodanColors.primary,
-    backgroundColor: TarodanColors.primaryLight,
+    borderColor: colors.primary[600]!,
+    backgroundColor: colors.primary[50]!,
   },
   optionContent: {
     flex: 1,
-    marginLeft: 12,
+    marginLeft: 4,
   },
   optionTitle: {
     fontSize: 15,
     fontWeight: '600',
-    color: TarodanColors.textPrimary,
+    color: colors.text.heading,
   },
   optionDescription: {
-    fontSize: 13,
-    color: TarodanColors.textSecondary,
+    fontSize: 12,
+    color: colors.text.muted,
     marginTop: 2,
   },
   optionPrice: {
-    fontSize: 16,
+    fontSize: 15,
     fontWeight: 'bold',
-    color: TarodanColors.primary,
+    color: colors.primary[600]!,
   },
-
-  // Card hint
-  cardHint: {
+  savedAddressRow: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    backgroundColor: colors.surface.alt,
+    borderRadius: 12,
+    padding: 12,
+    marginBottom: 8,
+    borderWidth: 2,
+    borderColor: 'transparent',
+  },
+  savedAddressRowActive: {
+    borderColor: colors.primary[600]!,
+    backgroundColor: colors.primary[50]!,
+  },
+  addressTitle: {
+    fontSize: 14,
+    fontWeight: '700',
+    color: colors.text.heading,
+  },
+  addressLine: {
     fontSize: 12,
-    color: TarodanColors.textTertiary,
-    marginTop: 6,
-    marginLeft: 4,
+    color: colors.text.muted,
+    marginTop: 2,
   },
-
-  // Security
-  securityNotice: {
+  defaultBadge: {
+    fontSize: 11,
+    color: colors.success[600]!,
+    fontWeight: '600',
+  },
+  saveCardRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: TarodanColors.successLight,
+    gap: 8,
+    marginTop: 4,
+  },
+  saveCardLabel: {
+    fontSize: 13,
+    color: colors.text.heading,
+    flex: 1,
+  },
+  paytrNotice: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    gap: 8,
     padding: 12,
     borderRadius: 10,
-    marginTop: 16,
+    backgroundColor: colors.success[50]!,
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: colors.success[600]!,
+    marginTop: 4,
   },
-  securityText: {
+  paytrNoticeText: {
     flex: 1,
-    fontSize: 13,
-    color: '#059669',
-    marginLeft: 8,
-    lineHeight: 18,
+    fontSize: 12,
+    lineHeight: 17,
+    color: colors.success[800] ?? colors.success[600]!,
   },
-
-  // Order items
+  providerChip: {
+    paddingHorizontal: 14,
+    paddingVertical: 8,
+    borderRadius: 999,
+    borderWidth: 1,
+    borderColor: colors.border.DEFAULT,
+  },
+  providerChipActive: {
+    backgroundColor: colors.primary[600]!,
+    borderColor: colors.primary[600]!,
+  },
+  providerChipText: {
+    fontSize: 13,
+    color: colors.text.heading,
+    fontWeight: '600',
+  },
+  providerChipTextActive: {
+    color: colors.white,
+  },
+  appliedCoupon: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: colors.success[50]!,
+    padding: 12,
+    borderRadius: 10,
+  },
   orderItem: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -1571,7 +1326,7 @@ const styles = StyleSheet.create({
     width: 60,
     height: 60,
     borderRadius: 8,
-    backgroundColor: TarodanColors.surfaceVariant,
+    backgroundColor: colors.surface.alt,
   },
   orderItemInfo: {
     flex: 1,
@@ -1580,57 +1335,48 @@ const styles = StyleSheet.create({
   orderItemTitle: {
     fontSize: 14,
     fontWeight: '500',
-    color: TarodanColors.textPrimary,
+    color: colors.text.heading,
   },
   orderItemMeta: {
     fontSize: 12,
-    color: TarodanColors.textSecondary,
+    color: colors.text.muted,
     marginTop: 2,
   },
   orderItemPrice: {
     fontSize: 16,
     fontWeight: 'bold',
-    color: TarodanColors.primary,
+    color: colors.primary[600]!,
   },
-
-  // Summary card (step 3)
-  summaryCard: {
-    backgroundColor: TarodanColors.surfaceVariant,
-    borderRadius: 12,
-    padding: 14,
-    marginBottom: 12,
-  },
-  summaryRow: {
+  securityNotice: {
     flexDirection: 'row',
-    alignItems: 'flex-start',
-    marginBottom: 12,
+    backgroundColor: colors.success[50]!,
+    padding: 16,
+    borderRadius: 12,
   },
-  summaryContent: {
+  securityContent: {
     flex: 1,
-    marginLeft: 10,
+    marginLeft: 12,
   },
-  summaryLabel: {
-    fontSize: 12,
-    color: TarodanColors.textTertiary,
-  },
-  summaryValue: {
+  securityTitle: {
     fontSize: 14,
-    color: TarodanColors.textPrimary,
-    marginTop: 1,
+    fontWeight: 'bold',
+    color: colors.success[600]!,
   },
-
-  // Order summary (always visible)
+  securityText: {
+    fontSize: 13,
+    color: colors.success[600]!,
+    marginTop: 4,
+  },
   orderSummary: {
-    backgroundColor: TarodanColors.background,
+    backgroundColor: colors.surface.DEFAULT,
     borderRadius: 12,
     padding: 16,
-    marginBottom: 16,
   },
   orderSummaryTitle: {
     fontSize: 16,
     fontWeight: 'bold',
-    color: TarodanColors.textPrimary,
-    marginBottom: 14,
+    color: colors.text.heading,
+    marginBottom: 16,
   },
   orderSummaryRow: {
     flexDirection: 'row',
@@ -1639,52 +1385,48 @@ const styles = StyleSheet.create({
   },
   orderSummaryLabel: {
     fontSize: 14,
-    color: TarodanColors.textSecondary,
+    color: colors.text.muted,
   },
   orderSummaryValue: {
     fontSize: 14,
-    color: TarodanColors.textPrimary,
-    fontWeight: '500',
-  },
-  totalDivider: {
-    height: 1,
-    backgroundColor: TarodanColors.border,
-    marginVertical: 10,
+    color: colors.text.heading,
   },
   orderTotalLabel: {
     fontSize: 16,
     fontWeight: 'bold',
-    color: TarodanColors.textPrimary,
+    color: colors.text.heading,
   },
   orderTotalValue: {
     fontSize: 20,
     fontWeight: 'bold',
-    color: TarodanColors.primary,
+    color: colors.primary[600]!,
   },
-
-  // Bottom bar
   bottomBar: {
-    backgroundColor: TarodanColors.background,
+    backgroundColor: colors.surface.DEFAULT,
     padding: 16,
-    paddingBottom: Platform.OS === 'ios' ? 30 : 16,
     borderTopWidth: 1,
-    borderTopColor: TarodanColors.border,
+    borderTopColor: colors.border.DEFAULT,
   },
-  primaryButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: TarodanColors.primary,
-    paddingVertical: 15,
+  actionButton: {
     borderRadius: 12,
-    gap: 8,
   },
-  primaryButtonDisabled: {
-    opacity: 0.7,
+  emptyContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: colors.surface.alt,
+    padding: 20,
   },
-  primaryButtonText: {
-    color: '#fff',
-    fontSize: 16,
+  emptyTitle: {
+    fontSize: 20,
     fontWeight: 'bold',
+    color: colors.text.heading,
+    marginTop: 16,
+  },
+  emptySubtitle: {
+    fontSize: 14,
+    color: colors.text.muted,
+    textAlign: 'center',
+    marginTop: 8,
   },
 });

@@ -1,10 +1,13 @@
-import { View, ScrollView, StyleSheet, TouchableOpacity } from 'react-native';
-import { Text, Card, Button, Chip, RadioButton, Divider, ActivityIndicator } from 'react-native-paper';
+import { View, ScrollView, StyleSheet, TouchableOpacity, Linking, Alert } from 'react-native';
 import { useState } from 'react';
 import { router } from 'expo-router';
+import { useMutation } from '@tanstack/react-query';
 import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
+import { theme, Text, Card, Button, Chip, Radio } from '@tarodan/ui-native';
+import { membershipApi } from '../src/services/api';
 import { useAuthStore } from '../src/stores/authStore';
-import { TarodanColors } from '../src/theme';
+
+const { colors } = theme;
 
 type PlanType = 'monthly' | 'annual';
 
@@ -45,19 +48,49 @@ const COMPARISON = [
   { feature: 'İlan Sayısı', free: '10', premium: 'Sınırsız' },
   { feature: 'Fotoğraf / İlan', free: '5', premium: '15' },
   { feature: 'İlan Süresi', free: '60 gün', premium: 'Süresiz' },
-  { feature: 'Takas Özelliği', free: '❌', premium: '✓' },
-  { feature: 'Dijital Garaj', free: '❌', premium: '✓' },
-  { feature: 'Öne Çıkan İlan', free: '❌', premium: '3 adet' },
+  { feature: 'Takas Özelliği', free: '✕', premium: '✓' },
+  { feature: 'Dijital Garaj', free: '✕', premium: '✓' },
+  { feature: 'Öne Çıkan İlan', free: '✕', premium: '3 adet' },
   { feature: 'Günlük Mesaj', free: '50', premium: 'Sınırsız' },
   { feature: 'Reklam', free: 'Var', premium: 'Yok' },
   { feature: 'Destek', free: '24-48 saat', premium: '12 saat' },
 ];
 
 export default function UpgradeScreen() {
-  const { isAuthenticated, user } = useAuthStore();
+  const { isAuthenticated, user, refreshUserData } = useAuthStore();
   const [selectedPlan, setSelectedPlan] = useState<PlanType>('annual');
 
   const isPremium = user?.membershipTier === 'premium';
+
+  // Subscribe mutation — backend POST /membership/subscribe { tierType, billingPeriod }
+  const subscribeMutation = useMutation({
+    mutationFn: async (planId: string) => {
+      // planId formatı: 'premium-annual' | 'premium-monthly' (örn.) → tierType + billingPeriod
+      const isAnnual = planId.includes('annual') || selectedPlan === 'annual';
+      const tierType = planId.split('-')[0] || 'premium';
+      return membershipApi.subscribe({
+        tierType,
+        billingPeriod: isAnnual ? 'yearly' : 'monthly',
+      });
+    },
+    onSuccess: (response) => {
+      // In a real app, this would redirect to a payment gateway
+      const paymentUrl = response.data?.paymentUrl;
+      if (paymentUrl) {
+        Linking.openURL(paymentUrl);
+      } else {
+        Alert.alert(
+          'Ödeme',
+          'Ödeme sayfasına yönlendiriliyorsunuz...',
+          [{ text: 'Tamam' }]
+        );
+      }
+      refreshUserData();
+    },
+    onError: () => {
+      Alert.alert('Hata', 'Abonelik oluşturulamadı. Lütfen tekrar deneyin.');
+    },
+  });
 
   const handleSubscribe = () => {
     if (!isAuthenticated) {
@@ -65,18 +98,16 @@ export default function UpgradeScreen() {
       return;
     }
 
-    const period = selectedPlan === 'annual' ? 'yearly' : 'monthly';
-    router.push(`/membership/checkout?tier=premium&period=${period}`);
+    const plan = PLANS[selectedPlan];
+    subscribeMutation.mutate(plan.id);
   };
-
-  const plan = PLANS[selectedPlan];
 
   return (
     <View style={styles.container}>
       {/* Header */}
       <View style={styles.header}>
         <TouchableOpacity onPress={() => router.back()}>
-          <Ionicons name="arrow-back" size={24} color={TarodanColors.textOnPrimary} />
+          <Ionicons name="arrow-back" size={24} color={colors.white} />
         </TouchableOpacity>
         <Text style={styles.headerTitle}>Premium Üyelik</Text>
         <View style={{ width: 24 }} />
@@ -86,18 +117,20 @@ export default function UpgradeScreen() {
         {/* Already Premium */}
         {isPremium && (
           <Card style={styles.alreadyPremiumCard}>
-            <Card.Content style={styles.alreadyPremiumContent}>
-              <Ionicons name="checkmark-shield" size={48} color={TarodanColors.success} />
-              <Text variant="titleLarge" style={styles.alreadyPremiumTitle}>
+            <View style={styles.alreadyPremiumContent}>
+              <Ionicons name="shield-checkmark" size={48} color={colors.success[600]!} />
+              <Text variant="h2" style={styles.alreadyPremiumTitle}>
                 Zaten Premium Üyesiniz!
               </Text>
-              <Text variant="bodyMedium" style={styles.alreadyPremiumText}>
+              <Text variant="body" style={styles.alreadyPremiumText}>
                 Tüm premium özelliklerin keyfini çıkarın.
               </Text>
-              <Button mode="outlined" onPress={() => router.push('/settings/subscription')}>
-                Abonelik Ayarları
-              </Button>
-            </Card.Content>
+              <Button
+                variant="outline"
+                title="Abonelik Ayarları"
+                onPress={() => router.push('/settings/subscription')}
+              />
+            </View>
           </Card>
         )}
 
@@ -105,82 +138,79 @@ export default function UpgradeScreen() {
         {!isPremium && (
           <>
             <View style={styles.heroSection}>
-              <MaterialCommunityIcons name="crown" size={64} color={TarodanColors.primary} />
-              <Text variant="headlineSmall" style={styles.heroTitle}>
+              <MaterialCommunityIcons name="crown" size={64} color={colors.primary[600]!} />
+              <Text variant="h2" style={styles.heroTitle}>
                 Premium Koleksiyoner
               </Text>
-              <Text variant="bodyMedium" style={styles.heroSubtitle}>
+              <Text variant="body" style={styles.heroSubtitle}>
                 Sınırsız ilan, takas özelliği ve çok daha fazlası
               </Text>
             </View>
 
             {/* Plan Selection */}
             <Card style={styles.planCard}>
-              <Card.Content>
-                <Text variant="titleMedium" style={styles.sectionTitle}>Plan Seçin</Text>
+              <Text variant="h3" style={styles.sectionTitle}>Plan Seçin</Text>
 
-                <TouchableOpacity
-                  style={[styles.planOption, selectedPlan === 'annual' && styles.planOptionSelected]}
-                  onPress={() => setSelectedPlan('annual')}
-                >
-                  <View style={styles.planOptionContent}>
-                    <RadioButton
-                      value="annual"
-                      status={selectedPlan === 'annual' ? 'checked' : 'unchecked'}
-                      onPress={() => setSelectedPlan('annual')}
-                    />
-                    <View style={styles.planInfo}>
-                      <View style={styles.planHeader}>
-                        <Text variant="titleSmall">{PLANS.annual.name}</Text>
-                        <Chip compact mode="flat" style={styles.savingsBadge}>
-                          {PLANS.annual.savings}
-                        </Chip>
-                      </View>
-                      <Text variant="bodySmall" style={styles.planSubtext}>
-                        ₺{PLANS.annual.monthlyPrice}/ay olarak ödenir
-                      </Text>
+              <TouchableOpacity
+                style={[styles.planOption, selectedPlan === 'annual' && styles.planOptionSelected]}
+                onPress={() => setSelectedPlan('annual')}
+              >
+                <View style={styles.planOptionContent}>
+                  <Radio
+                    checked={selectedPlan === 'annual'}
+                    onChange={() => setSelectedPlan('annual')}
+                  />
+                  <View style={styles.planInfo}>
+                    <View style={styles.planHeader}>
+                      <Text variant="h3">{PLANS.annual.name}</Text>
+                      <Chip
+                        label={PLANS.annual.savings!}
+                        variant="success"
+                        size="sm"
+                      />
                     </View>
+                    <Text variant="bodySm" style={styles.planSubtext}>
+                      ₺{PLANS.annual.monthlyPrice}/ay olarak ödenir
+                    </Text>
                   </View>
-                  <Text variant="titleMedium" style={styles.planPrice}>
-                    ₺{PLANS.annual.price}/{PLANS.annual.period}
-                  </Text>
-                </TouchableOpacity>
+                </View>
+                <Text variant="h3" style={styles.planPrice}>
+                  ₺{PLANS.annual.price}/{PLANS.annual.period}
+                </Text>
+              </TouchableOpacity>
 
-                <TouchableOpacity
-                  style={[styles.planOption, selectedPlan === 'monthly' && styles.planOptionSelected]}
-                  onPress={() => setSelectedPlan('monthly')}
-                >
-                  <View style={styles.planOptionContent}>
-                    <RadioButton
-                      value="monthly"
-                      status={selectedPlan === 'monthly' ? 'checked' : 'unchecked'}
-                      onPress={() => setSelectedPlan('monthly')}
-                    />
-                    <View style={styles.planInfo}>
-                      <Text variant="titleSmall">{PLANS.monthly.name}</Text>
-                      <Text variant="bodySmall" style={styles.planSubtext}>
-                        İstediğiniz zaman iptal edin
-                      </Text>
-                    </View>
+              <TouchableOpacity
+                style={[styles.planOption, selectedPlan === 'monthly' && styles.planOptionSelected]}
+                onPress={() => setSelectedPlan('monthly')}
+              >
+                <View style={styles.planOptionContent}>
+                  <Radio
+                    checked={selectedPlan === 'monthly'}
+                    onChange={() => setSelectedPlan('monthly')}
+                  />
+                  <View style={styles.planInfo}>
+                    <Text variant="h3">{PLANS.monthly.name}</Text>
+                    <Text variant="bodySm" style={styles.planSubtext}>
+                      İstediğiniz zaman iptal edin
+                    </Text>
                   </View>
-                  <Text variant="titleMedium" style={styles.planPrice}>
-                    ₺{PLANS.monthly.price}/{PLANS.monthly.period}
-                  </Text>
-                </TouchableOpacity>
-              </Card.Content>
+                </View>
+                <Text variant="h3" style={styles.planPrice}>
+                  ₺{PLANS.monthly.price}/{PLANS.monthly.period}
+                </Text>
+              </TouchableOpacity>
             </Card>
 
             {/* Subscribe Button */}
             <Button
-              mode="contained"
-              style={styles.subscribeButton}
-              contentStyle={styles.subscribeButtonContent}
-              onPress={handleSubscribe}
-            >
-              {selectedPlan === 'annual' 
+              variant="primary"
+              title={selectedPlan === 'annual'
                 ? `Yıllık ₺${PLANS.annual.price} ile Başla`
                 : `Aylık ₺${PLANS.monthly.price} ile Başla`}
-            </Button>
+              style={styles.subscribeButton}
+              onPress={handleSubscribe}
+              isLoading={subscribeMutation.isPending}
+            />
             <Text style={styles.guaranteeText}>
               7 gün içinde memnun kalmazsanız iade garantisi
             </Text>
@@ -189,76 +219,70 @@ export default function UpgradeScreen() {
 
         {/* Features */}
         <Card style={styles.featuresCard}>
-          <Card.Content>
-            <Text variant="titleMedium" style={styles.sectionTitle}>Premium Özellikler</Text>
-            <View style={styles.featuresGrid}>
-              {PREMIUM_FEATURES.map((feature, index) => (
-                <View key={index} style={styles.featureItem}>
-                  <View style={styles.featureIcon}>
-                    <Ionicons name={feature.icon as any} size={24} color={TarodanColors.primary} />
-                  </View>
-                  <Text variant="bodyMedium" style={styles.featureTitle}>{feature.title}</Text>
-                  <Text variant="bodySmall" style={styles.featureDesc}>{feature.description}</Text>
+          <Text variant="h3" style={styles.sectionTitle}>Premium Özellikler</Text>
+          <View style={styles.featuresGrid}>
+            {PREMIUM_FEATURES.map((feature, index) => (
+              <View key={index} style={styles.featureItem}>
+                <View style={styles.featureIcon}>
+                  <Ionicons name={feature.icon as any} size={24} color={colors.primary[600]!} />
                 </View>
-              ))}
-            </View>
-          </Card.Content>
+                <Text variant="body" style={styles.featureTitle}>{feature.title}</Text>
+                <Text variant="bodySm" style={styles.featureDesc}>{feature.description}</Text>
+              </View>
+            ))}
+          </View>
         </Card>
 
         {/* Comparison Table */}
         <Card style={styles.comparisonCard}>
-          <Card.Content>
-            <Text variant="titleMedium" style={styles.sectionTitle}>Karşılaştırma</Text>
-            
-            <View style={styles.comparisonHeader}>
-              <Text style={[styles.comparisonCell, styles.comparisonFeature]}>Özellik</Text>
-              <Text style={[styles.comparisonCell, styles.comparisonValue]}>Ücretsiz</Text>
-              <Text style={[styles.comparisonCell, styles.comparisonValue, styles.premiumColumn]}>Premium</Text>
-            </View>
+          <Text variant="h3" style={styles.sectionTitle}>Karşılaştırma</Text>
 
-            {COMPARISON.map((row, index) => (
-              <View key={index} style={styles.comparisonRow}>
-                <Text style={[styles.comparisonCell, styles.comparisonFeature]}>{row.feature}</Text>
-                <Text style={[styles.comparisonCell, styles.comparisonValue]}>{row.free}</Text>
-                <Text style={[styles.comparisonCell, styles.comparisonValue, styles.premiumColumn, styles.premiumValue]}>
-                  {row.premium}
-                </Text>
-              </View>
-            ))}
-          </Card.Content>
+          <View style={styles.comparisonHeader}>
+            <Text style={[styles.comparisonCell, styles.comparisonFeature]}>Özellik</Text>
+            <Text style={[styles.comparisonCell, styles.comparisonValue]}>Ücretsiz</Text>
+            <Text style={[styles.comparisonCell, styles.comparisonValue, styles.premiumColumn]}>Premium</Text>
+          </View>
+
+          {COMPARISON.map((row, index) => (
+            <View key={index} style={styles.comparisonRow}>
+              <Text style={[styles.comparisonCell, styles.comparisonFeature]}>{row.feature}</Text>
+              <Text style={[styles.comparisonCell, styles.comparisonValue]}>{row.free}</Text>
+              <Text style={[styles.comparisonCell, styles.comparisonValue, styles.premiumColumn, styles.premiumValue]}>
+                {row.premium}
+              </Text>
+            </View>
+          ))}
         </Card>
 
         {/* FAQ */}
         <Card style={styles.faqCard}>
-          <Card.Content>
-            <Text variant="titleMedium" style={styles.sectionTitle}>Sıkça Sorulan Sorular</Text>
-            
-            <View style={styles.faqItem}>
-              <Text variant="titleSmall">İstediğim zaman iptal edebilir miyim?</Text>
-              <Text variant="bodySmall" style={styles.faqAnswer}>
-                Evet, aboneliğinizi istediğiniz zaman iptal edebilirsiniz. İptal ettiğinizde dönem sonuna kadar premium özellikler aktif kalır.
-              </Text>
-            </View>
-            
-            <View style={styles.faqItem}>
-              <Text variant="titleSmall">İade garantisi var mı?</Text>
-              <Text variant="bodySmall" style={styles.faqAnswer}>
-                İlk 7 gün içinde memnun kalmazsanız tam iade yapılır.
-              </Text>
-            </View>
-            
-            <View style={styles.faqItem}>
-              <Text variant="titleSmall">Ödeme yöntemleri nelerdir?</Text>
-              <Text variant="bodySmall" style={styles.faqAnswer}>
-                Kredi kartı, banka kartı ve havale/EFT ile ödeme yapabilirsiniz.
-              </Text>
-            </View>
-          </Card.Content>
+          <Text variant="h3" style={styles.sectionTitle}>Sıkça Sorulan Sorular</Text>
+
+          <View style={styles.faqItem}>
+            <Text variant="h3">İstediğim zaman iptal edebilir miyim?</Text>
+            <Text variant="bodySm" style={styles.faqAnswer}>
+              Evet, aboneliğinizi istediğiniz zaman iptal edebilirsiniz. İptal ettiğinizde dönem sonuna kadar premium özellikler aktif kalır.
+            </Text>
+          </View>
+
+          <View style={styles.faqItem}>
+            <Text variant="h3">İade garantisi var mı?</Text>
+            <Text variant="bodySm" style={styles.faqAnswer}>
+              İlk 7 gün içinde memnun kalmazsanız tam iade yapılır.
+            </Text>
+          </View>
+
+          <View style={styles.faqItem}>
+            <Text variant="h3">Ödeme yöntemleri nelerdir?</Text>
+            <Text variant="bodySm" style={styles.faqAnswer}>
+              Kredi kartı, banka kartı ve havale/EFT ile ödeme yapabilirsiniz.
+            </Text>
+          </View>
         </Card>
 
         {/* Help */}
         <TouchableOpacity style={styles.helpLink} onPress={() => router.push('/help')}>
-          <Ionicons name="help-circle" size={20} color={TarodanColors.primary} />
+          <Ionicons name="help-circle" size={20} color={colors.primary[600]!} />
           <Text style={styles.helpText}>Sorularınız mı var? Yardım Merkezi</Text>
         </TouchableOpacity>
 
@@ -271,10 +295,10 @@ export default function UpgradeScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: TarodanColors.backgroundSecondary,
+    backgroundColor: colors.surface.alt,
   },
   header: {
-    backgroundColor: TarodanColors.primary,
+    backgroundColor: colors.primary[600]!,
     paddingTop: 50,
     paddingBottom: 16,
     paddingHorizontal: 20,
@@ -285,7 +309,7 @@ const styles = StyleSheet.create({
   headerTitle: {
     fontSize: 18,
     fontWeight: 'bold',
-    color: TarodanColors.textOnPrimary,
+    color: colors.white,
   },
   content: {
     flex: 1,
@@ -293,9 +317,9 @@ const styles = StyleSheet.create({
   },
   alreadyPremiumCard: {
     marginBottom: 16,
-    backgroundColor: TarodanColors.success + '10',
+    backgroundColor: colors.success[50]!,
     borderWidth: 1,
-    borderColor: TarodanColors.success,
+    borderColor: colors.success[600]!,
   },
   alreadyPremiumContent: {
     alignItems: 'center',
@@ -304,37 +328,37 @@ const styles = StyleSheet.create({
   alreadyPremiumTitle: {
     marginTop: 16,
     marginBottom: 8,
-    color: TarodanColors.success,
+    color: colors.success[600]!,
   },
   alreadyPremiumText: {
     textAlign: 'center',
     marginBottom: 16,
-    color: TarodanColors.textSecondary,
+    color: colors.text.muted,
   },
   heroSection: {
     alignItems: 'center',
     padding: 24,
-    backgroundColor: TarodanColors.background,
+    backgroundColor: colors.surface.DEFAULT,
     borderRadius: 16,
     marginBottom: 16,
   },
   heroTitle: {
     marginTop: 16,
     textAlign: 'center',
-    color: TarodanColors.textPrimary,
+    color: colors.text.heading,
   },
   heroSubtitle: {
     marginTop: 8,
     textAlign: 'center',
-    color: TarodanColors.textSecondary,
+    color: colors.text.muted,
   },
   planCard: {
     marginBottom: 16,
-    backgroundColor: TarodanColors.background,
+    backgroundColor: colors.surface.DEFAULT,
   },
   sectionTitle: {
     marginBottom: 16,
-    color: TarodanColors.textPrimary,
+    color: colors.text.heading,
   },
   planOption: {
     flexDirection: 'row',
@@ -342,13 +366,13 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     padding: 16,
     borderWidth: 2,
-    borderColor: TarodanColors.border,
+    borderColor: colors.border.DEFAULT,
     borderRadius: 12,
     marginBottom: 12,
   },
   planOptionSelected: {
-    borderColor: TarodanColors.primary,
-    backgroundColor: TarodanColors.primary + '08',
+    borderColor: colors.primary[600]!,
+    backgroundColor: colors.primary[50]!,
   },
   planOptionContent: {
     flexDirection: 'row',
@@ -363,34 +387,27 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     gap: 8,
   },
-  savingsBadge: {
-    backgroundColor: TarodanColors.success + '20',
-  },
   planSubtext: {
-    color: TarodanColors.textSecondary,
+    color: colors.text.muted,
     marginTop: 2,
   },
   planPrice: {
-    color: TarodanColors.primary,
+    color: colors.primary[600]!,
     fontWeight: 'bold',
   },
   subscribeButton: {
     marginBottom: 8,
-    backgroundColor: TarodanColors.primary,
     borderRadius: 12,
-  },
-  subscribeButtonContent: {
-    paddingVertical: 8,
   },
   guaranteeText: {
     textAlign: 'center',
-    color: TarodanColors.success,
+    color: colors.success[600]!,
     fontSize: 12,
     marginBottom: 24,
   },
   featuresCard: {
     marginBottom: 16,
-    backgroundColor: TarodanColors.background,
+    backgroundColor: colors.surface.DEFAULT,
   },
   featuresGrid: {
     flexDirection: 'row',
@@ -405,27 +422,27 @@ const styles = StyleSheet.create({
     width: 48,
     height: 48,
     borderRadius: 24,
-    backgroundColor: TarodanColors.primary + '10',
+    backgroundColor: colors.primary[50]!,
     justifyContent: 'center',
     alignItems: 'center',
     marginBottom: 8,
   },
   featureTitle: {
     fontWeight: '600',
-    color: TarodanColors.textPrimary,
+    color: colors.text.heading,
   },
   featureDesc: {
-    color: TarodanColors.textSecondary,
+    color: colors.text.muted,
     marginTop: 2,
   },
   comparisonCard: {
     marginBottom: 16,
-    backgroundColor: TarodanColors.background,
+    backgroundColor: colors.surface.DEFAULT,
   },
   comparisonHeader: {
     flexDirection: 'row',
     borderBottomWidth: 2,
-    borderBottomColor: TarodanColors.border,
+    borderBottomColor: colors.border.DEFAULT,
     paddingBottom: 12,
     marginBottom: 8,
   },
@@ -433,39 +450,39 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     paddingVertical: 10,
     borderBottomWidth: 1,
-    borderBottomColor: TarodanColors.border,
+    borderBottomColor: colors.border.DEFAULT,
   },
   comparisonCell: {
     fontSize: 13,
   },
   comparisonFeature: {
     flex: 2,
-    color: TarodanColors.textPrimary,
+    color: colors.text.heading,
   },
   comparisonValue: {
     flex: 1,
     textAlign: 'center',
-    color: TarodanColors.textSecondary,
+    color: colors.text.muted,
   },
   premiumColumn: {
-    backgroundColor: TarodanColors.primary + '08',
+    backgroundColor: colors.primary[50]!,
     marginLeft: 4,
     borderRadius: 4,
     paddingVertical: 4,
   },
   premiumValue: {
-    color: TarodanColors.primary,
+    color: colors.primary[600]!,
     fontWeight: '600',
   },
   faqCard: {
     marginBottom: 16,
-    backgroundColor: TarodanColors.background,
+    backgroundColor: colors.surface.DEFAULT,
   },
   faqItem: {
     marginBottom: 16,
   },
   faqAnswer: {
-    color: TarodanColors.textSecondary,
+    color: colors.text.muted,
     marginTop: 4,
     lineHeight: 20,
   },
@@ -477,7 +494,7 @@ const styles = StyleSheet.create({
   },
   helpText: {
     marginLeft: 8,
-    color: TarodanColors.primary,
+    color: colors.primary[600]!,
     fontWeight: '500',
   },
 });

@@ -1,7 +1,7 @@
 import { create } from 'zustand';
 import { api } from '../services/api';
 
-interface FollowedSeller {
+export interface FollowedSeller {
   id: string;
   displayName: string;
   avatarUrl?: string;

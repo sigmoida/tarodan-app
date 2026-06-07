@@ -92,9 +92,16 @@ export class TradeResponseDto {
   completedAt?: Date;
   cancelledAt?: Date;
   cancelReason?: string;
-  
+
+  // Stamped when the first to_warehouse shipment is received. Once set,
+  // user-side cancel is locked and only admin can resolve.
+  firstWarehouseArrivalAt?: Date | null;
+  // Derived for the requesting viewer: true only when this user is allowed to
+  // cancel the trade right now (participant + eligible state + not locked).
+  canCancel?: boolean;
+
   version?: number;
-  
+
   createdAt: Date;
   updatedAt: Date;
 }

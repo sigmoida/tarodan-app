@@ -67,6 +67,43 @@ interface MessagesState {
   getOtherParticipant: (thread: MessageThread) => { id: string; displayName: string; avatarUrl?: string };
 }
 
+/**
+ * API thread'leri düz alanlarla döndürür (participant1Id/Name/AvatarUrl,
+ * participant2...). Web (apps/web messages/page.tsx) bunu otherUser'a çevirir.
+ * Mobil getOtherParticipant nested participant1/participant2 objesi beklediği
+ * için burada düz alanları nesneye normalize ediyoruz — yoksa isim 'Kullanıcı'
+ * görünür. Hem fetchThreads hem fetchThread bu helper'ı kullanır.
+ */
+function normalizeThread(t: any): MessageThread {
+  if (!t || typeof t !== 'object') return t;
+  const participant1 =
+    t.participant1 && typeof t.participant1 === 'object'
+      ? t.participant1
+      : {
+          id: t.participant1Id || t.sender?.id || '',
+          displayName: t.participant1Name || t.sender?.displayName || 'Kullanıcı',
+          avatarUrl: t.participant1AvatarUrl || t.sender?.avatarUrl || undefined,
+        };
+  const participant2 =
+    t.participant2 && typeof t.participant2 === 'object'
+      ? t.participant2
+      : {
+          id: t.participant2Id || t.otherUser?.id || t.receiver?.id || '',
+          displayName:
+            t.participant2Name || t.otherUser?.displayName || t.receiver?.displayName || 'Kullanıcı',
+          avatarUrl:
+            t.participant2AvatarUrl || t.otherUser?.avatarUrl || t.receiver?.avatarUrl || undefined,
+        };
+  return {
+    ...t,
+    participant1Id: t.participant1Id || participant1.id,
+    participant2Id: t.participant2Id || participant2.id,
+    participant1,
+    participant2,
+    unreadCount: t.unreadCount || 0,
+  };
+}
+
 const FREE_DAILY_MESSAGE_LIMIT = 50;
 
 export const useMessagesStore = create<MessagesState>((set, get) => ({
@@ -86,18 +123,8 @@ export const useMessagesStore = create<MessagesState>((set, get) => ({
       const response = await messagesApi.getThreads();
       const threadsData = response.data?.threads || response.data?.data || response.data || [];
       
-      // Normalize thread data - API farklı format dönebilir
-      const normalizedThreads = (Array.isArray(threadsData) ? threadsData : []).map((t: any) => {
-        // API'den otherUser gelebilir veya participant1/participant2 gelebilir
-        const defaultParticipant = { id: '', displayName: 'Kullanıcı', avatarUrl: undefined };
-        
-        return {
-          ...t,
-          participant1: t.participant1 || t.sender || defaultParticipant,
-          participant2: t.participant2 || t.receiver || t.otherUser || defaultParticipant,
-          unreadCount: t.unreadCount || 0,
-        };
-      });
+      // Normalize thread data — düz API alanlarını nested participant objesine çevir.
+      const normalizedThreads = (Array.isArray(threadsData) ? threadsData : []).map(normalizeThread);
       
       set({ 
         threads: normalizedThreads, 
@@ -113,7 +140,8 @@ export const useMessagesStore = create<MessagesState>((set, get) => ({
   fetchThread: async (threadId: string) => {
     try {
       const response = await messagesApi.getThread(threadId);
-      set({ currentThread: response.data });
+      const raw = (response.data as any)?.data ?? response.data;
+      set({ currentThread: raw ? normalizeThread(raw) : null });
     } catch (error: any) {
       console.error('Failed to fetch thread:', error);
       set({ error: 'Mesaj konusu yüklenemedi' });

@@ -1,0 +1,10 @@
+# DEPRECATED — bu placeholder D-01-checkout-bypass-regression.yaml ile kapatıldı.
+# Bypass payment chain UI doğrulaması artık D-01 altında (smoke tag'inde) koşar.
+# Burada sadece launch + home doğrulaması yapılır; kaldırılma adayı.
+appId: com.tarodan.app
+tags:
+  - placeholder
+---
+- runFlow: ../subflows/open-tarodan.yaml
+- assertVisible:
+    text: "Ana Sayfa"
