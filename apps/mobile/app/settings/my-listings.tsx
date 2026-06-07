@@ -20,6 +20,7 @@ import { productsApi } from '../../src/services/api';
 import { useAuthStore } from '../../src/stores/authStore';
 import { useTranslation } from '../../src/i18n';
 import { resolveImageUrl } from '../../src/utils/imageUrl';
+import { BoostModal } from '../../src/components/product/BoostModal';
 
 const { colors, spacing, radius } = theme;
 
@@ -36,6 +37,7 @@ interface Listing {
   expiresAt?: string;
   condition: string;
   category?: { name: string };
+  boostedUntil?: string | null;
 }
 
 type FilterType = 'all' | 'active' | 'pending' | 'sold' | 'expired' | 'inactive';
@@ -49,6 +51,11 @@ export default function MyListingsScreen() {
   const [actionMenuListing, setActionMenuListing] = useState<Listing | null>(null);
   const [deleteDialogVisible, setDeleteDialogVisible] = useState(false);
   const [selectedListing, setSelectedListing] = useState<Listing | null>(null);
+  const [boostListing, setBoostListing] = useState<Listing | null>(null);
+  const isPremiumUser = Boolean(
+    (user as any)?.isPremium ||
+      ((user as any)?.membership_type && (user as any)?.membership_type !== 'free'),
+  );
 
   const { data: listingsData, isLoading, isError, refetch } = useQuery({
     queryKey: ['my-listings', filter],
@@ -206,6 +213,9 @@ export default function MyListingsScreen() {
         break;
       case 'activate':
         reactivateMutation.mutate(listing.id);
+        break;
+      case 'boost':
+        setBoostListing(listing);
         break;
       case 'relist':
         // Check listing limit before relisting
@@ -449,6 +459,12 @@ export default function MyListingsScreen() {
               </Pressable>
             )}
             {actionMenuListing.status === 'active' && (
+              <Pressable style={styles.menuItem} onPress={() => handleMenuAction('boost', actionMenuListing)}>
+                <Ionicons name="rocket" size={20} color={colors.warning[600]!} />
+                <Text style={[styles.menuItemText, { color: colors.warning[700]! }]}>Öne Çıkar</Text>
+              </Pressable>
+            )}
+            {actionMenuListing.status === 'active' && (
               <Pressable style={styles.menuItem} onPress={() => handleMenuAction('deactivate', actionMenuListing)}>
                 <Ionicons name="pause-circle" size={20} color={colors.text.heading} />
                 <Text style={styles.menuItemText}>Deaktif Et</Text>
@@ -488,6 +504,16 @@ export default function MyListingsScreen() {
           />
         </View>
       </Modal>
+
+      {/* Boost / Öne Çıkar Modal */}
+      <BoostModal
+        visible={boostListing !== null}
+        onClose={() => setBoostListing(null)}
+        listingId={boostListing?.id ?? ''}
+        listingTitle={boostListing?.title ?? ''}
+        boostedUntil={boostListing?.boostedUntil ?? null}
+        isPremium={isPremiumUser}
+      />
 
       {/* FAB */}
       {canCreateNew && (

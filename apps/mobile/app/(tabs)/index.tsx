@@ -85,6 +85,21 @@ export default function HomeScreen() {
     },
   });
 
+  // Öne çıkan (boost'lu) ürünler — web vitrini ile aynı: GET /products?boostedOnly=true
+  const { data: boostedResponse } = useQuery({
+    queryKey: ['products', 'boosted'],
+    queryFn: async () => {
+      try {
+        const response = await productsApi.getAll({ boostedOnly: true, status: 'active', limit: 12 });
+        const list = response.data?.data || response.data?.products || response.data || [];
+        return Array.isArray(list) ? list : [];
+      } catch {
+        return [];
+      }
+    },
+  });
+  const boostedProducts: any[] = boostedResponse || [];
+
   // Fetch categories - web ile aynı endpoint: GET /categories
   const { data: categoriesResponse } = useQuery({
     queryKey: ['categories'],
@@ -249,6 +264,26 @@ export default function HomeScreen() {
                 <Ionicons name="swap-horizontal" size={10} color={colors.white} />
                 <Text variant="caption" tone="inverted" weight="bold">
                   {' '}Takas
+                </Text>
+              </View>
+            )}
+            {(item.isBoosted || item.boostedUntil) && (
+              <View
+                style={{
+                  position: 'absolute',
+                  top: 10,
+                  right: 10,
+                  paddingHorizontal: 8,
+                  paddingVertical: 4,
+                  borderRadius: 6,
+                  flexDirection: 'row',
+                  alignItems: 'center',
+                  backgroundColor: colors.warning[500]!,
+                }}
+              >
+                <Ionicons name="rocket" size={10} color={colors.white} />
+                <Text variant="caption" tone="inverted" weight="bold">
+                  {' '}Sponsorlu
                 </Text>
               </View>
             )}
@@ -500,6 +535,21 @@ export default function HomeScreen() {
                 <Text style={styles.viewGarageBtnText}>Garajını incele →</Text>
               </TouchableOpacity>
             </View>
+          </View>
+        )}
+
+        {/* Öne Çıkan / Sponsorlu Ürünler (boost'lu) — Tümünü Gör YOK */}
+        {boostedProducts.length > 0 && (
+          <View style={styles.section}>
+            <View style={styles.sectionHeader}>
+              <View style={styles.sectionTitleContainer}>
+                <View style={styles.sectionIndicator} />
+                <Text style={styles.sectionTitle}>🚀 Öne Çıkan Ürünler</Text>
+              </View>
+            </View>
+            <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.productsScroll}>
+              {boostedProducts.slice(0, 12).map((item: any, index: number) => renderProductCard(item, index))}
+            </ScrollView>
           </View>
         )}
 

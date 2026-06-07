@@ -49,12 +49,13 @@ export default function ProfileScreen() {
   // Web ile parite: sayaçlar kullanıcının kendi public profilinin stats objesinden
   // ({ totalListings, totalSales, totalTrades, averageRating, totalRatings }).
   // (business-stats yalnızca business tier'da çalışıyordu → premium/free'de boştu.)
-  const { data: apiStats } = useQuery({
+  const { data: apiProfile } = useQuery({
     queryKey: ['user-stats', user?.id],
     queryFn: async () => {
       try {
         const response = await userApi.getPublicProfile(String(user?.id));
-        return (response.data as any)?.data?.stats ?? (response.data as any)?.stats ?? null;
+        // Tüm public profil gövdesi (stats + trustScore/trustLevel — trust premium+showTrustScore'a bağlı).
+        return (response.data as any)?.data ?? (response.data as any) ?? null;
       } catch (error) {
         console.log('Stats API failed, using user data');
         return null;
@@ -63,6 +64,9 @@ export default function ProfileScreen() {
     enabled: isAuthenticated && !!user?.id,
     retry: 1,
   });
+  const apiStats = (apiProfile as any)?.stats ?? null;
+  const trustScore: number | null = (apiProfile as any)?.trustScore ?? null;
+  const trustLevel: string | null = (apiProfile as any)?.trustLevel ?? null;
 
   // Koleksiyon sayısı business-stats'ta gelmeyebilir; web gibi /collections/me
   // üzerinden ayrı çekilir (meta.total).
@@ -383,6 +387,18 @@ export default function ProfileScreen() {
                 <Ionicons name="diamond" size={14} color={colors.warning[500]!} />
                 <Text variant="caption" weight="semibold" style={{ marginLeft: spacing[1] }}>
                   {effectiveTier} Üye
+                </Text>
+              </View>
+            )}
+            {trustScore != null && (
+              <View style={styles.trustBadge}>
+                <Ionicons name="shield-checkmark" size={13} color={colors.warning[600]!} />
+                <Text
+                  variant="caption"
+                  weight="semibold"
+                  style={{ marginLeft: spacing[1], color: colors.warning[700]! }}
+                >
+                  Güven {trustScore}/100{trustLevel ? ` · ${trustLevel}` : ''}
                 </Text>
               </View>
             )}
@@ -736,6 +752,16 @@ const styles = StyleSheet.create({
     paddingVertical: spacing[1],
     borderRadius: radius['2xl'],
     marginTop: spacing[2],
+    alignSelf: 'flex-start',
+  },
+  trustBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: colors.warning[50]!,
+    paddingHorizontal: spacing[2.5],
+    paddingVertical: spacing[1],
+    borderRadius: radius['2xl'],
+    marginTop: spacing[1.5],
     alignSelf: 'flex-start',
   },
   editButton: { padding: spacing[2] },

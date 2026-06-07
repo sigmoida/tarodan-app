@@ -25,6 +25,8 @@ export interface ProductCardProduct extends ProductPriceFields {
   isPreorder?: boolean;
   isLimited?: boolean;
   isTradeEnabled?: boolean;
+  isBoosted?: boolean;
+  boostedUntil?: string | null;
   condition?: string;
   rating?: { average: number | null; count: number } | null;
   seller?: { id?: string; displayName?: string; isVerified?: boolean } | null;
@@ -136,8 +138,14 @@ export function ProductCard({
           onError={() => setImgSrc(FALLBACK_IMG)}
         />
 
-        {/* Sol üst: indirim / ön sipariş / limited */}
+        {/* Sol üst: sponsorlu / indirim / ön sipariş / limited */}
         <View style={styles.topLeftStack}>
+          {product.isBoosted || product.boostedUntil ? (
+            <View style={[styles.badge, styles.boostBadge]}>
+              <Ionicons name="rocket" size={10} color={colors.white} />
+              <Text style={[styles.badgeText, { marginLeft: 4 }]}>SPONSORLU</Text>
+            </View>
+          ) : null}
           {onSale && discountPct > 0 ? (
             <View style={[styles.badge, styles.saleBadge]}>
               <Text style={styles.badgeText}>%{discountPct} İndirim</Text>
@@ -327,6 +335,9 @@ const styles = StyleSheet.create({
   },
   tradeBadge: {
     backgroundColor: colors.info[600]!,
+  },
+  boostBadge: {
+    backgroundColor: colors.warning[500]!,
   },
   neutralBadge: {
     backgroundColor: colors.overlay.black70,

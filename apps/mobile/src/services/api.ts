@@ -202,6 +202,20 @@ export const productsApi = {
   /** Aynı kategoriden benzer ürünler — backend: GET /products/:id/similar */
   getSimilar: (id: string, limit = 12) =>
     api.get(`/products/${id}/similar`, { params: { limit } }),
+  // ---- Boost / Öne Çıkarma ----
+  /** Boost süre/fiyat paketleri. Backend: GET /products/boost/pricing */
+  getBoostPricing: () =>
+    api.get<{
+      enabled?: boolean;
+      options?: Array<{ durationDays: number; price: number; label: string }>;
+    }>('/products/boost/pricing'),
+  /** Kullanıcının boost'ları (en yeni önce). Backend: GET /products/boost/my */
+  getMyBoosts: () => api.get('/products/boost/my'),
+  /** İlanı öne çıkar — ödeme başlat (paymentId döner). Backend: POST /products/:id/boost/initiate */
+  initiateBoost: (
+    productId: string,
+    data: { durationDays: number; autoRenew?: boolean; provider?: 'paytr' },
+  ) => api.post(`/products/${productId}/boost/initiate`, data),
 };
 
 // Categories API - Web ile aynı endpoint'ler
