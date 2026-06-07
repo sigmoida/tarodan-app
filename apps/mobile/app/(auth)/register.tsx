@@ -19,10 +19,25 @@ import {
   strongPasswordSchema,
 } from '../../src/utils/validation';
 
+/** 18+ yaş kontrolü — API RegisterDto birthDate'i zorunlu kılar (IsAdultConstraint). */
+function isAdult(dateStr: string): boolean {
+  const d = new Date(dateStr);
+  if (Number.isNaN(d.getTime())) return false;
+  const today = new Date();
+  let age = today.getFullYear() - d.getFullYear();
+  const monthDiff = today.getMonth() - d.getMonth();
+  if (monthDiff < 0 || (monthDiff === 0 && today.getDate() < d.getDate())) age -= 1;
+  return age >= 18;
+}
+
 const registerSchema = z
   .object({
     displayName: displayNameSchema,
     email: emailSchema,
+    birthDate: z
+      .string()
+      .regex(/^\d{4}-\d{2}-\d{2}$/, 'Doğum tarihi YYYY-AA-GG biçiminde olmalı')
+      .refine(isAdult, 'Kayıt için en az 18 yaşında olmalısınız'),
     password: strongPasswordSchema,
     confirmPassword: z.string(),
     acceptTerms: z
@@ -48,6 +63,7 @@ export default function RegisterScreen() {
         displayName: data.displayName,
         email: data.email,
         password: data.password,
+        birthDate: data.birthDate,
       }),
     onSuccess: () => router.replace('/(auth)/login'),
   });
@@ -96,6 +112,21 @@ export default function RegisterScreen() {
 
         <Controller
           control={control}
+          name="birthDate"
+          render={({ field: { onChange, value } }) => (
+            <Input
+              testID="register-birthDate-input"
+              label="Doğum Tarihi (YYYY-AA-GG)"
+              value={value}
+              onChangeText={onChange}
+              autoCapitalize="none"
+              error={errors.birthDate?.message}
+            />
+          )}
+        />
+
+        <Controller
+          control={control}
           name="password"
           render={({ field: { onChange, value } }) => (
             <Input
@@ -109,6 +140,9 @@ export default function RegisterScreen() {
             />
           )}
         />
+        <Text variant="bodySm" tone="muted">
+          Şifre en az 8 karakter olmalı; 1 büyük harf, 1 küçük harf ve 1 rakam içermeli.
+        </Text>
 
         <Controller
           control={control}
@@ -142,6 +176,26 @@ export default function RegisterScreen() {
             {errors.acceptTerms.message}
           </Text>
         ) : null}
+
+        <HStack justify="center" wrap gap={1}>
+          <Text
+            variant="bodySm"
+            tone="primary"
+            weight="semibold"
+            onPress={() => router.push('/terms')}
+          >
+            Kullanım Koşulları
+          </Text>
+          <Text variant="bodySm" tone="muted">ve</Text>
+          <Text
+            variant="bodySm"
+            tone="primary"
+            weight="semibold"
+            onPress={() => router.push('/privacy')}
+          >
+            Gizlilik Politikası
+          </Text>
+        </HStack>
 
         {registerMutation.isError ? (
           <Text variant="bodySm" tone="danger" align="center">

@@ -50,8 +50,10 @@ interface OrderDetail {
     fullName: string;
     phone: string;
     address: string;
+    district?: string;
     city: string;
-    postalCode: string;
+    postalCode?: string;
+    zipCode?: string;
   };
   trackingNumber?: string;
   trackingUrl?: string;
@@ -428,7 +430,12 @@ export default function OrderDetailScreen() {
             {order.shippingAddress.address}
           </Text>
           <Text variant="caption" style={styles.addressText}>
-            {order.shippingAddress.city} {order.shippingAddress.postalCode}
+            {order.shippingAddress.district
+              ? `${order.shippingAddress.district} / ${order.shippingAddress.city}`
+              : order.shippingAddress.city}
+            {(order.shippingAddress.zipCode ?? order.shippingAddress.postalCode)
+              ? ` ${order.shippingAddress.zipCode ?? order.shippingAddress.postalCode}`
+              : ''}
           </Text>
           <Text variant="caption" style={styles.addressText}>
             Tel: {order.shippingAddress.phone}

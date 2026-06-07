@@ -1,5 +1,5 @@
 import { View, ScrollView, StyleSheet, TouchableOpacity, RefreshControl } from 'react-native';
-import { Avatar, Badge, FAB, Input, Spinner, Text, theme } from '@tarodan/ui-native';
+import { Avatar, Badge, Input, Spinner, Text, theme } from '@tarodan/ui-native';
 import { useState, useCallback } from 'react';
 import { router, useFocusEffect } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
@@ -226,14 +226,6 @@ export default function MessagesListScreen() {
           <View style={{ height: 100 }} />
         </ScrollView>
       )}
-
-      {/* New Message FAB */}
-      <FAB
-        icon="add"
-        accessibilityLabel="Yeni mesaj"
-        style={styles.fab}
-        onPress={() => router.push('/messages/new')}
-      />
     </View>
   );
 }

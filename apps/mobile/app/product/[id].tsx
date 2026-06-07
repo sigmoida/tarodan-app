@@ -1,5 +1,5 @@
-import { useState, useEffect } from 'react';
-import { View, ScrollView, Image, Dimensions, StyleSheet, Pressable, Share } from 'react-native';
+import { useState, useEffect, useRef } from 'react';
+import { View, ScrollView, Image, Dimensions, StyleSheet, Pressable, Share, Modal } from 'react-native';
 import {
   Button,
   IconButton,
@@ -10,7 +10,7 @@ import {
   Text,
   theme,
 } from '@tarodan/ui-native';
-import { useQuery } from '@tanstack/react-query';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useLocalSearchParams, router } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { productsApi, ratingsApi, userReportsApi } from '../../src/services/api';
@@ -38,55 +38,28 @@ const CONDITION_LABELS: Record<string, { name: string; color: string }> = {
   poor: { name: 'Hasarlı', color: colors.danger[600]! },
 };
 
-// Mock product for demo/offline mode
-const MOCK_PRODUCT = {
-  id: '1',
-  title: 'Porsche 911 GT3 RS (Silver)',
-  description: '1:18 ölçekli, orijinal kutusunda, hiç açılmamış koleksiyonluk Porsche 911 GT3 RS modeli. AutoArt üretimi, son derece detaylı iç mekan ve motor bölümü. Kapılar, kaput ve bagaj açılabilir.',
-  price: 3200,
-  brand: 'AutoArt',
-  scale: '1:18',
-  condition: 'new',
-  category: 'Spor Araba',
-  year: '2023',
-  tradeAvailable: true,
-  viewCount: 156,
-  favoriteCount: 12,
-  images: ['https://placehold.co/400x400/f3f4f6/9ca3af?text=Porsche+911'],
-  seller: {
-    id: 's1',
-    displayName: 'Premium Collector',
-    avatarUrl: null,
-    rating: 4.8,
-    totalSales: 127,
-    memberSince: '2023-01-15',
-    responseTime: '< 1 saat',
-    verified: true,
-  },
-  reviews: [
-    { id: 'r1', userName: 'Ahmet K.', rating: 5, comment: 'Mükemmel ürün, çok iyi paketlenmişti.', date: '2024-01-05' },
-    { id: 'r2', userName: 'Mehmet Y.', rating: 4, comment: 'Güzel model, açıklamaya uygun.', date: '2024-01-02' },
-  ],
-  createdAt: '2024-01-10',
-};
-
 export default function ProductDetailScreen() {
   const { id } = useLocalSearchParams();
   const productId = String(id);
   const { isAuthenticated, user } = useAuthStore();
-  const { addItem } = useCartStore();
+  const { addItem, isInCart } = useCartStore();
   const { incrementProductView, getPromptType, setLastPromptShown, canShowPrompt } = useGuestStore();
   const { addToFavorites, removeFromFavorites, isInFavorites, fetchFavorites } = useFavoritesStore();
+  const queryClient = useQueryClient();
 
   const [currentImage, setCurrentImage] = useState(0);
   const [snackbar, setSnackbar] = useState({ visible: false, message: '', type: 'success' as 'success' | 'error' });
   const [showAllDescription, setShowAllDescription] = useState(false);
   const [isFavorite, setIsFavorite] = useState(false);
+  const [favoriteCount, setFavoriteCount] = useState(0);
   const [favoriteLoading, setFavoriteLoading] = useState(false);
   const [showPrompt, setShowPrompt] = useState(false);
   const [promptType, setPromptType] = useState<'favorites' | 'message' | 'purchase' | 'trade' | 'collections' | null>(null);
   const [offerModalOpen, setOfferModalOpen] = useState(false);
   const [collectionModalOpen, setCollectionModalOpen] = useState(false);
+  // Tam ekran görsel görüntüleyici (G1 — pinch-zoom)
+  const [imageViewerOpen, setImageViewerOpen] = useState(false);
+  const [viewerIndex, setViewerIndex] = useState(0);
 
   // Check if product is in favorites when authenticated
   useEffect(() => {
@@ -115,6 +88,12 @@ export default function ProductDetailScreen() {
     }
   }, [id, isAuthenticated]);
 
+  // Görüntülenme sayacı ürün başına 1 kez artırılır (web ile parite).
+  const viewCountedRef = useRef(false);
+  useEffect(() => {
+    viewCountedRef.current = false;
+  }, [id]);
+
   // Web ile aynı endpoint: GET /products/:id
   const { data: apiProduct, isLoading } = useQuery({
     queryKey: ['product', id],
@@ -122,10 +101,25 @@ export default function ProductDetailScreen() {
       try {
         const response = await productsApi.getOne(productId);
         const product = response.data.data || response.data;
-        console.log('📦 Ürün detayı yüklendi:', product?.title);
+        // Web ile parite: ürünü çektikten sonra görüntülenmeyi say (POST /products/:id/view).
+        if (product && !viewCountedRef.current) {
+          viewCountedRef.current = true;
+          try {
+            const viewResp: any = await productsApi.incrementView(productId);
+            const vc = viewResp?.data?.viewCount ?? viewResp?.data?.data?.viewCount;
+            if (vc !== undefined) product.viewCount = vc;
+            // Liste/öne-çıkan ekranlardaki görüntülenme bayatlamasın — geri dönünce tazelensin
+            queryClient.invalidateQueries({ queryKey: ['products'] });
+            queryClient.invalidateQueries({ queryKey: ['products-search'] });
+            queryClient.invalidateQueries({ queryKey: ['featured-business'] });
+            queryClient.invalidateQueries({ queryKey: ['featured-collector'] });
+          } catch {
+            // görüntülenme sayımı kritik değil — yoksay
+          }
+        }
         return product;
       } catch (error) {
-        console.log('⚠️ Ürün detayı yüklenemedi, mock data kullanılacak');
+        console.log('⚠️ Ürün detayı yüklenemedi');
         return null;
       }
     },
@@ -138,27 +132,15 @@ export default function ProductDetailScreen() {
     queryFn: async () => {
       try {
         const response = await ratingsApi.getProductRatings(productId);
-        return response.data.data || response.data || [];
+        // API şekli: { ratings, total, page, pageSize }
+        const data: any = response.data;
+        return data?.ratings ?? data?.items ?? data?.data ?? (Array.isArray(data) ? data : []);
       } catch {
-        return MOCK_PRODUCT.reviews;
+        return [];
       }
     },
     enabled: !!id,
   });
-
-  // Use API data or fallback to mock
-  const product = apiProduct || MOCK_PRODUCT;
-  // Transform image URLs to use network IP instead of localhost
-  const images = product.images?.length > 0
-    ? product.images.map((img: any) => {
-        const url = typeof img === 'string' ? img : img.url;
-        return typeof img === 'string' ? transformImageUrl(url) : { ...img, url: transformImageUrl(url) };
-      })
-    : ['https://placehold.co/400x400/f3f4f6/9ca3af?text=Ürün'];
-
-  const getConditionInfo = (condition: string) => {
-    return CONDITION_LABELS[condition] || { name: condition, color: colors.gray[500] };
-  };
 
   // Sold / inactive ürün → unavailable sayfasına yönlendir (web pariteti)
   useEffect(() => {
@@ -169,6 +151,48 @@ export default function ProductDetailScreen() {
       } as any);
     }
   }, [apiProduct, productId]);
+
+  // Favori (beğeni) sayısını server'daki likeCount'tan senkronize et
+  useEffect(() => {
+    if (apiProduct) setFavoriteCount(apiProduct.likeCount ?? 0);
+  }, [apiProduct]);
+
+  const product = apiProduct;
+  // Görsel URL'lerini çöz (cardUrl/detailUrl/url) — yoksa placeholder.
+  const images = product?.images?.length > 0
+    ? product.images.map((img: any) => {
+        const uri = transformImageUrl(img);
+        return typeof img === 'string' ? uri : { ...img, url: uri };
+      })
+    : ['https://placehold.co/400x400/f3f4f6/9ca3af?text=Ürün'];
+
+  // Tüm hook'lar yukarıda tamamlandı — buradan sonra erken çıkış güvenli.
+  if (isLoading) {
+    return (
+      <View style={styles.loadingContainer}>
+        <Spinner size="lg" />
+        <Text style={styles.loadingText}>Yükleniyor...</Text>
+      </View>
+    );
+  }
+  if (!product) {
+    return (
+      <View style={styles.loadingContainer}>
+        <Ionicons name="cube-outline" size={64} color={colors.text.muted} />
+        <Text style={styles.loadingText}>Ürün bulunamadı</Text>
+        <Button
+          variant="primary"
+          title="Geri Dön"
+          onPress={() => router.back()}
+          style={{ marginTop: 16 }}
+        />
+      </View>
+    );
+  }
+
+  const getConditionInfo = (condition: string) => {
+    return CONDITION_LABELS[condition] || { name: condition, color: colors.gray[500] };
+  };
 
   const handleAddToCart = () => {
     if (apiProduct?.status === 'sold' || apiProduct?.status === 'inactive') {
@@ -206,6 +230,8 @@ export default function ProductDetailScreen() {
         const success = await removeFromFavorites(productId);
         if (success) {
           setIsFavorite(false);
+          setFavoriteCount((c) => Math.max(0, c - 1)); // beğeni sayısı anında güncellensin
+          invalidateProductLists();
           setSnackbar({ visible: true, message: 'Favorilerden kaldırıldı', type: 'success' });
         } else {
           setSnackbar({ visible: true, message: 'Favorilerden kaldırılamadı', type: 'error' });
@@ -214,6 +240,8 @@ export default function ProductDetailScreen() {
         const success = await addToFavorites(productId);
         if (success) {
           setIsFavorite(true);
+          setFavoriteCount((c) => c + 1); // beğeni sayısı anında güncellensin
+          invalidateProductLists();
           setSnackbar({ visible: true, message: 'Favorilere eklendi!', type: 'success' });
         } else {
           setSnackbar({ visible: true, message: 'Favorilere eklenemedi', type: 'error' });
@@ -224,6 +252,14 @@ export default function ProductDetailScreen() {
     } finally {
       setFavoriteLoading(false);
     }
+  };
+
+  // Beğeni/görüntülenme değişince tüm liste ekranları (home/öne çıkanlar/arama) tazelensin
+  const invalidateProductLists = () => {
+    queryClient.invalidateQueries({ queryKey: ['products'] });
+    queryClient.invalidateQueries({ queryKey: ['products-search'] });
+    queryClient.invalidateQueries({ queryKey: ['featured-business'] });
+    queryClient.invalidateQueries({ queryKey: ['featured-collector'] });
   };
 
   const handleMessage = () => {
@@ -328,16 +364,11 @@ export default function ProductDetailScreen() {
     );
   };
 
-  if (isLoading && !product) {
-    return (
-      <View style={styles.loadingContainer}>
-        <Spinner size="lg" />
-        <Text style={styles.loadingText}>Yükleniyor...</Text>
-      </View>
-    );
-  }
-
   const conditionInfo = getConditionInfo(product.condition);
+  const isOwner = Boolean(
+    isAuthenticated && user?.id && product.seller?.id && user.id === product.seller.id
+  );
+  const inCart = isInCart(productId);
 
   return (
     <View style={styles.container}>
@@ -388,12 +419,18 @@ export default function ProductDetailScreen() {
           {images.map((img: any, index: number) => {
             const uri = typeof img === 'string' ? img : img.url;
             return (
-              <Image
+              <Pressable
                 key={index}
-                source={{ uri }}
-                style={styles.productImage}
-                resizeMode="contain"
-              />
+                onPress={() => { setViewerIndex(index); setImageViewerOpen(true); }}
+                accessibilityRole="imagebutton"
+                accessibilityLabel="Fotoğrafı büyüt"
+              >
+                <Image
+                  source={{ uri }}
+                  style={styles.productImage}
+                  resizeMode="contain"
+                />
+              </Pressable>
             );
           })}
         </ScrollView>
@@ -440,7 +477,7 @@ export default function ProductDetailScreen() {
             </View>
             <View style={styles.quickInfoItem}>
               <Ionicons name="heart-outline" size={16} color={colors.text.muted} />
-              <Text style={styles.quickInfoText}>{product.favoriteCount || 0} favori</Text>
+              <Text style={styles.quickInfoText}>{favoriteCount} favori</Text>
             </View>
             <View style={styles.quickInfoItem}>
               <Ionicons name="time-outline" size={16} color={colors.text.muted} />
@@ -608,29 +645,37 @@ export default function ProductDetailScreen() {
               </Pressable>
             </View>
 
-            {(Array.isArray(reviews) && reviews.length > 0 ? reviews : MOCK_PRODUCT.reviews || []).slice(0, 2).map((review: any) => (
-              <View key={review.id} style={styles.reviewCard}>
-                <View style={styles.reviewHeader}>
-                  <Text style={styles.reviewerName}>{review.userName}</Text>
-                  <View style={styles.ratingStars}>
-                    {[1, 2, 3, 4, 5].map((star) => (
-                      <Ionicons
-                        key={star}
-                        name={star <= review.rating ? 'star' : 'star-outline'}
-                        size={14}
-                        color={colors.warning[500]!}
-                      />
-                    ))}
+            {(Array.isArray(reviews) ? reviews : []).slice(0, 2).map((review: any) => {
+              // Backend rating: { score, comment, createdAt, reviewer: { displayName } }
+              const score = review.score ?? review.rating ?? 0;
+              const reviewerName = review.reviewer?.displayName ?? review.userName ?? 'Kullanıcı';
+              const dateStr = review.createdAt ?? review.date;
+              return (
+                <View key={review.id} style={styles.reviewCard}>
+                  <View style={styles.reviewHeader}>
+                    <Text style={styles.reviewerName}>{reviewerName}</Text>
+                    <View style={styles.ratingStars}>
+                      {[1, 2, 3, 4, 5].map((star) => (
+                        <Ionicons
+                          key={star}
+                          name={star <= score ? 'star' : 'star-outline'}
+                          size={14}
+                          color={colors.warning[500]!}
+                        />
+                      ))}
+                    </View>
                   </View>
+                  <Text style={styles.reviewComment}>{review.comment}</Text>
+                  {dateStr ? (
+                    <Text style={styles.reviewDate}>
+                      {new Date(dateStr).toLocaleDateString('tr-TR')}
+                    </Text>
+                  ) : null}
                 </View>
-                <Text style={styles.reviewComment}>{review.comment}</Text>
-                <Text style={styles.reviewDate}>
-                  {new Date(review.date).toLocaleDateString('tr-TR')}
-                </Text>
-              </View>
-            ))}
+              );
+            })}
 
-            {(!Array.isArray(reviews) || reviews.length === 0) && (!MOCK_PRODUCT.reviews || MOCK_PRODUCT.reviews.length === 0) && (
+            {(!Array.isArray(reviews) || reviews.length === 0) && (
               <Text style={styles.noReviews}>Henüz değerlendirme yok</Text>
             )}
           </View>
@@ -657,28 +702,97 @@ export default function ProductDetailScreen() {
           <Text style={styles.bottomPriceValue}>₺{product.price?.toLocaleString('tr-TR')}</Text>
         </View>
         <View style={styles.bottomButtons}>
-          {product.tradeAvailable && (
+          {isOwner ? (
             <Button
-              variant="outline"
-              onPress={handleTrade}
-              icon="swap-horizontal"
-              style={styles.tradeButton}
-              textStyle={styles.tradeButtonLabel}
+              testID="product-detail-edit-button"
+              variant="primary"
+              onPress={() => router.push(`/listing/${product.id}/edit` as any)}
+              icon="create-outline"
+              style={styles.cartButton}
             >
-              Takas
+              İlanı Düzenle
             </Button>
+          ) : (
+            <>
+              {product.tradeAvailable && (
+                <Button
+                  variant="outline"
+                  onPress={handleTrade}
+                  icon="swap-horizontal"
+                  style={styles.tradeButton}
+                  textStyle={styles.tradeButtonLabel}
+                >
+                  Takas
+                </Button>
+              )}
+              {inCart ? (
+                <Button
+                  testID="product-detail-go-to-cart-button"
+                  variant="outline"
+                  onPress={() => router.push('/cart')}
+                  icon="checkmark-circle"
+                  style={styles.cartButton}
+                >
+                  Sepette • Git
+                </Button>
+              ) : (
+                <Button
+                  testID="product-detail-add-to-cart-button"
+                  variant="primary"
+                  onPress={handleAddToCart}
+                  icon="cart"
+                  style={styles.cartButton}
+                >
+                  Sepete Ekle
+                </Button>
+              )}
+            </>
           )}
-          <Button
-            testID="product-detail-add-to-cart-button"
-            variant="primary"
-            onPress={handleAddToCart}
-            icon="cart"
-            style={styles.cartButton}
-          >
-            Sepete Ekle
-          </Button>
         </View>
       </View>
+
+      {/* Tam ekran görsel görüntüleyici — pinch-zoom (G1) */}
+      <Modal
+        visible={imageViewerOpen}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setImageViewerOpen(false)}
+      >
+        <View style={styles.viewerContainer}>
+          <Pressable
+            style={styles.viewerClose}
+            onPress={() => setImageViewerOpen(false)}
+            accessibilityRole="button"
+            accessibilityLabel="Kapat"
+          >
+            <Ionicons name="close" size={30} color={colors.white} />
+          </Pressable>
+          <ScrollView
+            horizontal
+            pagingEnabled
+            showsHorizontalScrollIndicator={false}
+            contentOffset={{ x: viewerIndex * width, y: 0 }}
+          >
+            {images.map((img: any, index: number) => {
+              const uri = typeof img === 'string' ? img : img.url;
+              return (
+                <ScrollView
+                  key={index}
+                  style={styles.viewerPageScroll}
+                  contentContainerStyle={styles.viewerPage}
+                  maximumZoomScale={3}
+                  minimumZoomScale={1}
+                  showsVerticalScrollIndicator={false}
+                  showsHorizontalScrollIndicator={false}
+                  centerContent
+                >
+                  <Image source={{ uri }} style={styles.viewerImage} resizeMode="contain" />
+                </ScrollView>
+              );
+            })}
+          </ScrollView>
+        </View>
+      </Modal>
 
       <Snackbar
         visible={snackbar.visible}
@@ -781,6 +895,34 @@ const styles = StyleSheet.create({
     width,
     height: width,
     backgroundColor: colors.gray[50],
+  },
+  viewerContainer: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.96)',
+  },
+  viewerClose: {
+    position: 'absolute',
+    top: 50,
+    right: 20,
+    zIndex: 10,
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    backgroundColor: 'rgba(0,0,0,0.45)',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  viewerPageScroll: {
+    width,
+  },
+  viewerPage: {
+    flexGrow: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  viewerImage: {
+    width,
+    height: width,
   },
   imageIndicators: {
     flexDirection: 'row',

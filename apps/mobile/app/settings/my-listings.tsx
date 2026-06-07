@@ -19,6 +19,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { productsApi } from '../../src/services/api';
 import { useAuthStore } from '../../src/stores/authStore';
 import { useTranslation } from '../../src/i18n';
+import { resolveImageUrl } from '../../src/utils/imageUrl';
 
 const { colors, spacing, radius } = theme;
 
@@ -363,7 +364,7 @@ export default function MyListingsScreen() {
                 onPress={() => router.push(`/product/${listing.id}`)}
               >
                 <Image
-                  source={{ uri: listing.images?.[0]?.url || 'https://via.placeholder.com/100x100?text=No+Image' }}
+                  source={{ uri: resolveImageUrl(listing.images) }}
                   style={styles.listingImage}
                 />
                 <View style={styles.listingInfo}>

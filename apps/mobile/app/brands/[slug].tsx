@@ -10,6 +10,7 @@ import { ScreenHeader } from '../../src/components/common';
 const { colors } = theme;
 import { ProductGrid } from '../../src/components/product';
 import type { ProductCardProduct } from '../../src/components/product';
+import { resolveImageUrl } from '../../src/utils/imageUrl';
 
 interface Brand {
   id: string;
@@ -70,7 +71,7 @@ export default function BrandDetailScreen() {
           loadingBrand ? null : brand ? (
             <View style={styles.header}>
               {brand.logo ? (
-                <Image source={{ uri: brand.logo }} style={styles.logo} resizeMode="contain" />
+                <Image source={{ uri: resolveImageUrl(brand.logo) }} style={styles.logo} resizeMode="contain" />
               ) : (
                 <View style={styles.logoFallback}>
                   <Text style={styles.logoFallbackText}>{brand.name.charAt(0).toUpperCase()}</Text>

@@ -231,10 +231,15 @@ export default function PaymentWebViewScreen() {
           domStorageEnabled
           thirdPartyCookiesEnabled
           mixedContentMode="compatibility"
+          // PayTR 3DS adımı yeni pencere açabilir; Safari'ye düşmesin diye
+          // aynı WebView içinde tut.
+          setSupportMultipleWindows={false}
+          onShouldStartLoadWithRequest={() => true}
         />
       ) : state.url ? (
         <WebView
           ref={webviewRef}
+          originWhitelist={['*']}
           source={{ uri: state.url }}
           onNavigationStateChange={handleNavigationChange}
           startInLoadingState
@@ -247,6 +252,10 @@ export default function PaymentWebViewScreen() {
           domStorageEnabled
           thirdPartyCookiesEnabled
           mixedContentMode="compatibility"
+          // PayTR 3DS adımı yeni pencere açabilir; Safari'ye düşmesin diye
+          // aynı WebView içinde tut.
+          setSupportMultipleWindows={false}
+          onShouldStartLoadWithRequest={() => true}
         />
       ) : null}
     </SafeAreaView>

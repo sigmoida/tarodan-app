@@ -314,6 +314,7 @@ const styles = StyleSheet.create({
   },
   recommendationsSection: {
     marginTop: 24,
+    width: '100%',
     alignItems: 'center',
   },
   sectionTitle: {

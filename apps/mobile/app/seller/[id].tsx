@@ -6,40 +6,12 @@ import { useLocalSearchParams, router } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { userApi, productsApi, ratingsApi } from '../../src/services/api';
 import { useAuthStore } from '../../src/stores/authStore';
+import { resolveImageUrl } from '../../src/utils/imageUrl';
 
 const { colors } = theme;
 
 const { width } = Dimensions.get('window');
 const CARD_WIDTH = (width - 48) / 2;
-
-// Mock seller for demo/offline mode
-const MOCK_SELLER = {
-  id: 's1',
-  displayName: 'Premium Collector',
-  bio: 'Koleksiyoner ve model araba tutkunu. 10 yıldır diecast modellerle ilgileniyorum. Özellikle 1:18 ölçekli premium markalar konusunda uzmanım.',
-  avatarUrl: null,
-  rating: 4.8,
-  totalReviews: 89,
-  totalSales: 127,
-  totalListings: 34,
-  memberSince: '2023-01-15',
-  responseTime: '< 1 saat',
-  responseRate: 98,
-  verified: true,
-  badges: ['fast_shipper', 'trusted_seller', 'responsive'],
-  location: 'İstanbul',
-  products: [
-    { id: '1', title: 'Porsche 911 GT3 RS', price: 3200, images: ['https://placehold.co/200x200/f3f4f6/9ca3af?text=Porsche'], tradeAvailable: true },
-    { id: '2', title: 'Ferrari 488 GTB', price: 2800, images: ['https://placehold.co/200x200/f3f4f6/9ca3af?text=Ferrari'], tradeAvailable: false },
-    { id: '3', title: 'Lamborghini Aventador', price: 3500, images: ['https://placehold.co/200x200/f3f4f6/9ca3af?text=Lambo'], tradeAvailable: true },
-    { id: '4', title: 'BMW M4 Competition', price: 1800, images: ['https://placehold.co/200x200/f3f4f6/9ca3af?text=BMW'], tradeAvailable: false },
-  ],
-  reviews: [
-    { id: 'r1', userName: 'Ahmet K.', rating: 5, comment: 'Harika satıcı, hızlı kargo.', date: '2024-01-10' },
-    { id: 'r2', userName: 'Mehmet Y.', rating: 5, comment: 'Çok dikkatli paketleme, teşekkürler!', date: '2024-01-08' },
-    { id: 'r3', userName: 'Ali V.', rating: 4, comment: 'Ürün açıklamaya uygun, güvenilir satıcı.', date: '2024-01-05' },
-  ],
-};
 
 const BADGE_INFO: Record<string, { label: string; icon: string; color: string }> = {
   fast_shipper: { label: 'Hızlı Kargo', icon: 'rocket-outline', color: colors.info[600]! },
@@ -77,7 +49,7 @@ export default function SellerProfileScreen() {
         const data: any = response.data;
         return data?.data ?? data?.items ?? data ?? [];
       } catch {
-        return MOCK_SELLER.products;
+        return [];
       }
     },
     enabled: !!id,
@@ -111,12 +83,10 @@ export default function SellerProfileScreen() {
     enabled: !!id,
   });
 
-  const seller = apiSeller || MOCK_SELLER;
-  const products = sellerProducts || MOCK_SELLER.products;
-  // Backend ratings öncelikli; yoksa mock fallback.
-  const reviews = (Array.isArray(ratingList) && ratingList.length > 0)
-    ? ratingList
-    : (seller.reviews || MOCK_SELLER.reviews);
+  const seller = apiSeller;
+  const products = Array.isArray(sellerProducts) ? sellerProducts : [];
+  // Backend ratings (web ile parite); yoksa boş.
+  const reviews = Array.isArray(ratingList) ? ratingList : [];
 
   const handleMessage = () => {
     if (!isAuthenticated) {
@@ -126,11 +96,26 @@ export default function SellerProfileScreen() {
     router.push(`/messages/new?sellerId=${id}`);
   };
 
-  if (isLoading && !seller) {
+  if (isLoading) {
     return (
       <View style={styles.loadingContainer}>
         <Spinner size="lg" />
         <Text style={styles.loadingText}>Yükleniyor...</Text>
+      </View>
+    );
+  }
+
+  if (!seller) {
+    return (
+      <View style={styles.loadingContainer}>
+        <Ionicons name="person-outline" size={64} color={colors.text.muted} />
+        <Text style={styles.loadingText}>Satıcı bulunamadı</Text>
+        <Button
+          variant="primary"
+          title="Geri Dön"
+          onPress={() => router.back()}
+          style={{ marginTop: 16 }}
+        />
       </View>
     );
   }
@@ -155,7 +140,7 @@ export default function SellerProfileScreen() {
           />
           <View style={styles.profileNameRow}>
             <Text style={styles.profileName}>{seller.displayName}</Text>
-            {seller.verified && (
+            {seller.isVerified && (
               <Ionicons name="checkmark-circle" size={24} color={colors.warning[500]!} />
             )}
           </View>
@@ -165,19 +150,21 @@ export default function SellerProfileScreen() {
               <Text style={styles.locationText}>{seller.location}</Text>
             </View>
           )}
-          <Text style={styles.memberSince}>
-            Üye: {new Date(seller.memberSince).toLocaleDateString('tr-TR', { month: 'long', year: 'numeric' })}
-          </Text>
+          {seller.createdAt ? (
+            <Text style={styles.memberSince}>
+              Üye: {new Date(seller.createdAt).toLocaleDateString('tr-TR', { month: 'long', year: 'numeric' })}
+            </Text>
+          ) : null}
 
-          {/* Stats Row */}
+          {/* Stats Row — web ile parite: stats objesinden */}
           <View style={styles.statsRow}>
             <View style={styles.statItem}>
-              <Text style={styles.statValue}>{seller.totalListings}</Text>
+              <Text style={styles.statValue}>{seller.stats?.totalListings ?? products.length}</Text>
               <Text style={styles.statLabel}>İlan</Text>
             </View>
             <View style={styles.statDivider} />
             <View style={styles.statItem}>
-              <Text style={styles.statValue}>{seller.totalSales}</Text>
+              <Text style={styles.statValue}>{seller.stats?.totalSales ?? 0}</Text>
               <Text style={styles.statLabel}>Satış</Text>
             </View>
             <View style={styles.statDivider} />
@@ -185,13 +172,11 @@ export default function SellerProfileScreen() {
               <View style={styles.ratingValue}>
                 <Ionicons name="star" size={18} color={colors.warning[500]!} />
                 <Text style={styles.statValue}>
-                  {(ratingStats?.averageScore ?? ratingStats?.averageRating ?? seller.rating ?? 0).toFixed
-                    ? (ratingStats?.averageScore ?? ratingStats?.averageRating ?? seller.rating ?? 0).toFixed(1)
-                    : seller.rating}
+                  {(ratingStats?.averageScore ?? ratingStats?.averageRating ?? seller.stats?.averageRating ?? 0).toFixed(1)}
                 </Text>
               </View>
               <Text style={styles.statLabel}>
-                {(ratingStats?.totalRatings ?? ratingStats?.total ?? seller.totalReviews ?? 0)} değerlendirme
+                {(ratingStats?.totalRatings ?? ratingStats?.total ?? seller.stats?.totalRatings ?? 0)} değerlendirme
               </Text>
             </View>
           </View>
@@ -211,18 +196,6 @@ export default function SellerProfileScreen() {
               })}
             </View>
           )}
-
-          {/* Response Info */}
-          <View style={styles.responseInfo}>
-            <View style={styles.responseItem}>
-              <Ionicons name="time-outline" size={20} color={colors.text.muted} />
-              <Text style={styles.responseText}>Yanıt süresi: {seller.responseTime}</Text>
-            </View>
-            <View style={styles.responseItem}>
-              <Ionicons name="chatbubbles-outline" size={20} color={colors.text.muted} />
-              <Text style={styles.responseText}>Yanıt oranı: %{seller.responseRate}</Text>
-            </View>
-          </View>
 
           {/* Bio */}
           {seller.bio && (
@@ -276,6 +249,14 @@ export default function SellerProfileScreen() {
 
         {/* Tab Content */}
         {activeTab === 'listings' ? (
+          products.length === 0 ? (
+            <View style={{ alignItems: 'center', padding: 32 }}>
+              <Ionicons name="cube-outline" size={48} color={colors.text.subtle} />
+              <Text style={{ color: colors.text.muted, marginTop: 8, fontSize: 14 }}>
+                Henüz ilan yok
+              </Text>
+            </View>
+          ) : (
           <View style={styles.listingsGrid}>
             {products.map((product: any) => (
               <Pressable
@@ -285,7 +266,7 @@ export default function SellerProfileScreen() {
               >
                 <Card style={styles.productCard} padding={0}>
                   <Image
-                    source={{ uri: product.images?.[0] || 'https://placehold.co/200x200/f3f4f6/9ca3af?text=Ürün' }}
+                    source={{ uri: resolveImageUrl(product.images) }}
                     style={styles.productImage}
                     resizeMode="cover"
                   />
@@ -302,6 +283,7 @@ export default function SellerProfileScreen() {
               </Pressable>
             ))}
           </View>
+          )
         ) : (
           <View style={styles.reviewsList}>
             {reviews.length === 0 ? (

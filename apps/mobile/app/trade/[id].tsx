@@ -24,6 +24,7 @@ import { tradesApi, paymentsApi } from '../../src/services/api';
 import { useAuthStore } from '../../src/stores/authStore';
 import { useTranslation } from '../../src/i18n';
 import { captureException } from '../../src/services/sentry';
+import { resolveImageUrl } from '../../src/utils/imageUrl';
 
 const { colors } = theme;
 
@@ -458,7 +459,7 @@ export default function TradeDetailScreen() {
               onPress={() => router.push(`/product/${item.product.id}`)}
             >
               <Image
-                source={{ uri: item.product.images?.[0]?.url || 'https://via.placeholder.com/50' }}
+                source={{ uri: resolveImageUrl(item.product.images) }}
                 style={styles.itemImage}
               />
               <View style={styles.itemInfo}>
@@ -490,7 +491,7 @@ export default function TradeDetailScreen() {
               onPress={() => router.push(`/product/${item.product.id}`)}
             >
               <Image
-                source={{ uri: item.product.images?.[0]?.url || 'https://via.placeholder.com/50' }}
+                source={{ uri: resolveImageUrl(item.product.images) }}
                 style={styles.itemImage}
               />
               <View style={styles.itemInfo}>

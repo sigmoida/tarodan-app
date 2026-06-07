@@ -7,37 +7,11 @@ import { Ionicons } from '@expo/vector-icons';
 import { api } from '../../src/services/api';
 import { useAuthStore } from '../../src/stores/authStore';
 import { useTranslation } from '../../src/i18n';
+import { resolveImageUrl } from '../../src/utils/imageUrl';
 
 const { colors, radius } = theme;
 
 // Mock collections for demo when API fails
-const MOCK_COLLECTIONS = [
-  {
-    id: '1',
-    name: 'Ferrari Koleksiyonum',
-    description: 'Tüm Ferrari modellerim',
-    itemCount: 24,
-    coverImage: 'https://via.placeholder.com/300x200?text=Ferrari',
-    isPublic: true,
-  },
-  {
-    id: '2',
-    name: 'Vintage Trucks',
-    description: '60-70\'ler kamyonları',
-    itemCount: 12,
-    coverImage: 'https://via.placeholder.com/300x200?text=Trucks',
-    isPublic: false,
-  },
-  {
-    id: '3',
-    name: '1:18 Premium',
-    description: 'En değerli modellerim',
-    itemCount: 8,
-    coverImage: 'https://via.placeholder.com/300x200?text=Premium',
-    isPublic: true,
-  },
-];
-
 export default function CollectionsScreen() {
   const { t } = useTranslation();
   const { limits, isAuthenticated } = useAuthStore();
@@ -51,16 +25,17 @@ export default function CollectionsScreen() {
     queryFn: async () => {
       try {
         const response = await api.get('/collections/me');
-        return response.data?.data || response.data || [];
+        // API şekli: { collections, total, page, pageSize }
+        return response.data?.collections ?? response.data?.data ?? (Array.isArray(response.data) ? response.data : []);
       } catch (error) {
-        console.log('Failed to fetch collections, using mock data');
-        return MOCK_COLLECTIONS;
+        console.log('Koleksiyonlar yüklenemedi');
+        return [];
       }
     },
     enabled: isAuthenticated,
   });
 
-  const collections = Array.isArray(collectionsData) ? collectionsData : MOCK_COLLECTIONS;
+  const collections = Array.isArray(collectionsData) ? collectionsData : [];
 
   const onRefresh = async () => {
     setRefreshing(true);
@@ -135,7 +110,7 @@ export default function CollectionsScreen() {
                   onPress={() => router.push(`/collections/${collection.id}`)}
                 >
                   <Image
-                    source={{ uri: collection.coverImage || 'https://via.placeholder.com/300x200?text=Koleksiyon' }}
+                    source={{ uri: resolveImageUrl(collection.coverImageUrl ?? collection.coverImage) }}
                     style={styles.collectionImage}
                   />
                   <View style={styles.collectionOverlay}>

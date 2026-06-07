@@ -15,6 +15,7 @@ import { notificationsApi } from '../../src/services/api';
 import { TarodanColors } from '../../src/theme';
 import { formatRelativeDate } from '../../src/utils/format';
 import { useAuthStore } from '../../src/stores/authStore';
+import { resolveImageUrl } from '../../src/utils/imageUrl';
 
 const { colors } = theme;
 
@@ -186,7 +187,7 @@ export default function NotificationsScreen() {
         activeOpacity={0.75}
       >
         {STOCKOUT_TYPES.has(item.type) && item.data?.productImage ? (
-          <Image source={{ uri: item.data.productImage }} style={styles.thumb} />
+          <Image source={{ uri: resolveImageUrl(item.data.productImage) }} style={styles.thumb} />
         ) : (
           <View style={[styles.iconContainer, { backgroundColor: bg }]}>
             <Ionicons name={icon} size={20} color={color} />

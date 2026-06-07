@@ -9,6 +9,8 @@ import { api, productsApi, categoriesApi, collectionsApi } from '../../src/servi
 import { SCALES, BRANDS } from '../../src/theme';
 import { useAuthStore } from '../../src/stores/authStore';
 import { useGuestStore } from '../../src/stores/guestStore';
+import { useCartStore } from '../../src/stores/cartStore';
+import { useFavoritesStore } from '../../src/stores/favoritesStore';
 import { SignupPrompt } from '../../src/components/SignupPrompt';
 import { getImageUrl as getImageUrlFromUtils } from '../../src/utils/imageUrl';
 
@@ -26,6 +28,14 @@ export default function HomeScreen() {
   
   const { isAuthenticated } = useAuthStore();
   const { incrementListingView, getPromptType, setLastPromptShown, canShowPrompt } = useGuestStore();
+
+  // Sepet/favori sayaçları — header rozetleri için (store değişince re-render).
+  const cartCount = useCartStore((s) => s.items.reduce((n, i) => n + i.quantity, 0));
+  const favCount = useFavoritesStore((s) => s.items.length);
+  const fetchFavorites = useFavoritesStore((s) => s.fetchFavorites);
+  useEffect(() => {
+    if (isAuthenticated) fetchFavorites();
+  }, [isAuthenticated]);
 
   // Check API connection
   useEffect(() => {
@@ -185,7 +195,7 @@ export default function HomeScreen() {
   };
 
   const handleBrandPress = (brandId: string) => {
-    router.push(`/search?brand=${brandId}`);
+    router.push(`/search?brandId=${brandId}`);
   };
 
   const handleCategoryPress = (categoryId: string) => {
@@ -289,12 +299,22 @@ export default function HomeScreen() {
               onPress={() => router.push('/favorites')}
             >
               <Ionicons name="heart-outline" size={24} color={colors.white} />
+              {favCount > 0 && (
+                <View style={styles.headerBadge}>
+                  <Text style={styles.headerBadgeText}>{favCount > 99 ? '99+' : favCount}</Text>
+                </View>
+              )}
             </TouchableOpacity>
             <TouchableOpacity
               style={styles.headerIconBtn}
               onPress={() => router.push('/cart')}
             >
               <Ionicons name="cart-outline" size={24} color={colors.white} />
+              {cartCount > 0 && (
+                <View style={styles.headerBadge}>
+                  <Text style={styles.headerBadgeText}>{cartCount > 99 ? '99+' : cartCount}</Text>
+                </View>
+              )}
             </TouchableOpacity>
           </View>
         </View>
@@ -464,7 +484,7 @@ export default function HomeScreen() {
                       onPress={() => router.push(`/product/${item.productId}`)}
                     >
                       <Image
-                        source={{ uri: item.productImage || 'https://placehold.co/150x150/f3f4f6/9ca3af?text=Ürün' }}
+                        source={{ uri: getImageUrlFromUtils(item.productImage) }}
                         style={styles.featuredProductImage}
                       />
                       <Text style={styles.featuredProductTitle} numberOfLines={2}>{item.productTitle}</Text>
@@ -475,7 +495,7 @@ export default function HomeScreen() {
               )}
               <TouchableOpacity 
                 style={styles.viewGarageBtn}
-                onPress={() => router.push(`/collection/${featuredCollector.id}` as any)}
+                onPress={() => router.push(`/collections/${featuredCollector.id}` as any)}
               >
                 <Text style={styles.viewGarageBtnText}>Garajını incele →</Text>
               </TouchableOpacity>
@@ -555,7 +575,7 @@ export default function HomeScreen() {
               <View style={styles.companyHeader}>
                 {companyOfWeek.avatarUrl ? (
                   <Image
-                    source={{ uri: companyOfWeek.avatarUrl }}
+                    source={{ uri: getImageUrlFromUtils(companyOfWeek.avatarUrl) }}
                     style={styles.companyAvatar}
                   />
                 ) : (
@@ -633,8 +653,9 @@ export default function HomeScreen() {
                       onPress={() => router.push(`/product/${product.id}`)}
                     >
                       <Image
-                        source={{ uri: getImageUrl(product.images) }}
+                        source={{ uri: getImageUrl(product.image ?? product.cardUrl ?? product.images) }}
                         style={styles.companyProductImage}
+                        resizeMode="cover"
                       />
                       <View style={styles.companyProductLikes}>
                         <Ionicons name="thumbs-up" size={12} color={colors.primary[600]!} />
@@ -657,11 +678,11 @@ export default function HomeScreen() {
                     <TouchableOpacity 
                       key={collection.id} 
                       style={styles.companyCollectionCard}
-                      onPress={() => router.push(`/collection/${collection.id}` as any)}
+                      onPress={() => router.push(`/collections/${collection.id}` as any)}
                     >
                       {collection.coverImageUrl ? (
                         <Image
-                          source={{ uri: collection.coverImageUrl }}
+                          source={{ uri: getImageUrlFromUtils(collection.coverImageUrl) }}
                           style={styles.companyCollectionImage}
                         />
                       ) : (
@@ -716,10 +737,10 @@ export default function HomeScreen() {
                 <TouchableOpacity 
                   key={collection.id} 
                   style={styles.collectionCard}
-                  onPress={() => router.push(`/collection/${collection.id}` as any)}
+                  onPress={() => router.push(`/collections/${collection.id}` as any)}
                 >
                   <Image 
-                    source={{ uri: collection.coverImageUrl || 'https://placehold.co/200x150/f3f4f6/9ca3af?text=Koleksiyon' }} 
+                    source={{ uri: getImageUrlFromUtils(collection.coverImageUrl) }}
                     style={styles.collectionImage}
                   />
                   <View style={styles.collectionInfo}>
@@ -789,6 +810,25 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
     backgroundColor: colors.overlay.white10,
+  },
+  headerBadge: {
+    position: 'absolute',
+    top: -4,
+    right: -4,
+    minWidth: 18,
+    height: 18,
+    borderRadius: 9,
+    paddingHorizontal: 4,
+    backgroundColor: colors.danger[600]!,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 1.5,
+    borderColor: colors.white,
+  },
+  headerBadgeText: {
+    color: colors.white,
+    fontSize: 10,
+    fontWeight: '700',
   },
   searchBar: {
     backgroundColor: colors.surface.DEFAULT,
@@ -1031,8 +1071,10 @@ const styles = StyleSheet.create({
   },
   productImageContainer: {
     position: 'relative',
+    width: '100%',
   },
   productImage: {
+    width: '100%',
     height: 140,
     backgroundColor: colors.gray[200],
   },

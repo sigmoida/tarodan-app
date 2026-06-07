@@ -8,6 +8,7 @@ import { useQuery } from '@tanstack/react-query';
 import { manufacturersApi } from '../../src/services/api';
 import { theme, Text, Input } from '@tarodan/ui-native';
 import { ScreenHeader, ScreenLoader, ErrorState, EmptyState } from '../../src/components/common';
+import { resolveImageUrl } from '../../src/utils/imageUrl';
 const { colors } = theme;
 
 interface Manufacturer {
@@ -45,7 +46,7 @@ export default function ManufacturersScreen() {
     >
       <View style={styles.logoWrap}>
         {item.logo ? (
-          <Image source={{ uri: item.logo }} style={styles.logo} resizeMode="contain" />
+          <Image source={{ uri: resolveImageUrl(item.logo) }} style={styles.logo} resizeMode="contain" />
         ) : (
           <Text style={styles.logoFallback}>{item.name.charAt(0).toUpperCase()}</Text>
         )}

@@ -9,6 +9,7 @@ import {
   Modal,
   Image,
   Pressable,
+  RefreshControl,
 } from 'react-native';
 import { useInfiniteQuery, useQuery } from '@tanstack/react-query';
 import { router, useLocalSearchParams } from 'expo-router';
@@ -59,7 +60,10 @@ export default function SearchScreen() {
     category: (params.category as string) || '',
     categoryId: (params.categoryId as string) || '',
     brand: (params.brand as string) || '',
+    brandId: (params.brandId as string) || '',
+    scale: (params.scale as string) || '',
     manufacturer: (params.manufacturer as string) || '',
+    manufacturerId: (params.manufacturerId as string) || '',
   }));
 
   // Arama kutusu — yazarken debounce ile filters.search'e yansır
@@ -111,6 +115,8 @@ export default function SearchScreen() {
     fetchNextPage,
     hasNextPage,
     isFetchingNextPage,
+    refetch,
+    isRefetching,
   } = useInfiniteQuery({
     queryKey: ['products-search', filters],
     initialPageParam: 1,
@@ -171,6 +177,14 @@ export default function SearchScreen() {
 
   const renderProduct = ({ item }: { item: any }) => {
     const imageUrl = getImageUrlFromUtils(item.images);
+    const ratingAvg = item.rating?.average ? Number(item.rating.average) : 0;
+    const ratingCount = item.rating?.count ?? item.reviewCount ?? 0;
+    const price = item.price ?? item.salePrice ?? null;
+    const oldPrice = item.originalPrice ?? item.oldPrice ?? null;
+    const hasDiscount = oldPrice != null && price != null && Number(oldPrice) > Number(price);
+    const discountPercent =
+      item.discountPercent ??
+      (hasDiscount ? Math.round((1 - Number(price) / Number(oldPrice)) * 100) : 0);
     return (
       <Pressable
         onPress={() => handleProductPress(item.id)}
@@ -200,9 +214,51 @@ export default function SearchScreen() {
             <Text variant="caption" tone="muted" style={{ marginTop: 2 }}>
               {asLabel(item.brand, 'Marka')} • {asLabel(item.scale, '1:64')}
             </Text>
-            <Text variant="h3" tone="primary" style={{ marginTop: 4 }}>
-              ₺{item.price?.toLocaleString('tr-TR')}
-            </Text>
+            {ratingAvg > 0 ? (
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 2, marginTop: 4 }}>
+                <Ionicons name="star" size={12} color={colors.warning[500]!} />
+                <Text variant="caption" tone="muted">
+                  {ratingAvg.toFixed(1)}
+                  {ratingCount ? ` (${ratingCount})` : ''}
+                </Text>
+              </View>
+            ) : null}
+            <View
+              style={{
+                flexDirection: 'row',
+                alignItems: 'center',
+                flexWrap: 'wrap',
+                gap: 6,
+                marginTop: 4,
+              }}
+            >
+              <Text variant="h3" tone="primary">
+                ₺{Number(price ?? 0).toLocaleString('tr-TR')}
+              </Text>
+              {hasDiscount ? (
+                <Text
+                  variant="caption"
+                  tone="muted"
+                  style={{ textDecorationLine: 'line-through' }}
+                >
+                  ₺{Number(oldPrice).toLocaleString('tr-TR')}
+                </Text>
+              ) : null}
+              {discountPercent > 0 ? (
+                <View
+                  style={{
+                    backgroundColor: colors.danger[600]!,
+                    borderRadius: 4,
+                    paddingHorizontal: 4,
+                    paddingVertical: 1,
+                  }}
+                >
+                  <Text variant="caption" tone="inverted" weight="bold">
+                    %{discountPercent}
+                  </Text>
+                </View>
+              ) : null}
+            </View>
           </View>
         </Card>
       </Pressable>
@@ -437,6 +493,14 @@ export default function SearchScreen() {
           keyExtractor={(item, index) => `${item.id}-${index}`}
           renderItem={renderProduct}
           showsVerticalScrollIndicator={false}
+          refreshControl={
+            <RefreshControl
+              refreshing={isRefetching}
+              onRefresh={refetch}
+              colors={[colors.primary[600]!]}
+              tintColor={colors.primary[600]!}
+            />
+          }
           onEndReached={() => {
             if (hasNextPage && !isFetchingNextPage) fetchNextPage();
           }}

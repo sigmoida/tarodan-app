@@ -13,6 +13,7 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { api } from '../../src/services/api';
 import { useAuthStore } from '../../src/stores/authStore';
 import { useTranslation } from '../../src/i18n';
+import { resolveImageUrl } from '../../src/utils/imageUrl';
 
 const { colors, spacing, radius } = theme;
 
@@ -156,7 +157,7 @@ export default function BusinessDashboardScreen() {
         >
           <View style={styles.companyInfo}>
             {stats?.company.avatarUrl ? (
-              <Image source={{ uri: stats.company.avatarUrl }} style={styles.companyAvatar} />
+              <Image source={{ uri: resolveImageUrl(stats.company.avatarUrl) }} style={styles.companyAvatar} />
             ) : (
               <View style={styles.companyAvatarPlaceholder}>
                 <Text style={styles.companyAvatarText}>🏢</Text>
@@ -326,7 +327,7 @@ function ProductRow({ product, index, metric }: { product: ProductStats; index: 
         <Text style={styles.productRankText}>{index + 1}</Text>
       </View>
       {product.image ? (
-        <Image source={{ uri: product.image }} style={styles.productImage} />
+        <Image source={{ uri: resolveImageUrl(product.image) }} style={styles.productImage} />
       ) : (
         <View style={[styles.productImage, styles.productImagePlaceholder]}>
           <Text>📦</Text>
@@ -365,7 +366,7 @@ function CollectionRow({ collection, index }: { collection: CollectionStats; ind
         <Text style={styles.productRankText}>{index + 1}</Text>
       </View>
       {collection.coverImage ? (
-        <Image source={{ uri: collection.coverImage }} style={styles.productImage} />
+        <Image source={{ uri: resolveImageUrl(collection.coverImage) }} style={styles.productImage} />
       ) : (
         <View style={[styles.productImage, styles.productImagePlaceholder]}>
           <Text>📚</Text>

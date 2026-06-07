@@ -10,6 +10,7 @@ import * as ImagePicker from 'expo-image-picker';
 import { Ionicons } from '@expo/vector-icons';
 import { api } from '../../../src/services/api';
 import { useAuthStore } from '../../../src/stores/authStore';
+import { resolveImageUrl } from '../../../src/utils/imageUrl';
 
 const { colors } = theme;
 
@@ -341,7 +342,7 @@ export default function EditCollectionScreen() {
                   onPress={() => router.push(`/product/${item.product.id}`)}
                 >
                   <Image
-                    source={{ uri: item.product.images?.[0]?.url || 'https://via.placeholder.com/50' }}
+                    source={{ uri: resolveImageUrl(item.product.images) }}
                     style={styles.itemImage}
                   />
                   <Text variant="body" style={styles.itemTitle} numberOfLines={1}>

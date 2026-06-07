@@ -11,7 +11,7 @@ import {
   Text,
   theme,
 } from '@tarodan/ui-native';
-import { userApi, notificationsApi } from '../../src/services/api';
+import { userApi, notificationsApi, collectionsApi } from '../../src/services/api';
 import { useAuthStore } from '../../src/stores/authStore';
 import { SignupPrompt } from '../../src/components/SignupPrompt';
 import { getRestrictionMessage, GuestAction } from '../../src/utils/guestRestrictions';
@@ -46,28 +46,57 @@ export default function ProfileScreen() {
     'favorites' | 'message' | 'purchase' | 'trade' | 'collections'
   >('favorites');
 
+  // Web ile parite: sayaçlar kullanıcının kendi public profilinin stats objesinden
+  // ({ totalListings, totalSales, totalTrades, averageRating, totalRatings }).
+  // (business-stats yalnızca business tier'da çalışıyordu → premium/free'de boştu.)
   const { data: apiStats } = useQuery({
-    queryKey: ['user-stats'],
+    queryKey: ['user-stats', user?.id],
     queryFn: async () => {
       try {
-        const response = await userApi.getStats();
-        return response.data?.data || response.data;
+        const response = await userApi.getPublicProfile(String(user?.id));
+        return (response.data as any)?.data?.stats ?? (response.data as any)?.stats ?? null;
       } catch (error) {
         console.log('Stats API failed, using user data');
         return null;
+      }
+    },
+    enabled: isAuthenticated && !!user?.id,
+    retry: 1,
+  });
+
+  // Koleksiyon sayısı business-stats'ta gelmeyebilir; web gibi /collections/me
+  // üzerinden ayrı çekilir (meta.total).
+  const { data: collectionsCount } = useQuery({
+    queryKey: ['user-collections-count'],
+    queryFn: async () => {
+      try {
+        const res = await collectionsApi.getMyCollections({ limit: 1 });
+        const body = res.data as
+          | { meta?: { total?: number }; data?: unknown[]; total?: number }
+          | unknown[]
+          | undefined;
+        if (Array.isArray(body)) return body.length;
+        return (
+          body?.meta?.total ??
+          body?.total ??
+          (Array.isArray(body?.data) ? body!.data!.length : 0)
+        );
+      } catch {
+        return 0;
       }
     },
     enabled: isAuthenticated,
     retry: 1,
   });
 
-  const stats = apiStats || {
-    listings: user?.listingCount || 0,
-    trades: user?.totalSales || 0,
-    rating: user?.rating || 0,
-    collections: 0,
-    favorites: 0,
-    orders: user?.totalPurchases || 0,
+  const apiStatsObj = (apiStats as Record<string, number> | null) || null;
+  const stats = {
+    listings: apiStatsObj?.totalListings ?? (user as any)?.listingCount ?? 0,
+    trades: apiStatsObj?.totalTrades ?? 0,
+    rating: apiStatsObj?.averageRating ?? (user as any)?.rating ?? 0,
+    collections: collectionsCount ?? 0,
+    favorites: apiStatsObj?.favorites ?? 0,
+    orders: apiStatsObj?.orders ?? user?.totalPurchases ?? 0,
   };
 
   const { data: unreadData } = useQuery({

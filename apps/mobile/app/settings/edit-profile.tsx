@@ -22,6 +22,7 @@ import { api } from '../../src/services/api';
 import { useAuthStore } from '../../src/stores/authStore';
 import { MembershipBadgeCard } from '../../src/components/PremiumBadge';
 import { useTranslation } from '../../src/i18n';
+import { resolveImageUrl } from '../../src/utils/imageUrl';
 
 const { colors, radius } = theme;
 
@@ -31,6 +32,8 @@ const getMaxBioLength = (isPremium: boolean) => isPremium ? 2000 : 500;
 const createProfileSchema = (isPremium: boolean) => z.object({
   displayName: z.string().min(2, 'İsim en az 2 karakter olmalı').max(50),
   bio: z.string().max(getMaxBioLength(isPremium), `Biyografi en fazla ${getMaxBioLength(isPremium)} karakter olabilir`).optional(),
+  phone: z.string().max(20).optional().or(z.literal('')),
+  birthDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'Tarih YYYY-AA-GG formatında olmalı').optional().or(z.literal('')),
   // Premium features
   websiteUrl: z.string().url('Geçerli bir URL girin').optional().or(z.literal('')),
   twitterHandle: z.string().max(50).optional(),
@@ -38,6 +41,11 @@ const createProfileSchema = (isPremium: boolean) => z.object({
   facebookUrl: z.string().url('Geçerli bir URL girin').optional().or(z.literal('')),
   youtubeUrl: z.string().url('Geçerli bir URL girin').optional().or(z.literal('')),
   customProfileSlug: z.string().min(3).max(30).regex(/^[a-z0-9-]+$/, 'Sadece küçük harf, rakam ve tire kullanın').optional(),
+  // Kurumsal (business tier) — web ile parite
+  companyName: z.string().max(120).optional().or(z.literal('')),
+  taxId: z.string().max(20).optional().or(z.literal('')),
+  taxOffice: z.string().max(120).optional().or(z.literal('')),
+  isCorporateSeller: z.boolean().optional(),
   // Preferences
   showEmail: z.boolean(),
   showPhone: z.boolean(),
@@ -58,6 +66,7 @@ export default function EditProfileScreen() {
   });
 
   const isPremium = limits?.maxListings === -1;
+  const isBusinessTier = (user as any)?.membershipTier === 'business';
   const maxBioLength = getMaxBioLength(isPremium);
 
   const { control, handleSubmit, formState: { errors }, watch } = useForm<ProfileForm>({
@@ -65,6 +74,12 @@ export default function EditProfileScreen() {
     defaultValues: {
       displayName: user?.displayName || '',
       bio: user?.bio || '',
+      phone: (user as any)?.phone || '',
+      birthDate: (user as any)?.birthDate ? new Date((user as any).birthDate).toISOString().split('T')[0] : '',
+      companyName: (user as any)?.companyName || '',
+      taxId: (user as any)?.taxId || '',
+      taxOffice: (user as any)?.taxOffice || '',
+      isCorporateSeller: (user as any)?.isCorporateSeller ?? !!(user as any)?.companyName,
       websiteUrl: user?.websiteUrl || '',
       twitterHandle: user?.twitterHandle || '',
       instagramHandle: user?.instagramHandle || '',
@@ -87,7 +102,16 @@ export default function EditProfileScreen() {
     mutationFn: async (data: ProfileForm) => {
       const formData = new FormData();
 
-      Object.entries(data).forEach(([key, value]) => {
+      const payload: Record<string, any> = { ...data };
+      // Kurumsal alanlar yalnızca business tier'da gönderilir (web ile parite)
+      if (!isBusinessTier) {
+        delete payload.companyName;
+        delete payload.taxId;
+        delete payload.taxOffice;
+        delete payload.isCorporateSeller;
+      }
+
+      Object.entries(payload).forEach(([key, value]) => {
         if (value !== undefined && value !== '') {
           formData.append(key, typeof value === 'boolean' ? String(value) : value);
         }
@@ -165,7 +189,7 @@ export default function EditProfileScreen() {
         <View style={styles.avatarSection}>
           <TouchableOpacity onPress={pickAvatar}>
             {avatar ? (
-              <Image source={{ uri: avatar }} style={styles.avatar} />
+              <Image source={{ uri: resolveImageUrl(avatar) }} style={styles.avatar} />
             ) : (
               <Avatar
                 size="xl"
@@ -222,6 +246,38 @@ export default function EditProfileScreen() {
             )}
           />
 
+          <Controller
+            control={control}
+            name="phone"
+            render={({ field: { onChange, value } }) => (
+              <Input
+                label="Telefon"
+                value={value}
+                onChangeText={onChange}
+                keyboardType="phone-pad"
+                placeholder="+90 5XX XXX XX XX"
+                containerStyle={styles.input}
+                error={errors.phone?.message}
+              />
+            )}
+          />
+
+          <Controller
+            control={control}
+            name="birthDate"
+            render={({ field: { onChange, value } }) => (
+              <Input
+                label="Doğum Tarihi (YYYY-AA-GG)"
+                value={value}
+                onChangeText={onChange}
+                placeholder="1990-01-31"
+                keyboardType="numbers-and-punctuation"
+                containerStyle={styles.input}
+                error={errors.birthDate?.message}
+              />
+            )}
+          />
+
           {!isPremium && (
             <TouchableOpacity
               style={styles.upgradeHint}
@@ -234,6 +290,75 @@ export default function EditProfileScreen() {
             </TouchableOpacity>
           )}
         </Card>
+
+        {/* Kurumsal Bilgiler (Business tier) — web ile parite */}
+        {isBusinessTier && (
+          <Card style={styles.card}>
+            <View style={styles.premiumFeatureHeader}>
+              <MaterialCommunityIcons name="office-building" size={20} color={colors.primary[600]!} />
+              <Text variant="h3" style={styles.premiumFeatureTitle}>Kurumsal Bilgiler</Text>
+            </View>
+
+            <Controller
+              control={control}
+              name="companyName"
+              render={({ field: { onChange, value } }) => (
+                <Input
+                  label="Firma Adı"
+                  value={value}
+                  onChangeText={onChange}
+                  containerStyle={styles.input}
+                  error={errors.companyName?.message}
+                />
+              )}
+            />
+
+            <Controller
+              control={control}
+              name="taxId"
+              render={({ field: { onChange, value } }) => (
+                <Input
+                  label="Vergi No"
+                  value={value}
+                  onChangeText={onChange}
+                  keyboardType="number-pad"
+                  containerStyle={styles.input}
+                  error={errors.taxId?.message}
+                />
+              )}
+            />
+
+            <Controller
+              control={control}
+              name="taxOffice"
+              render={({ field: { onChange, value } }) => (
+                <Input
+                  label="Vergi Dairesi"
+                  value={value}
+                  onChangeText={onChange}
+                  containerStyle={styles.input}
+                  error={errors.taxOffice?.message}
+                />
+              )}
+            />
+
+            <View style={styles.switchRow}>
+              <View style={styles.switchInfo}>
+                <Text variant="body">Kurumsal Satıcı</Text>
+                <Text variant="bodySm" style={styles.switchHint}>
+                  Faturalar firma bilgilerinizle düzenlensin
+                </Text>
+              </View>
+              <Controller
+                control={control}
+                name="isCorporateSeller"
+                render={({ field: { onChange, value } }) => (
+                  <Switch value={!!value} onValueChange={onChange} />
+                )}
+              />
+            </View>
+          </Card>
+        )}
 
         {/* Custom URL (Premium Only) */}
         {isPremium && (

@@ -10,6 +10,7 @@ import { ScreenHeader } from '../../src/components/common';
 const { colors } = theme;
 import { ProductGrid } from '../../src/components/product';
 import type { ProductCardProduct } from '../../src/components/product';
+import { resolveImageUrl } from '../../src/utils/imageUrl';
 
 interface Manufacturer {
   id: string;
@@ -70,7 +71,7 @@ export default function ManufacturerDetailScreen() {
           loadingManufacturer ? null : manufacturer ? (
             <View style={styles.header}>
               {manufacturer.logo ? (
-                <Image source={{ uri: manufacturer.logo }} style={styles.logo} resizeMode="contain" />
+                <Image source={{ uri: resolveImageUrl(manufacturer.logo) }} style={styles.logo} resizeMode="contain" />
               ) : (
                 <View style={styles.logoFallback}>
                   <Text style={styles.logoFallbackText}>

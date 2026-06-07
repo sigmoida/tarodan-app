@@ -25,7 +25,7 @@ ALTER TABLE "products" ADD COLUMN "search_text" TEXT;
 --    Concatenates: title + description + (display_value or value) of every
 --    active attribute linked to the product. Inactive attributes are excluded
 --    so deactivating a slug also drops it from search.
-CREATE OR REPLACE FUNCTION compute_product_search_text(p_id UUID)
+CREATE OR REPLACE FUNCTION compute_product_search_text(p_id TEXT)
 RETURNS TEXT
 LANGUAGE sql
 STABLE
@@ -84,7 +84,7 @@ RETURNS TRIGGER
 LANGUAGE plpgsql
 AS $$
 DECLARE
-  affected_product_id UUID;
+  affected_product_id TEXT;
 BEGIN
   IF TG_OP = 'DELETE' THEN
     affected_product_id := OLD.product_id;

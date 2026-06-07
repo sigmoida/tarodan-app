@@ -181,8 +181,11 @@ export const productsApi = {
       manufacturers: Array<{ id: string; name: string; slug: string }>;
       materials: Array<{ slug: string; label: string }>;
     }>('/products/filters'),
-  getOne: (id: string | number) => 
+  getOne: (id: string | number) =>
     api.get(`/products/${id}`),
+  /** Görüntülenme sayacını artır — web ile parite (POST /products/:id/view). Ekran başına 1 kez çağrılmalı. */
+  incrementView: (id: string | number) =>
+    api.post(`/products/${id}/view`),
   create: (data: Record<string, any>) =>
     api.post('/products', data),
   update: (id: string | number, data: Record<string, any>) =>

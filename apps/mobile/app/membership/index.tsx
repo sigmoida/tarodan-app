@@ -72,6 +72,7 @@ export default function MembershipScreen() {
   const { t } = useTranslation();
   const { isAuthenticated, user } = useAuthStore();
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
   const [membership, setMembership] = useState<MembershipDetails | null>(null);
   const [settings, setSettings] = useState<PlatformSettings>({});
   const [billingPeriod, setBillingPeriod] = useState<'monthly' | 'yearly'>('monthly');
@@ -86,18 +87,23 @@ export default function MembershipScreen() {
 
   const fetchData = async () => {
     setLoading(true);
-    try {
-      const [membershipRes, settingsRes] = await Promise.all([
-        membershipApi.getCurrentMembership(),
-        api.get('/admin/settings/public'),
-      ]);
-      setMembership(membershipRes.data);
-      setSettings(settingsRes.data || {});
-    } catch (err: any) {
-      console.error('Failed to load membership data:', err);
-    } finally {
-      setLoading(false);
+    setError(null);
+    // allSettled: biri başarısız olsa diğeri (fiyatlar/üyelik) yine yüklensin.
+    const [membershipRes, settingsRes] = await Promise.allSettled([
+      membershipApi.getCurrentMembership(),
+      api.get('/admin/settings/public'),
+    ]);
+    if (membershipRes.status === 'fulfilled') {
+      setMembership(membershipRes.value.data);
     }
+    if (settingsRes.status === 'fulfilled') {
+      setSettings(settingsRes.value.data || {});
+    }
+    if (membershipRes.status === 'rejected' && settingsRes.status === 'rejected') {
+      console.error('Failed to load membership data:', membershipRes.reason);
+      setError('Üyelik bilgileri yüklenemedi. Lütfen tekrar deneyin.');
+    }
+    setLoading(false);
   };
 
   const currentTier: TierType = (membership?.tier?.type as TierType) || 'free';
@@ -191,6 +197,13 @@ export default function MembershipScreen() {
       </View>
 
       <ScrollView style={styles.scrollView} showsVerticalScrollIndicator={false}>
+        {error ? (
+          <TouchableOpacity style={styles.errorBanner} onPress={fetchData} activeOpacity={0.8}>
+            <Ionicons name="alert-circle" size={18} color={colors.danger[600]!} />
+            <Text style={styles.errorBannerText}>{error}</Text>
+            <Text style={styles.errorBannerRetry}>Tekrar dene</Text>
+          </TouchableOpacity>
+        ) : null}
         {/* Pending Payment Banner */}
         {hasPendingPayment && (
           <TouchableOpacity
@@ -379,6 +392,27 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
     gap: 12,
+  },
+  errorBanner: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    margin: 16,
+    padding: 12,
+    borderRadius: 10,
+    backgroundColor: colors.danger[50]!,
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: colors.danger[600]!,
+  },
+  errorBannerText: {
+    flex: 1,
+    fontSize: 13,
+    color: colors.danger[600]!,
+  },
+  errorBannerRetry: {
+    fontSize: 13,
+    fontWeight: '700',
+    color: colors.danger[600]!,
   },
   loadingText: {
     fontSize: 14,
