@@ -9,6 +9,7 @@ import { Cron } from '@nestjs/schedule';
 import { PrismaService } from '../../prisma';
 import { InjectQueue } from '@nestjs/bull';
 import { Queue } from 'bull';
+import { MembershipTierType } from '@prisma/client';
 
 @Injectable()
 export class MembershipSchedulerService {
@@ -85,7 +86,7 @@ export class MembershipSchedulerService {
           to: user.email,
           subject: '🌟 Premium Üyelik ile Daha Fazla Fırsat!',
           template: 'premium-offer',
-          data: {
+          templateData: {
             userName: user.displayName,
             productCount: user._count.products,
             orderCount: user._count.buyerOrders,
@@ -175,12 +176,16 @@ export class MembershipSchedulerService {
           to: membership.user.email,
           subject: `⏰ ${membership.tier.name} Üyeliğiniz 7 Gün İçinde Sona Eriyor`,
           template: 'membership-expiring',
-          data: {
+          templateData: {
             userName: membership.user.displayName,
             tierName: membership.tier.name,
             expirationDate: membership.currentPeriodEnd.toLocaleDateString('tr-TR'),
             daysRemaining: 7,
             renewUrl: 'https://tarodan.com/membership/renew',
+            autoRenew: membership.autoRenew,
+            renewNote: membership.autoRenew
+              ? 'Otomatik yenileme açık: üyeliğin bitince hatırlatma göndereceğiz, tek tıkla yenileyebilirsin.'
+              : 'Üyeliğini kaybetmemek için yenilemeyi unutma.',
           },
         });
       }
@@ -191,12 +196,16 @@ export class MembershipSchedulerService {
           to: membership.user.email,
           subject: `🚨 ${membership.tier.name} Üyeliğiniz Yarın Sona Eriyor!`,
           template: 'membership-expiring-urgent',
-          data: {
+          templateData: {
             userName: membership.user.displayName,
             tierName: membership.tier.name,
             expirationDate: membership.currentPeriodEnd.toLocaleDateString('tr-TR'),
             daysRemaining: 1,
             renewUrl: 'https://tarodan.com/membership/renew',
+            autoRenew: membership.autoRenew,
+            renewNote: membership.autoRenew
+              ? 'Otomatik yenileme açık: üyeliğin bitince hatırlatma göndereceğiz, tek tıkla yenileyebilirsin.'
+              : 'Üyeliğini kaybetmemek için yenilemeyi unutma.',
           },
         });
       }
@@ -209,6 +218,93 @@ export class MembershipSchedulerService {
       this.logger.error(`Error sending expiration reminders: ${error.message}`, error.stack);
       return { sevenDayReminders: 0, oneDayReminders: 0, error: error.message };
     }
+  }
+
+  /**
+   * Otomatik yenileme (dev/mock). Süresi 24 saat içinde dolan/dolmuş, autoRenew AÇIK ve kayıtlı
+   * VARSAYILAN kartı olan ücretli üyelikleri "çeker" ve dönemi (aylık/yıllık) uzatır.
+   *
+   * ⚠️ Gerçek para çekimi YOK — PayTR iframe token döndürmediği için SİMÜLASYON.
+   * Production'da bu noktada gateway token charge yapılır; başarılıysa dönem uzatılır,
+   * başarısızsa status=past_due'ya alınır. Kart yoksa çekim yapılmaz (hatırlatma akışı devrede).
+   * Her saat çalışır; manuel de çağrılabilir (manualProcessAutoRenewals).
+   */
+  @Cron('0 * * * *') // Her saat
+  async processAutoRenewals() {
+    try {
+      const now = new Date();
+      const within24h = new Date(now.getTime() + 24 * 60 * 60 * 1000);
+      const due = await this.prisma.userMembership.findMany({
+        where: {
+          status: 'active',
+          autoRenew: true,
+          currentPeriodEnd: { lte: within24h },
+          tier: { type: { not: MembershipTierType.free } },
+        },
+        include: {
+          tier: true,
+          user: { select: { id: true, email: true, displayName: true } },
+        },
+      });
+
+      let renewed = 0;
+      for (const m of due) {
+        const card = await this.prisma.paymentMethod.findFirst({
+          where: { userId: m.userId, isDefault: true },
+        });
+        if (!card) continue; // kayıtlı kart yok → çekilemez (hatırlatma ayrıca gönderiliyor)
+
+        const periodDays = Math.round(
+          (m.currentPeriodEnd.getTime() - m.currentPeriodStart.getTime()) / 86400000,
+        );
+        const isYearly = periodDays > 180;
+        const price = isYearly ? Number(m.tier.yearlyPrice) : Number(m.tier.monthlyPrice);
+
+        // ── MOCK CHARGE ── (production: gateway token ile `price` çek; başarısızsa past_due)
+        const newStart = new Date(m.currentPeriodEnd);
+        const newEnd = new Date(newStart);
+        if (isYearly) newEnd.setFullYear(newEnd.getFullYear() + 1);
+        else newEnd.setMonth(newEnd.getMonth() + 1);
+
+        await this.prisma.userMembership.update({
+          where: { userId: m.userId },
+          data: { currentPeriodStart: newStart, currentPeriodEnd: newEnd, status: 'active' },
+        });
+
+        this.logger.warn(
+          `[MOCK AUTO-RENEW] ${m.user.email}: ${price} TL "${isYearly ? 'yearly' : 'monthly'}" charged from card ****${card.lastFour} → extended to ${newEnd.toISOString()}`,
+        );
+
+        await this.emailQueue
+          .add('send-template', {
+            to: m.user.email,
+            subject: `${m.tier.name} üyeliğin yenilendi`,
+            template: 'membership-renewed',
+            data: {
+              userName: m.user.displayName,
+              tierName: m.tier.name,
+              amount: price,
+              cardLast4: card.lastFour,
+              billingPeriod: isYearly ? 'yıllık' : 'aylık',
+              nextRenewal: newEnd.toLocaleDateString('tr-TR'),
+            },
+          })
+          .catch(() => {});
+
+        renewed++;
+      }
+
+      if (renewed > 0) this.logger.log(`Auto-renewed ${renewed} membership(s) [MOCK]`);
+      return { renewed };
+    } catch (error: any) {
+      this.logger.error(`Error processing auto-renewals: ${error.message}`, error.stack);
+      return { renewed: 0, error: error.message };
+    }
+  }
+
+  /** Manuel tetikleme (test/admin) */
+  async manualProcessAutoRenewals(): Promise<{ renewed: number }> {
+    return this.processAutoRenewals();
   }
 
   /**

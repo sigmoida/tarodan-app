@@ -394,6 +394,8 @@ export const membershipApi = {
   getLimits: () => api.get('/membership/me/limits'),
   subscribe: (data: { tierType: string; billingPeriod: 'monthly' | 'yearly' }) =>
     api.post('/membership/subscribe', data),
+  toggleAutoRenew: (autoRenew: boolean) =>
+    api.patch('/membership/auto-renew', { autoRenew }),
   cancel: () => api.post('/membership/cancel'),
   getBillingHistory: () => api.get('/membership/billing-history'),
 };

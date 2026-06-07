@@ -25,6 +25,7 @@ import {
 } from '@prisma/client';
 import { getAvailableQuantity, safeDecrementReserved } from '../product/helpers/product-availability.helper';
 import { getProductStatusFromQuantity } from '../product/helpers/product-status.helper';
+import { createTradeWarehouseShipments } from './helpers/warehouse-shipments';
 import { PaymentService } from '../payment/payment.service';
 import { ProductLockService } from '../product/product-lock.service';
 import { SuratCargoService } from '../surat-cargo/surat-cargo.service';
@@ -621,6 +622,17 @@ export class TradeService {
         },
       });
 
+      // Non-cash takas kabul edildi → her iki taraf için depo etiketini ŞİMDİ oluştur (BUG B).
+      // (Nakit takas awaiting_payment'a gider; etiketler ödeme tamamlanınca payment.service'te oluşur.)
+      if (nextStatus === TradeStatus.shipping_to_warehouse) {
+        await createTradeWarehouseShipments(tx, {
+          id: tradeId,
+          tradeNumber: trade.tradeNumber,
+          initiatorId: trade.initiatorId,
+          receiverId: trade.receiverId,
+        });
+      }
+
       if (trade.cashAmount && trade.cashPayerId) {
         const commission = trade.cashAmount.toNumber() * 0.05;
         await tx.tradeCashPayment.create({
@@ -1193,31 +1205,45 @@ export class TradeService {
         );
       }
 
-      // User can only ship once for the to_warehouse leg
+      // Depo etiketi kabulde otomatik oluşturulduğu için genelde kayıt VARDIR.
+      // Bu çağrı "kargoya verdim/teslim ettim" anlamına gelir → mevcut etiketi günceller.
       const existingShipment = await tx.tradeShipment.findFirst({
         where: { tradeId, shipperId: userId, leg: 'to_warehouse' },
       });
+
       if (existingShipment) {
-        throw new BadRequestException('Depoya zaten gönderim yaptınız');
+        if (existingShipment.shippedAt) {
+          throw new BadRequestException('Depoya zaten gönderim yaptınız');
+        }
+        await tx.tradeShipment.update({
+          where: { id: existingShipment.id },
+          data: {
+            fromAddressId: dto.fromAddressId,
+            carrier: dto.carrier ?? existingShipment.carrier,
+            trackingNumber: dto.trackingNumber ?? existingShipment.trackingNumber,
+            status: ShipmentStatus.label_created,
+            shippedAt: new Date(),
+          },
+        });
+      } else {
+        // Geri-uyumluluk: otomatik etiket yoksa (eski takaslar) eskisi gibi oluştur
+        const trackingNumber = dto.trackingNumber ||
+          `TRK${Date.now().toString(36).toUpperCase()}${Math.random().toString(36).substring(2, 6).toUpperCase()}`;
+        await tx.tradeShipment.create({
+          data: {
+            tradeId,
+            shipperId: userId,
+            fromAddressId: dto.fromAddressId,
+            carrier: dto.carrier,
+            trackingNumber,
+            status: ShipmentStatus.label_created,
+            shippedAt: new Date(),
+            leg: 'to_warehouse',
+            recipientType: 'warehouse',
+            recipientUserId: null,
+          },
+        });
       }
-
-      const trackingNumber = dto.trackingNumber ||
-        `TRK${Date.now().toString(36).toUpperCase()}${Math.random().toString(36).substring(2, 6).toUpperCase()}`;
-
-      await tx.tradeShipment.create({
-        data: {
-          tradeId,
-          shipperId: userId,
-          fromAddressId: dto.fromAddressId,
-          carrier: dto.carrier,
-          trackingNumber,
-          status: ShipmentStatus.label_created,
-          shippedAt: new Date(),
-          leg: 'to_warehouse',
-          recipientType: 'warehouse',
-          recipientUserId: null,
-        },
-      });
 
       // Trade status stays as shipping_to_warehouse until admin marks both
       // shipments as delivered, which transitions the trade to at_warehouse.

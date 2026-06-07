@@ -25,6 +25,7 @@ interface Manufacturer {
 const CATEGORY_BAR_ITEMS = {
     tr: [
         { label: 'Kategoriler', dropdown: 'categories' },
+        { label: 'Tüm İlanlar', href: '/listings' },
         { label: 'Yeni Gelenler', href: '/listings?sortBy=created_desc' },
         { label: 'Çok Satanlar', href: '/listings?sortBy=view_count_desc' },
         { label: 'İndirimler', href: '/listings?discountOnly=true' },
@@ -34,6 +35,7 @@ const CATEGORY_BAR_ITEMS = {
     ],
     en: [
         { label: 'Categories', dropdown: 'categories' },
+        { label: 'All Listings', href: '/listings' },
         { label: 'New Arrivals', href: '/listings?sortBy=created_desc' },
         { label: 'Best Sellers', href: '/listings?sortBy=view_count_desc' },
         { label: 'On Sale', href: '/listings?discountOnly=true' },

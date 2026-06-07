@@ -305,6 +305,10 @@ export class SearchService implements OnModuleInit {
               viewCount: { type: 'integer' },
               ratingAverage: { type: 'float' },
               ratingCount: { type: 'integer' },
+              rankTier: { type: 'integer' },
+              qualityScore: { type: 'integer' },
+              popularityScore: { type: 'integer' },
+              relevanceScore: { type: 'integer' },
               createdAt: { type: 'date' },
               updatedAt: { type: 'date' },
             },
@@ -474,7 +478,12 @@ export class SearchService implements OnModuleInit {
       case 'title_asc': sort = [{ 'title.keyword': 'asc' }]; break;
       case 'title_desc': sort = [{ 'title.keyword': 'desc' }]; break;
       case 'rating_desc': sort = [{ ratingAverage: 'desc' }, { ratingCount: 'desc' }]; break;
-      default: sort = query ? [{ _score: 'desc' }] : [{ createdAt: 'desc' }];
+      default:
+        // Alaka sıralaması: metin aramasında _score birincil kalır (relevance korunur),
+        // boost/kalite eşitlik bozucu olur; gezinmede (query yok) sponsorlu kademe öne geçer.
+        sort = query
+          ? [{ _score: 'desc' }, { relevanceScore: 'desc' }, { viewCount: 'desc' }]
+          : [{ relevanceScore: 'desc' }, { viewCount: 'desc' }, { createdAt: 'desc' }];
     }
 
     try {
@@ -614,6 +623,10 @@ export class SearchService implements OnModuleInit {
       viewCount: product.viewCount || 0,
       ratingAverage: product.averageRating != null ? parseFloat(product.averageRating.toString()) : 0,
       ratingCount: product.ratingCount ?? 0,
+      rankTier: product.rankTier ?? 0,
+      qualityScore: product.qualityScore ?? 0,
+      popularityScore: product.popularityScore ?? 0,
+      relevanceScore: product.relevanceScore ?? 0,
       material: materialAttr?.attribute?.slug || undefined,
       vehicleType: vehicleTypeAttr?.attribute?.slug || undefined,
       isTradeEnabled: product.isTradeEnabled,

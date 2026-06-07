@@ -5,6 +5,7 @@ import { NotificationService } from '../notification/notification.service';
 import { NotificationType } from '../notification/dto';
 import { StorageService } from '../storage/storage.service';
 import { RatingService } from '../rating/rating.service';
+import { computeTrustScore } from './helpers/trust-score';
 
 // In-memory storage for user blocks until schema is updated
 interface UserBlock {
@@ -126,6 +127,30 @@ export class UserService {
       },
     });
 
+    // Güven Skoru için ek istatistikler (puan, satış, takas)
+    const [ratingAgg, salesCount, tradesCount] = await Promise.all([
+      this.prisma.rating.aggregate({
+        where: { receiverId: id, status: 'approved' },
+        _avg: { score: true },
+        _count: true,
+      }),
+      this.prisma.order.count({ where: { sellerId: id, status: 'completed' } }),
+      this.prisma.trade.count({
+        where: { OR: [{ initiatorId: id }, { receiverId: id }], status: 'completed' },
+      }),
+    ]);
+    const isPremium =
+      !!user.membership &&
+      user.membership.status === 'active' &&
+      user.membership.tier.type !== 'free';
+    const trust = computeTrustScore({
+      averageRating: ratingAgg._avg?.score || 0,
+      totalRatings: ratingAgg._count,
+      totalSales: salesCount,
+      totalTrades: tradesCount,
+      isVerified: user.isVerified,
+    });
+
     // Format membership info for frontend
     const membershipInfo = user.membership ? {
       id: user.membership.id,
@@ -167,11 +192,21 @@ export class UserService {
 
     // Remove raw membership and add the mapped membershipInfo
     const { membership: rawMembership, ...rest } = user;
-    return { 
-      ...rest, 
+    return {
+      ...rest,
       avatarUrl: resolvedAvatarUrl,
       membership: membershipInfo,
       listingCount,
+      isPremium,
+      trustScore: trust.score,
+      trustLevel: trust.level,
+      stats: {
+        totalListings: listingCount,
+        totalSales: salesCount,
+        totalTrades: tradesCount,
+        averageRating: ratingAgg._avg?.score || 0,
+        totalRatings: ratingAgg._count,
+      },
     };
   }
 
@@ -190,6 +225,7 @@ export class UserService {
       taxOffice?: string;
       isCorporateSeller?: boolean;
       avatarUrl?: string;
+      showTrustScore?: boolean;
     },
   ) {
     // Check if user is business tier - only business tier users should have business info
@@ -229,6 +265,7 @@ export class UserService {
     if (data.displayName !== undefined) updateData.displayName = data.displayName;
     if (data.phone !== undefined) updateData.phone = data.phone;
     if (data.bio !== undefined) updateData.bio = data.bio;
+    if (data.showTrustScore !== undefined) updateData.showTrustScore = data.showTrustScore;
     if (data.birthDate !== undefined) {
       updateData.birthDate = data.birthDate ? new Date(data.birthDate) : null;
     }
@@ -739,20 +776,20 @@ export class UserService {
       throw new NotFoundException('Kullanıcı bulunamadı');
     }
 
-    // Get seller stats + followers count
-    const [totalListings, totalSales, totalTrades, ratings, followersCount] = await Promise.all([
-      this.prisma.product.count({ 
-        where: { 
-          sellerId: userId, 
-          status: 'active' 
-        } 
+    // Get seller stats + followers count + membership
+    const [totalListings, totalSales, totalTrades, ratings, followersCount, membership] = await Promise.all([
+      this.prisma.product.count({
+        where: {
+          sellerId: userId,
+          status: 'active'
+        }
       }),
       this.prisma.order.count({ where: { sellerId: userId, status: 'completed' } }),
-      this.prisma.trade.count({ 
-        where: { 
+      this.prisma.trade.count({
+        where: {
           OR: [{ initiatorId: userId }, { receiverId: userId }],
           status: 'completed',
-        } 
+        }
       }),
       this.prisma.rating.aggregate({
         where: { receiverId: userId, status: 'approved' },
@@ -760,15 +797,38 @@ export class UserService {
         _count: true,
       }),
       this.prisma.userFollow.count({ where: { followingId: userId } }),
+      this.prisma.userMembership.findUnique({
+        where: { userId },
+        select: { status: true, tier: { select: { type: true } } },
+      }),
     ]);
 
     // Resolve avatar URL (S3 key → presigned URL)
     const resolvedAvatarUrl = await this.resolveAvatarUrl(user.avatarUrl);
 
+    // Premium (ücretli, aktif) üyelik mi?
+    const membershipTier = membership?.tier.type ?? 'free';
+    const isPremium = membership != null && membership.status === 'active' && membershipTier !== 'free';
+
+    // Güven Skoru (0..100) — premium avantajı
+    const trust = computeTrustScore({
+      averageRating: ratings._avg?.score || 0,
+      totalRatings: ratings._count,
+      totalSales,
+      totalTrades,
+      isVerified: user.isVerified,
+    });
+    // Herkese açık profilde skoru sadece premium VE kullanıcı görünürlüğü açıksa göster
+    const trustVisible = isPremium && (user as any).showTrustScore !== false;
+
     return {
       ...user,
       avatarUrl: resolvedAvatarUrl,
       followersCount,
+      isPremium,
+      membershipTier,
+      trustScore: trustVisible ? trust.score : null,
+      trustLevel: trustVisible ? trust.level : null,
       stats: {
         totalListings,
         totalSales,

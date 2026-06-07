@@ -98,6 +98,15 @@ export class ProductQueryDto {
 
   @ApiPropertyOptional({
     example: true,
+    description: 'Filter only actively boosted (sponsored) products',
+  })
+  @IsOptional()
+  @Transform(({ value }) => value === 'true' || value === true)
+  @IsBoolean()
+  boostedOnly?: boolean;
+
+  @ApiPropertyOptional({
+    example: true,
     description: 'Filter only products currently on sale/discount',
   })
   @IsOptional()

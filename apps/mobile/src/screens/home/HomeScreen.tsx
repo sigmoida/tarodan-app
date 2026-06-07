@@ -18,6 +18,7 @@ import {
 import Icon from 'react-native-vector-icons/Ionicons';
 import { useListingsStore } from '../../stores/listingsStore';
 import { useCartStore } from '../../stores/cartStore';
+import { listingsApi } from '../../services/api';
 import { safeString } from '../../utils/safeString';
 import { getImageUrl } from '../../utils/imageUrl';
 import { isProductTradeOpen } from '../../utils/isProductTradeOpen';
@@ -52,8 +53,14 @@ const ListingCard = ({ item, onPress }: any) => (
         source={{ uri: getImageUrl(item.images) }}
         style={styles.listingImage}
       />
+      {item.isBoosted && (
+        <View style={styles.sponsoredBadge}>
+          <Icon name="rocket" size={11} color="#FFF" />
+          <Text style={styles.sponsoredBadgeText}>Sponsorlu</Text>
+        </View>
+      )}
       {isProductTradeOpen(item) && (
-        <View style={styles.tradeBadge}>
+        <View style={[styles.tradeBadge, item.isBoosted && styles.tradeBadgeBelow]}>
           <Icon name="swap-horizontal" size={12} color="#FFF" />
           <Text style={styles.tradeBadgeText}>Takas</Text>
         </View>
@@ -67,19 +74,49 @@ const ListingCard = ({ item, onPress }: any) => (
   </TouchableOpacity>
 );
 
+// Öne Çıkan (boost'lu) yatay şerit kartı — web'deki şeridin mobil karşılığı
+const BoostedCard = ({ item, onPress }: any) => (
+  <TouchableOpacity style={styles.boostedCard} onPress={onPress}>
+    <View style={styles.boostedImageWrap}>
+      <Image source={{ uri: getImageUrl(item.images) }} style={styles.boostedImage} />
+      <View style={styles.sponsoredBadge}>
+        <Icon name="rocket" size={11} color="#FFF" />
+        <Text style={styles.sponsoredBadgeText}>Sponsorlu</Text>
+      </View>
+    </View>
+    <View style={styles.boostedInfo}>
+      <Text style={styles.boostedTitle} numberOfLines={1}>{item.title}</Text>
+      <Text style={styles.boostedPrice}>₺{item.price?.toLocaleString('tr-TR')}</Text>
+    </View>
+  </TouchableOpacity>
+);
+
 const HomeScreen = ({ navigation }: any) => {
   const [searchQuery, setSearchQuery] = useState('');
   const [refreshing, setRefreshing] = useState(false);
+  const [boosted, setBoosted] = useState<any[]>([]);
   const { listings, fetchListings, isLoading, setFilters } = useListingsStore();
   const { itemCount } = useCartStore();
 
+  const fetchBoosted = async () => {
+    try {
+      const res = await listingsApi.getAll({ boostedOnly: true, limit: 12, status: 'active' });
+      const raw: any = res?.data;
+      const list = Array.isArray(raw) ? raw : (raw?.data ?? raw?.products ?? []);
+      setBoosted(Array.isArray(list) ? list : []);
+    } catch {
+      setBoosted([]);
+    }
+  };
+
   useEffect(() => {
     fetchListings(true);
+    fetchBoosted();
   }, []);
 
   const onRefresh = async () => {
     setRefreshing(true);
-    await fetchListings(true);
+    await Promise.all([fetchListings(true), fetchBoosted()]);
     setRefreshing(false);
   };
 
@@ -178,10 +215,30 @@ const HomeScreen = ({ navigation }: any) => {
           </ScrollView>
         </View>
 
-        {/* Featured Listings */}
+        {/* Öne Çıkan Ürünler (boost'lu, yatay kayan şerit — Tümünü Gör YOK) */}
+        {boosted.length > 0 && (
+          <View style={styles.section}>
+            <Text style={styles.sectionTitle}>🚀 Öne Çıkan Ürünler</Text>
+            <FlatList
+              data={boosted}
+              horizontal
+              showsHorizontalScrollIndicator={false}
+              renderItem={({ item }) => (
+                <BoostedCard
+                  item={item}
+                  onPress={() => navigation.navigate('ListingDetail', { id: item.id })}
+                />
+              )}
+              keyExtractor={(item) => `boosted-${item.id}`}
+              contentContainerStyle={{ paddingRight: 16 }}
+            />
+          </View>
+        )}
+
+        {/* Senin İçin (genel öneri grid'i) */}
         <View style={styles.section}>
           <View style={styles.sectionHeader}>
-            <Text style={styles.sectionTitle}>Öne Çıkanlar</Text>
+            <Text style={styles.sectionTitle}>Senin İçin</Text>
             <TouchableOpacity onPress={() => navigation.navigate('Listings')}>
               <Text style={styles.seeAllText}>Tümünü Gör</Text>
             </TouchableOpacity>
@@ -217,6 +274,36 @@ const HomeScreen = ({ navigation }: any) => {
           </View>
           <Icon name="chevron-forward" size={24} color="#FFF" />
         </TouchableOpacity>
+
+        {/* Takas Vitrini */}
+        {listings.some((l: any) => isProductTradeOpen(l)) && (
+          <View style={styles.section}>
+            <View style={styles.sectionHeader}>
+              <Text style={styles.sectionTitle}>Takas Vitrini</Text>
+              <TouchableOpacity
+                onPress={() => {
+                  setFilters({ tradeOnly: true });
+                  navigation.navigate('Listings');
+                }}
+              >
+                <Text style={styles.seeAllText}>Tümünü Gör</Text>
+              </TouchableOpacity>
+            </View>
+            <FlatList
+              data={listings.filter((l: any) => isProductTradeOpen(l)).slice(0, 4)}
+              renderItem={({ item }) => (
+                <ListingCard
+                  item={item}
+                  onPress={() => navigation.navigate('ListingDetail', { id: item.id })}
+                />
+              )}
+              keyExtractor={(item) => `trade-${item.id}`}
+              numColumns={2}
+              columnWrapperStyle={styles.listingsRow}
+              scrollEnabled={false}
+            />
+          </View>
+        )}
 
         {/* Recent Listings */}
         <View style={[styles.section, { marginBottom: 100 }]}>
@@ -362,6 +449,44 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     marginBottom: 16,
   },
+  boostedCard: {
+    width: 150,
+    backgroundColor: '#FFF',
+    borderRadius: 12,
+    overflow: 'hidden',
+    marginRight: 12,
+    borderWidth: 1,
+    borderColor: '#FDE68A',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 2,
+  },
+  boostedImageWrap: {
+    position: 'relative',
+    width: '100%',
+    height: 110,
+    backgroundColor: '#F5F5F5',
+  },
+  boostedImage: {
+    width: '100%',
+    height: '100%',
+  },
+  boostedInfo: {
+    padding: 10,
+  },
+  boostedTitle: {
+    fontSize: 13,
+    fontWeight: '600',
+    color: '#212121',
+    marginBottom: 4,
+  },
+  boostedPrice: {
+    fontSize: 15,
+    fontWeight: '700',
+    color: '#E53935',
+  },
   listingCard: {
     width: CARD_WIDTH,
     backgroundColor: '#FFF',
@@ -395,7 +520,27 @@ const styles = StyleSheet.create({
     paddingVertical: 4,
     borderRadius: 12,
   },
+  tradeBadgeBelow: {
+    top: 38,
+  },
   tradeBadgeText: {
+    color: '#FFF',
+    fontSize: 11,
+    fontWeight: '600',
+    marginLeft: 4,
+  },
+  sponsoredBadge: {
+    position: 'absolute',
+    top: 8,
+    left: 8,
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#F59E0B',
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 12,
+  },
+  sponsoredBadgeText: {
     color: '#FFF',
     fontSize: 11,
     fontWeight: '600',

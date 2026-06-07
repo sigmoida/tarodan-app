@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { View, ScrollView, StyleSheet, Image, Alert } from 'react-native';
+import { View, ScrollView, StyleSheet, Image, Linking } from 'react-native';
 import { Modal, Portal, Text, Button, Card, IconButton, Chip, Snackbar, ActivityIndicator, Divider } from 'react-native-paper';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
@@ -10,227 +10,193 @@ interface Product {
   id: string;
   title: string;
   price: number;
-  images: { url: string }[];
+  images?: Array<{ url?: string; cardUrl?: string } | string>;
   status: string;
-  isFeatured?: boolean;
-  featuredUntil?: string;
 }
 
-interface FeaturedSlot {
+interface Boost {
   id: string;
   productId: string;
-  product: Product;
-  expiresAt: string;
-  position: number;
+  product: { id: string; title: string; status: string; image: string | null } | null;
+  durationDays: number;
+  price: number;
+  status: string;
+  startsAt: string | null;
+  endsAt: string | null;
+  isActive: boolean;
+  remainingMs: number;
+  createdAt: string;
+}
+
+interface BoostOption {
+  durationDays: number;
+  price: number;
+  label: string;
 }
 
 interface FeaturedListingsModalProps {
   visible: boolean;
   onDismiss: () => void;
+  /** @deprecated boost artık süreye göre satın alınır; slot kavramı kaldırıldı */
   maxSlots?: number;
 }
+
+const getImageUri = (images?: Product['images']): string => {
+  const first = images?.[0];
+  if (!first) return 'https://via.placeholder.com/60';
+  if (typeof first === 'string') return first;
+  return first.cardUrl || first.url || 'https://via.placeholder.com/60';
+};
 
 export const FeaturedListingsModal: React.FC<FeaturedListingsModalProps> = ({
   visible,
   onDismiss,
-  maxSlots = 3,
 }) => {
   const queryClient = useQueryClient();
   const [selectedProductId, setSelectedProductId] = useState<string | null>(null);
+  const [selectedDuration, setSelectedDuration] = useState<number | null>(null);
+  const [autoRenew, setAutoRenew] = useState(false);
   const [snackbar, setSnackbar] = useState({ visible: false, message: '' });
 
-  // Fetch current featured listings
-  const { data: featuredSlots, isLoading: loadingFeatured } = useQuery<FeaturedSlot[]>({
-    queryKey: ['my-featured-listings'],
+  // Premium mi? (otomatik yenileme seçeneği premium'a özel)
+  const { data: me } = useQuery({
+    queryKey: ['me-premium'],
     queryFn: async () => {
-      try {
-        const response = await api.get('/products/featured/my-slots');
-        return response.data;
-      } catch (error) {
-        // Return mock data
-        return [
-          {
-            id: '1',
-            productId: 'p1',
-            product: {
-              id: 'p1',
-              title: 'Ferrari 488 GTB',
-              price: 2500,
-              images: [{ url: 'https://via.placeholder.com/80' }],
-              status: 'active',
-            },
-            expiresAt: new Date(Date.now() + 5 * 24 * 60 * 60 * 1000).toISOString(),
-            position: 1,
-          },
-        ];
-      }
+      const res = await api.get('/users/me');
+      return res.data?.user ?? res.data ?? null;
+    },
+    enabled: visible,
+  });
+  const isPremium = !!me?.isPremium;
+
+  // Boost geçmişi / aktif boost'lar
+  const { data: boosts, isLoading: loadingBoosts } = useQuery<Boost[]>({
+    queryKey: ['my-boosts'],
+    queryFn: async () => {
+      const response = await api.get('/products/boost/my');
+      return response.data || [];
     },
     enabled: visible,
   });
 
-  // Fetch eligible products (active listings not already featured)
+  // Boost fiyatlandırması (admin'den ayarlanabilir)
+  const { data: pricing, isLoading: loadingPricing } = useQuery<{ enabled: boolean; options: BoostOption[] }>({
+    queryKey: ['boost-pricing'],
+    queryFn: async () => {
+      const response = await api.get('/products/boost/pricing');
+      return response.data || { enabled: true, options: [] };
+    },
+    enabled: visible,
+  });
+
+  // Öne çıkarılabilir aktif ilanlar
   const { data: eligibleProducts, isLoading: loadingProducts } = useQuery<Product[]>({
-    queryKey: ['eligible-for-featured'],
+    queryKey: ['eligible-for-boost'],
     queryFn: async () => {
-      try {
-        const response = await api.get('/products/my-listings', { 
-          params: { status: 'active', notFeatured: true } 
-        });
-        return response.data?.data || response.data || [];
-      } catch (error) {
-        // Return mock data
-        return [
-          { id: 'p2', title: 'Porsche 911 GT3', price: 1800, images: [{ url: 'https://via.placeholder.com/80' }], status: 'active' },
-          { id: 'p3', title: 'BMW M3 E30', price: 1200, images: [{ url: 'https://via.placeholder.com/80' }], status: 'active' },
-          { id: 'p4', title: 'Mercedes 300SL', price: 3500, images: [{ url: 'https://via.placeholder.com/80' }], status: 'active' },
-        ];
-      }
+      const response = await api.get('/products/my', { params: { status: 'active', limit: 100 } });
+      return response.data?.data || response.data || [];
     },
     enabled: visible,
   });
 
-  // Add to featured mutation
-  const addFeaturedMutation = useMutation({
-    mutationFn: async (productId: string) => {
-      return api.post('/products/featured', { productId });
+  // Varsayılan süre seçimi (7 gün varsa o)
+  useEffect(() => {
+    if (pricing?.options?.length && selectedDuration == null) {
+      const seven = pricing.options.find((o) => o.durationDays === 7);
+      setSelectedDuration(seven?.durationDays ?? pricing.options[0].durationDays);
+    }
+  }, [pricing, selectedDuration]);
+
+  const initiateBoostMutation = useMutation({
+    mutationFn: async () => {
+      const response = await api.post(`/products/${selectedProductId}/boost/initiate`, {
+        durationDays: selectedDuration,
+        autoRenew: isPremium ? autoRenew : false,
+      });
+      return response.data;
     },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['my-featured-listings'] });
-      queryClient.invalidateQueries({ queryKey: ['eligible-for-featured'] });
-      setSelectedProductId(null);
-      setSnackbar({ visible: true, message: 'İlan öne çıkarıldı!' });
+    onSuccess: async (data: any) => {
+      queryClient.invalidateQueries({ queryKey: ['my-boosts'] });
+      const paymentUrl = data?.paymentUrl;
+      if (paymentUrl && String(paymentUrl).startsWith('http')) {
+        onDismiss();
+        await Linking.openURL(paymentUrl).catch(() => {
+          setSnackbar({ visible: true, message: 'Ödeme sayfası açılamadı' });
+        });
+        return;
+      }
+      setSnackbar({ visible: true, message: 'Ödeme başlatılamadı' });
     },
     onError: (error: any) => {
       setSnackbar({ visible: true, message: error.response?.data?.message || 'Öne çıkarma başarısız' });
     },
   });
 
-  // Remove from featured mutation
-  const removeFeaturedMutation = useMutation({
-    mutationFn: async (slotId: string) => {
-      return api.delete(`/products/featured/${slotId}`);
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['my-featured-listings'] });
-      queryClient.invalidateQueries({ queryKey: ['eligible-for-featured'] });
-      setSnackbar({ visible: true, message: 'Öne çıkarma kaldırıldı' });
-    },
-    onError: (error: any) => {
-      setSnackbar({ visible: true, message: error.response?.data?.message || 'İşlem başarısız' });
-    },
-  });
+  const activeBoosts = (boosts || []).filter((b) => b.isActive);
+  // Aktif boost'u olan ilanlar da seçilebilir → yeni süre kalan sürenin ÜSTÜNE eklenir (stacking)
+  const selectableProducts = eligibleProducts || [];
 
-  const usedSlots = featuredSlots?.length || 0;
-  const availableSlots = maxSlots - usedSlots;
+  const selectedPrice = pricing?.options.find((o) => o.durationDays === selectedDuration)?.price ?? null;
 
-  const handleAddFeatured = () => {
+  const handleConfirm = () => {
     if (!selectedProductId) {
       setSnackbar({ visible: true, message: 'Lütfen bir ilan seçin' });
       return;
     }
-    addFeaturedMutation.mutate(selectedProductId);
+    if (selectedDuration == null) {
+      setSnackbar({ visible: true, message: 'Lütfen bir süre seçin' });
+      return;
+    }
+    initiateBoostMutation.mutate();
   };
 
-  const handleRemoveFeatured = (slotId: string, productTitle: string) => {
-    Alert.alert(
-      'Öne Çıkarmayı Kaldır',
-      `"${productTitle}" ilanının öne çıkarmasını kaldırmak istediğinize emin misiniz?`,
-      [
-        { text: 'İptal', style: 'cancel' },
-        { text: 'Kaldır', style: 'destructive', onPress: () => removeFeaturedMutation.mutate(slotId) },
-      ]
-    );
-  };
-
-  const formatRemainingTime = (expiresAt: string) => {
-    const now = new Date();
-    const expiry = new Date(expiresAt);
-    const diffMs = expiry.getTime() - now.getTime();
+  const formatRemainingTime = (endsAt: string | null) => {
+    if (!endsAt) return '';
+    const diffMs = new Date(endsAt).getTime() - Date.now();
     const diffDays = Math.ceil(diffMs / (1000 * 60 * 60 * 24));
-    
     if (diffDays <= 0) return 'Süresi doldu';
     if (diffDays === 1) return '1 gün kaldı';
     return `${diffDays} gün kaldı`;
   };
 
+  const boostDisabled = pricing?.enabled === false;
+
   return (
     <Portal>
-      <Modal
-        visible={visible}
-        onDismiss={onDismiss}
-        contentContainerStyle={styles.modal}
-      >
+      <Modal visible={visible} onDismiss={onDismiss} contentContainerStyle={styles.modal}>
         <View style={styles.header}>
           <View style={styles.headerTitle}>
-            <MaterialCommunityIcons name="star-circle" size={28} color={TarodanColors.primary} />
-            <Text variant="titleLarge" style={styles.title}>Öne Çıkan İlanlar</Text>
+            <MaterialCommunityIcons name="rocket-launch" size={26} color={TarodanColors.primary} />
+            <Text variant="titleLarge" style={styles.title}>İlanı Öne Çıkar</Text>
           </View>
           <IconButton icon="close" onPress={onDismiss} />
         </View>
 
-        {/* Slots Overview */}
-        <View style={styles.slotsOverview}>
-          <View style={styles.slotsInfo}>
-            <Text variant="bodyMedium">Kullanılan Slotlar</Text>
-            <Text variant="headlineSmall" style={styles.slotsCount}>
-              {usedSlots} / {maxSlots}
-            </Text>
-          </View>
-          <View style={styles.slotsIndicator}>
-            {[...Array(maxSlots)].map((_, index) => (
-              <View
-                key={index}
-                style={[
-                  styles.slotDot,
-                  index < usedSlots && styles.slotDotActive,
-                ]}
-              />
-            ))}
-          </View>
-        </View>
-
         <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
-          {/* Current Featured Listings */}
-          <Text variant="titleSmall" style={styles.sectionTitle}>
-            Aktif Öne Çıkan İlanlarınız
-          </Text>
+          {/* Aktif boost'lar */}
+          <Text variant="titleSmall" style={styles.sectionTitle}>Aktif Öne Çıkan İlanlarınız</Text>
 
-          {loadingFeatured ? (
+          {loadingBoosts ? (
             <ActivityIndicator style={{ marginVertical: 20 }} />
-          ) : featuredSlots?.length === 0 ? (
+          ) : activeBoosts.length === 0 ? (
             <Card style={styles.emptyCard}>
               <Card.Content style={styles.emptyContent}>
                 <Ionicons name="star-outline" size={40} color={TarodanColors.textLight} />
-                <Text variant="bodyMedium" style={styles.emptyText}>
-                  Henüz öne çıkan ilanınız yok
-                </Text>
+                <Text variant="bodyMedium" style={styles.emptyText}>Henüz aktif öne çıkan ilanınız yok</Text>
               </Card.Content>
             </Card>
           ) : (
-            featuredSlots?.map((slot) => (
-              <Card key={slot.id} style={styles.featuredCard}>
+            activeBoosts.map((boost) => (
+              <Card key={boost.id} style={styles.featuredCard}>
                 <Card.Content style={styles.featuredContent}>
-                  <Image
-                    source={{ uri: slot.product.images?.[0]?.url || 'https://via.placeholder.com/60' }}
-                    style={styles.productImage}
-                  />
                   <View style={styles.productInfo}>
                     <Text variant="bodyMedium" numberOfLines={1} style={styles.productTitle}>
-                      {slot.product.title}
-                    </Text>
-                    <Text variant="bodySmall" style={styles.productPrice}>
-                      ₺{(slot.product?.price ?? 0).toLocaleString('tr-TR')}
+                      {boost.product?.title ?? 'İlan'}
                     </Text>
                     <Chip compact style={styles.expiryChip} textStyle={{ fontSize: 10 }}>
-                      {formatRemainingTime(slot.expiresAt)}
+                      {formatRemainingTime(boost.endsAt)}
                     </Chip>
                   </View>
-                  <IconButton
-                    icon="close-circle"
-                    size={24}
-                    iconColor={TarodanColors.error}
-                    onPress={() => handleRemoveFeatured(slot.id, slot.product.title)}
-                  />
                 </Card.Content>
               </Card>
             ))
@@ -238,99 +204,112 @@ export const FeaturedListingsModal: React.FC<FeaturedListingsModalProps> = ({
 
           <Divider style={styles.divider} />
 
-          {/* Add New Featured */}
-          {availableSlots > 0 ? (
+          {boostDisabled ? (
+            <Card style={styles.emptyCard}>
+              <Card.Content style={styles.emptyContent}>
+                <Text variant="bodyMedium" style={styles.emptyText}>Öne çıkarma şu anda kullanılamıyor.</Text>
+              </Card.Content>
+            </Card>
+          ) : (
             <>
-              <Text variant="titleSmall" style={styles.sectionTitle}>
-                İlan Öne Çıkar ({availableSlots} slot boş)
-              </Text>
+              {/* Süre seçimi */}
+              <Text variant="titleSmall" style={styles.sectionTitle}>Süre Seçin</Text>
+              {loadingPricing ? (
+                <ActivityIndicator style={{ marginVertical: 12 }} />
+              ) : (
+                <View style={styles.durationRow}>
+                  {pricing?.options.map((opt) => (
+                    <Chip
+                      key={opt.durationDays}
+                      selected={selectedDuration === opt.durationDays}
+                      showSelectedOverlay
+                      onPress={() => setSelectedDuration(opt.durationDays)}
+                      style={[
+                        styles.durationChip,
+                        selectedDuration === opt.durationDays && styles.durationChipSelected,
+                      ]}
+                    >
+                      {opt.label} · ₺{opt.price.toLocaleString('tr-TR')}
+                    </Chip>
+                  ))}
+                </View>
+              )}
 
+              {/* Otomatik yenileme (premium'a özel) */}
+              {isPremium && (
+                <Chip
+                  icon={autoRenew ? 'check' : 'autorenew'}
+                  selected={autoRenew}
+                  showSelectedOverlay
+                  onPress={() => setAutoRenew(!autoRenew)}
+                  style={{ alignSelf: 'flex-start', marginBottom: 12 }}
+                >
+                  Süre bitince otomatik yenile
+                </Chip>
+              )}
+
+              {/* İlan seçimi */}
+              <Text variant="titleSmall" style={styles.sectionTitle}>İlan Seçin</Text>
               {loadingProducts ? (
                 <ActivityIndicator style={{ marginVertical: 20 }} />
-              ) : eligibleProducts?.length === 0 ? (
+              ) : selectableProducts.length === 0 ? (
                 <Card style={styles.emptyCard}>
                   <Card.Content style={styles.emptyContent}>
                     <Ionicons name="pricetag-outline" size={40} color={TarodanColors.textLight} />
-                    <Text variant="bodyMedium" style={styles.emptyText}>
-                      Öne çıkarılabilir ilan yok
-                    </Text>
+                    <Text variant="bodyMedium" style={styles.emptyText}>Öne çıkarılabilir aktif ilan yok</Text>
                   </Card.Content>
                 </Card>
               ) : (
-                <>
-                  {eligibleProducts?.map((product) => (
-                    <Card
-                      key={product.id}
-                      style={[
-                        styles.selectableCard,
-                        selectedProductId === product.id && styles.selectedCard,
-                      ]}
-                      onPress={() => setSelectedProductId(product.id)}
-                    >
-                      <Card.Content style={styles.selectableContent}>
-                        <View style={[
-                          styles.radioCircle,
-                          selectedProductId === product.id && styles.radioCircleSelected,
-                        ]}>
-                          {selectedProductId === product.id && (
-                            <Ionicons name="checkmark" size={14} color="#fff" />
-                          )}
-                        </View>
-                        <Image
-                          source={{ uri: product.images?.[0]?.url || 'https://via.placeholder.com/50' }}
-                          style={styles.selectableImage}
-                        />
-                        <View style={styles.selectableInfo}>
-                          <Text variant="bodyMedium" numberOfLines={1}>
-                            {product.title}
-                          </Text>
-                          <Text variant="bodySmall" style={styles.productPrice}>
-                            ₺{(product.price ?? 0).toLocaleString('tr-TR')}
-                          </Text>
-                        </View>
-                      </Card.Content>
-                    </Card>
-                  ))}
-
-                  <Button
-                    mode="contained"
-                    onPress={handleAddFeatured}
-                    loading={addFeaturedMutation.isPending}
-                    disabled={!selectedProductId || addFeaturedMutation.isPending}
-                    style={styles.addButton}
-                    icon="star"
+                selectableProducts.map((product) => (
+                  <Card
+                    key={product.id}
+                    style={[styles.selectableCard, selectedProductId === product.id && styles.selectedCard]}
+                    onPress={() => setSelectedProductId(product.id)}
                   >
-                    Öne Çıkar
-                  </Button>
-                </>
+                    <Card.Content style={styles.selectableContent}>
+                      <View style={[styles.radioCircle, selectedProductId === product.id && styles.radioCircleSelected]}>
+                        {selectedProductId === product.id && <Ionicons name="checkmark" size={14} color="#fff" />}
+                      </View>
+                      <Image source={{ uri: getImageUri(product.images) }} style={styles.selectableImage} />
+                      <View style={styles.selectableInfo}>
+                        <Text variant="bodyMedium" numberOfLines={1}>{product.title}</Text>
+                        <Text variant="bodySmall" style={styles.productPrice}>
+                          ₺{(product.price ?? 0).toLocaleString('tr-TR')}
+                        </Text>
+                      </View>
+                    </Card.Content>
+                  </Card>
+                ))
               )}
+
+              <Button
+                mode="contained"
+                onPress={handleConfirm}
+                loading={initiateBoostMutation.isPending}
+                disabled={!selectedProductId || selectedDuration == null || initiateBoostMutation.isPending}
+                style={styles.addButton}
+                icon="rocket-launch"
+              >
+                {selectedPrice != null
+                  ? `Öne Çıkar ve Öde (₺${selectedPrice.toLocaleString('tr-TR')})`
+                  : 'Öne Çıkar ve Öde'}
+              </Button>
             </>
-          ) : (
-            <Card style={styles.fullCard}>
-              <Card.Content style={styles.fullContent}>
-                <MaterialCommunityIcons name="star-check" size={40} color={TarodanColors.primary} />
-                <Text variant="bodyMedium" style={styles.fullText}>
-                  Tüm slotlarınız dolu!
-                </Text>
-                <Text variant="bodySmall" style={styles.fullHint}>
-                  Yeni bir ilan öne çıkarmak için mevcut bir öne çıkarmayı kaldırın.
-                </Text>
-              </Card.Content>
-            </Card>
           )}
 
-          {/* Info Card */}
+          {/* Bilgi kartı */}
           <Card style={styles.infoCard}>
             <Card.Content>
               <View style={styles.infoHeader}>
                 <Ionicons name="information-circle" size={20} color={TarodanColors.info} />
-                <Text variant="titleSmall" style={styles.infoTitle}>Öne Çıkan İlanlar Hakkında</Text>
+                <Text variant="titleSmall" style={styles.infoTitle}>Öne Çıkarma Hakkında</Text>
               </View>
               <View style={styles.infoBullets}>
-                <Text style={styles.infoBullet}>• Premium üyeler {maxSlots} adet öne çıkan slot hakkına sahiptir</Text>
-                <Text style={styles.infoBullet}>• Öne çıkan ilanlar arama sonuçlarında üstte görünür</Text>
-                <Text style={styles.infoBullet}>• Her öne çıkarma 7 gün sürer</Text>
-                <Text style={styles.infoBullet}>• Ek öne çıkarma: 50 TRY/ilan/hafta</Text>
+                <Text style={styles.infoBullet}>• Öne çıkan ilanlar arama, kategori ve ana sayfa vitrininde üst sıralarda görünür</Text>
+                <Text style={styles.infoBullet}>• Hem ücretsiz hem premium üyeler ilan öne çıkarabilir</Text>
+                <Text style={styles.infoBullet}>• Süre dolunca ilan otomatik olarak normal sıralamaya döner</Text>
+                <Text style={styles.infoBullet}>• Aktif boost'u olan ilana tekrar süre alırsanız kalan sürenin üstüne eklenir</Text>
+                <Text style={styles.infoBullet}>• Fiyatlar seçtiğiniz süreye göre değişir</Text>
               </View>
             </Card.Content>
           </Card>
@@ -374,38 +353,6 @@ const styles = StyleSheet.create({
     fontWeight: 'bold',
     color: TarodanColors.textPrimary,
   },
-  slotsOverview: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    paddingHorizontal: 16,
-    paddingVertical: 12,
-    backgroundColor: TarodanColors.primary + '10',
-    marginHorizontal: 16,
-    marginVertical: 8,
-    borderRadius: 12,
-  },
-  slotsInfo: {},
-  slotsCount: {
-    color: TarodanColors.primary,
-    fontWeight: 'bold',
-  },
-  slotsIndicator: {
-    flexDirection: 'row',
-    gap: 8,
-  },
-  slotDot: {
-    width: 20,
-    height: 20,
-    borderRadius: 10,
-    borderWidth: 2,
-    borderColor: TarodanColors.primary + '40',
-    backgroundColor: 'transparent',
-  },
-  slotDotActive: {
-    backgroundColor: TarodanColors.primary,
-    borderColor: TarodanColors.primary,
-  },
   content: {
     paddingHorizontal: 16,
   },
@@ -413,6 +360,18 @@ const styles = StyleSheet.create({
     marginTop: 8,
     marginBottom: 12,
     color: TarodanColors.textPrimary,
+  },
+  durationRow: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 8,
+    marginBottom: 8,
+  },
+  durationChip: {
+    backgroundColor: TarodanColors.backgroundSecondary,
+  },
+  durationChipSelected: {
+    backgroundColor: TarodanColors.primary + '20',
   },
   emptyCard: {
     marginBottom: 12,
@@ -425,6 +384,7 @@ const styles = StyleSheet.create({
   emptyText: {
     marginTop: 8,
     color: TarodanColors.textSecondary,
+    textAlign: 'center',
   },
   featuredCard: {
     marginBottom: 8,
@@ -436,15 +396,8 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
   },
-  productImage: {
-    width: 60,
-    height: 60,
-    borderRadius: 8,
-    backgroundColor: TarodanColors.border,
-  },
   productInfo: {
     flex: 1,
-    marginLeft: 12,
   },
   productTitle: {
     color: TarodanColors.textPrimary,
@@ -502,26 +455,6 @@ const styles = StyleSheet.create({
   addButton: {
     marginTop: 12,
     backgroundColor: TarodanColors.primary,
-  },
-  fullCard: {
-    marginBottom: 12,
-    backgroundColor: TarodanColors.success + '10',
-    borderWidth: 1,
-    borderColor: TarodanColors.success + '30',
-  },
-  fullContent: {
-    alignItems: 'center',
-    paddingVertical: 20,
-  },
-  fullText: {
-    marginTop: 8,
-    color: TarodanColors.success,
-    fontWeight: '600',
-  },
-  fullHint: {
-    marginTop: 4,
-    color: TarodanColors.textSecondary,
-    textAlign: 'center',
   },
   infoCard: {
     marginTop: 16,

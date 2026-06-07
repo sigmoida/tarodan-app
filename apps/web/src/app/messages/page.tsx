@@ -72,6 +72,28 @@ function parseMessageContent(content: string): Array<{ type: 'text' | 'image'; v
   return parts.length ? parts : [{ type: 'text', value: content }];
 }
 
+/**
+ * Sohbet listesi önizlemesi: resim mesajları için ham link yerine "📷 Fotoğraf"
+ * gösterir. İçerik filtresi [IMG:...] içindeki presigned URL'i bozsa bile
+ * (artık X-Amz / %2F / http parçaları) bunları resim olarak algılar.
+ */
+function getThreadPreview(content: string, locale: string): string {
+  if (!content) return '';
+  const photoLabel = locale === 'en' ? '📷 Photo' : '📷 Fotoğraf';
+  let hadImage = /\[IMG:https?:\/\/[^\]]+\]/i.test(content);
+  let text = content.replace(/\[IMG:https?:\/\/[^\]]+\]/gi, '').trim();
+  if (/https?:\/\//i.test(text) || /amazonaws|x-amz-|%2f/i.test(text)) {
+    hadImage = true;
+    text = text
+      .replace(/https?:\/\/\S+/gi, '')
+      .replace(/\S*%2[fF]\S*/g, '')
+      .replace(/\S*[xX]-[aA]mz-\S*/g, '')
+      .trim();
+  }
+  if (hadImage) return text ? `📷 ${text}` : photoLabel;
+  return text;
+}
+
 const checkContentFilter = (text: string, locale: string): { passed: boolean; warning?: string } => {
   const lowerText = text.toLowerCase();
   
@@ -455,15 +477,15 @@ export default function MessagesPage() {
               {visibleThreads.map((thread) => {
                 const isSelected = selectedThread?.id === thread.id;
                 return (
-                  <Button variant="secondary" key={thread.id}
+                  <button key={thread.id}
                     type="button"
                     onClick={() => setSelectedThread(thread)}
-                    className={`w-full text-left px-4 py-3 transition-colors border-l-4 border-b border-border-subtle last:border-b-0 ${
+                    className={`block w-full text-left px-4 py-3 transition-colors border-l-4 border-b border-border-subtle last:border-b-0 ${
                       isSelected
                         ? 'border-l-primary-500 bg-primary-50/60'
                         : 'border-l-transparent hover:bg-surface'
                     }`}>
-                    <div className="flex items-center gap-3">
+                    <div className="flex items-center gap-3 w-full min-w-0">
                       <div className="relative flex-shrink-0">
                         <UserAvatar displayName={thread.otherUser?.displayName} avatarUrl={thread.otherUser?.avatarUrl} size="sm" className="!w-11 !h-11" />
                         {thread.unreadCount > 0 && (
@@ -484,7 +506,7 @@ export default function MessagesPage() {
                         {thread.lastMessage && (
                           <p className="text-sm text-muted truncate mt-0.5">
                             {thread.lastMessage.isFromMe ? (locale === 'en' ? 'You: ' : 'Sen: ') : ''}
-                            {thread.lastMessage.content}
+                            {getThreadPreview(thread.lastMessage.content, locale)}
                           </p>
                         )}
                         {thread.product && (
@@ -492,7 +514,7 @@ export default function MessagesPage() {
                         )}
                       </div>
                     </div>
-                  </Button>
+                  </button>
                 );
               })}
               {hasMoreThreads && (

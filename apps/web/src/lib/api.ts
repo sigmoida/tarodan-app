@@ -310,6 +310,17 @@ export const paymentsApi = {
     page?: number;
     limit?: number;
   }) => api.get('/payments/me', { params }),
+  // Saklı kart yönetimi
+  getMethods: () => api.get('/payments/methods'),
+  addMethod: (card: {
+    cardNumber: string;
+    cardHolderName: string;
+    expireMonth: string;
+    expireYear: string;
+    cvc: string;
+  }) => api.post('/payments/methods', { card }),
+  deleteMethod: (id: string) => api.delete(`/payments/methods/${id}`),
+  setDefaultMethod: (id: string) => api.patch(`/payments/methods/${id}/default`),
   cancel: (paymentId: string) =>
     api.post(`/payments/${paymentId}/cancel`),
   /** Fail sayfasından; ödeme hâlâ pending ise rezervasyonu serbest bırakır */

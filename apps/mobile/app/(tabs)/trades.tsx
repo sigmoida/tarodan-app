@@ -8,28 +8,38 @@ import { tr } from 'date-fns/locale';
 import { tradesApi } from '../../src/services/api';
 import { useAuthStore } from '../../src/stores/authStore';
 
+interface TradeListItem {
+  id: string;
+  status: string;
+  createdAt: string;
+  cashAmount?: number | null;
+  deadline?: string | null;
+  responseDeadline?: string | null;
+  initiatorItems?: { productTitle?: string }[];
+  receiverItems?: { productTitle?: string }[];
+}
+
 const TRADE_STATUSES: Record<string, { label: string; color: string }> = {
   pending: { label: 'Bekliyor', color: '#FFC107' },
   accepted: { label: 'Kabul Edildi', color: '#4CAF50' },
+  awaiting_payment: { label: 'Ödeme Bekleniyor', color: '#FF9800' },
+  shipping_to_warehouse: { label: 'Depoya Gönderim', color: '#2196F3' },
+  at_warehouse: { label: 'Depoda', color: '#673AB7' },
+  admin_reviewing: { label: 'İnceleniyor', color: '#3F51B5' },
+  shipping_to_recipients: { label: 'Size Gönderiliyor', color: '#009688' },
   rejected: { label: 'Reddedildi', color: '#F44336' },
-  initiator_shipped: { label: 'Kargoda', color: '#2196F3' },
-  receiver_shipped: { label: 'Kargoda', color: '#2196F3' },
-  both_shipped: { label: 'Kargoda', color: '#2196F3' },
-  initiator_received: { label: 'Teslim', color: '#9C27B0' },
-  receiver_received: { label: 'Teslim', color: '#9C27B0' },
   completed: { label: 'Tamamlandı', color: '#4CAF50' },
   cancelled: { label: 'İptal', color: '#9E9E9E' },
   disputed: { label: 'İtiraz', color: '#FF5722' },
   countered: { label: 'Karşı Teklif', color: '#2563EB' },
 };
 
-/** API TradeStatus ile uyumlu; shipped/confirmed yok (400 veriyordu) */
+/** "Kargoda" filtresi için backend escrow statüleri */
 const SHIPPING_STATUSES = new Set([
-  'initiator_shipped',
-  'receiver_shipped',
-  'both_shipped',
-  'initiator_received',
-  'receiver_received',
+  'shipping_to_warehouse',
+  'at_warehouse',
+  'admin_reviewing',
+  'shipping_to_recipients',
 ]);
 
 type TradesTabFilter = 'all' | 'pending' | 'shipping' | 'completed';
@@ -48,13 +58,11 @@ export default function TradesScreen() {
       if (filter === 'pending') params.status = 'pending';
       if (filter === 'completed') params.status = 'completed';
       const res = await tradesApi.getAll(params);
-      const body = res.data as { trades?: unknown[]; data?: unknown[] } | undefined;
-      let list = body?.trades ?? body?.data ?? [];
+      const body = res.data as { trades?: TradeListItem[]; data?: TradeListItem[] } | undefined;
+      let list: TradeListItem[] = body?.trades ?? body?.data ?? [];
       if (!Array.isArray(list)) list = [];
       if (filter === 'shipping') {
-        list = list.filter(
-          (t: { status?: string }) => t?.status && SHIPPING_STATUSES.has(t.status),
-        );
+        list = list.filter((t) => !!t?.status && SHIPPING_STATUSES.has(t.status));
       }
       return { trades: list };
     },
@@ -154,7 +162,7 @@ export default function TradesScreen() {
 
                   {(item.deadline || item.responseDeadline) && (
                     <Text variant="bodySmall" style={{ color: theme.colors.error, marginTop: 4 }}>
-                      Son: {format(new Date(item.deadline || item.responseDeadline), 'dd MMM HH:mm', { locale: tr })}
+                      Son: {format(new Date(String(item.deadline || item.responseDeadline)), 'dd MMM HH:mm', { locale: tr })}
                     </Text>
                   )}
                 </Card.Content>

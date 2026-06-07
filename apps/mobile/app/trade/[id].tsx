@@ -29,6 +29,11 @@ import { transformImageUrl } from '../../src/utils/imageUrl';
 const TRADE_STATUSES = {
   pending: { label: 'Bekliyor', color: TarodanColors.warning, icon: 'time-outline' },
   accepted: { label: 'Kabul Edildi', color: TarodanColors.success, icon: 'checkmark-circle-outline' },
+  awaiting_payment: { label: 'Ödeme Bekleniyor', color: TarodanColors.warning, icon: 'card-outline' },
+  shipping_to_warehouse: { label: 'Depoya Gönderim', color: TarodanColors.info, icon: 'cube-outline' },
+  at_warehouse: { label: 'Tarodan Deposunda', color: TarodanColors.primary, icon: 'business-outline' },
+  admin_reviewing: { label: 'İnceleniyor', color: TarodanColors.info, icon: 'search-outline' },
+  shipping_to_recipients: { label: 'Size Gönderiliyor', color: TarodanColors.primary, icon: 'airplane-outline' },
   rejected: { label: 'Reddedildi', color: TarodanColors.error, icon: 'close-circle-outline' },
   countered: { label: 'Karşı Teklif', color: TarodanColors.info, icon: 'swap-horizontal' },
   initiator_shipped: { label: 'Kargo Gönderildi', color: TarodanColors.info, icon: 'cube-outline' },
@@ -66,6 +71,7 @@ interface TradeItem {
 interface TradeShipmentInfo {
   carrier?: string;
   trackingNumber?: string;
+  shippedAt?: string | null;
 }
 
 interface Trade {
@@ -228,18 +234,20 @@ export default function TradeDetailScreen() {
   );
   const isCashPayer = Boolean(trade && user && trade.cashPayerId === user.id);
 
+  // Depo etiketi kabulde otomatik oluşur; "Kargoya Verdim" = kendi etiketini henüz teslim
+  // etmemiş katılımcı için (shippedAt yoksa). Statü: shipping_to_warehouse.
+  const myShipmentInfo = trade
+    ? user?.id === trade.initiatorId
+      ? trade.initiatorShipment
+      : trade.receiverShipment
+    : null;
   const needToShip = Boolean(
     trade &&
       user &&
       !cashPaymentPending &&
-      ((user.id === trade.initiatorId &&
-        !trade.initiatorShipment &&
-        !trade.initiatorShippedAt &&
-        (trade.status === 'accepted' || trade.status === 'receiver_shipped')) ||
-        (user.id === trade.receiverId &&
-          !trade.receiverShipment &&
-          !trade.receiverShippedAt &&
-          (trade.status === 'accepted' || trade.status === 'initiator_shipped'))),
+      trade.status === 'shipping_to_warehouse' &&
+      (user.id === trade.initiatorId || user.id === trade.receiverId) &&
+      !myShipmentInfo?.shippedAt,
   );
 
   useEffect(() => {
@@ -511,7 +519,7 @@ export default function TradeDetailScreen() {
     }
   };
 
-  const canConfirm = trade.status === 'both_shipped';
+  const canConfirm = trade.status === 'shipping_to_recipients';
 
   const myShipment = isInitiator ? trade.initiatorShipment : trade.receiverShipment;
   const theirShipment = isInitiator ? trade.receiverShipment : trade.initiatorShipment;
@@ -943,37 +951,53 @@ export default function TradeDetailScreen() {
           </Card>
         )}
 
-        {/* Shipping Info */}
-        {(trade.status === 'accepted' || trade.status.includes('shipped') || trade.status === 'completed') && (
+        {/* Depoya gönderim / kargo durumu — iki tarafa da kabulde numara atanır */}
+        {[
+          'shipping_to_warehouse',
+          'at_warehouse',
+          'admin_reviewing',
+          'shipping_to_recipients',
+          'completed',
+        ].includes(trade.status) && (
           <Card style={styles.card}>
             <Card.Content>
-              <Text variant="titleSmall" style={styles.sectionTitle}>Kargo Durumu</Text>
-              
+              <Text variant="titleSmall" style={styles.sectionTitle}>Tarodan Deposuna Gönderim</Text>
+              <Text variant="bodySmall" style={[styles.cashPaymentMuted, { marginBottom: 10 }]}>
+                Sistem her iki tarafa da kargo numarası atadı. Numaranızla en yakın şubeye giderek
+                ürününüzü teslim edin.
+              </Text>
+
               <View style={styles.shippingRow}>
                 <Ionicons
-                  name={myTrackingNumber ? 'checkmark-circle' : 'ellipse-outline'}
+                  name={myShipment?.shippedAt ? 'checkmark-circle' : 'cube-outline'}
                   size={20}
-                  color={myTrackingNumber ? TarodanColors.success : TarodanColors.textSecondary}
+                  color={myShipment?.shippedAt ? TarodanColors.success : TarodanColors.info}
                 />
                 <Text variant="bodyMedium" style={styles.shippingText}>
-                  Sizin kargonuz:{' '}
+                  Sizin gönderiniz:{' '}
                   {myTrackingNumber
-                    ? `${myShipment?.carrier ? `${myShipment.carrier} · ` : ''}${myTrackingNumber}`
-                    : 'Henüz gönderilmedi'}
+                    ? `${myShipment?.carrier ? `${myShipment.carrier} · ` : ''}${myTrackingNumber}${
+                        myShipment?.shippedAt ? ' (kargoya verildi)' : ' (etiket hazır)'
+                      }`
+                    : 'Numara bekleniyor'}
                 </Text>
               </View>
 
               <View style={styles.shippingRow}>
                 <Ionicons
-                  name={theirTrackingNumber ? 'checkmark-circle' : 'ellipse-outline'}
+                  name={theirShipment?.shippedAt ? 'checkmark-circle' : 'ellipse-outline'}
                   size={20}
-                  color={theirTrackingNumber ? TarodanColors.success : TarodanColors.textSecondary}
+                  color={theirShipment?.shippedAt ? TarodanColors.success : TarodanColors.textSecondary}
                 />
                 <Text variant="bodyMedium" style={styles.shippingText}>
                   Karşı taraf:{' '}
                   {theirTrackingNumber
-                    ? `${theirShipment?.carrier ? `${theirShipment.carrier} · ` : ''}${theirTrackingNumber}`
-                    : 'Henüz gönderilmedi'}
+                    ? `${theirShipment?.carrier ? `${theirShipment.carrier} · ` : ''}${theirTrackingNumber}${
+                        theirShipment?.shippedAt ? ' (kargoya verildi)' : ' (etiket hazır)'
+                      }`
+                    : theirShipment?.shippedAt
+                      ? 'Kargoya verdi'
+                      : 'Henüz kargoya vermedi'}
                 </Text>
               </View>
             </Card.Content>
@@ -1046,7 +1070,7 @@ export default function TradeDetailScreen() {
               icon="cube-send"
               style={styles.actionButton}
             >
-              Kargo Bilgisi Gir
+              Kargoya Verdim
             </Button>
           )}
 

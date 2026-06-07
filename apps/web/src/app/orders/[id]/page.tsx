@@ -13,6 +13,7 @@ import {
   addressesApi,
   ratingsApi,
   mediaApi,
+  supportApi,
 } from "@/lib/api";
 import {
   ArrowLeftIcon,
@@ -36,6 +37,7 @@ import {
   Input,
   Modal,
   Radio,
+  Select,
   Spinner,
   StatusBadge,
   Textarea,
@@ -201,6 +203,11 @@ export default function OrderDetailPage() {
   const [submittingReview, setSubmittingReview] = useState(false);
   const [reviewImages, setReviewImages] = useState<File[]>([]);
   const [reviewImagePreviews, setReviewImagePreviews] = useState<string[]>([]);
+  const [refundReason, setRefundReason] = useState("");
+  const [refundDescription, setRefundDescription] = useState("");
+  const [refundImages, setRefundImages] = useState<File[]>([]);
+  const [refundImagePreviews, setRefundImagePreviews] = useState<string[]>([]);
+  const [submittingRefund, setSubmittingRefund] = useState(false);
 
   const orderId = params?.id as string;
 
@@ -581,8 +588,95 @@ export default function OrderDetailPage() {
     }
   };
 
-  const handleRefund = async () => {
-    toast(locale === "en" ? "Coming soon" : "Yakında gelecektir");
+  const handleRefund = () => {
+    setRefundReason(
+      locale === "en" ? "Damaged/defective item" : "Hasarlı/kusurlu ürün geldi",
+    );
+    setRefundDescription("");
+    setRefundImages([]);
+    setRefundImagePreviews([]);
+    setShowRefundModal(true);
+  };
+  const handleRefundImageAdd = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = Array.from(e.target.files || []);
+    const remaining = 5 - refundImages.length;
+    const newFiles = files.slice(0, remaining);
+    if (newFiles.length === 0) return;
+    setRefundImages((prev) => [...prev, ...newFiles]);
+    newFiles.forEach((file) => {
+      const reader = new FileReader();
+      reader.onload = (ev) =>
+        setRefundImagePreviews((prev) => [
+          ...prev,
+          ev.target?.result as string,
+        ]);
+      reader.readAsDataURL(file);
+    });
+    e.target.value = "";
+  };
+  const removeRefundImage = (index: number) => {
+    setRefundImages((prev) => prev.filter((_, i) => i !== index));
+    setRefundImagePreviews((prev) => prev.filter((_, i) => i !== index));
+  };
+  // Satıcı henüz kargoya vermediyse (ödeme alındı / hazırlanıyor) iade anında iptal+iade
+  // olarak işlenebilir. Kargoya verildikten sonra kanıt fotoğraflı talep gerekir.
+  const sellerNotShippedYet =
+    order?.status === "paid" || order?.status === "preparing";
+
+  const submitReturnRequest = async () => {
+    if (!order || submittingRefund) return;
+    setSubmittingRefund(true);
+    try {
+      const reasonText =
+        refundReason + (refundDescription ? ` — ${refundDescription}` : "");
+
+      // Satıcı kargoya vermediyse → mevcut iptal/iade akışı (anında iade).
+      if (sellerNotShippedYet) {
+        await api.post(`/orders/${order.id}/cancel`, { reason: reasonText });
+        toast.success(
+          locale === "en"
+            ? "Your return was processed and a refund has been started."
+            : "İadeniz işleme alındı; iade süreci başlatıldı.",
+        );
+        setShowRefundModal(false);
+        await invalidateOrder();
+        return;
+      }
+
+      // Kargoya verildikten sonra: kanıt fotoğraflı iade talebi (doğrudan yükleme).
+      let imageUrls: string[] = [];
+      if (refundImages.length > 0) {
+        const results = await Promise.all(
+          refundImages.map((file) => mediaApi.uploadReviewImage(file)),
+        );
+        imageUrls = results
+          .map((r) => r.data?.url)
+          .filter(Boolean) as string[];
+      }
+      const orderNo = order.orderNumber || order.id;
+      await supportApi.createTicket({
+        subject:
+          (locale === "en" ? "Return request - " : "İade Talebi - ") + orderNo,
+        category: "product",
+        message:
+          (locale === "en" ? "Return reason: " : "İade sebebi: ") + reasonText,
+        orderId: order.id,
+        attachments: imageUrls.length > 0 ? imageUrls : undefined,
+      });
+      toast.success(
+        locale === "en"
+          ? "Your return request has been submitted."
+          : "İade talebiniz oluşturuldu.",
+      );
+      setShowRefundModal(false);
+    } catch (error: any) {
+      toast.error(
+        error?.response?.data?.message ||
+          (locale === "en" ? "Operation failed" : "İşlem başarısız"),
+      );
+    } finally {
+      setSubmittingRefund(false);
+    }
   };
 
   const handleReactivate = async () => {
@@ -1471,7 +1565,6 @@ export default function OrderDetailPage() {
                     variant="secondary"
                     size="lg"
                     className="w-full flex items-center justify-center gap-2"
-                    disabled
                     onClick={handleRefund}
                   >
                     <ArrowUturnLeftIcon className="w-5 h-5" />
@@ -1991,6 +2084,140 @@ export default function OrderDetailPage() {
               {submittingReview ? t("common.sending") : t("review.submit")}
             </Button>
           </div>
+        </Modal>
+
+        {/* İade Talebi Modal */}
+        <Modal
+          isOpen={showRefundModal && !!order}
+          onClose={() => setShowRefundModal(false)}
+          title={locale === "en" ? "Create Return Request" : "İade Talebi Oluştur"}
+          maxWidth="max-w-lg"
+        >
+          {order && (
+            <div className="space-y-4">
+              <div className="text-sm text-muted">
+                {locale === "en" ? "Order" : "Sipariş"}:{" "}
+                <span className="font-medium text-heading">
+                  {order.orderNumber || order.id}
+                </span>
+              </div>
+
+              <div className="bg-info-50 border border-info-200 rounded-lg p-3 text-sm text-info-800">
+                {sellerNotShippedYet
+                  ? locale === "en"
+                    ? "The seller hasn't shipped yet — your return will be processed instantly and refunded."
+                    : "Satıcı henüz kargoya vermedi — iadeniz anında işlenip ücretiniz iade edilecek."
+                  : locale === "en"
+                    ? "Add photos of the issue so we can process your request faster."
+                    : "Talebinizi daha hızlı sonuçlandırabilmemiz için sorunun fotoğraflarını ekleyin."}
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-body mb-1">
+                  {locale === "en" ? "Reason" : "Sebep"}
+                </label>
+                <Select
+                  value={refundReason}
+                  onChange={(e) => setRefundReason(e.target.value)}
+                  options={
+                    locale === "en"
+                      ? [
+                          { value: "Damaged/defective item", label: "Damaged/defective item" },
+                          { value: "Wrong item received", label: "Wrong item received" },
+                          { value: "Item not as described", label: "Item not as described" },
+                          { value: "Changed my mind (right of withdrawal)", label: "Changed my mind (right of withdrawal)" },
+                          { value: "Other", label: "Other" },
+                        ]
+                      : [
+                          { value: "Hasarlı/kusurlu ürün geldi", label: "Hasarlı/kusurlu ürün geldi" },
+                          { value: "Yanlış ürün geldi", label: "Yanlış ürün geldi" },
+                          { value: "Ürün açıklamayla uyuşmuyor", label: "Ürün açıklamayla uyuşmuyor" },
+                          { value: "Cayma hakkı (fikrimi değiştirdim)", label: "Cayma hakkı (fikrimi değiştirdim)" },
+                          { value: "Diğer", label: "Diğer" },
+                        ]
+                  }
+                />
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-body mb-1">
+                  {locale === "en" ? "Description" : "Açıklama"}
+                </label>
+                <Textarea
+                  value={refundDescription}
+                  onChange={(e) => setRefundDescription(e.target.value)}
+                  placeholder={locale === "en" ? "Optional" : "Opsiyonel"}
+                  rows={3}
+                  className="px-4"
+                  maxLength={1000}
+                />
+              </div>
+
+              {/* Doğrudan fotoğraf yükleme — sadece kargoya verildikten sonra (kanıt için) */}
+              {!sellerNotShippedYet && (
+              <div>
+                <label className="block text-sm font-medium text-body mb-1">
+                  {locale === "en"
+                    ? "Evidence photos (optional, max 5)"
+                    : "Kanıt fotoğrafları (opsiyonel, maks 5)"}
+                </label>
+                <div className="flex flex-wrap gap-2">
+                  {refundImagePreviews.map((src, idx) => (
+                    <div
+                      key={idx}
+                      className="relative w-16 h-16 rounded-lg overflow-hidden border border-border"
+                    >
+                      <img src={src} alt="" className="w-full h-full object-cover" />
+                      <Button
+                        variant="secondary"
+                        type="button"
+                        onClick={() => removeRefundImage(idx)}
+                        className="absolute top-0 right-0 bg-danger-500 text-inverted rounded-bl-lg w-5 h-5 flex items-center justify-center text-xs"
+                      >
+                        ×
+                      </Button>
+                    </div>
+                  ))}
+                  {refundImages.length < 5 && (
+                    <label className="w-16 h-16 border-2 border-dashed flex items-center justify-center cursor-pointer hover:border-primary-400 rounded-lg">
+                      <span className="text-2xl text-subtle">+</span>
+                      <Input
+                        type="file"
+                        accept="image/*"
+                        onChange={handleRefundImageAdd}
+                        className="hidden"
+                      />
+                    </label>
+                  )}
+                </div>
+              </div>
+              )}
+
+              <div className="flex gap-3 pt-2">
+                <Button
+                  variant="secondary"
+                  size="md"
+                  className="flex-1"
+                  onClick={() => setShowRefundModal(false)}
+                >
+                  {t("common.cancel")}
+                </Button>
+                <Button
+                  variant="primary"
+                  size="md"
+                  className="flex-1"
+                  onClick={submitReturnRequest}
+                  disabled={submittingRefund || !refundReason}
+                >
+                  {submittingRefund
+                    ? t("common.sending")
+                    : locale === "en"
+                      ? "Create Request"
+                      : "Talep Oluştur"}
+                </Button>
+              </div>
+            </div>
+          )}
         </Modal>
       </main>
     </div>

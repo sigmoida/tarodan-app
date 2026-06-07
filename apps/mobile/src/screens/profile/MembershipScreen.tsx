@@ -1,8 +1,8 @@
 /**
- * Membership Screen
+ * Membership Screen — gerçek tier'lar + abonelik (ödeme yönlendirmesiyle)
  */
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   View,
   Text,
@@ -10,92 +10,127 @@ import {
   ScrollView,
   TouchableOpacity,
   Alert,
+  ActivityIndicator,
+  Linking,
+  Switch,
 } from 'react-native';
 import Icon from 'react-native-vector-icons/Ionicons';
-import { useAuthStore } from '../../stores/authStore';
+import { membershipApi } from '../../services/api';
 
-const PLANS = [
-  {
-    id: 'free',
-    name: 'Ücretsiz',
-    price: 0,
-    period: '',
-    features: [
-      { text: '5 aktif ilan', included: true },
-      { text: 'Temel mesajlaşma', included: true },
-      { text: 'Takas özelliği', included: true },
-      { text: 'Standart destek', included: true },
-      { text: 'Öne çıkarma', included: false },
-      { text: 'İstatistikler', included: false },
-      { text: 'Öncelikli destek', included: false },
-    ],
-    color: '#9E9E9E',
-    popular: false,
-  },
-  {
-    id: 'premium',
-    name: 'Premium',
-    price: 49.90,
-    period: '/ay',
-    features: [
-      { text: '25 aktif ilan', included: true },
-      { text: 'Gelişmiş mesajlaşma', included: true },
-      { text: 'Takas özelliği', included: true },
-      { text: 'E-posta desteği', included: true },
-      { text: 'Aylık 3 öne çıkarma', included: true },
-      { text: 'Temel istatistikler', included: true },
-      { text: 'Öncelikli destek', included: false },
-    ],
-    color: '#E53935',
-    popular: true,
-  },
-  {
-    id: 'pro',
-    name: 'Pro',
-    price: 99.90,
-    period: '/ay',
-    features: [
-      { text: 'Sınırsız ilan', included: true },
-      { text: 'Premium mesajlaşma', included: true },
-      { text: 'Takas özelliği', included: true },
-      { text: 'Telefon desteği', included: true },
-      { text: 'Sınırsız öne çıkarma', included: true },
-      { text: 'Detaylı istatistikler', included: true },
-      { text: 'Öncelikli destek', included: true },
-    ],
-    color: '#9C27B0',
-    popular: false,
-  },
-];
+const TIER_COLORS: Record<string, string> = {
+  free: '#9E9E9E',
+  basic: '#2196F3',
+  premium: '#E53935',
+  business: '#9C27B0',
+};
+
+// Tier flag'lerinden özellik listesi üret
+const buildFeatures = (tier: any): { text: string; included: boolean }[] => {
+  const maxTotal = tier?.maxTotalListings;
+  const listingText =
+    maxTotal === -1 || maxTotal == null
+      ? 'Sınırsız ilan'
+      : `${maxTotal} aktif ilan`;
+  const slots = tier?.featuredListingSlots ?? 0;
+  return [
+    { text: listingText, included: true },
+    { text: 'Mesajlaşma', included: true },
+    { text: 'Takas özelliği', included: !!tier?.canTrade },
+    { text: 'Koleksiyon oluşturma', included: !!tier?.canCreateCollections },
+    {
+      text: slots > 0 ? `${slots} öne çıkarma hakkı` : 'Öne çıkarma',
+      included: slots > 0,
+    },
+    { text: 'Reklamsız', included: !!tier?.isAdFree },
+  ];
+};
 
 const MembershipScreen = () => {
-  const { user } = useAuthStore();
-  const [selectedPlan, setSelectedPlan] = useState<string | null>(null);
+  const [tiers, setTiers] = useState<any[]>([]);
+  const [currentTierType, setCurrentTierType] = useState<string>('free');
+  const [selectedType, setSelectedType] = useState<string | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [subscribing, setSubscribing] = useState(false);
+  const [autoRenew, setAutoRenew] = useState(false);
 
-  const currentPlan = user?.membership_type || 'free';
+  useEffect(() => {
+    let active = true;
+    Promise.all([
+      membershipApi.getTiers().catch(() => null),
+      membershipApi.getCurrentMembership().catch(() => null),
+    ])
+      .then(([tiersRes, meRes]) => {
+        if (!active) return;
+        const rawTiers = tiersRes?.data?.data ?? tiersRes?.data ?? [];
+        const list = (Array.isArray(rawTiers) ? rawTiers : []).filter(
+          (t: any) => t?.isActive !== false,
+        );
+        list.sort((a: any, b: any) => (a?.sortOrder ?? 0) - (b?.sortOrder ?? 0));
+        setTiers(list);
+        const me = meRes?.data;
+        setCurrentTierType(me?.tierType ?? me?.tier?.type ?? 'free');
+        setAutoRenew(!!me?.autoRenew);
+      })
+      .finally(() => active && setLoading(false));
+    return () => {
+      active = false;
+    };
+  }, []);
 
-  const handleSelectPlan = (planId: string) => {
-    if (planId === currentPlan) return;
-    setSelectedPlan(planId);
+  const handleSelect = (tierType: string) => {
+    if (tierType === currentTierType) return;
+    setSelectedType(tierType);
   };
 
-  const handleSubscribe = () => {
-    if (!selectedPlan || selectedPlan === 'free') {
-      Alert.alert('Bilgi', 'Ücretsiz plan varsayılan olarak aktiftir');
+  const handleSubscribe = async () => {
+    if (!selectedType) return;
+    if (selectedType === 'free') {
+      Alert.alert('Bilgi', 'Ücretsiz plan varsayılan olarak aktiftir.');
       return;
     }
-
-    Alert.alert(
-      'Abonelik',
-      'Seçtiğiniz plana abone olmak için ödeme sayfasına yönlendirileceksiniz.',
-      [
-        { text: 'İptal', style: 'cancel' },
-        { text: 'Devam', onPress: () => {
-          // Navigate to payment
-        }},
-      ]
-    );
+    setSubscribing(true);
+    try {
+      const res = await membershipApi.subscribe({
+        tierType: selectedType,
+        billingPeriod: 'monthly',
+      });
+      const paymentUrl = res?.data?.paymentUrl;
+      if (paymentUrl && String(paymentUrl).startsWith('http')) {
+        await Linking.openURL(paymentUrl);
+      } else {
+        Alert.alert('Bilgi', 'Üyelik güncellendi.');
+      }
+    } catch (error: any) {
+      Alert.alert(
+        'Hata',
+        error?.response?.data?.message || 'Abonelik başlatılamadı',
+      );
+    } finally {
+      setSubscribing(false);
+    }
   };
+
+  const handleToggleAutoRenew = async (value: boolean) => {
+    setAutoRenew(value);
+    try {
+      await membershipApi.toggleAutoRenew(value);
+    } catch {
+      setAutoRenew(!value);
+      Alert.alert('Hata', 'İşlem başarısız');
+    }
+  };
+
+  const priceOf = (tier: any) => Number(tier?.monthlyPrice ?? 0);
+
+  if (loading) {
+    return (
+      <View style={[styles.container, styles.center]}>
+        <ActivityIndicator size="large" color="#E53935" />
+      </View>
+    );
+  }
+
+  const currentTier = tiers.find((t) => t.type === currentTierType);
 
   return (
     <ScrollView style={styles.container} showsVerticalScrollIndicator={false}>
@@ -103,78 +138,106 @@ const MembershipScreen = () => {
       <View style={styles.currentPlanCard}>
         <Text style={styles.currentPlanLabel}>Mevcut Planınız</Text>
         <Text style={styles.currentPlanName}>
-          {PLANS.find(p => p.id === currentPlan)?.name || 'Ücretsiz'}
+          {currentTier?.name ||
+            (currentTierType === 'free' ? 'Ücretsiz' : currentTierType)}
         </Text>
       </View>
 
+      {/* Otomatik yenileme hatırlatması (ücretli üyelikte) */}
+      {currentTierType !== 'free' && (
+        <View style={styles.autoRenewCard}>
+          <View style={{ flex: 1, paddingRight: 12 }}>
+            <Text style={styles.autoRenewTitle}>Otomatik Yenileme</Text>
+            <Text style={styles.autoRenewDesc}>
+              Açıkken üyelik bitiminde kayıtlı kartından (aylık/yıllık) otomatik yenilenir.
+              Kapatırsan çekim yapılmaz.
+            </Text>
+          </View>
+          <Switch value={autoRenew} onValueChange={handleToggleAutoRenew} />
+        </View>
+      )}
+
       {/* Plans */}
-      {PLANS.map((plan) => (
-        <TouchableOpacity
-          key={plan.id}
-          style={[
-            styles.planCard,
-            (selectedPlan === plan.id || (!selectedPlan && currentPlan === plan.id)) && {
-              borderColor: plan.color,
-              borderWidth: 2,
-            },
-          ]}
-          onPress={() => handleSelectPlan(plan.id)}
-        >
-          {plan.popular && (
-            <View style={styles.popularBadge}>
-              <Text style={styles.popularText}>EN POPÜLER</Text>
-            </View>
-          )}
-
-          <View style={styles.planHeader}>
-            <Text style={styles.planName}>{plan.name}</Text>
-            <View style={styles.priceContainer}>
-              {plan.price > 0 ? (
-                <>
-                  <Text style={[styles.planPrice, { color: plan.color }]}>
-                    ₺{(plan.price ?? 0).toFixed(2)}
-                  </Text>
-                  <Text style={styles.planPeriod}>{plan.period}</Text>
-                </>
-              ) : (
-                <Text style={styles.planPrice}>Ücretsiz</Text>
-              )}
-            </View>
-          </View>
-
-          <View style={styles.featuresList}>
-            {plan.features.map((feature, index) => (
-              <View key={index} style={styles.featureItem}>
-                <Icon
-                  name={feature.included ? 'checkmark-circle' : 'close-circle'}
-                  size={20}
-                  color={feature.included ? '#4CAF50' : '#BDBDBD'}
-                />
-                <Text
-                  style={[
-                    styles.featureText,
-                    !feature.included && styles.featureTextDisabled,
-                  ]}
-                >
-                  {feature.text}
-                </Text>
+      {tiers.map((tier) => {
+        const color = TIER_COLORS[tier.type] || '#9E9E9E';
+        const price = priceOf(tier);
+        const isSelected =
+          selectedType === tier.type ||
+          (!selectedType && currentTierType === tier.type);
+        const features = buildFeatures(tier);
+        return (
+          <TouchableOpacity
+            key={tier.type}
+            style={[
+              styles.planCard,
+              isSelected && { borderColor: color, borderWidth: 2 },
+            ]}
+            onPress={() => handleSelect(tier.type)}
+          >
+            {tier.type === 'premium' && (
+              <View style={styles.popularBadge}>
+                <Text style={styles.popularText}>EN POPÜLER</Text>
               </View>
-            ))}
-          </View>
+            )}
 
-          {currentPlan === plan.id && (
-            <View style={styles.currentBadge}>
-              <Text style={styles.currentBadgeText}>Aktif Plan</Text>
+            <View style={styles.planHeader}>
+              <Text style={styles.planName}>{tier.name}</Text>
+              <View style={styles.priceContainer}>
+                {price > 0 ? (
+                  <>
+                    <Text style={[styles.planPrice, { color }]}>
+                      ₺{price.toFixed(2)}
+                    </Text>
+                    <Text style={styles.planPeriod}>/ay</Text>
+                  </>
+                ) : (
+                  <Text style={styles.planPrice}>Ücretsiz</Text>
+                )}
+              </View>
             </View>
-          )}
-        </TouchableOpacity>
-      ))}
+
+            <View style={styles.featuresList}>
+              {features.map((feature, index) => (
+                <View key={index} style={styles.featureItem}>
+                  <Icon
+                    name={feature.included ? 'checkmark-circle' : 'close-circle'}
+                    size={20}
+                    color={feature.included ? '#4CAF50' : '#BDBDBD'}
+                  />
+                  <Text
+                    style={[
+                      styles.featureText,
+                      !feature.included && styles.featureTextDisabled,
+                    ]}
+                  >
+                    {feature.text}
+                  </Text>
+                </View>
+              ))}
+            </View>
+
+            {currentTierType === tier.type && (
+              <View style={styles.currentBadge}>
+                <Text style={styles.currentBadgeText}>Aktif Plan</Text>
+              </View>
+            )}
+          </TouchableOpacity>
+        );
+      })}
 
       {/* Subscribe Button */}
-      {selectedPlan && selectedPlan !== currentPlan && (
-        <TouchableOpacity style={styles.subscribeButton} onPress={handleSubscribe}>
+      {selectedType && selectedType !== currentTierType && (
+        <TouchableOpacity
+          style={styles.subscribeButton}
+          onPress={handleSubscribe}
+          disabled={subscribing}
+        >
           <Text style={styles.subscribeButtonText}>
-            {selectedPlan === 'free' ? 'Ücretsiz Plana Geç' : 'Abone Ol'}
+            {subscribing
+              ? 'Yönlendiriliyor...'
+              : selectedType === 'free'
+                ? 'Ücretsiz Plana Geç'
+                : 'Abone Ol ve Öde'}
           </Text>
         </TouchableOpacity>
       )}
@@ -189,6 +252,10 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: '#FAFAFA',
     padding: 16,
+  },
+  center: {
+    justifyContent: 'center',
+    alignItems: 'center',
   },
   currentPlanCard: {
     backgroundColor: '#FFF',
@@ -211,6 +278,29 @@ const styles = StyleSheet.create({
     fontWeight: '700',
     color: '#212121',
     marginTop: 4,
+  },
+  autoRenewCard: {
+    backgroundColor: '#FFF',
+    borderRadius: 16,
+    padding: 16,
+    marginBottom: 24,
+    flexDirection: 'row',
+    alignItems: 'center',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.08,
+    shadowRadius: 6,
+    elevation: 2,
+  },
+  autoRenewTitle: {
+    fontSize: 16,
+    fontWeight: '700',
+    color: '#212121',
+  },
+  autoRenewDesc: {
+    fontSize: 12,
+    color: '#757575',
+    marginTop: 2,
   },
   planCard: {
     backgroundColor: '#FFF',
@@ -310,5 +400,3 @@ const styles = StyleSheet.create({
 });
 
 export default MembershipScreen;
-
-

@@ -22,6 +22,8 @@ import { ProductStatus, Prisma, MembershipTierType, Brand } from '@prisma/client
 import { buildProductWhere } from './helpers/build-product-where';
 import { fulltextProductSearch } from './helpers/fulltext-search';
 import { getAvailableQuantity } from './helpers/product-availability.helper';
+import { computeQualityScore } from './helpers/quality-score';
+import { computeRelevanceScore } from './helpers/relevance-score';
 import { DiscountService } from '../discount/discount.service';
 import { StorageService } from '../storage/storage.service';
 
@@ -154,6 +156,19 @@ export class ProductService implements OnModuleInit {
     const carModelId = dto.carModelId?.trim() || undefined;
     const manufacturerId = dto.manufacturerId?.trim() || undefined;
 
+    // Yeni ilan: rankTier'ı (premium satıcı → 1) ve başlangıç popülerlik baseline'ını inline ver.
+    // Böylece recompute (best-effort) başarısız olsa bile kademe doğru başlar; baseline ise
+    // yeni ilana "ilk 24 saat" görünürlük sağlar (skor 0 değil, createdAt ile kademe üstünde).
+    const sellerMembership = await this.prisma.userMembership.findUnique({
+      where: { userId: sellerId },
+      select: { status: true, tier: { select: { type: true } } },
+    });
+    const isPremiumSeller =
+      sellerMembership != null &&
+      sellerMembership.status === 'active' &&
+      sellerMembership.tier.type !== MembershipTierType.free;
+    const FRESH_POPULARITY_BASELINE = 10;
+
     try {
       const product = await this.prisma.product.create({
         data: {
@@ -168,6 +183,14 @@ export class ProductService implements OnModuleInit {
           isTradeEnabled: dto.isTradeEnabled || false,
           isPreorder: dto.isPreorder ?? false,
           isSet: dto.isSet ?? false,
+          rankTier: isPremiumSeller ? 1 : 0,
+          popularityScore: FRESH_POPULARITY_BASELINE,
+          popularityUpdatedAt: new Date(),
+          relevanceScore: computeRelevanceScore({
+            rankTier: isPremiumSeller ? 1 : 0,
+            qualityScore: 0,
+            popularityScore: FRESH_POPULARITY_BASELINE,
+          }),
           brandId,
           carModelId,
           manufacturerId,
@@ -204,6 +227,9 @@ export class ProductService implements OnModuleInit {
 
       // Link scale and material (attributes) so they show on detail and in filters
       await this.linkProductAttributes(product.id, dto.scale, dto.attributeIds, dto.material);
+
+      // İlan Kalite Skoru + rankTier hesapla (best-effort; sıralama bozulmasın)
+      await this.recomputeProductRanking(product.id).catch(() => {});
 
       // Invalidate product list cache
       await this.cache.delPattern('products:list:*');
@@ -371,7 +397,14 @@ export class ProductService implements OnModuleInit {
     const total = await this.prisma.product.count({ where });
     const products = await this.prisma.product.findMany({
       where,
-      orderBy: [{ viewCount: 'desc' }, { id: 'asc' }],
+      // Sponsorlu (rankTier=2) → Premium (1) → Standart (0); kademe içinde kalite + popülerlik
+      orderBy: [
+        { relevanceScore: { sort: 'desc', nulls: 'last' } },
+        { viewCount: 'desc' },
+        { likeCount: 'desc' },
+        { createdAt: 'desc' },
+        { id: 'asc' },
+      ],
       skip: (page - 1) * limit,
       take: limit,
       include: {
@@ -550,7 +583,18 @@ export class ProductService implements OnModuleInit {
         ];
         break;
       default:
-        orderBy = [{ viewCount: 'desc' }, { likeCount: 'desc' }, { createdAt: 'desc' }];
+        // Varsayılan/alaka sıralaması: Sponsorlu (rankTier=2) → Premium satıcı (1) → Standart (0).
+        // Kademe içinde İlan Kalite Skoru, ardından etkileşim (favori/görüntülenme) ve yenilik.
+        // Açık sortBy seçildiğinde (price/created/title/view/rating) bu öncelik uygulanmaz.
+        // Harmanlanmış relevance skoru: boost/premium bonusu + kalite + etkileşim tek skorda.
+        // Öne çıkanlar normalde önde; çok popüler ürün de geri kalmaz (viral geçebilir).
+        orderBy = [
+          { relevanceScore: { sort: 'desc', nulls: 'last' } },
+          { viewCount: 'desc' }, // relevance eşitse: çok görüntülenen önde (canlı)
+          { likeCount: 'desc' },
+          { createdAt: 'desc' },
+          { id: 'asc' },
+        ];
     }
 
     const total = await this.prisma.product.count({ where });
@@ -998,6 +1042,9 @@ export class ProductService implements OnModuleInit {
         }
       }
 
+      // İlan Kalite Skoru + rankTier yeniden hesapla (foto/açıklama değişmiş olabilir)
+      await this.recomputeProductRanking(id).catch(() => {});
+
       // Invalidate cache for this product and product lists
       await this.cache.del(`products:detail:${id}`);
       await this.cache.delPattern('products:list:*');
@@ -1444,11 +1491,81 @@ Bu ürünü istek listenizden kaldırmak için ürün sayfasına gidip "İstek L
   /**
    * Format product response
    */
+  /**
+   * İlan Kalite Skoru + rankTier'ı yeniden hesaplar ve Product'a yazar.
+   * rankTier: aktif boost → 2, ücretli (free olmayan) üyeli satıcı → 1, standart → 0.
+   * create/update sonrası ve boost aktivasyon/bitiş yollarında çağrılır.
+   */
+  async recomputeProductRanking(productId: string): Promise<void> {
+    const product = await this.prisma.product.findUnique({
+      where: { id: productId },
+      select: {
+        id: true,
+        description: true,
+        boostedUntil: true,
+        sellerId: true,
+        popularityScore: true,
+        seller: { select: { isVerified: true } },
+        _count: { select: { images: true } },
+      },
+    });
+    if (!product) return;
+
+    // Satıcının onaylı ortalama güven puanı (0..5)
+    let sellerRating: number | null = null;
+    const ratingStats = await this.prisma.rating.aggregate({
+      where: { receiverId: product.sellerId, status: 'approved' },
+      _avg: { score: true },
+      _count: true,
+    });
+    if (ratingStats._count > 0 && ratingStats._avg?.score) {
+      sellerRating = Number(ratingStats._avg.score);
+    }
+
+    const qualityScore = computeQualityScore({
+      photoCount: product._count.images,
+      description: product.description,
+      sellerRating,
+      isVerifiedSeller: product.seller?.isVerified ?? false,
+    });
+
+    // rankTier hesapla
+    const now = new Date();
+    const hasActiveBoost =
+      product.boostedUntil != null && new Date(product.boostedUntil) > now;
+    let rankTier = 0;
+    if (hasActiveBoost) {
+      rankTier = 2;
+    } else {
+      const membership = await this.prisma.userMembership.findUnique({
+        where: { userId: product.sellerId },
+        select: { status: true, tier: { select: { type: true } } },
+      });
+      const isPremiumSeller =
+        membership != null &&
+        membership.status === 'active' &&
+        membership.tier.type !== MembershipTierType.free;
+      rankTier = isPremiumSeller ? 1 : 0;
+    }
+
+    const relevanceScore = computeRelevanceScore({
+      rankTier,
+      qualityScore,
+      popularityScore: product.popularityScore,
+    });
+
+    await this.prisma.product.update({
+      where: { id: product.id },
+      data: { qualityScore, rankTier, relevanceScore },
+    });
+  }
+
   private async formatProductResponse(product: any) {
     // Get seller's active listings count
     let sellerListingsCount = 0;
     let sellerRating = null;
     let sellerTotalRatings = 0;
+    let sellerIsPremium = false;
 
     if (product.seller?.id) {
       sellerListingsCount = await this.prisma.product.count({
@@ -1469,6 +1586,16 @@ Bu ürünü istek listenizden kaldırmak için ürün sayfasına gidip "İstek L
         sellerRating = Number(sellerRatingStats._avg.score.toFixed(1));
         sellerTotalRatings = sellerRatingStats._count;
       }
+
+      // Premium satıcı mı? (aktif, free olmayan üyelik)
+      const sellerMembership = await this.prisma.userMembership.findUnique({
+        where: { userId: product.seller.id },
+        select: { status: true, tier: { select: { type: true } } },
+      });
+      sellerIsPremium =
+        sellerMembership != null &&
+        sellerMembership.status === 'active' &&
+        sellerMembership.tier.type !== MembershipTierType.free;
     }
 
     // Get product rating stats (use cached columns when available, else aggregate)
@@ -1523,6 +1650,10 @@ Bu ürünü istek listenizden kaldırmak için ürün sayfasına gidip "İstek L
 
     const isOnSale = displayOldPrice != null && displayOldPrice > displayPrice;
 
+    // Boost (öne çıkarma) durumu: boostedUntil gelecekteyse ilan sponsorludur
+    const boostedUntil = product.boostedUntil ? new Date(product.boostedUntil) : null;
+    const isBoosted = boostedUntil != null && boostedUntil > now;
+
     return {
       id: product.id,
       title: product.title,
@@ -1533,6 +1664,8 @@ Bu ürünü istek listenizden kaldırmak için ürün sayfasına gidip "İstek L
       saleEndDate: saleEndDate?.toISOString() || null,
       isOnSale,
       discountPercent,
+      isBoosted,
+      boostedUntil: boostedUntil?.toISOString() || null,
       // API uyumluluğu: eski alanlar (originalPrice/salePrice) = oldPrice/price
       originalPrice: displayOldPrice,
       salePrice: displayPrice,
@@ -1566,6 +1699,7 @@ Bu ürünü istek listenizden kaldırmak için ürün sayfasına gidip "İstek L
           productsCount: sellerListingsCount,
           rating: sellerRating,
           totalRatings: sellerTotalRatings,
+          isPremium: sellerIsPremium,
         }
         : undefined,
       category: product.category
@@ -1674,12 +1808,18 @@ Bu ürünü istek listenizden kaldırmak için ürün sayfasına gidip "İstek L
       }),
       this.prisma.product.update({
         where: { id: productId },
-        data: { likeCount: { increment: 1 } },
+        // Beğeni etkileşim skoruna canlı yansır (like ağırlığı 5 — gece job ile aynı)
+        data: {
+          likeCount: { increment: 1 },
+          popularityScore: { increment: 5 },
+          relevanceScore: { increment: 5 },
+        },
       }),
     ]);
 
     // Invalidate cache
     await this.cache.del(`products:detail:${productId}`);
+    await this.cache.delPattern('products:list:*');
 
     return { liked: true, likeCount: updatedProduct.likeCount };
   }
@@ -1723,12 +1863,17 @@ Bu ürünü istek listenizden kaldırmak için ürün sayfasına gidip "İstek L
       }),
       this.prisma.product.update({
         where: { id: productId },
-        data: { likeCount: { decrement: 1 } },
+        data: {
+          likeCount: { decrement: 1 },
+          popularityScore: { decrement: 5 },
+          relevanceScore: { decrement: 5 },
+        },
       }),
     ]);
 
     // Invalidate cache
     await this.cache.del(`products:detail:${productId}`);
+    await this.cache.delPattern('products:list:*');
 
     return { liked: false, likeCount: Math.max(0, updatedProduct.likeCount) };
   }
@@ -1805,7 +1950,12 @@ Bu ürünü istek listenizden kaldırmak için ürün sayfasına gidip "İstek L
 
     const updatedProduct = await this.prisma.product.update({
       where: { id: productId },
-      data: { viewCount: { increment: 1 } },
+      // Görüntülenme etkileşim skoruna canlı yansır (view ağırlığı 1 — gece job ile aynı)
+      data: {
+        viewCount: { increment: 1 },
+        popularityScore: { increment: 1 },
+        relevanceScore: { increment: 1 },
+      },
     });
 
     await this.cache.del(`products:detail:${productId}`);

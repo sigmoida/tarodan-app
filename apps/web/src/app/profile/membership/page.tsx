@@ -49,7 +49,9 @@ export default function MembershipPage() {
     pendingPayment?: boolean;
     pendingTierName?: string;
     pendingTierType?: string;
+    autoRenew?: boolean;
   } | null>(null);
+  const [autoRenewSaving, setAutoRenewSaving] = useState(false);
   const [paymentMethods, setPaymentMethods] = useState<Array<{
     id: string;
     cardBrand: string;
@@ -119,6 +121,7 @@ export default function MembershipPage() {
             pendingPayment: pendingPayment || undefined,
             pendingTierName: membership.pendingTierName,
             pendingTierType: membership.pendingTierType,
+            autoRenew: membership.autoRenew,
           });
           if (isPaidTier && !pendingPayment) {
             try {
@@ -284,6 +287,21 @@ export default function MembershipPage() {
     }
   }, [isRequired, isBusinessAccount, currentTier, router]);
 
+  const handleToggleAutoRenew = async () => {
+    const next = !(membershipDetails?.autoRenew ?? false);
+    setAutoRenewSaving(true);
+    setMembershipDetails((d) => (d ? { ...d, autoRenew: next } : d));
+    try {
+      await api.patch('/membership/auto-renew', { autoRenew: next });
+      toast.success(next ? 'Otomatik yenileme hatırlatması açık' : 'Otomatik yenileme hatırlatması kapalı');
+    } catch {
+      setMembershipDetails((d) => (d ? { ...d, autoRenew: !next } : d));
+      toast.error('İşlem başarısız');
+    } finally {
+      setAutoRenewSaving(false);
+    }
+  };
+
   const handleSelectTier = (tierId: string) => {
     if (tierId === 'free') {
       toast(t('membership.planAlreadyActive'));
@@ -435,6 +453,36 @@ export default function MembershipPage() {
               </div>
             </div>
 
+            {/* Otomatik yenileme — hatırlatma tabanlı (sessiz çekim yok) */}
+            <div className="border-t border-border pt-6 mb-6">
+              <div className="flex items-center justify-between gap-4">
+                <div>
+                  <h3 className="text-lg font-semibold text-heading">Otomatik Yenileme</h3>
+                  <p className="text-sm text-muted mt-1">
+                    Açıkken üyeliğin bitiminde kayıtlı kartından (aylık/yıllık seçimine göre)
+                    otomatik yenilenir. Kapatırsan çekim yapılmaz. Kayıtlı kartın yoksa
+                    "Kart Ekle"den ekleyebilirsin.
+                  </p>
+                </div>
+                <button
+                  type="button"
+                  onClick={handleToggleAutoRenew}
+                  disabled={autoRenewSaving}
+                  role="switch"
+                  aria-checked={!!membershipDetails?.autoRenew}
+                  className={`relative inline-flex h-7 w-12 flex-shrink-0 items-center rounded-full transition-colors ${
+                    membershipDetails?.autoRenew ? 'bg-primary-500' : 'bg-border'
+                  }`}
+                >
+                  <span
+                    className={`inline-block h-5 w-5 transform rounded-full bg-surface-elevated shadow transition-transform ${
+                      membershipDetails?.autoRenew ? 'translate-x-6' : 'translate-x-1'
+                    }`}
+                  />
+                </button>
+              </div>
+            </div>
+
             <div className="border-t border-border pt-6">
               <div className="flex items-center justify-between mb-4">
                 <h3 className="text-lg font-semibold text-heading flex items-center gap-2">
@@ -442,13 +490,13 @@ export default function MembershipPage() {
                   Kayıtlı Kartlar
                 </h3>
                 <Link
-                  href="/profile/payments"
+                  href="/profile/payments/cards"
                   className="text-sm text-primary-500 hover:text-primary-600 font-medium"
                 >
                   Kart Yönetimi
                 </Link>
               </div>
-              
+
               {paymentMethods.length > 0 ? (
                 <div className="space-y-3">
                   {paymentMethods.map((method) => (
@@ -478,13 +526,14 @@ export default function MembershipPage() {
                   ))}
                 </div>
               ) : (
-                <div className="p-6 bg-warning-50 border border-warning-200 rounded-lg text-center">
-                  <p className="text-warning-800 font-medium mb-2">Henüz kayıtlı kartınız yok</p>
-                  <p className="text-sm text-warning-700 mb-4">
-                    Üyeliğinizin otomatik yenilenmesi için bir kart eklemeniz gerekmektedir.
+                <div className="p-6 bg-surface border border-border rounded-lg text-center">
+                  <p className="text-heading font-medium mb-2">Henüz kayıtlı kartınız yok</p>
+                  <p className="text-sm text-muted mb-4">
+                    Kart eklemek zorunlu değildir; yenilemeyi daha hızlı tamamlamak için
+                    isterseniz kaydedebilirsiniz.
                   </p>
                   <Link
-                    href="/profile/payments"
+                    href="/profile/payments/cards"
                     className="inline-block px-4 py-2 bg-primary-500 text-inverted rounded-lg hover:bg-primary-600 transition-colors text-sm font-medium"
                   >
                     Kart Ekle

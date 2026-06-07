@@ -18,6 +18,7 @@ import {
   ChevronLeftIcon,
   ChevronRightIcon,
   TagIcon,
+  ArrowsRightLeftIcon,
 } from "@heroicons/react/24/outline";
 import { api, listingsApi, manufacturersApi } from "@/lib/api";
 import { formatPrice } from "@/lib/format";
@@ -78,6 +79,7 @@ interface Product {
   scale?: string;
   isTradeEnabled?: boolean;
   trade_available?: boolean;
+  isBoosted?: boolean;
   viewCount: number;
   likeCount: number;
   createdAt?: string;
@@ -486,6 +488,10 @@ export default function Home() {
   const { t, locale } = useTranslation();
   const [discountedProducts, setDiscountedProducts] = useState<Product[]>([]);
   const [isLoadingDiscounted, setIsLoadingDiscounted] = useState(false);
+  const [tradeProducts, setTradeProducts] = useState<Product[]>([]);
+  const [isLoadingTrade, setIsLoadingTrade] = useState(false);
+  const [featuredProducts, setFeaturedProducts] = useState<Product[]>([]);
+  const [isLoadingFeatured, setIsLoadingFeatured] = useState(false);
   const [currentCollectionIndex, setCurrentCollectionIndex] = useState(0);
   const [showAuthModal, setShowAuthModal] = useState(false);
   const [authModalConfig, setAuthModalConfig] = useState({
@@ -611,7 +617,51 @@ export default function Home() {
 
   useEffect(() => {
     fetchDiscountedProducts();
+    fetchTradeProducts();
+    fetchFeaturedProducts();
   }, []);
+
+  const fetchFeaturedProducts = async () => {
+    setIsLoadingFeatured(true);
+    try {
+      const response = await listingsApi.getAll({
+        limit: 20,
+        page: 1,
+        boostedOnly: true,
+        status: "active",
+      });
+      const raw = response?.data;
+      const products = Array.isArray(raw)
+        ? raw
+        : (raw?.data ?? raw?.products ?? []);
+      setFeaturedProducts(Array.isArray(products) ? products : []);
+    } catch (error) {
+      console.error("Failed to fetch featured products:", error);
+    } finally {
+      setIsLoadingFeatured(false);
+    }
+  };
+
+  const fetchTradeProducts = async () => {
+    setIsLoadingTrade(true);
+    try {
+      const response = await listingsApi.getAll({
+        limit: 24,
+        page: 1,
+        tradeOnly: true,
+        status: "active",
+      });
+      const raw = response?.data;
+      const products = Array.isArray(raw)
+        ? raw
+        : (raw?.data ?? raw?.products ?? []);
+      setTradeProducts(Array.isArray(products) ? products : []);
+    } catch (error) {
+      console.error("Failed to fetch trade showcase:", error);
+    } finally {
+      setIsLoadingTrade(false);
+    }
+  };
 
   const fetchDiscountedProducts = async () => {
     setIsLoadingDiscounted(true);
@@ -743,6 +793,76 @@ export default function Home() {
         </div>
       </section>
 
+      {/* ── Öne Çıkan Ürünler (boost'lu, yatay kayan şerit — Tümünü Gör YOK) ── */}
+      {(isLoadingFeatured || featuredProducts.length > 0) && (
+        <section className="py-3">
+          <div className="px-3 sm:px-4 lg:px-6">
+            <div
+              className="bg-surface-elevated border border-border p-3 md:p-5"
+              style={{ borderRadius: "4px" }}
+            >
+              <SectionHeader
+                title={locale === "en" ? "Featured" : "Öne Çıkan Ürünler"}
+                icon={<span className="text-lg leading-none">🚀</span>}
+              />
+              <div className="flex gap-3 overflow-x-auto pb-2 px-1 snap-x">
+                {isLoadingFeatured ? (
+                  [...Array(6)].map((_, i) => (
+                    <div key={i} className="flex-shrink-0 w-40">
+                      <SkeletonCard />
+                    </div>
+                  ))
+                ) : (
+                  featuredProducts.map((product, idx) => (
+                    <Link
+                      key={product.id}
+                      href={`/listings/${product.id}`}
+                      className="flex-shrink-0 w-40 block group snap-start"
+                    >
+                      <div
+                        className="overflow-hidden border border-border hover:border-amber-400 hover:shadow-soft transition-all"
+                        style={{ borderRadius: "4px" }}
+                      >
+                        <div className="relative aspect-[4/3] bg-surface-alt">
+                          <OptimizedImage
+                            src={getImageUrl(product.images?.[0], idx, product.title)}
+                            alt={product.title}
+                            fill
+                            className="object-cover"
+                            fallbackSrc="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='400' height='300'%3E%3Crect fill='%23f3f4f6' width='400' height='300'/%3E%3C/svg%3E"
+                            logContext={{ productId: product.id, page: "home-featured" }}
+                          />
+                          <div className="absolute top-1.5 left-1.5">
+                            <span
+                              className="text-[10px] font-bold bg-amber-500 text-inverted px-1.5 py-0.5"
+                              style={{ borderRadius: "2px" }}
+                            >
+                              {locale === "en" ? "Sponsored" : "Sponsorlu"}
+                            </span>
+                          </div>
+                        </div>
+                        <div className="p-1.5">
+                          <h3 className="font-medium text-heading line-clamp-1 text-[11px] leading-tight mb-0.5">
+                            {product.title}
+                          </h3>
+                          <p className="text-xs font-bold text-primary-600">
+                            {getProductEffectivePrice(product).toLocaleString("tr-TR", {
+                              minimumFractionDigits: 0,
+                              maximumFractionDigits: 0,
+                            })}{" "}
+                            ₺
+                          </p>
+                        </div>
+                      </div>
+                    </Link>
+                  ))
+                )}
+              </div>
+            </div>
+          </div>
+        </section>
+      )}
+
       {/* ── On Sale ── */}
       <section className="py-3">
         <div className="px-3 sm:px-4 lg:px-6">
@@ -804,7 +924,13 @@ export default function Home() {
                     <Link
                       key={product.id}
                       href={`/listings/${product.id}`}
-                      className="block group"
+                      className={
+                        idx < 6
+                          ? "block group"
+                          : idx < 8
+                            ? "hidden sm:block group"
+                            : "hidden lg:block group"
+                      }
                     >
                       <div
                         className="overflow-hidden border border-border hover:border-primary-400 hover:shadow-soft transition-all"
@@ -917,6 +1043,101 @@ export default function Home() {
         </div>
       </section>
 
+      {/* ── Takas Vitrini ── */}
+      {(isLoadingTrade || tradeProducts.length > 0) && (
+        <section className="py-3">
+          <div className="px-3 sm:px-4 lg:px-6">
+            <div
+              className="bg-surface-elevated border border-border p-3 md:p-5"
+              style={{ borderRadius: "4px" }}
+            >
+              <SectionHeader
+                title={locale === "en" ? "Trade Showcase" : "Takas Vitrini"}
+                viewAllHref="/takas"
+                viewAllLabel={viewAllLabel}
+                icon={<ArrowsRightLeftIcon className="w-5 h-5 text-success-500" />}
+              />
+              <div className="grid grid-cols-3 sm:grid-cols-4 lg:grid-cols-6 gap-2">
+                {isLoadingTrade ? (
+                  [...Array(6)].map((_, i) => <SkeletonCard key={i} />)
+                ) : (
+                  tradeProducts.slice(0, 12).map((product, idx) => (
+                    <Link
+                      key={product.id}
+                      href={`/listings/${product.id}`}
+                      className={
+                        idx < 6
+                          ? "block group"
+                          : idx < 8
+                            ? "hidden sm:block group"
+                            : "hidden lg:block group"
+                      }
+                    >
+                      <div
+                        className="overflow-hidden border border-border hover:border-success-400 hover:shadow-soft transition-all"
+                        style={{ borderRadius: "4px" }}
+                      >
+                        <div className="relative aspect-[4/3] bg-surface-alt">
+                          <OptimizedImage
+                            src={getImageUrl(
+                              product.images?.[0],
+                              idx,
+                              product.title,
+                            )}
+                            alt={product.title}
+                            fill
+                            className="object-cover"
+                            fallbackSrc="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='400' height='300'%3E%3Crect fill='%23f3f4f6' width='400' height='300'/%3E%3C/svg%3E"
+                            logContext={{
+                              productId: product.id,
+                              page: "home-trade",
+                            }}
+                          />
+                          {product.isBoosted && (
+                            <div className="absolute top-1.5 left-1.5">
+                              <span
+                                className="text-[10px] font-bold bg-amber-500 text-inverted px-1.5 py-0.5"
+                                style={{ borderRadius: "2px" }}
+                              >
+                                {locale === "en" ? "Sponsored" : "Sponsorlu"}
+                              </span>
+                            </div>
+                          )}
+                          <div className="absolute bottom-1.5 left-1.5">
+                            <span
+                              className="inline-flex items-center gap-0.5 text-[10px] font-bold bg-success-500 text-inverted px-1.5 py-0.5"
+                              style={{ borderRadius: "2px" }}
+                            >
+                              <ArrowsRightLeftIcon className="w-2.5 h-2.5" />
+                              {locale === "en" ? "Trade" : "Takas"}
+                            </span>
+                          </div>
+                        </div>
+                        <div className="p-1.5">
+                          <h3 className="font-medium text-heading line-clamp-1 text-[10px] leading-tight mb-0.5">
+                            {product.title}
+                          </h3>
+                          <p className="text-xs font-bold text-primary-600">
+                            {getProductEffectivePrice(product).toLocaleString(
+                              "tr-TR",
+                              {
+                                minimumFractionDigits: 0,
+                                maximumFractionDigits: 0,
+                              },
+                            )}{" "}
+                            ₺
+                          </p>
+                        </div>
+                      </div>
+                    </Link>
+                  ))
+                )}
+              </div>
+            </div>
+          </div>
+        </section>
+      )}
+
       {/* ── Popular Listings ── */}
       <section className="py-3 bg-primary-50">
         <div className="px-3 sm:px-4 lg:px-6">
@@ -953,11 +1174,17 @@ export default function Home() {
                   />
                 </div>
               ) : (
-                bestSellers.slice(0, 16).map((product, idx) => (
+                bestSellers.slice(0, 24).map((product, idx) => (
                   <Link
                     key={product.id}
                     href={`/listings/${product.id}`}
-                    className="block group"
+                    className={
+                      idx < 12
+                        ? "block group"
+                        : idx < 15
+                          ? "hidden sm:block group"
+                          : "hidden lg:block group"
+                    }
                   >
                     <div
                       className="overflow-hidden border border-border hover:border-primary-400 hover:shadow-soft transition-all"
@@ -979,7 +1206,16 @@ export default function Home() {
                             page: "home-bestSellers",
                           }}
                         />
-                        {idx < 3 && (
+                        {product.isBoosted ? (
+                          <div className="absolute top-1.5 left-1.5">
+                            <span
+                              className="text-[10px] font-bold bg-amber-500 text-inverted px-1.5 py-0.5"
+                              style={{ borderRadius: "2px" }}
+                            >
+                              {locale === "en" ? "Sponsored" : "Sponsorlu"}
+                            </span>
+                          </div>
+                        ) : idx < 3 ? (
                           <div className="absolute top-1.5 left-1.5">
                             <span
                               className="text-[10px] font-bold bg-primary-500 text-inverted px-1.5 py-0.5"
@@ -988,7 +1224,7 @@ export default function Home() {
                               {locale === "en" ? "Popular" : "Popüler"}
                             </span>
                           </div>
-                        )}
+                        ) : null}
                       </div>
                       <div className="p-1.5">
                         <h3 className="font-medium text-heading line-clamp-1 text-[10px] leading-tight mb-0.5">

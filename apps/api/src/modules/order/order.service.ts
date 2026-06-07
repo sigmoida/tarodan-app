@@ -1758,8 +1758,14 @@ export class OrderService {
       where.status = { not: OrderStatus.cancelled };
     }
 
-    // Üyelik siparişlerini siparişlerim listesinde gösterme (sadece ürün siparişleri)
-    where.NOT = { productId: { startsWith: 'membership-' } };
+    // Üyelik ve boost (öne çıkarma) sanal siparişlerini "siparişlerim" listesinde gösterme
+    // (sadece gerçek ürün siparişleri). Boost'lar "Boostlarım"da görünür.
+    where.NOT = {
+      OR: [
+        { productId: { startsWith: 'membership-' } },
+        { productId: { startsWith: 'boost-' } },
+      ],
+    };
 
     const total = await this.prisma.order.count({ where });
 

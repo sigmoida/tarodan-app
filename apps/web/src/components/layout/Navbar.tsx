@@ -157,6 +157,7 @@ export default function Navbar() {
 
   const NAV_LINKS = [
     { href: '/listings', label: t('nav.listings') },
+    { href: '/takas', label: t('nav.tradeShowcase') || 'Takas Vitrini' },
     { href: '/ureticiler', label: t('nav.brands') || 'Üreticiler' },
     { href: '/trades', label: t('nav.trades') },
     { href: '/collections', label: t('nav.collections') },

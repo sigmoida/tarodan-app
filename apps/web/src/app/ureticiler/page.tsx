@@ -454,15 +454,15 @@ export default function UreticilerPage() {
           {SCALE_GROUPS.map((sg) => {
             const count = brandsForPage.filter((b) => b.scale === sg.scale).length;
             return (
-              <Button variant="secondary" key={sg.scale}
+              <button type="button" key={sg.scale}
                 onClick={() => setSelectedScale(selectedScale === sg.scale ? null : sg.scale)}
-                className={`text-left p-3 sm:p-4 border transition-all ${selectedScale === sg.scale ? 'bg-primary-50 border-primary-300 shadow-sm' : 'bg-surface-elevated border-border hover:border-primary-200 hover:shadow-sm'}`}
+                className={`block w-full text-left p-3 sm:p-4 border transition-all ${selectedScale === sg.scale ? 'bg-primary-50 border-primary-300 shadow-sm' : 'bg-surface-elevated border-border hover:border-primary-200 hover:shadow-sm'}`}
                 style={{ borderRadius: '4px' }}>
                 <div className="text-lg sm:text-xl font-black text-heading">{sg.scale}</div>
                 <div className="text-[11px] font-semibold text-primary-600 mt-0.5">{sg.label}</div>
                 <div className="text-[10px] text-subtle mt-1 leading-snug">{sg.desc}</div>
                 <div className="text-[10px] text-muted mt-2 font-medium">{count} üretici</div>
-              </Button>
+              </button>
             );
           })}
         </div>
@@ -501,7 +501,7 @@ export default function UreticilerPage() {
                   style={{ borderRadius: '6px' }}
                 >
                   {/* Brand Header - Always visible */}
-                  <Button variant="secondary" onClick={() => setExpandedBrand(expandedBrand === brand.slug ? null : brand.slug)}
+                  <button type="button" onClick={() => setExpandedBrand(expandedBrand === brand.slug ? null : brand.slug)}
                     className="w-full text-left p-4 sm:p-5 flex items-center gap-4 sm:gap-5">
                     <div className="w-16 h-16 sm:w-20 sm:h-20 flex-shrink-0 bg-surface border border-border-subtle flex items-center justify-center p-2 relative" style={{ borderRadius: '6px' }}>
                       {brand.logoUrl ? (
@@ -539,7 +539,7 @@ export default function UreticilerPage() {
                       </div>
                     </div>
                     <ChevronRightIcon className={`w-5 h-5 text-subtle flex-shrink-0 transition-transform duration-200 ${expandedBrand === brand.slug ? 'rotate-90' : ''}`} />
-                  </Button>
+                  </button>
 
                   {/* Expanded Content */}
                   <AnimatePresence>

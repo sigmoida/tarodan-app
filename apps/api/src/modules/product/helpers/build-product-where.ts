@@ -17,6 +17,7 @@ export interface ProductFilterParams {
   manufacturerId?: string;
   carModelId?: string;
   tradeOnly?: boolean;
+  boostedOnly?: boolean;
   preOrder?: boolean;
   limited?: boolean;
   set?: boolean;
@@ -48,7 +49,7 @@ export function buildProductWhere(
   const {
     search, categoryId, sellerId, brandId, condition,
     brand, scale, material, manufacturer, manufacturerId,
-    carModelId, tradeOnly, preOrder, limited,
+    carModelId, tradeOnly, boostedOnly, preOrder, limited,
     set: setFilter, minPrice, maxPrice,
   } = params;
 
@@ -58,7 +59,11 @@ export function buildProductWhere(
 
   const where: Prisma.ProductWhereInput = {
     status: ProductStatus.active,
-    NOT: { id: { startsWith: 'membership-' } },
+    // Sanal ürünler (membership-* / boost-* sipariş kalemleri) listelemelerden hariç
+    NOT: [
+      { id: { startsWith: 'membership-' } },
+      { id: { startsWith: 'boost-' } },
+    ],
   };
 
   // ── Full-text search results (pre-filtered via tsvector/tsquery) ──
@@ -89,6 +94,7 @@ export function buildProductWhere(
   // ── Enum/boolean filters (indexed columns) ──
   if (condition) where.condition = condition as any;
   if (tradeOnly) where.isTradeEnabled = true;
+  if (boostedOnly) where.boostedUntil = { gt: new Date() };
   if (preOrder) where.isPreorder = true;
   if (limited) where.isLimited = true;
   if (setFilter) where.isSet = true;

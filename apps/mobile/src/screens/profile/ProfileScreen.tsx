@@ -2,7 +2,7 @@
  * Profile Screen
  */
 
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   View,
   Text,
@@ -13,6 +13,7 @@ import {
 } from 'react-native';
 import Icon from 'react-native-vector-icons/Ionicons';
 import { useAuthStore } from '../../stores/authStore';
+import { userApi } from '../../services/api';
 
 const MenuItem = ({ icon, label, onPress, badge, color = '#212121' }: any) => (
   <TouchableOpacity style={styles.menuItem} onPress={onPress}>
@@ -31,6 +32,20 @@ const MenuItem = ({ icon, label, onPress, badge, color = '#212121' }: any) => (
 
 const ProfileScreen = ({ navigation }: any) => {
   const { user, logout } = useAuthStore();
+  const [profile, setProfile] = useState<any>(null);
+
+  useEffect(() => {
+    let active = true;
+    userApi
+      .getProfile()
+      .then((res) => {
+        if (active) setProfile(res.data?.user ?? res.data ?? null);
+      })
+      .catch(() => {});
+    return () => {
+      active = false;
+    };
+  }, []);
 
   const handleLogout = () => {
     Alert.alert(
@@ -47,11 +62,16 @@ const ProfileScreen = ({ navigation }: any) => {
     );
   };
 
-  const membershipLabel = user?.membership_type === 'premium' 
-    ? 'Premium Üye' 
-    : user?.membership_type === 'pro' 
-    ? 'Pro Üye' 
-    : 'Ücretsiz Üye';
+  const tierType = profile?.membership?.tier?.type ?? user?.membership_type ?? 'free';
+  const isPremium = profile?.isPremium ?? (tierType !== 'free');
+  const tierLabelMap: Record<string, string> = {
+    free: 'Ücretsiz Üye',
+    basic: 'Temel Üye',
+    premium: 'Premium Üye',
+    business: 'Kurumsal Üye',
+  };
+  const membershipLabel = tierLabelMap[tierType] || 'Ücretsiz Üye';
+  const stats = profile?.stats;
 
   return (
     <ScrollView style={styles.container} showsVerticalScrollIndicator={false}>
@@ -66,22 +86,31 @@ const ProfileScreen = ({ navigation }: any) => {
           <Icon name="star" size={14} color="#FFC107" />
           <Text style={styles.membershipText}>{membershipLabel}</Text>
         </View>
+        {isPremium && profile?.trustScore != null && (
+          <View style={styles.trustBadge}>
+            <Icon name="shield-checkmark" size={14} color="#F59E0B" />
+            <Text style={styles.trustText}>
+              Güven Skoru {profile.trustScore}/100
+              {profile.trustLevel ? ` · ${profile.trustLevel}` : ''}
+            </Text>
+          </View>
+        )}
       </View>
 
       {/* Stats */}
       <View style={styles.statsContainer}>
         <View style={styles.statItem}>
-          <Text style={styles.statValue}>0</Text>
+          <Text style={styles.statValue}>{stats?.totalListings ?? 0}</Text>
           <Text style={styles.statLabel}>İlan</Text>
         </View>
         <View style={styles.statDivider} />
         <View style={styles.statItem}>
-          <Text style={styles.statValue}>0</Text>
+          <Text style={styles.statValue}>{stats?.totalTrades ?? 0}</Text>
           <Text style={styles.statLabel}>Takas</Text>
         </View>
         <View style={styles.statDivider} />
         <View style={styles.statItem}>
-          <Text style={styles.statValue}>0.0</Text>
+          <Text style={styles.statValue}>{(stats?.averageRating ?? 0).toFixed(1)}</Text>
           <Text style={styles.statLabel}>Puan</Text>
         </View>
       </View>
@@ -213,6 +242,21 @@ const styles = StyleSheet.create({
     fontSize: 13,
     fontWeight: '600',
     color: '#F9A825',
+    marginLeft: 4,
+  },
+  trustBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#FEF3C7',
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 16,
+    marginTop: 8,
+  },
+  trustText: {
+    fontSize: 13,
+    fontWeight: '700',
+    color: '#B45309',
     marginLeft: 4,
   },
   statsContainer: {

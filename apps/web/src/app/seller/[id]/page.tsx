@@ -77,6 +77,9 @@ interface Seller {
   bio?: string;
   createdAt: string;
   isVerified: boolean;
+  isPremium?: boolean;
+  trustScore?: number;
+  trustLevel?: string;
   sellerType?: string;
   stats?: {
     totalListings: number;
@@ -136,6 +139,7 @@ export default function SellerProfilePage() {
           avatarUrl: firstProduct.seller.avatarUrl,
           createdAt: firstProduct.seller.createdAt || new Date().toISOString(),
           isVerified: firstProduct.seller.isVerified || false,
+          isPremium: firstProduct.seller.isPremium || false,
           stats: {
             totalListings: 0,
             totalSales: 0,
@@ -337,6 +341,12 @@ export default function SellerProfilePage() {
             >
               <div className="flex flex-col lg:flex-row lg:items-center gap-3 mb-3">
                 <h1 className="text-3xl md:text-4xl font-bold">{seller.displayName}</h1>
+                {seller.isPremium && (
+                  <span className="inline-flex items-center gap-1.5 bg-amber-400/90 text-amber-950 text-sm font-bold px-3 py-1.5 rounded-full">
+                    <StarSolidIcon className="w-4 h-4" />
+                    Premium
+                  </span>
+                )}
                 {seller.isVerified && (
                   <span className="inline-flex items-center gap-1.5 bg-surface-elevated/20 backdrop-blur-sm text-inverted text-sm px-3 py-1.5 rounded-full">
                     <CheckBadgeIcon className="w-4 h-4" />
@@ -366,6 +376,13 @@ export default function SellerProfilePage() {
                   <HeartIcon className="w-4 h-4" />
                   {followersCount} {locale === 'en' ? 'followers' : 'takipçi'}
                 </span>
+                {seller.isPremium && typeof seller.trustScore === 'number' && (
+                  <span className="flex items-center gap-2 bg-amber-400/90 text-amber-950 font-bold px-3 py-1 rounded-full">
+                    <CheckBadgeSolidIcon className="w-4 h-4" />
+                    {locale === 'en' ? 'Trust Score' : 'Güven Skoru'} {seller.trustScore}/100
+                    {seller.trustLevel && <span className="font-medium">· {seller.trustLevel}</span>}
+                  </span>
+                )}
               </div>
 
               {/* Action Buttons */}

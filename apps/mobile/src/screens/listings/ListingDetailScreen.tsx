@@ -164,7 +164,15 @@ const ListingDetailScreen = ({ route, navigation }: any) => {
               <Icon name="person" size={24} color="#757575" />
             </View>
             <View style={styles.sellerInfo}>
-              <Text style={styles.sellerName}>{listing.seller?.username}</Text>
+              <Text style={styles.sellerName}>
+                {listing.seller?.username || listing.seller?.displayName}
+              </Text>
+              {listing.seller?.isPremium && (
+                <View style={styles.sellerPremiumBadge}>
+                  <Icon name="shield-checkmark" size={12} color="#B45309" />
+                  <Text style={styles.sellerPremiumText}>Premium</Text>
+                </View>
+              )}
               <View style={styles.sellerRating}>
                 <Icon name="star" size={14} color="#FFC107" />
                 <Text style={styles.ratingText}>
@@ -371,6 +379,22 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: '600',
     color: '#212121',
+  },
+  sellerPremiumBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    alignSelf: 'flex-start',
+    backgroundColor: '#FEF3C7',
+    paddingHorizontal: 8,
+    paddingVertical: 2,
+    borderRadius: 10,
+    marginTop: 4,
+  },
+  sellerPremiumText: {
+    fontSize: 11,
+    fontWeight: '700',
+    color: '#B45309',
+    marginLeft: 3,
   },
   sellerRating: {
     flexDirection: 'row',

@@ -91,20 +91,60 @@ export class InvoiceService {
   ) { }
 
   /**
-   * Resolve font path for PDF (Turkish support). Uses INVOICE_FONT_PATH env, then platform defaults.
-   * Returns a path that exists, or null to use Helvetica fallback.
+   * Resolve a Turkish-capable Unicode TrueType font for the invoice PDF.
+   *
+   * The standard PDF font (Helvetica) only covers Latin-1 and mangles İ/ı/ş/ğ — which is why
+   * invoices looked like garbled "dummy" PDFs. We bundle DejaVu Sans (full Turkish coverage,
+   * freely redistributable) so rendering is correct on EVERY platform, including the
+   * node:alpine container which ships no system fonts at all.
+   *
+   * Priority: bundled DejaVu → INVOICE_FONT_PATH env → platform system fonts → null (Helvetica).
+   * @param weight 'regular' | 'bold'
    */
-  private getInvoiceFontPath(): string | null {
+  private getInvoiceFontPath(weight: 'regular' | 'bold' = 'regular'): string | null {
+    const bundledName = weight === 'bold' ? 'DejaVuSans-Bold.ttf' : 'DejaVuSans.ttf';
+    // Cover both dev and built layouts (code runs from dist/src/..., assets land under dist/...).
+    const bundledCandidates = [
+      path.join(__dirname, '../assets/fonts', bundledName),
+      path.join(__dirname, '../../assets/fonts', bundledName),
+      path.join(__dirname, '../../../assets/fonts', bundledName),
+      path.join(__dirname, '../../../../assets/fonts', bundledName),
+      path.join(process.cwd(), 'dist/src/assets/fonts', bundledName),
+      path.join(process.cwd(), 'dist/assets/fonts', bundledName),
+      path.join(process.cwd(), 'src/assets/fonts', bundledName),
+      path.join(process.cwd(), 'assets/fonts', bundledName),
+    ];
+    for (const p of bundledCandidates) {
+      if (fs.existsSync(p)) return p;
+    }
+
+    // Optional explicit override (regular weight).
     const envPath = this.configService.get('INVOICE_FONT_PATH');
-    if (envPath && typeof envPath === 'string' && fs.existsSync(envPath)) return envPath;
+    if (weight === 'regular' && envPath && typeof envPath === 'string' && fs.existsSync(envPath)) return envPath;
+
+    // System font fallbacks (Arial & DejaVu both support Turkish).
     const platform = process.platform;
     const candidates: string[] = [];
     if (platform === 'win32') {
-      candidates.push('C:\\Windows\\Fonts\\arial.ttf', 'C:\\Windows\\Fonts\\Arial.ttf');
+      candidates.push(
+        weight === 'bold' ? 'C:\\Windows\\Fonts\\arialbd.ttf' : 'C:\\Windows\\Fonts\\arial.ttf',
+        'C:\\Windows\\Fonts\\arial.ttf',
+      );
     } else if (platform === 'darwin') {
-      candidates.push('/System/Library/Fonts/Supplemental/Arial.ttf', '/Library/Fonts/Arial.ttf');
+      candidates.push(
+        weight === 'bold' ? '/Library/Fonts/Arial Bold.ttf' : '/System/Library/Fonts/Supplemental/Arial.ttf',
+        '/System/Library/Fonts/Supplemental/Arial.ttf',
+        '/Library/Fonts/Arial.ttf',
+      );
     } else {
-      candidates.push('/usr/share/fonts/truetype/msttcorefonts/arial.ttf', '/usr/share/fonts/TTF/Arial.ttf');
+      candidates.push(
+        weight === 'bold'
+          ? '/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf'
+          : '/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf',
+        '/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf',
+        '/usr/share/fonts/truetype/msttcorefonts/arial.ttf',
+        '/usr/share/fonts/TTF/Arial.ttf',
+      );
     }
     for (const p of candidates) {
       if (fs.existsSync(p)) return p;
@@ -1075,38 +1115,50 @@ export class InvoiceService {
         doc.on('end', () => resolve(Buffer.concat(buffers)));
         doc.on('error', (err) => reject(err));
 
-        // Load font for Turkish support (platform-aware: Windows, macOS, Linux or INVOICE_FONT_PATH)
-        const fontPath = this.getInvoiceFontPath();
-        const fontToUse = fontPath || 'Helvetica';
-        try {
-          doc.font(fontToUse);
-        } catch {
-          doc.font('Helvetica');
+        // Register a Unicode TrueType font so Turkish characters (İ, ı, ş, ğ, ç, ö, ü) render correctly.
+        // Without this, PDFKit's default Helvetica (Latin-1 only) mangles İ/ı/ş/ğ — the cause of the
+        // garbled, "dummy"-looking invoices. Bundled DejaVu Sans works on every platform.
+        const regularPath = this.getInvoiceFontPath('regular');
+        const boldPath = this.getInvoiceFontPath('bold');
+        let fontRegular = 'Helvetica';
+        let fontBold = 'Helvetica-Bold';
+        if (regularPath) {
+          try {
+            doc.registerFont('body', regularPath);
+            doc.registerFont('body-bold', boldPath || regularPath);
+            fontRegular = 'body';
+            fontBold = 'body-bold';
+          } catch (e: any) {
+            this.logger.warn(`Failed to register invoice font (${regularPath}): ${e?.message}. Falling back to Helvetica.`);
+          }
+        } else {
+          this.logger.warn('No Unicode invoice font found — Turkish characters may not render. Bundle DejaVu Sans or set INVOICE_FONT_PATH.');
         }
+        doc.font(fontRegular);
 
         // Header
-        doc.fillColor('#1d3557').fontSize(24).text('TARODAN', { align: 'left' });
-        doc.fontSize(10).fillColor('#666666').text('İkinci El Model Araba Pazarı', { align: 'left' });
+        doc.font(fontBold).fillColor('#1d3557').fontSize(24).text('TARODAN', { align: 'left' });
+        doc.font(fontRegular).fontSize(10).fillColor('#666666').text('İkinci El Model Araba Pazarı', { align: 'left' });
 
         doc.moveDown();
-        doc.fillColor('#000000').fontSize(20).text('FATURA', { align: 'right' });
-        doc.fontSize(10).text(`Fatura No: ${data.invoiceNumber}`, { align: 'right' });
+        doc.font(fontBold).fillColor('#000000').fontSize(20).text('FATURA', { align: 'right' });
+        doc.font(fontRegular).fontSize(10).text(`Fatura No: ${data.invoiceNumber}`, { align: 'right' });
         doc.text(`Tarih: ${data.invoiceDate.toLocaleDateString('tr-TR')}`, { align: 'right' });
 
         doc.moveDown();
         const yBeforeInfo = doc.y;
 
         // Seller Block
-        doc.fontSize(12).fillColor('#1d3557').text('SATICI BİLGİLERİ', 50, yBeforeInfo);
-        doc.fontSize(10).fillColor('#333333');
+        doc.font(fontBold).fontSize(12).fillColor('#1d3557').text('SATICI BİLGİLERİ', 50, yBeforeInfo);
+        doc.font(fontRegular).fontSize(10).fillColor('#333333');
         doc.text(data.seller.name);
         doc.text(data.seller.email);
         if (data.seller.taxId) doc.text(`Vergi No: ${data.seller.taxId}`);
         if (data.seller.address) doc.text(data.seller.address, { width: 200 });
 
         // Buyer Block
-        doc.fontSize(12).fillColor('#1d3557').text('ALICI BİLGİLERİ', 300, yBeforeInfo);
-        doc.fontSize(10).fillColor('#333333');
+        doc.font(fontBold).fontSize(12).fillColor('#1d3557').text('ALICI BİLGİLERİ', 300, yBeforeInfo);
+        doc.font(fontRegular).fontSize(10).fillColor('#333333');
         doc.text(data.buyer.name, 300);
         doc.text(data.buyer.email, 300);
         if (data.buyer.address) doc.text(data.buyer.address, 300, doc.y, { width: 200 });
@@ -1116,7 +1168,7 @@ export class InvoiceService {
         // Table Header
         const tableTop = doc.y;
         doc.rect(50, tableTop, 500, 20).fill('#f8f9fa');
-        doc.fillColor('#1d3557').fontSize(10);
+        doc.font(fontBold).fillColor('#1d3557').fontSize(10);
         doc.text('Açıklama', 60, tableTop + 6);
         doc.text('Adet', 350, tableTop + 6, { width: 50, align: 'center' });
         doc.text('Birim Fiyat', 400, tableTop + 6, { width: 70, align: 'right' });
@@ -1124,6 +1176,7 @@ export class InvoiceService {
 
         // Table Items
         let currentY = tableTop + 25;
+        doc.font(fontRegular);
         data.items.forEach((item) => {
           doc.fillColor('#333333');
           doc.text(item.description, 60, currentY, { width: 280 });
@@ -1157,12 +1210,12 @@ export class InvoiceService {
         }
 
         currentY += 25;
-        doc.fontSize(14).fillColor('#1d3557').font(fontToUse).text('GENEL TOPLAM:', 300, currentY, { width: 180, align: 'right' });
+        doc.font(fontBold).fontSize(14).fillColor('#1d3557').text('GENEL TOPLAM:', 300, currentY, { width: 180, align: 'right' });
         doc.text(`${data.total.toLocaleString('tr-TR')} TL`, 480, currentY, { width: 60, align: 'right' });
 
         // Footer
         const footerY = 750;
-        doc.fontSize(8).fillColor('#999999');
+        doc.font(fontRegular).fontSize(8).fillColor('#999999');
         doc.text('Bu fatura elektronik olarak oluşturulmuştur ve mali değeri vardır.', 50, footerY, { align: 'center', width: 500 });
         doc.text('Tarodan - Model Araba Alım Satım ve Takas Platformu', 50, footerY + 12, { align: 'center', width: 500 });
         doc.text('https://tarodan.com', 50, footerY + 24, { align: 'center', width: 500 });

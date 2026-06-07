@@ -24,6 +24,7 @@ interface ProductCardProduct {
   likeCount?: number;
   isPreorder?: boolean;
   isLimited?: boolean;
+  isBoosted?: boolean;
   condition?: string;
   rating?: { average: number | null; count: number };
 }
@@ -76,6 +77,11 @@ export default function ProductCard({
               loading={priority ? 'eager' : 'lazy'}
               onError={handleImgError}
             />
+            {product.isBoosted && (
+              <div className="absolute top-2 left-2">
+                <Badge variant="sponsored">{locale === 'en' ? 'Sponsored' : 'Sponsorlu'}</Badge>
+              </div>
+            )}
             {tag && (
               <div className="absolute top-2 right-2">
                 <Badge variant={tag === 'Yeni' || tag === 'New' ? 'new' : tag === 'Nadir' || tag === 'Rare' ? 'rare' : 'default'}>
@@ -141,6 +147,9 @@ export default function ProductCard({
             onError={handleImgError}
           />
           <div className="absolute top-3 left-3 flex flex-col items-start gap-1.5">
+            {product.isBoosted && (
+              <Badge variant="sponsored">{locale === 'en' ? 'Sponsored' : 'Sponsorlu'}</Badge>
+            )}
             {(product.viewCount ?? 0) > 0 && (
               <div className="flex items-center gap-1 bg-surface-elevated/90 backdrop-blur-sm px-2 py-1 rounded shadow-soft">
                 <svg className="w-3.5 h-3.5 text-info-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">

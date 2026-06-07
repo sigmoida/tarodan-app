@@ -755,6 +755,7 @@ export default function TradeDetailPage() {
           (locale === "en"
             ? "Failed to accept trade"
             : "Takas kabul edilemedi"),
+        { id: "trade-action-error" },
       );
     } finally {
       setIsActionLoading(false);
@@ -2306,6 +2307,29 @@ export default function TradeDetailPage() {
                       : "Bekleniyor"}
                 </p>
               </div>
+
+              {/* Otomatik atanan depo etiketin (kabulde oluşur) — teslimden ÖNCE de görünür */}
+              {(myToWarehouseShipment?.trackingNumber ||
+                fallbackMyWarehouseShipment?.trackingNumber) && (
+                <div className="mb-4 p-3 bg-surface-elevated rounded-lg border border-primary-200">
+                  <p className="text-xs text-muted mb-0.5">
+                    {locale === "en" ? "YOUR SHIPMENT" : "SİZİN GÖNDERİNİZ"}
+                  </p>
+                  <p className="font-mono font-semibold text-heading">
+                    {myToWarehouseShipment?.trackingNumber ||
+                      fallbackMyWarehouseShipment?.trackingNumber}
+                  </p>
+                  <p className="text-xs text-success-700 mt-1">
+                    {myWarehouseShipped
+                      ? locale === "en"
+                        ? "Dropped off at carrier"
+                        : "Kargoya verildi"
+                      : locale === "en"
+                        ? "Label ready — drop off your item at the nearest Sürat branch"
+                        : "Etiket hazır — ürününü en yakın Sürat şubesine teslim et"}
+                  </p>
+                </div>
+              )}
 
               <div className="mb-4 p-3 bg-info-50 border border-info-200 rounded-lg">
                 <p className="text-sm text-info-900">{warehouseProgressText}</p>

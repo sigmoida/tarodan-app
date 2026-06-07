@@ -186,7 +186,9 @@ const NOTIFICATION_TEMPLATES: Record<NotificationType, { title: string; message:
     title: 'Yeni Mesaj',
     message: '{{senderName}}: {{messagePreview}}',
     icon: '💬',
-    link: '/messages/{{threadId}}',
+    // Messages live on a single /messages page that opens a thread via ?thread=<id>.
+    // There is no /messages/<id> route, so a path-style link would 404.
+    link: '/messages?thread={{threadId}}',
   },
 
   // Wishlist/Favorites notifications
@@ -326,6 +328,13 @@ const NOTIFICATION_TEMPLATES: Record<NotificationType, { title: string; message:
     icon: '📢',
     link: '{{announcementLink}}',
   },
+  [NotificationType.BOOST_EXPIRED]: {
+    title: '🚀 Öne çıkarma süresi doldu',
+    message:
+      '"{{productTitle}}" ilanının öne çıkarması bitti. Otomatik yenileme açıktı — tek tıkla yeniden öne çıkar.',
+    icon: '🚀',
+    link: '/profile/listings',
+  },
   [NotificationType.TRADE_AUTO_CANCELLED]: {
     title: 'Takas Otomatik İptal Edildi',
     message: '{{cancelReason}}',
@@ -404,8 +413,10 @@ export class NotificationService {
           break;
 
         case NotificationChannel.IN_APP:
+          // saveInAppNotification already persists the in_app row (with icon + link).
+          // Do NOT also logNotification('in_app', ...) — that creates a SECOND channel='in_app'
+          // row (without a link) which getInAppNotifications() then returns as a duplicate.
           results.in_app = await this.saveInAppNotification(dto.userId, dto.type, title, message, dto.data);
-          await this.logNotification(dto.userId, 'in_app', dto.type, title, message, results.in_app);
           break;
 
         case NotificationChannel.SMS:
