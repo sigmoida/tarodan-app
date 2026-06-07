@@ -21,6 +21,7 @@ import { NotificationType } from '../notification/dto';
 import { OrderService } from '../order/order.service';
 import { ProductLockService } from '../product/product-lock.service';
 import { getAvailableQuantity } from '../product/helpers/product-availability.helper';
+import { generateUniqueReference } from '../../common/helpers/generate-reference';
 
 @Injectable()
 export class OfferService {
@@ -52,23 +53,15 @@ export class OfferService {
   }
 
   /**
-   * Generate unique order number using atomic DB sequence.
-   * Falls back to timestamp+random if the sequence doesn't exist yet.
+   * Generate a non-guessable, unique order number (e.g. "ORD-K7X9M2QF3N").
+   * Shares the same generator as OrderService so the format stays consistent.
    */
   private async generateOrderNumber(): Promise<string> {
-    const year = new Date().getFullYear();
-    const prefix = `ORD-${year}-`;
-
-    try {
-      const result = await this.prisma.$queryRaw<{ next_val: bigint }[]>`
-        SELECT nextval('order_number_seq') AS next_val
-      `;
-      return `${prefix}${String(result[0].next_val).padStart(6, '0')}`;
-    } catch {
-      const ts = Date.now().toString(36).toUpperCase();
-      const rand = Math.floor(Math.random() * 9999).toString().padStart(4, '0');
-      return `${prefix}${ts}${rand}`;
-    }
+    return generateUniqueReference(
+      'ORD',
+      async (code) =>
+        (await this.prisma.order.count({ where: { orderNumber: code } })) > 0,
+    );
   }
 
   /**

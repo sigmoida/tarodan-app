@@ -143,6 +143,25 @@ export class SuratCargoService {
       };
     }
 
+    // Idempotency: retry sonrası "Bu gönderi daha önce oluşturulmuş" yanıtı,
+    // ilk denemenin Sürat'ta gönderiyi gerçekten oluşturduğu anlamına gelir →
+    // başarı say (cancel yolundaki "Bulunamadi = başarı" mantığıyla simetrik).
+    // Türkçe karakter varyasyonlarına toleranslı (gonderi/gönderi, olustur/oluştur).
+    if (/daha\s*[öo]nce\s*olu[şs]turul/i.test(normalized)) {
+      this.logger.warn({
+        msg: 'Surat shipment already exists (idempotent success)',
+        correlationId,
+        idempotencyKey,
+        suratMessage: normalized,
+      });
+      return {
+        ok: true,
+        suratMessage: 'Tamam',
+        correlationId,
+        idempotencyKey,
+      };
+    }
+
     this.logger.warn({
       msg: 'Surat business failure',
       correlationId,

@@ -11,7 +11,7 @@ import {
   Text,
   theme,
 } from '@tarodan/ui-native';
-import { userApi, notificationsApi, collectionsApi } from '../../src/services/api';
+import { userApi, notificationsApi, collectionsApi, membershipApi } from '../../src/services/api';
 import { useAuthStore } from '../../src/stores/authStore';
 import { SignupPrompt } from '../../src/components/SignupPrompt';
 import { getRestrictionMessage, GuestAction } from '../../src/utils/guestRestrictions';
@@ -117,6 +117,26 @@ export default function ProfileScreen() {
     refetchOnWindowFocus: true,
   });
   const unreadNotifications: number = typeof unreadData === 'number' ? unreadData : 0;
+
+  // BUG-008: Efektif üyelik tier'ı — backend /membership/me past_due'yu free'ye
+  // indirir (web ile parite). user.membershipTier bayat kalabilir; rozet/ikon
+  // bunun yerine API'nin döndürdüğü efektif tier'ı kullanmalı.
+  const { data: membershipData } = useQuery({
+    queryKey: ['membership-me'],
+    queryFn: async () => {
+      try {
+        const response = await membershipApi.getCurrentMembership();
+        const body = response.data?.data ?? response.data ?? {};
+        return (body?.tier?.type ?? body?.tierType ?? null) as string | null;
+      } catch {
+        return null;
+      }
+    },
+    enabled: isAuthenticated,
+    retry: 1,
+  });
+  const effectiveTier: string = membershipData ?? user?.membershipTier ?? 'free';
+  const isPaidTier = effectiveTier === 'premium' || effectiveTier === 'business';
 
   const handleLogout = async () => {
     await logout();
@@ -358,11 +378,11 @@ export default function ProfileScreen() {
             <Text variant="bodySm" tone="muted" style={{ marginTop: 2 }}>
               {user?.email}
             </Text>
-            {user?.membershipTier && (
+            {isPaidTier && (
               <View style={styles.membershipBadge}>
                 <Ionicons name="diamond" size={14} color={colors.warning[500]!} />
                 <Text variant="caption" weight="semibold" style={{ marginLeft: spacing[1] }}>
-                  {user.membershipTier} Üye
+                  {effectiveTier} Üye
                 </Text>
               </View>
             )}
@@ -500,11 +520,7 @@ export default function ProfileScreen() {
             icon="diamond-outline"
             label="Üyelik Planı"
             onPress={() => router.push('/membership')}
-            rightSlot={
-              user?.membershipTier === 'premium' || user?.membershipTier === 'business' ? (
-                <Badge variant="primary">PRO</Badge>
-              ) : null
-            }
+            rightSlot={isPaidTier ? <Badge variant="primary">PRO</Badge> : null}
           />
           <MenuItem
             icon="notifications-outline"
@@ -516,7 +532,7 @@ export default function ProfileScreen() {
             label="Güvenlik"
             onPress={() => router.push('/settings/security')}
           />
-          {user?.membershipTier?.toLowerCase() === 'business' && (
+          {effectiveTier.toLowerCase() === 'business' && (
             <MenuItem
               icon="business-outline"
               label="İşletme Paneli"

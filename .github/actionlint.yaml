@@ -1,0 +1,5 @@
+# actionlint config. We use only GitHub-hosted runners (ubuntu-latest).
+# Pin shellcheck severity so embedded run-scripts are linted but info-level
+# style notes don't fail local checks.
+self-hosted-runner:
+  labels: []

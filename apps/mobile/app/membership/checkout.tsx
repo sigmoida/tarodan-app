@@ -1,9 +1,11 @@
 import { useState } from 'react';
-import { View, ScrollView, StyleSheet, TouchableOpacity } from 'react-native';
+import { View, ScrollView, StyleSheet, TouchableOpacity, Alert } from 'react-native';
 import { theme, Button, Card, Input, Radio, Text } from '@tarodan/ui-native';
 import { router, useLocalSearchParams } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { useAuthStore } from '../../src/stores/authStore';
+import { membershipApi, paymentsApi } from '../../src/services/api';
+import { captureException } from '../../src/services/sentry';
 
 const { colors } = theme;
 
@@ -60,8 +62,8 @@ const MEMBERSHIP_TIERS = {
 };
 
 export default function MembershipCheckoutScreen() {
-  const { tier: tierParam } = useLocalSearchParams<{ tier: string }>();
-  const { isAuthenticated } = useAuthStore();
+  const { tier: tierParam, period: periodParam } = useLocalSearchParams<{ tier: string; period?: string }>();
+  const { isAuthenticated, refreshUserData } = useAuthStore();
   const [paymentMethod, setPaymentMethod] = useState('card');
   const [loading, setLoading] = useState(false);
   const [cardNumber, setCardNumber] = useState('');
@@ -79,10 +81,63 @@ export default function MembershipCheckoutScreen() {
 
   const handlePayment = async () => {
     setLoading(true);
-    // Simulate payment process
-    await new Promise(resolve => setTimeout(resolve, 2000));
-    setLoading(false);
-    router.replace('/membership/success');
+    const tierType = (tierParam as string) || 'premium';
+    const billingPeriod: 'monthly' | 'yearly' = periodParam === 'yearly' ? 'yearly' : 'monthly';
+    try {
+      // Gerçek üyelik ödemesi — backend POST /membership/payments/initiate
+      // (Önceden bu ekran setTimeout ile sahte başarı veriyordu; ödeme/abonelik oluşmuyordu.)
+      const initResp: any = await membershipApi.initiatePayment({
+        tierType,
+        billingPeriod,
+        provider: 'paytr',
+      });
+      const initData = initResp?.data?.data ?? initResp?.data ?? {};
+      const paymentId = initData.paymentId || initData.id || initData.payment?.id;
+
+      // PAYMENT_BYPASS=true ortamında API gerçek PayTR token üretmez; `useBypass: true`
+      // döner ve istemcinin /payments/:id/bypass-complete çağırması beklenir
+      // (sipariş checkout'u ile birebir aynı desen).
+      if (initData.useBypass === true) {
+        if (paymentId) {
+          try {
+            await paymentsApi.bypassComplete(paymentId);
+          } catch (bypassErr: any) {
+            captureException(bypassErr, {
+              level: 'error',
+              tags: { flow: 'membership.bypassComplete' },
+              extra: { paymentId, tierType },
+            });
+          }
+        }
+        await refreshUserData();
+        setLoading(false);
+        router.replace(`/membership/success?tier=${tierType}` as any);
+        return;
+      }
+
+      // Gerçek PayTR akışı — WebView ödeme ekranına yönlendir
+      if (paymentId) {
+        setLoading(false);
+        router.replace({
+          pathname: '/payment/[id]',
+          params: { id: paymentId, provider: 'paytr', guest: '0', type: 'membership' },
+        } as any);
+        return;
+      }
+
+      throw new Error('Ödeme başlatılamadı (paymentId alınamadı).');
+    } catch (e: any) {
+      setLoading(false);
+      captureException(e, {
+        level: 'error',
+        tags: { flow: 'membership.initiatePayment' },
+        extra: { tierType, billingPeriod, status: e?.response?.status },
+      });
+      Alert.alert(
+        'Ödeme Hatası',
+        e?.response?.data?.message || 'Üyelik ödemesi başlatılamadı. Lütfen tekrar deneyin.',
+      );
+    }
   };
 
   const formatCardNumber = (text: string) => {

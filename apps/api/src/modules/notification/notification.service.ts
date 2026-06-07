@@ -121,7 +121,7 @@ const NOTIFICATION_TEMPLATES: Record<NotificationType, { title: string; message:
     title: 'Yeni Teklif Aldınız',
     message: '{{productTitle}} ürününüz için {{amount}} TL teklif aldınız.',
     icon: '💵',
-    link: '/profile/listings',
+    link: '/offers?tab=received',
   },
   [NotificationType.OFFER_ACCEPTED]: {
     title: 'Teklifiniz Kabul Edildi! 🎉',
@@ -492,8 +492,13 @@ export class NotificationService {
           break;
 
         case NotificationChannel.IN_APP:
+          // saveInAppNotification already persists the canonical in_app row
+          // (status='sent', with link+icon). Do NOT also call logNotification
+          // here — it would write a second channel='in_app' row and
+          // getInAppNotifications() would surface the notification twice in the
+          // bell. logNotification is only a delivery tracker for the external
+          // channels (email/push/sms).
           results.in_app = await this.saveInAppNotification(dto.userId, dto.type, title, message, dto.data);
-          await this.logNotification(dto.userId, 'in_app', dto.type, title, message, results.in_app);
           break;
 
         case NotificationChannel.SMS:
@@ -660,6 +665,10 @@ export class NotificationService {
     body: string,
     success: boolean,
   ): Promise<void> {
+    // in_app notifications are persisted by saveInAppNotification (the
+    // canonical store the bell reads). Guard against any caller logging an
+    // in_app delivery row here, which would duplicate the notification.
+    if (channel === 'in_app') return;
     try {
       await this.prisma.notificationLog.create({
         data: {

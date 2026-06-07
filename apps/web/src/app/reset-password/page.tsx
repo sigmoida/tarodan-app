@@ -255,11 +255,13 @@ export default function ResetPasswordPage() {
                     className="pl-12 pr-12 h-14 border-2 border-border rounded-xl focus:ring-0 focus:border-primary-500 transition-all duration-200 ease-premium"
                     required
                   />
-                  <Button variant="secondary" type="button"
+                  <button
+                    type="button"
                     onClick={() => setShowPassword(!showPassword)}
+                    aria-label={showPassword ? (locale === 'tr' ? 'Şifreyi gizle' : 'Hide password') : (locale === 'tr' ? 'Şifreyi göster' : 'Show password')}
                     className="absolute right-4 top-1/2 -translate-y-1/2 text-subtle hover:text-muted transition-colors duration-200">
                     {showPassword ? <EyeSlashIcon className="w-5 h-5" /> : <EyeIcon className="w-5 h-5" />}
-                  </Button>
+                  </button>
                 </div>
               </div>
 
@@ -296,11 +298,13 @@ export default function ResetPasswordPage() {
                     }`}
                     required
                   />
-                  <Button variant="secondary" type="button"
+                  <button
+                    type="button"
                     onClick={() => setShowConfirmPassword(!showConfirmPassword)}
+                    aria-label={showConfirmPassword ? (locale === 'tr' ? 'Şifreyi gizle' : 'Hide password') : (locale === 'tr' ? 'Şifreyi göster' : 'Show password')}
                     className="absolute right-4 top-1/2 -translate-y-1/2 text-subtle hover:text-muted transition-colors duration-200">
                     {showConfirmPassword ? <EyeSlashIcon className="w-5 h-5" /> : <EyeIcon className="w-5 h-5" />}
-                  </Button>
+                  </button>
                 </div>
                 {confirmPassword && !passwordsMatch && (
                   <p className="mt-2 text-sm text-danger-600 flex items-center gap-1">

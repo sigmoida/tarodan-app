@@ -15,8 +15,8 @@ import {
   RefundRequestStatus,
   ShipmentStatus,
 } from '@prisma/client';
-import { randomInt } from 'crypto';
 import { PrismaService } from '../../prisma';
+import { generateUniqueReference } from '../../common/helpers/generate-reference';
 import { PaymentService } from '../payment/payment.service';
 import { SuratCargoService } from '../surat-cargo/surat-cargo.service';
 import {
@@ -592,19 +592,17 @@ export class RefundService {
   // Internal helpers
   // ─────────────────────────────────────────────────────────────────────────────
 
+  /**
+   * Generate a non-guessable, unique refund number (e.g. "RFD-N4P7K2Q9M3").
+   * Random by design so it leaks no sequence/count information. The
+   * `refund_number` column's @unique constraint is the final collision guard.
+   */
   private async generateRefundNumber(): Promise<string> {
-    const year = new Date().getFullYear();
-    const prefix = `RFD-${year}-`;
-    try {
-      const result = await this.prisma.$queryRaw<{ next_val: bigint }[]>`
-        SELECT nextval('refund_request_number_seq') AS next_val
-      `;
-      return `${prefix}${String(result[0].next_val).padStart(6, '0')}`;
-    } catch {
-      const ts = Date.now().toString(36).toUpperCase();
-      const rand = randomInt(0, 9999).toString().padStart(4, '0');
-      return `${prefix}${ts}${rand}`;
-    }
+    return generateUniqueReference(
+      'RFD',
+      async (code) =>
+        (await this.prisma.refundRequest.count({ where: { refundNumber: code } })) > 0,
+    );
   }
 
   private classifyOrderPhase(order: {

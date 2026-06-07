@@ -239,6 +239,12 @@ export default function SellerDashboardScreen() {
               color={colors.warning[500]!}
             />
             <QuickAction
+              icon="cash-refund"
+              label="İade Talepleri"
+              onPress={() => router.push('/refund-requests/seller')}
+              color={colors.danger[600]!}
+            />
+            <QuickAction
               icon="chart-line"
               label="Analitik"
               onPress={() => router.push('/settings/analytics')}

@@ -54,9 +54,11 @@ function initStorageService(): StorageService | null {
 const randomPrice = (min: number, max: number) => 
   Math.round((Math.random() * (max - min) + min) * 100) / 100;
 
-// Helper to generate order number
-const generateOrderNumber = () => 
-  `ORD-${Date.now().toString(36).toUpperCase()}-${Math.random().toString(36).substring(2, 6).toUpperCase()}`;
+// Helper to generate order number (matches the runtime ORD-XXXXXXXXXX format;
+// non-ambiguous alphabet, dev/seed data only)
+const REF_ALPHABET = '23456789ABCDEFGHJKMNPQRSTVWXYZ';
+const generateOrderNumber = () =>
+  `ORD-${Array.from({ length: 10 }, () => REF_ALPHABET[Math.floor(Math.random() * REF_ALPHABET.length)]).join('')}`;
 
 // Helper to generate trade number
 const generateTradeNumber = () => 

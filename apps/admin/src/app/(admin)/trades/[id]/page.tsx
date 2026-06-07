@@ -16,6 +16,7 @@ import {
 } from '@heroicons/react/24/outline';
 import { adminApi } from '@/lib/api';
 import { getProductEffectivePrice } from '@/lib/productPrice';
+import { cancelReasonLabel } from '@/lib/utils';
 import { Button, Modal, Select, Spinner, StatusBadge, Textarea, cn, tradeStatusConfig } from '@tarodan/ui';
 import toast from 'react-hot-toast';
 
@@ -79,6 +80,7 @@ interface TradeDetail {
   adminNotes?: string;
   rejectionReason?: string;
   cancellationReason?: string;
+  cancelReason?: string;
   createdAt: string;
   acceptedAt?: string;
   approvedAt?: string;
@@ -719,15 +721,29 @@ export default function TradeDetailPage() {
         )}
 
         {/* Rejection / cancellation reason */}
-        {(trade.rejectionReason || trade.cancellationReason) && (
+        {(trade.rejectionReason || trade.cancellationReason || trade.cancelReason) && (
           <div className="bg-danger-50 border border-danger-200 rounded-xl p-6">
             <h2 className="text-lg font-semibold text-danger-900 mb-2 flex items-center gap-2">
               <XCircleIcon className="w-5 h-5" />
               {trade.rejectionReason ? 'Red Sebebi' : 'İptal Sebebi'}
             </h2>
-            <p className="text-sm text-danger-800 whitespace-pre-wrap">
-              {trade.rejectionReason || trade.cancellationReason}
-            </p>
+            {(() => {
+              const raw =
+                trade.rejectionReason ||
+                trade.cancellationReason ||
+                trade.cancelReason;
+              const short = trade.rejectionReason
+                ? null
+                : cancelReasonLabel(trade.cancellationReason || trade.cancelReason);
+              return (
+                <>
+                  {short && short !== raw && (
+                    <p className="text-sm font-medium text-danger-700 mb-1">{short}</p>
+                  )}
+                  <p className="text-sm text-danger-800 whitespace-pre-wrap">{raw}</p>
+                </>
+              );
+            })()}
           </div>
         )}
 
