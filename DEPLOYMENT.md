@@ -1,5 +1,9 @@
 # 🚀 Tarodan Deployment Rehberi
 
+> **KANONİK DEPLOY YOLU:** Bu proje **kendi VPS'imize Docker Compose + GHCR image pull**
+> ile deploy edilir. CI/CD detayları için `docs/CI_CD.md`. Aşağıdaki Railway / Fly.io /
+> Render bölümleri **alternatif/tarihsel** referanstır; aktif olarak kullanılmaz.
+
 Bu dokümantasyon, Tarodan projesini production ortamına deploy etmek için en uygun platformları ve adımları içerir.
 
 ## 📋 Proje Gereksinimleri

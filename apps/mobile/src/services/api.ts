@@ -171,6 +171,16 @@ export const authApi = {
 export const productsApi = {
   getAll: (params?: Record<string, any>) =>
     api.get('/products', { params }),
+  /** Dinamik filtre seçenekleri — web SidebarFilters ile aynı kaynak. Backend: GET /products/filters */
+  getFilters: () =>
+    api.get<{
+      categories: Array<{ value: string; label: string; slug: string; parentId: string | null }>;
+      brands: Array<{ id: string; name: string; slug: string }>;
+      carModels: Array<{ id: string; name: string; slug: string; brandId: string }>;
+      scales: string[];
+      manufacturers: Array<{ id: string; name: string; slug: string }>;
+      materials: Array<{ slug: string; label: string }>;
+    }>('/products/filters'),
   getOne: (id: string | number) => 
     api.get(`/products/${id}`),
   create: (data: Record<string, any>) =>
@@ -487,6 +497,9 @@ export const paymentsApi = {
     api.post('/payments/initiate-trade-cash', { tradeId }),
   getStatus: (paymentId: string) =>
     api.get(`/payments/${paymentId}`),
+  /** POST /payments/:id/verify — PayTR ödemesini aktif doğrula (web ile parite) */
+  verify: (paymentId: string) =>
+    api.post(`/payments/${paymentId}/verify`),
   getStatusLight: (paymentId: string) =>
     api.get(`/payments/${paymentId}/status`),
   getStatusLightGuest: (paymentId: string) =>
@@ -823,7 +836,7 @@ export const uploadApi = {
 // REFUND REQUESTS API
 // =============================================================================
 /**
- * Buyer-side refund request endpoints.
+ * Buyer + seller refund request endpoints (web ile parite).
  * Backend module: apps/api/src/modules/refund (RefundController).
  * Reasons (Prisma enum RefundReason): changed_mind | damaged | wrong_item |
  * not_as_described | missing_parts | other.
@@ -838,8 +851,15 @@ export const refundsApi = {
   getById: (id: string) => api.get(`/refund-requests/${id}`),
   /** GET /refund-requests/me — buyer's own refund requests */
   getMine: () => api.get('/refund-requests/me'),
+  /** GET /refund-requests/seller — seller'a gelen iade talepleri */
+  getSeller: () => api.get('/refund-requests/seller'),
   /** POST /refund-requests/:id/cancel */
   cancel: (id: string) => api.post(`/refund-requests/${id}/cancel`),
+  /** POST /refund-requests/:id/accept — satıcı iadeyi kabul eder */
+  accept: (id: string) => api.post(`/refund-requests/${id}/accept`),
+  /** POST /refund-requests/:id/reject — satıcı iadeyi reddeder (gerekçe) */
+  reject: (id: string, response: string) =>
+    api.post(`/refund-requests/${id}/reject`, { response }),
 };
 
 // =============================================================================
