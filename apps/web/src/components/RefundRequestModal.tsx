@@ -1,7 +1,7 @@
 "use client";
 
-import { Button, Modal, Select, Spinner, Textarea } from "@/components/ui";
-import { refundsApi, type RefundReason } from "@/lib/api";
+import { Button, Input, Modal, Select, Spinner, Textarea } from "@/components/ui";
+import { mediaApi, refundsApi, type RefundReason } from "@/lib/api";
 import { useTranslation } from "@/i18n/LanguageContext";
 import { useState } from "react";
 import toast from "react-hot-toast";
@@ -35,13 +35,28 @@ export default function RefundRequestModal({
   const { locale } = useTranslation();
   const [reason, setReason] = useState<RefundReason>("changed_mind");
   const [description, setDescription] = useState("");
-  const [evidenceInput, setEvidenceInput] = useState("");
+  const [evidenceFiles, setEvidenceFiles] = useState<File[]>([]);
+  const [evidencePreviews, setEvidencePreviews] = useState<string[]>([]);
   const [submitting, setSubmitting] = useState(false);
 
-  const evidencePhotoUrls = evidenceInput
-    .split(/\s+|,/)
-    .map((s) => s.trim())
-    .filter((s) => s.length > 0);
+  const handleEvidenceAdd = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = Array.from(e.target.files || []);
+    const newFiles = files.slice(0, 5 - evidenceFiles.length);
+    if (newFiles.length === 0) return;
+    setEvidenceFiles((prev) => [...prev, ...newFiles]);
+    newFiles.forEach((file) => {
+      const reader = new FileReader();
+      reader.onload = (ev) =>
+        setEvidencePreviews((prev) => [...prev, ev.target?.result as string]);
+      reader.readAsDataURL(file);
+    });
+    e.target.value = "";
+  };
+
+  const removeEvidence = (index: number) => {
+    setEvidenceFiles((prev) => prev.filter((_, i) => i !== index));
+    setEvidencePreviews((prev) => prev.filter((_, i) => i !== index));
+  };
 
   const evidenceRequired = REASONS_REQUIRING_EVIDENCE.includes(reason);
   const descriptionRequired = phase === "past_cooling_off";
@@ -85,17 +100,27 @@ export default function RefundRequestModal({
       );
       return;
     }
-    if (evidenceRequired && evidencePhotoUrls.length === 0) {
+    if (evidenceRequired && evidenceFiles.length === 0) {
       toast.error(
         locale === "en"
           ? "Photo evidence is required for this reason"
-          : "Bu sebep için en az bir kanıt fotoğrafı (URL) gereklidir",
+          : "Bu sebep için en az bir kanıt fotoğrafı gereklidir",
       );
       return;
     }
 
     setSubmitting(true);
     try {
+      // Fotoğrafları doğrudan yükle (URL yapıştırmaya gerek yok)
+      let evidencePhotoUrls: string[] = [];
+      if (evidenceFiles.length > 0) {
+        const results = await Promise.all(
+          evidenceFiles.map((file) => mediaApi.uploadReviewImage(file)),
+        );
+        evidencePhotoUrls = results
+          .map((r) => r.data?.url)
+          .filter(Boolean) as string[];
+      }
       await refundsApi.create(orderId, {
         reason,
         description: description.trim() || undefined,
@@ -197,24 +222,43 @@ export default function RefundRequestModal({
           <div>
             <label className="block text-sm font-medium text-body mb-2">
               {locale === "en"
-                ? "Evidence photo URLs"
-                : "Kanıt fotoğraf URL'leri"}{" "}
+                ? "Evidence photos (max 5)"
+                : "Kanıt fotoğrafları (maks 5)"}{" "}
               <span className="text-danger-500">*</span>
             </label>
-            <Textarea
-              value={evidenceInput}
-              onChange={(e) => setEvidenceInput(e.target.value)}
-              rows={3}
-              placeholder={
-                locale === "en"
-                  ? "Paste URLs separated by space or comma"
-                  : "URL'leri boşluk veya virgülle ayırın"
-              }
-            />
+            <div className="flex flex-wrap gap-2">
+              {evidencePreviews.map((src, idx) => (
+                <div
+                  key={idx}
+                  className="relative w-16 h-16 rounded-lg overflow-hidden border border-border"
+                >
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img src={src} alt="" className="w-full h-full object-cover" />
+                  <button
+                    type="button"
+                    onClick={() => removeEvidence(idx)}
+                    className="absolute top-0 right-0 bg-danger-500 text-inverted rounded-bl-lg w-5 h-5 flex items-center justify-center text-xs"
+                  >
+                    ×
+                  </button>
+                </div>
+              ))}
+              {evidenceFiles.length < 5 && (
+                <label className="w-16 h-16 border-2 border-dashed flex items-center justify-center cursor-pointer hover:border-primary-400 rounded-lg">
+                  <span className="text-2xl text-subtle">+</span>
+                  <Input
+                    type="file"
+                    accept="image/*"
+                    onChange={handleEvidenceAdd}
+                    className="hidden"
+                  />
+                </label>
+              )}
+            </div>
             <p className="text-xs text-muted mt-1">
               {locale === "en"
-                ? "Upload photos to a service (e.g. Imgur) and paste links here"
-                : "Fotoğrafları bir servise (örn. Imgur) yükleyip linklerini buraya yapıştırın"}
+                ? "Tap + to upload photos of the issue."
+                : "Sorunun fotoğraflarını yüklemek için + simgesine dokunun."}
             </p>
           </div>
         )}
