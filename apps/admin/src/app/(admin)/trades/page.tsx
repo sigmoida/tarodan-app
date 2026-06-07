@@ -4,6 +4,7 @@ import { useState, useEffect, useMemo, useCallback } from "react";
 import Link from "next/link";
 import { useSearchParams, useRouter } from "next/navigation";
 import { adminApi } from "@/lib/api";
+import { cancelReasonLabel } from "@/lib/utils";
 import {
   Button,
   Input,
@@ -33,6 +34,7 @@ interface Trade {
   cashAmount?: number;
   hasDispute: boolean;
   createdAt: string;
+  cancelReason?: string;
 }
 
 interface User {
@@ -180,6 +182,7 @@ export default function TradesPage() {
           cashAmount: Number(t.cashAmount || 0),
           hasDispute: !!t.dispute,
           createdAt: t.createdAt,
+          cancelReason: t.cancelReason ?? undefined,
         })),
       );
       setTotal(meta.total || data.length);
@@ -359,10 +362,18 @@ export default function TradesPage() {
                             label="⚠️ İtirazlı"
                           />
                         ) : (
-                          <StatusBadge
-                            status={trade.status}
-                            config={tradeStatusConfig}
-                          />
+                          <div className="flex flex-col items-start gap-1">
+                            <StatusBadge
+                              status={trade.status}
+                              config={tradeStatusConfig}
+                            />
+                            {trade.status === "cancelled" &&
+                              cancelReasonLabel(trade.cancelReason) && (
+                                <span className="text-xs text-muted">
+                                  {cancelReasonLabel(trade.cancelReason)}
+                                </span>
+                              )}
+                          </div>
                         )}
                       </td>
                       <td>

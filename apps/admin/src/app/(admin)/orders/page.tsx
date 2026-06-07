@@ -4,6 +4,7 @@ import { useState, useEffect, useMemo, useCallback, useRef } from "react";
 import Link from "next/link";
 import { useSearchParams, useRouter } from "next/navigation";
 import { adminApi } from "@/lib/api";
+import { cancelReasonLabel, orderOriginLabel } from "@/lib/utils";
 import {
   Button,
   Input,
@@ -34,6 +35,8 @@ interface Order {
   product?: { id: string; title: string };
   createdAt: string;
   itemCount: number;
+  cancelReason?: string;
+  offerId?: string | null;
 }
 
 interface User {
@@ -200,6 +203,8 @@ export default function OrdersPage() {
           product: o.product || undefined,
           createdAt: o.createdAt,
           itemCount: o.items?.length || 1,
+          cancelReason: o.cancelReason ?? undefined,
+          offerId: o.offerId ?? null,
         })),
       );
       setTotal(meta.total || data.length);
@@ -432,11 +437,18 @@ export default function OrdersPage() {
                           </Button>
                         </div>
                       ) : (
-                        <div className="flex items-center gap-1.5">
+                        <div className="flex flex-col items-start gap-1">
                           <StatusBadge
                             status={order.status}
                             config={orderStatusConfig}
                           />
+                          {order.status === "cancelled" &&
+                            cancelReasonLabel(order.cancelReason) && (
+                              <span className="text-xs text-muted">
+                                {cancelReasonLabel(order.cancelReason)} ·{" "}
+                                {orderOriginLabel(order.offerId)} iptali
+                              </span>
+                            )}
                         </div>
                       )}
                     </td>

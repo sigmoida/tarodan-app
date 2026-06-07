@@ -410,7 +410,18 @@ function OffersPageContent() {
           <div className="space-y-4">
             <AnimatePresence mode="popLayout">
               {offers.map((offer, index) => {
-                const offerStatusLabel = getOfferStatusLabel(offer.status);
+                // An accepted offer stays `accepted` after payment; the paid
+                // state lives on the linked order. Surface it as "Ödendi" so a
+                // sold offer is not visually indistinguishable from a merely
+                // accepted (still-payable) one.
+                const offerOrderPaid =
+                  offer.status === 'accepted' &&
+                  ['paid', 'preparing', 'shipped', 'delivered', 'completed'].includes(
+                    offer.orderStatus ?? '',
+                  );
+                const offerStatusLabel = offerOrderPaid
+                  ? (locale === 'en' ? 'Paid' : 'Ödendi')
+                  : getOfferStatusLabel(offer.status);
                 const listingEffectivePrice = getProductEffectivePrice(offer.product);
                 const discount = calculateDiscount(offer.amount, listingEffectivePrice);
                 const timeRemaining = offer.status === 'pending' ? getTimeRemaining(offer.expiresAt) : null;

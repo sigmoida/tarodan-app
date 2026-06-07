@@ -879,7 +879,13 @@ export class PaymentService {
       return this.processSuccessfulTradeCashPayment(payment, transactionId);
     }
 
-    let cancelledOrders: { buyerId: string; productId: string; productTitle: string }[] = [];
+    let cancelledOrders: {
+      buyerId: string;
+      productId: string;
+      productTitle: string;
+      offerId: string | null;
+      hadPayment: boolean;
+    }[] = [];
     let cancelledOffers: { buyerId: string; productId: string; productTitle: string }[] = [];
     let stockoutCategoryId: string | null = null;
 
@@ -1096,6 +1102,8 @@ export class PaymentService {
               buyerId: o.buyerId,
               productId: o.productId,
               productTitle: o.productTitle,
+              offerId: o.offerId,
+              hadPayment: o.hadPayment,
             })),
           );
           cancelledOffers.push(
@@ -1191,19 +1199,30 @@ export class PaymentService {
     }
 
     // Stockout cascade notifications: dispatch AFTER tx commits so failures
-    // here don't roll back the payment. Order-cancel notifications take
-    // precedence — if a buyer had both a pending order and a separate offer
-    // cancelled, only send the order notification.
-    const orderBuyerIds = new Set(cancelledOrders.map((o) => o.buyerId));
+    // here don't roll back the payment. One notification per buyer.
+    //
+    // An accepted-but-unpaid offer creates a pending_payment Order with no
+    // Payment row and no stock reservation (offer.service.ts acceptOffer). When
+    // stock runs out that Order is cancelled — but since the buyer never paid,
+    // it is really a cancelled OFFER, so we send "Teklifiniz iptal edildi"
+    // rather than the misleading "Siparişiniz iptal edildi". Direct-buy orders
+    // (no offer) and orders whose payment was already initiated keep the
+    // order-cancelled message.
+    const notifiedBuyers = new Set<string>();
     for (const o of cancelledOrders) {
-      await this.notificationService
-        .notifyOrderCancelledOutOfStock(o.buyerId, o.productId, o.productTitle, stockoutCategoryId)
-        .catch((err) =>
-          this.logger.warn(`stockout-notify (order) failed for ${o.buyerId}: ${err.message}`),
-        );
+      if (notifiedBuyers.has(o.buyerId)) continue;
+      notifiedBuyers.add(o.buyerId);
+      const isUnpaidOffer = o.offerId !== null && !o.hadPayment;
+      const notify = isUnpaidOffer
+        ? this.notificationService.notifyOfferCancelledOutOfStock(o.buyerId, o.productId, o.productTitle, stockoutCategoryId)
+        : this.notificationService.notifyOrderCancelledOutOfStock(o.buyerId, o.productId, o.productTitle, stockoutCategoryId);
+      await notify.catch((err) =>
+        this.logger.warn(`stockout-notify (${isUnpaidOffer ? 'offer' : 'order'}) failed for ${o.buyerId}: ${err.message}`),
+      );
     }
     for (const o of cancelledOffers) {
-      if (orderBuyerIds.has(o.buyerId)) continue;
+      if (notifiedBuyers.has(o.buyerId)) continue;
+      notifiedBuyers.add(o.buyerId);
       await this.notificationService
         .notifyOfferCancelledOutOfStock(o.buyerId, o.productId, o.productTitle, stockoutCategoryId)
         .catch((err) =>

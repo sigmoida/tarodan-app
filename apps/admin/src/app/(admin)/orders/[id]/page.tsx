@@ -15,6 +15,7 @@ import {
 } from '@heroicons/react/24/outline';
 import { adminApi } from '@/lib/api';
 import { getProductEffectivePrice } from '@/lib/productPrice';
+import { cancelReasonLabel, orderOriginLabel } from '@/lib/utils';
 import toast from 'react-hot-toast';
 import { Button, Input, Select, Spinner, Textarea } from '@tarodan/ui';
 import { AdminFinancialSummary } from '@/components/AdminFinancialSummary';
@@ -75,6 +76,8 @@ interface OrderDetail {
   };
   createdAt: string;
   updatedAt: string;
+  cancelReason?: string | null;
+  offerId?: string | null;
   // 48h pencere (Faz 1.2)
   deliveredAt?: string | null;
   confirmationDeadline?: string | null;
@@ -368,6 +371,19 @@ export default function OrderDetailPage() {
               </span>
             </div>
           </div>
+
+          {/* İptal nedeni + köken (#4): stok bitti / teklif iptali gibi */}
+          {order.status === 'cancelled' && (cancelReasonLabel(order.cancelReason) || order.offerId) && (
+            <div className="mb-6 rounded-lg border border-danger-200 bg-danger-50 px-4 py-3">
+              <p className="text-sm font-medium text-danger-700">
+                İptal nedeni: {cancelReasonLabel(order.cancelReason) ?? 'Belirtilmemiş'}
+              </p>
+              <p className="text-xs text-danger-600 mt-0.5">
+                Köken: {orderOriginLabel(order.offerId)}
+                {order.cancelReason ? ` · "${order.cancelReason}"` : ''}
+              </p>
+            </div>
+          )}
 
           {/* 48h pencere kartı (Faz 4A.5) */}
           {(order.status === 'awaiting_buyer_confirmation' || order.buyerConfirmedAt) && (

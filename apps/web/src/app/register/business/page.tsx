@@ -477,8 +477,8 @@ export default function BusinessRegisterPage() {
                 <label className="block text-sm font-medium text-body mb-2">
                   {t("auth.phone")} <span className="text-danger-500">*</span>
                 </label>
-                <div className="relative flex">
-                  <span className="inline-flex items-center bg-surface-alt border-r-0 rounded-l-xl text-muted font-medium">
+                <div className="flex min-w-0 overflow-hidden rounded-xl border border-border bg-surface transition-colors focus-within:border-primary-500 focus-within:ring-2 focus-within:ring-primary-200 focus-within:ring-offset-1">
+                  <span className="inline-flex flex-shrink-0 items-center px-3 bg-surface-alt text-muted font-medium">
                     +90
                   </span>
                   <Input
@@ -487,7 +487,7 @@ export default function BusinessRegisterPage() {
                     onChange={handlePhoneChange}
                     placeholder="5XX XXX XX XX"
                     maxLength={14}
-                    className="rounded-[4px] rounded-l-none flex-1 pl-3"
+                    className="flex-1 min-w-0 rounded-none border-0 bg-transparent focus:ring-0 focus:ring-offset-0"
                     required
                   />
                 </div>
