@@ -80,16 +80,20 @@ function parseMessageContent(content: string): Array<{ type: 'text' | 'image'; v
 function getThreadPreview(content: string, locale: string): string {
   if (!content) return '';
   const photoLabel = locale === 'en' ? '📷 Photo' : '📷 Fotoğraf';
-  let hadImage = /\[IMG:https?:\/\/[^\]]+\]/i.test(content);
-  let text = content.replace(/\[IMG:https?:\/\/[^\]]+\]/gi, '').trim();
-  if (/https?:\/\//i.test(text) || /amazonaws|x-amz-|%2f/i.test(text)) {
+  // [IMG:...] işaretini, içindeki URL içerik filtresi tarafından bozulmuş olsa
+  // bile (yalnız köşeli parantezler sağlam kaldıysa) yakala.
+  let hadImage = /\[IMG:/i.test(content);
+  let text = content.replace(/\[IMG:[^\]]*\]/gi, '').trim();
+  // Kalan metinde hâlâ URL / presigned-imza parçası varsa: bu da bir resim;
+  // ilgili token'ları tamamen temizle.
+  const urlLike = /(https?:\/\/|www\.|amazonaws|x-amz-|%2[fF]|\.s3\.)/i;
+  if (urlLike.test(text)) {
     hadImage = true;
-    text = text
-      .replace(/https?:\/\/\S+/gi, '')
-      .replace(/\S*%2[fF]\S*/g, '')
-      .replace(/\S*[xX]-[aA]mz-\S*/g, '')
-      .trim();
+    text = text.replace(/\S*(?:https?:\/\/|www\.|amazonaws|x-amz-|%2[fF]|\.s3\.)\S*/gi, '').trim();
   }
+  // Güvenlik ağı: temizlik sonrası hâlâ url-benzeri bir şey kaldıysa ham link
+  // sızdırmamak için metni tamamen at — sadece foto etiketi göster.
+  if (hadImage && urlLike.test(text)) text = '';
   if (hadImage) return text ? `📷 ${text}` : photoLabel;
   return text;
 }
@@ -139,6 +143,8 @@ export default function MessagesPage() {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const messagesScrollRef = useRef<HTMLDivElement>(null);
+  // Bildirim linkinden (/messages?thread=<id>) gelen thread'i bir kez otomatik açmak için.
+  const autoSelectedThreadRef = useRef<string | null>(null);
 
   const sellerId = searchParams.get('user');
   const productId = searchParams.get('listing');
@@ -226,6 +232,19 @@ export default function MessagesPage() {
       handleCreateThreadForProduct();
     }
   }, [sellerId, isAuthenticated, threadsQuery.isLoading]);
+
+  // Yeni mesaj bildirimine tıklayınca gelinen /messages?thread=<id> linkindeki
+  // sohbeti otomatik aç (bir kez; kullanıcı sonradan başka sohbet seçerse ezme).
+  useEffect(() => {
+    const threadIdParam = searchParams.get('thread');
+    if (!threadIdParam || threads.length === 0) return;
+    if (autoSelectedThreadRef.current === threadIdParam) return;
+    const found = threads.find((thr) => thr.id === threadIdParam);
+    if (found) {
+      setSelectedThread(found);
+      autoSelectedThreadRef.current = threadIdParam;
+    }
+  }, [searchParams, threads]);
 
   const handleCreateThreadForProduct = async () => {
     if (!sellerId || creatingThread) return;
