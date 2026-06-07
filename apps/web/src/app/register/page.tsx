@@ -463,11 +463,13 @@ export default function RegisterPage() {
                   placeholder="••••••••"
                   className="pl-10 pr-10 bg-surface focus:bg-surface-elevated transition-all duration-200 ease-premium"
                 />
-                <Button variant="secondary" type="button"
+                <button
+                  type="button"
                   onClick={() => setShowPassword(!showPassword)}
+                  aria-label={showPassword ? (locale === 'en' ? 'Hide password' : 'Şifreyi gizle') : (locale === 'en' ? 'Show password' : 'Şifreyi göster')}
                   className="absolute right-3.5 top-1/2 -translate-y-1/2 text-subtle hover:text-muted transition-colors duration-200">
                   {showPassword ? <EyeSlashIcon className="w-[18px] h-[18px]" /> : <EyeIcon className="w-[18px] h-[18px]" />}
-                </Button>
+                </button>
               </div>
               <p className="text-xs text-subtle mt-1">
                 {locale === 'en' ? 'Min 8 chars, uppercase, lowercase & number' : 'En az 8 karakter, büyük/küçük harf ve rakam'}

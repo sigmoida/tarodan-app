@@ -610,18 +610,18 @@ export default function BusinessRegisterPage() {
                     className="rounded-[4px] pl-12 pr-12"
                     required
                   />
-                  <Button
-                    variant="secondary"
+                  <button
                     type="button"
                     onClick={() => setShowPassword(!showPassword)}
-                    className="absolute right-4 top-1/2 -translate-y-1/2"
+                    aria-label={showPassword ? (locale === "en" ? "Hide password" : "Şifreyi gizle") : (locale === "en" ? "Show password" : "Şifreyi göster")}
+                    className="absolute right-4 top-1/2 -translate-y-1/2 text-subtle hover:text-muted transition-colors"
                   >
                     {showPassword ? (
-                      <EyeSlashIcon className="w-5 h-5 text-subtle" />
+                      <EyeSlashIcon className="w-5 h-5" />
                     ) : (
-                      <EyeIcon className="w-5 h-5 text-subtle" />
+                      <EyeIcon className="w-5 h-5" />
                     )}
-                  </Button>
+                  </button>
                 </div>
               </div>
 
