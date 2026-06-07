@@ -121,7 +121,7 @@ const NOTIFICATION_TEMPLATES: Record<NotificationType, { title: string; message:
     title: 'Yeni Teklif Aldınız',
     message: '{{productTitle}} ürününüz için {{amount}} TL teklif aldınız.',
     icon: '💵',
-    link: '/profile/listings',
+    link: '/offers?tab=received',
   },
   [NotificationType.OFFER_ACCEPTED]: {
     title: 'Teklifiniz Kabul Edildi! 🎉',

@@ -27,6 +27,7 @@ import {
 import { OrderStatus, OfferStatus, ProductStatus, CommissionRuleType, SellerType, CommissionAppliesTo, CommissionSellerType, MembershipTierType, Prisma } from '@prisma/client';
 import { getProductStatusFromQuantity } from '../product/helpers/product-status.helper';
 import { getAvailableQuantity } from '../product/helpers/product-availability.helper';
+import { generateUniqueReference } from '../../common/helpers/generate-reference';
 import { ProductLockService } from '../product/product-lock.service';
 import { EventService } from '../events';
 import { NotificationService } from '../notification/notification.service';
@@ -394,24 +395,17 @@ export class OrderService {
   }
 
   /**
-   * Generate unique order number using atomic DB sequence.
-   * Falls back to timestamp+random if the sequence doesn't exist yet.
+   * Generate a non-guessable, unique order number (e.g. "ORD-K7X9M2QF3N").
+   * Random by design so the value leaks no sequence/order-count information and
+   * cannot be enumerated. The `order_number` column's @unique constraint is the
+   * final guard against the (negligible) chance of a collision.
    */
   private async generateOrderNumber(): Promise<string> {
-    const year = new Date().getFullYear();
-    const prefix = `ORD-${year}-`;
-
-    try {
-      const result = await this.prisma.$queryRaw<{ next_val: bigint }[]>`
-        SELECT nextval('order_number_seq') AS next_val
-      `;
-      return `${prefix}${String(result[0].next_val).padStart(6, '0')}`;
-    } catch {
-      // Sequence may not exist yet; use timestamp+random as safe fallback
-      const ts = Date.now().toString(36).toUpperCase();
-      const rand = randomInt(0, 9999).toString().padStart(4, '0');
-      return `${prefix}${ts}${rand}`;
-    }
+    return generateUniqueReference(
+      'ORD',
+      async (code) =>
+        (await this.prisma.order.count({ where: { orderNumber: code } })) > 0,
+    );
   }
 
   /**
