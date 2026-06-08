@@ -733,10 +733,22 @@ export class MembershipService {
     // paralı üyeliği "free"ye düşürdüğü için premium üye takası yanlışlıkla engelleniyordu (BUG A).
     // Bu yüzden ham üyeliği okuyup tier.canTrade'i kontrol ediyoruz; past_due (ödeme bekleyen)
     // paralı üye de takas yapabilir. Sadece free / iptal / süresi dolmuş engellenir.
-    const membership = await this.prisma.userMembership.findUnique({
+    let membership = await this.prisma.userMembership.findUnique({
       where: { userId },
       include: { tier: true },
     });
+    // Kayıt (register) userMembership satırı oluşturmaz; satır yalnızca
+    // getUserMembership ilk çağrıldığında lazy oluşturulur. canCreateTrade ham satırı
+    // okuduğu için, üyelik sayfasını hiç açmamış yeni free kullanıcı yanlışlıkla
+    // engelleniyordu. Satırı (free tier) garanti edip ÖYLE kontrol et — past_due
+    // premium hâlâ takas edebilsin diye sonra yine HAM tier/status okunur (BUG A).
+    if (!membership) {
+      await this.getUserMembership(userId); // free tier satırını lazy oluşturur
+      membership = await this.prisma.userMembership.findUnique({
+        where: { userId },
+        include: { tier: true },
+      });
+    }
     const eligibleStatus =
       membership?.status === SubscriptionStatus.active ||
       membership?.status === SubscriptionStatus.past_due;
