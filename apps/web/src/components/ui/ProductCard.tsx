@@ -121,7 +121,7 @@ export default function ProductCard({
             />
             {isOutOfStock && (
               <div className="absolute inset-0 flex items-center justify-center">
-                <span className="bg-black/70 text-white text-[11px] font-extrabold tracking-wide px-2.5 py-1 rounded">
+                <span className="bg-heading/70 text-inverted text-[11px] font-extrabold tracking-wide px-2.5 py-1 rounded">
                   {outOfStockLabel}
                 </span>
               </div>
@@ -197,7 +197,7 @@ export default function ProductCard({
           />
           {isOutOfStock && (
             <div className="absolute inset-0 flex items-center justify-center">
-              <span className="bg-black/70 text-white text-xs font-extrabold tracking-wide px-3 py-1.5 rounded">
+              <span className="bg-heading/70 text-inverted text-xs font-extrabold tracking-wide px-3 py-1.5 rounded">
                 {outOfStockLabel}
               </span>
             </div>
