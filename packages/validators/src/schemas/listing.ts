@@ -46,13 +46,12 @@ export type HwAttributeGroupSlug = (typeof HW_ATTRIBUTE_GROUP_SLUGS)[number];
  */
 export const hwAttributesSchema = z
   .object(
-    HW_ATTRIBUTE_GROUP_SLUGS.reduce<Record<string, z.ZodType<string[]>>>(
-      (acc, slug) => {
-        acc[slug] = z.array(z.string().min(1)).default([]);
-        return acc;
-      },
-      {},
-    ),
+    HW_ATTRIBUTE_GROUP_SLUGS.reduce<
+      Record<string, z.ZodDefault<z.ZodArray<z.ZodString>>>
+    >((acc, slug) => {
+      acc[slug] = z.array(z.string().min(1)).default([]);
+      return acc;
+    }, {}),
   )
   .partial();
 export type HwAttributes = z.infer<typeof hwAttributesSchema>;

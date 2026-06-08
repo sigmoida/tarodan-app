@@ -1,5 +1,5 @@
 import { View, ScrollView, StyleSheet, TouchableOpacity, Image } from 'react-native';
-import { theme, Button, Switch, Snackbar, IconButton, Text, Input, Textarea } from '@tarodan/ui-native';
+import { theme, Button, Switch, Snackbar, IconButton, Text, Input, Textarea, ScreenHeader } from '@tarodan/ui-native';
 import { useState } from 'react';
 import { router } from 'expo-router';
 import { useForm, Controller } from 'react-hook-form';
@@ -109,13 +109,7 @@ export default function NewCollectionScreen() {
     const upgradeInfo = getUpgradeMessage('collectionFeature');
     return (
       <View style={styles.container}>
-        <View style={styles.header}>
-          <TouchableOpacity onPress={() => router.back()}>
-            <Ionicons name="arrow-back" size={24} color={colors.white} />
-          </TouchableOpacity>
-          <Text style={styles.headerTitle}>Dijital Garaj</Text>
-          <View style={{ width: 24 }} />
-        </View>
+        <ScreenHeader title="Dijital Garaj" onBack={() => router.back()} />
 
         <View style={styles.premiumRequired}>
           <MaterialCommunityIcons name="garage" size={80} color={colors.primary[600]!} />
@@ -162,14 +156,7 @@ export default function NewCollectionScreen() {
 
   return (
     <View style={styles.container}>
-      {/* Header */}
-      <View style={styles.header}>
-        <TouchableOpacity onPress={() => router.back()}>
-          <Ionicons name="arrow-back" size={24} color={colors.white} />
-        </TouchableOpacity>
-        <Text style={styles.headerTitle}>Yeni Koleksiyon</Text>
-        <View style={{ width: 24 }} />
-      </View>
+      <ScreenHeader title="Yeni Koleksiyon" onBack={() => router.back()} />
 
       <ScrollView style={styles.content}>
         {/* Cover Image */}
@@ -334,20 +321,6 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
     padding: 32,
-  },
-  header: {
-    backgroundColor: colors.primary[600]!,
-    paddingTop: 50,
-    paddingBottom: 16,
-    paddingHorizontal: 20,
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-  },
-  headerTitle: {
-    fontSize: 18,
-    fontWeight: 'bold',
-    color: colors.white,
   },
   subtitle: {
     textAlign: 'center',

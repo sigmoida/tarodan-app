@@ -29,7 +29,8 @@ import {
 } from '@heroicons/react/24/solid';
 import toast from 'react-hot-toast';
 import { api, listingsApi, ratingsApi } from '@/lib/api';
-import { getProductEffectivePrice } from '@/lib/productPrice';
+import { getProductEffectivePrice, isProductOutOfStock } from '@/lib/productPrice';
+import { OutOfStockOverlay } from '@/components/ui';
 import { useAuthStore } from '@/stores/authStore';
 import dynamic from 'next/dynamic';
 import { withChunkErrorLogging } from '@/lib/dynamicWithLogging';
@@ -96,6 +97,8 @@ interface Product {
   price: number;
   images: Array<{ url: string }>;
   condition: string;
+  status?: string | null;
+  availableQuantity?: number | null;
   isTradeEnabled?: boolean;
   viewCount?: number;
   likeCount?: number;
@@ -161,7 +164,9 @@ export default function SellerProfilePage() {
   const productsQuery = useQuery({
     queryKey: ['seller-products', sellerId],
     queryFn: async (): Promise<Product[]> => {
-      const response = await listingsApi.getAll({ sellerId, status: 'active', limit: 50 });
+      // status göndermiyoruz → satıcının kataloğu stoğu bitenleri (tükendi/satıldı) de
+      // içerir; build-product-where stok-içi olanları öne sıralar.
+      const response = await listingsApi.getAll({ sellerId, limit: 50 });
       return response.data?.data || response.data?.products || [];
     },
     enabled: !!sellerId,
@@ -509,10 +514,11 @@ export default function SellerProfilePage() {
                             src={getImageUrl(product.images)}
                             alt={product.title}
                             fill
-                            className="object-cover group-hover:scale-105 transition-transform duration-500"
+                            className={`object-cover group-hover:scale-105 transition-transform duration-500${isProductOutOfStock(product) ? ' opacity-50' : ''}`}
                             fallbackSrc="https://placehold.co/400x400/f8fafc/94a3b8?text=Ürün"
                             logContext={{ productId: product.id, page: 'seller-products' }}
                           />
+                          {isProductOutOfStock(product) && <OutOfStockOverlay />}
                           {product.isTradeEnabled && (
                             <div className="absolute top-2 left-2 bg-success-500 text-inverted text-xs px-2.5 py-1 rounded-lg flex items-center gap-1 shadow-sm">
                               <ArrowsRightLeftIcon className="w-3.5 h-3.5" />

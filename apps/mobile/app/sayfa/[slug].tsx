@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { View, ScrollView, StyleSheet, TouchableOpacity } from 'react-native';
-import { theme, Spinner, Text } from '@tarodan/ui-native';
+import { theme, Spinner, Text, ScreenHeader } from '@tarodan/ui-native';
 import { router, useLocalSearchParams } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { pagesApi } from '../../src/services/api';
@@ -59,13 +59,7 @@ export default function DynamicCMSPage() {
   if (loading) {
     return (
       <View style={styles.container}>
-        <View style={styles.header}>
-          <TouchableOpacity onPress={() => router.back()}>
-            <Ionicons name="arrow-back" size={24} color={colors.white} />
-          </TouchableOpacity>
-          <Text style={styles.headerTitle}>Yükleniyor...</Text>
-          <View style={{ width: 24 }} />
-        </View>
+        <ScreenHeader title="Yükleniyor..." onBack={() => router.back()} />
         <View style={styles.loadingContainer}>
           <Spinner size="lg" />
           <Text style={styles.loadingText}>Sayfa yükleniyor...</Text>
@@ -77,13 +71,7 @@ export default function DynamicCMSPage() {
   if (error) {
     return (
       <View style={styles.container}>
-        <View style={styles.header}>
-          <TouchableOpacity onPress={() => router.back()}>
-            <Ionicons name="arrow-back" size={24} color={colors.white} />
-          </TouchableOpacity>
-          <Text style={styles.headerTitle}>Hata</Text>
-          <View style={{ width: 24 }} />
-        </View>
+        <ScreenHeader title="Hata" onBack={() => router.back()} />
         <View style={styles.errorContainer}>
           <Ionicons name="alert-circle-outline" size={56} color={colors.danger[600]!} />
           <Text style={styles.errorTitle}>{error}</Text>
@@ -111,15 +99,7 @@ export default function DynamicCMSPage() {
 
   return (
     <View style={styles.container}>
-      <View style={styles.header}>
-        <TouchableOpacity onPress={() => router.back()}>
-          <Ionicons name="arrow-back" size={24} color={colors.white} />
-        </TouchableOpacity>
-        <Text style={styles.headerTitle} numberOfLines={1}>
-          {page?.title || 'Sayfa'}
-        </Text>
-        <View style={{ width: 24 }} />
-      </View>
+      <ScreenHeader title={page?.title || 'Sayfa'} onBack={() => router.back()} />
 
       <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
         {page?.updatedAt && (
@@ -141,23 +121,6 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: colors.surface.DEFAULT,
-  },
-  header: {
-    backgroundColor: colors.primary[600]!,
-    paddingTop: 50,
-    paddingBottom: 16,
-    paddingHorizontal: 20,
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-  },
-  headerTitle: {
-    fontSize: 18,
-    fontWeight: 'bold',
-    color: colors.white,
-    flex: 1,
-    textAlign: 'center',
-    marginHorizontal: 8,
   },
   content: {
     flex: 1,

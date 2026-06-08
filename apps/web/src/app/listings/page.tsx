@@ -18,7 +18,8 @@ import {
 } from '@heroicons/react/24/outline';
 import { StarIcon as StarIconSolid } from '@heroicons/react/24/solid';
 import { listingsApi, categoriesApi } from '@/lib/api';
-import { getProductEffectivePrice, isProductOnSaleDisplay, getProductOriginalPriceForDisplay } from '@/lib/productPrice';
+import { getProductEffectivePrice, isProductOnSaleDisplay, getProductOriginalPriceForDisplay, isProductOutOfStock } from '@/lib/productPrice';
+import { OutOfStockOverlay } from '@/components/ui';
 import { useTranslation } from '@/i18n';
 import { formatCondition } from '@/lib/format';
 import SidebarFilters from '@/components/SidebarFilters';
@@ -36,6 +37,8 @@ interface Listing {
   discountPercent?: number | null;
   isOnSale?: boolean;
   isBoosted?: boolean;
+  status?: string | null;
+  availableQuantity?: number | null;
   images: Array<{ id?: string; url?: string; cardUrl?: string; detailUrl?: string; sortOrder?: number }> | string[];
   brand?: {
     id: string;
@@ -589,11 +592,12 @@ export default function ListingsPage() {
                             src={getImageUrl(listing.images?.[0], index, listing.title)}
                             alt={listing.title}
                             fill
-                            className="object-cover"
+                            className={`object-cover${isProductOutOfStock(listing) ? ' opacity-50' : ''}`}
                             fallbackSrc={LISTING_PLACEHOLDERS[index % LISTING_PLACEHOLDERS.length]}
                             logContext={{ listingId: listing.id, page: 'listings' }}
                             priority={index === 0}
                           />
+                          {isProductOutOfStock(listing) && <OutOfStockOverlay />}
                           {(listing.trade_available || listing.isTradeEnabled) && (
                             <div className="absolute top-1 right-1 bg-success-500 text-inverted p-0.5 rounded">
                               <ArrowsRightLeftIcon className="w-2.5 h-2.5" />
@@ -639,11 +643,12 @@ export default function ListingsPage() {
                             src={getImageUrl(listing.images?.[0], index, listing.title)}
                             alt={listing.title}
                             fill
-                            className="object-cover group-hover:scale-[1.03] transition-transform duration-300"
+                            className={`object-cover group-hover:scale-[1.03] transition-transform duration-300${isProductOutOfStock(listing) ? ' opacity-50' : ''}`}
                             fallbackSrc={LISTING_PLACEHOLDERS[index % LISTING_PLACEHOLDERS.length]}
                             logContext={{ listingId: listing.id, page: 'listings' }}
                             priority={index < 4}
                           />
+                          {isProductOutOfStock(listing) && <OutOfStockOverlay />}
                           <div className="absolute top-1.5 left-1.5 flex flex-col items-start gap-1">
                             {listing.isBoosted && (
                               <div className="bg-amber-500 text-inverted text-[10px] font-bold px-1.5 py-0.5 rounded">

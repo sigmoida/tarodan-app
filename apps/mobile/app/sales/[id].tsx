@@ -13,7 +13,8 @@ import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 import { router, useLocalSearchParams } from 'expo-router';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { ordersApi } from '../../src/services/api';
-import { ScreenHeader } from '../../src/components/common';
+import { ScreenHeader, ThemedRefreshControl } from '../../src/components/common';
+import { useRefresh } from '../../src/hooks/useRefresh';
 import { formatPrice, formatOrderStatus, formatRelativeDate } from '../../src/utils/format';
 import { transformImageUrl } from '../../src/utils/imageUrl';
 
@@ -91,6 +92,8 @@ export default function SaleDetailScreen() {
     enabled: !!id,
   });
 
+  const { refreshing, onRefresh } = useRefresh(refetch);
+
   /**
    * Backend ödeme başarısı sonrasında siparişe Sürat Kargo gönderisini OTOMATIK
    * yaratır (payment.service.ts → auto-create shipment, provider='surat',
@@ -149,7 +152,10 @@ export default function SaleDetailScreen() {
     <SafeAreaView style={styles.container} edges={['top']}>
       <ScreenHeader title={`Sipariş ${order.orderNumber ? '#' + order.orderNumber : ''}`.trim()} />
 
-      <ScrollView contentContainerStyle={styles.scrollBody}>
+      <ScrollView
+        contentContainerStyle={styles.scrollBody}
+        refreshControl={<ThemedRefreshControl refreshing={refreshing} onRefresh={onRefresh} />}
+      >
         {/* Status */}
         <View style={[styles.statusBanner, { backgroundColor: sc.bg }]}>
           <Ionicons name="information-circle" size={20} color={sc.fg} />

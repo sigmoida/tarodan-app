@@ -8,6 +8,14 @@ export interface ProductFilterParams {
   search?: string;
   categoryId?: string;
   sellerId?: string;
+  /**
+   * Explicit status filter.
+   * - Verilirse: tam o statüye eşitlenir (örn. 'active' → yalnızca aktif + stoklu).
+   *   Öne çıkan/boosted/discount/trade carousel'leri `status=active` gönderdiği için
+   *   bu yolla stok-içi kalır.
+   * - Verilmezse: kapsayıcı küme uygulanır (aktif + tükenen + satıldı) — genel gözatma.
+   */
+  status?: ProductStatus;
   brandId?: string;
   condition?: string;
   brand?: string;
@@ -60,24 +68,41 @@ export function buildProductWhere(
   options: BuildWhereOptions = {},
 ): Prisma.ProductWhereInput {
   const {
-    search, categoryId, sellerId, brandId, condition,
+    search, categoryId, sellerId, status, brandId, condition,
     brand, scale, material, manufacturer, manufacturerId,
     carModelId, tradeOnly, boostedOnly, preOrder, limited,
     set: setFilter, minPrice, maxPrice, attributeSlugs, attrGroups,
   } = params;
 
-  const andConditions: Prisma.ProductWhereInput[] = [
-    { OR: [{ quantity: { gt: 0 } }, { quantity: null }] },
-  ];
+  const andConditions: Prisma.ProductWhereInput[] = [];
 
   const where: Prisma.ProductWhereInput = {
-    status: ProductStatus.active,
     // Sanal ürünler (membership-* / boost-* sipariş kalemleri) listelemelerden hariç
     NOT: [
       { id: { startsWith: 'membership-' } },
       { id: { startsWith: 'boost-' } },
     ],
   };
+
+  // ── Görünürlük (status / stok) ──
+  if (status) {
+    // Açık statü istendi: tam eşitle. 'active' için stok-içi semantiğini koru
+    // (qty > 0 veya null = sınırsız). Bu yol öne çıkan/promosyon carousel'leri için.
+    where.status = status;
+    if (status === ProductStatus.active) {
+      andConditions.push({ OR: [{ quantity: { gt: 0 } }, { quantity: null }] });
+    }
+  } else {
+    // Statü verilmedi (genel gözatma): aktif (stoklu) + otomatik tükenen + satıldı.
+    // Elle pasife alınan (inactive + quantity > 0), draft/pending/reserved/rejected gizli kalır.
+    andConditions.push({
+      OR: [
+        { status: ProductStatus.active },
+        { AND: [{ status: ProductStatus.inactive }, { quantity: 0 }] },
+        { status: ProductStatus.sold },
+      ],
+    });
+  }
 
   // ── Full-text search results (pre-filtered via tsvector/tsquery) ──
   if (options.fulltextIds && options.fulltextIds.length > 0) {

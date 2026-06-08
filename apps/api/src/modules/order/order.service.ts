@@ -1754,6 +1754,30 @@ export class OrderService {
   }
 
   /**
+   * Satıcı kazanç özeti — aktif filtreden ve sayfalamadan BAĞIMSIZ sunucu toplamı.
+   * Mobil "Kazanç Özeti" kartı bunu kullanır (önceden 20'lik sayfa + statü filtresinden
+   * türetiliyordu → filtreye basınca rakam değişiyordu).
+   *   totalEarnings   = teslim edilen + tamamlanan siparişlerin toplam tutarı
+   *   pendingEarnings = ödendi + hazırlanıyor + kargoda siparişlerin toplam tutarı
+   */
+  async getSellerEarnings(sellerId: string): Promise<{ totalEarnings: number; pendingEarnings: number }> {
+    const [realized, pending] = await Promise.all([
+      this.prisma.order.aggregate({
+        where: { sellerId, status: { in: [OrderStatus.delivered, OrderStatus.completed] } },
+        _sum: { totalAmount: true },
+      }),
+      this.prisma.order.aggregate({
+        where: { sellerId, status: { in: [OrderStatus.paid, OrderStatus.preparing, OrderStatus.shipped] } },
+        _sum: { totalAmount: true },
+      }),
+    ]);
+    return {
+      totalEarnings: Number(realized._sum.totalAmount ?? 0),
+      pendingEarnings: Number(pending._sum.totalAmount ?? 0),
+    };
+  }
+
+  /**
    * Get orders for current user
    */
   async findUserOrders(userId: string, query: OrderQueryDto) {
@@ -2507,7 +2531,16 @@ export class OrderService {
       title: order.product.title,
       imageUrl: resolvedImageUrl,
       status: order.product.status,
+      price: order.product.price != null ? Number(order.product.price) : undefined,
+      condition: order.product.condition,
     } : null;
+
+    // Tracking URL: Sürat gönderilerinde takip numarasından türetilir
+    const trackingNumber = order.shipment?.trackingNumber ?? null;
+    const trackingUrl =
+      trackingNumber && order.shipment?.provider === 'surat'
+        ? `https://www.suratkargo.com.tr/KargoTakip/?kargotakipno=${encodeURIComponent(trackingNumber)}`
+        : null;
 
     const totalAmount = Number(order.totalAmount ?? 0);
     const shippingCost = Number(order.shippingCost ?? 0);
@@ -2558,10 +2591,14 @@ export class OrderService {
         ? {
             id: (order.shippingAddress as any).id || order.shippingAddressId || '',
             title: (order.shippingAddress as any).title || '',
+            fullName: (order.shippingAddress as any).fullName || '',
+            phone: (order.shippingAddress as any).phone || '',
+            address: (order.shippingAddress as any).address || (order.shippingAddress as any).addressLine1 || '',
             addressLine1: (order.shippingAddress as any).address || (order.shippingAddress as any).addressLine1 || '',
             addressLine2: (order.shippingAddress as any).addressLine2 || '',
             district: (order.shippingAddress as any).district || '',
             city: (order.shippingAddress as any).city || '',
+            zipCode: (order.shippingAddress as any).zipCode || (order.shippingAddress as any).postalCode || '',
             postalCode: (order.shippingAddress as any).zipCode || (order.shippingAddress as any).postalCode || '',
           }
         : null,
@@ -2571,10 +2608,22 @@ export class OrderService {
             id: order.shipment.id,
             provider: order.shipment.provider,
             trackingNumber: order.shipment.trackingNumber,
+            trackingUrl,
             status: order.shipment.status,
             cost: order.shipment.cost ? Number(order.shipment.cost) : null,
+            shippedAt: order.shipment.shippedAt ?? null,
+            deliveredAt: order.shipment.deliveredAt ?? null,
           }
         : null,
+      // Mobil sipariş detayı bu alanları üst seviyede okur (kargo kartı + zaman çizelgesi)
+      trackingNumber,
+      trackingUrl,
+      paidAt: order.payment?.paidAt ?? null,
+      shippedAt: order.shipment?.shippedAt ?? null,
+      deliveredAt: order.deliveredAt ?? order.shipment?.deliveredAt ?? null,
+      completedAt: order.completedAt ?? null,
+      confirmationDeadline: order.confirmationDeadline ?? null,
+      buyerConfirmedAt: order.buyerConfirmedAt ?? null,
       isBuyer: order.buyerId === userId,
       isSeller: order.sellerId === userId,
       ...(await this.getOrderRatingFlags(order, userId)),

@@ -536,6 +536,9 @@ export default function CheckoutScreen() {
           return;
         }
 
+        // Token burada üretildi; ekran tekrar initiate etmesin diye URL'i geçiyoruz
+        // (PayTR token'ları tek kullanımlık — çift initiate ilk token'ı çöpe atardı).
+        const paymentUrl: string | undefined = initData.paymentUrl;
         clearCart();
         router.replace({
           pathname: '/payment/[id]',
@@ -544,6 +547,7 @@ export default function CheckoutScreen() {
             orderId: firstOrderId,
             provider: paymentProvider,
             guest: isAuthenticated ? '0' : '1',
+            ...(paymentUrl ? { paymentUrl } : {}),
           },
         } as any);
       } catch (payErr: any) {
@@ -698,8 +702,11 @@ export default function CheckoutScreen() {
             <CityDistrictSelector
               city={inline.city}
               district={inline.district}
-              onChangeCity={(city) => setInline({ ...inline, city })}
-              onChangeDistrict={(district) => setInline({ ...inline, district })}
+              // Fonksiyonel güncelleme şart: il seçilince CityDistrictSelector
+              // aynı anda hem onChangeCity hem onChangeDistrict('') çağırır;
+              // stale obje ile yazılırsa ikinci çağrı şehri ezer (il seçilemiyor).
+              onChangeCity={(city) => setInline((prev) => ({ ...prev, city }))}
+              onChangeDistrict={(district) => setInline((prev) => ({ ...prev, district }))}
             />
             <Input
               label="Açık Adres *"
@@ -1072,7 +1079,9 @@ export default function CheckoutScreen() {
             variant="primary"
             title="Devam Et"
             onPress={handleNextStep}
-            style={styles.actionButton}
+            icon="arrow-forward"
+            iconPosition="right"
+            style={[styles.actionButton, styles.continueButton]}
           />
         ) : (
           <Button
@@ -1081,6 +1090,7 @@ export default function CheckoutScreen() {
             onPress={handleCheckout}
             isLoading={loading}
             disabled={loading}
+            fullWidth
             style={styles.actionButton}
             icon="card-outline"
           />
@@ -1237,6 +1247,7 @@ const styles = StyleSheet.create({
   savedAddressRow: {
     flexDirection: 'row',
     alignItems: 'flex-start',
+    gap: 12,
     backgroundColor: colors.surface.alt,
     borderRadius: 12,
     padding: 12,
@@ -1409,6 +1420,10 @@ const styles = StyleSheet.create({
   },
   actionButton: {
     borderRadius: 12,
+  },
+  continueButton: {
+    alignSelf: 'flex-end',
+    paddingHorizontal: 32,
   },
   emptyContainer: {
     flex: 1,

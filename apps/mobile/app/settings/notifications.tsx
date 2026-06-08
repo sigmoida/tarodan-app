@@ -6,6 +6,7 @@ import {
   Divider,
   Spinner,
   Text,
+  ScreenHeader,
   theme,
 } from '@tarodan/ui-native';
 import { useState, useCallback, useEffect } from 'react';
@@ -13,6 +14,8 @@ import { router, useFocusEffect } from 'expo-router';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { Ionicons } from '@expo/vector-icons';
 import { api } from '../../src/services/api';
+import { ThemedRefreshControl } from '../../src/components/common';
+import { useRefresh } from '../../src/hooks/useRefresh';
 import { useAuthStore } from '../../src/stores/authStore';
 import { useTranslation } from '../../src/i18n';
 
@@ -69,6 +72,8 @@ export default function NotificationSettingsScreen() {
     enabled: isAuthenticated,
   });
 
+  const { refreshing, onRefresh } = useRefresh(refetch);
+
   useEffect(() => {
     if (settingsData) {
       setSettings(settingsData);
@@ -121,18 +126,17 @@ export default function NotificationSettingsScreen() {
 
   return (
     <View style={styles.container}>
-      {/* Header */}
-      <View style={styles.header}>
-        <TouchableOpacity onPress={() => router.back()}>
-          <Ionicons name="arrow-back" size={24} color={colors.white} />
-        </TouchableOpacity>
-        <Text style={styles.headerTitle}>{t('mobile.settingsNotifications')}</Text>
-        <TouchableOpacity onPress={handleSave} disabled={saveMutation.isPending}>
-          <Text style={styles.saveButton}>
-            {saveMutation.isPending ? 'Kaydediliyor...' : 'Kaydet'}
-          </Text>
-        </TouchableOpacity>
-      </View>
+      <ScreenHeader
+        title={t('mobile.settingsNotifications')}
+        onBack={() => router.back()}
+        right={
+          <TouchableOpacity onPress={handleSave} disabled={saveMutation.isPending}>
+            <Text style={styles.saveButton}>
+              {saveMutation.isPending ? 'Kaydediliyor...' : 'Kaydet'}
+            </Text>
+          </TouchableOpacity>
+        }
+      />
 
       {/* Content */}
       {isLoading ? (
@@ -140,7 +144,10 @@ export default function NotificationSettingsScreen() {
           <Spinner size="lg" />
         </View>
       ) : (
-        <ScrollView style={styles.content}>
+        <ScrollView
+          style={styles.content}
+          refreshControl={<ThemedRefreshControl refreshing={refreshing} onRefresh={onRefresh} />}
+        >
           {/* Push Notifications */}
           <Card style={styles.card}>
             <View style={styles.sectionHeader}>
@@ -310,20 +317,6 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     padding: 32,
     backgroundColor: colors.surface.DEFAULT,
-  },
-  header: {
-    backgroundColor: colors.primary[600]!,
-    paddingTop: 50,
-    paddingBottom: 16,
-    paddingHorizontal: 20,
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-  },
-  headerTitle: {
-    fontSize: 18,
-    fontWeight: 'bold',
-    color: colors.white,
   },
   saveButton: {
     color: colors.white,

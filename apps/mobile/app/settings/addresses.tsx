@@ -1,4 +1,4 @@
-import { View, ScrollView, StyleSheet, TouchableOpacity, Pressable, Alert } from 'react-native';
+import { View, ScrollView, StyleSheet, Pressable, Alert } from 'react-native';
 import {
   Card,
   Button,
@@ -8,9 +8,11 @@ import {
   Spinner,
   Input,
   Text,
+  ScreenHeader,
   theme,
 } from '@tarodan/ui-native';
-import { CityDistrictSelector } from '../../src/components/common';
+import { CityDistrictSelector, ThemedRefreshControl } from '../../src/components/common';
+import { useRefresh } from '../../src/hooks/useRefresh';
 import { useState, useCallback } from 'react';
 import { router, useFocusEffect } from 'expo-router';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
@@ -68,6 +70,8 @@ export default function AddressesScreen() {
   });
 
   const addresses: Address[] = addressesData || [];
+
+  const { refreshing, onRefresh } = useRefresh(refetch);
 
   // Refresh on focus
   useFocusEffect(
@@ -201,14 +205,11 @@ export default function AddressesScreen() {
 
   return (
     <View style={styles.container}>
-      {/* Header */}
-      <View style={styles.header}>
-        <TouchableOpacity onPress={() => router.back()}>
-          <Ionicons name="arrow-back" size={24} color={colors.white} />
-        </TouchableOpacity>
-        <Text style={styles.headerTitle}>{t('mobile.settingsAddresses')}</Text>
-        <Text style={styles.headerCount}>{addresses.length}/{maxAddresses}</Text>
-      </View>
+      <ScreenHeader
+        title={t('mobile.settingsAddresses')}
+        onBack={() => router.back()}
+        right={<Text style={styles.headerCount}>{addresses.length}/{maxAddresses}</Text>}
+      />
 
       {/* Content */}
       {isLoading ? (
@@ -225,7 +226,10 @@ export default function AddressesScreen() {
           <Button variant="primary" title="Adres Ekle" onPress={openAddDialog} />
         </View>
       ) : (
-        <ScrollView style={styles.content}>
+        <ScrollView
+          style={styles.content}
+          refreshControl={<ThemedRefreshControl refreshing={refreshing} onRefresh={onRefresh} />}
+        >
           {addresses.map((address) => (
             <Card key={address.id} style={styles.addressCard}>
               <View style={styles.cardHeader}>
@@ -328,8 +332,11 @@ export default function AddressesScreen() {
           <CityDistrictSelector
             city={formData.city}
             district={formData.district}
-            onChangeCity={(city) => setFormData({ ...formData, city })}
-            onChangeDistrict={(district) => setFormData({ ...formData, district })}
+            // Fonksiyonel güncelleme şart: il seçilince selector aynı anda
+            // onChangeCity + onChangeDistrict('') çağırır; stale obje ile
+            // yazılırsa ikinci çağrı ilk yazılan şehri ezer.
+            onChangeCity={(city) => setFormData((prev) => ({ ...prev, city }))}
+            onChangeDistrict={(district) => setFormData((prev) => ({ ...prev, district }))}
           />
           <Input
             label="Posta Kodu"
@@ -376,20 +383,6 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     padding: 32,
     backgroundColor: colors.surface.DEFAULT,
-  },
-  header: {
-    backgroundColor: colors.primary[600]!,
-    paddingTop: 50,
-    paddingBottom: 16,
-    paddingHorizontal: 20,
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-  },
-  headerTitle: {
-    fontSize: 18,
-    fontWeight: 'bold',
-    color: colors.white,
   },
   headerCount: {
     color: colors.white,

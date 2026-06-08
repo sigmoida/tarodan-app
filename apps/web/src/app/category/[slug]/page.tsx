@@ -14,7 +14,8 @@ import {
   Squares2X2Icon,
   ListBulletIcon,
 } from '@heroicons/react/24/outline';
-import { getProductEffectivePrice } from '@/lib/productPrice';
+import { getProductEffectivePrice, isProductOutOfStock } from '@/lib/productPrice';
+import { OutOfStockOverlay } from '@/components/ui';
 import { Button, Checkbox, Input, Select, Spinner } from '@tarodan/ui';
 
 interface Product {
@@ -27,6 +28,7 @@ interface Product {
   images: string[];
   condition: string;
   status: string;
+  availableQuantity?: number | null;
   isTradeEnabled: boolean;
   seller: {
     id: string;
@@ -296,10 +298,11 @@ export default function CategoryPage() {
                         src={product.images?.[0] || 'https://placehold.co/400x400/1a1a2e/666?text=No+Image'}
                         alt={product.title}
                         fill
-                        className="object-cover group-hover:scale-105 transition-transform"
+                        className={`object-cover group-hover:scale-105 transition-transform${isProductOutOfStock(product) ? ' opacity-50' : ''}`}
                         fallbackSrc="https://placehold.co/400x400/1a1a2e/666?text=No+Image"
                         logContext={{ productId: product.id, page: 'category-grid' }}
                       />
+                      {isProductOutOfStock(product) && <OutOfStockOverlay />}
                       {product.isTradeEnabled && (
                         <span className="absolute top-2 left-2 bg-primary-600 text-inverted text-xs font-bold px-2 py-1 rounded flex items-center gap-1">
                           <ArrowsRightLeftIcon className="h-3 w-3" />
@@ -339,10 +342,11 @@ export default function CategoryPage() {
                         src={product.images?.[0] || 'https://placehold.co/400x400/1a1a2e/666?text=No+Image'}
                         alt={product.title}
                         fill
-                        className="object-cover"
+                        className={`object-cover${isProductOutOfStock(product) ? ' opacity-50' : ''}`}
                         fallbackSrc="https://placehold.co/400x400/1a1a2e/666?text=No+Image"
                         logContext={{ productId: product.id, page: 'category-list' }}
                       />
+                      {isProductOutOfStock(product) && <OutOfStockOverlay />}
                     </div>
                     <div className="p-4 flex-1 flex flex-col justify-between">
                       <div>

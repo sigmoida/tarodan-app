@@ -1304,8 +1304,12 @@ export class PaymentService {
     const isMembershipOrder = resultOrder.productId.startsWith('membership-');
     const isBoostOrder = resultOrder.productId.startsWith('boost-');
 
-    // Boost siparişinde listelerin hemen güncellenmesi için ürün listesi cache'ini temizle
-    if (isBoostOrder) {
+    // Ürün listesi cache'ini temizle:
+    // - Boost: öne çıkarma sıralamayı etkiler.
+    // - Normal ürün siparişi: stok düşer, tükenince status=inactive olur → ürün
+    //   listelerde "stokta yok" olarak sona kayar; sıralama/görünürlük değişir.
+    // Membership siparişleri ürün listelerini etkilemez.
+    if (!isMembershipOrder) {
       await this.cache.delPattern('products:list:*').catch(() => {});
     }
 

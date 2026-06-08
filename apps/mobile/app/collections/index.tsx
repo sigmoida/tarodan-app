@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { View, ScrollView, StyleSheet, TouchableOpacity, FlatList, Image, Dimensions, RefreshControl } from 'react-native';
-import { theme, Avatar, Chip, Spinner, Text, Input } from '@tarodan/ui-native';
+import { theme, Avatar, Chip, Spinner, Text, Input, ScreenHeader } from '@tarodan/ui-native';
 import { useQuery } from '@tanstack/react-query';
 import { router } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
@@ -70,12 +70,9 @@ export default function CollectionsScreen() {
         <View style={styles.ownerRow}>
           <Avatar
             size="sm"
-            name={item.owner?.displayName || 'U'}
+            name={item.userName || 'U'}
           />
-          <Text style={styles.ownerName}>{item.owner?.displayName}</Text>
-          {item.owner?.verified && (
-            <Ionicons name="checkmark-circle" size={14} color={colors.warning[500]!} />
-          )}
+          <Text style={styles.ownerName}>{item.userName}</Text>
         </View>
       </View>
     </TouchableOpacity>
@@ -83,14 +80,7 @@ export default function CollectionsScreen() {
 
   return (
     <View style={styles.container}>
-      {/* Header */}
-      <View style={styles.header}>
-        <TouchableOpacity onPress={() => router.back()}>
-          <Ionicons name="arrow-back" size={24} color={colors.white} />
-        </TouchableOpacity>
-        <Text style={styles.headerTitle}>Koleksiyonlar</Text>
-        <View style={{ width: 24 }} />
-      </View>
+      <ScreenHeader title="Koleksiyonlar" onBack={() => router.back()} />
 
       {/* Search */}
       <View style={styles.searchSection}>
@@ -188,20 +178,6 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: colors.surface.alt,
-  },
-  header: {
-    backgroundColor: colors.primary[600]!,
-    paddingTop: 50,
-    paddingBottom: 16,
-    paddingHorizontal: 20,
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-  },
-  headerTitle: {
-    fontSize: 18,
-    fontWeight: 'bold',
-    color: colors.white,
   },
   searchSection: {
     padding: 16,

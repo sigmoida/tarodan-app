@@ -22,6 +22,8 @@ import { Ionicons } from '@expo/vector-icons';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useAuthStore } from '../../src/stores/authStore';
 import { discountsApi, productsApi } from '../../src/services/api';
+import { ThemedRefreshControl } from '../../src/components/common';
+import { useRefresh } from '../../src/hooks/useRefresh';
 import { formatPrice } from '../../src/utils/format';
 
 const { colors, spacing, radius } = theme;
@@ -125,6 +127,8 @@ export default function DiscountsScreen() {
     },
     enabled: isAuthenticated,
   });
+
+  const { refreshing, onRefresh } = useRefresh(discountsQuery.refetch, productsQuery.refetch);
 
   const filteredDiscounts = useMemo(() => {
     const list = discountsQuery.data ?? [];
@@ -323,7 +327,11 @@ export default function DiscountsScreen() {
           onAction={openCreate}
         />
       ) : (
-        <ScrollView style={styles.list} contentContainerStyle={{ padding: 16, paddingBottom: 100 }}>
+        <ScrollView
+          style={styles.list}
+          contentContainerStyle={{ padding: 16, paddingBottom: 100 }}
+          refreshControl={<ThemedRefreshControl refreshing={refreshing} onRefresh={onRefresh} />}
+        >
           {filteredDiscounts.map((d) => (
             <Card key={d.id} style={styles.discountCard}>
               <View style={styles.cardHeader}>

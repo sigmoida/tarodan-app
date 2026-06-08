@@ -1,17 +1,11 @@
 import { useState, useCallback } from 'react';
-import { Pressable, View, FlatList, RefreshControl } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { View, FlatList, RefreshControl, Pressable, StyleSheet } from 'react-native';
 import { useQuery } from '@tanstack/react-query';
 import { router } from 'expo-router';
-import { format } from 'date-fns';
-import { tr } from 'date-fns/locale';
+import { Ionicons } from '@expo/vector-icons';
 import {
   Button,
-  Card,
-  Chip,
-  type ChipVariant,
   ScreenHeader,
-  SegmentedButtons,
   Spinner,
   Text,
   VStack,
@@ -19,81 +13,70 @@ import {
 } from '@tarodan/ui-native';
 import { tradesApi } from '../../src/services/api';
 import { useAuthStore } from '../../src/stores/authStore';
+import { TradeCard, type TradeCardTrade } from '../../src/components/trade/TradeCard';
 
 const { colors, spacing } = theme;
 
-const TRADE_STATUSES: Record<string, { label: string; variant: ChipVariant }> = {
-  pending: { label: 'Bekliyor', variant: 'warning' },
-  accepted: { label: 'Kabul Edildi', variant: 'success' },
-  awaiting_payment: { label: 'Ödeme Bekleniyor', variant: 'warning' },
-  shipping_to_warehouse: { label: 'Depoya Gönderim', variant: 'info' },
-  at_warehouse: { label: 'Depoda', variant: 'primary' },
-  admin_reviewing: { label: 'İnceleniyor', variant: 'info' },
-  shipping_to_recipients: { label: 'Size Gönderiliyor', variant: 'primary' },
-  rejected: { label: 'Reddedildi', variant: 'danger' },
-  completed: { label: 'Tamamlandı', variant: 'success' },
-  cancelled: { label: 'İptal', variant: 'neutral' },
-  disputed: { label: 'İtiraz', variant: 'danger' },
-  countered: { label: 'Karşı Teklif', variant: 'info' },
-  // Legacy escrow statuses (pre-warehouse flow) kept for old trades
-  initiator_shipped: { label: 'Kargoda', variant: 'info' },
-  receiver_shipped: { label: 'Kargoda', variant: 'info' },
-  both_shipped: { label: 'Kargoda', variant: 'info' },
-  initiator_received: { label: 'Teslim', variant: 'primary' },
-  receiver_received: { label: 'Teslim', variant: 'primary' },
-};
+// "Kargoda" filtresi artık sunucu tarafında (statusGroup=shipping) yapılıyor;
+// istemci tarafı statü listesine gerek kalmadı.
+type TradesTabFilter = 'all' | 'pending' | 'shipping' | 'completed' | 'cancelled' | 'rejected';
 
-// "Kargoda" filtresi — yeni depo-escrow akışı statüleri
-const SHIPPING_STATUSES = new Set([
-  'shipping_to_warehouse',
-  'at_warehouse',
-  'admin_reviewing',
-  'shipping_to_recipients',
-]);
-
-type TradesTabFilter = 'all' | 'pending' | 'shipping' | 'completed';
-
-interface TradeItem {
-  id: string | number;
-  status: string;
-  createdAt: string;
-  cashAmount?: number | string | null;
-  deadline?: string | null;
-  responseDeadline?: string | null;
-  initiatorItems?: Array<{ productTitle?: string }>;
-  receiverItems?: Array<{ productTitle?: string }>;
-}
+// Sunucu sayaçları yalnızca ilk 4 grup için var; iptal/red sayaçsız gösterilir.
+const FILTERS: {
+  value: TradesTabFilter;
+  label: string;
+  icon: keyof typeof Ionicons.glyphMap | null;
+  countKey?: 'all' | 'pending' | 'shipping' | 'completed';
+}[] = [
+  { value: 'all', label: 'Tümü', icon: null, countKey: 'all' },
+  { value: 'pending', label: 'Bekleyen', icon: 'time-outline', countKey: 'pending' },
+  { value: 'shipping', label: 'Kargoda', icon: 'cube-outline', countKey: 'shipping' },
+  { value: 'completed', label: 'Tamamlanan', icon: 'checkmark-circle-outline', countKey: 'completed' },
+  { value: 'cancelled', label: 'İptal', icon: 'close-circle-outline' },
+  { value: 'rejected', label: 'Reddedilen', icon: 'ban-outline' },
+];
 
 export default function TradesScreen() {
-  const { isAuthenticated } = useAuthStore();
+  const { isAuthenticated, user } = useAuthStore();
   const [filter, setFilter] = useState<TradesTabFilter>('all');
   const [refreshing, setRefreshing] = useState(false);
 
   const { data: tradesPayload, isLoading, isError, refetch } = useQuery({
     queryKey: ['trades', filter],
     queryFn: async () => {
-      const params: Record<string, string> = {};
+      // pageSize:100 → liste tek sayfada (çoğu kullanıcı için tamamı). 'Kargoda' artık
+      // istemci tarafında değil, sunucuda (statusGroup) filtreleniyor → sayfaya takılmıyor.
+      const params: Record<string, string> = { pageSize: '100' };
       if (filter === 'pending') params.status = 'pending';
       if (filter === 'completed') params.status = 'completed';
+      if (filter === 'cancelled') params.status = 'cancelled';
+      if (filter === 'rejected') params.status = 'rejected';
+      if (filter === 'shipping') params.statusGroup = 'shipping';
       const res = await tradesApi.getAll(params);
-      const body = res.data as { trades?: TradeItem[]; data?: TradeItem[] } | undefined;
-      let list: TradeItem[] = body?.trades ?? body?.data ?? [];
+      const body = res.data as { trades?: TradeCardTrade[]; data?: TradeCardTrade[] } | undefined;
+      let list: TradeCardTrade[] = body?.trades ?? body?.data ?? [];
       if (!Array.isArray(list)) list = [];
-      if (filter === 'shipping') {
-        list = list.filter((t) => t?.status && SHIPPING_STATUSES.has(t.status));
-      }
       return { trades: list };
     },
     enabled: isAuthenticated,
   });
 
-  const tradesList: TradeItem[] = tradesPayload?.trades ?? [];
+  const tradesList: TradeCardTrade[] = tradesPayload?.trades ?? [];
+
+  // Segment sayaçları — filtreden/sayfalamadan bağımsız tek sunucu agregatı.
+  // tc.all = profil "Takaslar" tile'ı ile birebir.
+  const { data: countsResp, refetch: refetchCounts } = useQuery({
+    queryKey: ['trades-status-counts'],
+    queryFn: () => tradesApi.getStatusCounts(),
+    enabled: isAuthenticated,
+  });
+  const tc = countsResp?.data ?? { all: 0, pending: 0, shipping: 0, completed: 0 };
 
   const onRefresh = useCallback(async () => {
     setRefreshing(true);
-    await refetch();
+    await Promise.all([refetch(), refetchCounts()]);
     setRefreshing(false);
-  }, [refetch]);
+  }, [refetch, refetchCounts]);
 
   const handleBack = () => {
     if (router.canGoBack()) router.back();
@@ -102,8 +85,8 @@ export default function TradesScreen() {
 
   if (!isAuthenticated) {
     return (
-      <SafeAreaView style={{ flex: 1, backgroundColor: colors.surface.DEFAULT }} edges={['top']}>
-        <ScreenHeader title="Takaslarım" variant="light" onBack={handleBack} />
+      <View style={{ flex: 1, backgroundColor: colors.surface.DEFAULT }}>
+        <ScreenHeader title="Takaslarım" onBack={handleBack} />
         <View
           style={{
             flex: 1,
@@ -124,32 +107,48 @@ export default function TradesScreen() {
             onPress={() => router.push('/(auth)/login')}
           />
         </View>
-      </SafeAreaView>
+      </View>
     );
   }
 
-  const getStatusInfo = (status: string) =>
-    TRADE_STATUSES[status] || { label: status, variant: 'neutral' as ChipVariant };
-
   return (
-    <SafeAreaView style={{ flex: 1, backgroundColor: colors.surface.DEFAULT }} edges={['top']}>
-      <ScreenHeader title="Takaslarım" variant="light" onBack={handleBack} />
-      <View style={{ padding: spacing[4] }}>
-        <SegmentedButtons
-          value={filter}
-          onValueChange={(v) => setFilter(v as TradesTabFilter)}
-          options={[
-            { value: 'all', label: 'Tümü' },
-            { value: 'pending', label: 'Bekleyen' },
-            { value: 'shipping', label: 'Kargoda' },
-            { value: 'completed', label: 'Tamamlanan' },
-          ]}
-          density="small"
-        />
+    <View style={{ flex: 1, backgroundColor: colors.surface.DEFAULT }}>
+      <ScreenHeader title="Takaslarım" onBack={handleBack} />
+
+      {/* Status filters — web gibi sarmalanan (wrap) çip satırı */}
+      <View style={styles.filterRow}>
+        {FILTERS.map((f) => {
+          const active = filter === f.value;
+          const count = f.countKey ? (tc as Record<string, number>)[f.countKey] : undefined;
+          return (
+            <Pressable
+              key={f.value}
+              onPress={() => setFilter(f.value)}
+              style={[styles.filterPill, active && styles.filterPillActive]}
+            >
+              {f.icon ? (
+                <Ionicons
+                  name={f.icon}
+                  size={14}
+                  color={active ? colors.white : colors.text.muted}
+                />
+              ) : null}
+              <Text
+                variant="caption"
+                weight="medium"
+                style={{ color: active ? colors.white : colors.text.body }}
+              >
+                {f.label}
+                {count != null ? ` (${count})` : ''}
+              </Text>
+            </Pressable>
+          );
+        })}
       </View>
 
       {isError ? (
-        <VStack gap={2} align="center" padding={6}>
+        <VStack gap={3} align="center" padding={6} style={{ marginTop: spacing[8] }}>
+          <Ionicons name="alert-circle-outline" size={48} color={colors.danger[500]!} />
           <Text variant="body" align="center">
             Takaslar yüklenemedi. Çekerek yenileyin.
           </Text>
@@ -160,83 +159,61 @@ export default function TradesScreen() {
       ) : (
         <FlatList
           data={tradesList}
-          contentContainerStyle={{ padding: spacing[4] }}
+          contentContainerStyle={{ padding: spacing[4], paddingTop: spacing[2] }}
           refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} />}
           keyExtractor={(item) => item.id.toString()}
-          renderItem={({ item }) => {
-            const statusInfo = getStatusInfo(item.status);
-            const ini = item.initiatorItems || [];
-            const rec = item.receiverItems || [];
-            const myTitle = ini[0]?.productTitle || 'Ürün';
-            const theirTitle = rec[0]?.productTitle || 'Ürün';
-            return (
-              <Pressable
-                onPress={() => router.push(`/trade/${item.id}`)}
-                style={({ pressed }) => ({ opacity: pressed ? 0.85 : 1 })}
-              >
-              <Card style={{ marginBottom: spacing[3] }}>
-                <View
-                  style={{
-                    flexDirection: 'row',
-                    justifyContent: 'space-between',
-                    alignItems: 'center',
-                    marginBottom: spacing[2],
-                  }}
-                >
-                  <Chip label={statusInfo.label} variant={statusInfo.variant} size="sm" />
-                  <Text variant="caption" tone="muted">
-                    {format(new Date(item.createdAt), 'dd MMM yyyy', { locale: tr })}
-                  </Text>
-                </View>
-
-                <Text variant="h3" numberOfLines={1}>
-                  {myTitle}
-                </Text>
-                <Text variant="caption" tone="muted">
-                  ↔
-                </Text>
-                <Text variant="h3" numberOfLines={1}>
-                  {theirTitle}
-                </Text>
-
-                {item.cashAmount != null && Number(item.cashAmount) !== 0 && (
-                  <Text
-                    variant="body"
-                    tone="primary"
-                    style={{ marginTop: spacing[2] }}
-                  >
-                    Nakit fark: ₺{Math.abs(Number(item.cashAmount)).toLocaleString('tr-TR')}
-                  </Text>
-                )}
-
-                {(item.deadline || item.responseDeadline) && (
-                  <Text variant="caption" tone="danger" style={{ marginTop: spacing[1] }}>
-                    Son:{' '}
-                    {format(
-                      new Date(item.deadline || item.responseDeadline!),
-                      'dd MMM HH:mm',
-                      { locale: tr },
-                    )}
-                  </Text>
-                )}
-              </Card>
-              </Pressable>
-            );
-          }}
+          renderItem={({ item }) => <TradeCard trade={item} currentUserId={user?.id} />}
           ListEmptyComponent={
-            <VStack gap={4} align="center" style={{ marginTop: spacing[8] }}>
-              <Text variant="body" tone="muted">
+            <VStack gap={3} align="center" style={{ marginTop: spacing[10] }}>
+              <Ionicons name="swap-horizontal" size={56} color={colors.border.strong} />
+              <Text variant="h3" align="center">
                 Henüz takas yok
+              </Text>
+              <Text
+                variant="body"
+                tone="muted"
+                align="center"
+                style={{ paddingHorizontal: spacing[6] }}
+              >
+                {filter === 'all'
+                  ? 'Beğendiğin bir ürüne takas teklifi göndererek başlayabilirsin.'
+                  : 'Bu filtrede takas bulunamadı.'}
               </Text>
               <Button
                 variant="primary"
                 title="İlan Ara"
                 onPress={() => router.push('/search')}
+                style={{ marginTop: spacing[2] }}
               />
             </VStack>
           }
         />
       )}
-    </SafeAreaView>
+    </View>
   );
 }
+
+const styles = StyleSheet.create({
+  filterRow: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    paddingHorizontal: spacing[4],
+    paddingVertical: spacing[3],
+    gap: spacing[2],
+  },
+  filterPill: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing[1],
+    paddingHorizontal: spacing[3],
+    paddingVertical: spacing[2],
+    borderRadius: 999,
+    backgroundColor: colors.surface.alt,
+    borderWidth: 1,
+    borderColor: colors.border.DEFAULT,
+  },
+  filterPillActive: {
+    backgroundColor: colors.primary[600]!,
+    borderColor: colors.primary[600]!,
+  },
+});

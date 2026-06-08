@@ -1,9 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { View, Text, ScrollView, TouchableOpacity, StyleSheet, ActivityIndicator, Alert } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
 import { router } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
-import { theme } from '@tarodan/ui-native';
+import { theme, ScreenHeader } from '@tarodan/ui-native';
 import { useAuthStore } from '../../src/stores/authStore';
 import { api, membershipApi } from '../../src/services/api';
 import { useTranslation } from '../../src/i18n';
@@ -108,6 +107,17 @@ export default function MembershipScreen() {
 
   const currentTier: TierType = (membership?.tier?.type as TierType) || 'free';
 
+  // Web ile aynı mantık (profile/membership/page.tsx): business tier yalnızca
+  // kurumsal hesaplara (companyName + taxId) veya hâlihazırda business tier olan
+  // kullanıcıya gösterilir. Bireysel hesaplar business kartını hiç görmez —
+  // backend zaten 403 döndürür (membership.service.ts).
+  const isBusinessAccount = !!(user?.companyName && user?.taxId);
+  const isBusinessTier = currentTier === 'business' || user?.membershipTier === 'business';
+  const visibleTiers: TierType[] =
+    isBusinessAccount || isBusinessTier
+      ? TIER_ORDER.filter((t) => t === 'business')
+      : TIER_ORDER.filter((t) => t !== 'business');
+
   const getPrice = (tier: TierType): number => {
     if (tier === 'free') return 0;
     const key = `${tier}_${billingPeriod === 'monthly' ? 'monthly' : 'yearly'}_price` as keyof PlatformSettings;
@@ -170,31 +180,19 @@ export default function MembershipScreen() {
 
   if (loading) {
     return (
-      <SafeAreaView style={styles.container}>
-        <View style={styles.header}>
-          <TouchableOpacity onPress={() => router.back()} hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}>
-            <Ionicons name="arrow-back" size={24} color={colors.white} />
-          </TouchableOpacity>
-          <Text style={styles.headerTitle}>{t('mobile.membershipTitle')}</Text>
-          <View style={{ width: 24 }} />
-        </View>
+      <View style={styles.container}>
+        <ScreenHeader title={t('mobile.membershipTitle')} onBack={() => router.back()} />
         <View style={styles.loadingContainer}>
           <ActivityIndicator size="large" color={colors.primary[600]!} />
           <Text style={styles.loadingText}>Yükleniyor...</Text>
         </View>
-      </SafeAreaView>
+      </View>
     );
   }
 
   return (
-    <SafeAreaView style={styles.container} edges={['top']}>
-      <View style={styles.header}>
-        <TouchableOpacity onPress={() => router.back()} hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}>
-          <Ionicons name="arrow-back" size={24} color={colors.white} />
-        </TouchableOpacity>
-        <Text style={styles.headerTitle}>{t('mobile.membershipTitle')}</Text>
-        <View style={{ width: 24 }} />
-      </View>
+    <View style={styles.container}>
+      <ScreenHeader title={t('mobile.membershipTitle')} onBack={() => router.back()} />
 
       <ScrollView style={styles.scrollView} showsVerticalScrollIndicator={false}>
         {error ? (
@@ -273,7 +271,7 @@ export default function MembershipScreen() {
           snapToInterval={280 + 12}
           snapToAlignment="start"
         >
-          {TIER_ORDER.map((tier) => {
+          {visibleTiers.map((tier) => {
             const price = getPrice(tier);
             const isCurrent = tier === currentTier;
             const isUpgrade = tierIndex(tier) > tierIndex(currentTier);
@@ -365,7 +363,7 @@ export default function MembershipScreen() {
 
         <View style={{ height: 40 }} />
       </ScrollView>
-    </SafeAreaView>
+    </View>
   );
 }
 
@@ -373,19 +371,6 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: colors.surface.alt,
-  },
-  header: {
-    backgroundColor: colors.primary[600]!,
-    paddingVertical: 14,
-    paddingHorizontal: 16,
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-  },
-  headerTitle: {
-    fontSize: 18,
-    fontWeight: '700',
-    color: colors.white,
   },
   loadingContainer: {
     flex: 1,

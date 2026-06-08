@@ -15,7 +15,8 @@ import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 import { router } from 'expo-router';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { paymentsApi } from '../../src/services/api';
-import { ScreenHeader, ScreenLoader, EmptyState } from '../../src/components/common';
+import { ScreenHeader, ScreenLoader, EmptyState, ThemedRefreshControl } from '../../src/components/common';
+import { useRefresh } from '../../src/hooks/useRefresh';
 import { useAuthStore } from '../../src/stores/authStore';
 
 const { colors } = theme;
@@ -53,7 +54,7 @@ export default function PaymentMethodsScreen() {
     cardAlias: '',
   });
 
-  const { data, isLoading } = useQuery({
+  const { data, isLoading, refetch } = useQuery({
     queryKey: ['payment-methods'],
     queryFn: async () => {
       const response = await paymentsApi.getPaymentMethods();
@@ -62,6 +63,8 @@ export default function PaymentMethodsScreen() {
     },
     enabled: isAuthenticated,
   });
+
+  const { refreshing, onRefresh } = useRefresh(refetch);
 
   const methods: PaymentMethod[] = data ?? [];
 
@@ -161,7 +164,10 @@ export default function PaymentMethodsScreen() {
           onAction={() => setDialogOpen(true)}
         />
       ) : (
-        <ScrollView contentContainerStyle={styles.list}>
+        <ScrollView
+          contentContainerStyle={styles.list}
+          refreshControl={<ThemedRefreshControl refreshing={refreshing} onRefresh={onRefresh} />}
+        >
           {methods.map(m => (
             <Card key={m.cardToken} style={styles.cardItem}>
               <View style={styles.cardContent}>

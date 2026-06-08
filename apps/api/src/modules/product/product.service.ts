@@ -387,7 +387,9 @@ export class ProductService implements OnModuleInit {
 
     const cacheKey = `products:list:${JSON.stringify({
       search, categoryId, sellerId,
-      status: status || ProductStatus.active,
+      // Ham status: undefined (kapsayıcı: aktif + tükenen + satıldı) ile 'active'
+      // (yalnızca stok-içi) farklı sonuç verir → ayrı cache anahtarları olmalı.
+      status: status ?? null,
       condition, brand, brandId, manufacturerId,
       scale, material: materialSlug,
       tradeOnly, discountOnly, preOrder, limited,
@@ -464,7 +466,7 @@ export class ProductService implements OnModuleInit {
    */
   private async findAllViaElasticsearch(query: ProductQueryDto) {
     const {
-      search, categoryId, sellerId, condition, brand, scale,
+      search, categoryId, sellerId, status, condition, brand, scale,
       material: materialSlug, tradeOnly, discountOnly, preOrder,
       limited, set: setFilter, minPrice, maxPrice, sortBy,
       page = 1, limit = 20, brandId, manufacturerId, carModelId,
@@ -477,6 +479,8 @@ export class ProductService implements OnModuleInit {
       manufacturerId,
       carModelId,
       sellerId,
+      // status verilmezse undefined geçer → ES kapsayıcı küme (aktif + tükenen + satıldı)
+      status,
       condition,
       brand,
       scale,
@@ -628,6 +632,14 @@ export class ProductService implements OnModuleInit {
           { createdAt: 'desc' },
           { id: 'asc' },
         ];
+    }
+
+    // Stoktakiler önce: status verilmeyen kapsayıcı listelemede (aktif + tükenen + satıldı)
+    // aktif/stoklu ürünler tükenenlerden önce gelsin. Postgres enum sırası
+    // active(2) < sold(4) < inactive(5) olduğundan ORDER BY status ASC bunu doğal sağlar.
+    // (Tek-statülü carousel'lerde — status=active — etkisizdir.)
+    if (!query.status) {
+      orderBy = [{ status: 'asc' }, ...orderBy];
     }
 
     const total = await this.prisma.product.count({ where });
@@ -1696,6 +1708,7 @@ Bu ürünü istek listenizden kaldırmak için ürün sayfasına gidip "İstek L
   private async formatProductResponse(product: any) {
     // Get seller's active listings count
     let sellerListingsCount = 0;
+    let sellerTotalSales = 0;
     let sellerRating = null;
     let sellerTotalRatings = 0;
     let sellerIsPremium = false;
@@ -1706,6 +1719,11 @@ Bu ürünü istek listenizden kaldırmak için ürün sayfasına gidip "İstek L
           sellerId: product.seller.id,
           status: ProductStatus.active,
         },
+      });
+
+      // Tamamlanmış satış adedi (user.service stats.totalSales ile aynı hesap)
+      sellerTotalSales = await this.prisma.order.count({
+        where: { sellerId: product.seller.id, status: 'completed' },
       });
 
       // Get seller rating stats (only approved)
@@ -1830,6 +1848,7 @@ Bu ürünü istek listenizden kaldırmak için ürün sayfasına gidip "İstek L
           avatarUrl: await this.resolveAvatarUrl((product.seller as any).avatarUrl),
           listings_count: sellerListingsCount,
           productsCount: sellerListingsCount,
+          totalSales: sellerTotalSales,
           rating: sellerRating,
           totalRatings: sellerTotalRatings,
           isPremium: sellerIsPremium,
@@ -2143,18 +2162,26 @@ Bu ürünü istek listenizden kaldırmak için ürün sayfasına gidip "İstek L
       }
 
       // Get all listing counts by status (exclude inactive and draft)
-      const [pending, active, reserved, sold, rejected, inactive, total] = await Promise.all([
+      const [pending, active, reserved, sold, rejected, inactive, total, all] = await Promise.all([
         this.prisma.product.count({ where: { sellerId, status: ProductStatus.pending } }),
         this.prisma.product.count({ where: { sellerId, status: ProductStatus.active } }),
         this.prisma.product.count({ where: { sellerId, status: ProductStatus.reserved } }),
         this.prisma.product.count({ where: { sellerId, status: ProductStatus.sold } }),
         this.prisma.product.count({ where: { sellerId, status: ProductStatus.rejected } }),
         this.prisma.product.count({ where: { sellerId, status: ProductStatus.inactive } }),
-        // Total should exclude inactive and draft listings
+        // Total should exclude inactive and draft listings (limit/usage card uses this)
         this.prisma.product.count({
           where: {
             sellerId,
             status: { notIn: [ProductStatus.inactive, ProductStatus.draft] }
+          }
+        }),
+        // "Tümü" sayacı: draft hariç her şey (inactive DAHİL). Liste "Tümü" filtresi
+        // (findSellerProducts: notIn[draft]) ve profil İlanlarım tile'ı ile birebir.
+        this.prisma.product.count({
+          where: {
+            sellerId,
+            status: { notIn: [ProductStatus.draft] }
           }
         }),
       ]);
@@ -2180,6 +2207,7 @@ Bu ürünü istek listenizden kaldırmak için ürün sayfasına gidip "İstek L
           rejected,
           inactive,
           total, // Total excluding inactive and draft
+          all, // "Tümü": draft hariç hepsi (inactive dahil) — liste 'Tümü' ve profil tile ile aynı
           activeListings, // This counts against the limit
         },
         // Membership limits

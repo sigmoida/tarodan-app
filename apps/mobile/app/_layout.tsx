@@ -1,4 +1,4 @@
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import { Stack } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
@@ -9,6 +9,8 @@ import { useAuthStore } from '../src/stores/authStore';
 import { registerForPushNotifications, setupPushNotificationRouting } from '../src/services/push';
 import { LanguageProvider } from '../src/i18n';
 import { initSentry } from '../src/services/sentry';
+import AnimatedSplash from '../src/components/AnimatedSplash';
+import BusinessMembershipGuard from '../src/components/BusinessMembershipGuard';
 
 const { colors } = theme;
 
@@ -59,6 +61,10 @@ if (!isExpoGo && Notifications) {
 
 export default function RootLayout() {
   const { loadToken, isAuthenticated } = useAuthStore();
+  // appReady: hazırlık bitti. splashDone: animasyonlu splash çıkışını tamamladı.
+  // Native splash'i AnimatedSplash kapatır (onLayout) → beyaz parlama olmaz.
+  const [appReady, setAppReady] = useState(false);
+  const [splashDone, setSplashDone] = useState(false);
 
   useEffect(() => {
     async function prepare() {
@@ -75,7 +81,7 @@ export default function RootLayout() {
       } catch (e) {
         console.warn(e);
       } finally {
-        await SplashScreen.hideAsync();
+        setAppReady(true);
       }
     }
     prepare();
@@ -105,6 +111,11 @@ export default function RootLayout() {
           <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
           <Stack.Screen name="(auth)" options={{ headerShown: false }} />
         </Stack>
+        {/* Kurumsal hesap business üyelik yoksa üyelik sayfasına yönlendirir (web ile aynı). */}
+        <BusinessMembershipGuard />
+        {!splashDone && (
+          <AnimatedSplash appReady={appReady} onFinish={() => setSplashDone(true)} />
+        )}
       </LanguageProvider>
     </QueryClientProvider>
   );

@@ -11,6 +11,7 @@ import {
   Input,
   Text,
   theme,
+  ScreenHeader,
 } from '@tarodan/ui-native';
 import type { BadgeVariant } from '@tarodan/ui-native';
 import { useState } from 'react';
@@ -18,6 +19,8 @@ import { router, useLocalSearchParams } from 'expo-router';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { Ionicons } from '@expo/vector-icons';
 import { api, ordersApi, refundsApi } from '../../src/services/api';
+import { ThemedRefreshControl } from '../../src/components/common';
+import { useRefresh } from '../../src/hooks/useRefresh';
 import RatingModal from '../../src/components/RatingModal';
 import { AwaitingConfirmationBanner } from '../../src/components/AwaitingConfirmationBanner';
 import { captureException } from '../../src/services/sentry';
@@ -110,6 +113,7 @@ const uiOrderStatusConfig: Record<string, { label: string; variant: BadgeVariant
   processing: { label: 'Hazırlanıyor', variant: 'info' },
   shipped: { label: 'Kargoda', variant: 'primary' },
   delivered: { label: 'Teslim Edildi', variant: 'success' },
+  awaiting_confirmation: { label: 'Onayınız Bekleniyor', variant: 'warning' },
   completed: { label: 'Tamamlandı', variant: 'success' },
   cancelled: { label: 'İptal Edildi', variant: 'danger' },
   refunded: { label: 'İade', variant: 'secondary' },
@@ -132,7 +136,7 @@ export default function OrderDetailScreen() {
   });
 
   // Fetch order detail
-  const { data: order, isLoading } = useQuery({
+  const { data: order, isLoading, refetch } = useQuery({
     queryKey: ['order', id],
     queryFn: async () => {
       try {
@@ -154,6 +158,8 @@ export default function OrderDetailScreen() {
     },
     enabled: !!id,
   });
+
+  const { refreshing, onRefresh } = useRefresh(refetch);
 
   // Refund request mutation
   const refundMutation = useMutation({
@@ -300,18 +306,14 @@ export default function OrderDetailScreen() {
 
   return (
     <View style={styles.container}>
-      {/* Header */}
-      <View style={styles.header}>
-        <Pressable onPress={() => router.back()}>
-          <Ionicons name="arrow-back" size={24} color={colors.white} />
-        </Pressable>
-        <Text style={styles.headerTitle}>Sipariş Detayı</Text>
-        <View style={{ width: 24 }} />
-      </View>
+      <ScreenHeader title="Sipariş Detayı" onBack={() => router.back()} />
 
-      <ScrollView style={styles.content}>
+      <ScrollView
+        style={styles.content}
+        refreshControl={<ThemedRefreshControl refreshing={refreshing} onRefresh={onRefresh} />}
+      >
         {/* 48h pencere banner (Faz 4C.4) */}
-        {order.status === 'awaiting_buyer_confirmation' &&
+        {order.status === 'awaiting_confirmation' &&
           order.confirmationDeadline &&
           (order as any).isBuyer !== false && (
             <AwaitingConfirmationBanner
@@ -683,7 +685,14 @@ export default function OrderDetailScreen() {
         sellerId={order.seller.id}
         productTitle={order.product.title}
         sellerName={order.seller.displayName}
-        onSuccess={() => queryClient.invalidateQueries({ queryKey: ['order', id] })}
+        onSuccess={() => {
+          queryClient.invalidateQueries({ queryKey: ['order', id] });
+          setSnackbar({
+            visible: true,
+            variant: 'success',
+            message: 'Değerlendirmeniz alındı. Onaylandıktan sonra yayınlanacak.',
+          });
+        }}
       />
     </View>
   );
@@ -749,20 +758,6 @@ const styles = StyleSheet.create({
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
-  },
-  header: {
-    backgroundColor: colors.primary[600]!,
-    paddingTop: 50,
-    paddingBottom: 16,
-    paddingHorizontal: 20,
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-  },
-  headerTitle: {
-    fontSize: 18,
-    fontWeight: 'bold',
-    color: colors.white,
   },
   content: {
     flex: 1,

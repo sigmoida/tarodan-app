@@ -6,6 +6,7 @@ import {
   Spinner,
   Divider,
   Text,
+  ScreenHeader,
   theme,
 } from '@tarodan/ui-native';
 import { useCallback } from 'react';
@@ -152,16 +153,15 @@ export default function SavedSearchesScreen() {
 
   return (
     <View style={styles.container}>
-      {/* Header */}
-      <View style={styles.header}>
-        <TouchableOpacity onPress={() => router.back()}>
-          <Ionicons name="arrow-back" size={24} color={colors.white} />
-        </TouchableOpacity>
-        <Text style={styles.headerTitle}>{t('mobile.settingsSavedSearches')}</Text>
-        <Text style={styles.headerCount}>
-          {searches.length}/{maxSavedSearches === -1 ? '∞' : maxSavedSearches}
-        </Text>
-      </View>
+      <ScreenHeader
+        title={t('mobile.settingsSavedSearches')}
+        onBack={() => router.back()}
+        right={
+          <Text style={styles.headerCount}>
+            {searches.length}/{maxSavedSearches === -1 ? '∞' : maxSavedSearches}
+          </Text>
+        }
+      />
 
       {/* Limit Info */}
       {maxSavedSearches !== -1 && searches.length >= maxSavedSearches - 1 && (
@@ -277,20 +277,6 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     padding: 32,
     backgroundColor: colors.surface.DEFAULT,
-  },
-  header: {
-    backgroundColor: colors.primary[600]!,
-    paddingTop: 50,
-    paddingBottom: 16,
-    paddingHorizontal: 20,
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-  },
-  headerTitle: {
-    fontSize: 18,
-    fontWeight: 'bold',
-    color: colors.white,
   },
   headerCount: {
     color: colors.white,

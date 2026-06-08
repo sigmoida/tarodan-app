@@ -103,6 +103,17 @@ export function resolveImageUrl(input: unknown): string {
 }
 
 /**
+ * Avatar/profil görseli için kaynak çözücü. `resolveImageUrl`'den farkı:
+ * değer yok ya da çözülemiyorsa placeholder yerine `undefined` döner — böylece
+ * <Avatar> genel placeholder görseli yerine baş harf fallback'ini gösterir.
+ */
+export function resolveAvatarSource(input: unknown): string | undefined {
+  if (input == null || (typeof input === 'string' && !input.trim())) return undefined;
+  const resolved = resolveImageUrl(input);
+  return resolved === IMAGE_PLACEHOLDER ? undefined : resolved;
+}
+
+/**
  * Geriye dönük uyumlu alias'lar. Mevcut çağrılar otomatik sağlamlaşır.
  * @deprecated Yeni kodda `resolveImageUrl` kullanın.
  */

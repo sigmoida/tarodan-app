@@ -159,6 +159,31 @@ export default function ProductFilterSheet({
         </View>
 
         <ScrollView style={styles.content} keyboardShouldPersistTaps="handled">
+          {/* Arama */}
+          <View style={styles.section}>
+            <SectionTitle>Arama</SectionTitle>
+            <Input
+              placeholder="Model, marka veya anahtar kelime..."
+              value={filters.search}
+              onChangeText={(v) => onChange({ ...filters, search: v })}
+              leftIconName="search"
+              rightIcon={
+                filters.search ? (
+                  <Pressable
+                    onPress={() => onChange({ ...filters, search: '' })}
+                    hitSlop={8}
+                    accessibilityRole="button"
+                    accessibilityLabel="Aramayı temizle"
+                  >
+                    <Ionicons name="close-circle" size={20} color={colors.text.muted} />
+                  </Pressable>
+                ) : undefined
+              }
+            />
+          </View>
+
+          <Divider style={styles.divider} />
+
           {/* Araç Türü */}
           {options.categories.length > 0 && (
             <View style={styles.section}>

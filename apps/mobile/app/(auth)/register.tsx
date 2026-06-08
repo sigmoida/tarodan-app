@@ -6,6 +6,7 @@ import { router } from 'expo-router';
 import {
   Button,
   Checkbox,
+  DateField,
   HStack,
   Input,
   Screen,
@@ -30,13 +31,20 @@ function isAdult(dateStr: string): boolean {
   return age >= 18;
 }
 
+/** En geç seçilebilir doğum tarihi (bugün - 18 yıl) — 18+'ı seçici seviyesinde kısıtlar. */
+function maxBirthDate(): Date {
+  const d = new Date();
+  d.setFullYear(d.getFullYear() - 18);
+  return d;
+}
+
 const registerSchema = z
   .object({
     displayName: displayNameSchema,
     email: emailSchema,
     birthDate: z
       .string()
-      .regex(/^\d{4}-\d{2}-\d{2}$/, 'Doğum tarihi YYYY-AA-GG biçiminde olmalı')
+      .regex(/^\d{4}-\d{2}-\d{2}$/, 'Lütfen doğum tarihinizi seçin')
       .refine(isAdult, 'Kayıt için en az 18 yaşında olmalısınız'),
     password: strongPasswordSchema,
     confirmPassword: z.string(),
@@ -114,12 +122,13 @@ export default function RegisterScreen() {
           control={control}
           name="birthDate"
           render={({ field: { onChange, value } }) => (
-            <Input
+            <DateField
               testID="register-birthDate-input"
-              label="Doğum Tarihi (YYYY-AA-GG)"
+              label="Doğum Tarihi"
               value={value}
-              onChangeText={onChange}
-              autoCapitalize="none"
+              onChange={onChange}
+              placeholder="Tarih seçin"
+              maximumDate={maxBirthDate()}
               error={errors.birthDate?.message}
             />
           )}

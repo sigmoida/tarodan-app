@@ -1608,14 +1608,13 @@ export default function Home() {
                   <div className="flex items-start gap-4 mb-4">
                     <UserAvatar
                       displayName={companyOfWeek.displayName}
-                      companyName={companyOfWeek.companyName}
                       avatarUrl={companyOfWeek.avatarUrl}
                       size="lg"
                       className="border-2 border-border-subtle"
                     />
                     <div className="min-w-0">
                       <h3 className="text-sm font-bold text-heading flex items-center gap-1.5 mb-0.5">
-                        {companyOfWeek.companyName || companyOfWeek.displayName}
+                        {companyOfWeek.displayName || companyOfWeek.companyName}
                         {companyOfWeek.isVerified && (
                           <CheckBadgeIcon className="w-4 h-4 text-success-500" />
                         )}

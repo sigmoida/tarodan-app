@@ -13,17 +13,20 @@ import {
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useLocalSearchParams, router } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
-import { productsApi, ratingsApi, userReportsApi } from '../../src/services/api';
-import { useAuthStore } from '../../src/stores/authStore';
+import { productsApi, ratingsApi, userReportsApi } from '../../../src/services/api';
+import { ThemedRefreshControl } from '../../../src/components/common';
+import { useRefresh } from '../../../src/hooks/useRefresh';
+import { useAuthStore } from '../../../src/stores/authStore';
 import { Alert } from 'react-native';
-import { useCartStore } from '../../src/stores/cartStore';
-import { useGuestStore } from '../../src/stores/guestStore';
-import { useFavoritesStore } from '../../src/stores/favoritesStore';
-import { SignupPrompt } from '../../src/components/SignupPrompt';
-import MakeOfferModal from '../../src/components/product/MakeOfferModal';
-import AddToCollectionModal from '../../src/components/product/AddToCollectionModal';
-import { transformImageUrl, getImageUrl as getImageUrlFromUtils } from '../../src/utils/imageUrl';
-import { asLabel } from '../../src/utils/format';
+import { useCartStore } from '../../../src/stores/cartStore';
+import { useGuestStore } from '../../../src/stores/guestStore';
+import { useFavoritesStore } from '../../../src/stores/favoritesStore';
+import { SignupPrompt } from '../../../src/components/SignupPrompt';
+import MakeOfferModal from '../../../src/components/product/MakeOfferModal';
+import AddToCollectionModal from '../../../src/components/product/AddToCollectionModal';
+import { transformImageUrl, getImageUrl as getImageUrlFromUtils, resolveAvatarSource } from '../../../src/utils/imageUrl';
+import { asLabel } from '../../../src/utils/format';
+import { isProductTradeOpen } from '../../../src/utils/isProductTradeOpen';
 
 const { colors } = theme;
 
@@ -95,7 +98,7 @@ export default function ProductDetailScreen() {
   }, [id]);
 
   // Web ile aynı endpoint: GET /products/:id
-  const { data: apiProduct, isLoading } = useQuery({
+  const { data: apiProduct, isLoading, refetch: refetchProduct } = useQuery({
     queryKey: ['product', id],
     queryFn: async () => {
       try {
@@ -119,6 +122,17 @@ export default function ProductDetailScreen() {
         }
         return product;
       } catch (error) {
+        // Public endpoint pending/rejected/draft (ve stoklu inactive) ilanları 404 döndürür —
+        // görünürlük sınırı. Kullanıcı giriş yapmışsa kendi ilanı olabilir; sahibe özel
+        // endpoint (GET /products/my/:id) her statüde döner. Görüntülenme sayılmaz (kendi ilanı).
+        if (isAuthenticated) {
+          try {
+            const mineResp = await productsApi.getMyById(productId);
+            return mineResp.data.data || mineResp.data;
+          } catch {
+            // sahibi değil ya da gerçekten yok — aşağıda null
+          }
+        }
         console.log('⚠️ Ürün detayı yüklenemedi');
         return null;
       }
@@ -127,7 +141,7 @@ export default function ProductDetailScreen() {
   });
 
   // Web ile aynı endpoint: GET /ratings/products/:id
-  const { data: reviews } = useQuery({
+  const { data: reviews, refetch: refetchReviews } = useQuery({
     queryKey: ['product-reviews', id],
     queryFn: async () => {
       try {
@@ -142,15 +156,17 @@ export default function ProductDetailScreen() {
     enabled: !!id,
   });
 
-  // Sold / inactive ürün → unavailable sayfasına yönlendir (web pariteti)
-  useEffect(() => {
-    if (apiProduct && (apiProduct.status === 'sold' || apiProduct.status === 'inactive')) {
-      router.replace({
-        pathname: '/products/unavailable/[productId]',
-        params: { productId: productId },
-      } as any);
-    }
-  }, [apiProduct, productId]);
+  const { refreshing, onRefresh } = useRefresh(refetchProduct, refetchReviews);
+
+  // Sahibi mi? (kendi ilanını görüntülüyor olabilir — pending/sold/inactive dahil)
+  const isOwner = Boolean(
+    isAuthenticated && user?.id && apiProduct?.seller?.id && user.id === apiProduct.seller.id
+  );
+
+  // Not: Stoğu biten (sold / inactive+qty0) ilanlar artık unavailable sayfasına
+  // YÖNLENDİRİLMEZ — normal detayda "Stokta yok" rozeti + pasif satın al ile kalır.
+  // Gerçekten görüntülenemeyen ilanlar (pending/rejected, elle pasife alınan inactive+qty>0)
+  // public endpoint'ten zaten 404 döner → product null → "Ürün bulunamadı" gösterilir.
 
   // Favori (beğeni) sayısını server'daki likeCount'tan senkronize et
   useEffect(() => {
@@ -194,12 +210,14 @@ export default function ProductDetailScreen() {
     return CONDITION_LABELS[condition] || { name: condition, color: colors.gray[500] };
   };
 
+  // Stokta yok: active dışı statü veya müsait adet 0 (null = sınırsız stok → stokta).
+  const isOutOfStock =
+    (product.status != null && product.status !== 'active') ||
+    (product.availableQuantity != null && product.availableQuantity <= 0);
+
   const handleAddToCart = () => {
-    if (apiProduct?.status === 'sold' || apiProduct?.status === 'inactive') {
-      router.push({
-        pathname: '/products/unavailable/[productId]',
-        params: { productId: productId },
-      } as any);
+    if (isOutOfStock) {
+      setSnackbar({ visible: true, message: 'Bu ürün şu anda stokta yok', type: 'error' });
       return;
     }
     addItem({
@@ -365,9 +383,6 @@ export default function ProductDetailScreen() {
   };
 
   const conditionInfo = getConditionInfo(product.condition);
-  const isOwner = Boolean(
-    isAuthenticated && user?.id && product.seller?.id && user.id === product.seller.id
-  );
   const inCart = isInCart(productId);
 
   return (
@@ -404,7 +419,11 @@ export default function ProductDetailScreen() {
         </View>
       </View>
 
-      <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
+      <ScrollView
+        style={styles.content}
+        showsVerticalScrollIndicator={false}
+        refreshControl={<ThemedRefreshControl refreshing={refreshing} onRefresh={onRefresh} />}
+      >
         {/* Image Gallery */}
         <ScrollView
           horizontal
@@ -454,7 +473,7 @@ export default function ProductDetailScreen() {
         <View style={styles.mainContent}>
           {/* Badges */}
           <View style={styles.badgeRow}>
-            {product.tradeAvailable && (
+            {isProductTradeOpen(product) && (
               <View style={[styles.badge, { backgroundColor: colors.success[500]! }]}>
                 <Ionicons name="swap-horizontal" size={14} color={colors.white} />
                 <Text style={styles.badgeText}>Takas Açık</Text>
@@ -468,6 +487,18 @@ export default function ProductDetailScreen() {
           {/* Title & Price */}
           <Text style={styles.title}>{product.title}</Text>
           <Text style={styles.price}>₺{product.price?.toLocaleString('tr-TR')}</Text>
+
+          {/* Ürün puanı */}
+          {product.rating?.average != null && (product.rating?.count ?? 0) > 0 ? (
+            <Pressable
+              style={styles.headerRatingRow}
+              onPress={() => router.push(`/product/${id}/reviews`)}
+            >
+              <Ionicons name="star" size={16} color={colors.warning[500]!} />
+              <Text style={styles.headerRatingValue}>{Number(product.rating.average).toFixed(1)}</Text>
+              <Text style={styles.headerRatingCount}>({product.rating.count} değerlendirme)</Text>
+            </Pressable>
+          ) : null}
 
           {/* Quick Info */}
           <View style={styles.quickInfo}>
@@ -489,9 +520,10 @@ export default function ProductDetailScreen() {
 
           <Divider style={styles.divider} />
 
-          {/* Aksiyon Bar — Takas / Teklif / Koleksiyon / Mesaj / Paylaş */}
+          {/* Aksiyon Bar — sahibine göre değişir.
+              Sahip: Koleksiyon + Paylaş. Diğer kullanıcı: Takas / Teklif / Mesaj / Paylaş. */}
           <View style={styles.actionGrid}>
-            {product.tradeAvailable ? (
+            {!isOwner && isProductTradeOpen(product) ? (
               <Pressable style={styles.actionItem} onPress={handleTrade}>
                 <View style={[styles.actionIconWrap, { backgroundColor: colors.success[100]! }]}>
                   <Ionicons name="swap-horizontal" size={22} color={colors.success[600]!} />
@@ -500,26 +532,32 @@ export default function ProductDetailScreen() {
               </Pressable>
             ) : null}
 
-            <Pressable style={styles.actionItem} onPress={handleMakeOffer}>
-              <View style={[styles.actionIconWrap, { backgroundColor: colors.warning[50]! }]}>
-                <Ionicons name="pricetag-outline" size={22} color={colors.warning[600]!} />
-              </View>
-              <Text style={styles.actionLabel}>Teklif Ver</Text>
-            </Pressable>
+            {!isOwner && (
+              <Pressable style={styles.actionItem} onPress={handleMakeOffer}>
+                <View style={[styles.actionIconWrap, { backgroundColor: colors.warning[50]! }]}>
+                  <Ionicons name="pricetag-outline" size={22} color={colors.warning[600]!} />
+                </View>
+                <Text style={styles.actionLabel}>Teklif Ver</Text>
+              </Pressable>
+            )}
 
-            <Pressable style={styles.actionItem} onPress={handleAddToCollection}>
-              <View style={[styles.actionIconWrap, { backgroundColor: colors.primary[50]! }]}>
-                <Ionicons name="albums-outline" size={22} color={colors.primary[600]!} />
-              </View>
-              <Text style={styles.actionLabel}>Koleksiyon</Text>
-            </Pressable>
+            {isOwner && (
+              <Pressable style={styles.actionItem} onPress={handleAddToCollection}>
+                <View style={[styles.actionIconWrap, { backgroundColor: colors.primary[50]! }]}>
+                  <Ionicons name="albums-outline" size={22} color={colors.primary[600]!} />
+                </View>
+                <Text style={styles.actionLabel}>Koleksiyon</Text>
+              </Pressable>
+            )}
 
-            <Pressable style={styles.actionItem} onPress={handleMessage}>
-              <View style={[styles.actionIconWrap, { backgroundColor: colors.info[50]! }]}>
-                <Ionicons name="chatbubble-outline" size={22} color={colors.info[600]!} />
-              </View>
-              <Text style={styles.actionLabel}>Mesaj</Text>
-            </Pressable>
+            {!isOwner && (
+              <Pressable style={styles.actionItem} onPress={handleMessage}>
+                <View style={[styles.actionIconWrap, { backgroundColor: colors.info[50]! }]}>
+                  <Ionicons name="chatbubble-outline" size={22} color={colors.info[600]!} />
+                </View>
+                <Text style={styles.actionLabel}>Mesaj</Text>
+              </Pressable>
+            )}
 
             <Pressable style={styles.actionItem} onPress={handleShare}>
               <View style={[styles.actionIconWrap, { backgroundColor: colors.success[50]! }]}>
@@ -599,6 +637,7 @@ export default function ProductDetailScreen() {
             <Avatar
               size="lg"
               name={product.seller?.displayName || 'Satıcı'}
+              source={resolveAvatarSource((product.seller as any)?.avatarUrl)}
             />
             <View style={styles.sellerInfo}>
               <View style={styles.sellerNameRow}>
@@ -646,9 +685,10 @@ export default function ProductDetailScreen() {
             </View>
 
             {(Array.isArray(reviews) ? reviews : []).slice(0, 2).map((review: any) => {
-              // Backend rating: { score, comment, createdAt, reviewer: { displayName } }
+              // Ürün değerlendirmesi DTO'su: { score, title, review, createdAt, user: { displayName } }
               const score = review.score ?? review.rating ?? 0;
-              const reviewerName = review.reviewer?.displayName ?? review.userName ?? 'Kullanıcı';
+              const reviewerName = review.user?.displayName ?? review.userName ?? review.reviewer?.displayName ?? 'Kullanıcı';
+              const reviewText = review.review ?? review.comment;
               const dateStr = review.createdAt ?? review.date;
               return (
                 <View key={review.id} style={styles.reviewCard}>
@@ -665,7 +705,8 @@ export default function ProductDetailScreen() {
                       ))}
                     </View>
                   </View>
-                  <Text style={styles.reviewComment}>{review.comment}</Text>
+                  {review.title ? <Text style={styles.reviewTitle}>{review.title}</Text> : null}
+                  {reviewText ? <Text style={styles.reviewComment}>{reviewText}</Text> : null}
                   {dateStr ? (
                     <Text style={styles.reviewDate}>
                       {new Date(dateStr).toLocaleDateString('tr-TR')}
@@ -712,9 +753,20 @@ export default function ProductDetailScreen() {
             >
               İlanı Düzenle
             </Button>
+          ) : isOutOfStock ? (
+            <Button
+              testID="product-detail-out-of-stock-button"
+              variant="secondary"
+              onPress={() => {}}
+              disabled
+              icon="close-circle-outline"
+              style={styles.cartButton}
+            >
+              Stokta Yok
+            </Button>
           ) : (
             <>
-              {product.tradeAvailable && (
+              {isProductTradeOpen(product) && (
                 <Button
                   variant="outline"
                   onPress={handleTrade}
@@ -970,6 +1022,7 @@ const styles = StyleSheet.create({
   },
   price: {
     fontSize: 28,
+    lineHeight: 36,
     fontWeight: 'bold',
     color: colors.primary[600]!,
     marginBottom: 12,
@@ -996,7 +1049,9 @@ const styles = StyleSheet.create({
   actionGrid: {
     flexDirection: 'row',
     flexWrap: 'wrap',
-    justifyContent: 'space-between',
+    // flex-start: buton sayısı sahibe göre değiştiğinden (2 vs 4) sola hizalı
+    // sabit aralık, space-between'in az butonda oluşturduğu boşluğu önler.
+    justifyContent: 'flex-start',
     gap: 12,
   },
   actionItem: {
@@ -1137,6 +1192,12 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     gap: 2,
   },
+  reviewTitle: {
+    fontSize: 14,
+    fontWeight: '700',
+    color: colors.text.heading,
+    marginBottom: 2,
+  },
   reviewComment: {
     fontSize: 14,
     color: colors.text.heading,
@@ -1146,6 +1207,21 @@ const styles = StyleSheet.create({
     fontSize: 12,
     color: colors.text.muted,
     marginTop: 8,
+  },
+  headerRatingRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    marginTop: 6,
+  },
+  headerRatingValue: {
+    fontSize: 15,
+    fontWeight: '700',
+    color: colors.text.heading,
+  },
+  headerRatingCount: {
+    fontSize: 13,
+    color: colors.text.muted,
   },
   noReviews: {
     fontSize: 14,

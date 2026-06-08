@@ -1,4 +1,4 @@
-import { View, ScrollView, StyleSheet, Pressable, RefreshControl, Alert } from 'react-native';
+import { View, ScrollView, StyleSheet, RefreshControl, Alert } from 'react-native';
 import {
   Button,
   Card,
@@ -8,6 +8,7 @@ import {
   Text,
   StatusBadge,
   theme,
+  ScreenHeader,
 } from '@tarodan/ui-native';
 import type { BadgeVariant } from '@tarodan/ui-native';
 import { useState, useCallback } from 'react';
@@ -145,14 +146,7 @@ export default function SellerRefundRequestsScreen() {
 
   return (
     <View style={styles.container}>
-      {/* Header */}
-      <View style={styles.header}>
-        <Pressable onPress={() => router.back()}>
-          <Ionicons name="arrow-back" size={24} color={colors.white} />
-        </Pressable>
-        <Text style={styles.headerTitle}>İade Talepleri</Text>
-        <View style={{ width: 24 }} />
-      </View>
+      <ScreenHeader title="İade Talepleri" onBack={() => router.back()} />
 
       {isLoading && refunds.length === 0 ? (
         <View style={styles.loadingContainer}>
@@ -282,16 +276,6 @@ const styles = StyleSheet.create({
     padding: 32,
     backgroundColor: colors.surface.DEFAULT,
   },
-  header: {
-    backgroundColor: colors.primary[600]!,
-    paddingTop: 50,
-    paddingBottom: 16,
-    paddingHorizontal: 20,
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-  },
-  headerTitle: { fontSize: 18, fontWeight: 'bold', color: colors.white },
   title: { marginTop: 16, marginBottom: 8 },
   subtitle: { textAlign: 'center', marginBottom: 24 },
   loadingContainer: { flex: 1, justifyContent: 'center', alignItems: 'center' },

@@ -61,6 +61,18 @@ export class UserService {
     return null;
   }
 
+  /**
+   * Stabil avatar endpoint'i (GET /users/:id/avatar) için kullanıcının taze
+   * presigned avatar URL'ini döndürür. Avatar yoksa/çözülemezse null.
+   */
+  async getAvatarRedirectUrl(userId: string): Promise<string | null> {
+    const user = await this.prisma.user.findUnique({
+      where: { id: userId },
+      select: { avatarUrl: true },
+    });
+    return this.resolveAvatarUrl(user?.avatarUrl);
+  }
+
   private resolveProductImageUrl(imageKeyOrUrl: string | null | undefined): string | null {
     if (!imageKeyOrUrl) return null;
     if (imageKeyOrUrl.startsWith('http://') || imageKeyOrUrl.startsWith('https://') || imageKeyOrUrl.startsWith('/')) return imageKeyOrUrl;
@@ -757,7 +769,12 @@ export class UserService {
   /**
    * Get public user profile
    */
-  async getPublicProfile(userId: string) {
+  async getPublicProfile(userId: string, viewerId?: string) {
+    // Sahibin kendi profili mi? Sahip ise sayaçlar "tümünü" gösterir
+    // (ilan: draft hariç tüm durumlar, takas: tüm statüler, koleksiyon: özel dahil);
+    // başkası bakarken yalnızca herkese görünür/biten kayıtlar sayılır.
+    const isOwner = !!viewerId && viewerId === userId;
+
     const user = await this.prisma.user.findUnique({
       where: { id: userId },
       select: {
@@ -776,19 +793,29 @@ export class UserService {
       throw new NotFoundException('Kullanıcı bulunamadı');
     }
 
+    // İlan/koleksiyon sayımı viewer'a göre değişir (sahip → tümü, başkası → görünür olanlar).
+    const listingWhere = isOwner
+      ? { sellerId: userId, status: { notIn: ['draft'] } as any }
+      : { sellerId: userId, status: 'active' };
+    const collectionWhere = isOwner
+      ? { userId }
+      : { userId, isPublic: true };
+
     // Get seller stats + followers count + membership
-    const [totalListings, totalSales, totalTrades, ratings, followersCount, membership] = await Promise.all([
-      this.prisma.product.count({
-        where: {
-          sellerId: userId,
-          status: 'active'
-        }
-      }),
+    // completedTrades: güven skoru için sabit metrik (viewer'dan bağımsız).
+    // allTrades: sahip görünümünde gösterilen "tüm takaslar" sayısı.
+    const [totalListings, totalSales, completedTrades, allTrades, ratings, followersCount, membership, totalCollections] = await Promise.all([
+      this.prisma.product.count({ where: listingWhere }),
       this.prisma.order.count({ where: { sellerId: userId, status: 'completed' } }),
       this.prisma.trade.count({
         where: {
           OR: [{ initiatorId: userId }, { receiverId: userId }],
           status: 'completed',
+        }
+      }),
+      this.prisma.trade.count({
+        where: {
+          OR: [{ initiatorId: userId }, { receiverId: userId }],
         }
       }),
       this.prisma.rating.aggregate({
@@ -801,7 +828,11 @@ export class UserService {
         where: { userId },
         select: { status: true, tier: { select: { type: true } } },
       }),
+      this.prisma.collection.count({ where: collectionWhere }),
     ]);
+
+    // Gösterilecek takas sayısı: sahip → tümü, başkası → yalnızca tamamlanmış.
+    const totalTrades = isOwner ? allTrades : completedTrades;
 
     // Resolve avatar URL (S3 key → presigned URL)
     const resolvedAvatarUrl = await this.resolveAvatarUrl(user.avatarUrl);
@@ -815,7 +846,7 @@ export class UserService {
       averageRating: ratings._avg?.score || 0,
       totalRatings: ratings._count,
       totalSales,
-      totalTrades,
+      totalTrades: completedTrades,
       isVerified: user.isVerified,
     });
     // Herkese açık profilde skoru sadece premium VE kullanıcı görünürlüğü açıksa göster
@@ -833,6 +864,7 @@ export class UserService {
         totalListings,
         totalSales,
         totalTrades,
+        totalCollections,
         averageRating: ratings._avg?.score || 0,
         totalRatings: ratings._count,
       },

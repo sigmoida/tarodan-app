@@ -5,6 +5,8 @@ import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useLocalSearchParams, router } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { api, collectionsApi } from '../../../src/services/api';
+import { ThemedRefreshControl } from '../../../src/components/common';
+import { useRefresh } from '../../../src/hooks/useRefresh';
 import { useAuthStore } from '../../../src/stores/authStore';
 import { transformImageUrl } from '../../../src/utils/imageUrl';
 
@@ -14,11 +16,14 @@ const { width } = Dimensions.get('window');
 export default function CollectionDetailScreen() {
   const { id } = useLocalSearchParams();
   const queryClient = useQueryClient();
-  const { isAuthenticated } = useAuthStore();
+  const { isAuthenticated, user } = useAuthStore();
+  // Premium/business üyeler zaten koleksiyon oluşturabildiği için upsell'i gizle.
+  const isPremiumMember =
+    user?.membershipTier === 'premium' || user?.membershipTier === 'business';
   const [isLiked, setIsLiked] = useState(false);
   const [likeCount, setLikeCount] = useState(0);
 
-  const { data: apiCollection, isLoading } = useQuery({
+  const { data: apiCollection, isLoading, refetch } = useQuery({
     queryKey: ['collection', id],
     queryFn: async () => {
       try {
@@ -30,8 +35,14 @@ export default function CollectionDetailScreen() {
     },
   });
 
+  // NOT: GET /collections/:id her çağrıda viewCount'u artırıyor; kullanıcı bilerek
+  // aşağı çekerek yenilediği için görüntülenmenin +1 artması kabul edilebilir.
+  const { refreshing, onRefresh } = useRefresh(refetch);
+
   const collection = apiCollection;
   const items = collection?.items || [];
+  // Koleksiyon sahibi: ürün ekleme/düzenleme kontrollerini sadece sahibe göster.
+  const isOwner = isAuthenticated && !!user?.id && user.id === collection?.userId;
 
   // Beğeni durumu/sayısını server'dan senkronize et (web ile parite)
   useEffect(() => {
@@ -116,6 +127,14 @@ export default function CollectionDetailScreen() {
           <Ionicons name="arrow-back" size={24} color={colors.white} />
         </TouchableOpacity>
         <View style={styles.headerActions}>
+          {isOwner && (
+            <TouchableOpacity
+              style={styles.headerButton}
+              onPress={() => router.push(`/collections/${id}/edit`)}
+            >
+              <Ionicons name="create-outline" size={24} color={colors.white} />
+            </TouchableOpacity>
+          )}
           <TouchableOpacity style={styles.headerButton} onPress={handleShare}>
             <Ionicons name="share-outline" size={24} color={colors.white} />
           </TouchableOpacity>
@@ -129,7 +148,11 @@ export default function CollectionDetailScreen() {
         </View>
       </View>
 
-      <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
+      <ScrollView
+        style={styles.content}
+        showsVerticalScrollIndicator={false}
+        refreshControl={<ThemedRefreshControl refreshing={refreshing} onRefresh={onRefresh} />}
+      >
         {/* Collection Info */}
         <View style={styles.infoSection}>
           <Text style={styles.collectionName}>{collection.name}</Text>
@@ -137,24 +160,17 @@ export default function CollectionDetailScreen() {
           {/* Owner */}
           <TouchableOpacity
             style={styles.ownerRow}
-            onPress={() => router.push(`/seller/${collection.owner?.id}`)}
+            disabled={!collection.userId}
+            onPress={() => collection.userId && router.push(`/seller/${collection.userId}`)}
           >
             <Avatar
               size="md"
-              name={collection.owner?.displayName || 'U'}
+              name={collection.userName || 'U'}
             />
             <View style={styles.ownerInfo}>
               <View style={styles.ownerNameRow}>
-                <Text style={styles.ownerName}>{collection.owner?.displayName}</Text>
-                {collection.owner?.verified && (
-                  <Ionicons name="checkmark-circle" size={16} color={colors.warning[500]!} />
-                )}
+                <Text style={styles.ownerName}>{collection.userName}</Text>
               </View>
-              {collection.owner?.memberSince ? (
-                <Text style={styles.ownerSince}>
-                  Üye: {new Date(collection.owner.memberSince).toLocaleDateString('tr-TR', { month: 'short', year: 'numeric' })}
-                </Text>
-              ) : null}
             </View>
             <Ionicons name="chevron-forward" size={20} color={colors.text.muted} />
           </TouchableOpacity>
@@ -216,7 +232,17 @@ export default function CollectionDetailScreen() {
           {/* Items Section */}
           <View style={styles.itemsHeader}>
             <Text style={styles.itemsTitle}>Koleksiyon İçeriği</Text>
-            <Text style={styles.itemsCount}>{items.length} model</Text>
+            {isOwner ? (
+              <TouchableOpacity
+                style={styles.addItemBtn}
+                onPress={() => router.push(`/collections/${id}/add-items`)}
+              >
+                <Ionicons name="add" size={18} color={colors.primary[600]!} />
+                <Text style={styles.addItemBtnText}>Ürün Ekle</Text>
+              </TouchableOpacity>
+            ) : (
+              <Text style={styles.itemsCount}>{items.length} model</Text>
+            )}
           </View>
 
           {/* Items Grid — API item şekli: { productId, productTitle, productImage, productPrice, productStatus } */}
@@ -224,6 +250,15 @@ export default function CollectionDetailScreen() {
             <View style={styles.itemsEmpty}>
               <Ionicons name="cube-outline" size={40} color={colors.text.muted} />
               <Text style={styles.itemsEmptyText}>Bu koleksiyonda henüz ürün yok</Text>
+              {isOwner && (
+                <Button
+                  variant="primary"
+                  title="İlk ürünü ekle"
+                  icon="add"
+                  onPress={() => router.push(`/collections/${id}/add-items`)}
+                  style={{ marginTop: 12 }}
+                />
+              )}
             </View>
           ) : (
             <View style={styles.itemsGrid}>
@@ -254,23 +289,26 @@ export default function CollectionDetailScreen() {
           )}
         </View>
 
-        {/* Guest Notice */}
-        <View style={styles.guestNotice}>
-          <Ionicons name="lock-closed-outline" size={24} color={colors.text.muted} />
-          <View style={styles.noticeContent}>
-            <Text style={styles.noticeTitle}>Kendi Koleksiyonunuzu Oluşturun</Text>
-            <Text style={styles.noticeText}>
-              Premium üye olarak kendi Digital Garage'ınızı oluşturabilir,
-              koleksiyonlarınızı sergileyebilirsiniz.
-            </Text>
-            <Button
-              variant="primary"
-              title="Premium Üye Ol"
-              onPress={() => router.push('/(auth)/register')}
-              style={styles.noticeButton}
-            />
+        {/* Guest Notice — premium/business üyelere ve koleksiyon sahibine gösterme */}
+        {!isPremiumMember && !isOwner && (
+          <View style={styles.guestNotice}>
+            <Ionicons name="lock-closed-outline" size={24} color={colors.text.muted} />
+            <View style={styles.noticeContent}>
+              <Text style={styles.noticeTitle}>Kendi Koleksiyonunuzu Oluşturun</Text>
+              <Text style={styles.noticeText}>
+                Premium üye olarak kendi Digital Garage'ınızı oluşturabilir,
+                koleksiyonlarınızı sergileyebilirsiniz.
+              </Text>
+              <Button
+                variant="primary"
+                title="Premium Üye Ol"
+                onPress={() => router.push('/(auth)/register')}
+                fullWidth
+                style={styles.noticeButton}
+              />
+            </View>
           </View>
-        </View>
+        )}
 
         <View style={{ height: 40 }} />
       </ScrollView>
@@ -424,6 +462,21 @@ const styles = StyleSheet.create({
   itemsCount: {
     fontSize: 14,
     color: colors.text.muted,
+  },
+  addItemBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    paddingVertical: 6,
+    paddingHorizontal: 12,
+    borderRadius: 20,
+    borderWidth: 1.5,
+    borderColor: colors.primary[600]!,
+  },
+  addItemBtnText: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: colors.primary[600]!,
   },
   itemsGrid: {
     gap: 12,

@@ -1,10 +1,12 @@
 import { useState } from 'react';
 import { View, ScrollView, StyleSheet, TouchableOpacity, Dimensions, Image, Pressable } from 'react-native';
-import { Avatar, Button, Card, Spinner, Text, theme } from '@tarodan/ui-native';
+import { Avatar, Button, Card, Spinner, Text, theme, ScreenHeader } from '@tarodan/ui-native';
 import { useQuery } from '@tanstack/react-query';
 import { useLocalSearchParams, router } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { userApi, productsApi, ratingsApi } from '../../src/services/api';
+import { ThemedRefreshControl } from '../../src/components/common';
+import { useRefresh } from '../../src/hooks/useRefresh';
 import { useAuthStore } from '../../src/stores/authStore';
 import { resolveImageUrl } from '../../src/utils/imageUrl';
 
@@ -26,7 +28,7 @@ export default function SellerProfileScreen() {
   const { isAuthenticated } = useAuthStore();
   const [activeTab, setActiveTab] = useState<'listings' | 'reviews'>('listings');
 
-  const { data: apiSeller, isLoading } = useQuery({
+  const { data: apiSeller, isLoading, refetch: refetchSeller } = useQuery({
     queryKey: ['seller', id],
     queryFn: async () => {
       try {
@@ -41,7 +43,7 @@ export default function SellerProfileScreen() {
     retry: 1,
   });
 
-  const { data: sellerProducts } = useQuery({
+  const { data: sellerProducts, refetch: refetchProducts } = useQuery({
     queryKey: ['seller-products', id],
     queryFn: async () => {
       try {
@@ -56,7 +58,7 @@ export default function SellerProfileScreen() {
   });
 
   // Web `apps/web/src/app/seller/[id]/page.tsx:181-193` paritesi
-  const { data: ratingStats } = useQuery({
+  const { data: ratingStats, refetch: refetchStats } = useQuery({
     queryKey: ['seller-rating-stats', id],
     queryFn: async () => {
       try {
@@ -69,19 +71,28 @@ export default function SellerProfileScreen() {
     enabled: !!id,
   });
 
-  const { data: ratingList } = useQuery({
+  const { data: ratingList, refetch: refetchRatings } = useQuery({
     queryKey: ['seller-ratings', id],
     queryFn: async () => {
       try {
         const response = await ratingsApi.getUserRatings(String(id), { limit: 20 });
         const data: any = response.data;
-        return data?.items ?? data?.data ?? data ?? [];
+        // API şekli: { ratings, total, page, pageSize } (olası interceptor sarmalını da aç)
+        const payload = data?.data ?? data;
+        return payload?.ratings ?? payload?.items ?? (Array.isArray(payload) ? payload : []);
       } catch {
         return [];
       }
     },
     enabled: !!id,
   });
+
+  const { refreshing, onRefresh } = useRefresh(
+    refetchSeller,
+    refetchProducts,
+    refetchStats,
+    refetchRatings,
+  );
 
   const seller = apiSeller;
   const products = Array.isArray(sellerProducts) ? sellerProducts : [];
@@ -122,20 +133,18 @@ export default function SellerProfileScreen() {
 
   return (
     <View style={styles.container}>
-      {/* Header */}
-      <View style={styles.header}>
-        <TouchableOpacity onPress={() => router.back()}>
-          <Ionicons name="arrow-back" size={24} color={colors.white} />
-        </TouchableOpacity>
-        <Text style={styles.headerTitle}>Satıcı Profili</Text>
-        <View style={{ width: 24 }} />
-      </View>
+      <ScreenHeader title="Satıcı Profili" onBack={() => router.back()} />
 
-      <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
+      <ScrollView
+        style={styles.content}
+        showsVerticalScrollIndicator={false}
+        refreshControl={<ThemedRefreshControl refreshing={refreshing} onRefresh={onRefresh} />}
+      >
         {/* Profile Card */}
         <View style={styles.profileCard}>
           <Avatar
             size="xl"
+            source={seller.avatarUrl}
             name={seller.displayName?.substring(0, 2).toUpperCase() || 'S'}
           />
           <View style={styles.profileNameRow}>
@@ -180,6 +189,17 @@ export default function SellerProfileScreen() {
               </Text>
             </View>
           </View>
+
+          {/* Güven Skoru — web seller sayfası paritesi (premium + görünür; backend null dönerse gizli) */}
+          {seller.isPremium && typeof seller.trustScore === 'number' && (
+            <View style={styles.trustBadge}>
+              <Ionicons name="shield-checkmark" size={14} color={colors.warning[700]!} />
+              <Text style={styles.trustBadgeText}>
+                Güven Skoru {seller.trustScore}/100
+                {seller.trustLevel ? ` · ${seller.trustLevel}` : ''}
+              </Text>
+            </View>
+          )}
 
           {/* Badges */}
           {seller.badges && seller.badges.length > 0 && (
@@ -295,13 +315,12 @@ export default function SellerProfileScreen() {
               </View>
             ) : (
               reviews.map((review: any) => {
-                // Backend rating: { score, comment, createdAt, reviewer: { displayName, avatarUrl } }
-                // Mock: { rating, comment, date, userName }
+                // Kullanıcı/satıcı değerlendirmesi DTO'su: { score, comment, createdAt, giverName, giver: { displayName, avatarUrl } }
                 const score = review.score ?? review.rating ?? 0;
                 const reviewerName =
-                  review.reviewer?.displayName ?? review.userName ?? 'Kullanıcı';
+                  review.giver?.displayName ?? review.giverName ?? review.reviewer?.displayName ?? review.userName ?? 'Kullanıcı';
                 const dateStr = review.createdAt ?? review.date;
-                const avatarUrl = review.reviewer?.avatarUrl;
+                const avatarUrl = review.giver?.avatarUrl ?? review.reviewer?.avatarUrl;
                 return (
                   <View key={review.id} style={styles.reviewCard}>
                     <View style={styles.reviewHeader}>
@@ -359,20 +378,6 @@ const styles = StyleSheet.create({
   loadingText: {
     marginTop: 16,
     color: colors.text.muted,
-  },
-  header: {
-    backgroundColor: colors.primary[600]!,
-    paddingTop: 50,
-    paddingBottom: 16,
-    paddingHorizontal: 20,
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-  },
-  headerTitle: {
-    fontSize: 18,
-    fontWeight: 'bold',
-    color: colors.white,
   },
   content: {
     flex: 1,
@@ -439,6 +444,22 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: 4,
+  },
+  trustBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    alignSelf: 'center',
+    backgroundColor: colors.warning[50]!,
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 16,
+    gap: 6,
+    marginTop: 16,
+  },
+  trustBadgeText: {
+    fontSize: 13,
+    fontWeight: '600',
+    color: colors.warning[700]!,
   },
   badgesRow: {
     flexDirection: 'row',

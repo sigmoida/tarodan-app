@@ -16,7 +16,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { router, useLocalSearchParams } from 'expo-router';
 import { useQueryClient } from '@tanstack/react-query';
 import { Ionicons } from '@expo/vector-icons';
-import { theme } from '@tarodan/ui-native';
+import { theme, ScreenHeader } from '@tarodan/ui-native';
 import { useAuthStore } from '../../src/stores/authStore';
 import { offersApi, ordersApi } from '../../src/services/api';
 import { transformImageUrl } from '../../src/utils/imageUrl';
@@ -563,16 +563,12 @@ export default function OffersScreen() {
 
   return (
     <SafeAreaView style={styles.safeArea} edges={['top']}>
-      {/* Header */}
-      <View style={styles.header}>
-        <TouchableOpacity onPress={() => router.back()} style={styles.backBtn}>
-          <Ionicons name="arrow-back" size={24} color={colors.text.heading} />
-        </TouchableOpacity>
-        <View style={{ flex: 1 }}>
-          <Text style={styles.headerTitle}>Tekliflerim</Text>
-          <Text style={styles.headerSubtitle}>Tekliflerinizi yönetin</Text>
-        </View>
-      </View>
+      <ScreenHeader
+        title="Tekliflerim"
+        subtitle="Tekliflerinizi yönetin"
+        variant="light"
+        onBack={() => router.back()}
+      />
 
       {/* Tabs */}
       <View style={styles.tabContainer}>
@@ -743,29 +739,6 @@ const styles = StyleSheet.create({
   },
 
   // Header
-  header: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingHorizontal: 16,
-    paddingVertical: 12,
-    backgroundColor: colors.surface.elevated,
-    borderBottomWidth: 1,
-    borderBottomColor: colors.border.DEFAULT,
-  },
-  backBtn: {
-    marginRight: 12,
-    padding: 4,
-  },
-  headerTitle: {
-    fontSize: 20,
-    fontWeight: '700',
-    color: colors.text.heading,
-  },
-  headerSubtitle: {
-    fontSize: 12,
-    color: colors.text.subtle,
-    marginTop: 2,
-  },
 
   // Tabs
   tabContainer: {

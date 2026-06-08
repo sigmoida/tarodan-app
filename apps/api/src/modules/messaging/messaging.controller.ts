@@ -80,6 +80,21 @@ export class MessagingController {
   }
 
   /**
+   * Toplam okunmamış mesaj sayısı (tüm thread'ler) — header rozeti için.
+   * GET /messages/unread-count
+   */
+  @Get('unread-count')
+  async getUnreadCount(@Request() req: any): Promise<{ count: number }> {
+    try {
+      const count = await this.messagingService.getUnreadMessageCount(this.getUserId(req));
+      return { count };
+    } catch (e: any) {
+      this.logger.error(`messages/unread-count failed: ${e?.message}`, e?.stack);
+      throw e;
+    }
+  }
+
+  /**
    * Get a specific thread
    * GET /messages/threads/:id
    */

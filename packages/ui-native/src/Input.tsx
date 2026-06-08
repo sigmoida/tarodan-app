@@ -6,6 +6,7 @@ import {
   Text,
   TextInput,
   View,
+  type StyleProp,
   type TextInputProps,
   type TextStyle,
   type ViewStyle,
@@ -29,6 +30,8 @@ export interface InputProps extends TextInputProps {
   togglePasswordVisibility?: boolean;
   inputSize?: 'sm' | 'md' | 'lg';
   containerStyle?: ViewStyle;
+  /** Style merged into the bordered field wrapper (e.g. to square corners). */
+  fieldStyle?: StyleProp<ViewStyle>;
   inputStyle?: TextStyle;
 }
 
@@ -54,6 +57,7 @@ export const Input: React.FC<InputProps> = ({
   secureTextEntry,
   inputSize = 'md',
   containerStyle,
+  fieldStyle,
   inputStyle,
   onFocus,
   onBlur,
@@ -104,6 +108,7 @@ export const Input: React.FC<InputProps> = ({
         style={[
           styles.field,
           { height: ss.height, borderColor, backgroundColor: colors.white },
+          fieldStyle,
         ]}
       >
         {resolvedLeftIcon && <View style={styles.iconLeft}>{resolvedLeftIcon}</View>}

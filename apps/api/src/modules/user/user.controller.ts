@@ -7,9 +7,11 @@ import {
   Body,
   Param,
   Query,
+  Res,
   UseGuards,
   Logger,
 } from '@nestjs/common';
+import type { Response } from 'express';
 import {
   ApiTags,
   ApiOperation,
@@ -239,8 +241,36 @@ export class UserController {
   @Public()
   @ApiOperation({ summary: 'Kullanıcı profili görüntüle' })
   @ApiResponse({ status: 200, description: 'Kullanıcı profili' })
-  async getUserProfile(@Param('id') userId: string) {
-    return this.userService.getPublicProfile(userId);
+  async getUserProfile(
+    @Param('id') userId: string,
+    @CurrentUser('id') viewerId?: string,
+  ) {
+    // Token gönderildiyse (sahip kendi profiline bakıyorsa) viewerId dolu gelir;
+    // @Public rota olduğu için token yoksa null → sayaçlar herkese görünür modda döner.
+    return this.userService.getPublicProfile(userId, viewerId ?? undefined);
+  }
+
+  /**
+   * GET /users/:id/avatar
+   * Stabil avatar URL'i — taze presigned URL'e 302 redirect eder.
+   * Avatar'lar private S3'te tutulur ve presigned URL'ler 24s'te geçersizleşir;
+   * bu sabit endpoint istemci tarafında cache'lenebilir, redirect her istekte
+   * geçerli bir URL üretir. @Public: <Image> Authorization header gönderemez,
+   * profil fotoğrafları da zaten herkese açıktır.
+   */
+  @Get(':id/avatar')
+  @Public()
+  @ApiOperation({ summary: 'Kullanıcı avatarı (stabil URL → presigned redirect)' })
+  async getUserAvatar(@Param('id') userId: string, @Res() res: Response) {
+    const url = await this.userService.getAvatarRedirectUrl(userId);
+    if (!url) {
+      // Avatar yok / çözülemedi → 404; istemci <Image> onError ile baş harfe düşer.
+      res.status(404).end();
+      return;
+    }
+    // Redirect'i kısa süre cache'le (presigned URL 24s geçerli; bol pay var).
+    res.setHeader('Cache-Control', 'public, max-age=3600');
+    res.redirect(302, url);
   }
 
   /**

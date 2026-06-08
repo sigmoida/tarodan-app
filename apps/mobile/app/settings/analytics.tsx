@@ -7,12 +7,15 @@ import {
   Divider,
   Text,
   theme,
+  ScreenHeader,
 } from '@tarodan/ui-native';
 import { useState, useCallback } from 'react';
 import { router, useFocusEffect } from 'expo-router';
 import { useQuery } from '@tanstack/react-query';
 import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 import { api } from '../../src/services/api';
+import { ThemedRefreshControl } from '../../src/components/common';
+import { useRefresh } from '../../src/hooks/useRefresh';
 import { useAuthStore } from '../../src/stores/authStore';
 import { useTranslation } from '../../src/i18n';
 
@@ -109,6 +112,8 @@ export default function AnalyticsScreen() {
 
   const analytics: Analytics | null = analyticsData || null;
 
+  const { refreshing, onRefresh } = useRefresh(refetch);
+
   // Refresh on focus
   useFocusEffect(
     useCallback(() => {
@@ -145,14 +150,7 @@ export default function AnalyticsScreen() {
 
   return (
     <View style={styles.container}>
-      {/* Header */}
-      <View style={styles.header}>
-        <Pressable onPress={() => router.back()}>
-          <Ionicons name="arrow-back" size={24} color={colors.white} />
-        </Pressable>
-        <Text style={styles.headerTitle}>{t('mobile.settingsAnalytics')}</Text>
-        <View style={{ width: 24 }} />
-      </View>
+      <ScreenHeader title={t('mobile.settingsAnalytics')} onBack={() => router.back()} />
 
       {/* Content */}
       {isLoading ? (
@@ -164,7 +162,10 @@ export default function AnalyticsScreen() {
           <Text>Veri yüklenemedi</Text>
         </View>
       ) : (
-        <ScrollView style={styles.content}>
+        <ScrollView
+          style={styles.content}
+          refreshControl={<ThemedRefreshControl refreshing={refreshing} onRefresh={onRefresh} />}
+        >
           {/* Overview Cards */}
           <View style={styles.overviewRow}>
             <Card style={styles.overviewCard}>
@@ -466,20 +467,6 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     padding: 32,
     backgroundColor: colors.surface.DEFAULT,
-  },
-  header: {
-    backgroundColor: colors.primary[600]!,
-    paddingTop: 50,
-    paddingBottom: 16,
-    paddingHorizontal: 20,
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-  },
-  headerTitle: {
-    fontSize: 18,
-    fontWeight: 'bold',
-    color: colors.white,
   },
   title: {
     marginTop: 16,

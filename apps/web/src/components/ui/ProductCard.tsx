@@ -36,6 +36,10 @@ interface ProductCardProduct {
   isLimited?: boolean;
   isBoosted?: boolean;
   condition?: string;
+  /** Ürün statüsü (active = stokta). active dışındaki her statü "stokta yok" sayılır. */
+  status?: string | null;
+  /** Müsait adet (quantity - reserved). null = sınırsız stok. <= 0 ise stokta yok. */
+  availableQuantity?: number | null;
   rating?: { average: number | null; count: number };
   /**
    * Flattened attributes from API. Used to derive Hot Wheels rarity badge in-component.
@@ -91,6 +95,12 @@ export default function ProductCard({
   const handleImgError = () => setImgSrc(CARD_PLACEHOLDERS[fallbackIdx]);
   const hwRarity = deriveHwRarity(product.attributes);
 
+  // Stokta yok: active dışı statü veya müsait adet 0 (null = sınırsız stok → stokta).
+  const isOutOfStock =
+    (product.status != null && product.status !== 'active') ||
+    (product.availableQuantity != null && product.availableQuantity <= 0);
+  const outOfStockLabel = locale === 'en' ? 'OUT OF STOCK' : 'STOKTA YOK';
+
   const formatCurrency = (n: number) =>
     n.toLocaleString('tr-TR', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + ' \u20BA';
 
@@ -103,12 +113,19 @@ export default function ProductCard({
               src={imgSrc}
               alt={product.title}
               fill
-              className="object-cover"
+              className={`object-cover${isOutOfStock ? ' opacity-50' : ''}`}
               unoptimized
               priority={priority}
               loading={priority ? 'eager' : 'lazy'}
               onError={handleImgError}
             />
+            {isOutOfStock && (
+              <div className="absolute inset-0 flex items-center justify-center">
+                <span className="bg-black/70 text-white text-[11px] font-extrabold tracking-wide px-2.5 py-1 rounded">
+                  {outOfStockLabel}
+                </span>
+              </div>
+            )}
             {product.isBoosted && (
               <div className="absolute top-2 left-2">
                 <Badge variant="sponsored">{locale === 'en' ? 'Sponsored' : 'Sponsorlu'}</Badge>
@@ -172,12 +189,19 @@ export default function ProductCard({
             src={imgSrc}
             alt={product.title}
             fill
-            className="object-cover"
+            className={`object-cover${isOutOfStock ? ' opacity-50' : ''}`}
             unoptimized
             priority={priority}
             loading={priority ? 'eager' : 'lazy'}
             onError={handleImgError}
           />
+          {isOutOfStock && (
+            <div className="absolute inset-0 flex items-center justify-center">
+              <span className="bg-black/70 text-white text-xs font-extrabold tracking-wide px-3 py-1.5 rounded">
+                {outOfStockLabel}
+              </span>
+            </div>
+          )}
           <div className="absolute top-3 left-3 flex flex-col items-start gap-1.5">
             {product.isBoosted && (
               <Badge variant="sponsored">{locale === 'en' ? 'Sponsored' : 'Sponsorlu'}</Badge>

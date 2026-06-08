@@ -1,6 +1,6 @@
 import { View, StyleSheet, TouchableOpacity, TextInput as RNTextInput, KeyboardAvoidingView, Platform } from 'react-native';
-import { Avatar, Button, Input, Spinner, Text, theme } from '@tarodan/ui-native';
-import { useState } from 'react';
+import { Avatar, Button, Input, Spinner, Text, theme, ScreenHeader } from '@tarodan/ui-native';
+import { useEffect, useState } from 'react';
 import { router, useLocalSearchParams } from 'expo-router';
 import { useQuery } from '@tanstack/react-query';
 import { Ionicons } from '@expo/vector-icons';
@@ -20,9 +20,12 @@ interface User {
 
 export default function NewMessageScreen() {
   const { t } = useTranslation();
-  const { sellerId, productId, productTitle } = useLocalSearchParams<{ sellerId?: string; productId?: string; productTitle?: string }>();
+  const { sellerId, receiverId, productId, productTitle } = useLocalSearchParams<{ sellerId?: string; receiverId?: string; productId?: string; productTitle?: string }>();
   const { canSendMessage, createThread } = useMessagesStore();
   const { limits } = useAuthStore();
+
+  // Recipient can arrive as `sellerId` (seller/product context) or `receiverId` (trade context).
+  const recipientId = sellerId || receiverId;
 
   const decodedProductTitle = productTitle ? decodeURIComponent(productTitle) : '';
 
@@ -54,25 +57,34 @@ export default function NewMessageScreen() {
     enabled: searchQuery.length >= 2,
   });
 
-  // Fetch seller details if sellerId is provided
+  // Fetch recipient profile if a recipient id is provided (seller, product, or trade context)
   const { data: preselectedUser } = useQuery({
-    queryKey: ['user', sellerId],
+    queryKey: ['user', recipientId],
     queryFn: async () => {
-      if (!sellerId) return null;
+      if (!recipientId) return null;
       try {
-        const response = await api.get(`/users/${sellerId}`);
-        return response.data;
+        const response = await api.get(`/users/${recipientId}/profile`);
+        const profile = response.data?.data || response.data;
+        if (!profile?.id) return null;
+        return {
+          id: profile.id,
+          displayName: profile.displayName,
+          avatarUrl: profile.avatarUrl,
+          isSeller: profile.isSeller,
+        } as User;
       } catch (error) {
         return null;
       }
     },
-    enabled: !!sellerId && !selectedUser,
+    enabled: !!recipientId && !selectedUser,
   });
 
   // Set preselected user
-  if (preselectedUser && !selectedUser) {
-    setSelectedUser(preselectedUser);
-  }
+  useEffect(() => {
+    if (preselectedUser && !selectedUser) {
+      setSelectedUser(preselectedUser);
+    }
+  }, [preselectedUser, selectedUser]);
 
   // Fetch product details if productId is provided
   const { data: product } = useQuery({
@@ -116,14 +128,7 @@ export default function NewMessageScreen() {
       style={styles.container}
       behavior={Platform.OS === 'ios' ? 'padding' : undefined}
     >
-      {/* Header */}
-      <View style={styles.header}>
-        <TouchableOpacity onPress={() => router.back()}>
-          <Ionicons name="arrow-back" size={24} color={colors.white} />
-        </TouchableOpacity>
-        <Text style={styles.headerTitle}>{t('mobile.messagesNew')}</Text>
-        <View style={{ width: 24 }} />
-      </View>
+      <ScreenHeader title={t('mobile.messagesNew')} onBack={() => router.back()} />
 
       {/* Content */}
       <View style={styles.content}>
@@ -260,20 +265,6 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: colors.surface.DEFAULT,
-  },
-  header: {
-    backgroundColor: colors.primary[600]!,
-    paddingTop: 50,
-    paddingBottom: 16,
-    paddingHorizontal: 20,
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-  },
-  headerTitle: {
-    fontSize: 18,
-    fontWeight: 'bold',
-    color: colors.white,
   },
   content: {
     flex: 1,

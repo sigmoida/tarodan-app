@@ -28,6 +28,22 @@ const getApiUrl = () => {
 
 const API_URL = getApiUrl();
 
+/**
+ * Stabil avatar URL'i. Backend `GET /users/:id/avatar` taze bir presigned URL'e
+ * 302 redirect eder; URL hep aynı kaldığı için 24s'lik presigned expiry'sinden
+ * etkilenmez (persist edilmiş/uzun cache'lenmiş veride bayatlamaz).
+ *
+ * `versionHint` (mevcut presigned avatar URL'i) verilirse, S3 obje yolundan
+ * türetilen bir `?v` eki eklenir: foto değişince <Image> cache'i busts, aynı
+ * dosyada cache hit kalır.
+ */
+export const buildAvatarUrl = (userId: string, versionHint?: string | null): string => {
+  const base = `${API_URL}/users/${userId}/avatar`;
+  if (!versionHint) return base;
+  const filename = versionHint.split('?')[0].split('/').pop() || '';
+  return filename ? `${base}?v=${encodeURIComponent(filename)}` : base;
+};
+
 console.log('📡 API URL:', API_URL);
 console.log('📱 Platform:', Platform.OS);
 console.log('🌐 Expo Host:', Constants.expoConfig?.hostUri);
@@ -250,6 +266,9 @@ export type OrderAddressInput = {
 export const ordersApi = {
   getAll: (params?: Record<string, any>) =>
     api.get('/orders', { params }),
+  /** Satıcı kazanç özeti (filtre/sayfalama bağımsız): { totalEarnings, pendingEarnings } */
+  getSellerEarnings: () =>
+    api.get<{ totalEarnings: number; pendingEarnings: number }>('/orders/seller/earnings'),
   getOne: (id: string | number) =>
     api.get(`/orders/${id}`),
   create: (data: any) =>
@@ -317,6 +336,9 @@ export const messagesApi = {
     api.post(`/messages/threads/${threadId}/messages`, { content }),
   markAsRead: (threadId: string) =>
     api.post(`/messages/threads/${threadId}/read`),
+  /** Tüm thread'lerdeki toplam okunmamış mesaj sayısı (header rozeti, sayfalama bağımsız) */
+  getUnreadCount: () =>
+    api.get<{ count: number }>('/messages/unread-count'),
 };
 
 // Collections API - Web ile aynı endpoint'ler
@@ -351,6 +373,9 @@ export const collectionsApi = {
 export const tradesApi = {
   getAll: (params?: Record<string, any>) =>
     api.get('/trades', { params }),
+  /** Takaslar sekme sayaçları (filtre/sayfalama bağımsız): { all, pending, shipping, completed } */
+  getStatusCounts: () =>
+    api.get<{ all: number; pending: number; shipping: number; completed: number }>('/trades/status-counts'),
   getOne: (id: string | number) => 
     api.get(`/trades/${id}`),
   create: (data: {
@@ -425,7 +450,13 @@ export const userApi = {
     displayName?: string;
     phone?: string;
     bio?: string;
+    birthDate?: string;
     avatarUrl?: string;
+    companyName?: string;
+    taxId?: string;
+    taxOffice?: string;
+    isCorporateSeller?: boolean;
+    showTrustScore?: boolean;
   } | FormData) =>
     api.patch('/users/me', data, data instanceof FormData
       ? { headers: { 'Content-Type': 'multipart/form-data' } }

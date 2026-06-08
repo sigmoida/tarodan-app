@@ -19,8 +19,23 @@ const sizeMap = { sm: 28, md: 40, lg: 56, xl: 80 } as const;
 
 export const Avatar: React.FC<AvatarProps> = ({ source, name, size = 'md' }) => {
   const s = sizeMap[size];
+  const [failed, setFailed] = React.useState(false);
+
+  // Boş/whitespace string'i "kaynak yok" say — yoksa <Image> baş harf yerine
+  // boş daire bırakır (örn. çözülememiş/çıplak key).
   const src =
-    typeof source === 'string' ? { uri: source } : (source as ImageSourcePropType | undefined);
+    typeof source === 'string'
+      ? source.trim()
+        ? { uri: source.trim() }
+        : undefined
+      : (source as ImageSourcePropType | undefined);
+
+  // Kaynak değişince hata bayrağını sıfırla ki yeni URL tekrar denensin.
+  const srcKey = typeof source === 'string' ? source : JSON.stringify(source ?? null);
+  React.useEffect(() => {
+    setFailed(false);
+  }, [srcKey]);
+
   const initials = name
     ? name
         .split(' ')
@@ -31,6 +46,9 @@ export const Avatar: React.FC<AvatarProps> = ({ source, name, size = 'md' }) => 
         .toUpperCase()
     : '?';
 
+  // src yoksa veya yükleme başarısızsa (expired presigned URL / 403 / ağ) baş harfe düş.
+  const showImage = !!src && !failed;
+
   return (
     <View
       style={[
@@ -38,8 +56,12 @@ export const Avatar: React.FC<AvatarProps> = ({ source, name, size = 'md' }) => 
         { width: s, height: s, borderRadius: s / 2 },
       ]}
     >
-      {src ? (
-        <Image source={src} style={{ width: s, height: s, borderRadius: s / 2 }} />
+      {showImage ? (
+        <Image
+          source={src}
+          style={{ width: s, height: s, borderRadius: s / 2 }}
+          onError={() => setFailed(true)}
+        />
       ) : (
         <Text style={[styles.initials, { fontSize: s * 0.4 }]}>{initials}</Text>
       )}

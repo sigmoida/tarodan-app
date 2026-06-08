@@ -1,5 +1,5 @@
 import { View, ScrollView, StyleSheet, TouchableOpacity, Image, RefreshControl } from 'react-native';
-import { FAB, Snackbar, Spinner, Text, theme } from '@tarodan/ui-native';
+import { FAB, Snackbar, Spinner, Text, theme, ScreenHeader } from '@tarodan/ui-native';
 import { router } from 'expo-router';
 import { useQuery } from '@tanstack/react-query';
 import { useState } from 'react';
@@ -54,14 +54,7 @@ export default function CollectionsScreen() {
 
   return (
     <View style={styles.container}>
-      {/* Header */}
-      <View style={styles.header}>
-        <TouchableOpacity onPress={() => router.back()}>
-          <Ionicons name="arrow-back" size={24} color={colors.white} />
-        </TouchableOpacity>
-        <Text style={styles.headerTitle}>{t('mobile.settingsCollections')}</Text>
-        <View style={{ width: 24 }} />
-      </View>
+      <ScreenHeader title={t('mobile.settingsCollections')} onBack={() => router.back()} />
 
       <ScrollView
         style={styles.content}
@@ -176,20 +169,6 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: colors.surface.alt,
-  },
-  header: {
-    backgroundColor: colors.primary[600]!,
-    paddingTop: 50,
-    paddingBottom: 16,
-    paddingHorizontal: 20,
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-  },
-  headerTitle: {
-    fontSize: 18,
-    fontWeight: 'bold',
-    color: colors.white,
   },
   content: {
     flex: 1,

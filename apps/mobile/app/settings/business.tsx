@@ -4,6 +4,7 @@ import {
   Spinner,
   Button,
   Text,
+  ScreenHeader,
   theme,
 } from '@tarodan/ui-native';
 import { useState, useEffect } from 'react';
@@ -110,13 +111,7 @@ export default function BusinessDashboardScreen() {
   if (error) {
     return (
       <View style={styles.container}>
-        <View style={styles.header}>
-          <Pressable onPress={() => router.back()} style={styles.backButton}>
-            <Ionicons name="arrow-back" size={24} color={colors.text.heading} />
-          </Pressable>
-          <Text style={styles.headerTitle}>{t('mobile.settingsBusiness')}</Text>
-          <View style={{ width: 40 }} />
-        </View>
+        <ScreenHeader title={t('mobile.settingsBusiness')} variant="light" onBack={() => router.back()} />
         <View style={styles.errorContainer}>
           <Ionicons name="warning-outline" size={64} color={colors.danger[600]!} />
           <Text style={styles.errorText}>{error}</Text>
@@ -129,8 +124,8 @@ export default function BusinessDashboardScreen() {
           ) : (
             <Button
               variant="primary"
-              title="Üyeliğimi Yükselt"
-              onPress={() => router.push('/pricing')}
+              title="Kurumsal Hesap Aç"
+              onPress={() => router.push('/seller/register')}
             />
           )}
         </View>
@@ -140,14 +135,7 @@ export default function BusinessDashboardScreen() {
 
   return (
     <View style={styles.container}>
-      {/* Header */}
-      <View style={styles.header}>
-        <Pressable onPress={() => router.back()} style={styles.backButton}>
-          <Ionicons name="arrow-back" size={24} color={colors.text.heading} />
-        </Pressable>
-        <Text style={styles.headerTitle}>{t('mobile.settingsBusiness')}</Text>
-        <View style={{ width: 40 }} />
-      </View>
+      <ScreenHeader title={t('mobile.settingsBusiness')} variant="light" onBack={() => router.back()} />
 
       <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
         {/* Company Header */}
@@ -408,25 +396,6 @@ const styles = StyleSheet.create({
   loadingText: {
     marginTop: 12,
     color: colors.text.muted,
-  },
-  header: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingHorizontal: 16,
-    paddingTop: 50,
-    paddingBottom: 16,
-    backgroundColor: colors.white,
-    borderBottomWidth: 1,
-    borderBottomColor: colors.border.DEFAULT,
-  },
-  backButton: {
-    padding: 8,
-  },
-  headerTitle: {
-    fontSize: 18,
-    fontWeight: 'bold',
-    color: colors.text.heading,
   },
   errorContainer: {
     flex: 1,

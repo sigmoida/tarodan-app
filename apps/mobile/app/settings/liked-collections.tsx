@@ -1,5 +1,5 @@
 import { View, ScrollView, StyleSheet, TouchableOpacity, Image, RefreshControl } from 'react-native';
-import { Spinner, Snackbar, Text, theme } from '@tarodan/ui-native';
+import { Spinner, Snackbar, Text, theme, ScreenHeader } from '@tarodan/ui-native';
 import { useState, useCallback } from 'react';
 import { router, useFocusEffect } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
@@ -19,11 +19,8 @@ interface LikedCollection {
   likeCount: number;
   viewCount: number;
   isPublic: boolean;
-  owner?: {
-    id: string;
-    displayName: string;
-    avatarUrl?: string;
-  };
+  userId?: string;
+  userName?: string;
 }
 
 export default function LikedCollectionsScreen() {
@@ -83,13 +80,7 @@ export default function LikedCollectionsScreen() {
   if (!isAuthenticated) {
     return (
       <View style={styles.container}>
-        <View style={styles.header}>
-          <TouchableOpacity onPress={() => router.back()} style={styles.backButton}>
-            <Ionicons name="arrow-back" size={24} color={colors.white} />
-          </TouchableOpacity>
-          <Text style={styles.headerTitle}>{t('mobile.settingsLikedCollections')}</Text>
-          <View style={{ width: 40 }} />
-        </View>
+        <ScreenHeader title={t('mobile.settingsLikedCollections')} onBack={() => router.back()} />
         <View style={styles.emptyContainer}>
           <Ionicons name="heart-outline" size={64} color={colors.text.subtle} />
           <Text style={styles.emptyTitle}>Giriş Yapın</Text>
@@ -109,14 +100,7 @@ export default function LikedCollectionsScreen() {
 
   return (
     <View style={styles.container}>
-      {/* Header */}
-      <View style={styles.header}>
-        <TouchableOpacity onPress={() => router.back()} style={styles.backButton}>
-          <Ionicons name="arrow-back" size={24} color={colors.white} />
-        </TouchableOpacity>
-        <Text style={styles.headerTitle}>{t('mobile.settingsLikedCollections')}</Text>
-        <View style={{ width: 40 }} />
-      </View>
+      <ScreenHeader title={t('mobile.settingsLikedCollections')} onBack={() => router.back()} />
 
       {isLoading ? (
         <View style={styles.loadingContainer}>
@@ -193,11 +177,11 @@ export default function LikedCollectionsScreen() {
                   <Text style={styles.collectionName} numberOfLines={1}>
                     {collection.name}
                   </Text>
-                  {collection.owner && (
+                  {collection.userName ? (
                     <Text style={styles.ownerName} numberOfLines={1}>
-                      {collection.owner.displayName}
+                      {collection.userName}
                     </Text>
-                  )}
+                  ) : null}
                 </View>
               </TouchableOpacity>
             ))}
@@ -221,23 +205,6 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: colors.surface.alt,
-  },
-  header: {
-    backgroundColor: colors.primary[600]!,
-    paddingTop: 50,
-    paddingBottom: 16,
-    paddingHorizontal: 16,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-  },
-  backButton: {
-    padding: 8,
-  },
-  headerTitle: {
-    fontSize: 18,
-    fontWeight: 'bold',
-    color: colors.white,
   },
   scrollView: {
     flex: 1,

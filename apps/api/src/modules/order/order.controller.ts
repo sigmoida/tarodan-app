@@ -230,6 +230,21 @@ export class OrderController {
   }
 
   /**
+   * GET /orders/seller/earnings - Satıcı kazanç özeti (filtre/sayfalama bağımsız)
+   * NOT: ':id' rotasından ÖNCE tanımlı (çok-segmentli yol olduğu için aslında çakışmaz,
+   * yine de niyet net olsun diye burada).
+   */
+  @Get('seller/earnings')
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth()
+  @ApiOperation({ summary: 'Seller earnings summary (total + pending)' })
+  async getSellerEarnings(
+    @CurrentUser('id') userId: string,
+  ): Promise<{ totalEarnings: number; pendingEarnings: number }> {
+    return this.orderService.getSellerEarnings(userId);
+  }
+
+  /**
    * GET /orders/:id - Get single order
    */
   @Get(':id')

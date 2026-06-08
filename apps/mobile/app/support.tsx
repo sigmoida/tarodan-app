@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { View, ScrollView, StyleSheet, TouchableOpacity } from 'react-native';
 import { router } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
-import { theme, Text, Card, Chip, Snackbar, Input, Textarea, Button } from '@tarodan/ui-native';
+import { theme, Text, Card, Chip, Snackbar, Input, Textarea, Button, ScreenHeader } from '@tarodan/ui-native';
 import { useAuthStore } from '../src/stores/authStore';
 import { useTranslation } from '../src/i18n';
 
@@ -58,13 +58,7 @@ export default function SupportScreen() {
   if (!isAuthenticated) {
     return (
       <View style={styles.container}>
-        <View style={styles.header}>
-          <TouchableOpacity onPress={() => router.back()}>
-            <Ionicons name="arrow-back" size={24} color={colors.white} />
-          </TouchableOpacity>
-          <Text style={styles.headerTitle}>{t('mobile.pageSupport')}</Text>
-          <View style={{ width: 24 }} />
-        </View>
+        <ScreenHeader title={t('mobile.pageSupport')} onBack={() => router.back()} />
         <View style={styles.authRequired}>
           <Ionicons name="headset-outline" size={64} color={colors.primary[600]!} />
           <Text style={styles.authTitle}>Giriş Gerekli</Text>
@@ -83,14 +77,7 @@ export default function SupportScreen() {
 
   return (
     <View style={styles.container}>
-      {/* Header */}
-      <View style={styles.header}>
-        <TouchableOpacity onPress={() => router.back()}>
-          <Ionicons name="arrow-back" size={24} color={colors.white} />
-        </TouchableOpacity>
-        <Text style={styles.headerTitle}>Destek Talebi</Text>
-        <View style={{ width: 24 }} />
-      </View>
+      <ScreenHeader title="Destek Talebi" onBack={() => router.back()} />
 
       <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
         {/* Category Selection */}
@@ -214,20 +201,6 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: colors.surface.alt,
-  },
-  header: {
-    backgroundColor: colors.primary[600]!,
-    paddingTop: 50,
-    paddingBottom: 16,
-    paddingHorizontal: 20,
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-  },
-  headerTitle: {
-    fontSize: 18,
-    fontWeight: 'bold',
-    color: colors.white,
   },
   authRequired: {
     flex: 1,

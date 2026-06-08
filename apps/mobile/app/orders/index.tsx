@@ -5,12 +5,14 @@ import {
   Spinner,
   Card,
   StatusBadge,
+  Snackbar,
   Text,
   theme,
+  ScreenHeader,
 } from '@tarodan/ui-native';
 import { useState, useCallback } from 'react';
 import { router, useFocusEffect } from 'expo-router';
-import { useQuery } from '@tanstack/react-query';
+import { useQuery, useMutation } from '@tanstack/react-query';
 import { Ionicons } from '@expo/vector-icons';
 import type { BadgeVariant } from '@tarodan/ui-native';
 import { ordersApi } from '../../src/services/api';
@@ -38,6 +40,7 @@ interface Order {
   };
   trackingNumber?: string;
   createdAt: string;
+  isBuyer?: boolean;
   hasProductRating?: boolean;
   hasSellerRating?: boolean;
 }
@@ -51,6 +54,7 @@ const uiOrderStatusConfig: Record<string, { label: string; variant: BadgeVariant
   processing: { label: 'Hazırlanıyor', variant: 'info' },
   shipped: { label: 'Kargoda', variant: 'primary' },
   delivered: { label: 'Teslim Edildi', variant: 'success' },
+  awaiting_confirmation: { label: 'Onayınız Bekleniyor', variant: 'warning' },
   completed: { label: 'Tamamlandı', variant: 'success' },
   cancelled: { label: 'İptal', variant: 'danger' },
   refunded: { label: 'İade', variant: 'secondary' },
@@ -69,6 +73,11 @@ export default function OrdersScreen() {
     type: 'product' | 'seller';
     order: Order | null;
   }>({ visible: false, type: 'product', order: null });
+  const [snackbar, setSnackbar] = useState<{ visible: boolean; message: string; variant: 'success' | 'danger' | 'default' }>({
+    visible: false,
+    message: '',
+    variant: 'default',
+  });
 
   // Fetch orders
   const { data: ordersData, isLoading, refetch, error: ordersError } = useQuery({
@@ -133,8 +142,35 @@ export default function OrdersScreen() {
   };
 
   const canRate = (order: Order) => {
-    return ['delivered', 'completed'].includes(order.status);
+    // Yalnızca alıcı, teslim alınmış/tamamlanmış siparişi değerlendirebilir
+    return order.isBuyer === true && ['delivered', 'completed'].includes(order.status);
   };
+
+  // Alıcı teslimatı listeden onaylayabilir (completed'e taşır → değerlendirme açılır)
+  const canConfirmReceipt = (order: Order) =>
+    order.isBuyer === true && ['delivered', 'awaiting_confirmation'].includes(order.status);
+
+  const confirmMutation = useMutation({
+    mutationFn: async (order: Order) =>
+      order.status === 'awaiting_confirmation'
+        ? ordersApi.confirmReceipt(order.id)
+        : ordersApi.confirm(order.id),
+    onSuccess: () => {
+      refetch();
+      setSnackbar({
+        visible: true,
+        variant: 'success',
+        message: 'Teslimat onaylandı. Artık siparişi değerlendirebilirsiniz.',
+      });
+    },
+    onError: (err: any) => {
+      setSnackbar({
+        visible: true,
+        variant: 'danger',
+        message: err?.response?.data?.message || 'Onay başarısız oldu.',
+      });
+    },
+  });
 
   // Not authenticated
   if (!isAuthenticated) {
@@ -152,14 +188,7 @@ export default function OrdersScreen() {
 
   return (
     <View style={styles.container}>
-      {/* Header */}
-      <View style={styles.header}>
-        <Pressable onPress={() => router.back()}>
-          <Ionicons name="arrow-back" size={24} color={colors.white} />
-        </Pressable>
-        <Text style={styles.headerTitle}>{role === 'buyer' ? 'Siparişlerim' : 'Satışlarım'}</Text>
-        <View style={{ width: 24 }} />
-      </View>
+      <ScreenHeader title={role === 'buyer' ? 'Siparişlerim' : 'Satışlarım'} onBack={() => router.back()} />
 
       {/* Role Toggle */}
       <View style={{ flexDirection: 'row', paddingHorizontal: 16, paddingTop: 12, gap: 8 }}>
@@ -264,6 +293,21 @@ export default function OrdersScreen() {
                 </View>
               </Pressable>
 
+              {/* Alıcı teslim onayı — completed'e taşır, ardından değerlendirme açılır */}
+              {canConfirmReceipt(order) && (
+                <View style={styles.ratingSection}>
+                  <Button
+                    variant="primary"
+                    size="sm"
+                    icon="checkmark-circle"
+                    title="Teslim Aldım"
+                    onPress={() => confirmMutation.mutate(order)}
+                    isLoading={confirmMutation.isPending && confirmMutation.variables?.id === order.id}
+                    style={styles.rateButton}
+                  />
+                </View>
+              )}
+
               {/* Rating buttons for completed orders */}
               {canRate(order) && (
                 <View style={styles.ratingSection}>
@@ -314,8 +358,24 @@ export default function OrdersScreen() {
         sellerId={ratingModal.order?.seller.id}
         productTitle={ratingModal.order?.product.title}
         sellerName={ratingModal.order?.seller.displayName}
-        onSuccess={() => refetch()}
+        onSuccess={() => {
+          refetch();
+          setSnackbar({
+            visible: true,
+            variant: 'success',
+            message: 'Değerlendirmeniz alındı. Onaylandıktan sonra yayınlanacak.',
+          });
+        }}
       />
+
+      <Snackbar
+        visible={snackbar.visible}
+        onDismiss={() => setSnackbar({ visible: false, message: '', variant: 'default' })}
+        duration={3500}
+        variant={snackbar.variant}
+      >
+        {snackbar.message}
+      </Snackbar>
     </View>
   );
 }
@@ -331,20 +391,6 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     padding: 32,
     backgroundColor: colors.surface.DEFAULT,
-  },
-  header: {
-    backgroundColor: colors.primary[600]!,
-    paddingTop: 50,
-    paddingBottom: 16,
-    paddingHorizontal: 20,
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-  },
-  headerTitle: {
-    fontSize: 18,
-    fontWeight: 'bold',
-    color: colors.white,
   },
   title: {
     marginTop: 16,

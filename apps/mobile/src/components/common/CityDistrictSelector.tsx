@@ -1,5 +1,5 @@
 import React, { useMemo, useState } from 'react';
-import { View, StyleSheet, FlatList, TouchableOpacity, Modal, Pressable } from 'react-native';
+import { View, StyleSheet, FlatList, TouchableOpacity, Modal, Keyboard } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { theme, Input, Text } from '@tarodan/ui-native';
 import { turkeyLocations, getDistrictsForCity } from '../../utils/turkeyLocations';
@@ -69,11 +69,24 @@ export function CityDistrictSelector({
     setDistrictSearch('');
   };
 
+  // Modal'ı açmadan önce klavyeyi kapat: aksi halde iOS'ta pageSheet,
+  // açık klavyenin arkasında kalıp "açılmıyor / seçilemiyor" gibi görünür.
+  const openCityModal = () => {
+    Keyboard.dismiss();
+    setCityModal(true);
+  };
+
+  const openDistrictModal = () => {
+    if (!city) return;
+    Keyboard.dismiss();
+    setDistrictModal(true);
+  };
+
   return (
     <View>
       <TouchableOpacity
         activeOpacity={0.7}
-        onPress={() => setCityModal(true)}
+        onPress={openCityModal}
         style={[
           styles.fakeInput,
           cityError && styles.fakeInputError,
@@ -97,7 +110,7 @@ export function CityDistrictSelector({
       {!hideDistrict ? (
         <TouchableOpacity
           activeOpacity={0.7}
-          onPress={() => city && setDistrictModal(true)}
+          onPress={openDistrictModal}
           disabled={!city}
           style={[
             styles.fakeInput,
@@ -121,13 +134,19 @@ export function CityDistrictSelector({
         </TouchableOpacity>
       ) : null}
 
-      {/* City modal */}
-      <Modal visible={cityModal} animationType="slide" transparent onRequestClose={() => setCityModal(false)}>
-        <Pressable style={styles.backdrop} onPress={() => setCityModal(false)} />
-        <View style={styles.sheet}>
+      {/* City modal — uygulama genelinde kanıtlanmış pageSheet deseni
+          (bkz. ProductFilterSheet). transparent + absolute bottom-sheet
+          deseni iOS'ta klavye/dokunma sorunlarına yol açıyordu. */}
+      <Modal
+        visible={cityModal}
+        animationType="slide"
+        presentationStyle="pageSheet"
+        onRequestClose={() => setCityModal(false)}
+      >
+        <View style={styles.modalContainer}>
           <View style={styles.sheetHeader}>
             <Text style={styles.sheetTitle}>İl Seç</Text>
-            <TouchableOpacity onPress={() => setCityModal(false)}>
+            <TouchableOpacity onPress={() => setCityModal(false)} hitSlop={8}>
               <Ionicons name="close" size={22} color={colors.text.muted} />
             </TouchableOpacity>
           </View>
@@ -159,12 +178,16 @@ export function CityDistrictSelector({
       </Modal>
 
       {/* District modal */}
-      <Modal visible={districtModal} animationType="slide" transparent onRequestClose={() => setDistrictModal(false)}>
-        <Pressable style={styles.backdrop} onPress={() => setDistrictModal(false)} />
-        <View style={styles.sheet}>
+      <Modal
+        visible={districtModal}
+        animationType="slide"
+        presentationStyle="pageSheet"
+        onRequestClose={() => setDistrictModal(false)}
+      >
+        <View style={styles.modalContainer}>
           <View style={styles.sheetHeader}>
             <Text style={styles.sheetTitle}>İlçe Seç ({city})</Text>
-            <TouchableOpacity onPress={() => setDistrictModal(false)}>
+            <TouchableOpacity onPress={() => setDistrictModal(false)} hitSlop={8}>
               <Ionicons name="close" size={22} color={colors.text.muted} />
             </TouchableOpacity>
           </View>
@@ -234,20 +257,9 @@ const styles = StyleSheet.create({
   fakePlaceholder: {
     color: colors.text.subtle,
   },
-  backdrop: {
+  modalContainer: {
     flex: 1,
-    backgroundColor: colors.overlay.black50,
-  },
-  sheet: {
-    position: 'absolute',
-    bottom: 0,
-    left: 0,
-    right: 0,
-    maxHeight: '80%',
     backgroundColor: colors.surface.DEFAULT,
-    borderTopLeftRadius: 16,
-    borderTopRightRadius: 16,
-    paddingBottom: 16,
   },
   sheetHeader: {
     flexDirection: 'row',

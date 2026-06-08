@@ -223,7 +223,7 @@ export default function SellerDashboardScreen() {
             <QuickAction
               icon="plus-circle-outline"
               label="Yeni İlan"
-              onPress={() => router.push('/(tabs)/create')}
+              onPress={() => router.push('/(tabs)/sell')}
               color={colors.primary[600]!}
             />
             <QuickAction

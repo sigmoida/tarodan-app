@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { View, ScrollView, StyleSheet, TouchableOpacity } from 'react-native';
 import { router } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
-import { theme, Text, Input, Button, Divider } from '@tarodan/ui-native';
+import { theme, Text, Input, Button, Divider, ScreenHeader } from '@tarodan/ui-native';
 import { api } from '../src/services/api';
 
 const { colors } = theme;
@@ -94,14 +94,7 @@ export default function OrderTrackScreen() {
 
   return (
     <View style={styles.container}>
-      {/* Header */}
-      <View style={styles.header}>
-        <TouchableOpacity onPress={() => router.back()}>
-          <Ionicons name="arrow-back" size={24} color={colors.white} />
-        </TouchableOpacity>
-        <Text style={styles.headerTitle}>Sipariş Takip</Text>
-        <View style={{ width: 24 }} />
-      </View>
+      <ScreenHeader title="Sipariş Takip" onBack={() => router.back()} />
 
       <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
         {/* Track Form */}
@@ -319,20 +312,6 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: colors.surface.alt,
-  },
-  header: {
-    backgroundColor: colors.primary[600]!,
-    paddingTop: 50,
-    paddingBottom: 16,
-    paddingHorizontal: 20,
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-  },
-  headerTitle: {
-    fontSize: 18,
-    fontWeight: 'bold',
-    color: colors.white,
   },
   content: {
     flex: 1,

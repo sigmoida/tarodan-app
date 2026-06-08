@@ -30,6 +30,7 @@ export { ProgressBar, type ProgressBarProps } from './ProgressBar';
 export { FAB, type FABProps, type FABVariant, type FABSize } from './FAB';
 export { Snackbar, type SnackbarProps, type SnackbarVariant } from './Snackbar';
 export { Input, type InputProps } from './Input';
+export { DateField, type DateFieldProps } from './DateField';
 export { Textarea, type TextareaProps } from './Textarea';
 export {
   Select,

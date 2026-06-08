@@ -1,10 +1,8 @@
-import { View, ScrollView, StyleSheet, Pressable, Image, Alert, Linking } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { View, ScrollView, StyleSheet, Pressable, Image, Alert, Linking, Clipboard } from 'react-native';
 import {
   theme,
   Button,
   Card,
-  Divider,
   Spinner,
   Snackbar,
   Modal,
@@ -14,17 +12,20 @@ import {
   ScreenHeader,
   tradeStatusConfig,
 } from '@tarodan/ui-native';
-import { useState } from 'react';
-import { router, useLocalSearchParams, Stack } from 'expo-router';
+import { useState, useEffect } from 'react';
+import { router, useLocalSearchParams } from 'expo-router';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 import { format } from 'date-fns';
 import { tr } from 'date-fns/locale';
 import { tradesApi, paymentsApi } from '../../src/services/api';
+import { ThemedRefreshControl } from '../../src/components/common';
+import { useRefresh } from '../../src/hooks/useRefresh';
 import { useAuthStore } from '../../src/stores/authStore';
 import { useTranslation } from '../../src/i18n';
 import { captureException } from '../../src/services/sentry';
 import { resolveImageUrl } from '../../src/utils/imageUrl';
+import { formatPrice } from '../../src/utils/format';
 
 const { colors } = theme;
 
@@ -51,6 +52,48 @@ const TRADE_STATUSES = {
   cancelled: { label: 'İptal Edildi', color: colors.text.muted, icon: 'ban-outline' },
   disputed: { label: 'İtiraz Var', color: colors.danger[600]!, icon: 'warning-outline' },
 };
+
+// Statü açıklamaları — banner altındaki bilgilendirme kartı (web parity).
+const STATUS_DESCRIPTIONS: Record<string, string> = {
+  pending: 'Karşı tarafın teklifi yanıtlaması bekleniyor.',
+  accepted: 'Takas kabul edildi. Şimdi ürünler Tarodan deposuna kargolanacak.',
+  awaiting_payment: 'Nakit fark ödemesi bekleniyor. Ödeme tamamlanınca kargo süreci başlar.',
+  shipping_to_warehouse: 'Her iki taraf da ürününü Tarodan deposuna kargoluyor.',
+  at_warehouse: 'Ürünler Tarodan deposuna ulaştı.',
+  admin_reviewing: 'Ekibimiz ürünleri inceliyor. Onay sonrası size kargolanacak.',
+  shipping_to_recipients: 'Ürünler depodan size doğru kargolanıyor.',
+  returning: 'Takas reddedildi. Ürünleriniz size iade ediliyor.',
+  completed: 'Takas başarıyla tamamlandı.',
+  rejected: 'Bu takas teklifi reddedildi.',
+  cancelled: 'Bu takas iptal edildi.',
+  disputed: 'Bu takas için bir itiraz açıldı. Ekibimiz inceliyor.',
+};
+
+// Statüye göre aktif son tarih alanı.
+function deadlineForStatus(trade: Trade): string | null {
+  if (trade.status === 'pending') return trade.responseDeadline ?? null;
+  if (trade.status === 'awaiting_payment') return trade.paymentDeadline ?? null;
+  if (trade.status === 'shipping_to_warehouse') return trade.shippingDeadline ?? null;
+  if (trade.status === 'shipping_to_recipients') return trade.confirmationDeadline ?? null;
+  return null;
+}
+
+// Kalan süreyi "2g 04:15:30" / "04:15:30" biçiminde döndürür; süre dolduysa null.
+function formatCountdown(deadlineIso: string | null | undefined, nowMs: number): string | null {
+  if (!deadlineIso) return null;
+  const end = new Date(deadlineIso).getTime();
+  if (isNaN(end)) return null;
+  const diff = end - nowMs;
+  if (diff <= 0) return null;
+  const totalSec = Math.floor(diff / 1000);
+  const days = Math.floor(totalSec / 86400);
+  const hours = Math.floor((totalSec % 86400) / 3600);
+  const mins = Math.floor((totalSec % 3600) / 60);
+  const secs = totalSec % 60;
+  const pad = (n: number) => String(n).padStart(2, '0');
+  const hms = `${pad(hours)}:${pad(mins)}:${pad(secs)}`;
+  return days > 0 ? `${days}g ${hms}` : hms;
+}
 
 const SHIPMENT_STATUS_CHIP: Record<string, { labelKey: string; bg: string; fg: string; icon?: string }> = {
   label_created: { labelKey: 'trade.shipmentStatus.label_created', bg: colors.surface.alt, fg: colors.text.muted },
@@ -81,9 +124,110 @@ function ShipmentStatusChip({ status, t, testID }: { status?: string | null; t: 
   );
 }
 
+// Depo-escrow akışı için yatay ilerleme çubuğu (web ile parite).
+const STEP_FLOW_STATUSES = new Set([
+  'accepted',
+  'awaiting_payment',
+  'shipping_to_warehouse',
+  'at_warehouse',
+  'admin_reviewing',
+  'shipping_to_recipients',
+  'completed',
+]);
+
+// Statü → görünür adım. admin_reviewing, "Depoda" adımına denk gelir.
+const STATUS_TO_STEP_KEY: Record<string, string> = {
+  accepted: 'accepted',
+  awaiting_payment: 'awaiting_payment',
+  shipping_to_warehouse: 'shipping_to_warehouse',
+  at_warehouse: 'at_warehouse',
+  admin_reviewing: 'at_warehouse',
+  shipping_to_recipients: 'shipping_to_recipients',
+  completed: 'completed',
+};
+
+function TradeProgressStepper({ status, hasCash }: { status: string; hasCash: boolean }) {
+  if (!STEP_FLOW_STATUSES.has(status)) return null;
+  const steps = [
+    { key: 'accepted', label: 'Kabul Edildi' },
+    ...(hasCash ? [{ key: 'awaiting_payment', label: 'Ödeme' }] : []),
+    { key: 'shipping_to_warehouse', label: 'Depoya Kargo' },
+    { key: 'at_warehouse', label: 'Depoda' },
+    { key: 'shipping_to_recipients', label: 'Size Kargo' },
+    { key: 'completed', label: 'Tamamlandı' },
+  ];
+  const currentKey = STATUS_TO_STEP_KEY[status] ?? 'accepted';
+  const current = Math.max(
+    0,
+    steps.findIndex((s) => s.key === currentKey),
+  );
+  // Tamamlanmış takasta son adım da dahil tüm adımlar "bitti" (tik) gösterilir.
+  const isCompleted = status === 'completed';
+
+  return (
+    <View style={styles.stepperRow}>
+      {steps.map((step, i) => {
+        const done = i < current || isCompleted;
+        const active = i === current && !isCompleted;
+        const reached = i <= current;
+        return (
+          <View key={step.key} style={styles.stepCol}>
+            <View style={styles.stepLineRow}>
+              <View
+                style={[
+                  styles.stepLine,
+                  {
+                    backgroundColor: reached && i > 0 ? colors.primary[500]! : colors.border.DEFAULT,
+                    opacity: i === 0 ? 0 : 1,
+                  },
+                ]}
+              />
+              <View
+                style={[
+                  styles.stepCircle,
+                  done ? styles.stepDone : active ? styles.stepActive : styles.stepFuture,
+                ]}
+              >
+                {done ? (
+                  <Ionicons name="checkmark" size={14} color={colors.white} />
+                ) : (
+                  <Text style={[styles.stepNum, { color: active ? colors.white : colors.text.muted }]}>
+                    {i + 1}
+                  </Text>
+                )}
+              </View>
+              <View
+                style={[
+                  styles.stepLine,
+                  {
+                    backgroundColor: done ? colors.primary[500]! : colors.border.DEFAULT,
+                    opacity: i === steps.length - 1 ? 0 : 1,
+                  },
+                ]}
+              />
+            </View>
+            <Text
+              style={[
+                styles.stepLabel,
+                {
+                  color: active ? colors.primary[700]! : done ? colors.text.body : colors.text.muted,
+                  fontWeight: active ? '700' : '400',
+                },
+              ]}
+              numberOfLines={2}
+            >
+              {step.label}
+            </Text>
+          </View>
+        );
+      })}
+    </View>
+  );
+}
+
 interface TradeShipment {
   id: string;
-  direction: 'to_warehouse' | 'from_warehouse';
+  direction: 'to_warehouse' | 'from_warehouse' | 'return' | string;
   senderUserId?: string | null;
   recipientUserId?: string | null;
   trackingNumber?: string | null;
@@ -91,17 +235,31 @@ interface TradeShipment {
   carrier?: string | null;
 }
 
+interface TradeCashPayment {
+  id?: string;
+  amount?: number;
+  commission?: number;
+  totalAmount?: number;
+  status?: string;
+  paidAt?: string | null;
+}
+
 interface TradeItem {
   id: string;
-  productId: string;
-  side: 'initiator' | 'receiver';
+  productId?: string;
+  side?: 'initiator' | 'receiver';
   quantity: number;
   valueAtTrade: number;
-  product: {
-    id: string;
-    title: string;
-    price: number;
-    images: { url: string }[];
+  // API'nin döndürdüğü düz alanlar (TradeItemResponseDto):
+  productTitle?: string;
+  productImage?: string;
+  productImages?: Array<{ cardUrl?: string; detailUrl?: string }>;
+  // Eski/iç içe şekil — savunmacı fallback.
+  product?: {
+    id?: string;
+    title?: string;
+    price?: number;
+    images?: Array<{ url?: string; cardUrl?: string }> | string[];
   };
 }
 
@@ -121,13 +279,53 @@ interface Trade {
   initiatorTrackingNumber: string | null;
   receiverTrackingNumber: string | null;
   completedAt: string | null;
+  acceptedAt?: string | null;
+  cancelledAt?: string | null;
+  cancelReason?: string | null;
   createdAt: string;
-  initiator: { id: string; displayName: string; avatar?: string };
-  receiver: { id: string; displayName: string; avatar?: string };
-  items: TradeItem[];
+  initiatorName: string;
+  receiverName: string;
+  // API ürünleri iki ayrı dizi olarak döndürür; eski `items` (side'lı) fallback.
+  initiatorItems?: TradeItem[];
+  receiverItems?: TradeItem[];
+  items?: TradeItem[];
   shipments?: TradeShipment[];
+  cashPayment?: TradeCashPayment | null;
+  cashCommission?: number | null;
+  paymentDeadline?: string | null;
+  shippingDeadline?: string | null;
+  confirmationDeadline?: string | null;
+  version?: number;
   canCancel?: boolean;
   firstWarehouseArrivalAt?: string | null;
+}
+
+function CompareItemRow({ item, onPress }: { item: TradeItem; onPress: () => void }) {
+  const qty = Number(item.quantity) || 1;
+  return (
+    <Pressable
+      style={({ pressed }) => [styles.cmpItemRow, pressed && { opacity: 0.85 }]}
+      onPress={onPress}
+    >
+      <Image
+        source={{
+          uri: resolveImageUrl(
+            item.productImages?.[0] ?? item.productImage ?? item.product?.images,
+          ),
+        }}
+        style={styles.cmpThumb}
+      />
+      <View style={styles.itemInfo}>
+        <Text variant="bodySm" weight="medium" numberOfLines={1}>
+          {item.productTitle || item.product?.title || 'Ürün'}
+        </Text>
+        <Text variant="caption" tone="muted">
+          {qty}x · {formatPrice(item.valueAtTrade)}
+        </Text>
+      </View>
+      <Ionicons name="chevron-forward" size={16} color={colors.text.subtle} />
+    </Pressable>
+  );
 }
 
 export default function TradeDetailScreen() {
@@ -137,9 +335,9 @@ export default function TradeDetailScreen() {
   const queryClient = useQueryClient();
 
   const [snackbar, setSnackbar] = useState({ visible: false, message: '' });
-  const [counterModalVisible, setCounterModalVisible] = useState(false);
-  const [counterCashAmount, setCounterCashAmount] = useState('');
-  const [counterMessage, setCounterMessage] = useState('');
+  const [rejectModalVisible, setRejectModalVisible] = useState(false);
+  const [rejectReason, setRejectReason] = useState('');
+  const [now, setNow] = useState(() => Date.now());
   const [disputeModalVisible, setDisputeModalVisible] = useState(false);
   const [disputeReason, setDisputeReason] = useState<
     'shipment_lost' | 'shipment_damaged' | 'wrong_item' | 'other'
@@ -147,7 +345,7 @@ export default function TradeDetailScreen() {
   const [disputeDescription, setDisputeDescription] = useState('');
 
   // Fetch trade details
-  const { data: trade, isLoading } = useQuery<Trade>({
+  const { data: trade, isLoading, refetch } = useQuery<Trade>({
     queryKey: ['trade', id],
     queryFn: async () => {
       const response = await tradesApi.getOne(id as string);
@@ -155,6 +353,8 @@ export default function TradeDetailScreen() {
     },
     enabled: !!id,
   });
+
+  const { refreshing, onRefresh } = useRefresh(refetch);
 
   // Accept trade mutation
   const acceptMutation = useMutation({
@@ -174,31 +374,15 @@ export default function TradeDetailScreen() {
     },
   });
 
-  // Reject trade mutation
+  // Reject trade mutation — opsiyonel sebep ile (web parity)
   const rejectMutation = useMutation({
-    mutationFn: () => tradesApi.reject(id as string),
+    mutationFn: () => tradesApi.reject(id as string, rejectReason.trim() || undefined),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['trade', id] });
       queryClient.invalidateQueries({ queryKey: ['trades'] });
+      setRejectModalVisible(false);
+      setRejectReason('');
       setSnackbar({ visible: true, message: 'Takas reddedildi' });
-    },
-    onError: (error: any) => {
-      setSnackbar({ visible: true, message: error.response?.data?.message || 'İşlem başarısız' });
-    },
-  });
-
-  // Counter offer mutation
-  const counterMutation = useMutation({
-    mutationFn: () => tradesApi.counter(id as string, {
-      initiatorItems: [],
-      receiverItems: [],
-      cashAmount: parseFloat(counterCashAmount) || 0,
-      message: counterMessage,
-    } as any),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['trade', id] });
-      setCounterModalVisible(false);
-      setSnackbar({ visible: true, message: 'Karşı teklif gönderildi!' });
     },
     onError: (error: any) => {
       setSnackbar({ visible: true, message: error.response?.data?.message || 'İşlem başarısız' });
@@ -228,9 +412,19 @@ export default function TradeDetailScreen() {
         setSnackbar({ visible: true, message: 'Ödeme başlatılamadı (paymentId eksik).' });
         return;
       }
-      router.push(
-        `/payment/${paymentId}?provider=paytr&tradeCash=1` as any,
-      );
+      // Token burada üretildi; URL'i geçerek ekranın tekrar initiate etmesini önle
+      // (eski akış paymentId'yi initiateTradeCash'e tradeId sanıp yanlış çağırıyordu).
+      const paymentUrl: string | undefined = data.paymentUrl;
+      router.push({
+        pathname: '/payment/[id]',
+        params: {
+          id: paymentId,
+          provider: 'paytr',
+          tradeCash: '1',
+          tradeId: String(id),
+          ...(paymentUrl ? { paymentUrl } : {}),
+        },
+      } as any);
     },
     onError: (error: any) => {
       captureException(error, {
@@ -279,6 +473,12 @@ export default function TradeDetailScreen() {
     },
   });
 
+  // Geri sayım için saniyede bir tetiklenen tick.
+  useEffect(() => {
+    const timer = setInterval(() => setNow(Date.now()), 1000);
+    return () => clearInterval(timer);
+  }, []);
+
   const handleBack = () => {
     if (router.canGoBack()) router.back();
     else router.replace('/(tabs)' as never);
@@ -286,31 +486,32 @@ export default function TradeDetailScreen() {
 
   if (isLoading) {
     return (
-      <SafeAreaView style={{ flex: 1, backgroundColor: colors.surface.alt }} edges={['top']}>
-        <ScreenHeader title="Takas Detayı" variant="light" onBack={handleBack} />
+      <View style={{ flex: 1, backgroundColor: colors.surface.alt }}>
+        <ScreenHeader title="Takas Detayı" onBack={handleBack} />
         <View style={styles.loadingContainer}>
           <Spinner size="lg" />
         </View>
-      </SafeAreaView>
+      </View>
     );
   }
 
   if (!trade) {
     return (
-      <SafeAreaView style={{ flex: 1, backgroundColor: colors.surface.alt }} edges={['top']}>
-        <ScreenHeader title="Takas Detayı" variant="light" onBack={handleBack} />
+      <View style={{ flex: 1, backgroundColor: colors.surface.alt }}>
+        <ScreenHeader title="Takas Detayı" onBack={handleBack} />
         <View style={styles.errorContainer}>
           <Text>Takas bulunamadı</Text>
           <Button variant="primary" title="Geri Dön" onPress={handleBack} />
         </View>
-      </SafeAreaView>
+      </View>
     );
   }
 
   const isInitiator = user?.id === trade.initiatorId;
   const isReceiver = user?.id === trade.receiverId;
-  const otherPartyRaw = isInitiator ? trade.receiver : trade.initiator;
-  const otherParty = otherPartyRaw ?? { id: '', displayName: 'Kullanıcı', avatar: undefined };
+  const otherParty = isInitiator
+    ? { id: trade.receiverId, displayName: trade.receiverName || 'Kullanıcı' }
+    : { id: trade.initiatorId, displayName: trade.initiatorName || 'Kullanıcı' };
   const statusInfoBase = TRADE_STATUSES[trade.status as keyof typeof TRADE_STATUSES] || TRADE_STATUSES.pending;
   // Localize labels for the new auto-shipping flow statuses (i18n.tradeStatus.*)
   const NEW_STATUS_KEYS: Record<string, string> = {
@@ -325,14 +526,20 @@ export default function TradeDetailScreen() {
     : statusInfoBase;
 
   const tradeItems: TradeItem[] = Array.isArray(trade.items) ? trade.items : [];
-  const initiatorItems = tradeItems.filter(item => item.side === 'initiator');
-  const receiverItems = tradeItems.filter(item => item.side === 'receiver');
+  const initiatorItems = Array.isArray(trade.initiatorItems) && trade.initiatorItems.length
+    ? trade.initiatorItems
+    : tradeItems.filter(item => item.side === 'initiator');
+  const receiverItems = Array.isArray(trade.receiverItems) && trade.receiverItems.length
+    ? trade.receiverItems
+    : tradeItems.filter(item => item.side === 'receiver');
 
   const myItems = isInitiator ? initiatorItems : receiverItems;
   const theirItems = isInitiator ? receiverItems : initiatorItems;
 
-  const initiatorTotal = initiatorItems.reduce((sum, item) => sum + Number(item.valueAtTrade), 0);
-  const receiverTotal = receiverItems.reduce((sum, item) => sum + Number(item.valueAtTrade), 0);
+  const sideTotal = (items: TradeItem[]) =>
+    items.reduce((sum, item) => sum + Number(item.valueAtTrade) * (Number(item.quantity) || 1), 0);
+  const myTotal = sideTotal(myItems);
+  const theirTotal = sideTotal(theirItems);
 
   const handleAccept = () => {
     Alert.alert(
@@ -345,16 +552,7 @@ export default function TradeDetailScreen() {
     );
   };
 
-  const handleReject = () => {
-    Alert.alert(
-      'Takası Reddet',
-      'Bu takas teklifini reddetmek istediğinize emin misiniz?',
-      [
-        { text: 'İptal', style: 'cancel' },
-        { text: 'Reddet', style: 'destructive', onPress: () => rejectMutation.mutate() },
-      ]
-    );
-  };
+  const handleReject = () => setRejectModalVisible(true);
 
   const handleCancel = () => {
     Alert.alert(
@@ -377,6 +575,29 @@ export default function TradeDetailScreen() {
   const myFromWarehouseShipment = user
     ? shipments.find((s) => s.direction === 'from_warehouse' && s.recipientUserId === user.id)
     : undefined;
+  const otherFromWarehouseShipment = user
+    ? shipments.find(
+        (s) => s.direction === 'from_warehouse' && s.recipientUserId && s.recipientUserId !== user.id,
+      )
+    : undefined;
+  const myReturnShipment = user
+    ? shipments.find(
+        (s) => s.direction === 'return' && (s.recipientUserId === user.id || s.senderUserId === user.id),
+      )
+    : undefined;
+
+  const copyCode = (code?: string | null) => {
+    if (!code) return;
+    Clipboard.setString(code);
+    setSnackbar({ visible: true, message: 'Takip numarası kopyalandı' });
+  };
+
+  const countdown = formatCountdown(deadlineForStatus(trade), now);
+  const statusDescription = STATUS_DESCRIPTIONS[trade.status];
+  const cashPay = trade.cashPayment ?? null;
+  const cashPaid = cashPay?.status === 'completed';
+  const cashCommission = Number(cashPay?.commission ?? trade.cashCommission ?? 0);
+  const cashTotal = Number(cashPay?.totalAmount ?? 0);
 
   const myTrackingNumber = isInitiator ? trade.initiatorTrackingNumber : trade.receiverTrackingNumber;
   const theirTrackingNumber = isInitiator ? trade.receiverTrackingNumber : trade.initiatorTrackingNumber;
@@ -396,15 +617,16 @@ export default function TradeDetailScreen() {
   const hasBadge = !!tradeStatusConfig[trade.status];
 
   return (
-    <SafeAreaView style={styles.container} edges={['top']}>
-      <Stack.Screen options={{ title: `Takas #${trade.tradeNumber}` }} />
+    <View style={styles.container}>
       <ScreenHeader
         title={`Takas #${trade.tradeNumber}`}
-        variant="light"
         onBack={handleBack}
       />
 
-      <ScrollView style={styles.content}>
+      <ScrollView
+        style={styles.content}
+        refreshControl={<ThemedRefreshControl refreshing={refreshing} onRefresh={onRefresh} />}
+      >
         {/* Status Banner */}
         <View style={[styles.statusBanner, { backgroundColor: statusInfo.color + '15' }]}>
           <Ionicons name={statusInfo.icon as any} size={24} color={statusInfo.color} />
@@ -414,17 +636,151 @@ export default function TradeDetailScreen() {
           {hasBadge ? (
             <StatusBadge status={trade.status} config={tradeStatusConfig} size="sm" />
           ) : null}
-          {trade.status === 'pending' && trade.responseDeadline && (
-            <Text style={styles.deadlineText}>
-              Son: {format(new Date(trade.responseDeadline), 'dd MMM HH:mm', { locale: tr })}
-            </Text>
-          )}
         </View>
+
+        {/* Status description — özel kartı olan statülerde (tamamlandı/depoda/iade)
+            tekrar olmasın diye gizlenir. */}
+        {statusDescription &&
+          !['completed', 'at_warehouse', 'admin_reviewing', 'returning'].includes(trade.status) && (
+            <View style={styles.descCard}>
+              <Text variant="bodySm" tone="body">{statusDescription}</Text>
+              {trade.cancelReason &&
+              (trade.status === 'cancelled' || trade.status === 'rejected') ? (
+                <Text variant="caption" tone="muted" style={{ marginTop: 4 }}>
+                  Sebep: {trade.cancelReason}
+                </Text>
+              ) : null}
+            </View>
+          )}
+
+        {/* Countdown */}
+        {countdown && (
+          <View style={styles.countdownCard}>
+            <Ionicons name="time-outline" size={20} color={colors.primary[600]!} />
+            <View style={{ flex: 1 }}>
+              <Text style={styles.countdownText}>{countdown}</Text>
+              <Text variant="caption" tone="muted">
+                Lütfen süre dolmadan işleminizi tamamlayın
+              </Text>
+            </View>
+          </View>
+        )}
+
+        {/* Progress Stepper (depo-escrow akışı) */}
+        {STEP_FLOW_STATUSES.has(trade.status) && (
+          <Card style={styles.card}>
+            <TradeProgressStepper
+              status={trade.status}
+              hasCash={trade.cashAmount != null && Number(trade.cashAmount) > 0}
+            />
+          </Card>
+        )}
+
+        {/* Completed summary */}
+        {trade.status === 'completed' && (
+          <Card style={{ ...styles.card, ...styles.completedCard }}>
+            <View style={styles.completedHeader}>
+              <Ionicons name="checkmark-done-circle" size={28} color={colors.success[600]!} />
+              <Text variant="h3" style={{ color: colors.success[700]!, flex: 1 }}>
+                Takas Tamamlandı
+              </Text>
+            </View>
+            <Text variant="caption" tone="muted" style={{ marginBottom: 12 }}>
+              Takas başarıyla tamamlandı. İyi günlerde kullanın!
+            </Text>
+            <View style={styles.summaryDateRow}>
+              <Text variant="caption" tone="muted">Oluşturuldu</Text>
+              <Text variant="bodySm">
+                {format(new Date(trade.createdAt), 'd MMM yyyy', { locale: tr })}
+              </Text>
+            </View>
+            {trade.acceptedAt ? (
+              <View style={styles.summaryDateRow}>
+                <Text variant="caption" tone="muted">Kabul Edildi</Text>
+                <Text variant="bodySm">
+                  {format(new Date(trade.acceptedAt), 'd MMM yyyy', { locale: tr })}
+                </Text>
+              </View>
+            ) : null}
+            {trade.completedAt ? (
+              <View style={styles.summaryDateRow}>
+                <Text variant="caption" tone="muted">Tamamlandı</Text>
+                <Text variant="bodySm">
+                  {format(new Date(trade.completedAt), 'd MMM yyyy', { locale: tr })}
+                </Text>
+              </View>
+            ) : null}
+            <View style={styles.completedActions}>
+              <Button
+                variant="outline"
+                title="Takaslarım"
+                onPress={() => router.replace('/trades' as any)}
+                style={{ flex: 1 }}
+              />
+              <Button
+                variant="primary"
+                title="İlanlara Göz At"
+                onPress={() => router.push('/search')}
+                style={{ flex: 1 }}
+              />
+            </View>
+          </Card>
+        )}
+
+        {/* Warehouse review banner */}
+        {(trade.status === 'at_warehouse' || trade.status === 'admin_reviewing') && (
+          <Card style={{ ...styles.card, ...styles.infoBanner }}>
+            <View style={styles.bannerRow}>
+              <View style={styles.bannerIconCircle}>
+                <Ionicons name="shield-checkmark" size={22} color={colors.white} />
+              </View>
+              <View style={{ flex: 1 }}>
+                <Text variant="label" style={{ color: colors.info[700]! }}>
+                  Ürünleriniz Tarodan Deposunda
+                </Text>
+                <Text variant="caption" tone="muted" style={{ marginTop: 2 }}>
+                  Ekibimiz ürünleri inceliyor. İnceleme tamamlandığında bilgilendirileceksiniz.
+                </Text>
+              </View>
+            </View>
+          </Card>
+        )}
+
+        {/* Returning banner */}
+        {trade.status === 'returning' && (
+          <Card style={{ ...styles.card, ...styles.warningBanner }}>
+            <View style={styles.bannerRow}>
+              <View style={[styles.bannerIconCircle, { backgroundColor: colors.warning[500]! }]}>
+                <Ionicons name="return-up-back" size={22} color={colors.white} />
+              </View>
+              <View style={{ flex: 1 }}>
+                <Text variant="label" style={{ color: colors.warning[800]! }}>
+                  Takas Reddedildi
+                </Text>
+                <Text variant="caption" tone="muted" style={{ marginTop: 2 }}>
+                  Ürünleriniz size iade ediliyor.
+                </Text>
+                {trade.cancelReason ? (
+                  <Text variant="caption" tone="muted" style={{ marginTop: 4 }}>
+                    Sebep: {trade.cancelReason}
+                  </Text>
+                ) : null}
+              </View>
+            </View>
+          </Card>
+        )}
 
         {/* Trade Info */}
         <Card style={styles.card}>
           <View style={styles.tradeHeader}>
-            <Text variant="h3">Takas #{trade.tradeNumber}</Text>
+            <View style={styles.tradeHeaderTop}>
+              <Text variant="h3">Takas #{trade.tradeNumber}</Text>
+              {trade.version && trade.version > 1 ? (
+                <View style={styles.versionBadge}>
+                  <Text style={styles.versionBadgeText}>Karşı Teklif #{trade.version - 1}</Text>
+                </View>
+              ) : null}
+            </View>
             <Text variant="caption" style={styles.dateText}>
               {format(new Date(trade.createdAt), 'dd MMMM yyyy HH:mm', { locale: tr })}
             </Text>
@@ -447,82 +803,95 @@ export default function TradeDetailScreen() {
           </Pressable>
         </Card>
 
-        {/* My Items */}
+        {/* Items Comparison */}
         <Card style={styles.card}>
-          <Text variant="label" style={styles.sectionTitle}>
-            {isInitiator ? 'Teklif Ettiğiniz' : 'Alacağınız'} Ürünler
+          {/* My side */}
+          <Text variant="overline" tone="muted" style={styles.sideLabel}>
+            Senin Ürünlerin
           </Text>
-          {myItems.map((item) => (
-            <Pressable
-              key={item.id}
-              style={({ pressed }) => [styles.itemRow, pressed && { opacity: 0.85 }]}
-              onPress={() => router.push(`/product/${item.product.id}`)}
-            >
-              <Image
-                source={{ uri: resolveImageUrl(item.product.images) }}
-                style={styles.itemImage}
-              />
-              <View style={styles.itemInfo}>
-                <Text variant="body" numberOfLines={1}>{item.product.title}</Text>
-                <Text variant="caption" style={styles.itemPrice}>
-                  ₺{Number(item.valueAtTrade).toLocaleString('tr-TR')}
-                </Text>
-              </View>
-            </Pressable>
-          ))}
-          <Divider style={styles.divider} />
-          <View style={styles.totalRow}>
-            <Text variant="body">Toplam:</Text>
-            <Text variant="label" style={styles.totalPrice}>
-              ₺{(isInitiator ? initiatorTotal : receiverTotal).toLocaleString('tr-TR')}
-            </Text>
+          <View style={{ gap: 8 }}>
+            {myItems.length > 0 ? (
+              myItems.map((item) => (
+                <CompareItemRow
+                  key={item.id}
+                  item={item}
+                  onPress={() => {
+                    const pid = item.productId ?? item.product?.id;
+                    if (pid) router.push(`/product/${pid}`);
+                  }}
+                />
+              ))
+            ) : (
+              <Text variant="caption" tone="subtle">Ürün yok</Text>
+            )}
           </View>
-        </Card>
+          <View style={styles.cmpTotalRow}>
+            <Text variant="caption" tone="muted">Toplam Değer</Text>
+            <Text variant="h3" style={styles.cmpTotalValue}>{formatPrice(myTotal)}</Text>
+          </View>
 
-        {/* Their Items */}
-        <Card style={styles.card}>
-          <Text variant="label" style={styles.sectionTitle}>
-            {isInitiator ? 'Alacağınız' : 'Vereceğiniz'} Ürünler
+          {/* Swap divider */}
+          <View style={styles.arrowRow}>
+            <View style={styles.arrowLine} />
+            <View style={styles.arrowCircle}>
+              <Ionicons name="swap-vertical" size={18} color={colors.primary[600]!} />
+            </View>
+            <View style={styles.arrowLine} />
+          </View>
+
+          {/* Their side */}
+          <Text variant="overline" tone="muted" style={styles.sideLabel}>
+            {otherParty.displayName} Ürünleri
           </Text>
-          {theirItems.map((item) => (
-            <Pressable
-              key={item.id}
-              style={({ pressed }) => [styles.itemRow, pressed && { opacity: 0.85 }]}
-              onPress={() => router.push(`/product/${item.product.id}`)}
-            >
-              <Image
-                source={{ uri: resolveImageUrl(item.product.images) }}
-                style={styles.itemImage}
-              />
-              <View style={styles.itemInfo}>
-                <Text variant="body" numberOfLines={1}>{item.product.title}</Text>
-                <Text variant="caption" style={styles.itemPrice}>
-                  ₺{Number(item.valueAtTrade).toLocaleString('tr-TR')}
-                </Text>
-              </View>
-            </Pressable>
-          ))}
-          <Divider style={styles.divider} />
-          <View style={styles.totalRow}>
-            <Text variant="body">Toplam:</Text>
-            <Text variant="label" style={styles.totalPrice}>
-              ₺{(isInitiator ? receiverTotal : initiatorTotal).toLocaleString('tr-TR')}
-            </Text>
+          <View style={{ gap: 8 }}>
+            {theirItems.length > 0 ? (
+              theirItems.map((item) => (
+                <CompareItemRow
+                  key={item.id}
+                  item={item}
+                  onPress={() => {
+                    const pid = item.productId ?? item.product?.id;
+                    if (pid) router.push(`/product/${pid}`);
+                  }}
+                />
+              ))
+            ) : (
+              <Text variant="caption" tone="subtle">Ürün yok</Text>
+            )}
+          </View>
+          <View style={styles.cmpTotalRow}>
+            <Text variant="caption" tone="muted">Toplam Değer</Text>
+            <Text variant="h3" style={styles.cmpTotalValue}>{formatPrice(theirTotal)}</Text>
           </View>
         </Card>
 
         {/* Cash Adjustment */}
-        {trade.cashAmount && trade.cashAmount > 0 && (
-          <Card style={styles.card}>
-            <Text variant="label" style={styles.sectionTitle}>Nakit Fark</Text>
-            <View style={styles.cashRow}>
-              <MaterialCommunityIcons name="cash" size={24} color={colors.primary[600]!} />
-              <Text variant="body" style={styles.cashText}>
-                {trade.cashPayerId === user?.id ? 'Ödeyeceğiniz' : 'Alacağınız'} tutar:
-              </Text>
-              <Text variant="h3" style={styles.cashAmount}>
-                ₺{Number(trade.cashAmount).toLocaleString('tr-TR')}
-              </Text>
+        {trade.cashAmount != null && Number(trade.cashAmount) > 0 && (
+          <Card style={{ ...styles.card, ...styles.cashCard }}>
+            <View style={styles.cashHeaderRow}>
+              <View style={{ flex: 1 }}>
+                <Text variant="caption" tone="muted">Nakit Fark</Text>
+                <Text variant="h2" style={styles.cashBig}>{formatPrice(Math.abs(Number(trade.cashAmount ?? 0)))}</Text>
+                {cashCommission > 0 && cashTotal > 0 ? (
+                  <Text variant="caption" tone="muted" style={{ marginTop: 2 }}>
+                    Komisyon dahil toplam: {formatPrice(cashTotal)}
+                  </Text>
+                ) : null}
+                <Text variant="caption" tone="muted" style={{ marginTop: 2 }}>
+                  {trade.cashPayerId === user?.id
+                    ? 'Bu tutarı siz ödeyeceksiniz'
+                    : `${otherParty.displayName} ödeyecek`}
+                </Text>
+              </View>
+              <View style={{ alignItems: 'flex-end', gap: 6 }}>
+                <MaterialCommunityIcons name="cash-multiple" size={28} color={colors.success[600]!} />
+                {cashPaid ? (
+                  <View style={styles.paidChip}>
+                    <Ionicons name="checkmark-circle" size={14} color={colors.success[700]!} />
+                    <Text style={styles.paidChipText}>Ödendi</Text>
+                  </View>
+                ) : null}
+              </View>
             </View>
           </Card>
         )}
@@ -534,7 +903,7 @@ export default function TradeDetailScreen() {
             {trade.initiatorMessage && (
               <View style={styles.messageBox}>
                 <Text variant="caption" style={styles.messageSender}>
-                  {trade.initiator?.displayName ?? 'Kullanıcı'}:
+                  {trade.initiatorName ?? 'Kullanıcı'}:
                 </Text>
                 <Text variant="body">{trade.initiatorMessage}</Text>
               </View>
@@ -542,7 +911,7 @@ export default function TradeDetailScreen() {
             {trade.receiverMessage && (
               <View style={styles.messageBox}>
                 <Text variant="caption" style={styles.messageSender}>
-                  {trade.receiver?.displayName ?? 'Kullanıcı'}:
+                  {trade.receiverName ?? 'Kullanıcı'}:
                 </Text>
                 <Text variant="body">{trade.receiverMessage}</Text>
               </View>
@@ -550,8 +919,9 @@ export default function TradeDetailScreen() {
           </Card>
         )}
 
-        {/* Shipping Info */}
-        {(trade.status === 'accepted' || trade.status.includes('shipped') || trade.status === 'completed') && (
+        {/* Legacy Kargo Durumu — yalnızca eski (direkt-kargo) takaslarda; depo-escrow
+            akışında bu alanlar boş olduğu için kart gösterilmez (kafa karıştırmasın). */}
+        {(myTrackingNumber || theirTrackingNumber) && (
           <Card style={styles.card}>
             <Text variant="label" style={styles.sectionTitle}>Kargo Durumu</Text>
 
@@ -588,8 +958,12 @@ export default function TradeDetailScreen() {
           </Card>
         )}
 
-        {/* Inbound shipment info (Sürat Kargo, auto-issued) */}
-        {trade.status === 'shipping_to_warehouse' && (isInitiator || isReceiver) && (
+        {/* Inbound shipment info (Sürat Kargo, auto-issued) — kod oluştuğu an görünür
+            (nakitsizde kabulde hemen, nakitlide ödeme sonrası) ve depo inceleme
+            aşamaları boyunca kalır. */}
+        {['shipping_to_warehouse', 'at_warehouse', 'admin_reviewing'].includes(trade.status) &&
+          myToWarehouseShipment?.trackingNumber &&
+          (isInitiator || isReceiver) && (
           <Card style={{ ...styles.card, ...styles.inboundCard }} testID="trade-inbound-card">
             <View style={styles.shippingRow}>
               <MaterialCommunityIcons name="truck-fast-outline" size={22} color={colors.primary[600]!} />
@@ -602,15 +976,45 @@ export default function TradeDetailScreen() {
             </Text>
             <View style={styles.inboundShipBox}>
               <Text variant="caption" style={styles.messageSender}>{t('trade.warehouseShipping.yourShipment')}</Text>
-              <Text style={styles.inboundTrackingNumber}>
-                {myToWarehouseShipment?.trackingNumber ?? '—'}
-              </Text>
-              <Text variant="caption" style={styles.inboundShipHint}>
-                {t('trade.warehouseShipping.handIn')}
-              </Text>
+              <View style={styles.trackingCodeRow}>
+                <Text style={[styles.inboundTrackingNumber, { flex: 1 }]} numberOfLines={1}>
+                  {myToWarehouseShipment?.trackingNumber ?? '—'}
+                </Text>
+                {myToWarehouseShipment?.trackingNumber ? (
+                  <Pressable
+                    onPress={() => copyCode(myToWarehouseShipment?.trackingNumber)}
+                    style={styles.copyBtn}
+                    hitSlop={8}
+                  >
+                    <Ionicons name="copy-outline" size={16} color={colors.primary[600]!} />
+                    <Text variant="caption" tone="primary" weight="medium">Kopyala</Text>
+                  </Pressable>
+                ) : null}
+              </View>
+              {trade.status === 'shipping_to_warehouse' ? (
+                <Text variant="caption" style={styles.inboundShipHint}>
+                  {t('trade.warehouseShipping.handIn')}
+                </Text>
+              ) : (
+                <Text variant="caption" style={styles.inboundShipHint}>
+                  Ürününüz Tarodan deposuna ulaştı.
+                </Text>
+              )}
               <View style={styles.inboundChipRow}>
                 <ShipmentStatusChip testID="trade-status-chip-my-inbound" status={myToWarehouseShipment?.status} t={t} />
               </View>
+              {myToWarehouseShipment?.carrier === 'surat' && myToWarehouseShipment?.trackingNumber ? (
+                <Button
+                  variant="outline"
+                  title="Sürat'ta Takip Et"
+                  onPress={() =>
+                    Linking.openURL(
+                      `https://www.suratkargo.com.tr/KargoTakip/?kargotakipno=${encodeURIComponent(myToWarehouseShipment.trackingNumber!)}`,
+                    )
+                  }
+                  style={styles.trackButton}
+                />
+              ) : null}
             </View>
             <Text variant="caption" style={styles.inboundShipHint}>
               {renderOtherShipmentHint(otherToWarehouseShipment?.status)}
@@ -630,10 +1034,22 @@ export default function TradeDetailScreen() {
             {myFromWarehouseShipment ? (
               <View style={styles.inboundShipBox}>
                 <Text variant="caption" style={styles.messageSender}>Size gönderilen kargo</Text>
-                <Text style={styles.inboundTrackingNumber}>
-                  {(myFromWarehouseShipment.carrier === 'surat' ? 'Sürat Kargo' : myFromWarehouseShipment.carrier || '—')}
-                  {myFromWarehouseShipment.trackingNumber ? ` · ${myFromWarehouseShipment.trackingNumber}` : ''}
-                </Text>
+                <View style={styles.trackingCodeRow}>
+                  <Text style={[styles.inboundTrackingNumber, { flex: 1 }]} numberOfLines={1}>
+                    {(myFromWarehouseShipment.carrier === 'surat' ? 'Sürat Kargo' : myFromWarehouseShipment.carrier || '—')}
+                    {myFromWarehouseShipment.trackingNumber ? ` · ${myFromWarehouseShipment.trackingNumber}` : ''}
+                  </Text>
+                  {myFromWarehouseShipment.trackingNumber ? (
+                    <Pressable
+                      onPress={() => copyCode(myFromWarehouseShipment.trackingNumber)}
+                      style={styles.copyBtn}
+                      hitSlop={8}
+                    >
+                      <Ionicons name="copy-outline" size={16} color={colors.primary[600]!} />
+                      <Text variant="caption" tone="primary" weight="medium">Kopyala</Text>
+                    </Pressable>
+                  ) : null}
+                </View>
                 <View style={styles.inboundChipRow}>
                   <ShipmentStatusChip testID="trade-status-chip-my-outbound" status={myFromWarehouseShipment.status} t={t} />
                 </View>
@@ -653,21 +1069,82 @@ export default function TradeDetailScreen() {
                 </Text>
               </View>
             )}
+            {otherFromWarehouseShipment ? (
+              <View style={[styles.inboundShipBox, { marginTop: 8 }]}>
+                <Text variant="caption" style={styles.messageSender}>Karşı tarafın kargosu</Text>
+                <Text variant="bodySm" numberOfLines={1}>
+                  {(otherFromWarehouseShipment.carrier === 'surat' ? 'Sürat Kargo' : otherFromWarehouseShipment.carrier || '—')}
+                  {otherFromWarehouseShipment.trackingNumber ? ` · ${otherFromWarehouseShipment.trackingNumber}` : ''}
+                </Text>
+                <View style={styles.inboundChipRow}>
+                  <ShipmentStatusChip status={otherFromWarehouseShipment.status} t={t} />
+                </View>
+              </View>
+            ) : null}
           </Card>
         )}
 
-        {/* Trade Protection */}
-        <Card style={styles.protectionCard}>
-          <View style={styles.protectionContent}>
-            <Ionicons name="shield-checkmark" size={24} color={colors.success[600]!} />
-            <View style={styles.protectionTextContainer}>
-              <Text variant="label">Takas Koruma Programı</Text>
-              <Text variant="caption" style={styles.protectionDesc}>
-                Her iki taraf da ürünü teslim alana kadar işlem güvence altındadır.
+        {/* Return shipment tracking */}
+        {trade.status === 'returning' && myReturnShipment && (
+          <Card style={{ ...styles.card, ...styles.inboundCard }} testID="trade-return-card">
+            <View style={styles.shippingRow}>
+              <MaterialCommunityIcons name="truck-fast-outline" size={22} color={colors.warning[600]!} />
+              <Text variant="label" style={{ ...styles.sectionTitle, marginBottom: 0, flex: 1 }}>
+                İade Kargosu
               </Text>
             </View>
-          </View>
-        </Card>
+            <View style={styles.inboundShipBox}>
+              <View style={styles.trackingCodeRow}>
+                <Text style={[styles.inboundTrackingNumber, { flex: 1 }]} numberOfLines={1}>
+                  {myReturnShipment.carrier === 'surat' ? 'Sürat Kargo' : myReturnShipment.carrier || '—'}
+                  {myReturnShipment.trackingNumber ? ` · ${myReturnShipment.trackingNumber}` : ''}
+                </Text>
+                {myReturnShipment.trackingNumber ? (
+                  <Pressable
+                    onPress={() => copyCode(myReturnShipment.trackingNumber)}
+                    style={styles.copyBtn}
+                    hitSlop={8}
+                  >
+                    <Ionicons name="copy-outline" size={16} color={colors.primary[600]!} />
+                    <Text variant="caption" tone="primary" weight="medium">Kopyala</Text>
+                  </Pressable>
+                ) : null}
+              </View>
+              <View style={styles.inboundChipRow}>
+                <ShipmentStatusChip status={myReturnShipment.status} t={t} />
+              </View>
+              {myReturnShipment.carrier === 'surat' && myReturnShipment.trackingNumber && (
+                <Button
+                  variant="outline"
+                  title="Sürat'ta Takip Et"
+                  onPress={() =>
+                    Linking.openURL(
+                      `https://www.suratkargo.com.tr/KargoTakip/?kargotakipno=${encodeURIComponent(myReturnShipment.trackingNumber!)}`,
+                    )
+                  }
+                  style={styles.trackButton}
+                />
+              )}
+            </View>
+          </Card>
+        )}
+
+        {/* Trade Protection — yalnızca aktif/erken statülerde */}
+        {(trade.status === 'pending' ||
+          trade.status === 'accepted' ||
+          trade.status === 'awaiting_payment') && (
+          <Card style={styles.protectionCard}>
+            <View style={styles.protectionContent}>
+              <Ionicons name="shield-checkmark" size={24} color={colors.success[600]!} />
+              <View style={styles.protectionTextContainer}>
+                <Text variant="label">Takas Koruma Programı</Text>
+                <Text variant="caption" style={styles.protectionDesc}>
+                  Her iki taraf da ürünü teslim alana kadar işlem güvence altındadır.
+                </Text>
+              </View>
+            </View>
+          </Card>
+        )}
 
         {/* Actions */}
         <View style={styles.actions}>
@@ -723,23 +1200,26 @@ export default function TradeDetailScreen() {
             )}
 
           {/* awaiting_payment: cashPayer must initiate the cash payment */}
-          {trade.status === 'awaiting_payment' && trade.cashPayerId === user?.id && (
-            <>
+          {(trade.status === 'accepted' || trade.status === 'awaiting_payment') && trade.cashPayerId === user?.id && !cashPaid && (
+            <View style={styles.payCta}>
+              <Text variant="label" style={{ color: colors.primary[800]! }}>
+                Ödemenizi Tamamlayın
+              </Text>
+              <Text variant="caption" tone="muted" style={{ marginTop: 2, marginBottom: 10 }}>
+                Takas kabul edildi. Devam etmek için nakit fark ödemesini tamamlayın.
+              </Text>
               <Button
                 testID="cash-pay-button"
                 variant="primary"
-                title={`Ödeme Yap (₺${Number(trade.cashAmount ?? 0).toLocaleString('tr-TR')})`}
+                title={`Ödeme Yap — ${formatPrice(Math.abs(cashTotal > 0 ? cashTotal : Number(trade.cashAmount ?? 0)))}${cashCommission > 0 ? ' (komisyon dahil)' : ''}`}
                 onPress={() => cashPayMutation.mutate()}
                 isLoading={cashPayMutation.isPending}
                 disabled={cashPayMutation.isPending}
                 style={styles.actionButton}
               />
-              <Text variant="caption" style={styles.confirmReceiptHint}>
-                Nakit fark ödemesi tamamlanınca takas akışı başlar.
-              </Text>
-            </>
+            </View>
           )}
-          {trade.status === 'awaiting_payment' && trade.cashPayerId && trade.cashPayerId !== user?.id && (
+          {(trade.status === 'accepted' || trade.status === 'awaiting_payment') && trade.cashPayerId && trade.cashPayerId !== user?.id && !cashPaid && (
             <Text variant="caption" style={styles.confirmReceiptHint}>
               Karşı tarafın nakit fark ödemesi bekleniyor.
             </Text>
@@ -786,35 +1266,38 @@ export default function TradeDetailScreen() {
         <View style={{ height: 50 }} />
       </ScrollView>
 
-      {/* Counter Offer Modal */}
+      {/* Reject Modal — opsiyonel sebep */}
       <Modal
-        isOpen={counterModalVisible}
-        onClose={() => setCounterModalVisible(false)}
-        title="Karşı Teklif"
+        isOpen={rejectModalVisible}
+        onClose={() => !rejectMutation.isPending && setRejectModalVisible(false)}
+        title="Takası Reddet"
       >
+        <Text variant="caption" tone="muted" style={{ marginBottom: 12 }}>
+          Bu takas teklifini reddetmek üzeresiniz. İsterseniz bir sebep ekleyebilirsiniz (opsiyonel).
+        </Text>
         <Input
-          label="Nakit Fark (₺)"
-          value={counterCashAmount}
-          onChangeText={setCounterCashAmount}
-          keyboardType="numeric"
-          containerStyle={{ marginBottom: 12 }}
-        />
-        <Input
-          label="Mesajınız"
-          value={counterMessage}
-          onChangeText={setCounterMessage}
+          label="Sebep (opsiyonel)"
+          value={rejectReason}
+          onChangeText={setRejectReason}
           multiline
           numberOfLines={3}
+          placeholder="Örn. Teklif uygun değil"
           containerStyle={{ marginBottom: 12 }}
           inputStyle={{ minHeight: 80 }}
         />
         <View style={styles.modalActions}>
-          <Button variant="outline" title="İptal" onPress={() => setCounterModalVisible(false)} />
+          <Button
+            variant="outline"
+            title="Vazgeç"
+            onPress={() => setRejectModalVisible(false)}
+            disabled={rejectMutation.isPending}
+          />
           <Button
             variant="primary"
-            title="Gönder"
-            onPress={() => counterMutation.mutate()}
-            isLoading={counterMutation.isPending}
+            title="Reddet"
+            onPress={() => rejectMutation.mutate()}
+            isLoading={rejectMutation.isPending}
+            style={{ backgroundColor: colors.danger[600]! }}
           />
         </View>
       </Modal>
@@ -886,7 +1369,7 @@ export default function TradeDetailScreen() {
       >
         {snackbar.message}
       </Snackbar>
-    </SafeAreaView>
+    </View>
   );
 }
 
@@ -967,49 +1450,8 @@ const styles = StyleSheet.create({
     marginBottom: 12,
     color: colors.text.heading,
   },
-  itemRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingVertical: 8,
-  },
-  itemImage: {
-    width: 50,
-    height: 50,
-    borderRadius: 6,
-    backgroundColor: colors.border.DEFAULT,
-  },
   itemInfo: {
     flex: 1,
-    marginLeft: 12,
-  },
-  itemPrice: {
-    color: colors.primary[600]!,
-    fontWeight: '500',
-    marginTop: 2,
-  },
-  divider: {
-    marginVertical: 12,
-  },
-  totalRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-  },
-  totalPrice: {
-    color: colors.primary[600]!,
-    fontWeight: 'bold',
-  },
-  cashRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-  },
-  cashText: {
-    flex: 1,
-  },
-  cashAmount: {
-    color: colors.primary[600]!,
-    fontWeight: 'bold',
   },
   messageBox: {
     backgroundColor: colors.surface.alt,
@@ -1089,6 +1531,21 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     marginTop: 8,
   },
+  trackingCodeRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    marginTop: 4,
+  },
+  copyBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    paddingHorizontal: 8,
+    paddingVertical: 6,
+    borderRadius: 8,
+    backgroundColor: colors.primary[50]!,
+  },
   inboundShipHint: {
     color: colors.text.muted,
     marginTop: 8,
@@ -1109,5 +1566,243 @@ const styles = StyleSheet.create({
   shipmentChipText: {
     fontSize: 12,
     fontWeight: '600',
+  },
+
+  // ===== Progress stepper =====
+  stepperRow: {
+    flexDirection: 'row',
+  },
+  stepCol: {
+    flex: 1,
+    alignItems: 'center',
+  },
+  stepLineRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    width: '100%',
+  },
+  stepLine: {
+    flex: 1,
+    height: 2,
+  },
+  stepCircle: {
+    width: 26,
+    height: 26,
+    borderRadius: 13,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  stepDone: {
+    backgroundColor: colors.primary[500]!,
+  },
+  stepActive: {
+    backgroundColor: colors.primary[600]!,
+    borderWidth: 3,
+    borderColor: colors.primary[100]!,
+  },
+  stepFuture: {
+    backgroundColor: colors.surface.alt,
+    borderWidth: 1,
+    borderColor: colors.border.DEFAULT,
+  },
+  stepNum: {
+    fontSize: 12,
+    fontWeight: '600',
+  },
+  stepLabel: {
+    fontSize: 10,
+    textAlign: 'center',
+    marginTop: 6,
+    lineHeight: 13,
+  },
+
+  // ===== Items comparison =====
+  sideLabel: {
+    marginBottom: 10,
+  },
+  cmpItemRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+    backgroundColor: colors.surface.alt,
+    borderRadius: 8,
+    padding: 8,
+  },
+  cmpThumb: {
+    width: 52,
+    height: 52,
+    borderRadius: 6,
+    backgroundColor: colors.border.subtle,
+  },
+  cmpTotalRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginTop: 12,
+    paddingTop: 12,
+    borderTopWidth: 1,
+    borderTopColor: colors.border.DEFAULT,
+  },
+  cmpTotalValue: {
+    color: colors.primary[700]!,
+    fontWeight: 'bold',
+  },
+  arrowRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    marginVertical: 16,
+  },
+  arrowLine: {
+    flex: 1,
+    height: StyleSheet.hairlineWidth,
+    backgroundColor: colors.border.DEFAULT,
+  },
+  arrowCircle: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    backgroundColor: colors.primary[50]!,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+
+  // ===== Cash card =====
+  cashCard: {
+    backgroundColor: colors.success[50]!,
+    borderWidth: 1,
+    borderColor: colors.success[200]!,
+  },
+  cashHeaderRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+  },
+  cashBig: {
+    color: colors.success[700]!,
+    fontWeight: 'bold',
+    marginTop: 2,
+  },
+  paidChip: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    backgroundColor: colors.success[100]!,
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: 999,
+  },
+  paidChipText: {
+    fontSize: 12,
+    fontWeight: '700',
+    color: colors.success[700]!,
+  },
+
+  // ===== Status description + countdown =====
+  descCard: {
+    marginHorizontal: 16,
+    marginTop: 12,
+    padding: 12,
+    borderRadius: 10,
+    backgroundColor: colors.surface.DEFAULT,
+    borderWidth: 1,
+    borderColor: colors.border.subtle,
+  },
+  countdownCard: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+    marginHorizontal: 16,
+    marginTop: 12,
+    padding: 12,
+    borderRadius: 10,
+    backgroundColor: colors.primary[50]!,
+    borderWidth: 1,
+    borderColor: colors.primary[100]!,
+  },
+  countdownText: {
+    fontSize: 18,
+    fontWeight: '700',
+    color: colors.primary[800]!,
+    fontFamily: 'Courier',
+  },
+
+  // ===== Completed summary =====
+  completedCard: {
+    backgroundColor: colors.success[50]!,
+    borderWidth: 1,
+    borderColor: colors.success[200]!,
+  },
+  completedHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+    marginBottom: 8,
+  },
+  summaryDateRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingVertical: 6,
+    borderTopWidth: StyleSheet.hairlineWidth,
+    borderTopColor: colors.success[200]!,
+  },
+  completedActions: {
+    flexDirection: 'row',
+    gap: 12,
+    marginTop: 16,
+  },
+
+  // ===== Status banners =====
+  infoBanner: {
+    backgroundColor: colors.info[50]!,
+    borderWidth: 1,
+    borderColor: colors.info[200]!,
+  },
+  warningBanner: {
+    backgroundColor: colors.warning[50]!,
+    borderWidth: 1,
+    borderColor: colors.warning[200]!,
+  },
+  bannerRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+  },
+  bannerIconCircle: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    backgroundColor: colors.info[500]!,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+
+  // ===== Header version badge =====
+  tradeHeaderTop: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: 8,
+  },
+  versionBadge: {
+    backgroundColor: colors.primary[100]!,
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: 6,
+  },
+  versionBadgeText: {
+    fontSize: 11,
+    fontWeight: '700',
+    color: colors.primary[700]!,
+  },
+
+  // ===== Payment CTA =====
+  payCta: {
+    backgroundColor: colors.primary[50]!,
+    borderWidth: 1,
+    borderColor: colors.primary[100]!,
+    borderRadius: 12,
+    padding: 14,
   },
 });

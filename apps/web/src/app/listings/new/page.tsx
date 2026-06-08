@@ -663,6 +663,15 @@ export default function NewListingPage() {
       return;
     }
 
+    if (formData.images.length === 0) {
+      toast.error(
+        locale === "en"
+          ? "Please add at least one photo"
+          : "En az bir fotoğraf ekleyin",
+      );
+      return;
+    }
+
     // Check listing limit
     if (listingLimits && !listingLimits.canCreateListing) {
       toast.error(

@@ -6,7 +6,8 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { theme, Button, Card, Spinner, Snackbar, Switch, Divider, Text } from '@tarodan/ui-native';
 import { Ionicons } from '@expo/vector-icons';
 
-import { ScreenHeader } from '../../src/components/common';
+import { ScreenHeader, ThemedRefreshControl } from '../../src/components/common';
+import { useRefresh } from '../../src/hooks/useRefresh';
 import { membershipApi } from '../../src/services/api';
 
 const { colors } = theme;
@@ -74,6 +75,8 @@ export default function MembershipManageScreen() {
       return response.data?.data ?? response.data ?? null;
     },
   });
+
+  const { refreshing, onRefresh } = useRefresh(refetch);
 
   const tier = (data?.tier?.type ?? data?.tierType ?? 'free').toLowerCase();
   const tierName = data?.tier?.name ?? data?.tierName ?? TIER_NAMES[tier] ?? 'Ücretsiz Üyelik';
@@ -144,7 +147,10 @@ export default function MembershipManageScreen() {
   return (
     <SafeAreaView style={styles.container} edges={['top']}>
       <ScreenHeader title="Üyelik Yönetimi" />
-      <ScrollView contentContainerStyle={styles.scrollBody}>
+      <ScrollView
+        contentContainerStyle={styles.scrollBody}
+        refreshControl={<ThemedRefreshControl refreshing={refreshing} onRefresh={onRefresh} />}
+      >
         {/* Current plan */}
         <Card style={styles.card}>
           <View style={styles.headerRow}>

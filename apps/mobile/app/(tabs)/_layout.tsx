@@ -1,18 +1,27 @@
 import { Tabs } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
+import { useEffect } from 'react';
 import { View, Text, StyleSheet } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { theme } from '@tarodan/ui-native';
 import { useMessagesStore } from '../../src/stores/messagesStore';
+import { useAuthStore } from '../../src/stores/authStore';
 import { useTranslation } from '../../src/i18n';
 
 const { colors } = theme;
 
 export default function TabLayout() {
   const insets = useSafeAreaInsets();
-  const { getUnreadCount } = useMessagesStore();
+  const { getUnreadCount, fetchUnreadCount } = useMessagesStore();
+  const { isAuthenticated } = useAuthStore();
   const { t } = useTranslation();
   const unreadCount = getUnreadCount();
+
+  // Tab-bar mesaj rozetini app açılışında doğru göster (messages sekmesi ziyaret
+  // edilmeden) — sayfalama bağımsız sunucu toplamı.
+  useEffect(() => {
+    if (isAuthenticated) fetchUnreadCount();
+  }, [isAuthenticated, fetchUnreadCount]);
   const tabBarBottom = Math.max(insets.bottom, 8);
 
   return (

@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { View, ScrollView, StyleSheet, TouchableOpacity, Alert } from 'react-native';
-import { theme, Button, Card, Input, Radio, Text } from '@tarodan/ui-native';
+import { theme, Button, Card, Input, Radio, Text, ScreenHeader } from '@tarodan/ui-native';
 import { router, useLocalSearchParams } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { useAuthStore } from '../../src/stores/authStore';
@@ -115,12 +115,20 @@ export default function MembershipCheckoutScreen() {
         return;
       }
 
-      // Gerçek PayTR akışı — WebView ödeme ekranına yönlendir
+      // Gerçek PayTR akışı — WebView ödeme ekranına yönlendir.
+      // Token burada üretildi; URL'i geçerek ekranın tekrar initiate etmesini önle.
       if (paymentId) {
+        const paymentUrl: string | undefined = initData.paymentUrl;
         setLoading(false);
         router.replace({
           pathname: '/payment/[id]',
-          params: { id: paymentId, provider: 'paytr', guest: '0', type: 'membership' },
+          params: {
+            id: paymentId,
+            provider: 'paytr',
+            guest: '0',
+            type: 'membership',
+            ...(paymentUrl ? { paymentUrl } : {}),
+          },
         } as any);
         return;
       }
@@ -156,14 +164,7 @@ export default function MembershipCheckoutScreen() {
 
   return (
     <View style={styles.container}>
-      {/* Header */}
-      <View style={styles.header}>
-        <TouchableOpacity onPress={() => router.back()}>
-          <Ionicons name="arrow-back" size={24} color={colors.white} />
-        </TouchableOpacity>
-        <Text style={styles.headerTitle}>Üyelik Satın Al</Text>
-        <View style={{ width: 24 }} />
-      </View>
+      <ScreenHeader title="Üyelik Satın Al" onBack={() => router.back()} />
 
       <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
         {/* Selected Plan */}
@@ -301,20 +302,6 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: colors.surface.alt,
-  },
-  header: {
-    backgroundColor: colors.primary[600]!,
-    paddingTop: 50,
-    paddingBottom: 16,
-    paddingHorizontal: 20,
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-  },
-  headerTitle: {
-    fontSize: 18,
-    fontWeight: 'bold',
-    color: colors.white,
   },
   content: {
     flex: 1,

@@ -5,7 +5,6 @@ import { Ionicons } from '@expo/vector-icons';
 import {
   Avatar,
   Badge,
-  FAB,
   Input,
   Spinner,
   Text,
@@ -228,14 +227,6 @@ export default function MessagesTabScreen() {
           <View style={{ height: 100 }} />
         </ScrollView>
       )}
-
-      {/* New Message FAB */}
-      <FAB
-        icon="add"
-        accessibilityLabel="Yeni mesaj"
-        style={styles.fab}
-        onPress={() => router.push('/messages/new')}
-      />
     </View>
   );
 }
@@ -398,11 +389,5 @@ const styles = StyleSheet.create({
   unreadBadge: {
     backgroundColor: TarodanColors.primary,
     marginLeft: 8,
-  },
-  fab: {
-    position: 'absolute',
-    right: 16,
-    bottom: 24,
-    backgroundColor: TarodanColors.primary,
   },
 });

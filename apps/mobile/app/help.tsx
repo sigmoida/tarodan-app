@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { View, ScrollView, StyleSheet, TouchableOpacity, Linking } from 'react-native';
-import { theme, Text, Input, Textarea, Button, Snackbar, Divider } from '@tarodan/ui-native';
+import { theme, Text, Input, Textarea, Button, Snackbar, Divider, ScreenHeader } from '@tarodan/ui-native';
 import { router } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { useTranslation } from '../src/i18n';
@@ -187,14 +187,7 @@ export default function HelpScreen() {
 
   return (
     <View style={styles.container}>
-      {/* Header */}
-      <View style={styles.header}>
-        <TouchableOpacity onPress={() => router.back()}>
-          <Ionicons name="arrow-back" size={24} color={colors.white} />
-        </TouchableOpacity>
-        <Text style={styles.headerTitle}>{t('mobile.pageHelpCenter')}</Text>
-        <View style={{ width: 24 }} />
-      </View>
+      <ScreenHeader title={t('mobile.pageHelpCenter')} onBack={() => router.back()} />
 
       <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
         {/* Search */}
@@ -385,20 +378,6 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: colors.surface.alt,
-  },
-  header: {
-    backgroundColor: colors.primary[600]!,
-    paddingTop: 50,
-    paddingBottom: 16,
-    paddingHorizontal: 20,
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-  },
-  headerTitle: {
-    fontSize: 18,
-    fontWeight: 'bold',
-    color: colors.white,
   },
   content: {
     flex: 1,

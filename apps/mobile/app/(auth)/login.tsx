@@ -74,7 +74,7 @@ export default function LoginScreen() {
           'İşletme bilgilerinizi tamamlamışsınız. Kurumsal üyeliğe geçerek avantajlardan yararlanabilirsiniz.',
           [
             { text: 'Sonra', onPress: () => router.replace('/' as never), style: 'cancel' },
-            { text: 'Üyeliğe Geç', onPress: () => router.replace('/membership/checkout' as never) },
+            { text: 'Üyeliğe Geç', onPress: () => router.replace('/membership' as never) },
           ],
         );
         return;
@@ -110,6 +110,19 @@ export default function LoginScreen() {
   const onSubmit = (data: LoginForm) => {
     setErrorMessage(null);
     loginMutation.mutate(data);
+  };
+
+  /**
+   * Misafir olarak devam et: giriş yapmadan akışa dön. Login ekranı her zaman
+   * router.push ile açıldığı için geri dönülecek bir ekran varsa oraya
+   * (örn. checkout misafir formu) döneriz; yoksa ana sayfaya yönlendiririz.
+   */
+  const continueAsGuest = () => {
+    if (router.canGoBack()) {
+      router.back();
+    } else {
+      router.replace('/' as never);
+    }
   };
 
   /**
@@ -232,6 +245,16 @@ export default function LoginScreen() {
           title="Giriş Yap"
           onPress={handleLoginPress}
           isLoading={loginMutation.isPending}
+          disabled={loginMutation.isPending}
+        />
+
+        <Button
+          testID="continue-as-guest-button"
+          variant="outline"
+          size="lg"
+          fullWidth
+          title="Misafir Olarak Devam Et"
+          onPress={continueAsGuest}
           disabled={loginMutation.isPending}
         />
 

@@ -10,6 +10,7 @@ import {
   Button,
   Spinner,
   Text,
+  ScreenHeader,
   theme,
 } from '@tarodan/ui-native';
 import { useState, useCallback } from 'react';
@@ -28,7 +29,7 @@ interface Listing {
   id: string;
   title: string;
   price: number;
-  status: 'active' | 'pending' | 'sold' | 'inactive' | 'expired' | 'rejected';
+  status: 'active' | 'pending' | 'sold' | 'inactive' | 'reserved' | 'rejected';
   viewCount: number;
   favoriteCount?: number;
   images: Array<{ url: string }>;
@@ -40,7 +41,7 @@ interface Listing {
   boostedUntil?: string | null;
 }
 
-type FilterType = 'all' | 'active' | 'pending' | 'sold' | 'expired' | 'inactive';
+type FilterType = 'all' | 'active' | 'pending' | 'sold' | 'reserved' | 'inactive' | 'rejected';
 
 export default function MyListingsScreen() {
   const { t } = useTranslation();
@@ -60,7 +61,7 @@ export default function MyListingsScreen() {
   const { data: listingsData, isLoading, isError, refetch } = useQuery({
     queryKey: ['my-listings', filter],
     queryFn: async () => {
-      const params: any = {};
+      const params: any = { limit: 100 };
       if (filter !== 'all') {
         params.status = filter;
       }
@@ -72,6 +73,25 @@ export default function MyListingsScreen() {
 
   const listings: Listing[] = listingsData || [];
 
+  // Chip sayaçları — AKTİF FİLTREDEN BAĞIMSIZ stabil kaynak (GET /products/my/stats).
+  // Önceden sayaçlar o an çekili (filtrelenmiş + sayfalı) listeden hesaplanıyordu →
+  // filtreye basınca değişiyor, çok ilanı olanda tavanlanıyordu. Artık tek sunucu agregatı.
+  const { data: statsResp } = useQuery({
+    queryKey: ['my-listings-stats'],
+    queryFn: () => productsApi.getMyStats(),
+    retry: 1,
+  });
+  const statCounts = (statsResp?.data as any)?.counts ?? {};
+  const counts = {
+    all: statCounts.all ?? 0,
+    active: statCounts.active ?? 0,
+    pending: statCounts.pending ?? 0,
+    sold: statCounts.sold ?? 0,
+    reserved: statCounts.reserved ?? 0,
+    rejected: statCounts.rejected ?? 0,
+    inactive: statCounts.inactive ?? 0,
+  };
+
   // Deactivate listing mutation - Web ile aynı: PATCH /products/:id
   const deactivateMutation = useMutation({
     mutationFn: async (listingId: string) => {
@@ -79,6 +99,8 @@ export default function MyListingsScreen() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['my-listings'] });
+      queryClient.invalidateQueries({ queryKey: ['my-listings-stats'] });
+      queryClient.invalidateQueries({ queryKey: ['user-stats'] });
       refreshUserData();
       Alert.alert('Başarılı', 'İlan deaktif edildi');
     },
@@ -94,6 +116,8 @@ export default function MyListingsScreen() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['my-listings'] });
+      queryClient.invalidateQueries({ queryKey: ['my-listings-stats'] });
+      queryClient.invalidateQueries({ queryKey: ['user-stats'] });
       refreshUserData();
       Alert.alert('Başarılı', 'İlan tekrar aktif edildi');
     },
@@ -109,6 +133,8 @@ export default function MyListingsScreen() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['my-listings'] });
+      queryClient.invalidateQueries({ queryKey: ['my-listings-stats'] });
+      queryClient.invalidateQueries({ queryKey: ['user-stats'] });
       refreshUserData();
       setDeleteDialogVisible(false);
       setSelectedListing(null);
@@ -126,6 +152,8 @@ export default function MyListingsScreen() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['my-listings'] });
+      queryClient.invalidateQueries({ queryKey: ['my-listings-stats'] });
+      queryClient.invalidateQueries({ queryKey: ['user-stats'] });
       refreshUserData();
       Alert.alert('Başarılı', 'İlan yeniden yayınlandı');
     },
@@ -138,6 +166,7 @@ export default function MyListingsScreen() {
   useFocusEffect(
     useCallback(() => {
       refetch();
+      queryClient.invalidateQueries({ queryKey: ['my-listings-stats'] });
       refreshUserData();
     }, [])
   );
@@ -145,6 +174,7 @@ export default function MyListingsScreen() {
   const onRefresh = async () => {
     setRefreshing(true);
     await refetch();
+    queryClient.invalidateQueries({ queryKey: ['my-listings-stats'] });
     await refreshUserData();
     setRefreshing(false);
   };
@@ -160,7 +190,7 @@ export default function MyListingsScreen() {
       case 'sold': return colors.info[600]!;
       case 'pending': return colors.warning[600]!;
       case 'rejected': return colors.danger[600]!;
-      case 'expired': return colors.text.muted;
+      case 'reserved': return colors.primary[600]!;
       case 'inactive': return colors.text.subtle;
       default: return colors.text.muted;
     }
@@ -172,24 +202,11 @@ export default function MyListingsScreen() {
       case 'sold': return 'Satıldı';
       case 'pending': return 'Onay Bekliyor';
       case 'rejected': return 'Reddedildi';
-      case 'expired': return 'Süresi Doldu';
+      case 'reserved': return 'Rezerve';
       case 'inactive': return 'Deaktif';
       default: return status;
     }
   };
-
-  const getStatusCounts = () => {
-    return {
-      all: listings.length,
-      active: listings.filter(l => l.status === 'active').length,
-      pending: listings.filter(l => l.status === 'pending').length,
-      sold: listings.filter(l => l.status === 'sold').length,
-      expired: listings.filter(l => l.status === 'expired').length,
-      inactive: listings.filter(l => l.status === 'inactive').length,
-    };
-  };
-
-  const counts = getStatusCounts();
 
   const handleMenuAction = (action: string, listing: Listing) => {
     setActionMenuListing(null);
@@ -267,16 +284,15 @@ export default function MyListingsScreen() {
 
   return (
     <View style={styles.container}>
-      {/* Header */}
-      <View style={styles.header}>
-        <Pressable onPress={() => router.back()}>
-          <Ionicons name="arrow-back" size={24} color={colors.white} />
-        </Pressable>
-        <Text style={styles.headerTitle}>{t('mobile.settingsMyListings')}</Text>
-        <Pressable onPress={() => router.push('/settings/analytics')}>
-          <Ionicons name="stats-chart" size={24} color={colors.white} />
-        </Pressable>
-      </View>
+      <ScreenHeader
+        title={t('mobile.settingsMyListings')}
+        onBack={() => router.back()}
+        right={
+          <Pressable onPress={() => router.push('/settings/analytics')}>
+            <Ionicons name="stats-chart" size={24} color={colors.white} />
+          </Pressable>
+        }
+      />
 
       {/* Listing Limit Card */}
       <Card style={styles.limitCard}>
@@ -330,16 +346,22 @@ export default function MyListingsScreen() {
             onPress={() => setFilter('sold')}
           />
           <Chip
-            label={`Süresi Doldu (${counts.expired})`}
-            selected={filter === 'expired'}
-            variant={filter === 'expired' ? 'primary' : 'neutral'}
-            onPress={() => setFilter('expired')}
+            label={`Rezerve (${counts.reserved})`}
+            selected={filter === 'reserved'}
+            variant={filter === 'reserved' ? 'primary' : 'neutral'}
+            onPress={() => setFilter('reserved')}
           />
           <Chip
             label={`Deaktif (${counts.inactive})`}
             selected={filter === 'inactive'}
             variant={filter === 'inactive' ? 'primary' : 'neutral'}
             onPress={() => setFilter('inactive')}
+          />
+          <Chip
+            label={`Reddedildi (${counts.rejected})`}
+            selected={filter === 'rejected'}
+            variant={filter === 'rejected' ? 'primary' : 'neutral'}
+            onPress={() => setFilter('rejected')}
           />
         </ScrollView>
       </View>
@@ -470,7 +492,7 @@ export default function MyListingsScreen() {
                 <Text style={styles.menuItemText}>Deaktif Et</Text>
               </Pressable>
             )}
-            {(actionMenuListing.status === 'inactive' || actionMenuListing.status === 'expired') && (
+            {actionMenuListing.status === 'inactive' && (
               <Pressable style={styles.menuItem} onPress={() => handleMenuAction('relist', actionMenuListing)}>
                 <Ionicons name="refresh" size={20} color={colors.text.heading} />
                 <Text style={styles.menuItemText}>Yeniden Yayınla</Text>
@@ -521,7 +543,7 @@ export default function MyListingsScreen() {
           icon="add"
           accessibilityLabel="Yeni ilan oluştur"
           style={styles.fab}
-          onPress={() => router.push('/(tabs)/create')}
+          onPress={() => router.push('/(tabs)/sell')}
         />
       )}
     </View>
@@ -532,20 +554,6 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: colors.surface.alt,
-  },
-  header: {
-    backgroundColor: colors.primary[600]!,
-    paddingTop: 50,
-    paddingBottom: 16,
-    paddingHorizontal: 20,
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-  },
-  headerTitle: {
-    fontSize: 18,
-    fontWeight: 'bold',
-    color: colors.white,
   },
   limitCard: {
     margin: 16,
