@@ -1476,8 +1476,11 @@ async function main() {
     const buyers = users.filter(u => u.id !== product.sellerId);
     const buyer = buyers[Math.floor(Math.random() * buyers.length)];
     const status = orderStatuses[Math.floor(Math.random() * orderStatuses.length)];
-    const totalAmount = Number(product.price);
-    const commission = totalAmount * 0.05;
+    // Invariant (order.service checkout ile aynı): totalAmount = subtotal + shipping + buyerFee
+    const subtotal = Number(product.price);
+    const shippingCost = 30;
+    const totalAmount = subtotal + shippingCost;
+    const commission = subtotal * 0.05;
     const buyerAddress = addresses.find(a => a.userId === buyer.id);
 
     try {
@@ -1488,7 +1491,8 @@ async function main() {
           sellerId: product.sellerId,
           productId: product.id,
           totalAmount: totalAmount,
-          shippingCost: 30,
+          subtotal: subtotal,
+          shippingCost: shippingCost,
           commissionAmount: commission,
           status: status,
           paymentExpiresAt: new Date(Date.now() + 24 * 60 * 60 * 1000),

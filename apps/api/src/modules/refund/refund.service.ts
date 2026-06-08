@@ -839,20 +839,34 @@ export class RefundService {
       refundBuyerFee: boolean;
     },
     order: {
+      totalAmount: any;
       subtotal: any | null;
       shippingCost: any;
       buyerFeeAmount: any;
     },
   ): any {
-    let amount = new (Prisma as any).Decimal(0);
-    if (policy.refundProductAmount && order.subtotal != null) {
-      amount = amount.add(new (Prisma as any).Decimal(order.subtotal));
+    const D = (Prisma as any).Decimal;
+    const shippingCost = new D(order.shippingCost ?? 0);
+    const buyerFeeAmount = new D(order.buyerFeeAmount ?? 0);
+
+    // Ürün için iade edilecek tutar = alıcının ürüne FİİLEN ödediği tutar.
+    // totalAmount = ödenenÜrünTutarı + shipping + buyerFee (bkz. order.service checkout)
+    // olduğundan ödenenÜrünTutarı = totalAmount - shipping - buyerFee.
+    // Stored subtotal kullanılmaz: (a) çoğu eski/seed siparişte NULL,
+    // (b) indirim ÖNCESİ orijinal fiyatı tutar -> indirimli siparişte fazla iade.
+    const productAmount = new D(order.totalAmount ?? 0)
+      .sub(shippingCost)
+      .sub(buyerFeeAmount);
+
+    let amount = new D(0);
+    if (policy.refundProductAmount) {
+      amount = amount.add(productAmount.isNegative() ? new D(0) : productAmount);
     }
     if (policy.refundShippingFee) {
-      amount = amount.add(new (Prisma as any).Decimal(order.shippingCost));
+      amount = amount.add(shippingCost);
     }
     if (policy.refundBuyerFee) {
-      amount = amount.add(new (Prisma as any).Decimal(order.buyerFeeAmount));
+      amount = amount.add(buyerFeeAmount);
     }
     return amount;
   }
