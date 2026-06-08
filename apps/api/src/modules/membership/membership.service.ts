@@ -697,7 +697,11 @@ export class MembershipService {
           where: { id: membership.id },
           data: {
             tierId: freeTier.id,
-            status: SubscriptionStatus.expired,
+            // Free'ye düşürülen üye artık AKTİF bir ücretsiz üye. Önceden tier=free
+            // + status=expired (tutarsız) set ediliyordu; bu, getCurrentMembership /
+            // status okuyan diğer yerlerde kafa karışıklığı yaratıyordu.
+            status: SubscriptionStatus.active,
+            autoRenew: false,
           },
         });
         downgradeCount++;

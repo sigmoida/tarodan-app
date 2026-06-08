@@ -10,6 +10,7 @@ import { PrismaService } from '../../prisma';
 import { InjectQueue } from '@nestjs/bull';
 import { Queue } from 'bull';
 import { MembershipTierType } from '@prisma/client';
+import { MembershipService } from './membership.service';
 
 @Injectable()
 export class MembershipSchedulerService {
@@ -18,7 +19,33 @@ export class MembershipSchedulerService {
   constructor(
     private readonly prisma: PrismaService,
     @InjectQueue('email') private readonly emailQueue: Queue,
+    private readonly membershipService: MembershipService,
   ) {}
+
+  /**
+   * Süresi dolan paralı üyelikleri free tier'a düşür (her gün 03:00).
+   * Auto-renew (processAutoRenewals) saatlik çalıştığından buraya düşenler
+   * yenilenmemiş/yenilenememiş üyeliklerdir.
+   *
+   * ÖNEMLİ: checkExpiredMemberships() önceden HİÇBİR cron'a bağlı değildi (dead
+   * code) → süresi geçmiş paralı üyelikler hiç düşürülmüyor, status=active +
+   * tier=premium kalıyordu. canCreateTrade ham tier'ı okuduğu için süresi geçmiş
+   * premium kullanıcı hâlâ takas yapabiliyordu. Bu cron o boşluğu kapatır.
+   */
+  @Cron('0 3 * * *') // Her gün 03:00
+  async processExpiredDowngrades() {
+    try {
+      const count = await this.membershipService.checkExpiredMemberships();
+      if (count > 0) {
+        this.logger.log(`Downgraded ${count} expired membership(s) to free tier`);
+      }
+    } catch (error: any) {
+      this.logger.error(
+        `Error downgrading expired memberships: ${error.message}`,
+        error.stack,
+      );
+    }
+  }
 
   /**
    * Send monthly premium offer emails to free users

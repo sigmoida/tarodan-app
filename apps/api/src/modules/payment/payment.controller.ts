@@ -14,6 +14,7 @@ import {
   NotFoundException,
   ForbiddenException,
   UnauthorizedException,
+  BadRequestException,
   Logger,
 } from '@nestjs/common';
 import { Throttle } from '@nestjs/throttler';
@@ -190,13 +191,19 @@ export class PaymentController {
     @CurrentUser('id') userId: string,
     @Body() dto: AddCardDto,
   ) {
-    const y = dto.card.expireYear.length === 2 ? parseInt(`20${dto.card.expireYear}`, 10) : parseInt(dto.card.expireYear, 10);
+    // İstemci kart alanlarını nested ({ card: {...} }) ya da düz ({ cardNumber, ... })
+    // gönderebiliyor; ikisini de destekle. Eksikse 500 yerine 400 dön.
+    const c = dto.card ?? dto;
+    if (!c?.cardNumber || !c?.expireYear || !c?.expireMonth || !c?.cvc) {
+      throw new BadRequestException('Kart bilgileri eksik veya hatalı.');
+    }
+    const y = c.expireYear.length === 2 ? parseInt(`20${c.expireYear}`, 10) : parseInt(c.expireYear, 10);
     return this.paymentService.addPaymentMethod(userId, {
-      cardNumber: dto.card.cardNumber,
-      cardHolder: dto.card.cardHolderName,
-      expiryMonth: parseInt(dto.card.expireMonth, 10),
+      cardNumber: c.cardNumber,
+      cardHolder: c.cardHolderName,
+      expiryMonth: parseInt(c.expireMonth, 10),
       expiryYear: y,
-      cvv: dto.card.cvc,
+      cvv: c.cvc,
     });
   }
 
