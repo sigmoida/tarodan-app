@@ -47,7 +47,7 @@ export default function PaymentWebViewScreen() {
   // backend'in döndürdüğü paymentId ile güncellenir (cancel/verify/success için).
   const paymentIdRef = useRef<string>(params.id!);
   // Sadece PayTR kullanılıyor (iyzico kaldırıldı — web ile parite)
-  const provider: 'paytr' = 'paytr';
+  const provider = 'paytr' as const;
   const isGuest = params.guest === '1';
   const isMembership = params.type === 'membership';
 
@@ -75,7 +75,7 @@ export default function PaymentWebViewScreen() {
 
   useEffect(() => {
     initiatePayment();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+    // ödeme başlatma yalnızca route parametreleri değişince tetiklenir (kasıtlı)
   }, [params.id, params.paymentUrl]);
 
   const initiatePayment = async () => {

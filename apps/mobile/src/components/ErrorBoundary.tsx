@@ -2,7 +2,10 @@ import React, { Component, ReactNode } from 'react';
 import { View, Text, TouchableOpacity, StyleSheet, ScrollView } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { TarodanColors } from '../theme';
+import { theme } from '@tarodan/ui-native';
 import { captureException } from '../services/sentry';
+
+const { colors } = theme;
 import { useTranslation } from '../i18n';
 
 interface Props {
@@ -96,14 +99,14 @@ const styles = StyleSheet.create({
     maxHeight: 200,
     marginTop: 16,
     padding: 12,
-    backgroundColor: '#FEE',
+    backgroundColor: colors.danger[50],
     borderRadius: 8,
     width: '100%',
   },
   errorText: {
     fontFamily: 'Courier',
     fontSize: 11,
-    color: '#900',
+    color: colors.danger[800],
   },
   button: {
     marginTop: 24,
@@ -113,7 +116,7 @@ const styles = StyleSheet.create({
     borderRadius: 8,
   },
   buttonText: {
-    color: '#FFFFFF',
+    color: colors.white,
     fontWeight: '600',
     fontSize: 16,
   },

@@ -942,7 +942,7 @@ const styles = StyleSheet.create({
     width: 24,
     height: 24,
     borderRadius: radius.full,
-    backgroundColor: 'rgba(0,0,0,0.55)',
+    backgroundColor: colors.overlay.black50,
     alignItems: 'center',
     justifyContent: 'center',
   },

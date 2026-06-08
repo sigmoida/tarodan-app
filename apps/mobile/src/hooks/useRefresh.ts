@@ -22,8 +22,7 @@ export function useRefresh(...refetchers: Refetcher[]) {
     } finally {
       setRefreshing(false);
     }
-    // refetch referansları react-query tarafından stabil tutulur
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+    // refetch referansları react-query tarafından stabil tutulur (kasıtlı bağımlılık)
   }, refetchers);
 
   return { refreshing, onRefresh };

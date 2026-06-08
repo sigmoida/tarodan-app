@@ -42,21 +42,11 @@ jobs:
             echo "skip=false" >> "$GITHUB_OUTPUT"
           fi
 
-      - name: Setup Node + pnpm
-        if: steps.guard.outputs.skip == 'false'
-        uses: pnpm/action-setup@v4
-        with:
-          version: 8.12.0
-
-      - uses: actions/setup-node@v4
+      - uses: ./.github/actions/setup-workspace
         if: steps.guard.outputs.skip == 'false'
         with:
-          node-version: 20
-          cache: pnpm
-
-      - name: Install deps
-        if: steps.guard.outputs.skip == 'false'
-        run: pnpm install --frozen-lockfile
+          prisma: 'false'
+          turbo-cache: 'false'
 
       # NOTE: Real run requires a built .app artifact (Expo Go custom build or
       # eas build --profile development --platform ios --local). The path below

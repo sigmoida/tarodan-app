@@ -112,9 +112,9 @@ export default function CheckoutScreen() {
 
   // ---------- Kargo / Ödeme tercihleri ----------
   // Tek kargo firması: Sürat Kargo (web ile parite — apps/web/src/app/checkout/page.tsx).
-  const selectedCarrier: 'surat' = 'surat';
+  const selectedCarrier = 'surat' as const;
   // Sadece PayTR kullanılıyor (iyzico kaldırıldı — web ile parite)
-  const paymentProvider: 'paytr' = 'paytr';
+  const paymentProvider = 'paytr' as const;
   const [shippingCost, setShippingCost] = useState(0);
   const [shippingLoading, setShippingLoading] = useState(false);
 

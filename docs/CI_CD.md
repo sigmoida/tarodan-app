@@ -13,6 +13,22 @@ Kanonik CI/CD mimarisi. Tasarım kararları: `docs/superpowers/specs/2026-06-06-
 | Build Images (master) başarılı | `deploy-production.yml` | **manuel onay** → production VPS deploy |
 | apps/mobile değişikliği | `mobile-build.yml` | EAS development profili (iOS simulator) build |
 
+## Paylaşımlı yapı taşları
+
+Tekrar eden mantık tek yerde toplanmıştır — yeni job/workflow eklerken bunları kullan:
+
+- **`.github/actions/setup-workspace`** (composite) — ortak CI bootstrap:
+  pnpm + node + (opsiyonel) Turbo cache + `pnpm install` + (opsiyonel) prisma generate.
+  Job şablonu: `actions/checkout@v4` → `uses: ./.github/actions/setup-workspace`.
+  Inputs: `prisma` (default `true`), `turbo-cache` (default `true`).
+- **`.github/actions/prisma-generate`** (composite) — retry'lı `prisma generate`; `setup-workspace` çağırır.
+- **`.github/workflows/deploy.yml`** (`workflow_call`) — staging + production deploy mantığı.
+  `deploy-staging.yml` ve `deploy-production.yml` yalnızca tetik + secret eşleyen ince caller'lardır.
+
+**Tek versiyon kaynağı (CI'da elle pinleme YOK):**
+- Node sürümü → `.nvmrc` (`setup-node` `node-version-file` ile okur).
+- pnpm sürümü → `package.json` → `packageManager` alanı (`pnpm/action-setup` otomatik okur).
+
 ## Image'lar
 
 `ghcr.io/sigmoida/tarodan-{api,web,admin}` — her commit `sha-<12>` ile etiketlenir
@@ -21,6 +37,8 @@ servisi `api` ile aynı imajı paylaşır.
 
 ## Sunucu kurulumu (her VPS: staging + production)
 
+0. İlk kurulumda `scripts/setup-server.sh` ile sunucu hazırlanır (Docker + Compose + Node 20
+   + pnpm + ufw firewall 22/80/443 + Certbot). Tek seferlik bootstrap.
 1. `/opt/tarodan` içine repo clone edilir (compose + scripts için).
 2. `infrastructure/.env` doldurulur (`infrastructure/env.example.txt` referans):
    `REGISTRY=ghcr.io/sigmoida`, `IMAGE_TAG=latest`, `DOMAIN`, `DB_*`, `REDIS_*`, S3, PayTR, vb.
@@ -64,3 +82,5 @@ veya production'da Actions → Deploy Production → `workflow_dispatch` → `im
 `mobile-build.yml` EAS `development` profili ile iOS simulator `.app` üretir.
 `maestro-cloud.yml` bunu `app-file` olarak tüketecek şekilde bağlanmalı
 (`eas build --local` veya EAS artifact indirme).
+
+Maestro Cloud secret'ları ve kurulum detayı: [`apps/mobile/maestro/CLOUD_SETUP.md`](../apps/mobile/maestro/CLOUD_SETUP.md).

@@ -3,7 +3,10 @@
  * Provides helper functions for checking user membership limits and permissions
  */
 
+import { theme } from '@tarodan/ui-native';
 import { useAuthStore, MembershipTier, MembershipLimits } from '../stores/authStore';
+
+const { colors } = theme;
 
 // Free member specific limits
 export const FREE_MEMBER_LIMITS = {
@@ -246,15 +249,15 @@ export const getVerificationCriteria = (): VerificationCriteria => {
 export const getTierDisplayInfo = (tier: MembershipTier): { name: string; color: string; icon: string } => {
   switch (tier) {
     case 'free':
-      return { name: 'Ücretsiz Üye', color: '#757575', icon: 'account' };
+      return { name: 'Ücretsiz Üye', color: colors.gray[500], icon: 'account' };
     case 'basic':
-      return { name: 'Temel Üye', color: '#1976D2', icon: 'account-check' };
+      return { name: 'Temel Üye', color: colors.info[600]!, icon: 'account-check' };
     case 'premium':
-      return { name: 'Premium Üye', color: '#FF6B35', icon: 'crown' };
+      return { name: 'Premium Üye', color: colors.primary[500], icon: 'crown' };
     case 'business':
-      return { name: 'Kurumsal', color: '#9C27B0', icon: 'domain' };
+      return { name: 'Kurumsal', color: colors.primary[700], icon: 'domain' };
     default:
-      return { name: 'Üye', color: '#757575', icon: 'account' };
+      return { name: 'Üye', color: colors.gray[500], icon: 'account' };
   }
 };
 

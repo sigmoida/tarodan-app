@@ -112,7 +112,7 @@ export default function SearchScreen() {
     setFilters(next);
     setSearchQuery(next.search);
     if (params.openFilter) setFilterModalVisible(true);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+    // navToken değişiminde URL parametrelerini bir kez uygula (kasıtlı sınırlı bağımlılık)
   }, [navToken]);
 
   const options = useProductFilterOptions();

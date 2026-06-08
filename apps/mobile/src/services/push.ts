@@ -2,7 +2,10 @@ import * as Device from 'expo-device';
 import { Platform } from 'react-native';
 import Constants from 'expo-constants';
 import { router } from 'expo-router';
+import { theme } from '@tarodan/ui-native';
 import { api } from './api';
+
+const { colors } = theme;
 
 // Conditionally import notifications - only in development builds, not Expo Go
 let Notifications: any = null;
@@ -88,28 +91,28 @@ export async function registerForPushNotifications(): Promise<string | null> {
         name: 'Varsayılan',
         importance: Notifications.AndroidImportance.MAX,
         vibrationPattern: [0, 250, 250, 250],
-        lightColor: '#E53935',
+        lightColor: colors.danger[500],
       });
 
       await Notifications.setNotificationChannelAsync('trades', {
         name: 'Takaslar',
         importance: Notifications.AndroidImportance.HIGH,
         vibrationPattern: [0, 250, 250, 250],
-        lightColor: '#4CAF50',
+        lightColor: colors.success[500],
       });
 
       await Notifications.setNotificationChannelAsync('messages', {
         name: 'Mesajlar',
         importance: Notifications.AndroidImportance.HIGH,
         vibrationPattern: [0, 250, 250, 250],
-        lightColor: '#2196F3',
+        lightColor: colors.info[500],
       });
 
       await Notifications.setNotificationChannelAsync('orders', {
         name: 'Siparişler',
         importance: Notifications.AndroidImportance.HIGH,
         vibrationPattern: [0, 250, 250, 250],
-        lightColor: '#FF9800',
+        lightColor: colors.warning[500],
       });
     } catch (e) {
       console.log('⚠️ Notification channel setup failed');

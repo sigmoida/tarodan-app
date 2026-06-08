@@ -881,14 +881,14 @@ export class PaymentService {
       return this.processSuccessfulTradeCashPayment(payment, transactionId);
     }
 
-    let cancelledOrders: {
+    const cancelledOrders: {
       buyerId: string;
       productId: string;
       productTitle: string;
       offerId: string | null;
       hadPayment: boolean;
     }[] = [];
-    let cancelledOffers: { buyerId: string; productId: string; productTitle: string }[] = [];
+    const cancelledOffers: { buyerId: string; productId: string; productTitle: string }[] = [];
     let stockoutCategoryId: string | null = null;
 
     const result = await this.prisma.$transaction(async (tx) => {

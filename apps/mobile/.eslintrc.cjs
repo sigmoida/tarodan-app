@@ -19,8 +19,11 @@
  * Migrasyonla birlikte bu listeden çıkar. Yeni dosya EKLEME.
  */
 const MIGRATION_OVERRIDES = [
-  // Tüm ekranlar migrate edildi — sadece TarodanColors bridge dosyası kalıyor
+  // Legacy theme bridge — TarodanColors palette tanımı (ham hex burada yaşar)
+  // ve onu re-export eden index.ts. Bunlar renk KAYNAĞI olduğu için raw-color
+  // kuralından muaftır.
   'src/theme/index.ts',
+  'src/theme/colors.ts',
 ];
 
 /** Hex (#fff, #FF8800, #ff88aa00) ve rgb()/rgba() literal regex */
