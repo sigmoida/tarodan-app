@@ -43,6 +43,8 @@ interface Trade {
   message?: string;
   initiatorId: string;
   receiverId: string;
+  initiatorName?: string;
+  receiverName?: string;
   initiator?: { id: string; displayName: string };
   receiver?: { id: string; displayName: string };
   initiatorItems?: TradeItem[];
@@ -123,9 +125,10 @@ export default function TradeCounterScreen() {
     queryKey: ['my-tradeable-products', user?.id],
     queryFn: async () => {
       if (!user?.id) return [];
-      const response = await productsApi.getAll({ sellerId: user.id, isTradeEnabled: true, status: 'active' });
+      const response = await productsApi.getAll({ sellerId: user.id, tradeOnly: true, status: 'active' });
       const payload = response.data?.data ?? response.data ?? [];
-      return Array.isArray(payload) ? payload : payload?.products ?? [];
+      const list = Array.isArray(payload) ? payload : payload?.products ?? [];
+      return list.filter((p: any) => p.isTradeEnabled && p.status === 'active');
     },
     enabled: !!user?.id,
   });
@@ -135,9 +138,10 @@ export default function TradeCounterScreen() {
     queryKey: ['other-tradeable-products', otherPartyId],
     queryFn: async () => {
       if (!otherPartyId) return [];
-      const response = await productsApi.getAll({ sellerId: otherPartyId, isTradeEnabled: true, status: 'active' });
+      const response = await productsApi.getAll({ sellerId: otherPartyId, tradeOnly: true, status: 'active' });
       const payload = response.data?.data ?? response.data ?? [];
-      return Array.isArray(payload) ? payload : payload?.products ?? [];
+      const list = Array.isArray(payload) ? payload : payload?.products ?? [];
+      return list.filter((p: any) => p.isTradeEnabled && p.status === 'active');
     },
     enabled: !!otherPartyId,
   });
@@ -308,7 +312,7 @@ export default function TradeCounterScreen() {
 
         {renderPicker(
           'İsteyeceğim Ürünler',
-          `${amIInitiator ? trade.receiver?.displayName : trade.initiator?.displayName} adlı satıcıdan istediğim ürünleri seçin.`,
+          `${amIInitiator ? trade.receiverName : trade.initiatorName} adlı satıcıdan istediğim ürünleri seçin.`,
           theirProducts,
           selectedTheirs,
           toggleTheirs,

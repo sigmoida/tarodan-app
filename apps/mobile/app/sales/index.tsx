@@ -18,7 +18,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { Ionicons } from '@expo/vector-icons';
 import { ordersApi, shippingApi } from '../../src/services/api';
 import { useAuthStore } from '../../src/stores/authStore';
-import { resolveImageUrl } from '../../src/utils/imageUrl';
+import { getOrderProductImageUri } from '../../src/utils/orderProductImage';
 
 const { colors } = theme;
 
@@ -41,6 +41,7 @@ interface Sale {
     id: string;
     title: string;
     images?: Array<{ url: string }>;
+    imageUrl?: string | null;
   };
   buyer: {
     id: string;
@@ -283,7 +284,7 @@ export default function SalesScreen() {
 
               <View style={styles.saleContent}>
                 <Image
-                  source={{ uri: resolveImageUrl(sale.product.images) }}
+                  source={{ uri: getOrderProductImageUri(sale.product) }}
                   style={styles.productImage}
                 />
                 <View style={styles.saleInfo}>

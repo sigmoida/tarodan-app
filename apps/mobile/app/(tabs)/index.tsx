@@ -159,14 +159,11 @@ export default function HomeScreen() {
     queryKey: ['featured-collector'],
     queryFn: async () => {
       try {
-        const response = await collectionsApi.browse({ isPublic: true, page: 1, pageSize: 1 });
-        const collections = response.data?.collections || response.data?.data || [];
-        if (collections.length > 0) {
-          const collectionId = collections[0].id;
-          const detailResponse = await collectionsApi.getOne(collectionId);
-          return detailResponse.data?.collection || detailResponse.data;
-        }
-        return null;
+        // Web ile aynı endpoint: GET /users/featured-collector (skora göre seçilmiş gerçek
+        // "haftanın koleksiyoneri"). Önceki browse({pageSize:1}) ilk rastgele public koleksiyonu
+        // alıyordu — web ile sapıyordu.
+        const response = await api.get('/users/featured-collector');
+        return response.data ?? null;
       } catch (error) {
         console.log('⚠️ Haftanın Koleksiyoneri yüklenemedi');
         return null;
@@ -551,11 +548,11 @@ export default function HomeScreen() {
               <View style={styles.featuredHeader}>
                 <View style={styles.featuredAvatar}>
                   <Text style={styles.featuredAvatarText}>
-                    {(featuredCollector.userName || 'K').charAt(0).toUpperCase()}
+                    {(featuredCollector.user?.displayName || featuredCollector.userName || 'K').charAt(0).toUpperCase()}
                   </Text>
                 </View>
                 <View style={styles.featuredInfo}>
-                  <Text style={styles.featuredName}>{featuredCollector.userName || 'Koleksiyoner'}</Text>
+                  <Text style={styles.featuredName}>{featuredCollector.user?.displayName || featuredCollector.userName || 'Koleksiyoner'}</Text>
                   <Text style={styles.featuredDesc}>
                     {featuredCollector.description || `${featuredCollector.itemCount || 0} araçlık koleksiyon`}
                   </Text>

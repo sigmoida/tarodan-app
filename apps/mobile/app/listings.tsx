@@ -62,7 +62,16 @@ export default function ListingsScreen() {
   const [filterModalVisible, setFilterModalVisible] = useState(false);
   const [sortMenuVisible, setSortMenuVisible] = useState(false);
 
-  const options = useProductFilterOptions();
+  // Seçili üreticinin slug'ını çöz ki üreticiye-özel filtreler (HW vb.) yüklensin.
+  const baseOptions = useProductFilterOptions();
+  const manufacturerSlug = useMemo(() => {
+    const list = baseOptions.manufacturers;
+    if (filters.manufacturerId) return list.find((m) => m.id === filters.manufacturerId)?.slug;
+    if (filters.manufacturer)
+      return list.find((m) => m.name.toLowerCase() === filters.manufacturer.toLowerCase())?.slug;
+    return undefined;
+  }, [filters.manufacturerId, filters.manufacturer, baseOptions.manufacturers]);
+  const options = useProductFilterOptions(manufacturerSlug);
 
   const applySearch = () =>
     setFilters((prev) => ({ ...prev, search: searchQuery.trim() }));

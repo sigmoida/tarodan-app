@@ -317,6 +317,17 @@ export default function OfferDetailScreen() {
                 Alert.alert('Geçersiz tutar', 'Pozitif bir tutar girin.');
                 return;
               }
+              // API kuralı: karşı teklif mevcut tekliften yüksek, ürün fiyatından düşük/eşit olmalı.
+              const refAmount = Number(offer.amount) || 0;
+              const maxPrice = Number(offer.product?.price) || 0;
+              if (counterValue <= refAmount) {
+                Alert.alert('Hata', `Karşı teklif, mevcut tekliften (${formatPrice(refAmount)}) yüksek olmalıdır`);
+                return;
+              }
+              if (maxPrice > 0 && counterValue > maxPrice) {
+                Alert.alert('Hata', `Karşı teklif, ürün fiyatından (${formatPrice(maxPrice)}) yüksek olamaz`);
+                return;
+              }
               counterMutation.mutate(counterValue);
             }}
             isLoading={counterMutation.isPending}

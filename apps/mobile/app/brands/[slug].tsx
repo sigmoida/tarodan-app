@@ -41,14 +41,14 @@ export default function BrandDetailScreen() {
     refetch,
     isRefetching,
   } = useQuery({
-    queryKey: ['brand-products', slug],
+    queryKey: ['brand-products', brand?.id],
     queryFn: async () => {
-      if (!slug) return [];
-      const response = await productsApi.getAll({ brand: slug, status: 'active' });
+      if (!brand?.id) return [];
+      const response = await productsApi.getAll({ brandId: brand.id, status: 'active' });
       const payload = response.data?.data ?? response.data ?? [];
       return Array.isArray(payload) ? payload : payload?.products ?? [];
     },
-    enabled: !!slug,
+    enabled: !!brand?.id,
   });
 
   const products: ProductCardProduct[] = productsData ?? [];

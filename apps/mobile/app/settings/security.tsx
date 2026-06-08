@@ -48,8 +48,13 @@ export default function SecuritySettingsScreen() {
       return;
     }
 
-    if (newPassword.length < 8) {
-      Alert.alert('Hata', 'Şifre en az 8 karakter olmalıdır');
+    // API ChangePasswordDto ile birebir aynı kural — yoksa ham 400 dönüyordu
+    const strongPassword = /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[@$!%*?&])[A-Za-z\d@$!%*?&]{8,}$/;
+    if (!strongPassword.test(newPassword)) {
+      Alert.alert(
+        'Hata',
+        'Şifre en az 8 karakter, bir büyük harf, bir küçük harf, bir rakam ve bir özel karakter (@$!%*?&) içermelidir'
+      );
       return;
     }
 

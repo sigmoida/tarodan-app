@@ -31,7 +31,8 @@ interface Address {
   address: string;
   city: string;
   district: string;
-  postalCode: string;
+  postalCode?: string;
+  zipCode?: string; // API bu alanı döndürüyor
   isDefault: boolean;
 }
 
@@ -85,10 +86,13 @@ export default function AddressesScreen() {
   // Create/Update mutation
   const saveMutation = useMutation({
     mutationFn: async (data: typeof formData) => {
+      // API CreateAddressDto `zipCode` bekliyor (postalCode değil) — eşle, yoksa posta kodu kaybolur.
+      const { postalCode, ...rest } = data;
+      const payload = { ...rest, zipCode: postalCode };
       if (editingAddress) {
-        return api.patch(`/users/me/addresses/${editingAddress.id}`, data);
+        return api.patch(`/users/me/addresses/${editingAddress.id}`, payload);
       } else {
-        return api.post('/users/me/addresses', data);
+        return api.post('/users/me/addresses', payload);
       }
     },
     onSuccess: () => {
@@ -97,8 +101,9 @@ export default function AddressesScreen() {
       resetForm();
       Alert.alert('Başarılı', editingAddress ? 'Adres güncellendi' : 'Adres eklendi');
     },
-    onError: () => {
-      Alert.alert('Hata', 'Adres kaydedilemedi');
+    onError: (err: any) => {
+      const msg = err?.response?.data?.message;
+      Alert.alert('Hata', Array.isArray(msg) ? msg.join('\n') : msg || 'Adres kaydedilemedi');
     },
   });
 
@@ -165,7 +170,7 @@ export default function AddressesScreen() {
       address: address.address,
       city: address.city,
       district: address.district,
-      postalCode: address.postalCode,
+      postalCode: address.zipCode ?? address.postalCode ?? '',
       isDefault: address.isDefault,
     });
     setDialogVisible(true);
@@ -183,8 +188,17 @@ export default function AddressesScreen() {
   };
 
   const handleSubmit = () => {
-    if (!formData.title || !formData.fullName || !formData.phone || !formData.address || !formData.city) {
-      Alert.alert('Hata', 'Lütfen zorunlu alanları doldurun');
+    if (!formData.title || !formData.fullName || !formData.phone || !formData.address || !formData.city || !formData.district) {
+      Alert.alert('Hata', 'Lütfen zorunlu alanları doldurun (ilçe dahil)');
+      return;
+    }
+    // API DTO kuralları — client-side önden uygula (yoksa ham 400 "Adres kaydedilemedi")
+    if (formData.address.trim().length < 10) {
+      Alert.alert('Hata', 'Adres en az 10 karakter olmalıdır');
+      return;
+    }
+    if (formData.phone.replace(/\D/g, '').length < 10) {
+      Alert.alert('Hata', 'Geçerli bir telefon numarası giriniz (en az 10 hane)');
       return;
     }
     saveMutation.mutate(formData);
@@ -262,7 +276,7 @@ export default function AddressesScreen() {
               <Text variant="body">{address.fullName}</Text>
               <Text variant="bodySm" style={styles.addressDetail}>{address.address}</Text>
               <Text variant="bodySm" style={styles.addressDetail}>
-                {address.district}, {address.city} {address.postalCode}
+                {address.district}, {address.city} {address.zipCode ?? address.postalCode ?? ''}
               </Text>
               <Text variant="bodySm" style={styles.addressDetail}>Tel: {address.phone}</Text>
 

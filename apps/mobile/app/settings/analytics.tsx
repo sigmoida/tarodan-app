@@ -3,7 +3,6 @@ import {
   Card,
   Button,
   Spinner,
-  Chip,
   Divider,
   Text,
   theme,
@@ -24,34 +23,22 @@ const { colors, spacing, radius } = theme;
 interface Analytics {
   totalViews: number;
   totalFavorites: number;
-  totalListings: number;
   activeListings: number;
-  soldListings: number;
   totalSales: number;
   totalRevenue: number;
-  viewsLast7Days: number[];
-  favoritesLast7Days: number[];
-  topListings: Array<{
+  dailyViews: Array<{ date: string; views: number; favorites: number }>;
+  topProducts: Array<{
     id: string;
     title: string;
     views: number;
     favorites: number;
+    price?: number;
+    status?: string;
+    imageUrl?: string;
   }>;
   // Premium analytics
   conversionRate?: number;
-  avgTimeToSale?: number;
-  tradeSuccessRate?: number;
-  totalTrades?: number;
-  collectionViews?: number;
-  collectionLikes?: number;
-  revenueByMonth?: { month: string; revenue: number }[];
-  topPerformers?: Array<{
-    id: string;
-    title: string;
-    views: number;
-    favorites: number;
-    conversionRate: number;
-  }>;
+  avgTimeToSell?: number;
 }
 
 export default function AnalyticsScreen() {
@@ -65,47 +52,8 @@ export default function AnalyticsScreen() {
   const { data: analyticsData, isLoading, refetch } = useQuery({
     queryKey: ['analytics', timeRange],
     queryFn: async () => {
-      try {
-        const response = await api.get('/users/me/analytics', { params: { range: timeRange } });
-        return response.data;
-      } catch (error) {
-        console.log('Failed to fetch analytics');
-        // Return mock data for demo
-        return {
-          totalViews: 1245,
-          totalFavorites: 89,
-          totalListings: 7,
-          activeListings: 5,
-          soldListings: 2,
-          totalSales: 3,
-          totalRevenue: 4500,
-          viewsLast7Days: [45, 62, 38, 71, 55, 49, 83],
-          favoritesLast7Days: [3, 5, 2, 8, 4, 6, 7],
-          topListings: [
-            { id: '1', title: 'Ferrari 488 GTB', views: 234, favorites: 18 },
-            { id: '2', title: 'Porsche 911 GT3', views: 189, favorites: 12 },
-            { id: '3', title: 'BMW M3 E30', views: 156, favorites: 9 },
-          ],
-          // Premium analytics mock data
-          conversionRate: 4.2,
-          avgTimeToSale: 12,
-          tradeSuccessRate: 87,
-          totalTrades: 15,
-          collectionViews: 523,
-          collectionLikes: 45,
-          revenueByMonth: [
-            { month: 'Oca', revenue: 1200 },
-            { month: 'Şub', revenue: 850 },
-            { month: 'Mar', revenue: 2100 },
-            { month: 'Nis', revenue: 350 },
-          ],
-          topPerformers: [
-            { id: '1', title: 'Ferrari 488 GTB', views: 234, favorites: 18, conversionRate: 7.7 },
-            { id: '2', title: 'Porsche 911 GT3', views: 189, favorites: 12, conversionRate: 5.3 },
-            { id: '3', title: 'BMW M3 E30', views: 156, favorites: 9, conversionRate: 3.2 },
-          ],
-        };
-      }
+      const response = await api.get('/users/me/analytics', { params: { period: timeRange } });
+      return response.data;
     },
     enabled: isAuthenticated,
   });
@@ -193,7 +141,7 @@ export default function AnalyticsScreen() {
               <View style={styles.overviewContent}>
                 <Ionicons name="pricetag" size={24} color={colors.info[600]!} />
                 <Text variant="h3" style={styles.overviewValue}>
-                  {analytics.activeListings}/{analytics.totalListings}
+                  {analytics.activeListings}
                 </Text>
                 <Text variant="bodySm" style={styles.overviewLabel}>Aktif İlan</Text>
               </View>
@@ -202,7 +150,7 @@ export default function AnalyticsScreen() {
               <View style={styles.overviewContent}>
                 <Ionicons name="checkmark-circle" size={24} color={colors.success[600]!} />
                 <Text variant="h3" style={styles.overviewValue}>
-                  {analytics.soldListings}
+                  {analytics.totalSales}
                 </Text>
                 <Text variant="bodySm" style={styles.overviewLabel}>Satılan</Text>
               </View>
@@ -215,9 +163,10 @@ export default function AnalyticsScreen() {
               <Text variant="h3">Son 7 Gün Görüntülenme</Text>
             </View>
             <View style={styles.simpleChart}>
-              {(analytics.viewsLast7Days || []).map((value, index) => {
-                const maxVal = getMaxValue(analytics.viewsLast7Days || []);
-                const height = (value / maxVal) * 100;
+              {(analytics.dailyViews || []).map((d, index) => {
+                const dailyValues = (analytics.dailyViews || []).map((x) => x.views);
+                const maxVal = getMaxValue(dailyValues);
+                const height = (d.views / maxVal) * 100;
                 return (
                   <View key={index} style={styles.chartBar}>
                     <View style={[styles.bar, { height: `${height}%` }]} />
@@ -228,7 +177,7 @@ export default function AnalyticsScreen() {
             </View>
             <View style={styles.chartFooter}>
               <Text variant="bodySm" style={styles.chartTotal}>
-                Toplam: {(analytics.viewsLast7Days || []).reduce((a, b) => a + b, 0)} görüntülenme
+                Toplam: {(analytics.dailyViews || []).reduce((a, b) => a + b.views, 0)} görüntülenme
               </Text>
             </View>
           </Card>
@@ -236,7 +185,7 @@ export default function AnalyticsScreen() {
           {/* Top Listings */}
           <Card style={styles.card}>
             <Text variant="h3" style={styles.sectionTitle}>En Popüler İlanlarınız</Text>
-            {(analytics.topListings || []).map((listing, index) => (
+            {(analytics.topProducts || []).map((listing, index) => (
               <Pressable
                 key={listing.id}
                 style={styles.listingItem}
@@ -281,7 +230,7 @@ export default function AnalyticsScreen() {
 
                   <View style={styles.metricItem}>
                     <Text variant="h3" style={styles.metricValue}>
-                      {analytics.avgTimeToSale} gün
+                      {analytics.avgTimeToSell} gün
                     </Text>
                     <Text variant="bodySm" style={styles.metricLabel}>Ort. Satış Süresi</Text>
                     <View style={styles.metricTrend}>
@@ -303,101 +252,7 @@ export default function AnalyticsScreen() {
                       ₺{analytics.totalRevenue.toLocaleString('tr-TR')}
                     </Text>
                   </View>
-                  <Chip label="+23% bu ay" variant="success" />
                 </View>
-
-                <View style={styles.revenueChart}>
-                  {analytics.revenueByMonth?.map((item, index) => {
-                    const maxRevenue = Math.max(...(analytics.revenueByMonth?.map(r => r.revenue) || [1]));
-                    const height = (item.revenue / maxRevenue) * 80;
-                    return (
-                      <View key={index} style={styles.revenueBar}>
-                        <Text variant="bodySm" style={styles.revenueBarValue}>
-                          ₺{(item.revenue / 1000).toFixed(1)}K
-                        </Text>
-                        <View style={[styles.revenueBarFill, { height }]} />
-                        <Text style={styles.revenueBarLabel}>{item.month}</Text>
-                      </View>
-                    );
-                  })}
-                </View>
-              </Card>
-
-              {/* Trade Analytics */}
-              <Card style={styles.card}>
-                <Text variant="h3" style={styles.sectionTitle}>Takas İstatistikleri</Text>
-
-                <View style={styles.tradeStats}>
-                  <View style={styles.tradeStat}>
-                    <MaterialCommunityIcons name="swap-horizontal" size={32} color={colors.primary[600]!} />
-                    <Text variant="h3" style={styles.tradeStatValue}>
-                      {analytics.totalTrades}
-                    </Text>
-                    <Text variant="bodySm" style={styles.tradeStatLabel}>Toplam Takas</Text>
-                  </View>
-
-                  <View style={styles.tradeStat}>
-                    <View style={styles.successRateCircle}>
-                      <Text variant="h3" style={styles.successRateText}>
-                        %{analytics.tradeSuccessRate}
-                      </Text>
-                    </View>
-                    <Text variant="bodySm" style={styles.tradeStatLabel}>Başarı Oranı</Text>
-                  </View>
-                </View>
-              </Card>
-
-              {/* Collection Analytics */}
-              <Card style={styles.card}>
-                <Text variant="h3" style={styles.sectionTitle}>Dijital Garaj İstatistikleri</Text>
-
-                <View style={styles.collectionStats}>
-                  <View style={styles.collectionStat}>
-                    <Ionicons name="eye" size={24} color={colors.info[600]!} />
-                    <Text variant="h3" style={styles.collectionStatValue}>
-                      {analytics.collectionViews}
-                    </Text>
-                    <Text variant="bodySm" style={styles.collectionStatLabel}>
-                      Koleksiyon Görüntüleme
-                    </Text>
-                  </View>
-
-                  <View style={styles.collectionStat}>
-                    <Ionicons name="heart" size={24} color={colors.danger[600]!} />
-                    <Text variant="h3" style={styles.collectionStatValue}>
-                      {analytics.collectionLikes}
-                    </Text>
-                    <Text variant="bodySm" style={styles.collectionStatLabel}>
-                      Beğeni
-                    </Text>
-                  </View>
-                </View>
-              </Card>
-
-              {/* Top Performers with Conversion */}
-              <Card style={styles.card}>
-                <Text variant="h3" style={styles.sectionTitle}>En İyi Performans Gösterenler</Text>
-                {analytics.topPerformers?.map((listing, index) => (
-                  <Pressable
-                    key={listing.id}
-                    style={styles.performerItem}
-                    onPress={() => router.push(`/product/${listing.id}`)}
-                  >
-                    <Text style={styles.listingRank}>#{index + 1}</Text>
-                    <View style={styles.listingInfo}>
-                      <Text variant="body" numberOfLines={1}>{listing.title}</Text>
-                      <View style={styles.listingStats}>
-                        <Ionicons name="eye" size={14} color={colors.text.muted} />
-                        <Text style={styles.listingStat}>{listing.views}</Text>
-                        <Ionicons name="heart" size={14} color={colors.text.muted} style={{ marginLeft: 8 }} />
-                        <Text style={styles.listingStat}>{listing.favorites}</Text>
-                      </View>
-                    </View>
-                    <View style={styles.conversionBadge}>
-                      <Text style={styles.conversionText}>%{listing.conversionRate.toFixed(1)}</Text>
-                    </View>
-                  </Pressable>
-                ))}
               </Card>
 
               {/* Export Options */}

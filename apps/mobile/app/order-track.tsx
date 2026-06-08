@@ -12,7 +12,6 @@ interface OrderStatus {
   orderNumber: string;
   status: string;
   totalAmount: number;
-  shippingCost: number;
   createdAt: string;
   product: {
     title: string;
@@ -20,7 +19,7 @@ interface OrderStatus {
   };
   shipment?: {
     trackingNumber: string;
-    carrier: string;
+    provider: string;
     status: string;
     estimatedDelivery?: string;
   };
@@ -177,19 +176,8 @@ export default function OrderTrackScreen() {
               <Text style={styles.productTitle}>{order.product.title}</Text>
             </View>
 
-            {/* Price Info */}
+            {/* Price Info — guest-track yanıtında yalnızca toplam tutar var (kırılım yok) */}
             <View style={styles.priceSection}>
-              <View style={styles.priceRow}>
-                <Text style={styles.priceLabel}>Ürün Tutarı</Text>
-                <Text style={styles.priceValue}>
-                  ₺{((order.totalAmount ?? 0) - (order.shippingCost ?? 0)).toLocaleString('tr-TR')}
-                </Text>
-              </View>
-              <View style={styles.priceRow}>
-                <Text style={styles.priceLabel}>Kargo</Text>
-                <Text style={styles.priceValue}>₺{(order.shippingCost ?? 0).toLocaleString('tr-TR')}</Text>
-              </View>
-              <Divider style={{ marginVertical: 8 }} />
               <View style={styles.priceRow}>
                 <Text style={styles.totalLabel}>Toplam</Text>
                 <Text style={styles.totalValue}>₺{(order.totalAmount ?? 0).toLocaleString('tr-TR')}</Text>
@@ -204,7 +192,7 @@ export default function OrderTrackScreen() {
                   <View style={styles.shippingRow}>
                     <Text style={styles.shippingLabel}>Kargo Firması</Text>
                     <Text style={styles.shippingValue}>
-                      {order.shipment.carrier === 'surat' ? 'Sürat Kargo' : order.shipment.carrier}
+                      {order.shipment.provider === 'surat' ? 'Sürat Kargo' : order.shipment.provider}
                     </Text>
                   </View>
                   {order.shipment.trackingNumber && (

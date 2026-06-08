@@ -52,22 +52,27 @@ export default function NewCollectionScreen() {
 
   const createMutation = useMutation({
     mutationFn: async (data: CollectionForm) => {
-      const formData = new FormData();
-      formData.append('name', data.name);
-      if (data.description) formData.append('description', data.description);
-      formData.append('isPublic', String(data.isPublic));
+      // Koleksiyonu JSON ile oluştur (API @Body() CreateCollectionDto bekler, FileInterceptor yok)
+      const res = await api.post('/collections', {
+        name: data.name,
+        description: data.description,
+        isPublic: data.isPublic,
+      });
 
+      // Kapak görseli varsa dönen id ile ayrı multipart uca yükle (PATCH /collections/:id/cover, alan 'cover')
       if (coverImage) {
-        formData.append('coverImage', {
+        const formData = new FormData();
+        formData.append('cover', {
           uri: coverImage,
           type: 'image/jpeg',
           name: 'cover.jpg',
         } as any);
+        await api.patch(`/collections/${res.data.id}/cover`, formData, {
+          headers: { 'Content-Type': 'multipart/form-data' },
+        });
       }
 
-      return api.post('/collections', formData, {
-        headers: { 'Content-Type': 'multipart/form-data' },
-      });
+      return res;
     },
     onSuccess: (response) => {
       queryClient.invalidateQueries({ queryKey: ['collections'] });

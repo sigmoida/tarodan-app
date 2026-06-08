@@ -1080,10 +1080,19 @@ export class TradeService {
     const newCashAmount = Math.abs(dto.cashAmount || 0);
     const currentCashAmount = Math.abs(trade.cashAmount?.toNumber() || 0);
 
-    const isIdentical = 
+    // Nakit YÖNÜNÜ de karşılaştır: sadece "kim öder"i çevirmek (ben→o) gerçek bir değişikliktir.
+    // Math.abs yön bilgisini sildiği için, ödeyen tarafı ayrıca kıyaslıyoruz.
+    const newCashPayerId =
+      dto.cashAmount && dto.cashAmount !== 0
+        ? (dto.cashAmount > 0 ? originalReceiverId : originalInitiatorId)
+        : null;
+    const currentCashPayerId = trade.cashPayerId ?? null;
+
+    const isIdentical =
       JSON.stringify(newInitiatorItemIds) === JSON.stringify(currentReceiverItemIds) &&
       JSON.stringify(newReceiverItemIds) === JSON.stringify(currentInitiatorItemIds) &&
-      newCashAmount === currentCashAmount;
+      newCashAmount === currentCashAmount &&
+      newCashPayerId === currentCashPayerId;
 
     if (isIdentical) {
       throw new BadRequestException('Önceki teklif ile aynı. Lütfen değişiklik yapın.');

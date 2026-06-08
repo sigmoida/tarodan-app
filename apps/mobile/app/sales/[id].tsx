@@ -44,13 +44,22 @@ interface Order {
     address: string;
     zipCode?: string;
   };
+  pricing?: {
+    subtotal?: number;
+    shippingAmount?: number;
+    commissionAmount?: number;
+    sellerNetAmount?: number;
+    totalAmount?: number;
+  };
   items?: Array<{
     id: string;
-    productId: string;
-    title: string;
     price: number;
     quantity: number;
-    imageUrl?: string;
+    product?: {
+      id: string;
+      title: string;
+      imageUrl?: string;
+    };
   }>;
   shipment?: {
     carrier?: string;
@@ -176,11 +185,11 @@ export default function SaleDetailScreen() {
             <Pressable
               key={item.id}
               style={({ pressed }) => [styles.itemRow, { opacity: pressed ? 0.85 : 1 }]}
-              onPress={() => router.push(`/product/${item.productId}`)}
+              onPress={() => router.push(`/product/${item.product?.id}`)}
             >
-              <Image source={{ uri: transformImageUrl(item.imageUrl) }} style={styles.itemImg} />
+              <Image source={{ uri: transformImageUrl(item.product?.imageUrl) }} style={styles.itemImg} />
               <View style={{ flex: 1 }}>
-                <Text style={styles.itemTitle} numberOfLines={2}>{item.title}</Text>
+                <Text style={styles.itemTitle} numberOfLines={2}>{item.product?.title}</Text>
                 <Text style={styles.itemMeta}>Adet: {item.quantity}</Text>
                 <Text style={styles.itemPrice}>{formatPrice(item.price * item.quantity)}</Text>
               </View>
@@ -270,38 +279,47 @@ export default function SaleDetailScreen() {
         </View>
 
         {/* Totals */}
-        <View style={styles.card}>
-          <Text style={styles.sectionTitle}>Tutar Özeti</Text>
-          {order.subtotal ? (
-            <View style={styles.kvRow}>
-              <Text style={styles.kvLabel}>Ara Toplam</Text>
-              <Text style={styles.kvValue}>{formatPrice(order.subtotal)}</Text>
+        {(() => {
+          const p = order.pricing;
+          const subtotal = p?.subtotal ?? order.subtotal;
+          const shipping = p?.shippingAmount ?? order.shippingCost;
+          const commission = p?.commissionAmount ?? order.commission;
+          const net = p?.sellerNetAmount ?? order.netAmount;
+          return (
+            <View style={styles.card}>
+              <Text style={styles.sectionTitle}>Tutar Özeti</Text>
+              {subtotal != null ? (
+                <View style={styles.kvRow}>
+                  <Text style={styles.kvLabel}>Ara Toplam</Text>
+                  <Text style={styles.kvValue}>{formatPrice(subtotal)}</Text>
+                </View>
+              ) : null}
+              {shipping != null ? (
+                <View style={styles.kvRow}>
+                  <Text style={styles.kvLabel}>Kargo</Text>
+                  <Text style={styles.kvValue}>{formatPrice(shipping)}</Text>
+                </View>
+              ) : null}
+              {commission != null ? (
+                <View style={styles.kvRow}>
+                  <Text style={styles.kvLabel}>Komisyon</Text>
+                  <Text style={[styles.kvValue, { color: colors.danger[600]! }]}>
+                    - {formatPrice(commission)}
+                  </Text>
+                </View>
+              ) : null}
+              <Divider style={{ marginVertical: 8 }} />
+              <View style={styles.kvRow}>
+                <Text style={[styles.kvLabel, { fontWeight: '700' }]}>
+                  {net != null ? 'Net Kazanç' : 'Toplam'}
+                </Text>
+                <Text style={[styles.kvValue, { fontSize: 18, fontWeight: '800', color: colors.primary[600]! }]}>
+                  {formatPrice(net ?? order.totalAmount ?? 0)}
+                </Text>
+              </View>
             </View>
-          ) : null}
-          {order.shippingCost != null ? (
-            <View style={styles.kvRow}>
-              <Text style={styles.kvLabel}>Kargo</Text>
-              <Text style={styles.kvValue}>{formatPrice(order.shippingCost)}</Text>
-            </View>
-          ) : null}
-          {order.commission ? (
-            <View style={styles.kvRow}>
-              <Text style={styles.kvLabel}>Komisyon</Text>
-              <Text style={[styles.kvValue, { color: colors.danger[600]! }]}>
-                - {formatPrice(order.commission)}
-              </Text>
-            </View>
-          ) : null}
-          <Divider style={{ marginVertical: 8 }} />
-          <View style={styles.kvRow}>
-            <Text style={[styles.kvLabel, { fontWeight: '700' }]}>
-              {order.netAmount ? 'Net Kazanç' : 'Toplam'}
-            </Text>
-            <Text style={[styles.kvValue, { fontSize: 18, fontWeight: '800', color: colors.primary[600]! }]}>
-              {formatPrice(order.netAmount ?? order.totalAmount ?? 0)}
-            </Text>
-          </View>
-        </View>
+          );
+        })()}
 
         {/* Actions */}
         {canCancel ? (

@@ -114,6 +114,8 @@ export default function OffersScreen() {
 
   const [counterModalVisible, setCounterModalVisible] = useState(false);
   const [counterOfferId, setCounterOfferId] = useState<string | null>(null);
+  const [counterRefAmount, setCounterRefAmount] = useState(0); // mevcut teklif (alt sınır)
+  const [counterMaxPrice, setCounterMaxPrice] = useState(0); // ürün fiyatı (üst sınır)
   const [counterAmount, setCounterAmount] = useState('');
 
   const [buyerCounterModalVisible, setBuyerCounterModalVisible] = useState(false);
@@ -246,8 +248,10 @@ export default function OffersScreen() {
     }
   };
 
-  const openCounterModal = (offerId: string) => {
-    setCounterOfferId(offerId);
+  const openCounterModal = (offer: Offer) => {
+    setCounterOfferId(offer.id);
+    setCounterRefAmount(Number(offer.amount) || 0);
+    setCounterMaxPrice(Number(offer.product?.price) || 0);
     setCounterAmount('');
     setCounterModalVisible(true);
   };
@@ -257,6 +261,15 @@ export default function OffersScreen() {
     const amount = parseFloat(counterAmount.replace(',', '.'));
     if (isNaN(amount) || amount <= 0) {
       Alert.alert('Hata', 'Geçerli bir tutar girin');
+      return;
+    }
+    // API kuralı: karşı teklif mevcut tekliften YÜKSEK, ürün fiyatından DÜŞÜK/eşit olmalı.
+    if (amount <= counterRefAmount) {
+      Alert.alert('Hata', `Karşı teklif, mevcut tekliften (₺${counterRefAmount.toLocaleString('tr-TR')}) yüksek olmalıdır`);
+      return;
+    }
+    if (counterMaxPrice > 0 && amount > counterMaxPrice) {
+      Alert.alert('Hata', `Karşı teklif, ürün fiyatından (₺${counterMaxPrice.toLocaleString('tr-TR')}) yüksek olamaz`);
       return;
     }
     setActionLoading(counterOfferId);
@@ -463,7 +476,7 @@ export default function OffersScreen() {
                 </TouchableOpacity>
                 <TouchableOpacity
                   style={[styles.actionBtn, styles.counterBtn]}
-                  onPress={() => openCounterModal(offer.id)}
+                  onPress={() => openCounterModal(offer)}
                   disabled={isActionLoading}
                 >
                   <Ionicons name="swap-horizontal" size={16} color={colors.white} />

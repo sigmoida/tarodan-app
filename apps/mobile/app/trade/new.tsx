@@ -106,11 +106,14 @@ export default function NewTradeScreen() {
     queryFn: async () => {
       const response = await listingsApi.getAll({
         sellerId: targetSellerId,
-        tradeAvailable: true,
+        tradeOnly: true,
         status: 'active',
       });
       const raw = response.data?.data || response.data?.products || response.data || [];
-      return Array.isArray(raw) ? raw : [];
+      const list = Array.isArray(raw) ? raw : [];
+      return list.filter(
+        (p: Product) => p.status === 'active' && p.isTradeEnabled !== false,
+      );
     },
     enabled: !!targetSellerId && canTrade,
   });

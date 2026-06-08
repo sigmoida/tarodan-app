@@ -115,7 +115,16 @@ export default function SearchScreen() {
     // navToken değişiminde URL parametrelerini bir kez uygula (kasıtlı sınırlı bağımlılık)
   }, [navToken]);
 
-  const options = useProductFilterOptions();
+  // Seçili üreticinin slug'ını çöz ki üreticiye-özel filtreler (HW vb.) yüklensin.
+  const baseOptions = useProductFilterOptions();
+  const manufacturerSlug = useMemo(() => {
+    const list = baseOptions.manufacturers;
+    if (filters.manufacturerId) return list.find((m) => m.id === filters.manufacturerId)?.slug;
+    if (filters.manufacturer)
+      return list.find((m) => m.name.toLowerCase() === filters.manufacturer.toLowerCase())?.slug;
+    return undefined;
+  }, [filters.manufacturerId, filters.manufacturer, baseOptions.manufacturers]);
+  const options = useProductFilterOptions(manufacturerSlug);
 
   const { searches, addSearch, removeSearch, clearSearches } = useRecentSearchesStore();
   const recentSearchQueries = searches.map((s) => s.query);

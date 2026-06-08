@@ -143,15 +143,16 @@ export const authApi = {
   }) => api.post('/auth/register', data),
   /** İşletme hesabı olarak kayıt. Web /auth/register/business ile eşleşir. */
   registerBusiness: (data: {
-    displayName: string;
+    companyName: string;
     email: string;
     password: string;
-    phone?: string;
+    phone: string; // BusinessRegisterDto zorunlu: /^\+90[0-9]{10}$/
+    taxId: string;
+    city: string; // BusinessRegisterDto zorunlu (min 2)
+    district?: string;
+    companyType?: string;
     birthDate?: string;
     acceptsMarketingEmails?: boolean;
-    companyName: string;
-    taxId: string;
-    taxOffice?: string;
   }) => api.post('/auth/register/business', data),
   logout: () => api.post('/auth/logout'),
   getProfile: () => api.get('/users/me'),
@@ -165,7 +166,7 @@ export const authApi = {
     guestApi.post('/auth/reset-password', { token, newPassword }),
   verifyEmail: (token: string) =>
     guestApi.post('/auth/verify-email', { token }),
-  resendVerification: () => api.post('/auth/resend-verification'),
+  resendVerification: (email: string) => api.post('/auth/resend-verification', { email }),
   /** Şifre değiştirme — backend `security` modülüne taşındı. */
   changePassword: (currentPassword: string, newPassword: string) =>
     api.post('/security/password/change', { currentPassword, newPassword }),
@@ -188,7 +189,7 @@ export const productsApi = {
   getAll: (params?: Record<string, any>) =>
     api.get('/products', { params }),
   /** Dinamik filtre seçenekleri — web SidebarFilters ile aynı kaynak. Backend: GET /products/filters */
-  getFilters: () =>
+  getFilters: (params?: { manufacturer?: string }) =>
     api.get<{
       categories: Array<{ value: string; label: string; slug: string; parentId: string | null }>;
       brands: Array<{ id: string; name: string; slug: string }>;
@@ -196,7 +197,14 @@ export const productsApi = {
       scales: string[];
       manufacturers: Array<{ id: string; name: string; slug: string }>;
       materials: Array<{ slug: string; label: string }>;
-    }>('/products/filters'),
+      // Yalnızca attribute-grubu olan bir üretici seçilince dolar (örn Hot Wheels).
+      customAttributes?: Array<{
+        slug: string;
+        name: string;
+        manufacturerSlug: string;
+        attributes: Array<{ slug: string; label: string; color: string | null }>;
+      }>;
+    }>('/products/filters', { params }),
   getOne: (id: string | number) =>
     api.get(`/products/${id}`),
   /** Görüntülenme sayacını artır — web ile parite (POST /products/:id/view). Ekran başına 1 kez çağrılmalı. */

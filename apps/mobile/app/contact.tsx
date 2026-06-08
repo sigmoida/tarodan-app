@@ -22,6 +22,19 @@ export default function ContactScreen() {
       setSnackbar({ visible: true, message: 'Lütfen tüm alanları doldurun' });
       return;
     }
+    // Backend DTO ile parite (GuestContactDto): name @MinLength(2), message @MinLength(10).
+    if (name.trim().length < 2) {
+      setSnackbar({ visible: true, message: 'Adınız en az 2 karakter olmalıdır.' });
+      return;
+    }
+    if (!/^\S+@\S+\.\S+$/.test(email.trim())) {
+      setSnackbar({ visible: true, message: 'Geçerli bir e-posta adresi girin.' });
+      return;
+    }
+    if (message.trim().length < 10) {
+      setSnackbar({ visible: true, message: 'Mesaj en az 10 karakter olmalıdır.' });
+      return;
+    }
 
     setLoading(true);
     try {

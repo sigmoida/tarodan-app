@@ -56,6 +56,12 @@ export default function MakeOfferModal({
       Alert.alert('Geçersiz Tutar', 'Pozitif bir teklif tutarı girin.');
       return;
     }
+    // API kuralı: minimum teklif fiyatın %50'si (web paritesi) — yoksa ham 400 dönüyordu.
+    const minOffer = listPrice * 0.5;
+    if (numeric < minOffer) {
+      Alert.alert('Düşük Tutar', `Minimum teklif ₺${minOffer.toLocaleString('tr-TR')} (fiyatın %50'si).`);
+      return;
+    }
     if (numeric >= listPrice) {
       Alert.alert(
         'Yüksek Tutar',

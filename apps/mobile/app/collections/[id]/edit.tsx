@@ -35,11 +35,9 @@ interface Collection {
   ownerId?: string;
   items: Array<{
     id: string;
-    product: {
-      id: string;
-      title: string;
-      images: { url: string }[];
-    };
+    productId?: string;
+    productTitle: string;
+    productImage?: string;
   }>;
   createdAt: string;
 }
@@ -86,22 +84,25 @@ export default function EditCollectionScreen() {
   // Update mutation
   const updateMutation = useMutation({
     mutationFn: async (data: CollectionForm) => {
-      const formData = new FormData();
-      formData.append('name', data.name);
-      if (data.description) formData.append('description', data.description);
-      formData.append('isPublic', String(data.isPublic));
+      // Metin alanları JSON ile (API @Body() UpdateCollectionDto bekler, FileInterceptor yok)
+      await api.patch(`/collections/${id}`, {
+        name: data.name,
+        description: data.description || undefined,
+        isPublic: data.isPublic,
+      });
 
+      // Kapak değiştiyse ayrı multipart uca yükle (PATCH /collections/:id/cover, alan 'cover')
       if (coverImage && coverImage !== collection?.coverImageUrl) {
-        formData.append('coverImage', {
+        const formData = new FormData();
+        formData.append('cover', {
           uri: coverImage,
           type: 'image/jpeg',
           name: 'cover.jpg',
         } as any);
+        await api.patch(`/collections/${id}/cover`, formData, {
+          headers: { 'Content-Type': 'multipart/form-data' },
+        });
       }
-
-      return api.patch(`/collections/${id}`, formData, {
-        headers: { 'Content-Type': 'multipart/form-data' },
-      });
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['collection', id] });
@@ -339,21 +340,21 @@ export default function EditCollectionScreen() {
               <View key={item.id} style={styles.collectionItem}>
                 <TouchableOpacity
                   style={styles.itemContent}
-                  onPress={() => router.push(`/product/${item.product.id}`)}
+                  onPress={() => router.push(`/product/${item.productId}`)}
                 >
                   <Image
-                    source={{ uri: resolveImageUrl(item.product.images) }}
+                    source={{ uri: resolveImageUrl(item.productImage) }}
                     style={styles.itemImage}
                   />
                   <Text variant="body" style={styles.itemTitle} numberOfLines={1}>
-                    {item.product.title}
+                    {item.productTitle}
                   </Text>
                 </TouchableOpacity>
                 <IconButton
                   icon="close"
                   accessibilityLabel="Ürünü kaldır"
                   size="sm"
-                  onPress={() => handleRemoveItem(item.id, item.product.title)}
+                  onPress={() => handleRemoveItem(item.id, item.productTitle)}
                 />
               </View>
             ))

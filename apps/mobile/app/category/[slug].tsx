@@ -36,7 +36,7 @@ export default function CategoryScreen() {
     queryKey: ['category', slug],
     queryFn: async () => {
       try {
-        const response = await categoriesApi.getOne(slug);
+        const response = await categoriesApi.getBySlug(slug);
         return response.data.category || response.data;
       } catch (error) {
         console.log('Category fetch error:', error);
@@ -48,11 +48,11 @@ export default function CategoryScreen() {
 
   // Fetch products in category
   const { data: products, isLoading, refetch } = useQuery({
-    queryKey: ['category-products', slug, searchQuery, sortBy, selectedScale],
+    queryKey: ['category-products', category?.id, searchQuery, sortBy, selectedScale],
     queryFn: async () => {
       try {
         const params: any = {
-          categoryId: slug,
+          categoryId: category?.id,
           limit: 50,
           sortBy,
         };
@@ -66,7 +66,7 @@ export default function CategoryScreen() {
         return [];
       }
     },
-    enabled: !!slug,
+    enabled: !!category?.id,
   });
 
   const onRefresh = useCallback(async () => {

@@ -41,7 +41,7 @@ export default function VerifyEmailScreen() {
   });
 
   const resendMutation = useMutation({
-    mutationFn: () => authApi.resendVerification(),
+    mutationFn: () => authApi.resendVerification(user?.email ?? ''),
     onSuccess: () => {
       Alert.alert(
         'Gönderildi',
@@ -128,7 +128,7 @@ export default function VerifyEmailScreen() {
                 icon="mail-outline"
                 onPress={() => resendMutation.mutate()}
                 isLoading={resendMutation.isPending}
-                disabled={resendMutation.isPending}
+                disabled={resendMutation.isPending || !user?.email}
                 style={{ marginTop: spacing[3] }}
               />
             ) : null}
@@ -174,7 +174,7 @@ export default function VerifyEmailScreen() {
                 icon="mail-outline"
                 onPress={() => resendMutation.mutate()}
                 isLoading={resendMutation.isPending}
-                disabled={resendMutation.isPending}
+                disabled={resendMutation.isPending || !user?.email}
               />
             ) : null}
           </>

@@ -41,14 +41,14 @@ export default function ManufacturerDetailScreen() {
     refetch,
     isRefetching,
   } = useQuery({
-    queryKey: ['manufacturer-products', slug],
+    queryKey: ['manufacturer-products', manufacturer?.id],
     queryFn: async () => {
-      if (!slug) return [];
-      const response = await productsApi.getAll({ manufacturer: slug, status: 'active' });
+      if (!manufacturer?.id) return [];
+      const response = await productsApi.getAll({ manufacturerId: manufacturer.id, status: 'active' });
       const payload = response.data?.data ?? response.data ?? [];
       return Array.isArray(payload) ? payload : payload?.products ?? [];
     },
-    enabled: !!slug,
+    enabled: !!manufacturer?.id,
   });
 
   const products: ProductCardProduct[] = productsData ?? [];

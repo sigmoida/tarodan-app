@@ -1,11 +1,62 @@
 import { useEffect, useState } from 'react';
-import { View, ScrollView, StyleSheet, TouchableOpacity } from 'react-native';
+import { View, StyleSheet, TouchableOpacity } from 'react-native';
 import { theme, Spinner, Text, ScreenHeader } from '@tarodan/ui-native';
 import { router, useLocalSearchParams } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
+import { WebView } from 'react-native-webview';
 import { pagesApi } from '../../src/services/api';
 
 const { colors } = theme;
+
+// API page.content bir HTML string'idir; düz <Text> ile basıldığında etiketler ham görünür.
+// page/[slug].tsx ile aynı WebView/htmlWrapper desenini kullanarak HTML'i doğru render et.
+const htmlWrapper = (content: string) => `
+  <!DOCTYPE html>
+  <html>
+    <head>
+      <meta charset="utf-8" />
+      <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1" />
+      <style>
+        * { box-sizing: border-box; }
+        body {
+          font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+          color: ${colors.text.heading};
+          font-size: 15px;
+          line-height: 1.6;
+          margin: 0;
+          padding: 16px;
+          background: ${colors.surface.DEFAULT};
+        }
+        h1, h2, h3 { color: ${colors.text.heading}; margin-top: 20px; }
+        h1 { font-size: 22px; }
+        h2 { font-size: 18px; }
+        h3 { font-size: 16px; }
+        p { margin: 10px 0; }
+        a { color: ${colors.primary[600]!}; text-decoration: none; }
+        ul, ol { padding-left: 20px; }
+        li { margin: 6px 0; }
+        img { max-width: 100%; height: auto; border-radius: 8px; }
+        hr { border: none; border-top: 1px solid ${colors.border.DEFAULT}; margin: 16px 0; }
+        blockquote {
+          margin: 16px 0;
+          padding: 8px 16px;
+          border-left: 3px solid ${colors.primary[600]!};
+          background: ${colors.primary[50]!};
+          border-radius: 4px;
+          color: ${colors.text.heading};
+        }
+        code {
+          background: ${colors.surface.alt};
+          padding: 2px 6px;
+          border-radius: 4px;
+          font-family: 'Menlo', 'Courier New', monospace;
+          font-size: 13px;
+        }
+      </style>
+    </head>
+    <body>${content}</body>
+  </html>
+`;
 
 interface PageData {
   title: string;
@@ -99,20 +150,20 @@ export default function DynamicCMSPage() {
 
   return (
     <View style={styles.container}>
-      <ScreenHeader title={page?.title || 'Sayfa'} onBack={() => router.back()} />
+      <ScreenHeader
+        title={page?.title || 'Sayfa'}
+        subtitle={formatDate(page?.updatedAt) ? `Son güncelleme: ${formatDate(page?.updatedAt)}` : undefined}
+        onBack={() => router.back()}
+      />
 
-      <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
-        {page?.updatedAt && (
-          <Text style={styles.lastUpdated}>
-            Son güncelleme: {formatDate(page.updatedAt)}
-          </Text>
-        )}
-
-        <Text style={styles.pageTitle}>{page?.title}</Text>
-        <Text style={styles.pageContent}>{page?.content}</Text>
-
-        <View style={{ height: 40 }} />
-      </ScrollView>
+      <WebView
+        originWhitelist={['*']}
+        source={{ html: htmlWrapper(page?.content || '') }}
+        style={styles.webview}
+        startInLoadingState
+        javaScriptEnabled
+        scalesPageToFit={false}
+      />
     </View>
   );
 }
@@ -122,25 +173,9 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: colors.surface.DEFAULT,
   },
-  content: {
+  webview: {
     flex: 1,
-    padding: 20,
-  },
-  lastUpdated: {
-    fontSize: 13,
-    color: colors.text.muted,
-    marginBottom: 16,
-  },
-  pageTitle: {
-    fontSize: 22,
-    fontWeight: 'bold',
-    color: colors.text.heading,
-    marginBottom: 16,
-  },
-  pageContent: {
-    fontSize: 14,
-    color: colors.text.muted,
-    lineHeight: 24,
+    backgroundColor: colors.surface.DEFAULT,
   },
   loadingContainer: {
     flex: 1,

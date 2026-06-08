@@ -22,15 +22,13 @@ import { useAuthStore } from '../../src/stores/authStore';
 const { colors } = theme;
 
 interface PaymentMethod {
-  cardToken: string;
-  cardAlias?: string;
-  cardHolderName?: string;
-  lastFourDigits?: string;
+  id: string;
   cardBrand?: string;
-  binNumber?: string;
-  expireMonth?: string;
-  expireYear?: string;
+  lastFour?: string;
+  expiryMonth?: number;
+  expiryYear?: number;
   isDefault?: boolean;
+  createdAt?: string;
 }
 
 function brandIcon(brand?: string): React.ComponentProps<typeof MaterialCommunityIcons>['name'] {
@@ -58,7 +56,7 @@ export default function PaymentMethodsScreen() {
     queryKey: ['payment-methods'],
     queryFn: async () => {
       const response = await paymentsApi.getPaymentMethods();
-      const payload = response.data?.data ?? response.data ?? [];
+      const payload = response.data?.methods ?? response.data?.data ?? response.data ?? [];
       return Array.isArray(payload) ? payload : [];
     },
     enabled: isAuthenticated,
@@ -91,7 +89,7 @@ export default function PaymentMethodsScreen() {
   });
 
   const deleteMutation = useMutation({
-    mutationFn: (cardToken: string) => paymentsApi.deletePaymentMethod(cardToken),
+    mutationFn: (id: string) => paymentsApi.deletePaymentMethod(id),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['payment-methods'] });
     },
@@ -128,7 +126,7 @@ export default function PaymentMethodsScreen() {
       {
         text: 'Sil',
         style: 'destructive',
-        onPress: () => deleteMutation.mutate(m.cardToken),
+        onPress: () => deleteMutation.mutate(m.id),
       },
     ]);
   };
@@ -169,7 +167,7 @@ export default function PaymentMethodsScreen() {
           refreshControl={<ThemedRefreshControl refreshing={refreshing} onRefresh={onRefresh} />}
         >
           {methods.map(m => (
-            <Card key={m.cardToken} style={styles.cardItem}>
+            <Card key={m.id} style={styles.cardItem}>
               <View style={styles.cardContent}>
                 <View style={styles.cardIconWrap}>
                   <MaterialCommunityIcons
@@ -179,17 +177,14 @@ export default function PaymentMethodsScreen() {
                   />
                 </View>
                 <View style={styles.cardBody}>
-                  <Text style={styles.cardAlias}>{m.cardAlias || 'Kart'}</Text>
+                  <Text style={styles.cardAlias}>{m.cardBrand || 'Kart'}</Text>
                   <Text style={styles.cardNumber}>
-                    {m.cardBrand ? `${m.cardBrand} ` : ''}•••• {m.lastFourDigits || '****'}
+                    {m.cardBrand ? `${m.cardBrand} ` : ''}•••• {m.lastFour || '****'}
                   </Text>
-                  {m.expireMonth && m.expireYear ? (
+                  {m.expiryMonth && m.expiryYear ? (
                     <Text style={styles.cardExpiry}>
-                      Son Kullanım: {m.expireMonth}/{m.expireYear}
+                      Son Kullanım: {String(m.expiryMonth).padStart(2, '0')}/{m.expiryYear}
                     </Text>
-                  ) : null}
-                  {m.cardHolderName ? (
-                    <Text style={styles.cardHolder}>{m.cardHolderName}</Text>
                   ) : null}
                 </View>
                 <IconButton

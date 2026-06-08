@@ -13,11 +13,13 @@ import { useCallback } from 'react';
 import { router, useFocusEffect } from 'expo-router';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { Ionicons } from '@expo/vector-icons';
-import { api } from '../../src/services/api';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useAuthStore } from '../../src/stores/authStore';
 import { useTranslation } from '../../src/i18n';
 
 const { colors } = theme;
+
+const STORAGE_KEY = 'diecast_saved_searches';
 
 interface SavedSearch {
   id: string;
@@ -33,7 +35,7 @@ interface SavedSearch {
     tradeAvailable?: boolean;
   };
   resultCount?: number;
-  notifyOnNew: boolean;
+  notifyEnabled: boolean;
   createdAt: string;
   lastRunAt?: string;
 }
@@ -48,10 +50,11 @@ export default function SavedSearchesScreen() {
   // Fetch saved searches
   const { data: searchesData, isLoading, refetch } = useQuery({
     queryKey: ['saved-searches'],
-    queryFn: async () => {
+    queryFn: async (): Promise<SavedSearch[]> => {
       try {
-        const response = await api.get('/users/me/saved-searches');
-        return response.data?.data || response.data || [];
+        const stored = await AsyncStorage.getItem(STORAGE_KEY);
+        const parsed = stored ? JSON.parse(stored) : [];
+        return Array.isArray(parsed) ? parsed : [];
       } catch (error) {
         console.log('Failed to fetch saved searches');
         return [];
@@ -74,7 +77,10 @@ export default function SavedSearchesScreen() {
   // Delete mutation
   const deleteMutation = useMutation({
     mutationFn: async (searchId: string) => {
-      return api.delete(`/users/me/saved-searches/${searchId}`);
+      const stored = await AsyncStorage.getItem(STORAGE_KEY);
+      const list: SavedSearch[] = stored ? JSON.parse(stored) : [];
+      const next = list.filter((s) => s.id !== searchId);
+      await AsyncStorage.setItem(STORAGE_KEY, JSON.stringify(next));
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['saved-searches'] });
@@ -87,8 +93,11 @@ export default function SavedSearchesScreen() {
 
   // Toggle notification mutation
   const toggleNotificationMutation = useMutation({
-    mutationFn: async ({ searchId, notifyOnNew }: { searchId: string; notifyOnNew: boolean }) => {
-      return api.patch(`/users/me/saved-searches/${searchId}`, { notifyOnNew });
+    mutationFn: async ({ searchId, notifyEnabled }: { searchId: string; notifyEnabled: boolean }) => {
+      const stored = await AsyncStorage.getItem(STORAGE_KEY);
+      const list: SavedSearch[] = stored ? JSON.parse(stored) : [];
+      const next = list.map((s) => (s.id === searchId ? { ...s, notifyEnabled } : s));
+      await AsyncStorage.setItem(STORAGE_KEY, JSON.stringify(next));
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['saved-searches'] });
@@ -241,17 +250,17 @@ export default function SavedSearchesScreen() {
                 style={styles.notifyToggle}
                 onPress={() => toggleNotificationMutation.mutate({
                   searchId: search.id,
-                  notifyOnNew: !search.notifyOnNew,
+                  notifyEnabled: !search.notifyEnabled,
                 })}
               >
                 <Ionicons
-                  name={search.notifyOnNew ? 'notifications' : 'notifications-off-outline'}
+                  name={search.notifyEnabled ? 'notifications' : 'notifications-off-outline'}
                   size={18}
-                  color={search.notifyOnNew ? colors.primary[600]! : colors.text.muted}
+                  color={search.notifyEnabled ? colors.primary[600]! : colors.text.muted}
                 />
                 <Text style={[
                   styles.notifyText,
-                  search.notifyOnNew && styles.notifyTextActive,
+                  search.notifyEnabled && styles.notifyTextActive,
                 ]}>
                   Yeni ürünlerde bildir
                 </Text>

@@ -11,6 +11,13 @@ export type FilterBrand = { id: string; name: string; slug: string };
 export type FilterManufacturer = { id: string; name: string; slug: string };
 export type FilterCarModel = { id: string; name: string; slug: string; brandId: string };
 export type FilterMaterial = { slug: string; label: string };
+export type FilterCustomAttribute = { slug: string; label: string; color: string | null };
+export type FilterCustomAttributeGroup = {
+  slug: string;
+  name: string;
+  manufacturerSlug: string;
+  attributes: FilterCustomAttribute[];
+};
 
 export type ProductFilterOptions = {
   categories: FilterCategory[];
@@ -19,14 +26,18 @@ export type ProductFilterOptions = {
   carModels: FilterCarModel[];
   scales: string[];
   materials: FilterMaterial[];
+  /** Seçili üreticiye-özel attribute grupları (örn Hot Wheels). Üretici seçilmezse boş. */
+  customAttributes: FilterCustomAttributeGroup[];
   isLoading: boolean;
 };
 
-export function useProductFilterOptions(): ProductFilterOptions {
+export function useProductFilterOptions(manufacturerSlug?: string): ProductFilterOptions {
   const filtersQuery = useQuery({
-    queryKey: ['product-filters'],
+    queryKey: ['product-filters', manufacturerSlug ?? ''],
     queryFn: async () => {
-      const res = await productsApi.getFilters();
+      const res = await productsApi.getFilters(
+        manufacturerSlug ? { manufacturer: manufacturerSlug } : undefined,
+      );
       return res.data;
     },
     staleTime: 10 * 60 * 1000,
@@ -64,6 +75,7 @@ export function useProductFilterOptions(): ProductFilterOptions {
     carModels: data?.carModels ?? [],
     scales: data?.scales && data.scales.length > 0 ? data.scales : SCALE_FALLBACK,
     materials: data?.materials && data.materials.length > 0 ? data.materials : MATERIAL_FALLBACK,
+    customAttributes: data?.customAttributes ?? [],
     isLoading: filtersQuery.isLoading,
   };
 }

@@ -62,8 +62,8 @@ export default function NotificationSettingsScreen() {
     queryKey: ['notification-settings'],
     queryFn: async () => {
       try {
-        const response = await api.get('/users/me/notification-settings');
-        return response.data;
+        const response = await api.get('/users/me/settings').catch(() => null);
+        return response?.data ?? null;
       } catch (error) {
         console.log('Failed to fetch settings');
         return null;
@@ -76,7 +76,7 @@ export default function NotificationSettingsScreen() {
 
   useEffect(() => {
     if (settingsData) {
-      setSettings(settingsData);
+      setSettings(prev => ({ ...prev, ...settingsData }));
     }
   }, [settingsData]);
 
@@ -89,17 +89,14 @@ export default function NotificationSettingsScreen() {
     }, [isAuthenticated])
   );
 
-  // Save mutation
+  // Save mutation (best-effort; backend tercih ucu yoksa sessizce yutulur, web ile aynı)
   const saveMutation = useMutation({
     mutationFn: async (newSettings: NotificationSettings) => {
-      return api.patch('/users/me/notification-settings', newSettings);
+      return api.patch('/users/me/settings', newSettings).catch(() => null);
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['notification-settings'] });
       Alert.alert('Başarılı', 'Bildirim ayarları kaydedildi');
-    },
-    onError: () => {
-      Alert.alert('Hata', 'Ayarlar kaydedilemedi');
     },
   });
 

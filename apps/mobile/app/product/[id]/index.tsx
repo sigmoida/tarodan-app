@@ -250,6 +250,8 @@ export default function ProductDetailScreen() {
           setIsFavorite(false);
           setFavoriteCount((c) => Math.max(0, c - 1)); // beğeni sayısı anında güncellensin
           invalidateProductLists();
+          // Server gerçeğiyle senkron: stale cache (5dk staleTime) yüzünden tekrar girince 0'lanmasın
+          queryClient.invalidateQueries({ queryKey: ['product', id] });
           setSnackbar({ visible: true, message: 'Favorilerden kaldırıldı', type: 'success' });
         } else {
           setSnackbar({ visible: true, message: 'Favorilerden kaldırılamadı', type: 'error' });
@@ -260,6 +262,8 @@ export default function ProductDetailScreen() {
           setIsFavorite(true);
           setFavoriteCount((c) => c + 1); // beğeni sayısı anında güncellensin
           invalidateProductLists();
+          // Server gerçeğiyle senkron: stale cache (5dk staleTime) yüzünden tekrar girince 0'lanmasın
+          queryClient.invalidateQueries({ queryKey: ['product', id] });
           setSnackbar({ visible: true, message: 'Favorilere eklendi!', type: 'success' });
         } else {
           setSnackbar({ visible: true, message: 'Favorilere eklenemedi', type: 'error' });

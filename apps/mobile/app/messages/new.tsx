@@ -41,21 +41,13 @@ export default function NewMessageScreen() {
 
   const canSend = canSendMessage();
 
-  // Search users
-  const { data: searchResults, isLoading: searchLoading } = useQuery({
-    queryKey: ['users', 'search', searchQuery],
-    queryFn: async () => {
-      if (!searchQuery || searchQuery.length < 2) return [];
-      try {
-        const response = await api.get('/users/search', { params: { q: searchQuery } });
-        return response.data?.data || response.data || [];
-      } catch (error) {
-        console.log('Search failed');
-        return [];
-      }
-    },
-    enabled: searchQuery.length >= 2,
-  });
+  // NOT: Backend'de isimle kullanıcı arama ucu (GET /users/search) YOK; web'de de bu
+  // özellik bulunmuyor (mesajlar yalnızca participantId/sellerId ile açılır). Bozuk uca
+  // 404 isteği atmak yerine manuel aramayı devre dışı bırakıp kullanıcıyı bilgilendiriyoruz.
+  // Alıcı, ürün/satıcı/takas akışından gelen recipientId ile otomatik seçilir.
+  const searchResults: User[] = [];
+  const searchLoading = false;
+  const searchSupported = false;
 
   // Fetch recipient profile if a recipient id is provided (seller, product, or trade context)
   const { data: preselectedUser } = useQuery({
@@ -105,10 +97,13 @@ export default function NewMessageScreen() {
     if (!selectedUser || !messageText.trim() || sending || !canSend) return;
 
     setSending(true);
+    // API CreateThreadDto productId'yi @IsUUID('4') ile zorunlu kılıyor — UUID değilse
+    // göndermeyelim, yoksa thread oluşturma ham 400 "Geçerli bir ürün ID giriniz" döner.
+    const isUuid = !!productId && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(productId);
     const threadId = await createThread(
       selectedUser.id,
       messageText.trim(),
-      productId || undefined
+      isUuid ? productId : undefined
     );
 
     if (threadId) {
@@ -173,8 +168,11 @@ export default function NewMessageScreen() {
               </View>
             )}
 
-            {searchQuery.length >= 2 && !searchLoading && (!searchResults || searchResults.length === 0) && (
-              <Text style={styles.noResults}>Kullanıcı bulunamadı</Text>
+            {searchQuery.length >= 2 && !searchSupported && (
+              <Text style={styles.noResults}>
+                İsimle kullanıcı arama şu anda desteklenmiyor. Mesaj göndermek için bir ilan
+                veya satıcı profilinden "Mesaj Gönder" seçeneğini kullanın.
+              </Text>
             )}
           </View>
         ) : (

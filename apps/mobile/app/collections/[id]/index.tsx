@@ -74,13 +74,26 @@ export default function CollectionDetailScreen() {
     setIsLiked(next);
     setLikeCount((c) => Math.max(0, c + (next ? 1 : -1)));
     try {
-      if (next) await collectionsApi.like(String(id));
-      else await collectionsApi.unlike(String(id));
-      // NOT: ['collection', id] invalidate ETME — GET /collections/:id her çağrıda
-      // viewCount'u artırıyor; refetch görüntülenmeyi şişirir. Optimistic local state yeter.
+      // Server'ın döndürdüğü gerçeği (liked/likeCount) optimistic state'in üstüne yaz.
+      const resp: any = next
+        ? await collectionsApi.like(String(id))
+        : await collectionsApi.unlike(String(id));
+      const data = resp?.data?.data ?? resp?.data;
+      const serverLiked = typeof data?.liked === 'boolean' ? data.liked : next;
+      const serverCount = typeof data?.likeCount === 'number' ? data.likeCount : undefined;
+      if (serverCount !== undefined) {
+        setIsLiked(serverLiked);
+        setLikeCount(serverCount);
+      }
       queryClient.invalidateQueries({ queryKey: ['collections'] });
       queryClient.invalidateQueries({ queryKey: ['liked-collections'] });
       queryClient.invalidateQueries({ queryKey: ['myCollections'] });
+      // ['collection', id] cache'ini taze tut ki tekrar girince stale (eski isLiked/likeCount)
+      // gelmesin. GET /collections/:id her çağrıda viewCount'u +1 artırdığı için REFETCH değil,
+      // cache'i elle güncelliyoruz (görüntülenme şişmesin).
+      queryClient.setQueryData(['collection', id], (old: any) =>
+        old ? { ...old, isLiked: serverLiked, likeCount: serverCount ?? old.likeCount } : old
+      );
     } catch {
       // Rollback
       setIsLiked(!next);

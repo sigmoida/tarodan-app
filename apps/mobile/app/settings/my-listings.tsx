@@ -31,7 +31,7 @@ interface Listing {
   price: number;
   status: 'active' | 'pending' | 'sold' | 'inactive' | 'reserved' | 'rejected';
   viewCount: number;
-  favoriteCount?: number;
+  likeCount?: number;
   images: Array<{ url: string }>;
   createdAt: string;
   updatedAt: string;
@@ -419,7 +419,7 @@ export default function MyListingsScreen() {
                     </View>
                     <View style={styles.stat}>
                       <Ionicons name="heart-outline" size={14} color={colors.text.muted} />
-                      <Text style={styles.statText}>{listing.favoriteCount || 0}</Text>
+                      <Text style={styles.statText}>{listing.likeCount || 0}</Text>
                     </View>
                     <View style={[styles.statusBadge, { backgroundColor: colors.surface.alt }]}>
                       <View style={[styles.statusDot, { backgroundColor: getStatusColor(listing.status) }]} />

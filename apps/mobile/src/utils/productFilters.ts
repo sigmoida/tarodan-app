@@ -24,6 +24,8 @@ export type ProductFilters = {
   categoryId: string;
   manufacturer: string;
   manufacturerId: string;
+  /** Üreticiye-özel attribute seçimleri: { groupSlug: [attrSlug, ...] }. Web ile parite. */
+  customAttributes: Record<string, string[]>;
 };
 
 export const EMPTY_FILTERS: ProductFilters = {
@@ -47,6 +49,7 @@ export const EMPTY_FILTERS: ProductFilters = {
   categoryId: '',
   manufacturer: '',
   manufacturerId: '',
+  customAttributes: {},
 };
 
 /** Web ProductQueryDto-uyumlu sort değerleri (search.tsx eski 'newest'/'sort' yerine). */
@@ -99,6 +102,16 @@ export function buildListParams(
   if (f.material) p.material = f.material;
   if (f.manufacturerId) p.manufacturerId = f.manufacturerId;
   else if (f.manufacturer) p.manufacturer = f.manufacturer;
+  // Üreticiye-özel attribute seçimleri — backend OR-grup-içi / AND-gruplar-arası uyguluyor.
+  // Boş gruplar atılır. Web buildListParams ile birebir aynı (attrGroups JSON).
+  if (f.customAttributes) {
+    const nonEmpty = Object.fromEntries(
+      Object.entries(f.customAttributes).filter(
+        ([, slugs]) => Array.isArray(slugs) && slugs.length > 0,
+      ),
+    );
+    if (Object.keys(nonEmpty).length > 0) p.attrGroups = JSON.stringify(nonEmpty);
+  }
   if (f.tradeOnly) p.tradeOnly = true;
   if (f.discountOnly) p.discountOnly = true;
   if (f.preOrder) p.preOrder = true;
@@ -125,6 +138,8 @@ export function countActiveFilters(f: ProductFilters): number {
   if (f.preOrder) count += 1;
   if (f.limited) count += 1;
   if (f.set) count += 1;
+  // Her dolu üretici-attribute grubu bir filtre sayılır.
+  count += Object.values(f.customAttributes ?? {}).filter((v) => v.length > 0).length;
   return count;
 }
 

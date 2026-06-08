@@ -49,7 +49,7 @@ interface SellerRefund {
   description?: string;
   createdAt?: string;
   order?: { orderNumber?: string; product?: { title?: string } };
-  buyer?: { displayName?: string };
+  requester?: { displayName?: string };
 }
 
 function formatPrice(value?: number): string {
@@ -124,8 +124,8 @@ export default function SellerRefundRequestsScreen() {
 
   const submitReject = () => {
     if (!rejectDialog.id) return;
-    if (rejectReason.trim().length < 3) {
-      Alert.alert('Gerekçe gerekli', 'Lütfen reddetme gerekçesini yazın.');
+    if (rejectReason.trim().length < 10) {
+      Alert.alert('Gerekçe gerekli', 'Red gerekçesi en az 10 karakter olmalıdır.');
       return;
     }
     rejectMutation.mutate({ id: rejectDialog.id, response: rejectReason.trim() });
@@ -185,9 +185,9 @@ export default function SellerRefundRequestsScreen() {
                   <Text variant="caption" style={styles.muted}>
                     Sebep: {reasonLabels[rr.reason] ?? rr.reason}
                   </Text>
-                  {rr.buyer?.displayName ? (
+                  {rr.requester?.displayName ? (
                     <Text variant="caption" style={styles.muted}>
-                      Alıcı: {rr.buyer.displayName}
+                      Alıcı: {rr.requester.displayName}
                     </Text>
                   ) : null}
                   {rr.description ? (
