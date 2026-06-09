@@ -1,5 +1,7 @@
 import { useState } from 'react';
-import { Alert } from 'react-native';
+import { Alert, Pressable, StyleSheet } from 'react-native';
+import { Ionicons } from '@expo/vector-icons';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useForm, Controller } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
@@ -30,6 +32,7 @@ const loginSchema = z.object({
 type LoginForm = z.infer<typeof loginSchema>;
 
 export default function LoginScreen() {
+  const insets = useSafeAreaInsets();
   const { login } = useAuthStore();
   const [unverifiedEmail, setUnverifiedEmail] = useState<string | null>(null);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
@@ -160,6 +163,17 @@ export default function LoginScreen() {
 
   return (
     <Screen center>
+      <Pressable
+        testID="login-back-button"
+        onPress={continueAsGuest}
+        accessibilityRole="button"
+        accessibilityLabel="Ana sayfaya dön"
+        hitSlop={12}
+        style={[styles.backButton, { top: insets.top + 8 }]}
+      >
+        <Ionicons name="arrow-back" size={26} color="#111827" />
+      </Pressable>
+
       <VStack gap={4}>
         <Text variant="displaySm" tone="primary" align="center">
           Tarodan
@@ -308,3 +322,15 @@ export default function LoginScreen() {
     </Screen>
   );
 }
+
+const styles = StyleSheet.create({
+  backButton: {
+    position: 'absolute',
+    left: 16,
+    zIndex: 10,
+    width: 40,
+    height: 40,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+});

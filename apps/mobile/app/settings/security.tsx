@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { View, ScrollView, StyleSheet, TouchableOpacity, Alert } from 'react-native';
 import {
   Button,
@@ -21,11 +21,36 @@ const { colors } = theme;
 
 export default function SecuritySettingsScreen() {
   const { t } = useTranslation();
-  const { isAuthenticated, user, logout } = useAuthStore();
-  const [twoFactorEnabled, setTwoFactorEnabled] = useState((user as any)?.twoFactorEnabled || false);
+  const { isAuthenticated, logout } = useAuthStore();
+  const [twoFactorEnabled, setTwoFactorEnabled] = useState(false);
   const [showPasswordDialog, setShowPasswordDialog] = useState(false);
   const [showTwoFactorSetup, setShowTwoFactorSetup] = useState(false);
   const [loading, setLoading] = useState(false);
+
+  // Disable / yedek kod yenileme: backend her ikisinde de geçerli TOTP kodu ister.
+  const [showDisableDialog, setShowDisableDialog] = useState(false);
+  const [disableCode, setDisableCode] = useState('');
+  const [showRegenerateDialog, setShowRegenerateDialog] = useState(false);
+  const [regenerateCode, setRegenerateCode] = useState('');
+  const [newBackupCodes, setNewBackupCodes] = useState<string[] | null>(null);
+
+  // Gerçek 2FA durumunu sunucudan çek (user nesnesinde twoFactorEnabled yok —
+  // o alan yalnız AdminUser'da; normal kullanıcıda kaynak TwoFactorSecret.isEnabled).
+  useEffect(() => {
+    let active = true;
+    authApi
+      .getTwoFactorStatus()
+      .then((res) => {
+        const payload = (res.data as any)?.data ?? (res.data as any) ?? {};
+        if (active) setTwoFactorEnabled(!!payload.isEnabled);
+      })
+      .catch(() => {
+        /* sessizce yoksay: durum bilinmiyorsa kapalı varsay */
+      });
+    return () => {
+      active = false;
+    };
+  }, []);
 
   // Password change
   const [currentPassword, setCurrentPassword] = useState('');
@@ -108,30 +133,48 @@ export default function SecuritySettingsScreen() {
     }
   };
 
-  const handleDisableTwoFactor = async () => {
-    Alert.alert(
-      'İki Faktörlü Doğrulamayı Kapat',
-      'Bu işlem hesabınızın güvenliğini azaltacaktır. Devam etmek istiyor musunuz?',
-      [
-        { text: 'İptal', style: 'cancel' },
-        {
-          text: 'Kapat',
-          style: 'destructive',
-          onPress: async () => {
-            setLoading(true);
-            try {
-              await authApi.disableTwoFactor();
-              setTwoFactorEnabled(false);
-              Alert.alert('Başarılı', 'İki faktörlü doğrulama kapatıldı');
-            } catch (error: any) {
-              Alert.alert('Hata', error.response?.data?.message || 'İşlem başarısız');
-            } finally {
-              setLoading(false);
-            }
-          },
-        },
-      ]
-    );
+  const handleDisableTwoFactor = () => {
+    // Backend disable için geçerli TOTP kodu ister; kod giriş dialog'unu aç.
+    setDisableCode('');
+    setShowDisableDialog(true);
+  };
+
+  const confirmDisableTwoFactor = async () => {
+    if (disableCode.length !== 6) {
+      Alert.alert('Hata', 'Lütfen 6 haneli doğrulama kodunu girin');
+      return;
+    }
+    setLoading(true);
+    try {
+      await authApi.disableTwoFactor(disableCode);
+      setTwoFactorEnabled(false);
+      setShowDisableDialog(false);
+      setDisableCode('');
+      Alert.alert('Başarılı', 'İki faktörlü doğrulama kapatıldı');
+    } catch (error: any) {
+      Alert.alert('Hata', error.response?.data?.message || 'İşlem başarısız');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleRegenerateBackupCodes = async () => {
+    if (regenerateCode.length !== 6) {
+      Alert.alert('Hata', 'Lütfen 6 haneli doğrulama kodunu girin');
+      return;
+    }
+    setLoading(true);
+    try {
+      const res = await authApi.regenerateBackupCodes(regenerateCode);
+      const data: any = res.data;
+      const codes: string[] = Array.isArray(data) ? data : data?.backupCodes ?? data?.data ?? [];
+      setNewBackupCodes(codes);
+      setRegenerateCode('');
+    } catch (error: any) {
+      Alert.alert('Hata', error.response?.data?.message || 'Yedek kodlar yenilenemedi');
+    } finally {
+      setLoading(false);
+    }
   };
 
   const handleLogoutAllDevices = () => {
@@ -208,6 +251,18 @@ export default function SecuritySettingsScreen() {
             İki faktörlü doğrulama, hesabınıza ek bir güvenlik katmanı ekler.
             Google Authenticator veya benzeri bir uygulama gereklidir.
           </Text>
+          {twoFactorEnabled ? (
+            <Button
+              variant="outline"
+              title="Yedek Kodları Yenile"
+              onPress={() => {
+                setNewBackupCodes(null);
+                setRegenerateCode('');
+                setShowRegenerateDialog(true);
+              }}
+              style={{ marginTop: 12 }}
+            />
+          ) : null}
         </Card>
 
         {/* Sessions */}
@@ -308,6 +363,68 @@ export default function SecuritySettingsScreen() {
           <Button variant="ghost" title={t('mobile.cancel')} onPress={() => setShowTwoFactorSetup(false)} />
           <Button variant="primary" title={t('mobile.verify')} onPress={handleVerifyTwoFactor} isLoading={loading} />
         </View>
+      </Modal>
+
+      {/* 2FA Disable Dialog — backend geçerli TOTP kodu ister */}
+      <Modal isOpen={showDisableDialog} onClose={() => setShowDisableDialog(false)} title="2FA'yı Kapat">
+        <Text style={styles.dialogText}>
+          İki faktörlü doğrulamayı kapatmak için uygulamanızdaki 6 haneli kodu girin.
+        </Text>
+        <Input
+          label="Doğrulama Kodu"
+          value={disableCode}
+          onChangeText={setDisableCode}
+          keyboardType="numeric"
+          maxLength={6}
+          containerStyle={styles.dialogInput}
+        />
+        <View style={styles.dialogActions}>
+          <Button variant="ghost" title={t('mobile.cancel')} onPress={() => setShowDisableDialog(false)} />
+          <Button variant="danger" title="Kapat" onPress={confirmDisableTwoFactor} isLoading={loading} />
+        </View>
+      </Modal>
+
+      {/* 2FA Backup Codes Regenerate Dialog */}
+      <Modal
+        isOpen={showRegenerateDialog}
+        onClose={() => setShowRegenerateDialog(false)}
+        title="Yedek Kodları Yenile"
+      >
+        {newBackupCodes ? (
+          <>
+            <Text style={styles.dialogText}>
+              Yeni yedek kodlarınız. Güvenli bir yerde saklayın — eski kodlar artık geçersiz.
+            </Text>
+            <View style={styles.secretContainer}>
+              {newBackupCodes.map((code) => (
+                <Text key={code} style={styles.secretText}>
+                  {code}
+                </Text>
+              ))}
+            </View>
+            <View style={styles.dialogActions}>
+              <Button variant="primary" title="Tamam" onPress={() => setShowRegenerateDialog(false)} />
+            </View>
+          </>
+        ) : (
+          <>
+            <Text style={styles.dialogText}>
+              Yeni yedek kodlar üretmek için uygulamanızdaki 6 haneli kodu girin.
+            </Text>
+            <Input
+              label="Doğrulama Kodu"
+              value={regenerateCode}
+              onChangeText={setRegenerateCode}
+              keyboardType="numeric"
+              maxLength={6}
+              containerStyle={styles.dialogInput}
+            />
+            <View style={styles.dialogActions}>
+              <Button variant="ghost" title={t('mobile.cancel')} onPress={() => setShowRegenerateDialog(false)} />
+              <Button variant="primary" title="Yenile" onPress={handleRegenerateBackupCodes} isLoading={loading} />
+            </View>
+          </>
+        )}
       </Modal>
     </View>
   );

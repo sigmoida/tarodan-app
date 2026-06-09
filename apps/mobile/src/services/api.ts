@@ -175,11 +175,13 @@ export const authApi = {
   /** 2FA'yı etkinleştir; secret + qrCode + backupCodes döner */
   setupTwoFactor: () =>
     api.post<{ secret: string; qrCode: string; backupCodes?: string[] }>('/security/2fa/enable'),
-  verifyTwoFactor: (token: string) =>
-    api.post('/security/2fa/verify', { token }),
-  disableTwoFactor: (password?: string) =>
-    api.post('/security/2fa/disable', password ? { password } : {}),
-  regenerateBackupCodes: () => api.post('/security/2fa/backup-codes'),
+  // Backend Verify2FADto/Disable2FADto hepsi `code` alanı bekliyor (TOTP 6 hane).
+  verifyTwoFactor: (code: string) =>
+    api.post('/security/2fa/verify', { code }),
+  disableTwoFactor: (code: string) =>
+    api.post('/security/2fa/disable', { code }),
+  regenerateBackupCodes: (code: string) =>
+    api.post<{ backupCodes?: string[] } | string[]>('/security/2fa/backup-codes', { code }),
   /** Tüm cihazlardan çıkış — backend: DELETE /security/tokens */
   logoutAll: () => api.delete('/security/tokens'),
 };

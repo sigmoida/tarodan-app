@@ -102,7 +102,9 @@ export default function MakeOfferModal({
           label="Teklif tutarınız (TL) *"
           value={amount}
           onChangeText={(v: string) => setAmount(v.replace(/[^\d.,]/g, '').replace(',', '.'))}
-          keyboardType="numeric"
+          // Maestro: numeric klavyede return tuşu yok → hideKeyboard çalışmıyor.
+          // Test modunda default klavye (return var); input zaten rakam-dışını filtreler.
+          keyboardType={process.env.EXPO_PUBLIC_MAESTRO === '1' ? 'default' : 'numeric'}
           containerStyle={styles.input}
           placeholder="Örn. 1500"
         />

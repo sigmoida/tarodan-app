@@ -381,6 +381,7 @@ export default function EditProfileScreen() {
         {/* Submit Button */}
         <Button
           variant="primary"
+          fullWidth
           title="Değişiklikleri Kaydet"
           icon="checkmark"
           onPress={handleSubmit(onSubmit)}

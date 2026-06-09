@@ -2308,7 +2308,7 @@ DEPENDENCIES:
   - "ExpoAsset (from `../../../node_modules/.pnpm/expo-asset@12.0.12_expo@54.0.31_react-native@0.81.5_react@19.1.0/node_modules/expo-asset/ios`)"
   - "ExpoCamera (from `../../../node_modules/.pnpm/expo-camera@17.0.10_expo@54.0.31_react-native@0.81.5_react@19.1.0/node_modules/expo-camera/ios`)"
   - "ExpoDevice (from `../../../node_modules/.pnpm/expo-device@8.0.10_expo@54.0.31/node_modules/expo-device/ios`)"
-  - "ExpoFileSystem (from `../../../node_modules/.pnpm/expo-file-system@19.0.21_expo@54.0.31_react-native@0.81.5/node_modules/expo-file-system/ios`)"
+  - ExpoFileSystem (from `../node_modules/expo-file-system/ios`)
   - "ExpoFont (from `../../../node_modules/.pnpm/expo-font@14.0.10_expo@54.0.31_react-native@0.81.5_react@19.1.0/node_modules/expo-font/ios`)"
   - "ExpoHead (from `../../../node_modules/.pnpm/expo-router@6.0.21_@expo+metro-runtime@6.1.2_@types+react@19.1.17_expo-constants@18.0.13_expo_plgnaqur7bgspiktenun2umeoq/node_modules/expo-router/ios`)"
   - "ExpoImagePicker (from `../../../node_modules/.pnpm/expo-image-picker@17.0.10_expo@54.0.31/node_modules/expo-image-picker/ios`)"
@@ -2431,7 +2431,7 @@ EXTERNAL SOURCES:
   ExpoDevice:
     :path: "../../../node_modules/.pnpm/expo-device@8.0.10_expo@54.0.31/node_modules/expo-device/ios"
   ExpoFileSystem:
-    :path: "../../../node_modules/.pnpm/expo-file-system@19.0.21_expo@54.0.31_react-native@0.81.5/node_modules/expo-file-system/ios"
+    :path: "../node_modules/expo-file-system/ios"
   ExpoFont:
     :path: "../../../node_modules/.pnpm/expo-font@14.0.10_expo@54.0.31_react-native@0.81.5_react@19.1.0/node_modules/expo-font/ios"
   ExpoHead:
