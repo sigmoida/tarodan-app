@@ -13,12 +13,12 @@ Bir yolculuğun mobilde çalıştığını söylemek için **üçünün birden**
 
 > Backend iş mantığı (escrow, kargo hesabı, iade kuralları, webhook) zaten **521 API e2e** ile sabit ve hem web hem mobil aynı sunucuyu kullanır. Yapılacak iş mobil tarafında **(1) eksik ekranlar + (3) wiring kanıtı**dır.
 
-## Mevcut durum (başlangıç noktası)
+## Mevcut durum (2026-06-10 AFK koşusu sonrası)
 
-- ✅ RNTL: 28 suite / 155 test yeşil — ~42 yolculuk tam, ~22 kısmi UI kapsamı
-- ✅ API e2e: 521 test (backend mantığı) — ~64 backend-only yolculuk burada
-- ⚠️ Wiring: yalnız **Maestro J1** (guest→satın al→öde→teslim) mevcut; ödeme adımı muhtemelen bypass
-- 🚧 8 ürün eksikliği (G-01..G-08)
+- ✅ RNTL: **56 suite / 301 test yeşil** — kesin 136 denetimi sonrası **102 ✅ · 5 🟡 · 21 🔙 · 8 🚧** (bkz. `mobile-ui-coverage.md`)
+- ✅ API e2e: 521 test (backend mantığı) — backend-only yolculuklar burada
+- ❌ Wiring: **Maestro J1 FAILED-brittle** — ilk assert `"Kategoriler" görünür` bayat selector (ana ekran o metni göstermiyor); ödeme adımına ulaşılamadı. Ödeme zaten **bypass**, gerçek 3DS kanıtsız. → Aşama 0 işi.
+- 🚧 8 missing-screen eksikliği kesinleşti: G-01..G-08 (`mobile-gaps-from-journey-automation.md`)
 
 ## Yol Haritası (4 faz)
 
