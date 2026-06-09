@@ -356,7 +356,10 @@ export const useAuthStore = create<AuthState>((set, get) => ({
           limits,
           isLoading: false,
         });
-      } else if (process.env.EXPO_PUBLIC_MAESTRO === '1') {
+      } else if (
+        process.env.EXPO_PUBLIC_MAESTRO === '1' &&
+        process.env.EXPO_PUBLIC_MAESTRO_NO_AUTOLOGIN !== '1'
+      ) {
         // Maestro test bypass: auto-login with seeded credentials so that
         // e2e flows skip the login UI entirely. Code path is gated behind
         // EXPO_PUBLIC_MAESTRO and excluded from prod bundles by Expo's
