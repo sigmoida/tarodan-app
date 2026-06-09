@@ -84,6 +84,16 @@ J1-c (UI)   : doğrulama sipariş durumu UI'da "Tamamlandı"
 | 10 hold release | driver | — | hold serbest, PayoutTransfer, Order `completed` |
 | son | UI | sipariş "Tamamlandı" görünür | Order.status == completed |
 
+## Görünürlük garantisi (zorunlu gereksinim)
+
+Kullanıcı her journey'i **kendi açık simülatöründe gözüyle izleyecek**. Bu pazarlık konusu değil; harness şunları garanti eder:
+
+1. **Halihazırda booted, görünür simülatöre** koşar — runner mevcut booted cihazı (`xcrun simctl list devices booted`) hedefler; yeni headless cihaz açmaz, cloud/CI'a göndermez.
+2. **Arka planda koşmaz** — `maestro test` ön planda çalışır; uygulama penceresi önde kalır.
+3. **clearState ile UI kararmaz** — subflow'lar `clearState: false` korunur; gereksiz app kill/relaunch yapılmaz.
+4. **İzlenebilir tempo** — kritik adımlarda `waitForAnimationToEnd` / `extendedWaitUntil` kullanılır; gerekirse adımlar arası küçük görünür beklemeler eklenir ki kullanıcı geçişleri yakalayabilsin.
+5. **Driver segmentleri sırasında** runner kısa bir görünür log basar ("satıcı kargoluyor…") ki kullanıcı UI dışı adımın ne zaman olduğunu bilsin; sonraki UI segmenti aynı görünür simülatörde devam eder.
+
 ## Doğrulama derinliği
 
 - **UI**: her alıcı adımı `assertVisible` / `tapOn` (testID öncelikli, yoksa accessibility text) ile doğrulanır.
