@@ -1,0 +1,95 @@
+# Yolculuk 1 — Segment A: misafir gezinme → arama → ürün detay → kayıt formu submit.
+# Auto-login KAPALI çalışır (EXPO_PUBLIC_MAESTRO_NO_AUTOLOGIN=1) ki yeni kullanıcı
+# akışı zeynep ile ezilmesin. Kayıt sonrası orkestrator driver verify-email+seed-address
+# koşar, sonra J1-b-login-buy.yaml devam eder.
+# Gerekli env: REG_EMAIL (benzersiz), REG_PASSWORD, REG_NAME.
+appId: com.tarodan.app
+tags:
+  - manual
+env:
+  REG_EMAIL: maestro-j1@demo.com
+  REG_PASSWORD: Demo123!
+  REG_NAME: Maestro Alıcı
+---
+- launchApp:
+    appId: com.tarodan.app
+    clearState: false
+- waitForAnimationToEnd:
+    timeout: 5000
+- tapOn:
+    text: "Continue"
+    optional: true
+# 1. Misafir ana sayfa: login ekranı gelirse "Misafir Olarak Devam Et"
+- runFlow:
+    when:
+      visible:
+        id: "continue-as-guest-button"
+    commands:
+      - tapOn:
+          id: "continue-as-guest-button"
+- extendedWaitUntil:
+    visible: "Kategoriler"
+    timeout: 120000
+# 2. Arama → ilk ürün detay
+- tapOn:
+    text: "Ara"
+- extendedWaitUntil:
+    visible:
+      id: "search-input"
+    timeout: 15000
+- tapOn:
+    id: "search-input"
+- inputText: "diecast"
+- waitForAnimationToEnd:
+    timeout: 5000
+- tapOn:
+    text: ".*₺.*"
+    index: 0
+- extendedWaitUntil:
+    visible:
+      id: "product-detail-add-to-cart-button"
+    timeout: 15000
+# 3. Kayıt ol: detaydan profile/girişe gidip kayıt ekranını aç
+- tapOn:
+    text: "Profil"
+- extendedWaitUntil:
+    visible:
+      id: "profile-go-login-button"
+    timeout: 15000
+- tapOn:
+    id: "profile-go-login-button"
+- extendedWaitUntil:
+    visible:
+      id: "login-email-input"
+    timeout: 15000
+# Login ekranından "Kayıt Ol" linkine git
+- tapOn:
+    text: "Kayıt Ol"
+- extendedWaitUntil:
+    visible:
+      id: "register-displayName-input"
+    timeout: 15000
+- tapOn:
+    id: "register-displayName-input"
+- inputText: "${REG_NAME}"
+- tapOn:
+    id: "register-email-input"
+- inputText: "${REG_EMAIL}"
+- tapOn:
+    id: "register-password-input"
+- inputText: "${REG_PASSWORD}"
+- tapOn:
+    id: "register-confirmPassword-input"
+- inputText: "${REG_PASSWORD}"
+- tapOn:
+    id: "register-acceptTerms"
+# birthDate MAESTRO modunda öndolu (1990-01-01); dokunma.
+- tapOn:
+    id: "register-submit-button"
+# Başarılı kayıt → login ekranına döner (register.tsx onSuccess router.replace login)
+- extendedWaitUntil:
+    visible:
+      id: "login-email-input"
+    timeout: 20000
+- assertVisible:
+    id: "login-email-input"
