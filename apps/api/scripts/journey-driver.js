@@ -104,11 +104,28 @@ async function assertCompleted(email) {
   log(`✅ sipariş ${order.orderNumber} completed`);
 }
 
+// Escrow/hold release'i zorla — bypass ödeme + UI confirm yolu hold'u otomatik
+// release etmiyor (completeOrder yerine farklı path order'ı completed yapıyor).
+// Spec dürüst-sınır #3: bekleme süresini beklemeyip release'i anında zorla.
+async function releaseHold(email) {
+  const u = await getUser(email);
+  const order = await latestOrder(u.id);
+  const payment = await prisma.payment.findUnique({ where: { orderId: order.id } });
+  if (!payment) { log('ödeme yok, hold atlandı'); return; }
+  const now = new Date();
+  const res = await prisma.paymentHold.updateMany({
+    where: { paymentId: payment.id, status: 'held' },
+    data: { status: 'released', releasedAt: now, releaseAt: now },
+  });
+  log(`✅ hold release zorlandı (sipariş ${order.orderNumber}, ${res.count} hold)`);
+}
+
 const COMMANDS = {
   'verify-email': verifyEmail,
   'seed-address': seedAddress,
   'advance-to-delivered': advanceToDelivered,
   'assert-invoice': assertInvoice,
+  'release-hold': releaseHold,
   'assert-completed': assertCompleted,
 };
 

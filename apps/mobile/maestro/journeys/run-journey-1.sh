@@ -45,7 +45,8 @@ driver advance-to-delivered
 step "Segment C (UI): teslim onayı — simülatörü izle"
 ui "J1-c-confirm-delivery.yaml"
 
-step "Driver: sipariş completed + hold released assert"
+step "Driver: escrow/hold release zorla (adım 10) + completed assert"
+driver release-hold
 driver assert-completed
 
 step "✅ Yolculuk 1 tamamlandı — alıcı: $REG_EMAIL"

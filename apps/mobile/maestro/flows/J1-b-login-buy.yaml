@@ -100,31 +100,38 @@ tags:
     timeout: 15000
 - assertVisible:
     text: ".*Toplam.*"
-# 5. Checkout → Teslimat (seed'li adres) → Devam Et
+# 5. Checkout 3 adım: Adres → Ödeme → Onay.
 - tapOn:
     id: "cart-checkout-button"
+# Adım 1 (Teslimat/Adres): seed'li default adres seçili → Devam Et
 - extendedWaitUntil:
     visible: "Teslimat Bilgileri"
     timeout: 20000
 - tapOn:
     text: "Devam Et.*"
-# 6. Ödeme → bypass → başarı
+# Adım 2 (Ödeme: kargo + ödeme yöntemi) → Devam Et
 - extendedWaitUntil:
-    visible:
-      text: ".*Ödeme.*Tamamla.*|.*Ödemeyi.*"
+    visible: "Ödeme Yöntemi"
     timeout: 20000
 - tapOn:
-    text: ".*Ödeme.*Tamamla.*|.*Ödemeyi.*"
+    text: "Devam Et.*"
+# Adım 3 (Onay): "Onayla ve Öde (₺X)" → bypass ödeme → başarı
 - extendedWaitUntil:
     visible:
-      text: ".*başarı.*|Sipariş.*tamamland.*|Tamamlandı"
-    timeout: 30000
-# Sipariş oluştu doğrulama: Siparişlerim'de ORD-
-- tapOn:
-    text: "Profil"
-- tapOn:
-    id: "profile-orders-link"
-- extendedWaitUntil:
-    visible: "ORD-"
+      text: ".*Onayla ve Öde.*"
     timeout: 20000
-- assertVisible: "ORD-"
+- tapOn:
+    text: ".*Onayla ve Öde.*"
+# Başarı ekranı: "Ödemeniz Başarılı!" → sipariş oluştu (driver assert-invoice doğrular).
+- extendedWaitUntil:
+    visible:
+      text: ".*Başarılı.*|.*başarı.*|Sipariş.*tamamland.*|Tamamlandı"
+    timeout: 40000
+- assertVisible:
+    text: ".*Başarılı.*|.*tamamland.*"
+# Tam ekran (tab bar yok) → "Ana Sayfaya Dön" ile home'a temiz dön (C için).
+- tapOn:
+    text: "Ana Sayfaya Dön"
+- extendedWaitUntil:
+    visible: "Kategoriler"
+    timeout: 20000

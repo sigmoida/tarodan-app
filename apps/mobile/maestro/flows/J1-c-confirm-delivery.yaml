@@ -71,17 +71,19 @@ tags:
     timeout: 15000
 - tapOn:
     id: "profile-orders-link"
+# Buton ikon içerdiği için accessibility metni "Teslim Aldım" tam eşleşmiyor → regex.
 - extendedWaitUntil:
     visible:
-      text: "Teslim Aldım"
+      text: ".*Teslim Aldım.*"
     timeout: 20000
 - tapOn:
-    text: "Teslim Aldım"
+    text: ".*Teslim Aldım.*"
 - runFlow:
     when:
-      visible: "Onayla"
+      visible: ".*Onayla.*"
     commands:
-      - tapOn: "Onayla"
+      - tapOn:
+          text: ".*Onayla.*"
 # Son: sipariş durumu tamamlandı/onaylandı görünür
 - extendedWaitUntil:
     visible:
