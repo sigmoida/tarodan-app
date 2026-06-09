@@ -18,18 +18,8 @@ import {
   displayNameSchema,
   emailSchema,
   strongPasswordSchema,
+  isAdult,
 } from '../../src/utils/validation';
-
-/** 18+ yaş kontrolü — API RegisterDto birthDate'i zorunlu kılar (IsAdultConstraint). */
-function isAdult(dateStr: string): boolean {
-  const d = new Date(dateStr);
-  if (Number.isNaN(d.getTime())) return false;
-  const today = new Date();
-  let age = today.getFullYear() - d.getFullYear();
-  const monthDiff = today.getMonth() - d.getMonth();
-  if (monthDiff < 0 || (monthDiff === 0 && today.getDate() < d.getDate())) age -= 1;
-  return age >= 18;
-}
 
 /** En geç seçilebilir doğum tarihi (bugün - 18 yıl) — 18+'ı seçici seviyesinde kısıtlar. */
 function maxBirthDate(): Date {
