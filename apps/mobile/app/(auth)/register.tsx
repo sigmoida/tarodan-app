@@ -62,7 +62,12 @@ type RegisterForm = z.infer<typeof registerSchema>;
 export default function RegisterScreen() {
   const { control, handleSubmit, formState: { errors } } = useForm<RegisterForm>({
     resolver: zodResolver(registerSchema),
-    defaultValues: { acceptTerms: false },
+    defaultValues: {
+      acceptTerms: false,
+      // Maestro spinner DateField'ı süremez; test modunda geçerli (18+) bir
+      // doğum tarihi öndoldurulur. Prod'da EXPO_PUBLIC_MAESTRO unset → '' .
+      birthDate: process.env.EXPO_PUBLIC_MAESTRO === '1' ? '1990-01-01' : '',
+    },
   });
 
   const registerMutation = useMutation({
@@ -158,6 +163,7 @@ export default function RegisterScreen() {
           name="confirmPassword"
           render={({ field: { onChange, value } }) => (
             <Input
+              testID="register-confirmPassword-input"
               label="Şifre Tekrar"
               value={value}
               onChangeText={onChange}
@@ -173,6 +179,7 @@ export default function RegisterScreen() {
           name="acceptTerms"
           render={({ field: { onChange, value } }) => (
             <Checkbox
+              testID="register-acceptTerms"
               checked={value}
               onChange={() => onChange(!value)}
               label="Kullanım koşullarını ve gizlilik politikasını kabul ediyorum"
@@ -208,7 +215,12 @@ export default function RegisterScreen() {
 
         {registerMutation.isError ? (
           <Text variant="bodySm" tone="danger" align="center">
-            Kayıt başarısız. Lütfen tekrar deneyin.
+            {(() => {
+              const err = registerMutation.error as any;
+              const msg = err?.response?.data?.message;
+              const text = Array.isArray(msg) ? msg[0] : msg;
+              return text || err?.message || 'Kayıt başarısız. Lütfen tekrar deneyin.';
+            })()}
           </Text>
         ) : null}
 
