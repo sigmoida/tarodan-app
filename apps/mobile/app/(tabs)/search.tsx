@@ -265,6 +265,7 @@ export default function SearchScreen() {
       (hasDiscount ? Math.round((1 - Number(price) / Number(oldPrice)) * 100) : 0);
     return (
       <Pressable
+        testID="search-result-card"
         onPress={() => handleProductPress(item.id)}
         style={({ pressed }) => [styles.productCardWrapper, { opacity: pressed ? 0.85 : 1 }]}
       >

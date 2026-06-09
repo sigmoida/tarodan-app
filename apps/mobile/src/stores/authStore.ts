@@ -343,6 +343,15 @@ export const useAuthStore = create<AuthState>((set, get) => ({
 
   loadToken: async () => {
     try {
+      // Maestro register/guest journey: keychain (SecureStore) clearState'i atlatıp
+      // önceki oturumun token'ını taşıyabiliyor. NO_AUTOLOGIN modunda token'ı temizle
+      // ki gerçekten çıkışlı (misafir) başlansın. Yalnız test gate'i — prod'da unset.
+      if (process.env.EXPO_PUBLIC_MAESTRO_NO_AUTOLOGIN === '1') {
+        await SecureStore.deleteItemAsync('accessToken');
+        await SecureStore.deleteItemAsync('refreshToken');
+        set({ isAuthenticated: false, token: null, user: null, limits: null, isLoading: false });
+        return;
+      }
       const token = await SecureStore.getItemAsync('accessToken');
       if (token) {
         // Web ile aynı endpoint: GET /users/me

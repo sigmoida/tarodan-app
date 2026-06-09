@@ -5,9 +5,7 @@
 appId: com.tarodan.app
 tags:
   - manual
-env:
-  REG_EMAIL: maestro-j1@demo.com
-  REG_PASSWORD: Demo123!
+# REG_EMAIL / REG_PASSWORD orkestratörden --env ile gelir (inline env --env'i ezer).
 ---
 - launchApp:
     appId: com.tarodan.app
@@ -17,6 +15,23 @@ env:
 - tapOn:
     text: "Continue"
     optional: true
+# Expo geliştirici menüsü açılırsa kapat (backdrop, sonra X).
+- runFlow:
+    when:
+      visible: "Toggle performance monitor"
+    commands:
+      - tapOn:
+          point: "50%,10%"
+      - waitForAnimationToEnd:
+          timeout: 2000
+- runFlow:
+    when:
+      visible: "Toggle performance monitor"
+    commands:
+      - tapOn:
+          point: "91%,47%"
+      - waitForAnimationToEnd:
+          timeout: 2000
 # Giriş: Profil → Giriş Yap → REG_EMAIL
 - tapOn:
     text: "Profil"
@@ -58,8 +73,16 @@ env:
 - inputText: "diecast"
 - waitForAnimationToEnd:
     timeout: 5000
+# Klavyeyi kapat — açık klavyede listenin ilk tap'i karta değil klavye kapatmaya gider.
+- hideKeyboard
+- waitForAnimationToEnd:
+    timeout: 3000
+- extendedWaitUntil:
+    visible:
+      id: "search-result-card"
+    timeout: 15000
 - tapOn:
-    text: ".*₺.*"
+    id: "search-result-card"
     index: 0
 - extendedWaitUntil:
     visible:

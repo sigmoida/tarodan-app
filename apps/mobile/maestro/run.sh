@@ -50,7 +50,10 @@ else
   log "Metro hazır. (log: /tmp/tarodan-metro.log)"
 fi
 
-# 4. Maestro — ön planda, görünür simülatörde
-log "maestro test $* — simülatörü izle"
+# 4. Maestro — ön planda, görünür simülatörde.
+# Flow yolu İLK arg; Maestro --env'i flow'dan ÖNCE ister, bu yüzden flow'u sona al:
+#   maestro test --env K=V flow.yaml
+FLOW="$1"; shift || true
+log "maestro test $* $FLOW — simülatörü izle"
 cd "$MOBILE_DIR/maestro"
-exec maestro test "$@"
+exec maestro test "$@" "$FLOW"

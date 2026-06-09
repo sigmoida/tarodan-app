@@ -6,19 +6,47 @@
 appId: com.tarodan.app
 tags:
   - manual
-env:
-  REG_EMAIL: maestro-j1@demo.com
-  REG_PASSWORD: Demo123!
-  REG_NAME: Maestro Alıcı
+# REG_EMAIL / REG_PASSWORD / REG_NAME orkestratörden --env ile gelir.
+# Inline env: defaultları Maestro'da --env'i EZDİĞİ için bilinçli olarak yok.
 ---
 - launchApp:
     appId: com.tarodan.app
-    clearState: false
+    # clearState: true — önceki koşumdan kalan SecureStore token'ı temizle ki
+    # NO_AUTOLOGIN ile gerçekten misafir başlasın (zeynep oturumu sızmasın).
+    clearState: true
 - waitForAnimationToEnd:
     timeout: 5000
+# clearState dev-client launcher'ı açar (son sunucu hafızası da silinir);
+# "DEVELOPMENT SERVERS" görünürse localhost'a dokunup uygulamaya gir.
+- runFlow:
+    when:
+      visible: "DEVELOPMENT SERVERS"
+    commands:
+      - tapOn:
+          text: ".*localhost.*"
+      - waitForAnimationToEnd:
+          timeout: 8000
 - tapOn:
     text: "Continue"
     optional: true
+# Expo geliştirici menüsü (Reload / Go home / Tools sheet) fresh launch'ta açılıp
+# ana ekranı kapatabiliyor → kapat. Önce backdrop (üst dimmed alan), sonra X.
+- runFlow:
+    when:
+      visible: "Toggle performance monitor"
+    commands:
+      - tapOn:
+          point: "50%,10%"
+      - waitForAnimationToEnd:
+          timeout: 2000
+- runFlow:
+    when:
+      visible: "Toggle performance monitor"
+    commands:
+      - tapOn:
+          point: "91%,47%"
+      - waitForAnimationToEnd:
+          timeout: 2000
 # 1. Misafir ana sayfa: login ekranı gelirse "Misafir Olarak Devam Et"
 - runFlow:
     when:
@@ -42,14 +70,35 @@ env:
 - inputText: "diecast"
 - waitForAnimationToEnd:
     timeout: 5000
-- tapOn:
-    text: ".*₺.*"
-    index: 0
+# Klavyeyi kapat — açık klavyede arama listesinin ilk tap'i karta değil klavye
+# kapatmaya gidiyor (keyboardShouldPersistTaps), onPress tetiklenmiyor.
+- hideKeyboard
+- waitForAnimationToEnd:
+    timeout: 3000
 - extendedWaitUntil:
     visible:
-      id: "product-detail-add-to-cart-button"
+      id: "search-result-card"
     timeout: 15000
-# 3. Kayıt ol: detaydan profile/girişe gidip kayıt ekranını aç
+- tapOn:
+    id: "search-result-card"
+    index: 0
+# Ürün detayı açıldı doğrulaması — stoktan/oturumdan bağımsız "Fiyat" etiketi
+# (add-to-cart butonu stokta-yok ürünlerde gizlenir, misafir sıralaması farklı).
+- extendedWaitUntil:
+    visible:
+      text: "Fiyat"
+    timeout: 15000
+# Detay tabs dışı stacked ekran (tab bar gizli) — sol-üst geri (←) okuna dokunup dön.
+# iOS'ta Maestro `back` (kenar swipe) güvenilmez; header geri butonuna koordinatla dokun.
+- tapOn:
+    point: "8%,7%"
+- waitForAnimationToEnd:
+    timeout: 3000
+# 3. Kayıt ol: Profil tab'ine git (back sonrası tab bar görünür)
+- extendedWaitUntil:
+    visible:
+      text: "Profil"
+    timeout: 10000
 - tapOn:
     text: "Profil"
 - extendedWaitUntil:
@@ -81,6 +130,11 @@ env:
 - tapOn:
     id: "register-confirmPassword-input"
 - inputText: "${REG_PASSWORD}"
+# Klavyeyi kapat — açık klavye checkbox'ı örtüyor; acceptTerms tap'i klavye "u"
+# tuşuna denk gelip confirmPassword'a fazladan karakter yazıyordu.
+- hideKeyboard
+- waitForAnimationToEnd:
+    timeout: 2000
 - tapOn:
     id: "register-acceptTerms"
 # birthDate MAESTRO modunda öndolu (1990-01-01); dokunma.

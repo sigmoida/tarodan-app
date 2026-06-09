@@ -6,9 +6,7 @@
 appId: com.tarodan.app
 tags:
   - manual
-env:
-  REG_EMAIL: maestro-j1@demo.com
-  REG_PASSWORD: Demo123!
+# REG_EMAIL / REG_PASSWORD orkestratörden --env ile gelir (inline env --env'i ezer).
 ---
 - launchApp:
     appId: com.tarodan.app
@@ -18,6 +16,23 @@ env:
 - tapOn:
     text: "Continue"
     optional: true
+# Expo geliştirici menüsü açılırsa kapat (backdrop, sonra X).
+- runFlow:
+    when:
+      visible: "Toggle performance monitor"
+    commands:
+      - tapOn:
+          point: "50%,10%"
+      - waitForAnimationToEnd:
+          timeout: 2000
+- runFlow:
+    when:
+      visible: "Toggle performance monitor"
+    commands:
+      - tapOn:
+          point: "91%,47%"
+      - waitForAnimationToEnd:
+          timeout: 2000
 # Giriş garanti (oturum düşmüşse)
 - tapOn:
     text: "Profil"

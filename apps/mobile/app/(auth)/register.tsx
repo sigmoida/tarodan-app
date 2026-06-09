@@ -148,7 +148,14 @@ export default function RegisterScreen() {
               label="Şifre"
               value={value}
               onChangeText={onChange}
-              secureTextEntry
+              // Maestro: iOS secureTextEntry'ye yazamıyor + "Automatic Strong Password"
+              // kaplaması çıkıyor. Test modunda maskeyi kapat (login.tsx ile aynı). Prod: maskeli.
+              secureTextEntry={process.env.EXPO_PUBLIC_MAESTRO !== '1'}
+              // Maskesizken iOS otomatik öneri fazladan karakter ekliyor (şifre eşleşmez).
+              autoCorrect={false}
+              autoComplete="off"
+              autoCapitalize="none"
+              spellCheck={false}
               togglePasswordVisibility
               error={errors.password?.message}
             />
@@ -167,7 +174,11 @@ export default function RegisterScreen() {
               label="Şifre Tekrar"
               value={value}
               onChangeText={onChange}
-              secureTextEntry
+              secureTextEntry={process.env.EXPO_PUBLIC_MAESTRO !== '1'}
+              autoCorrect={false}
+              autoComplete="off"
+              autoCapitalize="none"
+              spellCheck={false}
               togglePasswordVisibility
               error={errors.confirmPassword?.message}
             />
