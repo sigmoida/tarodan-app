@@ -4,6 +4,10 @@
  * Native modül mock'ları gerektikçe buraya eklenir (SecureStore, AsyncStorage, image-picker).
  */
 
+// Test modu: register birthDate öndolu (1990-01-01), şifre alanları maskesiz.
+// Uygulama EXPO_PUBLIC_MAESTRO==='1' ile bu davranışları açar.
+process.env.EXPO_PUBLIC_MAESTRO = '1';
+
 // expo-secure-store: testte gerçek keychain yok — no-op mock.
 jest.mock('expo-secure-store', () => ({
   getItemAsync: jest.fn(() => Promise.resolve(null)),
