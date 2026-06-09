@@ -20,7 +20,7 @@ driver() { ( cd "$API_DIR" && node scripts/journey-driver.js "$@" --email "$REG_
 ui() {
   ( cd "$MOBILE_DIR" && \
     EXPO_PUBLIC_MAESTRO_NO_AUTOLOGIN=1 \
-    bash maestro/run.sh "maestro/flows/$1" \
+    bash maestro/run.sh "flows/$1" \
       --env REG_EMAIL="$REG_EMAIL" \
       --env REG_PASSWORD="$REG_PASSWORD" \
       --env REG_NAME="$REG_NAME" )
