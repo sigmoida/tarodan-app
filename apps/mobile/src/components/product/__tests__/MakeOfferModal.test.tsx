@@ -5,7 +5,7 @@
  */
 import React from 'react';
 import { Alert } from 'react-native';
-import { render, screen, fireEvent, waitFor } from '@testing-library/react-native';
+import { screen, fireEvent, waitFor } from '@testing-library/react-native';
 import MakeOfferModal from '../MakeOfferModal';
 import { renderWithProviders } from '../../../test-utils';
 
