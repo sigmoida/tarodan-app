@@ -32,6 +32,26 @@ Sebep: satıcı tarafının iki temel adımı mobil UI'dan yapılamıyor.
 
 ---
 
+## Yolculuk 3 — Pazarlık (teklif/karşı-teklif) (KISMEN — 2026-06-09)
+
+Pazarlık akışı (teklif → karşı teklif → kabul) UI'dan otomatikleştirilebilir; ama:
+
+### G-04 — Kabul edilen teklif siparişi (pending_payment) mobilde ödenemiyor
+- **Yer:** Teklif kabul → `pending_payment` Order oluşuyor ([offers/index.tsx handleAccept](../../apps/mobile/app/offers/index.tsx)), ama:
+  - [order-track.tsx](../../apps/mobile/app/order-track.tsx) salt-okunur (durum timeline'ı, "öde" butonu yok).
+  - [orders/index.tsx](../../apps/mobile/app/orders/index.tsx) / [orders/[id].tsx](../../apps/mobile/app/orders/[id].tsx) pending_payment için yalnız etiket ("Ödeme Bekleniyor"), ödeme aksiyonu yok.
+  - [checkout/index.tsx](../../apps/mobile/app/checkout/index.tsx) **sepet-tabanlı** — mevcut bir order'ı (orderId) ödeme yolu yok.
+  - Teklif accepted kartı → "Siparişi Görüntüle" → order-track (salt-okunur).
+- **Sonuç:** Alıcı teklifi kabul edip siparişi oluşturabiliyor ama **mobilden ödeyemiyor**.
+- **Olası çözümler:** (a) Mobile'a "pending_payment order → öde" entry point (checkout'a orderId desteği); (b) test/otomasyonda driver ile bypass ödeme simüle et.
+
+### Otomatikleştirilebilir kalan (pazarlık çekirdeği)
+- Adım 1-2: alıcı teklif verir — UI ([MakeOfferModal.tsx](../../apps/mobile/src/components/product/MakeOfferModal.tsx), `offer-amount-input`/`offer-submit-button` testID'leri VAR).
+- Adım 3: satıcı karşı teklif — driver (mobil counter modal testID'siz; UI hesap-değiştirme yerine driver simüle).
+- Adım 4: alıcı karşı teklifi kabul — UI (Tekliflerim → "Karşı teklifi kabul et", testID YOK → text selektör).
+- Adım 5 ödeme: G-04 → driver simüle.
+- Adım 6-7: teslim onayı (UI) + payout (driver) — Yolculuk 1 deseni.
+
 ## Notlar
 - Bu boşluklar **ürün eksiği** sinyali; her biri ayrı bir mobil iş kalemi olabilir.
 - Otomasyon stratejisi: bir yolculuk boşluğa takılırsa ya driver ile simüle et ya da atla + buraya not düş.
