@@ -6,8 +6,8 @@
 import React from 'react';
 import { Alert } from 'react-native';
 import { render, screen, fireEvent, waitFor } from '@testing-library/react-native';
-import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import MakeOfferModal from '../MakeOfferModal';
+import { renderWithProviders } from '../../../test-utils';
 
 // API'yi mock'la — ağ yok, deterministik.
 jest.mock('../../../services/api', () => ({
@@ -20,19 +20,16 @@ const createMock = offersApi.create as jest.Mock;
 function renderModal(props: Partial<React.ComponentProps<typeof MakeOfferModal>> = {}) {
   const onDismiss = jest.fn();
   const onSuccess = jest.fn();
-  const client = new QueryClient({ defaultOptions: { mutations: { retry: false } } });
-  render(
-    <QueryClientProvider client={client}>
-      <MakeOfferModal
-        visible
-        onDismiss={onDismiss}
-        onSuccess={onSuccess}
-        productId="prod-1"
-        productTitle="Test Ürünü"
-        listPrice={390}
-        {...props}
-      />
-    </QueryClientProvider>,
+  renderWithProviders(
+    <MakeOfferModal
+      visible
+      onDismiss={onDismiss}
+      onSuccess={onSuccess}
+      productId="prod-1"
+      productTitle="Test Ürünü"
+      listPrice={390}
+      {...props}
+    />,
   );
   return { onDismiss, onSuccess };
 }
