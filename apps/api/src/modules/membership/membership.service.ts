@@ -375,6 +375,7 @@ export class MembershipService {
           currentPeriodStart: now,
           currentPeriodEnd: periodEnd,
           cancelledAt: null,
+          autoRenew: true, // Ücretli üyelikte oto-yenileme hatırlatması default açık
         },
       });
     } else {
@@ -385,6 +386,7 @@ export class MembershipService {
           status: SubscriptionStatus.past_due, // Will be activated after payment
           currentPeriodStart: now,
           currentPeriodEnd: periodEnd,
+          autoRenew: true, // Ücretli üyelikte oto-yenileme hatırlatması default açık
         },
       });
     }
@@ -584,20 +586,9 @@ export class MembershipService {
       throw new NotFoundException('Üyelik bulunamadı');
     }
 
-    // If enabling auto-renew, require a payment method
-    if (autoRenew && !paymentMethodId) {
-      // Check if user has any payment method
-      const existingMethod = await this.prisma.paymentMethod.findFirst({
-        where: { userId, isDefault: true },
-      });
-      
-      if (!existingMethod) {
-        throw new BadRequestException('Otomatik yenileme için kayıtlı bir kart gereklidir');
-      }
-      paymentMethodId = existingMethod.id;
-    }
-
-    // Validate payment method belongs to user
+    // Otomatik yenileme hatırlatma-tabanlıdır (bitişte bildirim + tek tık yenile);
+    // kayıtlı kart GEREKMEZ. Kart verilirse doğrula, verilmezse hatırlatma yine açılır.
+    // Validate payment method belongs to user (opsiyonel)
     if (paymentMethodId) {
       const paymentMethod = await this.prisma.paymentMethod.findFirst({
         where: { id: paymentMethodId, userId },
@@ -706,7 +697,11 @@ export class MembershipService {
           where: { id: membership.id },
           data: {
             tierId: freeTier.id,
-            status: SubscriptionStatus.expired,
+            // Free'ye düşürülen üye artık AKTİF bir ücretsiz üye. Önceden tier=free
+            // + status=expired (tutarsız) set ediliyordu; bu, getCurrentMembership /
+            // status okuyan diğer yerlerde kafa karışıklığı yaratıyordu.
+            status: SubscriptionStatus.active,
+            autoRenew: false,
           },
         });
         downgradeCount++;
@@ -738,9 +733,31 @@ export class MembershipService {
   // VALIDATE TRADE CREATION
   // ==========================================================================
   async canCreateTrade(userId: string): Promise<{ allowed: boolean; reason?: string }> {
-    const limits = await this.getUserLimits(userId);
+    // Takas kapısı GERÇEK (satın alınan) tier'a bakar. getUserLimits, ödeme bekleyen (past_due)
+    // paralı üyeliği "free"ye düşürdüğü için premium üye takası yanlışlıkla engelleniyordu (BUG A).
+    // Bu yüzden ham üyeliği okuyup tier.canTrade'i kontrol ediyoruz; past_due (ödeme bekleyen)
+    // paralı üye de takas yapabilir. Sadece free / iptal / süresi dolmuş engellenir.
+    let membership = await this.prisma.userMembership.findUnique({
+      where: { userId },
+      include: { tier: true },
+    });
+    // Kayıt (register) userMembership satırı oluşturmaz; satır yalnızca
+    // getUserMembership ilk çağrıldığında lazy oluşturulur. canCreateTrade ham satırı
+    // okuduğu için, üyelik sayfasını hiç açmamış yeni free kullanıcı yanlışlıkla
+    // engelleniyordu. Satırı (free tier) garanti edip ÖYLE kontrol et — past_due
+    // premium hâlâ takas edebilsin diye sonra yine HAM tier/status okunur (BUG A).
+    if (!membership) {
+      await this.getUserMembership(userId); // free tier satırını lazy oluşturur
+      membership = await this.prisma.userMembership.findUnique({
+        where: { userId },
+        include: { tier: true },
+      });
+    }
+    const eligibleStatus =
+      membership?.status === SubscriptionStatus.active ||
+      membership?.status === SubscriptionStatus.past_due;
 
-    if (!limits.canTrade) {
+    if (!membership || !membership.tier?.canTrade || !eligibleStatus) {
       return {
         allowed: false,
         reason: 'Takas özelliği üyeliğinizde mevcut değil. Üyeliğinizi yükseltin.',

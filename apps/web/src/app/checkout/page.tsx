@@ -1146,8 +1146,10 @@ export default function CheckoutPage() {
             return;
           }
 
+          // Tek toast: hata burada gösterildi; dıştaki catch'e tekrar fırlatma
+          // (yoksa outer catch ikinci bir toast.error atıyor → hata 2 kez görünüyor).
           toast.error(errorMessage);
-          throw orderError;
+          return;
         }
 
         // Backend directBuy returns orderId; guest checkout returns id; support both

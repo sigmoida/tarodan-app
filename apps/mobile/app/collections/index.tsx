@@ -1,6 +1,6 @@
 import { useState } from 'react';
-import { View, ScrollView, StyleSheet, TouchableOpacity, FlatList, Image, Dimensions } from 'react-native';
-import { theme, Avatar, Chip, Spinner, Text, Input } from '@tarodan/ui-native';
+import { View, ScrollView, StyleSheet, TouchableOpacity, FlatList, Image, Dimensions, RefreshControl } from 'react-native';
+import { theme, Avatar, Chip, Spinner, Text, Input, ScreenHeader } from '@tarodan/ui-native';
 import { useQuery } from '@tanstack/react-query';
 import { router } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
@@ -11,117 +11,11 @@ const { colors } = theme;
 const { width } = Dimensions.get('window');
 
 // Mock collections for demo
-const MOCK_COLLECTIONS = [
-  {
-    id: 'c1',
-    name: 'Ferrari Koleksiyonu',
-    description: 'Klasik ve modern Ferrari modelleri',
-    coverImage: 'https://placehold.co/400x300/e74c3c/ffffff?text=Ferrari',
-    itemCount: 24,
-    viewCount: 1250,
-    likeCount: 89,
-    owner: {
-      id: 'u1',
-      displayName: 'CarCollector',
-      avatarUrl: null,
-      verified: true,
-    },
-    createdAt: '2024-01-15',
-  },
-  {
-    id: 'c2',
-    name: 'Vintage Hot Wheels',
-    description: '1970-1990 dönemi nadir Hot Wheels modelleri',
-    coverImage: 'https://placehold.co/400x300/3498db/ffffff?text=Hot+Wheels',
-    itemCount: 156,
-    viewCount: 3450,
-    likeCount: 245,
-    owner: {
-      id: 'u2',
-      displayName: 'HotWheelsMaster',
-      avatarUrl: null,
-      verified: true,
-    },
-    createdAt: '2023-11-20',
-  },
-  {
-    id: 'c3',
-    name: 'JDM Legends',
-    description: 'Japon spor arabaları 1:18 ve 1:24 ölçek',
-    coverImage: 'https://placehold.co/400x300/2ecc71/ffffff?text=JDM',
-    itemCount: 38,
-    viewCount: 890,
-    likeCount: 67,
-    owner: {
-      id: 'u3',
-      displayName: 'JDMFan',
-      avatarUrl: null,
-      verified: false,
-    },
-    createdAt: '2024-01-02',
-  },
-  {
-    id: 'c4',
-    name: 'Porsche Through Ages',
-    description: '356\'dan 992\'ye Porsche tarihi',
-    coverImage: 'https://placehold.co/400x300/f39c12/ffffff?text=Porsche',
-    itemCount: 45,
-    viewCount: 2100,
-    likeCount: 178,
-    owner: {
-      id: 'u4',
-      displayName: 'PorscheLover',
-      avatarUrl: null,
-      verified: true,
-    },
-    createdAt: '2023-12-10',
-  },
-  {
-    id: 'c5',
-    name: 'Muscle Cars USA',
-    description: 'Amerikan kas arabaları koleksiyonu',
-    coverImage: 'https://placehold.co/400x300/9b59b6/ffffff?text=Muscle',
-    itemCount: 62,
-    viewCount: 1780,
-    likeCount: 134,
-    owner: {
-      id: 'u5',
-      displayName: 'MuscleKing',
-      avatarUrl: null,
-      verified: false,
-    },
-    createdAt: '2023-10-05',
-  },
-];
-
-const FEATURED_GARAGES = [
-  {
-    id: 'g1',
-    userName: 'Premium Collector',
-    totalItems: 245,
-    totalCollections: 8,
-    totalLikes: 1250,
-    avatarUrl: null,
-    verified: true,
-    featuredCollection: MOCK_COLLECTIONS[0],
-  },
-  {
-    id: 'g2',
-    userName: 'HotWheelsMaster',
-    totalItems: 512,
-    totalCollections: 15,
-    totalLikes: 3450,
-    avatarUrl: null,
-    verified: true,
-    featuredCollection: MOCK_COLLECTIONS[1],
-  },
-];
-
 export default function CollectionsScreen() {
   const [searchQuery, setSearchQuery] = useState('');
   const [activeFilter, setActiveFilter] = useState<'all' | 'popular' | 'recent'>('all');
 
-  const { data: apiCollections, isLoading } = useQuery({
+  const { data: apiCollections, isLoading, refetch, isRefetching } = useQuery({
     queryKey: ['collections', searchQuery, activeFilter],
     queryFn: async () => {
       try {
@@ -131,14 +25,15 @@ export default function CollectionsScreen() {
             sort: activeFilter === 'popular' ? 'popular' : activeFilter === 'recent' ? 'newest' : undefined,
           },
         });
-        return response.data.data || response.data || [];
+        // API şekli: { collections, total, page, pageSize }
+        return response.data?.collections ?? response.data?.data ?? (Array.isArray(response.data) ? response.data : []);
       } catch {
         return null;
       }
     },
   });
 
-  const collections = Array.isArray(apiCollections) ? apiCollections : MOCK_COLLECTIONS;
+  const collections = Array.isArray(apiCollections) ? apiCollections : [];
 
   const filteredCollections = collections.filter((c: any) =>
     c.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
@@ -151,7 +46,7 @@ export default function CollectionsScreen() {
       onPress={() => router.push(`/collections/${item.id}`)}
     >
       <Image
-        source={{ uri: transformImageUrl(item.coverImage) }}
+        source={{ uri: transformImageUrl(item.coverImageUrl ?? item.coverImage) }}
         style={styles.collectionImage}
         resizeMode="cover"
       />
@@ -175,12 +70,9 @@ export default function CollectionsScreen() {
         <View style={styles.ownerRow}>
           <Avatar
             size="sm"
-            name={item.owner?.displayName || 'U'}
+            name={item.userName || 'U'}
           />
-          <Text style={styles.ownerName}>{item.owner?.displayName}</Text>
-          {item.owner?.verified && (
-            <Ionicons name="checkmark-circle" size={14} color={colors.warning[500]!} />
-          )}
+          <Text style={styles.ownerName}>{item.userName}</Text>
         </View>
       </View>
     </TouchableOpacity>
@@ -188,14 +80,7 @@ export default function CollectionsScreen() {
 
   return (
     <View style={styles.container}>
-      {/* Header */}
-      <View style={styles.header}>
-        <TouchableOpacity onPress={() => router.back()}>
-          <Ionicons name="arrow-back" size={24} color={colors.white} />
-        </TouchableOpacity>
-        <Text style={styles.headerTitle}>Koleksiyonlar</Text>
-        <View style={{ width: 24 }} />
-      </View>
+      <ScreenHeader title="Koleksiyonlar" onBack={() => router.back()} />
 
       {/* Search */}
       <View style={styles.searchSection}>
@@ -229,48 +114,18 @@ export default function CollectionsScreen() {
         />
       </View>
 
-      <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
-        {/* Featured Digital Garages */}
-        <View style={styles.section}>
-          <View style={styles.sectionHeader}>
-            <Text style={styles.sectionTitle}>🏆 Öne Çıkan Garajlar</Text>
-            <TouchableOpacity>
-              <Text style={styles.seeAll}>Tümü</Text>
-            </TouchableOpacity>
-          </View>
-          <ScrollView horizontal showsHorizontalScrollIndicator={false}>
-            {FEATURED_GARAGES.map((garage) => (
-              <TouchableOpacity
-                key={garage.id}
-                style={styles.garageCard}
-                onPress={() => router.push(`/garage/${garage.id}` as any)}
-              >
-                <View style={styles.garageHeader}>
-                  <Avatar
-                    size="lg"
-                    name={garage.userName}
-                  />
-                  {garage.verified && (
-                    <View style={styles.verifiedBadge}>
-                      <Ionicons name="checkmark-circle" size={18} color={colors.warning[500]!} />
-                    </View>
-                  )}
-                </View>
-                <Text style={styles.garageName}>{garage.userName}</Text>
-                <View style={styles.garageStats}>
-                  <Text style={styles.garageStatText}>{garage.totalItems} model</Text>
-                  <Text style={styles.garageStatDot}>•</Text>
-                  <Text style={styles.garageStatText}>{garage.totalCollections} koleksiyon</Text>
-                </View>
-                <View style={styles.garageLikes}>
-                  <Ionicons name="heart" size={14} color={colors.danger[600]!} />
-                  <Text style={styles.garageLikesText}>{garage.totalLikes}</Text>
-                </View>
-              </TouchableOpacity>
-            ))}
-          </ScrollView>
-        </View>
-
+      <ScrollView
+        style={styles.content}
+        showsVerticalScrollIndicator={false}
+        refreshControl={
+          <RefreshControl
+            refreshing={isRefetching}
+            onRefresh={refetch}
+            colors={[colors.primary[600]!]}
+            tintColor={colors.primary[600]!}
+          />
+        }
+      >
         {/* Collections Grid */}
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>📚 Koleksiyonlar</Text>
@@ -323,20 +178,6 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: colors.surface.alt,
-  },
-  header: {
-    backgroundColor: colors.primary[600]!,
-    paddingTop: 50,
-    paddingBottom: 16,
-    paddingHorizontal: 20,
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-  },
-  headerTitle: {
-    fontSize: 18,
-    fontWeight: 'bold',
-    color: colors.white,
   },
   searchSection: {
     padding: 16,

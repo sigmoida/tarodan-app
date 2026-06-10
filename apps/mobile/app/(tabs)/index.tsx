@@ -1,16 +1,20 @@
 import { View, ScrollView, RefreshControl, Dimensions, Image, TouchableOpacity, StyleSheet, Pressable } from 'react-native';
-import React, { useState, useCallback, useEffect } from 'react';
+import React, { useState, useCallback, useEffect, useMemo } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { router } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Card, Input, Spinner, Text, theme } from '@tarodan/ui-native';
-import { api, productsApi, categoriesApi, collectionsApi } from '../../src/services/api';
+import { api, productsApi, categoriesApi, collectionsApi, notificationsApi } from '../../src/services/api';
 import { SCALES, BRANDS } from '../../src/theme';
 import { useAuthStore } from '../../src/stores/authStore';
 import { useGuestStore } from '../../src/stores/guestStore';
+import { useCartStore } from '../../src/stores/cartStore';
+import { useFavoritesStore } from '../../src/stores/favoritesStore';
 import { SignupPrompt } from '../../src/components/SignupPrompt';
 import { getImageUrl as getImageUrlFromUtils } from '../../src/utils/imageUrl';
+import { isProductOutOfStock } from '../../src/utils/productPrice';
+import { OutOfStockOverlay } from '../../src/components/product';
 
 const { colors, spacing, radius } = theme;
 
@@ -26,6 +30,35 @@ export default function HomeScreen() {
   
   const { isAuthenticated } = useAuthStore();
   const { incrementListingView, getPromptType, setLastPromptShown, canShowPrompt } = useGuestStore();
+
+  // Sepet/favori sayaçları — header rozetleri için (store değişince re-render).
+  const cartItems = useCartStore((s) => s.items);
+  const cartCount = cartItems.reduce((n, i) => n + i.quantity, 0);
+  // Kart üstünde "Sepette" göstergesi için ürün id seti (sepet değişince güncellenir).
+  const cartProductIds = useMemo(() => new Set(cartItems.map((i) => i.productId)), [cartItems]);
+  const favCount = useFavoritesStore((s) => s.items.length);
+  const fetchFavorites = useFavoritesStore((s) => s.fetchFavorites);
+  useEffect(() => {
+    if (isAuthenticated) fetchFavorites();
+  }, [isAuthenticated]);
+
+  // Okunmamış bildirim sayısı — header zil rozeti için (profil ile aynı query key).
+  const { data: unreadData } = useQuery({
+    queryKey: ['notifications-unread'],
+    queryFn: async () => {
+      try {
+        const response = await notificationsApi.getUnreadCount();
+        const body = response.data as { count?: number; data?: { count?: number } } | undefined;
+        return body?.count ?? body?.data?.count ?? 0;
+      } catch {
+        return 0;
+      }
+    },
+    enabled: isAuthenticated,
+    refetchInterval: 60000,
+    refetchOnWindowFocus: true,
+  });
+  const unreadCount = typeof unreadData === 'number' ? unreadData : 0;
 
   // Check API connection
   useEffect(() => {
@@ -75,6 +108,21 @@ export default function HomeScreen() {
     },
   });
 
+  // Öne çıkan (boost'lu) ürünler — web vitrini ile aynı: GET /products?boostedOnly=true
+  const { data: boostedResponse } = useQuery({
+    queryKey: ['products', 'boosted'],
+    queryFn: async () => {
+      try {
+        const response = await productsApi.getAll({ boostedOnly: true, status: 'active', limit: 12 });
+        const list = response.data?.data || response.data?.products || response.data || [];
+        return Array.isArray(list) ? list : [];
+      } catch {
+        return [];
+      }
+    },
+  });
+  const boostedProducts: any[] = boostedResponse || [];
+
   // Fetch categories - web ile aynı endpoint: GET /categories
   const { data: categoriesResponse } = useQuery({
     queryKey: ['categories'],
@@ -111,14 +159,11 @@ export default function HomeScreen() {
     queryKey: ['featured-collector'],
     queryFn: async () => {
       try {
-        const response = await collectionsApi.browse({ isPublic: true, page: 1, pageSize: 1 });
-        const collections = response.data?.collections || response.data?.data || [];
-        if (collections.length > 0) {
-          const collectionId = collections[0].id;
-          const detailResponse = await collectionsApi.getOne(collectionId);
-          return detailResponse.data?.collection || detailResponse.data;
-        }
-        return null;
+        // Web ile aynı endpoint: GET /users/featured-collector (skora göre seçilmiş gerçek
+        // "haftanın koleksiyoneri"). Önceki browse({pageSize:1}) ilk rastgele public koleksiyonu
+        // alıyordu — web ile sapıyordu.
+        const response = await api.get('/users/featured-collector');
+        return response.data ?? null;
       } catch (error) {
         console.log('⚠️ Haftanın Koleksiyoneri yüklenemedi');
         return null;
@@ -174,22 +219,30 @@ export default function HomeScreen() {
     setRefreshing(false);
   }, [refetchProducts]);
 
+  // Her navigasyona benzersiz token ekle: Ara sekmesi kalıcı bir tab olduğundan,
+  // token değişimi ekrana "bu taze bir geçiş, filtreyi yeniden uygula" sinyali verir.
+  const navToken = () => `&t=${Date.now()}`;
+
   const handleSearch = () => {
     if (searchQuery.trim()) {
-      router.push(`/search?q=${encodeURIComponent(searchQuery)}`);
+      router.navigate(`/search?q=${encodeURIComponent(searchQuery)}${navToken()}`);
     }
   };
 
   const handleScalePress = (scale: string) => {
-    router.push(`/search?scale=${scale}`);
+    router.navigate(`/search?scale=${encodeURIComponent(scale)}${navToken()}`);
   };
 
-  const handleBrandPress = (brandId: string) => {
-    router.push(`/search?brand=${brandId}`);
+  // Anasayfa "Markalar" şeridi aslında üreticiler (Hot Wheels, Tamiya...) — web ile
+  // aynı: manufacturer ismi ile filtrele (backend ismi case-insensitive eşler).
+  const handleBrandPress = (brand: { id: string; name: string }) => {
+    router.navigate(`/search?manufacturer=${encodeURIComponent(brand.name)}${navToken()}`);
   };
 
-  const handleCategoryPress = (categoryId: string) => {
-    router.push(`/search?categoryId=${categoryId}`);
+  const handleCategoryPress = (cat: { id: string; name: string }) => {
+    router.navigate(
+      `/search?categoryId=${encodeURIComponent(cat.id)}&category=${encodeURIComponent(cat.name)}${navToken()}`,
+    );
   };
 
   const handleProductPress = (productId: string) => {
@@ -233,12 +286,37 @@ export default function HomeScreen() {
       >
         <Card style={styles.productCard} padding={0}>
           <View style={styles.productImageContainer}>
-            <Image source={{ uri: imageUrl }} style={styles.productImage} resizeMode="cover" />
+            <Image
+              source={{ uri: imageUrl }}
+              style={[styles.productImage, isProductOutOfStock(item) && { opacity: 0.45 }]}
+              resizeMode="cover"
+            />
+            {isProductOutOfStock(item) && <OutOfStockOverlay />}
             {isTradeEnabled && (
               <View style={[styles.badge, { backgroundColor: colors.success[600]! }]}>
                 <Ionicons name="swap-horizontal" size={10} color={colors.white} />
                 <Text variant="caption" tone="inverted" weight="bold">
                   {' '}Takas
+                </Text>
+              </View>
+            )}
+            {(item.isBoosted || item.boostedUntil) && (
+              <View
+                style={{
+                  position: 'absolute',
+                  top: 10,
+                  right: 10,
+                  paddingHorizontal: 8,
+                  paddingVertical: 4,
+                  borderRadius: 6,
+                  flexDirection: 'row',
+                  alignItems: 'center',
+                  backgroundColor: colors.warning[500]!,
+                }}
+              >
+                <Ionicons name="rocket" size={10} color={colors.white} />
+                <Text variant="caption" tone="inverted" weight="bold">
+                  {' '}Sponsorlu
                 </Text>
               </View>
             )}
@@ -248,6 +326,14 @@ export default function HomeScreen() {
                 {viewCount}
               </Text>
             </View>
+            {cartProductIds.has(item.id) && (
+              <View style={styles.inCartPill}>
+                <Ionicons name="checkmark-circle" size={13} color={colors.white} />
+                <Text variant="caption" tone="inverted" weight="bold" style={{ marginLeft: 4 }}>
+                  Sepette
+                </Text>
+              </View>
+            )}
           </View>
           <View style={styles.productContent}>
             <Text variant="bodySm" weight="semibold" numberOfLines={2}>
@@ -278,7 +364,18 @@ export default function HomeScreen() {
             />
           </View>
           <View style={styles.headerActions}>
-            <TouchableOpacity 
+            <TouchableOpacity
+              style={styles.headerIconBtn}
+              onPress={() => router.push('/notifications')}
+            >
+              <Ionicons name="notifications-outline" size={24} color={colors.white} />
+              {unreadCount > 0 && (
+                <View style={styles.headerBadge}>
+                  <Text style={styles.headerBadgeText}>{unreadCount > 99 ? '99+' : unreadCount}</Text>
+                </View>
+              )}
+            </TouchableOpacity>
+            <TouchableOpacity
               style={styles.headerIconBtn}
               onPress={() => router.push('/collections')}
             >
@@ -289,12 +386,22 @@ export default function HomeScreen() {
               onPress={() => router.push('/favorites')}
             >
               <Ionicons name="heart-outline" size={24} color={colors.white} />
+              {favCount > 0 && (
+                <View style={styles.headerBadge}>
+                  <Text style={styles.headerBadgeText}>{favCount > 99 ? '99+' : favCount}</Text>
+                </View>
+              )}
             </TouchableOpacity>
             <TouchableOpacity
               style={styles.headerIconBtn}
               onPress={() => router.push('/cart')}
             >
               <Ionicons name="cart-outline" size={24} color={colors.white} />
+              {cartCount > 0 && (
+                <View style={styles.headerBadge}>
+                  <Text style={styles.headerBadgeText}>{cartCount > 99 ? '99+' : cartCount}</Text>
+                </View>
+              )}
             </TouchableOpacity>
           </View>
         </View>
@@ -352,7 +459,7 @@ export default function HomeScreen() {
                 <View style={styles.sectionIndicator} />
                 <Text style={styles.sectionTitle}>Kategoriler</Text>
               </View>
-              <TouchableOpacity onPress={() => router.push('/search')}>
+              <TouchableOpacity onPress={() => router.navigate(`/search?reset=1${navToken()}`)}>
                 <Text style={styles.seeAllText}>Tümünü gör {'>'}</Text>
               </TouchableOpacity>
             </View>
@@ -361,7 +468,7 @@ export default function HomeScreen() {
                 <TouchableOpacity
                   key={cat.id}
                   style={styles.brandItem}
-                  onPress={() => handleCategoryPress(cat.id)}
+                  onPress={() => handleCategoryPress(cat)}
                 >
                   <View style={styles.brandLogo}>
                     <Text style={styles.brandLogoText}>{cat.name}</Text>
@@ -382,7 +489,7 @@ export default function HomeScreen() {
               <View style={styles.sectionIndicator} />
               <Text style={styles.sectionTitle}>Markalar</Text>
             </View>
-            <TouchableOpacity onPress={() => router.push('/search?showBrands=true')}>
+            <TouchableOpacity onPress={() => router.navigate(`/search?openFilter=1${navToken()}`)}>
               <Text style={styles.seeAllText}>Tümünü gör {'>'}</Text>
             </TouchableOpacity>
           </View>
@@ -391,7 +498,7 @@ export default function HomeScreen() {
               <TouchableOpacity
                 key={brand.id}
                 style={styles.brandItem}
-                onPress={() => handleBrandPress(brand.id)}
+                onPress={() => handleBrandPress(brand)}
               >
                 <View style={styles.brandLogo}>
                   <Text style={styles.brandLogoText}>{brand.name}</Text>
@@ -408,7 +515,7 @@ export default function HomeScreen() {
               <View style={styles.sectionIndicator} />
               <Text style={styles.sectionTitle}>Boyut</Text>
             </View>
-            <TouchableOpacity onPress={() => router.push('/search?showScales=true')}>
+            <TouchableOpacity onPress={() => router.navigate(`/search?openFilter=1${navToken()}`)}>
               <Text style={styles.seeAllText}>Tümünü gör {'>'}</Text>
             </TouchableOpacity>
           </View>
@@ -441,11 +548,11 @@ export default function HomeScreen() {
               <View style={styles.featuredHeader}>
                 <View style={styles.featuredAvatar}>
                   <Text style={styles.featuredAvatarText}>
-                    {(featuredCollector.userName || 'K').charAt(0).toUpperCase()}
+                    {(featuredCollector.user?.displayName || featuredCollector.userName || 'K').charAt(0).toUpperCase()}
                   </Text>
                 </View>
                 <View style={styles.featuredInfo}>
-                  <Text style={styles.featuredName}>{featuredCollector.userName || 'Koleksiyoner'}</Text>
+                  <Text style={styles.featuredName}>{featuredCollector.user?.displayName || featuredCollector.userName || 'Koleksiyoner'}</Text>
                   <Text style={styles.featuredDesc}>
                     {featuredCollector.description || `${featuredCollector.itemCount || 0} araçlık koleksiyon`}
                   </Text>
@@ -464,7 +571,7 @@ export default function HomeScreen() {
                       onPress={() => router.push(`/product/${item.productId}`)}
                     >
                       <Image
-                        source={{ uri: item.productImage || 'https://placehold.co/150x150/f3f4f6/9ca3af?text=Ürün' }}
+                        source={{ uri: getImageUrlFromUtils(item.productImage) }}
                         style={styles.featuredProductImage}
                       />
                       <Text style={styles.featuredProductTitle} numberOfLines={2}>{item.productTitle}</Text>
@@ -475,11 +582,26 @@ export default function HomeScreen() {
               )}
               <TouchableOpacity 
                 style={styles.viewGarageBtn}
-                onPress={() => router.push(`/collection/${featuredCollector.id}` as any)}
+                onPress={() => router.push(`/collections/${featuredCollector.id}` as any)}
               >
                 <Text style={styles.viewGarageBtnText}>Garajını incele →</Text>
               </TouchableOpacity>
             </View>
+          </View>
+        )}
+
+        {/* Öne Çıkan / Sponsorlu Ürünler (boost'lu) — Tümünü Gör YOK */}
+        {boostedProducts.length > 0 && (
+          <View style={styles.section}>
+            <View style={styles.sectionHeader}>
+              <View style={styles.sectionTitleContainer}>
+                <View style={styles.sectionIndicator} />
+                <Text style={styles.sectionTitle}>🚀 Öne Çıkan Ürünler</Text>
+              </View>
+            </View>
+            <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.productsScroll}>
+              {boostedProducts.slice(0, 12).map((item: any, index: number) => renderProductCard(item, index))}
+            </ScrollView>
           </View>
         )}
 
@@ -555,7 +677,7 @@ export default function HomeScreen() {
               <View style={styles.companyHeader}>
                 {companyOfWeek.avatarUrl ? (
                   <Image
-                    source={{ uri: companyOfWeek.avatarUrl }}
+                    source={{ uri: getImageUrlFromUtils(companyOfWeek.avatarUrl) }}
                     style={styles.companyAvatar}
                   />
                 ) : (
@@ -564,14 +686,14 @@ export default function HomeScreen() {
                     style={styles.companyAvatarGradient}
                   >
                     <Text style={styles.companyAvatarText}>
-                      {(companyOfWeek.companyName || companyOfWeek.displayName || 'Ş').charAt(0).toUpperCase()}
+                      {(companyOfWeek.displayName || companyOfWeek.companyName || 'Ş').charAt(0).toUpperCase()}
                     </Text>
                   </LinearGradient>
                 )}
                 <View style={styles.companyInfo}>
                   <View style={styles.companyNameRow}>
                     <Text style={styles.companyNameText}>
-                      {companyOfWeek.companyName || companyOfWeek.displayName || 'Şirket'}
+                      {companyOfWeek.displayName || companyOfWeek.companyName || 'Şirket'}
                     </Text>
                     {companyOfWeek.isVerified && (
                       <Ionicons name="checkmark-circle" size={18} color={colors.success[600]!} />
@@ -633,8 +755,9 @@ export default function HomeScreen() {
                       onPress={() => router.push(`/product/${product.id}`)}
                     >
                       <Image
-                        source={{ uri: getImageUrl(product.images) }}
+                        source={{ uri: getImageUrl(product.image ?? product.cardUrl ?? product.images) }}
                         style={styles.companyProductImage}
+                        resizeMode="cover"
                       />
                       <View style={styles.companyProductLikes}>
                         <Ionicons name="thumbs-up" size={12} color={colors.primary[600]!} />
@@ -657,11 +780,11 @@ export default function HomeScreen() {
                     <TouchableOpacity 
                       key={collection.id} 
                       style={styles.companyCollectionCard}
-                      onPress={() => router.push(`/collection/${collection.id}` as any)}
+                      onPress={() => router.push(`/collections/${collection.id}` as any)}
                     >
                       {collection.coverImageUrl ? (
                         <Image
-                          source={{ uri: collection.coverImageUrl }}
+                          source={{ uri: getImageUrlFromUtils(collection.coverImageUrl) }}
                           style={styles.companyCollectionImage}
                         />
                       ) : (
@@ -716,10 +839,10 @@ export default function HomeScreen() {
                 <TouchableOpacity 
                   key={collection.id} 
                   style={styles.collectionCard}
-                  onPress={() => router.push(`/collection/${collection.id}` as any)}
+                  onPress={() => router.push(`/collections/${collection.id}` as any)}
                 >
                   <Image 
-                    source={{ uri: collection.coverImageUrl || 'https://placehold.co/200x150/f3f4f6/9ca3af?text=Koleksiyon' }} 
+                    source={{ uri: getImageUrlFromUtils(collection.coverImageUrl) }}
                     style={styles.collectionImage}
                   />
                   <View style={styles.collectionInfo}>
@@ -780,7 +903,7 @@ const styles = StyleSheet.create({
     backgroundColor: colors.overlay.white20,
     borderRadius: 14,
     padding: 6,
-    gap: 4,
+    gap: 8,
   },
   headerIconBtn: {
     width: 40,
@@ -789,6 +912,48 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
     backgroundColor: colors.overlay.white10,
+  },
+  headerBadge: {
+    position: 'absolute',
+    top: -6,
+    right: -6,
+    minWidth: 20,
+    height: 20,
+    borderRadius: 10,
+    paddingHorizontal: 5,
+    backgroundColor: colors.white,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 2,
+    borderColor: colors.primary[600]!,
+    shadowColor: colors.black,
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.18,
+    shadowRadius: 2,
+    elevation: 3,
+  },
+  headerBadgeText: {
+    color: colors.primary[700]!,
+    fontSize: 12,
+    fontWeight: '800',
+    lineHeight: 14,
+    textAlign: 'center',
+  },
+  inCartPill: {
+    position: 'absolute',
+    bottom: 8,
+    left: 8,
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: colors.primary[600]!,
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 8,
+    shadowColor: colors.black,
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.2,
+    shadowRadius: 3,
+    elevation: 3,
   },
   searchBar: {
     backgroundColor: colors.surface.DEFAULT,
@@ -1031,8 +1196,10 @@ const styles = StyleSheet.create({
   },
   productImageContainer: {
     position: 'relative',
+    width: '100%',
   },
   productImage: {
+    width: '100%',
     height: 140,
     backgroundColor: colors.gray[200],
   },

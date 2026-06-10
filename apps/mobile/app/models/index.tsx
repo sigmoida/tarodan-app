@@ -4,7 +4,8 @@ import { theme, Chip, Spinner, Text, Input, EmptyState } from '@tarodan/ui-nativ
 import { router } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { useQuery } from '@tanstack/react-query';
-import { ScreenHeader } from '../../src/components/common';
+import { ScreenHeader, ThemedRefreshControl } from '../../src/components/common';
+import { useRefresh } from '../../src/hooks/useRefresh';
 import { carModelsApi } from '../../src/services/api';
 import { transformImageUrl } from '../../src/utils/imageUrl';
 
@@ -41,7 +42,7 @@ export default function ModelsScreen() {
   const [search, setSearch] = useState('');
   const [selectedBrand, setSelectedBrand] = useState<string>('all');
 
-  const { data, isLoading } = useQuery({
+  const { data, isLoading, refetch } = useQuery({
     queryKey: ['car-models'],
     queryFn: async () => {
       const response = await carModelsApi.findAll();
@@ -49,6 +50,8 @@ export default function ModelsScreen() {
       return Array.isArray(items) ? items : [];
     },
   });
+
+  const { refreshing, onRefresh } = useRefresh(refetch);
 
   const models = data ?? [];
 
@@ -136,6 +139,7 @@ export default function ModelsScreen() {
           style={styles.list}
           contentContainerStyle={{ paddingBottom: 32 }}
           showsVerticalScrollIndicator={false}
+          refreshControl={<ThemedRefreshControl refreshing={refreshing} onRefresh={onRefresh} />}
         >
           {grouped.map(({ brand, models: brandModels }) => (
             <View key={brand.slug} style={styles.brandSection}>

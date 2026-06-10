@@ -652,6 +652,7 @@ export default function TradeDetailPage() {
           (locale === "en"
             ? "Failed to accept trade"
             : "Takas kabul edilemedi"),
+        { id: "trade-action-error" },
       );
     } finally {
       setIsActionLoading(false);

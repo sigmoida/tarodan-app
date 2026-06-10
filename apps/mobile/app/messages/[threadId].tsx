@@ -8,6 +8,7 @@ import { useMessagesStore, Message } from '../../src/stores/messagesStore';
 import { useAuthStore } from '../../src/stores/authStore';
 import { detectViolations, getViolationMessage, parseMessageContent } from '../../src/utils/contentFilter';
 import { mediaApi } from '../../src/services/api';
+import { resolveImageUrl } from '../../src/utils/imageUrl';
 
 const { colors } = theme;
 
@@ -127,6 +128,11 @@ export default function MessageThreadScreen() {
     if (success) {
       setInputText('');
       scrollViewRef.current?.scrollToEnd({ animated: true });
+    } else {
+      Alert.alert(
+        'Mesaj gönderilemedi',
+        useMessagesStore.getState().error || 'Lütfen tekrar deneyin.'
+      );
     }
     setSending(false);
   };
@@ -306,7 +312,7 @@ export default function MessageThreadScreen() {
                                 {parsed.images.map((img, idx) => (
                                   <RNImage
                                     key={`${message.id}-img-${idx}`}
-                                    source={{ uri: img }}
+                                    source={{ uri: resolveImageUrl(img) }}
                                     style={styles.messageImage}
                                     resizeMode="cover"
                                   />

@@ -10,6 +10,7 @@ import {
   Text,
   Input,
   Textarea,
+  ScreenHeader,
 } from '@tarodan/ui-native';
 import { useState, useEffect } from 'react';
 import { router, useLocalSearchParams } from 'expo-router';
@@ -21,6 +22,7 @@ import { useAuthStore } from '../../src/stores/authStore';
 import { getUpgradeMessage } from '../../src/utils/membershipLimits';
 import { getImageUrl } from '../../src/utils/imageUrl';
 import { getProductEffectivePrice } from '../../src/utils/productPrice';
+import { formatPrice } from '../../src/utils/format';
 import { formatApiErrorMessage } from '../../src/utils/formatApiErrorMessage';
 
 const { colors } = theme;
@@ -104,11 +106,14 @@ export default function NewTradeScreen() {
     queryFn: async () => {
       const response = await listingsApi.getAll({
         sellerId: targetSellerId,
-        tradeAvailable: true,
+        tradeOnly: true,
         status: 'active',
       });
       const raw = response.data?.data || response.data?.products || response.data || [];
-      return Array.isArray(raw) ? raw : [];
+      const list = Array.isArray(raw) ? raw : [];
+      return list.filter(
+        (p: Product) => p.status === 'active' && p.isTradeEnabled !== false,
+      );
     },
     enabled: !!targetSellerId && canTrade,
   });
@@ -175,13 +180,7 @@ export default function NewTradeScreen() {
     const upgradeInfo = getUpgradeMessage('tradeFeature');
     return (
       <View style={styles.container}>
-        <View style={styles.header}>
-          <Pressable onPress={() => router.back()}>
-            <Ionicons name="arrow-back" size={24} color={colors.white} />
-          </Pressable>
-          <Text style={styles.headerTitle}>Takas Teklifi</Text>
-          <View style={{ width: 24 }} />
-        </View>
+        <ScreenHeader title="Takas Teklifi" onBack={() => router.back()} />
 
         <View style={styles.premiumRequired}>
           <MaterialCommunityIcons name="swap-horizontal" size={80} color={colors.primary[600]!} />
@@ -272,7 +271,7 @@ export default function NewTradeScreen() {
           {product.title}
         </Text>
         <Text variant="caption" style={styles.productPrice}>
-          ₺{getProductEffectivePrice(product).toLocaleString('tr-TR')}
+          {formatPrice(getProductEffectivePrice(product))}
         </Text>
       </View>
       <View style={[styles.checkbox, isSelected && styles.checkboxSelected]}>
@@ -283,14 +282,7 @@ export default function NewTradeScreen() {
 
   return (
     <View style={styles.container}>
-      {/* Header */}
-      <View style={styles.header}>
-        <Pressable onPress={() => router.back()}>
-          <Ionicons name="arrow-back" size={24} color={colors.white} />
-        </Pressable>
-        <Text style={styles.headerTitle}>Takas Teklifi</Text>
-        <View style={{ width: 24 }} />
-      </View>
+      <ScreenHeader title="Takas Teklifi" onBack={() => router.back()} />
 
       {/* Steps Indicator */}
       <View style={styles.stepsContainer}>
@@ -325,7 +317,7 @@ export default function NewTradeScreen() {
                   <Text variant="body" style={styles.emptyText}>
                     Takas için aktif ilanınız yok
                   </Text>
-                  <Button variant="outline" title="İlan Oluştur" onPress={() => router.push('/(tabs)/create')} />
+                  <Button variant="outline" title="İlan Oluştur" onPress={() => router.push('/(tabs)/sell')} />
                 </View>
               </Card>
             ) : (
@@ -396,7 +388,7 @@ export default function NewTradeScreen() {
               <Input
                 label="Tutar (₺)"
                 value={cashAmount}
-                onChangeText={setCashAmount}
+                onChangeText={(v: string) => setCashAmount(v.replace(/[^\d.,]/g, ''))}
                 keyboardType="numeric"
                 containerStyle={styles.cashInput}
               />
@@ -436,7 +428,7 @@ export default function NewTradeScreen() {
                     {product.title}
                   </Text>
                   <Text variant="caption" style={styles.summaryItemPrice}>
-                    ₺{product.price?.toLocaleString('tr-TR')}
+                    {formatPrice(getProductEffectivePrice(product))}
                   </Text>
                 </View>
               ))}
@@ -444,7 +436,7 @@ export default function NewTradeScreen() {
               <View style={styles.summaryTotal}>
                 <Text variant="body">Toplam Değer:</Text>
                 <Text variant="label" style={styles.totalPrice}>
-                  ₺{myTotal.toLocaleString('tr-TR')}
+                  {formatPrice(myTotal)}
                 </Text>
               </View>
             </Card>
@@ -464,7 +456,7 @@ export default function NewTradeScreen() {
                     {product.title}
                   </Text>
                   <Text variant="caption" style={styles.summaryItemPrice}>
-                    ₺{product.price?.toLocaleString('tr-TR')}
+                    {formatPrice(getProductEffectivePrice(product))}
                   </Text>
                 </View>
               ))}
@@ -472,7 +464,7 @@ export default function NewTradeScreen() {
               <View style={styles.summaryTotal}>
                 <Text variant="body">Toplam Değer:</Text>
                 <Text variant="label" style={styles.totalPrice}>
-                  ₺{theirTotal.toLocaleString('tr-TR')}
+                  {formatPrice(theirTotal)}
                 </Text>
               </View>
             </Card>
@@ -484,7 +476,7 @@ export default function NewTradeScreen() {
                 <Text variant="body">
                   {cashDirection === 'offer' ? 'Siz ödeyeceksiniz: ' : 'Karşı taraf ödeyecek: '}
                   <Text style={{ color: colors.primary[600]!, fontWeight: 'bold' }}>
-                    ₺{cashValue.toLocaleString('tr-TR')}
+                    {formatPrice(cashValue)}
                   </Text>
                 </Text>
               </Card>
@@ -494,11 +486,14 @@ export default function NewTradeScreen() {
             <Textarea
               label="Mesajınız (Opsiyonel)"
               value={message}
-              onChangeText={setMessage}
+              onChangeText={(v: string) => setMessage(v.slice(0, 500))}
               rows={3}
               containerStyle={styles.messageInput}
               placeholder="Teklif hakkında bir not ekleyin..."
             />
+            <Text variant="caption" tone="subtle" style={styles.charCount}>
+              {message.length}/500
+            </Text>
 
             {/* Trade Protection Info */}
             <Card style={styles.protectionCard}>
@@ -550,20 +545,6 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
     padding: 32,
-  },
-  header: {
-    backgroundColor: colors.primary[600]!,
-    paddingTop: 50,
-    paddingBottom: 16,
-    paddingHorizontal: 20,
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-  },
-  headerTitle: {
-    fontSize: 18,
-    fontWeight: 'bold',
-    color: colors.white,
   },
   subtitle: {
     textAlign: 'center',
@@ -739,8 +720,12 @@ const styles = StyleSheet.create({
     fontWeight: 'bold',
   },
   messageInput: {
-    marginBottom: 16,
+    marginBottom: 4,
     backgroundColor: colors.surface.DEFAULT,
+  },
+  charCount: {
+    textAlign: 'right',
+    marginBottom: 16,
   },
   protectionCard: {
     marginBottom: 16,

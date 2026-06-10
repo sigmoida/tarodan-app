@@ -26,6 +26,7 @@ import {
 } from '@prisma/client';
 import { getAvailableQuantity, safeDecrementReserved } from '../product/helpers/product-availability.helper';
 import { getProductStatusFromQuantity } from '../product/helpers/product-status.helper';
+import { createTradeWarehouseShipments } from './helpers/warehouse-shipments';
 import { PaymentService } from '../payment/payment.service';
 import { ProductLockService } from '../product/product-lock.service';
 import { SuratCargoService } from '../surat-cargo/surat-cargo.service';
@@ -51,6 +52,15 @@ import {
   TradeResponseDto,
   TradeListResponseDto,
 } from './dto';
+
+// Depo-escrow akışındaki "Kargoda" statüleri — trades 'shipping' liste filtresi ve
+// status-counts.shipping tek kaynaktan bunu kullanır (mobil SHIPPING_STATUSES ile birebir).
+const SHIPPING_TRADE_STATUSES: TradeStatus[] = [
+  TradeStatus.shipping_to_warehouse,
+  TradeStatus.at_warehouse,
+  TradeStatus.admin_reviewing,
+  TradeStatus.shipping_to_recipients,
+];
 
 @Injectable()
 export class TradeService {
@@ -668,7 +678,7 @@ export class TradeService {
     userId: string,
     query: TradeQueryDto,
   ): Promise<TradeListResponseDto> {
-    const { status, role, page = 1, pageSize = 20, sortBy = 'createdAt', sortOrder = 'desc' } = query;
+    const { status, statusGroup, role, page = 1, pageSize = 20, sortBy = 'createdAt', sortOrder = 'desc' } = query;
 
     const where: Prisma.TradeWhereInput = {};
 
@@ -681,8 +691,11 @@ export class TradeService {
       where.OR = [{ initiatorId: userId }, { receiverId: userId }];
     }
 
-    // Filter by status
-    if (status) {
+    // Filter by status. statusGroup ('shipping') çoklu-statü → tek enum'dan önceliklidir.
+    // Sunucu tarafı filtre: 'Kargoda' artık 20'lik sayfaya takılmadan tüm eşleşenleri döndürür.
+    if (statusGroup === 'shipping') {
+      where.status = { in: SHIPPING_TRADE_STATUSES };
+    } else if (status) {
       where.status = status;
     }
 
@@ -715,6 +728,31 @@ export class TradeService {
       total,
       page,
       pageSize,
+    };
+  }
+
+  /**
+   * Trades sekmesi sayaçları — filtreden ve sayfalamadan bağımsız tek groupBy.
+   * all = profil "Takaslar" tile'ı ile birebir (OR initiator/receiver, statü filtresiz).
+   */
+  async getTradeStatusCounts(
+    userId: string,
+  ): Promise<{ all: number; pending: number; shipping: number; completed: number }> {
+    const rows = await this.prisma.trade.groupBy({
+      by: ['status'],
+      where: { OR: [{ initiatorId: userId }, { receiverId: userId }] },
+      _count: { _all: true },
+    });
+    const by = new Map<TradeStatus, number>(
+      rows.map((r) => [r.status, r._count._all]),
+    );
+    const all = rows.reduce((n, r) => n + r._count._all, 0);
+    const shipping = SHIPPING_TRADE_STATUSES.reduce((n, s) => n + (by.get(s) ?? 0), 0);
+    return {
+      all,
+      pending: by.get(TradeStatus.pending) ?? 0,
+      shipping,
+      completed: by.get(TradeStatus.completed) ?? 0,
     };
   }
 
@@ -842,6 +880,17 @@ export class TradeService {
           version: { increment: 1 },
         },
       });
+
+      // Non-cash takas kabul edildi → her iki taraf için depo etiketini ŞİMDİ oluştur (BUG B).
+      // (Nakit takas awaiting_payment'a gider; etiketler ödeme tamamlanınca payment.service'te oluşur.)
+      if (nextStatus === TradeStatus.shipping_to_warehouse) {
+        await createTradeWarehouseShipments(tx, {
+          id: tradeId,
+          tradeNumber: trade.tradeNumber,
+          initiatorId: trade.initiatorId,
+          receiverId: trade.receiverId,
+        });
+      }
 
       if (trade.cashAmount && trade.cashPayerId) {
         const commission = trade.cashAmount.toNumber() * 0.05;
@@ -1031,10 +1080,19 @@ export class TradeService {
     const newCashAmount = Math.abs(dto.cashAmount || 0);
     const currentCashAmount = Math.abs(trade.cashAmount?.toNumber() || 0);
 
-    const isIdentical = 
+    // Nakit YÖNÜNÜ de karşılaştır: sadece "kim öder"i çevirmek (ben→o) gerçek bir değişikliktir.
+    // Math.abs yön bilgisini sildiği için, ödeyen tarafı ayrıca kıyaslıyoruz.
+    const newCashPayerId =
+      dto.cashAmount && dto.cashAmount !== 0
+        ? (dto.cashAmount > 0 ? originalReceiverId : originalInitiatorId)
+        : null;
+    const currentCashPayerId = trade.cashPayerId ?? null;
+
+    const isIdentical =
       JSON.stringify(newInitiatorItemIds) === JSON.stringify(currentReceiverItemIds) &&
       JSON.stringify(newReceiverItemIds) === JSON.stringify(currentInitiatorItemIds) &&
-      newCashAmount === currentCashAmount;
+      newCashAmount === currentCashAmount &&
+      newCashPayerId === currentCashPayerId;
 
     if (isIdentical) {
       throw new BadRequestException('Önceki teklif ile aynı. Lütfen değişiklik yapın.');
@@ -2133,6 +2191,12 @@ export class TradeService {
   private async invalidateProductCaches(productIds: string[]): Promise<void> {
     for (const productId of [...new Set(productIds)]) {
       await this.cache.del(`products:detail:${productId}`);
+    }
+    // Takas akışı stok/statü değiştirir (tükenme → inactive, geri dönüş → active,
+    // rezerv). Bu, listelerdeki görünürlük ve "stokta yok" sıralamasını etkiler →
+    // ürün listesi cache'ini temizle.
+    if (productIds.length > 0) {
+      await this.cache.delPattern('products:list:*').catch(() => {});
     }
   }
 

@@ -6,7 +6,8 @@ import { Ionicons } from '@expo/vector-icons';
 import { router, useLocalSearchParams } from 'expo-router';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { offersApi } from '../../src/services/api';
-import { ScreenHeader, ScreenLoader, ErrorState } from '../../src/components/common';
+import { ScreenHeader, ScreenLoader, ErrorState, ThemedRefreshControl } from '../../src/components/common';
+import { useRefresh } from '../../src/hooks/useRefresh';
 import { formatPrice, formatOfferStatus, formatRelativeDate } from '../../src/utils/format';
 import { transformImageUrl } from '../../src/utils/imageUrl';
 import { useAuthStore } from '../../src/stores/authStore';
@@ -73,6 +74,8 @@ export default function OfferDetailScreen() {
     },
     enabled: !!id,
   });
+
+  const { refreshing, onRefresh } = useRefresh(refetch);
 
   const invalidate = () => {
     queryClient.invalidateQueries({ queryKey: ['offer', id] });
@@ -156,7 +159,10 @@ export default function OfferDetailScreen() {
     <SafeAreaView style={styles.container} edges={['top']}>
       <ScreenHeader title="Teklif Detayı" />
 
-      <ScrollView contentContainerStyle={styles.scrollBody}>
+      <ScrollView
+        contentContainerStyle={styles.scrollBody}
+        refreshControl={<ThemedRefreshControl refreshing={refreshing} onRefresh={onRefresh} />}
+      >
         {/* Product */}
         <Pressable
           style={({ pressed }) => [styles.productCard, pressed && { opacity: 0.85 }]}
@@ -309,6 +315,17 @@ export default function OfferDetailScreen() {
             onPress={() => {
               if (counterValue <= 0) {
                 Alert.alert('Geçersiz tutar', 'Pozitif bir tutar girin.');
+                return;
+              }
+              // API kuralı: karşı teklif mevcut tekliften yüksek, ürün fiyatından düşük/eşit olmalı.
+              const refAmount = Number(offer.amount) || 0;
+              const maxPrice = Number(offer.product?.price) || 0;
+              if (counterValue <= refAmount) {
+                Alert.alert('Hata', `Karşı teklif, mevcut tekliften (${formatPrice(refAmount)}) yüksek olmalıdır`);
+                return;
+              }
+              if (maxPrice > 0 && counterValue > maxPrice) {
+                Alert.alert('Hata', `Karşı teklif, ürün fiyatından (${formatPrice(maxPrice)}) yüksek olamaz`);
                 return;
               }
               counterMutation.mutate(counterValue);

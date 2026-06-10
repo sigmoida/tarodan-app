@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useCallback } from 'react';
 import { View, FlatList, Image, StyleSheet, TouchableOpacity, RefreshControl } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { router, useFocusEffect } from 'expo-router';
@@ -15,6 +15,7 @@ import { notificationsApi } from '../../src/services/api';
 import { TarodanColors } from '../../src/theme';
 import { formatRelativeDate } from '../../src/utils/format';
 import { useAuthStore } from '../../src/stores/authStore';
+import { resolveImageUrl } from '../../src/utils/imageUrl';
 
 const { colors } = theme;
 
@@ -47,45 +48,122 @@ const STOCKOUT_TYPES = new Set([
 
 type IoniconName = React.ComponentProps<typeof Ionicons>['name'];
 
+// NOT: Backend bildirim tipleri küçük snake_case'tir (notification.dto.ts
+// NotificationType). Eskiden burada BÜYÜK_HARF case'ler vardı, hiçbiri
+// eşleşmeyip her bildirim varsayılan zile düşüyordu.
 function getIconForType(type: string): { icon: IoniconName; color: string; bg: string } {
   switch (type) {
-    case 'ORDER_CREATED':
-    case 'ORDER_PAID':
+    // ---- Siparişler ----
+    case 'order_created':
       return { icon: 'cart', color: TarodanColors.primary, bg: TarodanColors.primaryLight };
-    case 'ORDER_SHIPPED':
-    case 'ORDER_IN_TRANSIT':
-    case 'ORDER_OUT_FOR_DELIVERY':
-      return { icon: 'cube', color: TarodanColors.info, bg: TarodanColors.infoLight };
-    case 'ORDER_DELIVERED':
-    case 'ORDER_COMPLETED':
-      return { icon: 'checkmark-circle', color: TarodanColors.success, bg: TarodanColors.successLight };
-    case 'ORDER_CANCELLED':
-    case 'ORDER_REFUNDED':
-      return { icon: 'close-circle', color: TarodanColors.error, bg: TarodanColors.errorLight };
-    case 'OFFER_RECEIVED':
-    case 'OFFER_COUNTERED':
-      return { icon: 'pricetag', color: TarodanColors.accent, bg: TarodanColors.accentLight };
-    case 'OFFER_ACCEPTED':
-      return { icon: 'thumbs-up', color: TarodanColors.success, bg: TarodanColors.successLight };
-    case 'OFFER_REJECTED':
-      return { icon: 'thumbs-down', color: TarodanColors.error, bg: TarodanColors.errorLight };
-    case 'TRADE_RECEIVED':
-    case 'TRADE_COUNTERED':
-    case 'TRADE_SHIPPED':
-      return { icon: 'swap-horizontal', color: TarodanColors.badgeTrade, bg: TarodanColors.accentBlueLite };
-    case 'MESSAGE':
-    case 'MESSAGE_RECEIVED':
-      return { icon: 'chatbubbles', color: TarodanColors.info, bg: TarodanColors.infoLight };
-    case 'PAYMENT_RECEIVED':
-    case 'PAYMENT_SUCCESS':
+    case 'order_paid':
+    case 'payment_received':
       return { icon: 'card', color: TarodanColors.success, bg: TarodanColors.successLight };
-    case 'PAYMENT_FAILED':
-      return { icon: 'alert-circle', color: TarodanColors.error, bg: TarodanColors.errorLight };
-    case 'RATING_RECEIVED':
-      return { icon: 'star', color: TarodanColors.star, bg: TarodanColors.warningLight };
-    case 'COLLECTION_LIKED':
-    case 'FOLLOW_RECEIVED':
+    case 'order_shipped':
+    case 'trade_shipped':
+    case 'order_delivered_confirm':
+    case 'refund_return_opened':
+      return { icon: 'cube', color: TarodanColors.info, bg: TarodanColors.infoLight };
+    case 'order_delivered':
+    case 'order_completed':
+    case 'order_auto_completed':
+    case 'order_manually_confirmed':
+    case 'product_approved':
+    case 'product_sold':
+    case 'refund_approved':
+      return { icon: 'checkmark-circle', color: TarodanColors.success, bg: TarodanColors.successLight };
+    case 'order_force_completed_by_admin':
+      return { icon: 'shield-checkmark', color: TarodanColors.info, bg: TarodanColors.infoLight };
+    case 'order_cancelled':
+    case 'order_cancelled_out_of_stock':
+    case 'offer_cancelled_out_of_stock':
+    case 'offer_counter_declined':
+    case 'product_rejected':
+    case 'trade_rejected':
+    case 'trade_auto_cancelled':
+    case 'reservation_expired':
+      return { icon: 'close-circle', color: TarodanColors.error, bg: TarodanColors.errorLight };
+    case 'order_refunded':
+    case 'refund_completed':
+    case 'seller_did_not_ship_refunded':
+    case 'payment_released':
+      return { icon: 'cash', color: TarodanColors.success, bg: TarodanColors.successLight };
+    case 'refund_rejected':
+    case 'refund_cancelled':
+      return { icon: 'arrow-undo', color: TarodanColors.error, bg: TarodanColors.errorLight };
+    case 'order_preparing_deadline_warning':
+    case 'order_reservation_released':
+    case 'offer_expired':
+    case 'membership_expiring':
+    case 'membership_expired':
+    case 'listing_expiring':
+    case 'listing_expired':
+    case 'refund_disputed':
+      return { icon: 'time', color: TarodanColors.warning, bg: TarodanColors.warningLight };
+
+    // ---- Teklifler ----
+    case 'offer_received':
+      return { icon: 'pricetag', color: TarodanColors.accent, bg: TarodanColors.accentLight };
+    case 'offer_counter':
+      return { icon: 'pricetags', color: TarodanColors.accent, bg: TarodanColors.accentLight };
+    case 'offer_accepted':
+      return { icon: 'thumbs-up', color: TarodanColors.success, bg: TarodanColors.successLight };
+    case 'offer_rejected':
+    case 'offer_auto_rejected':
+      return { icon: 'thumbs-down', color: TarodanColors.error, bg: TarodanColors.errorLight };
+
+    // ---- Takaslar ----
+    case 'trade_received':
+    case 'trade_counter':
+      return { icon: 'swap-horizontal', color: TarodanColors.badgeTrade, bg: TarodanColors.accentBlueLite };
+    case 'trade_accepted':
+    case 'trade_completed':
+      return { icon: 'swap-horizontal', color: TarodanColors.success, bg: TarodanColors.successLight };
+
+    // ---- Mesaj ----
+    case 'new_message':
+      return { icon: 'chatbubbles', color: TarodanColors.info, bg: TarodanColors.infoLight };
+
+    // ---- Favori / stok ----
+    case 'price_drop':
+      return { icon: 'trending-down', color: TarodanColors.success, bg: TarodanColors.successLight };
+    case 'wishlist_item_sold':
+    case 'wishlist_sold':
+      return { icon: 'heart-dislike', color: TarodanColors.error, bg: TarodanColors.errorLight };
+    case 'back_in_stock':
+      return { icon: 'refresh-circle', color: TarodanColors.success, bg: TarodanColors.successLight };
+
+    // ---- Sosyal ----
+    case 'new_follower':
+      return { icon: 'person-add', color: TarodanColors.primary, bg: TarodanColors.primaryLight };
+    case 'seller_new_listing':
+      return { icon: 'add-circle', color: TarodanColors.info, bg: TarodanColors.infoLight };
+    case 'collection_liked':
+    case 'product_liked':
       return { icon: 'heart', color: TarodanColors.primary, bg: TarodanColors.primaryLight };
+
+    // ---- Değerlendirme ----
+    case 'review_received':
+      return { icon: 'star', color: TarodanColors.star, bg: TarodanColors.warningLight };
+
+    // ---- Üyelik / öne çıkarma / kampanya ----
+    case 'membership_upgraded':
+      return { icon: 'ribbon', color: TarodanColors.success, bg: TarodanColors.successLight };
+    case 'listing_views_milestone':
+      return { icon: 'eye', color: TarodanColors.info, bg: TarodanColors.infoLight };
+    case 'boost_expired':
+      return { icon: 'rocket', color: TarodanColors.accent, bg: TarodanColors.accentLight };
+    case 'promotion':
+      return { icon: 'gift', color: TarodanColors.accent, bg: TarodanColors.accentLight };
+    case 'special_offer':
+      return { icon: 'diamond', color: TarodanColors.accent, bg: TarodanColors.accentLight };
+
+    // ---- Genel ----
+    case 'welcome':
+      return { icon: 'sparkles', color: TarodanColors.primary, bg: TarodanColors.primaryLight };
+    case 'system_announcement':
+      return { icon: 'megaphone', color: TarodanColors.info, bg: TarodanColors.infoLight };
+
     default:
       return { icon: 'notifications', color: TarodanColors.primary, bg: TarodanColors.primaryLight };
   }
@@ -103,11 +181,64 @@ function routeForNotification(n: Notification): string | null {
   return null;
 }
 
+/**
+ * Backend `link` alanları WEB rotaları için interpole ediliyor (ör.
+ * /listings/:id, /trades/:id, /messages?thread=:id). Mobil expo-router
+ * rotaları farklı olduğundan link'i mobil rotaya çeviriyoruz. Eşleşme yoksa
+ * null döner → çağıran taraf data tabanlı routeForNotification'a düşer.
+ */
+function toMobileRoute(link: string): string | null {
+  if (!link || link.includes('{{')) return null; // interpole edilmemiş şablon
+  const [rawPath, rawQuery] = link.split('?');
+  const path = rawPath.replace(/\/+$/, '');
+
+  // /messages?thread=<id> → /messages/<id>  (RN'de URLSearchParams'a güvenmeden)
+  if (path === '/messages') {
+    const thread = rawQuery?.match(/(?:^|&)thread=([^&]+)/)?.[1];
+    return thread ? `/messages/${decodeURIComponent(thread)}` : '/(tabs)/messages';
+  }
+  // /offers?tab=received → /offers
+  if (path === '/offers') return '/offers';
+
+  const seg = path.split('/').filter(Boolean);
+  const [head, id] = seg;
+
+  switch (head) {
+    case 'listings':
+      // web: ürün detayı /listings/:id → mobil /product/:id; liste → arama
+      return id ? `/product/${id}` : '/(tabs)/search';
+    case 'trades':
+      // web çoğul → mobil tekil; liste → tab
+      return id ? `/trade/${id}` : '/(tabs)/trades';
+    case 'profile':
+      if (id === 'listings') return '/settings/my-listings';
+      if (id === 'earnings') return '/settings/payments';
+      return '/(tabs)/profile';
+    case 'refund-requests':
+      // mobilde [id] detayı yok → satıcı iade listesi
+      return '/refund-requests/seller';
+    // Mobil rotalarla birebir uyumlu — olduğu gibi geçir
+    case 'orders':
+    case 'product':
+    case 'products': // /products/unavailable/:id
+    case 'collections':
+    case 'seller':
+    case 'favorites':
+    case 'pricing':
+      return path;
+    default:
+      return null;
+  }
+}
+
 export default function NotificationsScreen() {
   const { isAuthenticated } = useAuthStore();
   const [notifications, setNotifications] = useState<Notification[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
+  // Okunmamış sayısı backend'den (tüm bildirimler) — önceden yalnızca yüklü 20'lik
+  // sayfadan hesaplanıyordu → çok bildirimi olanda eksik sayıyordu.
+  const [unreadCount, setUnreadCount] = useState(0);
 
   const fetchNotifications = useCallback(async () => {
     if (!isAuthenticated) {
@@ -117,9 +248,27 @@ export default function NotificationsScreen() {
       return;
     }
     try {
-      const response = await notificationsApi.getAll();
-      const payload = response.data?.data ?? response.data ?? [];
-      setNotifications(Array.isArray(payload) ? payload : []);
+      const [listRes, countRes] = await Promise.all([
+        notificationsApi.getAll(),
+        notificationsApi.getUnreadCount().catch(() => null),
+      ]);
+      // Backend GET /notifications → { notifications, unreadCount, pagination }.
+      // Axios interceptor body'yi sarmıyor, yani dizi data.notifications altında.
+      // data/dizi fallback'leri response şekli değişirse diye korunuyor.
+      const body: any = listRes.data;
+      const list: Notification[] = Array.isArray(body?.notifications)
+        ? body.notifications
+        : Array.isArray(body?.data)
+          ? body.data
+          : Array.isArray(body)
+            ? body
+            : [];
+      setNotifications(list);
+      // Backend toplam okunmamış sayısı; ulaşılamazsa yüklü sayfadan türet (fallback).
+      const c = (countRes?.data as any)?.count ?? (countRes?.data as any)?.data?.count;
+      setUnreadCount(
+        typeof c === 'number' ? c : list.filter((n: any) => !(n.read || n.isRead)).length,
+      );
     } catch (error) {
       console.warn('Failed to fetch notifications:', error);
     } finally {
@@ -128,10 +277,8 @@ export default function NotificationsScreen() {
     }
   }, [isAuthenticated]);
 
-  useEffect(() => {
-    fetchNotifications();
-  }, [fetchNotifications]);
-
+  // useFocusEffect ilk mount'ta da çalışır; ayrı useEffect ile çift fetch'e
+  // gerek yok.
   useFocusEffect(
     useCallback(() => {
       fetchNotifications();
@@ -143,6 +290,13 @@ export default function NotificationsScreen() {
     fetchNotifications();
   };
 
+  // Bildirimler gizli bir tab; home/profil'den push ile açılıyor. Header'da geri
+  // butonu olmayınca kullanıcı çıkamıyordu (trades ekranıyla aynı pattern).
+  const handleBack = () => {
+    if (router.canGoBack()) router.back();
+    else router.replace('/(tabs)');
+  };
+
   const handlePress = async (notification: Notification) => {
     const isUnread = !(notification.read || notification.isRead);
     if (isUnread) {
@@ -151,17 +305,17 @@ export default function NotificationsScreen() {
         setNotifications(prev =>
           prev.map(n => (n.id === notification.id ? { ...n, read: true, isRead: true } : n)),
         );
+        setUnreadCount(c => Math.max(0, c - 1));
       } catch (error) {
         console.warn('Failed to mark as read:', error);
       }
     }
 
-    // Prefer backend-provided deep link (already interpolated with ids).
-    if (notification.link) {
-      router.push(notification.link as any);
-      return;
-    }
-    const target = routeForNotification(notification);
+    // Backend link'i WEB rotası — mobil rotaya normalize et; üretemezse
+    // data'dan (orderId/tradeId/...) türet.
+    const target =
+      (notification.link ? toMobileRoute(notification.link) : null) ??
+      routeForNotification(notification);
     if (target) router.push(target as any);
   };
 
@@ -169,12 +323,11 @@ export default function NotificationsScreen() {
     try {
       await notificationsApi.markAllAsRead();
       setNotifications(prev => prev.map(n => ({ ...n, read: true, isRead: true })));
+      setUnreadCount(0);
     } catch (error) {
       console.warn('Failed to mark all as read:', error);
     }
   };
-
-  const unreadCount = notifications.filter(n => !(n.read || n.isRead)).length;
 
   const renderItem = ({ item }: { item: Notification }) => {
     const isUnread = !(item.read || item.isRead);
@@ -186,7 +339,7 @@ export default function NotificationsScreen() {
         activeOpacity={0.75}
       >
         {STOCKOUT_TYPES.has(item.type) && item.data?.productImage ? (
-          <Image source={{ uri: item.data.productImage }} style={styles.thumb} />
+          <Image source={{ uri: resolveImageUrl(item.data.productImage) }} style={styles.thumb} />
         ) : (
           <View style={[styles.iconContainer, { backgroundColor: bg }]}>
             <Ionicons name={icon} size={20} color={color} />
@@ -217,16 +370,23 @@ export default function NotificationsScreen() {
     return (
       <SafeAreaView style={styles.container} edges={['top']}>
         <View style={styles.header}>
-          <Text variant="h2">Bildirimler</Text>
+          <View style={styles.headerLeft}>
+            <TouchableOpacity onPress={handleBack} style={styles.backBtn} hitSlop={8}>
+              <Ionicons name="chevron-back" size={26} color={colors.white} />
+            </TouchableOpacity>
+            <Text variant="h2" tone="inverted">Bildirimler</Text>
+          </View>
         </View>
-        <EmptyState
-          fullscreen
-          icon="notifications-outline"
-          title="Bildirimleri görmek için giriş yapın"
-          subtitle="Siparişleriniz, tekliflerileriniz ve mesajlarınız için anlık bildirimler burada görünür."
-          actionLabel="Giriş Yap"
-          onAction={() => router.push('/(auth)/login')}
-        />
+        <View style={styles.body}>
+          <EmptyState
+            fullscreen
+            icon="notifications-outline"
+            title="Bildirimleri görmek için giriş yapın"
+            subtitle="Siparişleriniz, tekliflerileriniz ve mesajlarınız için anlık bildirimler burada görünür."
+            actionLabel="Giriş Yap"
+            onAction={() => router.push('/(auth)/login')}
+          />
+        </View>
       </SafeAreaView>
     );
   }
@@ -235,9 +395,16 @@ export default function NotificationsScreen() {
     return (
       <SafeAreaView style={styles.container} edges={['top']}>
         <View style={styles.header}>
-          <Text variant="h2">Bildirimler</Text>
+          <View style={styles.headerLeft}>
+            <TouchableOpacity onPress={handleBack} style={styles.backBtn} hitSlop={8}>
+              <Ionicons name="chevron-back" size={26} color={colors.white} />
+            </TouchableOpacity>
+            <Text variant="h2" tone="inverted">Bildirimler</Text>
+          </View>
         </View>
-        <ScreenLoader />
+        <View style={styles.body}>
+          <ScreenLoader />
+        </View>
       </SafeAreaView>
     );
   }
@@ -246,9 +413,12 @@ export default function NotificationsScreen() {
     <SafeAreaView style={styles.container} edges={['top']}>
       <View style={styles.header}>
         <View style={styles.headerLeft}>
-          <Text variant="h2">Bildirimler</Text>
+          <TouchableOpacity onPress={handleBack} style={styles.backBtn} hitSlop={8}>
+            <Ionicons name="chevron-back" size={26} color={colors.white} />
+          </TouchableOpacity>
+          <Text variant="h2" tone="inverted">Bildirimler</Text>
           {unreadCount > 0 ? (
-            <Badge variant="primary">{unreadCount}</Badge>
+            <Badge variant="primary" style={styles.headerBadge}>{unreadCount}</Badge>
           ) : null}
         </View>
         {unreadCount > 0 ? (
@@ -257,6 +427,7 @@ export default function NotificationsScreen() {
             size="sm"
             title="Tümünü Okundu"
             onPress={handleMarkAllAsRead}
+            textStyle={styles.markAllText}
           />
         ) : null}
       </View>
@@ -264,6 +435,7 @@ export default function NotificationsScreen() {
         data={notifications}
         renderItem={renderItem}
         keyExtractor={item => item.id}
+        style={styles.body}
         contentContainerStyle={notifications.length === 0 ? styles.emptyList : styles.list}
         refreshControl={
           <RefreshControl
@@ -287,7 +459,13 @@ export default function NotificationsScreen() {
 }
 
 const styles = StyleSheet.create({
+  // SafeAreaView'in kendisi turuncu → status bar inset'i de turuncu olur
+  // (anasayfa/profil header'larıyla aynı). İçerik gri arka planı `body`'den alır.
   container: {
+    flex: 1,
+    backgroundColor: colors.primary[600],
+  },
+  body: {
     flex: 1,
     backgroundColor: TarodanColors.backgroundSecondary,
   },
@@ -297,14 +475,24 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    backgroundColor: TarodanColors.background,
-    borderBottomWidth: StyleSheet.hairlineWidth,
-    borderBottomColor: TarodanColors.border,
+    backgroundColor: colors.primary[600],
+  },
+  // Turuncu header üstünde okunması için beyaz rozet (home/profil deseni).
+  headerBadge: {
+    backgroundColor: colors.white,
+  },
+  markAllText: {
+    color: colors.white,
   },
   headerLeft: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 8,
+  },
+  backBtn: {
+    marginLeft: -4,
+    marginRight: 2,
+    padding: 2,
   },
   titleSpacing: { marginBottom: 4 },
   messageSpacing: { marginBottom: 6 },

@@ -19,6 +19,7 @@ model User {
   isEmailVerified         Boolean                  @default(false) @map("is_email_verified")
   isPhoneVerified         Boolean                  @default(false) @map("is_phone_verified")
   isSeller                Boolean                  @default(false) @map("is_seller")
+  showTrustScore          Boolean                  @default(true) @map("show_trust_score")
   sellerType              SellerType?              @map("seller_type")
   taxId                   String?                  @map("tax_id")
   companyName             String?                  @unique @map("company_name")
@@ -401,6 +402,14 @@ model Product {
   manufacturerId      String?            @map("manufacturer_id")
   averageRating       Decimal?           @map("average_rating") @db.Decimal(3, 2)
   ratingCount         Int                @default(0) @map("rating_count")
+  boostedUntil        DateTime?          @map("boosted_until")
+  qualityScore        Int                @default(0) @map("quality_score")
+  rankTier            Int                @default(0) @map("rank_tier")
+  relevanceScore      Int?               @map("relevance_score")
+  /// Denormalized concat of title + description + attribute display values.
+  /// Maintained by Postgres triggers; never write directly from application code.
+  /// Used for full-text search via the GIN index `products_search_text_fts_idx`.
+  searchText          String?            @map("search_text")
   cartItems           CartItem[]
   collectionItems     CollectionItem[]
   offers              Offer[]
@@ -409,6 +418,7 @@ model Product {
   images              ProductImage[]
   likes               ProductLike[]
   productRatings      ProductRating[]
+  boosts              ProductBoost[]
   tags                ProductTag[]
   brand               Brand?             @relation(fields: [brandId], references: [id])
   carModel            CarModel?          @relation(fields: [carModelId], references: [id])
@@ -430,7 +440,31 @@ model Product {
   @@index([createdAt(sort: Desc)])
   @@index([saleStartDate, saleEndDate])
   @@index([averageRating(sort: Desc), ratingCount(sort: Desc)])
+  @@index([rankTier(sort: Desc), qualityScore(sort: Desc), createdAt(sort: Desc)])
+  @@index([boostedUntil])
+  @@index([relevanceScore(sort: Desc)])
   @@map("products")
+}
+
+model ProductBoost {
+  id           String      @id @default(uuid())
+  productId    String      @map("product_id")
+  userId       String      @map("user_id")
+  durationDays Int         @map("duration_days")
+  price        Decimal     @db.Decimal(10, 2)
+  status       BoostStatus @default(pending)
+  autoRenew    Boolean     @default(false) @map("auto_renew")
+  startsAt     DateTime?   @map("starts_at")
+  endsAt       DateTime?   @map("ends_at")
+  orderId      String?     @unique @map("order_id")
+  createdAt    DateTime    @default(now()) @map("created_at")
+  updatedAt    DateTime    @updatedAt @map("updated_at")
+  product      Product     @relation(fields: [productId], references: [id], onDelete: Cascade)
+
+  @@index([productId])
+  @@index([userId])
+  @@index([status, endsAt])
+  @@map("product_boosts")
 }
 
 model ProductImage {
@@ -528,7 +562,8 @@ model TradeShipment {
   id              String               @id @default(uuid())
   tradeId         String               @map("trade_id")
   shipperId       String               @map("shipper_id")
-  fromAddressId   String               @map("from_address_id")
+  // Nullable: kabulde depo etiketi otomatik oluşur (adres henüz yok), kullanıcı kargoya verirken set edilir
+  fromAddressId   String?              @map("from_address_id")
   carrier         String
   trackingNumber  String?              @map("tracking_number")
   status          ShipmentStatus       @default(pending)
@@ -547,7 +582,7 @@ model TradeShipment {
   createdAt       DateTime             @default(now()) @map("created_at")
   updatedAt       DateTime             @updatedAt @map("updated_at")
   events          TradeShipmentEvent[]
-  fromAddress     Address              @relation(fields: [fromAddressId], references: [id])
+  fromAddress     Address?             @relation(fields: [fromAddressId], references: [id])
   trade           Trade                @relation(fields: [tradeId], references: [id], onDelete: Cascade)
 
   @@index([tradeId])
@@ -843,19 +878,21 @@ model ProductTag {
 }
 
 model AttributeGroup {
-  id          String      @id @default(uuid())
-  name        String      @unique
-  slug        String      @unique
-  description String?
-  isRequired  Boolean     @default(false) @map("is_required")
-  isActive    Boolean     @default(true) @map("is_active")
-  sortOrder   Int         @default(0) @map("sort_order")
-  createdAt   DateTime    @default(now()) @map("created_at")
-  updatedAt   DateTime    @updatedAt @map("updated_at")
-  attributes  Attribute[]
+  id               String      @id @default(uuid())
+  name             String      @unique
+  slug             String      @unique
+  description      String?
+  isRequired       Boolean     @default(false) @map("is_required")
+  isActive         Boolean     @default(true) @map("is_active")
+  sortOrder        Int         @default(0) @map("sort_order")
+  manufacturerSlug String?     @map("manufacturer_slug")
+  createdAt        DateTime    @default(now()) @map("created_at")
+  updatedAt        DateTime    @updatedAt @map("updated_at")
+  attributes       Attribute[]
 
   @@index([isActive])
   @@index([sortOrder])
+  @@index([manufacturerSlug])
   @@map("attribute_groups")
 }
 
@@ -1794,6 +1831,14 @@ enum ProductCondition {
   very_good
   good
   fair
+}
+
+enum BoostStatus {
+  pending
+  active
+  expired
+  cancelled
+  failed
 }
 
 enum OfferStatus {

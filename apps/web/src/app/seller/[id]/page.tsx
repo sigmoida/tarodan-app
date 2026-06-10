@@ -29,7 +29,8 @@ import {
 } from '@heroicons/react/24/solid';
 import toast from 'react-hot-toast';
 import { api, listingsApi, ratingsApi } from '@/lib/api';
-import { getProductEffectivePrice } from '@/lib/productPrice';
+import { getProductEffectivePrice, isProductOutOfStock } from '@/lib/productPrice';
+import { OutOfStockOverlay } from '@/components/ui';
 import { useAuthStore } from '@/stores/authStore';
 import dynamic from 'next/dynamic';
 import { withChunkErrorLogging } from '@/lib/dynamicWithLogging';
@@ -77,6 +78,9 @@ interface Seller {
   bio?: string;
   createdAt: string;
   isVerified: boolean;
+  isPremium?: boolean;
+  trustScore?: number;
+  trustLevel?: string;
   sellerType?: string;
   stats?: {
     totalListings: number;
@@ -93,6 +97,8 @@ interface Product {
   price: number;
   images: Array<{ url: string }>;
   condition: string;
+  status?: string | null;
+  availableQuantity?: number | null;
   isTradeEnabled?: boolean;
   viewCount?: number;
   likeCount?: number;
@@ -136,6 +142,7 @@ export default function SellerProfilePage() {
           avatarUrl: firstProduct.seller.avatarUrl,
           createdAt: firstProduct.seller.createdAt || new Date().toISOString(),
           isVerified: firstProduct.seller.isVerified || false,
+          isPremium: firstProduct.seller.isPremium || false,
           stats: {
             totalListings: 0,
             totalSales: 0,
@@ -157,7 +164,9 @@ export default function SellerProfilePage() {
   const productsQuery = useQuery({
     queryKey: ['seller-products', sellerId],
     queryFn: async (): Promise<Product[]> => {
-      const response = await listingsApi.getAll({ sellerId, status: 'active', limit: 50 });
+      // status göndermiyoruz → satıcının kataloğu stoğu bitenleri (tükendi/satıldı) de
+      // içerir; build-product-where stok-içi olanları öne sıralar.
+      const response = await listingsApi.getAll({ sellerId, limit: 50 });
       return response.data?.data || response.data?.products || [];
     },
     enabled: !!sellerId,
@@ -337,6 +346,12 @@ export default function SellerProfilePage() {
             >
               <div className="flex flex-col lg:flex-row lg:items-center gap-3 mb-3">
                 <h1 className="text-3xl md:text-4xl font-bold">{seller.displayName}</h1>
+                {seller.isPremium && (
+                  <span className="inline-flex items-center gap-1.5 bg-amber-400/90 text-amber-950 text-sm font-bold px-3 py-1.5 rounded-full">
+                    <StarSolidIcon className="w-4 h-4" />
+                    Premium
+                  </span>
+                )}
                 {seller.isVerified && (
                   <span className="inline-flex items-center gap-1.5 bg-surface-elevated/20 backdrop-blur-sm text-inverted text-sm px-3 py-1.5 rounded-full">
                     <CheckBadgeIcon className="w-4 h-4" />
@@ -366,6 +381,13 @@ export default function SellerProfilePage() {
                   <HeartIcon className="w-4 h-4" />
                   {followersCount} {locale === 'en' ? 'followers' : 'takipçi'}
                 </span>
+                {seller.isPremium && typeof seller.trustScore === 'number' && (
+                  <span className="flex items-center gap-2 bg-amber-400/90 text-amber-950 font-bold px-3 py-1 rounded-full">
+                    <CheckBadgeSolidIcon className="w-4 h-4" />
+                    {locale === 'en' ? 'Trust Score' : 'Güven Skoru'} {seller.trustScore}/100
+                    {seller.trustLevel && <span className="font-medium">· {seller.trustLevel}</span>}
+                  </span>
+                )}
               </div>
 
               {/* Action Buttons */}
@@ -492,10 +514,11 @@ export default function SellerProfilePage() {
                             src={getImageUrl(product.images)}
                             alt={product.title}
                             fill
-                            className="object-cover group-hover:scale-105 transition-transform duration-500"
+                            className={`object-cover group-hover:scale-105 transition-transform duration-500${isProductOutOfStock(product) ? ' opacity-50' : ''}`}
                             fallbackSrc="https://placehold.co/400x400/f8fafc/94a3b8?text=Ürün"
                             logContext={{ productId: product.id, page: 'seller-products' }}
                           />
+                          {isProductOutOfStock(product) && <OutOfStockOverlay />}
                           {product.isTradeEnabled && (
                             <div className="absolute top-2 left-2 bg-success-500 text-inverted text-xs px-2.5 py-1 rounded-lg flex items-center gap-1 shadow-sm">
                               <ArrowsRightLeftIcon className="w-3.5 h-3.5" />

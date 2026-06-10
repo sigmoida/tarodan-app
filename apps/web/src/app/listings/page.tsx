@@ -18,7 +18,8 @@ import {
 } from '@heroicons/react/24/outline';
 import { StarIcon as StarIconSolid } from '@heroicons/react/24/solid';
 import { listingsApi, categoriesApi } from '@/lib/api';
-import { getProductEffectivePrice, isProductOnSaleDisplay, getProductOriginalPriceForDisplay } from '@/lib/productPrice';
+import { getProductEffectivePrice, isProductOnSaleDisplay, getProductOriginalPriceForDisplay, isProductOutOfStock } from '@/lib/productPrice';
+import { OutOfStockOverlay } from '@/components/ui';
 import { useTranslation } from '@/i18n';
 import { formatCondition } from '@/lib/format';
 import SidebarFilters from '@/components/SidebarFilters';
@@ -35,6 +36,9 @@ interface Listing {
   saleEndDate?: string | null;
   discountPercent?: number | null;
   isOnSale?: boolean;
+  isBoosted?: boolean;
+  status?: string | null;
+  availableQuantity?: number | null;
   images: Array<{ id?: string; url?: string; cardUrl?: string; detailUrl?: string; sortOrder?: number }> | string[];
   brand?: {
     id: string;
@@ -78,6 +82,19 @@ export default function ListingsPage() {
   const [currentPage, setCurrentPage] = useState(1);
   const pageLimit = 48;
 
+  // Manufacturer-scoped custom attributes are URL-encoded as `attr.<groupSlug>=<a,b,c>`.
+  // Example: ?attr.hw-rarity=treasure-hunt&attr.hw-segment=mainline,premium
+  const parseCustomAttrsFromUrl = (): Record<string, string[]> => {
+    const out: Record<string, string[]> = {};
+    searchParams.forEach((value, key) => {
+      if (!key.startsWith('attr.') || !value) return;
+      const groupSlug = key.slice('attr.'.length);
+      if (!groupSlug) return;
+      out[groupSlug] = value.split(',').filter(Boolean);
+    });
+    return out;
+  };
+
   const [filters, setFilters] = useState({
     search: autoDetectedBrand ? '' : urlSearch,
     brand: searchParams.get('brand') || autoDetectedBrand || '',
@@ -94,11 +111,12 @@ export default function ListingsPage() {
     preOrder: searchParams.get('preOrder') === 'true',
     limited: searchParams.get('limited') === 'true',
     set: searchParams.get('set') === 'true',
-    sortBy: searchParams.get('sortBy') || 'created_desc',
+    sortBy: searchParams.get('sortBy') || 'relevance',
     category: searchParams.get('category') || '',
     categoryId: searchParams.get('categoryId') || '',
     manufacturer: searchParams.get('manufacturer') || '',
     manufacturerId: searchParams.get('manufacturerId') || '',
+    customAttributes: parseCustomAttrsFromUrl(),
   });
 
   const searchString = searchParams.toString();
@@ -125,11 +143,17 @@ export default function ListingsPage() {
     if (f.preOrder) params.set('preOrder', 'true');
     if (f.limited) params.set('limited', 'true');
     if (f.set) params.set('set', 'true');
-    if (f.sortBy && f.sortBy !== 'created_desc') params.set('sortBy', f.sortBy);
+    if (f.sortBy && f.sortBy !== 'relevance') params.set('sortBy', f.sortBy);
     if (f.category) params.set('category', f.category);
     if (f.categoryId) params.set('categoryId', f.categoryId);
     if (f.manufacturer) params.set('manufacturer', f.manufacturer);
     if (f.manufacturerId) params.set('manufacturerId', f.manufacturerId);
+    // Encode manufacturer-scoped attribute selections as attr.<groupSlug>=a,b,c
+    if (f.customAttributes) {
+      for (const [groupSlug, slugs] of Object.entries(f.customAttributes)) {
+        if (slugs && slugs.length > 0) params.set(`attr.${groupSlug}`, slugs.join(','));
+      }
+    }
     if (page > 1) params.set('page', page.toString());
     return params;
   };
@@ -176,7 +200,7 @@ export default function ListingsPage() {
         condition: searchParams.get('condition') || '',
         minPrice: searchParams.get('minPrice') || '',
         maxPrice: searchParams.get('maxPrice') || '',
-        sortBy: searchParams.get('sortBy') || prev.sortBy || 'created_desc',
+        sortBy: searchParams.get('sortBy') || prev.sortBy || 'relevance',
         category: searchParams.get('category') || '',
         categoryId: searchParams.get('categoryId') || '',
         manufacturer: searchParams.get('manufacturer') || '',
@@ -234,7 +258,20 @@ export default function ListingsPage() {
         if (filters.preOrder) p.preOrder = true;
         if (filters.limited) p.limited = true;
         if (filters.set) p.set = true;
-        if (filters.sortBy) p.sortBy = filters.sortBy;
+        // 'relevance' is the server-side default ranking (relevanceScore); don't send it as an explicit sort.
+        if (filters.sortBy && filters.sortBy !== 'relevance') p.sortBy = filters.sortBy;
+        // Manufacturer-scoped attribute selections, sent group-aware so backend can apply
+        // OR-within-group + AND-across-groups semantics. Empty groups are dropped.
+        if (filters.customAttributes) {
+          const nonEmpty = Object.fromEntries(
+            Object.entries(filters.customAttributes).filter(
+              ([, slugs]) => Array.isArray(slugs) && slugs.length > 0,
+            ),
+          );
+          if (Object.keys(nonEmpty).length > 0) {
+            p.attrGroups = JSON.stringify(nonEmpty);
+          }
+        }
         return p;
       };
 
@@ -261,7 +298,8 @@ export default function ListingsPage() {
     setFilters({
       search: '', brand: '', brandId: '', carModelId: '', carModel: '', scale: '', material: '', condition: '', minPrice: '', maxPrice: '',
       tradeOnly: false, discountOnly: false, preOrder: false, limited: false, set: false,
-      sortBy: 'created_desc', category: '', categoryId: '', manufacturer: '', manufacturerId: '',
+      sortBy: 'relevance', category: '', categoryId: '', manufacturer: '', manufacturerId: '',
+      customAttributes: {},
     });
     setCurrentPage(1);
     // URL sync is handled by useEffect [filters, currentPage]
@@ -383,6 +421,7 @@ export default function ListingsPage() {
                 className="w-auto flex-shrink-0"
                 selectSize="sm"
               >
+                <option value="relevance">{locale === 'en' ? 'Recommended' : 'Önerilen'}</option>
                 <option value="created_desc">{t('product.sortNewest')}</option>
                 <option value="created_asc">{t('product.sortOldest')}</option>
                 <option value="view_count_desc">{t('product.sortPopular')}</option>
@@ -553,11 +592,12 @@ export default function ListingsPage() {
                             src={getImageUrl(listing.images?.[0], index, listing.title)}
                             alt={listing.title}
                             fill
-                            className="object-cover"
+                            className={`object-cover${isProductOutOfStock(listing) ? ' opacity-50' : ''}`}
                             fallbackSrc={LISTING_PLACEHOLDERS[index % LISTING_PLACEHOLDERS.length]}
                             logContext={{ listingId: listing.id, page: 'listings' }}
                             priority={index === 0}
                           />
+                          {isProductOutOfStock(listing) && <OutOfStockOverlay />}
                           {(listing.trade_available || listing.isTradeEnabled) && (
                             <div className="absolute top-1 right-1 bg-success-500 text-inverted p-0.5 rounded">
                               <ArrowsRightLeftIcon className="w-2.5 h-2.5" />
@@ -603,17 +643,25 @@ export default function ListingsPage() {
                             src={getImageUrl(listing.images?.[0], index, listing.title)}
                             alt={listing.title}
                             fill
-                            className="object-cover group-hover:scale-[1.03] transition-transform duration-300"
+                            className={`object-cover group-hover:scale-[1.03] transition-transform duration-300${isProductOutOfStock(listing) ? ' opacity-50' : ''}`}
                             fallbackSrc={LISTING_PLACEHOLDERS[index % LISTING_PLACEHOLDERS.length]}
                             logContext={{ listingId: listing.id, page: 'listings' }}
                             priority={index < 4}
                           />
-                          {(listing.trade_available || listing.isTradeEnabled) && (
-                            <div className="absolute top-1.5 left-1.5 bg-success-500 text-inverted text-[10px] px-1.5 py-0.5 rounded flex items-center gap-0.5">
-                              <ArrowsRightLeftIcon className="w-2.5 h-2.5" />
-                              <span className="hidden sm:inline">{locale === 'en' ? 'Trade' : 'Takas'}</span>
-                            </div>
-                          )}
+                          {isProductOutOfStock(listing) && <OutOfStockOverlay />}
+                          <div className="absolute top-1.5 left-1.5 flex flex-col items-start gap-1">
+                            {listing.isBoosted && (
+                              <div className="bg-amber-500 text-inverted text-[10px] font-bold px-1.5 py-0.5 rounded">
+                                {locale === 'en' ? 'Sponsored' : 'Sponsorlu'}
+                              </div>
+                            )}
+                            {(listing.trade_available || listing.isTradeEnabled) && (
+                              <div className="bg-success-500 text-inverted text-[10px] px-1.5 py-0.5 rounded flex items-center gap-0.5">
+                                <ArrowsRightLeftIcon className="w-2.5 h-2.5" />
+                                <span className="hidden sm:inline">{locale === 'en' ? 'Trade' : 'Takas'}</span>
+                              </div>
+                            )}
+                          </div>
                           {isProductOnSaleDisplay(listing) && (
                             <div className="absolute top-1.5 right-1.5 bg-danger-500 text-inverted text-[10px] font-bold px-1.5 py-0.5 rounded">
                               %{listing.discountPercent ?? 0}

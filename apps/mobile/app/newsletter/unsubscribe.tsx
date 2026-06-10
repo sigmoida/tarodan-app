@@ -17,9 +17,18 @@ export default function NewsletterUnsubscribeScreen() {
 
   const unsubscribeMutation = useMutation({
     mutationFn: async (data: { email?: string; token?: string }) => {
-      return guestApi.post('/newsletter/unsubscribe', data);
+      // Web ile birebir: token akışı GET ?token=..., e-posta akışı POST { email }.
+      if (data.token) {
+        return guestApi.get(`/newsletter/unsubscribe?token=${encodeURIComponent(data.token)}`);
+      }
+      return guestApi.post('/newsletter/unsubscribe', { email: data.email });
     },
-    onSuccess: () => {
+    onSuccess: (res: any) => {
+      // API 2xx döner ama gövdede success:false ile başarısız olabilir (geçersiz e-posta vb.).
+      if (res?.data?.success === false) {
+        Alert.alert('Hata', res.data.message || 'Abonelik iptal edilemedi.');
+        return;
+      }
       setSuccess(true);
     },
     onError: (e: any) =>

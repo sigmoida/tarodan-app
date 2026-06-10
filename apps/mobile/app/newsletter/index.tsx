@@ -12,13 +12,14 @@ const { colors } = theme;
 
 export default function NewsletterScreen() {
   const [email, setEmail] = useState('');
-  const [name, setName] = useState('');
 
   const subscribeMutation = useMutation({
     mutationFn: async () => {
+      // Web paritesi (newsletter/page.tsx): NewsletterSubscribeDto yalnızca email/newsletter
+      // kabul eder; backend 'name' alanını desteklemez (whitelist ile sessizce strip edilir).
       return guestApi.post('/newsletter/subscribe', {
         email: email.trim().toLowerCase(),
-        name: name.trim() || undefined,
+        newsletter: true,
       });
     },
     onSuccess: () => {
@@ -28,7 +29,6 @@ export default function NewsletterScreen() {
         [{ text: 'Tamam', onPress: () => router.back() }],
       );
       setEmail('');
-      setName('');
     },
     onError: (e: any) =>
       Alert.alert('Hata', e?.response?.data?.message || 'Abonelik kaydedilemedi.'),
@@ -58,12 +58,6 @@ export default function NewsletterScreen() {
             Yeni modeller, özel koleksiyonlar ve kampanyalar için bültenimize abone olun. İstediğiniz zaman aboneliğinizi iptal edebilirsiniz.
           </Text>
 
-          <Input
-            label="Adınız (opsiyonel)"
-            value={name}
-            onChangeText={setName}
-            containerStyle={styles.input}
-          />
           <Input
             label="E-posta *"
             value={email}

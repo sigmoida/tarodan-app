@@ -3,6 +3,7 @@ import { ConfigModule } from '@nestjs/config';
 import { ThrottlerModule } from '@nestjs/throttler';
 import { APP_GUARD, APP_INTERCEPTOR } from '@nestjs/core';
 import { PrismaModule } from './prisma';
+import { DevModule } from './modules/dev/dev.module';
 import { AuthModule, JwtAuthGuard, BannedUserGuard } from './modules/auth';
 import { UserModule } from './modules/user';
 import { ProductModule } from './modules/product';
@@ -89,7 +90,13 @@ import { ErrorLogInterceptor } from './common/interceptors/error-log.interceptor
     // Configuration
     ConfigModule.forRoot({
       isGlobal: true,
-      envFilePath: ['.env.local', '.env', 'env.txt'], // env.txt de okunabilir
+      // Test'te SADECE .env.test (tarodan_test + Mailhog). .env (dev, DATABASE_URL=tarodan)
+      // dahil edilmez — ConfigModule last-wins ile .env, tarodan'ı ezip API'yi YANLIŞ DB'ye
+      // bağlıyordu (snapshot'lar tarodan_test'te → reset patlıyor → flaky 403). Eksikler
+      // spawned process.env'den (runner/webServer DATABASE_URL=tarodan_test) gelir.
+      envFilePath: process.env.NODE_ENV === 'test'
+        ? ['.env.test']
+        : ['.env.local', '.env', 'env.txt'],
     }),
 
     // Rate limiting
@@ -182,6 +189,8 @@ import { ErrorLogInterceptor } from './common/interceptors/error-log.interceptor
     TaxModule,
     // Static pages (public GET /api/pages/:slug)
     PagesModule,
+    // Dev/test hook'ları — yalnız NODE_ENV=test'te yüklenir
+    ...(process.env.NODE_ENV === 'test' ? [DevModule] : []),
   ],
   controllers: [],
   providers: [

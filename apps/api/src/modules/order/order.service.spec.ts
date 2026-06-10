@@ -10,6 +10,8 @@ import { NotificationService } from '../notification/notification.service';
 import { DiscountService } from '../discount/discount.service';
 import { DiscountCalculator } from '../discount/discount-calculator';
 import { SuratCargoService } from '../surat-cargo/surat-cargo.service';
+import { ProductLockService } from '../product/product-lock.service';
+import { CommissionLedgerService } from '../commission/commission-ledger.service';
 import { DirectBuyDto } from './dto';
 import { OrderStatus, ProductStatus } from '@prisma/client';
 
@@ -265,5 +267,144 @@ describe.skip('OrderService guest checkout OTP (1.12)', () => {
 
     expect(mockPrisma.$transaction).not.toHaveBeenCalled();
     expect(mockCache.set).toHaveBeenCalled();
+  });
+});
+
+/**
+ * findOne response shape — mobil Sipariş Detayı ekranının okuduğu alanların
+ * formatOrderResponse tarafından gönderildiğini doğrular (kayıplı yanıt regresyonu).
+ */
+describe('OrderService findOne (response shape for mobile order detail)', () => {
+  let service: OrderService;
+
+  const buyerId = 'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa';
+  const sellerId = 'eeeeeeee-eeee-eeee-eeee-eeeeeeeeeeee';
+  const orderId = 'order-detail-1';
+
+  const mockOrder = {
+    id: orderId,
+    orderNumber: 'ORD-2025-000123',
+    buyerId,
+    sellerId,
+    productId: 'bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb',
+    status: OrderStatus.shipped,
+    totalAmount: 329.99,
+    shippingCost: 29.99,
+    commissionAmount: 20,
+    buyerFeeAmount: 10,
+    sellerFeeAmount: 8,
+    deliveredAt: null as Date | null,
+    completedAt: null as Date | null,
+    confirmationDeadline: new Date('2026-06-10T12:00:00Z'),
+    buyerConfirmedAt: null as Date | null,
+    createdAt: new Date('2026-06-01T10:00:00Z'),
+    updatedAt: new Date('2026-06-02T10:00:00Z'),
+    product: {
+      id: 'bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb',
+      title: 'Vintage Star Wars Figure',
+      status: ProductStatus.sold,
+      price: 300,
+      condition: 'good',
+      images: [{ cardKey: 'https://cdn.test/img.jpg' }],
+    },
+    buyer: { id: buyerId, displayName: 'Buyer', isVerified: true, avatarUrl: null },
+    seller: { id: sellerId, displayName: 'Seller', isVerified: true, avatarUrl: null },
+    shipment: {
+      id: 'ship-1',
+      provider: 'surat',
+      trackingNumber: 'TRK123456',
+      status: 'in_transit',
+      cost: 29.99,
+      shippedAt: new Date('2026-06-02T09:00:00Z'),
+      deliveredAt: null,
+    },
+    payment: {
+      id: 'pay-1',
+      status: 'completed',
+      amount: 329.99,
+      provider: 'paytr',
+      paidAt: new Date('2026-06-01T11:00:00Z'),
+    },
+    shippingAddress: {
+      id: 'addr-1',
+      title: 'Ev',
+      fullName: 'Alıcı Adı',
+      phone: '+905551234567',
+      city: 'İstanbul',
+      district: 'Kadıköy',
+      address: 'Test cad. No:1 D:2',
+      zipCode: '34000',
+    },
+    refundRequests: [],
+  };
+
+  const mockPrisma = {
+    order: { findUnique: jest.fn().mockResolvedValue(mockOrder) },
+    productRating: { findFirst: jest.fn().mockResolvedValue(null) },
+    rating: { findFirst: jest.fn().mockResolvedValue(null) },
+  };
+
+  beforeEach(async () => {
+    jest.clearAllMocks();
+    mockPrisma.order.findUnique.mockResolvedValue(mockOrder);
+    mockPrisma.productRating.findFirst.mockResolvedValue(null);
+    mockPrisma.rating.findFirst.mockResolvedValue(null);
+
+    const module: TestingModule = await Test.createTestingModule({
+      providers: [
+        OrderService,
+        { provide: PrismaService, useValue: mockPrisma },
+        { provide: EventService, useValue: {} },
+        { provide: CacheService, useValue: {} },
+        { provide: ConfigService, useValue: { get: jest.fn() } },
+        { provide: NotificationService, useValue: {} },
+        { provide: DiscountService, useValue: {} },
+        { provide: DiscountCalculator, useValue: {} },
+        { provide: SuratCargoService, useValue: {} },
+        { provide: ProductLockService, useValue: {} },
+        { provide: CommissionLedgerService, useValue: {} },
+      ],
+    }).compile();
+
+    service = module.get(OrderService);
+  });
+
+  it('returns product price/condition, full shipping address, tracking and timeline timestamps', async () => {
+    const result: any = await service.findOne(orderId, buyerId);
+
+    // Ürün: fiyat + durum (mobilde ₺0 / boş "Durum:" regresyonu)
+    expect(result.product.price).toBe(300);
+    expect(result.product.condition).toBe('good');
+
+    // Teslimat adresi: ad, telefon, açık adres (mobilde boş satır regresyonu)
+    expect(result.shippingAddress.fullName).toBe('Alıcı Adı');
+    expect(result.shippingAddress.phone).toBe('+905551234567');
+    expect(result.shippingAddress.address).toBe('Test cad. No:1 D:2');
+    expect(result.shippingAddress.zipCode).toBe('34000');
+    // Mevcut tüketiciler için geriye dönük alanlar korunmalı
+    expect(result.shippingAddress.addressLine1).toBe('Test cad. No:1 D:2');
+    expect(result.shippingAddress.postalCode).toBe('34000');
+
+    // Kargo takip: üst seviye trackingNumber + türetilmiş Sürat URL
+    expect(result.trackingNumber).toBe('TRK123456');
+    expect(result.trackingUrl).toContain('suratkargo.com.tr');
+    expect(result.trackingUrl).toContain('TRK123456');
+
+    // Zaman çizelgesi: paidAt / shippedAt üst seviyede
+    expect(result.paidAt).toEqual(mockOrder.payment.paidAt);
+    expect(result.shippedAt).toEqual(mockOrder.shipment.shippedAt);
+    expect(result.confirmationDeadline).toEqual(mockOrder.confirmationDeadline);
+  });
+
+  it('does not derive a tracking URL for non-surat providers', async () => {
+    mockPrisma.order.findUnique.mockResolvedValueOnce({
+      ...mockOrder,
+      shipment: { ...mockOrder.shipment, provider: 'other' },
+    });
+
+    const result: any = await service.findOne(orderId, buyerId);
+
+    expect(result.trackingNumber).toBe('TRK123456');
+    expect(result.trackingUrl).toBeNull();
   });
 });

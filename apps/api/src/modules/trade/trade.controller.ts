@@ -87,6 +87,21 @@ export class TradeController {
   }
 
   /**
+   * Trades sekme sayaçları (Tümü/Bekleyen/Kargoda/Tamamlanan)
+   * GET /trades/status-counts
+   * NOT: ':id' (ParseUUIDPipe) rotasından ÖNCE tanımlı olmalı, yoksa dinamik rota yutar.
+   */
+  @Get('status-counts')
+  async getStatusCounts(@Request() req: any) {
+    try {
+      return await this.tradeService.getTradeStatusCounts(this.getUserId(req));
+    } catch (e: any) {
+      this.logger.error(`trades/status-counts failed: ${e?.message}`, e?.stack);
+      throw e;
+    }
+  }
+
+  /**
    * Get trade by ID
    * GET /trades/:id
    */

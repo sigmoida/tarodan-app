@@ -88,6 +88,28 @@ export class ProductQueryDto {
   material?: string;
 
   @ApiPropertyOptional({
+    example: 'treasure-hunt,mainline,red',
+    description:
+      'DEPRECATED: flat slug list — AND-combined across all slugs. Use `attrGroups` for ' +
+      'correct OR-within-group / AND-across-groups semantics.',
+  })
+  @IsOptional()
+  @IsString()
+  attributeSlugs?: string;
+
+  @ApiPropertyOptional({
+    example: '{"hw-rarity":["treasure-hunt","super-treasure-hunt"],"hw-body-color":["red"]}',
+    description:
+      'JSON-encoded map of attribute group slug -> selected attribute slugs. ' +
+      'Within a single group: OR (any of the selected slugs matches). ' +
+      'Across groups: AND (every group must have at least one match). ' +
+      'Empty arrays and unknown keys are ignored.',
+  })
+  @IsOptional()
+  @IsString()
+  attrGroups?: string;
+
+  @ApiPropertyOptional({
     example: true,
     description: 'Filter only trade-enabled products',
   })
@@ -95,6 +117,15 @@ export class ProductQueryDto {
   @Transform(({ value }) => value === 'true' || value === true)
   @IsBoolean()
   tradeOnly?: boolean;
+
+  @ApiPropertyOptional({
+    example: true,
+    description: 'Filter only actively boosted (sponsored) products',
+  })
+  @IsOptional()
+  @Transform(({ value }) => value === 'true' || value === true)
+  @IsBoolean()
+  boostedOnly?: boolean;
 
   @ApiPropertyOptional({
     example: true,

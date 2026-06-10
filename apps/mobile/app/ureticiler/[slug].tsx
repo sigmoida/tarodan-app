@@ -10,6 +10,7 @@ import { ScreenHeader } from '../../src/components/common';
 const { colors } = theme;
 import { ProductGrid } from '../../src/components/product';
 import type { ProductCardProduct } from '../../src/components/product';
+import { resolveImageUrl } from '../../src/utils/imageUrl';
 
 interface Manufacturer {
   id: string;
@@ -40,14 +41,14 @@ export default function ManufacturerDetailScreen() {
     refetch,
     isRefetching,
   } = useQuery({
-    queryKey: ['manufacturer-products', slug],
+    queryKey: ['manufacturer-products', manufacturer?.id],
     queryFn: async () => {
-      if (!slug) return [];
-      const response = await productsApi.getAll({ manufacturer: slug, status: 'active' });
+      if (!manufacturer?.id) return [];
+      const response = await productsApi.getAll({ manufacturerId: manufacturer.id, status: 'active' });
       const payload = response.data?.data ?? response.data ?? [];
       return Array.isArray(payload) ? payload : payload?.products ?? [];
     },
-    enabled: !!slug,
+    enabled: !!manufacturer?.id,
   });
 
   const products: ProductCardProduct[] = productsData ?? [];
@@ -70,7 +71,7 @@ export default function ManufacturerDetailScreen() {
           loadingManufacturer ? null : manufacturer ? (
             <View style={styles.header}>
               {manufacturer.logo ? (
-                <Image source={{ uri: manufacturer.logo }} style={styles.logo} resizeMode="contain" />
+                <Image source={{ uri: resolveImageUrl(manufacturer.logo) }} style={styles.logo} resizeMode="contain" />
               ) : (
                 <View style={styles.logoFallback}>
                   <Text style={styles.logoFallbackText}>

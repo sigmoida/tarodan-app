@@ -47,10 +47,6 @@ export default function LoginScreen() {
         refreshToken?: string;
         user?: {
           email?: string;
-          isEmailVerified?: boolean;
-          companyName?: string;
-          taxId?: string;
-          membershipTier?: string;
         };
       };
       const accessToken = data.tokens?.accessToken || data.accessToken;
@@ -62,22 +58,40 @@ export default function LoginScreen() {
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       await login(accessToken!, user as any, refreshToken);
 
-      if (user && !user.isEmailVerified) {
-        setUnverifiedEmail(user.email ?? null);
-      }
-
-      const hasBusinessInfo = !!(user?.companyName && user?.taxId);
-      const isBusinessTier = user?.membershipTier === 'business';
-      if (hasBusinessInfo && !isBusinessTier) {
-        Alert.alert(
-          'Kurumsal Üyelik',
-          'İşletme bilgilerinizi tamamlamışsınız. Kurumsal üyeliğe geçerek avantajlardan yararlanabilirsiniz.',
-          [
-            { text: 'Sonra', onPress: () => router.replace('/' as never), style: 'cancel' },
-            { text: 'Üyeliğe Geç', onPress: () => router.replace('/membership/checkout' as never) },
-          ],
-        );
-        return;
+      // Doğrulanmamış e-posta banner'ı yalnızca login HATASI ('verify/doğrula')
+      // ile tetiklenir (onError); başarılı login her zaman doğrulanmış kullanıcıdandır.
+      // Kurumsal yükseltme kontrolü web gibi /users/me'den okunur (login response'unda
+      // companyName/taxId/membership yok).
+      try {
+        const profileResponse = (await authApi.getProfile()).data as {
+          user?: Record<string, unknown>;
+        } & Record<string, unknown>;
+        const currentUser = (profileResponse?.user ?? profileResponse) as {
+          companyName?: string | null;
+          taxId?: string | null;
+          membershipTier?: string | null;
+          membership?: { tier?: { type?: string; name?: string } | null } | null;
+        };
+        const membershipTier =
+          currentUser?.membership?.tier?.type ||
+          currentUser?.membership?.tier?.name ||
+          currentUser?.membershipTier ||
+          'free';
+        const isBusinessTier = String(membershipTier).toLowerCase().includes('business');
+        const hasBusinessInfo = !!(currentUser?.companyName && currentUser?.taxId);
+        if (hasBusinessInfo && !isBusinessTier) {
+          Alert.alert(
+            'Kurumsal Üyelik',
+            'İşletme bilgilerinizi tamamlamışsınız. Kurumsal üyeliğe geçerek avantajlardan yararlanabilirsiniz.',
+            [
+              { text: 'Sonra', onPress: () => router.replace('/' as never), style: 'cancel' },
+              { text: 'Üyeliğe Geç', onPress: () => router.replace('/membership' as never) },
+            ],
+          );
+          return;
+        }
+      } catch {
+        // Profil çekilemese bile login akışı devam etsin
       }
 
       router.replace('/' as never);
@@ -97,7 +111,7 @@ export default function LoginScreen() {
   });
 
   const resendVerificationMutation = useMutation({
-    mutationFn: () => authApi.resendVerification(),
+    mutationFn: () => authApi.resendVerification(unverifiedEmail ?? getValues('email')),
     onSuccess: () => {
       Alert.alert('Gönderildi', 'Doğrulama bağlantısı e-posta adresinize tekrar gönderildi.');
     },
@@ -110,6 +124,19 @@ export default function LoginScreen() {
   const onSubmit = (data: LoginForm) => {
     setErrorMessage(null);
     loginMutation.mutate(data);
+  };
+
+  /**
+   * Misafir olarak devam et: giriş yapmadan akışa dön. Login ekranı her zaman
+   * router.push ile açıldığı için geri dönülecek bir ekran varsa oraya
+   * (örn. checkout misafir formu) döneriz; yoksa ana sayfaya yönlendiririz.
+   */
+  const continueAsGuest = () => {
+    if (router.canGoBack()) {
+      router.back();
+    } else {
+      router.replace('/' as never);
+    }
   };
 
   /**
@@ -232,6 +259,16 @@ export default function LoginScreen() {
           title="Giriş Yap"
           onPress={handleLoginPress}
           isLoading={loginMutation.isPending}
+          disabled={loginMutation.isPending}
+        />
+
+        <Button
+          testID="continue-as-guest-button"
+          variant="outline"
+          size="lg"
+          fullWidth
+          title="Misafir Olarak Devam Et"
+          onPress={continueAsGuest}
           disabled={loginMutation.isPending}
         />
 

@@ -1,9 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { View, Text, ScrollView, TouchableOpacity, StyleSheet, ActivityIndicator, Alert } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
 import { router } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
-import { theme } from '@tarodan/ui-native';
+import { theme, ScreenHeader } from '@tarodan/ui-native';
 import { useAuthStore } from '../../src/stores/authStore';
 import { api, membershipApi } from '../../src/services/api';
 import { useTranslation } from '../../src/i18n';
@@ -72,6 +71,7 @@ export default function MembershipScreen() {
   const { t } = useTranslation();
   const { isAuthenticated, user } = useAuthStore();
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
   const [membership, setMembership] = useState<MembershipDetails | null>(null);
   const [settings, setSettings] = useState<PlatformSettings>({});
   const [billingPeriod, setBillingPeriod] = useState<'monthly' | 'yearly'>('monthly');
@@ -86,21 +86,37 @@ export default function MembershipScreen() {
 
   const fetchData = async () => {
     setLoading(true);
-    try {
-      const [membershipRes, settingsRes] = await Promise.all([
-        membershipApi.getCurrentMembership(),
-        api.get('/admin/settings/public'),
-      ]);
-      setMembership(membershipRes.data);
-      setSettings(settingsRes.data || {});
-    } catch (err: any) {
-      console.error('Failed to load membership data:', err);
-    } finally {
-      setLoading(false);
+    setError(null);
+    // allSettled: biri başarısız olsa diğeri (fiyatlar/üyelik) yine yüklensin.
+    const [membershipRes, settingsRes] = await Promise.allSettled([
+      membershipApi.getCurrentMembership(),
+      api.get('/admin/settings/public'),
+    ]);
+    if (membershipRes.status === 'fulfilled') {
+      setMembership(membershipRes.value.data);
     }
+    if (settingsRes.status === 'fulfilled') {
+      setSettings(settingsRes.value.data || {});
+    }
+    if (membershipRes.status === 'rejected' && settingsRes.status === 'rejected') {
+      console.error('Failed to load membership data:', membershipRes.reason);
+      setError('Üyelik bilgileri yüklenemedi. Lütfen tekrar deneyin.');
+    }
+    setLoading(false);
   };
 
   const currentTier: TierType = (membership?.tier?.type as TierType) || 'free';
+
+  // Web ile aynı mantık (profile/membership/page.tsx): business tier yalnızca
+  // kurumsal hesaplara (companyName + taxId) veya hâlihazırda business tier olan
+  // kullanıcıya gösterilir. Bireysel hesaplar business kartını hiç görmez —
+  // backend zaten 403 döndürür (membership.service.ts).
+  const isBusinessAccount = !!(user?.companyName && user?.taxId);
+  const isBusinessTier = currentTier === 'business' || user?.membershipTier === 'business';
+  const visibleTiers: TierType[] =
+    isBusinessAccount || isBusinessTier
+      ? TIER_ORDER.filter((t) => t === 'business')
+      : TIER_ORDER.filter((t) => t !== 'business');
 
   const getPrice = (tier: TierType): number => {
     if (tier === 'free') return 0;
@@ -164,33 +180,28 @@ export default function MembershipScreen() {
 
   if (loading) {
     return (
-      <SafeAreaView style={styles.container}>
-        <View style={styles.header}>
-          <TouchableOpacity onPress={() => router.back()} hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}>
-            <Ionicons name="arrow-back" size={24} color={colors.white} />
-          </TouchableOpacity>
-          <Text style={styles.headerTitle}>{t('mobile.membershipTitle')}</Text>
-          <View style={{ width: 24 }} />
-        </View>
+      <View style={styles.container}>
+        <ScreenHeader title={t('mobile.membershipTitle')} onBack={() => router.back()} />
         <View style={styles.loadingContainer}>
           <ActivityIndicator size="large" color={colors.primary[600]!} />
           <Text style={styles.loadingText}>Yükleniyor...</Text>
         </View>
-      </SafeAreaView>
+      </View>
     );
   }
 
   return (
-    <SafeAreaView style={styles.container} edges={['top']}>
-      <View style={styles.header}>
-        <TouchableOpacity onPress={() => router.back()} hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}>
-          <Ionicons name="arrow-back" size={24} color={colors.white} />
-        </TouchableOpacity>
-        <Text style={styles.headerTitle}>{t('mobile.membershipTitle')}</Text>
-        <View style={{ width: 24 }} />
-      </View>
+    <View style={styles.container}>
+      <ScreenHeader title={t('mobile.membershipTitle')} onBack={() => router.back()} />
 
       <ScrollView style={styles.scrollView} showsVerticalScrollIndicator={false}>
+        {error ? (
+          <TouchableOpacity style={styles.errorBanner} onPress={fetchData} activeOpacity={0.8}>
+            <Ionicons name="alert-circle" size={18} color={colors.danger[600]!} />
+            <Text style={styles.errorBannerText}>{error}</Text>
+            <Text style={styles.errorBannerRetry}>Tekrar dene</Text>
+          </TouchableOpacity>
+        ) : null}
         {/* Pending Payment Banner */}
         {hasPendingPayment && (
           <TouchableOpacity
@@ -260,7 +271,7 @@ export default function MembershipScreen() {
           snapToInterval={280 + 12}
           snapToAlignment="start"
         >
-          {TIER_ORDER.map((tier) => {
+          {visibleTiers.map((tier) => {
             const price = getPrice(tier);
             const isCurrent = tier === currentTier;
             const isUpgrade = tierIndex(tier) > tierIndex(currentTier);
@@ -352,7 +363,7 @@ export default function MembershipScreen() {
 
         <View style={{ height: 40 }} />
       </ScrollView>
-    </SafeAreaView>
+    </View>
   );
 }
 
@@ -361,24 +372,32 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: colors.surface.alt,
   },
-  header: {
-    backgroundColor: colors.primary[600]!,
-    paddingVertical: 14,
-    paddingHorizontal: 16,
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-  },
-  headerTitle: {
-    fontSize: 18,
-    fontWeight: '700',
-    color: colors.white,
-  },
   loadingContainer: {
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
     gap: 12,
+  },
+  errorBanner: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    margin: 16,
+    padding: 12,
+    borderRadius: 10,
+    backgroundColor: colors.danger[50]!,
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: colors.danger[600]!,
+  },
+  errorBannerText: {
+    flex: 1,
+    fontSize: 13,
+    color: colors.danger[600]!,
+  },
+  errorBannerRetry: {
+    fontSize: 13,
+    fontWeight: '700',
+    color: colors.danger[600]!,
   },
   loadingText: {
     fontSize: 14,

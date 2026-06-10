@@ -4,6 +4,7 @@ import { Button, Spinner, Text, theme } from '@tarodan/ui-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { router, useLocalSearchParams } from 'expo-router';
+import { useQueryClient } from '@tanstack/react-query';
 import { paymentsApi } from '../../src/services/api';
 import { formatPrice } from '../../src/utils/format';
 
@@ -12,6 +13,7 @@ const { colors } = theme;
 interface PaymentInfo {
   id: string;
   orderId?: string;
+  tradeId?: string;
   amount?: number;
   currency?: string;
   status?: string;
@@ -20,28 +22,72 @@ interface PaymentInfo {
 }
 
 export default function PaymentSuccessScreen() {
-  const { paymentId, guest } = useLocalSearchParams<{ paymentId: string; guest?: string }>();
+  const { paymentId, guest, tradeCash, tradeId } = useLocalSearchParams<{
+    paymentId: string;
+    guest?: string;
+    tradeCash?: string;
+    tradeId?: string;
+  }>();
+  const queryClient = useQueryClient();
+  const isTrade = tradeCash === '1' || !!tradeId;
   const [loading, setLoading] = useState(true);
   const [info, setInfo] = useState<PaymentInfo | null>(null);
 
   useEffect(() => {
-    const load = async () => {
-      if (!paymentId) { setLoading(false); return; }
-      try {
-        const response = guest === '1'
-          ? await paymentsApi.getStatusLightGuest(paymentId)
-          : await paymentsApi.getStatus(paymentId);
-        setInfo(response.data?.data ?? response.data ?? null);
-      } catch {
-        // Sessiz — success sayfasında hata kritik değil
-      } finally {
-        setLoading(false);
-      }
+    let cancelled = false;
+
+    const fetchStatus = async (): Promise<PaymentInfo | null> => {
+      const response = guest === '1'
+        ? await paymentsApi.getStatusLightGuest(paymentId)
+        : await paymentsApi.getStatus(paymentId);
+      return response.data?.data ?? response.data ?? null;
     };
-    load();
-  }, [paymentId, guest]);
+
+    const isTerminal = (s?: string) =>
+      s === 'paid' || s === 'completed' || s === 'success' || s === 'hold_payment';
+
+    const run = async () => {
+      if (!paymentId) { setLoading(false); return; }
+
+      // durum-sorgu (verify) ile sunucu tarafı tamamlamayı hemen tetikle —
+      // PayTR callback'i gecikse bile ödeme/sipariş anında işlenir. Idempotent & public.
+      try { await paymentsApi.verify(paymentId); } catch { /* best-effort */ }
+
+      // Callback/verify işlenene kadar birkaç kez yokla.
+      let last: PaymentInfo | null = null;
+      for (let attempt = 0; attempt < 5 && !cancelled; attempt++) {
+        try {
+          const data = await fetchStatus();
+          last = data;
+          if (!cancelled) setInfo(data);
+          if (isTerminal(data?.status)) break;
+        } catch {
+          // Sessiz — success sayfasında hata kritik değil
+        }
+        if (attempt < 4 && !cancelled) {
+          await new Promise(resolve => setTimeout(resolve, 1500));
+        }
+      }
+      if (cancelled) return;
+
+      // Takas nakit farkı ödemesi: takasa dön + ilgili query'leri tazele (web ile parite).
+      const tid = tradeId || last?.tradeId;
+      if (isTrade && tid) {
+        queryClient.invalidateQueries({ queryKey: ['trade'] });
+        queryClient.invalidateQueries({ queryKey: ['trades'] });
+        queryClient.invalidateQueries({ queryKey: ['trades-status-counts'] });
+        router.replace(`/trade/${tid}` as any);
+        return;
+      }
+      setLoading(false);
+    };
+
+    run();
+    return () => { cancelled = true; };
+  }, [paymentId, guest, isTrade, tradeId, queryClient]);
 
   const orderId = info?.order?.id || info?.orderId;
+  const tid = tradeId || info?.tradeId;
 
   return (
     <SafeAreaView style={styles.container}>
@@ -52,7 +98,9 @@ export default function PaymentSuccessScreen() {
 
         <Text style={styles.title}>Ödemeniz Başarılı!</Text>
         <Text style={styles.subtitle}>
-          Siparişiniz alındı. Detayları e-posta adresinize gönderdik.
+          {isTrade
+            ? 'Nakit fark ödemesi alındı. Takas süreci başlıyor...'
+            : 'Siparişiniz alındı. Detayları e-posta adresinize gönderdik.'}
         </Text>
 
         {loading ? (
@@ -87,7 +135,15 @@ export default function PaymentSuccessScreen() {
         ) : null}
 
         <View style={styles.actions}>
-          {orderId && guest !== '1' ? (
+          {isTrade && tid ? (
+            <Button
+              variant="primary"
+              title="Takasa Dön"
+              fullWidth
+              onPress={() => router.replace(`/trade/${tid}` as any)}
+              style={styles.btn}
+            />
+          ) : orderId && guest !== '1' ? (
             <Button
               variant="primary"
               title="Siparişimi Gör"

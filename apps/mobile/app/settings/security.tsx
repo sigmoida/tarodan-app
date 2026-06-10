@@ -9,6 +9,7 @@ import {
   Input,
   Text,
   theme,
+  ScreenHeader,
 } from '@tarodan/ui-native';
 import { router } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
@@ -47,8 +48,13 @@ export default function SecuritySettingsScreen() {
       return;
     }
 
-    if (newPassword.length < 8) {
-      Alert.alert('Hata', 'Şifre en az 8 karakter olmalıdır');
+    // API ChangePasswordDto ile birebir aynı kural — yoksa ham 400 dönüyordu
+    const strongPassword = /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[@$!%*?&])[A-Za-z\d@$!%*?&]{8,}$/;
+    if (!strongPassword.test(newPassword)) {
+      Alert.alert(
+        'Hata',
+        'Şifre en az 8 karakter, bir büyük harf, bir küçük harf, bir rakam ve bir özel karakter (@$!%*?&) içermelidir'
+      );
       return;
     }
 
@@ -153,14 +159,7 @@ export default function SecuritySettingsScreen() {
 
   return (
     <View style={styles.container}>
-      {/* Header */}
-      <View style={styles.header}>
-        <TouchableOpacity onPress={() => router.back()}>
-          <Ionicons name="arrow-back" size={24} color={colors.white} />
-        </TouchableOpacity>
-        <Text style={styles.headerTitle}>{t('mobile.settingsSecurity')}</Text>
-        <View style={{ width: 24 }} />
-      </View>
+      <ScreenHeader title={t('mobile.settingsSecurity')} onBack={() => router.back()} />
 
       <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
         {/* Password Section */}
@@ -318,20 +317,6 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: colors.surface.alt,
-  },
-  header: {
-    backgroundColor: colors.primary[600]!,
-    paddingTop: 50,
-    paddingBottom: 16,
-    paddingHorizontal: 20,
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-  },
-  headerTitle: {
-    fontSize: 18,
-    fontWeight: 'bold',
-    color: colors.white,
   },
   content: {
     flex: 1,

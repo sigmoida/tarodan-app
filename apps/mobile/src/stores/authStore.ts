@@ -30,6 +30,11 @@ export interface User {
   // Seller info
   isSeller: boolean;
   sellerType?: SellerType;
+
+  // Business account info (companyName + taxId = kurumsal/işletme hesabı, web ile aynı)
+  companyName?: string;
+  taxId?: string;
+  taxOffice?: string;
   
   // Stats for verification criteria
   totalSales: number;
@@ -225,6 +230,11 @@ const mapApiUserToUser = (apiUser: any): User => {
   // Seller
   isSeller: apiUser.isSeller || apiUser.is_seller || false,
   sellerType: apiUser.sellerType || apiUser.seller_type,
+
+  // Business account info (web ile aynı: companyName + taxId varsa kurumsal hesap)
+  companyName: apiUser.companyName ?? apiUser.company_name ?? undefined,
+  taxId: apiUser.taxId ?? apiUser.tax_id ?? undefined,
+  taxOffice: apiUser.taxOffice ?? apiUser.tax_office ?? undefined,
   
   // Stats
   totalSales: apiUser.totalSales || apiUser.total_sales || 0,

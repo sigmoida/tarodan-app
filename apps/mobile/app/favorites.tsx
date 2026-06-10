@@ -2,7 +2,7 @@ import { View, ScrollView, StyleSheet, TouchableOpacity, Image, RefreshControl }
 import { useState, useCallback } from 'react';
 import { router, useFocusEffect } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
-import { theme, Text, Card, IconButton, Button, Spinner, Snackbar } from '@tarodan/ui-native';
+import { theme, Text, Card, IconButton, Button, Spinner, Snackbar, ScreenHeader } from '@tarodan/ui-native';
 import { useFavoritesStore, WishlistItem } from '../src/stores/favoritesStore';
 import { useAuthStore } from '../src/stores/authStore';
 import { useCartStore } from '../src/stores/cartStore';
@@ -98,14 +98,7 @@ export default function FavoritesScreen() {
 
   return (
     <View style={styles.container}>
-      {/* Header */}
-      <View style={styles.header}>
-        <TouchableOpacity onPress={() => router.back()}>
-          <Ionicons name="arrow-back" size={24} color={colors.white} />
-        </TouchableOpacity>
-        <Text style={styles.headerTitle}>Favorilerim ({getFavoriteCount()})</Text>
-        <View style={{ width: 24 }} />
-      </View>
+      <ScreenHeader title={`Favorilerim (${getFavoriteCount()})`} onBack={() => router.back()} />
 
       {/* Content */}
       {items.length === 0 ? (
@@ -182,7 +175,7 @@ export default function FavoritesScreen() {
           {/* Recommendations Section */}
           <View style={styles.recommendationsSection}>
             <Text variant="h3" style={styles.sectionTitle}>Beğenebileceğiniz</Text>
-            <Button variant="outline" title="Daha Fazla Ürün Keşfet" onPress={() => router.push('/(tabs)/search')} />
+            <Button variant="outline" title="Daha Fazla Ürün Keşfet" style={{ alignSelf: 'center' }} onPress={() => router.push('/(tabs)/search')} />
           </View>
 
           <View style={{ height: 100 }} />
@@ -216,20 +209,6 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     padding: 32,
     backgroundColor: colors.surface.DEFAULT,
-  },
-  header: {
-    backgroundColor: colors.primary[600]!,
-    paddingTop: 50,
-    paddingBottom: 16,
-    paddingHorizontal: 20,
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-  },
-  headerTitle: {
-    fontSize: 18,
-    fontWeight: 'bold',
-    color: colors.white,
   },
   title: {
     marginTop: 16,
@@ -314,6 +293,7 @@ const styles = StyleSheet.create({
   },
   recommendationsSection: {
     marginTop: 24,
+    width: '100%',
     alignItems: 'center',
   },
   sectionTitle: {

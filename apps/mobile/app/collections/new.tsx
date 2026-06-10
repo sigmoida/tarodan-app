@@ -1,5 +1,5 @@
 import { View, ScrollView, StyleSheet, TouchableOpacity, Image } from 'react-native';
-import { theme, Button, Switch, Snackbar, IconButton, Text, Input, Textarea } from '@tarodan/ui-native';
+import { theme, Button, Switch, Snackbar, IconButton, Text, Input, Textarea, ScreenHeader } from '@tarodan/ui-native';
 import { useState } from 'react';
 import { router } from 'expo-router';
 import { useForm, Controller } from 'react-hook-form';
@@ -52,22 +52,27 @@ export default function NewCollectionScreen() {
 
   const createMutation = useMutation({
     mutationFn: async (data: CollectionForm) => {
-      const formData = new FormData();
-      formData.append('name', data.name);
-      if (data.description) formData.append('description', data.description);
-      formData.append('isPublic', String(data.isPublic));
+      // Koleksiyonu JSON ile oluştur (API @Body() CreateCollectionDto bekler, FileInterceptor yok)
+      const res = await api.post('/collections', {
+        name: data.name,
+        description: data.description,
+        isPublic: data.isPublic,
+      });
 
+      // Kapak görseli varsa dönen id ile ayrı multipart uca yükle (PATCH /collections/:id/cover, alan 'cover')
       if (coverImage) {
-        formData.append('coverImage', {
+        const formData = new FormData();
+        formData.append('cover', {
           uri: coverImage,
           type: 'image/jpeg',
           name: 'cover.jpg',
         } as any);
+        await api.patch(`/collections/${res.data.id}/cover`, formData, {
+          headers: { 'Content-Type': 'multipart/form-data' },
+        });
       }
 
-      return api.post('/collections', formData, {
-        headers: { 'Content-Type': 'multipart/form-data' },
-      });
+      return res;
     },
     onSuccess: (response) => {
       queryClient.invalidateQueries({ queryKey: ['collections'] });
@@ -109,13 +114,7 @@ export default function NewCollectionScreen() {
     const upgradeInfo = getUpgradeMessage('collectionFeature');
     return (
       <View style={styles.container}>
-        <View style={styles.header}>
-          <TouchableOpacity onPress={() => router.back()}>
-            <Ionicons name="arrow-back" size={24} color={colors.white} />
-          </TouchableOpacity>
-          <Text style={styles.headerTitle}>Dijital Garaj</Text>
-          <View style={{ width: 24 }} />
-        </View>
+        <ScreenHeader title="Dijital Garaj" onBack={() => router.back()} />
 
         <View style={styles.premiumRequired}>
           <MaterialCommunityIcons name="garage" size={80} color={colors.primary[600]!} />
@@ -162,14 +161,7 @@ export default function NewCollectionScreen() {
 
   return (
     <View style={styles.container}>
-      {/* Header */}
-      <View style={styles.header}>
-        <TouchableOpacity onPress={() => router.back()}>
-          <Ionicons name="arrow-back" size={24} color={colors.white} />
-        </TouchableOpacity>
-        <Text style={styles.headerTitle}>Yeni Koleksiyon</Text>
-        <View style={{ width: 24 }} />
-      </View>
+      <ScreenHeader title="Yeni Koleksiyon" onBack={() => router.back()} />
 
       <ScrollView style={styles.content}>
         {/* Cover Image */}
@@ -334,20 +326,6 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
     padding: 32,
-  },
-  header: {
-    backgroundColor: colors.primary[600]!,
-    paddingTop: 50,
-    paddingBottom: 16,
-    paddingHorizontal: 20,
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-  },
-  headerTitle: {
-    fontSize: 18,
-    fontWeight: 'bold',
-    color: colors.white,
   },
   subtitle: {
     textAlign: 'center',

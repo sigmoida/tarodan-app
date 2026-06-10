@@ -1,13 +1,29 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { View, ScrollView, StyleSheet, TouchableOpacity, Alert } from 'react-native';
-import { theme, Button, Card, Input, Radio, Text } from '@tarodan/ui-native';
+import { theme, Button, Card, Input, Radio, Text, ScreenHeader } from '@tarodan/ui-native';
 import { router, useLocalSearchParams } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { useAuthStore } from '../../src/stores/authStore';
-import { membershipApi, paymentsApi } from '../../src/services/api';
+import { api, membershipApi, paymentsApi } from '../../src/services/api';
 import { captureException } from '../../src/services/sentry';
 
 const { colors } = theme;
+
+interface PlatformSettings {
+  basic_monthly_price?: number;
+  basic_yearly_price?: number;
+  premium_monthly_price?: number;
+  premium_yearly_price?: number;
+  business_monthly_price?: number;
+  business_yearly_price?: number;
+  yearly_discount_percentage?: number;
+}
+
+const DEFAULT_MONTHLY: Record<string, number> = {
+  basic: 49,
+  premium: 99,
+  business: 499,
+};
 
 const MEMBERSHIP_TIERS = {
   basic: {
@@ -44,7 +60,7 @@ const MEMBERSHIP_TIERS = {
   business: {
     id: 'business',
     name: 'İş',
-    price: 199,
+    price: 499,
     period: 'ay',
     features: [
       '200 ücretsiz ilan',
@@ -70,8 +86,43 @@ export default function MembershipCheckoutScreen() {
   const [cardExpiry, setCardExpiry] = useState('');
   const [cardCvc, setCardCvc] = useState('');
   const [cardName, setCardName] = useState('');
+  const [settings, setSettings] = useState<PlatformSettings>({});
 
   const tier = MEMBERSHIP_TIERS[tierParam as keyof typeof MEMBERSHIP_TIERS] || MEMBERSHIP_TIERS.premium;
+  const tierType = (tierParam as string) || 'premium';
+  const billingPeriod: 'monthly' | 'yearly' = periodParam === 'yearly' ? 'yearly' : 'monthly';
+
+  // Web checkout ile aynı: fiyatlar admin panelden (GET /admin/settings/public) dinamik gelir.
+  useEffect(() => {
+    let active = true;
+    api
+      .get('/admin/settings/public')
+      .then((res) => {
+        if (active) setSettings(res.data || {});
+      })
+      .catch(() => {
+        // fallback varsayılan fiyatlara düşülür
+      });
+    return () => {
+      active = false;
+    };
+  }, []);
+
+  // Ekranda gösterilecek fiyat — seçili periyoda (aylık/yıllık) göre.
+  const displayPrice: number = (() => {
+    const periodKey = `${tierType}_${billingPeriod}_price` as keyof PlatformSettings;
+    const direct = settings[periodKey];
+    if (typeof direct === 'number' && direct > 0) return direct;
+    const monthlyKey = `${tierType}_monthly_price` as keyof PlatformSettings;
+    const monthly = (settings[monthlyKey] as number | undefined) ?? DEFAULT_MONTHLY[tierType] ?? tier.price;
+    if (billingPeriod === 'yearly') {
+      const discount = settings.yearly_discount_percentage ?? 20;
+      return Math.round(monthly * 12 * (1 - discount / 100));
+    }
+    return monthly;
+  })();
+
+  const periodLabel = billingPeriod === 'yearly' ? 'yıl' : 'ay';
 
   // Not authenticated redirect
   if (!isAuthenticated) {
@@ -81,8 +132,6 @@ export default function MembershipCheckoutScreen() {
 
   const handlePayment = async () => {
     setLoading(true);
-    const tierType = (tierParam as string) || 'premium';
-    const billingPeriod: 'monthly' | 'yearly' = periodParam === 'yearly' ? 'yearly' : 'monthly';
     try {
       // Gerçek üyelik ödemesi — backend POST /membership/payments/initiate
       // (Önceden bu ekran setTimeout ile sahte başarı veriyordu; ödeme/abonelik oluşmuyordu.)
@@ -115,12 +164,20 @@ export default function MembershipCheckoutScreen() {
         return;
       }
 
-      // Gerçek PayTR akışı — WebView ödeme ekranına yönlendir
+      // Gerçek PayTR akışı — WebView ödeme ekranına yönlendir.
+      // Token burada üretildi; URL'i geçerek ekranın tekrar initiate etmesini önle.
       if (paymentId) {
+        const paymentUrl: string | undefined = initData.paymentUrl;
         setLoading(false);
         router.replace({
           pathname: '/payment/[id]',
-          params: { id: paymentId, provider: 'paytr', guest: '0', type: 'membership' },
+          params: {
+            id: paymentId,
+            provider: 'paytr',
+            guest: '0',
+            type: 'membership',
+            ...(paymentUrl ? { paymentUrl } : {}),
+          },
         } as any);
         return;
       }
@@ -156,14 +213,7 @@ export default function MembershipCheckoutScreen() {
 
   return (
     <View style={styles.container}>
-      {/* Header */}
-      <View style={styles.header}>
-        <TouchableOpacity onPress={() => router.back()}>
-          <Ionicons name="arrow-back" size={24} color={colors.white} />
-        </TouchableOpacity>
-        <Text style={styles.headerTitle}>Üyelik Satın Al</Text>
-        <View style={{ width: 24 }} />
-      </View>
+      <ScreenHeader title="Üyelik Satın Al" onBack={() => router.back()} />
 
       <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
         {/* Selected Plan */}
@@ -172,7 +222,7 @@ export default function MembershipCheckoutScreen() {
             <View>
               <Text style={[styles.planName, { color: tier.color }]}>{tier.name}</Text>
               <Text style={styles.planPrice}>
-                ₺{tier.price}<Text style={styles.planPeriod}>/{tier.period}</Text>
+                ₺{displayPrice.toLocaleString('tr-TR')}<Text style={styles.planPeriod}>/{periodLabel}</Text>
               </Text>
             </View>
             {'popular' in tier && tier.popular && (
@@ -258,17 +308,17 @@ export default function MembershipCheckoutScreen() {
         <Text style={styles.sectionTitle}>Sipariş Özeti</Text>
         <Card style={styles.summaryCard}>
           <View style={styles.summaryRow}>
-            <Text style={styles.summaryLabel}>{tier.name} Üyelik</Text>
-            <Text style={styles.summaryValue}>₺{tier.price}</Text>
+            <Text style={styles.summaryLabel}>{tier.name} Üyelik ({periodLabel === 'yıl' ? 'Yıllık' : 'Aylık'})</Text>
+            <Text style={styles.summaryValue}>₺{displayPrice.toLocaleString('tr-TR')}</Text>
           </View>
           <View style={styles.summaryRow}>
             <Text style={styles.summaryLabel}>KDV (%20)</Text>
-            <Text style={styles.summaryValue}>₺{(tier.price * 0.2).toFixed(2)}</Text>
+            <Text style={styles.summaryValue}>₺{(displayPrice * 0.2).toFixed(2)}</Text>
           </View>
           <View style={styles.divider} />
           <View style={styles.summaryRow}>
             <Text style={styles.totalLabel}>Toplam</Text>
-            <Text style={styles.totalValue}>₺{(tier.price * 1.2).toFixed(2)}</Text>
+            <Text style={styles.totalValue}>₺{(displayPrice * 1.2).toFixed(2)}</Text>
           </View>
         </Card>
 
@@ -284,7 +334,7 @@ export default function MembershipCheckoutScreen() {
         {/* Pay Button */}
         <Button
           variant="primary"
-          title={loading ? 'İşleniyor...' : `₺${(tier.price * 1.2).toFixed(2)} Öde`}
+          title={loading ? 'İşleniyor...' : `₺${(displayPrice * 1.2).toFixed(2)} Öde`}
           onPress={handlePayment}
           isLoading={loading}
           disabled={loading || !cardNumber || !cardExpiry || !cardCvc || !cardName}
@@ -301,20 +351,6 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: colors.surface.alt,
-  },
-  header: {
-    backgroundColor: colors.primary[600]!,
-    paddingTop: 50,
-    paddingBottom: 16,
-    paddingHorizontal: 20,
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-  },
-  headerTitle: {
-    fontSize: 18,
-    fontWeight: 'bold',
-    color: colors.white,
   },
   content: {
     flex: 1,

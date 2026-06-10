@@ -4,6 +4,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 import { api } from '../services/api';
 import { theme, Text, Button, Card, Chip, IconButton, Snackbar, Spinner, Divider, Modal } from '@tarodan/ui-native';
+import { resolveImageUrl } from '../utils/imageUrl';
 
 const { colors } = theme;
 
@@ -205,7 +206,7 @@ export const FeaturedListingsModal: React.FC<FeaturedListingsModalProps> = ({
             <Card key={slot.id} style={styles.featuredCard}>
               <View style={styles.featuredContent}>
                 <Image
-                  source={{ uri: slot.product.images?.[0]?.url || 'https://via.placeholder.com/60' }}
+                  source={{ uri: resolveImageUrl(slot.product.images) }}
                   style={styles.productImage}
                 />
                 <View style={styles.productInfo}>
@@ -277,7 +278,7 @@ export const FeaturedListingsModal: React.FC<FeaturedListingsModalProps> = ({
                           )}
                         </View>
                         <Image
-                          source={{ uri: product.images?.[0]?.url || 'https://via.placeholder.com/50' }}
+                          source={{ uri: resolveImageUrl(product.images) }}
                           style={styles.selectableImage}
                         />
                         <View style={styles.selectableInfo}>

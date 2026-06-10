@@ -154,7 +154,9 @@ export class EmailWorker {
     this.logger.log(`Processing template email job ${job.id}`);
 
     const { to, template, templateData } = job.data;
-    const data = templateData || {};
+    // Some producers pass the payload under `data` instead of `templateData` — accept both
+    // so the template always receives its variables (otherwise it renders empty/blank).
+    const data = templateData || (job.data as any).data || {};
 
     if (!template) {
       throw new Error('Template name is required');
@@ -169,7 +171,8 @@ export class EmailWorker {
       html = this.substituteVariables(dbTemplate.bodyHtml, data);
     } else {
       html = this.renderTemplate(template, data);
-      subject = this.getTemplateSubject(template, data);
+      // Prefer the subject the producer supplied; only fall back to the per-template default.
+      subject = job.data.subject || this.getTemplateSubject(template, data);
     }
 
     return this.handleSend({
@@ -217,6 +220,12 @@ export class EmailWorker {
       'offer-received': 'Yeni Teklif Aldınız',
       'offer-accepted': 'Teklifiniz Kabul Edildi',
       'payment-received': 'Ödeme Alındı',
+      'payment-failed': `Ödeme Tamamlanamadı - ${data?.orderNumber || ''}`,
+      'payment-refunded': `İade İşleminiz Tamamlandı - ${data?.orderNumber || ''}`,
+      'payment-refunded-seller': `İade İşlemi Bildirimi - ${data?.orderNumber || ''}`,
+      'premium-offer': '🌟 Premium Üyelik ile Daha Fazla Fırsat!',
+      'membership-expiring': `${data?.tierName || 'Üyeliğiniz'} Sona Eriyor`,
+      'membership-expiring-urgent': `${data?.tierName || 'Üyeliğiniz'} Yarın Sona Eriyor!`,
       'product-approved': 'Ürününüz Onaylandı',
       'wishlist-price-change': data?.isPriceDrop
         ? `🎉 Fiyat Düştü: ${data?.productTitle || ''}`
@@ -705,9 +714,147 @@ export class EmailWorker {
           `).join('')}
         </div>` : '<p>Bu ay öne çıkan ürün bulunmamaktadır.</p>'}
       `, 'Tarodan Aylık Özel Fırsatlar'),
+
+      'payment-failed': wrapEmail(`
+        ${title('Ödemeniz Tamamlanamadı', '⚠️')}
+        ${greeting(data?.buyerName)}
+        <p style="font-size: 15px; color: #4b5563; line-height: 1.6; margin: 0 0 20px 0;">
+          Siparişiniz için ödeme işlemi tamamlanamadı ve sipariş iptal edildi. Üzgünüz! Dilerseniz ürünü tekrar inceleyip yeniden sipariş verebilirsiniz.
+        </p>
+        ${detailsBox(`
+          <table width="100%" cellspacing="0" cellpadding="0">
+            ${detailRow('Sipariş No', '#' + (data?.orderNumber || ''))}
+            ${detailRow('Tutar', this.formatPrice(data?.amount || 0) + ' TL', true)}
+          </table>
+        `)}
+        ${warningBox(`
+          <p style="margin: 0; font-size: 14px; color: #92400e;">
+            ${data?.failureReason || 'Ödeme işlemi tamamlanamadığı için siparişiniz iptal edildi.'}
+          </p>
+        `)}
+        <div style="text-align: center; margin: 32px 0;">
+          ${primaryButton('Alışverişe Devam Et', `${frontendUrl}/listings`)}
+        </div>
+        <p style="font-size: 14px; color: #6b7280; text-align: center; margin: 0;">
+          Sorun yaşadıysanız <a href="mailto:destek@tarodan.com" style="color: #f97316; text-decoration: none;">destek@tarodan.com</a> üzerinden bize ulaşabilirsiniz.
+        </p>
+      `, 'Ödemeniz Tamamlanamadı'),
+
+      'payment-refunded': wrapEmail(`
+        ${title('İade İşleminiz Tamamlandı', '💰')}
+        ${greeting(data?.buyerName)}
+        <p style="font-size: 15px; color: #4b5563; line-height: 1.6; margin: 0 0 20px 0;">
+          Siparişiniz için iade işlemi başarıyla gerçekleştirildi. İade tutarı, bankanıza bağlı olarak birkaç iş günü içinde hesabınıza yansıyacaktır.
+        </p>
+        ${successBox(`
+          <p style="margin: 0; font-size: 16px; color: #166534; font-weight: 600;">
+            ✓ İade işlemi onaylandı
+          </p>
+        `)}
+        ${detailsBox(`
+          <table width="100%" cellspacing="0" cellpadding="0">
+            ${detailRow('Sipariş No', '#' + (data?.orderNumber || ''))}
+            ${detailRow('İade Tutarı', this.formatPrice(data?.refundAmount || 0) + ' TL', true)}
+          </table>
+        `)}
+        <div style="text-align: center; margin: 32px 0;">
+          ${primaryButton('Siparişi Görüntüle', `${frontendUrl}/orders/${data?.orderId || ''}`)}
+        </div>
+      `, 'İade İşleminiz Tamamlandı'),
+
+      'payment-refunded-seller': wrapEmail(`
+        ${title('İade İşlemi Bildirimi', '🔄')}
+        ${greeting(data?.sellerName)}
+        <p style="font-size: 15px; color: #4b5563; line-height: 1.6; margin: 0 0 20px 0;">
+          Bir siparişiniz için iade işlemi gerçekleştirildi. Detaylar aşağıda yer almaktadır.
+        </p>
+        ${detailsBox(`
+          <table width="100%" cellspacing="0" cellpadding="0">
+            ${detailRow('Sipariş No', '#' + (data?.orderNumber || ''))}
+            ${detailRow('İade Tutarı', this.formatPrice(data?.refundAmount || 0) + ' TL', true)}
+          </table>
+        `)}
+        ${infoBox(`
+          <p style="margin: 0; font-size: 14px; color: #92400e;">
+            ℹ️ İade tutarı alıcıya aktarılmıştır. Herhangi bir işlem yapmanıza gerek yoktur.
+          </p>
+        `)}
+        <div style="text-align: center; margin: 32px 0;">
+          ${primaryButton('Siparişi Görüntüle', `${frontendUrl}/seller/orders/${data?.orderId || ''}`)}
+        </div>
+      `, 'İade İşlemi Bildirimi'),
+
+      'premium-offer': wrapEmail(`
+        ${title('Premium ile Daha Fazlası Sizi Bekliyor', '🌟')}
+        ${greeting(data?.userName)}
+        <p style="font-size: 15px; color: #4b5563; line-height: 1.6; margin: 0 0 20px 0;">
+          Tarodan'da daha fazla satış, daha fazla görünürlük ve özel ayrıcalıklar için Premium üyeliğe geçin!
+        </p>
+        ${detailsBox(`
+          <p style="margin: 0 0 12px 0; font-weight: 600; color: #111827;">Premium üyelik avantajları</p>
+          ${Array.isArray(data?.benefits) && data.benefits.length > 0
+            ? `<ul style="margin: 0; padding-left: 20px; color: #4b5563; font-size: 14px; line-height: 1.9;">
+                ${data.benefits.map((b: string) => `<li>${b}</li>`).join('')}
+              </ul>`
+            : `<p style="margin: 0; color: #4b5563; font-size: 14px;">Sınırsız ilan, takas, Digital Garage ve daha fazlası.</p>`}
+        `)}
+        <div style="text-align: center; margin: 32px 0;">
+          ${primaryButton(data?.ctaText || 'Premium Üye Ol', data?.ctaUrl || `${frontendUrl}/membership`)}
+        </div>
+      `, 'Premium Üyelik'),
+
+      'membership-expiring': wrapEmail(`
+        ${title('Üyeliğiniz Sona Eriyor', '⏰')}
+        ${greeting(data?.userName)}
+        <p style="font-size: 15px; color: #4b5563; line-height: 1.6; margin: 0 0 20px 0;">
+          <strong style="color: #111827;">${data?.tierName || 'Üyeliğiniz'}</strong> üyeliğinizin süresi
+          ${data?.daysRemaining ? `${data.daysRemaining} gün içinde ` : ''}sona erecek. Kesintisiz devam etmek için üyeliğinizi yenileyin.
+        </p>
+        ${detailsBox(`
+          <table width="100%" cellspacing="0" cellpadding="0">
+            ${detailRow('Üyelik', data?.tierName || '')}
+            ${data?.expirationDate ? detailRow('Bitiş Tarihi', String(data.expirationDate), true) : ''}
+          </table>
+        `)}
+        <div style="text-align: center; margin: 32px 0;">
+          ${primaryButton('Üyeliğimi Yenile', data?.renewUrl || `${frontendUrl}/membership`)}
+        </div>
+      `, 'Üyeliğiniz Sona Eriyor'),
+
+      'membership-expiring-urgent': wrapEmail(`
+        ${title('Üyeliğiniz Yarın Sona Eriyor!', '🚨')}
+        ${greeting(data?.userName)}
+        <p style="font-size: 15px; color: #4b5563; line-height: 1.6; margin: 0 0 20px 0;">
+          <strong style="color: #111827;">${data?.tierName || 'Üyeliğiniz'}</strong> üyeliğinizin süresi
+          <strong style="color: #dc2626;">yarın (${data?.expirationDate || ''})</strong> sona eriyor.
+          Avantajlarınızı kaybetmemek için hemen yenileyin.
+        </p>
+        ${warningBox(`
+          <p style="margin: 0; font-size: 14px; color: #92400e;">
+            ⚠️ Üyeliğiniz sona erdiğinde Premium özelliklere erişiminiz kısıtlanacaktır.
+          </p>
+        `)}
+        <div style="text-align: center; margin: 32px 0;">
+          ${primaryButton('Hemen Yenile', data?.renewUrl || `${frontendUrl}/membership`)}
+        </div>
+      `, 'Üyeliğiniz Yarın Sona Eriyor!'),
     };
 
-    return templates[template] || wrapEmail(`<p>${JSON.stringify(data)}</p>`, 'Tarodan Bildirim');
+    const rendered = templates[template];
+    if (rendered) return rendered;
+
+    // No matching template — send a clean generic notification instead of leaking raw JSON to the user.
+    this.logger.warn(`No email template found for "${template}" — using generic fallback`);
+    return wrapEmail(`
+      ${title('Tarodan Bildirimi', '🔔')}
+      ${greeting(data?.buyerName || data?.sellerName || data?.userName || data?.name)}
+      <p style="font-size: 15px; color: #4b5563; line-height: 1.6; margin: 0 0 20px 0;">
+        Hesabınızla ilgili yeni bir bildiriminiz var. Ayrıntılar için Tarodan hesabınıza giriş yapabilirsiniz.
+      </p>
+      <div style="text-align: center; margin: 32px 0;">
+        ${primaryButton('Hesabıma Git', frontendUrl)}
+      </div>
+    `, 'Tarodan Bildirim');
   }
 
   /**

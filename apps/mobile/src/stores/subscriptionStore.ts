@@ -1,5 +1,8 @@
 import { create } from 'zustand';
+import { theme } from '@tarodan/ui-native';
 import { membershipApi, paymentsApi } from '../services/api';
+
+const { colors } = theme;
 
 export interface MembershipTier {
   id: string;
@@ -249,14 +252,14 @@ export const formatBillingPeriod = (period: 'monthly' | 'yearly'): string => {
 export const getSubscriptionStatusText = (status: Subscription['status']): { text: string; color: string } => {
   switch (status) {
     case 'active':
-      return { text: 'Aktif', color: '#4CAF50' };
+      return { text: 'Aktif', color: colors.success[600]! };
     case 'cancelled':
-      return { text: 'İptal Edildi', color: '#F44336' };
+      return { text: 'İptal Edildi', color: colors.danger[500]! };
     case 'past_due':
-      return { text: 'Ödeme Gecikmiş', color: '#FF9800' };
+      return { text: 'Ödeme Gecikmiş', color: colors.warning[500]! };
     case 'expired':
-      return { text: 'Süresi Doldu', color: '#9E9E9E' };
+      return { text: 'Süresi Doldu', color: colors.gray[400] };
     default:
-      return { text: 'Bilinmiyor', color: '#9E9E9E' };
+      return { text: 'Bilinmiyor', color: colors.gray[400] };
   }
 };

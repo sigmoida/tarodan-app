@@ -1,7 +1,7 @@
 import { View, ScrollView, StyleSheet, TouchableOpacity } from 'react-native';
 import { router } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
-import { theme, Text, Card, Button } from '@tarodan/ui-native';
+import { theme, Text, Card, Button, ScreenHeader } from '@tarodan/ui-native';
 import { useAuthStore } from '../src/stores/authStore';
 import { useTranslation } from '../src/i18n';
 
@@ -88,6 +88,15 @@ export default function PricingScreen() {
   const { isAuthenticated, user } = useAuthStore();
   const currentTier = user?.membershipTier || 'free';
 
+  // Web ile aynı: business tier yalnızca kurumsal hesaplara (companyName + taxId)
+  // veya hâlihazırda business tier olan kullanıcıya gösterilir. Bireysel hesaplar
+  // business kartını görmez (backend 403 döndürür).
+  const isBusinessAccount = !!(user?.companyName && user?.taxId);
+  const visibleTiers =
+    isBusinessAccount || currentTier === 'business'
+      ? MEMBERSHIP_TIERS
+      : MEMBERSHIP_TIERS.filter((tier) => tier.id !== 'business');
+
   const handleSelectPlan = (tierId: string) => {
     if (!isAuthenticated) {
       router.push('/(auth)/login');
@@ -103,14 +112,7 @@ export default function PricingScreen() {
 
   return (
     <View style={styles.container}>
-      {/* Header */}
-      <View style={styles.header}>
-        <TouchableOpacity onPress={() => router.back()}>
-          <Ionicons name="arrow-back" size={24} color={colors.white} />
-        </TouchableOpacity>
-        <Text style={styles.headerTitle}>{t('mobile.pagePricing')}</Text>
-        <View style={{ width: 24 }} />
-      </View>
+      <ScreenHeader title={t('mobile.pagePricing')} onBack={() => router.back()} />
 
       <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
         {/* Title Section */}
@@ -122,7 +124,7 @@ export default function PricingScreen() {
         </View>
 
         {/* Plans */}
-        {MEMBERSHIP_TIERS.map((tier) => (
+        {visibleTiers.map((tier) => (
           <Card
             key={tier.id}
             style={{
@@ -233,20 +235,6 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: colors.surface.alt,
-  },
-  header: {
-    backgroundColor: colors.primary[600]!,
-    paddingTop: 50,
-    paddingBottom: 16,
-    paddingHorizontal: 20,
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-  },
-  headerTitle: {
-    fontSize: 18,
-    fontWeight: 'bold',
-    color: colors.white,
   },
   content: {
     flex: 1,

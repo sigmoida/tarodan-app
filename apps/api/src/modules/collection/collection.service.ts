@@ -41,6 +41,16 @@ try {
   sharp = null;
 }
 
+// "Görünür" item filtresi: custom item'lar + ürünü active/sold olan item'lar.
+// mapCollectionToDto'daki filtreyle birebir aynı semantik — liste ve detay
+// endpoint'lerinin aynı itemCount'u dönmesi için tek kaynak.
+const VISIBLE_ITEM_FILTER: Prisma.CollectionItemWhereInput = {
+  OR: [
+    { productId: null },
+    { product: { status: { in: ['active', 'sold'] } } },
+  ],
+};
+
 @Injectable()
 export class CollectionService {
   private readonly logger = new Logger(CollectionService.name);
@@ -361,7 +371,7 @@ export class CollectionService {
         where,
         include: {
           user: { select: { id: true, displayName: true } },
-          _count: { select: { items: true } },
+          _count: { select: { items: { where: VISIBLE_ITEM_FILTER } } },
         },
         orderBy: { createdAt: 'desc' },
         skip: (safePage - 1) * safePageSize,
@@ -479,7 +489,7 @@ export class CollectionService {
       include: {
         user: { select: { id: true, displayName: true } },
         category: { select: { id: true, name: true, slug: true } },
-        _count: { select: { items: true } },
+        _count: { select: { items: { where: VISIBLE_ITEM_FILTER } } },
       },
     });
 
@@ -562,7 +572,7 @@ export class CollectionService {
         include: {
           user: { select: { id: true, displayName: true } },
           category: { select: { id: true, name: true, slug: true } },
-          _count: { select: { items: true } },
+          _count: { select: { items: { where: VISIBLE_ITEM_FILTER } } },
         },
         ...(needsInMemorySort ? {} : { orderBy, skip: (safePage - 1) * safePageSize, take: safePageSize }),
       }),
@@ -1347,6 +1357,9 @@ export class CollectionService {
                     avatarUrl: true,
                   },
                 },
+                // Gerçek görünür item sayısı — items aşağıda kapak için take:4 ile
+                // sınırlı olduğundan itemCount'u bu _count'tan override ediyoruz.
+                _count: { select: { items: { where: VISIBLE_ITEM_FILTER } } },
                 items: {
                   take: 4,
                   orderBy: { sortOrder: 'asc' },
@@ -1387,7 +1400,12 @@ export class CollectionService {
       const collections = (await Promise.all(
         validLikes.map(async (like) => {
           try {
-            return await this.mapCollectionToDto((like as any).collection, true);
+            const col = (like as any).collection;
+            const dto = await this.mapCollectionToDto(col, true);
+            // items take:4 ile sınırlı olduğu için mapCollectionToDto'nun
+            // ürettiği itemCount yanıltıcı; gerçek görünür sayıyla değiştir.
+            dto.itemCount = col._count?.items ?? dto.itemCount;
+            return dto;
           } catch (err) {
             this.logger.error('getLikedCollections: error mapping collection');
             return null;

@@ -20,10 +20,12 @@ import {
   UserIcon,
   CurrencyDollarIcon,
   CalendarDaysIcon,
+  RocketLaunchIcon,
 } from "@heroicons/react/24/outline";
 import { StarIcon } from "@heroicons/react/24/solid";
 import toast from "react-hot-toast";
 import { Button, Spinner } from "@tarodan/ui";
+import BoostModal from "@/components/BoostModal";
 import { useAuthStore } from "@/stores/authStore";
 import { userApi, api, ordersApi } from "@/lib/api";
 import {
@@ -41,6 +43,8 @@ interface Listing {
   isOnSale?: boolean;
   discountPercent?: number | null;
   status: string;
+  isBoosted?: boolean;
+  boostedUntil?: string | null;
   images?: Array<{ url: string } | string>;
   createdAt: string;
   viewCount?: number;
@@ -102,12 +106,15 @@ export default function ProfileListingsPage() {
   const searchParams = useSearchParams();
   const pathname = usePathname();
   const queryClient = useQueryClient();
-  const { isAuthenticated, isLoading: authLoading } = useAuthStore();
+  const { isAuthenticated, isLoading: authLoading, user } = useAuthStore();
+  const isPremiumUser =
+    !!(user as any)?.membershipTier && (user as any).membershipTier !== "free";
 
   const [activeFilter, setActiveFilter] = useState(
     searchParams.get("status") || "",
   );
   const [deletingId, setDeletingId] = useState<string | null>(null);
+  const [boostTarget, setBoostTarget] = useState<Listing | null>(null);
   const prevPathnameRef = useRef<string | null>(null);
 
   useEffect(() => {
@@ -331,6 +338,14 @@ export default function ProfileListingsPage() {
                         {statusConfig.label}
                       </span>
                     </div>
+                    {listing.isBoosted && (
+                      <div className="absolute top-2 right-2">
+                        <span className="inline-flex items-center gap-1 px-2 py-1 rounded-sm text-xs font-bold bg-amber-500 text-inverted">
+                          <RocketLaunchIcon className="w-3 h-3" />
+                          Öne Çıkan
+                        </span>
+                      </div>
+                    )}
                   </div>
 
                   <div className="p-4">
@@ -463,6 +478,16 @@ export default function ProfileListingsPage() {
                           Düzenle
                         </Link>
                       )}
+                      {listing.status === "active" && (
+                        <button
+                          type="button"
+                          onClick={() => setBoostTarget(listing)}
+                          className="flex-1 py-2 text-center bg-amber-500 hover:bg-amber-600 text-inverted rounded text-sm font-medium transition-colors flex items-center justify-center gap-1"
+                        >
+                          <RocketLaunchIcon className="w-4 h-4" />
+                          {listing.isBoosted ? "Süre Ekle" : "Öne Çıkar"}
+                        </button>
+                      )}
                       {listing.status === "sold" && listing.orderId && (
                         <Link
                           href={`/orders?highlight=${listing.orderId}`}
@@ -501,6 +526,17 @@ export default function ProfileListingsPage() {
           </div>
         )}
       </main>
+
+      {boostTarget && (
+        <BoostModal
+          listingId={boostTarget.id}
+          listingTitle={boostTarget.title}
+          boostedUntil={boostTarget.boostedUntil ?? null}
+          isPremium={isPremiumUser}
+          open={!!boostTarget}
+          onClose={() => setBoostTarget(null)}
+        />
+      )}
     </div>
   );
 }

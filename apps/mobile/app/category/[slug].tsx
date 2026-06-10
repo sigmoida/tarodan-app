@@ -1,6 +1,6 @@
 import { useState, useCallback } from 'react';
 import { View, ScrollView, StyleSheet, TouchableOpacity, Image, Dimensions, RefreshControl } from 'react-native';
-import { theme, Chip, Spinner, Text, Input, Modal } from '@tarodan/ui-native';
+import { theme, Chip, Spinner, Text, Input, Modal, ScreenHeader } from '@tarodan/ui-native';
 import { useQuery } from '@tanstack/react-query';
 import { router, useLocalSearchParams } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
@@ -8,6 +8,8 @@ import { productsApi, categoriesApi } from '../../src/services/api';
 import { SCALES } from '../../src/theme';
 import { getImageUrl as getImageUrlFromUtils } from '../../src/utils/imageUrl';
 import { isProductTradeOpen } from '../../src/utils/isProductTradeOpen';
+import { isProductOutOfStock } from '../../src/utils/productPrice';
+import { OutOfStockOverlay } from '../../src/components/product';
 import { safeString } from '../../src/utils/safeString';
 
 const { colors } = theme;
@@ -34,7 +36,7 @@ export default function CategoryScreen() {
     queryKey: ['category', slug],
     queryFn: async () => {
       try {
-        const response = await categoriesApi.getOne(slug);
+        const response = await categoriesApi.getBySlug(slug);
         return response.data.category || response.data;
       } catch (error) {
         console.log('Category fetch error:', error);
@@ -46,11 +48,11 @@ export default function CategoryScreen() {
 
   // Fetch products in category
   const { data: products, isLoading, refetch } = useQuery({
-    queryKey: ['category-products', slug, searchQuery, sortBy, selectedScale],
+    queryKey: ['category-products', category?.id, searchQuery, sortBy, selectedScale],
     queryFn: async () => {
       try {
         const params: any = {
-          categoryId: slug,
+          categoryId: category?.id,
           limit: 50,
           sortBy,
         };
@@ -64,7 +66,7 @@ export default function CategoryScreen() {
         return [];
       }
     },
-    enabled: !!slug,
+    enabled: !!category?.id,
   });
 
   const onRefresh = useCallback(async () => {
@@ -91,7 +93,11 @@ export default function CategoryScreen() {
         onPress={() => router.push(`/product/${item.id}`)}
       >
         <View style={styles.productImageContainer}>
-          <Image source={{ uri: getImageUrl(item) }} style={styles.productImage} />
+          <Image
+            source={{ uri: getImageUrl(item) }}
+            style={[styles.productImage, isProductOutOfStock(item) && { opacity: 0.45 }]}
+          />
+          {isProductOutOfStock(item) && <OutOfStockOverlay />}
           {isTradeEnabled && (
             <View style={styles.tradeBadge}>
               <Ionicons name="swap-horizontal" size={12} color={colors.white} />
@@ -114,14 +120,7 @@ export default function CategoryScreen() {
 
   return (
     <View style={styles.container}>
-      {/* Header */}
-      <View style={styles.header}>
-        <TouchableOpacity onPress={() => router.back()}>
-          <Ionicons name="arrow-back" size={24} color={colors.white} />
-        </TouchableOpacity>
-        <Text style={styles.headerTitle}>{category?.name || 'Kategori'}</Text>
-        <View style={{ width: 24 }} />
-      </View>
+      <ScreenHeader title={category?.name || 'Kategori'} onBack={() => router.back()} />
 
       {/* Search & Filters */}
       <View style={styles.filterSection}>
@@ -222,20 +221,6 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: colors.surface.alt,
-  },
-  header: {
-    backgroundColor: colors.primary[600]!,
-    paddingTop: 50,
-    paddingBottom: 16,
-    paddingHorizontal: 20,
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-  },
-  headerTitle: {
-    fontSize: 18,
-    fontWeight: 'bold',
-    color: colors.white,
   },
   filterSection: {
     backgroundColor: colors.surface.DEFAULT,

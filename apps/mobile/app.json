@@ -35,6 +35,15 @@
     "plugins": [
       "expo-router",
       [
+        "expo-splash-screen",
+        {
+          "backgroundColor": "#FE6F13",
+          "image": "./assets/splash-icon.png",
+          "imageWidth": 240,
+          "resizeMode": "contain"
+        }
+      ],
+      [
         "expo-camera",
         {
           "cameraPermission": "Ürün fotoğrafı çekmek için kamera erişimi gereklidir."
@@ -49,10 +58,11 @@
       [
         "expo-notifications",
         {
-          "color": "#E53935"
+          "color": "#EA580C"
         }
       ],
-      "expo-secure-store"
+      "expo-secure-store",
+      "@react-native-community/datetimepicker"
     ],
     "experiments": {
       "typedRoutes": true

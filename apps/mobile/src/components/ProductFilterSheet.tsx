@@ -116,11 +116,24 @@ export default function ProductFilterSheet({
     );
 
   const selectManufacturer = (id: string, name: string) =>
+    // Üretici değişince üreticiye-özel attribute seçimlerini sıfırla (web ile parite) —
+    // başka üreticinin attribute'ları yeni üreticide anlamsız.
     onChange(
       filters.manufacturerId === id
-        ? { ...filters, manufacturerId: '', manufacturer: '' }
-        : { ...filters, manufacturerId: id, manufacturer: name },
+        ? { ...filters, manufacturerId: '', manufacturer: '', customAttributes: {} }
+        : { ...filters, manufacturerId: id, manufacturer: name, customAttributes: {} },
     );
+
+  const toggleCustomAttribute = (groupSlug: string, attrSlug: string) => {
+    const current = filters.customAttributes?.[groupSlug] ?? [];
+    const next = current.includes(attrSlug)
+      ? current.filter((s) => s !== attrSlug)
+      : [...current, attrSlug];
+    const nextMap = { ...(filters.customAttributes ?? {}) };
+    if (next.length === 0) delete nextMap[groupSlug];
+    else nextMap[groupSlug] = next;
+    onChange({ ...filters, customAttributes: nextMap });
+  };
 
   const toggleScale = (scale: string) =>
     onChange({ ...filters, scale: filters.scale === scale ? '' : scale });
@@ -159,6 +172,31 @@ export default function ProductFilterSheet({
         </View>
 
         <ScrollView style={styles.content} keyboardShouldPersistTaps="handled">
+          {/* Arama */}
+          <View style={styles.section}>
+            <SectionTitle>Arama</SectionTitle>
+            <Input
+              placeholder="Model, marka veya anahtar kelime..."
+              value={filters.search}
+              onChangeText={(v) => onChange({ ...filters, search: v })}
+              leftIconName="search"
+              rightIcon={
+                filters.search ? (
+                  <Pressable
+                    onPress={() => onChange({ ...filters, search: '' })}
+                    hitSlop={8}
+                    accessibilityRole="button"
+                    accessibilityLabel="Aramayı temizle"
+                  >
+                    <Ionicons name="close-circle" size={20} color={colors.text.muted} />
+                  </Pressable>
+                ) : undefined
+              }
+            />
+          </View>
+
+          <Divider style={styles.divider} />
+
           {/* Araç Türü */}
           {options.categories.length > 0 && (
             <View style={styles.section}>
@@ -281,6 +319,32 @@ export default function ProductFilterSheet({
               ))}
             </View>
           </View>
+
+          {/* Üreticiye-özel filtreler (örn Hot Wheels: Segment, Assortment...).
+              Yalnızca attribute-grubu olan bir üretici seçilince dolar. Web SidebarFilters paritesi. */}
+          {options.customAttributes.length > 0 && (
+            <>
+              <Divider style={styles.divider} />
+              {options.customAttributes.map((group) => {
+                const selected = filters.customAttributes?.[group.slug] ?? [];
+                return (
+                  <View key={group.slug} style={styles.section}>
+                    <SectionTitle>{group.name}</SectionTitle>
+                    <View style={styles.scrollList}>
+                      {group.attributes.map((attr) => (
+                        <RadioRow
+                          key={attr.slug}
+                          label={attr.label}
+                          selected={selected.includes(attr.slug)}
+                          onPress={() => toggleCustomAttribute(group.slug, attr.slug)}
+                        />
+                      ))}
+                    </View>
+                  </View>
+                );
+              })}
+            </>
+          )}
 
           <Divider style={styles.divider} />
 

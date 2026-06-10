@@ -29,3 +29,18 @@ export function getProductOriginalPriceForDisplay(p: ProductPriceFields): number
   const old = p.oldPrice != null ? Number(p.oldPrice) : (p.originalPrice != null ? Number(p.originalPrice) : null);
   return old ?? Number(p.price);
 }
+
+/**
+ * Ürün stokta yok mu?
+ * - active dışı her statü (sold / inactive vb.) "stokta yok" sayılır.
+ * - availableQuantity (quantity - reserved) <= 0 → stokta yok. null = sınırsız stok → stokta.
+ * Listelerde "Stokta yok" rozeti ve detayda pasif satın al için tek kaynak.
+ */
+export function isProductOutOfStock(p: {
+  status?: string | null;
+  availableQuantity?: number | null;
+}): boolean {
+  if (p.status != null && p.status !== 'active') return true;
+  if (p.availableQuantity != null && p.availableQuantity <= 0) return true;
+  return false;
+}

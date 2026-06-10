@@ -65,6 +65,7 @@ export {
 export { ButtonLink } from './ButtonLink';
 export { default as SectionHeader } from './SectionHeader';
 export { default as ProductCard } from './ProductCard';
+export { default as OutOfStockOverlay } from './OutOfStockOverlay';
 export { default as SkeletonCard } from './SkeletonCard';
 export { default as BrandCard } from './BrandCard';
 export { default as ScaleChip } from './ScaleChip';

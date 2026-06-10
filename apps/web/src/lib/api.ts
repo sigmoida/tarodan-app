@@ -64,16 +64,20 @@ api.interceptors.response.use(
 
             // Retry the original request
             return api(originalRequest);
-          } catch (refreshError) {
-            // Refresh failed, logout user
+          } catch (refreshError: any) {
+            // Refresh'in network/5xx ile patlaması (API erişilemez) ≠ geçersiz refresh token.
+            // Sadece refresh GERÇEKTEN 401/403 dönerse oturumu kapat; geçici hatada token'ı koru
+            // ki API hıçkırınca (özellikle ödeme dönüşü) kullanıcı login'e atılmasın.
+            const refreshStatus = refreshError?.response?.status;
+            const refreshRejectedAuth = refreshStatus === 401 || refreshStatus === 403;
             const hadToken = localStorage.getItem('auth_token');
-            if (!shouldPreserveAuthTokenOn401()) {
+            if (refreshRejectedAuth && !shouldPreserveAuthTokenOn401()) {
               localStorage.removeItem('auth_token');
               localStorage.removeItem('refresh_token');
             }
 
-            // Only auto-redirect for expired sessions; never redirect on public/guest pages
-            if (hadToken) {
+            // Only auto-redirect for genuinely expired/invalid sessions; never on transient errors or public/guest pages
+            if (refreshRejectedAuth && hadToken) {
               const currentPath = (typeof window !== 'undefined' && window.location?.pathname) || '';
               const publicPathsNoRedirect = ['/track-order', '/orders/track', '/login', '/register'];
               const isPublicPath = publicPathsNoRedirect.some(p => currentPath === p || currentPath.startsWith(p + '/'));
@@ -146,7 +150,10 @@ export const authApi = {
 
 // Products (was Listings - endpoint is /products in backend)
 export const listingsApi = {
-  getFilters: () => api.get('/products/filters'),
+  getFilters: (params?: { manufacturer?: string }) =>
+    api.get('/products/filters', { params }),
+  getAttributeGroups: (params?: { manufacturer?: string }) =>
+    api.get('/products/attribute-groups', { params }),
   getPopular: (params?: { limit?: number; page?: number }) =>
     api.get('/products/popular', { params: { limit: 20, page: 1, ...params }, headers: { 'Cache-Control': 'no-cache', Pragma: 'no-cache' } }),
   getAll: (params?: Record<string, any>) =>
@@ -310,6 +317,17 @@ export const paymentsApi = {
     page?: number;
     limit?: number;
   }) => api.get('/payments/me', { params }),
+  // Saklı kart yönetimi
+  getMethods: () => api.get('/payments/methods'),
+  addMethod: (card: {
+    cardNumber: string;
+    cardHolderName: string;
+    expireMonth: string;
+    expireYear: string;
+    cvc: string;
+  }) => api.post('/payments/methods', { card }),
+  deleteMethod: (id: string) => api.delete(`/payments/methods/${id}`),
+  setDefaultMethod: (id: string) => api.patch(`/payments/methods/${id}/default`),
   cancel: (paymentId: string) =>
     api.post(`/payments/${paymentId}/cancel`),
   /** Fail sayfasından; ödeme hâlâ pending ise rezervasyonu serbest bırakır */

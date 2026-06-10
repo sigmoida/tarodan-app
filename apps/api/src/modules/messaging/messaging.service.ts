@@ -341,6 +341,22 @@ export class MessagingService {
     };
   }
 
+  /**
+   * Kullanıcının TÜM thread'lerindeki toplam okunmamış mesaj sayısı — sayfalamadan
+   * bağımsız tek sorgu. (Header rozeti önceden 20'lik thread sayfasının unreadCount'larını
+   * topluyordu → >20 thread'de eksik sayıyordu.) Per-thread unreadCount formülünün toplamı
+   * = receiverId=me, okunmamış, görünür statü.
+   */
+  async getUnreadMessageCount(userId: string): Promise<number> {
+    return this.prisma.message.count({
+      where: {
+        receiverId: userId,
+        readAt: null,
+        status: { in: [MessageStatus.sent, MessageStatus.approved] },
+      },
+    });
+  }
+
   // ==========================================================================
   // GET THREAD BY ID
   // ==========================================================================

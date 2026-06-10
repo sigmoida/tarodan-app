@@ -7,13 +7,15 @@ import {
   Dimensions,
   Modal,
 } from 'react-native';
-import { theme, Text, Input, Chip, Spinner, Radio } from '@tarodan/ui-native';
+import { theme, Text, Input, Chip, Spinner, Radio, ScreenHeader } from '@tarodan/ui-native';
 import { useState, useMemo } from 'react';
 import { useInfiniteQuery } from '@tanstack/react-query';
 import { router, useLocalSearchParams } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { productsApi } from '../src/services/api';
 import { getImageUrl as getImageUrlFromUtils } from '../src/utils/imageUrl';
+import { isProductOutOfStock } from '../src/utils/productPrice';
+import { OutOfStockOverlay } from '../src/components/product';
 import { asLabel } from '../src/utils/format';
 import ProductFilterSheet from '../src/components/ProductFilterSheet';
 import { useProductFilterOptions } from '../src/hooks/useProductFilterOptions';
@@ -60,7 +62,16 @@ export default function ListingsScreen() {
   const [filterModalVisible, setFilterModalVisible] = useState(false);
   const [sortMenuVisible, setSortMenuVisible] = useState(false);
 
-  const options = useProductFilterOptions();
+  // Seçili üreticinin slug'ını çöz ki üreticiye-özel filtreler (HW vb.) yüklensin.
+  const baseOptions = useProductFilterOptions();
+  const manufacturerSlug = useMemo(() => {
+    const list = baseOptions.manufacturers;
+    if (filters.manufacturerId) return list.find((m) => m.id === filters.manufacturerId)?.slug;
+    if (filters.manufacturer)
+      return list.find((m) => m.name.toLowerCase() === filters.manufacturer.toLowerCase())?.slug;
+    return undefined;
+  }, [filters.manufacturerId, filters.manufacturer, baseOptions.manufacturers]);
+  const options = useProductFilterOptions(manufacturerSlug);
 
   const applySearch = () =>
     setFilters((prev) => ({ ...prev, search: searchQuery.trim() }));
@@ -127,7 +138,11 @@ export default function ListingsScreen() {
         onPress={() => router.push(`/product/${item.id}`)}
       >
         <View style={styles.productImageContainer}>
-          <Image source={{ uri: getImageUrlFromUtils(item.images) }} style={styles.productImage} />
+          <Image
+            source={{ uri: getImageUrlFromUtils(item.images) }}
+            style={[styles.productImage, isProductOutOfStock(item) && { opacity: 0.45 }]}
+          />
+          {isProductOutOfStock(item) && <OutOfStockOverlay />}
           {isTradeEnabled && (
             <View style={styles.tradeBadge}>
               <Ionicons name="swap-horizontal" size={12} color={colors.white} />
@@ -153,14 +168,7 @@ export default function ListingsScreen() {
 
   return (
     <View style={styles.container}>
-      {/* Header */}
-      <View style={styles.header}>
-        <TouchableOpacity onPress={() => router.back()}>
-          <Ionicons name="arrow-back" size={24} color={colors.white} />
-        </TouchableOpacity>
-        <Text style={styles.headerTitle}>İlanlar</Text>
-        <View style={{ width: 24 }} />
-      </View>
+      <ScreenHeader title="İlanlar" onBack={() => router.back()} />
 
       {/* Search & Sort */}
       <View style={styles.searchSection}>
@@ -296,16 +304,6 @@ export default function ListingsScreen() {
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: colors.surface.alt },
-  header: {
-    backgroundColor: colors.primary[600]!,
-    paddingTop: 50,
-    paddingBottom: 16,
-    paddingHorizontal: 20,
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-  },
-  headerTitle: { fontSize: 18, fontWeight: 'bold', color: colors.white },
   searchSection: {
     backgroundColor: colors.surface.DEFAULT,
     paddingHorizontal: 16,

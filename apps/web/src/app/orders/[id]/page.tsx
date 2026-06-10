@@ -13,6 +13,7 @@ import {
   addressesApi,
   ratingsApi,
   mediaApi,
+  supportApi,
 } from "@/lib/api";
 import RefundRequestModal from "@/components/RefundRequestModal";
 import {
@@ -36,6 +37,7 @@ import {
   Input,
   Modal,
   Radio,
+  Select,
   Spinner,
   StatusBadge,
   Textarea,
@@ -190,6 +192,11 @@ export default function OrderDetailPage() {
   const [submittingReview, setSubmittingReview] = useState(false);
   const [reviewImages, setReviewImages] = useState<File[]>([]);
   const [reviewImagePreviews, setReviewImagePreviews] = useState<string[]>([]);
+  const [refundReason, setRefundReason] = useState("");
+  const [refundDescription, setRefundDescription] = useState("");
+  const [refundImages, setRefundImages] = useState<File[]>([]);
+  const [refundImagePreviews, setRefundImagePreviews] = useState<string[]>([]);
+  const [submittingRefund, setSubmittingRefund] = useState(false);
 
   const orderId = params?.id as string;
 

@@ -109,7 +109,20 @@ export default function NewListingPage() {
     isSet: false,
     quantity: "" as string | number,
     images: [] as Array<{ cardKey: string; detailKey: string }>,
+    // Manufacturer-scoped extra attributes (e.g. Hot Wheels Segment/Assortment/...).
+    // Populated only when a manufacturer with scoped groups is selected.
+    customAttributes: {} as Record<string, string[]>,
   });
+  // Attribute groups applicable to the currently selected manufacturer (re-fetched on change).
+  const [manufacturerAttrGroups, setManufacturerAttrGroups] = useState<
+    Array<{
+      slug: string;
+      name: string;
+      manufacturerSlug: string | null;
+      isRequired: boolean;
+      attributes: Array<{ slug: string; label: string; color?: string | null }>;
+    }>
+  >([]);
   const [uploadingImages, setUploadingImages] = useState(false);
   // Store preview URLs (cardUrl from upload response for display)
   const [imagePreviewUrls, setImagePreviewUrls] = useState<string[]>([]);
@@ -443,6 +456,69 @@ export default function NewListingPage() {
     fetchFilters();
   }, []);
 
+  // Tracks the manufacturer for which `customAttributes` are currently valid. When the user
+  // switches manufacturers, this triggers a one-time reset so stale HW-specific selections
+  // from a prior manufacturer don't persist into the new payload.
+  const activeAttrManufacturer = useRef<string>("");
+
+  // Manufacturer-scoped attribute groups: re-fetch whenever the selected manufacturer changes.
+  // Clears any stale selections so the form never submits HW attributes for a non-HW manufacturer.
+  useEffect(() => {
+    // Don't act until manufacturerList has finished loading — otherwise we'd wipe a
+    // localStorage-restored manufacturerId on mount before its row is available.
+    if (manufacturerList.length === 0) return;
+
+    const selected = manufacturerList.find((m) => m.id === formData.manufacturerId);
+    const newKey = selected?.id ?? "";
+    const manufacturerActuallyChanged = activeAttrManufacturer.current !== newKey;
+
+    if (!selected) {
+      setManufacturerAttrGroups([]);
+      if (manufacturerActuallyChanged && Object.keys(formData.customAttributes).length > 0) {
+        setFormData((prev) => ({ ...prev, customAttributes: {} }));
+      }
+      activeAttrManufacturer.current = "";
+      return;
+    }
+
+    // Switching from manufacturer A to manufacturer B: discard A's selections.
+    // Keeping them would mean the payload submits attribute slugs that don't belong to B.
+    if (manufacturerActuallyChanged && activeAttrManufacturer.current !== "") {
+      setFormData((prev) => ({ ...prev, customAttributes: {} }));
+    }
+    activeAttrManufacturer.current = newKey;
+
+    let cancelled = false;
+    (async () => {
+      try {
+        const response = await listingsApi.getAttributeGroups({ manufacturer: selected.slug });
+        if (cancelled) return;
+        const groups = (response.data as Array<{
+          slug: string;
+          name: string;
+          manufacturerSlug: string | null;
+          isRequired: boolean;
+          attributes: Array<{ slug: string; label: string; color?: string | null }>;
+        }>) ?? [];
+        // Only render groups specific to this manufacturer; global groups (scale, material) are
+        // already represented by their own dedicated fields in the form.
+        const scoped = groups.filter((g) => g.manufacturerSlug === selected.slug);
+        setManufacturerAttrGroups(scoped);
+      } catch (error) {
+        if (process.env.NODE_ENV === "development")
+          console.error("Failed to fetch manufacturer attribute groups:", error);
+        if (!cancelled) setManufacturerAttrGroups([]);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+    // formData.customAttributes intentionally excluded — we don't want a clearing side-effect
+    // every time the user toggles an attribute. The ref above guarantees we reset only when
+    // manufacturerId genuinely changes.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [formData.manufacturerId, manufacturerList]);
+
   useEffect(() => {
     if (formData.brandId) {
       const selectedBrand = brands.find((b) => b.id === formData.brandId);
@@ -587,6 +663,15 @@ export default function NewListingPage() {
       return;
     }
 
+    if (formData.images.length === 0) {
+      toast.error(
+        locale === "en"
+          ? "Please add at least one photo"
+          : "En az bir fotoğraf ekleyin",
+      );
+      return;
+    }
+
     // Check listing limit
     if (listingLimits && !listingLimits.canCreateListing) {
       toast.error(
@@ -597,6 +682,12 @@ export default function NewListingPage() {
 
     setIsLoading(true);
     try {
+      // Flatten manufacturer-scoped attribute selections into the flat slug array the API expects.
+      // groupSlug -> [attrSlug, attrSlug] becomes [attrSlug, attrSlug, attrSlug] from all groups.
+      const customAttributeSlugs = Object.values(formData.customAttributes)
+        .flat()
+        .filter(Boolean);
+
       const payload = {
         title: formData.title,
         description: formData.description || undefined,
@@ -619,6 +710,7 @@ export default function NewListingPage() {
             ? Number(formData.quantity)
             : undefined, // undefined = unlimited stock
         images: formData.images.length > 0 ? formData.images : undefined,
+        attributes: customAttributeSlugs.length > 0 ? customAttributeSlugs : undefined,
       };
 
       await listingsApi.create(payload as any);
@@ -959,6 +1051,106 @@ export default function NewListingPage() {
                 </div>
               </div>
             </div>
+
+            {/* Section: Manufacturer-specific extra fields (e.g. Hot Wheels Segment/Assortment/...) */}
+            {manufacturerAttrGroups.length > 0 && (
+              <div className="bg-surface-elevated rounded border border-border-subtle p-5">
+                <h2 className="text-sm font-semibold text-heading uppercase tracking-wide mb-1">
+                  {manufacturerList.find((m) => m.id === formData.manufacturerId)?.name}{" "}
+                  {locale === "en" ? "details" : "detayları"}
+                </h2>
+                <p className="text-xs text-muted mb-4">
+                  {locale === "en"
+                    ? "Optional fields specific to this manufacturer. Buyers can filter by these."
+                    : "Bu üreticiye özgü opsiyonel alanlar. Alıcılar bunlara göre filtreleyebilir."}
+                </p>
+                <div className="space-y-4">
+                  {manufacturerAttrGroups.map((group) => {
+                    const selected = formData.customAttributes[group.slug] ?? [];
+                    const isLong = group.attributes.length > 20;
+                    return (
+                      <div key={group.slug}>
+                        <label className="block text-sm font-medium text-body mb-1">
+                          {group.name}
+                          {selected.length > 0 && (
+                            <span className="ml-2 text-xs text-muted">
+                              ({selected.length})
+                            </span>
+                          )}
+                        </label>
+                        {isLong ? (
+                          // Long lists (Assortment, Designer, Wheel Type) use a Select with single
+                          // pick to keep the form compact. Multi-select via dedicated picker later.
+                          <Select
+                            value={selected[0] ?? ""}
+                            onChange={(e) => {
+                              const value = e.target.value;
+                              setFormData((prev) => {
+                                const next = { ...prev.customAttributes };
+                                if (!value) delete next[group.slug];
+                                else next[group.slug] = [value];
+                                return { ...prev, customAttributes: next };
+                              });
+                            }}
+                          >
+                            <option value="">
+                              {locale === "en"
+                                ? `Select ${group.name.toLowerCase()}`
+                                : `${group.name} seçin`}
+                            </option>
+                            {group.attributes.map((a) => (
+                              <option key={a.slug} value={a.slug}>
+                                {a.label}
+                              </option>
+                            ))}
+                          </Select>
+                        ) : (
+                          // Short lists (Segment, Body Color, Color Finishes, Rarity) render as
+                          // toggleable chips for fast selection.
+                          <div className="flex flex-wrap gap-2">
+                            {group.attributes.map((a) => {
+                              const isSelected = selected.includes(a.slug);
+                              return (
+                                <button
+                                  key={a.slug}
+                                  type="button"
+                                  onClick={() => {
+                                    setFormData((prev) => {
+                                      const current = prev.customAttributes[group.slug] ?? [];
+                                      const next = current.includes(a.slug)
+                                        ? current.filter((s) => s !== a.slug)
+                                        : [...current, a.slug];
+                                      const map = { ...prev.customAttributes };
+                                      if (next.length === 0) delete map[group.slug];
+                                      else map[group.slug] = next;
+                                      return { ...prev, customAttributes: map };
+                                    });
+                                  }}
+                                  className={`inline-flex items-center gap-1.5 px-3 py-1.5 text-xs rounded-full border transition-colors ${
+                                    isSelected
+                                      ? "bg-primary-500 text-inverted border-primary-500"
+                                      : "bg-surface text-body border-border-subtle hover:bg-surface-alt"
+                                  }`}
+                                >
+                                  {a.color && (
+                                    <span
+                                      className="w-2.5 h-2.5 rounded-full border border-border-subtle"
+                                      style={{ backgroundColor: a.color }}
+                                      aria-hidden="true"
+                                    />
+                                  )}
+                                  {a.label}
+                                </button>
+                              );
+                            })}
+                          </div>
+                        )}
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
 
             {/* Section: Options */}
             <div className="bg-surface-elevated rounded border border-border-subtle p-5">

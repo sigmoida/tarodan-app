@@ -13,6 +13,8 @@ import { InitiatePaymentDto, PaymentProvider, PayTRCallbackDto } from './dto';
 import { PaymentStatus, PaymentHoldStatus, OrderStatus, ProductStatus, SubscriptionStatus, TradeStatus, OfferStatus } from '@prisma/client';
 import { getProductStatusFromQuantity } from '../product/helpers/product-status.helper';
 import { safeDecrementReserved } from '../product/helpers/product-availability.helper';
+import { computeRelevanceScore, RELEVANCE_PREMIUM_BONUS } from '../product/helpers/relevance-score';
+import { createTradeWarehouseShipments } from '../trade/helpers/warehouse-shipments';
 import { PayTRService } from '../payment-providers/paytr.service';
 import { EventService } from '../events';
 import { InvoiceService } from '../invoice/invoice.service';
@@ -450,16 +452,39 @@ export class PaymentService {
       this.logger.log(`Re-reserved 1 unit for order ${order.id} after release`);
     }
 
-    // Create payment record
-    const payment = await this.prisma.payment.create({
-      data: {
-        orderId: dto.orderId,
-        amount: order.totalAmount,
-        currency: 'TRY',
-        provider: PaymentProvider.paytr,
-        status: PaymentStatus.pending,
-      },
+    // Create payment record.
+    // order_id UNIQUE: bir sipariş için tek Payment. Önceki ödeme başarısız/iptal olduysa
+    // (ödeme zaman aşımı → kullanıcı geri dönüp tekrar öder) var olanı YENİDEN KULLAN; aksi halde
+    // yeni create 'Unique constraint failed (order_id)' ile 500 verir (re-ödeme akışı çöker).
+    const existingOrderPayment = await this.prisma.payment.findUnique({
+      where: { orderId: dto.orderId },
     });
+    let payment;
+    if (existingOrderPayment) {
+      if (existingOrderPayment.status === PaymentStatus.completed) {
+        throw new BadRequestException('Bu sipariş zaten ödendi');
+      }
+      payment = await this.prisma.payment.update({
+        where: { id: existingOrderPayment.id },
+        data: {
+          status: PaymentStatus.pending,
+          failureReason: null,
+          providerPaymentId: null,
+          amount: order.totalAmount,
+          provider: PaymentProvider.paytr,
+        },
+      });
+    } else {
+      payment = await this.prisma.payment.create({
+        data: {
+          orderId: dto.orderId,
+          amount: order.totalAmount,
+          currency: 'TRY',
+          provider: PaymentProvider.paytr,
+          status: PaymentStatus.pending,
+        },
+      });
+    }
 
     // Log payment creation
     await this.logPaymentAction('created', payment.id, dto.orderId, undefined, undefined, PaymentStatus.pending, {
@@ -879,8 +904,14 @@ export class PaymentService {
       return this.processSuccessfulTradeCashPayment(payment, transactionId);
     }
 
-    let cancelledOrders: { buyerId: string; productId: string; productTitle: string }[] = [];
-    let cancelledOffers: { buyerId: string; productId: string; productTitle: string }[] = [];
+    const cancelledOrders: {
+      buyerId: string;
+      productId: string;
+      productTitle: string;
+      offerId: string | null;
+      hadPayment: boolean;
+    }[] = [];
+    const cancelledOffers: { buyerId: string; productId: string; productTitle: string }[] = [];
     let stockoutCategoryId: string | null = null;
 
     const result = await this.prisma.$transaction(async (tx) => {
@@ -949,6 +980,8 @@ export class PaymentService {
 
       // Check if this is a membership order (productId starts with "membership-")
       const isMembershipOrder = payment.order?.productId?.startsWith('membership-') ?? false;
+      // Boost (öne çıkarma) siparişi mi? (productId "boost-" ile başlar)
+      const isBoostOrder = payment.order?.productId?.startsWith('boost-') ?? false;
       const productIdsToInvalidate: string[] = [];
 
       if (isMembershipOrder) {
@@ -966,6 +999,20 @@ export class PaymentService {
               cancelledAt: null,
             },
           });
+
+          // Premium (free olmayan) üyelik aktifleşti: satıcının boost'suz aktif ilanlarını
+          // premium kademesine (rankTier=1) yükselt. Boost'lu (2) ürünlere dokunma.
+          if (membership.tier.type !== 'free') {
+            await tx.product.updateMany({
+              where: {
+                sellerId: payment.order.buyerId,
+                status: ProductStatus.active,
+                rankTier: 0,
+              },
+              // rankTier 0→1; relevanceScore'a premium bonusu ekle (kademe 0→1 farkı)
+              data: { rankTier: 1, relevanceScore: { increment: RELEVANCE_PREMIUM_BONUS } },
+            });
+          }
 
           // Update membership payment record
           await tx.membershipPayment.updateMany({
@@ -1040,6 +1087,57 @@ export class PaymentService {
 
           this.logger.log(`Membership activated for user ${payment.order.buyerId} after payment ${payment.id}`);
         }
+      } else if (isBoostOrder) {
+        // Boost siparişi: ilgili ProductBoost'u aktive et, ürünü sponsorlu kademesine (rankTier=2) al.
+        // Stok/quantity'ye DOKUNULMAZ — boost sanal bir hizmet, fiziksel ürün değil.
+        const boost = await tx.productBoost.findUnique({
+          where: { orderId: payment.orderId },
+        });
+        if (boost) {
+          const nowTs = new Date();
+          // Stacking: ilanda hâlâ aktif bir boost varsa, yeni süre kalan sürenin ÜSTÜNE eklenir.
+          // (örn. kalan 15 gün + yeni 30 gün = toplam 45 gün)
+          const boostedProduct = await tx.product.findUnique({
+            where: { id: boost.productId },
+            select: { boostedUntil: true, qualityScore: true, popularityScore: true },
+          });
+          const base =
+            boostedProduct?.boostedUntil && boostedProduct.boostedUntil > nowTs
+              ? boostedProduct.boostedUntil
+              : nowTs;
+          const startsAt = nowTs;
+          const endsAt = new Date(
+            base.getTime() + boost.durationDays * 24 * 60 * 60 * 1000,
+          );
+          await tx.productBoost.update({
+            where: { id: boost.id },
+            data: { status: 'active', startsAt, endsAt },
+          });
+          await tx.product.update({
+            where: { id: boost.productId },
+            data: {
+              boostedUntil: endsAt,
+              rankTier: 2,
+              relevanceScore: computeRelevanceScore({
+                rankTier: 2,
+                qualityScore: boostedProduct?.qualityScore ?? 0,
+                popularityScore: boostedProduct?.popularityScore,
+              }),
+            },
+          });
+          // Boost sanal hizmettir: sipariş kargo/teslimat akışına girmesin → terminal "completed".
+          // (Paylaşılan kod yukarıda preparing yapmıştı; burada override ediyoruz.)
+          await tx.order.update({
+            where: { id: payment.orderId },
+            data: { status: OrderStatus.completed, preparingDeadline: null },
+          });
+          productIdsToInvalidate.push(boost.productId);
+          this.logger.log(
+            `Boost activated for product ${boost.productId} until ${endsAt.toISOString()} after payment ${payment.id}`,
+          );
+        } else {
+          this.logger.warn(`Boost order ${payment.orderId} paid but no matching ProductBoost found`);
+        }
       } else {
         // Regular product order: ödeme başarılı → quantity--, reservedQuantity--
         productIdsToInvalidate.push(payment.order.productId);
@@ -1096,6 +1194,8 @@ export class PaymentService {
               buyerId: o.buyerId,
               productId: o.productId,
               productTitle: o.productTitle,
+              offerId: o.offerId,
+              hadPayment: o.hadPayment,
             })),
           );
           cancelledOffers.push(
@@ -1126,8 +1226,8 @@ export class PaymentService {
         throw new Error('Order not found after payment');
       }
 
-      // Only create payment hold for regular product orders (not membership orders)
-      if (!isMembershipOrder) {
+      // Only create payment hold for regular product orders (not membership/boost orders)
+      if (!isMembershipOrder && !isBoostOrder) {
         // Calculate seller payout (amount - commission)
         const sellerAmount = Number(order.totalAmount) - Number(order.commissionAmount);
 
@@ -1156,7 +1256,7 @@ export class PaymentService {
 
         this.logger.log(`Payment ${payment.id} completed, hold created for seller ${order.sellerId}`);
       } else {
-        this.logger.log(`Membership payment ${payment.id} completed, no hold needed`);
+        this.logger.log(`Virtual order payment ${payment.id} (membership/boost) completed, no hold needed`);
       }
 
       return { order, productIdsToInvalidate };
@@ -1191,19 +1291,30 @@ export class PaymentService {
     }
 
     // Stockout cascade notifications: dispatch AFTER tx commits so failures
-    // here don't roll back the payment. Order-cancel notifications take
-    // precedence — if a buyer had both a pending order and a separate offer
-    // cancelled, only send the order notification.
-    const orderBuyerIds = new Set(cancelledOrders.map((o) => o.buyerId));
+    // here don't roll back the payment. One notification per buyer.
+    //
+    // An accepted-but-unpaid offer creates a pending_payment Order with no
+    // Payment row and no stock reservation (offer.service.ts acceptOffer). When
+    // stock runs out that Order is cancelled — but since the buyer never paid,
+    // it is really a cancelled OFFER, so we send "Teklifiniz iptal edildi"
+    // rather than the misleading "Siparişiniz iptal edildi". Direct-buy orders
+    // (no offer) and orders whose payment was already initiated keep the
+    // order-cancelled message.
+    const notifiedBuyers = new Set<string>();
     for (const o of cancelledOrders) {
-      await this.notificationService
-        .notifyOrderCancelledOutOfStock(o.buyerId, o.productId, o.productTitle, stockoutCategoryId)
-        .catch((err) =>
-          this.logger.warn(`stockout-notify (order) failed for ${o.buyerId}: ${err.message}`),
-        );
+      if (notifiedBuyers.has(o.buyerId)) continue;
+      notifiedBuyers.add(o.buyerId);
+      const isUnpaidOffer = o.offerId !== null && !o.hadPayment;
+      const notify = isUnpaidOffer
+        ? this.notificationService.notifyOfferCancelledOutOfStock(o.buyerId, o.productId, o.productTitle, stockoutCategoryId)
+        : this.notificationService.notifyOrderCancelledOutOfStock(o.buyerId, o.productId, o.productTitle, stockoutCategoryId);
+      await notify.catch((err) =>
+        this.logger.warn(`stockout-notify (${isUnpaidOffer ? 'offer' : 'order'}) failed for ${o.buyerId}: ${err.message}`),
+      );
     }
     for (const o of cancelledOffers) {
-      if (orderBuyerIds.has(o.buyerId)) continue;
+      if (notifiedBuyers.has(o.buyerId)) continue;
+      notifiedBuyers.add(o.buyerId);
       await this.notificationService
         .notifyOfferCancelledOutOfStock(o.buyerId, o.productId, o.productTitle, stockoutCategoryId)
         .catch((err) =>
@@ -1211,11 +1322,21 @@ export class PaymentService {
         );
     }
 
-    // Emit order.paid event AFTER transaction commits (only for regular product orders, not membership)
+    // Emit order.paid event AFTER transaction commits (only for regular product orders, not membership/boost)
     // This publishes jobs to email, push, and shipping queues
     const isMembershipOrder = resultOrder.productId.startsWith('membership-');
+    const isBoostOrder = resultOrder.productId.startsWith('boost-');
 
+    // Ürün listesi cache'ini temizle:
+    // - Boost: öne çıkarma sıralamayı etkiler.
+    // - Normal ürün siparişi: stok düşer, tükenince status=inactive olur → ürün
+    //   listelerde "stokta yok" olarak sona kayar; sıralama/görünürlük değişir.
+    // Membership siparişleri ürün listelerini etkilemez.
     if (!isMembershipOrder) {
+      await this.cache.delPattern('products:list:*').catch(() => {});
+    }
+
+    if (!isMembershipOrder && !isBoostOrder) {
       try {
         const shippingAddressData = resultOrder.shippingAddress as any;
 
@@ -1264,8 +1385,8 @@ export class PaymentService {
       }
     }
 
-    // Generate and send invoice to buyer (only for regular product orders, not membership)
-    if (!isMembershipOrder) {
+    // Generate and send invoice to buyer (only for regular product orders, not membership/boost)
+    if (!isMembershipOrder && !isBoostOrder) {
       try {
         await this.invoiceService.generateAndSendInvoice(resultOrder.id);
         this.logger.log(`Invoice generated and sent for order ${resultOrder.orderNumber}`);
@@ -1276,7 +1397,8 @@ export class PaymentService {
     }
 
     // Auto-create Shipment record (Sürat Kargo gönderi kaydı oluşturuldu at order creation)
-    if (!isMembershipOrder) {
+    // Membership/boost sanal sipariştir → kargo kaydı oluşturma.
+    if (!isMembershipOrder && !isBoostOrder) {
       try {
         const existingShipment = await this.prisma.shipment.findFirst({
           where: { orderId: resultOrder.id },
@@ -1515,6 +1637,15 @@ export class PaymentService {
             version: { increment: 1 },
           },
         });
+
+        // Nakit takas ödemesi tamamlandı → her iki taraf için depo etiketini oluştur (BUG B)
+        await createTradeWarehouseShipments(tx, {
+          id: trade.id,
+          tradeNumber: trade.tradeNumber,
+          initiatorId: trade.initiatorId,
+          receiverId: trade.receiverId,
+        });
+
         tradeTransitioned = true;
       }
 

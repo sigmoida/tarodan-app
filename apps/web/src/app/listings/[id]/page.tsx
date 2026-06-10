@@ -1857,6 +1857,12 @@ export default function ListingDetailPage() {
                           t("product.seller")}
                       </Button>
                     )}
+                    {(listing.seller as { isPremium?: boolean }).isPremium && (
+                      <span className="inline-flex items-center gap-1 mt-0.5 px-2 py-0.5 rounded text-[11px] font-bold bg-amber-100 text-amber-700 border border-amber-200">
+                        <StarIcon className="w-3 h-3" />
+                        Premium
+                      </span>
+                    )}
                     <div className="flex items-center gap-2 text-sm text-muted">
                       {listing.seller.rating && listing.seller.rating > 0 ? (
                         <div className="flex items-center">

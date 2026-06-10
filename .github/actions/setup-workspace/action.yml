@@ -1,0 +1,43 @@
+name: 'Setup Workspace'
+description: >-
+  Ortak CI bootstrap: pnpm + node (tek kaynaktan), opsiyonel Turbo cache,
+  bağımlılık kurulumu ve opsiyonel prisma generate. Tekrarı sıfırlar.
+  Not: checkout bu action'dan ÖNCE job içinde yapılmalı (local action ancak
+  repo checkout edilince çözülür).
+
+inputs:
+  prisma:
+    description: 'prisma generate çalıştırılsın mı (retry ile)'
+    required: false
+    default: 'true'
+  turbo-cache:
+    description: '.turbo cache restore/save edilsin mi'
+    required: false
+    default: 'true'
+
+runs:
+  using: 'composite'
+  steps:
+    # pnpm sürümü pinlenmez → package.json "packageManager" alanından okunur (tek kaynak).
+    - uses: pnpm/action-setup@v4
+
+    # Node sürümü .nvmrc'den okunur (tek kaynak).
+    - uses: actions/setup-node@v4
+      with:
+        node-version-file: .nvmrc
+        cache: pnpm
+
+    - name: Cache Turbo
+      if: inputs.turbo-cache == 'true'
+      uses: actions/cache@v4
+      with:
+        path: .turbo
+        key: turbo-${{ runner.os }}-${{ github.job }}-${{ github.sha }}
+        restore-keys: |
+          turbo-${{ runner.os }}-${{ github.job }}-
+
+    - run: pnpm install --frozen-lockfile
+      shell: bash
+
+    - uses: ./.github/actions/prisma-generate
+      if: inputs.prisma == 'true'

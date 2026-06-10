@@ -7,6 +7,7 @@ export type UiOrderStatus =
   | 'processing'
   | 'shipped'
   | 'delivered'
+  | 'awaiting_confirmation'
   | 'completed'
   | 'cancelled'
   | 'refunded';
@@ -23,6 +24,8 @@ export function apiStatusToUi(api: string | undefined | null): UiOrderStatus {
       return 'shipped';
     case 'delivered':
       return 'delivered';
+    case 'awaiting_buyer_confirmation':
+      return 'awaiting_confirmation';
     case 'completed':
       return 'completed';
     case 'cancelled':

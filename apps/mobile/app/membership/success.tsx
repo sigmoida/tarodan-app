@@ -1,11 +1,20 @@
+import { useEffect } from 'react';
 import { View, StyleSheet } from 'react-native';
 import { theme, Button, Text } from '@tarodan/ui-native';
 import { router } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
+import { useAuthStore } from '../../src/stores/authStore';
 
 const { colors } = theme;
 
 export default function MembershipSuccessScreen() {
+  const { refreshUserData } = useAuthStore();
+
+  // PayTR dönüşü sonrası yeni üyelik kademesi yerel kullanıcıya yansısın.
+  useEffect(() => {
+    refreshUserData?.();
+  }, [refreshUserData]);
+
   return (
     <View style={styles.container}>
       <View style={styles.content}>

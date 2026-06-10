@@ -1,6 +1,6 @@
 import { useEffect } from 'react';
 import { View, ScrollView, StyleSheet, TouchableOpacity, Image } from 'react-native';
-import { Button, IconButton, Divider, Text, theme } from '@tarodan/ui-native';
+import { Button, IconButton, Divider, Text, theme, ScreenHeader } from '@tarodan/ui-native';
 import { router } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { useCartStore } from '../src/stores/cartStore';
@@ -36,13 +36,7 @@ export default function CartScreen() {
   if (items.length === 0) {
     return (
       <View style={styles.emptyContainer}>
-        <View style={styles.header}>
-          <TouchableOpacity onPress={() => router.back()}>
-            <Ionicons name="arrow-back" size={24} color={colors.white} />
-          </TouchableOpacity>
-          <Text style={styles.headerTitle}>Sepetim</Text>
-          <View style={{ width: 24 }} />
-        </View>
+        <ScreenHeader title="Sepetim" onBack={() => router.back()} />
 
         <View style={styles.emptyContent}>
           <Ionicons name="cart-outline" size={80} color={colors.text.muted} />
@@ -63,14 +57,7 @@ export default function CartScreen() {
 
   return (
     <View style={styles.container}>
-      {/* Header */}
-      <View style={styles.header}>
-        <TouchableOpacity onPress={() => router.back()}>
-          <Ionicons name="arrow-back" size={24} color={colors.white} />
-        </TouchableOpacity>
-        <Text style={styles.headerTitle}>Sepetim ({itemCount})</Text>
-        <View style={{ width: 24 }} />
-      </View>
+      <ScreenHeader title={`Sepetim (${itemCount})`} onBack={() => router.back()} />
 
       {/* Expiry Notice */}
       <View style={styles.expiryNotice}>
@@ -197,20 +184,6 @@ const styles = StyleSheet.create({
     color: colors.text.muted,
     textAlign: 'center',
     marginTop: 8,
-  },
-  header: {
-    backgroundColor: colors.primary[600]!,
-    paddingTop: 50,
-    paddingBottom: 16,
-    paddingHorizontal: 20,
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-  },
-  headerTitle: {
-    fontSize: 18,
-    fontWeight: 'bold',
-    color: colors.white,
   },
   expiryNotice: {
     flexDirection: 'row',

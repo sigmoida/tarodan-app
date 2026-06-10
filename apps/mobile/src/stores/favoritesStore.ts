@@ -90,22 +90,45 @@ export const useFavoritesStore = create<FavoritesState>((set, get) => ({
 
   // Web ile aynı endpoint: POST /wishlist
   addToFavorites: async (productId: string) => {
+    // Optimistic: anında listeye ekle ki kalp ikonu/badge hemen güncellensin.
+    const alreadyThere = get().items.some((i) => i.productId === productId);
+    if (!alreadyThere) {
+      const optimisticItem: WishlistItem = {
+        id: `temp-${productId}`,
+        productId,
+        product: {
+          id: productId,
+          title: 'Ürün',
+          price: 0,
+          images: [],
+          condition: 'good',
+          status: 'active',
+          seller: { id: '', displayName: 'Satıcı' },
+        },
+        addedAt: new Date().toISOString(),
+      };
+      set((state) => ({ items: [...state.items, optimisticItem], error: null }));
+    }
+
     try {
       await wishlistApi.add(productId);
-      
-      // Refresh the favorites list after adding
+      // Gerçek veriyle senkronize et (optimistic placeholder'ı değiştirir).
       await get().fetchFavorites();
-      
       return true;
     } catch (error: any) {
       console.error('Failed to add to favorites:', error);
-      
+
       // If already in wishlist, still return success (idempotent)
       if (error.response?.status === 409 || error.response?.data?.message?.includes('zaten')) {
+        await get().fetchFavorites();
         return true;
       }
-      
-      set({ error: 'Favorilere eklenemedi' });
+
+      // Rollback optimistic ekleme.
+      set((state) => ({
+        items: state.items.filter((i) => i.productId !== productId),
+        error: 'Favorilere eklenemedi',
+      }));
       return false;
     }
   },

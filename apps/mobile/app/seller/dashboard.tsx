@@ -81,11 +81,49 @@ function QuickAction({
 export default function SellerDashboardScreen() {
   const { user, isAuthenticated } = useAuthStore();
 
+  const isBusiness = user?.membershipTier === 'business';
+
+  // İşletme olmayan satıcılarda /users/me/business-stats 400 döndüğü için panel boş kalıyordu.
+  // Web seller dashboard gibi genel veriyi non-business uçlardan çek:
+  // - /products/my/stats (counts.active/sold/total)
+  // - /users/me/analytics (totalSales/totalRevenue/pendingOrders)
+  // business-stats yalnızca isBusiness olduğunda EK olarak istenir.
   const statsQuery = useQuery<SellerStats>({
-    queryKey: ['seller-stats'],
+    queryKey: ['seller-stats', isBusiness],
     queryFn: async () => {
-      const response = await userApi.getStats();
-      return response.data?.data ?? response.data ?? {};
+      const [productStatsRes, analyticsRes, businessStatsRes] = await Promise.allSettled([
+        productsApi.getMyStats(),
+        userApi.getAnalytics(),
+        isBusiness ? userApi.getStats() : Promise.resolve(null),
+      ]);
+
+      const productStats =
+        productStatsRes.status === 'fulfilled'
+          ? productStatsRes.value.data?.data ?? productStatsRes.value.data ?? {}
+          : {};
+      const counts = productStats?.counts ?? {};
+
+      const analytics =
+        analyticsRes.status === 'fulfilled'
+          ? analyticsRes.value.data?.data ?? analyticsRes.value.data ?? {}
+          : {};
+
+      const businessStats =
+        businessStatsRes.status === 'fulfilled' && businessStatsRes.value
+          ? (businessStatsRes.value as any).data?.data ?? (businessStatsRes.value as any).data ?? {}
+          : {};
+
+      // business-stats varsa onu temel al, eksik/non-business alanları genel uçlardan tamamla.
+      return {
+        ...businessStats,
+        activeListings: counts.active ?? businessStats.activeListings,
+        soldListings: counts.sold ?? businessStats.soldListings,
+        totalListings: counts.total ?? businessStats.totalListings,
+        pendingOrders: analytics.pendingOrders ?? businessStats.pendingOrders,
+        monthlySales: businessStats.monthlySales ?? analytics.totalRevenue,
+        totalSales: businessStats.totalSales ?? analytics.totalRevenue,
+        totalOrders: businessStats.totalOrders ?? analytics.totalSales,
+      };
     },
     enabled: isAuthenticated,
   });
@@ -140,8 +178,6 @@ export default function SellerDashboardScreen() {
   const pendingOrders = pendingOrdersQuery.data ?? stats.pendingOrders ?? 0;
   const monthly = stats.monthlySales ?? 0;
   const rating = stats.averageRating ?? 0;
-
-  const isBusiness = user?.membershipTier === 'business';
 
   const refresh = () => {
     statsQuery.refetch();
@@ -223,7 +259,7 @@ export default function SellerDashboardScreen() {
             <QuickAction
               icon="plus-circle-outline"
               label="Yeni İlan"
-              onPress={() => router.push('/(tabs)/create')}
+              onPress={() => router.push('/(tabs)/sell')}
               color={colors.primary[600]!}
             />
             <QuickAction

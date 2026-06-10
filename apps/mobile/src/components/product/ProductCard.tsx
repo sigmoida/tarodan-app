@@ -11,6 +11,7 @@ import {
   getProductOriginalPriceForDisplay,
   isProductOnSaleDisplay,
   getProductDiscountPercent,
+  isProductOutOfStock,
 } from '../../utils/productPrice';
 
 const { colors } = theme;
@@ -25,7 +26,13 @@ export interface ProductCardProduct extends ProductPriceFields {
   isPreorder?: boolean;
   isLimited?: boolean;
   isTradeEnabled?: boolean;
+  isBoosted?: boolean;
+  boostedUntil?: string | null;
   condition?: string;
+  /** Ürün statüsü (active = stokta). active dışındaki her statü "stokta yok" sayılır. */
+  status?: string | null;
+  /** Müsait adet (quantity - reserved). null = sınırsız stok. <= 0 ise stokta yok. */
+  availableQuantity?: number | null;
   rating?: { average: number | null; count: number } | null;
   seller?: { id?: string; displayName?: string; isVerified?: boolean } | null;
   brand?: string | null;
@@ -42,6 +49,8 @@ interface ProductCardProps {
   /** Favori butonu göster (kart üstünde kalp ikonu). */
   onToggleFavorite?: () => void;
   isFavorite?: boolean;
+  /** Ürün sepetteyse görsel üstünde "Sepette" göstergesi çıkar. */
+  inCart?: boolean;
   /** Grid modu için sütun sayısı bilgisi (aspectRatio ayarı için gerekmez, sadece bilgi). */
   compact?: boolean;
 }
@@ -65,6 +74,7 @@ export function ProductCard({
   onPress,
   onToggleFavorite,
   isFavorite = false,
+  inCart = false,
   compact = false,
 }: ProductCardProps) {
   const [imgSrc, setImgSrc] = useState<string>(() => resolveImageSrc(product));
@@ -82,18 +92,32 @@ export function ProductCard({
   const ratingAvg = product.rating?.average ?? null;
   const ratingCount = product.rating?.count ?? 0;
 
+  // Stokta yok: active dışı statü veya müsait adet 0 (null = sınırsız stok → stokta).
+  const isOutOfStock = isProductOutOfStock(product);
+
   if (layout === 'list') {
     return (
       <TouchableOpacity style={styles.listCard} onPress={handlePress} activeOpacity={0.85}>
         <View style={styles.listImageWrap}>
           <Image
             source={{ uri: imgSrc }}
-            style={styles.listImage}
+            style={[styles.listImage, isOutOfStock && styles.imageDimmed]}
             onError={() => setImgSrc(FALLBACK_IMG)}
           />
+          {isOutOfStock ? (
+            <View style={styles.outOfStockOverlay}>
+              <Text style={styles.outOfStockText}>STOKTA YOK</Text>
+            </View>
+          ) : null}
           {onSale && discountPct > 0 ? (
             <View style={[styles.badge, styles.saleBadge]}>
               <Text style={styles.badgeText}>%{discountPct}</Text>
+            </View>
+          ) : null}
+          {inCart ? (
+            <View style={styles.inCartPill}>
+              <Ionicons name="checkmark-circle" size={12} color={colors.white} />
+              <Text style={styles.inCartPillText}>Sepette</Text>
             </View>
           ) : null}
         </View>
@@ -132,12 +156,24 @@ export function ProductCard({
       <View style={styles.gridImageWrap}>
         <Image
           source={{ uri: imgSrc }}
-          style={styles.gridImage}
+          style={[styles.gridImage, isOutOfStock && styles.imageDimmed]}
           onError={() => setImgSrc(FALLBACK_IMG)}
         />
 
-        {/* Sol üst: indirim / ön sipariş / limited */}
+        {isOutOfStock ? (
+          <View style={styles.outOfStockOverlay}>
+            <Text style={styles.outOfStockText}>STOKTA YOK</Text>
+          </View>
+        ) : null}
+
+        {/* Sol üst: sponsorlu / indirim / ön sipariş / limited */}
         <View style={styles.topLeftStack}>
+          {product.isBoosted || product.boostedUntil ? (
+            <View style={[styles.badge, styles.boostBadge]}>
+              <Ionicons name="rocket" size={10} color={colors.white} />
+              <Text style={[styles.badgeText, { marginLeft: 4 }]}>SPONSORLU</Text>
+            </View>
+          ) : null}
           {onSale && discountPct > 0 ? (
             <View style={[styles.badge, styles.saleBadge]}>
               <Text style={styles.badgeText}>%{discountPct} İndirim</Text>
@@ -183,6 +219,13 @@ export function ProductCard({
             </TouchableOpacity>
           ) : null}
         </View>
+
+        {inCart ? (
+          <View style={styles.inCartPill}>
+            <Ionicons name="checkmark-circle" size={12} color={colors.white} />
+            <Text style={styles.inCartPillText}>Sepette</Text>
+          </View>
+        ) : null}
       </View>
 
       <View style={[styles.gridBody, compact && { padding: 8 }]}>
@@ -286,6 +329,31 @@ const styles = StyleSheet.create({
     marginTop: 4,
   },
 
+  // ========== OUT OF STOCK ==========
+  imageDimmed: {
+    opacity: 0.45,
+  },
+  outOfStockOverlay: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  outOfStockText: {
+    backgroundColor: colors.overlay.black70,
+    color: colors.white,
+    fontSize: 12,
+    fontWeight: '800',
+    letterSpacing: 0.5,
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 6,
+    overflow: 'hidden',
+  },
+
   // ========== BADGES ==========
   topLeftStack: {
     position: 'absolute',
@@ -328,6 +396,9 @@ const styles = StyleSheet.create({
   tradeBadge: {
     backgroundColor: colors.info[600]!,
   },
+  boostBadge: {
+    backgroundColor: colors.warning[500]!,
+  },
   neutralBadge: {
     backgroundColor: colors.overlay.black70,
   },
@@ -338,6 +409,28 @@ const styles = StyleSheet.create({
     backgroundColor: colors.overlay.white90,
     alignItems: 'center',
     justifyContent: 'center',
+  },
+  inCartPill: {
+    position: 'absolute',
+    bottom: 8,
+    left: 8,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    backgroundColor: colors.primary[600]!,
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 8,
+    shadowColor: colors.black,
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.2,
+    shadowRadius: 3,
+    elevation: 3,
+  },
+  inCartPillText: {
+    color: colors.white,
+    fontSize: 11,
+    fontWeight: '700',
   },
 
   // ========== RATING ==========

@@ -1,7 +1,7 @@
-import { View, ScrollView, StyleSheet, TouchableOpacity } from 'react-native';
+import { View, ScrollView, StyleSheet } from 'react-native';
 import { router } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
-import { theme, Text, Card } from '@tarodan/ui-native';
+import { theme, Text, Card, ScreenHeader } from '@tarodan/ui-native';
 import { useTranslation } from '../src/i18n';
 
 const { colors } = theme;
@@ -29,13 +29,7 @@ export default function PaymentOptionsScreen() {
   const { t } = useTranslation();
   return (
     <View style={styles.container}>
-      <View style={styles.header}>
-        <TouchableOpacity onPress={() => router.back()}>
-          <Ionicons name="arrow-back" size={24} color={colors.white} />
-        </TouchableOpacity>
-        <Text style={styles.headerTitle}>{t('mobile.pagePaymentOptions')}</Text>
-        <View style={{ width: 24 }} />
-      </View>
+      <ScreenHeader title={t('mobile.pagePaymentOptions')} onBack={() => router.back()} />
 
       <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
         <View style={styles.iconRow}>
@@ -69,16 +63,6 @@ export default function PaymentOptionsScreen() {
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: colors.surface.alt },
-  header: {
-    backgroundColor: colors.primary[600]!,
-    paddingTop: 50,
-    paddingBottom: 16,
-    paddingHorizontal: 20,
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-  },
-  headerTitle: { fontSize: 18, fontWeight: 'bold', color: colors.white },
   content: { flex: 1, padding: 16 },
   iconRow: { flexDirection: 'row', alignItems: 'center', marginBottom: 20, gap: 12 },
   iconCircle: {

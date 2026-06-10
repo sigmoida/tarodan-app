@@ -173,4 +173,15 @@ export class CreateProductDto {
   @IsArray()
   @IsUUID('4', { each: true })
   attributeIds?: string[];
+
+  @ApiPropertyOptional({
+    example: ['treasure-hunt', 'mainline', 'red'],
+    description:
+      'Additional attribute slugs (e.g. Hot Wheels Segment/Assortment/Rarity selections). ' +
+      'Resolved server-side to ProductAttribute rows via Attribute.slug lookup.',
+  })
+  @IsOptional()
+  @IsArray()
+  @IsString({ each: true })
+  attributes?: string[];
 }

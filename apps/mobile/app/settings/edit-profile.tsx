@@ -1,13 +1,13 @@
-import { View, ScrollView, StyleSheet, TouchableOpacity, Image, Alert } from 'react-native';
+import { View, ScrollView, StyleSheet, TouchableOpacity, Image } from 'react-native';
 import {
   Button,
   Card,
-  Switch,
-  Divider,
-  Snackbar,
   Avatar,
+  DateField,
   Input,
   Text,
+  Snackbar,
+  ScreenHeader,
   theme,
 } from '@tarodan/ui-native';
 import { useState, useEffect } from 'react';
@@ -18,37 +18,59 @@ import { z } from 'zod';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import * as ImagePicker from 'expo-image-picker';
 import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
-import { api } from '../../src/services/api';
+import { userApi, mediaApi } from '../../src/services/api';
 import { useAuthStore } from '../../src/stores/authStore';
 import { MembershipBadgeCard } from '../../src/components/PremiumBadge';
 import { useTranslation } from '../../src/i18n';
+import { resolveImageUrl } from '../../src/utils/imageUrl';
 
 const { colors, radius } = theme;
 
-// Free: 500 chars, Premium: 2000 chars
-const getMaxBioLength = (isPremium: boolean) => isPremium ? 2000 : 500;
+const MAX_BIO_LENGTH = 500; // Backend DTO (UpdateProfileDto) bio'yu 500 ile sınırlar — web ile aynı.
 
-const createProfileSchema = (isPremium: boolean) => z.object({
-  displayName: z.string().min(2, 'İsim en az 2 karakter olmalı').max(50),
-  bio: z.string().max(getMaxBioLength(isPremium), `Biyografi en fazla ${getMaxBioLength(isPremium)} karakter olabilir`).optional(),
-  // Premium features
-  websiteUrl: z.string().url('Geçerli bir URL girin').optional().or(z.literal('')),
-  twitterHandle: z.string().max(50).optional(),
-  instagramHandle: z.string().max(50).optional(),
-  facebookUrl: z.string().url('Geçerli bir URL girin').optional().or(z.literal('')),
-  youtubeUrl: z.string().url('Geçerli bir URL girin').optional().or(z.literal('')),
-  customProfileSlug: z.string().min(3).max(30).regex(/^[a-z0-9-]+$/, 'Sadece küçük harf, rakam ve tire kullanın').optional(),
-  // Preferences
-  showEmail: z.boolean(),
-  showPhone: z.boolean(),
-  allowMessages: z.boolean(),
-});
+// 18+ kontrolü (web ile parite): doğum tarihi en geç bugünden 18 yıl önce olmalı.
+const minBirthDate = () => {
+  const d = new Date();
+  d.setFullYear(d.getFullYear() - 18);
+  return d;
+};
 
-type ProfileForm = z.infer<ReturnType<typeof createProfileSchema>>;
+const createProfileSchema = (isBusinessTier: boolean) =>
+  z.object({
+    displayName: z.string().min(2, 'İsim en az 2 karakter olmalı').max(50),
+    bio: z
+      .string()
+      .max(MAX_BIO_LENGTH, `Biyografi en fazla ${MAX_BIO_LENGTH} karakter olabilir`)
+      .optional()
+      .or(z.literal('')),
+    phone: z.string().max(20).optional().or(z.literal('')),
+    birthDate: z
+      .string()
+      .regex(/^\d{4}-\d{2}-\d{2}$/, 'Lütfen geçerli bir doğum tarihi seçin')
+      .refine((val) => new Date(val) <= minBirthDate(), '18 yaşından büyük olmalısınız')
+      .optional()
+      .or(z.literal('')),
+    // Kurumsal (business tier) — web ile parite. Business ise firma adı zorunlu.
+    companyName: isBusinessTier
+      ? z.string().min(2, 'Şirket adı zorunludur').max(120)
+      : z.string().max(120).optional().or(z.literal('')),
+    taxId: z.string().max(20).optional().or(z.literal('')),
+    taxOffice: z.string().max(120).optional().or(z.literal('')),
+  });
+
+type ProfileForm = {
+  displayName: string;
+  bio?: string;
+  phone?: string;
+  birthDate?: string;
+  companyName?: string;
+  taxId?: string;
+  taxOffice?: string;
+};
 
 export default function EditProfileScreen() {
   const { t } = useTranslation();
-  const { user, isAuthenticated, limits, updateUser } = useAuthStore();
+  const { user, isAuthenticated, refreshUserData } = useAuthStore();
   const queryClient = useQueryClient();
 
   const [avatar, setAvatar] = useState<string | null>(null);
@@ -57,23 +79,20 @@ export default function EditProfileScreen() {
     message: '',
   });
 
-  const isPremium = limits?.maxListings === -1;
-  const maxBioLength = getMaxBioLength(isPremium);
+  const isBusinessTier = (user as any)?.membershipTier === 'business';
 
   const { control, handleSubmit, formState: { errors }, watch } = useForm<ProfileForm>({
-    resolver: zodResolver(createProfileSchema(isPremium)),
+    resolver: zodResolver(createProfileSchema(isBusinessTier)),
     defaultValues: {
       displayName: user?.displayName || '',
       bio: user?.bio || '',
-      websiteUrl: user?.websiteUrl || '',
-      twitterHandle: user?.twitterHandle || '',
-      instagramHandle: user?.instagramHandle || '',
-      facebookUrl: user?.facebookUrl || '',
-      youtubeUrl: user?.youtubeUrl || '',
-      customProfileSlug: user?.customProfileSlug || '',
-      showEmail: user?.showEmail ?? false,
-      showPhone: user?.showPhone ?? false,
-      allowMessages: user?.allowMessages ?? true,
+      phone: (user as any)?.phone || '',
+      // İlk 10 karakteri al ("1990-01-31T00:00:00Z" -> "1990-01-31"); toISOString
+      // saat dilimi kaymasından kaçınmak için Date round-trip'i yapma.
+      birthDate: (user as any)?.birthDate ? String((user as any).birthDate).slice(0, 10) : '',
+      companyName: (user as any)?.companyName || '',
+      taxId: (user as any)?.taxId || '',
+      taxOffice: (user as any)?.taxOffice || '',
     },
   });
 
@@ -85,28 +104,48 @@ export default function EditProfileScreen() {
 
   const updateMutation = useMutation({
     mutationFn: async (data: ProfileForm) => {
-      const formData = new FormData();
-
-      Object.entries(data).forEach(([key, value]) => {
-        if (value !== undefined && value !== '') {
-          formData.append(key, typeof value === 'boolean' ? String(value) : value);
-        }
-      });
-
+      // 1. Avatar yerel olarak değiştiyse önce /media/upload/avatar'a yükle (web ile aynı akış),
+      //    dönen anahtarı (key) avatarUrl olarak JSON PATCH ile gönder.
+      let avatarUrl: string | undefined;
       if (avatar && avatar !== user?.avatar && !avatar.startsWith('http')) {
-        formData.append('avatar', {
+        const uploadRes = await mediaApi.uploadAvatar({
           uri: avatar,
-          type: 'image/jpeg',
           name: 'avatar.jpg',
-        } as any);
+          type: 'image/jpeg',
+        });
+        avatarUrl = uploadRes.data?.key ?? uploadRes.data?.url;
       }
 
-      return api.patch('/users/me', formData, {
-        headers: { 'Content-Type': 'multipart/form-data' },
+      const payload: Record<string, any> = {
+        displayName: data.displayName,
+        phone: data.phone,
+        bio: data.bio,
+        birthDate: data.birthDate,
+      };
+      if (avatarUrl) payload.avatarUrl = avatarUrl;
+
+      // Kurumsal alanlar yalnızca business tier'da gönderilir (web ile parite).
+      // Backend, non-business'ta companyName/taxId'yi yalnızca isCorporateSeller=true ile işler.
+      if (isBusinessTier) {
+        payload.companyName = data.companyName;
+        payload.taxId = data.taxId;
+        payload.taxOffice = data.taxOffice;
+        payload.isCorporateSeller = !!data.companyName;
+      }
+
+      // Boş string'leri undefined'a çevir (validation hatalarını önlemek için — web ile aynı).
+      Object.keys(payload).forEach((key) => {
+        if (payload[key] === '') payload[key] = undefined;
       });
+
+      return userApi.updateProfile(payload);
     },
-    onSuccess: (response) => {
-      updateUser(response.data);
+    onSuccess: async () => {
+      // Store'u taze /users/me ile güncelle: mapApiUserToUser, API'nin döndürdüğü
+      // 'avatarUrl' alanını UI'ın okuduğu 'avatar' alanına eşler. Aksi halde
+      // updateUser ham yanıtı sığ merge ettiği için 'avatar' bayat kalır ve
+      // profilde yeni foto görünmez. Web'deki refreshUser() ile parite.
+      await refreshUserData();
       queryClient.invalidateQueries({ queryKey: ['user'] });
       setSnackbar({ visible: true, message: 'Profil güncellendi!', variant: 'success' });
     },
@@ -137,6 +176,7 @@ export default function EditProfileScreen() {
   };
 
   const bioLength = watch('bio')?.length || 0;
+  const companyNameValue = watch('companyName');
 
   if (!isAuthenticated) {
     return (
@@ -149,23 +189,22 @@ export default function EditProfileScreen() {
 
   return (
     <View style={styles.container}>
-      {/* Header */}
-      <View style={styles.header}>
-        <TouchableOpacity onPress={() => router.back()}>
-          <Ionicons name="arrow-back" size={24} color={colors.white} />
-        </TouchableOpacity>
-        <Text style={styles.headerTitle}>{t('mobile.settingsEditProfile')}</Text>
-        <TouchableOpacity onPress={handleSubmit(onSubmit)}>
-          <Text style={styles.saveButton}>{t('mobile.save')}</Text>
-        </TouchableOpacity>
-      </View>
+      <ScreenHeader
+        title={t('mobile.settingsEditProfile')}
+        onBack={() => router.back()}
+        right={
+          <TouchableOpacity onPress={handleSubmit(onSubmit)}>
+            <Text style={styles.saveButton}>{t('mobile.save')}</Text>
+          </TouchableOpacity>
+        }
+      />
 
       <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
         {/* Avatar Section */}
         <View style={styles.avatarSection}>
           <TouchableOpacity onPress={pickAvatar}>
             {avatar ? (
-              <Image source={{ uri: avatar }} style={styles.avatar} />
+              <Image source={{ uri: resolveImageUrl(avatar) }} style={styles.avatar} />
             ) : (
               <Avatar
                 size="xl"
@@ -187,9 +226,9 @@ export default function EditProfileScreen() {
           />
         </View>
 
-        {/* Basic Info */}
+        {/* Personal Information (web: Kişisel Bilgiler) */}
         <Card style={styles.card}>
-          <Text variant="h3" style={styles.sectionTitle}>Temel Bilgiler</Text>
+          <Text variant="h3" style={styles.sectionTitle}>Kişisel Bilgiler</Text>
 
           <Controller
             control={control}
@@ -205,248 +244,139 @@ export default function EditProfileScreen() {
             )}
           />
 
+          {/* E-posta — salt okunur (web ile parite) */}
+          <Input
+            label="E-posta Adresi"
+            value={user?.email || ''}
+            editable={false}
+            containerStyle={styles.input}
+          />
+          <Text variant="bodySm" style={styles.hintText}>
+            🔒 E-posta değişikliği için destek ile iletişime geçin
+          </Text>
+
+          <Controller
+            control={control}
+            name="phone"
+            render={({ field: { onChange, value } }) => (
+              <Input
+                label="Telefon"
+                value={value}
+                onChangeText={onChange}
+                keyboardType="phone-pad"
+                placeholder="+90 5XX XXX XX XX"
+                containerStyle={styles.input}
+                error={errors.phone?.message}
+              />
+            )}
+          />
+
+          <Controller
+            control={control}
+            name="birthDate"
+            render={({ field: { onChange, value } }) => (
+              <DateField
+                label="Doğum Tarihi"
+                value={value}
+                onChange={onChange}
+                placeholder="Tarih seçin"
+                maximumDate={minBirthDate()}
+                containerStyle={styles.input}
+                error={errors.birthDate?.message}
+              />
+            )}
+          />
+
           <Controller
             control={control}
             name="bio"
             render={({ field: { onChange, value } }) => (
               <Input
-                label={`Hakkımda (${bioLength}/${maxBioLength})`}
+                label={`Hakkımda (${bioLength}/${MAX_BIO_LENGTH})`}
                 value={value}
                 onChangeText={onChange}
                 multiline
                 numberOfLines={4}
+                maxLength={MAX_BIO_LENGTH}
                 containerStyle={styles.input}
                 placeholder={t("mobile.bioPlaceholder")}
                 error={errors.bio?.message}
               />
             )}
           />
-
-          {!isPremium && (
-            <TouchableOpacity
-              style={styles.upgradeHint}
-              onPress={() => router.push('/upgrade')}
-            >
-              <Ionicons name="diamond" size={16} color={colors.primary[600]!} />
-              <Text variant="bodySm" style={styles.upgradeHintText}>
-                Premium ile 2000 karaktere kadar biyografi yazabilirsiniz
-              </Text>
-            </TouchableOpacity>
-          )}
         </Card>
 
-        {/* Custom URL (Premium Only) */}
-        {isPremium && (
+        {/* İşletme Bilgileri (Business tier) — web ile parite */}
+        {isBusinessTier && (
           <Card style={styles.card}>
-            <View style={styles.premiumFeatureHeader}>
-              <MaterialCommunityIcons name="crown" size={20} color={colors.primary[600]!} />
-              <Text variant="h3" style={styles.premiumFeatureTitle}>Özel Profil URL</Text>
-            </View>
-
-            <View style={styles.urlPreview}>
-              <Text variant="bodySm" style={styles.urlPrefix}>tarodan.com/</Text>
-              <Controller
-                control={control}
-                name="customProfileSlug"
-                render={({ field: { onChange, value } }) => (
-                  <Input
-                    value={value}
-                    onChangeText={onChange}
-                    inputSize="sm"
-                    containerStyle={styles.slugInput}
-                    placeholder="kullanici-adi"
-                    error={errors.customProfileSlug?.message}
-                  />
-                )}
-              />
-            </View>
-            <Text variant="bodySm" style={styles.hintText}>
-              Sadece küçük harfler, rakamlar ve tire (-) kullanabilirsiniz
-            </Text>
-          </Card>
-        )}
-
-        {/* Social Links (Premium Only) */}
-        {isPremium ? (
-          <Card style={styles.card}>
-            <View style={styles.premiumFeatureHeader}>
-              <MaterialCommunityIcons name="crown" size={20} color={colors.primary[600]!} />
-              <Text variant="h3" style={styles.premiumFeatureTitle}>Sosyal Medya Bağlantıları</Text>
+            <View style={styles.businessHeader}>
+              <View style={styles.premiumFeatureHeader}>
+                <MaterialCommunityIcons name="office-building" size={20} color={colors.primary[600]!} />
+                <Text variant="h3" style={styles.premiumFeatureTitle}>İşletme Bilgileri</Text>
+              </View>
+              <View style={styles.tierBadge}>
+                <Text variant="bodySm" style={styles.tierBadgeText}>İş Üyeliği</Text>
+              </View>
             </View>
 
             <Controller
               control={control}
-              name="websiteUrl"
+              name="companyName"
               render={({ field: { onChange, value } }) => (
                 <Input
-                  label="Web Sitesi"
+                  label="Şirket / Ticari Unvan *"
                   value={value}
                   onChangeText={onChange}
+                  placeholder="ABC Ltd. Şti."
                   containerStyle={styles.input}
-                  placeholder="https://websitem.com"
-                  leftIconName="globe-outline"
-                  error={errors.websiteUrl?.message}
+                  error={errors.companyName?.message}
                 />
               )}
             />
-
-            <Controller
-              control={control}
-              name="instagramHandle"
-              render={({ field: { onChange, value } }) => (
-                <Input
-                  label="Instagram"
-                  value={value}
-                  onChangeText={onChange}
-                  containerStyle={styles.input}
-                  placeholder="kullanici_adi"
-                  leftIconName="logo-instagram"
-                />
-              )}
-            />
-
-            <Controller
-              control={control}
-              name="twitterHandle"
-              render={({ field: { onChange, value } }) => (
-                <Input
-                  label="Twitter / X"
-                  value={value}
-                  onChangeText={onChange}
-                  containerStyle={styles.input}
-                  placeholder="kullanici_adi"
-                  leftIconName="logo-twitter"
-                />
-              )}
-            />
-
-            <Controller
-              control={control}
-              name="youtubeUrl"
-              render={({ field: { onChange, value } }) => (
-                <Input
-                  label="YouTube"
-                  value={value}
-                  onChangeText={onChange}
-                  containerStyle={styles.input}
-                  placeholder="https://youtube.com/@kanal"
-                  leftIconName="logo-youtube"
-                  error={errors.youtubeUrl?.message}
-                />
-              )}
-            />
-          </Card>
-        ) : (
-          <Card style={styles.lockedCard}>
-            <View style={styles.lockedContent}>
-              <Ionicons name="lock-closed" size={24} color={colors.text.muted} />
-              <Text variant="body" style={styles.lockedTitle}>Sosyal Medya Bağlantıları</Text>
-              <Text variant="bodySm" style={styles.lockedText}>
-                Premium üyeler profillerine sosyal medya bağlantıları ekleyebilir
+            {!companyNameValue && (
+              <Text variant="bodySm" style={styles.warningText}>
+                ⚠️ İşletme panelini kullanmak için şirket adı zorunludur
               </Text>
-              <Button variant="outline" title="Premium'a Geç" onPress={() => router.push('/upgrade')} style={styles.lockedButton} />
+            )}
+
+            <Controller
+              control={control}
+              name="taxId"
+              render={({ field: { onChange, value } }) => (
+                <Input
+                  label="Vergi Kimlik No"
+                  value={value}
+                  onChangeText={(text) => onChange(text.replace(/\D/g, '').slice(0, 11))}
+                  keyboardType="number-pad"
+                  placeholder="1234567890"
+                  containerStyle={styles.input}
+                  error={errors.taxId?.message}
+                />
+              )}
+            />
+
+            <Controller
+              control={control}
+              name="taxOffice"
+              render={({ field: { onChange, value } }) => (
+                <Input
+                  label="Vergi Dairesi"
+                  value={value}
+                  onChangeText={onChange}
+                  placeholder="Kadıköy VD"
+                  containerStyle={styles.input}
+                  error={errors.taxOffice?.message}
+                />
+              )}
+            />
+
+            <View style={styles.infoBox}>
+              <Text variant="bodySm" style={styles.infoBoxText}>
+                ℹ️ Kurumsal satıcı bilgileri fatura kesiminde kullanılır. Yanlış bilgi girişi yasal sorumluluk doğurabilir.
+              </Text>
             </View>
           </Card>
         )}
-
-        {/* Privacy Settings */}
-        <Card style={styles.card}>
-          <Text variant="h3" style={styles.sectionTitle}>Gizlilik Ayarları</Text>
-
-          <View style={styles.switchRow}>
-            <View style={styles.switchInfo}>
-              <Text variant="body">E-posta Göster</Text>
-              <Text variant="bodySm" style={styles.switchHint}>
-                E-postanız profilinizde görünsün mü?
-              </Text>
-            </View>
-            <Controller
-              control={control}
-              name="showEmail"
-              render={({ field: { onChange, value } }) => (
-                <Switch value={value} onValueChange={onChange} />
-              )}
-            />
-          </View>
-
-          <Divider style={styles.switchDivider} />
-
-          <View style={styles.switchRow}>
-            <View style={styles.switchInfo}>
-              <Text variant="body">Telefon Göster</Text>
-              <Text variant="bodySm" style={styles.switchHint}>
-                Telefonunuz profilinizde görünsün mü?
-              </Text>
-            </View>
-            <Controller
-              control={control}
-              name="showPhone"
-              render={({ field: { onChange, value } }) => (
-                <Switch value={value} onValueChange={onChange} />
-              )}
-            />
-          </View>
-
-          <Divider style={styles.switchDivider} />
-
-          <View style={styles.switchRow}>
-            <View style={styles.switchInfo}>
-              <Text variant="body">Mesaj Almaya İzin Ver</Text>
-              <Text variant="bodySm" style={styles.switchHint}>
-                Diğer üyeler size mesaj gönderebilsin mi?
-              </Text>
-            </View>
-            <Controller
-              control={control}
-              name="allowMessages"
-              render={({ field: { onChange, value } }) => (
-                <Switch value={value} onValueChange={onChange} />
-              )}
-            />
-          </View>
-        </Card>
-
-        {/* Verification Status */}
-        <Card style={styles.card}>
-          <Text variant="h3" style={styles.sectionTitle}>Doğrulama Durumu</Text>
-
-          <View style={styles.verificationItem}>
-            <Ionicons
-              name={user?.isEmailVerified ? 'checkmark-circle' : 'ellipse-outline'}
-              size={24}
-              color={user?.isEmailVerified ? colors.success[600]! : colors.text.muted}
-            />
-            <Text variant="body" style={styles.verificationText}>
-              E-posta Doğrulandı
-            </Text>
-            {!user?.isEmailVerified && (
-              <Button variant="ghost" size="sm" title="Doğrula" onPress={() => {}} />
-            )}
-          </View>
-
-          <View style={styles.verificationItem}>
-            <Ionicons
-              name={user?.isPhoneVerified ? 'checkmark-circle' : 'ellipse-outline'}
-              size={24}
-              color={user?.isPhoneVerified ? colors.success[600]! : colors.text.muted}
-            />
-            <Text variant="body" style={styles.verificationText}>
-              Telefon Doğrulandı
-            </Text>
-            {!user?.isPhoneVerified && (
-              <Button variant="ghost" size="sm" title="Doğrula" onPress={() => {}} />
-            )}
-          </View>
-
-          {user?.isVerified && (
-            <View style={styles.verifiedBanner}>
-              <Ionicons name="shield-checkmark" size={24} color={colors.success[600]!} />
-              <Text variant="body" style={styles.verifiedText}>
-                {isPremium ? 'Doğrulanmış Premium Koleksiyoner' : 'Doğrulanmış Üye'}
-              </Text>
-            </View>
-          )}
-        </Card>
 
         {/* Submit Button */}
         <Button
@@ -484,20 +414,6 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
     gap: 16,
-  },
-  header: {
-    backgroundColor: colors.primary[600]!,
-    paddingTop: 50,
-    paddingBottom: 16,
-    paddingHorizontal: 20,
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-  },
-  headerTitle: {
-    fontSize: 18,
-    fontWeight: 'bold',
-    color: colors.white,
   },
   saveButton: {
     color: colors.white,
@@ -548,101 +464,45 @@ const styles = StyleSheet.create({
     color: colors.text.muted,
     marginTop: 4,
   },
-  upgradeHint: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: colors.primary[50]!,
-    padding: 8,
-    borderRadius: radius.md,
-    marginTop: 8,
-  },
-  upgradeHintText: {
-    marginLeft: 8,
-    color: colors.primary[700]!,
-    flex: 1,
+  warningText: {
+    color: colors.primary[600]!,
+    marginTop: -6,
+    marginBottom: 8,
   },
   premiumFeatureHeader: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginBottom: 16,
   },
   premiumFeatureTitle: {
     marginLeft: 8,
     color: colors.primary[700]!,
   },
-  urlPreview: {
+  businessHeader: {
     flexDirection: 'row',
     alignItems: 'center',
-  },
-  urlPrefix: {
-    color: colors.text.muted,
-    marginRight: 4,
-  },
-  slugInput: {
-    flex: 1,
-  },
-  lockedCard: {
+    justifyContent: 'space-between',
     marginBottom: 16,
-    backgroundColor: colors.surface.alt,
-    borderWidth: 1,
-    borderColor: colors.border.DEFAULT,
-    borderStyle: 'dashed',
   },
-  lockedContent: {
-    alignItems: 'center',
-    paddingVertical: 24,
+  tierBadge: {
+    backgroundColor: colors.primary[50]!,
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderRadius: radius.full ?? 999,
   },
-  lockedTitle: {
-    marginTop: 8,
-    color: colors.text.heading,
+  tierBadgeText: {
+    color: colors.primary[600]!,
     fontWeight: '600',
   },
-  lockedText: {
-    marginTop: 4,
-    color: colors.text.muted,
-    textAlign: 'center',
-  },
-  lockedButton: {
-    marginTop: 12,
-  },
-  switchRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    paddingVertical: 8,
-  },
-  switchInfo: {
-    flex: 1,
-  },
-  switchHint: {
-    color: colors.text.muted,
-    marginTop: 2,
-  },
-  switchDivider: {
-    marginVertical: 8,
-  },
-  verificationItem: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingVertical: 8,
-  },
-  verificationText: {
-    flex: 1,
-    marginLeft: 12,
-    color: colors.text.heading,
-  },
-  verifiedBanner: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: colors.success[50]!,
+  infoBox: {
+    backgroundColor: colors.info[50]!,
+    borderWidth: 1,
+    borderColor: colors.info[100]!,
     padding: 12,
     borderRadius: radius.md,
-    marginTop: 8,
+    marginTop: 4,
   },
-  verifiedText: {
-    marginLeft: 8,
-    color: colors.success[700]!,
-    fontWeight: '500',
+  infoBoxText: {
+    color: colors.info[700]!,
   },
   submitButton: {
     marginTop: 8,

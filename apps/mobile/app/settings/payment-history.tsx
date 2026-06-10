@@ -9,7 +9,7 @@ import {
   Alert,
   RefreshControl,
 } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { ScreenHeader } from '@tarodan/ui-native';
 import { router, useFocusEffect } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { TarodanColors } from '../../src/theme';
@@ -132,14 +132,8 @@ export default function PaymentHistoryScreen() {
 
   if (!isAuthenticated) {
     return (
-      <SafeAreaView style={styles.container} edges={['top']}>
-        <View style={styles.header}>
-          <TouchableOpacity onPress={() => router.back()} style={styles.headerBackBtn}>
-            <Ionicons name="arrow-back" size={24} color={TarodanColors.textOnPrimary} />
-          </TouchableOpacity>
-          <Text style={styles.headerTitle}>Ödeme Geçmişi</Text>
-          <View style={styles.headerPlaceholder} />
-        </View>
+      <View style={styles.container}>
+        <ScreenHeader title="Ödeme Geçmişi" onBack={() => router.back()} />
         <View style={styles.centeredContainer}>
           <Ionicons name="log-in-outline" size={48} color={TarodanColors.textTertiary} />
           <Text style={styles.emptyTitle}>Giriş Yapın</Text>
@@ -148,19 +142,13 @@ export default function PaymentHistoryScreen() {
             <Text style={styles.loginButtonText}>Giriş Yap</Text>
           </TouchableOpacity>
         </View>
-      </SafeAreaView>
+      </View>
     );
   }
 
   return (
-    <SafeAreaView style={styles.container} edges={['top']}>
-      <View style={styles.header}>
-        <TouchableOpacity onPress={() => router.back()} style={styles.headerBackBtn}>
-          <Ionicons name="arrow-back" size={24} color={TarodanColors.textOnPrimary} />
-        </TouchableOpacity>
-        <Text style={styles.headerTitle}>Ödeme Geçmişi</Text>
-        <View style={styles.headerPlaceholder} />
-      </View>
+    <View style={styles.container}>
+      <ScreenHeader title="Ödeme Geçmişi" onBack={() => router.back()} />
 
       {isLoading ? (
         <View style={styles.centeredContainer}>
@@ -192,7 +180,7 @@ export default function PaymentHistoryScreen() {
           }
         />
       )}
-    </SafeAreaView>
+    </View>
   );
 }
 
@@ -200,25 +188,6 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: TarodanColors.backgroundSecondary,
-  },
-  header: {
-    backgroundColor: TarodanColors.primary,
-    paddingBottom: 16,
-    paddingHorizontal: 20,
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-  },
-  headerBackBtn: {
-    padding: 4,
-  },
-  headerTitle: {
-    fontSize: 18,
-    fontWeight: 'bold',
-    color: TarodanColors.textOnPrimary,
-  },
-  headerPlaceholder: {
-    width: 32,
   },
   centeredContainer: {
     flex: 1,

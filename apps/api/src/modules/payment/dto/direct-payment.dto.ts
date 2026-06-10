@@ -1,4 +1,5 @@
-import { IsString, IsOptional, IsBoolean, IsNumber, Length, Matches } from 'class-validator';
+import { IsString, IsOptional, IsBoolean, IsNumber, Length, Matches, ValidateNested } from 'class-validator';
+import { Type } from 'class-transformer';
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 
 export class CreditCardDto {
@@ -59,8 +60,21 @@ export class DirectPaymentDto {
 }
 
 export class AddCardDto {
-    @ApiProperty({ description: 'Card Details' })
-    card: CreditCardDto;
+    // Nested şekil: { card: { cardNumber, ... } }
+    @ApiPropertyOptional({ description: 'Card Details (nested)' })
+    @IsOptional()
+    @ValidateNested()
+    @Type(() => CreditCardDto)
+    card?: CreditCardDto;
+
+    // Düz (top-level) şekil: { cardNumber, ... } — bazı istemciler böyle gönderiyor.
+    // whitelist:true bunları DTO'da tanımlı olmazsa siliyordu → controller'da
+    // dto.card undefined kalıp 500 atıyordu. İkisini de kabul ediyoruz.
+    @IsOptional() @IsString() cardNumber?: string;
+    @IsOptional() @IsString() cardHolderName?: string;
+    @IsOptional() @IsString() expireMonth?: string;
+    @IsOptional() @IsString() expireYear?: string;
+    @IsOptional() @IsString() cvc?: string;
 
     @ApiPropertyOptional({ description: 'Card Alias' })
     @IsOptional()

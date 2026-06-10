@@ -16,6 +16,6 @@ import { ProductModule } from '../product/product.module';
   imports: [ScheduleModule.forRoot(), PrismaModule, ConfigModule, CacheModule, EventModule, forwardRef(() => NotificationModule), StorageModule, forwardRef(() => OrderModule), ProductModule],
   controllers: [OfferController],
   providers: [OfferService, OfferSchedulerService],
-  exports: [OfferService],
+  exports: [OfferService, OfferSchedulerService],
 })
 export class OfferModule {}

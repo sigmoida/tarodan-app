@@ -39,6 +39,7 @@ interface ListingsState {
     minPrice?: number;
     maxPrice?: number;
     condition?: string;
+    tradeOnly?: boolean;
   };
   
   fetchListings: (reset?: boolean) => Promise<void>;

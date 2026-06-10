@@ -22,6 +22,8 @@ import { ProductStatus, Prisma, MembershipTierType, Brand } from '@prisma/client
 import { buildProductWhere } from './helpers/build-product-where';
 import { fulltextProductSearch } from './helpers/fulltext-search';
 import { getAvailableQuantity } from './helpers/product-availability.helper';
+import { computeQualityScore } from './helpers/quality-score';
+import { computeRelevanceScore } from './helpers/relevance-score';
 import { DiscountService } from '../discount/discount.service';
 import { StorageService } from '../storage/storage.service';
 
@@ -154,6 +156,19 @@ export class ProductService implements OnModuleInit {
     const carModelId = dto.carModelId?.trim() || undefined;
     const manufacturerId = dto.manufacturerId?.trim() || undefined;
 
+    // Yeni ilan: rankTier'ı (premium satıcı → 1) ve başlangıç popülerlik baseline'ını inline ver.
+    // Böylece recompute (best-effort) başarısız olsa bile kademe doğru başlar; baseline ise
+    // yeni ilana "ilk 24 saat" görünürlük sağlar (skor 0 değil, createdAt ile kademe üstünde).
+    const sellerMembership = await this.prisma.userMembership.findUnique({
+      where: { userId: sellerId },
+      select: { status: true, tier: { select: { type: true } } },
+    });
+    const isPremiumSeller =
+      sellerMembership != null &&
+      sellerMembership.status === 'active' &&
+      sellerMembership.tier.type !== MembershipTierType.free;
+    const FRESH_POPULARITY_BASELINE = 10;
+
     try {
       const product = await this.prisma.product.create({
         data: {
@@ -168,6 +183,14 @@ export class ProductService implements OnModuleInit {
           isTradeEnabled: dto.isTradeEnabled || false,
           isPreorder: dto.isPreorder ?? false,
           isSet: dto.isSet ?? false,
+          rankTier: isPremiumSeller ? 1 : 0,
+          popularityScore: FRESH_POPULARITY_BASELINE,
+          popularityUpdatedAt: new Date(),
+          relevanceScore: computeRelevanceScore({
+            rankTier: isPremiumSeller ? 1 : 0,
+            qualityScore: 0,
+            popularityScore: FRESH_POPULARITY_BASELINE,
+          }),
           brandId,
           carModelId,
           manufacturerId,
@@ -203,7 +226,16 @@ export class ProductService implements OnModuleInit {
       });
 
       // Link scale and material (attributes) so they show on detail and in filters
-      await this.linkProductAttributes(product.id, dto.scale, dto.attributeIds, dto.material);
+      await this.linkProductAttributes(
+        product.id,
+        dto.scale,
+        dto.attributeIds,
+        dto.material,
+        dto.attributes,
+      );
+
+      // İlan Kalite Skoru + rankTier hesapla (best-effort; sıralama bozulmasın)
+      await this.recomputeProductRanking(product.id).catch(() => {});
 
       // Invalidate product list cache
       await this.cache.delPattern('products:list:*');
@@ -249,13 +281,17 @@ export class ProductService implements OnModuleInit {
   }
 
   /**
-   * Link scale (1:64), material (slug), and attributeIds to product via ProductAttribute.
+   * Link scale (1:64), material (slug), attributeIds, and attribute slugs to product via ProductAttribute.
+   * attributeSlugs: opaque list of Attribute.slug values from any group (used for Hot Wheels extras
+   * like 'mainline', 'treasure-hunt', 'red'). Slugs are resolved server-side to attribute IDs.
+   * Unknown slugs are silently dropped (logged in dev).
    */
   private async linkProductAttributes(
     productId: string,
     scale?: string,
     attributeIds?: string[],
     materialSlug?: string,
+    attributeSlugs?: string[],
   ) {
     const toLink: string[] = [];
 
@@ -286,6 +322,27 @@ export class ProductService implements OnModuleInit {
       if (materialAttr) toLink.push(materialAttr.id);
     }
     if (attributeIds?.length) toLink.push(...attributeIds);
+
+    if (attributeSlugs?.length) {
+      // Resolve slug -> attribute id. Slugs are unique within a group; the same slug could
+      // theoretically exist under multiple groups, so we accept all matches.
+      const resolved = await this.prisma.attribute.findMany({
+        where: {
+          slug: { in: attributeSlugs.map((s) => s.trim()).filter(Boolean) },
+          isActive: true,
+          group: { isActive: true },
+        },
+        select: { id: true, slug: true },
+      });
+      const resolvedSlugs = new Set(resolved.map((r) => r.slug));
+      const unknown = attributeSlugs.filter((s) => !resolvedSlugs.has(s));
+      if (unknown.length > 0 && process.env.NODE_ENV === 'development') {
+        this.logger.warn(
+          `Unknown attribute slug(s) ignored for product ${productId}: ${unknown.join(', ')}`,
+        );
+      }
+      toLink.push(...resolved.map((r) => r.id));
+    }
 
     for (const attributeId of toLink) {
       await this.prisma.productAttribute.upsert({
@@ -330,12 +387,16 @@ export class ProductService implements OnModuleInit {
 
     const cacheKey = `products:list:${JSON.stringify({
       search, categoryId, sellerId,
-      status: status || ProductStatus.active,
+      // Ham status: undefined (kapsayıcı: aktif + tükenen + satıldı) ile 'active'
+      // (yalnızca stok-içi) farklı sonuç verir → ayrı cache anahtarları olmalı.
+      status: status ?? null,
       condition, brand, brandId, manufacturerId,
       scale, material: materialSlug,
       tradeOnly, discountOnly, preOrder, limited,
       set: query.set,
       minPrice, maxPrice, sortBy, page, limit, carModelId,
+      attributeSlugs: query.attributeSlugs,
+      attrGroups: query.attrGroups,
     })}`;
 
     const hasSearch = !!(search && String(search).trim());
@@ -371,7 +432,14 @@ export class ProductService implements OnModuleInit {
     const total = await this.prisma.product.count({ where });
     const products = await this.prisma.product.findMany({
       where,
-      orderBy: [{ viewCount: 'desc' }, { id: 'asc' }],
+      // Sponsorlu (rankTier=2) → Premium (1) → Standart (0); kademe içinde kalite + popülerlik
+      orderBy: [
+        { relevanceScore: { sort: 'desc', nulls: 'last' } },
+        { viewCount: 'desc' },
+        { likeCount: 'desc' },
+        { createdAt: 'desc' },
+        { id: 'asc' },
+      ],
       skip: (page - 1) * limit,
       take: limit,
       include: {
@@ -398,7 +466,7 @@ export class ProductService implements OnModuleInit {
    */
   private async findAllViaElasticsearch(query: ProductQueryDto) {
     const {
-      search, categoryId, sellerId, condition, brand, scale,
+      search, categoryId, sellerId, status, condition, brand, scale,
       material: materialSlug, tradeOnly, discountOnly, preOrder,
       limited, set: setFilter, minPrice, maxPrice, sortBy,
       page = 1, limit = 20, brandId, manufacturerId, carModelId,
@@ -411,6 +479,8 @@ export class ProductService implements OnModuleInit {
       manufacturerId,
       carModelId,
       sellerId,
+      // status verilmezse undefined geçer → ES kapsayıcı küme (aktif + tükenen + satıldı)
+      status,
       condition,
       brand,
       scale,
@@ -550,7 +620,26 @@ export class ProductService implements OnModuleInit {
         ];
         break;
       default:
-        orderBy = [{ viewCount: 'desc' }, { likeCount: 'desc' }, { createdAt: 'desc' }];
+        // Varsayılan/alaka sıralaması: Sponsorlu (rankTier=2) → Premium satıcı (1) → Standart (0).
+        // Kademe içinde İlan Kalite Skoru, ardından etkileşim (favori/görüntülenme) ve yenilik.
+        // Açık sortBy seçildiğinde (price/created/title/view/rating) bu öncelik uygulanmaz.
+        // Harmanlanmış relevance skoru: boost/premium bonusu + kalite + etkileşim tek skorda.
+        // Öne çıkanlar normalde önde; çok popüler ürün de geri kalmaz (viral geçebilir).
+        orderBy = [
+          { relevanceScore: { sort: 'desc', nulls: 'last' } },
+          { viewCount: 'desc' }, // relevance eşitse: çok görüntülenen önde (canlı)
+          { likeCount: 'desc' },
+          { createdAt: 'desc' },
+          { id: 'asc' },
+        ];
+    }
+
+    // Stoktakiler önce: status verilmeyen kapsayıcı listelemede (aktif + tükenen + satıldı)
+    // aktif/stoklu ürünler tükenenlerden önce gelsin. Postgres enum sırası
+    // active(2) < sold(4) < inactive(5) olduğundan ORDER BY status ASC bunu doğal sağlar.
+    // (Tek-statülü carousel'lerde — status=active — etkisizdir.)
+    if (!query.status) {
+      orderBy = [{ status: 'asc' }, ...orderBy];
     }
 
     const total = await this.prisma.product.count({ where });
@@ -1036,7 +1125,12 @@ export class ProductService implements OnModuleInit {
         },
       });
 
-      if (dto.scale !== undefined || dto.attributeIds !== undefined || dto.material !== undefined) {
+      if (
+        dto.scale !== undefined ||
+        dto.attributeIds !== undefined ||
+        dto.material !== undefined ||
+        dto.attributes !== undefined
+      ) {
         const scaleMaterialAttrIds = await this.prisma.attribute.findMany({
           where: { group: { slug: { in: ['scale', 'material'] } } },
           select: { id: true },
@@ -1046,12 +1140,34 @@ export class ProductService implements OnModuleInit {
             where: { productId: id, attributeId: { in: scaleMaterialAttrIds } },
           });
         }
-        await this.linkProductAttributes(id, dto.scale, dto.attributeIds, dto.material);
+        // Also clear any prior manufacturer-scoped attribute selections so the user can
+        // replace them via the update payload (matches POST create semantics).
+        if (dto.attributes !== undefined) {
+          const scopedAttrIds = await this.prisma.attribute.findMany({
+            where: { group: { manufacturerSlug: { not: null } } },
+            select: { id: true },
+          }).then((a) => a.map((x) => x.id));
+          if (scopedAttrIds.length > 0) {
+            await this.prisma.productAttribute.deleteMany({
+              where: { productId: id, attributeId: { in: scopedAttrIds } },
+            });
+          }
+        }
+        await this.linkProductAttributes(
+          id,
+          dto.scale,
+          dto.attributeIds,
+          dto.material,
+          dto.attributes,
+        );
         // Reindex in ES so search/list shows updated scale/material
         if (this.searchService.isAvailable()) {
           this.searchService.indexProduct(id).catch((err) => this.logger.warn(`ES index update failed for ${id}:`, err));
         }
       }
+
+      // İlan Kalite Skoru + rankTier yeniden hesapla (foto/açıklama değişmiş olabilir)
+      await this.recomputeProductRanking(id).catch(() => {});
 
       // Invalidate cache for this product and product lists
       await this.cache.del(`products:detail:${id}`);
@@ -1484,9 +1600,12 @@ Bu ürünü istek listenizden kaldırmak için ürün sayfasına gidip "İstek L
         .map((pa: any) => ({
           id: pa.attribute.id,
           name: pa.attribute.slug,
+          slug: pa.attribute.slug,
           label: pa.attribute.group.name,
           value: pa.attribute.displayValue || pa.attribute.value,
           group: pa.attribute.group.name,
+          groupSlug: pa.attribute.group.slug,
+          manufacturerSlug: pa.attribute.group.manufacturerSlug ?? null,
         }));
       const scaleFromGroup = this.getAttributeValueByGroup(productAttributes, 'scale', 'Ölçek');
       const scaleFromAttrs = attributes.find((a) => a.group === 'Ölçek' || a.label === 'Ölçek')?.value;
@@ -1517,11 +1636,82 @@ Bu ürünü istek listenizden kaldırmak için ürün sayfasına gidip "İstek L
   /**
    * Format product response
    */
+  /**
+   * İlan Kalite Skoru + rankTier'ı yeniden hesaplar ve Product'a yazar.
+   * rankTier: aktif boost → 2, ücretli (free olmayan) üyeli satıcı → 1, standart → 0.
+   * create/update sonrası ve boost aktivasyon/bitiş yollarında çağrılır.
+   */
+  async recomputeProductRanking(productId: string): Promise<void> {
+    const product = await this.prisma.product.findUnique({
+      where: { id: productId },
+      select: {
+        id: true,
+        description: true,
+        boostedUntil: true,
+        sellerId: true,
+        popularityScore: true,
+        seller: { select: { isVerified: true } },
+        _count: { select: { images: true } },
+      },
+    });
+    if (!product) return;
+
+    // Satıcının onaylı ortalama güven puanı (0..5)
+    let sellerRating: number | null = null;
+    const ratingStats = await this.prisma.rating.aggregate({
+      where: { receiverId: product.sellerId, status: 'approved' },
+      _avg: { score: true },
+      _count: true,
+    });
+    if (ratingStats._count > 0 && ratingStats._avg?.score) {
+      sellerRating = Number(ratingStats._avg.score);
+    }
+
+    const qualityScore = computeQualityScore({
+      photoCount: product._count.images,
+      description: product.description,
+      sellerRating,
+      isVerifiedSeller: product.seller?.isVerified ?? false,
+    });
+
+    // rankTier hesapla
+    const now = new Date();
+    const hasActiveBoost =
+      product.boostedUntil != null && new Date(product.boostedUntil) > now;
+    let rankTier = 0;
+    if (hasActiveBoost) {
+      rankTier = 2;
+    } else {
+      const membership = await this.prisma.userMembership.findUnique({
+        where: { userId: product.sellerId },
+        select: { status: true, tier: { select: { type: true } } },
+      });
+      const isPremiumSeller =
+        membership != null &&
+        membership.status === 'active' &&
+        membership.tier.type !== MembershipTierType.free;
+      rankTier = isPremiumSeller ? 1 : 0;
+    }
+
+    const relevanceScore = computeRelevanceScore({
+      rankTier,
+      qualityScore,
+      popularityScore: product.popularityScore,
+    });
+
+    await this.prisma.product.update({
+      where: { id: product.id },
+      data: { qualityScore, rankTier, relevanceScore },
+    });
+  }
+
   private async formatProductResponse(product: any) {
     // Get seller's active listings count
     let sellerListingsCount = 0;
+    let sellerTotalSales = 0;
     let sellerRating = null;
     let sellerTotalRatings = 0;
+    let sellerIsPremium = false;
 
     if (product.seller?.id) {
       sellerListingsCount = await this.prisma.product.count({
@@ -1529,6 +1719,11 @@ Bu ürünü istek listenizden kaldırmak için ürün sayfasına gidip "İstek L
           sellerId: product.seller.id,
           status: ProductStatus.active,
         },
+      });
+
+      // Tamamlanmış satış adedi (user.service stats.totalSales ile aynı hesap)
+      sellerTotalSales = await this.prisma.order.count({
+        where: { sellerId: product.seller.id, status: 'completed' },
       });
 
       // Get seller rating stats (only approved)
@@ -1542,6 +1737,16 @@ Bu ürünü istek listenizden kaldırmak için ürün sayfasına gidip "İstek L
         sellerRating = Number(sellerRatingStats._avg.score.toFixed(1));
         sellerTotalRatings = sellerRatingStats._count;
       }
+
+      // Premium satıcı mı? (aktif, free olmayan üyelik)
+      const sellerMembership = await this.prisma.userMembership.findUnique({
+        where: { userId: product.seller.id },
+        select: { status: true, tier: { select: { type: true } } },
+      });
+      sellerIsPremium =
+        sellerMembership != null &&
+        sellerMembership.status === 'active' &&
+        sellerMembership.tier.type !== MembershipTierType.free;
     }
 
     // Get product rating stats (use cached columns when available, else aggregate)
@@ -1596,8 +1801,13 @@ Bu ürünü istek listenizden kaldırmak için ürün sayfasına gidip "İstek L
 
     const isOnSale = displayOldPrice != null && displayOldPrice > displayPrice;
 
+    // Boost (öne çıkarma) durumu: boostedUntil gelecekteyse ilan sponsorludur
+    const boostedUntil = product.boostedUntil ? new Date(product.boostedUntil) : null;
+    const isBoosted = boostedUntil != null && boostedUntil > now;
+
     return {
       id: product.id,
+      sellerId, // flat sellerId (nested seller.id'ye ek) — API tüketicileri için
       title: product.title,
       description: product.description,
       price: displayPrice,
@@ -1606,6 +1816,8 @@ Bu ürünü istek listenizden kaldırmak için ürün sayfasına gidip "İstek L
       saleEndDate: saleEndDate?.toISOString() || null,
       isOnSale,
       discountPercent,
+      isBoosted,
+      boostedUntil: boostedUntil?.toISOString() || null,
       // API uyumluluğu: eski alanlar (originalPrice/salePrice) = oldPrice/price
       originalPrice: displayOldPrice,
       salePrice: displayPrice,
@@ -1637,8 +1849,10 @@ Bu ürünü istek listenizden kaldırmak için ürün sayfasına gidip "İstek L
           avatarUrl: await this.resolveAvatarUrl((product.seller as any).avatarUrl),
           listings_count: sellerListingsCount,
           productsCount: sellerListingsCount,
+          totalSales: sellerTotalSales,
           rating: sellerRating,
           totalRatings: sellerTotalRatings,
+          isPremium: sellerIsPremium,
         }
         : undefined,
       category: product.category
@@ -1747,12 +1961,18 @@ Bu ürünü istek listenizden kaldırmak için ürün sayfasına gidip "İstek L
       }),
       this.prisma.product.update({
         where: { id: productId },
-        data: { likeCount: { increment: 1 } },
+        // Beğeni etkileşim skoruna canlı yansır (like ağırlığı 5 — gece job ile aynı)
+        data: {
+          likeCount: { increment: 1 },
+          popularityScore: { increment: 5 },
+          relevanceScore: { increment: 5 },
+        },
       }),
     ]);
 
     // Invalidate cache
     await this.cache.del(`products:detail:${productId}`);
+    await this.cache.delPattern('products:list:*');
 
     return { liked: true, likeCount: updatedProduct.likeCount };
   }
@@ -1796,12 +2016,17 @@ Bu ürünü istek listenizden kaldırmak için ürün sayfasına gidip "İstek L
       }),
       this.prisma.product.update({
         where: { id: productId },
-        data: { likeCount: { decrement: 1 } },
+        data: {
+          likeCount: { decrement: 1 },
+          popularityScore: { decrement: 5 },
+          relevanceScore: { decrement: 5 },
+        },
       }),
     ]);
 
     // Invalidate cache
     await this.cache.del(`products:detail:${productId}`);
+    await this.cache.delPattern('products:list:*');
 
     return { liked: false, likeCount: Math.max(0, updatedProduct.likeCount) };
   }
@@ -1878,7 +2103,12 @@ Bu ürünü istek listenizden kaldırmak için ürün sayfasına gidip "İstek L
 
     const updatedProduct = await this.prisma.product.update({
       where: { id: productId },
-      data: { viewCount: { increment: 1 } },
+      // Görüntülenme etkileşim skoruna canlı yansır (view ağırlığı 1 — gece job ile aynı)
+      data: {
+        viewCount: { increment: 1 },
+        popularityScore: { increment: 1 },
+        relevanceScore: { increment: 1 },
+      },
     });
 
     await this.cache.del(`products:detail:${productId}`);
@@ -1933,18 +2163,26 @@ Bu ürünü istek listenizden kaldırmak için ürün sayfasına gidip "İstek L
       }
 
       // Get all listing counts by status (exclude inactive and draft)
-      const [pending, active, reserved, sold, rejected, inactive, total] = await Promise.all([
+      const [pending, active, reserved, sold, rejected, inactive, total, all] = await Promise.all([
         this.prisma.product.count({ where: { sellerId, status: ProductStatus.pending } }),
         this.prisma.product.count({ where: { sellerId, status: ProductStatus.active } }),
         this.prisma.product.count({ where: { sellerId, status: ProductStatus.reserved } }),
         this.prisma.product.count({ where: { sellerId, status: ProductStatus.sold } }),
         this.prisma.product.count({ where: { sellerId, status: ProductStatus.rejected } }),
         this.prisma.product.count({ where: { sellerId, status: ProductStatus.inactive } }),
-        // Total should exclude inactive and draft listings
+        // Total should exclude inactive and draft listings (limit/usage card uses this)
         this.prisma.product.count({
           where: {
             sellerId,
             status: { notIn: [ProductStatus.inactive, ProductStatus.draft] }
+          }
+        }),
+        // "Tümü" sayacı: draft hariç her şey (inactive DAHİL). Liste "Tümü" filtresi
+        // (findSellerProducts: notIn[draft]) ve profil İlanlarım tile'ı ile birebir.
+        this.prisma.product.count({
+          where: {
+            sellerId,
+            status: { notIn: [ProductStatus.draft] }
           }
         }),
       ]);
@@ -1970,6 +2208,7 @@ Bu ürünü istek listenizden kaldırmak için ürün sayfasına gidip "İstek L
           rejected,
           inactive,
           total, // Total excluding inactive and draft
+          all, // "Tümü": draft hariç hepsi (inactive dahil) — liste 'Tümü' ve profil tile ile aynı
           activeListings, // This counts against the limit
         },
         // Membership limits
@@ -2007,9 +2246,51 @@ Bu ürünü istek listenizden kaldırmak için ürün sayfasına gidip "İstek L
   }
 
   /**
-   * Get dynamic filters (categories, brands, etc.)
+   * Get attribute groups applicable to a manufacturer (or global only if no manufacturer).
+   * Used by listing forms to render conditional fields (e.g. Hot Wheels-only filters).
+   *
+   * Returns global groups (manufacturerSlug=null) always; adds manufacturer-scoped
+   * groups when manufacturer slug is provided.
    */
-  async getFilters() {
+  async getAttributeGroupsForManufacturer(manufacturer?: string) {
+    const groups = await this.prisma.attributeGroup.findMany({
+      where: {
+        isActive: true,
+        OR: [
+          { manufacturerSlug: null },
+          ...(manufacturer ? [{ manufacturerSlug: manufacturer }] : []),
+        ],
+      },
+      include: {
+        attributes: {
+          where: { isActive: true },
+          select: { slug: true, value: true, displayValue: true, color: true, sortOrder: true },
+          orderBy: { sortOrder: 'asc' },
+        },
+      },
+      orderBy: { sortOrder: 'asc' },
+    });
+
+    return groups.map((g) => ({
+      slug: g.slug,
+      name: g.name,
+      description: g.description,
+      isRequired: g.isRequired,
+      manufacturerSlug: g.manufacturerSlug,
+      attributes: g.attributes.map((a) => ({
+        slug: a.slug,
+        label: a.displayValue || a.value,
+        color: a.color,
+      })),
+    }));
+  }
+
+  /**
+   * Get dynamic filters (categories, brands, etc.)
+   * When `manufacturer` slug is provided, also returns manufacturer-scoped attribute
+   * groups in `customAttributes` (e.g. Hot Wheels Segment/Assortment/Wheel Type).
+   */
+  async getFilters(manufacturer?: string) {
     // 1. Categories
     const categories = await this.prisma.category.findMany({
       where: { isActive: true },
@@ -2069,6 +2350,23 @@ Bu ürünü istek listenizden kaldırmak için ürün sayfasına gidip "İstek L
       orderBy: [{ brandId: 'asc' }, { sortOrder: 'asc' }, { name: 'asc' }],
     });
 
+    // 6. Manufacturer-scoped custom attribute groups (e.g. Hot Wheels).
+    //    Empty array when no manufacturer or no scoped groups exist.
+    //    Global groups (scale, material) are NOT duplicated here — they're already above.
+    const customAttributes = manufacturer
+      ? await this.prisma.attributeGroup.findMany({
+          where: { isActive: true, manufacturerSlug: manufacturer },
+          include: {
+            attributes: {
+              where: { isActive: true },
+              select: { slug: true, value: true, displayValue: true, color: true },
+              orderBy: { sortOrder: 'asc' },
+            },
+          },
+          orderBy: { sortOrder: 'asc' },
+        })
+      : [];
+
     return {
       categories: categories.map(c => ({ value: c.id, label: c.name, slug: c.slug, parentId: c.parentId })),
       brands: brands.map((b) => ({ id: b.id, name: b.name, slug: b.slug })),
@@ -2081,6 +2379,16 @@ Bu ürünü istek listenizden kaldırmak için ürün sayfasına gidip "İstek L
         { slug: 'composite', label: 'Composite (Kompozit)' },
         { slug: 'plastic', label: 'Plastic (Plastik)' },
       ],
+      customAttributes: customAttributes.map((g) => ({
+        slug: g.slug,
+        name: g.name,
+        manufacturerSlug: g.manufacturerSlug,
+        attributes: g.attributes.map((a) => ({
+          slug: a.slug,
+          label: a.displayValue || a.value,
+          color: a.color,
+        })),
+      })),
     };
   }
 }

@@ -54,9 +54,11 @@ function initStorageService(): StorageService | null {
 const randomPrice = (min: number, max: number) => 
   Math.round((Math.random() * (max - min) + min) * 100) / 100;
 
-// Helper to generate order number
-const generateOrderNumber = () => 
-  `ORD-${Date.now().toString(36).toUpperCase()}-${Math.random().toString(36).substring(2, 6).toUpperCase()}`;
+// Helper to generate order number (matches the runtime ORD-XXXXXXXXXX format;
+// non-ambiguous alphabet, dev/seed data only)
+const REF_ALPHABET = '23456789ABCDEFGHJKMNPQRSTVWXYZ';
+const generateOrderNumber = () =>
+  `ORD-${Array.from({ length: 10 }, () => REF_ALPHABET[Math.floor(Math.random() * REF_ALPHABET.length)]).join('')}`;
 
 // Helper to generate trade number
 const generateTradeNumber = () => 
@@ -465,6 +467,10 @@ async function main() {
   }
 
   console.log(`✅ Created attribute groups (${scaleValues.length} scales, ${materialValues.length} materials, ${vehicleTypeValues.length} vehicle types)`);
+
+  console.log('Seeding Hot Wheels-specific attribute groups...');
+  const { seedHotWheelsAttributes } = await import('./seed-hw-attributes');
+  await seedHotWheelsAttributes(prisma);
 
   // Map seed category slug (cat) -> vehicle_type attribute slug for product attributes
   const catToVehicleTypeSlug: Record<string, string> = {
@@ -1470,8 +1476,11 @@ async function main() {
     const buyers = users.filter(u => u.id !== product.sellerId);
     const buyer = buyers[Math.floor(Math.random() * buyers.length)];
     const status = orderStatuses[Math.floor(Math.random() * orderStatuses.length)];
-    const totalAmount = Number(product.price);
-    const commission = totalAmount * 0.05;
+    // Invariant (order.service checkout ile aynı): totalAmount = subtotal + shipping + buyerFee
+    const subtotal = Number(product.price);
+    const shippingCost = 30;
+    const totalAmount = subtotal + shippingCost;
+    const commission = subtotal * 0.05;
     const buyerAddress = addresses.find(a => a.userId === buyer.id);
 
     try {
@@ -1482,7 +1491,8 @@ async function main() {
           sellerId: product.sellerId,
           productId: product.id,
           totalAmount: totalAmount,
-          shippingCost: 30,
+          subtotal: subtotal,
+          shippingCost: shippingCost,
           commissionAmount: commission,
           status: status,
           paymentExpiresAt: new Date(Date.now() + 24 * 60 * 60 * 1000),

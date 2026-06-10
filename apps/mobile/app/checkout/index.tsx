@@ -112,9 +112,9 @@ export default function CheckoutScreen() {
 
   // ---------- Kargo / Ödeme tercihleri ----------
   // Tek kargo firması: Sürat Kargo (web ile parite — apps/web/src/app/checkout/page.tsx).
-  const selectedCarrier: 'surat' = 'surat';
+  const selectedCarrier = 'surat' as const;
   // Sadece PayTR kullanılıyor (iyzico kaldırıldı — web ile parite)
-  const paymentProvider: 'paytr' = 'paytr';
+  const paymentProvider = 'paytr' as const;
   const [shippingCost, setShippingCost] = useState(0);
   const [shippingLoading, setShippingLoading] = useState(false);
 
@@ -190,9 +190,9 @@ export default function CheckoutScreen() {
     if (cards.length > 0 && selectedCardToken === 'webview') {
       setSelectedCardToken(cards[0].cardToken);
     }
-    // Üye + hiç kart yok → yeni kart formu varsayılan
-    if (cards.length === 0 && selectedCardToken !== 'new' && selectedCardToken !== 'webview') {
-      setSelectedCardToken('new');
+    // Üye + hiç kart yok → PayTR WebView akışı varsayılan (manuel kart girişi yok)
+    if (cards.length === 0 && selectedCardToken !== 'webview') {
+      setSelectedCardToken('webview');
     }
   }, [isAuthenticated, cards]);
 
@@ -536,6 +536,9 @@ export default function CheckoutScreen() {
           return;
         }
 
+        // Token burada üretildi; ekran tekrar initiate etmesin diye URL'i geçiyoruz
+        // (PayTR token'ları tek kullanımlık — çift initiate ilk token'ı çöpe atardı).
+        const paymentUrl: string | undefined = initData.paymentUrl;
         clearCart();
         router.replace({
           pathname: '/payment/[id]',
@@ -544,6 +547,7 @@ export default function CheckoutScreen() {
             orderId: firstOrderId,
             provider: paymentProvider,
             guest: isAuthenticated ? '0' : '1',
+            ...(paymentUrl ? { paymentUrl } : {}),
           },
         } as any);
       } catch (payErr: any) {
@@ -698,8 +702,11 @@ export default function CheckoutScreen() {
             <CityDistrictSelector
               city={inline.city}
               district={inline.district}
-              onChangeCity={(city) => setInline({ ...inline, city })}
-              onChangeDistrict={(district) => setInline({ ...inline, district })}
+              // Fonksiyonel güncelleme şart: il seçilince CityDistrictSelector
+              // aynı anda hem onChangeCity hem onChangeDistrict('') çağırır;
+              // stale obje ile yazılırsa ikinci çağrı şehri ezer (il seçilemiyor).
+              onChangeCity={(city) => setInline((prev) => ({ ...prev, city }))}
+              onChangeDistrict={(district) => setInline((prev) => ({ ...prev, district }))}
             />
             <Input
               label="Açık Adres *"
@@ -909,30 +916,6 @@ export default function CheckoutScreen() {
                     </TouchableOpacity>
                   ))}
 
-                  {/* Yeni kart formu */}
-                  <TouchableOpacity
-                    style={[
-                      styles.optionCard,
-                      selectedCardToken === 'new' && styles.optionCardActive,
-                    ]}
-                    onPress={() => setSelectedCardToken('new')}
-                  >
-                    <Radio
-                      checked={selectedCardToken === 'new'}
-                      onChange={() => setSelectedCardToken('new')}
-                    />
-                    <MaterialCommunityIcons
-                      name="credit-card-plus"
-                      size={22}
-                      color={colors.primary[600]!}
-                      style={{ marginRight: 6 }}
-                    />
-                    <View style={styles.optionContent}>
-                      <Text style={styles.optionTitle}>Yeni Kart Ekle</Text>
-                      <Text style={styles.optionDescription}>3DS ile güvenli ödeme</Text>
-                    </View>
-                  </TouchableOpacity>
-
                   {/* WebView (provider-hosted) seçeneği */}
                   <TouchableOpacity
                     style={[
@@ -961,75 +944,14 @@ export default function CheckoutScreen() {
                 </View>
               ) : null}
 
-              {/* Üye + kart yok ya da yeni kart formu seçili */}
-              {isAuthenticated && selectedCardToken === 'new' ? (
-                <View>
-                  <Input
-                    label="Kart Sahibi *"
-                    value={cardForm.cardHolderName}
-                    onChangeText={(v: string) =>
-                      setCardForm({ ...cardForm, cardHolderName: v })
-                    }
-                    containerStyle={styles.input}
-                  />
-                  <Input
-                    label="Kart Numarası *"
-                    value={cardForm.cardNumber}
-                    onChangeText={(v: string) =>
-                      setCardForm({ ...cardForm, cardNumber: v.replace(/[^\d\s]/g, '') })
-                    }
-                    keyboardType="number-pad"
-                    maxLength={19}
-                    containerStyle={styles.input}
-                  />
-                  <View style={{ flexDirection: 'row', gap: 8 }}>
-                    <Input
-                      label="Ay *"
-                      value={cardForm.expireMonth}
-                      onChangeText={(v: string) =>
-                        setCardForm({ ...cardForm, expireMonth: v.replace(/[^\d]/g, '') })
-                      }
-                      keyboardType="number-pad"
-                      maxLength={2}
-                      containerStyle={{ ...styles.input, flex: 1 }}
-                    />
-                    <Input
-                      label="Yıl *"
-                      value={cardForm.expireYear}
-                      onChangeText={(v: string) =>
-                        setCardForm({ ...cardForm, expireYear: v.replace(/[^\d]/g, '') })
-                      }
-                      keyboardType="number-pad"
-                      maxLength={4}
-                      containerStyle={{ ...styles.input, flex: 1 }}
-                    />
-                    <Input
-                      label="CVC *"
-                      value={cardForm.cvc}
-                      onChangeText={(v: string) =>
-                        setCardForm({ ...cardForm, cvc: v.replace(/[^\d]/g, '') })
-                      }
-                      keyboardType="number-pad"
-                      maxLength={4}
-                      secureTextEntry
-                      containerStyle={{ ...styles.input, flex: 1 }}
-                    />
-                  </View>
-                  <Input
-                    label="Kart Takma Adı (opsiyonel)"
-                    value={cardForm.cardAlias}
-                    onChangeText={(v: string) => setCardForm({ ...cardForm, cardAlias: v })}
-                    containerStyle={styles.input}
-                  />
-                  <View style={styles.saveCardRow}>
-                    <Switch
-                      value={cardForm.saveCard}
-                      onValueChange={(v: boolean) => setCardForm({ ...cardForm, saveCard: v })}
-                    />
-                    <Text style={styles.saveCardLabel}>Bu kartı sonraki alışverişler için kaydet</Text>
-                  </View>
-                </View>
-              ) : null}
+              {/* PayTR bilgilendirme — kart bilgisi uygulamaya girilmez (PCI). */}
+              <View style={styles.paytrNotice}>
+                <Ionicons name="lock-closed" size={18} color={colors.success[600]!} />
+                <Text style={styles.paytrNoticeText}>
+                  Ödemeniz PayTR güvenli altyapısı üzerinden alınır. Kart bilgileriniz Tarodan'a
+                  kaydedilmez; bir sonraki adımda PayTR'nin 3D Secure ödeme sayfası açılır.
+                </Text>
+              </View>
 
               {/* Provider: sadece PayTR (iyzico kaldırıldı — web ile parite) */}
             </View>
@@ -1157,7 +1079,9 @@ export default function CheckoutScreen() {
             variant="primary"
             title="Devam Et"
             onPress={handleNextStep}
-            style={styles.actionButton}
+            icon="arrow-forward"
+            iconPosition="right"
+            style={[styles.actionButton, styles.continueButton]}
           />
         ) : (
           <Button
@@ -1166,6 +1090,7 @@ export default function CheckoutScreen() {
             onPress={handleCheckout}
             isLoading={loading}
             disabled={loading}
+            fullWidth
             style={styles.actionButton}
             icon="card-outline"
           />
@@ -1322,6 +1247,7 @@ const styles = StyleSheet.create({
   savedAddressRow: {
     flexDirection: 'row',
     alignItems: 'flex-start',
+    gap: 12,
     backgroundColor: colors.surface.alt,
     borderRadius: 12,
     padding: 12,
@@ -1358,6 +1284,23 @@ const styles = StyleSheet.create({
     fontSize: 13,
     color: colors.text.heading,
     flex: 1,
+  },
+  paytrNotice: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    gap: 8,
+    padding: 12,
+    borderRadius: 10,
+    backgroundColor: colors.success[50]!,
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: colors.success[600]!,
+    marginTop: 4,
+  },
+  paytrNoticeText: {
+    flex: 1,
+    fontSize: 12,
+    lineHeight: 17,
+    color: colors.success[800] ?? colors.success[600]!,
   },
   providerChip: {
     paddingHorizontal: 14,
@@ -1477,6 +1420,10 @@ const styles = StyleSheet.create({
   },
   actionButton: {
     borderRadius: 12,
+  },
+  continueButton: {
+    alignSelf: 'flex-end',
+    paddingHorizontal: 32,
   },
   emptyContainer: {
     flex: 1,

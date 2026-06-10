@@ -8,7 +8,7 @@ import { ConfigService } from '@nestjs/config';
 import { Cron, CronExpression } from '@nestjs/schedule';
 import { PrismaService } from '../../prisma';
 import { Client } from '@elastic/elasticsearch';
-import { ProductStatus } from '@prisma/client';
+import { Prisma, ProductStatus } from '@prisma/client';
 import { StorageService } from '../storage/storage.service';
 import { buildProductWhere } from '../product/helpers/build-product-where';
 import { fulltextProductSearch } from '../product/helpers/fulltext-search';
@@ -58,6 +58,11 @@ export interface SearchOptions {
   limited?: boolean;
   set?: boolean;
   sellerId?: string;
+  /**
+   * Açık statü filtresi. Verilirse yalnızca o statü (örn. 'active' → stok-içi).
+   * Verilmezse kapsayıcı küme: aktif + otomatik tükenen (inactive+qty0) + satıldı.
+   */
+  status?: string;
   page?: number;
   pageSize?: number;
   sortBy?: string;
@@ -123,11 +128,11 @@ export class SearchService implements OnModuleInit {
     try {
       const [esRes, dbCount] = await Promise.all([
         this.client.count({ index: this.PRODUCTS_INDEX }).catch(() => ({ count: 0 })),
-        this.prisma.product.count({ where: { status: ProductStatus.active } }),
+        this.prisma.product.count({ where: this.indexableProductWhere() }),
       ]);
       const esCount = esRes?.count ?? 0;
       if (esCount === 0 && dbCount > 0) {
-        this.logger.log(`Elasticsearch index boş, DB'de ${dbCount} aktif ürün var – reindex başlatılıyor...`);
+        this.logger.log(`Elasticsearch index boş, DB'de ${dbCount} listelenebilir ürün var – reindex başlatılıyor...`);
         const indexed = await this.reindexAll();
         this.logger.log(`Elasticsearch reindex tamamlandı: ${indexed} ürün index'lendi.`);
       }
@@ -138,6 +143,24 @@ export class SearchService implements OnModuleInit {
 
   isAvailable(): boolean {
     return this.esAvailable;
+  }
+
+  /**
+   * ES'e indekslenecek ürün kümesi: listelerde görünebilenler.
+   * = aktif (stoklu) + otomatik tükenen (inactive + quantity=0) + satıldı.
+   * Hariç: elle pasife alınan (inactive + quantity>0), draft/pending/reserved/rejected
+   * ve sanal (membership-) ürünler. Bu küme build-product-where.ts'teki kapsayıcı
+   * listeleme filtresiyle hizalıdır.
+   */
+  private indexableProductWhere(): Prisma.ProductWhereInput {
+    return {
+      OR: [
+        { status: ProductStatus.active },
+        { AND: [{ status: ProductStatus.inactive }, { quantity: 0 }] },
+        { status: ProductStatus.sold },
+      ],
+      NOT: { id: { startsWith: 'membership-' } },
+    };
   }
 
   private async ensureIndexExists(): Promise<void> {
@@ -301,10 +324,15 @@ export class SearchService implements OnModuleInit {
               isPreorder: { type: 'boolean' },
               isLimited: { type: 'boolean' },
               isSet: { type: 'boolean' },
+              inStock: { type: 'boolean' },
               quantity: { type: 'integer' },
               viewCount: { type: 'integer' },
               ratingAverage: { type: 'float' },
               ratingCount: { type: 'integer' },
+              rankTier: { type: 'integer' },
+              qualityScore: { type: 'integer' },
+              popularityScore: { type: 'integer' },
+              relevanceScore: { type: 'integer' },
               createdAt: { type: 'date' },
               updatedAt: { type: 'date' },
             },
@@ -358,6 +386,7 @@ export class SearchService implements OnModuleInit {
       limited,
       set: setFilter,
       sellerId,
+      status,
       page = 1,
       pageSize = 20,
       sortBy = 'relevance',
@@ -405,8 +434,30 @@ export class SearchService implements OnModuleInit {
       });
     }
 
-    // Always active only
-    filter.push({ term: { status: ProductStatus.active } });
+    // Görünürlük (status / stok)
+    if (status) {
+      // Açık statü istendi: tam eşitle (örn. discount carousel'i status=active → stok-içi).
+      filter.push({ term: { status } });
+    } else {
+      // Statü verilmedi: aktif (stoklu) + otomatik tükenen (inactive+qty0) + satıldı.
+      filter.push({
+        bool: {
+          should: [
+            { term: { status: ProductStatus.active } },
+            {
+              bool: {
+                must: [
+                  { term: { status: ProductStatus.inactive } },
+                  { term: { quantity: 0 } },
+                ],
+              },
+            },
+            { term: { status: ProductStatus.sold } },
+          ],
+          minimum_should_match: 1,
+        },
+      });
+    }
     filter.push({ bool: { must_not: { prefix: { id: 'membership-' } } } });
 
     // ID-based filters (keyword exact match)
@@ -474,7 +525,19 @@ export class SearchService implements OnModuleInit {
       case 'title_asc': sort = [{ 'title.keyword': 'asc' }]; break;
       case 'title_desc': sort = [{ 'title.keyword': 'desc' }]; break;
       case 'rating_desc': sort = [{ ratingAverage: 'desc' }, { ratingCount: 'desc' }]; break;
-      default: sort = query ? [{ _score: 'desc' }] : [{ createdAt: 'desc' }];
+      default:
+        // Alaka sıralaması: metin aramasında _score birincil kalır (relevance korunur),
+        // boost/kalite eşitlik bozucu olur; gezinmede (query yok) sponsorlu kademe öne geçer.
+        sort = query
+          ? [{ _score: 'desc' }, { relevanceScore: 'desc' }, { viewCount: 'desc' }]
+          : [{ relevanceScore: 'desc' }, { viewCount: 'desc' }, { createdAt: 'desc' }];
+    }
+
+    // Stoktakiler önce: status verilmeyen kapsayıcı aramada (aktif + tükenen + satıldı)
+    // stoklu ürünler tükenenlerden önce gelsin. Eski indeks dokümanlarında alan
+    // bulunmayabilir → missing '_first' ile stok-içi gibi davranır.
+    if (!status) {
+      sort = [{ inStock: { order: 'desc', missing: '_first' } }, ...sort];
     }
 
     try {
@@ -614,12 +677,18 @@ export class SearchService implements OnModuleInit {
       viewCount: product.viewCount || 0,
       ratingAverage: product.averageRating != null ? parseFloat(product.averageRating.toString()) : 0,
       ratingCount: product.ratingCount ?? 0,
+      rankTier: product.rankTier ?? 0,
+      qualityScore: product.qualityScore ?? 0,
+      popularityScore: product.popularityScore ?? 0,
+      relevanceScore: product.relevanceScore ?? 0,
       material: materialAttr?.attribute?.slug || undefined,
       vehicleType: vehicleTypeAttr?.attribute?.slug || undefined,
       isTradeEnabled: product.isTradeEnabled,
       isPreorder: product.isPreorder,
       isLimited: product.isLimited,
       isSet: product.isSet,
+      // Stok-içi sıralama için denormalize bayrak (status=active ⟺ stoklu).
+      inStock: product.status === ProductStatus.active,
       quantity: product.quantity,
       createdAt: product.createdAt,
       updatedAt: product.updatedAt,
@@ -697,10 +766,7 @@ export class SearchService implements OnModuleInit {
 
     try {
       const products = await this.prisma.product.findMany({
-        where: {
-          status: ProductStatus.active,
-          NOT: { id: { startsWith: 'membership-' } },
-        },
+        where: this.indexableProductWhere(),
         include: this.productInclude,
       });
 
@@ -1161,10 +1227,7 @@ export class SearchService implements OnModuleInit {
 
     try {
       const dbCount = await this.prisma.product.count({
-        where: {
-          status: ProductStatus.active,
-          NOT: { id: { startsWith: 'membership-' } },
-        },
+        where: this.indexableProductWhere(),
       });
 
       const esResponse = await this.client.count({ index: this.PRODUCTS_INDEX });
@@ -1183,15 +1246,12 @@ export class SearchService implements OnModuleInit {
 
   private async deltaSync(): Promise<void> {
     try {
-      const activeProducts = await this.prisma.product.findMany({
-        where: {
-          status: ProductStatus.active,
-          NOT: { id: { startsWith: 'membership-' } },
-        },
+      const indexableProducts = await this.prisma.product.findMany({
+        where: this.indexableProductWhere(),
         select: { id: true, updatedAt: true },
       });
 
-      const dbIds = new Set(activeProducts.map((p) => p.id));
+      const dbIds = new Set(indexableProducts.map((p) => p.id));
 
       // Get all ES document IDs
       const esIds = new Set<string>();

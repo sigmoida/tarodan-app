@@ -28,6 +28,22 @@ const getApiUrl = () => {
 
 const API_URL = getApiUrl();
 
+/**
+ * Stabil avatar URL'i. Backend `GET /users/:id/avatar` taze bir presigned URL'e
+ * 302 redirect eder; URL hep aynı kaldığı için 24s'lik presigned expiry'sinden
+ * etkilenmez (persist edilmiş/uzun cache'lenmiş veride bayatlamaz).
+ *
+ * `versionHint` (mevcut presigned avatar URL'i) verilirse, S3 obje yolundan
+ * türetilen bir `?v` eki eklenir: foto değişince <Image> cache'i busts, aynı
+ * dosyada cache hit kalır.
+ */
+export const buildAvatarUrl = (userId: string, versionHint?: string | null): string => {
+  const base = `${API_URL}/users/${userId}/avatar`;
+  if (!versionHint) return base;
+  const filename = versionHint.split('?')[0].split('/').pop() || '';
+  return filename ? `${base}?v=${encodeURIComponent(filename)}` : base;
+};
+
 console.log('📡 API URL:', API_URL);
 console.log('📱 Platform:', Platform.OS);
 console.log('🌐 Expo Host:', Constants.expoConfig?.hostUri);
@@ -127,15 +143,16 @@ export const authApi = {
   }) => api.post('/auth/register', data),
   /** İşletme hesabı olarak kayıt. Web /auth/register/business ile eşleşir. */
   registerBusiness: (data: {
-    displayName: string;
+    companyName: string;
     email: string;
     password: string;
-    phone?: string;
+    phone: string; // BusinessRegisterDto zorunlu: /^\+90[0-9]{10}$/
+    taxId: string;
+    city: string; // BusinessRegisterDto zorunlu (min 2)
+    district?: string;
+    companyType?: string;
     birthDate?: string;
     acceptsMarketingEmails?: boolean;
-    companyName: string;
-    taxId: string;
-    taxOffice?: string;
   }) => api.post('/auth/register/business', data),
   logout: () => api.post('/auth/logout'),
   getProfile: () => api.get('/users/me'),
@@ -149,7 +166,7 @@ export const authApi = {
     guestApi.post('/auth/reset-password', { token, newPassword }),
   verifyEmail: (token: string) =>
     guestApi.post('/auth/verify-email', { token }),
-  resendVerification: () => api.post('/auth/resend-verification'),
+  resendVerification: (email: string) => api.post('/auth/resend-verification', { email }),
   /** Şifre değiştirme — backend `security` modülüne taşındı. */
   changePassword: (currentPassword: string, newPassword: string) =>
     api.post('/security/password/change', { currentPassword, newPassword }),
@@ -172,7 +189,7 @@ export const productsApi = {
   getAll: (params?: Record<string, any>) =>
     api.get('/products', { params }),
   /** Dinamik filtre seçenekleri — web SidebarFilters ile aynı kaynak. Backend: GET /products/filters */
-  getFilters: () =>
+  getFilters: (params?: { manufacturer?: string }) =>
     api.get<{
       categories: Array<{ value: string; label: string; slug: string; parentId: string | null }>;
       brands: Array<{ id: string; name: string; slug: string }>;
@@ -180,9 +197,19 @@ export const productsApi = {
       scales: string[];
       manufacturers: Array<{ id: string; name: string; slug: string }>;
       materials: Array<{ slug: string; label: string }>;
-    }>('/products/filters'),
-  getOne: (id: string | number) => 
+      // Yalnızca attribute-grubu olan bir üretici seçilince dolar (örn Hot Wheels).
+      customAttributes?: Array<{
+        slug: string;
+        name: string;
+        manufacturerSlug: string;
+        attributes: Array<{ slug: string; label: string; color: string | null }>;
+      }>;
+    }>('/products/filters', { params }),
+  getOne: (id: string | number) =>
     api.get(`/products/${id}`),
+  /** Görüntülenme sayacını artır — web ile parite (POST /products/:id/view). Ekran başına 1 kez çağrılmalı. */
+  incrementView: (id: string | number) =>
+    api.post(`/products/${id}/view`),
   create: (data: Record<string, any>) =>
     api.post('/products', data),
   update: (id: string | number, data: Record<string, any>) =>
@@ -199,6 +226,20 @@ export const productsApi = {
   /** Aynı kategoriden benzer ürünler — backend: GET /products/:id/similar */
   getSimilar: (id: string, limit = 12) =>
     api.get(`/products/${id}/similar`, { params: { limit } }),
+  // ---- Boost / Öne Çıkarma ----
+  /** Boost süre/fiyat paketleri. Backend: GET /products/boost/pricing */
+  getBoostPricing: () =>
+    api.get<{
+      enabled?: boolean;
+      options?: Array<{ durationDays: number; price: number; label: string }>;
+    }>('/products/boost/pricing'),
+  /** Kullanıcının boost'ları (en yeni önce). Backend: GET /products/boost/my */
+  getMyBoosts: () => api.get('/products/boost/my'),
+  /** İlanı öne çıkar — ödeme başlat (paymentId döner). Backend: POST /products/:id/boost/initiate */
+  initiateBoost: (
+    productId: string,
+    data: { durationDays: number; autoRenew?: boolean; provider?: 'paytr' },
+  ) => api.post(`/products/${productId}/boost/initiate`, data),
 };
 
 // Categories API - Web ile aynı endpoint'ler
@@ -233,6 +274,9 @@ export type OrderAddressInput = {
 export const ordersApi = {
   getAll: (params?: Record<string, any>) =>
     api.get('/orders', { params }),
+  /** Satıcı kazanç özeti (filtre/sayfalama bağımsız): { totalEarnings, pendingEarnings } */
+  getSellerEarnings: () =>
+    api.get<{ totalEarnings: number; pendingEarnings: number }>('/orders/seller/earnings'),
   getOne: (id: string | number) =>
     api.get(`/orders/${id}`),
   create: (data: any) =>
@@ -300,6 +344,9 @@ export const messagesApi = {
     api.post(`/messages/threads/${threadId}/messages`, { content }),
   markAsRead: (threadId: string) =>
     api.post(`/messages/threads/${threadId}/read`),
+  /** Tüm thread'lerdeki toplam okunmamış mesaj sayısı (header rozeti, sayfalama bağımsız) */
+  getUnreadCount: () =>
+    api.get<{ count: number }>('/messages/unread-count'),
 };
 
 // Collections API - Web ile aynı endpoint'ler
@@ -334,6 +381,9 @@ export const collectionsApi = {
 export const tradesApi = {
   getAll: (params?: Record<string, any>) =>
     api.get('/trades', { params }),
+  /** Takaslar sekme sayaçları (filtre/sayfalama bağımsız): { all, pending, shipping, completed } */
+  getStatusCounts: () =>
+    api.get<{ all: number; pending: number; shipping: number; completed: number }>('/trades/status-counts'),
   getOne: (id: string | number) => 
     api.get(`/trades/${id}`),
   create: (data: {
@@ -408,7 +458,13 @@ export const userApi = {
     displayName?: string;
     phone?: string;
     bio?: string;
+    birthDate?: string;
     avatarUrl?: string;
+    companyName?: string;
+    taxId?: string;
+    taxOffice?: string;
+    isCorporateSeller?: boolean;
+    showTrustScore?: boolean;
   } | FormData) =>
     api.patch('/users/me', data, data instanceof FormData
       ? { headers: { 'Content-Type': 'multipart/form-data' } }

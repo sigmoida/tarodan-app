@@ -5,6 +5,7 @@ import { NotificationService } from '../notification/notification.service';
 import { NotificationType } from '../notification/dto';
 import { StorageService } from '../storage/storage.service';
 import { RatingService } from '../rating/rating.service';
+import { computeTrustScore } from './helpers/trust-score';
 
 // In-memory storage for user blocks until schema is updated
 interface UserBlock {
@@ -58,6 +59,18 @@ export class UserService {
       }
     }
     return null;
+  }
+
+  /**
+   * Stabil avatar endpoint'i (GET /users/:id/avatar) için kullanıcının taze
+   * presigned avatar URL'ini döndürür. Avatar yoksa/çözülemezse null.
+   */
+  async getAvatarRedirectUrl(userId: string): Promise<string | null> {
+    const user = await this.prisma.user.findUnique({
+      where: { id: userId },
+      select: { avatarUrl: true },
+    });
+    return this.resolveAvatarUrl(user?.avatarUrl);
   }
 
   private resolveProductImageUrl(imageKeyOrUrl: string | null | undefined): string | null {
@@ -126,6 +139,30 @@ export class UserService {
       },
     });
 
+    // Güven Skoru için ek istatistikler (puan, satış, takas)
+    const [ratingAgg, salesCount, tradesCount] = await Promise.all([
+      this.prisma.rating.aggregate({
+        where: { receiverId: id, status: 'approved' },
+        _avg: { score: true },
+        _count: true,
+      }),
+      this.prisma.order.count({ where: { sellerId: id, status: 'completed' } }),
+      this.prisma.trade.count({
+        where: { OR: [{ initiatorId: id }, { receiverId: id }], status: 'completed' },
+      }),
+    ]);
+    const isPremium =
+      !!user.membership &&
+      user.membership.status === 'active' &&
+      user.membership.tier.type !== 'free';
+    const trust = computeTrustScore({
+      averageRating: ratingAgg._avg?.score || 0,
+      totalRatings: ratingAgg._count,
+      totalSales: salesCount,
+      totalTrades: tradesCount,
+      isVerified: user.isVerified,
+    });
+
     // Format membership info for frontend
     const membershipInfo = user.membership ? {
       id: user.membership.id,
@@ -167,11 +204,21 @@ export class UserService {
 
     // Remove raw membership and add the mapped membershipInfo
     const { membership: rawMembership, ...rest } = user;
-    return { 
-      ...rest, 
+    return {
+      ...rest,
       avatarUrl: resolvedAvatarUrl,
       membership: membershipInfo,
       listingCount,
+      isPremium,
+      trustScore: trust.score,
+      trustLevel: trust.level,
+      stats: {
+        totalListings: listingCount,
+        totalSales: salesCount,
+        totalTrades: tradesCount,
+        averageRating: ratingAgg._avg?.score || 0,
+        totalRatings: ratingAgg._count,
+      },
     };
   }
 
@@ -190,6 +237,7 @@ export class UserService {
       taxOffice?: string;
       isCorporateSeller?: boolean;
       avatarUrl?: string;
+      showTrustScore?: boolean;
     },
   ) {
     // Check if user is business tier - only business tier users should have business info
@@ -229,6 +277,7 @@ export class UserService {
     if (data.displayName !== undefined) updateData.displayName = data.displayName;
     if (data.phone !== undefined) updateData.phone = data.phone;
     if (data.bio !== undefined) updateData.bio = data.bio;
+    if (data.showTrustScore !== undefined) updateData.showTrustScore = data.showTrustScore;
     if (data.birthDate !== undefined) {
       updateData.birthDate = data.birthDate ? new Date(data.birthDate) : null;
     }
@@ -720,7 +769,12 @@ export class UserService {
   /**
    * Get public user profile
    */
-  async getPublicProfile(userId: string) {
+  async getPublicProfile(userId: string, viewerId?: string) {
+    // Sahibin kendi profili mi? Sahip ise sayaçlar "tümünü" gösterir
+    // (ilan: draft hariç tüm durumlar, takas: tüm statüler, koleksiyon: özel dahil);
+    // başkası bakarken yalnızca herkese görünür/biten kayıtlar sayılır.
+    const isOwner = !!viewerId && viewerId === userId;
+
     const user = await this.prisma.user.findUnique({
       where: { id: userId },
       select: {
@@ -739,20 +793,30 @@ export class UserService {
       throw new NotFoundException('Kullanıcı bulunamadı');
     }
 
-    // Get seller stats + followers count
-    const [totalListings, totalSales, totalTrades, ratings, followersCount] = await Promise.all([
-      this.prisma.product.count({ 
-        where: { 
-          sellerId: userId, 
-          status: 'active' 
-        } 
-      }),
+    // İlan/koleksiyon sayımı viewer'a göre değişir (sahip → tümü, başkası → görünür olanlar).
+    const listingWhere = isOwner
+      ? { sellerId: userId, status: { notIn: ['draft'] } as any }
+      : { sellerId: userId, status: 'active' };
+    const collectionWhere = isOwner
+      ? { userId }
+      : { userId, isPublic: true };
+
+    // Get seller stats + followers count + membership
+    // completedTrades: güven skoru için sabit metrik (viewer'dan bağımsız).
+    // allTrades: sahip görünümünde gösterilen "tüm takaslar" sayısı.
+    const [totalListings, totalSales, completedTrades, allTrades, ratings, followersCount, membership, totalCollections] = await Promise.all([
+      this.prisma.product.count({ where: listingWhere }),
       this.prisma.order.count({ where: { sellerId: userId, status: 'completed' } }),
-      this.prisma.trade.count({ 
-        where: { 
+      this.prisma.trade.count({
+        where: {
           OR: [{ initiatorId: userId }, { receiverId: userId }],
           status: 'completed',
-        } 
+        }
+      }),
+      this.prisma.trade.count({
+        where: {
+          OR: [{ initiatorId: userId }, { receiverId: userId }],
+        }
       }),
       this.prisma.rating.aggregate({
         where: { receiverId: userId, status: 'approved' },
@@ -760,19 +824,47 @@ export class UserService {
         _count: true,
       }),
       this.prisma.userFollow.count({ where: { followingId: userId } }),
+      this.prisma.userMembership.findUnique({
+        where: { userId },
+        select: { status: true, tier: { select: { type: true } } },
+      }),
+      this.prisma.collection.count({ where: collectionWhere }),
     ]);
+
+    // Gösterilecek takas sayısı: sahip → tümü, başkası → yalnızca tamamlanmış.
+    const totalTrades = isOwner ? allTrades : completedTrades;
 
     // Resolve avatar URL (S3 key → presigned URL)
     const resolvedAvatarUrl = await this.resolveAvatarUrl(user.avatarUrl);
+
+    // Premium (ücretli, aktif) üyelik mi?
+    const membershipTier = membership?.tier.type ?? 'free';
+    const isPremium = membership != null && membership.status === 'active' && membershipTier !== 'free';
+
+    // Güven Skoru (0..100) — premium avantajı
+    const trust = computeTrustScore({
+      averageRating: ratings._avg?.score || 0,
+      totalRatings: ratings._count,
+      totalSales,
+      totalTrades: completedTrades,
+      isVerified: user.isVerified,
+    });
+    // Herkese açık profilde skoru sadece premium VE kullanıcı görünürlüğü açıksa göster
+    const trustVisible = isPremium && (user as any).showTrustScore !== false;
 
     return {
       ...user,
       avatarUrl: resolvedAvatarUrl,
       followersCount,
+      isPremium,
+      membershipTier,
+      trustScore: trustVisible ? trust.score : null,
+      trustLevel: trustVisible ? trust.level : null,
       stats: {
         totalListings,
         totalSales,
         totalTrades,
+        totalCollections,
         averageRating: ratings._avg?.score || 0,
         totalRatings: ratings._count,
       },

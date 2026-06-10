@@ -8,6 +8,7 @@ import { useQuery } from '@tanstack/react-query';
 import { manufacturersApi } from '../../src/services/api';
 import { theme, Text, Input } from '@tarodan/ui-native';
 import { ScreenHeader, ScreenLoader, ErrorState, EmptyState } from '../../src/components/common';
+import { resolveImageUrl } from '../../src/utils/imageUrl';
 const { colors } = theme;
 
 interface Manufacturer {
@@ -16,6 +17,7 @@ interface Manufacturer {
   slug: string;
   logo?: string | null;
   productCount?: number;
+  _count?: { products: number };
 }
 
 export default function ManufacturersScreen() {
@@ -37,7 +39,9 @@ export default function ManufacturersScreen() {
     return all.filter(m => m.name.toLowerCase().includes(q));
   }, [data, search]);
 
-  const renderItem = ({ item }: { item: Manufacturer }) => (
+  const renderItem = ({ item }: { item: Manufacturer }) => {
+    const count = item.productCount ?? item._count?.products;
+    return (
     <TouchableOpacity
       style={styles.card}
       onPress={() => router.push(`/ureticiler/${item.slug}` as any)}
@@ -45,20 +49,21 @@ export default function ManufacturersScreen() {
     >
       <View style={styles.logoWrap}>
         {item.logo ? (
-          <Image source={{ uri: item.logo }} style={styles.logo} resizeMode="contain" />
+          <Image source={{ uri: resolveImageUrl(item.logo) }} style={styles.logo} resizeMode="contain" />
         ) : (
           <Text style={styles.logoFallback}>{item.name.charAt(0).toUpperCase()}</Text>
         )}
       </View>
       <View style={styles.body}>
         <Text style={styles.name}>{item.name}</Text>
-        {typeof item.productCount === 'number' ? (
-          <Text style={styles.count}>{item.productCount} ürün</Text>
+        {typeof count === 'number' ? (
+          <Text style={styles.count}>{count} ürün</Text>
         ) : null}
       </View>
       <Ionicons name="chevron-forward" size={18} color={colors.text.subtle} />
     </TouchableOpacity>
-  );
+    );
+  };
 
   return (
     <SafeAreaView style={styles.container} edges={['top']}>

@@ -26,8 +26,14 @@ function toTsQuery(input: string): string {
  * Runs a Postgres full-text search on the products table.
  * Returns matching product IDs ranked by relevance (ts_rank) + trigram similarity.
  *
- * Uses the GIN index created by the migration (products_fts_idx).
- * Falls back to trigram similarity when tsquery yields no results.
+ * Queries the denormalized `search_text` column which is maintained by Postgres
+ * triggers and contains: title + description + attribute display values. This
+ * means searches for manufacturer-scoped attribute labels (e.g. "treasure hunt",
+ * "mainline", "Real Riders") find products that have those attributes attached,
+ * not only those that happen to mention the term in their title.
+ *
+ * Uses the GIN index `products_search_text_fts_idx`.
+ * Falls back to trigram similarity on title when tsquery yields no results.
  */
 export async function fulltextProductSearch(
   prisma: PrismaService,
@@ -41,11 +47,11 @@ export async function fulltextProductSearch(
     `
     SELECT id FROM products
     WHERE
-      to_tsvector('${FTS_CONFIG}', coalesce(title, '') || ' ' || coalesce(description, ''))
+      to_tsvector('${FTS_CONFIG}', coalesce(search_text, ''))
       @@ to_tsquery('${FTS_CONFIG}', $1)
     ORDER BY
       ts_rank(
-        to_tsvector('${FTS_CONFIG}', coalesce(title, '') || ' ' || coalesce(description, '')),
+        to_tsvector('${FTS_CONFIG}', coalesce(search_text, '')),
         to_tsquery('${FTS_CONFIG}', $1)
       ) DESC
     LIMIT $2
@@ -56,7 +62,9 @@ export async function fulltextProductSearch(
 
   if (rows.length > 0) return rows.map((r) => r.id);
 
-  // Fallback: trigram similarity for partial / fuzzy matches
+  // Fallback: trigram similarity for partial / fuzzy matches. Stays on title because
+  // search_text can grow long (multiple attribute labels) and trigram similarity on
+  // long text is noisier than on the human-curated title.
   const trigramRows = await prisma.$queryRawUnsafe<{ id: string }[]>(
     `
     SELECT id FROM products

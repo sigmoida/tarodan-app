@@ -58,20 +58,12 @@ export class PaymentSchedulerService {
 
         const cancelReason = 'Stok tükendiği için otomatik iptal edildi';
 
-        for (const offer of sweepResult.rejectedOffers) {
-          try {
-            await this.eventService.emitOfferAutoRejected({
-              offerId: offer.offerId,
-              buyerId: offer.buyerId,
-              productId: offer.productId,
-              productTitle: offer.productTitle,
-              reason: cancelReason,
-            });
-          } catch (err: any) {
-            this.logger.error(`Failed to notify offer ${offer.offerId}: ${err.message}`);
-          }
-        }
-
+        // NOT (mükerrer bildirim fix): İptal edilen TEKLİFLER zaten
+        // sweepOutOfStockProducts() içinde notifyOfferCancelledOutOfStock()
+        // (IN_APP + PUSH) ile bildiriliyor. Burada ayrıca emitOfferAutoRejected()
+        // çağırmak aynı teklif için İKİNCİ bir bildirim üretiyordu (çift). Teklif
+        // emit'i kaldırıldı; yalnız TAKAS bildirimi burada gönderiliyor (sweep
+        // takasları bildirmez).
         for (const trade of sweepResult.cancelledTrades) {
           try {
             await this.eventService.emitTradeAutoCancelled({

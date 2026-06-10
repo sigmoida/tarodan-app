@@ -1,9 +1,9 @@
-import { View, ScrollView, StyleSheet, TouchableOpacity, Linking, Alert } from 'react-native';
+import { View, ScrollView, StyleSheet, TouchableOpacity, Alert } from 'react-native';
 import { useState } from 'react';
 import { router } from 'expo-router';
 import { useMutation } from '@tanstack/react-query';
 import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
-import { theme, Text, Card, Button, Chip, Radio } from '@tarodan/ui-native';
+import { theme, Text, Card, Button, Chip, Radio, ScreenHeader } from '@tarodan/ui-native';
 import { membershipApi } from '../src/services/api';
 import { useAuthStore } from '../src/stores/authStore';
 
@@ -73,19 +73,29 @@ export default function UpgradeScreen() {
         billingPeriod: isAnnual ? 'yearly' : 'monthly',
       });
     },
-    onSuccess: (response) => {
-      // In a real app, this would redirect to a payment gateway
-      const paymentUrl = response.data?.paymentUrl;
-      if (paymentUrl) {
-        Linking.openURL(paymentUrl);
-      } else {
-        Alert.alert(
-          'Ödeme',
-          'Ödeme sayfasına yönlendiriliyorsunuz...',
-          [{ text: 'Tamam' }]
-        );
+    onSuccess: (response: any) => {
+      const data = response?.data?.data ?? response?.data ?? {};
+      const paymentId = data.paymentId || data.id;
+      const paymentUrl: string | undefined = data.paymentUrl;
+
+      // Bypass (dev/test) ya da ödeme gerektirmeyen durum → üyelik zaten güncellendi.
+      if (data.useBypass === true || (!paymentUrl && !paymentId)) {
+        refreshUserData();
+        Alert.alert('Üyelik', 'Üyeliğiniz güncellendi.');
+        return;
       }
-      refreshUserData();
+
+      // Gerçek PayTR akışı — dış tarayıcı (Linking) yerine app içi WebView ödeme ekranı.
+      router.push({
+        pathname: '/payment/[id]',
+        params: {
+          id: paymentId,
+          provider: 'paytr',
+          guest: '0',
+          type: 'membership',
+          ...(paymentUrl ? { paymentUrl } : {}),
+        },
+      } as any);
     },
     onError: () => {
       Alert.alert('Hata', 'Abonelik oluşturulamadı. Lütfen tekrar deneyin.');
@@ -104,14 +114,7 @@ export default function UpgradeScreen() {
 
   return (
     <View style={styles.container}>
-      {/* Header */}
-      <View style={styles.header}>
-        <TouchableOpacity onPress={() => router.back()}>
-          <Ionicons name="arrow-back" size={24} color={colors.white} />
-        </TouchableOpacity>
-        <Text style={styles.headerTitle}>Premium Üyelik</Text>
-        <View style={{ width: 24 }} />
-      </View>
+      <ScreenHeader title="Premium Üyelik" onBack={() => router.back()} />
 
       <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
         {/* Already Premium */}
@@ -296,20 +299,6 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: colors.surface.alt,
-  },
-  header: {
-    backgroundColor: colors.primary[600]!,
-    paddingTop: 50,
-    paddingBottom: 16,
-    paddingHorizontal: 20,
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-  },
-  headerTitle: {
-    fontSize: 18,
-    fontWeight: 'bold',
-    color: colors.white,
   },
   content: {
     flex: 1,

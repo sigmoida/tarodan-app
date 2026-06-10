@@ -1,45 +1,19 @@
 import { useState } from 'react';
 import { View, ScrollView, StyleSheet, TouchableOpacity, Dimensions, Image, Pressable } from 'react-native';
-import { Avatar, Button, Card, Spinner, Text, theme } from '@tarodan/ui-native';
+import { Avatar, Button, Card, Spinner, Text, theme, ScreenHeader } from '@tarodan/ui-native';
 import { useQuery } from '@tanstack/react-query';
 import { useLocalSearchParams, router } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { userApi, productsApi, ratingsApi } from '../../src/services/api';
+import { ThemedRefreshControl } from '../../src/components/common';
+import { useRefresh } from '../../src/hooks/useRefresh';
 import { useAuthStore } from '../../src/stores/authStore';
+import { resolveImageUrl } from '../../src/utils/imageUrl';
 
 const { colors } = theme;
 
 const { width } = Dimensions.get('window');
 const CARD_WIDTH = (width - 48) / 2;
-
-// Mock seller for demo/offline mode
-const MOCK_SELLER = {
-  id: 's1',
-  displayName: 'Premium Collector',
-  bio: 'Koleksiyoner ve model araba tutkunu. 10 yıldır diecast modellerle ilgileniyorum. Özellikle 1:18 ölçekli premium markalar konusunda uzmanım.',
-  avatarUrl: null,
-  rating: 4.8,
-  totalReviews: 89,
-  totalSales: 127,
-  totalListings: 34,
-  memberSince: '2023-01-15',
-  responseTime: '< 1 saat',
-  responseRate: 98,
-  verified: true,
-  badges: ['fast_shipper', 'trusted_seller', 'responsive'],
-  location: 'İstanbul',
-  products: [
-    { id: '1', title: 'Porsche 911 GT3 RS', price: 3200, images: ['https://placehold.co/200x200/f3f4f6/9ca3af?text=Porsche'], tradeAvailable: true },
-    { id: '2', title: 'Ferrari 488 GTB', price: 2800, images: ['https://placehold.co/200x200/f3f4f6/9ca3af?text=Ferrari'], tradeAvailable: false },
-    { id: '3', title: 'Lamborghini Aventador', price: 3500, images: ['https://placehold.co/200x200/f3f4f6/9ca3af?text=Lambo'], tradeAvailable: true },
-    { id: '4', title: 'BMW M4 Competition', price: 1800, images: ['https://placehold.co/200x200/f3f4f6/9ca3af?text=BMW'], tradeAvailable: false },
-  ],
-  reviews: [
-    { id: 'r1', userName: 'Ahmet K.', rating: 5, comment: 'Harika satıcı, hızlı kargo.', date: '2024-01-10' },
-    { id: 'r2', userName: 'Mehmet Y.', rating: 5, comment: 'Çok dikkatli paketleme, teşekkürler!', date: '2024-01-08' },
-    { id: 'r3', userName: 'Ali V.', rating: 4, comment: 'Ürün açıklamaya uygun, güvenilir satıcı.', date: '2024-01-05' },
-  ],
-};
 
 const BADGE_INFO: Record<string, { label: string; icon: string; color: string }> = {
   fast_shipper: { label: 'Hızlı Kargo', icon: 'rocket-outline', color: colors.info[600]! },
@@ -54,7 +28,7 @@ export default function SellerProfileScreen() {
   const { isAuthenticated } = useAuthStore();
   const [activeTab, setActiveTab] = useState<'listings' | 'reviews'>('listings');
 
-  const { data: apiSeller, isLoading } = useQuery({
+  const { data: apiSeller, isLoading, refetch: refetchSeller } = useQuery({
     queryKey: ['seller', id],
     queryFn: async () => {
       try {
@@ -69,7 +43,7 @@ export default function SellerProfileScreen() {
     retry: 1,
   });
 
-  const { data: sellerProducts } = useQuery({
+  const { data: sellerProducts, refetch: refetchProducts } = useQuery({
     queryKey: ['seller-products', id],
     queryFn: async () => {
       try {
@@ -77,14 +51,14 @@ export default function SellerProfileScreen() {
         const data: any = response.data;
         return data?.data ?? data?.items ?? data ?? [];
       } catch {
-        return MOCK_SELLER.products;
+        return [];
       }
     },
     enabled: !!id,
   });
 
   // Web `apps/web/src/app/seller/[id]/page.tsx:181-193` paritesi
-  const { data: ratingStats } = useQuery({
+  const { data: ratingStats, refetch: refetchStats } = useQuery({
     queryKey: ['seller-rating-stats', id],
     queryFn: async () => {
       try {
@@ -97,13 +71,15 @@ export default function SellerProfileScreen() {
     enabled: !!id,
   });
 
-  const { data: ratingList } = useQuery({
+  const { data: ratingList, refetch: refetchRatings } = useQuery({
     queryKey: ['seller-ratings', id],
     queryFn: async () => {
       try {
         const response = await ratingsApi.getUserRatings(String(id), { limit: 20 });
         const data: any = response.data;
-        return data?.items ?? data?.data ?? data ?? [];
+        // API şekli: { ratings, total, page, pageSize } (olası interceptor sarmalını da aç)
+        const payload = data?.data ?? data;
+        return payload?.ratings ?? payload?.items ?? (Array.isArray(payload) ? payload : []);
       } catch {
         return [];
       }
@@ -111,12 +87,17 @@ export default function SellerProfileScreen() {
     enabled: !!id,
   });
 
-  const seller = apiSeller || MOCK_SELLER;
-  const products = sellerProducts || MOCK_SELLER.products;
-  // Backend ratings öncelikli; yoksa mock fallback.
-  const reviews = (Array.isArray(ratingList) && ratingList.length > 0)
-    ? ratingList
-    : (seller.reviews || MOCK_SELLER.reviews);
+  const { refreshing, onRefresh } = useRefresh(
+    refetchSeller,
+    refetchProducts,
+    refetchStats,
+    refetchRatings,
+  );
+
+  const seller = apiSeller;
+  const products = Array.isArray(sellerProducts) ? sellerProducts : [];
+  // Backend ratings (web ile parite); yoksa boş.
+  const reviews = Array.isArray(ratingList) ? ratingList : [];
 
   const handleMessage = () => {
     if (!isAuthenticated) {
@@ -126,7 +107,7 @@ export default function SellerProfileScreen() {
     router.push(`/messages/new?sellerId=${id}`);
   };
 
-  if (isLoading && !seller) {
+  if (isLoading) {
     return (
       <View style={styles.loadingContainer}>
         <Spinner size="lg" />
@@ -135,27 +116,40 @@ export default function SellerProfileScreen() {
     );
   }
 
+  if (!seller) {
+    return (
+      <View style={styles.loadingContainer}>
+        <Ionicons name="person-outline" size={64} color={colors.text.muted} />
+        <Text style={styles.loadingText}>Satıcı bulunamadı</Text>
+        <Button
+          variant="primary"
+          title="Geri Dön"
+          onPress={() => router.back()}
+          style={{ marginTop: 16 }}
+        />
+      </View>
+    );
+  }
+
   return (
     <View style={styles.container}>
-      {/* Header */}
-      <View style={styles.header}>
-        <TouchableOpacity onPress={() => router.back()}>
-          <Ionicons name="arrow-back" size={24} color={colors.white} />
-        </TouchableOpacity>
-        <Text style={styles.headerTitle}>Satıcı Profili</Text>
-        <View style={{ width: 24 }} />
-      </View>
+      <ScreenHeader title="Satıcı Profili" onBack={() => router.back()} />
 
-      <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
+      <ScrollView
+        style={styles.content}
+        showsVerticalScrollIndicator={false}
+        refreshControl={<ThemedRefreshControl refreshing={refreshing} onRefresh={onRefresh} />}
+      >
         {/* Profile Card */}
         <View style={styles.profileCard}>
           <Avatar
             size="xl"
+            source={seller.avatarUrl}
             name={seller.displayName?.substring(0, 2).toUpperCase() || 'S'}
           />
           <View style={styles.profileNameRow}>
             <Text style={styles.profileName}>{seller.displayName}</Text>
-            {seller.verified && (
+            {seller.isVerified && (
               <Ionicons name="checkmark-circle" size={24} color={colors.warning[500]!} />
             )}
           </View>
@@ -165,19 +159,21 @@ export default function SellerProfileScreen() {
               <Text style={styles.locationText}>{seller.location}</Text>
             </View>
           )}
-          <Text style={styles.memberSince}>
-            Üye: {new Date(seller.memberSince).toLocaleDateString('tr-TR', { month: 'long', year: 'numeric' })}
-          </Text>
+          {seller.createdAt ? (
+            <Text style={styles.memberSince}>
+              Üye: {new Date(seller.createdAt).toLocaleDateString('tr-TR', { month: 'long', year: 'numeric' })}
+            </Text>
+          ) : null}
 
-          {/* Stats Row */}
+          {/* Stats Row — web ile parite: stats objesinden */}
           <View style={styles.statsRow}>
             <View style={styles.statItem}>
-              <Text style={styles.statValue}>{seller.totalListings}</Text>
+              <Text style={styles.statValue}>{seller.stats?.totalListings ?? products.length}</Text>
               <Text style={styles.statLabel}>İlan</Text>
             </View>
             <View style={styles.statDivider} />
             <View style={styles.statItem}>
-              <Text style={styles.statValue}>{seller.totalSales}</Text>
+              <Text style={styles.statValue}>{seller.stats?.totalSales ?? 0}</Text>
               <Text style={styles.statLabel}>Satış</Text>
             </View>
             <View style={styles.statDivider} />
@@ -185,16 +181,25 @@ export default function SellerProfileScreen() {
               <View style={styles.ratingValue}>
                 <Ionicons name="star" size={18} color={colors.warning[500]!} />
                 <Text style={styles.statValue}>
-                  {(ratingStats?.averageScore ?? ratingStats?.averageRating ?? seller.rating ?? 0).toFixed
-                    ? (ratingStats?.averageScore ?? ratingStats?.averageRating ?? seller.rating ?? 0).toFixed(1)
-                    : seller.rating}
+                  {(ratingStats?.averageScore ?? ratingStats?.averageRating ?? seller.stats?.averageRating ?? 0).toFixed(1)}
                 </Text>
               </View>
               <Text style={styles.statLabel}>
-                {(ratingStats?.totalRatings ?? ratingStats?.total ?? seller.totalReviews ?? 0)} değerlendirme
+                {(ratingStats?.totalRatings ?? ratingStats?.total ?? seller.stats?.totalRatings ?? 0)} değerlendirme
               </Text>
             </View>
           </View>
+
+          {/* Güven Skoru — web seller sayfası paritesi (premium + görünür; backend null dönerse gizli) */}
+          {seller.isPremium && typeof seller.trustScore === 'number' && (
+            <View style={styles.trustBadge}>
+              <Ionicons name="shield-checkmark" size={14} color={colors.warning[700]!} />
+              <Text style={styles.trustBadgeText}>
+                Güven Skoru {seller.trustScore}/100
+                {seller.trustLevel ? ` · ${seller.trustLevel}` : ''}
+              </Text>
+            </View>
+          )}
 
           {/* Badges */}
           {seller.badges && seller.badges.length > 0 && (
@@ -211,18 +216,6 @@ export default function SellerProfileScreen() {
               })}
             </View>
           )}
-
-          {/* Response Info */}
-          <View style={styles.responseInfo}>
-            <View style={styles.responseItem}>
-              <Ionicons name="time-outline" size={20} color={colors.text.muted} />
-              <Text style={styles.responseText}>Yanıt süresi: {seller.responseTime}</Text>
-            </View>
-            <View style={styles.responseItem}>
-              <Ionicons name="chatbubbles-outline" size={20} color={colors.text.muted} />
-              <Text style={styles.responseText}>Yanıt oranı: %{seller.responseRate}</Text>
-            </View>
-          </View>
 
           {/* Bio */}
           {seller.bio && (
@@ -276,6 +269,14 @@ export default function SellerProfileScreen() {
 
         {/* Tab Content */}
         {activeTab === 'listings' ? (
+          products.length === 0 ? (
+            <View style={{ alignItems: 'center', padding: 32 }}>
+              <Ionicons name="cube-outline" size={48} color={colors.text.subtle} />
+              <Text style={{ color: colors.text.muted, marginTop: 8, fontSize: 14 }}>
+                Henüz ilan yok
+              </Text>
+            </View>
+          ) : (
           <View style={styles.listingsGrid}>
             {products.map((product: any) => (
               <Pressable
@@ -285,7 +286,7 @@ export default function SellerProfileScreen() {
               >
                 <Card style={styles.productCard} padding={0}>
                   <Image
-                    source={{ uri: product.images?.[0] || 'https://placehold.co/200x200/f3f4f6/9ca3af?text=Ürün' }}
+                    source={{ uri: resolveImageUrl(product.images) }}
                     style={styles.productImage}
                     resizeMode="cover"
                   />
@@ -302,6 +303,7 @@ export default function SellerProfileScreen() {
               </Pressable>
             ))}
           </View>
+          )
         ) : (
           <View style={styles.reviewsList}>
             {reviews.length === 0 ? (
@@ -313,13 +315,12 @@ export default function SellerProfileScreen() {
               </View>
             ) : (
               reviews.map((review: any) => {
-                // Backend rating: { score, comment, createdAt, reviewer: { displayName, avatarUrl } }
-                // Mock: { rating, comment, date, userName }
+                // Kullanıcı/satıcı değerlendirmesi DTO'su: { score, comment, createdAt, giverName, giver: { displayName, avatarUrl } }
                 const score = review.score ?? review.rating ?? 0;
                 const reviewerName =
-                  review.reviewer?.displayName ?? review.userName ?? 'Kullanıcı';
+                  review.giver?.displayName ?? review.giverName ?? review.reviewer?.displayName ?? review.userName ?? 'Kullanıcı';
                 const dateStr = review.createdAt ?? review.date;
-                const avatarUrl = review.reviewer?.avatarUrl;
+                const avatarUrl = review.giver?.avatarUrl ?? review.reviewer?.avatarUrl;
                 return (
                   <View key={review.id} style={styles.reviewCard}>
                     <View style={styles.reviewHeader}>
@@ -377,20 +378,6 @@ const styles = StyleSheet.create({
   loadingText: {
     marginTop: 16,
     color: colors.text.muted,
-  },
-  header: {
-    backgroundColor: colors.primary[600]!,
-    paddingTop: 50,
-    paddingBottom: 16,
-    paddingHorizontal: 20,
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-  },
-  headerTitle: {
-    fontSize: 18,
-    fontWeight: 'bold',
-    color: colors.white,
   },
   content: {
     flex: 1,
@@ -457,6 +444,22 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: 4,
+  },
+  trustBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    alignSelf: 'center',
+    backgroundColor: colors.warning[50]!,
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 16,
+    gap: 6,
+    marginTop: 16,
+  },
+  trustBadgeText: {
+    fontSize: 13,
+    fontWeight: '600',
+    color: colors.warning[700]!,
   },
   badgesRow: {
     flexDirection: 'row',

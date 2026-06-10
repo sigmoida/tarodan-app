@@ -1,5 +1,5 @@
 import { View, ScrollView, StyleSheet, TouchableOpacity, RefreshControl } from 'react-native';
-import { Avatar, Badge, FAB, Input, Spinner, Text, theme } from '@tarodan/ui-native';
+import { Avatar, Badge, Input, Spinner, Text, theme, ScreenHeader } from '@tarodan/ui-native';
 import { useState, useCallback } from 'react';
 import { router, useFocusEffect } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
@@ -97,19 +97,15 @@ export default function MessagesListScreen() {
 
   return (
     <View style={styles.container}>
-      {/* Header */}
-      <View style={styles.header}>
-        <TouchableOpacity onPress={() => router.back()}>
-          <Ionicons name="arrow-back" size={24} color={colors.white} />
-        </TouchableOpacity>
-        <View style={styles.headerTitleContainer}>
-          <Text style={styles.headerTitle}>{t('mobile.messagesTitle')}</Text>
-          {unreadCount > 0 && (
+      <ScreenHeader
+        title={t('mobile.messagesTitle')}
+        onBack={() => router.back()}
+        right={
+          unreadCount > 0 ? (
             <Badge variant="danger" style={styles.headerBadge}>{unreadCount}</Badge>
-          )}
-        </View>
-        <View style={{ width: 24 }} />
-      </View>
+          ) : undefined
+        }
+      />
 
       {/* Message Limit Banner */}
       {!isUnlimited && dailyMessageCount >= messageLimit - 10 && (
@@ -226,14 +222,6 @@ export default function MessagesListScreen() {
           <View style={{ height: 100 }} />
         </ScrollView>
       )}
-
-      {/* New Message FAB */}
-      <FAB
-        icon="add"
-        accessibilityLabel="Yeni mesaj"
-        style={styles.fab}
-        onPress={() => router.push('/messages/new')}
-      />
     </View>
   );
 }
@@ -248,24 +236,6 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
     padding: 32,
-  },
-  header: {
-    backgroundColor: colors.primary[600]!,
-    paddingTop: 50,
-    paddingBottom: 16,
-    paddingHorizontal: 20,
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-  },
-  headerTitleContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-  },
-  headerTitle: {
-    fontSize: 18,
-    fontWeight: 'bold',
-    color: colors.white,
   },
   headerBadge: {
     marginLeft: 8,

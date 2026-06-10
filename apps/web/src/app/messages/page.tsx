@@ -72,6 +72,32 @@ function parseMessageContent(content: string): Array<{ type: 'text' | 'image'; v
   return parts.length ? parts : [{ type: 'text', value: content }];
 }
 
+/**
+ * Sohbet listesi önizlemesi: resim mesajları için ham link yerine "📷 Fotoğraf"
+ * gösterir. İçerik filtresi [IMG:...] içindeki presigned URL'i bozsa bile
+ * (artık X-Amz / %2F / http parçaları) bunları resim olarak algılar.
+ */
+function getThreadPreview(content: string, locale: string): string {
+  if (!content) return '';
+  const photoLabel = locale === 'en' ? '📷 Photo' : '📷 Fotoğraf';
+  // [IMG:...] işaretini, içindeki URL içerik filtresi tarafından bozulmuş olsa
+  // bile (yalnız köşeli parantezler sağlam kaldıysa) yakala.
+  let hadImage = /\[IMG:/i.test(content);
+  let text = content.replace(/\[IMG:[^\]]*\]/gi, '').trim();
+  // Kalan metinde hâlâ URL / presigned-imza parçası varsa: bu da bir resim;
+  // ilgili token'ları tamamen temizle.
+  const urlLike = /(https?:\/\/|www\.|amazonaws|x-amz-|%2[fF]|\.s3\.)/i;
+  if (urlLike.test(text)) {
+    hadImage = true;
+    text = text.replace(/\S*(?:https?:\/\/|www\.|amazonaws|x-amz-|%2[fF]|\.s3\.)\S*/gi, '').trim();
+  }
+  // Güvenlik ağı: temizlik sonrası hâlâ url-benzeri bir şey kaldıysa ham link
+  // sızdırmamak için metni tamamen at — sadece foto etiketi göster.
+  if (hadImage && urlLike.test(text)) text = '';
+  if (hadImage) return text ? `📷 ${text}` : photoLabel;
+  return text;
+}
+
 const checkContentFilter = (text: string, locale: string): { passed: boolean; warning?: string } => {
   const lowerText = text.toLowerCase();
   
@@ -117,6 +143,8 @@ export default function MessagesPage() {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const messagesScrollRef = useRef<HTMLDivElement>(null);
+  // Bildirim linkinden (/messages?thread=<id>) gelen thread'i bir kez otomatik açmak için.
+  const autoSelectedThreadRef = useRef<string | null>(null);
 
   const sellerId = searchParams.get('user');
   const productId = searchParams.get('listing');
@@ -204,6 +232,19 @@ export default function MessagesPage() {
       handleCreateThreadForProduct();
     }
   }, [sellerId, isAuthenticated, threadsQuery.isLoading]);
+
+  // Yeni mesaj bildirimine tıklayınca gelinen /messages?thread=<id> linkindeki
+  // sohbeti otomatik aç (bir kez; kullanıcı sonradan başka sohbet seçerse ezme).
+  useEffect(() => {
+    const threadIdParam = searchParams.get('thread');
+    if (!threadIdParam || threads.length === 0) return;
+    if (autoSelectedThreadRef.current === threadIdParam) return;
+    const found = threads.find((thr) => thr.id === threadIdParam);
+    if (found) {
+      setSelectedThread(found);
+      autoSelectedThreadRef.current = threadIdParam;
+    }
+  }, [searchParams, threads]);
 
   const handleCreateThreadForProduct = async () => {
     if (!sellerId || creatingThread) return;
@@ -455,15 +496,15 @@ export default function MessagesPage() {
               {visibleThreads.map((thread) => {
                 const isSelected = selectedThread?.id === thread.id;
                 return (
-                  <Button variant="secondary" key={thread.id}
+                  <button key={thread.id}
                     type="button"
                     onClick={() => setSelectedThread(thread)}
-                    className={`w-full text-left px-4 py-3 transition-colors border-l-4 border-b border-border-subtle last:border-b-0 ${
+                    className={`block w-full text-left px-4 py-3 transition-colors border-l-4 border-b border-border-subtle last:border-b-0 ${
                       isSelected
                         ? 'border-l-primary-500 bg-primary-50/60'
                         : 'border-l-transparent hover:bg-surface'
                     }`}>
-                    <div className="flex items-center gap-3">
+                    <div className="flex items-center gap-3 w-full min-w-0">
                       <div className="relative flex-shrink-0">
                         <UserAvatar displayName={thread.otherUser?.displayName} avatarUrl={thread.otherUser?.avatarUrl} size="sm" className="!w-11 !h-11" />
                         {thread.unreadCount > 0 && (
@@ -484,7 +525,7 @@ export default function MessagesPage() {
                         {thread.lastMessage && (
                           <p className="text-sm text-muted truncate mt-0.5">
                             {thread.lastMessage.isFromMe ? (locale === 'en' ? 'You: ' : 'Sen: ') : ''}
-                            {thread.lastMessage.content}
+                            {getThreadPreview(thread.lastMessage.content, locale)}
                           </p>
                         )}
                         {thread.product && (
@@ -492,7 +533,7 @@ export default function MessagesPage() {
                         )}
                       </div>
                     </div>
-                  </Button>
+                  </button>
                 );
               })}
               {hasMoreThreads && (
