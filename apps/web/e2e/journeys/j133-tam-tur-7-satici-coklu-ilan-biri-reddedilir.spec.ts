@@ -52,9 +52,8 @@ test.describe('J133 — Çoklu ilan: biri reddedilir, biri satılır', () => {
       data: { title: `J133 Duzeltilmis Urun ${Date.now()}`, description: 'Kurallara uygun güncellendi.' },
     });
     expect(fix.ok(), 'reddedilen ürün düzeltildi').toBeTruthy();
-    // ⚠️ APP-GAP (flag'lendi): reddedilen ürün düzenlenince 'pending'e dönmüyor + resubmit endpoint'i
-    //    yok → yeniden onaya giremiyor. Eksik re-submit'i dev-hook ile simüle ediyoruz.
-    await backdate(request, 'product', { id: p1 }, { status: 'pending' });
+    // Düzeltme reddedilen ürünü otomatik 'pending'e döndürür (re-submit, app davranışı).
+    expect((await dbFind(request, 'product', { id: p1 }, { status: true }))?.status, 'düzeltilen ürün yeniden incelemede').toBe('pending');
     const approve1 = await request.post(`${API}/admin/products/${p1}/approve`, { headers: auth(adminTok), data: {} });
     expect(approve1.ok(), 'düzeltilen ürün onayı').toBeTruthy();
     expect((await dbFind(request, 'product', { id: p1 }, { status: true })).status).toBe('active');

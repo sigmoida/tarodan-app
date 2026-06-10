@@ -1207,6 +1207,17 @@ export class AdminService {
 
     await this.createAuditLog(adminId, 'product_reject', 'Product', productId, product, { ...updated, reason: dto.reason });
 
+    // Satıcıya in-app bildirim: ilan reddedildi (neden ile). Bildirim hatası reddi bloke etmesin.
+    try {
+      await this.notificationService.createInAppNotification(
+        product.sellerId,
+        NotificationType.PRODUCT_REJECTED,
+        { productTitle: product.title, reason: dto.reason },
+      );
+    } catch (err: any) {
+      this.logger.warn(`PRODUCT_REJECTED notification failed for ${productId}: ${err?.message}`);
+    }
+
     // Invalidate product cache
     await this.cache.del(`product:${productId}`);
     await this.cache.delPattern('products:list:*');

@@ -1035,7 +1035,8 @@ export class ProductService implements OnModuleInit {
       description: dto.description,
       ...(effectivePrice !== undefined ? { price: effectivePrice } : {}),
       condition: dto.condition,
-      status: dto.status,
+      // Reddedilen ürün düzenlenince otomatik yeniden incelemeye girsin (re-submit → pending).
+      status: dto.status ?? (product.status === ProductStatus.rejected ? ProductStatus.pending : undefined),
       isTradeEnabled: dto.isTradeEnabled !== undefined ? dto.isTradeEnabled : undefined,
       isPreorder: dto.isPreorder !== undefined ? dto.isPreorder : undefined,
       isSet: dto.isSet !== undefined ? dto.isSet : undefined,
