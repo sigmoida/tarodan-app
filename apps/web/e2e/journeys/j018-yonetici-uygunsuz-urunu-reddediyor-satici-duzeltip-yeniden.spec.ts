@@ -142,25 +142,18 @@ test.describe('J18 — Ürün moderasyon red/düzelt/onay/satış', () => {
     p = await dbFind(request, 'product', { id: productId }, { status: true });
     expect(p?.status, 'ilan rejected').toBe('rejected');
 
-    // 3) Satıcıya red bildirimi.
-    // ⚠️ APP-GAP (flag'lendi): admin.service.rejectProduct ürün reddinde satıcıya in-app bildirim
-    //    OLUŞTURMUYOR (sadece status=rejected + audit log). Çoğu platform satıcıyı bilgilendirir.
-    //    Karar verilene kadar bu adım best-effort — varsa doğrula, yoksa akışı bloke etme.
+    // 3) Satıcıya red bildirimi GERÇEKTEN oluştu (PRODUCT_REJECTED) — admin.service.rejectProduct.
     const _sid = (await apiMe(request, sellerToken)).id;
-    const notif = await dbFind(request, 'notificationLog', { userId: _sid }, { id: true, type: true }, { createdAt: 'desc' });
-    if (notif) expect(notif.id, 'bildirim id').toBeTruthy();
+    const notif = await dbFind(request, 'notificationLog', { userId: _sid, type: 'product_rejected' }, { id: true }, { createdAt: 'desc' });
+    expect(notif, 'satıcıya red bildirimi oluştu').toBeTruthy();
 
-    // 4) Satıcı ürünü düzeltir (açıklama/fiyat günceller)
+    // 4) Satıcı ürünü düzeltir → reddedilen ürün otomatik 'pending'e döner (re-submit, app davranışı).
     const fixRes = await request.patch(`${API}/products/${productId}`, {
       headers: authHeader(sellerToken),
       data: { description: 'Kurallara uygun, detaylı ve net açıklama eklendi. Orijinal ürün.', price: 249.99 },
     });
     expect(fixRes.ok(), 'satıcı ürünü düzeltti').toBeTruthy();
-
-    // ⚠️ APP-GAP (flag'lendi): reddedilen ürün düzenlenince status 'pending'e DÖNMÜYOR ve bir
-    //    "resubmit" endpoint'i de yok → satıcının düzelttiği ürün yeniden incelemeye/onaya giremiyor.
-    //    Eksik re-submit adımını dev-hook ile simüle ediyoruz (gerçek üründe bu otomatik olmalı).
-    await backdate(request, 'product', { id: productId }, { status: 'pending' });
+    expect((await dbFind(request, 'product', { id: productId }, { status: true }))?.status, 'düzeltilen ürün yeniden incelemeye girdi').toBe('pending');
 
     // 5) Admin bu kez onaylar
     const approveRes = await request.post(`${API}/admin/products/${productId}/approve`, {
