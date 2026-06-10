@@ -1807,6 +1807,7 @@ Bu ürünü istek listenizden kaldırmak için ürün sayfasına gidip "İstek L
 
     return {
       id: product.id,
+      sellerId, // flat sellerId (nested seller.id'ye ek) — API tüketicileri için
       title: product.title,
       description: product.description,
       price: displayPrice,

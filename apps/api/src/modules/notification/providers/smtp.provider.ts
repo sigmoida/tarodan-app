@@ -41,17 +41,15 @@ export class SmtpProvider {
     const secure = this.configService.get<string>('SMTP_SECURE', 'false') === 'true';
     
     this.fromEmail = this.configService.get<string>('MAIL_FROM', 'noreply@tarodan.com');
-    this.enabled = !!(host && user && pass);
+    // Host yeterli (Mailhog/dev auth istemez); user+pass varsa auth uygulanır (prod).
+    this.enabled = !!host;
 
     if (this.enabled) {
       this.transporter = nodemailer.createTransport({
         host,
         port,
         secure,
-        auth: {
-          user,
-          pass,
-        },
+        auth: user && pass ? { user, pass } : undefined,
         tls: {
           // For Office 365, we need to allow less secure TLS
           rejectUnauthorized: false,

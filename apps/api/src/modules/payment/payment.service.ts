@@ -452,16 +452,39 @@ export class PaymentService {
       this.logger.log(`Re-reserved 1 unit for order ${order.id} after release`);
     }
 
-    // Create payment record
-    const payment = await this.prisma.payment.create({
-      data: {
-        orderId: dto.orderId,
-        amount: order.totalAmount,
-        currency: 'TRY',
-        provider: PaymentProvider.paytr,
-        status: PaymentStatus.pending,
-      },
+    // Create payment record.
+    // order_id UNIQUE: bir sipariş için tek Payment. Önceki ödeme başarısız/iptal olduysa
+    // (ödeme zaman aşımı → kullanıcı geri dönüp tekrar öder) var olanı YENİDEN KULLAN; aksi halde
+    // yeni create 'Unique constraint failed (order_id)' ile 500 verir (re-ödeme akışı çöker).
+    const existingOrderPayment = await this.prisma.payment.findUnique({
+      where: { orderId: dto.orderId },
     });
+    let payment;
+    if (existingOrderPayment) {
+      if (existingOrderPayment.status === PaymentStatus.completed) {
+        throw new BadRequestException('Bu sipariş zaten ödendi');
+      }
+      payment = await this.prisma.payment.update({
+        where: { id: existingOrderPayment.id },
+        data: {
+          status: PaymentStatus.pending,
+          failureReason: null,
+          providerPaymentId: null,
+          amount: order.totalAmount,
+          provider: PaymentProvider.paytr,
+        },
+      });
+    } else {
+      payment = await this.prisma.payment.create({
+        data: {
+          orderId: dto.orderId,
+          amount: order.totalAmount,
+          currency: 'TRY',
+          provider: PaymentProvider.paytr,
+          status: PaymentStatus.pending,
+        },
+      });
+    }
 
     // Log payment creation
     await this.logPaymentAction('created', payment.id, dto.orderId, undefined, undefined, PaymentStatus.pending, {

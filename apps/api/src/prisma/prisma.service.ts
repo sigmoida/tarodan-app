@@ -9,7 +9,15 @@ export class PrismaService extends PrismaClient implements OnModuleInit, OnModul
   private readonly logger = new Logger(PrismaService.name);
 
   constructor(@Optional() private readonly eventEmitter?: EventEmitter2) {
+    // TEST'te: Prisma Client runtime'da apps/api/.env'i yükleyip process.env.DATABASE_URL'i
+    // dev (tarodan) yapıyor → E2E'de YANLIŞ DB. .env'de OLMAYAN dedike TEST_DATABASE_URL ile
+    // EXPLICIT datasource url ver → Prisma'nın .env'i bunu ezemez. (prod/dev'i etkilemez.)
+    const testUrl =
+      process.env.NODE_ENV === 'test' && process.env.TEST_DATABASE_URL
+        ? process.env.TEST_DATABASE_URL
+        : undefined;
     super({
+      ...(testUrl ? { datasources: { db: { url: testUrl } } } : {}),
       log: [
         { emit: 'event', level: 'query' },
         { emit: 'stdout', level: 'info' },
