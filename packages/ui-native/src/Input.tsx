@@ -59,6 +59,7 @@ export const Input: React.FC<InputProps> = ({
   containerStyle,
   fieldStyle,
   inputStyle,
+  multiline,
   onFocus,
   onBlur,
   ...rest
@@ -107,7 +108,10 @@ export const Input: React.FC<InputProps> = ({
       <View
         style={[
           styles.field,
-          { height: ss.height, borderColor, backgroundColor: colors.white },
+          multiline
+            ? { minHeight: ss.height, paddingVertical: spacing[2], alignItems: 'flex-start' }
+            : { height: ss.height },
+          { borderColor, backgroundColor: colors.white },
           fieldStyle,
         ]}
       >
@@ -116,8 +120,10 @@ export const Input: React.FC<InputProps> = ({
           style={[
             styles.input,
             { fontSize: ss.font, color: colors.text.heading },
+            multiline ? styles.inputMultiline : null,
             inputStyle,
           ]}
+          multiline={multiline}
           placeholderTextColor={colors.text.subtle}
           secureTextEntry={effectiveSecure}
           onFocus={(e) => {
@@ -162,6 +168,10 @@ const styles = StyleSheet.create({
   input: {
     flex: 1,
     padding: 0,
+  },
+  inputMultiline: {
+    alignSelf: 'stretch',
+    textAlignVertical: 'top',
   },
   iconLeft: { marginRight: spacing[2] },
   iconRight: { marginLeft: spacing[2] },
