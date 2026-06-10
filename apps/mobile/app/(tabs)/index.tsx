@@ -583,13 +583,13 @@ export default function HomeScreen() {
           </View>
         )}
 
-        {/* Öne Çıkan / Sponsorlu Ürünler (boost'lu) — Tümünü Gör YOK */}
+        {/* Sponsorlu Ürünler (boost'lu) — Tümünü Gör YOK */}
         {boostedProducts.length > 0 && (
           <View style={styles.section}>
             <View style={styles.sectionHeader}>
               <View style={styles.sectionTitleContainer}>
                 <View style={styles.sectionIndicator} />
-                <Text style={styles.sectionTitle}>🚀 Öne Çıkan Ürünler</Text>
+                <Text style={styles.sectionTitle}>Sponsorlu Ürünler</Text>
               </View>
             </View>
             <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.productsScroll}>
@@ -598,12 +598,12 @@ export default function HomeScreen() {
           </View>
         )}
 
-        {/* Products Section - Öne Çıkanlar */}
+        {/* Products Section - Popüler İlanlar (web 'Popüler İlanlar' / bestSellers paritesi) */}
         <View style={[styles.section, styles.bestSellersSection]}>
           <View style={styles.sectionHeader}>
             <View style={styles.sectionTitleContainer}>
               <View style={styles.sectionIndicator} />
-              <Text style={[styles.sectionTitle, { color: colors.white }]}>Öne Çıkanlar</Text>
+              <Text style={[styles.sectionTitle, { color: colors.white }]}>Popüler İlanlar</Text>
             </View>
             <TouchableOpacity onPress={() => router.push('/search')}>
               <Text style={[styles.seeAllText, { color: colors.white }]}>Tümünü gör {'>'}</Text>
