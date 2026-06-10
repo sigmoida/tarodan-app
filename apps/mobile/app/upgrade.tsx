@@ -207,6 +207,8 @@ export default function UpgradeScreen() {
             {/* Subscribe Button */}
             <Button
               variant="primary"
+              fullWidth
+              size="lg"
               title={selectedPlan === 'annual'
                 ? `Yıllık ₺${PLANS.annual.price} ile Başla`
                 : `Aylık ₺${PLANS.monthly.price} ile Başla`}
@@ -369,11 +371,13 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   planInfo: {
+    flex: 1,
     marginLeft: 8,
   },
   planHeader: {
     flexDirection: 'row',
     alignItems: 'center',
+    flexWrap: 'wrap',
     gap: 8,
   },
   planSubtext: {
@@ -383,6 +387,9 @@ const styles = StyleSheet.create({
   planPrice: {
     color: colors.primary[600]!,
     fontWeight: 'bold',
+    flexShrink: 0,
+    marginLeft: 12,
+    textAlign: 'right',
   },
   subscribeButton: {
     marginBottom: 8,

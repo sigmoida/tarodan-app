@@ -292,32 +292,25 @@ export default function HomeScreen() {
               resizeMode="cover"
             />
             {isProductOutOfStock(item) && <OutOfStockOverlay />}
-            {isTradeEnabled && (
-              <View style={[styles.badge, { backgroundColor: colors.success[600]! }]}>
-                <Ionicons name="swap-horizontal" size={10} color={colors.white} />
-                <Text variant="caption" tone="inverted" weight="bold">
-                  {' '}Takas
-                </Text>
-              </View>
-            )}
-            {(item.isBoosted || item.boostedUntil) && (
-              <View
-                style={{
-                  position: 'absolute',
-                  top: 10,
-                  right: 10,
-                  paddingHorizontal: 8,
-                  paddingVertical: 4,
-                  borderRadius: 6,
-                  flexDirection: 'row',
-                  alignItems: 'center',
-                  backgroundColor: colors.warning[500]!,
-                }}
-              >
-                <Ionicons name="rocket" size={10} color={colors.white} />
-                <Text variant="caption" tone="inverted" weight="bold">
-                  {' '}Sponsorlu
-                </Text>
+            {/* Sol üst: durum rozetleri — dikey stack, üst üste binmesin */}
+            {(isTradeEnabled || item.isBoosted || item.boostedUntil) && (
+              <View style={styles.topLeftStack}>
+                {isTradeEnabled && (
+                  <View style={[styles.badge, { backgroundColor: colors.success[600]! }]}>
+                    <Ionicons name="swap-horizontal" size={10} color={colors.white} />
+                    <Text variant="caption" tone="inverted" weight="bold">
+                      {' '}Takas
+                    </Text>
+                  </View>
+                )}
+                {(item.isBoosted || item.boostedUntil) && (
+                  <View style={[styles.badge, { backgroundColor: colors.warning[500]! }]}>
+                    <Ionicons name="rocket" size={10} color={colors.white} />
+                    <Text variant="caption" tone="inverted" weight="bold">
+                      {' '}Sponsorlu
+                    </Text>
+                  </View>
+                )}
               </View>
             )}
             <View style={styles.likesContainer}>
@@ -1203,10 +1196,16 @@ const styles = StyleSheet.create({
     height: 140,
     backgroundColor: colors.gray[200],
   },
-  badge: {
+  topLeftStack: {
     position: 'absolute',
     top: 10,
     left: 10,
+    flexDirection: 'column',
+    alignItems: 'flex-start',
+    gap: 6,
+  },
+  badge: {
+    alignSelf: 'flex-start',
     paddingHorizontal: 10,
     paddingVertical: 5,
     borderRadius: 6,

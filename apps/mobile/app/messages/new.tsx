@@ -248,6 +248,8 @@ export default function NewMessageScreen() {
       <View style={styles.footer}>
         <Button
           variant="primary"
+          fullWidth
+          size="lg"
           title="Gönder"
           onPress={handleSend}
           disabled={!selectedUser || !messageText.trim() || !canSend || sending}

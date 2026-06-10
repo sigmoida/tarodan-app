@@ -161,6 +161,13 @@ export default function PaymentWebViewScreen() {
     }
   };
 
+  // Geri git; stack kökündeysek (deep link / replace ile gelinmişse) ana sayfaya düş.
+  // Düz router.back() bu durumda "GO_BACK was not handled by any navigator" hatası verir.
+  const safeBack = () => {
+    if (router.canGoBack()) router.back();
+    else router.replace('/(tabs)' as never);
+  };
+
   const handleCancel = () => {
     Alert.alert(
       'Ödemeyi İptal Et',
@@ -176,7 +183,7 @@ export default function PaymentWebViewScreen() {
             } catch {
               // cancel başarısız olsa bile UI'ı geri al
             }
-            router.back();
+            safeBack();
           },
         },
       ],
@@ -276,7 +283,7 @@ export default function PaymentWebViewScreen() {
       ) : state.error ? (
         <View style={styles.errorWrap}>
           <ErrorState message={state.error} onRetry={initiatePayment} />
-          <Button variant="ghost" title="Geri Dön" onPress={() => router.back()} />
+          <Button variant="ghost" title="Geri Dön" onPress={safeBack} />
         </View>
       ) : state.html ? (
         <WebView
