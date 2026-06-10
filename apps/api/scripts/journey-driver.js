@@ -120,6 +120,48 @@ async function releaseHold(email) {
   log(`✅ hold release zorlandı (sipariş ${order.orderNumber}, ${res.count} hold)`);
 }
 
+// ---- Teklif (offer) komutları — Yolculuk 4 (pazarlık başarısız) ----
+async function latestPendingOffer(buyerId) {
+  const o = await prisma.offer.findFirst({
+    where: { buyerId, status: 'pending' },
+    orderBy: { createdAt: 'desc' },
+  });
+  if (!o) fail(`Buyer'ın pending teklifi yok: ${buyerId}`);
+  return o;
+}
+
+// Temiz başlangıç: buyer'ın açık (pending) tekliflerini iptal et ("1 pending/ürün" kuralı).
+async function resetOffers(email) {
+  const u = await getUser(email);
+  const res = await prisma.offer.updateMany({
+    where: { buyerId: u.id, status: 'pending' },
+    data: { status: 'cancelled', cancelReason: 'maestro-reset' },
+  });
+  log(`✅ ${res.count} pending teklif temizlendi (cancelled): ${email}`);
+}
+
+// Adım 3: teklif süresini doldur (cron yerine anında).
+async function expireOffer(email) {
+  const u = await getUser(email);
+  const offer = await latestPendingOffer(u.id);
+  await prisma.offer.update({
+    where: { id: offer.id },
+    data: { status: 'expired', expiresAt: new Date(Date.now() - 60000) },
+  });
+  log(`✅ teklif süresi dolduruldu (${offer.amount}₺ → expired)`);
+}
+
+// Adım 6: satıcı reddi.
+async function rejectOffer(email) {
+  const u = await getUser(email);
+  const offer = await latestPendingOffer(u.id);
+  await prisma.offer.update({
+    where: { id: offer.id },
+    data: { status: 'rejected', cancelReason: 'maestro-seller-reject' },
+  });
+  log(`✅ teklif reddedildi (${offer.amount}₺ → rejected)`);
+}
+
 const COMMANDS = {
   'verify-email': verifyEmail,
   'seed-address': seedAddress,
@@ -127,6 +169,9 @@ const COMMANDS = {
   'assert-invoice': assertInvoice,
   'release-hold': releaseHold,
   'assert-completed': assertCompleted,
+  'reset-offers': resetOffers,
+  'expire-offer': expireOffer,
+  'reject-offer': rejectOffer,
 };
 
 (async () => {
