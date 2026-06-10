@@ -181,7 +181,7 @@ export default function OrdersScreen() {
         <Text style={styles.subtitle}>
           Siparişlerinizi görmek için giriş yapın
         </Text>
-        <Button variant="primary" title="Giriş Yap" onPress={() => router.push('/(auth)/login')} />
+        <Button variant="primary" title="Giriş Yap" onPress={() => router.push('/(auth)/login')} style={{ alignSelf: 'center' }} />
       </View>
     );
   }
@@ -196,11 +196,13 @@ export default function OrdersScreen() {
           label="Aldıklarım"
           selected={role === 'buyer'}
           onPress={() => { setRole('buyer'); setFilter('all'); }}
+          style={{ flex: 1 }}
         />
         <Chip
           label="Sattıklarım"
           selected={role === 'seller'}
           onPress={() => { setRole('seller'); setFilter('all'); }}
+          style={{ flex: 1 }}
         />
       </View>
 
@@ -225,7 +227,7 @@ export default function OrdersScreen() {
           <Text style={styles.emptySubtitle}>
             Siparişler yüklenemedi. Lütfen tekrar deneyin.
           </Text>
-          <Button variant="primary" title="Yenile" onPress={() => refetch()} style={{ marginTop: 12 }} />
+          <Button variant="primary" title="Yenile" onPress={() => refetch()} style={StyleSheet.flatten([styles.emptyButton, { marginTop: 12 }])} />
         </View>
       ) : isLoading && orders.length === 0 ? (
         <View style={styles.loadingContainer}>
@@ -240,7 +242,12 @@ export default function OrdersScreen() {
           <Text style={styles.emptySubtitle}>
             Alışverişe başlayın!
           </Text>
-          <Button variant="primary" title="Ürünleri Keşfet" onPress={() => router.push('/(tabs)/search')} />
+          <Button
+            variant="primary"
+            title="Ürünleri Keşfet"
+            onPress={() => router.push('/(tabs)/search')}
+            style={styles.emptyButton}
+          />
         </View>
       ) : (
         <ScrollView
@@ -430,6 +437,10 @@ const styles = StyleSheet.create({
     textAlign: 'center',
     marginBottom: 24,
     color: colors.text.muted,
+  },
+  emptyButton: {
+    alignSelf: 'center',
+    paddingHorizontal: 32,
   },
   ordersList: {
     flex: 1,

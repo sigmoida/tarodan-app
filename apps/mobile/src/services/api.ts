@@ -862,6 +862,19 @@ export const mediaApi = {
       },
     );
   },
+  /** İade talebi kanıt fotoğrafı — web ile parite: POST /media/upload?folder=reviews */
+  uploadRefundEvidence: (file: RNFile) => {
+    const formData = new FormData();
+    appendRNFile(formData, 'file', file);
+    return api.post<{ url: string; key?: string }>(
+      '/media/upload',
+      formData,
+      {
+        headers: { 'Content-Type': 'multipart/form-data' },
+        params: { folder: 'reviews' },
+      },
+    );
+  },
   deleteFile: (key: string) => api.delete(`/media/${encodeURIComponent(key)}`),
 };
 

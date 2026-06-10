@@ -28,7 +28,7 @@ const { colors } = theme;
 interface Offer {
   id: string;
   amount: number;
-  status: 'pending' | 'accepted' | 'rejected' | 'countered' | 'cancelled' | 'expired';
+  status: 'pending' | 'accepted' | 'rejected' | 'countered' | 'cancelled' | 'expired' | 'payment_expired';
   orderId?: string | null;
   orderStatus?: string | null;
   message?: string;
@@ -58,6 +58,7 @@ const STATUS_CONFIG: Record<OfferStatus, { label: string; color: string; bg: str
   countered: { label: 'Karşı Teklif',   color: colors.info[600]!,    bg: colors.info[100]!,    icon: 'swap-horizontal-outline' },
   cancelled: { label: 'İptal Edildi',   color: colors.gray[500]!,    bg: colors.gray[100]!,    icon: 'close-circle-outline' },
   expired:   { label: 'Süresi Doldu',   color: colors.gray[500]!,    bg: colors.gray[100]!,    icon: 'alert-circle-outline' },
+  payment_expired: { label: 'Ödeme Süresi Doldu', color: colors.danger[600]!, bg: colors.danger[100]!, icon: 'alert-circle-outline' },
 };
 
 function getProductImage(product: Offer['product']): string {
@@ -351,7 +352,8 @@ export default function OffersScreen() {
 
   // --- Offer card ---
   const renderOffer = ({ item: offer }: { item: Offer }) => {
-    const status = STATUS_CONFIG[offer.status];
+    // Bilinmeyen/yeni bir backend durumu gelirse .bg/.color erişiminde patlamayı önle.
+    const status = STATUS_CONFIG[offer.status] ?? STATUS_CONFIG.expired;
     const otherUser = activeTab === 'received' ? offer.buyer : offer.seller;
     const timeRemaining = offer.status === 'pending' ? getTimeRemaining(offer.expiresAt) : null;
     const isActionLoading = actionLoading === offer.id;
@@ -382,6 +384,14 @@ export default function OffersScreen() {
               <Ionicons name={status.icon} size={14} color={status.color} />
               <Text style={[styles.statusText, { color: status.color }]}>{status.label}</Text>
             </View>
+
+            {/* Gönderilen sekmesinde satıcıdan karşı teklif geldiyse net vurgu */}
+            {activeTab === 'sent' && offer.status === 'pending' && offer.buyerMustAccept ? (
+              <View style={styles.counterAlertBadge}>
+                <Ionicons name="swap-horizontal" size={14} color={colors.white} />
+                <Text style={styles.counterAlertText}>Satıcıdan karşı teklif · yanıtlayın</Text>
+              </View>
+            ) : null}
           </View>
         </View>
 
@@ -535,15 +545,35 @@ export default function OffersScreen() {
           </View>
         )}
 
-        {/* Accepted → order link */}
+        {/* Accepted → ödeme bekliyorsa "Ödeme Yap", aksi halde sipariş linki */}
         {offer.status === 'accepted' && offer.orderId && (
-          <TouchableOpacity
-            style={[styles.actionBtn, styles.orderBtn, { alignSelf: 'flex-start', marginTop: 12 }]}
-            onPress={() => router.push(`/order-track?orderId=${offer.orderId}`)}
-          >
-            <Ionicons name="cube-outline" size={16} color={colors.white} />
-            <Text style={styles.actionBtnText}>Siparişi Görüntüle</Text>
-          </TouchableOpacity>
+          offer.orderStatus === 'pending_payment' ? (
+            <TouchableOpacity
+              style={[styles.actionBtn, styles.payBtn, { alignSelf: 'flex-start', marginTop: 12 }]}
+              onPress={() =>
+                router.push({
+                  pathname: '/payment/[id]',
+                  params: {
+                    id: offer.orderId!,
+                    orderId: offer.orderId!,
+                    provider: 'paytr',
+                    guest: '0',
+                  },
+                } as any)
+              }
+            >
+              <Ionicons name="card-outline" size={16} color={colors.white} />
+              <Text style={styles.actionBtnText}>Ödeme Yap · {formatPrice(offer.amount)}</Text>
+            </TouchableOpacity>
+          ) : (
+            <TouchableOpacity
+              style={[styles.actionBtn, styles.orderBtn, { alignSelf: 'flex-start', marginTop: 12 }]}
+              onPress={() => router.push(`/order-track?orderId=${offer.orderId}`)}
+            >
+              <Ionicons name="cube-outline" size={16} color={colors.white} />
+              <Text style={styles.actionBtnText}>Siparişi Görüntüle</Text>
+            </TouchableOpacity>
+          )
         )}
       </View>
     );
@@ -849,6 +879,22 @@ const styles = StyleSheet.create({
     fontSize: 11,
     fontWeight: '600',
   },
+  counterAlertBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    alignSelf: 'flex-start',
+    gap: 4,
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 6,
+    marginTop: 6,
+    backgroundColor: colors.info[600]!,
+  },
+  counterAlertText: {
+    fontSize: 11,
+    fontWeight: '700',
+    color: colors.white,
+  },
 
   // Amount
   amountRow: {
@@ -1021,6 +1067,9 @@ const styles = StyleSheet.create({
   },
   orderBtn: {
     backgroundColor: colors.primary[600]!,
+  },
+  payBtn: {
+    backgroundColor: colors.success[600]!,
   },
 
   // Empty

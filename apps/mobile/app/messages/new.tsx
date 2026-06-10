@@ -118,12 +118,19 @@ export default function NewMessageScreen() {
     setSearchQuery('');
   };
 
+  // Geri git; stack kökündeysek (deep link / replace ile gelinmişse) mesajlara düş.
+  // Düz router.back() bu durumda "GO_BACK was not handled by any navigator" hatası verir.
+  const handleBack = () => {
+    if (router.canGoBack()) router.back();
+    else router.replace('/(tabs)/messages' as never);
+  };
+
   return (
     <KeyboardAvoidingView
       style={styles.container}
       behavior={Platform.OS === 'ios' ? 'padding' : undefined}
     >
-      <ScreenHeader title={t('mobile.messagesNew')} onBack={() => router.back()} />
+      <ScreenHeader title={t('mobile.messagesNew')} onBack={handleBack} />
 
       {/* Content */}
       <View style={styles.content}>
