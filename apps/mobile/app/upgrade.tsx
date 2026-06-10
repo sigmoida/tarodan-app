@@ -132,6 +132,7 @@ export default function UpgradeScreen() {
                 variant="outline"
                 title="Abonelik Ayarları"
                 onPress={() => router.push('/settings/subscription')}
+                style={{ alignSelf: 'center' }}
               />
             </View>
           </Card>

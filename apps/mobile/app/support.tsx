@@ -69,6 +69,7 @@ export default function SupportScreen() {
             variant="primary"
             title="Giriş Yap"
             onPress={() => router.push('/(auth)/login')}
+            style={{ alignSelf: 'center' }}
           />
         </View>
       </View>
@@ -174,6 +175,7 @@ export default function SupportScreen() {
           disabled={loading || !category || !subject || !description}
           style={styles.submitButton}
           icon="send"
+          fullWidth
         />
 
         {/* Contact Info */}

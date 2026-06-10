@@ -165,7 +165,7 @@ export default function AddCollectionItemsScreen() {
             title="İlan Oluştur"
             icon="add"
             onPress={() => router.push('/(tabs)/sell')}
-            style={{ marginTop: 16 }}
+            style={{ marginTop: 16, alignSelf: 'center' }}
           />
         </View>
       ) : filtered.length === 0 ? (

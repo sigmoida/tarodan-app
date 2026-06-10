@@ -48,7 +48,7 @@ export default function CartScreen() {
             variant="primary"
             title="İlanlara Göz At"
             onPress={() => router.replace('/')}
-            style={{ marginTop: 24 }}
+            style={{ marginTop: 24, alignSelf: 'center' }}
           />
         </View>
       </View>

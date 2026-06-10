@@ -683,7 +683,7 @@ export default function SearchScreen() {
                   variant="outline"
                   title="Filtreleri Temizle"
                   onPress={clearAllFilters}
-                  style={{ marginTop: spacing[4] }}
+                  style={{ marginTop: spacing[4], alignSelf: 'center' }}
                 />
               </View>
             }

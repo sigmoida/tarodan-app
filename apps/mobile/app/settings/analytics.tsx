@@ -91,7 +91,7 @@ export default function AnalyticsScreen() {
         <Text variant="body" style={styles.subtitle}>
           İstatistiklerinizi görmek için giriş yapın
         </Text>
-        <Button variant="primary" title="Giriş Yap" onPress={() => router.push('/(auth)/login')} />
+        <Button variant="primary" title="Giriş Yap" onPress={() => router.push('/(auth)/login')} style={{ alignSelf: 'center' }} />
       </View>
     );
   }
