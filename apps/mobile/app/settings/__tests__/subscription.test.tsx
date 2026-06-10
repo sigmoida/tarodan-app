@@ -80,6 +80,27 @@ describe('J107 · abonelik ayarları (settings/subscription)', () => {
     expect(screen.getByText("Premium'a Yükselt")).toBeOnTheScreen();
   });
 
+  it('regresyon: AKTİF ücretsiz üyelik premium gibi gösterilmemeli', () => {
+    // Backend her kullanıcıya status=active bir ücretsiz üyelik açar (~100 yıl
+    // geçerli). Eskiden isPremium yalnız isSubscriptionActive'e bakıyordu; bu
+    // yüzden ücretsiz kullanıcılar bile "Premium Üyelik" görüyordu. Artık tier
+    // tipi de kontrol edildiği için ücretsiz üyelik premium sayılmamalı.
+    mockStoreState = {
+      ...baseStore(),
+      subscription: {
+        ...activePremiumSub,
+        tierId: 'free',
+        tier: { type: 'free', name: 'Ücretsiz Üyelik' },
+        currentPeriodEnd: new Date(Date.now() + 365 * 86400000).toISOString(),
+      },
+    };
+    renderWithProviders(<SubscriptionSettingsScreen />);
+    expect(screen.getByText('Ücretsiz Üyelik')).toBeOnTheScreen();
+    expect(screen.getByText("Premium'a Yükselt")).toBeOnTheScreen();
+    // Premium'a özel aksiyonlar görünmemeli
+    expect(screen.queryByText('Aboneliği İptal Et')).toBeNull();
+  });
+
   it('J108.1 premium aktif → "Aboneliği İptal Et" görünür', () => {
     mockStoreState = { ...baseStore(), subscription: activePremiumSub };
     renderWithProviders(<SubscriptionSettingsScreen />);
