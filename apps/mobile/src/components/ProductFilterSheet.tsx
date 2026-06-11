@@ -127,13 +127,13 @@ export default function ProductFilterSheet({
     );
 
   const toggleCustomAttribute = (groupSlug: string, attrSlug: string) => {
+    // Her custom attribute grubu tekli seçim: aynı değere tekrar basınca kaldır,
+    // farklı değere basınca önceki seçimi değiştir. (web ile parite)
     const current = filters.customAttributes?.[groupSlug] ?? [];
-    const next = current.includes(attrSlug)
-      ? current.filter((s) => s !== attrSlug)
-      : [...current, attrSlug];
+    const isSelected = current.includes(attrSlug);
     const nextMap = { ...(filters.customAttributes ?? {}) };
-    if (next.length === 0) delete nextMap[groupSlug];
-    else nextMap[groupSlug] = next;
+    if (isSelected) delete nextMap[groupSlug];
+    else nextMap[groupSlug] = [attrSlug];
     onChange({ ...filters, customAttributes: nextMap });
   };
 
