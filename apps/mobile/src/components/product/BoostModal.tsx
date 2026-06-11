@@ -89,12 +89,22 @@ export function BoostModal({
       });
       const data: any = res?.data?.data ?? res?.data ?? {};
       const paymentId = data.paymentId || data.id || data.payment?.id;
+      // initiateBoost zaten PayTR token + URL üretip döndürür. URL'i ödeme ekranına
+      // geçiriyoruz ki ekran tekrar initiate/retry ETMESİN (retry pending ödemeyi
+      // reddediyor → "Sadece başarısız ödemeler tekrar denenebilir" hatası). Checkout
+      // ile aynı pattern: tek kullanımlık token boşa harcanmaz.
+      const paymentUrl: string | undefined = data.paymentUrl;
       if (paymentId) {
         onClose();
-        // Mobil ödeme: WebView ekranı bypass/PayTR akışını kendi yönetir.
         router.push({
           pathname: '/payment/[id]',
-          params: { id: String(paymentId), provider: 'paytr', guest: '0', type: 'boost' },
+          params: {
+            id: String(paymentId),
+            provider: 'paytr',
+            guest: '0',
+            type: 'boost',
+            ...(paymentUrl ? { paymentUrl } : {}),
+          },
         } as any);
         return;
       }

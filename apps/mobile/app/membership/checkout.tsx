@@ -133,13 +133,11 @@ export default function MembershipCheckoutScreen() {
   const handlePayment = async () => {
     setLoading(true);
     try {
-      // Gerçek üyelik ödemesi — backend POST /membership/payments/initiate
-      // (Önceden bu ekran setTimeout ile sahte başarı veriyordu; ödeme/abonelik oluşmuyordu.)
-      const initResp: any = await membershipApi.initiatePayment({
-        tierType,
-        billingPeriod,
-        provider: 'paytr',
-      });
+      // subscribe: hedef kademeyi (ör. premium) past_due olarak AYARLAR ve ardından
+      // ödemeyi başlatır (paymentId/paymentUrl/useBypass döner). Web ile parite.
+      // Doğrudan initiatePayment çağırırsak backend ödemeyi kullanıcının MEVCUT
+      // kademesine göre yapar → yükseltme gerçekleşmez, plan "Temel" kalır.
+      const initResp: any = await membershipApi.subscribe({ tierType, billingPeriod });
       const initData = initResp?.data?.data ?? initResp?.data ?? {};
       const paymentId = initData.paymentId || initData.id || initData.payment?.id;
 
@@ -338,6 +336,7 @@ export default function MembershipCheckoutScreen() {
           onPress={handlePayment}
           isLoading={loading}
           disabled={loading || !cardNumber || !cardExpiry || !cardCvc || !cardName}
+          fullWidth
           style={styles.payButton}
         />
 

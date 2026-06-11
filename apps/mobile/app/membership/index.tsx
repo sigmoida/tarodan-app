@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { View, Text, ScrollView, TouchableOpacity, StyleSheet, ActivityIndicator } from 'react-native';
-import { router } from 'expo-router';
+import { router, useFocusEffect } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { theme, ScreenHeader, appAlert } from '@tarodan/ui-native';
 import { useAuthStore } from '../../src/stores/authStore';
@@ -79,10 +79,17 @@ export default function MembershipScreen() {
   useEffect(() => {
     if (!isAuthenticated) {
       router.replace('/(auth)/login');
-      return;
     }
-    fetchData();
   }, [isAuthenticated]);
+
+  // Ekrana her dönüşte güncel kademeyi çek (üyelik yükseltme sonrası "mevcut
+  // plan" anında güncellensin; mount'ta da çalışır).
+  useFocusEffect(
+    React.useCallback(() => {
+      if (isAuthenticated) fetchData();
+      // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [isAuthenticated]),
+  );
 
   const fetchData = async () => {
     setLoading(true);

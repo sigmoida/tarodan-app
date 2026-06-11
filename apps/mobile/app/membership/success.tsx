@@ -1,19 +1,46 @@
 import { useEffect } from 'react';
 import { View, StyleSheet } from 'react-native';
 import { theme, Button, Text } from '@tarodan/ui-native';
-import { router } from 'expo-router';
+import { router, useLocalSearchParams } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
+import { useQueryClient } from '@tanstack/react-query';
 import { useAuthStore } from '../../src/stores/authStore';
+import { paymentsApi } from '../../src/services/api';
 
 const { colors } = theme;
 
 export default function MembershipSuccessScreen() {
+  const { paymentId } = useLocalSearchParams<{ paymentId?: string }>();
   const { refreshUserData } = useAuthStore();
+  const queryClient = useQueryClient();
 
-  // PayTR dönüşü sonrası yeni üyelik kademesi yerel kullanıcıya yansısın.
+  // PayTR dönüşü sonrası: üyeliği sunucu tarafında KESİNLEŞTİR, sonra yerel
+  // kullanıcı + üyelik query'lerini tazele. Callback (ngrok) gecikse/ulaşmasa
+  // bile verify (durum-sorgu) ile ödeme işlenir; aksi halde üyelik `past_due`
+  // kalır ve "mevcut plan" Temel/ücretsiz görünür (order success ile aynı desen).
   useEffect(() => {
-    refreshUserData?.();
-  }, [refreshUserData]);
+    let cancelled = false;
+    const run = async () => {
+      if (paymentId) {
+        try { await paymentsApi.verify(paymentId); } catch { /* best-effort */ }
+        // Aktivasyon (past_due → active) işlenene kadar kısa süre yokla.
+        for (let i = 0; i < 4 && !cancelled; i++) {
+          try {
+            const res = await paymentsApi.getStatus(paymentId);
+            const status = (res.data?.data ?? res.data)?.status;
+            if (status === 'paid' || status === 'completed' || status === 'success') break;
+          } catch { /* yoksay */ }
+          if (i < 3 && !cancelled) await new Promise((r) => setTimeout(r, 1200));
+        }
+      }
+      if (cancelled) return;
+      await refreshUserData?.();
+      // Tüm üyelik query'lerini (örn. ['membership','me']) tazele.
+      queryClient.invalidateQueries({ queryKey: ['membership'] });
+    };
+    run();
+    return () => { cancelled = true; };
+  }, [paymentId, refreshUserData, queryClient]);
 
   return (
     <View style={styles.container}>
