@@ -161,24 +161,24 @@ export default function PaymentWebViewScreen() {
     }
   };
 
+  // Geri git; stack kökündeysek (deep link / replace ile gelinmişse) ana sayfaya düş.
+  // Düz router.back() bu durumda "GO_BACK was not handled by any navigator" hatası verir.
+  const safeBack = () => {
+    if (router.canGoBack()) router.back();
+    else router.replace('/(tabs)' as never);
+  };
+
   const handleCancel = () => {
+    // Geri çıkış siparişi İPTAL ETMEZ — sadece ödeme ekranından çıkar. Sipariş
+    // "ödeme bekliyor" kalır; backend re-initiate'i (taze token + gerekirse yeniden
+    // rezervasyon) zaten destekliyor. Terk edilen ödeme/rezervasyonu 30dk/24s cron temizler.
+    // (Eski davranış paymentsApi.cancel ile siparişi iptal edip "ödeme beklenmiyor"a düşürüyordu.)
     Alert.alert(
-      'Ödemeyi İptal Et',
-      'Ödeme işlemini iptal etmek istediğinize emin misiniz? Bu işlem sepetinizdeki rezervasyonu serbest bırakır.',
+      'Ödemeden Çık',
+      'Ödemeyi tamamlamadan çıkmak istediğinize emin misiniz? Siparişiniz "ödeme bekliyor" olarak kalır; daha sonra tekrar ödeyebilirsiniz.',
       [
-        { text: 'Devam Et', style: 'cancel' },
-        {
-          text: 'İptal Et',
-          style: 'destructive',
-          onPress: async () => {
-            try {
-              await paymentsApi.cancel(paymentIdRef.current);
-            } catch {
-              // cancel başarısız olsa bile UI'ı geri al
-            }
-            router.back();
-          },
-        },
+        { text: 'Ödemeye Devam Et', style: 'cancel' },
+        { text: 'Çık', onPress: () => safeBack() },
       ],
     );
   };
@@ -276,7 +276,7 @@ export default function PaymentWebViewScreen() {
       ) : state.error ? (
         <View style={styles.errorWrap}>
           <ErrorState message={state.error} onRetry={initiatePayment} />
-          <Button variant="ghost" title="Geri Dön" onPress={() => router.back()} />
+          <Button variant="ghost" title="Geri Dön" onPress={safeBack} />
         </View>
       ) : state.html ? (
         <WebView
@@ -356,5 +356,6 @@ const styles = StyleSheet.create({
   errorWrap: {
     flex: 1,
     paddingVertical: 16,
+    alignItems: 'center',
   },
 });

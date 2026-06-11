@@ -1158,19 +1158,21 @@ export default function TradeDetailScreen() {
                 isLoading={acceptMutation.isPending}
                 style={styles.actionButton}
               />
-              <Button
-                variant="outline"
-                title="Karşı Teklif"
-                onPress={() => router.push(`/trade/counter/${id}` as any)}
-                style={styles.actionButton}
-              />
-              <Button
-                variant="outline"
-                title="Reddet"
-                onPress={handleReject}
-                isLoading={rejectMutation.isPending}
-                style={{ ...styles.actionButton, borderColor: colors.danger[600]! }}
-              />
+              <View style={styles.actionRow}>
+                <Button
+                  variant="outline"
+                  title="Karşı Teklif"
+                  onPress={() => router.push(`/trade/counter/${id}` as any)}
+                  style={{ ...styles.actionButton, ...styles.actionItem }}
+                />
+                <Button
+                  variant="outline"
+                  title="Reddet"
+                  onPress={handleReject}
+                  isLoading={rejectMutation.isPending}
+                  style={{ ...styles.actionButton, ...styles.actionItem, borderColor: colors.danger[600]! }}
+                />
+              </View>
             </>
           )}
 
@@ -1260,6 +1262,7 @@ export default function TradeDetailScreen() {
             variant="ghost"
             title="Mesaj Gönder"
             onPress={() => router.push(`/messages/new?receiverId=${otherParty.id}`)}
+            style={styles.actionButton}
           />
         </View>
 
@@ -1501,6 +1504,14 @@ const styles = StyleSheet.create({
   },
   actionButton: {
     borderRadius: 8,
+    alignSelf: 'stretch',
+  },
+  actionRow: {
+    flexDirection: 'row',
+    gap: 12,
+  },
+  actionItem: {
+    flex: 1,
   },
   modalActions: {
     flexDirection: 'row',

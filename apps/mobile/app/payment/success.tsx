@@ -182,9 +182,11 @@ const styles = StyleSheet.create({
   },
   title: {
     fontSize: 26,
+    lineHeight: 34,
     fontWeight: '800',
     color: colors.text.heading,
     textAlign: 'center',
+    includeFontPadding: true,
   },
   subtitle: {
     fontSize: 14,

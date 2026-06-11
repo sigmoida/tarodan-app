@@ -29,5 +29,5 @@ const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: colors.surface.DEFAULT },
   content: { flex: 1, justifyContent: 'center', alignItems: 'center', padding: 24 },
   text: { textAlign: 'center', color: colors.text.muted },
-  button: { marginTop: 16 },
+  button: { marginTop: 16, alignSelf: 'center' },
 });

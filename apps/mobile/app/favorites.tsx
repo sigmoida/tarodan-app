@@ -71,7 +71,7 @@ export default function FavoritesScreen() {
           Favorilerinizi görmek için giriş yapın
         </Text>
         <Button variant="primary" title="Giriş Yap" onPress={() => router.push('/(auth)/login')} style={styles.button} />
-        <Button variant="ghost" title="Hesap Oluştur" onPress={() => router.push('/(auth)/register')} />
+        <Button variant="ghost" title="Hesap Oluştur" onPress={() => router.push('/(auth)/register')} style={{ alignSelf: 'center' }} />
       </View>
     );
   }
@@ -91,7 +91,7 @@ export default function FavoritesScreen() {
         <Ionicons name="cloud-offline-outline" size={64} color={colors.text.subtle} />
         <Text style={{ marginTop: 16, fontSize: 16, fontWeight: '600', color: colors.text.heading }}>Yüklenemedi</Text>
         <Text style={{ marginTop: 8, color: colors.text.subtle, textAlign: 'center' }}>Favorileriniz yüklenirken bir hata oluştu.</Text>
-        <Button variant="primary" title="Tekrar Dene" onPress={() => fetchFavorites()} style={{ marginTop: 16 }} />
+        <Button variant="primary" title="Tekrar Dene" onPress={() => fetchFavorites()} style={{ marginTop: 16, alignSelf: 'center' }} />
       </View>
     );
   }
@@ -222,6 +222,8 @@ const styles = StyleSheet.create({
   button: {
     marginBottom: 8,
     minWidth: 200,
+    // Button varsayılanı alignSelf:'flex-start' → ortalı kapsayıcıda sola kayar.
+    alignSelf: 'center',
   },
   emptyContainer: {
     flex: 1,
@@ -242,6 +244,7 @@ const styles = StyleSheet.create({
   },
   browseButton: {
     minWidth: 200,
+    alignSelf: 'center',
   },
   scrollView: {
     flex: 1,

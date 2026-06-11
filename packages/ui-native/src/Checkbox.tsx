@@ -9,6 +9,7 @@ export interface CheckboxProps {
   disabled?: boolean;
   size?: 'sm' | 'md' | 'lg';
   error?: string;
+  testID?: string;
 }
 
 const { colors, radius, spacing, typography } = theme;
@@ -22,10 +23,12 @@ export const Checkbox: React.FC<CheckboxProps> = ({
   disabled,
   size = 'md',
   error,
+  testID,
 }) => {
   const s = sizeMap[size];
   return (
     <Pressable
+      testID={testID}
       disabled={disabled}
       onPress={() => onChange(!checked)}
       style={[styles.row, disabled ? styles.disabled : null]}

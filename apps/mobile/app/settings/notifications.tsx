@@ -116,7 +116,7 @@ export default function NotificationSettingsScreen() {
         <Text variant="body" style={styles.subtitle}>
           Ayarlarınızı düzenlemek için giriş yapın
         </Text>
-        <Button variant="primary" title="Giriş Yap" onPress={() => router.push('/(auth)/login')} />
+        <Button variant="primary" title="Giriş Yap" onPress={() => router.push('/(auth)/login')} style={{ alignSelf: 'center' }} />
       </View>
     );
   }

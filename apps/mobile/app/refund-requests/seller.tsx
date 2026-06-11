@@ -139,7 +139,7 @@ export default function SellerRefundRequestsScreen() {
         <Text variant="body" tone="muted" style={styles.subtitle}>
           İade taleplerini görmek için giriş yapın
         </Text>
-        <Button variant="primary" title="Giriş Yap" onPress={() => router.push('/(auth)/login')} />
+        <Button variant="primary" title="Giriş Yap" onPress={() => router.push('/(auth)/login')} style={{ alignSelf: 'center' }} />
       </View>
     );
   }

@@ -24,7 +24,7 @@ import {
   CityDistrictSelector,
   ScreenHeader,
 } from '../../src/components/common';
-import { router } from 'expo-router';
+import { router, useLocalSearchParams } from 'expo-router';
 import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 import { useQuery } from '@tanstack/react-query';
 import { useCartStore } from '../../src/stores/cartStore';
@@ -89,8 +89,22 @@ const EMPTY_ADDRESS: ShippingAddressInput = {
 };
 
 export default function CheckoutScreen() {
-  const { items, getSubtotal, clearCart } = useCartStore();
+  const { buyNow } = useLocalSearchParams<{ buyNow?: string }>();
+  const isBuyNow = buyNow === '1';
+  const { items: cartItems, clearCart: clearCartStore, buyNowItem, clearBuyNow } = useCartStore();
   const { isAuthenticated, user } = useAuthStore();
+
+  // Hızlı Al akışında sepet yerine tek ürün kullanılır; sepet kirlenmez.
+  const items = useMemo(
+    // Hızlı Al modunda yalnızca buyNowItem; yoksa boş (sepete düşüp yanlış ürün alınmasın).
+    () => (isBuyNow ? (buyNowItem ? [buyNowItem] : []) : cartItems),
+    [isBuyNow, buyNowItem, cartItems],
+  );
+  // Akış bitince doğru kaynağı temizle (Hızlı Al → buyNowItem, normal → sepet).
+  const finalizeCart = () => {
+    if (isBuyNow) clearBuyNow();
+    else clearCartStore();
+  };
 
   // ---------- Step ----------
   const [step, setStep] = useState(1); // 1: Adres, 2: Ödeme, 3: Onay
@@ -146,7 +160,10 @@ export default function CheckoutScreen() {
     message: '',
   });
 
-  const subtotal = getSubtotal();
+  const subtotal = useMemo(
+    () => items.reduce((sum, it) => sum + it.price * it.quantity, 0),
+    [items],
+  );
   const total = subtotal + shippingCost - (appliedDiscount?.amount ?? 0);
 
   // ---------- Üye için kayıtlı adresler ----------
@@ -424,7 +441,7 @@ export default function CheckoutScreen() {
           'Hata',
           'Sipariş oluşturuldu fakat ödeme başlatılamadı. Siparişlerim sayfasından devam edebilirsiniz.',
         );
-        clearCart();
+        finalizeCart();
         router.replace('/orders' as any);
         return;
       }
@@ -446,7 +463,7 @@ export default function CheckoutScreen() {
           const paymentId = directData.paymentId || directData.id || directData.payment?.id;
           // 3DS gerekiyorsa veya hala pending ise WebView akışına geç
           if (status === 'paid' || status === 'success' || status === 'completed') {
-            clearCart();
+            finalizeCart();
             router.replace({
               pathname: '/payment/success',
               params: { paymentId, orderId: firstOrderId },
@@ -454,7 +471,7 @@ export default function CheckoutScreen() {
             return;
           }
           // Aksi halde WebView akışına geçilir
-          clearCart();
+          finalizeCart();
           router.replace({
             pathname: '/payment/[id]',
             params: {
@@ -489,7 +506,7 @@ export default function CheckoutScreen() {
           });
           const directData: any = directResp.data?.data ?? directResp.data ?? {};
           const paymentId = directData.paymentId || directData.id || directData.payment?.id;
-          clearCart();
+          finalizeCart();
           router.replace({
             pathname: '/payment/[id]',
             params: {
@@ -528,7 +545,7 @@ export default function CheckoutScreen() {
               extra: { paymentId, orderId: firstOrderId },
             });
           }
-          clearCart();
+          finalizeCart();
           router.replace({
             pathname: '/payment/success',
             params: { paymentId, orderId: firstOrderId },
@@ -539,7 +556,7 @@ export default function CheckoutScreen() {
         // Token burada üretildi; ekran tekrar initiate etmesin diye URL'i geçiyoruz
         // (PayTR token'ları tek kullanımlık — çift initiate ilk token'ı çöpe atardı).
         const paymentUrl: string | undefined = initData.paymentUrl;
-        clearCart();
+        finalizeCart();
         router.replace({
           pathname: '/payment/[id]',
           params: {
@@ -618,7 +635,7 @@ export default function CheckoutScreen() {
           variant="primary"
           title="Alışverişe Başla"
           onPress={() => router.replace('/' as any)}
-          style={{ marginTop: 20 }}
+          style={{ marginTop: 20, alignSelf: 'center' }}
         />
       </View>
     );

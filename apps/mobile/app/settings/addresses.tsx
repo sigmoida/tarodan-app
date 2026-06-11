@@ -212,7 +212,7 @@ export default function AddressesScreen() {
         <Text variant="body" style={styles.subtitle}>
           Adreslerinizi görmek için giriş yapın
         </Text>
-        <Button variant="primary" title="Giriş Yap" onPress={() => router.push('/(auth)/login')} />
+        <Button variant="primary" title="Giriş Yap" onPress={() => router.push('/(auth)/login')} style={{ alignSelf: 'center' }} />
       </View>
     );
   }
@@ -237,7 +237,7 @@ export default function AddressesScreen() {
           <Text variant="body" style={styles.emptySubtitle}>
             Teslimat adresinizi ekleyin
           </Text>
-          <Button variant="primary" title="Adres Ekle" onPress={openAddDialog} />
+          <Button variant="primary" title="Adres Ekle" onPress={openAddDialog} style={{ alignSelf: 'center' }} />
         </View>
       ) : (
         <ScrollView

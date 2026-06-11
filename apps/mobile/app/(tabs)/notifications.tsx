@@ -311,9 +311,17 @@ export default function NotificationsScreen() {
       }
     }
 
+    // Bazı bildirim tipleri için doğrudan mobil rota — backend/web ortak link'i
+    // (ör. karşı teklif → /listings/:id) yanlış yere götürdüğü için tipe öncelik ver.
+    // Karşı teklif alıcının başlattığı pazarlıktadır → "Gönderilen" sekmesi.
+    const typeRoute: Record<string, string> = {
+      offer_counter: '/offers?tab=sent',
+    };
+
     // Backend link'i WEB rotası — mobil rotaya normalize et; üretemezse
     // data'dan (orderId/tradeId/...) türet.
     const target =
+      typeRoute[notification.type] ??
       (notification.link ? toMobileRoute(notification.link) : null) ??
       routeForNotification(notification);
     if (target) router.push(target as any);

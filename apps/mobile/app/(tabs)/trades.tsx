@@ -105,6 +105,7 @@ export default function TradesScreen() {
             variant="primary"
             title="Giriş Yap"
             onPress={() => router.push('/(auth)/login')}
+            style={{ alignSelf: 'center' }}
           />
         </View>
       </View>

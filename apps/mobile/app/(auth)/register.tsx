@@ -18,18 +18,8 @@ import {
   displayNameSchema,
   emailSchema,
   strongPasswordSchema,
+  isAdult,
 } from '../../src/utils/validation';
-
-/** 18+ yaş kontrolü — API RegisterDto birthDate'i zorunlu kılar (IsAdultConstraint). */
-function isAdult(dateStr: string): boolean {
-  const d = new Date(dateStr);
-  if (Number.isNaN(d.getTime())) return false;
-  const today = new Date();
-  let age = today.getFullYear() - d.getFullYear();
-  const monthDiff = today.getMonth() - d.getMonth();
-  if (monthDiff < 0 || (monthDiff === 0 && today.getDate() < d.getDate())) age -= 1;
-  return age >= 18;
-}
 
 /** En geç seçilebilir doğum tarihi (bugün - 18 yıl) — 18+'ı seçici seviyesinde kısıtlar. */
 function maxBirthDate(): Date {
@@ -62,7 +52,12 @@ type RegisterForm = z.infer<typeof registerSchema>;
 export default function RegisterScreen() {
   const { control, handleSubmit, formState: { errors } } = useForm<RegisterForm>({
     resolver: zodResolver(registerSchema),
-    defaultValues: { acceptTerms: false },
+    defaultValues: {
+      acceptTerms: false,
+      // Maestro spinner DateField'ı süremez; test modunda geçerli (18+) bir
+      // doğum tarihi öndoldurulur. Prod'da EXPO_PUBLIC_MAESTRO unset → '' .
+      birthDate: process.env.EXPO_PUBLIC_MAESTRO === '1' ? '1990-01-01' : '',
+    },
   });
 
   const registerMutation = useMutation({
@@ -143,7 +138,14 @@ export default function RegisterScreen() {
               label="Şifre"
               value={value}
               onChangeText={onChange}
-              secureTextEntry
+              // Maestro: iOS secureTextEntry'ye yazamıyor + "Automatic Strong Password"
+              // kaplaması çıkıyor. Test modunda maskeyi kapat (login.tsx ile aynı). Prod: maskeli.
+              secureTextEntry={process.env.EXPO_PUBLIC_MAESTRO !== '1'}
+              // Maskesizken iOS otomatik öneri fazladan karakter ekliyor (şifre eşleşmez).
+              autoCorrect={false}
+              autoComplete="off"
+              autoCapitalize="none"
+              spellCheck={false}
               togglePasswordVisibility
               error={errors.password?.message}
             />
@@ -158,10 +160,15 @@ export default function RegisterScreen() {
           name="confirmPassword"
           render={({ field: { onChange, value } }) => (
             <Input
+              testID="register-confirmPassword-input"
               label="Şifre Tekrar"
               value={value}
               onChangeText={onChange}
-              secureTextEntry
+              secureTextEntry={process.env.EXPO_PUBLIC_MAESTRO !== '1'}
+              autoCorrect={false}
+              autoComplete="off"
+              autoCapitalize="none"
+              spellCheck={false}
               togglePasswordVisibility
               error={errors.confirmPassword?.message}
             />
@@ -173,6 +180,7 @@ export default function RegisterScreen() {
           name="acceptTerms"
           render={({ field: { onChange, value } }) => (
             <Checkbox
+              testID="register-acceptTerms"
               checked={value}
               onChange={() => onChange(!value)}
               label="Kullanım koşullarını ve gizlilik politikasını kabul ediyorum"
@@ -208,7 +216,12 @@ export default function RegisterScreen() {
 
         {registerMutation.isError ? (
           <Text variant="bodySm" tone="danger" align="center">
-            Kayıt başarısız. Lütfen tekrar deneyin.
+            {(() => {
+              const err = registerMutation.error as any;
+              const msg = err?.response?.data?.message;
+              const text = Array.isArray(msg) ? msg[0] : msg;
+              return text || err?.message || 'Kayıt başarısız. Lütfen tekrar deneyin.';
+            })()}
           </Text>
         ) : null}
 

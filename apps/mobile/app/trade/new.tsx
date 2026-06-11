@@ -218,7 +218,7 @@ export default function NewTradeScreen() {
       <View style={styles.centeredContainer}>
         <Text variant="h3">Giriş Yapın</Text>
         <Text variant="body" style={styles.subtitle}>Takas teklifi vermek için giriş yapmalısınız</Text>
-        <Button variant="primary" title="Giriş Yap" onPress={() => router.push('/(auth)/login')} />
+        <Button variant="primary" title="Giriş Yap" onPress={() => router.push('/(auth)/login')} style={{ alignSelf: 'center' }} />
       </View>
     );
   }
@@ -317,7 +317,7 @@ export default function NewTradeScreen() {
                   <Text variant="body" style={styles.emptyText}>
                     Takas için aktif ilanınız yok
                   </Text>
-                  <Button variant="outline" title="İlan Oluştur" onPress={() => router.push('/(tabs)/sell')} />
+                  <Button variant="outline" title="İlan Oluştur" onPress={() => router.push('/(tabs)/sell')} style={{ alignSelf: 'center' }} />
                 </View>
               </Card>
             ) : (

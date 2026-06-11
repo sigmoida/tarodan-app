@@ -49,7 +49,7 @@ export default function FollowingScreen() {
         <Text variant="body" style={styles.subtitle}>
           Satıcıları takip etmek için giriş yapın
         </Text>
-        <Button variant="primary" title="Giriş Yap" onPress={() => router.push('/(auth)/login')} />
+        <Button variant="primary" title="Giriş Yap" onPress={() => router.push('/(auth)/login')} style={{ alignSelf: 'center' }} />
       </View>
     );
   }
@@ -70,7 +70,7 @@ export default function FollowingScreen() {
           <Text variant="body" style={styles.emptySubtitle}>
             Satıcıları takip ederek yeni ilanlarından haberdar olun
           </Text>
-          <Button variant="primary" title="Satıcıları Keşfet" onPress={() => router.push('/(tabs)/search')} />
+          <Button variant="primary" title="Satıcıları Keşfet" onPress={() => router.push('/(tabs)/search')} style={{ alignSelf: 'center' }} />
         </View>
       ) : (
         <ScrollView

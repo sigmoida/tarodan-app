@@ -89,14 +89,17 @@ export default function MessagesTabScreen() {
     <View style={styles.container}>
       {/* Header */}
       <View style={styles.header}>
+        <View style={styles.headerSide} />
         <Text variant="h3" tone="inverted" weight="bold">
           Mesajlar
         </Text>
-        {unreadCount > 0 && (
-          <Badge variant="danger" style={styles.headerBadge}>
-            {unreadCount}
-          </Badge>
-        )}
+        <View style={styles.headerSide}>
+          {unreadCount > 0 && (
+            <Badge variant="danger" style={styles.headerBadge}>
+              {unreadCount}
+            </Badge>
+          )}
+        </View>
       </View>
 
       {/* Message Limit Banner */}
@@ -255,6 +258,10 @@ const styles = StyleSheet.create({
     fontSize: 18,
     fontWeight: 'bold',
     color: TarodanColors.textOnPrimary,
+  },
+  headerSide: {
+    flex: 1,
+    justifyContent: 'center',
   },
   headerBadge: {
     marginLeft: 8,

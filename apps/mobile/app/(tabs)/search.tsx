@@ -265,6 +265,7 @@ export default function SearchScreen() {
       (hasDiscount ? Math.round((1 - Number(price) / Number(oldPrice)) * 100) : 0);
     return (
       <Pressable
+        testID="search-result-card"
         onPress={() => handleProductPress(item.id)}
         style={({ pressed }) => [styles.productCardWrapper, { opacity: pressed ? 0.85 : 1 }]}
       >
@@ -682,7 +683,7 @@ export default function SearchScreen() {
                   variant="outline"
                   title="Filtreleri Temizle"
                   onPress={clearAllFilters}
-                  style={{ marginTop: spacing[4] }}
+                  style={{ marginTop: spacing[4], alignSelf: 'center' }}
                 />
               </View>
             }

@@ -119,14 +119,6 @@ export default function CollectionsScreen() {
                   </View>
                 </TouchableOpacity>
               ))}
-
-              {/* Add New Collection Card */}
-              {canCreateCollections && (
-                <TouchableOpacity style={styles.addCollectionCard} onPress={handleCreateCollection}>
-                  <Ionicons name="add-circle-outline" size={40} color={colors.primary[600]!} />
-                  <Text style={styles.addCollectionText}>Yeni Koleksiyon</Text>
-                </TouchableOpacity>
-              )}
             </View>
 
             {/* Empty State */}
@@ -242,24 +234,6 @@ const styles = StyleSheet.create({
     fontSize: 12,
     color: colors.text.muted,
     marginTop: 4,
-  },
-  addCollectionCard: {
-    width: '48%',
-    height: 180,
-    backgroundColor: colors.surface.DEFAULT,
-    borderRadius: 12,
-    marginBottom: 16,
-    alignItems: 'center',
-    justifyContent: 'center',
-    borderWidth: 2,
-    borderColor: colors.border.DEFAULT,
-    borderStyle: 'dashed',
-  },
-  addCollectionText: {
-    fontSize: 14,
-    fontWeight: '500',
-    color: colors.primary[600]!,
-    marginTop: 8,
   },
   fab: {
     position: 'absolute',

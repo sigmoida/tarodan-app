@@ -207,7 +207,7 @@ export default function SalesScreen() {
         <Text variant="body" tone="muted" style={styles.subtitle}>
           Satışlarınızı görmek için giriş yapın
         </Text>
-        <Button variant="primary" title="Giriş Yap" onPress={() => router.push('/(auth)/login')} />
+        <Button variant="primary" title="Giriş Yap" onPress={() => router.push('/(auth)/login')} style={{ alignSelf: 'center' }} />
       </View>
     );
   }
@@ -264,7 +264,7 @@ export default function SalesScreen() {
           <Text variant="body" tone="muted" style={styles.emptySubtitle}>
             İlan oluşturarak satışa başlayın
           </Text>
-          <Button variant="primary" title="İlan Oluştur" onPress={() => router.push('/(tabs)/sell')} />
+          <Button variant="primary" title="İlan Oluştur" onPress={() => router.push('/(tabs)/sell')} style={{ alignSelf: 'center' }} />
         </View>
       ) : (
         <ScrollView

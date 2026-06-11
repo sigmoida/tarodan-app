@@ -22,9 +22,17 @@ interface CartState {
   items: CartItem[];
   lastUpdated: number;
   isLoading: boolean;
-  
+  /**
+   * "Hızlı Al" için sepetten bağımsız tek ürün. Checkout `?buyNow=1` ile açıldığında
+   * sepet yerine bu ürün kullanılır; böylece sepet kirlenmez (web parite).
+   * Kalıcı depoya yazılmaz (partialize) — uygulama yeniden açılınca sıfırlanır.
+   */
+  buyNowItem: CartItem | null;
+
   // Actions
   addItem: (item: Omit<CartItem, 'id' | 'quantity' | 'addedAt'>) => void;
+  setBuyNow: (item: Omit<CartItem, 'id' | 'quantity' | 'addedAt'>) => void;
+  clearBuyNow: () => void;
   addToCart: (productId: string) => Promise<void>;
   removeItem: (itemId: string) => void;
   removeByProductId: (productId: string) => void;
@@ -47,6 +55,22 @@ export const useCartStore = create<CartState>()(
       items: [],
       lastUpdated: Date.now(),
       isLoading: false,
+      buyNowItem: null,
+
+      setBuyNow: (item) => {
+        set({
+          buyNowItem: {
+            ...item,
+            id: `buynow-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+            quantity: 1,
+            addedAt: Date.now(),
+          },
+        });
+      },
+
+      clearBuyNow: () => {
+        set({ buyNowItem: null });
+      },
 
       addItem: (item) => {
         const items = get().items;
@@ -151,6 +175,8 @@ export const useCartStore = create<CartState>()(
     {
       name: 'tarodan-cart',
       storage: createJSONStorage(() => AsyncStorage),
+      // buyNowItem geçicidir; yalnızca sepet kalıcı yazılır.
+      partialize: (state) => ({ items: state.items, lastUpdated: state.lastUpdated }),
     }
   )
 );

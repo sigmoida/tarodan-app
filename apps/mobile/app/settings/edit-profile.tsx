@@ -182,7 +182,7 @@ export default function EditProfileScreen() {
     return (
       <View style={styles.centeredContainer}>
         <Text variant="h3">Giriş Yapın</Text>
-        <Button variant="primary" title="Giriş Yap" onPress={() => router.push('/(auth)/login')} />
+        <Button variant="primary" title="Giriş Yap" onPress={() => router.push('/(auth)/login')} style={{ alignSelf: 'center' }} />
       </View>
     );
   }
@@ -381,6 +381,7 @@ export default function EditProfileScreen() {
         {/* Submit Button */}
         <Button
           variant="primary"
+          fullWidth
           title="Değişiklikleri Kaydet"
           icon="checkmark"
           onPress={handleSubmit(onSubmit)}

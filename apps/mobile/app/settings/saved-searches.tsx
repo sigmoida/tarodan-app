@@ -155,7 +155,7 @@ export default function SavedSearchesScreen() {
         <Text variant="body" style={styles.subtitle}>
           Aramalarınızı kaydetmek için giriş yapın
         </Text>
-        <Button variant="primary" title="Giriş Yap" onPress={() => router.push('/(auth)/login')} />
+        <Button variant="primary" title="Giriş Yap" onPress={() => router.push('/(auth)/login')} style={{ alignSelf: 'center' }} />
       </View>
     );
   }
@@ -199,7 +199,7 @@ export default function SavedSearchesScreen() {
           <Text variant="body" style={styles.emptySubtitle}>
             Arama sayfasında arama yapıp "Aramayı Kaydet" butonuna tıklayın
           </Text>
-          <Button variant="primary" title="Aramaya Git" onPress={() => router.push('/(tabs)/search')} />
+          <Button variant="primary" title="Aramaya Git" onPress={() => router.push('/(tabs)/search')} style={{ alignSelf: 'center' }} />
         </View>
       ) : (
         <ScrollView style={styles.content}>
