@@ -13,7 +13,15 @@ import {
 } from '@heroicons/react/24/outline';
 import { adminApi } from '@/lib/api';
 import toast from 'react-hot-toast';
-import { Button, Input, Select, Spinner } from '@tarodan/ui';
+import {
+  Button,
+  Input,
+  Select,
+  Spinner,
+  enumLabel,
+  paymentStatusConfig,
+  paymentProviderConfig,
+} from '@tarodan/ui';
 
 interface PaymentStatistics {
   period: string;
@@ -201,7 +209,7 @@ export default function AdminPaymentStatisticsPage() {
               {statistics.byStatus.map((item) => (
                 <div key={item.status}>
                   <div className="flex justify-between mb-1">
-                    <span className="text-sm font-medium text-body">{item.status}</span>
+                    <span className="text-sm font-medium text-body">{enumLabel(paymentStatusConfig, item.status)}</span>
                     <span className="text-sm text-muted">
                       {item.count} ({item.percentage.toFixed(1)}%)
                     </span>
@@ -224,7 +232,7 @@ export default function AdminPaymentStatisticsPage() {
               {statistics.byProvider.map((item) => (
                 <div key={item.provider}>
                   <div className="flex justify-between mb-1">
-                    <span className="text-sm font-medium text-body uppercase">{item.provider}</span>
+                    <span className="text-sm font-medium text-body">{enumLabel(paymentProviderConfig, item.provider)}</span>
                     <span className="text-sm text-muted">
                       {item.count} ({item.percentage.toFixed(1)}%)
                     </span>

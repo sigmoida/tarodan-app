@@ -9,11 +9,11 @@ import {
   Button,
   Input,
   Select,
-  Spinner,
   StatusBadge,
   tradeStatusConfig,
 } from "@tarodan/ui";
 import type { StatusConfig } from "@tarodan/ui";
+import { DataTable, type ColumnDef } from "@/components/DataTable";
 import {
   MagnifyingGlassIcon,
   EyeIcon,
@@ -202,6 +202,109 @@ export default function TradesPage() {
 
   const disputedCount = trades.filter((t) => t.hasDispute).length;
 
+  const columns: ColumnDef<Trade, any>[] = [
+    {
+      header: "Takas No",
+      cell: ({ row }) => (
+        <span className="font-mono text-sm">{row.original.tradeNumber}</span>
+      ),
+    },
+    {
+      header: "Durum",
+      cell: ({ row }) =>
+        row.original.hasDispute ? (
+          <StatusBadge
+            status="disputed_override"
+            config={disputeConfig}
+            label="⚠️ İtirazlı"
+          />
+        ) : (
+          <div className="flex flex-col items-start gap-1">
+            <StatusBadge status={row.original.status} config={tradeStatusConfig} />
+            {row.original.status === "cancelled" &&
+              cancelReasonLabel(row.original.cancelReason) && (
+                <span className="text-xs text-muted">
+                  {cancelReasonLabel(row.original.cancelReason)}
+                </span>
+              )}
+          </div>
+        ),
+    },
+    {
+      header: "Başlatan",
+      cell: ({ row }) => (
+        <Link
+          href={`/users/${row.original.initiator.id}`}
+          className="text-heading hover:text-primary-600"
+        >
+          {row.original.initiator.displayName}
+        </Link>
+      ),
+    },
+    {
+      header: "Alan",
+      cell: ({ row }) => (
+        <Link
+          href={`/users/${row.original.receiver.id}`}
+          className="text-heading hover:text-primary-600"
+        >
+          {row.original.receiver.displayName}
+        </Link>
+      ),
+    },
+    {
+      header: "Ürünler",
+      cell: ({ row }) => (
+        <>
+          {row.original.initiatorItemsCount} ↔️ {row.original.receiverItemsCount}
+        </>
+      ),
+    },
+    {
+      header: "Nakit",
+      cell: ({ row }) =>
+        row.original.cashAmount ? (
+          <span className="text-primary-400">
+            +₺{row.original.cashAmount.toLocaleString()}
+          </span>
+        ) : (
+          <span className="text-muted">-</span>
+        ),
+    },
+    {
+      header: "Tarih",
+      cell: ({ row }) => (
+        <span className="whitespace-nowrap">
+          {new Date(row.original.createdAt).toLocaleDateString("tr-TR")}
+        </span>
+      ),
+    },
+    {
+      id: "actions",
+      header: "İşlemler",
+      cell: ({ row }) => (
+        <div className="flex gap-1 whitespace-nowrap">
+          <Link
+            href={`/trades/${row.original.id}`}
+            className="p-2 text-muted hover:text-heading hover:bg-surface-alt rounded-lg"
+            title="Detay"
+          >
+            <EyeIcon className="h-5 w-5" />
+          </Link>
+          {row.original.hasDispute && (
+            <Button
+              variant="secondary"
+              className="p-2 text-danger-600 hover:bg-danger-500/10 rounded-lg"
+              title="İtirazı Çöz"
+            >
+              <ExclamationTriangleIcon className="h-5 w-5" />
+            </Button>
+          )}
+        </div>
+      ),
+    },
+  ];
+
   return (
     <>
       <div className="space-y-6">
@@ -319,122 +422,13 @@ export default function TradesPage() {
           </Select>
         </div>
 
-        <div className="admin-card overflow-hidden">
-          <div className="overflow-x-auto">
-            <table className="admin-table">
-              <thead>
-                <tr>
-                  <th>Takas No</th>
-                  <th>Durum</th>
-                  <th>Başlatan</th>
-                  <th>Alan</th>
-                  <th>Ürünler</th>
-                  <th>Nakit</th>
-                  <th>Tarih</th>
-                  <th>İşlemler</th>
-                </tr>
-              </thead>
-              <tbody>
-                {loading ? (
-                  <tr>
-                    <td colSpan={8} className="text-center py-8">
-                      <Spinner size="lg" className="mx-auto" />
-                    </td>
-                  </tr>
-                ) : trades.length === 0 ? (
-                  <tr>
-                    <td colSpan={8} className="text-center py-8 text-muted">
-                      Takas bulunamadı
-                    </td>
-                  </tr>
-                ) : (
-                  trades.map((trade) => (
-                    <tr
-                      key={trade.id}
-                      className={trade.hasDispute ? "bg-danger-900/10" : ""}
-                    >
-                      <td className="font-mono text-sm">{trade.tradeNumber}</td>
-                      <td>
-                        {trade.hasDispute ? (
-                          <StatusBadge
-                            status="disputed_override"
-                            config={disputeConfig}
-                            label="⚠️ İtirazlı"
-                          />
-                        ) : (
-                          <div className="flex flex-col items-start gap-1">
-                            <StatusBadge
-                              status={trade.status}
-                              config={tradeStatusConfig}
-                            />
-                            {trade.status === "cancelled" &&
-                              cancelReasonLabel(trade.cancelReason) && (
-                                <span className="text-xs text-muted">
-                                  {cancelReasonLabel(trade.cancelReason)}
-                                </span>
-                              )}
-                          </div>
-                        )}
-                      </td>
-                      <td>
-                        <Link
-                          href={`/users/${trade.initiator.id}`}
-                          className="text-heading hover:text-primary-600"
-                        >
-                          {trade.initiator.displayName}
-                        </Link>
-                      </td>
-                      <td>
-                        <Link
-                          href={`/users/${trade.receiver.id}`}
-                          className="text-heading hover:text-primary-600"
-                        >
-                          {trade.receiver.displayName}
-                        </Link>
-                      </td>
-                      <td>
-                        {trade.initiatorItemsCount} ↔️{" "}
-                        {trade.receiverItemsCount}
-                      </td>
-                      <td>
-                        {trade.cashAmount ? (
-                          <span className="text-primary-400">
-                            +₺{trade.cashAmount.toLocaleString()}
-                          </span>
-                        ) : (
-                          <span className="text-muted">-</span>
-                        )}
-                      </td>
-                      <td className="whitespace-nowrap">
-                        {new Date(trade.createdAt).toLocaleDateString("tr-TR")}
-                      </td>
-                      <td className="whitespace-nowrap">
-                        <div className="flex gap-1">
-                          <Link
-                            href={`/trades/${trade.id}`}
-                            className="p-2 text-muted hover:text-heading hover:bg-surface-alt rounded-lg"
-                            title="Detay"
-                          >
-                            <EyeIcon className="h-5 w-5" />
-                          </Link>
-                          {trade.hasDispute && (
-                            <Button
-                              variant="secondary"
-                              className="p-2 text-danger-600 hover:bg-danger-500/10 rounded-lg"
-                              title="İtirazı Çöz"
-                            >
-                              <ExclamationTriangleIcon className="h-5 w-5" />
-                            </Button>
-                          )}
-                        </div>
-                      </td>
-                    </tr>
-                  ))
-                )}
-              </tbody>
-            </table>
-          </div>
-        </div>
+        <DataTable
+          columns={columns}
+          data={trades}
+          loading={loading}
+          emptyText="Takas bulunamadı"
+          getRowId={(t) => t.id}
+        />
 
         <div className="flex items-center justify-between">
           <p className="text-sm text-muted">

@@ -2,7 +2,8 @@
 
 import { useState, useEffect } from 'react';
 import { adminApi } from '@/lib/api';
-import { Button, Checkbox, Input, Spinner, Textarea } from '@tarodan/ui';
+import { DataTable, type ColumnDef } from '@/components/DataTable';
+import { Button, Checkbox, Input, Textarea } from '@tarodan/ui';
 import {
     PlusIcon,
     PencilIcon,
@@ -145,6 +146,94 @@ export default function CollectionsPage() {
         }
     };
 
+    const columns: ColumnDef<Collection, any>[] = [
+        {
+            header: 'Koleksiyon',
+            cell: ({ row }) => (
+                <div className="flex items-center gap-3">
+                    {row.original.coverImageUrl ? (
+                        <img src={row.original.coverImageUrl} alt="" className="w-10 h-10 rounded object-cover" />
+                    ) : (
+                        <div className="w-10 h-10 rounded bg-surface-alt flex items-center justify-center text-muted text-xs">
+                            N/A
+                        </div>
+                    )}
+                    <div>
+                        <div className="font-medium text-heading">{row.original.name}</div>
+                        {row.original.description && (
+                            <div className="text-sm text-muted truncate max-w-xs">{row.original.description}</div>
+                        )}
+                    </div>
+                </div>
+            ),
+        },
+        {
+            header: 'Sahibi',
+            cell: ({ row }) => (
+                <span className="text-muted">{row.original.owner?.displayName || '-'}</span>
+            ),
+        },
+        {
+            id: 'itemCount',
+            header: () => <span className="block text-center">Ürün</span>,
+            cell: ({ row }) => <div className="text-center text-muted">{row.original.itemCount}</div>,
+        },
+        {
+            id: 'viewCount',
+            header: () => <span className="block text-center">Görüntüleme</span>,
+            cell: ({ row }) => <div className="text-center text-muted">{row.original.viewCount}</div>,
+        },
+        {
+            id: 'likeCount',
+            header: () => <span className="block text-center">Beğeni</span>,
+            cell: ({ row }) => <div className="text-center text-muted">{row.original.likeCount}</div>,
+        },
+        {
+            id: 'status',
+            header: () => <span className="block text-center">Durum</span>,
+            cell: ({ row }) => (
+                <div className="flex items-center justify-center gap-2">
+                    {row.original.isPublic ? (
+                        <span className="px-2 py-1 text-xs bg-success-50 text-success-700 rounded">Görünür</span>
+                    ) : (
+                        <span className="px-2 py-1 text-xs bg-body text-muted rounded">Gizli</span>
+                    )}
+                    {row.original.isFeatured && (
+                        <span className="px-2 py-1 text-xs bg-warning-50 text-warning-700 rounded">Öne Çıkan</span>
+                    )}
+                </div>
+            ),
+        },
+        {
+            id: 'actions',
+            header: 'İşlemler',
+            cell: ({ row }) => (
+                <div className="flex items-center justify-end gap-2">
+                    <Button variant="secondary" onClick={() => toggleVisibility(row.original)}
+                        className="p-2 text-muted hover:text-heading hover:bg-surface-alt rounded-lg"
+                        title={row.original.isPublic ? 'Gizle' : 'Görünür yap'}>
+                        {row.original.isPublic ? <EyeSlashIcon className="h-5 w-5" /> : <EyeIcon className="h-5 w-5" />}
+                    </Button>
+                    <Button variant="secondary" onClick={() => toggleFeatured(row.original)}
+                        className="p-2 text-muted hover:text-warning-700 hover:bg-surface-alt rounded-lg"
+                        title={row.original.isFeatured ? 'Öne çıkarmayı kaldır' : 'Öne çıkar'}>
+                        {row.original.isFeatured ? <StarSolidIcon className="h-5 w-5 text-warning-700" /> : <StarIcon className="h-5 w-5" />}
+                    </Button>
+                    <Button variant="secondary" onClick={() => openEditModal(row.original)}
+                        className="p-2 text-muted hover:text-heading hover:bg-surface-alt rounded-lg"
+                        title="Düzenle">
+                        <PencilIcon className="h-5 w-5" />
+                    </Button>
+                    <Button variant="secondary" onClick={() => setDeleteConfirm(row.original.id)}
+                        className="p-2 text-danger-600 hover:text-danger-300 hover:bg-danger-50 rounded-lg"
+                        title="Sil">
+                        <TrashIcon className="h-5 w-5" />
+                    </Button>
+                </div>
+            ),
+        },
+    ];
+
     return (
         <>
             <div className="space-y-6">
@@ -172,118 +261,32 @@ export default function CollectionsPage() {
                 </div>
 
                 {/* Collections Table */}
-                <div className="admin-card overflow-hidden">
-                    {loading ? (
-                        <div className="text-center py-12">
-                            <Spinner size="lg" className="mx-auto" />
-                            <p className="text-muted mt-4">Yükleniyor...</p>
-                        </div>
-                    ) : collections.length === 0 ? (
-                        <div className="text-center py-12 text-muted">
-                            Henüz koleksiyon yok
-                        </div>
-                    ) : (
-                        <div className="overflow-x-auto">
-                            <table className="w-full">
-                                <thead className="bg-surface-alt">
-                                    <tr>
-                                        <th className="text-left px-4 py-3 text-sm font-medium text-muted">Koleksiyon</th>
-                                        <th className="text-left px-4 py-3 text-sm font-medium text-muted">Sahibi</th>
-                                        <th className="text-center px-4 py-3 text-sm font-medium text-muted">Ürün</th>
-                                        <th className="text-center px-4 py-3 text-sm font-medium text-muted">Görüntüleme</th>
-                                        <th className="text-center px-4 py-3 text-sm font-medium text-muted">Beğeni</th>
-                                        <th className="text-center px-4 py-3 text-sm font-medium text-muted">Durum</th>
-                                        <th className="text-right px-4 py-3 text-sm font-medium text-muted">İşlemler</th>
-                                    </tr>
-                                </thead>
-                                <tbody className="divide-y divide-border">
-                                    {collections.map((collection) => (
-                                        <tr key={collection.id} className="hover:bg-surface-alt/50">
-                                            <td className="px-4 py-3">
-                                                <div className="flex items-center gap-3">
-                                                    {collection.coverImageUrl ? (
-                                                        <img src={collection.coverImageUrl} alt="" className="w-10 h-10 rounded object-cover" />
-                                                    ) : (
-                                                        <div className="w-10 h-10 rounded bg-surface-alt flex items-center justify-center text-muted text-xs">
-                                                            N/A
-                                                        </div>
-                                                    )}
-                                                    <div>
-                                                        <div className="font-medium text-heading">{collection.name}</div>
-                                                        {collection.description && (
-                                                            <div className="text-sm text-muted truncate max-w-xs">{collection.description}</div>
-                                                        )}
-                                                    </div>
-                                                </div>
-                                            </td>
-                                            <td className="px-4 py-3">
-                                                <span className="text-muted">{collection.owner?.displayName || '-'}</span>
-                                            </td>
-                                            <td className="px-4 py-3 text-center text-muted">{collection.itemCount}</td>
-                                            <td className="px-4 py-3 text-center text-muted">{collection.viewCount}</td>
-                                            <td className="px-4 py-3 text-center text-muted">{collection.likeCount}</td>
-                                            <td className="px-4 py-3">
-                                                <div className="flex items-center justify-center gap-2">
-                                                    {collection.isPublic ? (
-                                                        <span className="px-2 py-1 text-xs bg-success-50 text-success-700 rounded">Görünür</span>
-                                                    ) : (
-                                                        <span className="px-2 py-1 text-xs bg-body text-muted rounded">Gizli</span>
-                                                    )}
-                                                    {collection.isFeatured && (
-                                                        <span className="px-2 py-1 text-xs bg-warning-50 text-warning-700 rounded">Öne Çıkan</span>
-                                                    )}
-                                                </div>
-                                            </td>
-                                            <td className="px-4 py-3">
-                                                <div className="flex items-center justify-end gap-2">
-                                                    <Button variant="secondary" onClick={() => toggleVisibility(collection)}
-                                                        className="p-2 text-muted hover:text-heading hover:bg-surface-alt rounded-lg"
-                                                        title={collection.isPublic ? 'Gizle' : 'Görünür yap'}>
-                                                        {collection.isPublic ? <EyeSlashIcon className="h-5 w-5" /> : <EyeIcon className="h-5 w-5" />}
-                                                    </Button>
-                                                    <Button variant="secondary" onClick={() => toggleFeatured(collection)}
-                                                        className="p-2 text-muted hover:text-warning-700 hover:bg-surface-alt rounded-lg"
-                                                        title={collection.isFeatured ? 'Öne çıkarmayı kaldır' : 'Öne çıkar'}>
-                                                        {collection.isFeatured ? <StarSolidIcon className="h-5 w-5 text-warning-700" /> : <StarIcon className="h-5 w-5" />}
-                                                    </Button>
-                                                    <Button variant="secondary" onClick={() => openEditModal(collection)}
-                                                        className="p-2 text-muted hover:text-heading hover:bg-surface-alt rounded-lg"
-                                                        title="Düzenle">
-                                                        <PencilIcon className="h-5 w-5" />
-                                                    </Button>
-                                                    <Button variant="secondary" onClick={() => setDeleteConfirm(collection.id)}
-                                                        className="p-2 text-danger-600 hover:text-danger-300 hover:bg-danger-50 rounded-lg"
-                                                        title="Sil">
-                                                        <TrashIcon className="h-5 w-5" />
-                                                    </Button>
-                                                </div>
-                                            </td>
-                                        </tr>
-                                    ))}
-                                </tbody>
-                            </table>
-                        </div>
-                    )}
+                <DataTable
+                    columns={columns}
+                    data={collections}
+                    loading={loading}
+                    emptyText="Henüz koleksiyon yok"
+                    getRowId={(c) => c.id}
+                />
 
-                    {/* Pagination */}
-                    {totalPages > 1 && (
-                        <div className="flex items-center justify-between px-4 py-3 border-t border-border">
-                            <Button variant="secondary" onClick={() => setPage((p) => Math.max(1, p - 1))}
-                                disabled={page === 1}
-                                className="px-3 py-1 bg-surface-alt text-muted rounded disabled:opacity-50">
-                                Önceki
-                            </Button>
-                            <span className="text-muted">
-                                Sayfa {page} / {totalPages}
-                            </span>
-                            <Button variant="secondary" onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
-                                disabled={page === totalPages}
-                                className="px-3 py-1 bg-surface-alt text-muted rounded disabled:opacity-50">
-                                Sonraki
-                            </Button>
-                        </div>
-                    )}
-                </div>
+                {/* Pagination */}
+                {totalPages > 1 && (
+                    <div className="admin-card flex items-center justify-between px-4 py-3">
+                        <Button variant="secondary" onClick={() => setPage((p) => Math.max(1, p - 1))}
+                            disabled={page === 1}
+                            className="px-3 py-1 bg-surface-alt text-muted rounded disabled:opacity-50">
+                            Önceki
+                        </Button>
+                        <span className="text-muted">
+                            Sayfa {page} / {totalPages}
+                        </span>
+                        <Button variant="secondary" onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
+                            disabled={page === totalPages}
+                            className="px-3 py-1 bg-surface-alt text-muted rounded disabled:opacity-50">
+                            Sonraki
+                        </Button>
+                    </div>
+                )}
             </div>
 
             {/* Create/Edit Modal */}

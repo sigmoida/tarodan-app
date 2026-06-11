@@ -11,7 +11,16 @@ import {
   ExclamationTriangleIcon,
 } from '@heroicons/react/24/outline';
 import { adminApi } from '@/lib/api';
-import { Button, Input, Spinner, Textarea } from '@tarodan/ui';
+import {
+  Button,
+  Input,
+  Spinner,
+  Textarea,
+  enumLabel,
+  paymentProviderConfig,
+  orderStatusConfig,
+  paymentHoldStatusConfig,
+} from '@tarodan/ui';
 import toast from 'react-hot-toast';
 
 interface PaymentDetail {
@@ -207,7 +216,7 @@ export default function AdminPaymentDetailPage() {
                 </div>
                 <div className="flex justify-between">
                   <span className="text-muted">Ödeme Sağlayıcı:</span>
-                  <span className="uppercase">{payment.provider}</span>
+                  <span>{enumLabel(paymentProviderConfig, payment.provider)}</span>
                 </div>
                 <div className="flex justify-between">
                   <span className="text-muted">Transaction ID:</span>
@@ -258,7 +267,7 @@ export default function AdminPaymentDetailPage() {
                 </div>
                 <div className="flex justify-between">
                   <span className="text-muted">Sipariş Durumu:</span>
-                  <span>{payment.order.status}</span>
+                  <span>{enumLabel(orderStatusConfig, payment.order.status)}</span>
                 </div>
                 <div className="flex justify-between">
                   <span className="text-muted">Toplam Tutar:</span>
@@ -303,7 +312,7 @@ export default function AdminPaymentDetailPage() {
                       </div>
                       <div className="flex justify-between">
                         <span className="text-muted">Durum:</span>
-                        <span>{hold.status}</span>
+                        <span>{enumLabel(paymentHoldStatusConfig, hold.status)}</span>
                       </div>
                       {hold.releaseAt && (
                         <div className="flex justify-between">

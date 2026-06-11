@@ -11,7 +11,8 @@ import {
   CheckCircleIcon,
 } from "@heroicons/react/24/outline";
 import toast from "react-hot-toast";
-import { Button, Input, Select, Spinner } from "@tarodan/ui";
+import { Button, Input, Select, membershipTierConfig, enumLabel } from "@tarodan/ui";
+import { DataTable, type ColumnDef } from "@/components/DataTable";
 
 interface User {
   id: string;
@@ -115,6 +116,130 @@ export default function UsersPage() {
     return true;
   });
 
+  const columns: ColumnDef<User, any>[] = [
+    {
+      header: "Kullanıcı",
+      cell: ({ row }) => (
+        <div className="flex items-center">
+          <div className="w-10 h-10 rounded-full bg-primary-100 flex items-center justify-center mr-3">
+            <span className="text-primary-600 font-medium">
+              {row.original.displayName?.charAt(0) ?? "?"}
+            </span>
+          </div>
+          <div>
+            <p className="font-medium text-heading">
+              {row.original.displayName}
+            </p>
+            <p className="text-sm text-muted">{row.original.email}</p>
+          </div>
+        </div>
+      ),
+    },
+    {
+      header: "Durum",
+      cell: ({ row }) => (
+        <div className="flex flex-col gap-1">
+          {row.original.isSeller && (
+            <span className="badge badge-info">Satıcı</span>
+          )}
+          {row.original.isVerified && (
+            <span className="badge badge-success">
+              Doğrulanmış
+            </span>
+          )}
+          {row.original.isBanned && (
+            <span className="badge badge-danger">Engelli</span>
+          )}
+        </div>
+      ),
+    },
+    {
+      header: "Üyelik",
+      cell: ({ row }) => (
+        <span
+          className={`badge ${
+            row.original.membershipTier === "premium"
+              ? "badge-warning"
+              : "badge-gray"
+          }`}
+        >
+          {enumLabel(
+            membershipTierConfig,
+            (row.original.membershipTier || "").toLowerCase(),
+            row.original.membershipTier || "Ücretsiz",
+          )}
+        </span>
+      ),
+    },
+    {
+      header: "Sipariş",
+      cell: ({ row }) => row.original.ordersCount,
+    },
+    {
+      header: "Ürün",
+      cell: ({ row }) => row.original.productsCount,
+    },
+    {
+      header: "Kayıt Tarihi",
+      cell: ({ row }) => (
+        <span className="whitespace-nowrap">
+          {new Date(row.original.createdAt).toLocaleDateString("tr-TR")}
+        </span>
+      ),
+    },
+    {
+      header: "Son Giriş",
+      cell: ({ row }) =>
+        row.original.lastLoginAt ? (
+          <span className="text-muted whitespace-nowrap">
+            {new Date(row.original.lastLoginAt).toLocaleDateString(
+              "tr-TR",
+              {
+                day: "2-digit",
+                month: "2-digit",
+                year: "numeric",
+                hour: "2-digit",
+                minute: "2-digit",
+              },
+            )}
+          </span>
+        ) : (
+          <span className="text-muted whitespace-nowrap">Hiç giriş yapmadı</span>
+        ),
+    },
+    {
+      id: "actions",
+      header: "İşlemler",
+      cell: ({ row }) => (
+        <div className="flex items-center gap-2 whitespace-nowrap">
+          <Link
+            href={`/users/${row.original.id}`}
+            className="p-2 text-muted hover:text-heading hover:bg-surface-alt rounded-lg"
+            title="Detay"
+          >
+            <EyeIcon className="h-5 w-5" />
+          </Link>
+          <Button
+            variant="secondary"
+            onClick={() => handleBanUser(row.original.id, row.original.isBanned)}
+            className={`p-2 rounded-lg ${
+              row.original.isBanned
+                ? "text-success-700 hover:bg-success-500/10"
+                : "text-danger-600 hover:bg-danger-500/10"
+            }`}
+            title={row.original.isBanned ? "Engeli Kaldır" : "Engelle"}
+          >
+            {row.original.isBanned ? (
+              <CheckCircleIcon className="h-5 w-5" />
+            ) : (
+              <NoSymbolIcon className="h-5 w-5" />
+            )}
+          </Button>
+        </div>
+      ),
+    },
+  ];
+
   return (
     <div className="space-y-6">
       {/* Header */}
@@ -158,135 +283,13 @@ export default function UsersPage() {
       </div>
 
       {/* Table */}
-      <div className="admin-card overflow-hidden">
-        <div className="overflow-x-auto">
-          <table className="admin-table">
-            <thead>
-              <tr>
-                <th>Kullanıcı</th>
-                <th>Durum</th>
-                <th>Üyelik</th>
-                <th>Sipariş</th>
-                <th>Ürün</th>
-                <th>Kayıt Tarihi</th>
-                <th>Son Giriş</th>
-                <th>İşlemler</th>
-              </tr>
-            </thead>
-            <tbody>
-              {loading ? (
-                <tr>
-                  <td colSpan={8} className="text-center py-8">
-                    <Spinner size="lg" className="mx-auto" />
-                  </td>
-                </tr>
-              ) : filteredUsers.length === 0 ? (
-                <tr>
-                  <td colSpan={8} className="text-center py-8 text-muted">
-                    Kullanıcı bulunamadı
-                  </td>
-                </tr>
-              ) : (
-                filteredUsers.map((user) => (
-                  <tr key={user.id}>
-                    <td>
-                      <div className="flex items-center">
-                        <div className="w-10 h-10 rounded-full bg-primary-100 flex items-center justify-center mr-3">
-                          <span className="text-primary-600 font-medium">
-                            {user.displayName?.charAt(0) ?? "?"}
-                          </span>
-                        </div>
-                        <div>
-                          <p className="font-medium text-heading">
-                            {user.displayName}
-                          </p>
-                          <p className="text-sm text-muted">{user.email}</p>
-                        </div>
-                      </div>
-                    </td>
-                    <td>
-                      <div className="flex flex-col gap-1">
-                        {user.isSeller && (
-                          <span className="badge badge-info">Satıcı</span>
-                        )}
-                        {user.isVerified && (
-                          <span className="badge badge-success">
-                            Doğrulanmış
-                          </span>
-                        )}
-                        {user.isBanned && (
-                          <span className="badge badge-danger">Engelli</span>
-                        )}
-                      </div>
-                    </td>
-                    <td>
-                      <span
-                        className={`badge ${
-                          user.membershipTier === "premium"
-                            ? "badge-warning"
-                            : "badge-gray"
-                        }`}
-                      >
-                        {user.membershipTier || "Free"}
-                      </span>
-                    </td>
-                    <td>{user.ordersCount}</td>
-                    <td>{user.productsCount}</td>
-                    <td className="whitespace-nowrap">
-                      {new Date(user.createdAt).toLocaleDateString("tr-TR")}
-                    </td>
-                    <td className="whitespace-nowrap">
-                      {user.lastLoginAt ? (
-                        <span className="text-muted">
-                          {new Date(user.lastLoginAt).toLocaleDateString(
-                            "tr-TR",
-                            {
-                              day: "2-digit",
-                              month: "2-digit",
-                              year: "numeric",
-                              hour: "2-digit",
-                              minute: "2-digit",
-                            },
-                          )}
-                        </span>
-                      ) : (
-                        <span className="text-muted">Hiç giriş yapmadı</span>
-                      )}
-                    </td>
-                    <td className="whitespace-nowrap">
-                      <div className="flex items-center gap-2">
-                        <Link
-                          href={`/users/${user.id}`}
-                          className="p-2 text-muted hover:text-heading hover:bg-surface-alt rounded-lg"
-                          title="Detay"
-                        >
-                          <EyeIcon className="h-5 w-5" />
-                        </Link>
-                        <Button
-                          variant="secondary"
-                          onClick={() => handleBanUser(user.id, user.isBanned)}
-                          className={`p-2 rounded-lg ${
-                            user.isBanned
-                              ? "text-success-700 hover:bg-success-500/10"
-                              : "text-danger-600 hover:bg-danger-500/10"
-                          }`}
-                          title={user.isBanned ? "Engeli Kaldır" : "Engelle"}
-                        >
-                          {user.isBanned ? (
-                            <CheckCircleIcon className="h-5 w-5" />
-                          ) : (
-                            <NoSymbolIcon className="h-5 w-5" />
-                          )}
-                        </Button>
-                      </div>
-                    </td>
-                  </tr>
-                ))
-              )}
-            </tbody>
-          </table>
-        </div>
-      </div>
+      <DataTable
+        columns={columns}
+        data={filteredUsers}
+        loading={loading}
+        emptyText="Kullanıcı bulunamadı"
+        getRowId={(u) => u.id}
+      />
 
       {/* Pagination */}
       <div className="flex items-center justify-between">

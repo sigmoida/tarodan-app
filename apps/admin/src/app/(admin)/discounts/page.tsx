@@ -2,12 +2,12 @@
 
 import { useState, useEffect } from "react";
 import { adminApi } from "@/lib/api";
+import { DataTable, type ColumnDef } from "@/components/DataTable";
 import {
   Button,
   Checkbox,
   Input,
   Select,
-  Spinner,
   StatusBadge,
   Textarea,
 } from "@tarodan/ui";
@@ -356,6 +356,137 @@ export default function DiscountsPage() {
     return "unknown";
   };
 
+  const columns: ColumnDef<Discount, any>[] = [
+    {
+      header: "İndirim",
+      cell: ({ row }) => (
+        <div>
+          <p className="font-medium text-heading">{row.original.name}</p>
+          {row.original.description && (
+            <p className="text-xs text-muted truncate max-w-xs">
+              {row.original.description}
+            </p>
+          )}
+        </div>
+      ),
+    },
+    {
+      header: "Kod",
+      cell: ({ row }) => (
+        <>
+          {row.original.code ? (
+            <code className="px-2 py-1 bg-surface-alt rounded text-sm font-mono text-heading">
+              {row.original.code}
+            </code>
+          ) : (
+            <span className="text-xs text-muted italic">Otomatik</span>
+          )}
+          {row.original.isFlashSale && (
+            <span className="ml-2 px-2 py-0.5 rounded-full bg-primary-100 text-primary-700 text-xs font-medium border border-primary-200">
+              ⚡ Flash
+            </span>
+          )}
+        </>
+      ),
+    },
+    {
+      header: "Değer",
+      cell: ({ row }) => (
+        <span className="font-semibold text-primary">
+          {row.original.type === "percentage" && `%${row.original.value}`}
+          {row.original.type === "fixed_amount" && `${row.original.value} TL`}
+          {row.original.type === "bogo" &&
+            `BOGO (${row.original.buyQuantity} Ver ${row.original.getQuantity} Al ${row.original.value === 100 ? "Bedava" : `%${row.original.value} İndirim`})`}
+          {row.original.type === "bulk_quantity" &&
+            `${row.original.minQuantity} adet alımda %${row.original.value}`}
+        </span>
+      ),
+    },
+    {
+      header: "Kapsam",
+      cell: ({ row }) => (
+        <>
+          <span className="badge badge-info">
+            {SCOPE_LABELS[row.original.scope]}
+          </span>
+          {row.original.categoryName && (
+            <p className="text-xs text-muted mt-1">
+              {row.original.categoryName}
+            </p>
+          )}
+        </>
+      ),
+    },
+    {
+      header: "Kullanım",
+      cell: ({ row }) => (
+        <span className="text-muted">
+          {row.original.usedCount}
+          {row.original.usageLimitTotal &&
+            ` / ${row.original.usageLimitTotal}`}
+        </span>
+      ),
+    },
+    {
+      header: "Tarih",
+      cell: ({ row }) => (
+        <p className="text-xs text-muted">
+          {formatDate(row.original.startDate)} -{" "}
+          {formatDate(row.original.endDate)}
+        </p>
+      ),
+    },
+    {
+      header: "Durum",
+      cell: ({ row }) => (
+        <StatusBadge
+          status={getDiscountStatus(row.original)}
+          config={discountStatusConfig}
+        />
+      ),
+    },
+    {
+      id: "actions",
+      header: "İşlemler",
+      cell: ({ row }) => (
+        <div className="flex items-center justify-end gap-2">
+          <Button
+            variant="secondary"
+            onClick={() => toggleDiscountStatus(row.original)}
+            className={`p-1.5 rounded-lg transition-colors ${
+              row.original.isActive
+                ? "text-muted hover:bg-surface-alt"
+                : "text-success-700 hover:bg-success-50"
+            }`}
+            title={row.original.isActive ? "Devre dışı bırak" : "Aktif et"}
+          >
+            {row.original.isActive ? (
+              <XMarkIcon className="w-4 h-4" />
+            ) : (
+              <CheckIcon className="w-4 h-4" />
+            )}
+          </Button>
+          <Button
+            variant="secondary"
+            onClick={() => openEditModal(row.original)}
+            className="p-1.5 text-info-700 hover:bg-info-50 rounded-lg transition-colors"
+            title="Düzenle"
+          >
+            <PencilIcon className="w-4 h-4" />
+          </Button>
+          <Button
+            variant="secondary"
+            onClick={() => setDeleteConfirm(row.original.id)}
+            className="p-1.5 text-danger-600 hover:bg-danger-50 rounded-lg transition-colors"
+            title="Sil"
+          >
+            <TrashIcon className="w-4 h-4" />
+          </Button>
+        </div>
+      ),
+    },
+  ];
+
   return (
     <>
       <div className="p-6">
@@ -444,154 +575,13 @@ export default function DiscountsPage() {
 
         {/* Table */}
         <div className="admin-card p-0 overflow-hidden">
-          {loading ? (
-            <div className="p-8 text-center">
-              <Spinner
-                size="lg"
-                color="border-primary border-t-transparent"
-                className="mx-auto"
-              />
-              <p className="mt-2 text-muted">Yükleniyor...</p>
-            </div>
-          ) : discounts.length === 0 ? (
-            <div className="p-8 text-center">
-              <TagIcon className="w-12 h-12 text-muted/50 mx-auto mb-3" />
-              <p className="text-muted">Henüz indirim tanımlanmamış</p>
-              <Button onClick={openCreateModal} className="mt-4">
-                İlk İndirimi Oluştur
-              </Button>
-            </div>
-          ) : (
-            <div className="overflow-x-auto">
-              <table className="admin-table">
-                <thead>
-                  <tr>
-                    <th>İndirim</th>
-                    <th>Kod</th>
-                    <th>Değer</th>
-                    <th>Kapsam</th>
-                    <th>Kullanım</th>
-                    <th>Tarih</th>
-                    <th>Durum</th>
-                    <th className="text-right">İşlemler</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {discounts.map((discount) => (
-                    <tr key={discount.id}>
-                      <td>
-                        <div>
-                          <p className="font-medium text-heading">
-                            {discount.name}
-                          </p>
-                          {discount.description && (
-                            <p className="text-xs text-muted truncate max-w-xs">
-                              {discount.description}
-                            </p>
-                          )}
-                        </div>
-                      </td>
-                      <td>
-                        {discount.code ? (
-                          <code className="px-2 py-1 bg-surface-alt rounded text-sm font-mono text-heading">
-                            {discount.code}
-                          </code>
-                        ) : (
-                          <span className="text-xs text-muted italic">
-                            Otomatik
-                          </span>
-                        )}
-                        {discount.isFlashSale && (
-                          <span className="ml-2 px-2 py-0.5 rounded-full bg-primary-100 text-primary-700 text-xs font-medium border border-primary-200">
-                            ⚡ Flash
-                          </span>
-                        )}
-                      </td>
-                      <td>
-                        <span className="font-semibold text-primary">
-                          {discount.type === "percentage" &&
-                            `%${discount.value}`}
-                          {discount.type === "fixed_amount" &&
-                            `${discount.value} TL`}
-                          {discount.type === "bogo" &&
-                            `BOGO (${discount.buyQuantity} Ver ${discount.getQuantity} Al ${discount.value === 100 ? "Bedava" : `%${discount.value} İndirim`})`}
-                          {discount.type === "bulk_quantity" &&
-                            `${discount.minQuantity} adet alımda %${discount.value}`}
-                        </span>
-                      </td>
-                      <td>
-                        <span className="badge badge-info">
-                          {SCOPE_LABELS[discount.scope]}
-                        </span>
-                        {discount.categoryName && (
-                          <p className="text-xs text-muted mt-1">
-                            {discount.categoryName}
-                          </p>
-                        )}
-                      </td>
-                      <td className="text-muted">
-                        {discount.usedCount}
-                        {discount.usageLimitTotal &&
-                          ` / ${discount.usageLimitTotal}`}
-                      </td>
-                      <td>
-                        <p className="text-xs text-muted">
-                          {formatDate(discount.startDate)} -{" "}
-                          {formatDate(discount.endDate)}
-                        </p>
-                      </td>
-                      <td>
-                        <StatusBadge
-                          status={getDiscountStatus(discount)}
-                          config={discountStatusConfig}
-                        />
-                      </td>
-                      <td>
-                        <div className="flex items-center justify-end gap-2">
-                          <Button
-                            variant="secondary"
-                            onClick={() => toggleDiscountStatus(discount)}
-                            className={`p-1.5 rounded-lg transition-colors ${
-                              discount.isActive
-                                ? "text-muted hover:bg-surface-alt"
-                                : "text-success-700 hover:bg-success-50"
-                            }`}
-                            title={
-                              discount.isActive
-                                ? "Devre dışı bırak"
-                                : "Aktif et"
-                            }
-                          >
-                            {discount.isActive ? (
-                              <XMarkIcon className="w-4 h-4" />
-                            ) : (
-                              <CheckIcon className="w-4 h-4" />
-                            )}
-                          </Button>
-                          <Button
-                            variant="secondary"
-                            onClick={() => openEditModal(discount)}
-                            className="p-1.5 text-info-700 hover:bg-info-50 rounded-lg transition-colors"
-                            title="Düzenle"
-                          >
-                            <PencilIcon className="w-4 h-4" />
-                          </Button>
-                          <Button
-                            variant="secondary"
-                            onClick={() => setDeleteConfirm(discount.id)}
-                            className="p-1.5 text-danger-600 hover:bg-danger-50 rounded-lg transition-colors"
-                            title="Sil"
-                          >
-                            <TrashIcon className="w-4 h-4" />
-                          </Button>
-                        </div>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          )}
+          <DataTable
+            columns={columns}
+            data={discounts}
+            loading={loading}
+            emptyText="Henüz indirim tanımlanmamış"
+            getRowId={(d) => d.id}
+          />
 
           {/* Pagination */}
           {pagination.totalPages > 1 && (

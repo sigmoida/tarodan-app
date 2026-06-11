@@ -4,7 +4,7 @@ import { useState, useEffect } from 'react';
 import { adminApi } from '@/lib/api';
 import { PencilIcon } from '@heroicons/react/24/outline';
 import toast from 'react-hot-toast';
-import { Button, Checkbox, Input, Spinner, Textarea } from '@tarodan/ui';
+import { Button, Checkbox, Input, Spinner, Textarea, enumLabel, membershipTierConfig } from '@tarodan/ui';
 
 interface MembershipTier {
   id: string;
@@ -144,7 +144,7 @@ export default function MembershipTiersPage() {
                 <div className="flex items-start justify-between mb-4">
                   <div>
                     <h3 className="text-lg font-semibold text-heading">{tier.name}</h3>
-                    <p className="text-sm text-muted uppercase">{tier.type}</p>
+                    <p className="text-sm text-muted">{enumLabel(membershipTierConfig, tier.type)}</p>
                   </div>
                   <Button variant="secondary" onClick={() => openEditModal(tier)}
                     className="p-2 text-muted hover:text-heading hover:bg-surface-alt rounded-lg"

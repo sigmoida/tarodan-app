@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import { adminApi } from '@/lib/api';
+import { DataTable, type ColumnDef } from '@/components/DataTable';
 import {
   MagnifyingGlassIcon,
   EyeIcon,
@@ -10,7 +11,7 @@ import {
   DocumentTextIcon,
 } from '@heroicons/react/24/outline';
 import toast from 'react-hot-toast';
-import { Button, Input, Select, Spinner } from '@tarodan/ui';
+import { Button, Input, Select } from '@tarodan/ui';
 
 interface AuditLog {
   id: string;
@@ -111,6 +112,69 @@ export default function AuditLogsPage() {
     return labels[type] || type;
   };
 
+  const columns: ColumnDef<AuditLog, any>[] = [
+    {
+      header: 'Tarih',
+      cell: ({ row }) => (
+        <div className="flex items-center gap-2">
+          <CalendarIcon className="w-4 h-4 text-muted" />
+          <span className="text-sm">
+            {new Date(row.original.createdAt).toLocaleString('tr-TR')}
+          </span>
+        </div>
+      ),
+    },
+    {
+      header: 'Admin',
+      cell: ({ row }) => (
+        <div className="flex items-center gap-2">
+          <UserIcon className="w-4 h-4 text-muted" />
+          <span className="text-sm">
+            {row.original.adminName || row.original.adminId.substring(0, 8)}
+          </span>
+        </div>
+      ),
+    },
+    {
+      header: 'İşlem',
+      cell: ({ row }) => (
+        <span className="badge badge-info">
+          {getActionLabel(row.original.action)}
+        </span>
+      ),
+    },
+    {
+      header: 'Tip',
+      cell: ({ row }) => (
+        <span className="text-sm text-muted">
+          {getEntityTypeLabel(row.original.entityType)}
+        </span>
+      ),
+    },
+    {
+      header: 'Entity ID',
+      cell: ({ row }) => (
+        <span className="font-mono text-xs text-muted">
+          {row.original.entityId.substring(0, 8)}...
+        </span>
+      ),
+    },
+    {
+      id: 'actions',
+      header: 'İşlemler',
+      cell: ({ row }) => (
+        <Button
+          variant="secondary"
+          onClick={() => setSelectedLog(row.original)}
+          className="p-2 text-muted hover:text-heading hover:bg-surface-alt rounded-lg"
+          title="Detay"
+        >
+          <EyeIcon className="h-5 w-5" />
+        </Button>
+      ),
+    },
+  ];
+
   return (
     <>
       <div className="space-y-6">
@@ -170,72 +234,13 @@ export default function AuditLogsPage() {
 
         {/* Logs Table */}
         <div className="admin-card overflow-hidden">
-          <div className="overflow-x-auto">
-            <table className="admin-table">
-              <thead>
-                <tr>
-                  <th>Tarih</th>
-                  <th>Admin</th>
-                  <th>İşlem</th>
-                  <th>Tip</th>
-                  <th>Entity ID</th>
-                  <th>İşlemler</th>
-                </tr>
-              </thead>
-              <tbody>
-                {loading ? (
-                  <tr>
-                    <td colSpan={6} className="text-center py-8">
-                      <Spinner size="lg" className="mx-auto" />
-                    </td>
-                  </tr>
-                ) : logs.length === 0 ? (
-                  <tr>
-                    <td colSpan={6} className="text-center py-8 text-muted">
-                      Log bulunamadı
-                    </td>
-                  </tr>
-                ) : (
-                  logs.map((log) => (
-                    <tr key={log.id}>
-                      <td>
-                        <div className="flex items-center gap-2">
-                          <CalendarIcon className="w-4 h-4 text-muted" />
-                          <span className="text-sm">
-                            {new Date(log.createdAt).toLocaleString('tr-TR')}
-                          </span>
-                        </div>
-                      </td>
-                      <td>
-                        <div className="flex items-center gap-2">
-                          <UserIcon className="w-4 h-4 text-muted" />
-                          <span className="text-sm">{log.adminName || log.adminId.substring(0, 8)}</span>
-                        </div>
-                      </td>
-                      <td>
-                        <span className="badge badge-info">{getActionLabel(log.action)}</span>
-                      </td>
-                      <td>
-                        <span className="text-sm text-muted">{getEntityTypeLabel(log.entityType)}</span>
-                      </td>
-                      <td>
-                        <span className="font-mono text-xs text-muted">
-                          {log.entityId.substring(0, 8)}...
-                        </span>
-                      </td>
-                      <td>
-                        <Button variant="secondary" onClick={() => setSelectedLog(log)}
-                          className="p-2 text-muted hover:text-heading hover:bg-surface-alt rounded-lg"
-                          title="Detay">
-                          <EyeIcon className="h-5 w-5" />
-                        </Button>
-                      </td>
-                    </tr>
-                  ))
-                )}
-              </tbody>
-            </table>
-          </div>
+          <DataTable
+            columns={columns}
+            data={logs}
+            loading={loading}
+            emptyText="Log bulunamadı"
+            getRowId={(log) => log.id}
+          />
 
           {/* Pagination */}
           {total > 20 && (

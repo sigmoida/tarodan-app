@@ -2,9 +2,10 @@
 
 import { useState, useEffect } from 'react';
 import { adminApi } from '@/lib/api';
-import { Button, Checkbox, Input, Spinner, Textarea } from '@tarodan/ui';
+import { Button, Checkbox, Input, Textarea } from '@tarodan/ui';
 import { PlusIcon, PencilIcon, TrashIcon } from '@heroicons/react/24/outline';
 import toast from 'react-hot-toast';
+import { DataTable, type ColumnDef } from '@/components/DataTable';
 
 interface Category {
   id: string;
@@ -108,35 +109,44 @@ export default function CategoriesPage() {
     }
   };
 
-  const renderCategory = (category: Category) => (
-    <div key={category.id} className="flex items-center justify-between p-4 hover:bg-surface-alt/50 transition-colors border-b border-border last:border-b-0">
-      <div className="flex-1 min-w-0">
+  const columns: ColumnDef<Category, any>[] = [
+    {
+      header: 'Kategori',
+      cell: ({ row }) => (
+        <div className="flex-1 min-w-0">
           <div className="flex items-center gap-2">
-            <span className="font-medium text-heading truncate">{category.name}</span>
-            {!category.isActive && (
+            <span className="font-medium text-heading truncate">{row.original.name}</span>
+            {!row.original.isActive && (
               <span className="px-2 py-0.5 text-xs bg-body text-muted rounded">Pasif</span>
             )}
-            <span className="text-xs text-muted">({category.productCount} ürün, {category.collectionCount} koleksiyon)</span>
+            <span className="text-xs text-muted">({row.original.productCount} ürün, {row.original.collectionCount} koleksiyon)</span>
           </div>
-          {category.description && (
-            <p className="text-xs text-muted mt-1 truncate max-w-md">{category.description}</p>
+          {row.original.description && (
+            <p className="text-xs text-muted mt-1 truncate max-w-md">{row.original.description}</p>
           )}
-      </div>
-      <div className="flex items-center gap-2 ml-4 flex-shrink-0">
-        <Button variant="secondary" onClick={() => openEditModal(category)}
-          className="p-2 text-muted hover:text-heading hover:bg-surface-alt rounded-lg"
-          title="Düzenle">
-          <PencilIcon className="h-5 w-5" />
-        </Button>
-        <Button variant="secondary" onClick={() => setDeleteConfirm(category.id)}
-          className="p-2 text-danger-600 hover:text-danger-300 hover:bg-danger-50 rounded-lg"
-          title="Sil"
-          disabled={category.productCount > 0}>
-          <TrashIcon className="h-5 w-5" />
-        </Button>
-      </div>
-    </div>
-  );
+        </div>
+      ),
+    },
+    {
+      id: 'actions',
+      header: 'İşlemler',
+      cell: ({ row }) => (
+        <div className="flex items-center gap-2 ml-4 flex-shrink-0">
+          <Button variant="secondary" onClick={() => openEditModal(row.original)}
+            className="p-2 text-muted hover:text-heading hover:bg-surface-alt rounded-lg"
+            title="Düzenle">
+            <PencilIcon className="h-5 w-5" />
+          </Button>
+          <Button variant="secondary" onClick={() => setDeleteConfirm(row.original.id)}
+            className="p-2 text-danger-600 hover:text-danger-300 hover:bg-danger-50 rounded-lg"
+            title="Sil"
+            disabled={row.original.productCount > 0}>
+            <TrashIcon className="h-5 w-5" />
+          </Button>
+        </div>
+      ),
+    },
+  ];
 
   return (
     <>
@@ -154,22 +164,13 @@ export default function CategoriesPage() {
         </div>
 
         {/* Categories List */}
-        <div className="admin-card overflow-hidden">
-          {loading ? (
-            <div className="text-center py-12">
-              <Spinner size="lg" className="mx-auto" />
-              <p className="text-muted mt-4">Yükleniyor...</p>
-            </div>
-          ) : categories.length === 0 ? (
-            <div className="text-center py-12 text-muted">
-              Henüz kategori yok
-            </div>
-          ) : (
-            <div>
-              {categories.map((category) => renderCategory(category))}
-            </div>
-          )}
-        </div>
+        <DataTable
+          columns={columns}
+          data={categories}
+          loading={loading}
+          emptyText="Henüz kategori yok"
+          getRowId={(c) => c.id}
+        />
       </div>
 
       {/* Create/Edit Modal */}

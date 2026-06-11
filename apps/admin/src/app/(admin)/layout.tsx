@@ -1,9 +1,14 @@
 import AdminLayout from '@/components/AdminLayout';
+import { ConfirmProvider } from '@/components/ConfirmProvider';
 
 export default function AdminRouteLayout({
   children,
 }: {
   children: React.ReactNode;
 }) {
-  return <AdminLayout>{children}</AdminLayout>;
+  return (
+    <ConfirmProvider>
+      <AdminLayout>{children}</AdminLayout>
+    </ConfirmProvider>
+  );
 }

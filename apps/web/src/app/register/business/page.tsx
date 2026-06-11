@@ -603,7 +603,7 @@ export default function BusinessRegisterPage() {
                 <div className="relative">
                   <LockClosedIcon className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-subtle" />
                   <Input
-                    type={showPassword ? "text" : "password"}
+                    type={showPassword ? "text" : "password"} hidePasswordToggle
                     value={password}
                     onChange={(e) => setPassword(e.target.value)}
                     placeholder="••••••••"
@@ -633,7 +633,7 @@ export default function BusinessRegisterPage() {
                 <div className="relative">
                   <LockClosedIcon className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-subtle" />
                   <Input
-                    type={showPassword ? "text" : "password"}
+                    type={showPassword ? "text" : "password"} hidePasswordToggle
                     value={confirmPassword}
                     onChange={(e) => setConfirmPassword(e.target.value)}
                     placeholder="••••••••"

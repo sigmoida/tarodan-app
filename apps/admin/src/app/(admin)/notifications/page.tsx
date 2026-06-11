@@ -14,9 +14,14 @@ import {
   Checkbox,
   Input,
   Select,
-  Spinner,
   Textarea,
+  enumLabel,
+  notificationChannelConfig,
+  deliveryStatusConfig,
 } from "@tarodan/ui";
+import { AdminTabs } from "@/components/AdminTabs";
+import { DataTable, type ColumnDef } from "@/components/DataTable";
+import { useConfirm } from "@/components/ConfirmProvider";
 
 interface NotificationLog {
   id: string;
@@ -47,6 +52,7 @@ interface ScheduledNotification {
 type TabType = "send" | "scheduled" | "history";
 
 export default function NotificationsPage() {
+  const confirm = useConfirm();
   const [activeTab, setActiveTab] = useState<TabType>("send");
 
   // Send notification state
@@ -219,7 +225,7 @@ export default function NotificationsPage() {
   };
 
   const handleCancelScheduled = async (id: string) => {
-    if (!confirm("Bu zamanlanmış bildirimi iptal etmek istiyor musunuz?"))
+    if (!(await confirm({ description: "Bu zamanlanmış bildirimi iptal etmek istiyor musunuz?", destructive: true })))
       return;
 
     try {
@@ -240,6 +246,106 @@ export default function NotificationsPage() {
     }));
   };
 
+  const scheduledColumns: ColumnDef<ScheduledNotification, any>[] = [
+    {
+      header: "Başlık",
+      cell: ({ row }) => (
+        <span className="font-medium text-heading">{row.original.title}</span>
+      ),
+    },
+    {
+      header: "Kanallar",
+      cell: ({ row }) => (
+        <span className="text-muted">{row.original.channels?.join(", ")}</span>
+      ),
+    },
+    {
+      header: "Hedef",
+      cell: ({ row }) => (
+        <span className="text-muted">{row.original.targetType}</span>
+      ),
+    },
+    {
+      header: "Tarih",
+      cell: ({ row }) => (
+        <span className="text-muted">
+          {new Date(row.original.scheduledFor).toLocaleString("tr-TR")}
+        </span>
+      ),
+    },
+    {
+      header: "Durum",
+      cell: ({ row }) => (
+        <span className="badge badge-warning">
+          {enumLabel(deliveryStatusConfig, row.original.status)}
+        </span>
+      ),
+    },
+    {
+      id: "actions",
+      header: "İşlem",
+      cell: ({ row }) => (
+        <Button
+          variant="secondary"
+          onClick={() => handleCancelScheduled(row.original.id)}
+          className="p-2 text-danger-600 hover:text-danger-300 hover:bg-danger-500/10 rounded-lg"
+        >
+          <XCircleIcon className="h-5 w-5" />
+        </Button>
+      ),
+    },
+  ];
+
+  const historyColumns: ColumnDef<NotificationLog, any>[] = [
+    {
+      header: "Kullanıcı",
+      cell: ({ row }) => (
+        <span className="text-heading">
+          {row.original.user?.displayName || row.original.userId}
+        </span>
+      ),
+    },
+    {
+      header: "Kanal",
+      cell: ({ row }) => (
+        <span className="text-muted">
+          {enumLabel(notificationChannelConfig, row.original.channel)}
+        </span>
+      ),
+    },
+    {
+      header: "Başlık",
+      cell: ({ row }) => (
+        <span className="text-heading">{row.original.title}</span>
+      ),
+    },
+    {
+      header: "Durum",
+      cell: ({ row }) => (
+        <span
+          className={`badge ${
+            row.original.status === "sent" ||
+            row.original.status === "delivered"
+              ? "badge-success"
+              : row.original.status === "failed"
+                ? "badge-danger"
+                : "badge-warning"
+          }`}
+        >
+          {enumLabel(deliveryStatusConfig, row.original.status)}
+        </span>
+      ),
+    },
+    {
+      header: "Tarih",
+      cell: ({ row }) => (
+        <span className="text-muted">
+          {new Date(row.original.createdAt).toLocaleString("tr-TR")}
+        </span>
+      ),
+    },
+  ];
+
   const tabs = [
     { key: "send", label: "Bildirim Gönder", icon: PaperAirplaneIcon },
     { key: "scheduled", label: "Zamanlanmış", icon: ClockIcon },
@@ -259,23 +365,11 @@ export default function NotificationsPage() {
         </div>
 
         {/* Tabs */}
-        <div className="flex flex-wrap gap-2 border-b border-border pb-4">
-          {tabs.map((tab) => (
-            <Button
-              variant="secondary"
-              key={tab.key}
-              onClick={() => setActiveTab(tab.key as TabType)}
-              className={`flex items-center gap-2 px-4 py-2 rounded-lg transition ${
-                activeTab === tab.key
-                  ? "bg-primary-500 text-heading"
-                  : "bg-surface-alt text-muted hover:text-heading hover:bg-surface-alt"
-              }`}
-            >
-              <tab.icon className="h-5 w-5" />
-              {tab.label}
-            </Button>
-          ))}
-        </div>
+        <AdminTabs
+          tabs={tabs}
+          value={activeTab}
+          onChange={(k) => setActiveTab(k as TabType)}
+        />
 
         {/* Send Tab */}
         {activeTab === "send" && (
@@ -319,7 +413,7 @@ export default function NotificationsPage() {
                       key={channel}
                       checked={sendForm.channels.includes(channel)}
                       onChange={() => toggleChannel(channel)}
-                      label={<span className="capitalize">{channel}</span>}
+                      label={<span>{enumLabel(notificationChannelConfig, channel)}</span>}
                     />
                   ))}
                 </div>
@@ -431,69 +525,13 @@ export default function NotificationsPage() {
 
         {/* Scheduled Tab */}
         {activeTab === "scheduled" && (
-          <div className="admin-card overflow-hidden">
-            <div className="overflow-x-auto">
-              <table className="admin-table">
-                <thead>
-                  <tr>
-                    <th>Başlık</th>
-                    <th>Kanallar</th>
-                    <th>Hedef</th>
-                    <th>Tarih</th>
-                    <th>Durum</th>
-                    <th>İşlem</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {loadingScheduled ? (
-                    <tr>
-                      <td colSpan={6} className="text-center py-8">
-                        <Spinner size="lg" className="mx-auto" />
-                      </td>
-                    </tr>
-                  ) : scheduled.length === 0 ? (
-                    <tr>
-                      <td
-                        colSpan={6}
-                        className="text-center py-8 text-muted"
-                      >
-                        Zamanlanmış bildirim yok
-                      </td>
-                    </tr>
-                  ) : (
-                    scheduled.map((item) => (
-                      <tr key={item.id}>
-                        <td className="font-medium text-heading">
-                          {item.title}
-                        </td>
-                        <td className="text-muted">
-                          {item.channels?.join(", ")}
-                        </td>
-                        <td className="text-muted">{item.targetType}</td>
-                        <td className="text-muted">
-                          {new Date(item.scheduledFor).toLocaleString("tr-TR")}
-                        </td>
-                        <td>
-                          <span className="badge badge-warning">
-                            {item.status}
-                          </span>
-                        </td>
-                        <td>
-                          <Button
-                            variant="secondary"
-                            onClick={() => handleCancelScheduled(item.id)}
-                            className="p-2 text-danger-600 hover:text-danger-300 hover:bg-danger-500/10 rounded-lg"
-                          >
-                            <XCircleIcon className="h-5 w-5" />
-                          </Button>
-                        </td>
-                      </tr>
-                    ))
-                  )}
-                </tbody>
-              </table>
-            </div>
-          </div>
+          <DataTable
+            columns={scheduledColumns}
+            data={scheduled}
+            loading={loadingScheduled}
+            emptyText="Zamanlanmış bildirim yok"
+            getRowId={(r) => r.id}
+          />
         )}
 
         {/* History Tab */}
@@ -535,68 +573,13 @@ export default function NotificationsPage() {
               </Select>
             </div>
 
-            <div className="admin-card overflow-hidden">
-              <div className="overflow-x-auto">
-                <table className="admin-table">
-                  <thead>
-                    <tr>
-                      <th>Kullanıcı</th>
-                      <th>Kanal</th>
-                      <th>Başlık</th>
-                      <th>Durum</th>
-                      <th>Tarih</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {loadingHistory ? (
-                      <tr>
-                        <td colSpan={5} className="text-center py-8">
-                          <Spinner size="lg" className="mx-auto" />
-                        </td>
-                      </tr>
-                    ) : history.length === 0 ? (
-                      <tr>
-                        <td
-                          colSpan={5}
-                          className="text-center py-8 text-muted"
-                        >
-                          Bildirim geçmişi boş
-                        </td>
-                      </tr>
-                    ) : (
-                      history.map((log) => (
-                        <tr key={log.id}>
-                          <td className="text-heading">
-                            {log.user?.displayName || log.userId}
-                          </td>
-                          <td className="text-muted uppercase">
-                            {log.channel}
-                          </td>
-                          <td className="text-heading">{log.title}</td>
-                          <td>
-                            <span
-                              className={`badge ${
-                                log.status === "sent" ||
-                                log.status === "delivered"
-                                  ? "badge-success"
-                                  : log.status === "failed"
-                                    ? "badge-danger"
-                                    : "badge-warning"
-                              }`}
-                            >
-                              {log.status}
-                            </span>
-                          </td>
-                          <td className="text-muted">
-                            {new Date(log.createdAt).toLocaleString("tr-TR")}
-                          </td>
-                        </tr>
-                      ))
-                    )}
-                  </tbody>
-                </table>
-              </div>
-            </div>
+            <DataTable
+              columns={historyColumns}
+              data={history}
+              loading={loadingHistory}
+              emptyText="Bildirim geçmişi boş"
+              getRowId={(r) => r.id}
+            />
 
             {/* Pagination */}
             {totalHistory > historyFilters.limit && (

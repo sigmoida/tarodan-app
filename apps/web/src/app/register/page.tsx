@@ -457,7 +457,7 @@ export default function RegisterPage() {
               <div className="relative">
                 <LockClosedIcon className="absolute left-3.5 top-1/2 -translate-y-1/2 w-[18px] h-[18px] text-subtle" />
                 <Input
-                  type={showPassword ? 'text' : 'password'}
+                  type={showPassword ? 'text' : 'password'} hidePasswordToggle
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
                   placeholder="••••••••"
@@ -483,7 +483,7 @@ export default function RegisterPage() {
               <div className="relative">
                 <LockClosedIcon className="absolute left-3.5 top-1/2 -translate-y-1/2 w-[18px] h-[18px] text-subtle" />
                 <Input
-                  type={showPassword ? 'text' : 'password'}
+                  type={showPassword ? 'text' : 'password'} hidePasswordToggle
                   value={confirmPassword}
                   onChange={(e) => setConfirmPassword(e.target.value)}
                   placeholder="••••••••"

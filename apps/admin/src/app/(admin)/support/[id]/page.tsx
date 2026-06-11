@@ -13,7 +13,7 @@ import {
 } from '@heroicons/react/24/outline';
 import { adminApi } from '@/lib/api';
 import toast from 'react-hot-toast';
-import { Button, Select, Spinner, Textarea } from '@tarodan/ui';
+import { Button, Select, Spinner, Textarea, enumLabel, ticketCategoryConfig } from '@tarodan/ui';
 
 interface SupportTicketDetail {
   id: string;
@@ -229,7 +229,7 @@ export default function SupportTicketDetailPage() {
                 <div className="space-y-3">
                   <div>
                     <span className="text-muted text-sm">Kategori:</span>
-                    <p className="font-medium capitalize">{ticket.category}</p>
+                    <p className="font-medium">{enumLabel(ticketCategoryConfig, ticket.category)}</p>
                   </div>
                   <div>
                     <span className="text-muted text-sm">Öncelik:</span>
