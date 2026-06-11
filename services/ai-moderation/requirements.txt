@@ -4,6 +4,9 @@ uvicorn[standard]>=0.29
 requests>=2.31
 pillow>=10.0
 
+# numpy 2.x'te torch import hatası ("cannot load module more than once") -> 1.x sabit
+numpy<2
+
 # Görsel: ResNet50 (torchvision) + NSFW (transformers ViT)
 # NOT: torch'u CPU sürümüyle kurmak daha küçük/hızlı (README'ye bakın).
 torch>=2.0

@@ -5,6 +5,10 @@ FROM python:3.11-slim
 
 WORKDIR /app
 
+# 0) numpy<2 — numpy 2.x'te torch import sırasında "cannot load module more than once"
+#    hatası veriyor; 1.26.x torch/transformers/detoxify ile en uyumlu sürüm.
+RUN pip install --no-cache-dir "numpy<2"
+
 # 1) CPU-only torch + torchvision (CUDA sürümü ~2GB, gereksiz)
 RUN pip install --no-cache-dir torch torchvision --index-url https://download.pytorch.org/whl/cpu
 
@@ -20,5 +24,5 @@ RUN python -c "from torchvision.models import ResNet50_Weights, resnet50; resnet
 # 4) Uygulama kodu
 COPY . .
 
-# Railway $PORT verir; yoksa 8000
-CMD uvicorn app:app --host 0.0.0.0 --port ${PORT:-8000}
+# Railway/Coolify $PORT verir; yoksa 8000 (JSON form — sinyal yönetimi düzgün)
+CMD ["sh", "-c", "uvicorn app:app --host 0.0.0.0 --port ${PORT:-8000}"]
