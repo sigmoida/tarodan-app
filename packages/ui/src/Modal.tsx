@@ -69,13 +69,15 @@ export const Modal = React.forwardRef<HTMLDivElement, ModalProps>(
         {/* Content */}
         <div
           className={cn(
-            'relative w-full bg-surface-elevated rounded-xl shadow-elevated p-6',
+            'relative w-full bg-surface-elevated rounded-xl shadow-elevated px-6 pb-6 pt-5',
             maxWidth,
             className,
           )}
         >
           {title && (
-            <h3 className="text-lg font-semibold text-heading mb-4">{title}</h3>
+            <h3 className="mb-4 text-lg font-semibold leading-tight text-heading">
+              {title}
+            </h3>
           )}
           {children}
         </div>

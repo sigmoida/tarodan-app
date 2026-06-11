@@ -26,17 +26,7 @@ const benefitTints = [
   { bg: colors.warning[50]!, fg: colors.warning[600]! },
 ] as const;
 
-const quickActionTints = [
-  { bg: colors.success[50]!, fg: colors.success[600]! },
-  { bg: colors.info[50]!, fg: colors.info[600]! },
-  { bg: colors.danger[50]!, fg: colors.danger[600]! },
-  { bg: colors.warning[50]!, fg: colors.warning[600]! },
-  { bg: colors.primary[50]!, fg: colors.primary[700]! },
-  { bg: colors.warning[100]!, fg: colors.warning[700]! },
-  { bg: colors.info[100]!, fg: colors.info[700]! },
-  { bg: colors.success[100]!, fg: colors.success[700]! },
-  { bg: colors.gray[100], fg: colors.gray[700]! },
-] as const;
+const quickActionTint = { bg: colors.primary[50]!, fg: colors.primary[700]! } as const;
 
 interface ProfileCollection {
   id: string;
@@ -170,6 +160,7 @@ export default function ProfileScreen() {
   });
   const effectiveTier: string = membershipData ?? user?.membershipTier ?? 'free';
   const isPaidTier = effectiveTier === 'premium' || effectiveTier === 'business';
+  const tierLabel = effectiveTier === 'business' ? 'Business' : 'Premium';
 
   // Aşağı çekince profildeki tüm sayaç/listeleri tazele (stats, garaj+koleksiyon
   // sayısı, üyelik tier'ı).
@@ -386,18 +377,15 @@ export default function ProfileScreen() {
 
   // Authenticated View
   const quickActionItems = [
-    { icon: 'pricetag' as const, label: 'İlanlarım', to: '/settings/my-listings', tint: quickActionTints[0] },
-    { icon: 'cube' as const, label: 'Siparişlerim', to: '/orders', tint: quickActionTints[1], testID: 'profile-orders-link' },
-    { icon: 'heart' as const, label: 'Favorilerim', to: '/favorites', tint: quickActionTints[2] },
-    { icon: 'chatbubbles' as const, label: 'Mesajlar', to: '/messages', tint: quickActionTints[3] },
-  ];
-
-  const quickActionItems2 = [
-    { icon: 'albums' as const, label: 'Beğenilen\nKoleksiyonlar', to: '/settings/liked-collections', tint: quickActionTints[4] },
-    { icon: 'swap-horizontal' as const, label: 'Takaslarım', to: '/trades', tint: quickActionTints[5], testID: 'profile-trades-link' },
-    { icon: 'pricetags' as const, label: 'Tekliflerim', to: '/offers', tint: quickActionTints[6], testID: 'profile-offers-link' },
-    { icon: 'stats-chart' as const, label: 'İstatistikler', to: '/settings/analytics', tint: quickActionTints[7] },
-    { icon: 'help-circle' as const, label: 'Yardım', to: '/help', tint: quickActionTints[8] },
+    { icon: 'pricetag' as const, label: 'İlanlarım', to: '/settings/my-listings' },
+    { icon: 'cube' as const, label: 'Siparişlerim', to: '/orders', testID: 'profile-orders-link' },
+    { icon: 'heart' as const, label: 'Favorilerim', to: '/favorites' },
+    { icon: 'chatbubbles' as const, label: 'Mesajlar', to: '/messages' },
+    { icon: 'albums' as const, label: 'Beğenilen Koleksiyonlar', to: '/settings/liked-collections' },
+    { icon: 'swap-horizontal' as const, label: 'Takaslarım', to: '/trades', testID: 'profile-trades-link' },
+    { icon: 'pricetags' as const, label: 'Tekliflerim', to: '/offers', testID: 'profile-offers-link' },
+    { icon: 'stats-chart' as const, label: 'İstatistikler', to: '/settings/analytics' },
+    { icon: 'help-circle' as const, label: 'Yardım', to: '/help' },
   ];
 
   return (
@@ -435,7 +423,7 @@ export default function ProfileScreen() {
               <View style={styles.membershipBadge}>
                 <Ionicons name="diamond" size={14} color={colors.warning[500]!} />
                 <Text variant="caption" weight="semibold" style={{ marginLeft: spacing[1] }}>
-                  {effectiveTier} Üye
+                  {tierLabel} Üye
                 </Text>
               </View>
             )}
@@ -605,27 +593,16 @@ export default function ProfileScreen() {
                 style={styles.quickAction}
                 onPress={() => router.push(q.to as never)}
               >
-                <View style={[styles.quickActionIcon, { backgroundColor: q.tint.bg }]}>
-                  <Ionicons name={q.icon} size={22} color={q.tint.fg} />
+                <View style={styles.quickActionIcon}>
+                  <Ionicons name={q.icon} size={22} color={quickActionTint.fg} />
                 </View>
-                <Text variant="caption" tone="muted" align="center">
-                  {q.label}
-                </Text>
-              </TouchableOpacity>
-            ))}
-          </View>
-          <View style={[styles.quickActions, { marginTop: spacing[3] }]}>
-            {quickActionItems2.map((q) => (
-              <TouchableOpacity
-                key={q.label}
-                testID={q.testID}
-                style={styles.quickAction}
-                onPress={() => router.push(q.to as never)}
-              >
-                <View style={[styles.quickActionIcon, { backgroundColor: q.tint.bg }]}>
-                  <Ionicons name={q.icon} size={22} color={q.tint.fg} />
-                </View>
-                <Text variant="caption" tone="muted" align="center">
+                <Text
+                  variant="caption"
+                  tone="muted"
+                  align="center"
+                  numberOfLines={2}
+                  style={styles.quickActionLabel}
+                >
                   {q.label}
                 </Text>
               </TouchableOpacity>
@@ -693,7 +670,7 @@ export default function ProfileScreen() {
           <MenuItem
             icon="information-circle-outline"
             label="Hakkında"
-            onPress={() => router.push('/help')}
+            onPress={() => router.push('/about')}
           />
         </View>
 
@@ -958,20 +935,26 @@ const styles = StyleSheet.create({
   },
   quickActions: {
     flexDirection: 'row',
-    justifyContent: 'space-between',
+    flexWrap: 'wrap',
     marginTop: spacing[3],
   },
   quickAction: {
     alignItems: 'center',
-    flex: 1,
+    width: '33.333%',
+    paddingHorizontal: spacing[1],
+    marginBottom: spacing[4],
   },
   quickActionIcon: {
-    width: 50,
-    height: 50,
+    width: 52,
+    height: 52,
     borderRadius: radius.full,
+    backgroundColor: quickActionTint.bg,
     alignItems: 'center',
     justifyContent: 'center',
     marginBottom: spacing[2],
+  },
+  quickActionLabel: {
+    minHeight: 32,
   },
   menuSection: {
     marginTop: spacing[6],

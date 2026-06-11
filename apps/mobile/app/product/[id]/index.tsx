@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, type ComponentProps } from 'react';
 import { View, ScrollView, Image, Dimensions, StyleSheet, Pressable, Share, Modal } from 'react-native';
 import {
   Button,
@@ -9,6 +9,7 @@ import {
   Avatar,
   Text,
   theme,
+  appAlert,
 } from '@tarodan/ui-native';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useLocalSearchParams, router } from 'expo-router';
@@ -17,20 +18,76 @@ import { productsApi, ratingsApi, userReportsApi } from '../../../src/services/a
 import { ThemedRefreshControl } from '../../../src/components/common';
 import { useRefresh } from '../../../src/hooks/useRefresh';
 import { useAuthStore } from '../../../src/stores/authStore';
-import { Alert } from 'react-native';
+import {  } from 'react-native';
 import { useCartStore } from '../../../src/stores/cartStore';
 import { useGuestStore } from '../../../src/stores/guestStore';
 import { useFavoritesStore } from '../../../src/stores/favoritesStore';
+import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { SignupPrompt } from '../../../src/components/SignupPrompt';
+import ZoomableImage from '../../../src/components/product/ZoomableImage';
 import MakeOfferModal from '../../../src/components/product/MakeOfferModal';
 import AddToCollectionModal from '../../../src/components/product/AddToCollectionModal';
 import { transformImageUrl, getImageUrl as getImageUrlFromUtils, resolveAvatarSource } from '../../../src/utils/imageUrl';
 import { asLabel } from '../../../src/utils/format';
+import { buildShareContent, productShareUrl } from '../../../src/utils/share';
 import { isProductTradeOpen } from '../../../src/utils/isProductTradeOpen';
+import {
+  getProductEffectivePrice,
+  getProductOriginalPriceForDisplay,
+  getProductDiscountPercent,
+  isProductOnSaleDisplay,
+} from '../../../src/utils/productPrice';
 
 const { colors } = theme;
 
 const { width } = Dimensions.get('window');
+
+/**
+ * Alt aksiyon barındaki eşit genişlikli dikey aksiyon hücresi (ikon üstte, etiket altta).
+ * Dar 1/4 sütunda "Sepete Ekle" gibi uzun etiketlerin yatay butonda taşmasını önler.
+ */
+function ActionTile({
+  testID,
+  icon,
+  label,
+  onPress,
+  variant = 'outline',
+  disabled,
+}: {
+  testID?: string;
+  icon: ComponentProps<typeof Ionicons>['name'];
+  label: string;
+  onPress: () => void;
+  variant?: 'primary' | 'outline';
+  disabled?: boolean;
+}) {
+  const isPrimary = variant === 'primary';
+  const tint = isPrimary ? colors.white : colors.primary[600]!;
+  return (
+    <Pressable
+      testID={testID}
+      onPress={onPress}
+      disabled={disabled}
+      accessibilityRole="button"
+      style={({ pressed }) => [
+        styles.actionTile,
+        isPrimary ? styles.actionTilePrimary : styles.actionTileOutline,
+        pressed && { opacity: 0.85 },
+        disabled && { opacity: 0.5 },
+      ]}
+    >
+      <Ionicons name={icon} size={20} color={tint} />
+      <Text
+        style={[styles.actionTileLabel, { color: tint }]}
+        numberOfLines={1}
+        adjustsFontSizeToFit
+        minimumFontScale={0.8}
+      >
+        {label}
+      </Text>
+    </Pressable>
+  );
+}
 
 // Local condition palette — replaces TarodanColors-driven CONDITIONS
 const CONDITION_LABELS: Record<string, { name: string; color: string }> = {
@@ -45,7 +102,7 @@ export default function ProductDetailScreen() {
   const { id } = useLocalSearchParams();
   const productId = String(id);
   const { isAuthenticated, user } = useAuthStore();
-  const { addItem, isInCart } = useCartStore();
+  const { addItem, isInCart, setBuyNow } = useCartStore();
   const { incrementProductView, getPromptType, setLastPromptShown, canShowPrompt } = useGuestStore();
   const { addToFavorites, removeFromFavorites, isInFavorites, fetchFavorites } = useFavoritesStore();
   const queryClient = useQueryClient();
@@ -63,6 +120,7 @@ export default function ProductDetailScreen() {
   // Tam ekran görsel görüntüleyici (G1 — pinch-zoom)
   const [imageViewerOpen, setImageViewerOpen] = useState(false);
   const [viewerIndex, setViewerIndex] = useState(0);
+  const [viewerZoomed, setViewerZoomed] = useState(false);
 
   // Check if product is in favorites when authenticated
   useEffect(() => {
@@ -215,6 +273,12 @@ export default function ProductDetailScreen() {
     (product.status != null && product.status !== 'active') ||
     (product.availableQuantity != null && product.availableQuantity <= 0);
 
+  // İndirim gösterimi — ProductCard ile aynı kural (üstü çizili eski fiyat + indirim rozeti).
+  const effectivePrice = getProductEffectivePrice(product);
+  const onSale = isProductOnSaleDisplay(product);
+  const originalPrice = getProductOriginalPriceForDisplay(product);
+  const discountPct = getProductDiscountPercent(product);
+
   const handleAddToCart = () => {
     if (isOutOfStock) {
       setSnackbar({ visible: true, message: 'Bu ürün şu anda stokta yok', type: 'error' });
@@ -233,6 +297,27 @@ export default function ProductDetailScreen() {
       },
     });
     setSnackbar({ visible: true, message: 'Ürün sepete eklendi!', type: 'success' });
+  };
+
+  // Hızlı Al — sepete dokunmadan tek ürünle doğrudan ödemeye git (web parite).
+  const handleBuyNow = () => {
+    if (isOutOfStock) {
+      setSnackbar({ visible: true, message: 'Bu ürün şu anda stokta yok', type: 'error' });
+      return;
+    }
+    setBuyNow({
+      productId: product.id,
+      title: product.title,
+      price: product.price,
+      imageUrl: typeof images[0] === 'string' ? images[0] : images[0]?.url || getImageUrlFromUtils(product.images),
+      brand: asLabel(product.brand, ''),
+      scale: asLabel(product.scale, ''),
+      seller: {
+        id: product.seller?.id || 'unknown',
+        displayName: product.seller?.displayName || 'Satıcı',
+      },
+    });
+    router.push('/checkout?buyNow=1' as any);
   };
 
   const handleFavorite = async () => {
@@ -334,10 +419,12 @@ export default function ProductDetailScreen() {
 
   const handleShare = async () => {
     try {
-      await Share.share({
-        message: `${product.title} - ₺${product.price?.toLocaleString('tr-TR')}\n\nTarodan'da bu ürüne göz atın!`,
-        title: product.title,
-      });
+      const { content, options } = buildShareContent(
+        `${product.title} - ₺${product.price?.toLocaleString('tr-TR')}\n\nTarodan'da bu ürüne göz atın!`,
+        productShareUrl(product.id),
+        product.title,
+      );
+      await Share.share(content, options);
     } catch (error) {
       console.error('Share error:', error);
     }
@@ -360,7 +447,7 @@ export default function ProductDetailScreen() {
       { key: 'other', label: 'Diğer' },
     ];
 
-    Alert.alert(
+    appAlert(
       'İlanı Raporla',
       'Bu ilanı neden raporlamak istiyorsunuz?',
       [
@@ -480,7 +567,11 @@ export default function ProductDetailScreen() {
             {isProductTradeOpen(product) && (
               <View style={[styles.badge, { backgroundColor: colors.success[500]! }]}>
                 <Ionicons name="swap-horizontal" size={14} color={colors.white} />
-                <Text style={styles.badgeText}>Takas Açık</Text>
+                {/* Android (Fabric): row+gap içinde Text genişliği yanlış ölçülüp son
+                    kelimeyi görünmez sarıyor; gap yerine marginLeft kullan. */}
+                <Text style={[styles.badgeText, { marginLeft: 4 }]} numberOfLines={1}>
+                  Takas Açık
+                </Text>
               </View>
             )}
             <View style={[styles.badge, { backgroundColor: conditionInfo.color }]}>
@@ -490,7 +581,19 @@ export default function ProductDetailScreen() {
 
           {/* Title & Price */}
           <Text style={styles.title}>{product.title}</Text>
-          <Text style={styles.price}>₺{product.price?.toLocaleString('tr-TR')}</Text>
+          <View style={styles.priceRow}>
+            <Text style={styles.price}>₺{effectivePrice.toLocaleString('tr-TR')}</Text>
+            {onSale ? (
+              <>
+                <Text style={styles.priceOld}>₺{originalPrice.toLocaleString('tr-TR')}</Text>
+                {discountPct > 0 ? (
+                  <View style={styles.discountBadge}>
+                    <Text style={styles.discountBadgeText}>%{discountPct}</Text>
+                  </View>
+                ) : null}
+              </>
+            ) : null}
+          </View>
 
           {/* Ürün puanı */}
           {product.rating?.average != null && (product.rating?.count ?? 0) > 0 ? (
@@ -522,6 +625,21 @@ export default function ProductDetailScreen() {
             </View>
           </View>
 
+          {/* Sahip için stok/rezervasyon dökümü — alıcıların gördüğü sayı (satışta)
+              fiziksel stoktan neden farklı, burada açıklanır. */}
+          {isOwner &&
+            product.quantity != null &&
+            product.availableQuantity != null &&
+            product.quantity - product.availableQuantity > 0 ? (
+            <View style={styles.reservedInfoBox}>
+              <Ionicons name="lock-closed-outline" size={16} color={colors.warning[700]!} />
+              <Text style={styles.reservedInfoText}>
+                Stok: {product.quantity} · {product.quantity - product.availableQuantity} adedi
+                aktif takas/sipariş için rezerve · Satışta görünen: {product.availableQuantity}
+              </Text>
+            </View>
+          ) : null}
+
           <Divider style={styles.divider} />
 
           {/* Aksiyon Bar — sahibine göre değişir.
@@ -529,45 +647,45 @@ export default function ProductDetailScreen() {
           <View style={styles.actionGrid}>
             {!isOwner && isProductTradeOpen(product) ? (
               <Pressable style={styles.actionItem} onPress={handleTrade}>
-                <View style={[styles.actionIconWrap, { backgroundColor: colors.success[100]! }]}>
-                  <Ionicons name="swap-horizontal" size={22} color={colors.success[600]!} />
+                <View style={styles.actionIconWrap}>
+                  <Ionicons name="swap-horizontal" size={22} color={colors.primary[700]!} />
                 </View>
-                <Text style={styles.actionLabel}>Takas</Text>
+                <Text style={styles.actionLabel} numberOfLines={1}>Takas</Text>
               </Pressable>
             ) : null}
 
             {!isOwner && (
               <Pressable style={styles.actionItem} onPress={handleMakeOffer}>
-                <View style={[styles.actionIconWrap, { backgroundColor: colors.warning[50]! }]}>
-                  <Ionicons name="pricetag-outline" size={22} color={colors.warning[600]!} />
+                <View style={styles.actionIconWrap}>
+                  <Ionicons name="pricetag-outline" size={22} color={colors.primary[700]!} />
                 </View>
-                <Text style={styles.actionLabel}>Teklif Ver</Text>
+                <Text style={styles.actionLabel} numberOfLines={1}>Teklif Ver</Text>
               </Pressable>
             )}
 
             {isOwner && (
               <Pressable style={styles.actionItem} onPress={handleAddToCollection}>
-                <View style={[styles.actionIconWrap, { backgroundColor: colors.primary[50]! }]}>
-                  <Ionicons name="albums-outline" size={22} color={colors.primary[600]!} />
+                <View style={styles.actionIconWrap}>
+                  <Ionicons name="albums-outline" size={22} color={colors.primary[700]!} />
                 </View>
-                <Text style={styles.actionLabel}>Koleksiyon</Text>
+                <Text style={styles.actionLabel} numberOfLines={1}>Koleksiyon</Text>
               </Pressable>
             )}
 
             {!isOwner && (
               <Pressable style={styles.actionItem} onPress={handleMessage}>
-                <View style={[styles.actionIconWrap, { backgroundColor: colors.info[50]! }]}>
-                  <Ionicons name="chatbubble-outline" size={22} color={colors.info[600]!} />
+                <View style={styles.actionIconWrap}>
+                  <Ionicons name="chatbubble-outline" size={22} color={colors.primary[700]!} />
                 </View>
-                <Text style={styles.actionLabel}>Mesaj</Text>
+                <Text style={styles.actionLabel} numberOfLines={1}>Mesaj</Text>
               </Pressable>
             )}
 
             <Pressable style={styles.actionItem} onPress={handleShare}>
-              <View style={[styles.actionIconWrap, { backgroundColor: colors.success[50]! }]}>
-                <Ionicons name="share-social-outline" size={22} color={colors.success[600]!} />
+              <View style={styles.actionIconWrap}>
+                <Ionicons name="share-social-outline" size={22} color={colors.primary[700]!} />
               </View>
-              <Text style={styles.actionLabel}>Paylaş</Text>
+              <Text style={styles.actionLabel} numberOfLines={1}>Paylaş</Text>
             </Pressable>
           </View>
 
@@ -742,79 +860,120 @@ export default function ProductDetailScreen() {
 
       {/* Bottom Actions */}
       <View style={styles.bottomBar}>
-        <View style={styles.bottomPrice}>
-          <Text style={styles.bottomPriceLabel}>Fiyat</Text>
-          <Text style={styles.bottomPriceValue}>₺{product.price?.toLocaleString('tr-TR')}</Text>
-        </View>
-        <View style={styles.bottomButtons}>
-          {isOwner ? (
+        {isOwner ? (
+          // Sahip: fiyat + tek aksiyon (düzenle)
+          <View style={styles.bottomRow}>
+            <View style={styles.bottomPrice}>
+              <Text style={styles.bottomPriceLabel}>Fiyat</Text>
+              {onSale ? (
+                <Text style={styles.bottomPriceOld} numberOfLines={1}>
+                  ₺{originalPrice.toLocaleString('tr-TR')}
+                </Text>
+              ) : null}
+              <Text style={styles.bottomPriceValue} numberOfLines={1}>
+                ₺{effectivePrice.toLocaleString('tr-TR')}
+              </Text>
+            </View>
             <Button
               testID="product-detail-edit-button"
               variant="primary"
               onPress={() => router.push(`/listing/${product.id}/edit` as any)}
               icon="create-outline"
-              style={styles.cartButton}
+              style={styles.flexButton}
             >
               İlanı Düzenle
             </Button>
-          ) : isOutOfStock ? (
+          </View>
+        ) : isOutOfStock ? (
+          // Stok yok: fiyat + pasif buton
+          <View style={styles.bottomRow}>
+            <View style={styles.bottomPrice}>
+              <Text style={styles.bottomPriceLabel}>Fiyat</Text>
+              <Text style={styles.bottomPriceValue} numberOfLines={1}>
+                ₺{effectivePrice.toLocaleString('tr-TR')}
+              </Text>
+            </View>
             <Button
               testID="product-detail-out-of-stock-button"
               variant="secondary"
               onPress={() => {}}
               disabled
               icon="close-circle-outline"
-              style={styles.cartButton}
+              style={styles.flexButton}
             >
               Stokta Yok
             </Button>
-          ) : (
-            <>
-              {isProductTradeOpen(product) && (
-                <Button
-                  variant="outline"
-                  onPress={handleTrade}
-                  icon="swap-horizontal"
-                  style={styles.tradeButton}
-                  textStyle={styles.tradeButtonLabel}
-                >
-                  Takas
-                </Button>
-              )}
-              {inCart ? (
-                <Button
-                  testID="product-detail-go-to-cart-button"
-                  variant="outline"
-                  onPress={() => router.push('/cart')}
-                  icon="checkmark-circle"
-                  style={styles.cartButton}
-                >
-                  Sepette • Git
-                </Button>
-              ) : (
-                <Button
-                  testID="product-detail-add-to-cart-button"
-                  variant="primary"
-                  onPress={handleAddToCart}
-                  icon="cart"
-                  style={styles.cartButton}
-                >
-                  Sepete Ekle
-                </Button>
-              )}
-            </>
-          )}
-        </View>
+          </View>
+        ) : (
+          // Alıcı: tek satırda 4 EŞİT sütun — [Fiyat] [Takas] [Hızlı Al] [Sepete Ekle].
+          // Takas kapalıysa o sütun boş placeholder kalır; diğer sütunlar tam olarak
+          // aynı hizada/genişlikte durur (4'e bölünmüş simetrik düzen korunur).
+          <View style={styles.tileRow}>
+            <View style={styles.priceCell}>
+              <Text style={styles.bottomPriceLabel}>Fiyat</Text>
+              {onSale ? (
+                <Text style={styles.bottomPriceOld} numberOfLines={1}>
+                  ₺{originalPrice.toLocaleString('tr-TR')}
+                </Text>
+              ) : null}
+              <Text
+                style={styles.priceCellValue}
+                numberOfLines={1}
+                adjustsFontSizeToFit
+                minimumFontScale={0.7}
+              >
+                ₺{effectivePrice.toLocaleString('tr-TR')}
+              </Text>
+            </View>
+
+            {isProductTradeOpen(product) ? (
+              <ActionTile
+                testID="product-detail-trade-button"
+                icon="swap-horizontal"
+                label="Takas"
+                onPress={handleTrade}
+              />
+            ) : (
+              <View style={styles.tilePlaceholder} />
+            )}
+
+            <ActionTile
+              testID="product-detail-buy-now-button"
+              icon="flash"
+              label="Hızlı Al"
+              variant="primary"
+              onPress={handleBuyNow}
+            />
+
+            {inCart ? (
+              <ActionTile
+                testID="product-detail-go-to-cart-button"
+                icon="checkmark-circle"
+                label="Sepette"
+                onPress={() => router.push('/cart')}
+              />
+            ) : (
+              <ActionTile
+                testID="product-detail-add-to-cart-button"
+                icon="cart"
+                label="Sepete Ekle"
+                onPress={handleAddToCart}
+              />
+            )}
+          </View>
+        )}
       </View>
 
-      {/* Tam ekran görsel görüntüleyici — pinch-zoom (G1) */}
+      {/* Tam ekran görsel görüntüleyici — pinch + double-tap zoom (G1) */}
       <Modal
         visible={imageViewerOpen}
         transparent
         animationType="fade"
         onRequestClose={() => setImageViewerOpen(false)}
+        onShow={() => setViewerZoomed(false)}
       >
-        <View style={styles.viewerContainer}>
+        {/* Modal Android'de yeni native pencere açtığı için root view modal içinde olmalı */}
+        <GestureHandlerRootView style={styles.viewerContainer}>
           <Pressable
             style={styles.viewerClose}
             onPress={() => setImageViewerOpen(false)}
@@ -826,28 +985,23 @@ export default function ProductDetailScreen() {
           <ScrollView
             horizontal
             pagingEnabled
+            scrollEnabled={!viewerZoomed}
             showsHorizontalScrollIndicator={false}
             contentOffset={{ x: viewerIndex * width, y: 0 }}
           >
             {images.map((img: any, index: number) => {
               const uri = typeof img === 'string' ? img : img.url;
               return (
-                <ScrollView
+                <ZoomableImage
                   key={index}
-                  style={styles.viewerPageScroll}
-                  contentContainerStyle={styles.viewerPage}
-                  maximumZoomScale={3}
-                  minimumZoomScale={1}
-                  showsVerticalScrollIndicator={false}
-                  showsHorizontalScrollIndicator={false}
-                  centerContent
-                >
-                  <Image source={{ uri }} style={styles.viewerImage} resizeMode="contain" />
-                </ScrollView>
+                  uri={uri}
+                  zoomed={viewerZoomed}
+                  onZoomChange={setViewerZoomed}
+                />
               );
             })}
           </ScrollView>
-        </View>
+        </GestureHandlerRootView>
       </Modal>
 
       <Snackbar
@@ -968,18 +1122,6 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
-  viewerPageScroll: {
-    width,
-  },
-  viewerPage: {
-    flexGrow: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  viewerImage: {
-    width,
-    height: width,
-  },
   imageIndicators: {
     flexDirection: 'row',
     justifyContent: 'center',
@@ -1011,7 +1153,6 @@ const styles = StyleSheet.create({
     paddingHorizontal: 10,
     paddingVertical: 6,
     borderRadius: 16,
-    gap: 4,
   },
   badgeText: {
     color: colors.white,
@@ -1024,15 +1165,38 @@ const styles = StyleSheet.create({
     color: colors.text.heading,
     marginBottom: 8,
   },
+  priceRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    flexWrap: 'wrap',
+    columnGap: 10,
+    rowGap: 4,
+    marginBottom: 12,
+  },
   price: {
     fontSize: 28,
     lineHeight: 36,
     fontWeight: 'bold',
     color: colors.primary[600]!,
-    marginBottom: 12,
-    alignSelf: 'flex-start',
     includeFontPadding: false,
-    paddingRight: 4,
+  },
+  priceOld: {
+    fontSize: 18,
+    lineHeight: 24,
+    color: colors.gray[400],
+    textDecorationLine: 'line-through',
+    includeFontPadding: false,
+  },
+  discountBadge: {
+    backgroundColor: colors.danger[600]!,
+    borderRadius: 6,
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+  },
+  discountBadgeText: {
+    color: colors.white,
+    fontSize: 13,
+    fontWeight: '800',
   },
   quickInfo: {
     flexDirection: 'row',
@@ -1050,17 +1214,30 @@ const styles = StyleSheet.create({
   divider: {
     marginVertical: 16,
   },
+  reservedInfoBox: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    gap: 8,
+    backgroundColor: colors.warning[50]!,
+    borderRadius: 8,
+    padding: 10,
+    marginTop: 12,
+  },
+  reservedInfoText: {
+    flex: 1,
+    fontSize: 13,
+    lineHeight: 18,
+    color: colors.warning[700]!,
+  },
   actionGrid: {
     flexDirection: 'row',
-    flexWrap: 'wrap',
-    // flex-start: buton sayısı sahibe göre değiştiğinden (2 vs 4) sola hizalı
-    // sabit aralık, space-between'in az butonda oluşturduğu boşluğu önler.
-    justifyContent: 'flex-start',
-    gap: 12,
+    alignItems: 'flex-start',
+    // flex:1 öğeler satırı eşit böler → buton sayısı sahibe göre değişse de
+    // (2 vs 4) tam genişliğe yayılır; sola yığılma/boşluk ve taşma olmaz.
+    gap: 8,
   },
   actionItem: {
-    width: '18%',
-    minWidth: 60,
+    flex: 1,
     alignItems: 'center',
     gap: 6,
   },
@@ -1068,13 +1245,16 @@ const styles = StyleSheet.create({
     width: 48,
     height: 48,
     borderRadius: 24,
+    // Profildeki "Hızlı Erişim" ile aynı: tüm aksiyonlar tek renk (primary tint).
+    backgroundColor: colors.primary[50]!,
     alignItems: 'center',
     justifyContent: 'center',
   },
   actionLabel: {
-    fontSize: 11,
-    color: colors.text.heading,
-    fontWeight: '500',
+    fontSize: 12,
+    lineHeight: 16,
+    color: colors.text.muted,
+    fontWeight: '600',
     textAlign: 'center',
   },
   section: {
@@ -1254,20 +1434,31 @@ const styles = StyleSheet.create({
     marginTop: 2,
   },
   bottomBar: {
-    flexDirection: 'row',
-    alignItems: 'center',
+    flexDirection: 'column',
+    gap: 10,
     padding: 16,
     backgroundColor: colors.white,
     borderTopWidth: 1,
     borderTopColor: colors.border.DEFAULT,
   },
+  // Sahip / stok yok: fiyat + tek buton satırı
+  bottomRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+  },
   bottomPrice: {
-    marginRight: 16,
     flexShrink: 0,
   },
   bottomPriceLabel: {
     fontSize: 12,
     color: colors.text.muted,
+  },
+  bottomPriceOld: {
+    fontSize: 13,
+    color: colors.gray[400],
+    textDecorationLine: 'line-through',
+    includeFontPadding: false,
   },
   bottomPriceValue: {
     fontSize: 20,
@@ -1277,21 +1468,51 @@ const styles = StyleSheet.create({
     includeFontPadding: false,
     paddingRight: 2,
   },
-  bottomButtons: {
+  flexButton: {
     flex: 1,
+    borderRadius: 12,
+  },
+  // Alıcı: 4 eşit sütunlu aksiyon satırı
+  tileRow: {
     flexDirection: 'row',
+    alignItems: 'stretch',
     gap: 8,
   },
-  tradeButton: {
+  priceCell: {
     flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  priceCellValue: {
+    fontSize: 16,
+    fontWeight: 'bold',
+    color: colors.text.heading,
+    includeFontPadding: false,
+  },
+  tilePlaceholder: {
+    flex: 1,
+  },
+  actionTile: {
+    flex: 1,
+    minHeight: 52,
     borderRadius: 12,
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 8,
+    paddingHorizontal: 4,
+    gap: 4,
+  },
+  actionTilePrimary: {
+    backgroundColor: colors.primary[600]!,
+  },
+  actionTileOutline: {
+    borderWidth: 1,
     borderColor: colors.primary[600]!,
+    backgroundColor: colors.white,
   },
-  tradeButtonLabel: {
-    color: colors.primary[600]!,
-  },
-  cartButton: {
-    flex: 2,
-    borderRadius: 12,
+  actionTileLabel: {
+    fontSize: 11,
+    fontWeight: '600',
+    textAlign: 'center',
   },
 });

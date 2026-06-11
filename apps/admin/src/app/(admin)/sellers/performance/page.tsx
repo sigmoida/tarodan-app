@@ -51,42 +51,42 @@ export default function SellerPerformancePage() {
                 {/* Stats Grid */}
                 <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
                     <div className="admin-card p-4 flex items-center gap-4">
-                        <div className="p-3 bg-info-500/10 rounded-lg">
+                        <div className="p-3 bg-info-500/10 rounded-lg shrink-0">
                             <UsersIcon className="w-6 h-6 text-info-500" />
                         </div>
-                        <div>
-                            <p className="text-sm text-muted">Aktif Satıcı</p>
-                            <h3 className="text-xl font-bold text-heading">{SELLER_STATS.totalActiveSellers}</h3>
+                        <div className="min-w-0">
+                            <p className="text-sm text-muted truncate">Aktif Satıcı</p>
+                            <h3 className="text-xl font-bold text-heading truncate">{SELLER_STATS.totalActiveSellers}</h3>
                         </div>
                     </div>
                     <div className="admin-card p-4 flex items-center gap-4">
-                        <div className="p-3 bg-success-500/10 rounded-lg">
+                        <div className="p-3 bg-success-500/10 rounded-lg shrink-0">
                             <CurrencyDollarIcon className="w-6 h-6 text-success-500" />
                         </div>
-                        <div>
-                            <p className="text-sm text-muted">Toplam Ciro</p>
-                            <h3 className="text-xl font-bold text-heading">
+                        <div className="min-w-0">
+                            <p className="text-sm text-muted truncate">Toplam Ciro</p>
+                            <h3 className="text-xl font-bold text-heading truncate">
                                 {new Intl.NumberFormat('tr-TR', { style: 'currency', currency: 'TRY' }).format(SELLER_STATS.totalRevenue)}
                             </h3>
                         </div>
                     </div>
                     <div className="admin-card p-4 flex items-center gap-4">
-                        <div className="p-3 bg-warning-500/10 rounded-lg">
+                        <div className="p-3 bg-warning-500/10 rounded-lg shrink-0">
                             <StarIcon className="w-6 h-6 text-warning-500" />
                         </div>
-                        <div>
-                            <p className="text-sm text-muted">Ort. Puan</p>
+                        <div className="min-w-0">
+                            <p className="text-sm text-muted truncate">Ort. Puan</p>
                             <h3 className="text-xl font-bold text-heading flex items-center gap-1">
-                                {SELLER_STATS.avgSellerRating} <StarIconSolid className="w-4 h-4 text-warning-500" />
+                                {SELLER_STATS.avgSellerRating} <StarIconSolid className="w-4 h-4 text-warning-500 shrink-0" />
                             </h3>
                         </div>
                     </div>
                     <div className="admin-card p-4 flex items-center gap-4">
-                        <div className="p-3 bg-primary-500/10 rounded-lg">
+                        <div className="p-3 bg-primary-500/10 rounded-lg shrink-0">
                             <ArrowTrendingUpIcon className="w-6 h-6 text-primary-500" />
                         </div>
-                        <div>
-                            <p className="text-sm text-muted">En İyi Satıcı</p>
+                        <div className="min-w-0">
+                            <p className="text-sm text-muted truncate">En İyi Satıcı</p>
                             <h3 className="text-sm font-bold text-heading truncate max-w-[120px]" title={SELLER_STATS.topSellerName}>
                                 {SELLER_STATS.topSellerName}
                             </h3>

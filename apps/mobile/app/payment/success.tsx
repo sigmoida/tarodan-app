@@ -10,28 +10,46 @@ import { formatPrice } from '../../src/utils/format';
 
 const { colors } = theme;
 
+// Web'deki OrderStatusLabels ile uyumlu Türkçe durum etiketleri
+const STATUS_LABELS: Record<string, string> = {
+  paid: 'Ödendi',
+  completed: 'Tamamlandı',
+  success: 'Ödendi',
+  hold_payment: 'Ödeme Alındı',
+  pending: 'Beklemede',
+  processing: 'İşleniyor',
+};
+
 interface PaymentInfo {
   id: string;
   orderId?: string;
+  checkoutGroupId?: string;
+  groupNumber?: string;
   tradeId?: string;
   amount?: number;
   currency?: string;
   status?: string;
   createdAt?: string;
   order?: { id: string; orderNumber?: string };
+  orders?: Array<{ orderId: string; orderNumber: string; productTitle?: string; status?: string }>;
 }
 
 export default function PaymentSuccessScreen() {
-  const { paymentId, guest, tradeCash, tradeId } = useLocalSearchParams<{
+  const { paymentId, guest, tradeCash, tradeId, groupId } = useLocalSearchParams<{
     paymentId: string;
     guest?: string;
     tradeCash?: string;
     tradeId?: string;
+    groupId?: string;
   }>();
   const queryClient = useQueryClient();
-  const isTrade = tradeCash === '1' || !!tradeId;
   const [loading, setLoading] = useState(true);
   const [info, setInfo] = useState<PaymentInfo | null>(null);
+
+  // Takas nakit farkı ödemesi mi? URL paramları 3DS dönüşü/deep link'te
+  // kaybolabilir; web ile parite için API yanıtındaki tradeId de sinyal sayılır.
+  const tid = tradeId || info?.tradeId;
+  const isTrade = tradeCash === '1' || !!tid;
 
   useEffect(() => {
     let cancelled = false;
@@ -71,12 +89,12 @@ export default function PaymentSuccessScreen() {
       if (cancelled) return;
 
       // Takas nakit farkı ödemesi: takasa dön + ilgili query'leri tazele (web ile parite).
-      const tid = tradeId || last?.tradeId;
-      if (isTrade && tid) {
+      const paidTradeId = tradeId || last?.tradeId;
+      if (paidTradeId) {
         queryClient.invalidateQueries({ queryKey: ['trade'] });
         queryClient.invalidateQueries({ queryKey: ['trades'] });
         queryClient.invalidateQueries({ queryKey: ['trades-status-counts'] });
-        router.replace(`/trade/${tid}` as any);
+        router.replace(`/trade/${paidTradeId}` as any);
         return;
       }
       setLoading(false);
@@ -84,10 +102,10 @@ export default function PaymentSuccessScreen() {
 
     run();
     return () => { cancelled = true; };
-  }, [paymentId, guest, isTrade, tradeId, queryClient]);
+  }, [paymentId, guest, tradeId, queryClient]);
 
   const orderId = info?.order?.id || info?.orderId;
-  const tid = tradeId || info?.tradeId;
+  const checkoutGroupId = groupId || info?.checkoutGroupId;
 
   return (
     <SafeAreaView style={styles.container}>
@@ -109,10 +127,21 @@ export default function PaymentSuccessScreen() {
           </View>
         ) : info ? (
           <View style={styles.summaryCard}>
-            {info.order?.orderNumber ? (
+            {info.groupNumber ? (
+              <View style={styles.summaryRow}>
+                <Text style={styles.summaryLabel}>Sipariş No</Text>
+                <Text style={styles.summaryValue}>{info.groupNumber}</Text>
+              </View>
+            ) : info.order?.orderNumber ? (
               <View style={styles.summaryRow}>
                 <Text style={styles.summaryLabel}>Sipariş No</Text>
                 <Text style={styles.summaryValue}>{info.order.orderNumber}</Text>
+              </View>
+            ) : null}
+            {info.orders && info.orders.length > 1 ? (
+              <View style={styles.summaryRow}>
+                <Text style={styles.summaryLabel}>Ürün Sayısı</Text>
+                <Text style={styles.summaryValue}>{info.orders.length}</Text>
               </View>
             ) : null}
             {info.amount ? (
@@ -127,7 +156,7 @@ export default function PaymentSuccessScreen() {
               <View style={styles.summaryRow}>
                 <Text style={styles.summaryLabel}>Durum</Text>
                 <Text style={[styles.summaryValue, { color: colors.success[600]! }]}>
-                  {info.status === 'paid' ? 'Ödendi' : info.status}
+                  {STATUS_LABELS[info.status] ?? info.status}
                 </Text>
               </View>
             ) : null}
@@ -141,6 +170,14 @@ export default function PaymentSuccessScreen() {
               title="Takasa Dön"
               fullWidth
               onPress={() => router.replace(`/trade/${tid}` as any)}
+              style={styles.btn}
+            />
+          ) : checkoutGroupId && guest !== '1' ? (
+            <Button
+              variant="primary"
+              title="Siparişimi Gör"
+              fullWidth
+              onPress={() => router.replace(`/orders/group/${checkoutGroupId}` as any)}
               style={styles.btn}
             />
           ) : orderId && guest !== '1' ? (
@@ -182,9 +219,11 @@ const styles = StyleSheet.create({
   },
   title: {
     fontSize: 26,
+    lineHeight: 34,
     fontWeight: '800',
     color: colors.text.heading,
     textAlign: 'center',
+    includeFontPadding: true,
   },
   subtitle: {
     fontSize: 14,

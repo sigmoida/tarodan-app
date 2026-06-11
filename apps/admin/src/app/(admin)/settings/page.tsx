@@ -4,6 +4,8 @@ import { useState, useEffect } from "react";
 import { adminApi } from "@/lib/api";
 import toast from "react-hot-toast";
 import { Button, Input, Select, Spinner } from "@tarodan/ui";
+import { ExclamationTriangleIcon } from "@heroicons/react/24/outline";
+import { AdminTabs } from "@/components/AdminTabs";
 
 interface Settings {
   freeListingLimit: number;
@@ -54,6 +56,7 @@ export default function SettingsPage() {
     language: "tr",
   });
   const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState(false);
   const [saving, setSaving] = useState(false);
   const [activeTab, setActiveTab] = useState<
     "general" | "listing" | "trade" | "message" | "membership"
@@ -64,6 +67,8 @@ export default function SettingsPage() {
   }, []);
 
   const loadSettings = async () => {
+    setLoading(true);
+    setLoadError(false);
     try {
       const settingsResponse = await adminApi.getSettings();
       // API response format: { data: { data: [...] } } or { data: [...] }
@@ -196,7 +201,8 @@ export default function SettingsPage() {
     } catch (error) {
       if (process.env.NODE_ENV === "development")
         console.error("Settings load error:", error);
-      toast.error("Ayarlar yüklenemedi");
+      setLoadError(true);
+      toast.error("Ayarlar yüklenemedi", { id: "settings-load" });
     } finally {
       setLoading(false);
     }
@@ -312,6 +318,22 @@ export default function SettingsPage() {
     );
   }
 
+  if (loadError) {
+    return (
+      <div className="admin-card flex flex-col items-center justify-center gap-4 py-16 text-center">
+        <ExclamationTriangleIcon className="h-12 w-12 shrink-0 text-danger-500" />
+        <div className="min-w-0">
+          <p className="text-lg font-semibold text-heading">Ayarlar yüklenemedi</p>
+          <p className="mt-1 text-sm text-muted">
+            Oturumun sona ermiş olabilir. Tekrar dene; sürerse çıkış yapıp
+            yeniden giriş yap.
+          </p>
+        </div>
+        <Button onClick={() => loadSettings()}>Tekrar Dene</Button>
+      </div>
+    );
+  }
+
   return (
     <div className="space-y-6">
       <div>
@@ -320,29 +342,21 @@ export default function SettingsPage() {
       </div>
 
       {/* Tabs */}
-      <div className="flex gap-2 border-b border-border pb-2">
-        {[
-          { id: "general", label: "Genel" },
-          { id: "listing", label: "İlan" },
-          { id: "trade", label: "Takas" },
-
-          { id: "message", label: "Mesaj" },
-          { id: "membership", label: "Üyelik" },
-        ].map((tab) => (
-          <Button
-            variant="secondary"
-            key={tab.id}
-            onClick={() => setActiveTab(tab.id as any)}
-            className={`px-4 py-2 rounded-t-lg transition-colors ${
-              activeTab === tab.id
-                ? "bg-surface-alt text-heading"
-                : "text-muted hover:text-heading"
-            }`}
-          >
-            {tab.label}
-          </Button>
-        ))}
-      </div>
+      <AdminTabs
+        tabs={[
+          { key: "general", label: "Genel" },
+          { key: "listing", label: "İlan" },
+          { key: "trade", label: "Takas" },
+          { key: "message", label: "Mesaj" },
+          { key: "membership", label: "Üyelik" },
+        ]}
+        value={activeTab}
+        onChange={(k) =>
+          setActiveTab(
+            k as "general" | "listing" | "trade" | "message" | "membership",
+          )
+        }
+      />
 
       {/* General Settings */}
       {activeTab === "general" && (

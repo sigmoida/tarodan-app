@@ -1,4 +1,4 @@
-import { View, ScrollView, StyleSheet, TouchableOpacity, Alert } from 'react-native';
+import { View, ScrollView, StyleSheet, TouchableOpacity } from 'react-native';
 import {
   Card,
   Button,
@@ -8,6 +8,7 @@ import {
   Text,
   ScreenHeader,
   theme,
+  appAlert,
 } from '@tarodan/ui-native';
 import { useCallback } from 'react';
 import { router, useFocusEffect } from 'expo-router';
@@ -84,10 +85,10 @@ export default function SavedSearchesScreen() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['saved-searches'] });
-      Alert.alert('Başarılı', 'Arama silindi');
+      appAlert('Başarılı', 'Arama silindi');
     },
     onError: () => {
-      Alert.alert('Hata', 'Arama silinemedi');
+      appAlert('Hata', 'Arama silinemedi');
     },
   });
 
@@ -119,7 +120,7 @@ export default function SavedSearchesScreen() {
   };
 
   const handleDelete = (search: SavedSearch) => {
-    Alert.alert(
+    appAlert(
       'Aramayı Sil',
       `"${search.name}" aramasını silmek istediğinize emin misiniz?`,
       [
@@ -155,7 +156,7 @@ export default function SavedSearchesScreen() {
         <Text variant="body" style={styles.subtitle}>
           Aramalarınızı kaydetmek için giriş yapın
         </Text>
-        <Button variant="primary" title="Giriş Yap" onPress={() => router.push('/(auth)/login')} />
+        <Button variant="primary" title="Giriş Yap" onPress={() => router.push('/(auth)/login')} style={{ alignSelf: 'center' }} />
       </View>
     );
   }
@@ -199,7 +200,7 @@ export default function SavedSearchesScreen() {
           <Text variant="body" style={styles.emptySubtitle}>
             Arama sayfasında arama yapıp "Aramayı Kaydet" butonuna tıklayın
           </Text>
-          <Button variant="primary" title="Aramaya Git" onPress={() => router.push('/(tabs)/search')} />
+          <Button variant="primary" title="Aramaya Git" onPress={() => router.push('/(tabs)/search')} style={{ alignSelf: 'center' }} />
         </View>
       ) : (
         <ScrollView style={styles.content}>

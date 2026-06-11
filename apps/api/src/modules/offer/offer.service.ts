@@ -544,6 +544,21 @@ export class OfferService {
         },
       });
 
+      // Alıcıya karşı teklif bildirimi (buyerCounter ile parite — eksikti)
+      try {
+        await this.notificationService.createInAppNotification(
+          offer.buyerId,
+          NotificationType.OFFER_COUNTER,
+          {
+            productId: offer.productId,
+            productTitle: offer.product.title,
+            amount: dto.amount,
+          },
+        );
+      } catch (e) {
+        this.logger.error(`counter notification: ${e}`);
+      }
+
       return await this.formatOfferResponse(counterOffer);
     });
   }

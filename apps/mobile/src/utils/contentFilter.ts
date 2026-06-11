@@ -119,6 +119,17 @@ export function parseMessageContent(content: string): ParsedMessage {
   return { text, images };
 }
 
+/**
+ * Liste önizlemesi için [IMG:url] işaretini "📷 Fotoğraf" etiketine çevirir.
+ * Ör: "[IMG:https://...]" → "📷 Fotoğraf", "bak [IMG:...]" → "bak 📷 Fotoğraf"
+ */
+export function formatMessagePreview(content: string): string {
+  if (!content) return '';
+  const { text, images } = parseMessageContent(content);
+  if (images.length === 0) return text;
+  return text ? `${text} 📷 Fotoğraf` : '📷 Fotoğraf';
+}
+
 export function embedImageInMessage(existingText: string, imageUrl: string): string {
   const base = existingText ? existingText.trim() + ' ' : '';
   return `${base}[IMG:${imageUrl}]`;

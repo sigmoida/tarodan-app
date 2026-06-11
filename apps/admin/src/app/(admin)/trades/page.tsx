@@ -1,25 +1,22 @@
 "use client";
 
-import { useState, useEffect, useMemo, useCallback } from "react";
+import { useState, useEffect, useMemo } from "react";
 import Link from "next/link";
 import { useSearchParams, useRouter } from "next/navigation";
 import { adminApi } from "@/lib/api";
 import { cancelReasonLabel } from "@/lib/utils";
 import {
   Button,
-  Input,
   Select,
-  Spinner,
   StatusBadge,
   tradeStatusConfig,
 } from "@tarodan/ui";
 import type { StatusConfig } from "@tarodan/ui";
+import { DataTable, type ColumnDef } from "@/components/DataTable";
+import { PageHeader, ActionButtons, ActionIconButton } from "@/components/admin-list";
 import {
-  MagnifyingGlassIcon,
   EyeIcon,
   ExclamationTriangleIcon,
-  UserIcon,
-  XCircleIcon,
 } from "@heroicons/react/24/outline";
 import toast from "react-hot-toast";
 
@@ -35,12 +32,6 @@ interface Trade {
   hasDispute: boolean;
   createdAt: string;
   cancelReason?: string;
-}
-
-interface User {
-  id: string;
-  displayName: string;
-  email: string;
 }
 
 const statusOptions = [
@@ -74,64 +65,16 @@ export default function TradesPage() {
   const [total, setTotal] = useState(0);
   const [reviewQueueCount, setReviewQueueCount] = useState(0);
 
-  // User filtering
-  const [users, setUsers] = useState<User[]>([]);
+  // User filter (driven by URL ?userId= deep-links, e.g. from user detail page)
   const [selectedUserId, setSelectedUserId] = useState<string>(urlUserId);
-  const [userSearch, setUserSearch] = useState("");
-  const [showUserDropdown, setShowUserDropdown] = useState(false);
-  const [loadingUsers, setLoadingUsers] = useState(false);
-
-  // Load users for dropdown
-  const loadUsers = useCallback(async (searchTerm: string) => {
-    if (!searchTerm || searchTerm.length < 2) {
-      setUsers([]);
-      return;
-    }
-    setLoadingUsers(true);
-    try {
-      const response = await adminApi.getUsers({
-        search: searchTerm,
-        limit: 10,
-      });
-      const data = response.data.data || response.data.users || [];
-      setUsers(
-        data.map((u: any) => ({
-          id: u.id,
-          displayName: u.displayName,
-          email: u.email,
-        })),
-      );
-    } catch (error) {
-      if (process.env.NODE_ENV === "development")
-        console.error("Load users error:", error);
-    } finally {
-      setLoadingUsers(false);
-    }
-  }, []);
-
-  // Debounce user search
-  useEffect(() => {
-    const timer = setTimeout(() => {
-      if (userSearch) loadUsers(userSearch);
-    }, 300);
-    return () => clearTimeout(timer);
-  }, [userSearch, loadUsers]);
 
   // Sync URL userId with state
   useEffect(() => {
     setSelectedUserId(urlUserId);
   }, [urlUserId]);
 
-  const handleSelectUser = (user: User) => {
-    setSelectedUserId(user.id);
-    setUserSearch(user.displayName);
-    setShowUserDropdown(false);
-    router.push(`/trades?userId=${user.id}`);
-  };
-
   const clearUserFilter = () => {
     setSelectedUserId("");
-    setUserSearch("");
     router.push("/trades");
   };
 
@@ -202,13 +145,114 @@ export default function TradesPage() {
 
   const disputedCount = trades.filter((t) => t.hasDispute).length;
 
+  const columns: ColumnDef<Trade, any>[] = [
+    {
+      header: "Takas No",
+      cell: ({ row }) => (
+        <span className="font-mono text-sm">{row.original.tradeNumber}</span>
+      ),
+    },
+    {
+      header: "Durum",
+      cell: ({ row }) =>
+        row.original.hasDispute ? (
+          <StatusBadge
+            status="disputed_override"
+            config={disputeConfig}
+            label="⚠️ İtirazlı"
+          />
+        ) : (
+          <div className="flex flex-col items-start gap-1">
+            <StatusBadge status={row.original.status} config={tradeStatusConfig} />
+            {row.original.status === "cancelled" &&
+              cancelReasonLabel(row.original.cancelReason) && (
+                <span className="text-xs text-muted">
+                  {cancelReasonLabel(row.original.cancelReason)}
+                </span>
+              )}
+          </div>
+        ),
+    },
+    {
+      header: "Başlatan",
+      cell: ({ row }) => (
+        <Link
+          href={`/users/${row.original.initiator.id}`}
+          className="text-heading hover:text-primary-600"
+        >
+          {row.original.initiator.displayName}
+        </Link>
+      ),
+    },
+    {
+      header: "Alan",
+      cell: ({ row }) => (
+        <Link
+          href={`/users/${row.original.receiver.id}`}
+          className="text-heading hover:text-primary-600"
+        >
+          {row.original.receiver.displayName}
+        </Link>
+      ),
+    },
+    {
+      header: "Ürünler",
+      cell: ({ row }) => (
+        <>
+          {row.original.initiatorItemsCount} ↔️ {row.original.receiverItemsCount}
+        </>
+      ),
+    },
+    {
+      header: "Nakit",
+      cell: ({ row }) =>
+        row.original.cashAmount ? (
+          <span className="text-primary-400">
+            +₺{row.original.cashAmount.toLocaleString()}
+          </span>
+        ) : (
+          <span className="text-muted">-</span>
+        ),
+    },
+    {
+      header: "Tarih",
+      cell: ({ row }) => (
+        <span className="whitespace-nowrap">
+          {new Date(row.original.createdAt).toLocaleDateString("tr-TR")}
+        </span>
+      ),
+    },
+    {
+      id: "actions",
+      header: "İşlemler",
+      cell: ({ row }) => (
+        <ActionButtons>
+          <ActionIconButton
+            icon={EyeIcon}
+            href={`/trades/${row.original.id}`}
+            title="Detay"
+          />
+          {row.original.hasDispute && (
+            <Button
+              variant="secondary"
+              className="p-2 text-danger-600 hover:bg-danger-500/10 rounded-lg"
+              title="İtirazı Çöz"
+            >
+              <ExclamationTriangleIcon className="h-5 w-5" />
+            </Button>
+          )}
+        </ActionButtons>
+      ),
+    },
+  ];
+
   return (
     <>
       <div className="space-y-6">
-        <div className="flex justify-between items-start">
-          <div>
-            <h1 className="text-2xl font-bold text-heading">Takaslar</h1>
-            <p className="text-muted mt-1">
+        <PageHeader
+          title="Takaslar"
+          description={
+            <>
               Toplam {total} takas
               {selectedUserId && (
                 <span className="ml-2">
@@ -222,90 +266,38 @@ export default function TradesPage() {
                   </Button>
                 </span>
               )}
-            </p>
-          </div>
-          <div className="flex flex-col gap-2 items-end">
-            {reviewQueueCount > 0 && (
-              <Button
-                variant="secondary"
-                onClick={() => {
-                  setStatus("at_warehouse");
-                  setPage(1);
-                }}
-                className={`flex items-center gap-2 px-4 py-2 rounded-lg border font-medium transition-colors ${
-                  status === "at_warehouse"
-                    ? "bg-warning-500 text-inverted border-warning-600"
-                    : "bg-warning-100 text-warning-900 border-warning-400 hover:bg-warning-200"
-                }`}
-                title="İnceleme kuyruğunu filtrele"
-              >
-                <ExclamationTriangleIcon className="h-5 w-5" />
-                <span>{reviewQueueCount} takas inceleme bekliyor</span>
-              </Button>
-            )}
-            {disputedCount > 0 && (
-              <div className="flex items-center gap-2 px-4 py-2 bg-danger-900/20 border border-danger-700 rounded-lg">
-                <ExclamationTriangleIcon className="h-5 w-5 text-danger-600" />
-                <span className="text-danger-600">
-                  {disputedCount} itirazlı takas
-                </span>
-              </div>
-            )}
-          </div>
-        </div>
+            </>
+          }
+        >
+          {reviewQueueCount > 0 && (
+            <Button
+              variant="secondary"
+              onClick={() => {
+                setStatus("at_warehouse");
+                setPage(1);
+              }}
+              className={`flex items-center gap-2 px-4 py-2 rounded-lg border font-medium transition-colors ${
+                status === "at_warehouse"
+                  ? "bg-warning-500 text-inverted border-warning-600"
+                  : "bg-warning-100 text-warning-900 border-warning-400 hover:bg-warning-200"
+              }`}
+              title="İnceleme kuyruğunu filtrele"
+            >
+              <ExclamationTriangleIcon className="h-5 w-5 shrink-0" />
+              <span>{reviewQueueCount} takas inceleme bekliyor</span>
+            </Button>
+          )}
+          {disputedCount > 0 && (
+            <div className="flex items-center gap-2 px-4 py-2 bg-danger-900/20 border border-danger-700 rounded-lg">
+              <ExclamationTriangleIcon className="h-5 w-5 text-danger-600 shrink-0" />
+              <span className="text-danger-600">
+                {disputedCount} itirazlı takas
+              </span>
+            </div>
+          )}
+        </PageHeader>
 
         <div className="flex flex-col sm:flex-row gap-4">
-          {/* User Filter */}
-          <div className="relative w-full sm:w-64">
-            <UserIcon className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-muted" />
-            <Input
-              type="text"
-              placeholder="Kullanıcı ara..."
-              value={userSearch}
-              onChange={(e) => {
-                setUserSearch(e.target.value);
-                setShowUserDropdown(true);
-              }}
-              onFocus={() => setShowUserDropdown(true)}
-              className="pl-10 pr-10"
-            />
-            {selectedUserId && (
-              <Button
-                variant="secondary"
-                onClick={clearUserFilter}
-                className="absolute right-3 top-1/2 -translate-y-1/2 text-muted hover:text-heading"
-              >
-                <XCircleIcon className="h-5 w-5" />
-              </Button>
-            )}
-
-            {showUserDropdown && userSearch.length >= 2 && (
-              <div className="absolute z-50 mt-1 bg-surface-alt shadow-lg max-h-60 overflow-y-auto">
-                {loadingUsers ? (
-                  <div className="p-3 text-center text-muted">
-                    Aranıyor...
-                  </div>
-                ) : users.length > 0 ? (
-                  users.map((user) => (
-                    <Button
-                      variant="secondary"
-                      key={user.id}
-                      onClick={() => handleSelectUser(user)}
-                      className="w-full px-4 py-2 text-left hover:bg-surface-alt text-heading"
-                    >
-                      <div className="font-medium">{user.displayName}</div>
-                      <div className="text-xs text-muted">{user.email}</div>
-                    </Button>
-                  ))
-                ) : (
-                  <div className="p-3 text-center text-muted">
-                    Kullanıcı bulunamadı
-                  </div>
-                )}
-              </div>
-            )}
-          </div>
-
           <Select
             value={status}
             onChange={(e) => setStatus(e.target.value)}
@@ -319,122 +311,14 @@ export default function TradesPage() {
           </Select>
         </div>
 
-        <div className="admin-card overflow-hidden">
-          <div className="overflow-x-auto">
-            <table className="admin-table">
-              <thead>
-                <tr>
-                  <th>Takas No</th>
-                  <th>Durum</th>
-                  <th>Başlatan</th>
-                  <th>Alan</th>
-                  <th>Ürünler</th>
-                  <th>Nakit</th>
-                  <th>Tarih</th>
-                  <th>İşlemler</th>
-                </tr>
-              </thead>
-              <tbody>
-                {loading ? (
-                  <tr>
-                    <td colSpan={8} className="text-center py-8">
-                      <Spinner size="lg" className="mx-auto" />
-                    </td>
-                  </tr>
-                ) : trades.length === 0 ? (
-                  <tr>
-                    <td colSpan={8} className="text-center py-8 text-muted">
-                      Takas bulunamadı
-                    </td>
-                  </tr>
-                ) : (
-                  trades.map((trade) => (
-                    <tr
-                      key={trade.id}
-                      className={trade.hasDispute ? "bg-danger-900/10" : ""}
-                    >
-                      <td className="font-mono text-sm">{trade.tradeNumber}</td>
-                      <td>
-                        {trade.hasDispute ? (
-                          <StatusBadge
-                            status="disputed_override"
-                            config={disputeConfig}
-                            label="⚠️ İtirazlı"
-                          />
-                        ) : (
-                          <div className="flex flex-col items-start gap-1">
-                            <StatusBadge
-                              status={trade.status}
-                              config={tradeStatusConfig}
-                            />
-                            {trade.status === "cancelled" &&
-                              cancelReasonLabel(trade.cancelReason) && (
-                                <span className="text-xs text-muted">
-                                  {cancelReasonLabel(trade.cancelReason)}
-                                </span>
-                              )}
-                          </div>
-                        )}
-                      </td>
-                      <td>
-                        <Link
-                          href={`/users/${trade.initiator.id}`}
-                          className="text-heading hover:text-primary-600"
-                        >
-                          {trade.initiator.displayName}
-                        </Link>
-                      </td>
-                      <td>
-                        <Link
-                          href={`/users/${trade.receiver.id}`}
-                          className="text-heading hover:text-primary-600"
-                        >
-                          {trade.receiver.displayName}
-                        </Link>
-                      </td>
-                      <td>
-                        {trade.initiatorItemsCount} ↔️{" "}
-                        {trade.receiverItemsCount}
-                      </td>
-                      <td>
-                        {trade.cashAmount ? (
-                          <span className="text-primary-400">
-                            +₺{trade.cashAmount.toLocaleString()}
-                          </span>
-                        ) : (
-                          <span className="text-muted">-</span>
-                        )}
-                      </td>
-                      <td className="whitespace-nowrap">
-                        {new Date(trade.createdAt).toLocaleDateString("tr-TR")}
-                      </td>
-                      <td className="whitespace-nowrap">
-                        <div className="flex gap-1">
-                          <Link
-                            href={`/trades/${trade.id}`}
-                            className="p-2 text-muted hover:text-heading hover:bg-surface-alt rounded-lg"
-                            title="Detay"
-                          >
-                            <EyeIcon className="h-5 w-5" />
-                          </Link>
-                          {trade.hasDispute && (
-                            <Button
-                              variant="secondary"
-                              className="p-2 text-danger-600 hover:bg-danger-500/10 rounded-lg"
-                              title="İtirazı Çöz"
-                            >
-                              <ExclamationTriangleIcon className="h-5 w-5" />
-                            </Button>
-                          )}
-                        </div>
-                      </td>
-                    </tr>
-                  ))
-                )}
-              </tbody>
-            </table>
-          </div>
-        </div>
+        <DataTable
+          columns={columns}
+          data={trades}
+          loading={loading}
+          emptyText="Takas bulunamadı"
+          getRowId={(t) => t.id}
+          rowClassName={(t) => (t.hasDispute ? "bg-danger-900/10" : "")}
+        />
 
         <div className="flex items-center justify-between">
           <p className="text-sm text-muted">

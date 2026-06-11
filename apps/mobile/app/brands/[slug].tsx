@@ -1,7 +1,6 @@
 import React from 'react';
 import { View, StyleSheet, Image } from 'react-native';
 
-import { SafeAreaView } from 'react-native-safe-area-context';
 import { useLocalSearchParams } from 'expo-router';
 import { useQuery } from '@tanstack/react-query';
 import { brandsApi, productsApi } from '../../src/services/api';
@@ -54,7 +53,7 @@ export default function BrandDetailScreen() {
   const products: ProductCardProduct[] = productsData ?? [];
 
   return (
-    <SafeAreaView style={styles.container} edges={['top']}>
+    <View style={styles.container}>
       <ScreenHeader title={brand?.name || 'Marka'} />
 
       <ProductGrid
@@ -87,7 +86,7 @@ export default function BrandDetailScreen() {
           ) : null
         }
       />
-    </SafeAreaView>
+    </View>
   );
 }
 

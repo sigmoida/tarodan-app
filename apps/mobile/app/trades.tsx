@@ -11,9 +11,9 @@ import {
   VStack,
   theme,
 } from '@tarodan/ui-native';
-import { tradesApi } from '../../src/services/api';
-import { useAuthStore } from '../../src/stores/authStore';
-import { TradeCard, type TradeCardTrade } from '../../src/components/trade/TradeCard';
+import { tradesApi } from '../src/services/api';
+import { useAuthStore } from '../src/stores/authStore';
+import { TradeCard, type TradeCardTrade } from '../src/components/trade/TradeCard';
 
 const { colors, spacing } = theme;
 
@@ -105,6 +105,7 @@ export default function TradesScreen() {
             variant="primary"
             title="Giriş Yap"
             onPress={() => router.push('/(auth)/login')}
+            style={{ alignSelf: 'center' }}
           />
         </View>
       </View>

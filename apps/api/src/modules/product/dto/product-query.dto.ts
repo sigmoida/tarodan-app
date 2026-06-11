@@ -120,6 +120,16 @@ export class ProductQueryDto {
 
   @ApiPropertyOptional({
     example: true,
+    description:
+      'Only products that can be offered in a trade (active, not in an active trade, has available stock). Used by /products/my.',
+  })
+  @IsOptional()
+  @Transform(({ value }) => value === 'true' || value === true)
+  @IsBoolean()
+  tradeEligible?: boolean;
+
+  @ApiPropertyOptional({
+    example: true,
     description: 'Filter only actively boosted (sponsored) products',
   })
   @IsOptional()

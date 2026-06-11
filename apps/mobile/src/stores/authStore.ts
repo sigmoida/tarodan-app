@@ -117,7 +117,7 @@ const TIER_LIMITS: Record<MembershipTier, MembershipLimits> = {
   free: {
     maxListings: 10,
     maxImagesPerListing: 5,
-    maxAddresses: 3,
+    maxAddresses: 10,
     maxSavedSearches: 5,
     maxMessagesPerDay: 50,
     listingExpireDays: 60,
@@ -134,7 +134,7 @@ const TIER_LIMITS: Record<MembershipTier, MembershipLimits> = {
   basic: {
     maxListings: 25,
     maxImagesPerListing: 10,
-    maxAddresses: 5,
+    maxAddresses: 10,
     maxSavedSearches: 10,
     maxMessagesPerDay: 100,
     listingExpireDays: 90,
@@ -168,7 +168,7 @@ const TIER_LIMITS: Record<MembershipTier, MembershipLimits> = {
   business: {
     maxListings: -1,
     maxImagesPerListing: 20,
-    maxAddresses: -1,
+    maxAddresses: 10,
     maxSavedSearches: -1,
     maxMessagesPerDay: -1,
     listingExpireDays: -1,
@@ -338,11 +338,24 @@ export const useAuthStore = create<AuthState>((set, get) => ({
     await SecureStore.deleteItemAsync('accessToken');
     await SecureStore.deleteItemAsync('refreshToken');
     set({ isAuthenticated: false, token: null, user: null, limits: null });
+    // Kullanıcıya özel yerel state (sepet/favori/mesaj rozetleri, query cache).
+    // Lazy require: messagesStore → authStore import zinciriyle döngü oluşmasın.
+    const { resetUserStores } = require('./resetUserStores');
+    resetUserStores();
     setSentryUser(null);
   },
 
   loadToken: async () => {
     try {
+      // Maestro register/guest journey: keychain (SecureStore) clearState'i atlatıp
+      // önceki oturumun token'ını taşıyabiliyor. NO_AUTOLOGIN modunda token'ı temizle
+      // ki gerçekten çıkışlı (misafir) başlansın. Yalnız test gate'i — prod'da unset.
+      if (process.env.EXPO_PUBLIC_MAESTRO_NO_AUTOLOGIN === '1') {
+        await SecureStore.deleteItemAsync('accessToken');
+        await SecureStore.deleteItemAsync('refreshToken');
+        set({ isAuthenticated: false, token: null, user: null, limits: null, isLoading: false });
+        return;
+      }
       const token = await SecureStore.getItemAsync('accessToken');
       if (token) {
         // Web ile aynı endpoint: GET /users/me
@@ -356,7 +369,10 @@ export const useAuthStore = create<AuthState>((set, get) => ({
           limits,
           isLoading: false,
         });
-      } else if (process.env.EXPO_PUBLIC_MAESTRO === '1') {
+      } else if (
+        process.env.EXPO_PUBLIC_MAESTRO === '1' &&
+        process.env.EXPO_PUBLIC_MAESTRO_NO_AUTOLOGIN !== '1'
+      ) {
         // Maestro test bypass: auto-login with seeded credentials so that
         // e2e flows skip the login UI entirely. Code path is gated behind
         // EXPO_PUBLIC_MAESTRO and excluded from prod bundles by Expo's

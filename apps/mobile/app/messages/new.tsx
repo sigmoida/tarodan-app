@@ -118,12 +118,19 @@ export default function NewMessageScreen() {
     setSearchQuery('');
   };
 
+  // Geri git; stack kökündeysek (deep link / replace ile gelinmişse) mesajlara düş.
+  // Düz router.back() bu durumda "GO_BACK was not handled by any navigator" hatası verir.
+  const handleBack = () => {
+    if (router.canGoBack()) router.back();
+    else router.replace('/(tabs)/messages' as never);
+  };
+
   return (
     <KeyboardAvoidingView
       style={styles.container}
       behavior={Platform.OS === 'ios' ? 'padding' : undefined}
     >
-      <ScreenHeader title={t('mobile.messagesNew')} onBack={() => router.back()} />
+      <ScreenHeader title={t('mobile.messagesNew')} onBack={handleBack} />
 
       {/* Content */}
       <View style={styles.content}>
@@ -187,9 +194,6 @@ export default function NewMessageScreen() {
               <Text variant="body" style={styles.recipientName}>
                 {selectedUser.displayName}
               </Text>
-              <TouchableOpacity onPress={() => setSelectedUser(null)}>
-                <Ionicons name="close-circle" size={24} color={colors.text.muted} />
-              </TouchableOpacity>
             </View>
           </View>
         )}
@@ -220,6 +224,7 @@ export default function NewMessageScreen() {
             <RNTextInput
               style={styles.messageInput}
               placeholder={canSend ? "Mesajınızı yazın..." : "Mesaj limiti doldu"}
+              placeholderTextColor={colors.text.subtle}
               value={messageText}
               onChangeText={setMessageText}
               multiline
@@ -248,6 +253,8 @@ export default function NewMessageScreen() {
       <View style={styles.footer}>
         <Button
           variant="primary"
+          fullWidth
+          size="lg"
           title="Gönder"
           onPress={handleSend}
           disabled={!selectedUser || !messageText.trim() || !canSend || sending}

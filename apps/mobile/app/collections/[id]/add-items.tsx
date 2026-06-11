@@ -1,4 +1,4 @@
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useRef } from 'react';
 import { View, ScrollView, StyleSheet, TouchableOpacity, Image, ActivityIndicator } from 'react-native';
 import { theme, Button, Input, Snackbar, Spinner, Text } from '@tarodan/ui-native';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
@@ -30,6 +30,13 @@ export default function AddCollectionItemsScreen() {
   const [snackbar, setSnackbar] = useState({ visible: false, message: '' });
   // o an POST/DELETE bekleyen productId'ler (satır spinner'ı + tekrar-tıklama kilidi)
   const [pending, setPending] = useState<Record<string, boolean>>({});
+  // Sunucu haritasının ÜZERİNE binen yerel katman: itemId (eklendi) | null (çıkarıldı).
+  // Query cache'e yazmıyoruz; böylece bir başka satırın tetiklediği refetch, hâlâ
+  // uçuşta olan mutasyonların optimistic işaretini silemez (ard arda ekleme yarışı).
+  const [overlay, setOverlay] = useState<Record<string, string | null>>({});
+  // Uçuştaki mutasyon sayısı: picker refetch'i ancak hepsi bittiğinde yapılır,
+  // yoksa eski sunucu verisi devam eden işlemlerin durumunu ezer.
+  const inFlight = useRef(0);
 
   // Kullanıcının kendi ilanları. Sadece koleksiyonda görünür olabilecek
   // durumdakileri (active/sold) göster — backend görünür item filtresiyle birebir,
@@ -68,25 +75,28 @@ export default function AddCollectionItemsScreen() {
     return listings.filter((l) => l.title?.toLowerCase().includes(q));
   }, [listings, search]);
 
-  const patchPicker = (productId: string, itemId: string | null) => {
-    queryClient.setQueryData<Record<string, string>>(
-      ['collection-picker', collectionId],
-      (old) => {
-        const next = { ...(old || {}) };
-        if (itemId) next[productId] = itemId;
-        else delete next[productId];
-        return next;
-      },
-    );
+  // Ekranda gösterilen durum: sunucu haritası + yerel katman.
+  // overlay'de null → çıkarıldı, string → eklendi (gerçek id ya da OPTIMISTIC).
+  const effectiveItemId = (productId: string): string | undefined => {
+    if (productId in overlay) return overlay[productId] ?? undefined;
+    return serverMap[productId];
+  };
+
+  const patchOverlay = (productId: string, itemId: string | null) => {
+    setOverlay((o) => ({ ...o, [productId]: itemId }));
   };
 
   const toggle = async (listing: Listing) => {
     if (pending[listing.id]) return;
-    const itemId = serverMap[listing.id];
+    const itemId = effectiveItemId(listing.id);
+    // Gerçek itemId henüz gelmediyse (önceki ekleme "zaten ekli" ile düştü ve
+    // refetch bekleniyor) çıkarma isteği atılamaz; senkron tamamlanana dek bekle.
+    if (itemId === OPTIMISTIC) return;
     const adding = !itemId;
     setPending((p) => ({ ...p, [listing.id]: true }));
-    // Optimistic: anında işaretle/kaldır. finally'deki invalidate gerçeğe oturtur.
-    patchPicker(listing.id, adding ? OPTIMISTIC : null);
+    inFlight.current += 1;
+    // Optimistic: anında işaretle/kaldır. Sunucu cevabı gerçeğe oturtur.
+    patchOverlay(listing.id, adding ? OPTIMISTIC : null);
 
     try {
       if (!adding) {
@@ -96,12 +106,12 @@ export default function AddCollectionItemsScreen() {
         try {
           const res = await collectionsApi.addItem(collectionId, { productId: listing.id });
           const newItem = res.data?.data || res.data;
-          if (newItem?.id) patchPicker(listing.id, newItem.id);
+          if (newItem?.id) patchOverlay(listing.id, newItem.id);
           setSnackbar({ visible: true, message: 'Koleksiyona eklendi' });
         } catch (e: any) {
           const msg = e?.response?.data?.message || '';
           // Yarış/eskimiş durum: ürün zaten ekliyse hata gösterme, ekli kabul et.
-          // Aşağıdaki invalidate gerçek itemId'yi getirir.
+          // Aşağıdaki refetch gerçek itemId'yi getirir.
           if (e?.response?.status === 400 && /zaten/i.test(msg)) {
             setSnackbar({ visible: true, message: 'Bu ürün zaten koleksiyonda' });
           } else {
@@ -114,15 +124,26 @@ export default function AddCollectionItemsScreen() {
       queryClient.invalidateQueries({ queryKey: ['collections'] });
       queryClient.invalidateQueries({ queryKey: ['myCollections'] });
     } catch (e: any) {
+      // Başarısız mutasyonu geri al: katmandan düş, sunucu haritası geçerli olsun.
+      setOverlay((o) => {
+        const next = { ...o };
+        delete next[listing.id];
+        return next;
+      });
       setSnackbar({
         visible: true,
         message: e?.response?.data?.message || 'İşlem başarısız',
       });
     } finally {
-      // Her durumda picker'ı sunucudan doğrula: optimistic işareti gerçek id'ye
-      // oturtur ya da başarısız mutasyonu geri alır. Tek gerçek kaynak sunucu.
-      await queryClient.invalidateQueries({ queryKey: ['collection-picker', collectionId] });
+      inFlight.current -= 1;
       setPending((p) => ({ ...p, [listing.id]: false }));
+      // Picker'ı yalnızca uçuşta başka işlem KALMADIYSA sunucudan doğrula.
+      // Erken refetch, devam eden mutasyonların durumunu eski veriyle ezerdi.
+      if (inFlight.current === 0) {
+        await queryClient.invalidateQueries({ queryKey: ['collection-picker', collectionId] });
+        // Refetch beklenirken yeni işlem başladıysa katmana dokunma.
+        if (inFlight.current === 0) setOverlay({});
+      }
     }
   };
 
@@ -165,7 +186,7 @@ export default function AddCollectionItemsScreen() {
             title="İlan Oluştur"
             icon="add"
             onPress={() => router.push('/(tabs)/sell')}
-            style={{ marginTop: 16 }}
+            style={{ marginTop: 16, alignSelf: 'center' }}
           />
         </View>
       ) : filtered.length === 0 ? (
@@ -176,7 +197,7 @@ export default function AddCollectionItemsScreen() {
       ) : (
         <ScrollView contentContainerStyle={styles.list}>
           {filtered.map((listing) => {
-            const added = !!serverMap[listing.id];
+            const added = !!effectiveItemId(listing.id);
             const busy = !!pending[listing.id];
             return (
               <View key={listing.id} style={styles.row}>

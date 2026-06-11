@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect, useCallback, type FormEvent } from "react";
 import {
   ShieldCheckIcon,
   UserGroupIcon,
@@ -8,609 +8,563 @@ import {
   PencilIcon,
   TrashIcon,
 } from "@heroicons/react/24/outline";
-import { CheckIcon } from "@heroicons/react/24/solid";
 import toast from "react-hot-toast";
-import { Button, Checkbox, Input, Select, Textarea } from "@tarodan/ui";
+import { Button, Input, Select } from "@tarodan/ui";
+import { DataTable, type ColumnDef } from "@/components/DataTable";
+import { PageHeader, ActionButtons, ActionIconButton } from "@/components/admin-list";
+import { AdminTabs } from "@/components/AdminTabs";
+import { adminApi } from "@/lib/api";
+import { useAuthStore } from "@/lib/stores/authStore";
+import { useConfirm } from "@/components/ConfirmProvider";
 
-// Mock data for roles and permissions
-const AVAILABLE_PERMISSIONS = [
-  { id: "users.view", label: "Kullanıcıları Görüntüle", group: "Kullanıcılar" },
-  { id: "users.manage", label: "Kullanıcıları Yönet", group: "Kullanıcılar" },
-  { id: "products.view", label: "Ürünleri Görüntüle", group: "Ürünler" },
-  { id: "products.manage", label: "Ürünleri Yönet", group: "Ürünler" },
-  { id: "orders.view", label: "Siparişleri Görüntüle", group: "Siparişler" },
-  { id: "orders.manage", label: "Siparişleri Yönet", group: "Siparişler" },
-  { id: "settings.view", label: "Ayarları Görüntüle", group: "Ayarlar" },
-  { id: "settings.manage", label: "Ayarları Yönet", group: "Ayarlar" },
-  { id: "roles.manage", label: "Rolleri Yönet", group: "Ayarlar" },
-];
-
-const INITIAL_ROLES = [
+// Sistem rolleri SABİTtir (backend AdminRole enum'u: super_admin / admin / moderator).
+const SYSTEM_ROLES = [
   {
     id: "super_admin",
     name: "Süper Admin",
-    description: "Tam yetkili yönetici",
-    permissions: AVAILABLE_PERMISSIONS.map((p) => p.id),
-    usersCount: 2,
-    isSystem: true,
+    description: "Tam yetki — yönetici işlemlerinin tümü + sistem/finans ayarları.",
+    abilities: [
+      "Tüm yönetici yetkileri",
+      "Komisyon & vergi ayarları",
+      "Platform ayarları",
+      "IP engelleme & denetim kayıtları",
+      "Admin rol atama",
+    ],
   },
   {
     id: "admin",
     name: "Yönetici",
-    description: "Genel yönetim yetkisi",
-    permissions: [
-      "users.view",
-      "users.manage",
-      "products.view",
-      "products.manage",
-      "orders.view",
-      "orders.manage",
+    description: "Operasyon yönetimi — sistem ayarları hariç her şey.",
+    abilities: [
+      "Sipariş & ödeme yönetimi",
+      "Kullanıcı ban / yasak kaldırma",
+      "Raporlar & analitik",
+      "İade & takas yönetimi",
+      "İçerik moderasyonu",
     ],
-    usersCount: 5,
-    isSystem: true,
   },
   {
     id: "moderator",
     name: "Moderatör",
-    description: "İçerik ve kullanıcı denetimi",
-    permissions: ["users.view", "products.view", "products.manage"],
-    usersCount: 12,
-    isSystem: false,
+    description: "Sadece içerik moderasyonu.",
+    abilities: [
+      "Ürün onay / red",
+      "Mesaj moderasyonu",
+      "Yorum / puan moderasyonu",
+      "Destek talepleri",
+      "Kullanıcı / ürün görüntüleme",
+    ],
   },
 ];
 
-const INITIAL_ADMIN_USERS = [
-  {
-    id: "1",
-    name: "Görkem",
-    email: "gorkem@tarotaro.com",
-    role: "super_admin",
-    status: "active",
-    lastLogin: "2024-02-09 18:30",
-  },
-  {
-    id: "2",
-    name: "Ahmet",
-    email: "ahmet@tarotaro.com",
-    role: "admin",
-    status: "active",
-    lastLogin: "2024-02-08 14:20",
-  },
-  {
-    id: "3",
-    name: "Ayşe",
-    email: "ayse@tarotaro.com",
-    role: "moderator",
-    status: "inactive",
-    lastLogin: "2024-01-15 09:45",
-  },
-];
+const ROLE_NAME: Record<string, string> = {
+  super_admin: "Süper Admin",
+  admin: "Yönetici",
+  moderator: "Moderatör",
+};
+
+interface StaffItem {
+  id: string;
+  userId: string;
+  email: string;
+  name: string;
+  role: string;
+  isActive: boolean;
+  lastLoginAt: string | null;
+}
+
+function formatDate(v: string | null): string {
+  if (!v) return "—";
+  try {
+    return new Date(v).toLocaleString("tr-TR", {
+      dateStyle: "short",
+      timeStyle: "short",
+    });
+  } catch {
+    return "—";
+  }
+}
 
 export default function RolesPage() {
+  const confirm = useConfirm();
+  const { user } = useAuthStore();
+  const isSuperAdmin = user?.role === "super_admin";
+
   const [activeTab, setActiveTab] = useState<"roles" | "users">("roles");
-  const [roles, setRoles] = useState(INITIAL_ROLES);
-  const [adminUsers, setAdminUsers] = useState(INITIAL_ADMIN_USERS);
-  const [showRoleModal, setShowRoleModal] = useState(false);
-  const [showUserModal, setShowUserModal] = useState(false);
-
-  // Role Form State
-  const [editingRole, setEditingRole] = useState<any>(null);
-  const [roleForm, setRoleForm] = useState({
-    name: "",
-    description: "",
-    permissions: [] as string[],
+  const [staff, setStaff] = useState<StaffItem[]>([]);
+  const [roleCounts, setRoleCounts] = useState<Record<string, number>>({
+    super_admin: 0,
+    admin: 0,
+    moderator: 0,
   });
+  const [loading, setLoading] = useState(true);
+  const [allowAdminAssign, setAllowAdminAssign] = useState(false);
 
-  // User Assignment Form State
-  const [editingUser, setEditingUser] = useState<any>(null);
-  const [userForm, setUserForm] = useState({ email: "", role: "moderator" });
+  const [roleFilter, setRoleFilter] = useState<string | null>(null);
 
-  const handleEditRole = (role: any) => {
-    setEditingRole(role);
-    setRoleForm({
-      name: role.name,
-      description: role.description,
-      permissions: role.permissions,
-    });
-    setShowRoleModal(true);
-  };
-
-  const handleCreateRole = () => {
-    setEditingRole(null);
-    setRoleForm({ name: "", description: "", permissions: [] });
-    setShowRoleModal(true);
-  };
-
-  const handleSaveRole = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (editingRole) {
-      setRoles(
-        roles.map((r) => (r.id === editingRole.id ? { ...r, ...roleForm } : r)),
-      );
-      toast.success("Rol güncellendi");
-    } else {
-      const newRole = {
-        id: roleForm.name.toLowerCase().replace(/\s+/g, "_"),
-        ...roleForm,
-        usersCount: 0,
-        isSystem: false,
-      };
-      setRoles([...roles, newRole]);
-      toast.success("Yeni rol oluşturuldu");
-    }
-    setShowRoleModal(false);
-  };
-
-  const handleDeleteRole = (roleId: string) => {
-    if (confirm("Bu rolü silmek istediğinize emin misiniz?")) {
-      setRoles(roles.filter((r) => r.id !== roleId));
-      toast.success("Rol silindi");
-    }
-  };
-
-  const togglePermission = (permissionId: string) => {
-    setRoleForm((prev) => ({
-      ...prev,
-      permissions: prev.permissions.includes(permissionId)
-        ? prev.permissions.filter((p) => p !== permissionId)
-        : [...prev.permissions, permissionId],
-    }));
-  };
-
-  const handleAssignUser = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (editingUser) {
-      setAdminUsers((prev) =>
-        prev.map((u) =>
-          u.id === editingUser.id ? { ...u, role: userForm.role } : u,
-        ),
-      );
-      toast.success("Kullanıcı rolü güncellendi");
-    } else {
-      toast.success("Kullanıcıya rol atandı");
-    }
-    setShowUserModal(false);
-  };
-
-  // Group permissions by category
-  const groupedPermissions: Record<string, typeof AVAILABLE_PERMISSIONS> = {};
-  AVAILABLE_PERMISSIONS.forEach((perm) => {
-    if (!groupedPermissions[perm.group]) {
-      groupedPermissions[perm.group] = [];
-    }
-    groupedPermissions[perm.group].push(perm);
+  // Atama / düzenleme modalı
+  const [showModal, setShowModal] = useState(false);
+  const [editing, setEditing] = useState<StaffItem | null>(null);
+  const [form, setForm] = useState({
+    email: "",
+    role: "moderator",
+    password: "",
+    displayName: "",
   });
+  const [saving, setSaving] = useState(false);
+
+  // Yeni hesap oluşturulduğunda gösterilecek geçici şifre bilgisi
+  const [createdInfo, setCreatedInfo] = useState<{
+    email: string;
+    password: string;
+  } | null>(null);
+
+  const fetchStaff = useCallback(async () => {
+    setLoading(true);
+    try {
+      const res = await adminApi.getStaff();
+      setStaff(res.data?.items ?? []);
+      setRoleCounts(
+        res.data?.roleCounts ?? { super_admin: 0, admin: 0, moderator: 0 },
+      );
+    } catch (err: any) {
+      toast.error(err.response?.data?.message || "Admin personeli yüklenemedi");
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  const fetchSettings = useCallback(async () => {
+    try {
+      const res = await adminApi.getStaffSettings();
+      setAllowAdminAssign(!!res.data?.allowAdminAssign);
+    } catch {
+      /* ayar okunamazsa varsayılan kapalı */
+    }
+  }, []);
+
+  useEffect(() => {
+    fetchStaff();
+    fetchSettings();
+  }, [fetchStaff, fetchSettings]);
+
+  const toggleAllowAdmin = async () => {
+    const next = !allowAdminAssign;
+    setAllowAdminAssign(next); // iyimser
+    try {
+      await adminApi.setStaffSettings(next);
+      toast.success(
+        next
+          ? "Yöneticiler artık rol atayabilir"
+          : "Rol atama tekrar yalnızca süper adminde",
+      );
+    } catch (err: any) {
+      setAllowAdminAssign(!next); // geri al
+      toast.error(err.response?.data?.message || "Ayar değiştirilemedi");
+    }
+  };
+
+  const openAssign = () => {
+    setEditing(null);
+    setForm({ email: "", role: "moderator", password: "", displayName: "" });
+    setShowModal(true);
+  };
+
+  const openEdit = (s: StaffItem) => {
+    setEditing(s);
+    setForm({ email: s.email, role: s.role, password: "", displayName: "" });
+    setShowModal(true);
+  };
+
+  const handleSubmit = async (e: FormEvent) => {
+    e.preventDefault();
+    setSaving(true);
+    try {
+      if (editing) {
+        await adminApi.updateStaff(editing.id, { role: form.role });
+        toast.success("Kullanıcı rolü güncellendi");
+      } else {
+        const res = await adminApi.assignStaff({
+          email: form.email,
+          role: form.role,
+          ...(form.password ? { password: form.password } : {}),
+          ...(form.displayName ? { displayName: form.displayName } : {}),
+        });
+        toast.success("Kullanıcıya rol atandı");
+        // Yeni hesap oluşturulduysa geçici şifreyi göster
+        if (res.data?.tempPassword) {
+          setCreatedInfo({
+            email: form.email,
+            password: res.data.tempPassword,
+          });
+        }
+      }
+      setShowModal(false);
+      await fetchStaff();
+    } catch (err: any) {
+      toast.error(err.response?.data?.message || "İşlem başarısız");
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const handleRevoke = async (s: StaffItem) => {
+    if (
+      !(await confirm({
+        description: `${s.email} kullanıcısının admin yetkisini kaldırmak istediğinize emin misiniz?`,
+        destructive: true,
+      }))
+    )
+      return;
+    try {
+      await adminApi.removeStaff(s.id);
+      toast.success("Admin yetkisi kaldırıldı");
+      await fetchStaff();
+    } catch (err: any) {
+      toast.error(err.response?.data?.message || "Kaldırma başarısız");
+    }
+  };
+
+  const visibleStaff = roleFilter
+    ? staff.filter((s) => s.role === roleFilter)
+    : staff;
+
+  const columns: ColumnDef<StaffItem, any>[] = [
+    {
+      header: "Kullanıcı",
+      cell: ({ row }) => (
+        <span className="font-medium text-heading">{row.original.name}</span>
+      ),
+    },
+    {
+      header: "E-posta",
+      cell: ({ row }) => (
+        <span className="text-muted">{row.original.email}</span>
+      ),
+    },
+    {
+      header: "Rol",
+      cell: ({ row }) => (
+        <span
+          className={`px-2 py-1 rounded-full text-xs font-medium ${
+            row.original.role === "super_admin"
+              ? "bg-danger-500/10 text-danger-500"
+              : row.original.role === "admin"
+                ? "bg-primary-500/10 text-primary-500"
+                : "bg-info-500/10 text-info-500"
+          }`}
+        >
+          {ROLE_NAME[row.original.role] ?? row.original.role}
+        </span>
+      ),
+    },
+    {
+      header: "Durum",
+      cell: ({ row }) => (
+        <span
+          className={`px-2 py-1 rounded-full text-xs font-medium ${
+            row.original.isActive
+              ? "bg-success-500/10 text-success-500"
+              : "bg-muted/10 text-muted"
+          }`}
+        >
+          {row.original.isActive ? "Aktif" : "Pasif"}
+        </span>
+      ),
+    },
+    {
+      header: "Son Giriş",
+      cell: ({ row }) => (
+        <span className="text-muted">{formatDate(row.original.lastLoginAt)}</span>
+      ),
+    },
+    {
+      id: "actions",
+      header: "İşlemler",
+      cell: ({ row }) => (
+        <ActionButtons>
+          <ActionIconButton
+            icon={PencilIcon}
+            onClick={() => openEdit(row.original)}
+            title="Düzenle"
+          />
+          <ActionIconButton
+            icon={TrashIcon}
+            onClick={() => handleRevoke(row.original)}
+            title="Yetkiyi kaldır"
+            variant="danger"
+          />
+        </ActionButtons>
+      ),
+    },
+  ];
 
   return (
-    <>
-      <div className="space-y-6">
-        <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
-          <div>
-            <h1 className="text-2xl font-bold text-heading">
-              Roller ve İzinler
-            </h1>
-            <p className="text-muted mt-1">
-              Sistem erişim seviyelerini ve kullanıcı rollerini yönetin
-            </p>
+    <div className="space-y-6">
+      {/* Başlık */}
+      <PageHeader
+        title="Roller ve İzinler"
+        description="Sistem erişim seviyelerini ve kullanıcı rollerini yönetin"
+      />
+
+      {/* Sekmeler */}
+      <AdminTabs
+        tabs={[
+          { key: "roles", label: "Rol Tanımları", icon: ShieldCheckIcon },
+          { key: "users", label: "Kullanıcı Atamaları", icon: UserGroupIcon },
+        ]}
+        value={activeTab}
+        onChange={(k) => {
+          setActiveTab(k as "roles" | "users");
+          if (k === "users") setRoleFilter(null);
+        }}
+      />
+
+      {/* Yeni hesap geçici şifre uyarısı */}
+      {createdInfo && (
+        <div className="rounded-lg border border-warning-200 bg-warning-50 p-4 text-sm text-warning-800 flex items-start justify-between gap-4">
+          <div className="min-w-0">
+            <strong>{createdInfo.email}</strong> için yeni hesap oluşturuldu.
+            Geçici şifre:{" "}
+            <code className="px-2 py-0.5 bg-surface-elevated rounded font-mono">
+              {createdInfo.password}
+            </code>{" "}
+            — kullanıcıyla paylaşın (bu şifre bir daha gösterilmez).
           </div>
-          <div className="flex gap-2">
-            <Button
-              variant="secondary"
-              onClick={() => setActiveTab("roles")}
-              className={`px-4 py-2 rounded-lg transition-colors flex items-center ${
-                activeTab === "roles"
-                  ? "bg-primary-600 text-heading"
-                  : "bg-surface-alt text-muted hover:bg-surface-alt"
-              }`}
-            >
-              <ShieldCheckIcon className="w-5 h-5 mr-2" />
-              Rol Tanımları
-            </Button>
-            <Button
-              variant="secondary"
-              onClick={() => setActiveTab("users")}
-              className={`px-4 py-2 rounded-lg transition-colors flex items-center ${
-                activeTab === "users"
-                  ? "bg-primary-600 text-heading"
-                  : "bg-surface-alt text-muted hover:bg-surface-alt"
-              }`}
-            >
-              <UserGroupIcon className="w-5 h-5 mr-2" />
-              Kullanıcı Atamaları
-            </Button>
-          </div>
+          <button
+            type="button"
+            onClick={() => setCreatedInfo(null)}
+            className="text-warning-800 hover:opacity-70 shrink-0"
+          >
+            ✕
+          </button>
         </div>
+      )}
 
-        {activeTab === "roles" ? (
-          /* Roles List */
-          <div className="space-y-6">
-            <div className="flex justify-end">
-              <Button onClick={handleCreateRole} className="flex">
-                <PlusIcon className="w-5 h-5 mr-2" />
-                Yeni Rol Ekle
-              </Button>
-            </div>
-
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-              {roles.map((role) => (
-                <div
-                  key={role.id}
-                  className="admin-card relative group flex flex-col h-full"
-                >
-                  <div className="flex justify-between items-start mb-4">
-                    <div>
-                      <h3 className="text-lg font-semibold text-heading">
-                        {role.name}
-                      </h3>
-                      <div className="flex items-center mt-1">
-                        <span className="text-sm text-muted">
-                          {role.usersCount} Kullanıcı
-                        </span>
-                        {role.isSystem && (
-                          <span className="ml-2 text-xs bg-surface-alt text-muted px-2 py-0.5 rounded">
-                            Sistem
-                          </span>
-                        )}
-                      </div>
-                    </div>
-                    {!role.isSystem && (
-                      <div className="flex gap-2">
-                        <Button
-                          variant="secondary"
-                          onClick={() => handleEditRole(role)}
-                          className="p-1.5 hover:bg-surface-alt rounded transition-colors"
-                          title="Düzenle"
-                        >
-                          <PencilIcon className="w-4 h-4 text-info-700" />
-                        </Button>
-                        <Button
-                          variant="secondary"
-                          onClick={() => handleDeleteRole(role.id)}
-                          className="p-1.5 hover:bg-surface-alt rounded transition-colors"
-                          title="Sil"
-                        >
-                          <TrashIcon className="w-4 h-4 text-danger-600" />
-                        </Button>
-                      </div>
-                    )}
-                  </div>
-
-                  <p className="text-muted text-sm mb-4 flex-grow">
-                    {role.description}
-                  </p>
-
-                  <div className="mt-auto">
-                    <h4 className="text-xs font-medium text-muted uppercase mb-2">
-                      İzinler
-                    </h4>
-                    <div className="flex flex-wrap gap-2">
-                      {role.permissions.slice(0, 3).map((p) => (
-                        <span
-                          key={p}
-                          className="text-xs px-2 py-1 rounded bg-surface-alt text-muted"
-                        >
-                          {AVAILABLE_PERMISSIONS.find((ap) => ap.id === p)
-                            ?.label || p}
-                        </span>
-                      ))}
-                      {role.permissions.length > 3 && (
-                        <span className="text-xs px-2 py-1 rounded bg-surface-alt text-muted">
-                          +{role.permissions.length - 3} daha
-                        </span>
-                      )}
-                    </div>
-                  </div>
+      {activeTab === "roles" ? (
+        /* ─────────── Rol kartları (tıklanınca o roldeki kullanıcılar) ─────────── */
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+          {SYSTEM_ROLES.map((role) => (
+            <button
+              key={role.id}
+              type="button"
+              onClick={() => {
+                setRoleFilter(role.id);
+                setActiveTab("users");
+              }}
+              className="admin-card relative text-left flex flex-col h-full hover:ring-2 hover:ring-primary-400 transition-shadow cursor-pointer"
+            >
+              <div className="mb-3 min-w-0">
+                <h3 className="text-lg font-semibold text-heading truncate">
+                  {role.name}
+                </h3>
+                <span className="text-sm text-primary-600 font-medium">
+                  {loading ? "…" : (roleCounts[role.id] ?? 0)} kullanıcı →
+                  görüntüle
+                </span>
+                <span className="ml-2 shrink-0 whitespace-nowrap text-xs bg-surface-alt text-muted px-2 py-0.5 rounded">
+                  Sistem rolü
+                </span>
+              </div>
+              <p className="text-muted text-sm mb-4 flex-grow">
+                {role.description}
+              </p>
+              <div className="mt-auto">
+                <h4 className="text-xs font-medium text-muted uppercase mb-2">
+                  Yetkiler
+                </h4>
+                <div className="flex flex-wrap gap-2">
+                  {role.abilities.map((a) => (
+                    <span
+                      key={a}
+                      className="text-xs px-2 py-1 rounded bg-surface-alt text-muted"
+                    >
+                      {a}
+                    </span>
+                  ))}
                 </div>
-              ))}
-            </div>
-          </div>
-        ) : (
-          /* User Assignments */
-          <div className="admin-card overflow-hidden">
-            <div className="p-4 border-b border-border flex justify-between items-center bg-surface-elevated/50">
-              <h3 className="text-lg font-semibold text-heading">
+              </div>
+            </button>
+          ))}
+        </div>
+      ) : (
+        /* ─────────── Kullanıcı atamaları (gerçek admin personeli) ─────────── */
+        <div className="space-y-4">
+          <div className="admin-card flex flex-wrap justify-between items-center gap-3">
+            <div className="flex items-center gap-3 min-w-0">
+              <h3 className="text-lg font-semibold text-heading truncate">
                 Yönetici Kullanıcılar
               </h3>
-              <Button
-                onClick={() => {
-                  setEditingUser(null);
-                  setUserForm({ email: "", role: "moderator" });
-                  setShowUserModal(true);
-                }}
-                className="flex"
-              >
-                <PlusIcon className="w-5 h-5 mr-2" />
+              {roleFilter && (
+                <span className="text-sm text-muted">
+                  Filtre: <strong>{ROLE_NAME[roleFilter]}</strong>
+                  <button
+                    type="button"
+                    onClick={() => setRoleFilter(null)}
+                    className="ml-2 text-primary-600 hover:text-primary-700"
+                  >
+                    (temizle)
+                  </button>
+                </span>
+              )}
+            </div>
+            <div className="flex items-center gap-4 shrink-0">
+              {/* Süper admin: yöneticilere atama izni ver/al */}
+              {isSuperAdmin && (
+                <label className="flex items-center gap-2 text-sm text-muted cursor-pointer select-none">
+                  <input
+                    type="checkbox"
+                    checked={allowAdminAssign}
+                    onChange={toggleAllowAdmin}
+                    className="w-4 h-4 accent-primary-600"
+                  />
+                  Yöneticiler de atayabilsin
+                </label>
+              )}
+              <Button onClick={openAssign} className="flex items-center">
+                <PlusIcon className="w-5 h-5 mr-2 shrink-0" />
                 Yönetici Ata
               </Button>
             </div>
-            <div className="overflow-x-auto">
-              <table className="admin-table w-full">
-                <thead>
-                  <tr>
-                    <th className="text-left p-4">Kullanıcı</th>
-                    <th className="text-left p-4">E-posta</th>
-                    <th className="text-left p-4">Rol</th>
-                    <th className="text-left p-4">Durum</th>
-                    <th className="text-left p-4">Son Giriş</th>
-                    <th className="text-right p-4">İşlemler</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {adminUsers.map((user) => (
-                    <tr
-                      key={user.id}
-                      className="border-b border-border hover:bg-surface-alt/50"
-                    >
-                      <td className="p-4 font-medium text-heading">
-                        {user.name}
-                      </td>
-                      <td className="p-4 text-muted">{user.email}</td>
-                      <td className="p-4">
-                        <span
-                          className={`px-2 py-1 rounded-full text-xs font-medium ${
-                            user.role === "super_admin"
-                              ? "bg-danger-500/10 text-danger-500"
-                              : user.role === "admin"
-                                ? "bg-primary-500/10 text-primary-500"
-                                : "bg-info-500/10 text-info-500"
-                          }`}
-                        >
-                          {roles.find((r) => r.id === user.role)?.name ||
-                            user.role}
-                        </span>
-                      </td>
-                      <td className="p-4">
-                        <span
-                          className={`px-2 py-1 rounded-full text-xs font-medium ${
-                            user.status === "active"
-                              ? "bg-success-500/10 text-success-500"
-                              : "bg-muted/10 text-muted"
-                          }`}
-                        >
-                          {user.status === "active" ? "Aktif" : "Pasif"}
-                        </span>
-                      </td>
-                      <td className="p-4 text-muted">{user.lastLogin}</td>
-                      <td className="p-4 text-right">
-                        <Button
-                          variant="secondary"
-                          onClick={() => {
-                            setEditingUser(user);
-                            setUserForm({ email: user.email, role: user.role });
-                            setShowUserModal(true);
-                          }}
-                          className="text-info-700 hover:text-info-300 font-medium text-sm"
-                        >
-                          Düzenle
-                        </Button>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
           </div>
-        )}
 
-        {/* Create/Edit Role Modal */}
-        {showRoleModal && (
-          <div className="fixed inset-0 bg-heading/70 flex items-center justify-center z-50 p-4 backdrop-blur-sm">
-            <div className="bg-surface-elevated rounded-xl max-w-2xl w-full max-h-[90vh] overflow-y-auto border border-border shadow-2xl">
-              <div className="p-6">
-                <div className="flex justify-between items-center mb-6">
-                  <h3 className="text-xl font-bold text-heading">
-                    {editingRole ? "Rolü Düzenle" : "Yeni Rol Oluştur"}
-                  </h3>
-                  <Button
-                    variant="secondary"
-                    onClick={() => setShowRoleModal(false)}
-                    className="text-muted hover:text-heading"
+          <DataTable
+            columns={columns}
+            data={visibleStaff}
+            loading={loading}
+            emptyText={
+              roleFilter
+                ? "Bu rolde kullanıcı yok."
+                : "Henüz admin kullanıcı yok."
+            }
+            getRowId={(s) => s.id}
+          />
+        </div>
+      )}
+
+      {/* Atama / Düzenleme modalı */}
+      {showModal && (
+        <div className="fixed inset-0 bg-heading/70 flex items-center justify-center z-50 p-4 backdrop-blur-sm">
+          <div className="bg-surface-elevated rounded-xl max-w-md w-full border border-border shadow-2xl">
+            <div className="px-6 pb-6 pt-5">
+              <div className="flex justify-between items-center mb-6">
+                <h3 className="text-xl font-bold text-heading leading-tight">
+                  {editing ? "Rolü Güncelle" : "Kullanıcıya Rol Ata"}
+                </h3>
+                <Button
+                  variant="secondary"
+                  onClick={() => setShowModal(false)}
+                  className="text-muted hover:text-heading"
+                >
+                  <span className="sr-only">Kapat</span>
+                  <svg
+                    className="w-6 h-6"
+                    fill="none"
+                    viewBox="0 0 24 24"
+                    stroke="currentColor"
                   >
-                    <span className="sr-only">Kapat</span>
-                    <svg
-                      className="w-6 h-6"
-                      fill="none"
-                      viewBox="0 0 24 24"
-                      stroke="currentColor"
-                    >
-                      <path
-                        strokeLinecap="round"
-                        strokeLinejoin="round"
-                        strokeWidth={2}
-                        d="M6 18L18 6M6 6l12 12"
-                      />
-                    </svg>
-                  </Button>
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      strokeWidth={2}
+                      d="M6 18L18 6M6 6l12 12"
+                    />
+                  </svg>
+                </Button>
+              </div>
+
+              <form onSubmit={handleSubmit} className="space-y-6">
+                <div>
+                  <label className="block text-sm font-medium text-muted mb-1">
+                    Kullanıcı E-posta
+                  </label>
+                  <Input
+                    type="email"
+                    required
+                    value={form.email}
+                    onChange={(e) =>
+                      setForm({ ...form, email: e.target.value })
+                    }
+                    placeholder="ornek@email.com"
+                    disabled={!!editing}
+                  />
+                  {editing ? (
+                    <p className="text-xs text-muted mt-1">
+                      E-posta adresi değiştirilemez.
+                    </p>
+                  ) : (
+                    <p className="text-xs text-muted mt-1">
+                      E-posta kayıtlı değilse hesap otomatik oluşturulur.
+                    </p>
+                  )}
                 </div>
 
-                <form onSubmit={handleSaveRole} className="space-y-6">
-                  <div>
-                    <label className="block text-sm font-medium text-muted mb-1">
-                      Rol Adı
-                    </label>
-                    <Input
-                      type="text"
-                      required
-                      value={roleForm.name}
-                      onChange={(e) =>
-                        setRoleForm({ ...roleForm, name: e.target.value })
-                      }
-                      placeholder="Örn: Editör"
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-sm font-medium text-muted mb-1">
-                      Açıklama
-                    </label>
-                    <Textarea
-                      required
-                      value={roleForm.description}
-                      onChange={(e) =>
-                        setRoleForm({
-                          ...roleForm,
-                          description: e.target.value,
-                        })
-                      }
-                      rows={3}
-                      placeholder="Bu rolün yetkilerini kısaca açıklayın"
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-sm font-medium text-muted mb-3 block">
-                      İzinler
-                    </label>
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 max-h-[300px] overflow-y-auto pr-2 custom-scrollbar">
-                      {Object.entries(groupedPermissions).map(
-                        ([group, perms]) => (
-                          <div key={group} className="bg-surface-alt/50 p-4">
-                            <h4 className="font-medium text-heading mb-3 text-sm">
-                              {group}
-                            </h4>
-                            <div className="space-y-2">
-                              {perms.map((perm) => {
-                                const isChecked = roleForm.permissions.includes(
-                                  perm.id,
-                                );
-                                return (
-                                  <label
-                                    key={perm.id}
-                                    className="flex items-start gap-3 cursor-pointer group"
-                                  >
-                                    <div
-                                      className={`mt-0.5 w-5 h-5 rounded border flex-shrink-0 flex items-center justify-center transition-colors ${
-                                        isChecked
-                                          ? "bg-primary-600 border-primary-600"
-                                          : "border-border-strong group-hover:border-border-strong bg-surface-elevated"
-                                      }`}
-                                    >
-                                      {isChecked && (
-                                        <CheckIcon className="w-3.5 h-3.5 text-heading stroke-2" />
-                                      )}
-                                    </div>
-                                    <Checkbox
-                                      className="hidden"
-                                      checked={isChecked}
-                                      onChange={() => togglePermission(perm.id)}
-                                    />
-                                    <span
-                                      className={`text-sm select-none ${isChecked ? "text-heading" : "text-muted group-hover:text-muted"}`}
-                                    >
-                                      {perm.label}
-                                    </span>
-                                  </label>
-                                );
-                              })}
-                            </div>
-                          </div>
-                        ),
-                      )}
+                {/* Yeni hesap için opsiyonel alanlar */}
+                {!editing && (
+                  <>
+                    <div>
+                      <label className="block text-sm font-medium text-muted mb-1">
+                        Görünen Ad{" "}
+                        <span className="text-subtle">(yeni hesap için)</span>
+                      </label>
+                      <Input
+                        type="text"
+                        value={form.displayName}
+                        onChange={(e) =>
+                          setForm({ ...form, displayName: e.target.value })
+                        }
+                        placeholder="Boş bırakılırsa e-postadan türetilir"
+                      />
                     </div>
-                  </div>
-                  <div className="flex gap-3 justify-end pt-4 border-t border-border">
-                    <Button
-                      variant="secondary"
-                      type="button"
-                      onClick={() => setShowRoleModal(false)}
-                    >
-                      İptal
-                    </Button>
-                    <Button type="submit">
-                      {editingRole ? "Güncelle" : "Oluştur"}
-                    </Button>
-                  </div>
-                </form>
-              </div>
-            </div>
-          </div>
-        )}
+                    <div>
+                      <label className="block text-sm font-medium text-muted mb-1">
+                        Başlangıç Şifresi{" "}
+                        <span className="text-subtle">(yeni hesap için)</span>
+                      </label>
+                      <Input
+                        type="text"
+                        value={form.password}
+                        onChange={(e) =>
+                          setForm({ ...form, password: e.target.value })
+                        }
+                        placeholder="Boş bırakılırsa otomatik üretilir"
+                      />
+                    </div>
+                  </>
+                )}
 
-        {/* Assign User Modal */}
-        {showUserModal && (
-          <div className="fixed inset-0 bg-heading/70 flex items-center justify-center z-50 p-4 backdrop-blur-sm">
-            <div className="bg-surface-elevated rounded-xl max-w-md w-full border border-border shadow-2xl">
-              <div className="p-6">
-                <div className="flex justify-between items-center mb-6">
-                  <h3 className="text-xl font-bold text-heading">
-                    {editingUser ? "Rolü Güncelle" : "Kullanıcıya Rol Ata"}
-                  </h3>
+                <div>
+                  <label className="block text-sm font-medium text-muted mb-1">
+                    Atanacak Rol
+                  </label>
+                  <Select
+                    value={form.role}
+                    onChange={(e) => setForm({ ...form, role: e.target.value })}
+                  >
+                    {SYSTEM_ROLES.map((r) => (
+                      <option key={r.id} value={r.id}>
+                        {r.name}
+                      </option>
+                    ))}
+                  </Select>
+                </div>
+                <div className="flex gap-3 justify-end pt-4 border-t border-border">
                   <Button
                     variant="secondary"
-                    onClick={() => setShowUserModal(false)}
-                    className="text-muted hover:text-heading"
+                    type="button"
+                    onClick={() => setShowModal(false)}
                   >
-                    <span className="sr-only">Kapat</span>
-                    <svg
-                      className="w-6 h-6"
-                      fill="none"
-                      viewBox="0 0 24 24"
-                      stroke="currentColor"
-                    >
-                      <path
-                        strokeLinecap="round"
-                        strokeLinejoin="round"
-                        strokeWidth={2}
-                        d="M6 18L18 6M6 6l12 12"
-                      />
-                    </svg>
+                    İptal
+                  </Button>
+                  <Button type="submit" disabled={saving}>
+                    {saving ? "Kaydediliyor…" : editing ? "Güncelle" : "Ata"}
                   </Button>
                 </div>
-
-                <form onSubmit={handleAssignUser} className="space-y-6">
-                  <div>
-                    <label className="block text-sm font-medium text-muted mb-1">
-                      Kullanıcı E-posta
-                    </label>
-                    <Input
-                      type="email"
-                      required
-                      value={userForm.email}
-                      onChange={(e) =>
-                        setUserForm({ ...userForm, email: e.target.value })
-                      }
-                      placeholder="ornek@email.com"
-                      disabled={!!editingUser}
-                    />
-                    {editingUser && (
-                      <p className="text-xs text-muted mt-1">
-                        E-posta adresi değiştirilemez.
-                      </p>
-                    )}
-                  </div>
-                  <div>
-                    <label className="block text-sm font-medium text-muted mb-1">
-                      Atanacak Rol
-                    </label>
-                    <Select
-                      value={userForm.role}
-                      onChange={(e) =>
-                        setUserForm({ ...userForm, role: e.target.value })
-                      }
-                    >
-                      {roles.map((role) => (
-                        <option key={role.id} value={role.id}>
-                          {role.name}
-                        </option>
-                      ))}
-                    </Select>
-                  </div>
-                  <div className="flex gap-3 justify-end pt-4 border-t border-border">
-                    <Button
-                      variant="secondary"
-                      type="button"
-                      onClick={() => setShowUserModal(false)}
-                    >
-                      İptal
-                    </Button>
-                    <Button type="submit">
-                      {editingUser ? "Güncelle" : "Ata"}
-                    </Button>
-                  </div>
-                </form>
-              </div>
+              </form>
             </div>
           </div>
-        )}
-      </div>
-    </>
+        </div>
+      )}
+    </div>
   );
 }

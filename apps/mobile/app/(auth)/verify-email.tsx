@@ -1,9 +1,8 @@
 import { useEffect, useState } from 'react';
-import { Alert, View } from 'react-native';
+import { View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { router, useLocalSearchParams } from 'expo-router';
 import { useMutation } from '@tanstack/react-query';
-import { SafeAreaView } from 'react-native-safe-area-context';
 import {
   Button,
   Input,
@@ -12,6 +11,7 @@ import {
   Text,
   VStack,
   theme,
+  appAlert,
 } from '@tarodan/ui-native';
 import { authApi } from '../../src/services/api';
 import { useAuthStore } from '../../src/stores/authStore';
@@ -43,14 +43,14 @@ export default function VerifyEmailScreen() {
   const resendMutation = useMutation({
     mutationFn: () => authApi.resendVerification(user?.email ?? ''),
     onSuccess: () => {
-      Alert.alert(
+      appAlert(
         'Gönderildi',
         'Yeni bir doğrulama bağlantısı e-posta adresinize gönderildi. Spam kutunuzu da kontrol etmeyi unutmayın.',
       );
     },
     onError: (e: unknown) => {
       const err = e as { response?: { data?: { message?: string } } };
-      Alert.alert('Hata', err?.response?.data?.message || 'Doğrulama bağlantısı gönderilemedi.');
+      appAlert('Hata', err?.response?.data?.message || 'Doğrulama bağlantısı gönderilemedi.');
     },
   });
 
@@ -62,7 +62,7 @@ export default function VerifyEmailScreen() {
   }, [tokenParam, status, verifyMutation]);
 
   const handleManual = () => {
-    if (!manualToken.trim()) return Alert.alert('Eksik', 'Doğrulama kodunu girin.');
+    if (!manualToken.trim()) return appAlert('Eksik', 'Doğrulama kodunu girin.');
     setStatus('verifying');
     verifyMutation.mutate(manualToken.trim());
   };
@@ -77,8 +77,8 @@ export default function VerifyEmailScreen() {
         : colors.primary[600]!;
 
   return (
-    <SafeAreaView style={{ flex: 1, backgroundColor: colors.surface.DEFAULT }} edges={['top']}>
-      <ScreenHeader title="E-posta Doğrulama" variant="light" onBack={() => router.back()} />
+    <View style={{ flex: 1, backgroundColor: colors.surface.DEFAULT }}>
+      <ScreenHeader title="E-posta Doğrulama" onBack={() => router.back()} />
 
       <VStack gap={2} align="center" padding={6} flex={1}>
         <View style={{ marginTop: spacing[4], marginBottom: spacing[2] }}>
@@ -180,6 +180,6 @@ export default function VerifyEmailScreen() {
           </>
         )}
       </VStack>
-    </SafeAreaView>
+    </View>
   );
 }

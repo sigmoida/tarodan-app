@@ -122,6 +122,22 @@ export default function CheckoutPage() {
   const [guestOtpModalOpen, setGuestOtpModalOpen] = useState(false);
   const guestOtpInputRef = useRef<HTMLInputElement>(null);
 
+  // Checkout idempotency anahtarı: aynı sepet için tekrar denemeler (çift tıklama,
+  // ağ hatası sonrası retry) sunucuda AYNI grubu döndürür. İlk submit'te üretilir.
+  const checkoutIdempotencyKeyRef = useRef<string | null>(null);
+  const getCheckoutIdempotencyKey = () => {
+    if (!checkoutIdempotencyKeyRef.current) {
+      checkoutIdempotencyKeyRef.current =
+        typeof crypto !== "undefined" && crypto.randomUUID
+          ? crypto.randomUUID()
+          : "xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx".replace(/[xy]/g, (c) => {
+              const r = (Math.random() * 16) | 0;
+              return (c === "x" ? r : (r & 0x3) | 0x8).toString(16);
+            });
+    }
+    return checkoutIdempotencyKeyRef.current;
+  };
+
   // New address form
   const [newAddress, setNewAddress] = useState<Omit<Address, "id">>({
     title: "",
@@ -918,13 +934,17 @@ export default function CheckoutPage() {
         return;
       }
 
-      // Create orders - use different endpoint based on auth status
-      for (const item of checkoutItems) {
+      // Tüm sepet TEK çağrıda, tek CheckoutGroup altında sipariş edilir; tek
+      // ödeme grubu kapsar (eski ürün-başına-sipariş döngüsü 2. siparişi ödemesiz bırakıyordu).
+      {
         let orderResponse;
+        const checkoutGroupItems = checkoutItems.map((ci) => ({
+          productId: ci.productId,
+        }));
 
         try {
           if (isAuthenticated) {
-            // Authenticated user: use directBuy endpoint
+            // Authenticated user: use batch checkout endpoint
             // Only send shippingAddressId if it's a valid UUID, otherwise send shippingAddress object
             const validAddressId =
               hasSavedAddress &&
@@ -935,7 +955,8 @@ export default function CheckoutPage() {
 
             // Build request payload
             const payload: {
-              productId: string;
+              items: Array<{ productId: string }>;
+              idempotencyKey: string;
               shippingAddressId?: string;
               shippingAddress?: typeof shippingAddress;
               billingAddressId?: string;
@@ -948,7 +969,8 @@ export default function CheckoutPage() {
                 zipCode?: string;
               };
             } = {
-              productId: item.productId,
+              items: checkoutGroupItems,
+              idempotencyKey: getCheckoutIdempotencyKey(),
             };
 
             if (validAddressId) {
@@ -1032,13 +1054,13 @@ export default function CheckoutPage() {
 
             if (process.env.NODE_ENV === "development") {
               console.log(
-                "DirectBuy payload:",
+                "Checkout payload:",
                 JSON.stringify(payload, null, 2),
               );
             }
-            orderResponse = await ordersApi.directBuy(payload);
+            orderResponse = await ordersApi.checkout(payload);
           } else {
-            // Guest user: use guest checkout endpoint
+            // Guest user: use guest batch checkout endpoint
             const formattedContactPhone = normalizePhoneForPayload(
               contactPhone,
               guestPhoneCountryCode,
@@ -1049,7 +1071,8 @@ export default function CheckoutPage() {
             );
 
             const guestPayload: {
-              productId: string;
+              items: Array<{ productId: string }>;
+              idempotencyKey: string;
               email: string;
               phone: string;
               guestName: string;
@@ -1071,7 +1094,8 @@ export default function CheckoutPage() {
                 zipCode?: string;
               };
             } = {
-              productId: item.productId,
+              items: checkoutGroupItems,
+              idempotencyKey: getCheckoutIdempotencyKey(),
               email: contactEmail,
               phone: formattedContactPhone,
               guestName: contactName,
@@ -1102,7 +1126,7 @@ export default function CheckoutPage() {
               };
             }
 
-            orderResponse = await ordersApi.createGuest(guestPayload);
+            orderResponse = await ordersApi.checkoutGuest(guestPayload);
           }
         } catch (orderError: any) {
           if (process.env.NODE_ENV === "development") {
@@ -1141,8 +1165,12 @@ export default function CheckoutPage() {
               errorMessage.toLowerCase().includes(kw.toLowerCase()),
             );
 
-          if (isStockout && item?.productId) {
-            router.push(`/products/unavailable/${item.productId}`);
+          // API hata gövdesinde başarısız ürünün ID'si döner; yoksa ilk ürün
+          const stockoutProductId =
+            orderError.response?.data?.productId ||
+            checkoutItems[0]?.productId;
+          if (isStockout && stockoutProductId) {
+            router.push(`/products/unavailable/${stockoutProductId}`);
             return;
           }
 
@@ -1152,14 +1180,17 @@ export default function CheckoutPage() {
           return;
         }
 
-        // Backend directBuy returns orderId; guest checkout returns id; support both
+        // Batch checkout: { checkoutGroupId, orders: [{ orderId, ... }] } döner
+        const checkoutGroupData =
+          orderResponse?.data?.data ?? orderResponse?.data ?? {};
+        const checkoutGroupId: string | null =
+          checkoutGroupData?.checkoutGroupId ?? null;
         const orderId =
-          orderResponse?.data?.orderId ??
-          orderResponse?.data?.id ??
-          orderResponse?.data?.order?.id ??
+          checkoutGroupData?.orders?.[0]?.orderId ??
+          checkoutGroupData?.orderId ??
           null;
 
-        if (!orderId) {
+        if (!checkoutGroupId || !orderId) {
           if (process.env.NODE_ENV === "development") {
             console.error(
               "Checkout: order created but no orderId in response",
@@ -1178,11 +1209,11 @@ export default function CheckoutPage() {
 
         if (orderId) {
           // Sadece PayTR kullanılıyor (iyzico kaldırıldı)
+          // Grup ödemesi: tek ödeme gruptaki tüm siparişleri kapsar
           try {
-            const paymentResponse = await paymentsApi.initiate(
-              orderId,
-              paymentProvider,
-            );
+            const paymentResponse = isAuthenticated
+              ? await paymentsApi.initiateGroup(checkoutGroupId, paymentProvider)
+              : await paymentsApi.initiateGroupGuest(checkoutGroupId, paymentProvider);
             const paymentData = paymentResponse.data;
             const hasSession = isAuthenticated || !!authToken;
 
@@ -1226,8 +1257,11 @@ export default function CheckoutPage() {
               stockoutKeywords.some((kw) =>
                 msg.toLowerCase().includes(kw.toLowerCase()),
               );
-            if (isStockout && item?.productId) {
-              router.push(`/products/unavailable/${item.productId}`);
+            const stockoutProductId =
+              paymentError.response?.data?.productId ||
+              checkoutItems[0]?.productId;
+            if (isStockout && stockoutProductId) {
+              router.push(`/products/unavailable/${stockoutProductId}`);
               return;
             }
             toast.error(

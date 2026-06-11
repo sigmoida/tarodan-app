@@ -1,9 +1,9 @@
 import React, { useState } from 'react';
-import { View, ScrollView, StyleSheet, Image, Alert, Pressable } from 'react-native';
+import { View, ScrollView, StyleSheet, Image, Pressable } from 'react-native';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 import { api } from '../services/api';
-import { theme, Text, Button, Card, Chip, IconButton, Snackbar, Spinner, Divider, Modal } from '@tarodan/ui-native';
+import { theme, Text, Button, Card, Chip, IconButton, Snackbar, Spinner, Divider, Modal, appAlert } from '@tarodan/ui-native';
 import { resolveImageUrl } from '../utils/imageUrl';
 
 const { colors } = theme;
@@ -134,7 +134,7 @@ export const FeaturedListingsModal: React.FC<FeaturedListingsModalProps> = ({
   };
 
   const handleRemoveFeatured = (slotId: string, productTitle: string) => {
-    Alert.alert(
+    appAlert(
       'Öne Çıkarmayı Kaldır',
       `"${productTitle}" ilanının öne çıkarmasını kaldırmak istediğinize emin misiniz?`,
       [

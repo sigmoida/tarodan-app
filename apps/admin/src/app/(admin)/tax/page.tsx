@@ -2,18 +2,18 @@
 
 import { useState, useEffect } from "react";
 import { adminApi } from "@/lib/api";
-import { Button, Select, Checkbox, Input } from "@tarodan/ui";
+import { Button, Select, Checkbox, Input, Modal } from "@tarodan/ui";
 import {
   PlusIcon,
   PencilIcon,
   TrashIcon,
-  XMarkIcon,
   ChartBarIcon,
   MapPinIcon,
   CalculatorIcon,
   DocumentTextIcon,
 } from "@heroicons/react/24/outline";
 import toast from "react-hot-toast";
+import { AdminTabs } from "@/components/AdminTabs";
 
 type TabId = "regions" | "rates" | "rules" | "report";
 
@@ -400,10 +400,10 @@ export default function TaxSettingsPage() {
   };
 
   const tabs = [
-    { id: "regions" as TabId, label: "Vergi Bölgeleri", icon: MapPinIcon },
-    { id: "rates" as TabId, label: "Vergi Oranları", icon: CalculatorIcon },
-    { id: "rules" as TabId, label: "Vergi Kuralları", icon: DocumentTextIcon },
-    { id: "report" as TabId, label: "Vergi Raporu", icon: ChartBarIcon },
+    { key: "regions", label: "Vergi Bölgeleri", icon: MapPinIcon },
+    { key: "rates", label: "Vergi Oranları", icon: CalculatorIcon },
+    { key: "rules", label: "Vergi Kuralları", icon: DocumentTextIcon },
+    { key: "report", label: "Vergi Raporu", icon: ChartBarIcon },
   ];
 
   return (
@@ -416,38 +416,24 @@ export default function TaxSettingsPage() {
           </p>
         </div>
 
-        <div className="border-b border-border">
-          <nav className="flex gap-6">
-            {tabs.map(({ id, label, icon: Icon }) => (
-              <Button
-                variant="secondary"
-                key={id}
-                onClick={() => setActiveTab(id)}
-                className={`flex items-center gap-2 py-4 px-1 border-b-2 font-medium text-sm transition-colors ${
-                  activeTab === id
-                    ? "border-primary-500 text-primary-600"
-                    : "border-transparent text-muted hover:text-muted hover:border-border-strong"
-                }`}
-              >
-                <Icon className="h-5 w-5" />
-                {label}
-              </Button>
-            ))}
-          </nav>
-        </div>
+        <AdminTabs
+          tabs={tabs}
+          value={activeTab}
+          onChange={(k) => setActiveTab(k as TabId)}
+        />
 
         {activeTab === "regions" && (
           <div className="admin-card overflow-hidden">
-            <div className="flex justify-between items-center p-4 border-b border-border">
-              <h2 className="text-lg font-semibold text-heading">
+            <div className="flex justify-between items-center gap-3 p-4 border-b border-border">
+              <h2 className="text-lg font-semibold text-heading truncate min-w-0">
                 Vergi Bölgeleri
               </h2>
               <Button
                 type="button"
                 onClick={openCreateRegion}
-                className="flex gap-2"
+                className="flex gap-2 shrink-0"
               >
-                <PlusIcon className="h-5 w-5" />
+                <PlusIcon className="h-5 w-5 shrink-0" />
                 Yeni Bölge
               </Button>
             </div>
@@ -540,17 +526,17 @@ export default function TaxSettingsPage() {
 
         {activeTab === "rates" && (
           <div className="admin-card overflow-hidden">
-            <div className="flex justify-between items-center p-4 border-b border-border">
-              <h2 className="text-lg font-semibold text-heading">
+            <div className="flex justify-between items-center gap-3 p-4 border-b border-border">
+              <h2 className="text-lg font-semibold text-heading truncate min-w-0">
                 Vergi Oranları
               </h2>
               <Button
                 type="button"
                 onClick={openCreateRate}
-                className="flex gap-2"
+                className="flex gap-2 shrink-0"
                 disabled={regions.length === 0}
               >
-                <PlusIcon className="h-5 w-5" />
+                <PlusIcon className="h-5 w-5 shrink-0" />
                 Yeni Oran
               </Button>
             </div>
@@ -638,17 +624,17 @@ export default function TaxSettingsPage() {
 
         {activeTab === "rules" && (
           <div className="admin-card overflow-hidden">
-            <div className="flex justify-between items-center p-4 border-b border-border">
-              <h2 className="text-lg font-semibold text-heading">
+            <div className="flex justify-between items-center gap-3 p-4 border-b border-border">
+              <h2 className="text-lg font-semibold text-heading truncate min-w-0">
                 Vergi Kuralları
               </h2>
               <Button
                 type="button"
                 onClick={openCreateRule}
-                className="flex gap-2"
+                className="flex gap-2 shrink-0"
                 disabled={regions.length === 0 || rates.length === 0}
               >
-                <PlusIcon className="h-5 w-5" />
+                <PlusIcon className="h-5 w-5 shrink-0" />
                 Yeni Kural
               </Button>
             </div>
@@ -877,30 +863,15 @@ export default function TaxSettingsPage() {
 
         {/* Region modal */}
         {showRegionModal && (
-          <div
-            className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-heading/60"
-            onClick={() => setShowRegionModal(false)}
+          <Modal
+            isOpen={showRegionModal}
+            onClose={() => setShowRegionModal(false)}
+            title={
+              editingRegion ? "Vergi Bölgesi Düzenle" : "Yeni Vergi Bölgesi"
+            }
+            maxWidth="max-w-md"
           >
-            <div
-              className="rounded-xl shadow-xl max-w-md"
-              onClick={(e) => e.stopPropagation()}
-            >
-              <div className="flex justify-between items-center p-4 border-b border-border">
-                <h3 className="text-lg font-semibold text-heading">
-                  {editingRegion
-                    ? "Vergi Bölgesi Düzenle"
-                    : "Yeni Vergi Bölgesi"}
-                </h3>
-                <Button
-                  variant="secondary"
-                  type="button"
-                  onClick={() => setShowRegionModal(false)}
-                  className="text-muted hover:text-heading"
-                >
-                  <XMarkIcon className="h-6 w-6" />
-                </Button>
-              </div>
-              <form onSubmit={saveRegion} className="p-4 space-y-4">
+            <form onSubmit={saveRegion} className="space-y-4">
                 <div>
                   <label className="block text-sm font-medium text-muted mb-1">
                     Bölge Adı *
@@ -977,7 +948,7 @@ export default function TaxSettingsPage() {
                     label="Aktif"
                   />
                 </div>
-                <div className="flex justify-end gap-2 pt-2">
+                <div className="flex justify-end gap-2 pt-4 border-t border-border">
                   <Button
                     variant="secondary"
                     type="button"
@@ -988,34 +959,18 @@ export default function TaxSettingsPage() {
                   <Button type="submit">Kaydet</Button>
                 </div>
               </form>
-            </div>
-          </div>
+          </Modal>
         )}
 
         {/* Rate modal */}
         {showRateModal && (
-          <div
-            className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-heading/60"
-            onClick={() => setShowRateModal(false)}
+          <Modal
+            isOpen={showRateModal}
+            onClose={() => setShowRateModal(false)}
+            title={editingRate ? "Vergi Oranı Düzenle" : "Yeni Vergi Oranı"}
+            maxWidth="max-w-md"
           >
-            <div
-              className="rounded-xl shadow-xl max-w-md"
-              onClick={(e) => e.stopPropagation()}
-            >
-              <div className="flex justify-between items-center p-4 border-b border-border">
-                <h3 className="text-lg font-semibold text-heading">
-                  {editingRate ? "Vergi Oranı Düzenle" : "Yeni Vergi Oranı"}
-                </h3>
-                <Button
-                  variant="secondary"
-                  type="button"
-                  onClick={() => setShowRateModal(false)}
-                  className="text-muted hover:text-heading"
-                >
-                  <XMarkIcon className="h-6 w-6" />
-                </Button>
-              </div>
-              <form onSubmit={saveRate} className="p-4 space-y-4">
+            <form onSubmit={saveRate} className="space-y-4">
                 {!editingRate && (
                   <div>
                     <label className="block text-sm font-medium text-muted mb-1">
@@ -1124,7 +1079,7 @@ export default function TaxSettingsPage() {
                     label="Aktif"
                   />
                 </div>
-                <div className="flex justify-end gap-2 pt-2">
+                <div className="flex justify-end gap-2 pt-4 border-t border-border">
                   <Button
                     variant="secondary"
                     type="button"
@@ -1135,34 +1090,18 @@ export default function TaxSettingsPage() {
                   <Button type="submit">Kaydet</Button>
                 </div>
               </form>
-            </div>
-          </div>
+          </Modal>
         )}
 
         {/* Rule modal */}
         {showRuleModal && (
-          <div
-            className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-heading/60"
-            onClick={() => setShowRuleModal(false)}
+          <Modal
+            isOpen={showRuleModal}
+            onClose={() => setShowRuleModal(false)}
+            title={editingRule ? "Vergi Kuralı Düzenle" : "Yeni Vergi Kuralı"}
+            maxWidth="max-w-md"
           >
-            <div
-              className="rounded-xl shadow-xl max-w-md"
-              onClick={(e) => e.stopPropagation()}
-            >
-              <div className="flex justify-between items-center p-4 border-b border-border">
-                <h3 className="text-lg font-semibold text-heading">
-                  {editingRule ? "Vergi Kuralı Düzenle" : "Yeni Vergi Kuralı"}
-                </h3>
-                <Button
-                  variant="secondary"
-                  type="button"
-                  onClick={() => setShowRuleModal(false)}
-                  className="text-muted hover:text-heading"
-                >
-                  <XMarkIcon className="h-6 w-6" />
-                </Button>
-              </div>
-              <form onSubmit={saveRule} className="p-4 space-y-4">
+            <form onSubmit={saveRule} className="space-y-4">
                 <div>
                   <label className="block text-sm font-medium text-muted mb-1">
                     Vergi Bölgesi *
@@ -1271,7 +1210,7 @@ export default function TaxSettingsPage() {
                     label="Aktif"
                   />
                 </div>
-                <div className="flex justify-end gap-2 pt-2">
+                <div className="flex justify-end gap-2 pt-4 border-t border-border">
                   <Button
                     variant="secondary"
                     type="button"
@@ -1282,8 +1221,7 @@ export default function TaxSettingsPage() {
                   <Button type="submit">Kaydet</Button>
                 </div>
               </form>
-            </div>
-          </div>
+          </Modal>
         )}
 
         {/* Delete confirmation */}
@@ -1293,7 +1231,7 @@ export default function TaxSettingsPage() {
             onClick={() => setDeleteConfirm(null)}
           >
             <div
-              className="rounded-xl shadow-xl p-6 max-w-sm"
+              className="bg-surface-elevated rounded-xl shadow-xl px-6 pb-6 pt-5 max-w-sm w-full"
               onClick={(e) => e.stopPropagation()}
             >
               <p className="text-heading font-medium">

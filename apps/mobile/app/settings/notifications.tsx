@@ -1,4 +1,4 @@
-import { View, ScrollView, StyleSheet, TouchableOpacity, Alert } from 'react-native';
+import { View, ScrollView, StyleSheet, TouchableOpacity } from 'react-native';
 import {
   Card,
   Switch,
@@ -8,6 +8,7 @@ import {
   Text,
   ScreenHeader,
   theme,
+  appAlert,
 } from '@tarodan/ui-native';
 import { useState, useCallback, useEffect } from 'react';
 import { router, useFocusEffect } from 'expo-router';
@@ -96,7 +97,7 @@ export default function NotificationSettingsScreen() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['notification-settings'] });
-      Alert.alert('Başarılı', 'Bildirim ayarları kaydedildi');
+      appAlert('Başarılı', 'Bildirim ayarları kaydedildi');
     },
   });
 
@@ -116,7 +117,7 @@ export default function NotificationSettingsScreen() {
         <Text variant="body" style={styles.subtitle}>
           Ayarlarınızı düzenlemek için giriş yapın
         </Text>
-        <Button variant="primary" title="Giriş Yap" onPress={() => router.push('/(auth)/login')} />
+        <Button variant="primary" title="Giriş Yap" onPress={() => router.push('/(auth)/login')} style={{ alignSelf: 'center' }} />
       </View>
     );
   }

@@ -1,8 +1,8 @@
 import React, { useState } from 'react';
-import { View, StyleSheet, Alert } from 'react-native';
+import { View, StyleSheet } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useMutation } from '@tanstack/react-query';
-import { theme, Text, Button, Modal, Input, Textarea } from '@tarodan/ui-native';
+import { theme, Text, Button, Modal, Input, Textarea, appAlert } from '@tarodan/ui-native';
 import { offersApi } from '../../services/api';
 import { formatPrice } from '../../utils/format';
 
@@ -53,17 +53,17 @@ export default function MakeOfferModal({
   const handleSubmit = async () => {
     const numeric = parseFloat(amount);
     if (!numeric || numeric <= 0) {
-      Alert.alert('Geçersiz Tutar', 'Pozitif bir teklif tutarı girin.');
+      appAlert('Geçersiz Tutar', 'Pozitif bir teklif tutarı girin.');
       return;
     }
     // API kuralı: minimum teklif fiyatın %50'si (web paritesi) — yoksa ham 400 dönüyordu.
     const minOffer = listPrice * 0.5;
     if (numeric < minOffer) {
-      Alert.alert('Düşük Tutar', `Minimum teklif ₺${minOffer.toLocaleString('tr-TR')} (fiyatın %50'si).`);
+      appAlert('Düşük Tutar', `Minimum teklif ₺${minOffer.toLocaleString('tr-TR')} (fiyatın %50'si).`);
       return;
     }
     if (numeric >= listPrice) {
-      Alert.alert(
+      appAlert(
         'Yüksek Tutar',
         'Teklifiniz liste fiyatından yüksek veya eşit. Doğrudan satın alma seçeneğini kullanabilirsiniz.',
         [{ text: 'Tamam' }],
@@ -75,7 +75,7 @@ export default function MakeOfferModal({
       onSuccess?.();
       handleClose();
     } catch (e: any) {
-      Alert.alert(
+      appAlert(
         'Hata',
         e?.response?.data?.message || 'Teklif gönderilemedi. Lütfen tekrar deneyin.',
       );
@@ -102,7 +102,9 @@ export default function MakeOfferModal({
           label="Teklif tutarınız (TL) *"
           value={amount}
           onChangeText={(v: string) => setAmount(v.replace(/[^\d.,]/g, '').replace(',', '.'))}
-          keyboardType="numeric"
+          // Maestro: numeric klavyede return tuşu yok → hideKeyboard çalışmıyor.
+          // Test modunda default klavye (return var); input zaten rakam-dışını filtreler.
+          keyboardType={process.env.EXPO_PUBLIC_MAESTRO === '1' ? 'default' : 'numeric'}
           containerStyle={styles.input}
           placeholder="Örn. 1500"
         />

@@ -1,5 +1,5 @@
 import React from 'react';
-import { View, StyleSheet, ScrollView, Image, Alert, Linking, Pressable } from 'react-native';
+import { View, StyleSheet, ScrollView, Image, Linking, Pressable } from 'react-native';
 import {
   Button,
   Divider,
@@ -7,8 +7,8 @@ import {
   ErrorState,
   Text,
   theme,
+  appAlert,
 } from '@tarodan/ui-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 import { router, useLocalSearchParams } from 'expo-router';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
@@ -113,28 +113,28 @@ export default function SaleDetailScreen() {
     mutationFn: (reason: string) => ordersApi.cancel(id!, reason),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['sale-order', id] });
-      Alert.alert('Bilgi', 'Sipariş iptal edildi.');
+      appAlert('Bilgi', 'Sipariş iptal edildi.');
       router.back();
     },
     onError: (e: any) =>
-      Alert.alert('Hata', e?.response?.data?.message || 'İşlem başarısız.'),
+      appAlert('Hata', e?.response?.data?.message || 'İşlem başarısız.'),
   });
 
   if (isLoading) {
     return (
-      <SafeAreaView style={styles.container} edges={['top']}>
+      <View style={styles.container}>
         <ScreenHeader title="Sipariş Detayı" />
         <ScreenLoader />
-      </SafeAreaView>
+      </View>
     );
   }
 
   if (error || !order) {
     return (
-      <SafeAreaView style={styles.container} edges={['top']}>
+      <View style={styles.container}>
         <ScreenHeader title="Sipariş Detayı" />
         <ErrorState fullscreen onRetry={() => refetch()} />
-      </SafeAreaView>
+      </View>
     );
   }
 
@@ -158,7 +158,7 @@ export default function SaleDetailScreen() {
   };
 
   return (
-    <SafeAreaView style={styles.container} edges={['top']}>
+    <View style={styles.container}>
       <ScreenHeader title={`Sipariş ${order.orderNumber ? '#' + order.orderNumber : ''}`.trim()} />
 
       <ScrollView
@@ -328,7 +328,7 @@ export default function SaleDetailScreen() {
             icon="close-circle-outline"
             title="Siparişi İptal Et"
             onPress={() =>
-              Alert.alert(
+              appAlert(
                 'Siparişi İptal Et',
                 'Bu siparişi iptal etmek istediğinize emin misiniz? Alıcının ödemesi iade edilecek.',
                 [
@@ -346,7 +346,7 @@ export default function SaleDetailScreen() {
           />
         ) : null}
       </ScrollView>
-    </SafeAreaView>
+    </View>
   );
 }
 

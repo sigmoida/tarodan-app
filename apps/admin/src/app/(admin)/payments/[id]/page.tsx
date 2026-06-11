@@ -11,7 +11,16 @@ import {
   ExclamationTriangleIcon,
 } from '@heroicons/react/24/outline';
 import { adminApi } from '@/lib/api';
-import { Button, Input, Spinner, Textarea } from '@tarodan/ui';
+import {
+  Button,
+  Input,
+  Spinner,
+  Textarea,
+  enumLabel,
+  paymentProviderConfig,
+  orderStatusConfig,
+  paymentHoldStatusConfig,
+} from '@tarodan/ui';
 import toast from 'react-hot-toast';
 
 interface PaymentDetail {
@@ -207,7 +216,7 @@ export default function AdminPaymentDetailPage() {
                 </div>
                 <div className="flex justify-between">
                   <span className="text-muted">Ödeme Sağlayıcı:</span>
-                  <span className="uppercase">{payment.provider}</span>
+                  <span>{enumLabel(paymentProviderConfig, payment.provider)}</span>
                 </div>
                 <div className="flex justify-between">
                   <span className="text-muted">Transaction ID:</span>
@@ -258,7 +267,7 @@ export default function AdminPaymentDetailPage() {
                 </div>
                 <div className="flex justify-between">
                   <span className="text-muted">Sipariş Durumu:</span>
-                  <span>{payment.order.status}</span>
+                  <span>{enumLabel(orderStatusConfig, payment.order.status)}</span>
                 </div>
                 <div className="flex justify-between">
                   <span className="text-muted">Toplam Tutar:</span>
@@ -303,7 +312,7 @@ export default function AdminPaymentDetailPage() {
                       </div>
                       <div className="flex justify-between">
                         <span className="text-muted">Durum:</span>
-                        <span>{hold.status}</span>
+                        <span>{enumLabel(paymentHoldStatusConfig, hold.status)}</span>
                       </div>
                       {hold.releaseAt && (
                         <div className="flex justify-between">
@@ -373,8 +382,8 @@ export default function AdminPaymentDetailPage() {
         {/* Refund Modal */}
         {showRefundModal && (
           <div className="fixed inset-0 bg-heading bg-opacity-50 flex items-center justify-center z-50">
-            <div className="bg-surface-elevated rounded-xl p-6 max-w-md w-full mx-4">
-              <h2 className="text-xl font-bold text-heading mb-4">Manuel İade</h2>
+            <div className="bg-surface-elevated rounded-xl px-6 pb-6 pt-5 max-w-md w-full mx-4">
+              <h2 className="text-xl font-bold text-heading mb-4 leading-tight">Manuel İade</h2>
               <p className="text-muted mb-4">
                 Toplam ödeme tutarı: ₺{payment.amount.toLocaleString('tr-TR', { minimumFractionDigits: 2 })}
               </p>
@@ -431,8 +440,8 @@ export default function AdminPaymentDetailPage() {
         {/* Cancel Modal */}
         {showCancelModal && (
           <div className="fixed inset-0 bg-heading bg-opacity-50 flex items-center justify-center z-50">
-            <div className="bg-surface-elevated rounded-xl p-6 max-w-md w-full mx-4">
-              <h2 className="text-xl font-bold text-heading mb-4 flex items-center gap-2">
+            <div className="bg-surface-elevated rounded-xl px-6 pb-6 pt-5 max-w-md w-full mx-4">
+              <h2 className="text-xl font-bold text-heading mb-4 leading-tight flex items-center gap-2">
                 <ExclamationTriangleIcon className="w-6 h-6 text-primary-500" />
                 Zorla İptal
               </h2>

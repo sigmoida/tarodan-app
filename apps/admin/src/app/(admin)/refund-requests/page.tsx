@@ -7,10 +7,18 @@ import {
   Button,
   Input,
   Select,
-  Spinner,
   StatusBadge,
+  enumLabel,
+  refundReasonConfig,
   refundRequestStatusConfig,
 } from "@tarodan/ui";
+import { DataTable, type ColumnDef } from "@/components/DataTable";
+import {
+  PageHeader,
+  FilterToolbar,
+  ActionButtons,
+  ActionIconButton,
+} from "@/components/admin-list";
 import {
   MagnifyingGlassIcon,
   ArrowPathIcon,
@@ -91,127 +99,128 @@ export default function RefundRequestsPage() {
 
   const totalPages = Math.max(1, Math.ceil(total / PAGE_SIZE));
 
+  const columns: ColumnDef<RefundRequestRow, any>[] = [
+    {
+      header: "İade No",
+      cell: ({ row }) => (
+        <span className="font-mono text-xs">{row.original.refundNumber}</span>
+      ),
+    },
+    {
+      header: "Sipariş",
+      cell: ({ row }) => (
+        <Link
+          href={`/orders/${row.original.order.id}`}
+          className="text-primary-600 hover:underline"
+        >
+          {row.original.order.orderNumber}
+        </Link>
+      ),
+    },
+    {
+      header: "Alıcı",
+      cell: ({ row }) => (
+        <>
+          <div>{row.original.requester.displayName}</div>
+          <div className="text-xs text-muted">{row.original.requester.email}</div>
+        </>
+      ),
+    },
+    {
+      header: "Satıcı",
+      cell: ({ row }) => (
+        <>
+          <div>{row.original.order.seller.displayName}</div>
+          <div className="text-xs text-muted">{row.original.order.seller.email}</div>
+        </>
+      ),
+    },
+    {
+      header: "Tutar",
+      cell: ({ row }) => (
+        <span className="font-medium">
+          ₺{Number(row.original.amount).toLocaleString("tr-TR", { minimumFractionDigits: 2 })}
+        </span>
+      ),
+    },
+    {
+      header: "Sebep",
+      cell: ({ row }) => (
+        <span className="text-xs">
+          {enumLabel(refundReasonConfig, row.original.reason, row.original.reason)}
+        </span>
+      ),
+    },
+    {
+      header: "Durum",
+      cell: ({ row }) => (
+        <StatusBadge status={row.original.status} config={refundRequestStatusConfig} />
+      ),
+    },
+    {
+      header: "Oluşturma",
+      cell: ({ row }) => (
+        <span className="text-xs text-muted">
+          {new Date(row.original.createdAt).toLocaleString("tr-TR")}
+        </span>
+      ),
+    },
+    {
+      id: "actions",
+      header: () => <span className="block text-right" />,
+      cell: ({ row }) => (
+        <ActionButtons>
+          <ActionIconButton
+            icon={EyeIcon}
+            href={`/refund-requests/${row.original.id}`}
+            title="Detay"
+          />
+        </ActionButtons>
+      ),
+    },
+  ];
+
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-2xl font-bold text-heading">İade Talepleri</h1>
-          <p className="text-muted">
-            Aktif iade talepleri — admin müdahalesi gereken durumlar
-          </p>
-        </div>
-        <Button variant="secondary" onClick={load} className="p-2">
+      <PageHeader
+        title="İade Talepleri"
+        description="Aktif iade talepleri — admin müdahalesi gereken durumlar"
+      >
+        <Button variant="secondary" onClick={load} className="p-2 shrink-0">
           <ArrowPathIcon className="h-5 w-5" />
         </Button>
-      </div>
+      </PageHeader>
 
       {/* Filters */}
-      <div className="bg-surface-elevated rounded-xl shadow-sm p-4 grid grid-cols-1 md:grid-cols-4 gap-3 items-end">
-        <div>
-          <label className="block text-xs font-medium text-muted mb-1">Durum</label>
-          <Select value={status} onChange={(e) => setStatus(e.target.value)}>
-            {STATUS_OPTIONS.map((o) => (
-              <option key={o.value} value={o.value}>
-                {o.label}
-              </option>
-            ))}
-          </Select>
-        </div>
-        <div className="md:col-span-2">
-          <label className="block text-xs font-medium text-muted mb-1">Kullanıcı / İade No</label>
-          <Input
-            placeholder="Alıcı/satıcı adı, e-posta veya iade numarası"
-            value={userSearch}
-            onChange={(e) => setUserSearch(e.target.value)}
-          />
-        </div>
-        <div className="flex gap-2">
-          <Button variant="primary" onClick={applyFilters} className="flex-1">
-            <MagnifyingGlassIcon className="h-4 w-4 mr-1" />
-            Filtrele
-          </Button>
-        </div>
-        <div className="md:col-span-2 flex gap-2">
-          <div className="flex-1">
-            <label className="block text-xs font-medium text-muted mb-1">Başlangıç</label>
-            <Input type="date" value={from} onChange={(e) => setFrom(e.target.value)} />
-          </div>
-          <div className="flex-1">
-            <label className="block text-xs font-medium text-muted mb-1">Bitiş</label>
-            <Input type="date" value={to} onChange={(e) => setTo(e.target.value)} />
-          </div>
-        </div>
-      </div>
+      <FilterToolbar
+        search={userSearch}
+        onSearchChange={setUserSearch}
+        onSearchSubmit={applyFilters}
+        searchPlaceholder="Alıcı/satıcı adı, e-posta veya iade numarası"
+      >
+        <Select value={status} onChange={(e) => setStatus(e.target.value)} className="sm:w-56">
+          {STATUS_OPTIONS.map((o) => (
+            <option key={o.value} value={o.value}>
+              {o.label}
+            </option>
+          ))}
+        </Select>
+        <Input type="date" value={from} onChange={(e) => setFrom(e.target.value)} className="sm:w-40" />
+        <Input type="date" value={to} onChange={(e) => setTo(e.target.value)} className="sm:w-40" />
+        <Button variant="primary" onClick={applyFilters} className="shrink-0">
+          <MagnifyingGlassIcon className="h-4 w-4 mr-1" />
+          Filtrele
+        </Button>
+      </FilterToolbar>
 
       {/* List */}
-      <div className="bg-surface-elevated rounded-xl shadow-sm overflow-hidden">
-        {loading ? (
-          <div className="flex justify-center py-12">
-            <Spinner size="xl" color="border-primary-600 border-t-transparent" />
-          </div>
-        ) : items.length === 0 ? (
-          <div className="text-center py-12 text-muted">
-            Bu filtrelerle eşleşen iade talebi yok.
-          </div>
-        ) : (
-          <table className="w-full text-sm">
-            <thead className="bg-surface-alt text-left">
-              <tr>
-                <th className="px-4 py-3 font-medium text-muted">İade No</th>
-                <th className="px-4 py-3 font-medium text-muted">Sipariş</th>
-                <th className="px-4 py-3 font-medium text-muted">Alıcı</th>
-                <th className="px-4 py-3 font-medium text-muted">Satıcı</th>
-                <th className="px-4 py-3 font-medium text-muted">Tutar</th>
-                <th className="px-4 py-3 font-medium text-muted">Sebep</th>
-                <th className="px-4 py-3 font-medium text-muted">Durum</th>
-                <th className="px-4 py-3 font-medium text-muted">Oluşturma</th>
-                <th className="px-4 py-3" />
-              </tr>
-            </thead>
-            <tbody>
-              {items.map((rr) => (
-                <tr key={rr.id} className="border-t border-border hover:bg-surface-alt/40">
-                  <td className="px-4 py-3 font-mono text-xs">{rr.refundNumber}</td>
-                  <td className="px-4 py-3">
-                    <Link
-                      href={`/orders/${rr.order.id}`}
-                      className="text-primary-600 hover:underline"
-                    >
-                      {rr.order.orderNumber}
-                    </Link>
-                  </td>
-                  <td className="px-4 py-3">
-                    <div>{rr.requester.displayName}</div>
-                    <div className="text-xs text-muted">{rr.requester.email}</div>
-                  </td>
-                  <td className="px-4 py-3">
-                    <div>{rr.order.seller.displayName}</div>
-                    <div className="text-xs text-muted">{rr.order.seller.email}</div>
-                  </td>
-                  <td className="px-4 py-3 font-medium">
-                    ₺{Number(rr.amount).toLocaleString("tr-TR", { minimumFractionDigits: 2 })}
-                  </td>
-                  <td className="px-4 py-3 text-xs">{rr.reason}</td>
-                  <td className="px-4 py-3">
-                    <StatusBadge status={rr.status} config={refundRequestStatusConfig} />
-                  </td>
-                  <td className="px-4 py-3 text-xs text-muted">
-                    {new Date(rr.createdAt).toLocaleString("tr-TR")}
-                  </td>
-                  <td className="px-4 py-3 text-right">
-                    <Link href={`/refund-requests/${rr.id}`}>
-                      <Button variant="secondary" size="sm">
-                        <EyeIcon className="h-4 w-4 mr-1" />
-                        Detay
-                      </Button>
-                    </Link>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        )}
-      </div>
+      <DataTable
+        columns={columns}
+        data={items}
+        loading={loading}
+        emptyText="Bu filtrelerle eşleşen iade talebi yok."
+        getRowId={(rr) => rr.id}
+      />
 
       {/* Pagination */}
       {totalPages > 1 && (

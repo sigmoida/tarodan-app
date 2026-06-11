@@ -126,11 +126,11 @@ export default function AdminPagesPage() {
     <>
       <div className="space-y-6">
         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-          <h1 className="text-2xl font-bold text-heading">Sayfa Yönetimi</h1>
+          <h1 className="text-2xl font-bold text-heading truncate min-w-0">Sayfa Yönetimi</h1>
           <Button variant="secondary" type="button"
             onClick={openCreate}
-            className="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-primary-500 text-heading hover:bg-primary-600">
-            <PlusIcon className="h-5 w-5" />
+            className="inline-flex items-center gap-2 shrink-0 px-4 py-2 rounded-lg bg-primary-500 text-heading hover:bg-primary-600">
+            <PlusIcon className="h-5 w-5 shrink-0" />
             Yeni Sayfa
           </Button>
         </div>
@@ -202,8 +202,8 @@ export default function AdminPagesPage() {
         {showModal && (
           <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-heading/60">
             <div className="bg-surface-elevated rounded-xl border border-border w-full max-w-2xl max-h-[90vh] overflow-y-auto">
-              <div className="flex items-center justify-between p-4 border-b border-border">
-                <h2 className="text-lg font-semibold text-heading">
+              <div className="flex items-center justify-between px-4 pb-4 pt-3 border-b border-border">
+                <h2 className="text-lg font-semibold text-heading leading-tight">
                   {editing ? 'Sayfayı Düzenle' : 'Yeni Sayfa'}
                 </h2>
                 <Button variant="secondary" type="button"

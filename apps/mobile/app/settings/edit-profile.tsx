@@ -23,6 +23,8 @@ import { useAuthStore } from '../../src/stores/authStore';
 import { MembershipBadgeCard } from '../../src/components/PremiumBadge';
 import { useTranslation } from '../../src/i18n';
 import { resolveImageUrl } from '../../src/utils/imageUrl';
+import { PhoneInput } from '../../src/components/common';
+import { normalizePhoneForPayload, splitPhone } from '../../src/utils/phone';
 
 const { colors, radius } = theme;
 
@@ -81,12 +83,17 @@ export default function EditProfileScreen() {
 
   const isBusinessTier = (user as any)?.membershipTier === 'business';
 
+  // Kayıtlı numara "+90532…" formatında gelir — ülke kodu + formatlı lokal parçaya ayır.
+  const [phoneCountryCode, setPhoneCountryCode] = useState(
+    () => splitPhone((user as any)?.phone || '').countryCode,
+  );
+
   const { control, handleSubmit, formState: { errors }, watch } = useForm<ProfileForm>({
     resolver: zodResolver(createProfileSchema(isBusinessTier)),
     defaultValues: {
       displayName: user?.displayName || '',
       bio: user?.bio || '',
-      phone: (user as any)?.phone || '',
+      phone: splitPhone((user as any)?.phone || '').phone,
       // İlk 10 karakteri al ("1990-01-31T00:00:00Z" -> "1990-01-31"); toISOString
       // saat dilimi kaymasından kaçınmak için Date round-trip'i yapma.
       birthDate: (user as any)?.birthDate ? String((user as any).birthDate).slice(0, 10) : '',
@@ -118,7 +125,8 @@ export default function EditProfileScreen() {
 
       const payload: Record<string, any> = {
         displayName: data.displayName,
-        phone: data.phone,
+        // Boş bırakılırsa '' gönderilir (numara silme); doluysa "+90…" normalize edilir.
+        phone: data.phone ? normalizePhoneForPayload(data.phone, phoneCountryCode) : data.phone,
         bio: data.bio,
         birthDate: data.birthDate,
       };
@@ -182,7 +190,7 @@ export default function EditProfileScreen() {
     return (
       <View style={styles.centeredContainer}>
         <Text variant="h3">Giriş Yapın</Text>
-        <Button variant="primary" title="Giriş Yap" onPress={() => router.push('/(auth)/login')} />
+        <Button variant="primary" title="Giriş Yap" onPress={() => router.push('/(auth)/login')} style={{ alignSelf: 'center' }} />
       </View>
     );
   }
@@ -259,12 +267,12 @@ export default function EditProfileScreen() {
             control={control}
             name="phone"
             render={({ field: { onChange, value } }) => (
-              <Input
+              <PhoneInput
                 label="Telefon"
-                value={value}
-                onChangeText={onChange}
-                keyboardType="phone-pad"
-                placeholder="+90 5XX XXX XX XX"
+                countryCode={phoneCountryCode}
+                onCountryCodeChange={setPhoneCountryCode}
+                phone={value ?? ''}
+                onPhoneChange={onChange}
                 containerStyle={styles.input}
                 error={errors.phone?.message}
               />
@@ -381,6 +389,7 @@ export default function EditProfileScreen() {
         {/* Submit Button */}
         <Button
           variant="primary"
+          fullWidth
           title="Değişiklikleri Kaydet"
           icon="checkmark"
           onPress={handleSubmit(onSubmit)}

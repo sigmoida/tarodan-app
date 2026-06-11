@@ -1,7 +1,6 @@
 import React, { useMemo, useState } from 'react';
 import { View, StyleSheet, FlatList, TouchableOpacity, Image } from 'react-native';
 
-import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { router } from 'expo-router';
 import { useQuery } from '@tanstack/react-query';
@@ -66,7 +65,7 @@ export default function ManufacturersScreen() {
   };
 
   return (
-    <SafeAreaView style={styles.container} edges={['top']}>
+    <View style={styles.container}>
       <ScreenHeader title="Üreticiler" />
 
       <View style={styles.searchBar}>
@@ -100,7 +99,7 @@ export default function ManufacturersScreen() {
           onRefresh={refetch}
         />
       )}
-    </SafeAreaView>
+    </View>
   );
 }
 

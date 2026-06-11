@@ -292,32 +292,25 @@ export default function HomeScreen() {
               resizeMode="cover"
             />
             {isProductOutOfStock(item) && <OutOfStockOverlay />}
-            {isTradeEnabled && (
-              <View style={[styles.badge, { backgroundColor: colors.success[600]! }]}>
-                <Ionicons name="swap-horizontal" size={10} color={colors.white} />
-                <Text variant="caption" tone="inverted" weight="bold">
-                  {' '}Takas
-                </Text>
-              </View>
-            )}
-            {(item.isBoosted || item.boostedUntil) && (
-              <View
-                style={{
-                  position: 'absolute',
-                  top: 10,
-                  right: 10,
-                  paddingHorizontal: 8,
-                  paddingVertical: 4,
-                  borderRadius: 6,
-                  flexDirection: 'row',
-                  alignItems: 'center',
-                  backgroundColor: colors.warning[500]!,
-                }}
-              >
-                <Ionicons name="rocket" size={10} color={colors.white} />
-                <Text variant="caption" tone="inverted" weight="bold">
-                  {' '}Sponsorlu
-                </Text>
+            {/* Sol üst: durum rozetleri — dikey stack, üst üste binmesin */}
+            {(isTradeEnabled || item.isBoosted || item.boostedUntil) && (
+              <View style={styles.topLeftStack}>
+                {isTradeEnabled && (
+                  <View style={[styles.badge, { backgroundColor: colors.success[500]! }]}>
+                    <Ionicons name="swap-horizontal" size={10} color={colors.white} />
+                    <Text variant="caption" tone="inverted" weight="bold">
+                      {' '}Takas
+                    </Text>
+                  </View>
+                )}
+                {(item.isBoosted || item.boostedUntil) && (
+                  <View style={[styles.badge, { backgroundColor: colors.warning[500]! }]}>
+                    <Ionicons name="rocket" size={10} color={colors.white} />
+                    <Text variant="caption" tone="inverted" weight="bold">
+                      {' '}Sponsorlu
+                    </Text>
+                  </View>
+                )}
               </View>
             )}
             <View style={styles.likesContainer}>
@@ -590,13 +583,13 @@ export default function HomeScreen() {
           </View>
         )}
 
-        {/* Öne Çıkan / Sponsorlu Ürünler (boost'lu) — Tümünü Gör YOK */}
+        {/* Sponsorlu Ürünler (boost'lu) — Tümünü Gör YOK */}
         {boostedProducts.length > 0 && (
           <View style={styles.section}>
             <View style={styles.sectionHeader}>
               <View style={styles.sectionTitleContainer}>
                 <View style={styles.sectionIndicator} />
-                <Text style={styles.sectionTitle}>🚀 Öne Çıkan Ürünler</Text>
+                <Text style={styles.sectionTitle}>Sponsorlu Ürünler</Text>
               </View>
             </View>
             <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.productsScroll}>
@@ -605,12 +598,12 @@ export default function HomeScreen() {
           </View>
         )}
 
-        {/* Products Section - Öne Çıkanlar */}
+        {/* Products Section - Popüler İlanlar (web 'Popüler İlanlar' / bestSellers paritesi) */}
         <View style={[styles.section, styles.bestSellersSection]}>
           <View style={styles.sectionHeader}>
             <View style={styles.sectionTitleContainer}>
               <View style={styles.sectionIndicator} />
-              <Text style={[styles.sectionTitle, { color: colors.white }]}>Öne Çıkanlar</Text>
+              <Text style={[styles.sectionTitle, { color: colors.white }]}>Popüler İlanlar</Text>
             </View>
             <TouchableOpacity onPress={() => router.push('/search')}>
               <Text style={[styles.seeAllText, { color: colors.white }]}>Tümünü gör {'>'}</Text>
@@ -641,7 +634,7 @@ export default function HomeScreen() {
             <View style={styles.sectionHeader}>
               <View style={styles.sectionTitleContainer}>
                 <View style={styles.sectionIndicator} />
-                <Text style={styles.sectionTitle}>Tüm İlanlar ({products.length})</Text>
+                <Text style={styles.sectionTitle}>Tüm İlanlar</Text>
               </View>
               <TouchableOpacity onPress={() => router.push('/search')}>
                 <Text style={styles.seeAllText}>Tümünü gör {'>'}</Text>
@@ -668,9 +661,6 @@ export default function HomeScreen() {
                   <Text style={styles.businessBadgeText}>👑 Business</Text>
                 </View>
               </View>
-              <TouchableOpacity onPress={() => router.push('/search')}>
-                <Text style={styles.seeAllText}>Tümünü gör {'>'}</Text>
-              </TouchableOpacity>
             </View>
             <View style={styles.companyCard}>
               {/* Company Profile */}
@@ -1203,10 +1193,16 @@ const styles = StyleSheet.create({
     height: 140,
     backgroundColor: colors.gray[200],
   },
-  badge: {
+  topLeftStack: {
     position: 'absolute',
     top: 10,
     left: 10,
+    flexDirection: 'column',
+    alignItems: 'flex-start',
+    gap: 6,
+  },
+  badge: {
+    alignSelf: 'flex-start',
     paddingHorizontal: 10,
     paddingVertical: 5,
     borderRadius: 6,

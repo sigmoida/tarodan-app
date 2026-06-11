@@ -13,7 +13,15 @@ import {
 } from '@heroicons/react/24/outline';
 import { adminApi } from '@/lib/api';
 import toast from 'react-hot-toast';
-import { Button, Input, Select, Spinner } from '@tarodan/ui';
+import {
+  Button,
+  Input,
+  Select,
+  Spinner,
+  enumLabel,
+  paymentStatusConfig,
+  paymentProviderConfig,
+} from '@tarodan/ui';
 
 interface PaymentStatistics {
   period: string;
@@ -149,46 +157,46 @@ export default function AdminPaymentStatisticsPage() {
         {/* Summary Cards */}
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-6">
           <div className="bg-surface-elevated rounded-xl shadow-sm p-6">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm text-muted mb-1">Toplam Gelir</p>
-                <p className="text-2xl font-bold text-heading">
+            <div className="flex items-center justify-between gap-3">
+              <div className="min-w-0">
+                <p className="text-sm text-muted mb-1 truncate">Toplam Gelir</p>
+                <p className="text-2xl font-bold text-heading truncate">
                   ₺{statistics.summary.totalRevenue.toLocaleString('tr-TR', { minimumFractionDigits: 2 })}
                 </p>
               </div>
-              <CurrencyDollarIcon className="w-12 h-12 text-success-500" />
+              <CurrencyDollarIcon className="w-12 h-12 text-success-500 shrink-0" />
             </div>
           </div>
 
           <div className="bg-surface-elevated rounded-xl shadow-sm p-6">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm text-muted mb-1">Toplam Ödeme</p>
-                <p className="text-2xl font-bold text-heading">{statistics.summary.totalPayments}</p>
+            <div className="flex items-center justify-between gap-3">
+              <div className="min-w-0">
+                <p className="text-sm text-muted mb-1 truncate">Toplam Ödeme</p>
+                <p className="text-2xl font-bold text-heading truncate">{statistics.summary.totalPayments}</p>
               </div>
-              <CreditCardIcon className="w-12 h-12 text-info-500" />
+              <CreditCardIcon className="w-12 h-12 text-info-500 shrink-0" />
             </div>
           </div>
 
           <div className="bg-surface-elevated rounded-xl shadow-sm p-6">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm text-muted mb-1">Başarı Oranı</p>
-                <p className="text-2xl font-bold text-heading">{statistics.summary.successRate.toFixed(1)}%</p>
+            <div className="flex items-center justify-between gap-3">
+              <div className="min-w-0">
+                <p className="text-sm text-muted mb-1 truncate">Başarı Oranı</p>
+                <p className="text-2xl font-bold text-heading truncate">{statistics.summary.successRate.toFixed(1)}%</p>
               </div>
-              <CheckCircleIcon className="w-12 h-12 text-success-500" />
+              <CheckCircleIcon className="w-12 h-12 text-success-500 shrink-0" />
             </div>
           </div>
 
           <div className="bg-surface-elevated rounded-xl shadow-sm p-6">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm text-muted mb-1">Ortalama Tutar</p>
-                <p className="text-2xl font-bold text-heading">
+            <div className="flex items-center justify-between gap-3">
+              <div className="min-w-0">
+                <p className="text-sm text-muted mb-1 truncate">Ortalama Tutar</p>
+                <p className="text-2xl font-bold text-heading truncate">
                   ₺{statistics.summary.averageAmount.toLocaleString('tr-TR', { minimumFractionDigits: 2 })}
                 </p>
               </div>
-              <ChartBarIcon className="w-12 h-12 text-primary-500" />
+              <ChartBarIcon className="w-12 h-12 text-primary-500 shrink-0" />
             </div>
           </div>
         </div>
@@ -201,7 +209,7 @@ export default function AdminPaymentStatisticsPage() {
               {statistics.byStatus.map((item) => (
                 <div key={item.status}>
                   <div className="flex justify-between mb-1">
-                    <span className="text-sm font-medium text-body">{item.status}</span>
+                    <span className="text-sm font-medium text-body">{enumLabel(paymentStatusConfig, item.status)}</span>
                     <span className="text-sm text-muted">
                       {item.count} ({item.percentage.toFixed(1)}%)
                     </span>
@@ -224,7 +232,7 @@ export default function AdminPaymentStatisticsPage() {
               {statistics.byProvider.map((item) => (
                 <div key={item.provider}>
                   <div className="flex justify-between mb-1">
-                    <span className="text-sm font-medium text-body uppercase">{item.provider}</span>
+                    <span className="text-sm font-medium text-body">{enumLabel(paymentProviderConfig, item.provider)}</span>
                     <span className="text-sm text-muted">
                       {item.count} ({item.percentage.toFixed(1)}%)
                     </span>
@@ -248,21 +256,21 @@ export default function AdminPaymentStatisticsPage() {
         <div className="bg-surface-elevated rounded-xl shadow-sm p-6 mt-6">
           <h2 className="text-lg font-semibold text-heading mb-4">Detaylı Özet</h2>
           <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-            <div className="p-4 bg-success-50 rounded-lg">
-              <p className="text-sm text-muted mb-1">Tamamlanan</p>
-              <p className="text-2xl font-bold text-success-600">{statistics.summary.completedPayments}</p>
+            <div className="p-4 bg-success-50 rounded-lg min-w-0">
+              <p className="text-sm text-muted mb-1 truncate">Tamamlanan</p>
+              <p className="text-2xl font-bold text-success-600 truncate">{statistics.summary.completedPayments}</p>
             </div>
-            <div className="p-4 bg-danger-50 rounded-lg">
-              <p className="text-sm text-muted mb-1">Başarısız</p>
-              <p className="text-2xl font-bold text-danger-600">{statistics.summary.failedPayments}</p>
+            <div className="p-4 bg-danger-50 rounded-lg min-w-0">
+              <p className="text-sm text-muted mb-1 truncate">Başarısız</p>
+              <p className="text-2xl font-bold text-danger-600 truncate">{statistics.summary.failedPayments}</p>
             </div>
-            <div className="p-4 bg-warning-50 rounded-lg">
-              <p className="text-sm text-muted mb-1">Bekleyen</p>
-              <p className="text-2xl font-bold text-warning-600">{statistics.summary.pendingPayments}</p>
+            <div className="p-4 bg-warning-50 rounded-lg min-w-0">
+              <p className="text-sm text-muted mb-1 truncate">Bekleyen</p>
+              <p className="text-2xl font-bold text-warning-600 truncate">{statistics.summary.pendingPayments}</p>
             </div>
-            <div className="p-4 bg-info-50 rounded-lg">
-              <p className="text-sm text-muted mb-1">Toplam</p>
-              <p className="text-2xl font-bold text-info-600">{statistics.summary.totalPayments}</p>
+            <div className="p-4 bg-info-50 rounded-lg min-w-0">
+              <p className="text-sm text-muted mb-1 truncate">Toplam</p>
+              <p className="text-2xl font-bold text-info-600 truncate">{statistics.summary.totalPayments}</p>
             </div>
           </div>
         </div>

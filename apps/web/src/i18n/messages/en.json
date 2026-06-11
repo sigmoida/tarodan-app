@@ -624,6 +624,8 @@
     "invalidCardNumber": "Invalid card number"
   },
   "collection": {
+    "share": "Share",
+    "linkCopied": "Link copied",
     "collections": "Collections",
     "myCollections": "My Collections",
     "createCollection": "Create Collection",

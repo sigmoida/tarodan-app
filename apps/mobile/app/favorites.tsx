@@ -13,7 +13,7 @@ const { colors } = theme;
 export default function FavoritesScreen() {
   const { isAuthenticated } = useAuthStore();
   const { items, isLoading, error, fetchFavorites, removeFromFavorites, getFavoriteCount } = useFavoritesStore();
-  const { addItem: addToCart } = useCartStore();
+  const { addItem: addToCart, removeByProductId, isInCart } = useCartStore();
   const [refreshing, setRefreshing] = useState(false);
   const [snackbar, setSnackbar] = useState({ visible: false, message: '' });
 
@@ -41,7 +41,13 @@ export default function FavoritesScreen() {
     }
   };
 
-  const handleAddToCart = (item: WishlistItem) => {
+  // Toggle: sepetteyse çıkar, değilse ekle (tekrar basınca adet artırmasın).
+  const handleToggleCart = (item: WishlistItem) => {
+    if (isInCart(item.productId)) {
+      removeByProductId(item.productId);
+      setSnackbar({ visible: true, message: 'Sepetten çıkarıldı' });
+      return;
+    }
     const product = item.product;
     addToCart({
       productId: product.id,
@@ -71,7 +77,7 @@ export default function FavoritesScreen() {
           Favorilerinizi görmek için giriş yapın
         </Text>
         <Button variant="primary" title="Giriş Yap" onPress={() => router.push('/(auth)/login')} style={styles.button} />
-        <Button variant="ghost" title="Hesap Oluştur" onPress={() => router.push('/(auth)/register')} />
+        <Button variant="ghost" title="Hesap Oluştur" onPress={() => router.push('/(auth)/register')} style={{ alignSelf: 'center' }} />
       </View>
     );
   }
@@ -91,7 +97,7 @@ export default function FavoritesScreen() {
         <Ionicons name="cloud-offline-outline" size={64} color={colors.text.subtle} />
         <Text style={{ marginTop: 16, fontSize: 16, fontWeight: '600', color: colors.text.heading }}>Yüklenemedi</Text>
         <Text style={{ marginTop: 8, color: colors.text.subtle, textAlign: 'center' }}>Favorileriniz yüklenirken bir hata oluştu.</Text>
-        <Button variant="primary" title="Tekrar Dene" onPress={() => fetchFavorites()} style={{ marginTop: 16 }} />
+        <Button variant="primary" title="Tekrar Dene" onPress={() => fetchFavorites()} style={{ marginTop: 16, alignSelf: 'center' }} />
       </View>
     );
   }
@@ -120,34 +126,38 @@ export default function FavoritesScreen() {
         >
           {items.map((item) => (
             <Card key={item.id} padding={0} style={styles.card}>
-              <TouchableOpacity
-                style={styles.cardContent}
-                onPress={() => router.push(`/product/${item.productId}`)}
-              >
-                <Image
-                  source={{ uri: getImageUrl(item.product) }}
-                  style={styles.productImage}
-                />
-                <View style={styles.productInfo}>
-                  <Text variant="label" numberOfLines={2} style={styles.productTitle}>
-                    {item.product.title}
-                  </Text>
-                  <Text variant="caption" style={styles.sellerName}>
-                    {item.product.seller?.displayName || 'Satıcı'}
-                  </Text>
-                  <Text variant="h3" style={styles.price}>
-                    {formatPrice(item.product.price)}
-                  </Text>
+              {/* Aksiyon butonları navigasyon TouchableOpacity'sinin DIŞINDA (kardeş) —
+                  iç içe dokunulabilirlerde ebeveyn dokunuşu yutabiliyor (sepet ekranı deseni). */}
+              <View style={styles.cardContent}>
+                <TouchableOpacity
+                  style={styles.cardMain}
+                  onPress={() => router.push(`/product/${item.productId}`)}
+                >
+                  <Image
+                    source={{ uri: getImageUrl(item.product) }}
+                    style={styles.productImage}
+                  />
+                  <View style={styles.productInfo}>
+                    <Text variant="label" numberOfLines={2} style={styles.productTitle}>
+                      {item.product.title}
+                    </Text>
+                    <Text variant="caption" style={styles.sellerName}>
+                      {item.product.seller?.displayName || 'Satıcı'}
+                    </Text>
+                    <Text variant="h3" style={styles.price}>
+                      {formatPrice(item.product.price)}
+                    </Text>
 
-                  {/* Status indicator */}
-                  {item.product.status !== 'active' && (
-                    <View style={[styles.statusBadge, { backgroundColor: colors.warning[50]! }]}>
-                      <Text style={{ color: colors.warning[600]!, fontSize: 11 }}>
-                        {item.product.status === 'sold' ? 'Satıldı' : 'Aktif değil'}
-                      </Text>
-                    </View>
-                  )}
-                </View>
+                    {/* Status indicator */}
+                    {item.product.status !== 'active' && (
+                      <View style={[styles.statusBadge, { backgroundColor: colors.warning[50]! }]}>
+                        <Text style={{ color: colors.warning[600]!, fontSize: 11 }}>
+                          {item.product.status === 'sold' ? 'Satıldı' : 'Aktif değil'}
+                        </Text>
+                      </View>
+                    )}
+                  </View>
+                </TouchableOpacity>
 
                 {/* Actions */}
                 <View style={styles.actions}>
@@ -160,15 +170,15 @@ export default function FavoritesScreen() {
                   />
                   {item.product.status === 'active' && (
                     <IconButton
-                      icon="cart-outline"
-                      accessibilityLabel="Sepete ekle"
+                      icon={isInCart(item.productId) ? 'cart' : 'cart-outline'}
+                      accessibilityLabel={isInCart(item.productId) ? 'Sepetten çıkar' : 'Sepete ekle'}
                       size="md"
                       color={colors.primary[600]!}
-                      onPress={() => handleAddToCart(item)}
+                      onPress={() => handleToggleCart(item)}
                     />
                   )}
                 </View>
-              </TouchableOpacity>
+              </View>
             </Card>
           ))}
 
@@ -222,6 +232,8 @@ const styles = StyleSheet.create({
   button: {
     marginBottom: 8,
     minWidth: 200,
+    // Button varsayılanı alignSelf:'flex-start' → ortalı kapsayıcıda sola kayar.
+    alignSelf: 'center',
   },
   emptyContainer: {
     flex: 1,
@@ -242,6 +254,7 @@ const styles = StyleSheet.create({
   },
   browseButton: {
     minWidth: 200,
+    alignSelf: 'center',
   },
   scrollView: {
     flex: 1,
@@ -256,6 +269,10 @@ const styles = StyleSheet.create({
   cardContent: {
     flexDirection: 'row',
     padding: 12,
+  },
+  cardMain: {
+    flex: 1,
+    flexDirection: 'row',
   },
   productImage: {
     width: 100,

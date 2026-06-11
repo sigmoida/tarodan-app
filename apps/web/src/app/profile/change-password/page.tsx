@@ -186,7 +186,7 @@ export default function ChangePasswordPage() {
               </label>
               <div className="relative">
                 <LockClosedIcon className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-subtle" />
-                <Input type={showCurrent ? 'text' : 'password'}
+                <Input type={showCurrent ? 'text' : 'password'} hidePasswordToggle
                   value={currentPassword}
                   onChange={(e) => {
                     setCurrentPassword(e.target.value);
@@ -212,7 +212,7 @@ export default function ChangePasswordPage() {
               </label>
               <div className="relative">
                 <LockClosedIcon className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-subtle" />
-                <Input type={showNew ? 'text' : 'password'}
+                <Input type={showNew ? 'text' : 'password'} hidePasswordToggle
                   value={newPassword}
                   onChange={(e) => {
                     setNewPassword(e.target.value);
@@ -250,7 +250,7 @@ export default function ChangePasswordPage() {
               </label>
               <div className="relative">
                 <LockClosedIcon className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-subtle" />
-                <Input type={showConfirm ? 'text' : 'password'}
+                <Input type={showConfirm ? 'text' : 'password'} hidePasswordToggle
                   value={confirmPassword}
                   onChange={(e) => {
                     setConfirmPassword(e.target.value);

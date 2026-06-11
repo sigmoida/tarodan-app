@@ -610,6 +610,53 @@ export class NotificationService {
         link = this.interpolate(link, data);
       }
 
+      // Collapse NEW_MESSAGE per thread: if the user already has an UNREAD
+      // notification for this thread, update it (latest preview + count)
+      // instead of stacking a new row for every message. Once read, the next
+      // message starts a fresh notification.
+      if (type === NotificationType.NEW_MESSAGE && data?.threadId) {
+        const existing = await this.prisma.notificationLog.findFirst({
+          where: {
+            userId,
+            channel: 'in_app',
+            type,
+            status: 'sent',
+            data: { path: ['threadId'], equals: data.threadId },
+          },
+          orderBy: { createdAt: 'desc' },
+        });
+
+        if (existing) {
+          const previousCount =
+            Number((existing.data as Record<string, any>)?.messageCount) || 1;
+          const messageCount = previousCount + 1;
+          const now = new Date();
+
+          await this.prisma.notificationLog.update({
+            where: { id: existing.id },
+            data: {
+              title: `${title} (${messageCount})`,
+              body: message,
+              data: {
+                ...(data || {}),
+                messageCount,
+                icon: template?.icon,
+                link,
+              },
+              sentAt: now,
+              // Bell list is ordered by createdAt desc; bump so the
+              // collapsed notification surfaces as the most recent one.
+              createdAt: now,
+            },
+          });
+
+          this.logger.log(
+            `[saveInAppNotification] Collapsed into existing notification id=${existing.id} (messageCount=${messageCount})`,
+          );
+          return true;
+        }
+      }
+
       // Store in NotificationLog as an in-app notification
       const notification = await this.prisma.notificationLog.create({
         data: {

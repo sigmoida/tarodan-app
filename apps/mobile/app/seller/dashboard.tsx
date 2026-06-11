@@ -1,7 +1,6 @@
 import React from 'react';
 import { View, StyleSheet, ScrollView, TouchableOpacity, RefreshControl } from 'react-native';
 import { Card, Text, theme } from '@tarodan/ui-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 import { router } from 'expo-router';
 import { useQuery } from '@tanstack/react-query';
@@ -150,7 +149,7 @@ export default function SellerDashboardScreen() {
 
   if (!isAuthenticated) {
     return (
-      <SafeAreaView style={styles.container} edges={['top']}>
+      <View style={styles.container}>
         <ScreenHeader title="Satıcı Paneli" />
         <EmptyState
           fullscreen
@@ -159,17 +158,17 @@ export default function SellerDashboardScreen() {
           actionLabel="Giriş Yap"
           onAction={() => router.push('/(auth)/login')}
         />
-      </SafeAreaView>
+      </View>
     );
   }
 
   const isLoading = statsQuery.isLoading && pendingOrdersQuery.isLoading && myListingsQuery.isLoading;
   if (isLoading) {
     return (
-      <SafeAreaView style={styles.container} edges={['top']}>
+      <View style={styles.container}>
         <ScreenHeader title="Satıcı Paneli" />
         <ScreenLoader />
-      </SafeAreaView>
+      </View>
     );
   }
 
@@ -186,7 +185,7 @@ export default function SellerDashboardScreen() {
   };
 
   return (
-    <SafeAreaView style={styles.container} edges={['top']}>
+    <View style={styles.container}>
       <ScreenHeader title="Satıcı Paneli" subtitle={user?.displayName} />
       <ScrollView
         contentContainerStyle={styles.scrollBody}
@@ -330,7 +329,7 @@ export default function SellerDashboardScreen() {
           </Card>
         ) : null}
       </ScrollView>
-    </SafeAreaView>
+    </View>
   );
 }
 

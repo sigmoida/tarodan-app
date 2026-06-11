@@ -5,6 +5,7 @@ import { useQuery } from '@tanstack/react-query';
 import { router } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { api } from '../../src/services/api';
+import { useAuthStore } from '../../src/stores/authStore';
 import { transformImageUrl } from '../../src/utils/imageUrl';
 
 const { colors } = theme;
@@ -14,6 +15,10 @@ const { width } = Dimensions.get('window');
 export default function CollectionsScreen() {
   const [searchQuery, setSearchQuery] = useState('');
   const [activeFilter, setActiveFilter] = useState<'all' | 'popular' | 'recent'>('all');
+  const { isAuthenticated, user } = useAuthStore();
+  // Premium/business üyeler zaten koleksiyon oluşturabildiği için upsell'i gizle.
+  const isPremiumMember =
+    user?.membershipTier === 'premium' || user?.membershipTier === 'business';
 
   const { data: apiCollections, isLoading, refetch, isRefetching } = useQuery({
     queryKey: ['collections', searchQuery, activeFilter],
@@ -152,21 +157,26 @@ export default function CollectionsScreen() {
           )}
         </View>
 
-        {/* Info Card */}
-        <View style={styles.infoCard}>
-          <Ionicons name="information-circle" size={24} color={colors.info[600]!} />
-          <View style={styles.infoContent}>
-            <Text style={styles.infoTitle}>Digital Garage Nedir?</Text>
-            <Text style={styles.infoText}>
-              Koleksiyonunuzu sergileyin, diğer koleksiyonerleri keşfedin ve ilham alın.
-              Premium üyeler kendi garajlarını oluşturabilir.
-            </Text>
-            <TouchableOpacity style={styles.infoButton} onPress={() => router.push('/(auth)/register')}>
-              <Text style={styles.infoButtonText}>Premium Üye Ol</Text>
-              <Ionicons name="arrow-forward" size={16} color={colors.primary[600]!} />
-            </TouchableOpacity>
+        {/* Info Card — premium/business üyelere gösterme */}
+        {!isPremiumMember && (
+          <View style={styles.infoCard}>
+            <Ionicons name="information-circle" size={24} color={colors.info[600]!} />
+            <View style={styles.infoContent}>
+              <Text style={styles.infoTitle}>Digital Garage Nedir?</Text>
+              <Text style={styles.infoText}>
+                Koleksiyonunuzu sergileyin, diğer koleksiyonerleri keşfedin ve ilham alın.
+                Premium üyeler kendi garajlarını oluşturabilir.
+              </Text>
+              <TouchableOpacity
+                style={styles.infoButton}
+                onPress={() => router.push(isAuthenticated ? '/upgrade' : '/(auth)/login')}
+              >
+                <Text style={styles.infoButtonText}>Premium Üye Ol</Text>
+                <Ionicons name="arrow-forward" size={16} color={colors.primary[600]!} />
+              </TouchableOpacity>
+            </View>
           </View>
-        </View>
+        )}
 
         <View style={{ height: 40 }} />
       </ScrollView>

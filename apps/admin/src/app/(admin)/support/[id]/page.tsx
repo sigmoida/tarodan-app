@@ -13,7 +13,7 @@ import {
 } from '@heroicons/react/24/outline';
 import { adminApi } from '@/lib/api';
 import toast from 'react-hot-toast';
-import { Button, Select, Spinner, Textarea } from '@tarodan/ui';
+import { Button, Select, Spinner, Textarea, enumLabel, ticketCategoryConfig } from '@tarodan/ui';
 
 interface SupportTicketDetail {
   id: string;
@@ -229,7 +229,7 @@ export default function SupportTicketDetailPage() {
                 <div className="space-y-3">
                   <div>
                     <span className="text-muted text-sm">Kategori:</span>
-                    <p className="font-medium capitalize">{ticket.category}</p>
+                    <p className="font-medium">{enumLabel(ticketCategoryConfig, ticket.category)}</p>
                   </div>
                   <div>
                     <span className="text-muted text-sm">Öncelik:</span>
@@ -313,8 +313,8 @@ export default function SupportTicketDetailPage() {
         {/* Reply Modal */}
         {showReplyModal && (
           <div className="fixed inset-0 bg-heading bg-opacity-50 flex items-center justify-center z-50">
-            <div className="bg-surface-elevated rounded-xl p-6 max-w-md w-full mx-4">
-              <h3 className="text-lg font-semibold text-heading mb-4">Yanıt Ver</h3>
+            <div className="bg-surface-elevated rounded-xl px-6 pb-6 pt-5 max-w-md w-full mx-4">
+              <h3 className="text-lg font-semibold text-heading mb-4 leading-tight">Yanıt Ver</h3>
               <div className="mb-4">
                 <label className="block text-sm font-medium text-body mb-2">
                   Mesaj *
@@ -346,8 +346,8 @@ export default function SupportTicketDetailPage() {
         {/* Status Update Modal */}
         {showStatusModal && (
           <div className="fixed inset-0 bg-heading bg-opacity-50 flex items-center justify-center z-50">
-            <div className="bg-surface-elevated rounded-xl p-6 max-w-md w-full mx-4">
-              <h3 className="text-lg font-semibold text-heading mb-4">Durum Güncelle</h3>
+            <div className="bg-surface-elevated rounded-xl px-6 pb-6 pt-5 max-w-md w-full mx-4">
+              <h3 className="text-lg font-semibold text-heading mb-4 leading-tight">Durum Güncelle</h3>
               <div className="mb-4">
                 <label className="block text-sm font-medium text-body mb-2">
                   Yeni Durum

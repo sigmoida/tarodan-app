@@ -3,7 +3,8 @@
 import { useState, useEffect, useCallback } from 'react';
 import { adminApi } from '@/lib/api';
 import clsx from 'clsx';
-import { Button, Input } from '@tarodan/ui';
+import { Button, Input, enumLabel, severityConfig } from '@tarodan/ui';
+import { AdminTabs } from '@/components/AdminTabs';
 import {
     ExclamationTriangleIcon,
     ShieldExclamationIcon,
@@ -179,20 +180,12 @@ export default function LogsPage() {
                 </div>
 
                 {/* Tabs */}
-                <div className="flex space-x-1 mb-6 bg-surface-elevated p-1 rounded-lg w-fit">
-                    {tabs.map(tab => (
-                        <Button variant="secondary" key={tab.id}
-                            onClick={() => handleTabChange(tab.id)}
-                            className={clsx(
-                                'flex items-center px-4 py-2 rounded-md text-sm font-medium transition-colors',
-                                activeTab === tab.id
-                                    ? 'bg-primary-500 text-heading'
-                                    : 'text-muted hover:text-heading hover:bg-surface-alt'
-                            )}>
-                            <tab.icon className="h-4 w-4 mr-2" />
-                            {tab.name}
-                        </Button>
-                    ))}
+                <div className="mb-6">
+                    <AdminTabs
+                        tabs={tabs.map(tab => ({ key: tab.id, label: tab.name, icon: tab.icon }))}
+                        value={activeTab}
+                        onChange={(k) => handleTabChange(k as LogTab)}
+                    />
                 </div>
 
                 {/* Stats Cards */}
@@ -261,8 +254,8 @@ export default function LogsPage() {
                             className="pl-10 pr-4 border-border text-heading placeholder-muted focus:ring-1" />
                     </div>
                     <Button variant="secondary" onClick={() => loadLogs()}
-                        className="p-2 bg-surface-elevated border border-border rounded-lg text-muted hover:text-heading">
-                        <ArrowPathIcon className={clsx('h-5 w-5', loading && 'animate-spin')} />
+                        className="p-2 shrink-0 bg-surface-elevated border border-border rounded-lg text-muted hover:text-heading">
+                        <ArrowPathIcon className={clsx('h-5 w-5 shrink-0', loading && 'animate-spin')} />
                     </Button>
                 </div>
 
@@ -294,7 +287,7 @@ export default function LogsPage() {
                                                     <tr key={log.id} className="hover:bg-surface-alt/50">
                                                         <td className="px-4 py-3">
                                                             <span className={clsx('px-2 py-1 text-xs rounded-full border', severityColors[log.severity])}>
-                                                                {log.severity.toUpperCase()}
+                                                                {enumLabel(severityConfig, log.severity)}
                                                             </span>
                                                         </td>
                                                         <td className="px-4 py-3 text-sm text-heading max-w-md truncate">{log.message}</td>
@@ -335,7 +328,7 @@ export default function LogsPage() {
                                                         </td>
                                                         <td className="px-4 py-3">
                                                             <span className={clsx('px-2 py-1 text-xs rounded-full border', severityColors[log.severity])}>
-                                                                {log.severity.toUpperCase()}
+                                                                {enumLabel(severityConfig, log.severity)}
                                                             </span>
                                                         </td>
                                                         <td className="px-4 py-3 text-sm text-muted">

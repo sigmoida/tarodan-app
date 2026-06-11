@@ -225,6 +225,10 @@ const styles = StyleSheet.create({
   },
   iosPicker: {
     alignSelf: 'center',
+    // iOS spinner Modal içinde explicit boyut almazsa 0 yüksekliğe çöküp
+    // görünmez oluyor. Sabit yükseklik/genişlik ver.
+    width: '100%',
+    height: 200,
   },
   iosButtons: {
     flexDirection: 'row',

@@ -641,9 +641,9 @@ export class UserService {
       where: { userId },
     });
 
-    // Check address limit (max 3)
-    if (existingAddresses >= 3) {
-      throw new BadRequestException('En fazla 3 adres ekleyebilirsiniz. Yeni adres eklemek için mevcut bir adresi silin.');
+    // Check address limit (max 10)
+    if (existingAddresses >= 10) {
+      throw new BadRequestException('En fazla 10 adres ekleyebilirsiniz. Yeni adres eklemek için mevcut bir adresi silin.');
     }
 
     const title = (data.title?.trim() && data.title.trim()) || `Adres ${existingAddresses + 1}`;
@@ -1063,9 +1063,10 @@ export class UserService {
       totalRevenue,
       activeListings,
       pendingOrders,
+      allTimeSalesCount,
       // Previous period for comparison
-      prevViews,
-      prevLikes,
+      prevPeriodLikes,
+      currentPeriodLikes,
       prevSalesCount,
       prevRevenue,
     ] = await Promise.all([
@@ -1097,9 +1098,15 @@ export class UserService {
         where: { sellerId: userId, status: 'active' },
       }),
       this.prisma.order.count({
-        where: { 
-          sellerId: userId, 
+        where: {
+          sellerId: userId,
           status: { in: ['pending_payment', 'paid', 'preparing'] },
+        },
+      }),
+      this.prisma.order.count({
+        where: {
+          sellerId: userId,
+          status: { in: ['completed', 'delivered'] },
         },
       }),
       // Previous period for comparison
@@ -1177,14 +1184,15 @@ export class UserService {
         },
       });
 
-      // Approximate views based on current ratio
-      const avgViewsPerLike = currentViews > 0 && currentLikes > 0 
-        ? Math.round(currentViews / currentLikes) 
-        : 10;
-      
+      // Views are only stored as a cumulative counter; approximate the daily
+      // breakdown from that day's likes and the overall views-per-like ratio
+      const avgViewsPerLike = currentViews > 0 && currentLikes > 0
+        ? Math.round(currentViews / currentLikes)
+        : 0;
+
       dailyViews.push({
         date: dateStr,
-        views: dayLikes * avgViewsPerLike || Math.floor(Math.random() * 20) + 5, // fallback for demo
+        views: dayLikes * avgViewsPerLike,
         favorites: dayLikes,
       });
     }
@@ -1307,7 +1315,8 @@ export class UserService {
 
     // Calculate additional metrics
     const avgViewsPerListing = activeListings > 0 ? Math.round(currentViews / activeListings) : 0;
-    const conversionRate = currentViews > 0 ? (totalSalesCount / currentViews) * 100 : 0;
+    // Views are an all-time counter, so compare against all-time sales
+    const conversionRate = currentViews > 0 ? (allTimeSalesCount / currentViews) * 100 : 0;
 
     // Average time to sell (estimate)
     const soldProducts = await this.prisma.product.findMany({
@@ -1335,8 +1344,9 @@ export class UserService {
       totalRevenue: currentRevenue,
       activeListings,
       pendingOrders,
-      viewsChange: calcChange(prevLikes, prevViews), // Using likes as proxy for view change
-      favoritesChange: calcChange(prevLikes, prevViews > 0 ? prevViews : 1),
+      // Views aren't tracked per day, so likes act as a proxy for the views trend
+      viewsChange: calcChange(currentPeriodLikes, prevPeriodLikes),
+      favoritesChange: calcChange(currentPeriodLikes, prevPeriodLikes),
       salesChange: calcChange(totalSalesCount, prevSalesCount),
       revenueChange: calcChange(currentRevenue, previousRevenue),
       avgViewsPerListing,

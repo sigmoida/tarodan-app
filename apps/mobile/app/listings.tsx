@@ -9,7 +9,7 @@ import {
 } from 'react-native';
 import { theme, Text, Input, Chip, Spinner, Radio, ScreenHeader } from '@tarodan/ui-native';
 import { useState, useMemo } from 'react';
-import { useInfiniteQuery } from '@tanstack/react-query';
+import { keepPreviousData, useInfiniteQuery } from '@tanstack/react-query';
 import { router, useLocalSearchParams } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { productsApi } from '../src/services/api';
@@ -79,6 +79,7 @@ export default function ListingsScreen() {
   const {
     data,
     isLoading,
+    isFetching,
     fetchNextPage,
     hasNextPage,
     isFetchingNextPage,
@@ -86,6 +87,7 @@ export default function ListingsScreen() {
     isRefetching,
   } = useInfiniteQuery({
     queryKey: ['listings', filters],
+    placeholderData: keepPreviousData,
     initialPageParam: 1,
     queryFn: async ({ pageParam }) => {
       const listParams = buildListParams(filters, pageParam as number, PAGE_SIZE);
@@ -211,7 +213,9 @@ export default function ListingsScreen() {
             <Chip label={`${item.label} ✕`} variant="primary" onPress={item.onRemove} />
           )}
           ListFooterComponent={
-            <Chip label="Temizle ✕" variant="neutral" onPress={clearFilters} />
+            activeChips.length > 1 ? (
+              <Chip label="Temizle ✕" variant="neutral" onPress={clearFilters} />
+            ) : null
           }
         />
       )}
@@ -254,6 +258,7 @@ export default function ListingsScreen() {
         onClear={clearFilters}
         options={options}
         resultCount={total}
+        countLoading={isFetching && !isFetchingNextPage}
       />
 
       {/* Listings */}
@@ -395,7 +400,7 @@ const styles = StyleSheet.create({
     left: 8,
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: colors.success[600]!,
+    backgroundColor: colors.success[500]!,
     paddingHorizontal: 8,
     paddingVertical: 4,
     borderRadius: 4,

@@ -1,7 +1,6 @@
 import React from 'react';
 import { View, StyleSheet, TouchableOpacity, ScrollView } from 'react-native';
 
-import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { theme, Text } from '@tarodan/ui-native';
 import { ScreenHeader } from '../../src/components/common';
@@ -20,7 +19,7 @@ export default function LanguageSettingsScreen() {
   };
 
   return (
-    <SafeAreaView style={styles.container} edges={['top']}>
+    <View style={styles.container}>
       <ScreenHeader title={t('settings.language') || 'Dil / Language'} />
 
       <ScrollView contentContainerStyle={styles.scrollBody}>
@@ -51,7 +50,7 @@ export default function LanguageSettingsScreen() {
           </TouchableOpacity>
         ))}
       </ScrollView>
-    </SafeAreaView>
+    </View>
   );
 }
 

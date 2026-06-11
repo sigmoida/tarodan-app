@@ -86,11 +86,33 @@ api.interceptors.request.use(
   }
 );
 
+// Banlı kullanıcı yönlendirmesi: aynı anda dönen birden çok USER_BANNED 403'ünde
+// /banned ekranına tekrar tekrar replace yapmamak için flag. Çıkışta sıfırlanır.
+let bannedRedirectActive = false;
+export const resetBannedRedirect = () => {
+  bannedRedirectActive = false;
+};
+
 // Response interceptor - handle token refresh
 api.interceptors.response.use(
   (response) => response,
   async (error) => {
     const originalRequest = error.config;
+
+    // Banlı kullanıcı: backend BannedUserGuard tüm istekleri 403 + USER_BANNED
+    // ile bloklar (logout ve destek talebi hariç). Kullanıcıyı tam ekran
+    // /banned ekranına kilitle.
+    const errData = error.response?.data;
+    if (error.response?.status === 403 && errData?.errorCode === 'USER_BANNED') {
+      if (!bannedRedirectActive) {
+        bannedRedirectActive = true;
+        router.replace({
+          pathname: '/banned',
+          params: errData.bannedReason ? { reason: errData.bannedReason } : undefined,
+        });
+      }
+      return Promise.reject(error);
+    }
 
     if (error.response?.status === 401 && !originalRequest._retry) {
       originalRequest._retry = true;
@@ -175,11 +197,13 @@ export const authApi = {
   /** 2FA'yı etkinleştir; secret + qrCode + backupCodes döner */
   setupTwoFactor: () =>
     api.post<{ secret: string; qrCode: string; backupCodes?: string[] }>('/security/2fa/enable'),
-  verifyTwoFactor: (token: string) =>
-    api.post('/security/2fa/verify', { token }),
-  disableTwoFactor: (password?: string) =>
-    api.post('/security/2fa/disable', password ? { password } : {}),
-  regenerateBackupCodes: () => api.post('/security/2fa/backup-codes'),
+  // Backend Verify2FADto/Disable2FADto hepsi `code` alanı bekliyor (TOTP 6 hane).
+  verifyTwoFactor: (code: string) =>
+    api.post('/security/2fa/verify', { code }),
+  disableTwoFactor: (code: string) =>
+    api.post('/security/2fa/disable', { code }),
+  regenerateBackupCodes: (code: string) =>
+    api.post<{ backupCodes?: string[] } | string[]>('/security/2fa/backup-codes', { code }),
   /** Tüm cihazlardan çıkış — backend: DELETE /security/tokens */
   logoutAll: () => api.delete('/security/tokens'),
 };
@@ -299,6 +323,33 @@ export const ordersApi = {
     offerId?: string;
     price?: number;
   }) => guestApi.post('/orders/guest', data),
+  /** Toplu checkout (üye): sepetteki tüm ürünler tek CheckoutGroup altında, tek ödeme */
+  checkout: (data: {
+    items: Array<{ productId: string }>;
+    idempotencyKey: string;
+    shippingAddressId?: string;
+    shippingAddress?: OrderAddressInput;
+    billingAddressId?: string;
+    billingAddress?: OrderAddressInput;
+    couponCode?: string;
+  }) => api.post('/orders/checkout', data),
+  /** Toplu checkout (misafir) */
+  checkoutGuest: (data: {
+    items: Array<{ productId: string }>;
+    idempotencyKey: string;
+    email: string;
+    emailVerificationCode: string;
+    phone: string;
+    guestName: string;
+    shippingAddress: OrderAddressInput;
+    billingAddress?: OrderAddressInput;
+  }) => guestApi.post('/orders/checkout/guest', data),
+  /** Alıcının sipariş grupları (gruplu liste) */
+  getGroups: (params?: Record<string, any>) =>
+    api.get('/orders/groups', { params }),
+  /** Tek sipariş grubu detayı (ürün satırları + ayrı kargolar) */
+  getGroup: (id: string) =>
+    api.get(`/orders/groups/${id}`),
   cancel: (id: string | number, reason?: string) =>
     api.post(`/orders/${id}/cancel`, { reason }),
   /** Alıcı: teslim aldım onayı (backend: POST /orders/:id/confirm). */
@@ -546,8 +597,14 @@ export const addressesApi = {
 export const paymentsApi = {
   initiate: (orderId: string | number, provider: 'paytr' = 'paytr') =>
     api.post('/payments/initiate', { orderId, provider }),
+  /** Grup ödemesi: tek ödeme checkout grubundaki tüm siparişleri kapsar */
+  initiateGroup: (checkoutGroupId: string, provider: 'paytr' = 'paytr') =>
+    api.post('/payments/initiate', { checkoutGroupId, provider }),
   initiateGuest: (orderId: string | number, provider: 'paytr' = 'paytr') =>
     guestApi.post('/payments/initiate-guest', { orderId, provider }),
+  /** Grup ödemesi (misafir) */
+  initiateGroupGuest: (checkoutGroupId: string, provider: 'paytr' = 'paytr') =>
+    guestApi.post('/payments/initiate-guest', { checkoutGroupId, provider }),
   /** Takas nakit fark ödemesi başlat */
   initiateTradeCash: (tradeId: string) =>
     api.post('/payments/initiate-trade-cash', { tradeId }),
@@ -775,6 +832,7 @@ export const supportApi = {
   createTicket: (data: {
     subject: string;
     category: string;
+    priority?: string;
     message: string;
     orderId?: string;
     tradeId?: string;
@@ -857,6 +915,19 @@ export const mediaApi = {
       {
         headers: { 'Content-Type': 'multipart/form-data' },
         params: { folder: 'messages' },
+      },
+    );
+  },
+  /** İade talebi kanıt fotoğrafı — web ile parite: POST /media/upload?folder=reviews */
+  uploadRefundEvidence: (file: RNFile) => {
+    const formData = new FormData();
+    appendRNFile(formData, 'file', file);
+    return api.post<{ url: string; key?: string }>(
+      '/media/upload',
+      formData,
+      {
+        headers: { 'Content-Type': 'multipart/form-data' },
+        params: { folder: 'reviews' },
       },
     );
   },

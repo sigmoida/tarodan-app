@@ -1,7 +1,6 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { View, StyleSheet, Alert, BackHandler } from 'react-native';
-import { Button, Spinner, Text, theme } from '@tarodan/ui-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { View, StyleSheet, BackHandler } from 'react-native';
+import { Button, Spinner, Text, theme, appAlert } from '@tarodan/ui-native';
 import { Ionicons } from '@expo/vector-icons';
 import { router, useFocusEffect, useLocalSearchParams } from 'expo-router';
 import { WebView, WebViewNavigation } from 'react-native-webview';
@@ -27,6 +26,8 @@ export default function PaymentWebViewScreen() {
   const params = useLocalSearchParams<{
     id: string;
     orderId?: string;
+    /** Çok ürünlü sipariş grubu: tek ödeme tüm grubu kapsar */
+    groupId?: string;
     provider?: 'paytr';
     guest?: string;
     tradeCash?: string;
@@ -90,8 +91,13 @@ export default function PaymentWebViewScreen() {
       }
 
       // 2) Fallback: ekran kendisi initiate eder (deep link / kart 3DS fallback vb.).
+      //    Grup ödemesi öncelikli: tek ödeme tüm grubu kapsar.
       let response: any;
-      if (isGuest && params.orderId) {
+      if (params.groupId) {
+        response = isGuest
+          ? await paymentsApi.initiateGroupGuest(params.groupId, provider)
+          : await paymentsApi.initiateGroup(params.groupId, provider);
+      } else if (isGuest && params.orderId) {
         response = await paymentsApi.initiateGuest(params.orderId, provider);
       } else if (params.orderId) {
         response = await paymentsApi.initiate(params.orderId, provider);
@@ -161,24 +167,24 @@ export default function PaymentWebViewScreen() {
     }
   };
 
+  // Geri git; stack kökündeysek (deep link / replace ile gelinmişse) ana sayfaya düş.
+  // Düz router.back() bu durumda "GO_BACK was not handled by any navigator" hatası verir.
+  const safeBack = () => {
+    if (router.canGoBack()) router.back();
+    else router.replace('/(tabs)' as never);
+  };
+
   const handleCancel = () => {
-    Alert.alert(
-      'Ödemeyi İptal Et',
-      'Ödeme işlemini iptal etmek istediğinize emin misiniz? Bu işlem sepetinizdeki rezervasyonu serbest bırakır.',
+    // Geri çıkış siparişi İPTAL ETMEZ — sadece ödeme ekranından çıkar. Sipariş
+    // "ödeme bekliyor" kalır; backend re-initiate'i (taze token + gerekirse yeniden
+    // rezervasyon) zaten destekliyor. Terk edilen ödeme/rezervasyonu 30dk/24s cron temizler.
+    // (Eski davranış paymentsApi.cancel ile siparişi iptal edip "ödeme beklenmiyor"a düşürüyordu.)
+    appAlert(
+      'Ödemeden Çık',
+      'Ödemeyi tamamlamadan çıkmak istediğinize emin misiniz? Siparişiniz "ödeme bekliyor" olarak kalır; daha sonra tekrar ödeyebilirsiniz.',
       [
-        { text: 'Devam Et', style: 'cancel' },
-        {
-          text: 'İptal Et',
-          style: 'destructive',
-          onPress: async () => {
-            try {
-              await paymentsApi.cancel(paymentIdRef.current);
-            } catch {
-              // cancel başarısız olsa bile UI'ı geri al
-            }
-            router.back();
-          },
-        },
+        { text: 'Ödemeye Devam Et', style: 'cancel' },
+        { text: 'Çık', onPress: () => safeBack() },
       ],
     );
   };
@@ -193,6 +199,7 @@ export default function PaymentWebViewScreen() {
         params: {
           paymentId: paymentIdRef.current,
           orderId: params.orderId,
+          groupId: params.groupId,
           guest: params.guest,
           tradeCash: params.tradeCash,
           tradeId: params.tradeId,
@@ -254,7 +261,7 @@ export default function PaymentWebViewScreen() {
   };
 
   return (
-    <SafeAreaView style={styles.container} edges={['top']}>
+    <View style={styles.container}>
       <ScreenHeader
         title="Güvenli Ödeme"
         subtitle="PayTR"
@@ -276,7 +283,7 @@ export default function PaymentWebViewScreen() {
       ) : state.error ? (
         <View style={styles.errorWrap}>
           <ErrorState message={state.error} onRetry={initiatePayment} />
-          <Button variant="ghost" title="Geri Dön" onPress={() => router.back()} />
+          <Button variant="ghost" title="Geri Dön" onPress={safeBack} />
         </View>
       ) : state.html ? (
         <WebView
@@ -321,7 +328,7 @@ export default function PaymentWebViewScreen() {
           onShouldStartLoadWithRequest={handleShouldStartLoad}
         />
       ) : null}
-    </SafeAreaView>
+    </View>
   );
 }
 
@@ -356,5 +363,6 @@ const styles = StyleSheet.create({
   errorWrap: {
     flex: 1,
     paddingVertical: 16,
+    alignItems: 'center',
   },
 });

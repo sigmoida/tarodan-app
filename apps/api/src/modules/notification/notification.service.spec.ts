@@ -32,6 +32,8 @@ describe('NotificationService in-app dedupe', () => {
     },
     notificationLog: {
       create: jest.fn().mockResolvedValue({ id: 'log-1' }),
+      findFirst: jest.fn().mockResolvedValue(null),
+      update: jest.fn().mockResolvedValue({ id: 'log-1' }),
     },
   };
 
@@ -95,5 +97,56 @@ describe('NotificationService in-app dedupe', () => {
     });
 
     expect(inAppCreateCalls()).toHaveLength(1);
+  });
+
+  /**
+   * Collapse: rapid messages in the same thread must not stack one
+   * notification per message in the bell. An unread NEW_MESSAGE for the
+   * same thread is updated in place (latest preview + running count).
+   */
+  describe('NEW_MESSAGE per-thread collapse', () => {
+    const sendNewMessage = (preview: string) =>
+      service.createInAppNotification('user-1', NotificationType.NEW_MESSAGE, {
+        threadId: 'thread-1',
+        senderName: 'Ayşe',
+        messagePreview: preview,
+      });
+
+    it('creates a new row when there is no unread notification for the thread', async () => {
+      mockPrisma.notificationLog.findFirst.mockResolvedValueOnce(null);
+
+      await sendNewMessage('Merhaba');
+
+      expect(inAppCreateCalls()).toHaveLength(1);
+      expect(mockPrisma.notificationLog.update).not.toHaveBeenCalled();
+    });
+
+    it('updates the existing unread row instead of creating a second one', async () => {
+      mockPrisma.notificationLog.findFirst.mockResolvedValueOnce({
+        id: 'log-existing',
+        data: { threadId: 'thread-1', messageCount: 2 },
+      });
+
+      await sendNewMessage('Nasılsın?');
+
+      expect(inAppCreateCalls()).toHaveLength(0);
+      expect(mockPrisma.notificationLog.update).toHaveBeenCalledTimes(1);
+      const [updateArg] = mockPrisma.notificationLog.update.mock.calls[0];
+      expect(updateArg.where).toEqual({ id: 'log-existing' });
+      expect(updateArg.data.title).toBe('Yeni Mesaj (3)');
+      expect(updateArg.data.body).toBe('Ayşe: Nasılsın?');
+      expect(updateArg.data.data.messageCount).toBe(3);
+    });
+
+    it('only collapses into UNREAD notifications (read ones start fresh)', async () => {
+      mockPrisma.notificationLog.findFirst.mockResolvedValueOnce(null);
+
+      await sendNewMessage('Tekrar merhaba');
+
+      const [findArg] = mockPrisma.notificationLog.findFirst.mock.calls[0];
+      expect(findArg.where.status).toBe('sent');
+      expect(findArg.where.data).toEqual({ path: ['threadId'], equals: 'thread-1' });
+      expect(inAppCreateCalls()).toHaveLength(1);
+    });
   });
 });

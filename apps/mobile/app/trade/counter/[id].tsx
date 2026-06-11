@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { View, StyleSheet, ScrollView, Pressable, Image, Alert } from 'react-native';
+import { View, StyleSheet, ScrollView, Pressable, Image } from 'react-native';
 import {
   theme,
   Button,
@@ -10,6 +10,7 @@ import {
   Text,
   Input,
   Textarea,
+  appAlert,
 } from '@tarodan/ui-native';
 import { Ionicons } from '@expo/vector-icons';
 import { router, useLocalSearchParams } from 'expo-router';
@@ -172,7 +173,7 @@ export default function TradeCounterScreen() {
       setTimeout(() => router.replace(`/trade/${id}` as any), 1200);
     },
     onError: (e: any) =>
-      Alert.alert('Hata', e?.response?.data?.message || 'Karşı teklif gönderilemedi.'),
+      appAlert('Hata', e?.response?.data?.message || 'Karşı teklif gönderilemedi.'),
   });
 
   if (tradeQuery.error || (!trade && !tradeQuery.isLoading)) {
@@ -220,12 +221,12 @@ export default function TradeCounterScreen() {
 
   const handleSubmit = () => {
     if (selectedMine.length === 0 && selectedTheirs.length === 0) {
-      Alert.alert('Hata', 'En az bir ürün seçmelisiniz.');
+      appAlert('Hata', 'En az bir ürün seçmelisiniz.');
       return;
     }
     const currentSig = offerSignature(selectedMine, selectedTheirs, cashDirection, cashAmount);
     if (currentSig === initialSig) {
-      Alert.alert(
+      appAlert(
         'Değişiklik yok',
         'Karşı teklif önceki teklifle aynı. Lütfen ürün veya nakit farkında değişiklik yapın.',
       );

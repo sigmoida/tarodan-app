@@ -114,7 +114,7 @@ export default function OrderTrackScreen() {
               setOrderNumber(text);
               setError('');
             }}
-            style={styles.input}
+            containerStyle={styles.input}
             placeholder="ORD-XXXXXX"
             autoCapitalize="characters"
           />
@@ -126,7 +126,7 @@ export default function OrderTrackScreen() {
               setEmail(text);
               setError('');
             }}
-            style={styles.input}
+            containerStyle={styles.input}
             keyboardType="email-address"
             autoCapitalize="none"
             placeholder="ornek@email.com"
@@ -154,7 +154,7 @@ export default function OrderTrackScreen() {
         {order && (
           <View style={styles.resultCard}>
             <View style={styles.resultHeader}>
-              <View>
+              <View style={styles.resultHeaderInfo}>
                 <Text style={styles.orderNumber}>{order.orderNumber}</Text>
                 <Text style={styles.orderDate}>{formatDate(order.createdAt)}</Text>
               </View>
@@ -360,6 +360,10 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     alignItems: 'flex-start',
   },
+  resultHeaderInfo: {
+    flex: 1,
+    marginRight: 12,
+  },
   orderNumber: {
     fontSize: 18,
     fontWeight: 'bold',
@@ -376,12 +380,15 @@ const styles = StyleSheet.create({
     paddingHorizontal: 12,
     paddingVertical: 6,
     borderRadius: 20,
+    flexShrink: 0,
   },
   statusText: {
     fontSize: 12,
     fontWeight: '600',
     color: colors.white,
     marginLeft: 6,
+    includeFontPadding: false,
+    textAlignVertical: 'center',
   },
   sectionTitle: {
     fontSize: 14,
@@ -437,16 +444,20 @@ const styles = StyleSheet.create({
   shippingRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
+    alignItems: 'flex-start',
     marginBottom: 8,
   },
   shippingLabel: {
     fontSize: 14,
     color: colors.text.muted,
+    marginRight: 12,
   },
   shippingValue: {
+    flex: 1,
     fontSize: 14,
     color: colors.text.heading,
     fontWeight: '500',
+    textAlign: 'right',
   },
   trackingNumber: {
     color: colors.primary[600]!,
@@ -482,8 +493,10 @@ const styles = StyleSheet.create({
   timelineLine: {
     position: 'absolute',
     top: 11,
-    right: -20,
-    width: 40,
+    left: '50%',
+    right: '-50%',
+    marginLeft: 14,
+    marginRight: 14,
     height: 2,
     backgroundColor: colors.border.DEFAULT,
   },

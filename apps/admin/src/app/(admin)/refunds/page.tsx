@@ -4,13 +4,19 @@ import { useState, useEffect } from "react";
 import Link from "next/link";
 import { adminApi } from "@/lib/api";
 import {
-  MagnifyingGlassIcon,
   ArrowPathIcon,
   BanknotesIcon,
   EyeIcon,
 } from "@heroicons/react/24/outline";
 import toast from "react-hot-toast";
-import { Button, Input, Spinner } from "@tarodan/ui";
+import { Button, Input } from "@tarodan/ui";
+import { DataTable, type ColumnDef } from "@/components/DataTable";
+import {
+  PageHeader,
+  FilterToolbar,
+  ActionButtons,
+  ActionIconButton,
+} from "@/components/admin-list";
 
 interface Refund {
   id: string;
@@ -57,6 +63,78 @@ export default function RefundsPage() {
     }
   };
 
+  const columns: ColumnDef<Refund, any>[] = [
+    {
+      header: "ID",
+      cell: ({ row }) => (
+        <span className="font-mono text-sm">{row.original.id.slice(0, 8)}...</span>
+      ),
+    },
+    {
+      header: "Tutar",
+      cell: ({ row }) => (
+        <span className="font-medium text-danger-600">
+          ₺{row.original.amount.toLocaleString("tr-TR")}
+        </span>
+      ),
+    },
+    {
+      header: "Alıcı",
+      cell: ({ row }) =>
+        row.original.order?.buyer ? (
+          <Link
+            href={`/users/${row.original.order.buyer.id}`}
+            className="text-heading hover:text-primary-400"
+          >
+            {row.original.order.buyer.displayName}
+          </Link>
+        ) : (
+          <span className="text-muted">-</span>
+        ),
+    },
+    {
+      header: "Satıcı",
+      cell: ({ row }) =>
+        row.original.order?.seller ? (
+          <Link
+            href={`/users/${row.original.order.seller.id}`}
+            className="text-heading hover:text-primary-400"
+          >
+            {row.original.order.seller.displayName}
+          </Link>
+        ) : (
+          <span className="text-muted">-</span>
+        ),
+    },
+    {
+      header: "Ürün",
+      cell: ({ row }) => (
+        <span className="block max-w-[200px] truncate">
+          {row.original.order?.product?.title || "-"}
+        </span>
+      ),
+    },
+    {
+      header: "İade Tarihi",
+      cell: ({ row }) =>
+        new Date(row.original.refundedAt).toLocaleDateString("tr-TR"),
+    },
+    {
+      id: "actions",
+      header: "İşlemler",
+      cell: ({ row }) =>
+        row.original.order ? (
+          <ActionButtons>
+            <ActionIconButton
+              icon={EyeIcon}
+              href={`/orders/${row.original.order.id}`}
+              title="Detay"
+            />
+          </ActionButtons>
+        ) : null,
+    },
+  ];
+
   const handleSearch = () => {
     setPage(1);
     loadRefunds();
@@ -65,11 +143,7 @@ export default function RefundsPage() {
   return (
     <>
       <div className="space-y-6">
-        <div className="flex items-center justify-between">
-          <div>
-            <h1 className="text-2xl font-bold text-heading">İade Geçmişi</h1>
-            <p className="text-muted">Tamamlanmış iadeler</p>
-          </div>
+        <PageHeader title="İade Geçmişi" description="Tamamlanmış iadeler">
           <Button
             variant="secondary"
             onClick={loadRefunds}
@@ -77,116 +151,36 @@ export default function RefundsPage() {
           >
             <ArrowPathIcon className="h-5 w-5" />
           </Button>
-        </div>
+        </PageHeader>
 
-        <div className="flex flex-col sm:flex-row gap-4">
-          <div className="relative flex-1">
-            <MagnifyingGlassIcon className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-muted" />
-            <Input
-              type="text"
-              placeholder="Alıcı veya satıcı ara..."
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-              onKeyDown={(e) => e.key === "Enter" && handleSearch()}
-              className="pl-10"
-            />
-          </div>
+        <FilterToolbar
+          search={search}
+          onSearchChange={setSearch}
+          onSearchSubmit={handleSearch}
+          searchPlaceholder="Alıcı veya satıcı ara..."
+        >
           <Input
             type="date"
             value={startDate}
             onChange={(e) => setStartDate(e.target.value)}
+            className="sm:w-40"
           />
           <Input
             type="date"
             value={endDate}
             onChange={(e) => setEndDate(e.target.value)}
+            className="sm:w-40"
           />
-          <Button onClick={handleSearch}>Filtrele</Button>
-        </div>
+          <Button onClick={handleSearch} className="shrink-0">Filtrele</Button>
+        </FilterToolbar>
 
-        <div className="admin-card overflow-hidden">
-          <div className="overflow-x-auto">
-            <table className="admin-table">
-              <thead>
-                <tr>
-                  <th>ID</th>
-                  <th>Tutar</th>
-                  <th>Alıcı</th>
-                  <th>Satıcı</th>
-                  <th>Ürün</th>
-                  <th>İade Tarihi</th>
-                  <th>İşlemler</th>
-                </tr>
-              </thead>
-              <tbody>
-                {loading ? (
-                  <tr>
-                    <td colSpan={7} className="text-center py-8">
-                      <Spinner size="lg" className="mx-auto" />
-                    </td>
-                  </tr>
-                ) : refunds.length === 0 ? (
-                  <tr>
-                    <td colSpan={7} className="text-center py-8 text-muted">
-                      İade bulunamadı
-                    </td>
-                  </tr>
-                ) : (
-                  refunds.map((r) => (
-                    <tr key={r.id}>
-                      <td className="font-mono text-sm">
-                        {r.id.slice(0, 8)}...
-                      </td>
-                      <td className="font-medium text-danger-600">
-                        ₺{r.amount.toLocaleString("tr-TR")}
-                      </td>
-                      <td>
-                        {r.order?.buyer ? (
-                          <Link
-                            href={`/users/${r.order.buyer.id}`}
-                            className="text-heading hover:text-primary-400"
-                          >
-                            {r.order.buyer.displayName}
-                          </Link>
-                        ) : (
-                          <span className="text-muted">-</span>
-                        )}
-                      </td>
-                      <td>
-                        {r.order?.seller ? (
-                          <Link
-                            href={`/users/${r.order.seller.id}`}
-                            className="text-heading hover:text-primary-400"
-                          >
-                            {r.order.seller.displayName}
-                          </Link>
-                        ) : (
-                          <span className="text-muted">-</span>
-                        )}
-                      </td>
-                      <td className="max-w-[200px] truncate">
-                        {r.order?.product?.title || "-"}
-                      </td>
-                      <td>
-                        {new Date(r.refundedAt).toLocaleDateString("tr-TR")}
-                      </td>
-                      <td>
-                        {r.order && (
-                          <Link
-                            href={`/orders/${r.order.id}`}
-                            className="p-2 text-muted hover:text-heading inline-block"
-                          >
-                            <EyeIcon className="h-5 w-5" />
-                          </Link>
-                        )}
-                      </td>
-                    </tr>
-                  ))
-                )}
-              </tbody>
-            </table>
-          </div>
-        </div>
+        <DataTable
+          columns={columns}
+          data={refunds}
+          loading={loading}
+          emptyText="İade bulunamadı"
+          getRowId={(r) => r.id}
+        />
 
         <div className="flex items-center justify-between">
           <p className="text-sm text-muted">Toplam {total} iade</p>

@@ -4,7 +4,9 @@ const path = require('path');
 /** @type {import('next').NextConfig} */
 const nextConfig = {
   output: 'standalone',
-  reactStrictMode: true,
+  // Dev'de StrictMode effect'leri 2× çalıştırıp her yükleme/hata toast'ını ikiye
+  // katlıyordu (örn. "Siparişler/Ayarlar yüklenemedi" 2×). Kapatıyoruz.
+  reactStrictMode: false,
   transpilePackages: ['@tarodan/ui', '@tarodan/design-tokens'],
   experimental: {
     outputFileTracingRoot: path.join(__dirname, '../../'),
