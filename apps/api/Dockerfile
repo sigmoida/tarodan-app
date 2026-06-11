@@ -35,6 +35,9 @@ WORKDIR /app
 # Build
 RUN pnpm --filter @tarodan/api build
 
+# Build seed (compiled seed runnable in prod: npm run db:reset:prod / seed:prod)
+RUN pnpm --filter @tarodan/api build:seed
+
 # Production stage
 FROM node:20-alpine AS runner
 
@@ -51,6 +54,7 @@ RUN addgroup --system --gid 1001 nodejs && \
 
 # Copy built files
 COPY --from=builder /app/apps/api/dist ./dist
+COPY --from=builder /app/apps/api/dist-seed ./dist-seed
 # Copy root node_modules (hoisted = real files, not symlinks)
 COPY --from=builder /app/node_modules ./node_modules
 COPY --from=builder /app/apps/api/package.json ./package.json
