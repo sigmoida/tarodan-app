@@ -14,6 +14,7 @@ import { PaymentWorker } from './payment.worker';
 import { ShippingWorker } from './shipping.worker';
 import { SearchWorker } from './search.worker';
 import { AnalyticsWorker } from './analytics.worker';
+import { ModerationWorker } from './moderation.worker';
 
 // Prisma for database access
 import { PrismaModule } from '../prisma/prisma.module';
@@ -22,6 +23,7 @@ import { StorageModule } from '../modules/storage/storage.module';
 import { SearchModule } from '../modules/search/search.module';
 import { SuratCargoModule } from '../modules/surat-cargo/surat-cargo.module';
 import { NotificationModule } from '../modules/notification/notification.module';
+import { ModerationModule } from '../modules/moderation/moderation.module';
 import { QUEUE_NAMES } from './constants';
 
 @Module({
@@ -33,6 +35,7 @@ import { QUEUE_NAMES } from './constants';
     SearchModule,
     SuratCargoModule,
     NotificationModule,
+    ModerationModule,
     // Configure BullMQ with Redis connection
     BullModule.forRootAsync({
       imports: [ConfigModule],
@@ -63,6 +66,7 @@ import { QUEUE_NAMES } from './constants';
       { name: QUEUE_NAMES.SHIPPING },
       { name: QUEUE_NAMES.SEARCH },
       { name: QUEUE_NAMES.ANALYTICS },
+      { name: QUEUE_NAMES.MODERATION },
     ),
   ],
   providers: [
@@ -73,6 +77,7 @@ import { QUEUE_NAMES } from './constants';
     ShippingWorker,
     SearchWorker,
     AnalyticsWorker,
+    ModerationWorker,
   ],
   exports: [BullModule],
 })

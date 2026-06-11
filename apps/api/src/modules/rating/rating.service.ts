@@ -21,6 +21,7 @@ import { CacheService } from '../cache/cache.service';
 import { NotificationService } from '../notification/notification.service';
 import { NotificationType } from '../notification/dto';
 import { StorageService } from '../storage/storage.service';
+import { ModerationAiClient } from '../moderation/moderation-ai.client';
 
 @Injectable()
 export class RatingService {
@@ -32,7 +33,19 @@ export class RatingService {
     @Inject(forwardRef(() => NotificationService))
     private readonly notificationService: NotificationService,
     private readonly storageService: StorageService,
+    private readonly moderationAi: ModerationAiClient,
   ) {}
+
+  /** Yorum metni küfür/uygunsuz mu kontrol et — uygunsuzsa engelle. */
+  private async assertCleanComment(comment?: string | null): Promise<void> {
+    if (!comment?.trim() || !this.moderationAi.isEnabled) return;
+    const check = await this.moderationAi.checkText(comment);
+    if (!check.clean) {
+      throw new BadRequestException(
+        `Yorumunuz uygun değildir (${check.reason}). Lütfen düzenleyin.`,
+      );
+    }
+  }
 
   private async resolveAvatarUrl(avatarUrl: string | null | undefined): Promise<string | null> {
     if (!avatarUrl) return null;
@@ -72,6 +85,9 @@ export class RatingService {
     if (!dto.orderId && !dto.tradeId) {
       throw new BadRequestException('Sipariş veya takas ID gerekli');
     }
+
+    // Yorum metni denetimi (küfür/uygunsuz)
+    await this.assertCleanComment(dto.comment);
 
     // Verify transaction
     if (dto.orderId) {
@@ -212,6 +228,9 @@ export class RatingService {
     if (order.productId !== dto.productId) {
       throw new BadRequestException('Siparişteki ürün eşleşmiyor');
     }
+
+    // Yorum metni denetimi (başlık + yorum, küfür/uygunsuz)
+    await this.assertCleanComment(`${dto.title ?? ''} ${dto.review ?? ''}`);
 
     // Allow rating only for delivered or completed orders (must receive before rating)
     const allowedStatuses: OrderStatus[] = [OrderStatus.completed, OrderStatus.delivered];

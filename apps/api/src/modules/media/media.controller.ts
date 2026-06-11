@@ -17,6 +17,7 @@ import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { MediaService, UploadOptions, UploadResult } from './media.service';
 import { MembershipService } from '../membership/membership.service';
 import { StorageService } from '../storage/storage.service';
+import { ModerationAiClient } from '../moderation/moderation-ai.client';
 
 @Controller('media')
 @UseGuards(JwtAuthGuard)
@@ -25,7 +26,26 @@ export class MediaController {
     private readonly mediaService: MediaService,
     private readonly membershipService: MembershipService,
     private readonly storageService: StorageService,
+    private readonly moderationAi: ModerationAiClient,
   ) {}
+
+  /** Mesaj görselini (dosyanın kendisini) AI ile NSFW denetle — uygunsuzsa yüklemeyi engelle. */
+  private async assertCleanImageFile(file: Express.Multer.File): Promise<void> {
+    if (
+      !this.moderationAi.isEnabled ||
+      !file?.buffer ||
+      !file.mimetype?.startsWith('image/')
+    ) {
+      return;
+    }
+    const dataUri = `data:${file.mimetype};base64,${file.buffer.toString('base64')}`;
+    const verdict = await this.moderationAi.moderateImage(dataUri);
+    if (verdict?.decision === 'flag') {
+      throw new BadRequestException(
+        'Yüklediğiniz resim uygun değildir. Lütfen uygun bir görsel seçin.',
+      );
+    }
+  }
 
   @Post('upload')
   @UseInterceptors(FileInterceptor('file'))
@@ -37,6 +57,11 @@ export class MediaController {
   ): Promise<UploadResult> {
     if (!file) {
       throw new BadRequestException('No file provided');
+    }
+
+    // Mesaj görseli ise dosyanın kendisini AI ile denetle (uygunsuz/NSFW → engelle)
+    if ((folder || '') === 'messages') {
+      await this.assertCleanImageFile(file);
     }
 
     const options: UploadOptions = {

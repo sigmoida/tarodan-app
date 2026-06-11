@@ -407,6 +407,13 @@ model Product {
   qualityScore        Int                @default(0) @map("quality_score")
   rankTier            Int                @default(0) @map("rank_tier")
   relevanceScore      Int?               @map("relevance_score")
+  /// AI görsel moderasyonu (services/ai-moderation). null = henüz denetlenmedi.
+  aiCheckStatus       String?            @map("ai_check_status")
+  aiRelevanceScore    Float?             @map("ai_relevance_score")
+  aiNsfwScore         Float?             @map("ai_nsfw_score")
+  aiCheckLabels       Json?              @map("ai_check_labels")
+  aiCheckReason       String?            @map("ai_check_reason")
+  aiCheckedAt         DateTime?          @map("ai_checked_at")
   /// Denormalized concat of title + description + attribute display values.
   /// Maintained by Postgres triggers; never write directly from application code.
   /// Used for full-text search via the GIN index `products_search_text_fts_idx`.

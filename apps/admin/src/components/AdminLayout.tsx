@@ -99,6 +99,7 @@ const navGroups: NavGroup[] = [
     icon: Squares2X2Icon,
     items: [
       { name: 'Ürünler', href: '/products', icon: ShoppingBagIcon, roles: ['super_admin', 'admin', 'moderator'] },
+      { name: 'AI Denetim', href: '/ai-moderation', icon: ClipboardDocumentCheckIcon, roles: ['super_admin', 'admin', 'moderator'], keywords: ['ai', 'moderasyon', 'denetim', 'skor'] },
       { name: 'Kategoriler', href: '/categories', icon: CubeIcon },
       { name: 'Markalar', href: '/brands', icon: SwatchIcon },
       { name: 'Modeller', href: '/car-models', icon: TruckIcon },

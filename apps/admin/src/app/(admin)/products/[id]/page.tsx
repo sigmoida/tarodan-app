@@ -54,6 +54,11 @@ interface ProductDetail {
   createdAt: string;
   updatedAt: string;
   rejectionReason?: string;
+  // AI görsel moderasyon sonuçları
+  aiCheckStatus?: string | null;
+  aiRelevanceScore?: number | null;
+  aiNsfwScore?: number | null;
+  aiCheckReason?: string | null;
 }
 
 interface Review {
@@ -435,6 +440,36 @@ export default function ProductDetailPage() {
                           <p className="text-sm text-danger-800">
                             <strong>Red Nedeni:</strong> {product.rejectionReason}
                           </p>
+                        </div>
+                      </div>
+                    )}
+                    {product.aiCheckStatus && (
+                      <div className="pt-3 border-t">
+                        <span className="text-muted text-sm">
+                          AI Görsel Denetimi:
+                        </span>
+                        <div className="mt-1 flex flex-wrap items-center gap-2">
+                          <span
+                            className={`px-2 py-1 rounded text-xs font-medium ${
+                              product.aiCheckStatus === 'flagged'
+                                ? 'bg-danger-500/20 text-danger-600'
+                                : product.aiCheckStatus === 'review'
+                                  ? 'bg-warning-500/20 text-warning-700'
+                                  : 'bg-success-500/20 text-success-700'
+                            }`}
+                          >
+                            {product.aiCheckStatus === 'flagged'
+                              ? 'Uygunsuz şüphesi'
+                              : product.aiCheckStatus === 'review'
+                                ? 'Düşük ilgililik (admin incelemesi)'
+                                : 'Temiz · oto-onay'}
+                          </span>
+                          <span className="text-xs text-muted">
+                            İlgililik (araç/model): %
+                            {Math.round((product.aiRelevanceScore ?? 0) * 100)} ·
+                            Uygunsuzluk: %
+                            {((product.aiNsfwScore ?? 0) * 100).toFixed(2)}
+                          </span>
                         </div>
                       </div>
                     )}

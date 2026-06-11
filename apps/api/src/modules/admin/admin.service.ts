@@ -9,6 +9,7 @@ import {
 import * as bcrypt from 'bcrypt';
 import { PrismaService } from '../../prisma';
 import { StorageService } from '../storage/storage.service';
+import { ModerationAiClient } from '../moderation/moderation-ai.client';
 import {
   fulltextUserSearch,
   fulltextProductRatingSearch,
@@ -102,6 +103,7 @@ export class AdminService {
     private readonly ratingService: RatingService,
     private readonly refundService: RefundService,
     private readonly notificationService: NotificationService,
+    private readonly moderationAi: ModerationAiClient,
     @Optional()
     private readonly storageService: StorageService,
     @Optional()
@@ -3338,6 +3340,11 @@ export class AdminService {
           category: p.category?.name || 'Kategorisiz',
           createdAt: p.createdAt,
           status: 'pending',
+          // AI moderasyon sonuçları (null = henüz denetlenmedi)
+          aiCheckStatus: p.aiCheckStatus,
+          aiRelevanceScore: p.aiRelevanceScore,
+          aiNsfwScore: p.aiNsfwScore,
+          aiCheckReason: p.aiCheckReason,
         })),
       );
       totalCount += productCount;
@@ -3459,6 +3466,99 @@ export class AdminService {
       flaggedUsers,
       totalPending: pendingProducts + pendingMessages,
     };
+  }
+
+  /**
+   * AI ile denetlenmiş ürünleri skorlarıyla listele (admin "AI Denetim" sayfası).
+   */
+  async getAiModerationList(options: {
+    status?: string;
+    page?: number;
+    pageSize?: number;
+  }) {
+    const { status, page = 1, pageSize = 20 } = options;
+    const where: Prisma.ProductWhereInput = status
+      ? { aiCheckStatus: status }
+      : { aiCheckStatus: { not: null } };
+    const [items, total] = await Promise.all([
+      this.prisma.product.findMany({
+        where,
+        include: {
+          seller: { select: { id: true, displayName: true, email: true } },
+          images: { take: 1, orderBy: { sortOrder: 'asc' } },
+        },
+        orderBy: { aiCheckedAt: 'desc' },
+        skip: (page - 1) * pageSize,
+        take: pageSize,
+      }),
+      this.prisma.product.count({ where }),
+    ]);
+    return {
+      data: items.map((p) => ({
+        id: p.id,
+        title: p.title,
+        status: p.status,
+        imageUrl: this.resolveProductImageUrl(p.images[0]?.cardKey) || null,
+        seller: p.seller,
+        aiCheckStatus: p.aiCheckStatus,
+        aiRelevanceScore: p.aiRelevanceScore,
+        aiNsfwScore: p.aiNsfwScore,
+        aiCheckReason: p.aiCheckReason,
+        aiCheckedAt: p.aiCheckedAt,
+      })),
+      meta: { total, page, pageSize, totalPages: Math.ceil(total / pageSize) },
+    };
+  }
+
+  /**
+   * Tek bir görseli AI ile test et (admin "Görsel Test Et" aracı) — ürün oluşturmadan skor gör.
+   */
+  async testImageModeration(imageUrl: string) {
+    if (!imageUrl) {
+      throw new BadRequestException('imageUrl gerekli');
+    }
+    if (!this.moderationAi.isEnabled) {
+      return {
+        enabled: false,
+        message: 'AI moderasyon kapalı (AI_MODERATION_ENABLED=false)',
+      };
+    }
+    const result = await this.moderationAi.moderateImage(imageUrl);
+    if (!result) {
+      return {
+        enabled: true,
+        error: 'AI servisine erişilemedi ya da görsel indirilemedi',
+      };
+    }
+    return { enabled: true, ...result };
+  }
+
+  /** AI eşiklerini oku (admin "Kabul Eşiği" ayarı). */
+  async getAiConfig() {
+    if (!this.moderationAi.isEnabled) {
+      return { enabled: false, relevanceThreshold: 0.2, nsfwThreshold: 0.7 };
+    }
+    const cfg = await this.moderationAi.getConfig();
+    return {
+      enabled: true,
+      relevanceThreshold: cfg?.relevanceThreshold ?? 0.2,
+      nsfwThreshold: cfg?.nsfwThreshold ?? 0.7,
+    };
+  }
+
+  /** AI eşiklerini güncelle (canlı + kalıcı config.json). */
+  async setAiConfig(relevanceThreshold?: number, nsfwThreshold?: number) {
+    if (!this.moderationAi.isEnabled) {
+      throw new BadRequestException('AI moderasyon kapalı');
+    }
+    const cfg = await this.moderationAi.setConfig({
+      relevanceThreshold,
+      nsfwThreshold,
+    });
+    if (!cfg) {
+      throw new BadRequestException('AI servisine erişilemedi');
+    }
+    return { enabled: true, ...cfg };
   }
 
   /**

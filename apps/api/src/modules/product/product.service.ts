@@ -27,6 +27,10 @@ import { computeQualityScore } from './helpers/quality-score';
 import { computeRelevanceScore } from './helpers/relevance-score';
 import { DiscountService } from '../discount/discount.service';
 import { StorageService } from '../storage/storage.service';
+import { InjectQueue } from '@nestjs/bull';
+import { Queue } from 'bull';
+import { QUEUE_NAMES } from '../../workers/constants';
+import { ModerationAiClient } from '../moderation/moderation-ai.client';
 
 @Injectable()
 export class ProductService implements OnModuleInit {
@@ -49,6 +53,9 @@ export class ProductService implements OnModuleInit {
     private readonly smtpProvider: SmtpProvider,
     private readonly discountService: DiscountService,
     private readonly storageService: StorageService,
+    @InjectQueue(QUEUE_NAMES.MODERATION)
+    private readonly moderationQueue: Queue,
+    private readonly moderationAi: ModerationAiClient,
   ) { }
 
   /**
@@ -96,6 +103,33 @@ export class ProductService implements OnModuleInit {
         `Üyeliğiniz (${limits.tierName}) ile ilan başına maksimum ${limits.maxImages} görsel yükleyebilirsiniz. ` +
         `${dto.images.length} görsel gönderdiniz.`
       );
+    }
+
+    // AI görsel moderasyonu (senkron): uygunsuz/NSFW görselde ilanı ENGELLE + net mesaj.
+    // (İlgililik/oto-onay kararı async worker'da; burada sadece uygunsuzu durdururuz.)
+    if (dto.images?.length && this.moderationAi.isEnabled) {
+      for (const img of dto.images) {
+        const url = this.storageService.getPublicAssetUrl(img.cardKey);
+        if (!url) continue;
+        const verdict = await this.moderationAi.moderateImage(url);
+        if (verdict?.decision === 'flag') {
+          throw new BadRequestException(
+            'Yüklediğiniz resim uygun değildir. Lütfen uygun bir ürün görseli yükleyin.',
+          );
+        }
+      }
+    }
+
+    // Başlık + açıklama küfür/uygunsuz dil kontrolü (senkron) — uygunsuzsa engelle.
+    if (this.moderationAi.isEnabled) {
+      const textCheck = await this.moderationAi.checkText(
+        `${dto.title} ${dto.description ?? ''}`,
+      );
+      if (!textCheck.clean) {
+        throw new BadRequestException(
+          `Ürün başlığı/açıklaması uygun değildir (${textCheck.reason}). Lütfen düzenleyin.`,
+        );
+      }
     }
 
     // Auto-enable seller mode when user creates their first listing
@@ -237,6 +271,19 @@ export class ProductService implements OnModuleInit {
 
       // İlan Kalite Skoru + rankTier hesapla (best-effort; sıralama bozulmasın)
       await this.recomputeProductRanking(product.id).catch(() => {});
+
+      // AI görsel moderasyonu (async, best-effort): temiz+ilgili -> oto-onay,
+      // NSFW/şüpheli -> pending kalır (admin kuyruğu). Servis kapalıysa pending.
+      if (product.images?.length) {
+        this.moderationQueue
+          .add('product-image', {
+            productId: product.id,
+            cardKeys: product.images.map((img) => img.cardKey),
+          })
+          .catch((err) =>
+            this.logger.warn(`Moderation job eklenemedi: ${err.message}`),
+          );
+      }
 
       // Invalidate product list cache
       await this.cache.delPattern('products:list:*');

@@ -723,6 +723,47 @@ export class AdminController {
     return this.adminService.getModerationStats();
   }
 
+  @Get('moderation/ai-checks')
+  @Roles(AdminRole.super_admin, AdminRole.admin, AdminRole.moderator)
+  @ApiOperation({ summary: 'AI ile denetlenmiş tüm ürünler + skorları' })
+  async getAiModerationList(
+    @Query('status') status?: string,
+    @Query('page') page?: string,
+    @Query('pageSize') pageSize?: string,
+  ) {
+    return this.adminService.getAiModerationList({
+      status,
+      page: page ? parseInt(page, 10) : 1,
+      pageSize: pageSize ? parseInt(pageSize, 10) : 20,
+    });
+  }
+
+  @Post('moderation/test-image')
+  @Roles(AdminRole.super_admin, AdminRole.admin, AdminRole.moderator)
+  @ApiOperation({ summary: 'Tek görseli AI ile test et (skor gör)' })
+  async testImageModeration(@Body('imageUrl') imageUrl: string) {
+    return this.adminService.testImageModeration(imageUrl);
+  }
+
+  @Get('moderation/ai-config')
+  @Roles(AdminRole.super_admin, AdminRole.admin, AdminRole.moderator)
+  @ApiOperation({ summary: 'AI eşiklerini oku (kabul/uygunsuzluk %)' })
+  async getAiConfig() {
+    return this.adminService.getAiConfig();
+  }
+
+  @Post('moderation/ai-config')
+  @Roles(AdminRole.super_admin, AdminRole.admin)
+  @ApiOperation({ summary: 'AI eşiklerini ayarla (canlı + kalıcı)' })
+  async setAiConfig(
+    @Body() body: { relevanceThreshold?: number; nsfwThreshold?: number },
+  ) {
+    return this.adminService.setAiConfig(
+      body.relevanceThreshold,
+      body.nsfwThreshold,
+    );
+  }
+
   @Post('moderation/:type/:id/approve')
   @Roles(AdminRole.super_admin, AdminRole.admin, AdminRole.moderator)
   @HttpCode(HttpStatus.OK)

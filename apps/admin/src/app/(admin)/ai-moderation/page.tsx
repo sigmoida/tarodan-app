@@ -1,0 +1,340 @@
+"use client";
+
+import { useState, useEffect } from "react";
+import Link from "next/link";
+import { adminApi } from "@/lib/api";
+import { Button, Select } from "@tarodan/ui";
+import { DataTable, type ColumnDef } from "@/components/DataTable";
+import { PageHeader } from "@/components/admin-list";
+import toast from "react-hot-toast";
+
+interface AiCheckItem {
+  id: string;
+  title: string;
+  status: string;
+  imageUrl?: string | null;
+  seller?: { id: string; displayName: string; email: string };
+  aiCheckStatus?: string | null;
+  aiRelevanceScore?: number | null;
+  aiNsfwScore?: number | null;
+  aiCheckReason?: string | null;
+  aiCheckedAt?: string | null;
+}
+
+export default function AiModerationPage() {
+  const [items, setItems] = useState<AiCheckItem[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [status, setStatus] = useState("");
+  const [page, setPage] = useState(1);
+  const [total, setTotal] = useState(0);
+  // Görsel Test Et aracı
+  const [testUrl, setTestUrl] = useState("");
+  const [testResult, setTestResult] = useState<any>(null);
+  const [testing, setTesting] = useState(false);
+  // Kabul eşiği (ilgililik %)
+  const [relThreshold, setRelThreshold] = useState(20);
+  const [savingCfg, setSavingCfg] = useState(false);
+
+  useEffect(() => {
+    adminApi
+      .get("/admin/moderation/ai-config")
+      .then((res) =>
+        setRelThreshold(
+          Math.round((res.data?.relevanceThreshold ?? 0.2) * 100),
+        ),
+      )
+      .catch(() => {});
+  }, []);
+
+  const saveThreshold = async () => {
+    setSavingCfg(true);
+    try {
+      await adminApi.post("/admin/moderation/ai-config", {
+        relevanceThreshold: relThreshold / 100,
+      });
+      toast.success(`Kabul eşiği %${relThreshold} olarak kaydedildi`);
+    } catch {
+      toast.error("Eşik kaydedilemedi (AI servisi kapalı olabilir)");
+    } finally {
+      setSavingCfg(false);
+    }
+  };
+
+  const runTest = async (override?: string) => {
+    const url = (override ?? testUrl).trim();
+    if (!url) return;
+    setTesting(true);
+    setTestResult(null);
+    try {
+      const res = await adminApi.post("/admin/moderation/test-image", {
+        imageUrl: url,
+      });
+      setTestResult(res.data);
+    } catch {
+      toast.error("Test başarısız (görsel indirilemedi olabilir)");
+    } finally {
+      setTesting(false);
+    }
+  };
+
+  const onFile = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = () => {
+      const dataUrl = reader.result as string;
+      setTestUrl(dataUrl);
+      runTest(dataUrl);
+    };
+    reader.readAsDataURL(file);
+    e.target.value = "";
+  };
+
+  useEffect(() => {
+    load();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [status, page]);
+
+  const load = async () => {
+    setLoading(true);
+    try {
+      const res = await adminApi.get("/admin/moderation/ai-checks", {
+        params: { status: status || undefined, page, pageSize: 20 },
+      });
+      setItems(res.data.data || []);
+      setTotal(res.data.meta?.total || 0);
+    } catch {
+      toast.error("AI denetim listesi yüklenemedi");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const aiBadge = (s?: string | null) => {
+    const [cls, label] =
+      s === "flagged"
+        ? ["bg-danger-500/20 text-danger-600", "Uygunsuz şüphesi"]
+        : s === "review"
+          ? ["bg-warning-500/20 text-warning-700", "Düşük ilgililik"]
+          : ["bg-success-500/20 text-success-700", "Temiz · oto-onay"];
+    return (
+      <span className={`px-2 py-1 rounded text-xs font-medium ${cls}`}>
+        {label}
+      </span>
+    );
+  };
+
+  const columns: ColumnDef<AiCheckItem, any>[] = [
+    {
+      header: "Görsel",
+      cell: ({ row }) =>
+        row.original.imageUrl ? (
+          // eslint-disable-next-line @next/next/no-img-element
+          <img
+            src={row.original.imageUrl}
+            alt={row.original.title}
+            className="w-12 h-12 rounded object-cover shrink-0"
+          />
+        ) : (
+          <div className="w-12 h-12 rounded bg-surface-alt shrink-0" />
+        ),
+    },
+    {
+      header: "Ürün",
+      cell: ({ row }) => (
+        <Link
+          href={`/products/${row.original.id}`}
+          className="text-heading hover:text-primary-400 line-clamp-1"
+        >
+          {row.original.title}
+        </Link>
+      ),
+    },
+    { header: "AI Sonuç", cell: ({ row }) => aiBadge(row.original.aiCheckStatus) },
+    {
+      header: "İlgililik",
+      cell: ({ row }) => (
+        <span className="text-sm whitespace-nowrap">
+          %{Math.round((row.original.aiRelevanceScore ?? 0) * 100)}
+        </span>
+      ),
+    },
+    {
+      header: "Uygunsuzluk",
+      cell: ({ row }) => (
+        <span className="text-sm whitespace-nowrap">
+          %{((row.original.aiNsfwScore ?? 0) * 100).toFixed(2)}
+        </span>
+      ),
+    },
+    {
+      header: "Ürün Durumu",
+      cell: ({ row }) => (
+        <span className="text-sm text-muted">{row.original.status}</span>
+      ),
+    },
+    {
+      header: "Satıcı",
+      cell: ({ row }) => (
+        <span className="text-sm">
+          {row.original.seller?.displayName || "-"}
+        </span>
+      ),
+    },
+    {
+      header: "Denetim",
+      cell: ({ row }) => (
+        <span className="text-xs text-muted whitespace-nowrap">
+          {row.original.aiCheckedAt
+            ? new Date(row.original.aiCheckedAt).toLocaleString("tr-TR")
+            : "-"}
+        </span>
+      ),
+    },
+  ];
+
+  return (
+    <div className="space-y-6">
+      <PageHeader
+        title="AI Denetim"
+        description={`AI ile denetlenmiş ${total} ürün`}
+      />
+      <div className="admin-card p-4 space-y-3">
+        <h3 className="font-medium text-heading">
+          Görsel Test Et (ürün oluşturmadan skor gör)
+        </h3>
+        <div className="flex flex-wrap gap-2">
+          <input
+            value={testUrl}
+            onChange={(e) => setTestUrl(e.target.value)}
+            onKeyDown={(e) => e.key === "Enter" && runTest()}
+            placeholder="Görsel URL'i (https://...) veya data:image/...;base64,..."
+            className="flex-1 min-w-0 px-3 py-2 rounded-lg border border-border bg-surface text-sm"
+          />
+          <Button onClick={() => runTest()} disabled={testing || !testUrl.trim()}>
+            {testing ? "Test ediliyor..." : "Test Et"}
+          </Button>
+        </div>
+        <label className="inline-flex items-center gap-1 text-sm text-muted cursor-pointer">
+          veya{" "}
+          <span className="text-primary-500 underline">
+            bilgisayardan dosya seç
+          </span>
+          <input
+            type="file"
+            accept="image/*"
+            className="hidden"
+            onChange={onFile}
+          />
+        </label>
+        {testResult && (
+          <div className="flex flex-wrap items-center gap-3 pt-2 border-t border-border">
+            {testUrl && (
+              // eslint-disable-next-line @next/next/no-img-element
+              <img
+                src={testUrl}
+                alt="test"
+                className="w-16 h-16 rounded object-cover shrink-0"
+              />
+            )}
+            {testResult.error || testResult.enabled === false ? (
+              <span className="text-sm text-danger-600">
+                {testResult.error || testResult.message}
+              </span>
+            ) : (
+              <div className="flex flex-wrap items-center gap-2">
+                {aiBadge(
+                  testResult.decision === "flag"
+                    ? "flagged"
+                    : testResult.decision === "review"
+                      ? "review"
+                      : "passed",
+                )}
+                <span className="text-sm">
+                  İlgililik: %
+                  {Math.round((testResult.relevanceScore ?? 0) * 100)} ·
+                  Uygunsuzluk: %
+                  {((testResult.nsfwScore ?? 0) * 100).toFixed(2)}
+                </span>
+                <span className="text-xs text-muted">
+                  Etiketler:{" "}
+                  {(testResult.topLabels || [])
+                    .slice(0, 3)
+                    .map((l: { label: string }) => l.label)
+                    .join(", ")}
+                </span>
+              </div>
+            )}
+          </div>
+        )}
+      </div>
+      <div className="admin-card p-4 space-y-3">
+        <h3 className="font-medium text-heading">Kabul Eşiği (ilgililik %)</h3>
+        <p className="text-sm text-muted">
+          Ürün görseli bu yüzdenin üstünde ilgililik alırsa otomatik kabul
+          edilir; altındakiler admin onayına düşer. Düşürürsen daha çok ürün
+          oto-onaylanır, yükseltirsen daha çok admine gelir.
+        </p>
+        <div className="flex flex-wrap items-center gap-3">
+          <input
+            type="range"
+            min={0}
+            max={100}
+            value={relThreshold}
+            onChange={(e) => setRelThreshold(Number(e.target.value))}
+            className="flex-1 min-w-[200px] accent-primary-500"
+          />
+          <span className="font-semibold text-heading w-12 text-right">
+            %{relThreshold}
+          </span>
+          <Button onClick={saveThreshold} disabled={savingCfg}>
+            {savingCfg ? "Kaydediliyor..." : "Kaydet"}
+          </Button>
+        </div>
+      </div>
+      <div className="flex flex-wrap gap-3">
+        <Select
+          value={status}
+          onChange={(e) => {
+            setStatus(e.target.value);
+            setPage(1);
+          }}
+          className="sm:w-56"
+        >
+          <option value="">Tümü</option>
+          <option value="passed">Temiz (oto-onaylanan)</option>
+          <option value="review">Düşük ilgililik (admin incelemesi)</option>
+          <option value="flagged">Uygunsuz şüphesi</option>
+        </Select>
+      </div>
+      <DataTable
+        columns={columns}
+        data={items}
+        loading={loading}
+        emptyText="AI ile denetlenmiş ürün yok"
+        getRowId={(r) => r.id}
+      />
+      {total > 20 && (
+        <div className="flex items-center justify-between">
+          <p className="text-sm text-muted">Toplam {total} ürün</p>
+          <div className="flex gap-2">
+            <button
+              className="px-3 py-1 rounded border border-border text-sm disabled:opacity-50"
+              onClick={() => setPage((p) => Math.max(1, p - 1))}
+              disabled={page === 1}
+            >
+              Önceki
+            </button>
+            <button
+              className="px-3 py-1 rounded border border-border text-sm disabled:opacity-50"
+              onClick={() => setPage((p) => p + 1)}
+              disabled={page >= Math.ceil(total / 20)}
+            >
+              Sonraki
+            </button>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}

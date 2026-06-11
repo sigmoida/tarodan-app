@@ -15,6 +15,7 @@ import { MediaModule } from '../media/media.module';
 import { DiscountModule } from '../discount/discount.module';
 import { EventModule } from '../events/event.module';
 import { StorageModule } from '../storage/storage.module';
+import { ModerationModule } from '../moderation/moderation.module';
 import { RatingModule } from '../rating/rating.module';
 import { SuratCargoModule } from '../surat-cargo/surat-cargo.module';
 import { RefundModule } from '../refund/refund.module';
@@ -41,6 +42,7 @@ import { OrderModule } from '../order/order.module';
     RefundModule,
     NotificationModule,
     OrderModule,
+    ModerationModule,
   ],
   controllers: [AdminController],
   providers: [AdminService, ScheduledNotificationScheduler],

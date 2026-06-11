@@ -387,8 +387,17 @@ export default function MessagesPage() {
           },
         }));
       }
-    } catch (err) {
-      toast.error(locale === 'en' ? 'Failed to upload image' : 'Resim yüklenemedi');
+    } catch (err: any) {
+      // Sunucu mesajını göster (örn. AI: "Yüklediğiniz resim uygun değildir")
+      const raw = err?.response?.data?.message;
+      const msg = Array.isArray(raw) ? raw.join(' • ') : raw;
+      toast.error(
+        typeof msg === 'string' && msg
+          ? msg
+          : locale === 'en'
+            ? 'Failed to upload image'
+            : 'Resim yüklenemedi',
+      );
     } finally {
       setAttaching(false);
       e.target.value = '';

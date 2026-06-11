@@ -1,0 +1,15 @@
+# FastAPI servis
+fastapi>=0.110
+uvicorn[standard]>=0.29
+requests>=2.31
+pillow>=10.0
+
+# Görsel: ResNet50 (torchvision) + NSFW (transformers ViT)
+# NOT: torch'u CPU sürümüyle kurmak daha küçük/hızlı (README'ye bakın).
+torch>=2.0
+torchvision>=0.15
+transformers>=4.40
+
+# Metin: Detoxify multilingual (Türkçe dahil) — xlm-roberta -> sentencepiece gerekir
+detoxify>=0.5.2
+sentencepiece>=0.1.99

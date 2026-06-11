@@ -36,6 +36,11 @@ interface ModerationItem {
   conversationId?: string;
   createdAt: string;
   status: string;
+  // AI görsel moderasyon sonuçları (yalnızca ürünlerde; null = denetlenmedi)
+  aiCheckStatus?: string | null;
+  aiRelevanceScore?: number | null;
+  aiNsfwScore?: number | null;
+  aiCheckReason?: string | null;
 }
 
 interface ModerationStats {
@@ -327,6 +332,24 @@ const ModerationPage = () => {
                         {item.status === 'pending' ? 'Bekliyor' :
                          item.status === 'reported' ? 'Raporlandı' : item.status}
                       </span>
+                      {item.aiCheckStatus && (
+                        <span
+                          className={`shrink-0 px-2 py-1 rounded text-xs font-medium ${
+                            item.aiCheckStatus === 'flagged'
+                              ? 'bg-danger-500/20 text-danger-600'
+                              : item.aiCheckStatus === 'review'
+                                ? 'bg-warning-500/20 text-warning-700'
+                                : 'bg-success-500/20 text-success-700'
+                          }`}
+                          title={`AI · ilgililik: ${item.aiRelevanceScore ?? '—'} · NSFW: ${item.aiNsfwScore ?? '—'}${item.aiCheckReason ? ` · ${item.aiCheckReason}` : ''}`}
+                        >
+                          {item.aiCheckStatus === 'flagged'
+                            ? `AI: Uygunsuz şüphesi${item.aiNsfwScore != null ? ` (%${Math.round(item.aiNsfwScore * 100)})` : ''}`
+                            : item.aiCheckStatus === 'review'
+                              ? `AI: Düşük ilgililik${item.aiRelevanceScore != null ? ` (%${Math.round(item.aiRelevanceScore * 100)})` : ''}`
+                              : 'AI: Temiz'}
+                        </span>
+                      )}
                     </div>
                     
                     <h4 className="font-medium text-heading truncate">{item.title}</h4>
