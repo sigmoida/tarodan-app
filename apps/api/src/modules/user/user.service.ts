@@ -1045,6 +1045,41 @@ export class UserService {
   }
 
   /**
+   * Satıcı panosu özet istatistikleri (her satıcı için).
+   * Toplam gelir: ödemesi alınmış ve iptal/iade edilmemiş siparişler (pending_payment
+   * ve cancelled/refunded hariç) → bir satış yapıldığında gelir hemen görünür.
+   */
+  async getSellerSummaryStats(userId: string) {
+    const REVENUE_STATUSES: OrderStatus[] = [
+      OrderStatus.paid,
+      OrderStatus.preparing,
+      OrderStatus.shipped,
+      OrderStatus.delivered,
+      OrderStatus.awaiting_buyer_confirmation,
+      OrderStatus.completed,
+    ];
+
+    const [revenue, soldOrdersCount, activeProductsCount] = await Promise.all([
+      this.prisma.order.aggregate({
+        where: { sellerId: userId, status: { in: REVENUE_STATUSES } },
+        _sum: { totalAmount: true },
+      }),
+      this.prisma.order.count({
+        where: { sellerId: userId, status: { in: REVENUE_STATUSES } },
+      }),
+      this.prisma.product.count({
+        where: { sellerId: userId, status: ProductStatus.active },
+      }),
+    ]);
+
+    return {
+      totalRevenue: Number(revenue._sum.totalAmount || 0),
+      soldProductsCount: soldOrdersCount,
+      activeProductsCount,
+    };
+  }
+
+  /**
    * Get user analytics data
    * Available for all authenticated users
    */

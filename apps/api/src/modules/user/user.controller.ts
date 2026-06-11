@@ -433,6 +433,34 @@ export class UserController {
   }
 
   /**
+   * GET /users/me/stats
+   * Satıcı panosu için özet istatistikler (her satıcı için, business şartı yok).
+   * Toplam gelir + satış/aktif ilan sayıları.
+   */
+  @Get('me/stats')
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth()
+  @ApiOperation({
+    summary: 'Satıcı özet istatistikleri',
+    description: 'Toplam gelir, satılan ürün sayısı ve aktif ilan sayısını döner.',
+  })
+  @ApiResponse({
+    status: 200,
+    description: 'Satıcı istatistikleri',
+    schema: {
+      type: 'object',
+      properties: {
+        totalRevenue: { type: 'number' },
+        soldProductsCount: { type: 'number' },
+        activeProductsCount: { type: 'number' },
+      },
+    },
+  })
+  async getMyStats(@CurrentUser('id') userId: string) {
+    return this.userService.getSellerSummaryStats(userId);
+  }
+
+  /**
    * GET /users/top-collections
    * Get top collections from premium users (public)
    */
