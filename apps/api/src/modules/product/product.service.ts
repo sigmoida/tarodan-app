@@ -184,6 +184,7 @@ export class ProductService implements OnModuleInit {
           isTradeEnabled: dto.isTradeEnabled || false,
           isPreorder: dto.isPreorder ?? false,
           isSet: dto.isSet ?? false,
+          bundleSize: dto.isSet ? (dto.bundleSize ?? null) : null,
           rankTier: isPremiumSeller ? 1 : 0,
           popularityScore: FRESH_POPULARITY_BASELINE,
           popularityUpdatedAt: new Date(),
@@ -1109,6 +1110,12 @@ export class ProductService implements OnModuleInit {
       isTradeEnabled: dto.isTradeEnabled !== undefined ? dto.isTradeEnabled : undefined,
       isPreorder: dto.isPreorder !== undefined ? dto.isPreorder : undefined,
       isSet: dto.isSet !== undefined ? dto.isSet : undefined,
+      bundleSize:
+        dto.isSet === false
+          ? null
+          : dto.bundleSize !== undefined
+            ? dto.bundleSize
+            : undefined,
       quantity: dto.quantity !== undefined ? (dto.quantity === null ? null : Number(dto.quantity)) : undefined,
       category: dto.categoryId ? { connect: { id: dto.categoryId } } : undefined,
       brand: dto.brandId ? { connect: { id: dto.brandId } } : (dto.brandId === null ? { disconnect: true } : undefined),
