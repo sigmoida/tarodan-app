@@ -2,17 +2,17 @@
 
 import { useState, useEffect, useMemo } from 'react';
 import Link from 'next/link';
-import { useRouter, useSearchParams } from 'next/navigation';
+import { useRouter } from 'next/navigation';
 import OptimizedImage from '@/components/OptimizedImage';
 import { motion } from 'framer-motion';
-import { useQuery, useQueryClient, keepPreviousData } from '@tanstack/react-query';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import {
   MagnifyingGlassIcon,
-  FunnelIcon,
   FolderPlusIcon,
   EyeIcon,
   HeartIcon,
   XMarkIcon,
+  ArrowLeftIcon,
 } from '@heroicons/react/24/outline';
 import { useAuthStore } from '@/stores/authStore';
 import { collectionsApi, categoriesApi } from '@/lib/api';
@@ -31,17 +31,9 @@ interface Collection {
   viewCount?: number;
   likeCount?: number;
   userName?: string;
-  categoryId?: string | null;
-  category?: { id: string; name: string; slug: string } | null;
-  user?: {
-    id: string;
-    displayName: string;
-  };
 }
 
 type SortOption = 'popular' | 'recent' | 'name' | 'items_asc' | 'items_desc';
-
-const PUBLIC_PAGE_SIZE = 24;
 
 function flattenCategories(tree: { id: string; name: string; slug: string; children?: any[] }[], prefix = ''): { id: string; name: string; slug: string }[] {
   const out: { id: string; name: string; slug: string }[] = [];
@@ -54,33 +46,17 @@ function flattenCategories(tree: { id: string; name: string; slug: string; child
   return out;
 }
 
-export default function CollectionsPage() {
+export default function MyCollectionsPage() {
   const { t, locale } = useTranslation();
   const router = useRouter();
-  const searchParams = useSearchParams();
   const queryClient = useQueryClient();
   const { isAuthenticated, user, limits } = useAuthStore();
   const [mounted, setMounted] = useState(false);
   useEffect(() => { setMounted(true); }, []);
-  const [activeTab, setActiveTab] = useState<'public' | 'mine'>('public');
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [showPremiumModal, setShowPremiumModal] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
-  const [sortBy, setSortBy] = useState<SortOption>('popular');
-  const [categoryId, setCategoryId] = useState('');
-
-  useEffect(() => {
-    setCategoryId(searchParams.get('categoryId') || '');
-  }, [searchParams, mounted]);
-
-  const setCategoryFilter = (id: string) => {
-    setCategoryId(id);
-    const params = new URLSearchParams(searchParams.toString());
-    if (id) params.set('categoryId', id);
-    else params.delete('categoryId');
-    const q = params.toString();
-    router.replace(q ? `?${q}` : '/collections', { scroll: false });
-  };
+  const [sortBy, setSortBy] = useState<SortOption>('recent');
 
   const { data: categoriesTree } = useQuery({
     queryKey: ['categories', 'collections'],
@@ -88,41 +64,13 @@ export default function CollectionsPage() {
       const res = await categoriesApi.findAll({ refresh: '1' });
       return res.data?.data ?? res.data ?? [];
     },
-    meta: { page: 'collections-categories' },
+    meta: { page: 'my-collections-categories' },
   });
   const flatCategories = useMemo(
     () => (Array.isArray(categoriesTree) ? flattenCategories(categoriesTree) : []),
     [categoriesTree],
   );
 
-  const categoryParamId = typeof categoryId === 'string' ? categoryId.trim() : '';
-  // page/pageSize göndermiyoruz; API varsayılanı (ilk sayfa, 20 kayıt) kullanılsın. Gönderince sadece 1 sonuç dönme hatası oluşuyordu.
-  const publicQuery = useQuery({
-    queryKey: ['collections', 'public', sortBy, searchQuery.trim() || null, categoryParamId || null],
-    queryFn: async (): Promise<{ collections: Collection[]; total: number; page: number; pageSize: number }> => {
-      const params: Record<string, unknown> = {
-        sortBy,
-        ...(searchQuery.trim() ? { search: searchQuery.trim() } : {}),
-        ...(categoryParamId ? { categoryId: categoryParamId } : {}),
-      };
-      const response = await collectionsApi.browse(params);
-      const collections = response.data?.collections || response.data?.data || [];
-      const total = response.data?.total ?? (Array.isArray(collections) ? collections.length : 0);
-      const page = response.data?.page ?? 1;
-      const pageSize = response.data?.pageSize ?? PUBLIC_PAGE_SIZE;
-      return {
-        collections: Array.isArray(collections) ? collections : [],
-        total: typeof total === 'number' ? total : 0,
-        page: typeof page === 'number' ? page : 1,
-        pageSize: typeof pageSize === 'number' ? pageSize : PUBLIC_PAGE_SIZE,
-      };
-    },
-    placeholderData: keepPreviousData,
-    meta: { page: 'collections-public' },
-  });
-  const publicData = publicQuery.data;
-  const collections = publicData?.collections ?? [];
-  const publicTotal = publicData?.total ?? 0;
   const myQuery = useQuery({
     queryKey: ['collections', 'mine'],
     queryFn: async (): Promise<Collection[]> => {
@@ -131,13 +79,10 @@ export default function CollectionsPage() {
       return Array.isArray(data) ? data : [];
     },
     enabled: isAuthenticated,
-    meta: { page: 'collections-mine' },
+    meta: { page: 'my-collections' },
   });
   const myCollections = myQuery.data ?? [];
-
-  const loading = activeTab === 'public'
-    ? (publicQuery.isLoading && !publicQuery.data)
-    : (myQuery.isLoading && !myQuery.data);
+  const loading = myQuery.isLoading && !myQuery.data;
 
   const canCreateCollection = user?.membershipTier !== 'free' || limits?.canCreateCollections;
 
@@ -149,106 +94,67 @@ export default function CollectionsPage() {
     setShowCreateModal(true);
   };
 
-  const filteredAndSortedCollections = useMemo(() => {
-    let result = activeTab === 'public' ? collections : myCollections;
-
-    if (activeTab === 'mine' && searchQuery.trim()) {
+  const displayedCollections = useMemo(() => {
+    let result = myCollections;
+    if (searchQuery.trim()) {
       const query = searchQuery.toLowerCase().trim();
       result = result.filter(
         (collection) =>
           collection.name.toLowerCase().includes(query) ||
-          collection.description?.toLowerCase().includes(query) ||
-          collection.userName?.toLowerCase().includes(query)
+          collection.description?.toLowerCase().includes(query)
       );
     }
-
-    if (activeTab === 'mine') {
-      const sorted = [...result];
-      switch (sortBy) {
-        case 'popular':
-          sorted.sort((a, b) => (b.viewCount || 0) - (a.viewCount || 0));
-          break;
-        case 'recent':
-          sorted.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
-          break;
-        case 'name':
-          const collator = new Intl.Collator('tr', { sensitivity: 'base', numeric: false });
-          sorted.sort((a, b) => collator.compare(a.name.toLowerCase(), b.name.toLowerCase()));
-          break;
-        case 'items_asc':
-          sorted.sort((a, b) => (a.itemCount || 0) - (b.itemCount || 0));
-          break;
-        case 'items_desc':
-          sorted.sort((a, b) => (b.itemCount || 0) - (a.itemCount || 0));
-          break;
+    const sorted = [...result];
+    switch (sortBy) {
+      case 'popular':
+        sorted.sort((a, b) => (b.viewCount || 0) - (a.viewCount || 0));
+        break;
+      case 'recent':
+        sorted.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+        break;
+      case 'name': {
+        const collator = new Intl.Collator('tr', { sensitivity: 'base', numeric: false });
+        sorted.sort((a, b) => collator.compare(a.name.toLowerCase(), b.name.toLowerCase()));
+        break;
       }
-      return sorted;
+      case 'items_asc':
+        sorted.sort((a, b) => (a.itemCount || 0) - (b.itemCount || 0));
+        break;
+      case 'items_desc':
+        sorted.sort((a, b) => (b.itemCount || 0) - (a.itemCount || 0));
+        break;
     }
-
-    return result;
-  }, [activeTab, collections, myCollections, searchQuery, sortBy]);
-
-  const displayedCollections = filteredAndSortedCollections;
+    return sorted;
+  }, [myCollections, searchQuery, sortBy]);
 
   return (
     <div className="min-h-screen bg-surface">
-      {/* Page Header */}
-      <div className="bg-surface-elevated border-b border-border">
-        <div className="mx-auto px-6 sm:px-8 lg:px-12 xl:px-16 py-5">
-          <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
-            <div>
-              <h1 className="text-xl font-bold text-heading flex items-center gap-2">
-                <div className="w-1 h-6 bg-primary-500 rounded-sm" />
-                {t('collection.collections')}
-              </h1>
-              <p className="text-sm text-muted mt-0.5">{t('footer.description')}</p>
-            </div>
-            <div className="flex items-center gap-2">
-              {mounted && isAuthenticated && limits?.canCreateCollections && (
-                <Button
-                  variant="primary"
-                  size="md"
-                  onClick={handleCreateClick}
-                  className="flex items-center gap-1.5"
-                >
-                  <FolderPlusIcon className="w-4 h-4" />
-                  {t('collection.createCollection')}
-                </Button>
-              )}
-              {mounted && isAuthenticated && !limits?.canCreateCollections && (
-                <Link
-                  href="/pricing"
-                  className="px-4 py-2 bg-surface-alt text-body hover:bg-border-subtle rounded text-sm font-medium transition-colors"
-                >
-                  {t('membership.upgrade')}
-                </Link>
-              )}
-            </div>
+      <main className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+        {/* Header */}
+        <div className="flex items-center justify-between mb-8 gap-3">
+          <div>
+            <Link href="/profile" className="inline-flex items-center gap-1.5 text-sm text-muted hover:text-body mb-2 transition-colors">
+              <ArrowLeftIcon className="w-4 h-4" />
+              {t('common.back')}
+            </Link>
+            <h1 className="text-3xl font-bold text-heading">{t('collection.myCollections')}</h1>
+            <p className="text-muted mt-1">{myCollections.length} {locale === 'en' ? 'collections' : 'koleksiyon'}</p>
           </div>
+          {mounted && isAuthenticated && (
+            <Button
+              variant="primary"
+              size="md"
+              onClick={handleCreateClick}
+              className="flex items-center gap-1.5 flex-shrink-0"
+            >
+              <FolderPlusIcon className="w-4 h-4" />
+              {t('collection.createCollection')}
+            </Button>
+          )}
         </div>
-      </div>
-
-      <div className="mx-auto px-6 sm:px-8 lg:px-12 xl:px-16 py-5">
-        {/* Tabs */}
-        {mounted && isAuthenticated && (
-          <div className="flex gap-1 mb-5 bg-surface-alt rounded p-0.5 w-fit">
-            <Button variant="secondary" onClick={() => { setActiveTab('public'); setSearchQuery(''); }}
-              className={`px-4 py-1.5 rounded text-sm font-medium transition-colors ${
-                activeTab === 'public' ? 'bg-surface-elevated text-heading shadow-sm' : 'text-muted hover:text-body'
-              }`}>
-              {t('collection.isPublic')}
-            </Button>
-            <Button variant="secondary" onClick={() => { setActiveTab('mine'); setSearchQuery(''); }}
-              className={`px-4 py-1.5 rounded text-sm font-medium transition-colors ${
-                activeTab === 'mine' ? 'bg-surface-elevated text-heading shadow-sm' : 'text-muted hover:text-body'
-              }`}>
-              {t('collection.myCollections')} ({myCollections.length})
-            </Button>
-          </div>
-        )}
 
         {/* Search & Sort Bar */}
-        <div className="flex flex-col sm:flex-row gap-3 mb-5">
+        <div className="flex flex-col sm:flex-row gap-3 mb-6">
           <div className="relative flex-1">
             <MagnifyingGlassIcon className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-subtle" />
             <Input type="text"
@@ -262,52 +168,24 @@ export default function CollectionsPage() {
               </Button>
             )}
           </div>
-          <div className="flex items-center gap-2">
-            {activeTab === 'public' && (
-              <Select
-                value={categoryId}
-                onChange={(e) => setCategoryFilter(e.target.value)}
-                className="w-auto min-w-[140px]"
-                selectSize="sm"
-              >
-                <option value="">{locale === 'en' ? 'All Categories' : 'Tüm Kategoriler'}</option>
-                {flatCategories.map((cat) => (
-                  <option key={cat.id} value={cat.id}>{cat.name}</option>
-                ))}
-              </Select>
-            )}
-            <Select
-              value={sortBy}
-              onChange={(e) => setSortBy(e.target.value as SortOption)}
-              className="w-auto"
-              selectSize="sm"
-            >
-              <option value="popular">{t('common.popular')}</option>
-              <option value="recent">{t('common.newest')}</option>
-              <option value="name">A-Z</option>
-              <option value="items_desc">{t('common.desc')}</option>
-              <option value="items_asc">{t('common.asc')}</option>
-            </Select>
-          </div>
+          <Select
+            value={sortBy}
+            onChange={(e) => setSortBy(e.target.value as SortOption)}
+            className="w-auto"
+            selectSize="sm"
+          >
+            <option value="recent">{t('common.newest')}</option>
+            <option value="popular">{t('common.popular')}</option>
+            <option value="name">A-Z</option>
+            <option value="items_desc">{t('common.desc')}</option>
+            <option value="items_asc">{t('common.asc')}</option>
+          </Select>
         </div>
-
-        {/* Results Info */}
-        {(displayedCollections.length > 0 || categoryParamId || searchQuery.trim()) && (
-          <p className="text-xs text-muted mb-4">
-            {activeTab === 'public'
-              ? `${publicTotal} ${locale === 'en' ? 'collections' : 'koleksiyon'}`
-              : `${displayedCollections.length} ${locale === 'en' ? 'collections' : 'koleksiyon'}`}
-            {categoryParamId && flatCategories.find((c) => c.id === categoryParamId) && (
-              <> · {flatCategories.find((c) => c.id === categoryParamId)?.name}</>
-            )}
-            {searchQuery.trim() && ` · "${searchQuery}"`}
-          </p>
-        )}
 
         {/* Collections Grid */}
         {loading ? (
-          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-4">
-            {[...Array(12)].map((_, i) => (
+          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-4">
+            {[...Array(10)].map((_, i) => (
               <div key={i} className="bg-surface-elevated rounded border border-border-subtle overflow-hidden animate-pulse">
                 <div className="aspect-[4/3] bg-border-subtle" />
                 <div className="p-3 space-y-2">
@@ -328,19 +206,18 @@ export default function CollectionsPage() {
             <p className="text-subtle text-sm mb-4">
               {locale === 'en' ? 'Start building your collection today' : 'Koleksiyonunuzu bugün oluşturmaya başlayın'}
             </p>
-            {searchQuery && (
+            {searchQuery ? (
               <Button variant="secondary" size="md" onClick={() => setSearchQuery('')}>
                 {t('common.clear')}
               </Button>
-            )}
-            {activeTab === 'mine' && !searchQuery && (
-              <Button variant="primary" size="md" onClick={() => setShowCreateModal(true)}>
+            ) : (
+              <Button variant="primary" size="md" onClick={handleCreateClick}>
                 {t('collection.createCollection')}
               </Button>
             )}
           </div>
         ) : (
-          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-4">
+          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-4">
             {displayedCollections.map((collection, index) => (
               <motion.div
                 key={collection.id}
@@ -360,7 +237,7 @@ export default function CollectionsPage() {
                         fill
                         className="object-cover group-hover:scale-[1.03] transition-transform duration-300"
                         fallbackSrc="https://placehold.co/400x300/f3f4f6/9ca3af?text=Koleksiyon"
-                        logContext={{ collectionId: collection.id, page: 'collections' }}
+                        logContext={{ collectionId: collection.id, page: 'my-collections' }}
                       />
                     ) : (
                       <div className="absolute inset-0 flex items-center justify-center bg-gradient-to-br from-primary-50 to-primary-100 text-4xl">
@@ -395,17 +272,13 @@ export default function CollectionsPage() {
                         )}
                       </div>
                     </div>
-                    <div className="mt-1.5 pt-1.5 border-t border-border-subtle">
-                      <span className="text-[10px] text-subtle">@{collection.userName || collection.user?.displayName || 'Kullanıcı'}</span>
-                    </div>
                   </div>
                 </Link>
               </motion.div>
             ))}
           </div>
         )}
-
-        </div>
+      </main>
 
       {/* Create Collection Modal */}
       {showCreateModal && (

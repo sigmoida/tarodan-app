@@ -1059,7 +1059,7 @@ export class UserService {
       OrderStatus.completed,
     ];
 
-    const [revenue, soldOrdersCount, activeProductsCount] = await Promise.all([
+    const [revenue, soldOrdersCount, activeProductsCount, followersCount] = await Promise.all([
       this.prisma.order.aggregate({
         where: { sellerId: userId, status: { in: REVENUE_STATUSES } },
         _sum: { totalAmount: true },
@@ -1070,12 +1070,14 @@ export class UserService {
       this.prisma.product.count({
         where: { sellerId: userId, status: ProductStatus.active },
       }),
+      this.prisma.userFollow.count({ where: { followingId: userId } }),
     ]);
 
     return {
       totalRevenue: Number(revenue._sum.totalAmount || 0),
       soldProductsCount: soldOrdersCount,
       activeProductsCount,
+      followersCount,
     };
   }
 

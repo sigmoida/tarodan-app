@@ -65,6 +65,7 @@ interface UserProfile {
     collectionsCount: number;
     rating: number;
     reviewsCount: number;
+    followersCount?: number;
   };
   membership?: {
     tier: MembershipTier;
@@ -280,6 +281,7 @@ export default function ProfilePage() {
           collectionsCount: collectionsCount || (statsData.collectionsCount ?? 0),
           rating: statsData.rating ?? profileData.rating ?? user?.rating ?? 0,
           reviewsCount: statsData.reviewsCount ?? statsData.totalRatings ?? user?.totalRatings ?? 0,
+          followersCount: statsData.followersCount ?? profileData.followersCount ?? 0,
         },
       });
       
@@ -365,7 +367,7 @@ export default function ProfilePage() {
     {
       title: t('nav.collections'),
       items: [
-        { icon: RectangleStackIcon, label: t('collection.myCollections'), href: '/collections', desc: 'Koleksiyonlarınız' },
+        { icon: RectangleStackIcon, label: t('collection.myCollections'), href: '/profile/collections', desc: 'Koleksiyonlarınız' },
         { icon: StarIcon, label: 'Beğenilen Koleksiyonlar', href: '/collections/liked', desc: 'Beğendiğiniz koleksiyonlar' },
       ],
     },
@@ -461,7 +463,11 @@ export default function ProfilePage() {
                 <p className="text-primary-200 text-sm mt-1">
                   {t('profile.memberSince')}: {new Date(profile.createdAt).toLocaleDateString('tr-TR')}
                 </p>
-                
+                <div className="inline-flex items-center gap-1.5 mt-2">
+                  <span className="text-inverted font-semibold">{profile.stats?.followersCount ?? 0}</span>
+                  <span className="text-primary-200 text-sm">{t('profile.followers')}</span>
+                </div>
+
                 {/* Rating - Header'da göster */}
                 {profile.stats && profile.stats.rating > 0 && (
                   <div className="flex items-center gap-2 mt-2">

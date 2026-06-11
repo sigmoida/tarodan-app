@@ -512,7 +512,7 @@ export class ProductService implements OnModuleInit {
       include: {
         images: { orderBy: { sortOrder: 'asc' }, take: 1 },
         seller: {
-          select: { id: true, displayName: true, isVerified: true, sellerType: true },
+          select: { id: true, displayName: true, avatarUrl: true, isVerified: true, sellerType: true },
         },
         category: { select: { id: true, name: true, slug: true } },
         brand: { select: { id: true, name: true, slug: true, logo: true } },
@@ -750,6 +750,7 @@ export class ProductService implements OnModuleInit {
               select: {
                 id: true,
                 displayName: true,
+                avatarUrl: true,
                 isVerified: true,
                 sellerType: true,
               },
@@ -828,6 +829,7 @@ export class ProductService implements OnModuleInit {
           select: {
             id: true,
             displayName: true,
+            avatarUrl: true,
             isVerified: true,
             sellerType: true,
           },
@@ -1556,6 +1558,7 @@ Bu ürünü istek listenizden kaldırmak için ürün sayfasına gidip "İstek L
           select: {
             id: true,
             displayName: true,
+            avatarUrl: true,
             isVerified: true,
             sellerType: true,
           },
