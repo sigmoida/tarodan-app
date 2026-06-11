@@ -2,12 +2,19 @@
 
 import { useState, useEffect, useCallback } from "react";
 import { adminApi } from "@/lib/api";
+import { AdminTabs } from "@/components/AdminTabs";
+import { DataTable, type ColumnDef } from "@/components/DataTable";
+import {
+  PageHeader,
+  BulkActionBar,
+  ActionButtons,
+  ActionIconButton,
+} from "@/components/admin-list";
 import {
   Button,
   Checkbox,
   Input,
   Select,
-  Spinner,
   StatusBadge,
   Textarea,
 } from "@tarodan/ui";
@@ -27,6 +34,7 @@ import {
   XCircleIcon,
 } from "@heroicons/react/24/outline";
 import toast from "react-hot-toast";
+import { useConfirm } from "@/components/ConfirmProvider";
 
 type TabType = "methods" | "carriers" | "zones" | "rates" | "labels";
 
@@ -91,6 +99,7 @@ interface Shipment {
 }
 
 export default function ShippingPage() {
+  const confirm = useConfirm();
   const [activeTab, setActiveTab] = useState<TabType>("methods");
   const [loading, setLoading] = useState(false);
 
@@ -258,7 +267,7 @@ export default function ShippingPage() {
 
   // Delete handler
   const handleDelete = async (id: string) => {
-    if (!confirm("Silmek istediğinizden emin misiniz?")) return;
+    if (!(await confirm({ description: "Silmek istediğinizden emin misiniz?", destructive: true }))) return;
     try {
       switch (activeTab) {
         case "methods":
@@ -680,389 +689,375 @@ export default function ShippingPage() {
     }
   };
 
+  // ── Column definitions (one set per tab) ──
+  const methodColumns: ColumnDef<ShippingMethod, any>[] = [
+    {
+      header: "Ad",
+      cell: ({ row }) => (
+        <span className="font-medium text-heading">{row.original.name}</span>
+      ),
+    },
+    {
+      header: "Kod",
+      cell: ({ row }) => (
+        <code className="text-primary-400">{row.original.code}</code>
+      ),
+    },
+    {
+      header: "Açıklama",
+      cell: ({ row }) => (
+        <span className="text-muted max-w-xs truncate">
+          {row.original.description || "-"}
+        </span>
+      ),
+    },
+    {
+      header: "Durum",
+      cell: ({ row }) =>
+        row.original.isActive ? (
+          <span className="badge badge-success">Aktif</span>
+        ) : (
+          <span className="badge badge-gray">Pasif</span>
+        ),
+    },
+    {
+      id: "actions",
+      header: "İşlemler",
+      cell: ({ row }) => (
+        <ActionButtons>
+          <ActionIconButton
+            icon={PencilIcon}
+            onClick={() => openModal(row.original)}
+            title="Düzenle"
+          />
+          <ActionIconButton
+            icon={TrashIcon}
+            onClick={() => handleDelete(row.original.id)}
+            title="Sil"
+            variant="danger"
+          />
+        </ActionButtons>
+      ),
+    },
+  ];
+
+  const carrierColumns: ColumnDef<ShippingCarrier, any>[] = [
+    {
+      header: "Firma",
+      cell: ({ row }) => (
+        <div className="flex items-center gap-3">
+          {row.original.logo && (
+            <img
+              src={row.original.logo}
+              alt=""
+              className="h-8 w-8 object-contain rounded"
+            />
+          )}
+          <span className="font-medium text-heading">{row.original.name}</span>
+        </div>
+      ),
+    },
+    {
+      header: "Kod",
+      cell: ({ row }) => (
+        <code className="text-primary-400">{row.original.code}</code>
+      ),
+    },
+    {
+      header: "Takip URL",
+      cell: ({ row }) => (
+        <span className="text-muted max-w-xs truncate">
+          {row.original.trackingUrl || "-"}
+        </span>
+      ),
+    },
+    {
+      header: "Durum",
+      cell: ({ row }) =>
+        row.original.isActive ? (
+          <span className="badge badge-success">Aktif</span>
+        ) : (
+          <span className="badge badge-gray">Pasif</span>
+        ),
+    },
+    {
+      id: "actions",
+      header: "İşlemler",
+      cell: ({ row }) => (
+        <ActionButtons>
+          <ActionIconButton
+            icon={PencilIcon}
+            onClick={() => openModal(row.original)}
+            title="Düzenle"
+          />
+          <ActionIconButton
+            icon={TrashIcon}
+            onClick={() => handleDelete(row.original.id)}
+            title="Sil"
+            variant="danger"
+          />
+        </ActionButtons>
+      ),
+    },
+  ];
+
+  const zoneColumns: ColumnDef<ShippingZone, any>[] = [
+    {
+      header: "Bölge Adı",
+      cell: ({ row }) => (
+        <span className="font-medium text-heading">{row.original.name}</span>
+      ),
+    },
+    {
+      header: "Ülkeler",
+      cell: ({ row }) => (
+        <span className="text-muted">
+          {row.original.countries?.join(", ") || "-"}
+        </span>
+      ),
+    },
+    {
+      header: "Durum",
+      cell: ({ row }) =>
+        row.original.isActive ? (
+          <span className="badge badge-success">Aktif</span>
+        ) : (
+          <span className="badge badge-gray">Pasif</span>
+        ),
+    },
+    {
+      id: "actions",
+      header: "İşlemler",
+      cell: ({ row }) => (
+        <ActionButtons>
+          <ActionIconButton
+            icon={PencilIcon}
+            onClick={() => openModal(row.original)}
+            title="Düzenle"
+          />
+          <ActionIconButton
+            icon={TrashIcon}
+            onClick={() => handleDelete(row.original.id)}
+            title="Sil"
+            variant="danger"
+          />
+        </ActionButtons>
+      ),
+    },
+  ];
+
+  const rateColumns: ColumnDef<ShippingRate, any>[] = [
+    {
+      header: "Bölge",
+      cell: ({ row }) => (
+        <span className="font-medium text-heading">
+          {row.original.zone?.name || "-"}
+        </span>
+      ),
+    },
+    {
+      header: "Yöntem",
+      cell: ({ row }) => (
+        <span className="text-muted">{row.original.method?.name || "-"}</span>
+      ),
+    },
+    {
+      header: "Firma",
+      cell: ({ row }) => (
+        <span className="text-muted">{row.original.carrier?.name || "-"}</span>
+      ),
+    },
+    {
+      header: "Fiyat",
+      cell: ({ row }) => (
+        <>
+          <span className="text-primary-400 font-semibold">
+            ₺{row.original.basePrice?.toLocaleString()}
+          </span>
+          {row.original.pricePerKg > 0 && (
+            <span className="text-xs text-muted ml-1">
+              (+₺{row.original.pricePerKg}/kg)
+            </span>
+          )}
+        </>
+      ),
+    },
+    {
+      header: "Teslimat",
+      cell: ({ row }) => (
+        <span className="text-muted">
+          {row.original.minDeliveryDays}-{row.original.maxDeliveryDays} gün
+        </span>
+      ),
+    },
+    {
+      id: "actions",
+      header: "İşlemler",
+      cell: ({ row }) => (
+        <ActionButtons>
+          <ActionIconButton
+            icon={PencilIcon}
+            onClick={() => openModal(row.original)}
+            title="Düzenle"
+          />
+          <ActionIconButton
+            icon={TrashIcon}
+            onClick={() => handleDelete(row.original.id)}
+            title="Sil"
+            variant="danger"
+          />
+        </ActionButtons>
+      ),
+    },
+  ];
+
+  const labelColumns: ColumnDef<Shipment, any>[] = [
+    {
+      header: "Sipariş",
+      cell: ({ row }) => (
+        <span className="font-medium text-primary-400">
+          #{row.original.order?.orderNumber || "-"}
+        </span>
+      ),
+    },
+    {
+      header: "Alıcı",
+      cell: ({ row }) => (
+        <span className="text-heading">
+          {row.original.order?.buyer?.displayName || "-"}
+        </span>
+      ),
+    },
+    {
+      header: "Kargo",
+      cell: ({ row }) => (
+        <span className="text-muted">{row.original.carrier?.name || "-"}</span>
+      ),
+    },
+    {
+      header: "Takip No",
+      cell: ({ row }) => (
+        <code className="text-xs text-muted">
+          {row.original.trackingNumber || "-"}
+        </code>
+      ),
+    },
+    {
+      header: "Durum",
+      cell: ({ row }) => (
+        <StatusBadge
+          status={(row.original.status || "").toLowerCase()}
+          config={shippingStatusConfig}
+        />
+      ),
+    },
+    {
+      id: "actions",
+      header: "İşlemler",
+      cell: ({ row }) =>
+        row.original.labelUrl ? (
+          <a
+            href={row.original.labelUrl}
+            target="_blank"
+            rel="noreferrer"
+            className="p-2 text-info-700 hover:text-info-300 hover:bg-info-500/10 rounded-lg inline-flex"
+          >
+            <PrinterIcon className="h-4 w-4" />
+          </a>
+        ) : (
+          <ActionButtons>
+            <ActionIconButton
+              icon={TagIcon}
+              onClick={() => handleGenerateLabel(row.original.id)}
+              title="Etiket Oluştur"
+              variant="primary"
+            />
+          </ActionButtons>
+        ),
+    },
+  ];
+
   // Render table based on active tab
   const renderTable = () => {
-    if (loading) {
-      return (
-        <div className="text-center py-12">
-          <Spinner size="lg" className="mx-auto" />
-        </div>
-      );
-    }
-
     switch (activeTab) {
       case "methods":
         return (
-          <table className="admin-table">
-            <thead>
-              <tr>
-                <th>Ad</th>
-                <th>Kod</th>
-                <th>Açıklama</th>
-                <th>Durum</th>
-                <th>İşlemler</th>
-              </tr>
-            </thead>
-            <tbody>
-              {methods.length === 0 ? (
-                <tr>
-                  <td colSpan={5} className="text-center py-8 text-muted">
-                    Kayıt bulunamadı
-                  </td>
-                </tr>
-              ) : (
-                methods.map((item) => (
-                  <tr key={item.id}>
-                    <td className="font-medium text-heading">{item.name}</td>
-                    <td>
-                      <code className="text-primary-400">{item.code}</code>
-                    </td>
-                    <td className="text-muted max-w-xs truncate">
-                      {item.description || "-"}
-                    </td>
-                    <td>
-                      {item.isActive ? (
-                        <span className="badge badge-success">Aktif</span>
-                      ) : (
-                        <span className="badge badge-gray">Pasif</span>
-                      )}
-                    </td>
-                    <td>
-                      <div className="flex gap-2">
-                        <Button
-                          variant="secondary"
-                          onClick={() => openModal(item)}
-                          className="p-2 text-muted hover:text-heading hover:bg-surface-alt rounded-lg"
-                        >
-                          <PencilIcon className="h-4 w-4" />
-                        </Button>
-                        <Button
-                          variant="secondary"
-                          onClick={() => handleDelete(item.id)}
-                          className="p-2 text-danger-600 hover:text-danger-300 hover:bg-danger-500/10 rounded-lg"
-                        >
-                          <TrashIcon className="h-4 w-4" />
-                        </Button>
-                      </div>
-                    </td>
-                  </tr>
-                ))
-              )}
-            </tbody>
-          </table>
+          <DataTable
+            columns={methodColumns}
+            data={methods}
+            loading={loading}
+            emptyText="Kayıt bulunamadı"
+            getRowId={(r) => r.id}
+          />
         );
 
       case "carriers":
         return (
-          <table className="admin-table">
-            <thead>
-              <tr>
-                <th>Firma</th>
-                <th>Kod</th>
-                <th>Takip URL</th>
-                <th>Durum</th>
-                <th>İşlemler</th>
-              </tr>
-            </thead>
-            <tbody>
-              {carriers.length === 0 ? (
-                <tr>
-                  <td colSpan={5} className="text-center py-8 text-muted">
-                    Kayıt bulunamadı
-                  </td>
-                </tr>
-              ) : (
-                carriers.map((item) => (
-                  <tr key={item.id}>
-                    <td>
-                      <div className="flex items-center gap-3">
-                        {item.logo && (
-                          <img
-                            src={item.logo}
-                            alt=""
-                            className="h-8 w-8 object-contain rounded"
-                          />
-                        )}
-                        <span className="font-medium text-heading">
-                          {item.name}
-                        </span>
-                      </div>
-                    </td>
-                    <td>
-                      <code className="text-primary-400">{item.code}</code>
-                    </td>
-                    <td className="text-muted max-w-xs truncate">
-                      {item.trackingUrl || "-"}
-                    </td>
-                    <td>
-                      {item.isActive ? (
-                        <span className="badge badge-success">Aktif</span>
-                      ) : (
-                        <span className="badge badge-gray">Pasif</span>
-                      )}
-                    </td>
-                    <td>
-                      <div className="flex gap-2">
-                        <Button
-                          variant="secondary"
-                          onClick={() => openModal(item)}
-                          className="p-2 text-muted hover:text-heading hover:bg-surface-alt rounded-lg"
-                        >
-                          <PencilIcon className="h-4 w-4" />
-                        </Button>
-                        <Button
-                          variant="secondary"
-                          onClick={() => handleDelete(item.id)}
-                          className="p-2 text-danger-600 hover:text-danger-300 hover:bg-danger-500/10 rounded-lg"
-                        >
-                          <TrashIcon className="h-4 w-4" />
-                        </Button>
-                      </div>
-                    </td>
-                  </tr>
-                ))
-              )}
-            </tbody>
-          </table>
+          <DataTable
+            columns={carrierColumns}
+            data={carriers}
+            loading={loading}
+            emptyText="Kayıt bulunamadı"
+            getRowId={(r) => r.id}
+          />
         );
 
       case "zones":
         return (
-          <table className="admin-table">
-            <thead>
-              <tr>
-                <th>Bölge Adı</th>
-                <th>Ülkeler</th>
-                <th>Durum</th>
-                <th>İşlemler</th>
-              </tr>
-            </thead>
-            <tbody>
-              {zones.length === 0 ? (
-                <tr>
-                  <td colSpan={4} className="text-center py-8 text-muted">
-                    Kayıt bulunamadı
-                  </td>
-                </tr>
-              ) : (
-                zones.map((item) => (
-                  <tr key={item.id}>
-                    <td className="font-medium text-heading">{item.name}</td>
-                    <td className="text-muted">
-                      {item.countries?.join(", ") || "-"}
-                    </td>
-                    <td>
-                      {item.isActive ? (
-                        <span className="badge badge-success">Aktif</span>
-                      ) : (
-                        <span className="badge badge-gray">Pasif</span>
-                      )}
-                    </td>
-                    <td>
-                      <div className="flex gap-2">
-                        <Button
-                          variant="secondary"
-                          onClick={() => openModal(item)}
-                          className="p-2 text-muted hover:text-heading hover:bg-surface-alt rounded-lg"
-                        >
-                          <PencilIcon className="h-4 w-4" />
-                        </Button>
-                        <Button
-                          variant="secondary"
-                          onClick={() => handleDelete(item.id)}
-                          className="p-2 text-danger-600 hover:text-danger-300 hover:bg-danger-500/10 rounded-lg"
-                        >
-                          <TrashIcon className="h-4 w-4" />
-                        </Button>
-                      </div>
-                    </td>
-                  </tr>
-                ))
-              )}
-            </tbody>
-          </table>
+          <DataTable
+            columns={zoneColumns}
+            data={zones}
+            loading={loading}
+            emptyText="Kayıt bulunamadı"
+            getRowId={(r) => r.id}
+          />
         );
 
       case "rates":
         return (
-          <table className="admin-table">
-            <thead>
-              <tr>
-                <th>Bölge</th>
-                <th>Yöntem</th>
-                <th>Firma</th>
-                <th>Fiyat</th>
-                <th>Teslimat</th>
-                <th>İşlemler</th>
-              </tr>
-            </thead>
-            <tbody>
-              {rates.length === 0 ? (
-                <tr>
-                  <td colSpan={6} className="text-center py-8 text-muted">
-                    Kayıt bulunamadı
-                  </td>
-                </tr>
-              ) : (
-                rates.map((item) => (
-                  <tr key={item.id}>
-                    <td className="font-medium text-heading">
-                      {item.zone?.name || "-"}
-                    </td>
-                    <td className="text-muted">
-                      {item.method?.name || "-"}
-                    </td>
-                    <td className="text-muted">
-                      {item.carrier?.name || "-"}
-                    </td>
-                    <td>
-                      <span className="text-primary-400 font-semibold">
-                        ₺{item.basePrice?.toLocaleString()}
-                      </span>
-                      {item.pricePerKg > 0 && (
-                        <span className="text-xs text-muted ml-1">
-                          (+₺{item.pricePerKg}/kg)
-                        </span>
-                      )}
-                    </td>
-                    <td className="text-muted">
-                      {item.minDeliveryDays}-{item.maxDeliveryDays} gün
-                    </td>
-                    <td>
-                      <div className="flex gap-2">
-                        <Button
-                          variant="secondary"
-                          onClick={() => openModal(item)}
-                          className="p-2 text-muted hover:text-heading hover:bg-surface-alt rounded-lg"
-                        >
-                          <PencilIcon className="h-4 w-4" />
-                        </Button>
-                        <Button
-                          variant="secondary"
-                          onClick={() => handleDelete(item.id)}
-                          className="p-2 text-danger-600 hover:text-danger-300 hover:bg-danger-500/10 rounded-lg"
-                        >
-                          <TrashIcon className="h-4 w-4" />
-                        </Button>
-                      </div>
-                    </td>
-                  </tr>
-                ))
-              )}
-            </tbody>
-          </table>
+          <DataTable
+            columns={rateColumns}
+            data={rates}
+            loading={loading}
+            emptyText="Kayıt bulunamadı"
+            getRowId={(r) => r.id}
+          />
         );
 
       case "labels":
         return (
-          <>
-            {selectedIds.length > 0 && (
-              <div className="mb-4 flex items-center gap-4 p-4 bg-surface-alt rounded-lg">
-                <span className="text-muted">
-                  {selectedIds.length} gönderi seçildi
-                </span>
-                <Button onClick={handleBulkGenerateLabels}>
-                  <PrinterIcon className="h-4 w-4 mr-2" />
-                  Toplu Etiket Oluştur
-                </Button>
-              </div>
-            )}
-            <table className="admin-table">
-              <thead>
-                <tr>
-                  <th>
-                    <Checkbox
-                      checked={
-                        selectedIds.length === shipments.length &&
-                        shipments.length > 0
-                      }
-                      onChange={() => {
-                        if (selectedIds.length === shipments.length) {
-                          setSelectedIds([]);
-                        } else {
-                          setSelectedIds(shipments.map((s) => s.id));
-                        }
-                      }}
-                    />
-                  </th>
-                  <th>Sipariş</th>
-                  <th>Alıcı</th>
-                  <th>Kargo</th>
-                  <th>Takip No</th>
-                  <th>Durum</th>
-                  <th>İşlemler</th>
-                </tr>
-              </thead>
-              <tbody>
-                {shipments.length === 0 ? (
-                  <tr>
-                    <td colSpan={7} className="text-center py-8 text-muted">
-                      Gönderi bulunamadı
-                    </td>
-                  </tr>
-                ) : (
-                  shipments.map((item) => (
-                    <tr key={item.id}>
-                      <td>
-                        <Checkbox
-                          checked={selectedIds.includes(item.id)}
-                          onChange={() => {
-                            if (selectedIds.includes(item.id)) {
-                              setSelectedIds(
-                                selectedIds.filter((id) => id !== item.id),
-                              );
-                            } else {
-                              setSelectedIds([...selectedIds, item.id]);
-                            }
-                          }}
-                        />
-                      </td>
-                      <td className="font-medium text-primary-400">
-                        #{item.order?.orderNumber || "-"}
-                      </td>
-                      <td className="text-heading">
-                        {item.order?.buyer?.displayName || "-"}
-                      </td>
-                      <td className="text-muted">
-                        {item.carrier?.name || "-"}
-                      </td>
-                      <td>
-                        <code className="text-xs text-muted">
-                          {item.trackingNumber || "-"}
-                        </code>
-                      </td>
-                      <td>
-                        <StatusBadge
-                          status={(item.status || "").toLowerCase()}
-                          config={shippingStatusConfig}
-                        />
-                      </td>
-                      <td>
-                        {item.labelUrl ? (
-                          <a
-                            href={item.labelUrl}
-                            target="_blank"
-                            rel="noreferrer"
-                            className="p-2 text-info-700 hover:text-info-300 hover:bg-info-500/10 rounded-lg inline-flex"
-                          >
-                            <PrinterIcon className="h-4 w-4" />
-                          </a>
-                        ) : (
-                          <Button
-                            variant="secondary"
-                            onClick={() => handleGenerateLabel(item.id)}
-                            className="p-2 text-primary-400 hover:text-primary-300 hover:bg-primary-50 rounded-lg"
-                          >
-                            <TagIcon className="h-4 w-4" />
-                          </Button>
-                        )}
-                      </td>
-                    </tr>
-                  ))
-                )}
-              </tbody>
-            </table>
-          </>
+          <div className="space-y-4">
+            <BulkActionBar
+              count={selectedIds.length}
+              onClear={() => setSelectedIds([])}
+            >
+              <Button onClick={handleBulkGenerateLabels} className="shrink-0">
+                <PrinterIcon className="h-4 w-4 mr-2 shrink-0" />
+                Toplu Etiket Oluştur
+              </Button>
+            </BulkActionBar>
+            <DataTable
+              columns={labelColumns}
+              data={shipments}
+              loading={loading}
+              emptyText="Gönderi bulunamadı"
+              getRowId={(r) => r.id}
+              selectable
+              selectedIds={selectedIds}
+              onToggleRow={(id) =>
+                setSelectedIds((prev) =>
+                  prev.includes(id)
+                    ? prev.filter((x) => x !== id)
+                    : [...prev, id],
+                )
+              }
+              onToggleAll={(ids) =>
+                setSelectedIds((prev) =>
+                  prev.length === ids.length ? [] : ids,
+                )
+              }
+            />
+          </div>
         );
 
       default:
@@ -1074,59 +1069,40 @@ export default function ShippingPage() {
     <>
       <div className="space-y-6">
         {/* Header */}
-        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-          <div>
-            <h1 className="text-2xl font-bold text-heading">Kargo Yönetimi</h1>
-            <p className="text-muted mt-1">
-              Kargo yöntemleri, firmaları, bölgeleri ve ücretleri yönetin
-            </p>
-          </div>
-          <div className="flex gap-2">
-            <Button variant="secondary" onClick={loadData}>
-              <ArrowPathIcon
-                className={`h-4 w-4 ${loading ? "animate-spin" : ""}`}
-              />
+        <PageHeader
+          title="Kargo Yönetimi"
+          description="Kargo yöntemleri, firmaları, bölgeleri ve ücretleri yönetin"
+        >
+          <Button variant="secondary" onClick={loadData}>
+            <ArrowPathIcon
+              className={`h-4 w-4 shrink-0 ${loading ? "animate-spin" : ""}`}
+            />
+          </Button>
+          {activeTab !== "labels" && (
+            <Button onClick={() => openModal()}>
+              <PlusIcon className="h-4 w-4 mr-2 shrink-0" />
+              Yeni Ekle
             </Button>
-            {activeTab !== "labels" && (
-              <Button onClick={() => openModal()}>
-                <PlusIcon className="h-4 w-4 mr-2" />
-                Yeni Ekle
-              </Button>
-            )}
-          </div>
-        </div>
+          )}
+        </PageHeader>
 
         {/* Tabs */}
-        <div className="flex flex-wrap gap-2 border-b border-border pb-4">
-          {tabs.map((tab) => (
-            <Button
-              variant="secondary"
-              key={tab.key}
-              onClick={() => setActiveTab(tab.key as TabType)}
-              className={`flex items-center gap-2 px-4 py-2 rounded-lg transition ${
-                activeTab === tab.key
-                  ? "bg-primary-500 text-heading"
-                  : "bg-surface-alt text-muted hover:text-heading hover:bg-surface-alt"
-              }`}
-            >
-              <tab.icon className="h-5 w-5" />
-              {tab.label}
-            </Button>
-          ))}
-        </div>
+        <AdminTabs
+          tabs={tabs.map((t) => ({ key: t.key, label: t.label, icon: t.icon }))}
+          value={activeTab}
+          onChange={(k) => setActiveTab(k as TabType)}
+        />
 
         {/* Table */}
-        <div className="admin-card overflow-hidden">
-          <div className="overflow-x-auto">{renderTable()}</div>
-        </div>
+        {renderTable()}
       </div>
 
       {/* Modal */}
       {showModal && activeTab !== "labels" && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-heading/60">
           <div className="bg-surface-elevated rounded-xl border border-border w-full max-w-2xl max-h-[90vh] overflow-y-auto">
-            <div className="flex items-center justify-between p-4 border-b border-border">
-              <h2 className="text-lg font-semibold text-heading">
+            <div className="flex items-center justify-between px-4 pb-4 pt-3 border-b border-border">
+              <h2 className="text-lg font-semibold text-heading leading-tight">
                 {editing ? "Düzenle" : "Yeni Ekle"}
               </h2>
               <Button

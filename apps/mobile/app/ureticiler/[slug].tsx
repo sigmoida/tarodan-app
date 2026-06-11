@@ -1,7 +1,6 @@
 import React from 'react';
 import { View, StyleSheet, Image } from 'react-native';
 
-import { SafeAreaView } from 'react-native-safe-area-context';
 import { useLocalSearchParams } from 'expo-router';
 import { useQuery } from '@tanstack/react-query';
 import { manufacturersApi, productsApi } from '../../src/services/api';
@@ -10,6 +9,7 @@ import { ScreenHeader } from '../../src/components/common';
 const { colors } = theme;
 import { ProductGrid } from '../../src/components/product';
 import type { ProductCardProduct } from '../../src/components/product';
+import { resolveImageUrl } from '../../src/utils/imageUrl';
 
 interface Manufacturer {
   id: string;
@@ -40,20 +40,20 @@ export default function ManufacturerDetailScreen() {
     refetch,
     isRefetching,
   } = useQuery({
-    queryKey: ['manufacturer-products', slug],
+    queryKey: ['manufacturer-products', manufacturer?.id],
     queryFn: async () => {
-      if (!slug) return [];
-      const response = await productsApi.getAll({ manufacturer: slug, status: 'active' });
+      if (!manufacturer?.id) return [];
+      const response = await productsApi.getAll({ manufacturerId: manufacturer.id, status: 'active' });
       const payload = response.data?.data ?? response.data ?? [];
       return Array.isArray(payload) ? payload : payload?.products ?? [];
     },
-    enabled: !!slug,
+    enabled: !!manufacturer?.id,
   });
 
   const products: ProductCardProduct[] = productsData ?? [];
 
   return (
-    <SafeAreaView style={styles.container} edges={['top']}>
+    <View style={styles.container}>
       <ScreenHeader title={manufacturer?.name || 'Üretici'} />
 
       <ProductGrid
@@ -70,7 +70,7 @@ export default function ManufacturerDetailScreen() {
           loadingManufacturer ? null : manufacturer ? (
             <View style={styles.header}>
               {manufacturer.logo ? (
-                <Image source={{ uri: manufacturer.logo }} style={styles.logo} resizeMode="contain" />
+                <Image source={{ uri: resolveImageUrl(manufacturer.logo) }} style={styles.logo} resizeMode="contain" />
               ) : (
                 <View style={styles.logoFallback}>
                   <Text style={styles.logoFallbackText}>
@@ -88,7 +88,7 @@ export default function ManufacturerDetailScreen() {
           ) : null
         }
       />
-    </SafeAreaView>
+    </View>
   );
 }
 

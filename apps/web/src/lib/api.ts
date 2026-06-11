@@ -38,6 +38,22 @@ api.interceptors.response.use(
   async (error) => {
     const originalRequest = error.config;
 
+    // Banlı kullanıcı: backend BannedUserGuard tüm istekleri 403 + USER_BANNED
+    // ile bloklar. Kullanıcıyı /banned sayfasına yönlendir (zaten oradaysa dokunma).
+    const errData = error.response?.data;
+    if (
+      error.response?.status === 403 &&
+      errData?.errorCode === 'USER_BANNED' &&
+      typeof window !== 'undefined' &&
+      window.location?.pathname !== '/banned'
+    ) {
+      const reason = errData.bannedReason
+        ? `?reason=${encodeURIComponent(errData.bannedReason)}`
+        : '';
+      window.location.href = `/banned${reason}`;
+      return Promise.reject(error);
+    }
+
     if (error.response?.status === 401 && !originalRequest._retry) {
       originalRequest._retry = true;
 
@@ -64,16 +80,20 @@ api.interceptors.response.use(
 
             // Retry the original request
             return api(originalRequest);
-          } catch (refreshError) {
-            // Refresh failed, logout user
+          } catch (refreshError: any) {
+            // Refresh'in network/5xx ile patlaması (API erişilemez) ≠ geçersiz refresh token.
+            // Sadece refresh GERÇEKTEN 401/403 dönerse oturumu kapat; geçici hatada token'ı koru
+            // ki API hıçkırınca (özellikle ödeme dönüşü) kullanıcı login'e atılmasın.
+            const refreshStatus = refreshError?.response?.status;
+            const refreshRejectedAuth = refreshStatus === 401 || refreshStatus === 403;
             const hadToken = localStorage.getItem('auth_token');
-            if (!shouldPreserveAuthTokenOn401()) {
+            if (refreshRejectedAuth && !shouldPreserveAuthTokenOn401()) {
               localStorage.removeItem('auth_token');
               localStorage.removeItem('refresh_token');
             }
 
-            // Only auto-redirect for expired sessions; never redirect on public/guest pages
-            if (hadToken) {
+            // Only auto-redirect for genuinely expired/invalid sessions; never on transient errors or public/guest pages
+            if (refreshRejectedAuth && hadToken) {
               const currentPath = (typeof window !== 'undefined' && window.location?.pathname) || '';
               const publicPathsNoRedirect = ['/track-order', '/orders/track', '/login', '/register'];
               const isPublicPath = publicPathsNoRedirect.some(p => currentPath === p || currentPath.startsWith(p + '/'));
@@ -146,7 +166,10 @@ export const authApi = {
 
 // Products (was Listings - endpoint is /products in backend)
 export const listingsApi = {
-  getFilters: () => api.get('/products/filters'),
+  getFilters: (params?: { manufacturer?: string }) =>
+    api.get('/products/filters', { params }),
+  getAttributeGroups: (params?: { manufacturer?: string }) =>
+    api.get('/products/attribute-groups', { params }),
   getPopular: (params?: { limit?: number; page?: number }) =>
     api.get('/products/popular', { params: { limit: 20, page: 1, ...params }, headers: { 'Cache-Control': 'no-cache', Pragma: 'no-cache' } }),
   getAll: (params?: Record<string, any>) =>
@@ -268,6 +291,61 @@ export const ordersApi = {
     offerId?: string;
     price?: number;
   }) => api.post('/orders/guest', data),
+  /** Toplu checkout (üye): sepetteki tüm ürünler tek CheckoutGroup altında, tek ödeme */
+  checkout: (data: {
+    items: Array<{ productId: string }>;
+    idempotencyKey: string;
+    shippingAddressId?: string;
+    shippingAddress?: {
+      fullName: string;
+      phone: string;
+      city: string;
+      district: string;
+      address: string;
+      zipCode?: string;
+    };
+    billingAddressId?: string;
+    billingAddress?: {
+      fullName: string;
+      phone: string;
+      city: string;
+      district: string;
+      address: string;
+      zipCode?: string;
+    };
+    couponCode?: string;
+  }) => api.post('/orders/checkout', data),
+  /** Toplu checkout (misafir) */
+  checkoutGuest: (data: {
+    items: Array<{ productId: string }>;
+    idempotencyKey: string;
+    email: string;
+    emailVerificationCode: string;
+    phone: string;
+    guestName: string;
+    shippingAddress: {
+      fullName: string;
+      phone: string;
+      city: string;
+      district: string;
+      address: string;
+      zipCode?: string;
+    };
+    billingAddress?: {
+      fullName: string;
+      phone: string;
+      city: string;
+      district: string;
+      address: string;
+      zipCode?: string;
+    };
+  }) => api.post('/orders/checkout/guest', data),
+  /** Alıcının sipariş grupları (gruplu liste) */
+  getGroups: (params?: Record<string, any>) =>
+    api.get('/orders/groups', { params }),
+  /** Tek sipariş grubu detayı */
+  getGroup: (id: string) =>
+    api.get(`/orders/groups/${id}`),
   cancel: (id: string | number, reason?: string) =>
     api.post(`/orders/${id}/cancel`, { reason }),
   confirm: (id: string | number) =>
@@ -291,8 +369,14 @@ export const ordersApi = {
 export const paymentsApi = {
   initiate: (orderId: string | number, provider: 'paytr') =>
     api.post('/payments/initiate', { orderId, provider }),
+  /** Grup ödemesi: tek ödeme checkout grubundaki tüm siparişleri kapsar */
+  initiateGroup: (checkoutGroupId: string, provider: 'paytr') =>
+    api.post('/payments/initiate', { checkoutGroupId, provider }),
   initiateGuest: (orderId: string | number, provider: 'paytr') =>
     api.post('/payments/initiate-guest', { orderId, provider }),
+  /** Grup ödemesi (misafir) */
+  initiateGroupGuest: (checkoutGroupId: string, provider: 'paytr') =>
+    api.post('/payments/initiate-guest', { checkoutGroupId, provider }),
   /** Takas nakit fark ödemesi başlat (sipariş/teklif ile aynı ödeme altyapısı) */
   initiateTradeCash: (tradeId: string) =>
     api.post('/payments/initiate-trade-cash', { tradeId }),
@@ -310,6 +394,17 @@ export const paymentsApi = {
     page?: number;
     limit?: number;
   }) => api.get('/payments/me', { params }),
+  // Saklı kart yönetimi
+  getMethods: () => api.get('/payments/methods'),
+  addMethod: (card: {
+    cardNumber: string;
+    cardHolderName: string;
+    expireMonth: string;
+    expireYear: string;
+    cvc: string;
+  }) => api.post('/payments/methods', { card }),
+  deleteMethod: (id: string) => api.delete(`/payments/methods/${id}`),
+  setDefaultMethod: (id: string) => api.patch(`/payments/methods/${id}/default`),
   cancel: (paymentId: string) =>
     api.post(`/payments/${paymentId}/cancel`),
   /** Fail sayfasından; ödeme hâlâ pending ise rezervasyonu serbest bırakır */
@@ -529,7 +624,7 @@ export const membershipApi = {
 export const notificationsApi = {
   getAll: (params?: Record<string, any>) => api.get('/notifications', { params }),
   markAsRead: (id: string) => api.patch(`/notifications/${id}/read`),
-  markAllAsRead: () => api.patch('/notifications/read-all'),
+  markAllAsRead: () => api.post('/notifications/mark-all-read'),
   getUnreadCount: () => api.get('/notifications/unread-count'),
 };
 

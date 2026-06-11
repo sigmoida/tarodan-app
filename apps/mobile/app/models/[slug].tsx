@@ -4,7 +4,8 @@ import { theme, Spinner, Text, EmptyState } from '@tarodan/ui-native';
 import { useLocalSearchParams, router } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { useQuery } from '@tanstack/react-query';
-import { ScreenHeader } from '../../src/components/common';
+import { ScreenHeader, ThemedRefreshControl } from '../../src/components/common';
+import { useRefresh } from '../../src/hooks/useRefresh';
 import { CONDITIONS } from '../../src/theme';
 import { carModelsApi, productsApi } from '../../src/services/api';
 import { transformImageUrl } from '../../src/utils/imageUrl';
@@ -78,6 +79,8 @@ export default function ModelDetailScreen() {
     enabled: !!slugStr,
   });
 
+  const { refreshing, onRefresh } = useRefresh(modelQuery.refetch, productsQuery.refetch);
+
   const model = modelQuery.data;
   const products = productsQuery.data ?? [];
 
@@ -121,7 +124,10 @@ export default function ModelDetailScreen() {
     <View style={styles.container}>
       <ScreenHeader title={model.name} subtitle={model.brand?.name} />
 
-      <ScrollView contentContainerStyle={{ paddingBottom: 32 }}>
+      <ScrollView
+        contentContainerStyle={{ paddingBottom: 32 }}
+        refreshControl={<ThemedRefreshControl refreshing={refreshing} onRefresh={onRefresh} />}
+      >
         {/* Hero */}
         <View style={styles.hero}>
           {model.image ? (

@@ -1,9 +1,9 @@
-import { View, ScrollView, StyleSheet, TouchableOpacity, Linking, Alert } from 'react-native';
+import { View, ScrollView, StyleSheet, TouchableOpacity } from 'react-native';
 import { useState } from 'react';
 import { router } from 'expo-router';
 import { useMutation } from '@tanstack/react-query';
 import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
-import { theme, Text, Card, Button, Chip, Radio } from '@tarodan/ui-native';
+import { theme, Text, Card, Button, Chip, Radio, ScreenHeader, appAlert } from '@tarodan/ui-native';
 import { membershipApi } from '../src/services/api';
 import { useAuthStore } from '../src/stores/authStore';
 
@@ -73,22 +73,32 @@ export default function UpgradeScreen() {
         billingPeriod: isAnnual ? 'yearly' : 'monthly',
       });
     },
-    onSuccess: (response) => {
-      // In a real app, this would redirect to a payment gateway
-      const paymentUrl = response.data?.paymentUrl;
-      if (paymentUrl) {
-        Linking.openURL(paymentUrl);
-      } else {
-        Alert.alert(
-          'Ödeme',
-          'Ödeme sayfasına yönlendiriliyorsunuz...',
-          [{ text: 'Tamam' }]
-        );
+    onSuccess: (response: any) => {
+      const data = response?.data?.data ?? response?.data ?? {};
+      const paymentId = data.paymentId || data.id;
+      const paymentUrl: string | undefined = data.paymentUrl;
+
+      // Bypass (dev/test) ya da ödeme gerektirmeyen durum → üyelik zaten güncellendi.
+      if (data.useBypass === true || (!paymentUrl && !paymentId)) {
+        refreshUserData();
+        appAlert('Üyelik', 'Üyeliğiniz güncellendi.');
+        return;
       }
-      refreshUserData();
+
+      // Gerçek PayTR akışı — dış tarayıcı (Linking) yerine app içi WebView ödeme ekranı.
+      router.push({
+        pathname: '/payment/[id]',
+        params: {
+          id: paymentId,
+          provider: 'paytr',
+          guest: '0',
+          type: 'membership',
+          ...(paymentUrl ? { paymentUrl } : {}),
+        },
+      } as any);
     },
     onError: () => {
-      Alert.alert('Hata', 'Abonelik oluşturulamadı. Lütfen tekrar deneyin.');
+      appAlert('Hata', 'Abonelik oluşturulamadı. Lütfen tekrar deneyin.');
     },
   });
 
@@ -104,14 +114,7 @@ export default function UpgradeScreen() {
 
   return (
     <View style={styles.container}>
-      {/* Header */}
-      <View style={styles.header}>
-        <TouchableOpacity onPress={() => router.back()}>
-          <Ionicons name="arrow-back" size={24} color={colors.white} />
-        </TouchableOpacity>
-        <Text style={styles.headerTitle}>Premium Üyelik</Text>
-        <View style={{ width: 24 }} />
-      </View>
+      <ScreenHeader title="Premium Üyelik" onBack={() => router.back()} />
 
       <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
         {/* Already Premium */}
@@ -129,6 +132,7 @@ export default function UpgradeScreen() {
                 variant="outline"
                 title="Abonelik Ayarları"
                 onPress={() => router.push('/settings/subscription')}
+                style={{ alignSelf: 'center' }}
               />
             </View>
           </Card>
@@ -204,6 +208,8 @@ export default function UpgradeScreen() {
             {/* Subscribe Button */}
             <Button
               variant="primary"
+              fullWidth
+              size="lg"
               title={selectedPlan === 'annual'
                 ? `Yıllık ₺${PLANS.annual.price} ile Başla`
                 : `Aylık ₺${PLANS.monthly.price} ile Başla`}
@@ -297,20 +303,6 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: colors.surface.alt,
   },
-  header: {
-    backgroundColor: colors.primary[600]!,
-    paddingTop: 50,
-    paddingBottom: 16,
-    paddingHorizontal: 20,
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-  },
-  headerTitle: {
-    fontSize: 18,
-    fontWeight: 'bold',
-    color: colors.white,
-  },
   content: {
     flex: 1,
     padding: 16,
@@ -380,11 +372,13 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   planInfo: {
+    flex: 1,
     marginLeft: 8,
   },
   planHeader: {
     flexDirection: 'row',
     alignItems: 'center',
+    flexWrap: 'wrap',
     gap: 8,
   },
   planSubtext: {
@@ -394,6 +388,9 @@ const styles = StyleSheet.create({
   planPrice: {
     color: colors.primary[600]!,
     fontWeight: 'bold',
+    flexShrink: 0,
+    marginLeft: 12,
+    textAlign: 'right',
   },
   subscribeButton: {
     marginBottom: 8,

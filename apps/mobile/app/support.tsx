@@ -2,20 +2,24 @@ import { useState } from 'react';
 import { View, ScrollView, StyleSheet, TouchableOpacity } from 'react-native';
 import { router } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
-import { theme, Text, Card, Chip, Snackbar, Input, Textarea, Button } from '@tarodan/ui-native';
+import { theme, Text, Card, Chip, Snackbar, Input, Textarea, Button, ScreenHeader } from '@tarodan/ui-native';
 import { useAuthStore } from '../src/stores/authStore';
 import { useTranslation } from '../src/i18n';
+import { supportApi } from '../src/services/api';
 
 const { colors } = theme;
 
+// id'ler backend TicketCategory enum'u ile birebir (payment, shipping, trade, account, product, technical, other)
 const SUPPORT_CATEGORIES = [
-  { id: 'order', name: 'Sipariş Sorunu', icon: 'cube-outline' },
+  { id: 'shipping', name: 'Sipariş/Kargo Sorunu', icon: 'cube-outline' },
   { id: 'payment', name: 'Ödeme Sorunu', icon: 'card-outline' },
   { id: 'account', name: 'Hesap Sorunu', icon: 'person-outline' },
-  { id: 'listing', name: 'İlan Sorunu', icon: 'pricetag-outline' },
+  { id: 'product', name: 'İlan Sorunu', icon: 'pricetag-outline' },
   { id: 'trade', name: 'Takas Sorunu', icon: 'swap-horizontal' },
   { id: 'other', name: 'Diğer', icon: 'ellipsis-horizontal' },
 ];
+
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 const PRIORITY_OPTIONS = [
   { id: 'low', name: 'Düşük', color: colors.success[600]! },
@@ -40,31 +44,54 @@ export default function SupportScreen() {
       return;
     }
 
+    // Backend DTO ile parite (CreateTicketDto): subject @MinLength(5), message @MinLength(10).
+    if (subject.trim().length < 5) {
+      setSnackbar({ visible: true, message: 'Konu en az 5 karakter olmalıdır.' });
+      return;
+    }
+    if (description.trim().length < 10) {
+      setSnackbar({ visible: true, message: 'Açıklama en az 10 karakter olmalıdır.' });
+      return;
+    }
+
+    // orderId/tradeId backend'de UUID bekler; serbest metin girildiyse mesaja ekle.
+    const refId = orderId.trim();
+    const isUuid = UUID_RE.test(refId);
+    let message = description.trim();
+    if (refId && !isUuid) {
+      message = `Sipariş/Takas No: ${refId}\n\n${message}`;
+    }
+
     setLoading(true);
-    // Simulate API call
-    await new Promise(resolve => setTimeout(resolve, 1500));
-    setLoading(false);
+    try {
+      await supportApi.createTicket({
+        subject: subject.trim(),
+        category,
+        priority,
+        message,
+        ...(isUuid && category === 'trade' ? { tradeId: refId } : {}),
+        ...(isUuid && category !== 'trade' ? { orderId: refId } : {}),
+      });
 
-    setSnackbar({ visible: true, message: 'Destek talebiniz oluşturuldu!' });
+      setSnackbar({ visible: true, message: 'Destek talebiniz oluşturuldu!' });
 
-    // Reset form
-    setCategory('');
-    setSubject('');
-    setDescription('');
-    setOrderId('');
-    setPriority('medium');
+      // Reset form
+      setCategory('');
+      setSubject('');
+      setDescription('');
+      setOrderId('');
+      setPriority('medium');
+    } catch {
+      setSnackbar({ visible: true, message: 'Talep oluşturulamadı, lütfen tekrar deneyin.' });
+    } finally {
+      setLoading(false);
+    }
   };
 
   if (!isAuthenticated) {
     return (
       <View style={styles.container}>
-        <View style={styles.header}>
-          <TouchableOpacity onPress={() => router.back()}>
-            <Ionicons name="arrow-back" size={24} color={colors.white} />
-          </TouchableOpacity>
-          <Text style={styles.headerTitle}>{t('mobile.pageSupport')}</Text>
-          <View style={{ width: 24 }} />
-        </View>
+        <ScreenHeader title={t('mobile.pageSupport')} onBack={() => router.back()} />
         <View style={styles.authRequired}>
           <Ionicons name="headset-outline" size={64} color={colors.primary[600]!} />
           <Text style={styles.authTitle}>Giriş Gerekli</Text>
@@ -75,6 +102,7 @@ export default function SupportScreen() {
             variant="primary"
             title="Giriş Yap"
             onPress={() => router.push('/(auth)/login')}
+            style={{ alignSelf: 'center' }}
           />
         </View>
       </View>
@@ -83,14 +111,7 @@ export default function SupportScreen() {
 
   return (
     <View style={styles.container}>
-      {/* Header */}
-      <View style={styles.header}>
-        <TouchableOpacity onPress={() => router.back()}>
-          <Ionicons name="arrow-back" size={24} color={colors.white} />
-        </TouchableOpacity>
-        <Text style={styles.headerTitle}>Destek Talebi</Text>
-        <View style={{ width: 24 }} />
-      </View>
+      <ScreenHeader title="Destek Talebi" onBack={() => router.back()} />
 
       <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
         {/* Category Selection */}
@@ -136,7 +157,7 @@ export default function SupportScreen() {
 
         {/* Form Fields */}
         <Card style={styles.formCard}>
-          {(category === 'order' || category === 'trade') && (
+          {(category === 'shipping' || category === 'trade') && (
             <Input
               label="Sipariş/Takas Numarası (Opsiyonel)"
               value={orderId}
@@ -187,6 +208,7 @@ export default function SupportScreen() {
           disabled={loading || !category || !subject || !description}
           style={styles.submitButton}
           icon="send"
+          fullWidth
         />
 
         {/* Contact Info */}
@@ -214,20 +236,6 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: colors.surface.alt,
-  },
-  header: {
-    backgroundColor: colors.primary[600]!,
-    paddingTop: 50,
-    paddingBottom: 16,
-    paddingHorizontal: 20,
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-  },
-  headerTitle: {
-    fontSize: 18,
-    fontWeight: 'bold',
-    color: colors.white,
   },
   authRequired: {
     flex: 1,

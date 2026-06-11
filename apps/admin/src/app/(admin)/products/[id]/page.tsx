@@ -17,11 +17,13 @@ import {
 } from '@heroicons/react/24/outline';
 import { StarIcon as StarIconSolid } from '@heroicons/react/24/solid';
 import { adminApi } from '@/lib/api';
-import { Button, Input, Select, Spinner, Textarea } from '@tarodan/ui';
+import { AdminTabs } from '@/components/AdminTabs';
+import { Button, Input, Select, Spinner, Textarea, productConditionConfig, enumLabel } from '@tarodan/ui';
 import { getProductEffectivePrice, isProductOnSaleDisplay, getProductOriginalPriceForDisplay } from '@/lib/productPrice';
 import toast from 'react-hot-toast';
 import { format } from 'date-fns';
 import { tr } from 'date-fns/locale';
+import { useConfirm } from '@/components/ConfirmProvider';
 
 interface ProductDetail {
   id: string;
@@ -82,6 +84,7 @@ const statusConfig: Record<string, { label: string; color: string; bg: string }>
 };
 
 export default function ProductDetailPage() {
+  const confirm = useConfirm();
   const router = useRouter();
   const params = useParams();
   const productId = params.id as string;
@@ -188,7 +191,7 @@ export default function ProductDetailPage() {
   };
 
   const handleReviewDelete = async (reviewId: string) => {
-    if (!confirm('Bu yorumu silmek istediğinizden emin misiniz?')) return;
+    if (!(await confirm({ description: 'Bu yorumu silmek istediğinizden emin misiniz?', destructive: true }))) return;
     try {
       await adminApi.deleteReview(reviewId);
       toast.success('Yorum silindi');
@@ -320,12 +323,16 @@ export default function ProductDetailPage() {
         <main className="max-w-6xl mx-auto px-4 py-8">
           {/* Header */}
           <div className="flex items-center gap-4 mb-8">
-            <Link
-              href="/products"
+            <button
+              type="button"
+              onClick={() =>
+                window.history.length > 1 ? router.back() : router.push('/products')
+              }
+              aria-label="Geri"
               className="p-2 hover:bg-border-subtle rounded-lg transition-colors"
             >
               <ArrowLeftIcon className="w-6 h-6 text-muted" />
-            </Link>
+            </button>
             <div className="flex-1">
               <h1 className="text-3xl font-bold text-heading">{product.title}</h1>
               <p className="text-sm text-muted">Kategori: {product.category.name}</p>
@@ -338,25 +345,15 @@ export default function ProductDetailPage() {
           </div>
 
           {/* Tabs */}
-          <div className="mb-6 border-b border-border">
-            <nav className="-mb-px flex space-x-8">
-              <Button variant="secondary" onClick={() => setActiveTab('info')}
-                className={`py-4 px-1 border-b-2 font-medium text-sm ${activeTab === 'info'
-                  ? 'border-primary-500 text-primary-600'
-                  : 'border-transparent text-muted hover:text-body hover:border-border'
-                  }`}>
-                <CubeIcon className="w-5 h-5 inline mr-2" />
-                Ürün Bilgileri
-              </Button>
-              <Button variant="secondary" onClick={() => setActiveTab('reviews')}
-                className={`py-4 px-1 border-b-2 font-medium text-sm ${activeTab === 'reviews'
-                  ? 'border-primary-500 text-primary-600'
-                  : 'border-transparent text-muted hover:text-body hover:border-border'
-                  }`}>
-                <StarIcon className="w-5 h-5 inline mr-2" />
-                Yorumlar ({reviews.length})
-              </Button>
-            </nav>
+          <div className="mb-6">
+            <AdminTabs
+              tabs={[
+                { key: 'info', label: 'Ürün Bilgileri', icon: CubeIcon },
+                { key: 'reviews', label: 'Yorumlar', icon: StarIcon, badge: reviews.length },
+              ]}
+              value={activeTab}
+              onChange={(k) => setActiveTab(k as 'info' | 'reviews')}
+            />
           </div>
 
           {activeTab === 'info' ? (
@@ -413,7 +410,7 @@ export default function ProductDetailPage() {
                       </div>
                       <div>
                         <span className="text-muted text-sm">Durum:</span>
-                        <p className="font-medium capitalize">{product.condition}</p>
+                        <p className="font-medium">{enumLabel(productConditionConfig, product.condition)}</p>
                       </div>
                     </div>
                     <div className="grid grid-cols-2 gap-4 pt-3 border-t">
@@ -614,8 +611,8 @@ export default function ProductDetailPage() {
         {/* Reply Modal */}
         {replyModalOpen && (
           <div className="fixed inset-0 bg-heading bg-opacity-50 flex items-center justify-center z-50">
-            <div className="bg-surface-elevated rounded-xl p-6 max-w-lg w-full mx-4">
-              <h3 className="text-lg font-semibold text-heading mb-4">Yorumu Yanıtla</h3>
+            <div className="bg-surface-elevated rounded-xl px-6 pb-6 pt-5 max-w-lg w-full mx-4">
+              <h3 className="text-lg font-semibold text-heading mb-4 leading-tight">Yorumu Yanıtla</h3>
               {selectedReview && (
                 <div className="mb-4 p-3 bg-surface rounded-lg">
                   <p className="text-sm text-muted italic">"{selectedReview.review}"</p>
@@ -644,8 +641,8 @@ export default function ProductDetailPage() {
         {/* Approve Modal */}
         {showApproveModal && (
           <div className="fixed inset-0 bg-heading bg-opacity-50 flex items-center justify-center z-50">
-            <div className="bg-surface-elevated rounded-xl p-6 max-w-md w-full mx-4">
-              <h3 className="text-lg font-semibold text-heading mb-4">Ürünü Onayla</h3>
+            <div className="bg-surface-elevated rounded-xl px-6 pb-6 pt-5 max-w-md w-full mx-4">
+              <h3 className="text-lg font-semibold text-heading mb-4 leading-tight">Ürünü Onayla</h3>
               <div className="mb-4">
                 <label className="block text-sm font-medium text-body mb-2">
                   Not (Opsiyonel)
@@ -670,8 +667,8 @@ export default function ProductDetailPage() {
         {/* Reject Modal */}
         {showRejectModal && (
           <div className="fixed inset-0 bg-heading bg-opacity-50 flex items-center justify-center z-50">
-            <div className="bg-surface-elevated rounded-xl p-6 max-w-md w-full mx-4">
-              <h3 className="text-lg font-semibold text-heading mb-4">Ürünü Reddet</h3>
+            <div className="bg-surface-elevated rounded-xl px-6 pb-6 pt-5 max-w-md w-full mx-4">
+              <h3 className="text-lg font-semibold text-heading mb-4 leading-tight">Ürünü Reddet</h3>
               <div className="mb-4">
                 <label className="block text-sm font-medium text-body mb-2">
                   Red Nedeni *
@@ -696,9 +693,9 @@ export default function ProductDetailPage() {
         {/* Edit Modal */}
         {showEditModal && (
           <div className="fixed inset-0 bg-heading bg-opacity-50 flex items-center justify-center z-50 overflow-y-auto py-10">
-            <div className="bg-surface-elevated rounded-xl p-6 max-w-2xl w-full mx-4 my-auto">
+            <div className="bg-surface-elevated rounded-xl px-6 pb-6 pt-5 max-w-2xl w-full mx-4 my-auto">
               <div className="flex justify-between items-center mb-6">
-                <h3 className="text-lg font-semibold text-heading">Ürünü Düzenle</h3>
+                <h3 className="text-lg font-semibold text-heading leading-tight">Ürünü Düzenle</h3>
                 <Button variant="secondary" onClick={() => setShowEditModal(false)}
                   className="text-muted hover:text-body">
                   <XCircleIcon className="w-6 h-6" />
@@ -758,11 +755,11 @@ export default function ProductDetailPage() {
                       value={editForm.condition}
                       onChange={(e) => setEditForm({ ...editForm, condition: e.target.value })}
                     >
-                      <option value="new">Yeni</option>
-                      <option value="like_new">Yeni Gibi</option>
-                      <option value="good">İyi</option>
-                      <option value="fair">Orta</option>
-                      <option value="poor">Kötü</option>
+                      {Object.entries(productConditionConfig).map(([value, cfg]) => (
+                        <option key={value} value={value}>
+                          {cfg.label}
+                        </option>
+                      ))}
                     </Select>
                   </div>
                   <div>
@@ -794,8 +791,8 @@ export default function ProductDetailPage() {
         {/* Delete Modal */}
         {showDeleteModal && (
           <div className="fixed inset-0 bg-heading bg-opacity-50 flex items-center justify-center z-50">
-            <div className="bg-surface-elevated rounded-xl p-6 max-w-md w-full mx-4">
-              <h3 className="text-lg font-semibold text-heading mb-4">Ürünü Sil</h3>
+            <div className="bg-surface-elevated rounded-xl px-6 pb-6 pt-5 max-w-md w-full mx-4">
+              <h3 className="text-lg font-semibold text-heading mb-4 leading-tight">Ürünü Sil</h3>
               <p className="text-muted mb-6">
                 Bu ürünü silmek istediğinizden emin misiniz? Bu işlem geri alınamaz.
               </p>

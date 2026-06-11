@@ -26,14 +26,18 @@ import {
   ApiParam,
   ApiQuery,
 } from '@nestjs/swagger';
+import { Request } from 'express';
 import { ProductService } from './product.service';
+import { ProductBoostService } from './product-boost.service';
 import {
   CreateProductDto,
   UpdateProductDto,
   ProductQueryDto,
   ProductResponseDto,
   PaginatedProductsDto,
+  InitiateBoostDto,
 } from './dto';
+import { PaymentProvider } from '../payment/dto';
 import { JwtAuthGuard, Public, CurrentUser } from '../auth';
 
 @ApiTags('products')
@@ -41,7 +45,10 @@ import { JwtAuthGuard, Public, CurrentUser } from '../auth';
 export class ProductController {
   private readonly logger = new Logger(ProductController.name);
 
-  constructor(private readonly productService: ProductService) { }
+  constructor(
+    private readonly productService: ProductService,
+    private readonly productBoostService: ProductBoostService,
+  ) { }
 
   /**
    * GET /products
@@ -92,14 +99,56 @@ export class ProductController {
 
   /**
    * GET /products/filters
-   * Get dynamic filters (categories, brands, scales, manufacturers)
+   * Get dynamic filters (categories, brands, scales, manufacturers).
+   * Optional ?manufacturer=<slug> adds manufacturer-scoped attribute groups
+   * (e.g. Hot Wheels Segment/Assortment/Wheel Type/etc.) to customAttributes.
    */
   @Get('filters')
   @Public()
   @ApiOperation({ summary: 'Filtre seçenekleri (Categoriler, Markalar, vb.)' })
   @ApiResponse({ status: 200, description: 'Filtre listeleri' })
-  async getFilters() {
-    return this.productService.getFilters();
+  async getFilters(@Query('manufacturer') manufacturer?: string) {
+    return this.productService.getFilters(manufacturer);
+  }
+
+  /**
+   * GET /products/attribute-groups?manufacturer=<slug>
+   * Returns attribute groups (with attributes) applicable to the given manufacturer.
+   * Always includes global groups (manufacturerSlug=null) PLUS manufacturer-scoped groups.
+   * Used by listing creation forms to render conditional fields.
+   */
+  @Get('attribute-groups')
+  @Public()
+  @ApiOperation({ summary: 'Manufacturer-aware attribute group listesi (form için)' })
+  @ApiResponse({ status: 200, description: 'Form alan grupları' })
+  async getAttributeGroups(@Query('manufacturer') manufacturer?: string) {
+    return this.productService.getAttributeGroupsForManufacturer(manufacturer);
+  }
+
+  /**
+   * GET /products/boost/pricing
+   * Boost (öne çıkarma) süreleri ve fiyatları (admin'den ayarlanabilir)
+   * NOTE: ':id' rotasından önce tanımlanmalı (statik segment çakışmasını önlemek için)
+   */
+  @Get('boost/pricing')
+  @Public()
+  @ApiOperation({ summary: 'Boost süre/fiyat listesi' })
+  @ApiResponse({ status: 200, description: 'Boost fiyatlandırması' })
+  async getBoostPricing() {
+    return this.productBoostService.getPricing();
+  }
+
+  /**
+   * GET /products/boost/my
+   * Kullanıcının boost (öne çıkarma) geçmişi ve aktif boost'ları
+   */
+  @Get('boost/my')
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth()
+  @ApiOperation({ summary: 'Boost geçmişim' })
+  @ApiResponse({ status: 200, description: 'Kullanıcının boost kayıtları' })
+  async getMyBoosts(@CurrentUser('id') userId: string) {
+    return this.productBoostService.getMyBoosts(userId);
   }
 
   /**
@@ -302,6 +351,37 @@ export class ProductController {
     @Body() dto: UpdateProductDto,
   ) {
     return this.productService.update(id, sellerId, dto);
+  }
+
+  /**
+   * POST /products/:id/boost/initiate
+   * İlanı öne çıkar (boost): süre seç → ödeme başlat. Sahiplik + aktiflik doğrulanır.
+   */
+  @Post(':id/boost/initiate')
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth()
+  @ApiOperation({ summary: 'İlanı öne çıkar (boost satın al)' })
+  @ApiParam({ name: 'id', description: 'Product ID (UUID format)' })
+  @ApiResponse({ status: 201, description: 'Boost ödemesi başlatıldı (paymentUrl döner)' })
+  @ApiResponse({ status: 400, description: 'Geçersiz süre / ilan uygun değil' })
+  @ApiResponse({ status: 403, description: 'Sadece kendi ilanınızı öne çıkarabilirsiniz' })
+  async initiateBoost(
+    @Param('id', new ParseUUIDPipe({
+      errorHttpStatusCode: 400,
+      exceptionFactory: () => new BadRequestException('Geçersiz ürün ID formatı'),
+    })) id: string,
+    @CurrentUser('id') userId: string,
+    @Body() dto: InitiateBoostDto,
+    @Req() req: Request,
+  ) {
+    return this.productBoostService.initiateBoost(
+      userId,
+      id,
+      dto.durationDays,
+      dto.provider ?? PaymentProvider.paytr,
+      dto.autoRenew ?? false,
+      req,
+    );
   }
 
   /**

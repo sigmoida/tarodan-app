@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { View, ScrollView, StyleSheet, TouchableOpacity, Linking } from 'react-native';
 import { router } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
-import { theme, Button, Card, Snackbar, Text, Input, Textarea } from '@tarodan/ui-native';
+import { theme, Button, Card, Snackbar, Text, Input, Textarea, ScreenHeader } from '@tarodan/ui-native';
 import { supportApi } from '../src/services/api';
 import { useTranslation } from '../src/i18n';
 
@@ -20,6 +20,19 @@ export default function ContactScreen() {
   const handleSubmit = async () => {
     if (!name || !email || !subject || !message) {
       setSnackbar({ visible: true, message: 'Lütfen tüm alanları doldurun' });
+      return;
+    }
+    // Backend DTO ile parite (GuestContactDto): name @MinLength(2), message @MinLength(10).
+    if (name.trim().length < 2) {
+      setSnackbar({ visible: true, message: 'Adınız en az 2 karakter olmalıdır.' });
+      return;
+    }
+    if (!/^\S+@\S+\.\S+$/.test(email.trim())) {
+      setSnackbar({ visible: true, message: 'Geçerli bir e-posta adresi girin.' });
+      return;
+    }
+    if (message.trim().length < 10) {
+      setSnackbar({ visible: true, message: 'Mesaj en az 10 karakter olmalıdır.' });
       return;
     }
 
@@ -67,14 +80,7 @@ export default function ContactScreen() {
 
   return (
     <View style={styles.container}>
-      {/* Header */}
-      <View style={styles.header}>
-        <TouchableOpacity onPress={() => router.back()}>
-          <Ionicons name="arrow-back" size={24} color={colors.white} />
-        </TouchableOpacity>
-        <Text style={styles.headerTitle}>{t('mobile.pageContact')}</Text>
-        <View style={{ width: 24 }} />
-      </View>
+      <ScreenHeader title={t('mobile.pageContact')} onBack={() => router.back()} />
 
       <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
         {/* Contact Methods */}
@@ -180,20 +186,6 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: colors.surface.alt,
-  },
-  header: {
-    backgroundColor: colors.primary[600]!,
-    paddingTop: 50,
-    paddingBottom: 16,
-    paddingHorizontal: 20,
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-  },
-  headerTitle: {
-    fontSize: 18,
-    fontWeight: 'bold',
-    color: colors.white,
   },
   content: {
     flex: 1,

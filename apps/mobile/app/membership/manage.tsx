@@ -1,12 +1,12 @@
 import React, { useState } from 'react';
-import { View, ScrollView, StyleSheet, Alert } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { View, ScrollView, StyleSheet } from 'react-native';
 import { router } from 'expo-router';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { theme, Button, Card, Spinner, Snackbar, Switch, Divider, Text } from '@tarodan/ui-native';
+import { theme, Button, Card, Spinner, Snackbar, Switch, Divider, Text, appAlert } from '@tarodan/ui-native';
 import { Ionicons } from '@expo/vector-icons';
 
-import { ScreenHeader } from '../../src/components/common';
+import { ScreenHeader, ThemedRefreshControl } from '../../src/components/common';
+import { useRefresh } from '../../src/hooks/useRefresh';
 import { membershipApi } from '../../src/services/api';
 
 const { colors } = theme;
@@ -75,6 +75,8 @@ export default function MembershipManageScreen() {
     },
   });
 
+  const { refreshing, onRefresh } = useRefresh(refetch);
+
   const tier = (data?.tier?.type ?? data?.tierType ?? 'free').toLowerCase();
   const tierName = data?.tier?.name ?? data?.tierName ?? TIER_NAMES[tier] ?? 'Ücretsiz Üyelik';
   const isPaid = tier !== 'free';
@@ -112,7 +114,7 @@ export default function MembershipManageScreen() {
   });
 
   const handleCancel = () => {
-    Alert.alert(
+    appAlert(
       'Üyeliği İptal Et',
       'Üyeliğinizi iptal etmek istediğinize emin misiniz? Mevcut dönem sonuna kadar özelliklerinizi kullanmaya devam edebilirsiniz.',
       [
@@ -132,19 +134,22 @@ export default function MembershipManageScreen() {
 
   if (isLoading) {
     return (
-      <SafeAreaView style={styles.container} edges={['top']}>
+      <View style={styles.container}>
         <ScreenHeader title="Üyelik Yönetimi" />
         <View style={styles.loadingBox}>
           <Spinner size="lg" />
         </View>
-      </SafeAreaView>
+      </View>
     );
   }
 
   return (
-    <SafeAreaView style={styles.container} edges={['top']}>
+    <View style={styles.container}>
       <ScreenHeader title="Üyelik Yönetimi" />
-      <ScrollView contentContainerStyle={styles.scrollBody}>
+      <ScrollView
+        contentContainerStyle={styles.scrollBody}
+        refreshControl={<ThemedRefreshControl refreshing={refreshing} onRefresh={onRefresh} />}
+      >
         {/* Current plan */}
         <Card style={styles.card}>
           <View style={styles.headerRow}>
@@ -252,7 +257,7 @@ export default function MembershipManageScreen() {
       >
         {snackbar.message}
       </Snackbar>
-    </SafeAreaView>
+    </View>
   );
 }
 

@@ -41,12 +41,15 @@ export const DEFAULT_COUNTRY_CODE = '+90';
 
 /**
  * TR numaralarını XXX XXX XX XX şeklinde formatlar; diğer ülkeler için sadece
- * non-digit karakterleri temizler.
+ * non-digit karakterleri temizler. TR'de baştaki "90" (autofill: +90 5XX…) ve
+ * "0" (alışkanlık: 05XX…) prefix'leri normalize edilir.
  */
 export function formatPhoneNumber(value: string, countryCode: string = DEFAULT_COUNTRY_CODE): string {
-  const digits = value.replace(/\D/g, '');
+  let digits = value.replace(/\D/g, '');
 
   if (countryCode === DEFAULT_COUNTRY_CODE) {
+    if (digits.startsWith('90') && digits.length > 10) digits = digits.slice(2);
+    if (digits.startsWith('0')) digits = digits.slice(1);
     const limited = digits.slice(0, 10);
     if (limited.length <= 3) return limited;
     if (limited.length <= 6) return `${limited.slice(0, 3)} ${limited.slice(3)}`;
@@ -80,9 +83,14 @@ export function normalizePhoneForPayload(phone: string | undefined, countryCode:
   return hasCountryCodePrefix(clean) ? clean : getFullPhoneNumber(clean, countryCode);
 }
 
-/** Ülke koduna göre TR ise 13 (örnek: "5XX XXX XX XX"), diğerleri için 20. */
+/**
+ * Ülke koduna göre TR ise 17, diğerleri için 20. TR'de görünür değer en fazla
+ * 13 karakter ("5XX XXX XX XX") olsa da maxLength daha gevşek tutulur ki
+ * autofill'in yapıştırdığı "+90 5XX XXX XX XX" tarayıcı tarafından kırpılmadan
+ * formatlayıcıya ulaşsın.
+ */
 export function getPhoneMaxLength(countryCode: string): number {
-  return countryCode === DEFAULT_COUNTRY_CODE ? 13 : 20;
+  return countryCode === DEFAULT_COUNTRY_CODE ? 17 : 20;
 }
 
 /** Ülke koduna göre tipik placeholder. */

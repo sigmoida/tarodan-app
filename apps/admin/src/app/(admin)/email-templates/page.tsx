@@ -191,9 +191,9 @@ export default function AdminEmailTemplatesPage() {
         {showModal && selectedKey && (
           <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-heading/60">
             <div className="bg-surface-elevated rounded-xl border border-border w-full max-w-4xl max-h-[90vh] overflow-y-auto">
-              <div className="flex items-center justify-between p-4 border-b border-border">
-                <h2 className="text-lg font-semibold text-heading">Şablon: {selectedKey}</h2>
-                <Button variant="secondary" type="button" onClick={() => setShowModal(false)} className="text-muted hover:text-heading">
+              <div className="flex items-center justify-between gap-3 px-4 pb-4 pt-3 border-b border-border">
+                <h2 className="text-lg font-semibold text-heading leading-tight truncate min-w-0">Şablon: {selectedKey}</h2>
+                <Button variant="secondary" type="button" onClick={() => setShowModal(false)} className="text-muted hover:text-heading shrink-0">
                   <XMarkIcon className="h-6 w-6" />
                 </Button>
               </div>

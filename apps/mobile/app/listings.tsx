@@ -1,130 +1,150 @@
-import { View, ScrollView, StyleSheet, TouchableOpacity, Image, Dimensions, RefreshControl } from 'react-native';
-import { theme, Text, Input, Chip, Spinner, Modal } from '@tarodan/ui-native';
-import { useState, useCallback } from 'react';
-import { useQuery } from '@tanstack/react-query';
+import {
+  View,
+  FlatList,
+  StyleSheet,
+  TouchableOpacity,
+  Image,
+  Dimensions,
+  Modal,
+} from 'react-native';
+import { theme, Text, Input, Chip, Spinner, Radio, ScreenHeader } from '@tarodan/ui-native';
+import { useState, useMemo } from 'react';
+import { keepPreviousData, useInfiniteQuery } from '@tanstack/react-query';
 import { router, useLocalSearchParams } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { productsApi } from '../src/services/api';
-import { BRANDS, SCALES } from '../src/theme';
 import { getImageUrl as getImageUrlFromUtils } from '../src/utils/imageUrl';
+import { isProductOutOfStock } from '../src/utils/productPrice';
+import { OutOfStockOverlay } from '../src/components/product';
+import { asLabel } from '../src/utils/format';
+import ProductFilterSheet from '../src/components/ProductFilterSheet';
+import { useProductFilterOptions } from '../src/hooks/useProductFilterOptions';
+import {
+  EMPTY_FILTERS,
+  SORT_OPTIONS,
+  CONDITION_OPTIONS,
+  buildListParams,
+  countActiveFilters,
+  extractListings,
+  extractMeta,
+  type ProductFilters,
+} from '../src/utils/productFilters';
 
-const { colors } = theme;
+const { colors, spacing } = theme;
 const { width } = Dimensions.get('window');
 const CARD_WIDTH = (width - 48) / 2;
+const PAGE_SIZE = 24;
 
-const CONDITIONS = [
-  { id: 'new', name: 'Yeni' },
-  { id: 'very_good', name: 'Mükemmel' },
-  { id: 'good', name: 'İyi' },
-  { id: 'fair', name: 'Orta' },
-];
-
-const SORT_OPTIONS = [
-  { id: 'created_desc', name: 'En Yeni' },
-  { id: 'created_asc', name: 'En Eski' },
-  { id: 'price_asc', name: 'Fiyat: Düşükten Yükseğe' },
-  { id: 'price_desc', name: 'Fiyat: Yüksekten Düşüğe' },
-  { id: 'title_asc', name: 'A-Z' },
-  { id: 'title_desc', name: 'Z-A' },
-];
+const conditionLabel = (v: string) =>
+  CONDITION_OPTIONS.find((c) => c.value === v)?.label || v;
 
 export default function ListingsScreen() {
   const params = useLocalSearchParams<{
     brand?: string;
     scale?: string;
     categoryId?: string;
+    category?: string;
+    manufacturer?: string;
     search?: string;
   }>();
 
-  const [searchQuery, setSearchQuery] = useState(params.search || '');
-  const [showFilters, setShowFilters] = useState(false);
-  const [sortMenuVisible, setSortMenuVisible] = useState(false);
-  const [refreshing, setRefreshing] = useState(false);
-
-  const [filters, setFilters] = useState({
+  const [filters, setFilters] = useState<ProductFilters>(() => ({
+    ...EMPTY_FILTERS,
+    search: params.search || '',
     brand: params.brand || '',
     scale: params.scale || '',
-    condition: '',
-    minPrice: '',
-    maxPrice: '',
-    tradeOnly: false,
-    sortBy: 'created_desc',
-  });
+    categoryId: params.categoryId || '',
+    category: params.category || '',
+    manufacturer: params.manufacturer || '',
+  }));
 
-  const { data: listings, isLoading, refetch } = useQuery({
-    queryKey: ['listings', searchQuery, filters],
-    queryFn: async () => {
-      try {
-        const queryParams: any = {
-          limit: 100,
-          page: 1,
-        };
+  const [searchQuery, setSearchQuery] = useState(filters.search);
+  const [filterModalVisible, setFilterModalVisible] = useState(false);
+  const [sortMenuVisible, setSortMenuVisible] = useState(false);
 
-        if (searchQuery) queryParams.search = searchQuery;
-        if (filters.brand) queryParams.brand = filters.brand;
-        if (filters.scale) queryParams.scale = filters.scale;
-        if (filters.condition) queryParams.condition = filters.condition;
-        if (filters.minPrice) queryParams.minPrice = Number(filters.minPrice);
-        if (filters.maxPrice) queryParams.maxPrice = Number(filters.maxPrice);
-        if (filters.tradeOnly) queryParams.tradeOnly = true;
-        if (filters.sortBy) queryParams.sortBy = filters.sortBy;
-        if (params.categoryId) queryParams.categoryId = params.categoryId;
+  // Seçili üreticinin slug'ını çöz ki üreticiye-özel filtreler (HW vb.) yüklensin.
+  const baseOptions = useProductFilterOptions();
+  const manufacturerSlug = useMemo(() => {
+    const list = baseOptions.manufacturers;
+    if (filters.manufacturerId) return list.find((m) => m.id === filters.manufacturerId)?.slug;
+    if (filters.manufacturer)
+      return list.find((m) => m.name.toLowerCase() === filters.manufacturer.toLowerCase())?.slug;
+    return undefined;
+  }, [filters.manufacturerId, filters.manufacturer, baseOptions.manufacturers]);
+  const options = useProductFilterOptions(manufacturerSlug);
 
-        const response = await productsApi.getAll(queryParams);
-        return response.data.data || response.data.products || [];
-      } catch (error) {
-        console.log('⚠️ Listings fetch error:', error);
-        return [];
-      }
+  const applySearch = () =>
+    setFilters((prev) => ({ ...prev, search: searchQuery.trim() }));
+
+  const {
+    data,
+    isLoading,
+    isFetching,
+    fetchNextPage,
+    hasNextPage,
+    isFetchingNextPage,
+    refetch,
+    isRefetching,
+  } = useInfiniteQuery({
+    queryKey: ['listings', filters],
+    placeholderData: keepPreviousData,
+    initialPageParam: 1,
+    queryFn: async ({ pageParam }) => {
+      const listParams = buildListParams(filters, pageParam as number, PAGE_SIZE);
+      const res = await productsApi.getAll(listParams);
+      return {
+        items: extractListings(res.data),
+        meta: extractMeta(res.data, pageParam as number, PAGE_SIZE),
+      };
     },
+    getNextPageParam: (last) =>
+      last.meta.page < last.meta.totalPages ? last.meta.page + 1 : undefined,
   });
 
-  const onRefresh = useCallback(async () => {
-    setRefreshing(true);
-    await refetch();
-    setRefreshing(false);
-  }, [refetch]);
-
-  const handleSearch = () => {
-    refetch();
-  };
+  const listings: any[] = useMemo(
+    () => data?.pages.flatMap((p) => p.items) ?? [],
+    [data],
+  );
+  const total = data?.pages[0]?.meta.total ?? 0;
+  const activeFilterCount = useMemo(() => countActiveFilters(filters), [filters]);
 
   const clearFilters = () => {
-    setFilters({
-      brand: '',
-      scale: '',
-      condition: '',
-      minPrice: '',
-      maxPrice: '',
-      tradeOnly: false,
-      sortBy: 'created_desc',
-    });
+    setFilters({ ...EMPTY_FILTERS });
+    setSearchQuery('');
   };
 
-  const activeFilterCount = [
-    filters.brand,
-    filters.scale,
-    filters.condition,
-    filters.minPrice,
-    filters.maxPrice,
-    filters.tradeOnly,
-  ].filter(Boolean).length;
+  const getSortLabel = () =>
+    SORT_OPTIONS.find((o) => o.value === filters.sortBy)?.label || 'Sırala';
 
-  const getImageUrl = (item: any) => {
-    return getImageUrlFromUtils(item.images);
-  };
+  // Aktif filtre çipleri
+  const activeChips: { key: string; label: string; onRemove: () => void }[] = [];
+  if (filters.category) activeChips.push({ key: 'cat', label: filters.category, onRemove: () => setFilters({ ...filters, category: '', categoryId: '' }) });
+  if (filters.brand) activeChips.push({ key: 'brand', label: filters.brand, onRemove: () => setFilters({ ...filters, brand: '', brandId: '', carModel: '', carModelId: '' }) });
+  if (filters.carModel) activeChips.push({ key: 'model', label: filters.carModel, onRemove: () => setFilters({ ...filters, carModel: '', carModelId: '' }) });
+  if (filters.manufacturer) activeChips.push({ key: 'manuf', label: filters.manufacturer, onRemove: () => setFilters({ ...filters, manufacturer: '', manufacturerId: '' }) });
+  if (filters.scale) activeChips.push({ key: 'scale', label: filters.scale, onRemove: () => setFilters({ ...filters, scale: '' }) });
+  if (filters.material) activeChips.push({ key: 'mat', label: filters.material, onRemove: () => setFilters({ ...filters, material: '' }) });
+  if (filters.condition) activeChips.push({ key: 'cond', label: conditionLabel(filters.condition), onRemove: () => setFilters({ ...filters, condition: '' }) });
+  if (filters.minPrice || filters.maxPrice) activeChips.push({ key: 'price', label: `₺${filters.minPrice || '0'} - ₺${filters.maxPrice || '∞'}`, onRemove: () => setFilters({ ...filters, minPrice: '', maxPrice: '' }) });
+  if (filters.tradeOnly) activeChips.push({ key: 'trade', label: 'Takaslı', onRemove: () => setFilters({ ...filters, tradeOnly: false }) });
+  if (filters.discountOnly) activeChips.push({ key: 'disc', label: 'İndirimli', onRemove: () => setFilters({ ...filters, discountOnly: false }) });
+  if (filters.preOrder) activeChips.push({ key: 'pre', label: 'Ön Sipariş', onRemove: () => setFilters({ ...filters, preOrder: false }) });
+  if (filters.limited) activeChips.push({ key: 'lim', label: 'Limited', onRemove: () => setFilters({ ...filters, limited: false }) });
+  if (filters.set) activeChips.push({ key: 'set', label: 'Set', onRemove: () => setFilters({ ...filters, set: false }) });
 
-  const renderProductCard = (item: any) => {
-    const isTradeEnabled = item.isTradeEnabled || item.trade_available;
-
+  const renderProductCard = ({ item }: { item: any }) => {
+    const isTradeEnabled = item.isTradeEnabled || item.trade_available || item.tradeAvailable;
     return (
       <TouchableOpacity
-        key={item.id}
         style={styles.productCard}
         onPress={() => router.push(`/product/${item.id}`)}
       >
         <View style={styles.productImageContainer}>
-          <Image source={{ uri: getImageUrl(item) }} style={styles.productImage} />
+          <Image
+            source={{ uri: getImageUrlFromUtils(item.images) }}
+            style={[styles.productImage, isProductOutOfStock(item) && { opacity: 0.45 }]}
+          />
+          {isProductOutOfStock(item) && <OutOfStockOverlay />}
           {isTradeEnabled && (
             <View style={styles.tradeBadge}>
               <Ionicons name="swap-horizontal" size={12} color={colors.white} />
@@ -134,11 +154,13 @@ export default function ListingsScreen() {
         </View>
         <View style={styles.productContent}>
           <Text style={styles.productTitle} numberOfLines={2}>{item.title}</Text>
-          <Text style={styles.productMeta}>{item.brand || 'Marka'} • {item.scale || '1:64'}</Text>
+          <Text style={styles.productMeta}>
+            {asLabel(item.brand, 'Marka')} • {asLabel(item.scale, '1:64')}
+          </Text>
           <View style={styles.priceRow}>
             <Text style={styles.productPrice}>₺{item.price?.toLocaleString('tr-TR')}</Text>
             {item.condition && (
-              <Text style={styles.conditionBadge}>{item.condition}</Text>
+              <Text style={styles.conditionBadge}>{conditionLabel(item.condition)}</Text>
             )}
           </View>
         </View>
@@ -146,20 +168,9 @@ export default function ListingsScreen() {
     );
   };
 
-  const getSortLabel = () => {
-    return SORT_OPTIONS.find(o => o.id === filters.sortBy)?.name || 'Sırala';
-  };
-
   return (
     <View style={styles.container}>
-      {/* Header */}
-      <View style={styles.header}>
-        <TouchableOpacity onPress={() => router.back()}>
-          <Ionicons name="arrow-back" size={24} color={colors.white} />
-        </TouchableOpacity>
-        <Text style={styles.headerTitle}>İlanlar</Text>
-        <View style={{ width: 24 }} />
-      </View>
+      <ScreenHeader title="İlanlar" onBack={() => router.back()} />
 
       {/* Search & Sort */}
       <View style={styles.searchSection}>
@@ -167,133 +178,88 @@ export default function ListingsScreen() {
           placeholder="Model, marka ara..."
           value={searchQuery}
           onChangeText={setSearchQuery}
-          onSubmitEditing={handleSearch}
+          onSubmitEditing={applySearch}
           leftIconName="search"
           containerStyle={styles.searchBar}
         />
         <View style={styles.actionRow}>
-          <TouchableOpacity
-            style={styles.sortButton}
-            onPress={() => setSortMenuVisible(true)}
-          >
+          <TouchableOpacity style={styles.sortButton} onPress={() => setSortMenuVisible(true)}>
             <Ionicons name="swap-vertical" size={18} color={colors.text.muted} />
             <Text style={styles.sortButtonText}>{getSortLabel()}</Text>
           </TouchableOpacity>
 
-          <TouchableOpacity
-            style={[styles.filterButton, showFilters && styles.filterButtonActive]}
-            onPress={() => setShowFilters(!showFilters)}
-          >
-            <Ionicons
-              name="options-outline"
-              size={18}
-              color={showFilters ? colors.white : colors.text.muted}
-            />
-            <Text style={[styles.filterButtonText, showFilters && styles.filterButtonTextActive]}>
-              Filtreler
-            </Text>
+          <TouchableOpacity style={styles.filterButton} onPress={() => setFilterModalVisible(true)}>
+            <Ionicons name="options-outline" size={18} color={colors.text.muted} />
+            <Text style={styles.filterButtonText}>Filtreler</Text>
             {activeFilterCount > 0 && (
-              <View style={[styles.filterBadge, showFilters && styles.filterBadgeActive]}>
-                <Text style={[styles.filterBadgeText, showFilters && styles.filterBadgeTextActive]}>
-                  {activeFilterCount}
-                </Text>
+              <View style={styles.filterBadge}>
+                <Text style={styles.filterBadgeText}>{activeFilterCount}</Text>
               </View>
             )}
           </TouchableOpacity>
         </View>
       </View>
 
+      {/* Active Filter Chips */}
+      {activeChips.length > 0 && (
+        <FlatList
+          horizontal
+          data={activeChips}
+          keyExtractor={(c) => c.key}
+          showsHorizontalScrollIndicator={false}
+          style={styles.chipsRow}
+          contentContainerStyle={styles.chipsContent}
+          renderItem={({ item }) => (
+            <Chip label={`${item.label} ✕`} variant="primary" onPress={item.onRemove} />
+          )}
+          ListFooterComponent={
+            activeChips.length > 1 ? (
+              <Chip label="Temizle ✕" variant="neutral" onPress={clearFilters} />
+            ) : null
+          }
+        />
+      )}
+
       {/* Sort Modal */}
-      <Modal
-        isOpen={sortMenuVisible}
-        onClose={() => setSortMenuVisible(false)}
-        title="Sırala"
-      >
-        <View>
-          {SORT_OPTIONS.map((option) => {
-            const isSelected = filters.sortBy === option.id;
-            return (
-              <TouchableOpacity
-                key={option.id}
-                style={styles.sortOption}
-                onPress={() => {
-                  setFilters({ ...filters, sortBy: option.id });
-                  setSortMenuVisible(false);
-                }}
-              >
-                <Text style={styles.sortOptionText}>{option.name}</Text>
-                {isSelected && (
-                  <Ionicons name="checkmark" size={20} color={colors.primary[600]!} />
-                )}
-              </TouchableOpacity>
-            );
-          })}
-        </View>
+      <Modal visible={sortMenuVisible} transparent animationType="slide" onRequestClose={() => setSortMenuVisible(false)}>
+        <TouchableOpacity style={styles.sortBackdrop} activeOpacity={1} onPress={() => setSortMenuVisible(false)}>
+          <View style={styles.sortSheet}>
+            <View style={styles.sortHandle} />
+            <Text variant="h2" style={styles.sortTitle}>Sırala</Text>
+            {SORT_OPTIONS.map((option) => {
+              const isSelected = filters.sortBy === option.value;
+              return (
+                <TouchableOpacity
+                  key={option.value}
+                  style={styles.sortOption}
+                  onPress={() => {
+                    setFilters({ ...filters, sortBy: option.value });
+                    setSortMenuVisible(false);
+                  }}
+                >
+                  <Text style={styles.sortOptionText}>{option.label}</Text>
+                  <Radio checked={isSelected} onChange={() => {
+                    setFilters({ ...filters, sortBy: option.value });
+                    setSortMenuVisible(false);
+                  }} />
+                </TouchableOpacity>
+              );
+            })}
+          </View>
+        </TouchableOpacity>
       </Modal>
 
-      {/* Filters Panel */}
-      {showFilters && (
-        <View style={styles.filtersPanel}>
-          <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.filterChips}>
-            {/* Brand Filter */}
-            {BRANDS.slice(0, 6).map((brand) => (
-              <View key={brand.id} style={styles.filterChipWrap}>
-                <Chip
-                  label={brand.name}
-                  selected={filters.brand === brand.name}
-                  variant="primary"
-                  onPress={() => setFilters({ ...filters, brand: filters.brand === brand.name ? '' : brand.name })}
-                />
-              </View>
-            ))}
-          </ScrollView>
-
-          <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.filterChips}>
-            {/* Scale Filter */}
-            {SCALES.map((scale) => (
-              <View key={scale.id} style={styles.filterChipWrap}>
-                <Chip
-                  label={scale.name}
-                  selected={filters.scale === scale.id}
-                  variant="primary"
-                  onPress={() => setFilters({ ...filters, scale: filters.scale === scale.id ? '' : scale.id })}
-                />
-              </View>
-            ))}
-          </ScrollView>
-
-          <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.filterChips}>
-            {/* Condition Filter */}
-            {CONDITIONS.map((cond) => (
-              <View key={cond.id} style={styles.filterChipWrap}>
-                <Chip
-                  label={cond.name}
-                  selected={filters.condition === cond.id}
-                  variant="primary"
-                  onPress={() => setFilters({ ...filters, condition: filters.condition === cond.id ? '' : cond.id })}
-                />
-              </View>
-            ))}
-
-            {/* Trade Only */}
-            <View style={styles.filterChipWrap}>
-              <Chip
-                label="Sadece Takas"
-                selected={filters.tradeOnly}
-                variant="primary"
-                onPress={() => setFilters({ ...filters, tradeOnly: !filters.tradeOnly })}
-              />
-            </View>
-          </ScrollView>
-
-          {activeFilterCount > 0 && (
-            <TouchableOpacity style={styles.clearFiltersBtn} onPress={clearFilters}>
-              <Ionicons name="close-circle" size={16} color={colors.primary[600]!} />
-              <Text style={styles.clearFiltersText}>Filtreleri Temizle</Text>
-            </TouchableOpacity>
-          )}
-        </View>
-      )}
+      {/* Filter Sheet */}
+      <ProductFilterSheet
+        visible={filterModalVisible}
+        onClose={() => setFilterModalVisible(false)}
+        filters={filters}
+        onChange={setFilters}
+        onClear={clearFilters}
+        options={options}
+        resultCount={total}
+        countLoading={isFetching && !isFetchingNextPage}
+      />
 
       {/* Listings */}
       {isLoading ? (
@@ -301,50 +267,48 @@ export default function ListingsScreen() {
           <Spinner size="lg" />
           <Text style={styles.loadingText}>İlanlar yükleniyor...</Text>
         </View>
-      ) : !listings || listings.length === 0 ? (
-        <View style={styles.emptyContainer}>
-          <Ionicons name="pricetag-outline" size={64} color={colors.text.subtle} />
-          <Text style={styles.emptyTitle}>İlan bulunamadı</Text>
-          <Text style={styles.emptySubtitle}>Farklı filtreler deneyebilirsiniz</Text>
-        </View>
       ) : (
-        <ScrollView
-          style={styles.listingsContainer}
+        <FlatList
+          data={listings}
+          numColumns={2}
+          keyExtractor={(item, index) => `${item.id}-${index}`}
+          renderItem={renderProductCard}
+          columnWrapperStyle={styles.listRow}
           contentContainerStyle={styles.listingsContent}
-          refreshControl={
-            <RefreshControl refreshing={refreshing} onRefresh={onRefresh} colors={[colors.primary[600]!]} />
+          showsVerticalScrollIndicator={false}
+          refreshing={isRefetching}
+          onRefresh={refetch}
+          onEndReached={() => {
+            if (hasNextPage && !isFetchingNextPage) fetchNextPage();
+          }}
+          onEndReachedThreshold={0.5}
+          ListHeaderComponent={
+            <Text style={styles.resultsCount}>{total} ilan bulundu</Text>
           }
-        >
-          <Text style={styles.resultsCount}>{listings.length} ilan bulundu</Text>
-          <View style={styles.productsGrid}>
-            {listings.map((item: any) => renderProductCard(item))}
-          </View>
-          <View style={{ height: 100 }} />
-        </ScrollView>
+          ListFooterComponent={
+            isFetchingNextPage ? (
+              <View style={{ paddingVertical: spacing[4] }}>
+                <Spinner size="md" color={colors.primary[600]!} />
+              </View>
+            ) : (
+              <View style={{ height: 60 }} />
+            )
+          }
+          ListEmptyComponent={
+            <View style={styles.emptyContainer}>
+              <Ionicons name="pricetag-outline" size={64} color={colors.text.subtle} />
+              <Text style={styles.emptyTitle}>İlan bulunamadı</Text>
+              <Text style={styles.emptySubtitle}>Farklı filtreler deneyebilirsiniz</Text>
+            </View>
+          }
+        />
       )}
     </View>
   );
 }
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: colors.surface.alt,
-  },
-  header: {
-    backgroundColor: colors.primary[600]!,
-    paddingTop: 50,
-    paddingBottom: 16,
-    paddingHorizontal: 20,
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-  },
-  headerTitle: {
-    fontSize: 18,
-    fontWeight: 'bold',
-    color: colors.white,
-  },
+  container: { flex: 1, backgroundColor: colors.surface.alt },
   searchSection: {
     backgroundColor: colors.surface.DEFAULT,
     paddingHorizontal: 16,
@@ -352,14 +316,8 @@ const styles = StyleSheet.create({
     borderBottomWidth: 1,
     borderBottomColor: colors.border.DEFAULT,
   },
-  searchBar: {
-    marginBottom: 12,
-  },
-  actionRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-  },
+  searchBar: { marginBottom: 12 },
+  actionRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
   sortButton: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -368,24 +326,7 @@ const styles = StyleSheet.create({
     borderRadius: 8,
     backgroundColor: colors.surface.alt,
   },
-  sortButtonText: {
-    marginLeft: 6,
-    fontSize: 13,
-    color: colors.text.muted,
-  },
-  sortOption: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingVertical: 14,
-    paddingHorizontal: 4,
-    borderBottomWidth: 1,
-    borderBottomColor: colors.border.subtle,
-  },
-  sortOptionText: {
-    fontSize: 15,
-    color: colors.text.heading,
-  },
+  sortButtonText: { marginLeft: 6, fontSize: 13, color: colors.text.muted },
   filterButton: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -394,17 +335,7 @@ const styles = StyleSheet.create({
     borderRadius: 8,
     backgroundColor: colors.surface.alt,
   },
-  filterButtonActive: {
-    backgroundColor: colors.primary[600]!,
-  },
-  filterButtonText: {
-    marginLeft: 6,
-    fontSize: 13,
-    color: colors.text.muted,
-  },
-  filterButtonTextActive: {
-    color: colors.white,
-  },
+  filterButtonText: { marginLeft: 6, fontSize: 13, color: colors.text.muted },
   filterBadge: {
     marginLeft: 6,
     backgroundColor: colors.primary[600]!,
@@ -412,85 +343,43 @@ const styles = StyleSheet.create({
     paddingHorizontal: 6,
     paddingVertical: 2,
   },
-  filterBadgeActive: {
-    backgroundColor: colors.white,
-  },
-  filterBadgeText: {
-    fontSize: 11,
-    fontWeight: 'bold',
-    color: colors.white,
-  },
-  filterBadgeTextActive: {
-    color: colors.primary[600]!,
-  },
-  filtersPanel: {
+  filterBadgeText: { fontSize: 11, fontWeight: 'bold', color: colors.white },
+  chipsRow: { backgroundColor: colors.surface.DEFAULT, maxHeight: 56, flexGrow: 0 },
+  chipsContent: { paddingHorizontal: 16, paddingVertical: 12, gap: 8, alignItems: 'center' },
+  sortBackdrop: { flex: 1, backgroundColor: colors.overlay.black50, justifyContent: 'flex-end' },
+  sortSheet: {
     backgroundColor: colors.surface.DEFAULT,
-    paddingVertical: 12,
-    borderBottomWidth: 1,
-    borderBottomColor: colors.border.DEFAULT,
+    borderTopLeftRadius: 20,
+    borderTopRightRadius: 20,
+    padding: 20,
+    paddingBottom: 40,
   },
-  filterChips: {
-    paddingHorizontal: 16,
-    marginBottom: 8,
+  sortHandle: {
+    width: 40,
+    height: 4,
+    backgroundColor: colors.border.DEFAULT,
+    borderRadius: 2,
+    alignSelf: 'center',
+    marginBottom: 16,
   },
-  filterChipWrap: {
-    marginRight: 8,
-  },
-  clearFiltersBtn: {
+  sortTitle: { fontSize: 18, fontWeight: 'bold', color: colors.text.heading, marginBottom: 8 },
+  sortOption: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingHorizontal: 16,
-    paddingTop: 8,
-  },
-  clearFiltersText: {
-    marginLeft: 6,
-    fontSize: 13,
-    color: colors.primary[600]!,
-    fontWeight: '500',
-  },
-  loadingContainer: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  loadingText: {
-    marginTop: 12,
-    color: colors.text.muted,
-  },
-  emptyContainer: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-    padding: 32,
-  },
-  emptyTitle: {
-    marginTop: 16,
-    fontSize: 18,
-    fontWeight: 'bold',
-    color: colors.text.heading,
-  },
-  emptySubtitle: {
-    marginTop: 8,
-    fontSize: 14,
-    color: colors.text.muted,
-    textAlign: 'center',
-  },
-  listingsContainer: {
-    flex: 1,
-  },
-  listingsContent: {
-    padding: 16,
-  },
-  resultsCount: {
-    fontSize: 13,
-    color: colors.text.muted,
-    marginBottom: 12,
-  },
-  productsGrid: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
     justifyContent: 'space-between',
+    paddingVertical: 14,
+    borderBottomWidth: 1,
+    borderBottomColor: colors.border.subtle,
   },
+  sortOptionText: { fontSize: 15, color: colors.text.heading },
+  loadingContainer: { flex: 1, justifyContent: 'center', alignItems: 'center' },
+  loadingText: { marginTop: 12, color: colors.text.muted },
+  emptyContainer: { flex: 1, justifyContent: 'center', alignItems: 'center', padding: 32, paddingTop: 80 },
+  emptyTitle: { marginTop: 16, fontSize: 18, fontWeight: 'bold', color: colors.text.heading },
+  emptySubtitle: { marginTop: 8, fontSize: 14, color: colors.text.muted, textAlign: 'center' },
+  listingsContent: { padding: 16 },
+  listRow: { justifyContent: 'space-between' },
+  resultsCount: { fontSize: 13, color: colors.text.muted, marginBottom: 12 },
   productCard: {
     width: CARD_WIDTH,
     backgroundColor: colors.surface.DEFAULT,
@@ -503,55 +392,25 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.1,
     shadowRadius: 2,
   },
-  productImageContainer: {
-    position: 'relative',
-  },
-  productImage: {
-    width: '100%',
-    height: CARD_WIDTH * 0.9,
-    backgroundColor: colors.surface.alt,
-  },
+  productImageContainer: { position: 'relative' },
+  productImage: { width: '100%', height: CARD_WIDTH * 0.9, backgroundColor: colors.surface.alt },
   tradeBadge: {
     position: 'absolute',
     top: 8,
     left: 8,
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: colors.success[600]!,
+    backgroundColor: colors.success[500]!,
     paddingHorizontal: 8,
     paddingVertical: 4,
     borderRadius: 4,
   },
-  tradeBadgeText: {
-    marginLeft: 4,
-    fontSize: 11,
-    fontWeight: 'bold',
-    color: colors.white,
-  },
-  productContent: {
-    padding: 12,
-  },
-  productTitle: {
-    fontSize: 13,
-    fontWeight: '600',
-    color: colors.text.heading,
-    marginBottom: 4,
-  },
-  productMeta: {
-    fontSize: 11,
-    color: colors.text.muted,
-    marginBottom: 8,
-  },
-  priceRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-  },
-  productPrice: {
-    fontSize: 16,
-    fontWeight: 'bold',
-    color: colors.primary[600]!,
-  },
+  tradeBadgeText: { marginLeft: 4, fontSize: 11, fontWeight: 'bold', color: colors.white },
+  productContent: { padding: 12 },
+  productTitle: { fontSize: 13, fontWeight: '600', color: colors.text.heading, marginBottom: 4 },
+  productMeta: { fontSize: 11, color: colors.text.muted, marginBottom: 8 },
+  priceRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
+  productPrice: { fontSize: 16, fontWeight: 'bold', color: colors.primary[600]! },
   conditionBadge: {
     fontSize: 10,
     color: colors.text.muted,

@@ -1,12 +1,12 @@
 import React, { useState } from 'react';
-import { View, StyleSheet, ScrollView, Image, Alert, Pressable } from 'react-native';
-import { Button, Modal, Input, Text, theme } from '@tarodan/ui-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { View, StyleSheet, ScrollView, Image, Pressable } from 'react-native';
+import { Button, Modal, Input, Text, theme, appAlert } from '@tarodan/ui-native';
 import { Ionicons } from '@expo/vector-icons';
 import { router, useLocalSearchParams } from 'expo-router';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { offersApi } from '../../src/services/api';
-import { ScreenHeader, ScreenLoader, ErrorState } from '../../src/components/common';
+import { ScreenHeader, ScreenLoader, ErrorState, ThemedRefreshControl } from '../../src/components/common';
+import { useRefresh } from '../../src/hooks/useRefresh';
 import { formatPrice, formatOfferStatus, formatRelativeDate } from '../../src/utils/format';
 import { transformImageUrl } from '../../src/utils/imageUrl';
 import { useAuthStore } from '../../src/stores/authStore';
@@ -33,6 +33,7 @@ interface Offer {
   buyer?: { id: string; displayName: string };
   seller?: { id: string; displayName: string };
   counterAmount?: number;
+  buyerMustAccept?: boolean;
 }
 
 function statusColor(status: string): { bg: string; fg: string } {
@@ -74,6 +75,8 @@ export default function OfferDetailScreen() {
     enabled: !!id,
   });
 
+  const { refreshing, onRefresh } = useRefresh(refetch);
+
   const invalidate = () => {
     queryClient.invalidateQueries({ queryKey: ['offer', id] });
     queryClient.invalidateQueries({ queryKey: ['offers'] });
@@ -83,31 +86,31 @@ export default function OfferDetailScreen() {
     mutationFn: () => offersApi.accept(id!),
     onSuccess: () => {
       invalidate();
-      Alert.alert('Başarılı', 'Teklif kabul edildi. Sipariş oluşturuldu.');
+      appAlert('Başarılı', 'Teklif kabul edildi. Sipariş oluşturuldu.');
     },
     onError: (e: any) =>
-      Alert.alert('Hata', e?.response?.data?.message || 'Teklif kabul edilemedi.'),
+      appAlert('Hata', e?.response?.data?.message || 'Teklif kabul edilemedi.'),
   });
 
   const rejectMutation = useMutation({
     mutationFn: () => offersApi.reject(id!),
     onSuccess: () => {
       invalidate();
-      Alert.alert('Bilgi', 'Teklif reddedildi.');
+      appAlert('Bilgi', 'Teklif reddedildi.');
     },
     onError: (e: any) =>
-      Alert.alert('Hata', e?.response?.data?.message || 'İşlem başarısız.'),
+      appAlert('Hata', e?.response?.data?.message || 'İşlem başarısız.'),
   });
 
   const cancelMutation = useMutation({
     mutationFn: () => offersApi.cancel(id!),
     onSuccess: () => {
       invalidate();
-      Alert.alert('Bilgi', 'Teklif iptal edildi.');
+      appAlert('Bilgi', 'Teklif iptal edildi.');
       router.back();
     },
     onError: (e: any) =>
-      Alert.alert('Hata', e?.response?.data?.message || 'İşlem başarısız.'),
+      appAlert('Hata', e?.response?.data?.message || 'İşlem başarısız.'),
   });
 
   const counterMutation = useMutation({
@@ -116,27 +119,27 @@ export default function OfferDetailScreen() {
       invalidate();
       setCounterDialog(false);
       setCounterAmount('');
-      Alert.alert('Başarılı', 'Karşı teklif gönderildi.');
+      appAlert('Başarılı', 'Karşı teklif gönderildi.');
     },
     onError: (e: any) =>
-      Alert.alert('Hata', e?.response?.data?.message || 'Karşı teklif gönderilemedi.'),
+      appAlert('Hata', e?.response?.data?.message || 'Karşı teklif gönderilemedi.'),
   });
 
   if (isLoading) {
     return (
-      <SafeAreaView style={styles.container} edges={['top']}>
+      <View style={styles.container}>
         <ScreenHeader title="Teklif Detayı" />
         <ScreenLoader />
-      </SafeAreaView>
+      </View>
     );
   }
 
   if (error || !offer) {
     return (
-      <SafeAreaView style={styles.container} edges={['top']}>
+      <View style={styles.container}>
         <ScreenHeader title="Teklif Detayı" />
         <ErrorState fullscreen onRetry={() => refetch()} />
-      </SafeAreaView>
+      </View>
     );
   }
 
@@ -153,10 +156,13 @@ export default function OfferDetailScreen() {
   const counterValue = parseFloat(counterAmount) || 0;
 
   return (
-    <SafeAreaView style={styles.container} edges={['top']}>
+    <View style={styles.container}>
       <ScreenHeader title="Teklif Detayı" />
 
-      <ScrollView contentContainerStyle={styles.scrollBody}>
+      <ScrollView
+        contentContainerStyle={styles.scrollBody}
+        refreshControl={<ThemedRefreshControl refreshing={refreshing} onRefresh={onRefresh} />}
+      >
         {/* Product */}
         <Pressable
           style={({ pressed }) => [styles.productCard, pressed && { opacity: 0.85 }]}
@@ -254,7 +260,7 @@ export default function OfferDetailScreen() {
             <Button
               variant="outline"
               onPress={() =>
-                Alert.alert('Reddet', 'Teklifi reddetmek istediğinize emin misiniz?', [
+                appAlert('Reddet', 'Teklifi reddetmek istediğinize emin misiniz?', [
                   { text: 'Vazgeç', style: 'cancel' },
                   { text: 'Reddet', style: 'destructive', onPress: () => rejectMutation.mutate() },
                 ])
@@ -270,11 +276,12 @@ export default function OfferDetailScreen() {
           </View>
         ) : null}
 
-        {isPending && isBuyer ? (
+        {/* Karşı teklif (buyerMustAccept) geldiyse iptal hakkı kalkar; alıcı listeden kabul/red/yeni teklif verir */}
+        {isPending && isBuyer && !offer.buyerMustAccept ? (
           <Button
             variant="outline"
             onPress={() =>
-              Alert.alert('İptal Et', 'Teklifinizi iptal etmek istediğinize emin misiniz?', [
+              appAlert('İptal Et', 'Teklifinizi iptal etmek istediğinize emin misiniz?', [
                 { text: 'Vazgeç', style: 'cancel' },
                 { text: 'İptal Et', style: 'destructive', onPress: () => cancelMutation.mutate() },
               ])
@@ -308,7 +315,18 @@ export default function OfferDetailScreen() {
             variant="primary"
             onPress={() => {
               if (counterValue <= 0) {
-                Alert.alert('Geçersiz tutar', 'Pozitif bir tutar girin.');
+                appAlert('Geçersiz tutar', 'Pozitif bir tutar girin.');
+                return;
+              }
+              // API kuralı: karşı teklif mevcut tekliften yüksek, ürün fiyatından düşük/eşit olmalı.
+              const refAmount = Number(offer.amount) || 0;
+              const maxPrice = Number(offer.product?.price) || 0;
+              if (counterValue <= refAmount) {
+                appAlert('Hata', `Karşı teklif, mevcut tekliften (${formatPrice(refAmount)}) yüksek olmalıdır`);
+                return;
+              }
+              if (maxPrice > 0 && counterValue > maxPrice) {
+                appAlert('Hata', `Karşı teklif, ürün fiyatından (${formatPrice(maxPrice)}) yüksek olamaz`);
                 return;
               }
               counterMutation.mutate(counterValue);
@@ -320,7 +338,7 @@ export default function OfferDetailScreen() {
           </Button>
         </View>
       </Modal>
-    </SafeAreaView>
+    </View>
   );
 }
 

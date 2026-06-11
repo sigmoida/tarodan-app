@@ -2,7 +2,7 @@ import { View, ScrollView, StyleSheet, TouchableOpacity, RefreshControl } from '
 import { useState, useCallback } from 'react';
 import { router, useFocusEffect } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
-import { theme, Text, Card, Avatar, Button, Spinner } from '@tarodan/ui-native';
+import { theme, Text, Card, Avatar, Button, Spinner, ScreenHeader } from '@tarodan/ui-native';
 import { useFollowStore, FollowedSeller } from '../src/stores/followStore';
 import { useAuthStore } from '../src/stores/authStore';
 
@@ -49,21 +49,14 @@ export default function FollowingScreen() {
         <Text variant="body" style={styles.subtitle}>
           Satıcıları takip etmek için giriş yapın
         </Text>
-        <Button variant="primary" title="Giriş Yap" onPress={() => router.push('/(auth)/login')} />
+        <Button variant="primary" title="Giriş Yap" onPress={() => router.push('/(auth)/login')} style={{ alignSelf: 'center' }} />
       </View>
     );
   }
 
   return (
     <View style={styles.container}>
-      {/* Header */}
-      <View style={styles.header}>
-        <TouchableOpacity onPress={() => router.back()}>
-          <Ionicons name="arrow-back" size={24} color={colors.white} />
-        </TouchableOpacity>
-        <Text style={styles.headerTitle}>Takip Ettiklerim ({getFollowingCount()})</Text>
-        <View style={{ width: 24 }} />
-      </View>
+      <ScreenHeader title={`Takip Ettiklerim (${getFollowingCount()})`} onBack={() => router.back()} />
 
       {/* Content */}
       {isLoading && following.length === 0 ? (
@@ -77,7 +70,7 @@ export default function FollowingScreen() {
           <Text variant="body" style={styles.emptySubtitle}>
             Satıcıları takip ederek yeni ilanlarından haberdar olun
           </Text>
-          <Button variant="primary" title="Satıcıları Keşfet" onPress={() => router.push('/(tabs)/search')} />
+          <Button variant="primary" title="Satıcıları Keşfet" onPress={() => router.push('/(tabs)/search')} style={{ alignSelf: 'center' }} />
         </View>
       ) : (
         <ScrollView
@@ -142,20 +135,6 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     padding: 32,
     backgroundColor: colors.surface.DEFAULT,
-  },
-  header: {
-    backgroundColor: colors.primary[600]!,
-    paddingTop: 50,
-    paddingBottom: 16,
-    paddingHorizontal: 20,
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-  },
-  headerTitle: {
-    fontSize: 18,
-    fontWeight: 'bold',
-    color: colors.white,
   },
   title: {
     marginTop: 16,

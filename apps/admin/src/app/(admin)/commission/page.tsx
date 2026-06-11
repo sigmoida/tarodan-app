@@ -319,16 +319,16 @@ export default function CommissionPage() {
     <div className="space-y-6">
       {/* Header */}
       <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
-        <div>
-          <h1 className="text-2xl font-bold text-heading">
+        <div className="min-w-0">
+          <h1 className="text-2xl font-bold text-heading truncate">
             Komisyon Yönetimi
           </h1>
           <p className="text-muted mt-1">
             Platform komisyon oranlarını yönetin
           </p>
         </div>
-        <Button onClick={openCreateModal} className="flex gap-2">
-          <PlusIcon className="h-5 w-5" />
+        <Button onClick={openCreateModal} className="flex gap-2 shrink-0">
+          <PlusIcon className="h-5 w-5 shrink-0" />
           Yeni Kural Ekle
         </Button>
       </div>
@@ -337,7 +337,7 @@ export default function CommissionPage() {
       <div className="bg-info-900/20 border border-info-700 rounded-lg p-4">
         <div className="flex gap-3">
           <ExclamationTriangleIcon className="h-5 w-5 text-info-700 flex-shrink-0 mt-0.5" />
-          <div>
+          <div className="min-w-0">
             <h4 className="text-info-700 font-medium">Komisyon Hesaplama</h4>
             <p className="text-muted text-sm mt-1">
               Komisyon kuralları eşleşme sırasına göre değerlendirilir. Bir
@@ -355,7 +355,7 @@ export default function CommissionPage() {
         <div className="bg-warning-50 border border-warning-200 rounded-lg p-4">
           <div className="flex gap-3">
             <ExclamationTriangleIcon className="h-5 w-5 text-warning-600 flex-shrink-0 mt-0.5" />
-            <div>
+            <div className="min-w-0">
               <h4 className="text-warning-800 font-medium">
                 Varsayılan komisyon kuralı tanımlı değil
               </h4>
@@ -497,8 +497,8 @@ export default function CommissionPage() {
       {showModal && (
         <div className="fixed inset-0 bg-heading/50 flex items-center justify-center z-50 p-4 overflow-y-auto">
           <div className="bg-surface-elevated rounded-lg w-full max-w-2xl my-8">
-            <div className="flex items-center justify-between p-6 border-b border-border">
-              <h2 className="text-lg font-semibold text-heading">
+            <div className="flex items-center justify-between px-6 pb-6 pt-5 border-b border-border">
+              <h2 className="text-lg font-semibold text-heading leading-tight">
                 {editingRule ? "Kuralı Düzenle" : "Yeni Kural Ekle"}
               </h2>
               <Button
@@ -806,10 +806,10 @@ export default function CommissionPage() {
       {/* Delete Confirmation Modal */}
       {deleteConfirm && (
         <div className="fixed inset-0 bg-heading/50 flex items-center justify-center z-50 p-4">
-          <div className="bg-surface-elevated rounded-lg w-full max-w-sm p-6">
+          <div className="bg-surface-elevated rounded-lg w-full max-w-sm px-6 pb-6 pt-5">
             <div className="flex items-center gap-3 text-danger-600 mb-4">
               <ExclamationTriangleIcon className="h-6 w-6" />
-              <h3 className="text-lg font-semibold">Kuralı Sil</h3>
+              <h3 className="text-lg font-semibold leading-tight">Kuralı Sil</h3>
             </div>
             <p className="text-muted mb-6">
               Bu komisyon kuralını silmek istediğinizden emin misiniz? Bu işlem

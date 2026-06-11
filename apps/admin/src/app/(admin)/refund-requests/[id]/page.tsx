@@ -10,6 +10,8 @@ import {
   Spinner,
   StatusBadge,
   Textarea,
+  enumLabel,
+  refundReasonConfig,
   refundRequestStatusConfig,
 } from "@tarodan/ui";
 import {
@@ -26,6 +28,7 @@ import {
   RefundPolicyCard,
   type ReturnShippingPayer,
 } from "@/components/refunds/RefundPolicyCard";
+import { useConfirm } from "@/components/ConfirmProvider";
 
 interface HistoryEntry {
   action: string;
@@ -82,6 +85,7 @@ interface RefundRequestDetail {
 export default function RefundRequestDetailPage() {
   const { id } = useParams<{ id: string }>();
   const router = useRouter();
+  const confirm = useConfirm();
 
   const [rr, setRr] = useState<RefundRequestDetail | null>(null);
   const [loading, setLoading] = useState(true);
@@ -131,7 +135,7 @@ export default function RefundRequestDetailPage() {
   };
 
   const handleForceFinalize = async () => {
-    if (!confirm("Para iadesi manuel olarak tamamlanacak. Onaylıyor musunuz?")) return;
+    if (!(await confirm({ description: "Para iadesi manuel olarak tamamlanacak. Onaylıyor musunuz?", destructive: true }))) return;
     setProcessingFinalize(true);
     try {
       await adminApi.forceFinalizeRefund(id);
@@ -341,7 +345,7 @@ export default function RefundRequestDetailPage() {
             {Number(rr.amount).toLocaleString("tr-TR", { minimumFractionDigits: 2 })}
           </div>
           <div>
-            <span className="font-medium text-body">Sebep:</span> {rr.reason}
+            <span className="font-medium text-body">Sebep:</span> {enumLabel(refundReasonConfig, rr.reason, rr.reason)}
           </div>
           <div>
             <span className="font-medium text-body">Sipariş durumu:</span>{" "}

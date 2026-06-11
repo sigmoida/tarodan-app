@@ -266,18 +266,58 @@ export class PushWorker {
     let link: string | undefined;
     if (data?.orderId) {
       link = `/orders/${data.orderId}`;
+    } else if (data?.offerId) {
+      // Teklif bildirimleri (örn. offer_received) gelen teklifler listesine gitmeli,
+      // ürün detayına değil. orderId'den sonra gelir ki offer_accepted (orderId+offerId)
+      // /orders/... olarak kalsın.
+      link = `/offers?tab=received`;
     } else if (data?.productId) {
       link = `/listings/${data.productId}`;
     } else if (data?.tradeId) {
       link = `/trades/${data.tradeId}`;
     } else if (data?.threadId) {
-      link = `/messages/${data.threadId}`;
+      // /messages opens a thread via ?thread=<id>; there is no /messages/<id> route.
+      link = `/messages?thread=${data.threadId}`;
     } else if (data?.collectionId) {
       link = `/collections/${data.collectionId}`;
     }
 
     // Get icon based on notification type
     const icon = this.getNotificationIcon(notificationType);
+
+    // Mükerrer in-app bildirimi engelle: aynı kullanıcı + tip + ilgili varlık
+    // (teklif/takas/ürün/sipariş) için son 60 dk içinde zaten bir bildirim varsa
+    // tekrar oluşturma. (payment-scheduler sweep'i iptal edilmiş teklif/takasları
+    // tekrar bildirdiği için "Teklifiniz iptal edildi" / "Takas İptal" çiftleniyordu.)
+    const dedupField = data?.offerId
+      ? 'offerId'
+      : data?.tradeId
+        ? 'tradeId'
+        : data?.productId
+          ? 'productId'
+          : data?.orderId
+            ? 'orderId'
+            : null;
+    const dedupValue = dedupField ? data?.[dedupField] : null;
+    if (dedupField && dedupValue) {
+      const since = new Date(Date.now() - 60 * 60 * 1000);
+      const existing = await this.prisma.notificationLog.findFirst({
+        where: {
+          userId,
+          channel: 'in_app',
+          type: notificationType,
+          createdAt: { gte: since },
+          data: { path: [dedupField], equals: dedupValue },
+        },
+        select: { id: true },
+      });
+      if (existing) {
+        this.logger.log(
+          `Skipping duplicate in-app notification (${notificationType}/${dedupField}=${dedupValue}) for user ${userId}`,
+        );
+        return;
+      }
+    }
 
     await this.prisma.notificationLog.create({
       data: {

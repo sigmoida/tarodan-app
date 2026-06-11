@@ -4,16 +4,13 @@ import { theme } from '@tarodan/ui-native';
 const { colors } = theme;
 
 export default function TradeLayout() {
-  // headerShown TRUE: trade ekranlarının çoğu Stack.Screen options ile title
-  // veriyor ama header'ın kendisi gizliydi → geri butonu yoktu, kullanıcı
-  // ekrandan çıkamıyordu. Native header geri butonuyla beraber gelir.
+  // headerShown FALSE: her trade ekranı kendi in-app header'ını (ScreenHeader /
+  // özel header) geri butonuyla birlikte render ediyor. Native header açık
+  // kalırsa çift başlık + fazladan boşluk oluşuyordu (web'de tek header var).
   return (
     <Stack
       screenOptions={{
-        headerShown: true,
-        headerStyle: { backgroundColor: colors.primary[600]! },
-        headerTintColor: colors.white,
-        headerTitleStyle: { fontWeight: 'bold' },
+        headerShown: false,
         contentStyle: { backgroundColor: colors.surface.DEFAULT },
       }}
     />

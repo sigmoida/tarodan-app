@@ -41,3 +41,17 @@ export function getProductDiscountPercent(p: ProductPriceFields): number {
   if (!original || original <= 0) return 0;
   return Math.round(((original - current) / original) * 100);
 }
+
+/**
+ * Ürün stokta yok mu? — apps/web/src/lib/productPrice.ts paritesi.
+ * - active dışı her statü (sold / inactive vb.) "stokta yok" sayılır.
+ * - availableQuantity (quantity - reserved) <= 0 → stokta yok. null = sınırsız stok → stokta.
+ */
+export function isProductOutOfStock(p: {
+  status?: string | null;
+  availableQuantity?: number | null;
+}): boolean {
+  if (p.status != null && p.status !== 'active') return true;
+  if (p.availableQuantity != null && p.availableQuantity <= 0) return true;
+  return false;
+}

@@ -1,5 +1,5 @@
 import React from 'react';
-import { View, StyleSheet, ScrollView, Image, Alert, Linking, Pressable } from 'react-native';
+import { View, StyleSheet, ScrollView, Image, Linking, Pressable } from 'react-native';
 import {
   Button,
   Divider,
@@ -7,13 +7,14 @@ import {
   ErrorState,
   Text,
   theme,
+  appAlert,
 } from '@tarodan/ui-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 import { router, useLocalSearchParams } from 'expo-router';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { ordersApi } from '../../src/services/api';
-import { ScreenHeader } from '../../src/components/common';
+import { ScreenHeader, ThemedRefreshControl } from '../../src/components/common';
+import { useRefresh } from '../../src/hooks/useRefresh';
 import { formatPrice, formatOrderStatus, formatRelativeDate } from '../../src/utils/format';
 import { transformImageUrl } from '../../src/utils/imageUrl';
 
@@ -43,13 +44,22 @@ interface Order {
     address: string;
     zipCode?: string;
   };
+  pricing?: {
+    subtotal?: number;
+    shippingAmount?: number;
+    commissionAmount?: number;
+    sellerNetAmount?: number;
+    totalAmount?: number;
+  };
   items?: Array<{
     id: string;
-    productId: string;
-    title: string;
     price: number;
     quantity: number;
-    imageUrl?: string;
+    product?: {
+      id: string;
+      title: string;
+      imageUrl?: string;
+    };
   }>;
   shipment?: {
     carrier?: string;
@@ -91,6 +101,8 @@ export default function SaleDetailScreen() {
     enabled: !!id,
   });
 
+  const { refreshing, onRefresh } = useRefresh(refetch);
+
   /**
    * Backend ödeme başarısı sonrasında siparişe Sürat Kargo gönderisini OTOMATIK
    * yaratır (payment.service.ts → auto-create shipment, provider='surat',
@@ -101,28 +113,28 @@ export default function SaleDetailScreen() {
     mutationFn: (reason: string) => ordersApi.cancel(id!, reason),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['sale-order', id] });
-      Alert.alert('Bilgi', 'Sipariş iptal edildi.');
+      appAlert('Bilgi', 'Sipariş iptal edildi.');
       router.back();
     },
     onError: (e: any) =>
-      Alert.alert('Hata', e?.response?.data?.message || 'İşlem başarısız.'),
+      appAlert('Hata', e?.response?.data?.message || 'İşlem başarısız.'),
   });
 
   if (isLoading) {
     return (
-      <SafeAreaView style={styles.container} edges={['top']}>
+      <View style={styles.container}>
         <ScreenHeader title="Sipariş Detayı" />
         <ScreenLoader />
-      </SafeAreaView>
+      </View>
     );
   }
 
   if (error || !order) {
     return (
-      <SafeAreaView style={styles.container} edges={['top']}>
+      <View style={styles.container}>
         <ScreenHeader title="Sipariş Detayı" />
         <ErrorState fullscreen onRetry={() => refetch()} />
-      </SafeAreaView>
+      </View>
     );
   }
 
@@ -146,10 +158,13 @@ export default function SaleDetailScreen() {
   };
 
   return (
-    <SafeAreaView style={styles.container} edges={['top']}>
+    <View style={styles.container}>
       <ScreenHeader title={`Sipariş ${order.orderNumber ? '#' + order.orderNumber : ''}`.trim()} />
 
-      <ScrollView contentContainerStyle={styles.scrollBody}>
+      <ScrollView
+        contentContainerStyle={styles.scrollBody}
+        refreshControl={<ThemedRefreshControl refreshing={refreshing} onRefresh={onRefresh} />}
+      >
         {/* Status */}
         <View style={[styles.statusBanner, { backgroundColor: sc.bg }]}>
           <Ionicons name="information-circle" size={20} color={sc.fg} />
@@ -170,11 +185,11 @@ export default function SaleDetailScreen() {
             <Pressable
               key={item.id}
               style={({ pressed }) => [styles.itemRow, { opacity: pressed ? 0.85 : 1 }]}
-              onPress={() => router.push(`/product/${item.productId}`)}
+              onPress={() => router.push(`/product/${item.product?.id}`)}
             >
-              <Image source={{ uri: transformImageUrl(item.imageUrl) }} style={styles.itemImg} />
+              <Image source={{ uri: transformImageUrl(item.product?.imageUrl) }} style={styles.itemImg} />
               <View style={{ flex: 1 }}>
-                <Text style={styles.itemTitle} numberOfLines={2}>{item.title}</Text>
+                <Text style={styles.itemTitle} numberOfLines={2}>{item.product?.title}</Text>
                 <Text style={styles.itemMeta}>Adet: {item.quantity}</Text>
                 <Text style={styles.itemPrice}>{formatPrice(item.price * item.quantity)}</Text>
               </View>
@@ -264,38 +279,47 @@ export default function SaleDetailScreen() {
         </View>
 
         {/* Totals */}
-        <View style={styles.card}>
-          <Text style={styles.sectionTitle}>Tutar Özeti</Text>
-          {order.subtotal ? (
-            <View style={styles.kvRow}>
-              <Text style={styles.kvLabel}>Ara Toplam</Text>
-              <Text style={styles.kvValue}>{formatPrice(order.subtotal)}</Text>
+        {(() => {
+          const p = order.pricing;
+          const subtotal = p?.subtotal ?? order.subtotal;
+          const shipping = p?.shippingAmount ?? order.shippingCost;
+          const commission = p?.commissionAmount ?? order.commission;
+          const net = p?.sellerNetAmount ?? order.netAmount;
+          return (
+            <View style={styles.card}>
+              <Text style={styles.sectionTitle}>Tutar Özeti</Text>
+              {subtotal != null ? (
+                <View style={styles.kvRow}>
+                  <Text style={styles.kvLabel}>Ara Toplam</Text>
+                  <Text style={styles.kvValue}>{formatPrice(subtotal)}</Text>
+                </View>
+              ) : null}
+              {shipping != null ? (
+                <View style={styles.kvRow}>
+                  <Text style={styles.kvLabel}>Kargo</Text>
+                  <Text style={styles.kvValue}>{formatPrice(shipping)}</Text>
+                </View>
+              ) : null}
+              {commission != null ? (
+                <View style={styles.kvRow}>
+                  <Text style={styles.kvLabel}>Komisyon</Text>
+                  <Text style={[styles.kvValue, { color: colors.danger[600]! }]}>
+                    - {formatPrice(commission)}
+                  </Text>
+                </View>
+              ) : null}
+              <Divider style={{ marginVertical: 8 }} />
+              <View style={styles.kvRow}>
+                <Text style={[styles.kvLabel, { fontWeight: '700' }]}>
+                  {net != null ? 'Net Kazanç' : 'Toplam'}
+                </Text>
+                <Text style={[styles.kvValue, { fontSize: 18, fontWeight: '800', color: colors.primary[600]! }]}>
+                  {formatPrice(net ?? order.totalAmount ?? 0)}
+                </Text>
+              </View>
             </View>
-          ) : null}
-          {order.shippingCost != null ? (
-            <View style={styles.kvRow}>
-              <Text style={styles.kvLabel}>Kargo</Text>
-              <Text style={styles.kvValue}>{formatPrice(order.shippingCost)}</Text>
-            </View>
-          ) : null}
-          {order.commission ? (
-            <View style={styles.kvRow}>
-              <Text style={styles.kvLabel}>Komisyon</Text>
-              <Text style={[styles.kvValue, { color: colors.danger[600]! }]}>
-                - {formatPrice(order.commission)}
-              </Text>
-            </View>
-          ) : null}
-          <Divider style={{ marginVertical: 8 }} />
-          <View style={styles.kvRow}>
-            <Text style={[styles.kvLabel, { fontWeight: '700' }]}>
-              {order.netAmount ? 'Net Kazanç' : 'Toplam'}
-            </Text>
-            <Text style={[styles.kvValue, { fontSize: 18, fontWeight: '800', color: colors.primary[600]! }]}>
-              {formatPrice(order.netAmount ?? order.totalAmount ?? 0)}
-            </Text>
-          </View>
-        </View>
+          );
+        })()}
 
         {/* Actions */}
         {canCancel ? (
@@ -304,7 +328,7 @@ export default function SaleDetailScreen() {
             icon="close-circle-outline"
             title="Siparişi İptal Et"
             onPress={() =>
-              Alert.alert(
+              appAlert(
                 'Siparişi İptal Et',
                 'Bu siparişi iptal etmek istediğinize emin misiniz? Alıcının ödemesi iade edilecek.',
                 [
@@ -322,7 +346,7 @@ export default function SaleDetailScreen() {
           />
         ) : null}
       </ScrollView>
-    </SafeAreaView>
+    </View>
   );
 }
 

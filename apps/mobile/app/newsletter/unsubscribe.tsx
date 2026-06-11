@@ -1,7 +1,6 @@
 import React, { useEffect, useState } from 'react';
-import { View, StyleSheet, Alert, KeyboardAvoidingView, Platform, ScrollView } from 'react-native';
-import { theme, Button, Input, Text } from '@tarodan/ui-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { View, StyleSheet, KeyboardAvoidingView, Platform, ScrollView } from 'react-native';
+import { theme, Button, Input, Text, appAlert } from '@tarodan/ui-native';
 import { Ionicons } from '@expo/vector-icons';
 import { router, useLocalSearchParams } from 'expo-router';
 import { useMutation } from '@tanstack/react-query';
@@ -17,13 +16,22 @@ export default function NewsletterUnsubscribeScreen() {
 
   const unsubscribeMutation = useMutation({
     mutationFn: async (data: { email?: string; token?: string }) => {
-      return guestApi.post('/newsletter/unsubscribe', data);
+      // Web ile birebir: token akışı GET ?token=..., e-posta akışı POST { email }.
+      if (data.token) {
+        return guestApi.get(`/newsletter/unsubscribe?token=${encodeURIComponent(data.token)}`);
+      }
+      return guestApi.post('/newsletter/unsubscribe', { email: data.email });
     },
-    onSuccess: () => {
+    onSuccess: (res: any) => {
+      // API 2xx döner ama gövdede success:false ile başarısız olabilir (geçersiz e-posta vb.).
+      if (res?.data?.success === false) {
+        appAlert('Hata', res.data.message || 'Abonelik iptal edilemedi.');
+        return;
+      }
       setSuccess(true);
     },
     onError: (e: any) =>
-      Alert.alert('Hata', e?.response?.data?.message || 'Abonelik iptal edilemedi.'),
+      appAlert('Hata', e?.response?.data?.message || 'Abonelik iptal edilemedi.'),
   });
 
   // Token ile gelindiyse otomatik iptal
@@ -34,12 +42,12 @@ export default function NewsletterUnsubscribeScreen() {
   }, [tokenParam]);
 
   const handleSubmit = () => {
-    if (!/^\S+@\S+\.\S+$/.test(email)) return Alert.alert('Eksik', 'Geçerli bir e-posta girin.');
+    if (!/^\S+@\S+\.\S+$/.test(email)) return appAlert('Eksik', 'Geçerli bir e-posta girin.');
     unsubscribeMutation.mutate({ email: email.trim().toLowerCase() });
   };
 
   return (
-    <SafeAreaView style={styles.container} edges={['top']}>
+    <View style={styles.container}>
       <ScreenHeader title="Abonelik İptali" />
 
       <KeyboardAvoidingView
@@ -106,7 +114,7 @@ export default function NewsletterUnsubscribeScreen() {
           )}
         </ScrollView>
       </KeyboardAvoidingView>
-    </SafeAreaView>
+    </View>
   );
 }
 

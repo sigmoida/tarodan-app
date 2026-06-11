@@ -215,7 +215,7 @@ export default function TrackOrderPage() {
                       type="text"
                       value={orderNumber}
                       onChange={(e) => setOrderNumber(e.target.value)}
-                      placeholder="örn. ORD-20260101-XXXX"
+                      placeholder="örn. ORD-K7X9M2QF3N"
                       className="input w-full"
                       required
                     />

@@ -27,6 +27,7 @@ import {
 } from "chart.js";
 import { Line, Bar, Doughnut } from "react-chartjs-2";
 import { Button, Spinner, colors as dsColors } from "@tarodan/ui";
+import { AdminTabs } from "@/components/AdminTabs";
 
 ChartJS.register(
   CategoryScale,
@@ -414,38 +415,26 @@ export default function AnalyticsPage() {
       </div>
 
       {/* Tabs */}
-      <div className="border-b border-border">
-        <nav className="flex gap-4">
-          {[
-            {
-              key: "sales",
-              label: "Satış Analitiği",
-              icon: CurrencyDollarIcon,
-            },
-            { key: "users", label: "Kullanıcı Analitiği", icon: UsersIcon },
-            { key: "products", label: "Ürün Analitiği", icon: ShoppingBagIcon },
-            {
-              key: "trades",
-              label: "Takas Analitiği",
-              icon: ArrowsRightLeftIcon,
-            },
-          ].map((tab) => (
-            <Button
-              variant="secondary"
-              key={tab.key}
-              onClick={() => setActiveTab(tab.key as any)}
-              className={`flex items-center gap-2 px-4 py-3 border-b-2 transition-colors ${
-                activeTab === tab.key
-                  ? "border-primary-500 text-primary-600"
-                  : "border-transparent text-muted hover:text-heading"
-              }`}
-            >
-              <tab.icon className="h-5 w-5" />
-              {tab.label}
-            </Button>
-          ))}
-        </nav>
-      </div>
+      <AdminTabs
+        tabs={[
+          {
+            key: "sales",
+            label: "Satış Analitiği",
+            icon: CurrencyDollarIcon,
+          },
+          { key: "users", label: "Kullanıcı Analitiği", icon: UsersIcon },
+          { key: "products", label: "Ürün Analitiği", icon: ShoppingBagIcon },
+          {
+            key: "trades",
+            label: "Takas Analitiği",
+            icon: ArrowsRightLeftIcon,
+          },
+        ]}
+        value={activeTab}
+        onChange={(k) =>
+          setActiveTab(k as "sales" | "users" | "products" | "trades")
+        }
+      />
 
       {/* Sales Analytics */}
       {activeTab === "sales" && (
@@ -812,12 +801,12 @@ function StatCard({
 }) {
   return (
     <div className="admin-card">
-      <div className="flex items-center justify-between">
-        <div>
-          <p className="text-sm text-muted">{title}</p>
-          <p className="text-2xl font-bold text-heading mt-1">{value}</p>
+      <div className="flex items-center justify-between gap-3">
+        <div className="min-w-0">
+          <p className="text-sm text-muted truncate">{title}</p>
+          <p className="text-2xl font-bold text-heading mt-1 truncate">{value}</p>
         </div>
-        <div className={`p-3 rounded-lg ${color}`}>
+        <div className={`p-3 rounded-lg shrink-0 ${color}`}>
           <Icon className="h-6 w-6 text-heading" />
         </div>
       </div>

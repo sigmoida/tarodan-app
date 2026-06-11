@@ -6,7 +6,7 @@ import Image from 'next/image';
 import { usePathname, useRouter } from 'next/navigation';
 import { useAuthStore } from '@/lib/stores/authStore';
 import clsx from 'clsx';
-import { Button, Input } from '@tarodan/ui';
+import { Button, Input, adminRoleConfig, enumLabel } from '@tarodan/ui';
 import {
   HomeIcon,
   UsersIcon,
@@ -48,6 +48,8 @@ type NavItem = {
   icon: ComponentType<{ className?: string }>;
   /** Ek arama kelimeleri (ör. İngilizce route, eş anlamlı) */
   keywords?: string[];
+  /** Bu öğeyi görebilecek admin rolleri. Belirtilmezse varsayılan: super_admin + admin. */
+  roles?: string[];
 };
 
 type NavGroup = {
@@ -96,7 +98,7 @@ const navGroups: NavGroup[] = [
     name: 'Katalog',
     icon: Squares2X2Icon,
     items: [
-      { name: 'Ürünler', href: '/products', icon: ShoppingBagIcon },
+      { name: 'Ürünler', href: '/products', icon: ShoppingBagIcon, roles: ['super_admin', 'admin', 'moderator'] },
       { name: 'Kategoriler', href: '/categories', icon: CubeIcon },
       { name: 'Markalar', href: '/brands', icon: SwatchIcon },
       { name: 'Modeller', href: '/car-models', icon: TruckIcon },
@@ -111,10 +113,10 @@ const navGroups: NavGroup[] = [
     name: 'Hesaplar',
     icon: UsersIcon,
     items: [
-      { name: 'Kullanıcılar', href: '/users', icon: UsersIcon, keywords: ['user', 'üye'] },
+      { name: 'Kullanıcılar', href: '/users', icon: UsersIcon, keywords: ['user', 'üye'], roles: ['super_admin', 'admin', 'moderator'] },
       { name: 'Satıcı Başvuruları', href: '/sellers/applications', icon: ClipboardDocumentCheckIcon },
       { name: 'Satıcı Performansı', href: '/sellers/performance', icon: ChartBarIcon },
-      { name: 'Yorumlar', href: '/reviews', icon: StarIcon },
+      { name: 'Yorumlar', href: '/reviews', icon: StarIcon, roles: ['super_admin', 'admin', 'moderator'] },
       { name: 'Rol Yönetimi', href: '/roles', icon: UserCircleIcon },
     ],
   },
@@ -126,7 +128,7 @@ const navGroups: NavGroup[] = [
       { name: 'İndirimler', href: '/discounts', icon: TicketIcon },
       { name: 'Bildirimler', href: '/notifications', icon: BellAlertIcon },
       { name: 'E-posta Şablonları', href: '/email-templates', icon: ChatBubbleLeftRightIcon },
-      { name: 'Mesajlar', href: '/messages', icon: ChatBubbleLeftRightIcon },
+      { name: 'Mesajlar', href: '/messages', icon: ChatBubbleLeftRightIcon, roles: ['super_admin', 'admin', 'moderator'] },
       { name: 'Sayfalar', href: '/pages', icon: DocumentTextIcon },
     ],
   },
@@ -137,7 +139,7 @@ const navGroups: NavGroup[] = [
     items: [
       { name: 'Komisyon', href: '/commission', icon: CurrencyDollarIcon },
       { name: 'Satıcı Ödemeleri', href: '/payouts', icon: BanknotesIcon },
-      { name: 'Vergi Ayarları', href: '/tax', icon: CalculatorIcon },
+      { name: 'Vergi Ayarları', href: '/tax', icon: CalculatorIcon, roles: ['super_admin'] },
       { name: 'Ödeme Ayarları', href: '/settings/payments', icon: CreditCardIcon },
     ],
   },
@@ -146,8 +148,8 @@ const navGroups: NavGroup[] = [
     name: 'Sistem',
     icon: Cog6ToothIcon,
     items: [
-      { name: 'Sistem Ayarları', href: '/settings', icon: Cog6ToothIcon },
-      { name: 'Sistem Logları', href: '/logs', icon: ClipboardDocumentCheckIcon },
+      { name: 'Sistem Ayarları', href: '/settings', icon: Cog6ToothIcon, roles: ['super_admin'] },
+      { name: 'Sistem Logları', href: '/logs', icon: ClipboardDocumentCheckIcon, roles: ['super_admin'] },
     ],
   },
 ];
@@ -218,12 +220,30 @@ export default function AdminLayout({ children }: AdminLayoutProps) {
   const q = navQuery.trim().toLocaleLowerCase('tr-TR');
   const isSearching = q.length > 0;
 
+  // Menüyü kullanıcının rolüne göre filtrele (örn. moderatör Siparişler/Finans göremez).
+  const role = user?.role ?? '';
+  const inRole = (item: NavItem) =>
+    (item.roles ?? ['super_admin', 'admin']).includes(role);
+  const visibleTopNav = useMemo(
+    () => topLevelNav.filter(inRole),
+    [role], // eslint-disable-line react-hooks/exhaustive-deps
+  );
+  const visibleGroups = useMemo(
+    () =>
+      navGroups
+        .map((g) => ({ ...g, items: g.items.filter(inRole) }))
+        .filter((g) => g.items.length > 0),
+    [role], // eslint-disable-line react-hooks/exhaustive-deps
+  );
+
   // Arama aktifken: grupları yok say, tüm eşleşmeleri düz liste olarak göster
   const searchResults = useMemo(() => {
     if (!isSearching) return [] as NavItem[];
-    const all = [...topLevelNav, ...navGroups.flatMap((g) => g.items)];
+    const all = [...visibleTopNav, ...visibleGroups.flatMap((g) => g.items)];
     return all.filter((item) => matchesQuery(item, q));
-  }, [isSearching, q]);
+  }, [isSearching, q, visibleTopNav, visibleGroups]);
+
+  const [accountMenuOpen, setAccountMenuOpen] = useState(false);
 
   const handleLogout = () => {
     logout();
@@ -313,11 +333,11 @@ export default function AdminLayout({ children }: AdminLayoutProps) {
             )
           ) : (
             <>
-              {topLevelNav.map((item) => renderNavLink(item))}
+              {visibleTopNav.map((item) => renderNavLink(item))}
 
               <div className="h-2" />
 
-              {navGroups.map((group) => {
+              {visibleGroups.map((group) => {
                 const isOpen = openGroups.has(group.id);
                 const hasActive = group.items.some((item) => pathname.startsWith(item.href));
                 return (
@@ -365,7 +385,7 @@ export default function AdminLayout({ children }: AdminLayoutProps) {
             </div>
             <div className="ml-3">
               <p className="text-sm font-medium text-heading">{user?.displayName}</p>
-              <p className="text-xs text-muted">{user?.role}</p>
+              <p className="text-xs text-muted">{enumLabel(adminRoleConfig, user?.role)}</p>
             </div>
           </div>
           <Button variant="secondary" onClick={handleLogout}
@@ -401,14 +421,51 @@ export default function AdminLayout({ children }: AdminLayoutProps) {
             <div className="hidden sm:flex items-center gap-2 text-sm">
               <span className="text-muted">{user?.email}</span>
             </div>
-            <Link
-              href="/settings"
-              scroll={false}
-              className="flex items-center gap-2 px-3 py-2 rounded-lg text-muted hover:text-heading hover:bg-surface-alt transition-colors"
-            >
-              <UserCircleIcon className="h-5 w-5" />
-              <span className="hidden sm:inline text-sm">Profil</span>
-            </Link>
+            <div className="relative">
+              <button
+                onClick={() => setAccountMenuOpen((v) => !v)}
+                className="flex items-center gap-2 px-3 py-2 rounded-lg text-muted hover:text-heading hover:bg-surface-alt transition-colors"
+              >
+                <UserCircleIcon className="h-5 w-5 shrink-0" />
+                <span className="hidden sm:inline text-sm">Hesabım</span>
+                <ChevronDownIcon className="h-4 w-4 shrink-0" />
+              </button>
+              {accountMenuOpen && (
+                <>
+                  <div
+                    className="fixed inset-0 z-40"
+                    onClick={() => setAccountMenuOpen(false)}
+                  />
+                  <div className="absolute right-0 z-50 mt-2 w-60 overflow-hidden rounded-lg border border-border bg-surface-elevated py-1 shadow-elevated">
+                    <div className="border-b border-border px-4 py-3">
+                      <p className="truncate text-sm font-medium text-heading">
+                        {user?.displayName || 'Yönetici'}
+                      </p>
+                      <p className="truncate text-xs text-muted">{user?.email}</p>
+                    </div>
+                    <Link
+                      href="/settings"
+                      scroll={false}
+                      onClick={() => setAccountMenuOpen(false)}
+                      className="flex items-center gap-2 px-4 py-2 text-sm text-muted hover:bg-surface-alt hover:text-heading"
+                    >
+                      <Cog6ToothIcon className="h-4 w-4 shrink-0" />
+                      Sistem Ayarları
+                    </Link>
+                    <button
+                      onClick={() => {
+                        setAccountMenuOpen(false);
+                        handleLogout();
+                      }}
+                      className="flex w-full items-center gap-2 px-4 py-2 text-left text-sm text-danger-600 hover:bg-danger-500/10"
+                    >
+                      <ArrowRightOnRectangleIcon className="h-4 w-4 shrink-0" />
+                      Çıkış Yap
+                    </button>
+                  </div>
+                </>
+              )}
+            </div>
           </div>
         </header>
 

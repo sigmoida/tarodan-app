@@ -1,91 +1,30 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { View, ScrollView, StyleSheet, TouchableOpacity, Image, Dimensions, Share } from 'react-native';
 import { theme, Avatar, Button, Chip, Divider, Spinner, Text } from '@tarodan/ui-native';
-import { useQuery } from '@tanstack/react-query';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useLocalSearchParams, router } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
-import { api } from '../../../src/services/api';
+import { api, collectionsApi } from '../../../src/services/api';
+import { ThemedRefreshControl } from '../../../src/components/common';
+import { useRefresh } from '../../../src/hooks/useRefresh';
+import { useAuthStore } from '../../../src/stores/authStore';
 import { transformImageUrl } from '../../../src/utils/imageUrl';
-import { asLabel } from '../../../src/utils/format';
+import { buildShareContent, collectionShareUrl } from '../../../src/utils/share';
 
 const { colors } = theme;
 const { width } = Dimensions.get('window');
 
-// Mock collection for demo
-const MOCK_COLLECTION = {
-  id: 'c1',
-  name: 'Ferrari Koleksiyonu',
-  description: 'Klasik ve modern Ferrari modelleri. 1960\'lardan günümüze, F1 yarış arabalarından süper otomobillere kadar geniş bir yelpazede Ferrari modelleri.',
-  coverImage: 'https://placehold.co/800x400/e74c3c/ffffff?text=Ferrari+Collection',
-  isPublic: true,
-  itemCount: 24,
-  viewCount: 1250,
-  likeCount: 89,
-  shareCount: 34,
-  createdAt: '2024-01-15',
-  updatedAt: '2024-01-20',
-  estimatedValue: 45000,
-  owner: {
-    id: 'u1',
-    displayName: 'Premium Collector',
-    avatarUrl: null,
-    verified: true,
-    memberSince: '2023-01-15',
-  },
-  items: [
-    {
-      id: 'i1',
-      title: 'Ferrari F40',
-      brand: 'Kyosho',
-      scale: '1:18',
-      year: '1987',
-      acquiredDate: '2023-06-15',
-      notes: 'Pristine condition, original box',
-      imageUrl: 'https://placehold.co/200x200/e74c3c/ffffff?text=F40',
-      estimatedValue: 3500,
-    },
-    {
-      id: 'i2',
-      title: 'Ferrari 250 GTO',
-      brand: 'CMC',
-      scale: '1:18',
-      year: '1962',
-      acquiredDate: '2022-11-20',
-      notes: 'Limited edition #456/1000',
-      imageUrl: 'https://placehold.co/200x200/e74c3c/ffffff?text=250+GTO',
-      estimatedValue: 8500,
-    },
-    {
-      id: 'i3',
-      title: 'Ferrari 488 GTB',
-      brand: 'Bburago',
-      scale: '1:18',
-      year: '2015',
-      acquiredDate: '2023-01-10',
-      notes: 'Signature Series',
-      imageUrl: 'https://placehold.co/200x200/e74c3c/ffffff?text=488',
-      estimatedValue: 1200,
-    },
-    {
-      id: 'i4',
-      title: 'Ferrari SF90 Stradale',
-      brand: 'BBR',
-      scale: '1:18',
-      year: '2019',
-      acquiredDate: '2024-01-05',
-      notes: 'New acquisition',
-      imageUrl: 'https://placehold.co/200x200/e74c3c/ffffff?text=SF90',
-      estimatedValue: 4500,
-    },
-  ],
-  tags: ['Ferrari', 'Italian', 'Supercar', '1:18', 'Premium'],
-};
-
 export default function CollectionDetailScreen() {
   const { id } = useLocalSearchParams();
+  const queryClient = useQueryClient();
+  const { isAuthenticated, user } = useAuthStore();
+  // Premium/business üyeler zaten koleksiyon oluşturabildiği için upsell'i gizle.
+  const isPremiumMember =
+    user?.membershipTier === 'premium' || user?.membershipTier === 'business';
   const [isLiked, setIsLiked] = useState(false);
+  const [likeCount, setLikeCount] = useState(0);
 
-  const { data: apiCollection, isLoading } = useQuery({
+  const { data: apiCollection, isLoading, refetch } = useQuery({
     queryKey: ['collection', id],
     queryFn: async () => {
       try {
@@ -97,25 +36,75 @@ export default function CollectionDetailScreen() {
     },
   });
 
-  const collection = apiCollection || MOCK_COLLECTION;
-  const items = collection.items || MOCK_COLLECTION.items;
+  // NOT: GET /collections/:id her çağrıda viewCount'u artırıyor; kullanıcı bilerek
+  // aşağı çekerek yenilediği için görüntülenmenin +1 artması kabul edilebilir.
+  const { refreshing, onRefresh } = useRefresh(refetch);
+
+  const collection = apiCollection;
+  const items = collection?.items || [];
+  // Koleksiyon sahibi: ürün ekleme/düzenleme kontrollerini sadece sahibe göster.
+  const isOwner = isAuthenticated && !!user?.id && user.id === collection?.userId;
+
+  // Beğeni durumu/sayısını server'dan senkronize et (web ile parite)
+  useEffect(() => {
+    if (apiCollection) {
+      setIsLiked(!!apiCollection.isLiked);
+      setLikeCount(apiCollection.likeCount ?? 0);
+    }
+  }, [apiCollection]);
 
   const handleShare = async () => {
+    if (!collection) return;
     try {
-      await Share.share({
-        message: `${collection.name}\n\n${collection.description}\n\nTarodan'da bu koleksiyona göz atın!`,
-        title: collection.name,
-      });
+      const { content, options } = buildShareContent(
+        `${collection.name}\n\n${collection.description ?? ''}\n\nTarodan'da bu koleksiyona göz atın!`,
+        collectionShareUrl(String(collection.id ?? id)),
+        collection.name,
+      );
+      await Share.share(content, options);
     } catch (error) {
       console.error('Share error:', error);
     }
   };
 
-  const handleLike = () => {
-    setIsLiked(!isLiked);
+  const handleLike = async () => {
+    if (!isAuthenticated) {
+      router.push('/(auth)/login');
+      return;
+    }
+    const next = !isLiked;
+    // Optimistic
+    setIsLiked(next);
+    setLikeCount((c) => Math.max(0, c + (next ? 1 : -1)));
+    try {
+      // Server'ın döndürdüğü gerçeği (liked/likeCount) optimistic state'in üstüne yaz.
+      const resp: any = next
+        ? await collectionsApi.like(String(id))
+        : await collectionsApi.unlike(String(id));
+      const data = resp?.data?.data ?? resp?.data;
+      const serverLiked = typeof data?.liked === 'boolean' ? data.liked : next;
+      const serverCount = typeof data?.likeCount === 'number' ? data.likeCount : undefined;
+      if (serverCount !== undefined) {
+        setIsLiked(serverLiked);
+        setLikeCount(serverCount);
+      }
+      queryClient.invalidateQueries({ queryKey: ['collections'] });
+      queryClient.invalidateQueries({ queryKey: ['liked-collections'] });
+      queryClient.invalidateQueries({ queryKey: ['myCollections'] });
+      // ['collection', id] cache'ini taze tut ki tekrar girince stale (eski isLiked/likeCount)
+      // gelmesin. GET /collections/:id her çağrıda viewCount'u +1 artırdığı için REFETCH değil,
+      // cache'i elle güncelliyoruz (görüntülenme şişmesin).
+      queryClient.setQueryData(['collection', id], (old: any) =>
+        old ? { ...old, isLiked: serverLiked, likeCount: serverCount ?? old.likeCount } : old
+      );
+    } catch {
+      // Rollback
+      setIsLiked(!next);
+      setLikeCount((c) => Math.max(0, c + (next ? -1 : 1)));
+    }
   };
 
-  if (isLoading && !collection) {
+  if (isLoading) {
     return (
       <View style={styles.loadingContainer}>
         <Spinner size="lg" />
@@ -124,11 +113,26 @@ export default function CollectionDetailScreen() {
     );
   }
 
+  if (!collection) {
+    return (
+      <View style={styles.loadingContainer}>
+        <Ionicons name="albums-outline" size={64} color={colors.text.muted} />
+        <Text style={styles.loadingText}>Koleksiyon bulunamadı</Text>
+        <Button
+          variant="primary"
+          title="Geri Dön"
+          onPress={() => router.back()}
+          style={{ marginTop: 16 }}
+        />
+      </View>
+    );
+  }
+
   return (
     <View style={styles.container}>
       {/* Header Image */}
       <Image
-        source={{ uri: transformImageUrl(collection.coverImage) }}
+        source={{ uri: transformImageUrl(collection.coverImageUrl ?? collection.coverImage) }}
         style={styles.coverImage}
         resizeMode="cover"
       />
@@ -139,6 +143,14 @@ export default function CollectionDetailScreen() {
           <Ionicons name="arrow-back" size={24} color={colors.white} />
         </TouchableOpacity>
         <View style={styles.headerActions}>
+          {isOwner && (
+            <TouchableOpacity
+              style={styles.headerButton}
+              onPress={() => router.push(`/collections/${id}/edit`)}
+            >
+              <Ionicons name="create-outline" size={24} color={colors.white} />
+            </TouchableOpacity>
+          )}
           <TouchableOpacity style={styles.headerButton} onPress={handleShare}>
             <Ionicons name="share-outline" size={24} color={colors.white} />
           </TouchableOpacity>
@@ -152,7 +164,11 @@ export default function CollectionDetailScreen() {
         </View>
       </View>
 
-      <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
+      <ScrollView
+        style={styles.content}
+        showsVerticalScrollIndicator={false}
+        refreshControl={<ThemedRefreshControl refreshing={refreshing} onRefresh={onRefresh} />}
+      >
         {/* Collection Info */}
         <View style={styles.infoSection}>
           <Text style={styles.collectionName}>{collection.name}</Text>
@@ -160,22 +176,17 @@ export default function CollectionDetailScreen() {
           {/* Owner */}
           <TouchableOpacity
             style={styles.ownerRow}
-            onPress={() => router.push(`/seller/${collection.owner?.id}`)}
+            disabled={!collection.userId}
+            onPress={() => collection.userId && router.push(`/seller/${collection.userId}`)}
           >
             <Avatar
               size="md"
-              name={collection.owner?.displayName || 'U'}
+              name={collection.userName || 'U'}
             />
             <View style={styles.ownerInfo}>
               <View style={styles.ownerNameRow}>
-                <Text style={styles.ownerName}>{collection.owner?.displayName}</Text>
-                {collection.owner?.verified && (
-                  <Ionicons name="checkmark-circle" size={16} color={colors.warning[500]!} />
-                )}
+                <Text style={styles.ownerName}>{collection.userName}</Text>
               </View>
-              <Text style={styles.ownerSince}>
-                Üye: {new Date(collection.owner?.memberSince).toLocaleDateString('tr-TR', { month: 'short', year: 'numeric' })}
-              </Text>
             </View>
             <Ionicons name="chevron-forward" size={20} color={colors.text.muted} />
           </TouchableOpacity>
@@ -194,7 +205,7 @@ export default function CollectionDetailScreen() {
             </View>
             <View style={styles.statItem}>
               <Ionicons name="heart" size={20} color={colors.danger[600]!} />
-              <Text style={styles.statValue}>{isLiked ? collection.likeCount + 1 : collection.likeCount}</Text>
+              <Text style={styles.statValue}>{likeCount}</Text>
               <Text style={styles.statLabel}>Beğeni</Text>
             </View>
             <View style={styles.statItem}>
@@ -237,60 +248,83 @@ export default function CollectionDetailScreen() {
           {/* Items Section */}
           <View style={styles.itemsHeader}>
             <Text style={styles.itemsTitle}>Koleksiyon İçeriği</Text>
-            <Text style={styles.itemsCount}>{items.length} model</Text>
-          </View>
-
-          {/* Items Grid */}
-          <View style={styles.itemsGrid}>
-            {items.map((item: any) => (
+            {isOwner ? (
               <TouchableOpacity
-                key={item.id}
-                style={styles.itemCard}
+                style={styles.addItemBtn}
+                onPress={() => router.push(`/collections/${id}/add-items`)}
               >
-                <Image
-                  source={{ uri: transformImageUrl(item.imageUrl) }}
-                  style={styles.itemImage}
-                  resizeMode="cover"
-                />
-                <View style={styles.itemInfo}>
-                  <Text style={styles.itemTitle} numberOfLines={2}>{item.title}</Text>
-                  <Text style={styles.itemMeta}>{asLabel(item.brand)} • {asLabel(item.scale)}</Text>
-                  {item.year && (
-                    <Text style={styles.itemYear}>Model: {item.year}</Text>
-                  )}
-                  {item.estimatedValue && (
-                    <Text style={styles.itemValue}>
-                      ≈ ₺{item.estimatedValue.toLocaleString('tr-TR')}
-                    </Text>
-                  )}
-                  {item.notes && (
-                    <Text style={styles.itemNotes} numberOfLines={2}>
-                      📝 {item.notes}
-                    </Text>
-                  )}
-                </View>
+                <Ionicons name="add" size={18} color={colors.primary[600]!} />
+                <Text style={styles.addItemBtnText}>Ürün Ekle</Text>
               </TouchableOpacity>
-            ))}
+            ) : (
+              <Text style={styles.itemsCount}>{items.length} model</Text>
+            )}
           </View>
+
+          {/* Items Grid — API item şekli: { productId, productTitle, productImage, productPrice, productStatus } */}
+          {items.length === 0 ? (
+            <View style={styles.itemsEmpty}>
+              <Ionicons name="cube-outline" size={40} color={colors.text.muted} />
+              <Text style={styles.itemsEmptyText}>Bu koleksiyonda henüz ürün yok</Text>
+              {isOwner && (
+                <Button
+                  variant="primary"
+                  title="İlk ürünü ekle"
+                  icon="add"
+                  onPress={() => router.push(`/collections/${id}/add-items`)}
+                  style={{ marginTop: 12, alignSelf: 'center' }}
+                />
+              )}
+            </View>
+          ) : (
+            <View style={styles.itemsGrid}>
+              {items.map((item: any) => (
+                <TouchableOpacity
+                  key={item.id}
+                  style={styles.itemCard}
+                  onPress={() => item.productId && router.push(`/product/${item.productId}`)}
+                >
+                  <Image
+                    source={{ uri: transformImageUrl(item.productImage ?? item.imageUrl) }}
+                    style={styles.itemImage}
+                    resizeMode="cover"
+                  />
+                  <View style={styles.itemInfo}>
+                    <Text style={styles.itemTitle} numberOfLines={2}>
+                      {item.productTitle ?? item.title ?? 'Ürün'}
+                    </Text>
+                    {(item.productPrice ?? item.price) != null && (
+                      <Text style={styles.itemValue}>
+                        ₺{Number(item.productPrice ?? item.price).toLocaleString('tr-TR')}
+                      </Text>
+                    )}
+                  </View>
+                </TouchableOpacity>
+              ))}
+            </View>
+          )}
         </View>
 
-        {/* Guest Notice */}
-        <View style={styles.guestNotice}>
-          <Ionicons name="lock-closed-outline" size={24} color={colors.text.muted} />
-          <View style={styles.noticeContent}>
-            <Text style={styles.noticeTitle}>Kendi Koleksiyonunuzu Oluşturun</Text>
-            <Text style={styles.noticeText}>
-              Premium üye olarak kendi Digital Garage'ınızı oluşturabilir,
-              koleksiyonlarınızı sergileyebilirsiniz.
-            </Text>
-            <Button
-              variant="primary"
-              title="Premium Üye Ol"
-              onPress={() => router.push('/(auth)/register')}
-              style={styles.noticeButton}
-            />
+        {/* Guest Notice — premium/business üyelere ve koleksiyon sahibine gösterme */}
+        {!isPremiumMember && !isOwner && (
+          <View style={styles.guestNotice}>
+            <Ionicons name="lock-closed-outline" size={24} color={colors.text.muted} />
+            <View style={styles.noticeContent}>
+              <Text style={styles.noticeTitle}>Kendi Koleksiyonunuzu Oluşturun</Text>
+              <Text style={styles.noticeText}>
+                Premium üye olarak kendi Digital Garage'ınızı oluşturabilir,
+                koleksiyonlarınızı sergileyebilirsiniz.
+              </Text>
+              <Button
+                variant="primary"
+                title="Premium Üye Ol"
+                onPress={() => router.push(isAuthenticated ? '/upgrade' : '/(auth)/login')}
+                fullWidth
+                style={styles.noticeButton}
+              />
+            </View>
           </View>
-        </View>
+        )}
 
         <View style={{ height: 40 }} />
       </ScrollView>
@@ -445,8 +479,32 @@ const styles = StyleSheet.create({
     fontSize: 14,
     color: colors.text.muted,
   },
+  addItemBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    paddingVertical: 6,
+    paddingHorizontal: 12,
+    borderRadius: 20,
+    borderWidth: 1.5,
+    borderColor: colors.primary[600]!,
+  },
+  addItemBtnText: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: colors.primary[600]!,
+  },
   itemsGrid: {
     gap: 12,
+  },
+  itemsEmpty: {
+    alignItems: 'center',
+    paddingVertical: 32,
+    gap: 8,
+  },
+  itemsEmptyText: {
+    color: colors.text.muted,
+    fontSize: 14,
   },
   itemCard: {
     flexDirection: 'row',

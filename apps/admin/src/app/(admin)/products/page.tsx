@@ -12,15 +12,15 @@ import {
 import Image from "next/image";
 import {
   Button,
-  Checkbox,
   Input,
   Select,
-  Spinner,
   StatusBadge,
   productStatusConfig,
+  productConditionConfig,
+  enumLabel,
 } from "@tarodan/ui";
+import { DataTable, type ColumnDef } from "@/components/DataTable";
 import {
-  MagnifyingGlassIcon,
   CheckIcon,
   XMarkIcon,
   EyeIcon,
@@ -30,6 +30,14 @@ import {
   UserIcon,
 } from "@heroicons/react/24/outline";
 import toast from "react-hot-toast";
+import { useConfirm } from "@/components/ConfirmProvider";
+import {
+  PageHeader,
+  FilterToolbar,
+  BulkActionBar,
+  ActionButtons,
+  ActionIconButton,
+} from "@/components/admin-list";
 
 interface Product {
   id: string;
@@ -58,6 +66,7 @@ interface User {
 }
 
 export default function ProductsPage() {
+  const confirm = useConfirm();
   const searchParams = useSearchParams();
   const router = useRouter();
   const urlSellerId = useMemo(
@@ -238,7 +247,7 @@ export default function ProductsPage() {
   };
 
   const handleDelete = async (productId: string) => {
-    if (!confirm("Bu ürünü silmek istediğinize emin misiniz?")) return;
+    if (!(await confirm({ description: "Bu ürünü silmek istediğinize emin misiniz?", destructive: true }))) return;
 
     try {
       await adminApi.deleteProduct(productId);
@@ -262,11 +271,14 @@ export default function ProductsPage() {
     });
   };
 
-  const toggleSelectAll = () => {
+  const toggleSelectAll = (_ids?: string[]) => {
     const pendingProducts = filteredProducts.filter(
       (p) => p.status === "pending",
     );
-    if (selectedIds.size === pendingProducts.length) {
+    if (
+      pendingProducts.length > 0 &&
+      selectedIds.size === pendingProducts.length
+    ) {
       setSelectedIds(new Set());
     } else {
       setSelectedIds(new Set(pendingProducts.map((p) => p.id)));
@@ -327,17 +339,9 @@ export default function ProductsPage() {
     }
   };
 
-  const getConditionLabel = (condition: string) => {
-    const labels: Record<string, string> = {
-      mint: "Mint",
-      near_mint: "Near Mint",
-      excellent: "Excellent",
-      good: "Good",
-      fair: "Fair",
-      poor: "Poor",
-    };
-    return labels[condition] || condition;
-  };
+  // Merkezi ProductCondition etiketleri (new/like_new/very_good/good/fair).
+  const getConditionLabel = (condition: string) =>
+    enumLabel(productConditionConfig, condition);
 
   const filteredProducts = products.filter((product) => {
     if (search && !product.title.toLowerCase().includes(search.toLowerCase())) {
@@ -347,64 +351,157 @@ export default function ProductsPage() {
     return true;
   });
 
-  return (
-    <div className="space-y-6">
-      {/* Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-        <div className="flex items-center gap-3">
-          <div>
-            <h1 className="text-2xl font-bold text-heading">Ürünler</h1>
-            <p className="text-muted mt-1">
-              {filter === "pending"
-                ? `${products.filter((p) => p.status === "pending").length} ürün onay bekliyor`
-                : `Toplam ${total} ürün`}
-              {selectedSellerId && (
-                <span className="ml-2">
-                  — Satıcıya göre filtreleniyor
-                  <Button
-                    variant="secondary"
-                    onClick={clearSellerFilter}
-                    className="ml-2 text-primary-600 hover:underline"
-                  >
-                    Filtreyi kaldır
-                  </Button>
-                </span>
-              )}
-            </p>
+  const columns: ColumnDef<Product, any>[] = [
+    {
+      header: "Ürün",
+      cell: ({ row }) => (
+        <div className="flex items-center">
+          <div className="w-12 h-12 bg-surface-alt rounded-lg overflow-hidden mr-3 flex-shrink-0">
+            <Image
+              src={
+                row.original.imageUrl ||
+                "https://placehold.co/100x100/f3f4f6/666?text=Ürün"
+              }
+              alt={row.original.title}
+              width={48}
+              height={48}
+              className="object-cover w-full h-full"
+              unoptimized
+              onError={(e) => {
+                (e.target as HTMLImageElement).src =
+                  "https://placehold.co/100x100/f3f4f6/666?text=Ürün";
+              }}
+            />
           </div>
-          {pendingCount > 0 && (
-            <span className="px-3 py-1 bg-warning-500/20 text-warning-700 rounded-full text-sm font-medium">
-              {pendingCount} Bekleyen
+          <span className="font-medium text-heading line-clamp-2">
+            {row.original.title}
+          </span>
+        </div>
+      ),
+    },
+    {
+      header: "Fiyat",
+      cell: ({ row }) => (
+        <span className="font-medium text-primary-400">
+          {isProductOnSaleDisplay(row.original) && (
+            <span className="text-muted line-through text-sm block">
+              ₺
+              {getProductOriginalPriceForDisplay(row.original).toLocaleString(
+                "tr-TR",
+              )}
             </span>
           )}
-        </div>
-        {selectedIds.size > 0 && (
-          <div className="flex items-center gap-2">
-            <span className="text-sm text-muted">
-              {selectedIds.size} ürün seçili
-            </span>
-            <Button
-              variant="success"
-              size="sm"
-              onClick={handleBulkApprove}
-              disabled={bulkProcessing}
-              isLoading={bulkProcessing}
-            >
-              <CheckCircleIcon className="h-4 w-4" />
-              Seçilenleri Onayla
-            </Button>
-            <Button
-              variant="danger"
-              size="sm"
-              onClick={handleBulkReject}
-              disabled={bulkProcessing}
-              isLoading={bulkProcessing}
-            >
-              <XCircleIcon className="h-4 w-4" />
-              Seçilenleri Reddet
-            </Button>
-          </div>
-        )}
+          ₺
+          {getProductEffectivePrice(row.original).toLocaleString("tr-TR")}
+        </span>
+      ),
+    },
+    {
+      header: "Durum",
+      cell: ({ row }) => (
+        <StatusBadge
+          status={row.original.status}
+          config={productStatusConfig}
+        />
+      ),
+    },
+    {
+      header: "Kondisyon",
+      cell: ({ row }) => (
+        <span className="text-muted">
+          {getConditionLabel(row.original.condition)}
+        </span>
+      ),
+    },
+    {
+      header: "Satıcı",
+      cell: ({ row }) => (
+        <Link
+          href={`/users/${row.original.seller.id}`}
+          className="text-heading hover:text-primary-600"
+        >
+          {row.original.seller.displayName}
+        </Link>
+      ),
+    },
+    {
+      header: "Kategori",
+      cell: ({ row }) => row.original.category.name,
+    },
+    {
+      header: "Tarih",
+      cell: ({ row }) => (
+        <span className="whitespace-nowrap">
+          {new Date(row.original.createdAt).toLocaleDateString("tr-TR")}
+        </span>
+      ),
+    },
+    {
+      id: "actions",
+      header: "İşlemler",
+      cell: ({ row }) => (
+        <ActionButtons>
+          <ActionIconButton
+            icon={EyeIcon}
+            href={`/products/${row.original.id}`}
+            title="Detay"
+          />
+          {row.original.status === "pending" && (
+            <>
+              <ActionIconButton
+                icon={CheckIcon}
+                onClick={() => handleApprove(row.original.id)}
+                title="Onayla"
+                variant="success"
+              />
+              <ActionIconButton
+                icon={XMarkIcon}
+                onClick={() => handleReject(row.original.id)}
+                title="Reddet"
+                variant="danger"
+              />
+            </>
+          )}
+          <ActionIconButton
+            icon={TrashIcon}
+            onClick={() => handleDelete(row.original.id)}
+            title="Sil"
+            variant="danger"
+          />
+        </ActionButtons>
+      ),
+    },
+  ];
+
+  return (
+    <div className="space-y-6">
+      <PageHeader
+        title="Ürünler"
+        description={
+          <>
+            {filter === "pending"
+              ? `${products.filter((p) => p.status === "pending").length} ürün onay bekliyor`
+              : `Toplam ${total} ürün`}
+            {pendingCount > 0 && (
+              <span className="ml-2 px-3 py-1 bg-warning-500/20 text-warning-700 rounded-full text-sm font-medium shrink-0 whitespace-nowrap">
+                {pendingCount} Bekleyen
+              </span>
+            )}
+            {selectedSellerId && (
+              <span className="ml-2">
+                — Satıcıya göre filtreleniyor
+                <Button
+                  variant="secondary"
+                  onClick={clearSellerFilter}
+                  className="ml-2 text-primary-600 hover:underline"
+                >
+                  Filtreyi kaldır
+                </Button>
+              </span>
+            )}
+          </>
+        }
+      >
         <Button
           variant="secondary"
           onClick={async () => {
@@ -428,29 +525,41 @@ export default function ProductsPage() {
         >
           CSV İndir
         </Button>
-      </div>
+      </PageHeader>
+
+      <BulkActionBar
+        count={selectedIds.size}
+        onClear={() => setSelectedIds(new Set())}
+      >
+        <Button
+          variant="success"
+          size="sm"
+          onClick={handleBulkApprove}
+          disabled={bulkProcessing}
+          isLoading={bulkProcessing}
+        >
+          <CheckCircleIcon className="h-4 w-4" />
+          Seçilenleri Onayla
+        </Button>
+        <Button
+          variant="danger"
+          size="sm"
+          onClick={handleBulkReject}
+          disabled={bulkProcessing}
+          isLoading={bulkProcessing}
+        >
+          <XCircleIcon className="h-4 w-4" />
+          Seçilenleri Reddet
+        </Button>
+      </BulkActionBar>
 
       {/* Filters */}
-      <div className="flex flex-col sm:flex-row gap-4">
-        <div className="relative flex-1 flex gap-2">
-          <MagnifyingGlassIcon className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-muted pointer-events-none" />
-          <Input
-            type="text"
-            placeholder="Ürün ara..."
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            onKeyDown={(e) => e.key === "Enter" && loadProducts(1)}
-            className="admin-input-with-icon-left flex-1"
-          />
-          <Button
-            type="button"
-            onClick={() => loadProducts(1)}
-            className="whitespace-nowrap"
-          >
-            Ara
-          </Button>
-        </div>
-
+      <FilterToolbar
+        search={search}
+        onSearchChange={setSearch}
+        onSearchSubmit={() => loadProducts(1)}
+        searchPlaceholder="Ürün ara..."
+      >
         {/* Seller Filter */}
         <div className="relative w-full sm:w-64">
           <UserIcon className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-muted" />
@@ -512,172 +621,20 @@ export default function ProductsPage() {
           <option value="sold">Satılanlar</option>
           <option value="inactive">Silindi</option>
         </Select>
-      </div>
+      </FilterToolbar>
 
       {/* Table */}
-      <div className="admin-card overflow-hidden">
-        <div className="overflow-x-auto">
-          <table className="admin-table">
-            <thead>
-              <tr>
-                <th className="w-10">
-                  <Checkbox
-                    checked={
-                      selectedIds.size > 0 &&
-                      selectedIds.size ===
-                        filteredProducts.filter((p) => p.status === "pending")
-                          .length
-                    }
-                    onChange={toggleSelectAll}
-                    title="Tümünü seç (bekleyenler)"
-                  />
-                </th>
-                <th>Ürün</th>
-                <th>Fiyat</th>
-                <th>Durum</th>
-                <th>Kondisyon</th>
-                <th>Satıcı</th>
-                <th>Kategori</th>
-                <th>Tarih</th>
-                <th>İşlemler</th>
-              </tr>
-            </thead>
-            <tbody>
-              {loading ? (
-                <tr>
-                  <td colSpan={9} className="text-center py-8">
-                    <Spinner size="lg" className="mx-auto" />
-                  </td>
-                </tr>
-              ) : filteredProducts.length === 0 ? (
-                <tr>
-                  <td colSpan={9} className="text-center py-8 text-muted">
-                    Ürün bulunamadı
-                  </td>
-                </tr>
-              ) : (
-                filteredProducts.map((product) => (
-                  <tr
-                    key={product.id}
-                    className={
-                      selectedIds.has(product.id) ? "bg-primary-500/5" : ""
-                    }
-                  >
-                    <td>
-                      {product.status === "pending" && (
-                        <Checkbox
-                          checked={selectedIds.has(product.id)}
-                          onChange={() => toggleSelect(product.id)}
-                        />
-                      )}
-                    </td>
-                    <td>
-                      <div className="flex items-center">
-                        <div className="w-12 h-12 bg-surface-alt rounded-lg overflow-hidden mr-3 flex-shrink-0">
-                          <Image
-                            src={
-                              product.imageUrl ||
-                              "https://placehold.co/100x100/f3f4f6/666?text=Ürün"
-                            }
-                            alt={product.title}
-                            width={48}
-                            height={48}
-                            className="object-cover w-full h-full"
-                            unoptimized
-                            onError={(e) => {
-                              (e.target as HTMLImageElement).src =
-                                "https://placehold.co/100x100/f3f4f6/666?text=Ürün";
-                            }}
-                          />
-                        </div>
-                        <span className="font-medium text-heading line-clamp-2">
-                          {product.title}
-                        </span>
-                      </div>
-                    </td>
-                    <td className="font-medium text-primary-400">
-                      {isProductOnSaleDisplay(product) && (
-                        <span className="text-muted line-through text-sm block">
-                          ₺
-                          {getProductOriginalPriceForDisplay(
-                            product,
-                          ).toLocaleString("tr-TR")}
-                        </span>
-                      )}
-                      ₺
-                      {getProductEffectivePrice(product).toLocaleString(
-                        "tr-TR",
-                      )}
-                    </td>
-                    <td>
-                      <StatusBadge
-                        status={product.status}
-                        config={productStatusConfig}
-                      />
-                    </td>
-                    <td>
-                      <span className="text-muted">
-                        {getConditionLabel(product.condition)}
-                      </span>
-                    </td>
-                    <td>
-                      <Link
-                        href={`/users/${product.seller.id}`}
-                        className="text-heading hover:text-primary-600"
-                      >
-                        {product.seller.displayName}
-                      </Link>
-                    </td>
-                    <td>{product.category.name}</td>
-                    <td className="whitespace-nowrap">
-                      {new Date(product.createdAt).toLocaleDateString("tr-TR")}
-                    </td>
-                    <td className="whitespace-nowrap">
-                      <div className="flex items-center gap-1">
-                        <Link
-                          href={`/products/${product.id}`}
-                          className="p-2 text-muted hover:text-heading hover:bg-surface-alt rounded-lg"
-                          title="Detay"
-                        >
-                          <EyeIcon className="h-5 w-5" />
-                        </Link>
-                        {product.status === "pending" && (
-                          <>
-                            <Button
-                              variant="secondary"
-                              onClick={() => handleApprove(product.id)}
-                              className="p-2 text-success-700 hover:bg-success-500/10 rounded-lg"
-                              title="Onayla"
-                            >
-                              <CheckIcon className="h-5 w-5" />
-                            </Button>
-                            <Button
-                              variant="secondary"
-                              onClick={() => handleReject(product.id)}
-                              className="p-2 text-danger-600 hover:bg-danger-500/10 rounded-lg"
-                              title="Reddet"
-                            >
-                              <XMarkIcon className="h-5 w-5" />
-                            </Button>
-                          </>
-                        )}
-                        <Button
-                          variant="secondary"
-                          onClick={() => handleDelete(product.id)}
-                          className="p-2 text-danger-600 hover:bg-danger-500/10 rounded-lg"
-                          title="Sil"
-                        >
-                          <TrashIcon className="h-5 w-5" />
-                        </Button>
-                      </div>
-                    </td>
-                  </tr>
-                ))
-              )}
-            </tbody>
-          </table>
-        </div>
-      </div>
+      <DataTable
+        columns={columns}
+        data={filteredProducts}
+        loading={loading}
+        emptyText="Ürün bulunamadı"
+        getRowId={(p) => p.id}
+        selectable
+        selectedIds={Array.from(selectedIds)}
+        onToggleRow={(id) => toggleSelect(id)}
+        onToggleAll={(ids) => toggleSelectAll(ids)}
+      />
 
       {/* Pagination */}
       <div className="flex items-center justify-between">

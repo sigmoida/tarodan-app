@@ -1,4 +1,4 @@
-import { View, ScrollView, StyleSheet, TouchableOpacity, Pressable, Alert } from 'react-native';
+import { View, ScrollView, StyleSheet, Pressable } from 'react-native';
 import {
   Card,
   Button,
@@ -8,9 +8,13 @@ import {
   Spinner,
   Input,
   Text,
+  ScreenHeader,
   theme,
+  appAlert,
 } from '@tarodan/ui-native';
-import { CityDistrictSelector } from '../../src/components/common';
+import { CityDistrictSelector, PhoneInput, ThemedRefreshControl } from '../../src/components/common';
+import { DEFAULT_COUNTRY_CODE, normalizePhoneForPayload, splitPhone } from '../../src/utils/phone';
+import { useRefresh } from '../../src/hooks/useRefresh';
 import { useState, useCallback } from 'react';
 import { router, useFocusEffect } from 'expo-router';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
@@ -29,7 +33,8 @@ interface Address {
   address: string;
   city: string;
   district: string;
-  postalCode: string;
+  postalCode?: string;
+  zipCode?: string; // API bu alanı döndürüyor
   isDefault: boolean;
 }
 
@@ -43,6 +48,7 @@ export default function AddressesScreen() {
     title: '',
     fullName: '',
     phone: '',
+    phoneCountryCode: DEFAULT_COUNTRY_CODE,
     address: '',
     city: '',
     district: '',
@@ -50,7 +56,7 @@ export default function AddressesScreen() {
     isDefault: false,
   });
 
-  const maxAddresses = limits?.maxAddresses || 3;
+  const maxAddresses = limits?.maxAddresses || 10;
 
   // Fetch addresses
   const { data: addressesData, isLoading, refetch } = useQuery({
@@ -69,6 +75,8 @@ export default function AddressesScreen() {
 
   const addresses: Address[] = addressesData || [];
 
+  const { refreshing, onRefresh } = useRefresh(refetch);
+
   // Refresh on focus
   useFocusEffect(
     useCallback(() => {
@@ -81,20 +89,29 @@ export default function AddressesScreen() {
   // Create/Update mutation
   const saveMutation = useMutation({
     mutationFn: async (data: typeof formData) => {
+      // API CreateAddressDto `zipCode` bekliyor (postalCode değil) — eşle, yoksa posta kodu kaybolur.
+      // phoneCountryCode DTO'da yok; telefonu "+90…" olarak normalize edip payload'dan çıkar.
+      const { postalCode, phoneCountryCode, ...rest } = data;
+      const payload = {
+        ...rest,
+        phone: normalizePhoneForPayload(data.phone, phoneCountryCode),
+        zipCode: postalCode,
+      };
       if (editingAddress) {
-        return api.patch(`/users/me/addresses/${editingAddress.id}`, data);
+        return api.patch(`/users/me/addresses/${editingAddress.id}`, payload);
       } else {
-        return api.post('/users/me/addresses', data);
+        return api.post('/users/me/addresses', payload);
       }
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['addresses'] });
       setDialogVisible(false);
       resetForm();
-      Alert.alert('Başarılı', editingAddress ? 'Adres güncellendi' : 'Adres eklendi');
+      appAlert('Başarılı', editingAddress ? 'Adres güncellendi' : 'Adres eklendi');
     },
-    onError: () => {
-      Alert.alert('Hata', 'Adres kaydedilemedi');
+    onError: (err: any) => {
+      const msg = err?.response?.data?.message;
+      appAlert('Hata', Array.isArray(msg) ? msg.join('\n') : msg || 'Adres kaydedilemedi');
     },
   });
 
@@ -105,10 +122,11 @@ export default function AddressesScreen() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['addresses'] });
-      Alert.alert('Başarılı', 'Adres silindi');
+      appAlert('Başarılı', 'Adres silindi');
     },
-    onError: () => {
-      Alert.alert('Hata', 'Adres silinemedi');
+    onError: (err: any) => {
+      const msg = err?.response?.data?.message;
+      appAlert('Hata', Array.isArray(msg) ? msg.join('\n') : msg || 'Adres silinemedi');
     },
   });
 
@@ -127,6 +145,7 @@ export default function AddressesScreen() {
       title: '',
       fullName: '',
       phone: '',
+      phoneCountryCode: DEFAULT_COUNTRY_CODE,
       address: '',
       city: '',
       district: '',
@@ -138,7 +157,7 @@ export default function AddressesScreen() {
 
   const openAddDialog = () => {
     if (addresses.length >= maxAddresses) {
-      Alert.alert(
+      appAlert(
         'Adres Limiti',
         `Ücretsiz üyeler en fazla ${maxAddresses} adres kaydedebilir. Premium üyelikle daha fazla adres ekleyin.`,
         [
@@ -154,21 +173,23 @@ export default function AddressesScreen() {
 
   const openEditDialog = (address: Address) => {
     setEditingAddress(address);
+    const { countryCode, phone } = splitPhone(address.phone);
     setFormData({
       title: address.title,
       fullName: address.fullName,
-      phone: address.phone,
+      phone,
+      phoneCountryCode: countryCode,
       address: address.address,
       city: address.city,
       district: address.district,
-      postalCode: address.postalCode,
+      postalCode: address.zipCode ?? address.postalCode ?? '',
       isDefault: address.isDefault,
     });
     setDialogVisible(true);
   };
 
   const handleDelete = (address: Address) => {
-    Alert.alert(
+    appAlert(
       'Adresi Sil',
       `"${address.title}" adresini silmek istediğinize emin misiniz?`,
       [
@@ -179,8 +200,17 @@ export default function AddressesScreen() {
   };
 
   const handleSubmit = () => {
-    if (!formData.title || !formData.fullName || !formData.phone || !formData.address || !formData.city) {
-      Alert.alert('Hata', 'Lütfen zorunlu alanları doldurun');
+    if (!formData.title || !formData.fullName || !formData.phone || !formData.address || !formData.city || !formData.district) {
+      appAlert('Hata', 'Lütfen zorunlu alanları doldurun (ilçe dahil)');
+      return;
+    }
+    // API DTO kuralları — client-side önden uygula (yoksa ham 400 "Adres kaydedilemedi")
+    if (formData.address.trim().length < 10) {
+      appAlert('Hata', 'Adres en az 10 karakter olmalıdır');
+      return;
+    }
+    if (formData.phone.replace(/\D/g, '').length < 10) {
+      appAlert('Hata', 'Geçerli bir telefon numarası giriniz (en az 10 hane)');
       return;
     }
     saveMutation.mutate(formData);
@@ -194,21 +224,18 @@ export default function AddressesScreen() {
         <Text variant="body" style={styles.subtitle}>
           Adreslerinizi görmek için giriş yapın
         </Text>
-        <Button variant="primary" title="Giriş Yap" onPress={() => router.push('/(auth)/login')} />
+        <Button variant="primary" title="Giriş Yap" onPress={() => router.push('/(auth)/login')} style={{ alignSelf: 'center' }} />
       </View>
     );
   }
 
   return (
     <View style={styles.container}>
-      {/* Header */}
-      <View style={styles.header}>
-        <TouchableOpacity onPress={() => router.back()}>
-          <Ionicons name="arrow-back" size={24} color={colors.white} />
-        </TouchableOpacity>
-        <Text style={styles.headerTitle}>{t('mobile.settingsAddresses')}</Text>
-        <Text style={styles.headerCount}>{addresses.length}/{maxAddresses}</Text>
-      </View>
+      <ScreenHeader
+        title={t('mobile.settingsAddresses')}
+        onBack={() => router.back()}
+        right={<Text style={styles.headerCount}>{addresses.length}/{maxAddresses}</Text>}
+      />
 
       {/* Content */}
       {isLoading ? (
@@ -222,10 +249,13 @@ export default function AddressesScreen() {
           <Text variant="body" style={styles.emptySubtitle}>
             Teslimat adresinizi ekleyin
           </Text>
-          <Button variant="primary" title="Adres Ekle" onPress={openAddDialog} />
+          <Button variant="primary" title="Adres Ekle" onPress={openAddDialog} style={{ alignSelf: 'center' }} />
         </View>
       ) : (
-        <ScrollView style={styles.content}>
+        <ScrollView
+          style={styles.content}
+          refreshControl={<ThemedRefreshControl refreshing={refreshing} onRefresh={onRefresh} />}
+        >
           {addresses.map((address) => (
             <Card key={address.id} style={styles.addressCard}>
               <View style={styles.cardHeader}>
@@ -258,7 +288,7 @@ export default function AddressesScreen() {
               <Text variant="body">{address.fullName}</Text>
               <Text variant="bodySm" style={styles.addressDetail}>{address.address}</Text>
               <Text variant="bodySm" style={styles.addressDetail}>
-                {address.district}, {address.city} {address.postalCode}
+                {address.district}, {address.city} {address.zipCode ?? address.postalCode ?? ''}
               </Text>
               <Text variant="bodySm" style={styles.addressDetail}>Tel: {address.phone}</Text>
 
@@ -310,11 +340,12 @@ export default function AddressesScreen() {
             onChangeText={(text) => setFormData({ ...formData, fullName: text })}
             containerStyle={styles.input}
           />
-          <Input
+          <PhoneInput
             label="Telefon *"
-            value={formData.phone}
-            onChangeText={(text) => setFormData({ ...formData, phone: text })}
-            keyboardType="phone-pad"
+            countryCode={formData.phoneCountryCode}
+            onCountryCodeChange={(code) => setFormData({ ...formData, phoneCountryCode: code })}
+            phone={formData.phone}
+            onPhoneChange={(phone) => setFormData({ ...formData, phone })}
             containerStyle={styles.input}
           />
           <Input
@@ -328,8 +359,11 @@ export default function AddressesScreen() {
           <CityDistrictSelector
             city={formData.city}
             district={formData.district}
-            onChangeCity={(city) => setFormData({ ...formData, city })}
-            onChangeDistrict={(district) => setFormData({ ...formData, district })}
+            // Fonksiyonel güncelleme şart: il seçilince selector aynı anda
+            // onChangeCity + onChangeDistrict('') çağırır; stale obje ile
+            // yazılırsa ikinci çağrı ilk yazılan şehri ezer.
+            onChangeCity={(city) => setFormData((prev) => ({ ...prev, city }))}
+            onChangeDistrict={(district) => setFormData((prev) => ({ ...prev, district }))}
           />
           <Input
             label="Posta Kodu"
@@ -376,20 +410,6 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     padding: 32,
     backgroundColor: colors.surface.DEFAULT,
-  },
-  header: {
-    backgroundColor: colors.primary[600]!,
-    paddingTop: 50,
-    paddingBottom: 16,
-    paddingHorizontal: 20,
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-  },
-  headerTitle: {
-    fontSize: 18,
-    fontWeight: 'bold',
-    color: colors.white,
   },
   headerCount: {
     color: colors.white,

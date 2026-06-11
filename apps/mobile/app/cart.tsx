@@ -1,9 +1,10 @@
 import { useEffect } from 'react';
 import { View, ScrollView, StyleSheet, TouchableOpacity, Image } from 'react-native';
-import { Button, IconButton, Divider, Text, theme } from '@tarodan/ui-native';
+import { Button, IconButton, Divider, Text, theme, ScreenHeader } from '@tarodan/ui-native';
 import { router } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { useCartStore } from '../src/stores/cartStore';
+import { useAuthStore } from '../src/stores/authStore';
 import { transformImageUrl } from '../src/utils/imageUrl';
 import { asLabel } from '../src/utils/format';
 
@@ -11,6 +12,7 @@ const { colors } = theme;
 
 export default function CartScreen() {
   const { items, getSubtotal, getItemCount, removeItem, updateQuantity, cleanExpiredItems } = useCartStore();
+  const isAuthenticated = useAuthStore((s) => s.isAuthenticated);
 
   // Clean expired items on mount
   useEffect(() => {
@@ -18,8 +20,7 @@ export default function CartScreen() {
   }, []);
 
   const subtotal = getSubtotal();
-  const shipping = items.length > 0 ? 49.90 : 0;
-  const total = subtotal + shipping;
+  const total = subtotal;
   const itemCount = getItemCount();
 
   const handleRemove = (itemId: string) => {
@@ -36,13 +37,7 @@ export default function CartScreen() {
   if (items.length === 0) {
     return (
       <View style={styles.emptyContainer}>
-        <View style={styles.header}>
-          <TouchableOpacity onPress={() => router.back()}>
-            <Ionicons name="arrow-back" size={24} color={colors.white} />
-          </TouchableOpacity>
-          <Text style={styles.headerTitle}>Sepetim</Text>
-          <View style={{ width: 24 }} />
-        </View>
+        <ScreenHeader title="Sepetim" onBack={() => router.back()} />
 
         <View style={styles.emptyContent}>
           <Ionicons name="cart-outline" size={80} color={colors.text.muted} />
@@ -54,7 +49,7 @@ export default function CartScreen() {
             variant="primary"
             title="İlanlara Göz At"
             onPress={() => router.replace('/')}
-            style={{ marginTop: 24 }}
+            style={{ marginTop: 24, alignSelf: 'center' }}
           />
         </View>
       </View>
@@ -63,14 +58,7 @@ export default function CartScreen() {
 
   return (
     <View style={styles.container}>
-      {/* Header */}
-      <View style={styles.header}>
-        <TouchableOpacity onPress={() => router.back()}>
-          <Ionicons name="arrow-back" size={24} color={colors.white} />
-        </TouchableOpacity>
-        <Text style={styles.headerTitle}>Sepetim ({itemCount})</Text>
-        <View style={{ width: 24 }} />
-      </View>
+      <ScreenHeader title={`Sepetim (${itemCount})`} onBack={() => router.back()} />
 
       {/* Expiry Notice */}
       <View style={styles.expiryNotice}>
@@ -132,8 +120,8 @@ export default function CartScreen() {
             <Text style={styles.summaryValue}>₺{subtotal.toLocaleString('tr-TR')}</Text>
           </View>
           <View style={styles.summaryRow}>
-            <Text style={styles.summaryLabel}>Tahmini Kargo</Text>
-            <Text style={styles.summaryValue}>₺{shipping.toFixed(2)}</Text>
+            <Text style={styles.summaryLabel}>Kargo</Text>
+            <Text style={styles.summaryValue}>Ödeme adımında hesaplanır</Text>
           </View>
           <Divider style={{ marginVertical: 12 }} />
           <View style={styles.summaryRow}>
@@ -142,13 +130,15 @@ export default function CartScreen() {
           </View>
         </View>
 
-        {/* Guest Checkout Info */}
-        <View style={styles.guestInfo}>
-          <Ionicons name="information-circle-outline" size={20} color={colors.info[600]!} />
-          <Text style={styles.guestInfoText}>
-            Üye olmadan da alışveriş yapabilirsiniz. Siparişinizi e-posta ile takip edebilirsiniz.
-          </Text>
-        </View>
+        {/* Guest Checkout Info — yalnızca giriş yapmamış kullanıcılara göster */}
+        {!isAuthenticated && (
+          <View style={styles.guestInfo}>
+            <Ionicons name="information-circle-outline" size={20} color={colors.info[600]!} />
+            <Text style={styles.guestInfoText}>
+              Üye olmadan da alışveriş yapabilirsiniz. Siparişinizi e-posta ile takip edebilirsiniz.
+            </Text>
+          </View>
+        )}
 
         <View style={{ height: 120 }} />
       </ScrollView>
@@ -197,20 +187,6 @@ const styles = StyleSheet.create({
     color: colors.text.muted,
     textAlign: 'center',
     marginTop: 8,
-  },
-  header: {
-    backgroundColor: colors.primary[600]!,
-    paddingTop: 50,
-    paddingBottom: 16,
-    paddingHorizontal: 20,
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-  },
-  headerTitle: {
-    fontSize: 18,
-    fontWeight: 'bold',
-    color: colors.white,
   },
   expiryNotice: {
     flexDirection: 'row',

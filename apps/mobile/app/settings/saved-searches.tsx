@@ -1,4 +1,4 @@
-import { View, ScrollView, StyleSheet, TouchableOpacity, Alert } from 'react-native';
+import { View, ScrollView, StyleSheet, TouchableOpacity } from 'react-native';
 import {
   Card,
   Button,
@@ -6,17 +6,21 @@ import {
   Spinner,
   Divider,
   Text,
+  ScreenHeader,
   theme,
+  appAlert,
 } from '@tarodan/ui-native';
 import { useCallback } from 'react';
 import { router, useFocusEffect } from 'expo-router';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { Ionicons } from '@expo/vector-icons';
-import { api } from '../../src/services/api';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useAuthStore } from '../../src/stores/authStore';
 import { useTranslation } from '../../src/i18n';
 
 const { colors } = theme;
+
+const STORAGE_KEY = 'diecast_saved_searches';
 
 interface SavedSearch {
   id: string;
@@ -32,7 +36,7 @@ interface SavedSearch {
     tradeAvailable?: boolean;
   };
   resultCount?: number;
-  notifyOnNew: boolean;
+  notifyEnabled: boolean;
   createdAt: string;
   lastRunAt?: string;
 }
@@ -47,10 +51,11 @@ export default function SavedSearchesScreen() {
   // Fetch saved searches
   const { data: searchesData, isLoading, refetch } = useQuery({
     queryKey: ['saved-searches'],
-    queryFn: async () => {
+    queryFn: async (): Promise<SavedSearch[]> => {
       try {
-        const response = await api.get('/users/me/saved-searches');
-        return response.data?.data || response.data || [];
+        const stored = await AsyncStorage.getItem(STORAGE_KEY);
+        const parsed = stored ? JSON.parse(stored) : [];
+        return Array.isArray(parsed) ? parsed : [];
       } catch (error) {
         console.log('Failed to fetch saved searches');
         return [];
@@ -73,21 +78,27 @@ export default function SavedSearchesScreen() {
   // Delete mutation
   const deleteMutation = useMutation({
     mutationFn: async (searchId: string) => {
-      return api.delete(`/users/me/saved-searches/${searchId}`);
+      const stored = await AsyncStorage.getItem(STORAGE_KEY);
+      const list: SavedSearch[] = stored ? JSON.parse(stored) : [];
+      const next = list.filter((s) => s.id !== searchId);
+      await AsyncStorage.setItem(STORAGE_KEY, JSON.stringify(next));
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['saved-searches'] });
-      Alert.alert('Başarılı', 'Arama silindi');
+      appAlert('Başarılı', 'Arama silindi');
     },
     onError: () => {
-      Alert.alert('Hata', 'Arama silinemedi');
+      appAlert('Hata', 'Arama silinemedi');
     },
   });
 
   // Toggle notification mutation
   const toggleNotificationMutation = useMutation({
-    mutationFn: async ({ searchId, notifyOnNew }: { searchId: string; notifyOnNew: boolean }) => {
-      return api.patch(`/users/me/saved-searches/${searchId}`, { notifyOnNew });
+    mutationFn: async ({ searchId, notifyEnabled }: { searchId: string; notifyEnabled: boolean }) => {
+      const stored = await AsyncStorage.getItem(STORAGE_KEY);
+      const list: SavedSearch[] = stored ? JSON.parse(stored) : [];
+      const next = list.map((s) => (s.id === searchId ? { ...s, notifyEnabled } : s));
+      await AsyncStorage.setItem(STORAGE_KEY, JSON.stringify(next));
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['saved-searches'] });
@@ -109,7 +120,7 @@ export default function SavedSearchesScreen() {
   };
 
   const handleDelete = (search: SavedSearch) => {
-    Alert.alert(
+    appAlert(
       'Aramayı Sil',
       `"${search.name}" aramasını silmek istediğinize emin misiniz?`,
       [
@@ -145,23 +156,22 @@ export default function SavedSearchesScreen() {
         <Text variant="body" style={styles.subtitle}>
           Aramalarınızı kaydetmek için giriş yapın
         </Text>
-        <Button variant="primary" title="Giriş Yap" onPress={() => router.push('/(auth)/login')} />
+        <Button variant="primary" title="Giriş Yap" onPress={() => router.push('/(auth)/login')} style={{ alignSelf: 'center' }} />
       </View>
     );
   }
 
   return (
     <View style={styles.container}>
-      {/* Header */}
-      <View style={styles.header}>
-        <TouchableOpacity onPress={() => router.back()}>
-          <Ionicons name="arrow-back" size={24} color={colors.white} />
-        </TouchableOpacity>
-        <Text style={styles.headerTitle}>{t('mobile.settingsSavedSearches')}</Text>
-        <Text style={styles.headerCount}>
-          {searches.length}/{maxSavedSearches === -1 ? '∞' : maxSavedSearches}
-        </Text>
-      </View>
+      <ScreenHeader
+        title={t('mobile.settingsSavedSearches')}
+        onBack={() => router.back()}
+        right={
+          <Text style={styles.headerCount}>
+            {searches.length}/{maxSavedSearches === -1 ? '∞' : maxSavedSearches}
+          </Text>
+        }
+      />
 
       {/* Limit Info */}
       {maxSavedSearches !== -1 && searches.length >= maxSavedSearches - 1 && (
@@ -190,7 +200,7 @@ export default function SavedSearchesScreen() {
           <Text variant="body" style={styles.emptySubtitle}>
             Arama sayfasında arama yapıp "Aramayı Kaydet" butonuna tıklayın
           </Text>
-          <Button variant="primary" title="Aramaya Git" onPress={() => router.push('/(tabs)/search')} />
+          <Button variant="primary" title="Aramaya Git" onPress={() => router.push('/(tabs)/search')} style={{ alignSelf: 'center' }} />
         </View>
       ) : (
         <ScrollView style={styles.content}>
@@ -241,17 +251,17 @@ export default function SavedSearchesScreen() {
                 style={styles.notifyToggle}
                 onPress={() => toggleNotificationMutation.mutate({
                   searchId: search.id,
-                  notifyOnNew: !search.notifyOnNew,
+                  notifyEnabled: !search.notifyEnabled,
                 })}
               >
                 <Ionicons
-                  name={search.notifyOnNew ? 'notifications' : 'notifications-off-outline'}
+                  name={search.notifyEnabled ? 'notifications' : 'notifications-off-outline'}
                   size={18}
-                  color={search.notifyOnNew ? colors.primary[600]! : colors.text.muted}
+                  color={search.notifyEnabled ? colors.primary[600]! : colors.text.muted}
                 />
                 <Text style={[
                   styles.notifyText,
-                  search.notifyOnNew && styles.notifyTextActive,
+                  search.notifyEnabled && styles.notifyTextActive,
                 ]}>
                   Yeni ürünlerde bildir
                 </Text>
@@ -277,20 +287,6 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     padding: 32,
     backgroundColor: colors.surface.DEFAULT,
-  },
-  header: {
-    backgroundColor: colors.primary[600]!,
-    paddingTop: 50,
-    paddingBottom: 16,
-    paddingHorizontal: 20,
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-  },
-  headerTitle: {
-    fontSize: 18,
-    fontWeight: 'bold',
-    color: colors.white,
   },
   headerCount: {
     color: colors.white,

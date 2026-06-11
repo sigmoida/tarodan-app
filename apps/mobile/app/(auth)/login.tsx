@@ -1,5 +1,7 @@
 import { useState } from 'react';
-import { Alert } from 'react-native';
+import { Pressable, StyleSheet } from 'react-native';
+import { Ionicons } from '@expo/vector-icons';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useForm, Controller } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
@@ -13,6 +15,7 @@ import {
   Screen,
   Text,
   VStack,
+  appAlert,
 } from '@tarodan/ui-native';
 import { authApi } from '../../src/services/api';
 import { useAuthStore } from '../../src/stores/authStore';
@@ -30,6 +33,7 @@ const loginSchema = z.object({
 type LoginForm = z.infer<typeof loginSchema>;
 
 export default function LoginScreen() {
+  const insets = useSafeAreaInsets();
   const { login } = useAuthStore();
   const [unverifiedEmail, setUnverifiedEmail] = useState<string | null>(null);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
@@ -47,10 +51,6 @@ export default function LoginScreen() {
         refreshToken?: string;
         user?: {
           email?: string;
-          isEmailVerified?: boolean;
-          companyName?: string;
-          taxId?: string;
-          membershipTier?: string;
         };
       };
       const accessToken = data.tokens?.accessToken || data.accessToken;
@@ -62,22 +62,40 @@ export default function LoginScreen() {
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       await login(accessToken!, user as any, refreshToken);
 
-      if (user && !user.isEmailVerified) {
-        setUnverifiedEmail(user.email ?? null);
-      }
-
-      const hasBusinessInfo = !!(user?.companyName && user?.taxId);
-      const isBusinessTier = user?.membershipTier === 'business';
-      if (hasBusinessInfo && !isBusinessTier) {
-        Alert.alert(
-          'Kurumsal Üyelik',
-          'İşletme bilgilerinizi tamamlamışsınız. Kurumsal üyeliğe geçerek avantajlardan yararlanabilirsiniz.',
-          [
-            { text: 'Sonra', onPress: () => router.replace('/' as never), style: 'cancel' },
-            { text: 'Üyeliğe Geç', onPress: () => router.replace('/membership/checkout' as never) },
-          ],
-        );
-        return;
+      // Doğrulanmamış e-posta banner'ı yalnızca login HATASI ('verify/doğrula')
+      // ile tetiklenir (onError); başarılı login her zaman doğrulanmış kullanıcıdandır.
+      // Kurumsal yükseltme kontrolü web gibi /users/me'den okunur (login response'unda
+      // companyName/taxId/membership yok).
+      try {
+        const profileResponse = (await authApi.getProfile()).data as {
+          user?: Record<string, unknown>;
+        } & Record<string, unknown>;
+        const currentUser = (profileResponse?.user ?? profileResponse) as {
+          companyName?: string | null;
+          taxId?: string | null;
+          membershipTier?: string | null;
+          membership?: { tier?: { type?: string; name?: string } | null } | null;
+        };
+        const membershipTier =
+          currentUser?.membership?.tier?.type ||
+          currentUser?.membership?.tier?.name ||
+          currentUser?.membershipTier ||
+          'free';
+        const isBusinessTier = String(membershipTier).toLowerCase().includes('business');
+        const hasBusinessInfo = !!(currentUser?.companyName && currentUser?.taxId);
+        if (hasBusinessInfo && !isBusinessTier) {
+          appAlert(
+            'Kurumsal Üyelik',
+            'İşletme bilgilerinizi tamamlamışsınız. Kurumsal üyeliğe geçerek avantajlardan yararlanabilirsiniz.',
+            [
+              { text: 'Sonra', onPress: () => router.replace('/' as never), style: 'cancel' },
+              { text: 'Üyeliğe Geç', onPress: () => router.replace('/membership' as never) },
+            ],
+          );
+          return;
+        }
+      } catch {
+        // Profil çekilemese bile login akışı devam etsin
       }
 
       router.replace('/' as never);
@@ -97,19 +115,32 @@ export default function LoginScreen() {
   });
 
   const resendVerificationMutation = useMutation({
-    mutationFn: () => authApi.resendVerification(),
+    mutationFn: () => authApi.resendVerification(unverifiedEmail ?? getValues('email')),
     onSuccess: () => {
-      Alert.alert('Gönderildi', 'Doğrulama bağlantısı e-posta adresinize tekrar gönderildi.');
+      appAlert('Gönderildi', 'Doğrulama bağlantısı e-posta adresinize tekrar gönderildi.');
     },
     onError: (e: unknown) => {
       const err = e as { response?: { data?: { message?: string } } };
-      Alert.alert('Hata', err?.response?.data?.message || 'Doğrulama bağlantısı gönderilemedi.');
+      appAlert('Hata', err?.response?.data?.message || 'Doğrulama bağlantısı gönderilemedi.');
     },
   });
 
   const onSubmit = (data: LoginForm) => {
     setErrorMessage(null);
     loginMutation.mutate(data);
+  };
+
+  /**
+   * Misafir olarak devam et: giriş yapmadan akışa dön. Login ekranı her zaman
+   * router.push ile açıldığı için geri dönülecek bir ekran varsa oraya
+   * (örn. checkout misafir formu) döneriz; yoksa ana sayfaya yönlendiririz.
+   */
+  const continueAsGuest = () => {
+    if (router.canGoBack()) {
+      router.back();
+    } else {
+      router.replace('/' as never);
+    }
   };
 
   /**
@@ -133,6 +164,17 @@ export default function LoginScreen() {
 
   return (
     <Screen center>
+      <Pressable
+        testID="login-back-button"
+        onPress={continueAsGuest}
+        accessibilityRole="button"
+        accessibilityLabel="Ana sayfaya dön"
+        hitSlop={12}
+        style={[styles.backButton, { top: insets.top + 8 }]}
+      >
+        <Ionicons name="arrow-back" size={26} color="#111827" />
+      </Pressable>
+
       <VStack gap={4}>
         <Text variant="displaySm" tone="primary" align="center">
           Tarodan
@@ -236,6 +278,16 @@ export default function LoginScreen() {
         />
 
         <Button
+          testID="continue-as-guest-button"
+          variant="outline"
+          size="lg"
+          fullWidth
+          title="Misafir Olarak Devam Et"
+          onPress={continueAsGuest}
+          disabled={loginMutation.isPending}
+        />
+
+        <Button
           variant="ghost"
           fullWidth
           title="Şifremi Unuttum"
@@ -271,3 +323,15 @@ export default function LoginScreen() {
     </Screen>
   );
 }
+
+const styles = StyleSheet.create({
+  backButton: {
+    position: 'absolute',
+    left: 16,
+    zIndex: 10,
+    width: 40,
+    height: 40,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+});

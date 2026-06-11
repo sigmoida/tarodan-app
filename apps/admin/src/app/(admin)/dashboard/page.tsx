@@ -97,25 +97,25 @@ interface StatCardProps {
 function StatCard({ title, value, change, icon: Icon, color }: StatCardProps) {
   return (
     <div className="admin-card">
-      <div className="flex items-center justify-between">
-        <div>
-          <p className="text-sm text-muted">{title}</p>
-          <p className="text-2xl font-bold text-heading mt-1">{value}</p>
+      <div className="flex items-center justify-between gap-3">
+        <div className="min-w-0">
+          <p className="text-sm text-muted truncate">{title}</p>
+          <p className="text-2xl font-bold text-heading mt-1 truncate">{value}</p>
           {change !== undefined && (
-            <div className="flex items-center mt-2">
+            <div className="flex items-center mt-2 flex-wrap">
               {change >= 0 ? (
-                <ArrowTrendingUpIcon className="h-4 w-4 text-success-700 mr-1" />
+                <ArrowTrendingUpIcon className="h-4 w-4 text-success-700 mr-1 shrink-0" />
               ) : (
-                <ArrowTrendingDownIcon className="h-4 w-4 text-danger-600 mr-1" />
+                <ArrowTrendingDownIcon className="h-4 w-4 text-danger-600 mr-1 shrink-0" />
               )}
               <span className={change >= 0 ? 'text-success-700' : 'text-danger-600'}>
                 {Math.abs(change)}%
               </span>
-              <span className="text-muted ml-1 text-sm">vs dün</span>
+              <span className="text-muted ml-1 text-sm whitespace-nowrap">vs dün</span>
             </div>
           )}
         </div>
-        <div className={`p-3 rounded-lg ${color}`}>
+        <div className={`p-3 rounded-lg shrink-0 ${color}`}>
           <Icon className="h-6 w-6 text-heading" />
         </div>
       </div>
@@ -418,28 +418,28 @@ export default function DashboardPage() {
         {/* Quick Actions */}
         <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
           <Link href="/products" className="admin-card hover:border-primary-500/50 transition-colors flex items-center gap-3">
-            <div className="p-2 bg-primary-100 rounded-lg">
+            <div className="p-2 bg-primary-100 rounded-lg shrink-0">
               <ShoppingBagIcon className="h-6 w-6 text-primary-600" />
             </div>
-            <span className="font-medium text-heading">Ürünler</span>
+            <span className="font-medium text-heading min-w-0 truncate">Ürünler</span>
           </Link>
           <Link href="/orders" className="admin-card hover:border-primary-500/50 transition-colors flex items-center gap-3">
-            <div className="p-2 bg-info-500/20 rounded-lg">
+            <div className="p-2 bg-info-500/20 rounded-lg shrink-0">
               <ChartBarIcon className="h-6 w-6 text-info-500" />
             </div>
-            <span className="font-medium text-heading">Siparişler</span>
+            <span className="font-medium text-heading min-w-0 truncate">Siparişler</span>
           </Link>
           <Link href="/users" className="admin-card hover:border-primary-500/50 transition-colors flex items-center gap-3">
-            <div className="p-2 bg-primary-500/20 rounded-lg">
+            <div className="p-2 bg-primary-500/20 rounded-lg shrink-0">
               <UsersIcon className="h-6 w-6 text-primary-500" />
             </div>
-            <span className="font-medium text-heading">Kullanıcılar</span>
+            <span className="font-medium text-heading min-w-0 truncate">Kullanıcılar</span>
           </Link>
           <Link href="/messages" className="admin-card hover:border-primary-500/50 transition-colors flex items-center gap-3">
-            <div className="p-2 bg-success-500/20 rounded-lg">
+            <div className="p-2 bg-success-500/20 rounded-lg shrink-0">
               <ArrowsRightLeftIcon className="h-6 w-6 text-success-500" />
             </div>
-            <span className="font-medium text-heading">Mesajlar</span>
+            <span className="font-medium text-heading min-w-0 truncate">Mesajlar</span>
           </Link>
         </div>
 
@@ -448,10 +448,10 @@ export default function DashboardPage() {
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
             {pendingActions.pendingProducts > 0 && (
               <div className="bg-warning-900/20 border border-warning-700 rounded-lg p-4 flex items-center">
-                <div className="p-2 bg-warning-500/20 rounded-lg mr-4">
+                <div className="p-2 bg-warning-500/20 rounded-lg mr-4 shrink-0">
                   <ShoppingBagIcon className="h-6 w-6 text-warning-700" />
                 </div>
-                <div>
+                <div className="min-w-0">
                   <p className="text-warning-700 font-medium">
                     {pendingActions.pendingProducts} ürün onay bekliyor
                   </p>
@@ -463,10 +463,10 @@ export default function DashboardPage() {
             )}
             {pendingActions.refundRequests > 0 && (
               <div className="bg-primary-900/20 border border-primary-700 rounded-lg p-4 flex items-center">
-                <div className="p-2 bg-primary-500/20 rounded-lg mr-4">
+                <div className="p-2 bg-primary-500/20 rounded-lg mr-4 shrink-0">
                   <CurrencyDollarIcon className="h-6 w-6 text-primary-700" />
                 </div>
-                <div>
+                <div className="min-w-0">
                   <p className="text-primary-700 font-medium">
                     {pendingActions.refundRequests} iade talebi
                   </p>
@@ -478,10 +478,10 @@ export default function DashboardPage() {
             )}
             {(pendingActions.pendingMessages ?? 0) > 0 && (
               <div className="bg-info-900/20 border border-info-700 rounded-lg p-4 flex items-center">
-                <div className="p-2 bg-info-500/20 rounded-lg mr-4">
+                <div className="p-2 bg-info-500/20 rounded-lg mr-4 shrink-0">
                   <ArrowsRightLeftIcon className="h-6 w-6 text-info-700" />
                 </div>
-                <div>
+                <div className="min-w-0">
                   <p className="text-info-700 font-medium">
                     {pendingActions.pendingMessages} mesaj onay bekliyor
                   </p>
@@ -493,10 +493,10 @@ export default function DashboardPage() {
             )}
             {(pendingActions.identityVerificationRequests ?? 0) > 0 && (
               <div className="bg-info-900/20 border border-info-700 rounded-lg p-4 flex items-center">
-                <div className="p-2 bg-info-500/20 rounded-lg mr-4">
+                <div className="p-2 bg-info-500/20 rounded-lg mr-4 shrink-0">
                   <UsersIcon className="h-6 w-6 text-info-700" />
                 </div>
-                <div>
+                <div className="min-w-0">
                   <p className="text-info-700 font-medium">
                     {pendingActions.identityVerificationRequests} kimlik doğrulama talebi
                   </p>

@@ -100,6 +100,7 @@
     "brands": "Markalar",
     "models": "Modeller",
     "trades": "Takaslar",
+    "tradeShowcase": "Takas Vitrini",
     "collections": "Koleksiyonlar",
     "pricing": "Üyelik",
     "profile": "Profil",
@@ -622,6 +623,8 @@
     "invalidCardNumber": "Geçersiz kart numarası"
   },
   "collection": {
+    "share": "Paylaş",
+    "linkCopied": "Link kopyalandı",
     "collections": "Koleksiyonlar",
     "myCollections": "Koleksiyonlarım",
     "createCollection": "Koleksiyon Oluştur",

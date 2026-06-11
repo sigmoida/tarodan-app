@@ -236,12 +236,19 @@ export const useAuthStore = create<AuthState>()(
         } catch (error: unknown) {
           const status = (error as { response?: { status?: number } })?.response?.status;
           const isUnauthorized = status === 401 || status === 403;
-          if (isUnauthorized && typeof window !== 'undefined') {
-            localStorage.removeItem('auth_token');
-            localStorage.removeItem('refresh_token');
-          }
           if (isUnauthorized) {
+            // Token gerçekten geçersiz → temizle ve oturumu kapat.
+            if (typeof window !== 'undefined') {
+              localStorage.removeItem('auth_token');
+              localStorage.removeItem('refresh_token');
+            }
             set({ user: null, token: null, refreshToken: null, isAuthenticated: false, limits: null });
+          } else {
+            // Geçici hata (API erişilemez / 5xx / network) — token hâlâ geçerli olabilir.
+            // Oturumu DÜŞÜRME: iyimser olarak authenticated bırak (kullanıcı verisi
+            // sonraki refreshUser/checkAuth ile dolar). Aksi halde API hıçkırınca,
+            // özellikle ödeme dönüşünde yenilemede, kullanıcı login'e atılıyordu.
+            set({ isAuthenticated: true });
           }
         } finally {
           set({ isLoading: false });

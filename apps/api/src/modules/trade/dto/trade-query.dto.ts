@@ -14,6 +14,12 @@ export class TradeQueryDto {
   @IsEnum(TradeStatus)
   status?: TradeStatus;
 
+  // Çoklu-statü grubu (tek enum status yetmediğinde). 'shipping' = depo-escrow
+  // akışındaki kargo statüleri. status ile birlikte gönderilirse statusGroup önceliklidir.
+  @IsOptional()
+  @IsString()
+  statusGroup?: 'shipping';
+
   @IsOptional()
   @IsString()
   role?: 'initiator' | 'receiver' | 'all';

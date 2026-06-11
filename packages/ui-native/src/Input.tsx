@@ -6,6 +6,7 @@ import {
   Text,
   TextInput,
   View,
+  type StyleProp,
   type TextInputProps,
   type TextStyle,
   type ViewStyle,
@@ -14,6 +15,10 @@ import { theme } from './theme';
 
 type IoniconName = React.ComponentProps<typeof Ionicons>['name'];
 
+/**
+ * Not: `style` dış sarmalayıcıya (container) uygulanır — margin/yerleşim için.
+ * İçteki TextInput'u stillemek için `inputStyle`, çerçeve için `fieldStyle` kullanın.
+ */
 export interface InputProps extends TextInputProps {
   label?: string;
   error?: string;
@@ -29,6 +34,8 @@ export interface InputProps extends TextInputProps {
   togglePasswordVisibility?: boolean;
   inputSize?: 'sm' | 'md' | 'lg';
   containerStyle?: ViewStyle;
+  /** Style merged into the bordered field wrapper (e.g. to square corners). */
+  fieldStyle?: StyleProp<ViewStyle>;
   inputStyle?: TextStyle;
 }
 
@@ -54,7 +61,10 @@ export const Input: React.FC<InputProps> = ({
   secureTextEntry,
   inputSize = 'md',
   containerStyle,
+  fieldStyle,
   inputStyle,
+  style,
+  multiline,
   onFocus,
   onBlur,
   ...rest
@@ -98,12 +108,16 @@ export const Input: React.FC<InputProps> = ({
   const effectiveSecure = secureTextEntry ? passwordHidden : false;
 
   return (
-    <View style={[styles.container, containerStyle]}>
+    <View style={[styles.container, containerStyle, style as StyleProp<ViewStyle>]}>
       {label && <Text style={styles.label}>{label}</Text>}
       <View
         style={[
           styles.field,
-          { height: ss.height, borderColor, backgroundColor: colors.white },
+          multiline
+            ? { minHeight: ss.height, paddingVertical: spacing[2], alignItems: 'flex-start' }
+            : { height: ss.height },
+          { borderColor, backgroundColor: colors.white },
+          fieldStyle,
         ]}
       >
         {resolvedLeftIcon && <View style={styles.iconLeft}>{resolvedLeftIcon}</View>}
@@ -111,8 +125,10 @@ export const Input: React.FC<InputProps> = ({
           style={[
             styles.input,
             { fontSize: ss.font, color: colors.text.heading },
+            multiline ? styles.inputMultiline : null,
             inputStyle,
           ]}
+          multiline={multiline}
           placeholderTextColor={colors.text.subtle}
           secureTextEntry={effectiveSecure}
           onFocus={(e) => {
@@ -157,6 +173,12 @@ const styles = StyleSheet.create({
   input: {
     flex: 1,
     padding: 0,
+    textAlignVertical: 'center',
+    includeFontPadding: false,
+  },
+  inputMultiline: {
+    alignSelf: 'stretch',
+    textAlignVertical: 'top',
   },
   iconLeft: { marginRight: spacing[2] },
   iconRight: { marginLeft: spacing[2] },

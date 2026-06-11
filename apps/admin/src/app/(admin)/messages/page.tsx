@@ -2,8 +2,10 @@
 
 import { useState, useEffect } from "react";
 import { adminApi } from "@/lib/api";
-import { Button, Spinner, StatusBadge } from "@tarodan/ui";
+import { Button, StatusBadge } from "@tarodan/ui";
 import type { StatusConfig } from "@tarodan/ui";
+import { DataTable, type ColumnDef } from "@/components/DataTable";
+import { PageHeader, ActionButtons, ActionIconButton } from "@/components/admin-list";
 import {
   CheckIcon,
   XMarkIcon,
@@ -141,21 +143,118 @@ export default function MessagesPage() {
     rejected: { label: "Reddedildi", variant: "danger" },
   };
 
+  const columns: ColumnDef<Message, any>[] = [
+    {
+      header: "Gönderen",
+      cell: ({ row }) => (
+        <div>
+          <p className="font-medium text-heading">
+            {row.original.sender.displayName}
+          </p>
+          <p className="text-xs text-muted">{row.original.sender.email}</p>
+        </div>
+      ),
+    },
+    {
+      header: "Alıcı",
+      cell: ({ row }) => (
+        <div>
+          <p className="font-medium text-heading">
+            {row.original.receiver.displayName}
+          </p>
+          <p className="text-xs text-muted">{row.original.receiver.email}</p>
+        </div>
+      ),
+    },
+    {
+      header: "Mesaj",
+      cell: ({ row }) => (
+        <p className="text-sm text-muted line-clamp-2 max-w-md">
+          {row.original.originalContent || row.original.content}
+        </p>
+      ),
+    },
+    {
+      header: "Uyarılar",
+      cell: ({ row }) =>
+        row.original.flaggedReason ? (
+          <span className="badge badge-warning text-xs">
+            {row.original.flaggedReason}
+          </span>
+        ) : (
+          <span className="text-muted">-</span>
+        ),
+    },
+    {
+      header: "Durum",
+      cell: ({ row }) => (
+        <StatusBadge
+          status={row.original.status}
+          config={messageStatusConfig}
+        />
+      ),
+    },
+    {
+      header: "Tarih",
+      cell: ({ row }) => (
+        <span className="text-sm text-muted">
+          {new Date(row.original.createdAt).toLocaleDateString("tr-TR")}
+        </span>
+      ),
+    },
+    {
+      id: "actions",
+      header: "İşlemler",
+      cell: ({ row }) => {
+        const message = row.original;
+        return (
+          <ActionButtons>
+            {message.status === "pending" && (
+              <>
+                <ActionIconButton
+                  icon={CheckIcon}
+                  onClick={() => handleApprove(message.id)}
+                  title="Onayla"
+                  variant="success"
+                />
+                <ActionIconButton
+                  icon={XMarkIcon}
+                  onClick={() => handleReject(message.id)}
+                  title="Reddet"
+                  variant="danger"
+                />
+                {message.senderId && (
+                  <ActionIconButton
+                    icon={NoSymbolIcon}
+                    onClick={() => handleBanSender(message)}
+                    title="Göndereni yasakla (hesap engeli)"
+                    variant="primary"
+                  />
+                )}
+              </>
+            )}
+            <ActionIconButton icon={EyeIcon} title="Detay" />
+          </ActionButtons>
+        );
+      },
+    },
+  ];
+
   return (
     <>
       <div className="space-y-6">
-        <div>
-          <h1 className="text-2xl font-bold text-heading">Mesaj Moderation</h1>
-          <p className="text-muted mt-1">
-            {filter === "all"
+        <PageHeader
+          title="Mesaj Moderation"
+          description={
+            filter === "all"
               ? `Toplam ${total} mesaj`
               : filter === "pending"
                 ? `${total} mesaj onay bekliyor — Bekleyen mesajları onaylayın, reddedin veya göndereni yasaklayın`
                 : filter === "approved"
                   ? `${total} onaylanmış mesaj`
-                  : `${total} reddedilen mesaj`}
-          </p>
-        </div>
+                  : `${total} reddedilen mesaj`
+          }
+        />
 
         <div className="flex gap-4">
           {(["all", "pending", "approved", "rejected"] as const).map((f) => (
@@ -180,129 +279,13 @@ export default function MessagesPage() {
           ))}
         </div>
 
-        <div className="admin-card overflow-hidden">
-          <div className="overflow-x-auto">
-            <table className="admin-table">
-              <thead>
-                <tr>
-                  <th>Gönderen</th>
-                  <th>Alıcı</th>
-                  <th>Mesaj</th>
-                  <th>Uyarılar</th>
-                  <th>Durum</th>
-                  <th>Tarih</th>
-                  <th>İşlemler</th>
-                </tr>
-              </thead>
-              <tbody>
-                {loading ? (
-                  <tr>
-                    <td colSpan={7} className="text-center py-8">
-                      <Spinner size="lg" className="mx-auto" />
-                    </td>
-                  </tr>
-                ) : messages.length === 0 ? (
-                  <tr>
-                    <td colSpan={7} className="text-center py-8 text-muted">
-                      Mesaj bulunamadı
-                    </td>
-                  </tr>
-                ) : (
-                  messages.map((message) => (
-                    <tr key={message.id}>
-                      <td>
-                        <div>
-                          <p className="font-medium text-heading">
-                            {message.sender.displayName}
-                          </p>
-                          <p className="text-xs text-muted">
-                            {message.sender.email}
-                          </p>
-                        </div>
-                      </td>
-                      <td>
-                        <div>
-                          <p className="font-medium text-heading">
-                            {message.receiver.displayName}
-                          </p>
-                          <p className="text-xs text-muted">
-                            {message.receiver.email}
-                          </p>
-                        </div>
-                      </td>
-                      <td>
-                        <p className="text-sm text-muted line-clamp-2 max-w-md">
-                          {message.originalContent || message.content}
-                        </p>
-                      </td>
-                      <td>
-                        {message.flaggedReason ? (
-                          <span className="badge badge-warning text-xs">
-                            {message.flaggedReason}
-                          </span>
-                        ) : (
-                          <span className="text-muted">-</span>
-                        )}
-                      </td>
-                      <td>
-                        <StatusBadge
-                          status={message.status}
-                          config={messageStatusConfig}
-                        />
-                      </td>
-                      <td className="text-sm text-muted">
-                        {new Date(message.createdAt).toLocaleDateString(
-                          "tr-TR",
-                        )}
-                      </td>
-                      <td>
-                        <div className="flex gap-1">
-                          {message.status === "pending" && (
-                            <>
-                              <Button
-                                variant="secondary"
-                                onClick={() => handleApprove(message.id)}
-                                className="p-2 text-success-700 hover:bg-success-500/10 rounded-lg"
-                                title="Onayla"
-                              >
-                                <CheckIcon className="h-5 w-5" />
-                              </Button>
-                              <Button
-                                variant="secondary"
-                                onClick={() => handleReject(message.id)}
-                                className="p-2 text-danger-600 hover:bg-danger-500/10 rounded-lg"
-                                title="Reddet"
-                              >
-                                <XMarkIcon className="h-5 w-5" />
-                              </Button>
-                              {message.senderId && (
-                                <Button
-                                  variant="secondary"
-                                  onClick={() => handleBanSender(message)}
-                                  className="p-2 text-primary-700 hover:bg-primary-500/10 rounded-lg"
-                                  title="Göndereni yasakla (hesap engeli)"
-                                >
-                                  <NoSymbolIcon className="h-5 w-5" />
-                                </Button>
-                              )}
-                            </>
-                          )}
-                          <Button
-                            variant="secondary"
-                            className="p-2 text-muted hover:text-heading hover:bg-surface-alt rounded-lg"
-                            title="Detay"
-                          >
-                            <EyeIcon className="h-5 w-5" />
-                          </Button>
-                        </div>
-                      </td>
-                    </tr>
-                  ))
-                )}
-              </tbody>
-            </table>
-          </div>
-        </div>
+        <DataTable
+          columns={columns}
+          data={messages}
+          loading={loading}
+          emptyText="Mesaj bulunamadı"
+          getRowId={(m) => m.id}
+        />
 
         <div className="flex items-center justify-between">
           <p className="text-sm text-muted">

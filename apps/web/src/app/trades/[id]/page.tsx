@@ -634,12 +634,7 @@ export default function TradeDetailPage() {
 
     setIsActionLoading(true);
     try {
-      await tradesApi.accept(
-        trade.id,
-        locale === "en"
-          ? "I accept the trade offer"
-          : "Takas teklifini kabul ediyorum",
-      );
+      await tradesApi.accept(trade.id);
       toast.success(
         locale === "en" ? "Trade accepted!" : "Takas kabul edildi!",
       );
@@ -652,6 +647,7 @@ export default function TradeDetailPage() {
           (locale === "en"
             ? "Failed to accept trade"
             : "Takas kabul edilemedi"),
+        { id: "trade-action-error" },
       );
     } finally {
       setIsActionLoading(false);

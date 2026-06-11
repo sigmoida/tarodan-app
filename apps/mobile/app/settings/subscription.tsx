@@ -1,4 +1,4 @@
-import { View, ScrollView, StyleSheet, TouchableOpacity, Alert, Linking } from 'react-native';
+import { View, ScrollView, StyleSheet, TouchableOpacity, Linking } from 'react-native';
 import {
   Card,
   Button,
@@ -8,6 +8,8 @@ import {
   Snackbar,
   Text,
   theme,
+  ScreenHeader,
+  appAlert,
 } from '@tarodan/ui-native';
 import { useState, useEffect, useCallback } from 'react';
 import { router, useFocusEffect } from 'expo-router';
@@ -64,7 +66,7 @@ export default function SubscriptionSettingsScreen() {
   }, [error]);
 
   const handleCancel = () => {
-    Alert.alert(
+    appAlert(
       'Aboneliği İptal Et',
       'Aboneliğinizi iptal etmek istediğinize emin misiniz? Dönem sonuna kadar premium özelliklerden yararlanmaya devam edebilirsiniz.',
       [
@@ -101,12 +103,18 @@ export default function SubscriptionSettingsScreen() {
         <Text variant="body" style={styles.subtitle}>
           Abonelik ayarlarınızı görmek için giriş yapın
         </Text>
-        <Button variant="primary" title="Giriş Yap" onPress={() => router.push('/(auth)/login')} />
+        <Button variant="primary" title="Giriş Yap" onPress={() => router.push('/(auth)/login')} style={{ alignSelf: 'center' }} />
       </View>
     );
   }
 
-  const isPremium = subscription && isSubscriptionActive(subscription);
+  // Web ile aynı mantık (profile/membership/page.tsx): yalnızca AKTİF ve ücretli
+  // (free olmayan) üyelik "premium" sayılır. Backend her kullanıcıya aktif bir
+  // ücretsiz üyelik açtığı için (status=active, ~100 yıl geçerli), sadece
+  // isSubscriptionActive() kontrolü TÜM kullanıcıları (ücretsiz dâhil) premium
+  // gösteriyordu. Bu yüzden tier tipini de kontrol ediyoruz.
+  const tierType = subscription?.tier?.type ?? 'free';
+  const isPremium = !!subscription && isSubscriptionActive(subscription) && tierType !== 'free';
   const isCancelled = subscription?.status === 'cancelled';
   const daysLeft = subscription ? getDaysUntilRenewal(subscription) : 0;
   const statusInfo = subscription ? getSubscriptionStatusText(subscription.status) : null;
@@ -125,14 +133,7 @@ export default function SubscriptionSettingsScreen() {
 
   return (
     <View style={styles.container}>
-      {/* Header */}
-      <View style={styles.header}>
-        <TouchableOpacity onPress={() => router.back()}>
-          <Ionicons name="arrow-back" size={24} color={colors.white} />
-        </TouchableOpacity>
-        <Text style={styles.headerTitle}>{t('mobile.settingsSubscription')}</Text>
-        <View style={{ width: 24 }} />
-      </View>
+      <ScreenHeader title={t('mobile.settingsSubscription')} onBack={() => router.back()} />
 
       {isLoading && !subscription ? (
         <View style={styles.loadingContainer}>
@@ -145,9 +146,9 @@ export default function SubscriptionSettingsScreen() {
             <View style={styles.planHeader}>
               <View>
                 <Text variant="h2" style={styles.planName}>
-                  {isPremium ? 'Premium Üyelik' : 'Ücretsiz Üyelik'}
+                  {subscription?.tier?.name ?? (isPremium ? 'Premium Üyelik' : 'Ücretsiz Üyelik')}
                 </Text>
-                {statusInfo && (
+                {isPremium && statusInfo && (
                   <Chip
                     variant={statusChipVariant}
                     size="sm"
@@ -390,20 +391,6 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
     padding: 32,
-  },
-  header: {
-    backgroundColor: colors.primary[600]!,
-    paddingTop: 50,
-    paddingBottom: 16,
-    paddingHorizontal: 20,
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-  },
-  headerTitle: {
-    fontSize: 18,
-    fontWeight: 'bold',
-    color: colors.white,
   },
   subtitle: {
     textAlign: 'center',

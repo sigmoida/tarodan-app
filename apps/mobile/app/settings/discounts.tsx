@@ -1,5 +1,5 @@
 import React, { useState, useMemo } from 'react';
-import { View, ScrollView, StyleSheet, Pressable, Alert } from 'react-native';
+import { View, ScrollView, StyleSheet, Pressable } from 'react-native';
 import {
   Modal,
   Button,
@@ -16,12 +16,15 @@ import {
   EmptyState,
   ScreenLoader,
   theme,
+  appAlert,
 } from '@tarodan/ui-native';
 import { router } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useAuthStore } from '../../src/stores/authStore';
 import { discountsApi, productsApi } from '../../src/services/api';
+import { ThemedRefreshControl } from '../../src/components/common';
+import { useRefresh } from '../../src/hooks/useRefresh';
 import { formatPrice } from '../../src/utils/format';
 
 const { colors, spacing, radius } = theme;
@@ -126,6 +129,8 @@ export default function DiscountsScreen() {
     enabled: isAuthenticated,
   });
 
+  const { refreshing, onRefresh } = useRefresh(discountsQuery.refetch, productsQuery.refetch);
+
   const filteredDiscounts = useMemo(() => {
     const list = discountsQuery.data ?? [];
     const now = new Date();
@@ -155,7 +160,7 @@ export default function DiscountsScreen() {
       setSnackbar({ visible: true, message: form.id ? 'İndirim güncellendi' : 'İndirim oluşturuldu' });
     },
     onError: (e: any) => {
-      Alert.alert('Hata', e?.response?.data?.message || 'İndirim kaydedilemedi.');
+      appAlert('Hata', e?.response?.data?.message || 'İndirim kaydedilemedi.');
     },
   });
 
@@ -166,7 +171,7 @@ export default function DiscountsScreen() {
       setSnackbar({ visible: true, message: 'İndirim silindi' });
     },
     onError: (e: any) => {
-      Alert.alert('Hata', e?.response?.data?.message || 'İndirim silinemedi.');
+      appAlert('Hata', e?.response?.data?.message || 'İndirim silinemedi.');
     },
   });
 
@@ -207,20 +212,20 @@ export default function DiscountsScreen() {
 
   const handleSubmit = () => {
     if (!form.name.trim()) {
-      Alert.alert('Eksik', 'İndirim adı gerekli.');
+      appAlert('Eksik', 'İndirim adı gerekli.');
       return;
     }
     const valueNum = parseFloat(form.value);
     if (!valueNum || valueNum <= 0) {
-      Alert.alert('Eksik', 'Geçerli bir indirim değeri girin.');
+      appAlert('Eksik', 'Geçerli bir indirim değeri girin.');
       return;
     }
     if (form.type === 'percentage' && valueNum > 100) {
-      Alert.alert('Hata', 'Yüzde indirim 100\'den büyük olamaz.');
+      appAlert('Hata', 'Yüzde indirim 100\'den büyük olamaz.');
       return;
     }
     if (form.scope === 'product' && form.targetProductIds.length === 0) {
-      Alert.alert('Eksik', 'Lütfen en az bir ürün seçin.');
+      appAlert('Eksik', 'Lütfen en az bir ürün seçin.');
       return;
     }
 
@@ -246,7 +251,7 @@ export default function DiscountsScreen() {
   };
 
   const handleDelete = (d: Discount) => {
-    Alert.alert(
+    appAlert(
       'İndirimi Sil',
       `"${d.name}" indirimini silmek istediğinize emin misiniz?`,
       [
@@ -323,7 +328,11 @@ export default function DiscountsScreen() {
           onAction={openCreate}
         />
       ) : (
-        <ScrollView style={styles.list} contentContainerStyle={{ padding: 16, paddingBottom: 100 }}>
+        <ScrollView
+          style={styles.list}
+          contentContainerStyle={{ padding: 16, paddingBottom: 100 }}
+          refreshControl={<ThemedRefreshControl refreshing={refreshing} onRefresh={onRefresh} />}
+        >
           {filteredDiscounts.map((d) => (
             <Card key={d.id} style={styles.discountCard}>
               <View style={styles.cardHeader}>

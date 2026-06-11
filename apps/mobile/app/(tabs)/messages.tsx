@@ -5,7 +5,6 @@ import { Ionicons } from '@expo/vector-icons';
 import {
   Avatar,
   Badge,
-  FAB,
   Input,
   Spinner,
   Text,
@@ -13,13 +12,14 @@ import {
 } from '@tarodan/ui-native';
 import { useMessagesStore } from '../../src/stores/messagesStore';
 import { useAuthStore } from '../../src/stores/authStore';
+import { formatMessagePreview } from '../../src/utils/contentFilter';
 import { TarodanColors } from '../../src/theme';
 
 const { colors } = theme;
 
 export default function MessagesTabScreen() {
   const { isAuthenticated, user, limits } = useAuthStore();
-  const { threads, isLoading, fetchThreads, getUnreadCount, getOtherParticipant, dailyMessageCount } = useMessagesStore();
+  const { threads, isLoading, hasLoadedThreads, fetchThreads, getUnreadCount, getOtherParticipant, dailyMessageCount } = useMessagesStore();
   const [refreshing, setRefreshing] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
 
@@ -90,14 +90,17 @@ export default function MessagesTabScreen() {
     <View style={styles.container}>
       {/* Header */}
       <View style={styles.header}>
+        <View style={styles.headerSide} />
         <Text variant="h3" tone="inverted" weight="bold">
           Mesajlar
         </Text>
-        {unreadCount > 0 && (
-          <Badge variant="danger" style={styles.headerBadge}>
-            {unreadCount}
-          </Badge>
-        )}
+        <View style={styles.headerSide}>
+          {unreadCount > 0 && (
+            <Badge variant="danger" style={styles.headerBadge}>
+              {unreadCount}
+            </Badge>
+          )}
+        </View>
       </View>
 
       {/* Message Limit Banner */}
@@ -127,8 +130,9 @@ export default function MessagesTabScreen() {
         />
       </View>
 
-      {/* Content */}
-      {isLoading && threads.length === 0 ? (
+      {/* Content — ilk yükleme bitene dek spinner; "Henüz mesaj yok" boş ekranı
+          fetch başlamadan bir an çakıp zıplamaya yol açmasın. */}
+      {threads.length === 0 && (isLoading || !hasLoadedThreads) ? (
         <View style={styles.loadingContainer}>
           <Spinner size="lg" />
         </View>
@@ -212,7 +216,7 @@ export default function MessagesTabScreen() {
                     style={styles.lastMessage}
                   >
                     {thread.lastMessage?.senderId === user?.id ? 'Sen: ' : ''}
-                    {thread.lastMessage?.content || 'Henüz mesaj yok'}
+                    {formatMessagePreview(thread.lastMessage?.content ?? '') || 'Henüz mesaj yok'}
                   </Text>
                 </View>
 
@@ -228,14 +232,6 @@ export default function MessagesTabScreen() {
           <View style={{ height: 100 }} />
         </ScrollView>
       )}
-
-      {/* New Message FAB */}
-      <FAB
-        icon="add"
-        accessibilityLabel="Yeni mesaj"
-        style={styles.fab}
-        onPress={() => router.push('/messages/new')}
-      />
     </View>
   );
 }
@@ -252,7 +248,8 @@ const styles = StyleSheet.create({
     padding: 32,
   },
   header: {
-    backgroundColor: TarodanColors.primary,
+    // Ana sayfa header'ı ile aynı turuncu (colors.primary[600]).
+    backgroundColor: colors.primary[600]!,
     paddingTop: 50,
     paddingBottom: 16,
     paddingHorizontal: 20,
@@ -264,6 +261,10 @@ const styles = StyleSheet.create({
     fontSize: 18,
     fontWeight: 'bold',
     color: TarodanColors.textOnPrimary,
+  },
+  headerSide: {
+    flex: 1,
+    justifyContent: 'center',
   },
   headerBadge: {
     marginLeft: 8,
@@ -398,11 +399,5 @@ const styles = StyleSheet.create({
   unreadBadge: {
     backgroundColor: TarodanColors.primary,
     marginLeft: 8,
-  },
-  fab: {
-    position: 'absolute',
-    right: 16,
-    bottom: 24,
-    backgroundColor: TarodanColors.primary,
   },
 });

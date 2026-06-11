@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { View, ScrollView, StyleSheet, TouchableOpacity } from 'react-native';
 import { router } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
-import { theme, Text, Input, Button, Divider } from '@tarodan/ui-native';
+import { theme, Text, Input, Button, Divider, ScreenHeader } from '@tarodan/ui-native';
 import { api } from '../src/services/api';
 
 const { colors } = theme;
@@ -12,7 +12,6 @@ interface OrderStatus {
   orderNumber: string;
   status: string;
   totalAmount: number;
-  shippingCost: number;
   createdAt: string;
   product: {
     title: string;
@@ -20,7 +19,7 @@ interface OrderStatus {
   };
   shipment?: {
     trackingNumber: string;
-    carrier: string;
+    provider: string;
     status: string;
     estimatedDelivery?: string;
   };
@@ -94,14 +93,7 @@ export default function OrderTrackScreen() {
 
   return (
     <View style={styles.container}>
-      {/* Header */}
-      <View style={styles.header}>
-        <TouchableOpacity onPress={() => router.back()}>
-          <Ionicons name="arrow-back" size={24} color={colors.white} />
-        </TouchableOpacity>
-        <Text style={styles.headerTitle}>Sipariş Takip</Text>
-        <View style={{ width: 24 }} />
-      </View>
+      <ScreenHeader title="Sipariş Takip" onBack={() => router.back()} />
 
       <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
         {/* Track Form */}
@@ -122,7 +114,7 @@ export default function OrderTrackScreen() {
               setOrderNumber(text);
               setError('');
             }}
-            style={styles.input}
+            containerStyle={styles.input}
             placeholder="ORD-XXXXXX"
             autoCapitalize="characters"
           />
@@ -134,7 +126,7 @@ export default function OrderTrackScreen() {
               setEmail(text);
               setError('');
             }}
-            style={styles.input}
+            containerStyle={styles.input}
             keyboardType="email-address"
             autoCapitalize="none"
             placeholder="ornek@email.com"
@@ -162,7 +154,7 @@ export default function OrderTrackScreen() {
         {order && (
           <View style={styles.resultCard}>
             <View style={styles.resultHeader}>
-              <View>
+              <View style={styles.resultHeaderInfo}>
                 <Text style={styles.orderNumber}>{order.orderNumber}</Text>
                 <Text style={styles.orderDate}>{formatDate(order.createdAt)}</Text>
               </View>
@@ -184,19 +176,8 @@ export default function OrderTrackScreen() {
               <Text style={styles.productTitle}>{order.product.title}</Text>
             </View>
 
-            {/* Price Info */}
+            {/* Price Info — guest-track yanıtında yalnızca toplam tutar var (kırılım yok) */}
             <View style={styles.priceSection}>
-              <View style={styles.priceRow}>
-                <Text style={styles.priceLabel}>Ürün Tutarı</Text>
-                <Text style={styles.priceValue}>
-                  ₺{((order.totalAmount ?? 0) - (order.shippingCost ?? 0)).toLocaleString('tr-TR')}
-                </Text>
-              </View>
-              <View style={styles.priceRow}>
-                <Text style={styles.priceLabel}>Kargo</Text>
-                <Text style={styles.priceValue}>₺{(order.shippingCost ?? 0).toLocaleString('tr-TR')}</Text>
-              </View>
-              <Divider style={{ marginVertical: 8 }} />
               <View style={styles.priceRow}>
                 <Text style={styles.totalLabel}>Toplam</Text>
                 <Text style={styles.totalValue}>₺{(order.totalAmount ?? 0).toLocaleString('tr-TR')}</Text>
@@ -211,7 +192,7 @@ export default function OrderTrackScreen() {
                   <View style={styles.shippingRow}>
                     <Text style={styles.shippingLabel}>Kargo Firması</Text>
                     <Text style={styles.shippingValue}>
-                      {order.shipment.carrier === 'surat' ? 'Sürat Kargo' : order.shipment.carrier}
+                      {order.shipment.provider === 'surat' ? 'Sürat Kargo' : order.shipment.provider}
                     </Text>
                   </View>
                   {order.shipment.trackingNumber && (
@@ -320,20 +301,6 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: colors.surface.alt,
   },
-  header: {
-    backgroundColor: colors.primary[600]!,
-    paddingTop: 50,
-    paddingBottom: 16,
-    paddingHorizontal: 20,
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-  },
-  headerTitle: {
-    fontSize: 18,
-    fontWeight: 'bold',
-    color: colors.white,
-  },
   content: {
     flex: 1,
     padding: 16,
@@ -393,6 +360,10 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     alignItems: 'flex-start',
   },
+  resultHeaderInfo: {
+    flex: 1,
+    marginRight: 12,
+  },
   orderNumber: {
     fontSize: 18,
     fontWeight: 'bold',
@@ -409,12 +380,15 @@ const styles = StyleSheet.create({
     paddingHorizontal: 12,
     paddingVertical: 6,
     borderRadius: 20,
+    flexShrink: 0,
   },
   statusText: {
     fontSize: 12,
     fontWeight: '600',
     color: colors.white,
     marginLeft: 6,
+    includeFontPadding: false,
+    textAlignVertical: 'center',
   },
   sectionTitle: {
     fontSize: 14,
@@ -470,16 +444,20 @@ const styles = StyleSheet.create({
   shippingRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
+    alignItems: 'flex-start',
     marginBottom: 8,
   },
   shippingLabel: {
     fontSize: 14,
     color: colors.text.muted,
+    marginRight: 12,
   },
   shippingValue: {
+    flex: 1,
     fontSize: 14,
     color: colors.text.heading,
     fontWeight: '500',
+    textAlign: 'right',
   },
   trackingNumber: {
     color: colors.primary[600]!,
@@ -515,8 +493,10 @@ const styles = StyleSheet.create({
   timelineLine: {
     position: 'absolute',
     top: 11,
-    right: -20,
-    width: 40,
+    left: '50%',
+    right: '-50%',
+    marginLeft: 14,
+    marginRight: 14,
     height: 2,
     backgroundColor: colors.border.DEFAULT,
   },

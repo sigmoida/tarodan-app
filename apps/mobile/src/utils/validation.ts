@@ -47,3 +47,14 @@ export const displayNameSchema = z
 export const acceptTermsSchema = z
   .boolean()
   .refine((val) => val === true, 'Sözleşmeleri kabul etmelisiniz');
+
+/** "YYYY-MM-DD" doğum tarihi 18 yaş ve üstü mü? Geçersiz tarih → false. */
+export function isAdult(dateStr: string): boolean {
+  const d = new Date(dateStr);
+  if (Number.isNaN(d.getTime())) return false;
+  const today = new Date();
+  let age = today.getFullYear() - d.getFullYear();
+  const monthDiff = today.getMonth() - d.getMonth();
+  if (monthDiff < 0 || (monthDiff === 0 && today.getDate() < d.getDate())) age -= 1;
+  return age >= 18;
+}

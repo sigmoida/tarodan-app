@@ -186,7 +186,7 @@ export default function ChangePasswordPage() {
               </label>
               <div className="relative">
                 <LockClosedIcon className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-subtle" />
-                <Input type={showCurrent ? 'text' : 'password'}
+                <Input type={showCurrent ? 'text' : 'password'} hidePasswordToggle
                   value={currentPassword}
                   onChange={(e) => {
                     setCurrentPassword(e.target.value);
@@ -196,11 +196,13 @@ export default function ChangePasswordPage() {
                   className="w-full pl-12 pr-12 py-3 border-2 border-border rounded-xl focus:ring-0 focus:border-primary-500 transition-colors text-heading"
                   required
                   autoComplete="current-password" />
-                <Button variant="secondary" type="button"
+                <button
+                  type="button"
                   onClick={() => setShowCurrent(!showCurrent)}
+                  aria-label={showCurrent ? (locale === 'tr' ? 'Şifreyi gizle' : 'Hide password') : (locale === 'tr' ? 'Şifreyi göster' : 'Show password')}
                   className="absolute right-4 top-1/2 -translate-y-1/2 text-subtle hover:text-muted">
                   {showCurrent ? <EyeSlashIcon className="w-5 h-5" /> : <EyeIcon className="w-5 h-5" />}
-                </Button>
+                </button>
               </div>
             </div>
 
@@ -210,7 +212,7 @@ export default function ChangePasswordPage() {
               </label>
               <div className="relative">
                 <LockClosedIcon className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-subtle" />
-                <Input type={showNew ? 'text' : 'password'}
+                <Input type={showNew ? 'text' : 'password'} hidePasswordToggle
                   value={newPassword}
                   onChange={(e) => {
                     setNewPassword(e.target.value);
@@ -220,11 +222,13 @@ export default function ChangePasswordPage() {
                   className="w-full pl-12 pr-12 py-3 border-2 border-border rounded-xl focus:ring-0 focus:border-primary-500 transition-colors text-heading"
                   required
                   autoComplete="new-password" />
-                <Button variant="secondary" type="button"
+                <button
+                  type="button"
                   onClick={() => setShowNew(!showNew)}
+                  aria-label={showNew ? (locale === 'tr' ? 'Şifreyi gizle' : 'Hide password') : (locale === 'tr' ? 'Şifreyi göster' : 'Show password')}
                   className="absolute right-4 top-1/2 -translate-y-1/2 text-subtle hover:text-muted">
                   {showNew ? <EyeSlashIcon className="w-5 h-5" /> : <EyeIcon className="w-5 h-5" />}
-                </Button>
+                </button>
               </div>
             </div>
 
@@ -246,7 +250,7 @@ export default function ChangePasswordPage() {
               </label>
               <div className="relative">
                 <LockClosedIcon className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-subtle" />
-                <Input type={showConfirm ? 'text' : 'password'}
+                <Input type={showConfirm ? 'text' : 'password'} hidePasswordToggle
                   value={confirmPassword}
                   onChange={(e) => {
                     setConfirmPassword(e.target.value);
@@ -258,11 +262,13 @@ export default function ChangePasswordPage() {
                   }`}
                   required
                   autoComplete="new-password" />
-                <Button variant="secondary" type="button"
+                <button
+                  type="button"
                   onClick={() => setShowConfirm(!showConfirm)}
+                  aria-label={showConfirm ? (locale === 'tr' ? 'Şifreyi gizle' : 'Hide password') : (locale === 'tr' ? 'Şifreyi göster' : 'Show password')}
                   className="absolute right-4 top-1/2 -translate-y-1/2 text-subtle hover:text-muted">
                   {showConfirm ? <EyeSlashIcon className="w-5 h-5" /> : <EyeIcon className="w-5 h-5" />}
-                </Button>
+                </button>
               </div>
               {confirmPassword && !passwordsMatch && (
                 <p className="mt-2 text-sm text-danger-600 flex items-center gap-1">

@@ -19,8 +19,9 @@ import {
   CurrencyDollarIcon,
 } from '@heroicons/react/24/outline';
 import { adminApi } from '@/lib/api';
+import { AdminTabs } from '@/components/AdminTabs';
 import { getProductEffectivePrice } from '@/lib/productPrice';
-import { Button, StatusBadge, Textarea } from '@tarodan/ui';
+import { Button, StatusBadge, Textarea, enumLabel, subscriptionStatusConfig } from '@tarodan/ui';
 import type { StatusConfig } from '@tarodan/ui';
 import toast from 'react-hot-toast';
 import { Spinner } from '@tarodan/ui';
@@ -239,12 +240,16 @@ export default function UserDetailPage() {
       <div className="space-y-6">
         {/* Header */}
         <div className="flex items-center gap-4">
-          <Link
-            href="/users"
+          <button
+            type="button"
+            onClick={() =>
+              window.history.length > 1 ? router.back() : router.push('/users')
+            }
+            aria-label="Geri"
             className="p-2 hover:bg-surface-alt rounded-lg transition-colors"
           >
             <ArrowLeftIcon className="w-6 h-6 text-muted" />
-          </Link>
+          </button>
           <div className="flex-1 flex items-center gap-4">
             {user.avatarUrl ? (
               <Image
@@ -445,7 +450,7 @@ export default function UserDetailPage() {
                   </div>
                   <div>
                     <p className="text-muted text-sm">Durum</p>
-                    <p className="text-heading">{user.membership.status}</p>
+                    <p className="text-heading">{enumLabel(subscriptionStatusConfig, user.membership.status)}</p>
                   </div>
                   {user.membership.startDate && (
                     <div>
@@ -465,25 +470,17 @@ export default function UserDetailPage() {
 
             {/* Tabs for Orders, Products, Trades, Ratings */}
             <div className="admin-card">
-              <div className="border-b">
-                <div className="flex">
-                  {[
-                    { key: 'orders', label: 'Siparişler', count: user.recentOrders?.length || 0 },
-                    { key: 'products', label: 'Ürünler', count: user.products?.length || 0 },
-                    { key: 'trades', label: 'Takaslar', count: user.recentTrades?.length || 0 },
-                    { key: 'ratings', label: 'Değerlendirmeler', count: (user.receivedRatings?.length || 0) },
-                  ].map((tab) => (
-                    <Button variant="secondary" key={tab.key}
-                      onClick={() => setActiveTab(tab.key as any)}
-                      className={`px-6 py-4 text-sm font-medium transition-colors ${
-                        activeTab === tab.key
-                          ? 'text-primary-600 border-b-2 border-primary-500'
-                          : 'text-muted hover:text-heading'
-                      }`}>
-                      {tab.label} ({tab.count})
-                    </Button>
-                  ))}
-                </div>
+              <div className="p-6 pb-0">
+                <AdminTabs
+                  tabs={[
+                    { key: 'orders', label: 'Siparişler', badge: user.recentOrders?.length || 0 },
+                    { key: 'products', label: 'Ürünler', badge: user.products?.length || 0 },
+                    { key: 'trades', label: 'Takaslar', badge: user.recentTrades?.length || 0 },
+                    { key: 'ratings', label: 'Değerlendirmeler', badge: user.receivedRatings?.length || 0 },
+                  ]}
+                  value={activeTab}
+                  onChange={(k) => setActiveTab(k as 'orders' | 'products' | 'trades' | 'ratings')}
+                />
               </div>
 
               <div className="p-6">
@@ -787,8 +784,8 @@ export default function UserDetailPage() {
         {/* Ban Modal */}
         {showBanModal && (
           <div className="fixed inset-0 bg-heading/70 flex items-center justify-center z-50">
-            <div className="rounded-xl p-6 max-w-md mx-4">
-              <h3 className="text-lg font-semibold text-heading mb-4">Kullanıcıyı Banla</h3>
+            <div className="rounded-xl px-6 pb-6 pt-5 max-w-md mx-4">
+              <h3 className="text-lg font-semibold text-heading mb-4 leading-tight">Kullanıcıyı Banla</h3>
               <div className="mb-4">
                 <label className="block text-sm font-medium text-muted mb-2">
                   Ban Nedeni *
@@ -814,8 +811,8 @@ export default function UserDetailPage() {
         {/* Unban Modal */}
         {showUnbanModal && (
           <div className="fixed inset-0 bg-heading/70 flex items-center justify-center z-50">
-            <div className="rounded-xl p-6 max-w-md mx-4">
-              <h3 className="text-lg font-semibold text-heading mb-4">Banı Kaldır</h3>
+            <div className="rounded-xl px-6 pb-6 pt-5 max-w-md mx-4">
+              <h3 className="text-lg font-semibold text-heading mb-4 leading-tight">Banı Kaldır</h3>
               <p className="text-muted mb-6">
                 Bu kullanıcının banını kaldırmak istediğinizden emin misiniz?
               </p>

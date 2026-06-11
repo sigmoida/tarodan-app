@@ -1,6 +1,9 @@
 # Tarodan Mobile — Maestro E2E Test Suite
 
-Bu klasör mobil uygulamanın e2e test akışlarını barındırır. [Maestro](https://maestro.mobile.dev) kullanılır — YAML tabanlı, Expo Go ile doğrudan çalışır, dev build gerektirmez.
+Bu klasör mobil uygulamanın e2e test akışlarını barındırır. [Maestro](https://maestro.mobile.dev) kullanılır — YAML tabanlı.
+
+> **Önemli:** Flow'lar **Expo Go değil, dev build**'i hedefler (`appId: com.tarodan.app`).
+> Test koşumu için Metro **`EXPO_PUBLIC_MAESTRO=1`** ile başlatılmalı; bu, [authStore.loadToken](../src/stores/authStore.ts) içindeki auto-login'i açar (login UI'sını atlar). En kolay yol: **`pnpm maestro:dev <flow>`** (bkz. [run.sh](run.sh)) — backend health + booted simülatör + Metro'yu garanti edip flow'u görünür simülatörde koşar.
 
 ## Kurulum (tek seferlik)
 
@@ -26,6 +29,16 @@ maestro --version  # 2.5.x
 5. `PAYMENT_BYPASS=true` `apps/api/.env`'de (B-001 fix bypass yolunu test ettiği için).
 
 ## Çalıştırma
+
+**Önerilen (harness):**
+
+```bash
+cd apps/mobile
+pnpm maestro:dev flows/01-smoke.yaml          # tek flow, görünür simülatörde
+MAESTRO_EMAIL=ahmet@demo.com pnpm maestro:dev flows/E-05-membership-manage.yaml
+```
+
+**Düşük seviye (manuel):**
 
 ```bash
 cd apps/mobile/maestro

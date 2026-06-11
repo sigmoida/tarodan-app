@@ -1,10 +1,9 @@
 import { useState } from 'react';
-import { Alert, View } from 'react-native';
+import { View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { router } from 'expo-router';
 import * as SecureStore from 'expo-secure-store';
 import { useMutation } from '@tanstack/react-query';
-import { SafeAreaView } from 'react-native-safe-area-context';
 import {
   Button,
   Checkbox,
@@ -15,19 +14,24 @@ import {
   Text,
   VStack,
   theme,
+  appAlert,
 } from '@tarodan/ui-native';
 import { authApi } from '../../src/services/api';
 import { useAuthStore } from '../../src/stores/authStore';
+import { PhoneInput } from '../../src/components/common';
+import { DEFAULT_COUNTRY_CODE, normalizePhoneForPayload } from '../../src/utils/phone';
 
 const { colors, spacing, radius } = theme;
 
 interface BusinessForm {
   companyName: string;
   taxId: string;
-  taxOffice: string;
-  displayName: string;
+  city: string;
+  district: string;
+  companyType: string;
   email: string;
   phone: string;
+  phoneCountryCode: string;
   password: string;
   passwordConfirm: string;
 }
@@ -37,10 +41,12 @@ export default function RegisterBusinessScreen() {
   const [form, setForm] = useState<BusinessForm>({
     companyName: '',
     taxId: '',
-    taxOffice: '',
-    displayName: '',
+    city: '',
+    district: '',
+    companyType: '',
     email: '',
     phone: '',
+    phoneCountryCode: DEFAULT_COUNTRY_CODE,
     password: '',
     passwordConfirm: '',
   });
@@ -51,23 +57,31 @@ export default function RegisterBusinessScreen() {
     setForm((f) => ({ ...f, [key]: value }));
 
   const registerMutation = useMutation({
-    mutationFn: async () =>
-      authApi.registerBusiness({
-        displayName: form.displayName.trim(),
+    mutationFn: async () => {
+      const formattedPhone = normalizePhoneForPayload(form.phone, form.phoneCountryCode);
+      return authApi.registerBusiness({
+        companyName: form.companyName.trim(),
         email: form.email.trim().toLowerCase(),
         password: form.password,
-        phone: form.phone.trim() || undefined,
-        acceptsMarketingEmails: acceptMarketing,
-        companyName: form.companyName.trim(),
+        phone: formattedPhone,
         taxId: form.taxId.trim(),
-        taxOffice: form.taxOffice.trim() || undefined,
-      }),
+        city: form.city.trim(),
+        district: form.district.trim() || undefined,
+        companyType: form.companyType.trim() || undefined,
+        acceptsMarketingEmails: acceptMarketing,
+      });
+    },
     onSuccess: async (response) => {
       const data =
         (response.data as { data?: Record<string, unknown> })?.data ??
         ((response.data as Record<string, unknown>) ?? {});
-      const accessToken = (data.accessToken ?? data.token) as string | undefined;
-      const refreshToken = data.refreshToken as string | undefined;
+      const tokens = data.tokens as
+        | { accessToken?: string; refreshToken?: string }
+        | undefined;
+      const accessToken = (tokens?.accessToken ?? data.accessToken ?? data.token) as
+        | string
+        | undefined;
+      const refreshToken = (tokens?.refreshToken ?? data.refreshToken) as string | undefined;
       if (accessToken) {
         await SecureStore.setItemAsync('accessToken', accessToken);
         if (refreshToken) await SecureStore.setItemAsync('refreshToken', refreshToken);
@@ -76,7 +90,7 @@ export default function RegisterBusinessScreen() {
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         await login(accessToken!, data.user as any);
       }
-      Alert.alert(
+      appAlert(
         'Kurumsal hesap oluşturuldu',
         'E-posta doğrulaması için kayıtlı e-posta adresinize gönderilen bağlantıyı kullanın.',
         [{ text: 'Devam', onPress: () => router.replace('/seller/dashboard') }],
@@ -84,28 +98,36 @@ export default function RegisterBusinessScreen() {
     },
     onError: (e: unknown) => {
       const err = e as { response?: { data?: { message?: string } } };
-      Alert.alert('Hata', err?.response?.data?.message || 'Kayıt tamamlanamadı.');
+      appAlert('Hata', err?.response?.data?.message || 'Kayıt tamamlanamadı.');
     },
   });
 
   const handleSubmit = () => {
-    if (!form.companyName.trim()) return Alert.alert('Eksik', 'Şirket adı gerekli.');
+    if (!form.companyName.trim()) return appAlert('Eksik', 'Şirket adı gerekli.');
     if (!/^\d{10,11}$/.test(form.taxId.trim()))
-      return Alert.alert('Eksik', 'Vergi / T.C. no 10 veya 11 hane olmalı.');
-    if (!form.displayName.trim()) return Alert.alert('Eksik', 'Yetkili adı gerekli.');
-    if (!/^\S+@\S+\.\S+$/.test(form.email)) return Alert.alert('Eksik', 'Geçerli e-posta girin.');
+      return appAlert('Eksik', 'Vergi / T.C. no 10 veya 11 hane olmalı.');
+    if (form.city.trim().length < 2) return appAlert('Eksik', 'Şehir/İl gerekli.');
+    if (!/^\S+@\S+\.\S+$/.test(form.email)) return appAlert('Eksik', 'Geçerli e-posta girin.');
+    // TR için tam 10 hane; diğer ülke kodlarında en az 8 hane yeterli.
+    const phoneDigits = form.phone.replace(/\D/g, '');
+    const phoneValid =
+      form.phoneCountryCode === DEFAULT_COUNTRY_CODE
+        ? /^[0-9]{10}$/.test(phoneDigits)
+        : phoneDigits.length >= 8;
+    if (!phoneValid)
+      return appAlert('Eksik', 'Geçerli bir telefon numarası girin (5XX XXX XX XX).');
     if (form.password.length < 8)
-      return Alert.alert('Şifre Yetersiz', 'Şifre en az 8 karakter olmalı.');
+      return appAlert('Şifre Yetersiz', 'Şifre en az 8 karakter olmalı.');
     if (!/[A-Z]/.test(form.password))
-      return Alert.alert('Şifre Yetersiz', 'Şifre en az 1 büyük harf içermeli.');
+      return appAlert('Şifre Yetersiz', 'Şifre en az 1 büyük harf içermeli.');
     if (!/[a-z]/.test(form.password))
-      return Alert.alert('Şifre Yetersiz', 'Şifre en az 1 küçük harf içermeli.');
+      return appAlert('Şifre Yetersiz', 'Şifre en az 1 küçük harf içermeli.');
     if (!/\d/.test(form.password))
-      return Alert.alert('Şifre Yetersiz', 'Şifre en az 1 rakam içermeli.');
+      return appAlert('Şifre Yetersiz', 'Şifre en az 1 rakam içermeli.');
     if (form.password !== form.passwordConfirm)
-      return Alert.alert('Eksik', 'Şifreler eşleşmiyor.');
+      return appAlert('Eksik', 'Şifreler eşleşmiyor.');
     if (!acceptTerms)
-      return Alert.alert(
+      return appAlert(
         'Sözleşme',
         'Üyelik sözleşmesini ve KVKK aydınlatmasını kabul etmelisiniz.',
       );
@@ -113,8 +135,8 @@ export default function RegisterBusinessScreen() {
   };
 
   return (
-    <SafeAreaView style={{ flex: 1, backgroundColor: colors.surface.alt }} edges={['top']}>
-      <ScreenHeader title="Kurumsal Kayıt" variant="light" onBack={() => router.back()} />
+    <View style={{ flex: 1, backgroundColor: colors.surface.alt }}>
+      <ScreenHeader title="Kurumsal Kayıt" onBack={() => router.back()} />
 
       <Screen bg="alt" padding={4}>
         <VStack gap={3}>
@@ -157,21 +179,32 @@ export default function RegisterBusinessScreen() {
             </View>
             <View style={{ flex: 1 }}>
               <Input
-                label="Vergi Dairesi"
-                value={form.taxOffice}
-                onChangeText={(v) => setField('taxOffice', v)}
+                label="Firma Türü"
+                value={form.companyType}
+                onChangeText={(v) => setField('companyType', v)}
+              />
+            </View>
+          </HStack>
+          <HStack gap={2}>
+            <View style={{ flex: 1 }}>
+              <Input
+                label="Şehir / İl *"
+                value={form.city}
+                onChangeText={(v) => setField('city', v)}
+              />
+            </View>
+            <View style={{ flex: 1 }}>
+              <Input
+                label="İlçe"
+                value={form.district}
+                onChangeText={(v) => setField('district', v)}
               />
             </View>
           </HStack>
 
           <Text variant="label" style={{ marginTop: spacing[2] }}>
-            Yetkili / Hesap Bilgileri
+            Hesap Bilgileri
           </Text>
-          <Input
-            label="Yetkili Adı *"
-            value={form.displayName}
-            onChangeText={(v) => setField('displayName', v)}
-          />
           <Input
             label="E-posta *"
             value={form.email}
@@ -179,12 +212,12 @@ export default function RegisterBusinessScreen() {
             keyboardType="email-address"
             autoCapitalize="none"
           />
-          <Input
-            label="Telefon"
-            placeholder="+90 5XX XXX XX XX"
-            value={form.phone}
-            onChangeText={(v) => setField('phone', v)}
-            keyboardType="phone-pad"
+          <PhoneInput
+            label="Telefon *"
+            countryCode={form.phoneCountryCode}
+            onCountryCodeChange={(code) => setField('phoneCountryCode', code)}
+            phone={form.phone}
+            onPhoneChange={(v) => setField('phone', v)}
           />
           <Input
             label="Şifre *"
@@ -239,6 +272,6 @@ export default function RegisterBusinessScreen() {
           </HStack>
         </VStack>
       </Screen>
-    </SafeAreaView>
+    </View>
   );
 }

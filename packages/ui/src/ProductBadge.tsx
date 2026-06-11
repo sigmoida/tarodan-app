@@ -7,6 +7,7 @@ export type ProductBadgeVariant =
   | 'rare'
   | 'preorder'
   | 'limited'
+  | 'sponsored'
   | 'default';
 
 export interface ProductBadgeProps extends React.HTMLAttributes<HTMLSpanElement> {
@@ -19,6 +20,7 @@ const variantClasses: Record<ProductBadgeVariant, string> = {
   rare: 'bg-primary-600 text-inverted',
   preorder: 'bg-info-600 text-inverted',
   limited: 'bg-warning-500 text-inverted',
+  sponsored: 'bg-amber-500 text-inverted',
   default: 'bg-surface-alt text-body border border-border',
 };
 
@@ -32,7 +34,7 @@ export const ProductBadge = React.forwardRef<HTMLSpanElement, ProductBadgeProps>
       <span
         ref={ref}
         className={cn(
-          'inline-flex items-center gap-1 text-xs font-bold px-2.5 py-1 rounded-md',
+          'inline-flex items-center gap-1 whitespace-nowrap text-xs font-bold px-2.5 py-1 rounded-md',
           variantClasses[variant],
           className,
         )}

@@ -1,27 +1,30 @@
 "use client";
 
-import { useState, useEffect, useMemo, useCallback, useRef } from "react";
+import { useState, useEffect, useMemo } from "react";
 import Link from "next/link";
 import { useSearchParams, useRouter } from "next/navigation";
 import { adminApi } from "@/lib/api";
+import { cancelReasonLabel, orderOriginLabel } from "@/lib/utils";
 import {
   Button,
-  Input,
   Select,
-  Spinner,
   StatusBadge,
   orderStatusConfig,
 } from "@tarodan/ui";
+import { DataTable, type ColumnDef } from "@/components/DataTable";
 import {
-  MagnifyingGlassIcon,
   EyeIcon,
   PencilIcon,
   CheckIcon,
   XMarkIcon,
-  UserIcon,
-  XCircleIcon,
 } from "@heroicons/react/24/outline";
 import toast from "react-hot-toast";
+import {
+  PageHeader,
+  FilterToolbar,
+  ActionButtons,
+  ActionIconButton,
+} from "@/components/admin-list";
 
 interface Order {
   id: string;
@@ -34,12 +37,8 @@ interface Order {
   product?: { id: string; title: string };
   createdAt: string;
   itemCount: number;
-}
-
-interface User {
-  id: string;
-  displayName: string;
-  email: string;
+  cancelReason?: string;
+  offerId?: string | null;
 }
 
 const statusOptions = [
@@ -77,13 +76,8 @@ export default function OrdersPage() {
   const [newStatus, setNewStatus] = useState<string>("");
   const [updatingStatus, setUpdatingStatus] = useState(false);
 
-  // User filtering
-  const [users, setUsers] = useState<User[]>([]);
+  // User filter (driven by URL ?userId= deep-links, e.g. from user detail page)
   const [selectedUserId, setSelectedUserId] = useState<string>(urlUserId);
-  const [userSearch, setUserSearch] = useState("");
-  const [showUserDropdown, setShowUserDropdown] = useState(false);
-  const [loadingUsers, setLoadingUsers] = useState(false);
-  const dropdownRef = useRef<HTMLDivElement>(null);
 
   // Debounce order search (300ms)
   useEffect(() => {
@@ -94,78 +88,13 @@ export default function OrdersPage() {
     return () => clearTimeout(timer);
   }, [search]);
 
-  // Load users for dropdown
-  const loadUsers = useCallback(async (searchTerm: string) => {
-    if (!searchTerm || searchTerm.length < 2) {
-      setUsers([]);
-      return;
-    }
-    setLoadingUsers(true);
-    try {
-      const response = await adminApi.getUsers({
-        search: searchTerm,
-        limit: 10,
-      });
-      const data = response.data.data || response.data.users || [];
-      setUsers(
-        data.map((u: any) => ({
-          id: u.id,
-          displayName: u.displayName,
-          email: u.email,
-        })),
-      );
-    } catch (error) {
-      if (process.env.NODE_ENV === "development")
-        console.error("Load users error:", error);
-    } finally {
-      setLoadingUsers(false);
-    }
-  }, []);
-
-  // Debounce user search
-  useEffect(() => {
-    const timer = setTimeout(() => {
-      if (userSearch) loadUsers(userSearch);
-    }, 300);
-    return () => clearTimeout(timer);
-  }, [userSearch, loadUsers]);
-
-  // Close dropdown on outside click
-  useEffect(() => {
-    const handleClickOutside = (e: MouseEvent) => {
-      if (
-        dropdownRef.current &&
-        !dropdownRef.current.contains(e.target as Node)
-      ) {
-        setShowUserDropdown(false);
-      }
-    };
-    document.addEventListener("mousedown", handleClickOutside);
-    return () => document.removeEventListener("mousedown", handleClickOutside);
-  }, []);
-
   // Sync URL with state
   useEffect(() => {
     setSelectedUserId(urlUserId);
   }, [urlUserId]);
 
-  const updateUrl = (userId: string) => {
-    const params = new URLSearchParams(searchParams.toString());
-    if (userId) params.set("userId", userId);
-    else params.delete("userId");
-    router.push(`/orders?${params.toString()}`);
-  };
-
-  const handleSelectUser = (user: User) => {
-    setSelectedUserId(user.id);
-    setUserSearch(user.displayName);
-    setShowUserDropdown(false);
-    updateUrl(user.id);
-  };
-
   const clearUserFilter = () => {
     setSelectedUserId("");
-    setUserSearch("");
     const params = new URLSearchParams(searchParams.toString());
     params.delete("userId");
     router.push(`/orders?${params.toString()}`);
@@ -200,6 +129,8 @@ export default function OrdersPage() {
           product: o.product || undefined,
           createdAt: o.createdAt,
           itemCount: o.items?.length || 1,
+          cancelReason: o.cancelReason ?? undefined,
+          offerId: o.offerId ?? null,
         })),
       );
       setTotal(meta.total || data.length);
@@ -242,263 +173,209 @@ export default function OrdersPage() {
 
   const totalPages = Math.max(1, Math.ceil(total / 20));
 
+  const columns: ColumnDef<Order, any>[] = [
+    {
+      header: "Sipariş No",
+      cell: ({ row }) => (
+        <Link
+          href={`/orders/${row.original.id}`}
+          className="font-mono text-sm text-primary-600 hover:underline"
+        >
+          {row.original.orderNumber}
+        </Link>
+      ),
+    },
+    {
+      header: "Durum",
+      cell: ({ row }) =>
+        editingOrderId === row.original.id ? (
+          <div className="flex items-center gap-1.5">
+            <Select
+              value={newStatus}
+              onChange={(e) => setNewStatus(e.target.value)}
+              className="w-32"
+              selectSize="sm"
+              disabled={updatingStatus}
+            >
+              <option value="pending_payment">Ödeme Bekliyor</option>
+              <option value="paid">Ödendi</option>
+              <option value="preparing">Hazırlanıyor</option>
+              <option value="shipped">Kargoda</option>
+              <option value="delivered">Teslim Edildi</option>
+              <option value="completed">Tamamlandı</option>
+              <option value="cancelled">İptal</option>
+            </Select>
+            <Button
+              variant="secondary"
+              onClick={() => updateOrderStatus(row.original.id)}
+              disabled={updatingStatus}
+              className="p-1 text-success-600 hover:bg-success-50 rounded"
+              title="Kaydet"
+            >
+              <CheckIcon className="h-4 w-4" />
+            </Button>
+            <Button
+              variant="secondary"
+              onClick={cancelEditing}
+              disabled={updatingStatus}
+              className="p-1 text-danger-500 hover:bg-danger-50 rounded"
+              title="İptal"
+            >
+              <XMarkIcon className="h-4 w-4" />
+            </Button>
+          </div>
+        ) : (
+          <div className="flex flex-col items-start gap-1">
+            <StatusBadge
+              status={row.original.status}
+              config={orderStatusConfig}
+            />
+            {row.original.status === "cancelled" &&
+              cancelReasonLabel(row.original.cancelReason) && (
+                <span className="text-xs text-muted">
+                  {cancelReasonLabel(row.original.cancelReason)} ·{" "}
+                  {orderOriginLabel(row.original.offerId)} iptali
+                </span>
+              )}
+          </div>
+        ),
+    },
+    {
+      header: "Alıcı",
+      cell: ({ row }) => (
+        <Link
+          href={`/users/${row.original.buyer.id}`}
+          className="text-sm text-heading hover:text-primary-600"
+        >
+          {row.original.buyer.displayName}
+        </Link>
+      ),
+    },
+    {
+      header: "Satıcı",
+      cell: ({ row }) => (
+        <Link
+          href={`/users/${row.original.seller.id}`}
+          className="text-sm text-heading hover:text-primary-600"
+        >
+          {row.original.seller.displayName}
+        </Link>
+      ),
+    },
+    {
+      header: "Ürün",
+      cell: ({ row }) => (
+        <span
+          className="text-sm text-body truncate block max-w-[180px]"
+          title={row.original.product?.title}
+        >
+          {row.original.product?.title || `${row.original.itemCount} adet`}
+        </span>
+      ),
+    },
+    {
+      id: "amount",
+      header: () => <span className="block text-right">Tutar</span>,
+      cell: ({ row }) => (
+        <div className="text-right text-primary-600 font-medium text-sm tabular-nums">
+          ₺{row.original.totalAmount.toLocaleString("tr-TR")}
+        </div>
+      ),
+    },
+    {
+      id: "commission",
+      header: () => <span className="block text-right">Komisyon</span>,
+      cell: ({ row }) => (
+        <div className="text-right text-success-600 text-sm tabular-nums">
+          ₺{row.original.commission.toLocaleString("tr-TR")}
+        </div>
+      ),
+    },
+    {
+      header: "Tarih",
+      cell: ({ row }) => (
+        <span className="whitespace-nowrap text-sm text-muted">
+          {new Date(row.original.createdAt).toLocaleDateString("tr-TR")}
+        </span>
+      ),
+    },
+    {
+      id: "actions",
+      header: () => <span className="block text-center">İşlemler</span>,
+      cell: ({ row }) => (
+        <ActionButtons>
+          <ActionIconButton
+            icon={PencilIcon}
+            onClick={() => startEditing(row.original)}
+            title="Durumu Değiştir"
+          />
+          <ActionIconButton
+            icon={EyeIcon}
+            href={`/orders/${row.original.id}`}
+            title="Detay"
+          />
+        </ActionButtons>
+      ),
+    },
+  ];
+
   return (
     <div className="space-y-6">
-      <div>
-        <h1 className="text-2xl font-bold text-heading">Siparişler</h1>
-        <p className="text-muted mt-1">
-          Toplam {total} sipariş
-          {(selectedUserId || productId) && (
-            <span className="ml-2">
-              — Filtreleniyor
-              <Button
-                variant="secondary"
-                onClick={clearUserFilter}
-                className="ml-2 text-primary-600 hover:underline"
-              >
-                Filtreyi kaldır
-              </Button>
-            </span>
-          )}
-        </p>
-      </div>
+      <PageHeader
+        title="Siparişler"
+        description={
+          <>
+            Toplam {total} sipariş
+            {(selectedUserId || productId) && (
+              <span className="ml-2">
+                — Filtreleniyor
+                <Button
+                  variant="secondary"
+                  onClick={clearUserFilter}
+                  className="ml-2 text-primary-600 hover:underline"
+                >
+                  Filtreyi kaldır
+                </Button>
+              </span>
+            )}
+          </>
+        }
+      />
 
       {/* Filters */}
-      <div className="flex flex-col gap-3">
-        {/* Row 1: Search + Status */}
-        <div className="flex flex-col sm:flex-row gap-3">
-          <div className="relative flex-1">
-            <MagnifyingGlassIcon className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-subtle pointer-events-none shrink-0" />
-            <Input
-              type="text"
-              placeholder="Sipariş no, kullanıcı veya ürün ara..."
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-              className="admin-input-with-icon-left"
-            />
-          </div>
-          <Select
-            value={status}
-            onChange={(e) => {
-              setStatus(e.target.value);
-              setPage(1);
-            }}
-            className="sm:w-48"
-          >
-            {statusOptions.map((opt) => (
-              <option key={opt.value} value={opt.value}>
-                {opt.label}
-              </option>
-            ))}
-          </Select>
-        </div>
-
-        {/* Row 2: User filter */}
-        <div className="flex flex-col sm:flex-row items-start sm:items-center gap-3">
-          <div className="relative flex-1 w-full sm:max-w-xs" ref={dropdownRef}>
-            <UserIcon className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-subtle pointer-events-none shrink-0" />
-            <Input
-              type="text"
-              placeholder="Kullanıcı ara..."
-              value={userSearch}
-              onChange={(e) => {
-                setUserSearch(e.target.value);
-                setShowUserDropdown(true);
-              }}
-              onFocus={() => setShowUserDropdown(true)}
-              className="admin-input-with-icon-left-sm pr-9"
-            />
-            {selectedUserId && (
-              <Button
-                variant="secondary"
-                onClick={clearUserFilter}
-                className="absolute right-3 top-1/2 -translate-y-1/2 text-subtle hover:text-muted"
-              >
-                <XCircleIcon className="h-4 w-4" />
-              </Button>
-            )}
-
-            {showUserDropdown && userSearch.length >= 2 && (
-              <div className="absolute z-50 w-full mt-1 bg-surface-elevated border border-border rounded-lg shadow-lg max-h-60 overflow-y-auto">
-                {loadingUsers ? (
-                  <div className="p-3 text-center text-muted text-sm">
-                    Aranıyor...
-                  </div>
-                ) : users.length > 0 ? (
-                  users.map((user) => (
-                    <Button
-                      variant="secondary"
-                      key={user.id}
-                      onClick={() => handleSelectUser(user)}
-                      className="w-full px-4 py-2 text-left hover:bg-surface text-heading"
-                    >
-                      <div className="font-medium text-sm">
-                        {user.displayName}
-                      </div>
-                      <div className="text-xs text-muted">{user.email}</div>
-                    </Button>
-                  ))
-                ) : (
-                  <div className="p-3 text-center text-muted text-sm">
-                    Kullanıcı bulunamadı
-                  </div>
-                )}
-              </div>
-            )}
-          </div>
-        </div>
-      </div>
+      <FilterToolbar
+        search={search}
+        onSearchChange={setSearch}
+        searchPlaceholder="Sipariş no, kullanıcı veya ürün ara..."
+      >
+        <Select
+          value={status}
+          onChange={(e) => {
+            setStatus(e.target.value);
+            setPage(1);
+          }}
+          className="sm:w-48"
+        >
+          {statusOptions.map((opt) => (
+            <option key={opt.value} value={opt.value}>
+              {opt.label}
+            </option>
+          ))}
+        </Select>
+      </FilterToolbar>
 
       {/* Table */}
-      <div className="admin-card overflow-hidden">
-        <div className="overflow-x-auto">
-          <table className="admin-table">
-            <thead>
-              <tr>
-                <th>Sipariş No</th>
-                <th>Durum</th>
-                <th>Alıcı</th>
-                <th>Satıcı</th>
-                <th>Ürün</th>
-                <th className="text-right">Tutar</th>
-                <th className="text-right">Komisyon</th>
-                <th>Tarih</th>
-                <th className="text-center">İşlemler</th>
-              </tr>
-            </thead>
-            <tbody>
-              {loading ? (
-                <tr>
-                  <td colSpan={9} className="text-center py-12">
-                    <Spinner size="lg" className="mx-auto" />
-                  </td>
-                </tr>
-              ) : orders.length === 0 ? (
-                <tr>
-                  <td colSpan={9} className="text-center py-12 text-subtle">
-                    {debouncedSearch || status !== "all" || selectedUserId
-                      ? "Filtreye uygun sipariş bulunamadı"
-                      : "Henüz sipariş yok"}
-                  </td>
-                </tr>
-              ) : (
-                orders.map((order) => (
-                  <tr key={order.id} className="group hover:bg-surface/50">
-                    <td>
-                      <Link
-                        href={`/orders/${order.id}`}
-                        className="font-mono text-sm text-primary-600 hover:underline"
-                      >
-                        {order.orderNumber}
-                      </Link>
-                    </td>
-                    <td>
-                      {editingOrderId === order.id ? (
-                        <div className="flex items-center gap-1.5">
-                          <Select
-                            value={newStatus}
-                            onChange={(e) => setNewStatus(e.target.value)}
-                            className="w-32"
-                            selectSize="sm"
-                            disabled={updatingStatus}
-                          >
-                            <option value="pending_payment">
-                              Ödeme Bekliyor
-                            </option>
-                            <option value="paid">Ödendi</option>
-                            <option value="preparing">Hazırlanıyor</option>
-                            <option value="shipped">Kargoda</option>
-                            <option value="delivered">Teslim Edildi</option>
-                            <option value="completed">Tamamlandı</option>
-                            <option value="cancelled">İptal</option>
-                          </Select>
-                          <Button
-                            variant="secondary"
-                            onClick={() => updateOrderStatus(order.id)}
-                            disabled={updatingStatus}
-                            className="p-1 text-success-600 hover:bg-success-50 rounded"
-                            title="Kaydet"
-                          >
-                            <CheckIcon className="h-4 w-4" />
-                          </Button>
-                          <Button
-                            variant="secondary"
-                            onClick={cancelEditing}
-                            disabled={updatingStatus}
-                            className="p-1 text-danger-500 hover:bg-danger-50 rounded"
-                            title="İptal"
-                          >
-                            <XMarkIcon className="h-4 w-4" />
-                          </Button>
-                        </div>
-                      ) : (
-                        <div className="flex items-center gap-1.5">
-                          <StatusBadge
-                            status={order.status}
-                            config={orderStatusConfig}
-                          />
-                        </div>
-                      )}
-                    </td>
-                    <td>
-                      <Link
-                        href={`/users/${order.buyer.id}`}
-                        className="text-sm text-heading hover:text-primary-600"
-                      >
-                        {order.buyer.displayName}
-                      </Link>
-                    </td>
-                    <td>
-                      <Link
-                        href={`/users/${order.seller.id}`}
-                        className="text-sm text-heading hover:text-primary-600"
-                      >
-                        {order.seller.displayName}
-                      </Link>
-                    </td>
-                    <td>
-                      <span
-                        className="text-sm text-body truncate block max-w-[180px]"
-                        title={order.product?.title}
-                      >
-                        {order.product?.title || `${order.itemCount} adet`}
-                      </span>
-                    </td>
-                    <td className="text-right text-primary-600 font-medium text-sm tabular-nums">
-                      ₺{order.totalAmount.toLocaleString("tr-TR")}
-                    </td>
-                    <td className="text-right text-success-600 text-sm tabular-nums">
-                      ₺{order.commission.toLocaleString("tr-TR")}
-                    </td>
-                    <td className="whitespace-nowrap text-sm text-muted">
-                      {new Date(order.createdAt).toLocaleDateString("tr-TR")}
-                    </td>
-                    <td>
-                      <div className="flex items-center justify-center gap-1">
-                        <Button
-                          variant="secondary"
-                          onClick={() => startEditing(order)}
-                          className="p-1.5 text-subtle hover:text-info-600 hover:bg-info-50 rounded-md transition-colors"
-                          title="Durumu Değiştir"
-                        >
-                          <PencilIcon className="h-4 w-4" />
-                        </Button>
-                        <Link
-                          href={`/orders/${order.id}`}
-                          className="p-1.5 text-subtle hover:text-body hover:bg-surface-alt rounded-md transition-colors"
-                          title="Detay"
-                        >
-                          <EyeIcon className="h-4 w-4" />
-                        </Link>
-                      </div>
-                    </td>
-                  </tr>
-                ))
-              )}
-            </tbody>
-          </table>
-        </div>
-      </div>
+      <DataTable
+        columns={columns}
+        data={orders}
+        loading={loading}
+        emptyText={
+          debouncedSearch || status !== "all" || selectedUserId
+            ? "Filtreye uygun sipariş bulunamadı"
+            : "Henüz sipariş yok"
+        }
+        getRowId={(o) => o.id}
+      />
 
       {/* Pagination */}
       {total > 0 && (

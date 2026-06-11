@@ -417,8 +417,8 @@ export default function RegisterPage() {
                 <label className="block text-sm font-medium text-body mb-1.5">
                   {t('auth.phone')}
                 </label>
-                <div className="relative flex min-w-0">
-                  <span className="inline-flex items-center bg-surface-alt border-r-0 text-muted font-medium rounded-l-lg flex-shrink-0">
+                <div className="flex min-w-0 overflow-hidden rounded-lg border border-border bg-surface transition-all duration-200 ease-premium focus-within:border-primary-500 focus-within:bg-surface-elevated focus-within:ring-2 focus-within:ring-primary-200 focus-within:ring-offset-1">
+                  <span className="inline-flex flex-shrink-0 items-center px-3 bg-surface-alt text-muted font-medium">
                     +90
                   </span>
                   <Input
@@ -427,7 +427,7 @@ export default function RegisterPage() {
                     onChange={handlePhoneChange}
                     placeholder="5XX XXX XX XX"
                     maxLength={14}
-                    className="flex-1 min-w-0 rounded-r-lg rounded-l-none bg-surface focus:bg-surface-elevated transition-all duration-200 ease-premium"
+                    className="flex-1 min-w-0 rounded-none border-0 bg-transparent focus:ring-0 focus:ring-offset-0"
                   />
                 </div>
               </div>
@@ -457,17 +457,19 @@ export default function RegisterPage() {
               <div className="relative">
                 <LockClosedIcon className="absolute left-3.5 top-1/2 -translate-y-1/2 w-[18px] h-[18px] text-subtle" />
                 <Input
-                  type={showPassword ? 'text' : 'password'}
+                  type={showPassword ? 'text' : 'password'} hidePasswordToggle
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
                   placeholder="••••••••"
                   className="pl-10 pr-10 bg-surface focus:bg-surface-elevated transition-all duration-200 ease-premium"
                 />
-                <Button variant="secondary" type="button"
+                <button
+                  type="button"
                   onClick={() => setShowPassword(!showPassword)}
+                  aria-label={showPassword ? (locale === 'en' ? 'Hide password' : 'Şifreyi gizle') : (locale === 'en' ? 'Show password' : 'Şifreyi göster')}
                   className="absolute right-3.5 top-1/2 -translate-y-1/2 text-subtle hover:text-muted transition-colors duration-200">
                   {showPassword ? <EyeSlashIcon className="w-[18px] h-[18px]" /> : <EyeIcon className="w-[18px] h-[18px]" />}
-                </Button>
+                </button>
               </div>
               <p className="text-xs text-subtle mt-1">
                 {locale === 'en' ? 'Min 8 chars, uppercase, lowercase & number' : 'En az 8 karakter, büyük/küçük harf ve rakam'}
@@ -481,7 +483,7 @@ export default function RegisterPage() {
               <div className="relative">
                 <LockClosedIcon className="absolute left-3.5 top-1/2 -translate-y-1/2 w-[18px] h-[18px] text-subtle" />
                 <Input
-                  type={showPassword ? 'text' : 'password'}
+                  type={showPassword ? 'text' : 'password'} hidePasswordToggle
                   value={confirmPassword}
                   onChange={(e) => setConfirmPassword(e.target.value)}
                   placeholder="••••••••"

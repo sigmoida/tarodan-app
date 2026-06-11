@@ -1,5 +1,5 @@
 import { View, ScrollView, StyleSheet, TouchableOpacity, Image, RefreshControl } from 'react-native';
-import { FAB, Snackbar, Spinner, Text, theme } from '@tarodan/ui-native';
+import { FAB, Snackbar, Spinner, Text, theme, ScreenHeader } from '@tarodan/ui-native';
 import { router } from 'expo-router';
 import { useQuery } from '@tanstack/react-query';
 import { useState } from 'react';
@@ -7,37 +7,11 @@ import { Ionicons } from '@expo/vector-icons';
 import { api } from '../../src/services/api';
 import { useAuthStore } from '../../src/stores/authStore';
 import { useTranslation } from '../../src/i18n';
+import { resolveImageUrl } from '../../src/utils/imageUrl';
 
 const { colors, radius } = theme;
 
 // Mock collections for demo when API fails
-const MOCK_COLLECTIONS = [
-  {
-    id: '1',
-    name: 'Ferrari Koleksiyonum',
-    description: 'Tüm Ferrari modellerim',
-    itemCount: 24,
-    coverImage: 'https://via.placeholder.com/300x200?text=Ferrari',
-    isPublic: true,
-  },
-  {
-    id: '2',
-    name: 'Vintage Trucks',
-    description: '60-70\'ler kamyonları',
-    itemCount: 12,
-    coverImage: 'https://via.placeholder.com/300x200?text=Trucks',
-    isPublic: false,
-  },
-  {
-    id: '3',
-    name: '1:18 Premium',
-    description: 'En değerli modellerim',
-    itemCount: 8,
-    coverImage: 'https://via.placeholder.com/300x200?text=Premium',
-    isPublic: true,
-  },
-];
-
 export default function CollectionsScreen() {
   const { t } = useTranslation();
   const { limits, isAuthenticated } = useAuthStore();
@@ -51,16 +25,17 @@ export default function CollectionsScreen() {
     queryFn: async () => {
       try {
         const response = await api.get('/collections/me');
-        return response.data?.data || response.data || [];
+        // API şekli: { collections, total, page, pageSize }
+        return response.data?.collections ?? response.data?.data ?? (Array.isArray(response.data) ? response.data : []);
       } catch (error) {
-        console.log('Failed to fetch collections, using mock data');
-        return MOCK_COLLECTIONS;
+        console.log('Koleksiyonlar yüklenemedi');
+        return [];
       }
     },
     enabled: isAuthenticated,
   });
 
-  const collections = Array.isArray(collectionsData) ? collectionsData : MOCK_COLLECTIONS;
+  const collections = Array.isArray(collectionsData) ? collectionsData : [];
 
   const onRefresh = async () => {
     setRefreshing(true);
@@ -79,14 +54,7 @@ export default function CollectionsScreen() {
 
   return (
     <View style={styles.container}>
-      {/* Header */}
-      <View style={styles.header}>
-        <TouchableOpacity onPress={() => router.back()}>
-          <Ionicons name="arrow-back" size={24} color={colors.white} />
-        </TouchableOpacity>
-        <Text style={styles.headerTitle}>{t('mobile.settingsCollections')}</Text>
-        <View style={{ width: 24 }} />
-      </View>
+      <ScreenHeader title={t('mobile.settingsCollections')} onBack={() => router.back()} />
 
       <ScrollView
         style={styles.content}
@@ -135,7 +103,7 @@ export default function CollectionsScreen() {
                   onPress={() => router.push(`/collections/${collection.id}`)}
                 >
                   <Image
-                    source={{ uri: collection.coverImage || 'https://via.placeholder.com/300x200?text=Koleksiyon' }}
+                    source={{ uri: resolveImageUrl(collection.coverImageUrl ?? collection.coverImage) }}
                     style={styles.collectionImage}
                   />
                   <View style={styles.collectionOverlay}>
@@ -151,14 +119,6 @@ export default function CollectionsScreen() {
                   </View>
                 </TouchableOpacity>
               ))}
-
-              {/* Add New Collection Card */}
-              {canCreateCollections && (
-                <TouchableOpacity style={styles.addCollectionCard} onPress={handleCreateCollection}>
-                  <Ionicons name="add-circle-outline" size={40} color={colors.primary[600]!} />
-                  <Text style={styles.addCollectionText}>Yeni Koleksiyon</Text>
-                </TouchableOpacity>
-              )}
             </View>
 
             {/* Empty State */}
@@ -201,20 +161,6 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: colors.surface.alt,
-  },
-  header: {
-    backgroundColor: colors.primary[600]!,
-    paddingTop: 50,
-    paddingBottom: 16,
-    paddingHorizontal: 20,
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-  },
-  headerTitle: {
-    fontSize: 18,
-    fontWeight: 'bold',
-    color: colors.white,
   },
   content: {
     flex: 1,
@@ -288,24 +234,6 @@ const styles = StyleSheet.create({
     fontSize: 12,
     color: colors.text.muted,
     marginTop: 4,
-  },
-  addCollectionCard: {
-    width: '48%',
-    height: 180,
-    backgroundColor: colors.surface.DEFAULT,
-    borderRadius: 12,
-    marginBottom: 16,
-    alignItems: 'center',
-    justifyContent: 'center',
-    borderWidth: 2,
-    borderColor: colors.border.DEFAULT,
-    borderStyle: 'dashed',
-  },
-  addCollectionText: {
-    fontSize: 14,
-    fontWeight: '500',
-    color: colors.primary[600]!,
-    marginTop: 8,
   },
   fab: {
     position: 'absolute',

@@ -1,5 +1,5 @@
-import { View, ScrollView, StyleSheet, TouchableOpacity, KeyboardAvoidingView, Platform, TextInput as RNTextInput, Image as RNImage, Alert } from 'react-native';
-import { Avatar, IconButton, Spinner, Alert as UIAlert, Text, theme } from '@tarodan/ui-native';
+import { View, ScrollView, StyleSheet, TouchableOpacity, KeyboardAvoidingView, Platform, TextInput as RNTextInput, Image as RNImage } from 'react-native';
+import { Avatar, IconButton, Spinner, Alert as UIAlert, Text, theme, appAlert } from '@tarodan/ui-native';
 import { useState, useRef, useEffect, useCallback } from 'react';
 import { router, useLocalSearchParams, useFocusEffect } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
@@ -7,7 +7,9 @@ import * as ImagePicker from 'expo-image-picker';
 import { useMessagesStore, Message } from '../../src/stores/messagesStore';
 import { useAuthStore } from '../../src/stores/authStore';
 import { detectViolations, getViolationMessage, parseMessageContent } from '../../src/utils/contentFilter';
-import { mediaApi } from '../../src/services/api';
+import { mediaApi, userApi } from '../../src/services/api';
+import { resolveImageUrl } from '../../src/utils/imageUrl';
+import ReportModal from '../../src/components/ReportModal';
 
 const { colors } = theme;
 
@@ -30,7 +32,12 @@ export default function MessageThreadScreen() {
   const [inputText, setInputText] = useState('');
   const [sending, setSending] = useState(false);
   const [uploadingImage, setUploadingImage] = useState(false);
+  // Seçilen foto gönderilmeden önce input üstünde önizlenir; kullanıcı onaylayınca gönderilir.
+  const [pendingImage, setPendingImage] = useState<{ uri: string; name: string; type: string } | null>(null);
   const [filterWarning, setFilterWarning] = useState<string | null>(null);
+  const [showReportModal, setShowReportModal] = useState(false);
+  // İlk açılışta liste en alta konumlanana dek gizli tutulur (zıplama görünmesin).
+  const [isPositioned, setIsPositioned] = useState(false);
   const scrollViewRef = useRef<ScrollView>(null);
 
   const messageLimit = limits?.maxMessagesPerDay || 50;
@@ -48,24 +55,37 @@ export default function MessageThreadScreen() {
     }, [threadId])
   );
 
-  // Scroll to bottom when messages change
+  // Thread değişince ilk konumlama sıfırlanır
   useEffect(() => {
-    setTimeout(() => {
+    setIsPositioned(false);
+  }, [threadId]);
+
+  // İlk yüklemede animasyonsuz en alta konumla (liste o ana dek gizli);
+  // sonraki içerik değişimlerinde (yeni mesaj) yumuşak kaydır.
+  const handleContentSizeChange = () => {
+    if (!isPositioned) {
+      // Boş konuşma (yüklenmiş, mesaj yok) da "konumlanmış" sayılır.
+      if (messages.length > 0 || !isLoadingMessages) {
+        scrollViewRef.current?.scrollToEnd({ animated: false });
+        setIsPositioned(true);
+      }
+    } else {
       scrollViewRef.current?.scrollToEnd({ animated: true });
-    }, 100);
-  }, [messages]);
+    }
+  };
 
   /**
-   * Resim seç → mediaApi.uploadMessageImage → "[IMG:url]" formatında mesaj gönder.
-   * Web `apps/web/src/app/messages/page.tsx:337` ile aynı akış.
+   * Resim seç → önizleme olarak input üstüne ekle. Gönderim, kullanıcı
+   * gönder butonuna basınca handleSend içinde yapılır (yanlışlıkla
+   * direkt gönderim olmasın diye onay adımı).
    */
   const handleAttachImage = async () => {
-    if (!threadId || uploadingImage || !canSend) return;
+    if (!threadId || uploadingImage || sending || !canSend) return;
 
     // İzin iste
     const perm = await ImagePicker.requestMediaLibraryPermissionsAsync();
     if (!perm.granted) {
-      Alert.alert('İzin Gerekli', 'Resim göndermek için galeri erişim izni gerekli.');
+      appAlert('İzin Gerekli', 'Resim göndermek için galeri erişim izni gerekli.');
       return;
     }
 
@@ -82,53 +102,61 @@ export default function MessageThreadScreen() {
     const match = /\.(\w+)$/.exec(filename);
     const type = asset.mimeType || (match ? `image/${match[1]}` : 'image/jpeg');
 
-    const file = {
+    setPendingImage({
       uri: Platform.OS === 'ios' ? asset.uri.replace('file://', '') : asset.uri,
       name: filename,
       type,
-    };
-
-    setUploadingImage(true);
-    try {
-      const response = await mediaApi.uploadMessageImage(file as any);
-      const url = (response.data as any)?.url ?? (response.data as any)?.data?.url;
-      if (!url) throw new Error('Resim yüklendi fakat URL alınamadı.');
-
-      // Mevcut input metnini koru, sonuna [IMG:url] ekle
-      const base = inputText.trim();
-      const content = base ? `${base} [IMG:${url}]` : `[IMG:${url}]`;
-      const success = await sendMessage(threadId, content);
-      if (success) {
-        setInputText('');
-        scrollViewRef.current?.scrollToEnd({ animated: true });
-      }
-    } catch (e: any) {
-      Alert.alert('Hata', e?.response?.data?.message || 'Resim gönderilemedi.');
-    } finally {
-      setUploadingImage(false);
-    }
+    });
   };
 
   const handleSend = async () => {
-    if (!inputText.trim() || !threadId || sending || !canSend) return;
-
     const trimmed = inputText.trim();
+    if ((!trimmed && !pendingImage) || !threadId || sending || uploadingImage || !canSend) return;
 
     // Platform dışı iletişim tespiti (telefon, email, IBAN, WhatsApp vs.)
-    const violations = detectViolations(trimmed);
-    if (violations.length > 0) {
-      setFilterWarning(getViolationMessage(violations));
-      setTimeout(() => setFilterWarning(null), 5000);
-      return;
+    if (trimmed) {
+      const violations = detectViolations(trimmed);
+      if (violations.length > 0) {
+        setFilterWarning(getViolationMessage(violations));
+        setTimeout(() => setFilterWarning(null), 5000);
+        return;
+      }
     }
 
     setSending(true);
-    const success = await sendMessage(threadId, trimmed);
-    if (success) {
-      setInputText('');
-      scrollViewRef.current?.scrollToEnd({ animated: true });
+    try {
+      let content = trimmed;
+
+      // Önizlenen foto varsa önce yükle, "[IMG:url]" formatında mesaja ekle.
+      // Web `apps/web/src/app/messages/page.tsx:337` ile aynı format.
+      if (pendingImage) {
+        setUploadingImage(true);
+        try {
+          const response = await mediaApi.uploadMessageImage(pendingImage as any);
+          const url = (response.data as any)?.url ?? (response.data as any)?.data?.url;
+          if (!url) throw new Error('Resim yüklendi fakat URL alınamadı.');
+          content = trimmed ? `${trimmed} [IMG:${url}]` : `[IMG:${url}]`;
+        } catch (e: any) {
+          appAlert('Hata', e?.response?.data?.message || 'Resim gönderilemedi.');
+          return;
+        } finally {
+          setUploadingImage(false);
+        }
+      }
+
+      const success = await sendMessage(threadId, content);
+      if (success) {
+        setInputText('');
+        setPendingImage(null);
+      } else {
+        appAlert(
+          'Mesaj gönderilemedi',
+          useMessagesStore.getState().error || 'Lütfen tekrar deneyin.'
+        );
+      }
+    } finally {
+      setSending(false);
     }
-    setSending(false);
   };
 
   const formatTime = (dateString: string) => {
@@ -178,6 +206,41 @@ export default function MessageThreadScreen() {
 
   const other = currentThread ? getOtherParticipant(currentThread) : null;
 
+  const handleBlockUser = () => {
+    if (!other) return;
+    appAlert(
+      'Kullanıcıyı Engelle',
+      `${other.displayName} engellenecek. Bu kullanıcı size mesaj gönderemez ve ilanlarınızı göremez.`,
+      [
+        { text: 'Vazgeç', style: 'cancel' },
+        {
+          text: 'Engelle',
+          style: 'destructive',
+          onPress: async () => {
+            try {
+              await userApi.block(other.id);
+              appAlert('Engellendi', `${other.displayName} engellendi.`);
+              router.back();
+            } catch {
+              appAlert('Hata', 'Kullanıcı engellenirken bir sorun oluştu.');
+            }
+          },
+        },
+      ]
+    );
+  };
+
+  const handleHeaderMenu = () => {
+    if (!other) return;
+    appAlert(other.displayName, undefined, [
+      { text: 'Profili Görüntüle', onPress: () => router.push(`/seller/${other.id}`) },
+      // iOS'ta alert modalı kapanırken yeni bir native Modal açılırsa görünmeyebilir; kapanışı bekle.
+      { text: 'Şikayet Et', onPress: () => setTimeout(() => setShowReportModal(true), 300) },
+      { text: 'Engelle', style: 'destructive', onPress: handleBlockUser },
+      { text: 'Vazgeç', style: 'cancel' },
+    ]);
+  };
+
   return (
     <KeyboardAvoidingView
       style={styles.container}
@@ -213,9 +276,19 @@ export default function MessageThreadScreen() {
           icon="ellipsis-vertical"
           accessibilityLabel="Daha fazla"
           size="md"
-          onPress={() => {}}
+          onPress={handleHeaderMenu}
         />
       </View>
+
+      {other && (
+        <ReportModal
+          visible={showReportModal}
+          onDismiss={() => setShowReportModal(false)}
+          type="user"
+          targetId={other.id}
+          targetName={other.displayName}
+        />
+      )}
 
       {/* Product Banner */}
       {currentThread?.product && (
@@ -253,8 +326,9 @@ export default function MessageThreadScreen() {
       ) : (
         <ScrollView
           ref={scrollViewRef}
-          style={styles.messagesList}
+          style={[styles.messagesList, !isPositioned && styles.messagesListHidden]}
           contentContainerStyle={styles.messagesContent}
+          onContentSizeChange={handleContentSizeChange}
         >
           {groupedMessages.map((group, groupIndex) => (
             <View key={groupIndex}>
@@ -306,7 +380,7 @@ export default function MessageThreadScreen() {
                                 {parsed.images.map((img, idx) => (
                                   <RNImage
                                     key={`${message.id}-img-${idx}`}
-                                    source={{ uri: img }}
+                                    source={{ uri: resolveImageUrl(img) }}
                                     style={styles.messageImage}
                                     resizeMode="cover"
                                   />
@@ -348,6 +422,28 @@ export default function MessageThreadScreen() {
         </ScrollView>
       )}
 
+      {/* Seçilen foto önizlemesi — gönder butonuyla onaylanana dek bekler */}
+      {pendingImage && (
+        <View style={styles.pendingImageBar}>
+          <RNImage
+            source={{ uri: pendingImage.uri }}
+            style={styles.pendingImageThumb}
+            resizeMode="cover"
+          />
+          <Text style={styles.pendingImageText} numberOfLines={1}>
+            Fotoğraf gönderilmeye hazır
+          </Text>
+          <TouchableOpacity
+            style={styles.pendingImageRemove}
+            onPress={() => setPendingImage(null)}
+            disabled={uploadingImage || sending}
+            accessibilityLabel="Fotoğrafı kaldır"
+          >
+            <Ionicons name="close-circle" size={24} color={colors.text.muted} />
+          </TouchableOpacity>
+        </View>
+      )}
+
       {/* Input */}
       <View style={styles.inputContainer}>
         <TouchableOpacity
@@ -372,6 +468,7 @@ export default function MessageThreadScreen() {
           <RNTextInput
             style={styles.textInput}
             placeholder={canSend ? "Mesajınızı yazın..." : "Mesaj limiti doldu"}
+            placeholderTextColor={colors.text.subtle}
             value={inputText}
             onChangeText={setInputText}
             multiline
@@ -382,15 +479,15 @@ export default function MessageThreadScreen() {
         <TouchableOpacity
           style={[
             styles.sendButton,
-            (!inputText.trim() || !canSend || sending) && styles.sendButtonDisabled,
+            ((!inputText.trim() && !pendingImage) || !canSend || sending) && styles.sendButtonDisabled,
           ]}
           onPress={handleSend}
-          disabled={!inputText.trim() || !canSend || sending}
+          disabled={(!inputText.trim() && !pendingImage) || !canSend || sending}
         >
           <Ionicons
             name="send"
             size={24}
-            color={(!inputText.trim() || !canSend) ? colors.text.subtle : colors.white}
+            color={((!inputText.trim() && !pendingImage) || !canSend) ? colors.text.subtle : colors.white}
           />
         </TouchableOpacity>
       </View>
@@ -454,6 +551,9 @@ const styles = StyleSheet.create({
   },
   messagesList: {
     flex: 1,
+  },
+  messagesListHidden: {
+    opacity: 0,
   },
   messagesContent: {
     padding: 16,
@@ -586,5 +686,29 @@ const styles = StyleSheet.create({
   },
   attachButtonDisabled: {
     opacity: 0.5,
+  },
+  pendingImageBar: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    backgroundColor: colors.surface.DEFAULT,
+    borderTopWidth: 1,
+    borderTopColor: colors.border.DEFAULT,
+  },
+  pendingImageThumb: {
+    width: 56,
+    height: 56,
+    borderRadius: 8,
+    backgroundColor: colors.surface.alt,
+  },
+  pendingImageText: {
+    flex: 1,
+    marginHorizontal: 12,
+    fontSize: 14,
+    color: colors.text.muted,
+  },
+  pendingImageRemove: {
+    padding: 4,
   },
 });

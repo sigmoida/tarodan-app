@@ -150,7 +150,7 @@ export class SupportService {
         ticketNumber: this.generateTicketNumber(),
         creatorId: userId,
         category: dto.category,
-        priority: TicketPriority.medium,
+        priority: dto.priority ?? TicketPriority.medium,
         status: TicketStatus.open,
         subject: dto.subject,
         orderId: dto.orderId,

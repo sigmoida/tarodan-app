@@ -3,7 +3,7 @@
 import { useState, useEffect } from 'react';
 import { adminApi } from '@/lib/api';
 import { Button, Input, Select, Spinner, Textarea } from '@tarodan/ui';
-import { Fragment } from 'react';
+import { DataTable, type ColumnDef } from '@/components/DataTable';
 import {
     PlusIcon,
     PencilIcon,
@@ -16,6 +16,7 @@ import {
     TruckIcon,
 } from '@heroicons/react/24/outline';
 import toast from 'react-hot-toast';
+import { PageHeader, ActionButtons, ActionIconButton } from '@/components/admin-list';
 
 interface CarModel {
     id: string;
@@ -256,224 +257,202 @@ export default function BrandsPage() {
         }
     };
 
+    const columns: ColumnDef<Brand, any>[] = [
+        {
+            header: 'Marka',
+            cell: ({ row }) => (
+                <div className="flex items-center gap-3">
+                    {row.original.logo ? (
+                        <img
+                            src={row.original.logo}
+                            alt={row.original.name}
+                            className="w-10 h-10 rounded-lg object-contain bg-surface-alt"
+                        />
+                    ) : (
+                        <div className="w-10 h-10 rounded-lg bg-border-subtle flex items-center justify-center text-muted font-bold">
+                            {row.original.name.charAt(0).toUpperCase()}
+                        </div>
+                    )}
+                    <div>
+                        <p className="font-medium text-heading">{row.original.name}</p>
+                        <p className="text-sm text-muted">{row.original.slug}</p>
+                    </div>
+                </div>
+            ),
+        },
+        {
+            header: 'Website',
+            cell: ({ row }) => (
+                row.original.website ? (
+                    <a
+                        href={row.original.website}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="text-sm text-info-600 hover:text-info-800 flex items-center gap-1"
+                    >
+                        <GlobeAltIcon className="w-4 h-4" />
+                        Ziyaret Et
+                    </a>
+                ) : (
+                    <span className="text-muted text-sm">-</span>
+                )
+            ),
+        },
+        {
+            header: 'Durum',
+            cell: ({ row }) => (
+                <Button variant="secondary" onClick={() => toggleStatus(row.original)}
+                    className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-medium ${row.original.isActive
+                            ? 'bg-success-100 text-success-800'
+                            : 'bg-surface-alt text-body'
+                        }`}>
+                    {row.original.isActive ? (
+                        <>
+                            <CheckCircleIcon className="w-4 h-4" />
+                            Aktif
+                        </>
+                    ) : (
+                        <>
+                            <XCircleIcon className="w-4 h-4" />
+                            Pasif
+                        </>
+                    )}
+                </Button>
+            ),
+        },
+        {
+            header: 'Modeller',
+            cell: ({ row }) => (
+                <>
+                    <Button variant="secondary" onClick={() => toggleExpand(row.original.id)}
+                        className="inline-flex items-center gap-2 px-3 py-1.5 text-sm font-medium text-primary-600 hover:bg-primary-50 rounded-lg transition-colors">
+                        {expandedBrandId === row.original.id ? (
+                            <ChevronDownIcon className="w-4 h-4" />
+                        ) : (
+                            <ChevronRightIcon className="w-4 h-4" />
+                        )}
+                        <TruckIcon className="w-4 h-4" />
+                        Modeller
+                    </Button>
+                    {expandedBrandId === row.original.id && (
+                        <div className="mt-4">
+                            {modelsLoading ? (
+                                <div className="flex items-center gap-2 text-muted">
+                                    <Spinner size="sm" color="border-primary-500 border-t-transparent" />
+                                    Modeller yükleniyor...
+                                </div>
+                            ) : modelsForBrand.length === 0 ? (
+                                <div className="flex items-center gap-4">
+                                    <p className="text-muted">Bu marka için henüz model eklenmemiş</p>
+                                    <Button variant="secondary" onClick={() => openModelCreateModal(row.original.id)}
+                                        className="inline-flex items-center gap-2 px-3 py-1.5 text-sm font-medium text-primary-600 hover:bg-primary-50 rounded-lg">
+                                        <PlusIcon className="w-4 h-4" />
+                                        Model Ekle
+                                    </Button>
+                                </div>
+                            ) : (
+                                <div className="space-y-2">
+                                    <div className="flex items-center justify-between mb-2">
+                                        <span className="text-sm font-medium text-body">Modeller ({modelsForBrand.length})</span>
+                                        <Button variant="secondary" onClick={() => openModelCreateModal(row.original.id)}
+                                            className="inline-flex items-center gap-2 px-3 py-1.5 text-sm font-medium text-primary-600 hover:bg-primary-50 rounded-lg">
+                                            <PlusIcon className="w-4 h-4" />
+                                            Model Ekle
+                                        </Button>
+                                    </div>
+                                    <div className="max-h-48 overflow-y-auto">
+                                        <table className="min-w-full divide-y divide-border">
+                                            <tbody className="divide-y divide-border-subtle">
+                                                {modelsForBrand.map((m) => (
+                                                    <tr key={m.id} className="hover:bg-surface-alt">
+                                                        <td className="py-2 pr-4">
+                                                            <div>
+                                                                <p className="font-medium text-heading">{m.name}</p>
+                                                                <p className="text-xs text-muted">{m.slug}</p>
+                                                            </div>
+                                                        </td>
+                                                        <td className="py-2 pr-4 text-sm text-muted">
+                                                            {m.yearStart || m.yearEnd ? `${m.yearStart ?? '?'} - ${m.yearEnd ?? '?'}` : '-'}
+                                                        </td>
+                                                        <td className="py-2">
+                                                            <Button variant="secondary" onClick={() => toggleModelStatus(m)}
+                                                                className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium ${m.isActive ? 'bg-success-100 text-success-800' : 'bg-surface-alt text-body'}`}>
+                                                                {m.isActive ? 'Aktif' : 'Pasif'}
+                                                            </Button>
+                                                        </td>
+                                                        <td className="py-2 text-right">
+                                                            <div className="flex items-center justify-end gap-1">
+                                                                <Button variant="secondary" onClick={() => openModelEditModal(m)} className="p-1.5 text-muted hover:text-muted hover:bg-border-subtle rounded" title="Düzenle">
+                                                                    <PencilIcon className="w-4 h-4" />
+                                                                </Button>
+                                                                <Button variant="secondary" onClick={() => setDeleteConfirmModel(m.id)} className="p-1.5 text-muted hover:text-danger-600 hover:bg-danger-50 rounded" title="Sil">
+                                                                    <TrashIcon className="w-4 h-4" />
+                                                                </Button>
+                                                            </div>
+                                                        </td>
+                                                    </tr>
+                                                ))}
+                                            </tbody>
+                                        </table>
+                                    </div>
+                                </div>
+                            )}
+                        </div>
+                    )}
+                </>
+            ),
+        },
+        {
+            id: 'actions',
+            header: 'İşlemler',
+            cell: ({ row }) => (
+                <ActionButtons>
+                    <ActionIconButton
+                        icon={PencilIcon}
+                        onClick={() => openEditModal(row.original)}
+                        title="Düzenle"
+                    />
+                    <ActionIconButton
+                        icon={TrashIcon}
+                        onClick={() => setDeleteConfirm(row.original.id)}
+                        title="Sil"
+                        variant="danger"
+                    />
+                </ActionButtons>
+            ),
+        },
+    ];
+
     return (
         <>
             <div className="space-y-6">
-                {/* Header */}
-                <div className="flex justify-between items-center">
-                    <div>
-                        <h1 className="text-2xl font-bold text-heading">Marka Yönetimi</h1>
-                        <p className="mt-1 text-sm text-muted">
-                            Uygulamada gösterilecek markaları buradan yönetebilirsiniz
-                        </p>
-                    </div>
+                <PageHeader
+                    title="Marka Yönetimi"
+                    description="Uygulamada gösterilecek markaları buradan yönetebilirsiniz"
+                >
                     <Button variant="primary" size="md" onClick={openCreateModal}>
                         <PlusIcon className="w-5 h-5" />
                         Yeni Marka Ekle
                     </Button>
-                </div>
+                </PageHeader>
 
                 {/* Brands Table */}
-                <div className="bg-surface-elevated rounded-xl shadow-sm border border-border-subtle overflow-hidden">
-                    {loading ? (
-                        <div className="p-8 text-center">
-                            <Spinner size="lg" color="border-primary-500 border-t-transparent" className="mx-auto" />
-                            <p className="mt-2 text-muted">Yükleniyor...</p>
-                        </div>
-                    ) : brands.length === 0 ? (
-                        <div className="p-8 text-center">
-                            <p className="text-muted">Henüz marka eklenmemiş</p>
-                            <Button variant="secondary" onClick={openCreateModal}
-                                className="mt-4 text-primary-500 hover:text-primary-600 font-medium">
-                                İlk markayı ekle
-                            </Button>
-                        </div>
-                    ) : (
-                        <table className="min-w-full divide-y divide-border">
-                            <thead className="bg-surface">
-                                <tr>
-                                    <th className="px-6 py-3 text-left text-xs font-medium text-muted uppercase tracking-wider">
-                                        Marka
-                                    </th>
-                                    <th className="px-6 py-3 text-left text-xs font-medium text-muted uppercase tracking-wider">
-                                        Website
-                                    </th>
-                                    <th className="px-6 py-3 text-left text-xs font-medium text-muted uppercase tracking-wider">
-                                        Durum
-                                    </th>
-                                    <th className="px-6 py-3 text-left text-xs font-medium text-muted uppercase tracking-wider">
-                                        Modeller
-                                    </th>
-                                    <th className="px-6 py-3 text-right text-xs font-medium text-muted uppercase tracking-wider">
-                                        İşlemler
-                                    </th>
-                                </tr>
-                            </thead>
-                            <tbody className="bg-surface-elevated divide-y divide-border">
-                                {brands.map((brand) => (
-                                    <Fragment key={brand.id}>
-                                    <tr className="hover:bg-surface">
-                                        <td className="px-6 py-4 whitespace-nowrap">
-                                            <div className="flex items-center gap-3">
-                                                {brand.logo ? (
-                                                    <img
-                                                        src={brand.logo}
-                                                        alt={brand.name}
-                                                        className="w-10 h-10 rounded-lg object-contain bg-surface-alt"
-                                                    />
-                                                ) : (
-                                                    <div className="w-10 h-10 rounded-lg bg-border-subtle flex items-center justify-center text-muted font-bold">
-                                                        {brand.name.charAt(0).toUpperCase()}
-                                                    </div>
-                                                )}
-                                                <div>
-                                                    <p className="font-medium text-heading">{brand.name}</p>
-                                                    <p className="text-sm text-muted">{brand.slug}</p>
-                                                </div>
-                                            </div>
-                                        </td>
-                                        <td className="px-6 py-4 whitespace-nowrap">
-                                            {brand.website ? (
-                                                <a
-                                                    href={brand.website}
-                                                    target="_blank"
-                                                    rel="noopener noreferrer"
-                                                    className="text-sm text-info-600 hover:text-info-800 flex items-center gap-1"
-                                                >
-                                                    <GlobeAltIcon className="w-4 h-4" />
-                                                    Ziyaret Et
-                                                </a>
-                                            ) : (
-                                                <span className="text-muted text-sm">-</span>
-                                            )}
-                                        </td>
-                                        <td className="px-6 py-4 whitespace-nowrap">
-                                            <Button variant="secondary" onClick={() => toggleStatus(brand)}
-                                                className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-medium ${brand.isActive
-                                                        ? 'bg-success-100 text-success-800'
-                                                        : 'bg-surface-alt text-body'
-                                                    }`}>
-                                                {brand.isActive ? (
-                                                    <>
-                                                        <CheckCircleIcon className="w-4 h-4" />
-                                                        Aktif
-                                                    </>
-                                                ) : (
-                                                    <>
-                                                        <XCircleIcon className="w-4 h-4" />
-                                                        Pasif
-                                                    </>
-                                                )}
-                                            </Button>
-                                        </td>
-                                        <td className="px-6 py-4 whitespace-nowrap">
-                                            <Button variant="secondary" onClick={() => toggleExpand(brand.id)}
-                                                className="inline-flex items-center gap-2 px-3 py-1.5 text-sm font-medium text-primary-600 hover:bg-primary-50 rounded-lg transition-colors">
-                                                {expandedBrandId === brand.id ? (
-                                                    <ChevronDownIcon className="w-4 h-4" />
-                                                ) : (
-                                                    <ChevronRightIcon className="w-4 h-4" />
-                                                )}
-                                                <TruckIcon className="w-4 h-4" />
-                                                Modeller
-                                            </Button>
-                                        </td>
-                                        <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
-                                            <div className="flex items-center justify-end gap-2">
-                                                <Button variant="secondary" onClick={() => openEditModal(brand)}
-                                                    className="p-2 text-muted hover:text-muted hover:bg-surface-alt rounded-lg"
-                                                    title="Düzenle">
-                                                    <PencilIcon className="w-4 h-4" />
-                                                </Button>
-                                                <Button variant="secondary" onClick={() => setDeleteConfirm(brand.id)}
-                                                    className="p-2 text-muted hover:text-danger-600 hover:bg-danger-50 rounded-lg"
-                                                    title="Sil">
-                                                    <TrashIcon className="w-4 h-4" />
-                                                </Button>
-                                            </div>
-                                        </td>
-                                    </tr>
-                                    {expandedBrandId === brand.id && (
-                                        <tr key={`${brand.id}-models`}>
-                                            <td colSpan={5} className="px-6 py-4 bg-surface">
-                                                {modelsLoading ? (
-                                                    <div className="flex items-center gap-2 text-muted">
-                                                        <Spinner size="sm" color="border-primary-500 border-t-transparent" />
-                                                        Modeller yükleniyor...
-                                                    </div>
-                                                ) : modelsForBrand.length === 0 ? (
-                                                    <div className="flex items-center gap-4">
-                                                        <p className="text-muted">Bu marka için henüz model eklenmemiş</p>
-                                                        <Button variant="secondary" onClick={() => openModelCreateModal(brand.id)}
-                                                            className="inline-flex items-center gap-2 px-3 py-1.5 text-sm font-medium text-primary-600 hover:bg-primary-50 rounded-lg">
-                                                            <PlusIcon className="w-4 h-4" />
-                                                            Model Ekle
-                                                        </Button>
-                                                    </div>
-                                                ) : (
-                                                    <div className="space-y-2">
-                                                        <div className="flex items-center justify-between mb-2">
-                                                            <span className="text-sm font-medium text-body">Modeller ({modelsForBrand.length})</span>
-                                                            <Button variant="secondary" onClick={() => openModelCreateModal(brand.id)}
-                                                                className="inline-flex items-center gap-2 px-3 py-1.5 text-sm font-medium text-primary-600 hover:bg-primary-50 rounded-lg">
-                                                                <PlusIcon className="w-4 h-4" />
-                                                                Model Ekle
-                                                            </Button>
-                                                        </div>
-                                                        <div className="max-h-48 overflow-y-auto">
-                                                            <table className="min-w-full divide-y divide-border">
-                                                                <tbody className="divide-y divide-border-subtle">
-                                                                    {modelsForBrand.map((m) => (
-                                                                        <tr key={m.id} className="hover:bg-surface-alt">
-                                                                            <td className="py-2 pr-4">
-                                                                                <div>
-                                                                                    <p className="font-medium text-heading">{m.name}</p>
-                                                                                    <p className="text-xs text-muted">{m.slug}</p>
-                                                                                </div>
-                                                                            </td>
-                                                                            <td className="py-2 pr-4 text-sm text-muted">
-                                                                                {m.yearStart || m.yearEnd ? `${m.yearStart ?? '?'} - ${m.yearEnd ?? '?'}` : '-'}
-                                                                            </td>
-                                                                            <td className="py-2">
-                                                                                <Button variant="secondary" onClick={() => toggleModelStatus(m)}
-                                                                                    className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium ${m.isActive ? 'bg-success-100 text-success-800' : 'bg-surface-alt text-body'}`}>
-                                                                                    {m.isActive ? 'Aktif' : 'Pasif'}
-                                                                                </Button>
-                                                                            </td>
-                                                                            <td className="py-2 text-right">
-                                                                                <div className="flex items-center justify-end gap-1">
-                                                                                    <Button variant="secondary" onClick={() => openModelEditModal(m)} className="p-1.5 text-muted hover:text-muted hover:bg-border-subtle rounded" title="Düzenle">
-                                                                                        <PencilIcon className="w-4 h-4" />
-                                                                                    </Button>
-                                                                                    <Button variant="secondary" onClick={() => setDeleteConfirmModel(m.id)} className="p-1.5 text-muted hover:text-danger-600 hover:bg-danger-50 rounded" title="Sil">
-                                                                                        <TrashIcon className="w-4 h-4" />
-                                                                                    </Button>
-                                                                                </div>
-                                                                            </td>
-                                                                        </tr>
-                                                                    ))}
-                                                                </tbody>
-                                                            </table>
-                                                        </div>
-                                                    </div>
-                                                )}
-                                            </td>
-                                        </tr>
-                                    )}
-                                    </Fragment>
-                                ))}
-                            </tbody>
-                        </table>
-                    )}
-                </div>
+                <DataTable
+                    columns={columns}
+                    data={brands}
+                    loading={loading}
+                    emptyText="Henüz marka eklenmemiş"
+                    emptyAction={<Button onClick={openCreateModal}><PlusIcon className="w-5 h-5 mr-2" />İlk markayı ekle</Button>}
+                    getRowId={(b) => b.id}
+                />
 
                 {/* Create/Edit Modal */}
                 {showModal && (
                     <div className="fixed inset-0 z-50 overflow-y-auto">
                         <div className="flex min-h-full items-center justify-center p-4">
                             <div className="fixed inset-0 bg-heading/50" onClick={() => setShowModal(false)} />
-                            <div className="relative bg-surface-elevated rounded-xl shadow-xl w-full max-w-md p-6">
-                                <h3 className="text-lg font-semibold text-heading mb-4">
+                            <div className="relative bg-surface-elevated rounded-xl shadow-xl w-full max-w-md px-6 pb-6 pt-5">
+                                <h3 className="text-lg font-semibold text-heading mb-4 leading-tight">
                                     {editingBrand ? 'Markayı Düzenle' : 'Yeni Marka Ekle'}
                                 </h3>
                                 <form onSubmit={handleSubmit} className="space-y-4">
@@ -556,8 +535,8 @@ export default function BrandsPage() {
                     <div className="fixed inset-0 z-50 overflow-y-auto">
                         <div className="flex min-h-full items-center justify-center p-4">
                             <div className="fixed inset-0 bg-heading/50" onClick={() => setDeleteConfirm(null)} />
-                            <div className="relative bg-surface-elevated rounded-xl shadow-xl w-full max-w-sm p-6">
-                                <h3 className="text-lg font-semibold text-heading mb-2">
+                            <div className="relative bg-surface-elevated rounded-xl shadow-xl w-full max-w-sm px-6 pb-6 pt-5">
+                                <h3 className="text-lg font-semibold text-heading mb-2 leading-tight">
                                     Markayı Sil
                                 </h3>
                                 <p className="text-muted mb-4">
@@ -581,8 +560,8 @@ export default function BrandsPage() {
                     <div className="fixed inset-0 z-50 overflow-y-auto">
                         <div className="flex min-h-full items-center justify-center p-4">
                             <div className="fixed inset-0 bg-heading/50" onClick={() => setShowModelModal(false)} />
-                            <div className="relative bg-surface-elevated rounded-xl shadow-xl w-full max-w-md p-6">
-                                <h3 className="text-lg font-semibold text-heading mb-4">
+                            <div className="relative bg-surface-elevated rounded-xl shadow-xl w-full max-w-md px-6 pb-6 pt-5">
+                                <h3 className="text-lg font-semibold text-heading mb-4 leading-tight">
                                     {editingModel ? 'Modeli Düzenle' : 'Yeni Model Ekle'}
                                 </h3>
                                 <form onSubmit={handleModelSubmit} className="space-y-4">
@@ -663,8 +642,8 @@ export default function BrandsPage() {
                     <div className="fixed inset-0 z-50 overflow-y-auto">
                         <div className="flex min-h-full items-center justify-center p-4">
                             <div className="fixed inset-0 bg-heading/50" onClick={() => setDeleteConfirmModel(null)} />
-                            <div className="relative bg-surface-elevated rounded-xl shadow-xl w-full max-w-sm p-6">
-                                <h3 className="text-lg font-semibold text-heading mb-2">Modeli Sil</h3>
+                            <div className="relative bg-surface-elevated rounded-xl shadow-xl w-full max-w-sm px-6 pb-6 pt-5">
+                                <h3 className="text-lg font-semibold text-heading mb-2 leading-tight">Modeli Sil</h3>
                                 <p className="text-muted mb-4">Bu modeli silmek istediğinizden emin misiniz? Bu işlem geri alınamaz.</p>
                                 <div className="flex justify-end gap-3">
                                     <Button variant="secondary" size="md" onClick={() => setDeleteConfirmModel(null)}>

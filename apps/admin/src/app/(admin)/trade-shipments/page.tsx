@@ -5,13 +5,12 @@ import Link from "next/link";
 import { adminApi } from "@/lib/api";
 import {
   Button,
-  Input,
   Select,
-  Spinner,
   StatusBadge,
 } from "@tarodan/ui";
 import type { StatusConfig } from "@tarodan/ui";
-import { MagnifyingGlassIcon } from "@heroicons/react/24/outline";
+import { DataTable, type ColumnDef } from "@/components/DataTable";
+import { PageHeader, FilterToolbar } from "@/components/admin-list";
 import toast from "react-hot-toast";
 
 interface TradeShipmentRow {
@@ -86,6 +85,80 @@ function formatRelative(iso: string): string {
 
 const PAGE_SIZE = 20;
 
+const columns: ColumnDef<TradeShipmentRow, any>[] = [
+  {
+    header: "Takas No",
+    cell: ({ row }) =>
+      row.original.trade ? (
+        <Link
+          href={`/trades/${row.original.trade.id}`}
+          className="font-mono text-sm text-primary-600 hover:underline"
+        >
+          {row.original.trade.tradeNumber ||
+            `#${row.original.trade.id.slice(0, 8)}`}
+        </Link>
+      ) : (
+        <span className="text-subtle text-sm">—</span>
+      ),
+  },
+  {
+    header: "Yön",
+    cell: ({ row }) => (
+      <span className="text-sm text-body">
+        {legLabels[row.original.leg] || row.original.leg}
+      </span>
+    ),
+  },
+  {
+    header: "Kargo",
+    cell: ({ row }) => (
+      <span className="text-sm text-body">{row.original.carrier}</span>
+    ),
+  },
+  {
+    header: "Takip No",
+    cell: ({ row }) =>
+      row.original.trackingNumber ? (
+        <span className="font-mono text-xs text-body">
+          {row.original.trackingNumber}
+        </span>
+      ) : (
+        <span className="text-subtle text-sm">—</span>
+      ),
+  },
+  {
+    header: "Durum",
+    cell: ({ row }) => (
+      <StatusBadge
+        status={row.original.status}
+        config={shipmentStatusConfig}
+      />
+    ),
+  },
+  {
+    header: "Gönderici",
+    cell: ({ row }) =>
+      row.original.shipper ? (
+        <Link
+          href={`/users/${row.original.shipper.id}`}
+          className="text-sm text-heading hover:text-primary-600"
+        >
+          {row.original.shipper.displayName}
+        </Link>
+      ) : (
+        <span className="text-subtle text-sm">—</span>
+      ),
+  },
+  {
+    header: "Güncelleme",
+    cell: ({ row }) => (
+      <span className="whitespace-nowrap text-sm text-muted">
+        {formatRelative(row.original.updatedAt)}
+      </span>
+    ),
+  },
+];
+
 export default function TradeShipmentsPage() {
   const [rows, setRows] = useState<TradeShipmentRow[]>([]);
   const [loading, setLoading] = useState(true);
@@ -141,23 +214,14 @@ export default function TradeShipmentsPage() {
 
   return (
     <div className="space-y-6">
-      <div>
-        <h1 className="text-2xl font-bold text-heading">Takas Kargoları</h1>
-        <p className="text-muted mt-1">Toplam {total} kargo</p>
-      </div>
+      <PageHeader title="Takas Kargoları" description={`Toplam ${total} kargo`} />
 
       {/* Filters */}
-      <div className="flex flex-col sm:flex-row gap-3">
-        <div className="relative flex-1">
-          <MagnifyingGlassIcon className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-subtle pointer-events-none shrink-0" />
-          <Input
-            type="text"
-            placeholder="Takas No ile ara..."
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            className="admin-input-with-icon-left"
-          />
-        </div>
+      <FilterToolbar
+        search={search}
+        onSearchChange={setSearch}
+        searchPlaceholder="Takas No ile ara..."
+      >
         <Select
           value={status}
           onChange={(e) => {
@@ -186,99 +250,20 @@ export default function TradeShipmentsPage() {
             </option>
           ))}
         </Select>
-      </div>
+      </FilterToolbar>
 
       {/* Table */}
-      <div className="admin-card overflow-hidden">
-        <div className="overflow-x-auto">
-          <table className="admin-table">
-            <thead>
-              <tr>
-                <th>Takas No</th>
-                <th>Yön</th>
-                <th>Kargo</th>
-                <th>Takip No</th>
-                <th>Durum</th>
-                <th>Gönderici</th>
-                <th>Güncelleme</th>
-              </tr>
-            </thead>
-            <tbody>
-              {loading ? (
-                <tr>
-                  <td colSpan={7} className="text-center py-12">
-                    <Spinner size="lg" className="mx-auto" />
-                  </td>
-                </tr>
-              ) : rows.length === 0 ? (
-                <tr>
-                  <td colSpan={7} className="text-center py-12 text-subtle">
-                    {debouncedSearch || status !== "all" || leg !== "all"
-                      ? "Filtreye uygun kargo bulunamadı"
-                      : "Henüz takas kargosu yok"}
-                  </td>
-                </tr>
-              ) : (
-                rows.map((row) => (
-                  <tr key={row.id} className="group hover:bg-surface/50">
-                    <td>
-                      {row.trade ? (
-                        <Link
-                          href={`/trades/${row.trade.id}`}
-                          className="font-mono text-sm text-primary-600 hover:underline"
-                        >
-                          {row.trade.tradeNumber ||
-                            `#${row.trade.id.slice(0, 8)}`}
-                        </Link>
-                      ) : (
-                        <span className="text-subtle text-sm">—</span>
-                      )}
-                    </td>
-                    <td>
-                      <span className="text-sm text-body">
-                        {legLabels[row.leg] || row.leg}
-                      </span>
-                    </td>
-                    <td>
-                      <span className="text-sm text-body">{row.carrier}</span>
-                    </td>
-                    <td>
-                      {row.trackingNumber ? (
-                        <span className="font-mono text-xs text-body">
-                          {row.trackingNumber}
-                        </span>
-                      ) : (
-                        <span className="text-subtle text-sm">—</span>
-                      )}
-                    </td>
-                    <td>
-                      <StatusBadge
-                        status={row.status}
-                        config={shipmentStatusConfig}
-                      />
-                    </td>
-                    <td>
-                      {row.shipper ? (
-                        <Link
-                          href={`/users/${row.shipper.id}`}
-                          className="text-sm text-heading hover:text-primary-600"
-                        >
-                          {row.shipper.displayName}
-                        </Link>
-                      ) : (
-                        <span className="text-subtle text-sm">—</span>
-                      )}
-                    </td>
-                    <td className="whitespace-nowrap text-sm text-muted">
-                      {formatRelative(row.updatedAt)}
-                    </td>
-                  </tr>
-                ))
-              )}
-            </tbody>
-          </table>
-        </div>
-      </div>
+      <DataTable
+        columns={columns}
+        data={rows}
+        loading={loading}
+        emptyText={
+          debouncedSearch || status !== "all" || leg !== "all"
+            ? "Filtreye uygun kargo bulunamadı"
+            : "Henüz takas kargosu yok"
+        }
+        getRowId={(r) => r.id}
+      />
 
       {/* Pagination */}
       {total > 0 && (

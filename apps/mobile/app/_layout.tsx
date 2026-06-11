@@ -1,14 +1,18 @@
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import { Stack } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
-import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import { QueryClientProvider } from '@tanstack/react-query';
 import * as SplashScreen from 'expo-splash-screen';
 import Constants from 'expo-constants';
-import { theme } from '@tarodan/ui-native';
+import { theme, AlertDialogHost } from '@tarodan/ui-native';
 import { useAuthStore } from '../src/stores/authStore';
+// Paylaşılan QueryClient — logout'ta resetUserStores aynı örneği temizler.
+import { queryClient } from '../src/lib/queryClient';
 import { registerForPushNotifications, setupPushNotificationRouting } from '../src/services/push';
 import { LanguageProvider } from '../src/i18n';
 import { initSentry } from '../src/services/sentry';
+import AnimatedSplash from '../src/components/AnimatedSplash';
+import BusinessMembershipGuard from '../src/components/BusinessMembershipGuard';
 
 const { colors } = theme;
 
@@ -28,16 +32,6 @@ if (!isExpoGo) {
     console.log('⚠️ expo-notifications not available');
   }
 }
-
-// Query client
-const queryClient = new QueryClient({
-  defaultOptions: {
-    queries: {
-      staleTime: 1000 * 60 * 5,
-      retry: 2,
-    },
-  },
-});
 
 // Prevent splash screen from hiding
 SplashScreen.preventAutoHideAsync();
@@ -59,6 +53,10 @@ if (!isExpoGo && Notifications) {
 
 export default function RootLayout() {
   const { loadToken, isAuthenticated } = useAuthStore();
+  // appReady: hazırlık bitti. splashDone: animasyonlu splash çıkışını tamamladı.
+  // Native splash'i AnimatedSplash kapatır (onLayout) → beyaz parlama olmaz.
+  const [appReady, setAppReady] = useState(false);
+  const [splashDone, setSplashDone] = useState(false);
 
   useEffect(() => {
     async function prepare() {
@@ -75,7 +73,7 @@ export default function RootLayout() {
       } catch (e) {
         console.warn(e);
       } finally {
-        await SplashScreen.hideAsync();
+        setAppReady(true);
       }
     }
     prepare();
@@ -105,6 +103,13 @@ export default function RootLayout() {
           <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
           <Stack.Screen name="(auth)" options={{ headerShown: false }} />
         </Stack>
+        {/* Kurumsal hesap business üyelik yoksa üyelik sayfasına yönlendirir (web ile aynı). */}
+        <BusinessMembershipGuard />
+        {/* Native Alert.alert yerine temalı dialog — appAlert() bu host'u kullanır. */}
+        <AlertDialogHost />
+        {!splashDone && (
+          <AnimatedSplash appReady={appReady} onFinish={() => setSplashDone(true)} />
+        )}
       </LanguageProvider>
     </QueryClientProvider>
   );

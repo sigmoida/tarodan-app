@@ -130,7 +130,7 @@ export class CreateProductDto {
 
   @ApiPropertyOptional({
     example: 5,
-    description: 'Stock quantity (null for unlimited stock)',
+    description: 'Stock quantity (defaults to 1 when omitted; null for unlimited stock)',
   })
   @IsOptional()
   @IsNumber({}, { message: 'Stok miktarı sayı olmalıdır' })
@@ -173,4 +173,15 @@ export class CreateProductDto {
   @IsArray()
   @IsUUID('4', { each: true })
   attributeIds?: string[];
+
+  @ApiPropertyOptional({
+    example: ['treasure-hunt', 'mainline', 'red'],
+    description:
+      'Additional attribute slugs (e.g. Hot Wheels Segment/Assortment/Rarity selections). ' +
+      'Resolved server-side to ProductAttribute rows via Attribute.slug lookup.',
+  })
+  @IsOptional()
+  @IsArray()
+  @IsString({ each: true })
+  attributes?: string[];
 }

@@ -1,12 +1,12 @@
 import React, { useMemo, useState } from 'react';
 import { View, StyleSheet, FlatList, TouchableOpacity, Image } from 'react-native';
 
-import { SafeAreaView } from 'react-native-safe-area-context';
 import { router } from 'expo-router';
 import { useQuery } from '@tanstack/react-query';
 import { brandsApi } from '../../src/services/api';
 import { theme, Text, Input } from '@tarodan/ui-native';
 import { ScreenHeader, ScreenLoader, ErrorState, EmptyState } from '../../src/components/common';
+import { resolveImageUrl } from '../../src/utils/imageUrl';
 const { colors } = theme;
 
 interface Brand {
@@ -48,7 +48,7 @@ export default function BrandsScreen() {
     >
       <View style={styles.logoWrap}>
         {item.logo ? (
-          <Image source={{ uri: item.logo }} style={styles.logo} resizeMode="contain" />
+          <Image source={{ uri: resolveImageUrl(item.logo) }} style={styles.logo} resizeMode="contain" />
         ) : (
           <Text style={styles.logoFallback}>{item.name.charAt(0).toUpperCase()}</Text>
         )}
@@ -61,7 +61,7 @@ export default function BrandsScreen() {
   );
 
   return (
-    <SafeAreaView style={styles.container} edges={['top']}>
+    <View style={styles.container}>
       <ScreenHeader title="Markalar" />
 
       <View style={styles.searchBar}>
@@ -96,7 +96,7 @@ export default function BrandsScreen() {
           onRefresh={refetch}
         />
       )}
-    </SafeAreaView>
+    </View>
   );
 }
 

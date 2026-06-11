@@ -6,6 +6,7 @@ import { router } from 'expo-router';
 import {
   Button,
   Checkbox,
+  DateField,
   HStack,
   Input,
   Screen,
@@ -17,12 +18,24 @@ import {
   displayNameSchema,
   emailSchema,
   strongPasswordSchema,
+  isAdult,
 } from '../../src/utils/validation';
+
+/** En geç seçilebilir doğum tarihi (bugün - 18 yıl) — 18+'ı seçici seviyesinde kısıtlar. */
+function maxBirthDate(): Date {
+  const d = new Date();
+  d.setFullYear(d.getFullYear() - 18);
+  return d;
+}
 
 const registerSchema = z
   .object({
     displayName: displayNameSchema,
     email: emailSchema,
+    birthDate: z
+      .string()
+      .regex(/^\d{4}-\d{2}-\d{2}$/, 'Lütfen doğum tarihinizi seçin')
+      .refine(isAdult, 'Kayıt için en az 18 yaşında olmalısınız'),
     password: strongPasswordSchema,
     confirmPassword: z.string(),
     acceptTerms: z
@@ -39,7 +52,12 @@ type RegisterForm = z.infer<typeof registerSchema>;
 export default function RegisterScreen() {
   const { control, handleSubmit, formState: { errors } } = useForm<RegisterForm>({
     resolver: zodResolver(registerSchema),
-    defaultValues: { acceptTerms: false },
+    defaultValues: {
+      acceptTerms: false,
+      // Maestro spinner DateField'ı süremez; test modunda geçerli (18+) bir
+      // doğum tarihi öndoldurulur. Prod'da EXPO_PUBLIC_MAESTRO unset → '' .
+      birthDate: process.env.EXPO_PUBLIC_MAESTRO === '1' ? '1990-01-01' : '',
+    },
   });
 
   const registerMutation = useMutation({
@@ -48,6 +66,7 @@ export default function RegisterScreen() {
         displayName: data.displayName,
         email: data.email,
         password: data.password,
+        birthDate: data.birthDate,
       }),
     onSuccess: () => router.replace('/(auth)/login'),
   });
@@ -96,6 +115,22 @@ export default function RegisterScreen() {
 
         <Controller
           control={control}
+          name="birthDate"
+          render={({ field: { onChange, value } }) => (
+            <DateField
+              testID="register-birthDate-input"
+              label="Doğum Tarihi"
+              value={value}
+              onChange={onChange}
+              placeholder="Tarih seçin"
+              maximumDate={maxBirthDate()}
+              error={errors.birthDate?.message}
+            />
+          )}
+        />
+
+        <Controller
+          control={control}
           name="password"
           render={({ field: { onChange, value } }) => (
             <Input
@@ -103,22 +138,37 @@ export default function RegisterScreen() {
               label="Şifre"
               value={value}
               onChangeText={onChange}
-              secureTextEntry
+              // Maestro: iOS secureTextEntry'ye yazamıyor + "Automatic Strong Password"
+              // kaplaması çıkıyor. Test modunda maskeyi kapat (login.tsx ile aynı). Prod: maskeli.
+              secureTextEntry={process.env.EXPO_PUBLIC_MAESTRO !== '1'}
+              // Maskesizken iOS otomatik öneri fazladan karakter ekliyor (şifre eşleşmez).
+              autoCorrect={false}
+              autoComplete="off"
+              autoCapitalize="none"
+              spellCheck={false}
               togglePasswordVisibility
               error={errors.password?.message}
             />
           )}
         />
+        <Text variant="bodySm" tone="muted">
+          Şifre en az 8 karakter olmalı; 1 büyük harf, 1 küçük harf ve 1 rakam içermeli.
+        </Text>
 
         <Controller
           control={control}
           name="confirmPassword"
           render={({ field: { onChange, value } }) => (
             <Input
+              testID="register-confirmPassword-input"
               label="Şifre Tekrar"
               value={value}
               onChangeText={onChange}
-              secureTextEntry
+              secureTextEntry={process.env.EXPO_PUBLIC_MAESTRO !== '1'}
+              autoCorrect={false}
+              autoComplete="off"
+              autoCapitalize="none"
+              spellCheck={false}
               togglePasswordVisibility
               error={errors.confirmPassword?.message}
             />
@@ -130,6 +180,7 @@ export default function RegisterScreen() {
           name="acceptTerms"
           render={({ field: { onChange, value } }) => (
             <Checkbox
+              testID="register-acceptTerms"
               checked={value}
               onChange={() => onChange(!value)}
               label="Kullanım koşullarını ve gizlilik politikasını kabul ediyorum"
@@ -143,9 +194,34 @@ export default function RegisterScreen() {
           </Text>
         ) : null}
 
+        <HStack justify="center" wrap gap={1}>
+          <Text
+            variant="bodySm"
+            tone="primary"
+            weight="semibold"
+            onPress={() => router.push('/terms')}
+          >
+            Kullanım Koşulları
+          </Text>
+          <Text variant="bodySm" tone="muted">ve</Text>
+          <Text
+            variant="bodySm"
+            tone="primary"
+            weight="semibold"
+            onPress={() => router.push('/privacy')}
+          >
+            Gizlilik Politikası
+          </Text>
+        </HStack>
+
         {registerMutation.isError ? (
           <Text variant="bodySm" tone="danger" align="center">
-            Kayıt başarısız. Lütfen tekrar deneyin.
+            {(() => {
+              const err = registerMutation.error as any;
+              const msg = err?.response?.data?.message;
+              const text = Array.isArray(msg) ? msg[0] : msg;
+              return text || err?.message || 'Kayıt başarısız. Lütfen tekrar deneyin.';
+            })()}
           </Text>
         ) : null}
 

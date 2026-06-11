@@ -1,10 +1,11 @@
 import { View, ScrollView, StyleSheet, TouchableOpacity, RefreshControl } from 'react-native';
-import { Avatar, Badge, FAB, Input, Spinner, Text, theme } from '@tarodan/ui-native';
+import { Avatar, Badge, Input, Spinner, Text, theme, ScreenHeader } from '@tarodan/ui-native';
 import { useState, useCallback } from 'react';
 import { router, useFocusEffect } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { useMessagesStore, MessageThread } from '../../src/stores/messagesStore';
 import { useAuthStore } from '../../src/stores/authStore';
+import { formatMessagePreview } from '../../src/utils/contentFilter';
 import { useTranslation } from '../../src/i18n';
 
 const { colors } = theme;
@@ -12,7 +13,7 @@ const { colors } = theme;
 export default function MessagesListScreen() {
   const { t } = useTranslation();
   const { isAuthenticated, user, limits } = useAuthStore();
-  const { threads, isLoading, fetchThreads, getUnreadCount, getOtherParticipant, dailyMessageCount } = useMessagesStore();
+  const { threads, isLoading, hasLoadedThreads, fetchThreads, getUnreadCount, getOtherParticipant, dailyMessageCount } = useMessagesStore();
   const [refreshing, setRefreshing] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
 
@@ -97,19 +98,15 @@ export default function MessagesListScreen() {
 
   return (
     <View style={styles.container}>
-      {/* Header */}
-      <View style={styles.header}>
-        <TouchableOpacity onPress={() => router.back()}>
-          <Ionicons name="arrow-back" size={24} color={colors.white} />
-        </TouchableOpacity>
-        <View style={styles.headerTitleContainer}>
-          <Text style={styles.headerTitle}>{t('mobile.messagesTitle')}</Text>
-          {unreadCount > 0 && (
+      <ScreenHeader
+        title={t('mobile.messagesTitle')}
+        onBack={() => router.back()}
+        right={
+          unreadCount > 0 ? (
             <Badge variant="danger" style={styles.headerBadge}>{unreadCount}</Badge>
-          )}
-        </View>
-        <View style={{ width: 24 }} />
-      </View>
+          ) : undefined
+        }
+      />
 
       {/* Message Limit Banner */}
       {!isUnlimited && dailyMessageCount >= messageLimit - 10 && (
@@ -136,8 +133,8 @@ export default function MessagesListScreen() {
         />
       </View>
 
-      {/* Content */}
-      {isLoading && threads.length === 0 ? (
+      {/* Content — ilk yükleme bitene dek spinner; boş ekran bir an çakmasın. */}
+      {threads.length === 0 && (isLoading || !hasLoadedThreads) ? (
         <View style={styles.loadingContainer}>
           <Spinner size="lg" />
         </View>
@@ -212,7 +209,7 @@ export default function MessagesListScreen() {
                     numberOfLines={1}
                   >
                     {thread.lastMessage?.senderId === user?.id ? 'Sen: ' : ''}
-                    {thread.lastMessage?.content || 'Henüz mesaj yok'}
+                    {formatMessagePreview(thread.lastMessage?.content ?? '') || 'Henüz mesaj yok'}
                   </Text>
                 </View>
 
@@ -226,14 +223,6 @@ export default function MessagesListScreen() {
           <View style={{ height: 100 }} />
         </ScrollView>
       )}
-
-      {/* New Message FAB */}
-      <FAB
-        icon="add"
-        accessibilityLabel="Yeni mesaj"
-        style={styles.fab}
-        onPress={() => router.push('/messages/new')}
-      />
     </View>
   );
 }
@@ -248,24 +237,6 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
     padding: 32,
-  },
-  header: {
-    backgroundColor: colors.primary[600]!,
-    paddingTop: 50,
-    paddingBottom: 16,
-    paddingHorizontal: 20,
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-  },
-  headerTitleContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-  },
-  headerTitle: {
-    fontSize: 18,
-    fontWeight: 'bold',
-    color: colors.white,
   },
   headerBadge: {
     marginLeft: 8,

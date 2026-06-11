@@ -1,4 +1,4 @@
-import { View, ScrollView, StyleSheet, Pressable, Image, RefreshControl, Alert } from 'react-native';
+import { View, ScrollView, StyleSheet, Image, RefreshControl } from 'react-native';
 import {
   Button,
   Card,
@@ -9,6 +9,8 @@ import {
   Text,
   StatusBadge,
   theme,
+  ScreenHeader,
+  appAlert,
 } from '@tarodan/ui-native';
 import type { BadgeVariant } from '@tarodan/ui-native';
 import { useState, useCallback } from 'react';
@@ -17,6 +19,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { Ionicons } from '@expo/vector-icons';
 import { ordersApi, shippingApi } from '../../src/services/api';
 import { useAuthStore } from '../../src/stores/authStore';
+import { getOrderProductImageUri } from '../../src/utils/orderProductImage';
 
 const { colors } = theme;
 
@@ -39,6 +42,7 @@ interface Sale {
     id: string;
     title: string;
     images?: Array<{ url: string }>;
+    imageUrl?: string | null;
   };
   buyer: {
     id: string;
@@ -70,12 +74,17 @@ export default function SalesScreen() {
     queryKey: ['orders', 'seller', filter],
     queryFn: async () => {
       try {
-        const params: any = { role: 'seller' };
+        const params: any = { role: 'seller', limit: 100 };
         if (filter !== 'all') {
-          params.status = filter;
+          // Mobil UI 'processing' adını kullanır; backend enum'u 'preparing'. Sınırda çevir.
+          params.status = filter === 'processing' ? 'preparing' : filter;
         }
         const response = await ordersApi.getAll(params);
-        return (response.data as any)?.data || response.data || [];
+        const raw = (response.data as any)?.data || response.data || [];
+        // Backend 'preparing' → mobil 'processing' (badge/aksiyon/filtre tek isimle çalışsın).
+        return (Array.isArray(raw) ? raw : []).map((o: any) =>
+          o?.status === 'preparing' ? { ...o, status: 'processing' } : o,
+        );
       } catch (error) {
         console.log('Failed to fetch sales');
         return [];
@@ -85,6 +94,17 @@ export default function SalesScreen() {
   });
 
   const sales: Sale[] = salesData || [];
+
+  // Kazanç özeti — AKTİF FİLTREDEN BAĞIMSIZ sunucu agregatı. Önceden totalEarnings/
+  // pendingEarnings filtrelenmiş + sayfalı `sales` listesinden hesaplanıyordu → 'paid'
+  // filtresine basınca toplam kazanç 0'a düşüyordu. Artık tüm siparişler üzerinden tek sorgu.
+  const { data: earningsResp } = useQuery({
+    queryKey: ['orders', 'seller', 'earnings'],
+    queryFn: () => ordersApi.getSellerEarnings(),
+    enabled: isAuthenticated,
+  });
+  const totalEarnings = earningsResp?.data?.totalEarnings ?? 0;
+  const pendingEarnings = earningsResp?.data?.pendingEarnings ?? 0;
 
   /**
    * Backend'de tek "status update" endpoint'i yok; iki ayrı akış:
@@ -111,10 +131,10 @@ export default function SalesScreen() {
       queryClient.invalidateQueries({ queryKey: ['orders'] });
       setShipDialog({ visible: false, order: null });
       setTrackingNumber('');
-      Alert.alert('Başarılı', 'Sipariş durumu güncellendi');
+      appAlert('Başarılı', 'Sipariş durumu güncellendi');
     },
     onError: (e: any) => {
-      Alert.alert('Hata', e?.response?.data?.message || e?.message || 'Durum güncellenemedi');
+      appAlert('Hata', e?.response?.data?.message || e?.message || 'Durum güncellenemedi');
     },
   });
 
@@ -150,7 +170,7 @@ export default function SalesScreen() {
   };
 
   const handleMarkAsProcessing = (order: Sale) => {
-    Alert.alert(
+    appAlert(
       'Siparişi Hazırlıyor Olarak İşaretle',
       'Siparişi hazırlamaya başladığınızı onaylıyor musunuz?',
       [
@@ -165,7 +185,7 @@ export default function SalesScreen() {
 
   const handleShip = () => {
     if (!trackingNumber.trim()) {
-      Alert.alert('Hata', 'Takip numarası giriniz');
+      appAlert('Hata', 'Takip numarası giriniz');
       return;
     }
     if (shipDialog.order) {
@@ -177,14 +197,7 @@ export default function SalesScreen() {
     }
   };
 
-  // Calculate totals
-  const totalEarnings = sales
-    .filter(s => ['delivered', 'completed'].includes(s.status))
-    .reduce((sum, s) => sum + s.totalAmount, 0);
-
-  const pendingEarnings = sales
-    .filter(s => ['paid', 'processing', 'shipped'].includes(s.status))
-    .reduce((sum, s) => sum + s.totalAmount, 0);
+  // totalEarnings / pendingEarnings yukarıda sunucu agregatından (filtreden bağımsız) geliyor.
 
   // Not authenticated or not a seller
   if (!isAuthenticated) {
@@ -195,7 +208,7 @@ export default function SalesScreen() {
         <Text variant="body" tone="muted" style={styles.subtitle}>
           Satışlarınızı görmek için giriş yapın
         </Text>
-        <Button variant="primary" title="Giriş Yap" onPress={() => router.push('/(auth)/login')} />
+        <Button variant="primary" title="Giriş Yap" onPress={() => router.push('/(auth)/login')} style={{ alignSelf: 'center' }} />
       </View>
     );
   }
@@ -207,14 +220,7 @@ export default function SalesScreen() {
 
   return (
     <View style={styles.container}>
-      {/* Header */}
-      <View style={styles.header}>
-        <Pressable onPress={() => router.back()}>
-          <Ionicons name="arrow-back" size={24} color={colors.white} />
-        </Pressable>
-        <Text style={styles.headerTitle}>Satışlarım</Text>
-        <View style={{ width: 24 }} />
-      </View>
+      <ScreenHeader title="Satışlarım" onBack={() => router.back()} />
 
       {/* Earnings Summary */}
       <Card variant="elevated" style={styles.earningsCard}>
@@ -259,7 +265,7 @@ export default function SalesScreen() {
           <Text variant="body" tone="muted" style={styles.emptySubtitle}>
             İlan oluşturarak satışa başlayın
           </Text>
-          <Button variant="primary" title="İlan Oluştur" onPress={() => router.push('/(tabs)/create')} />
+          <Button variant="primary" title="İlan Oluştur" onPress={() => router.push('/(tabs)/sell')} style={{ alignSelf: 'center' }} />
         </View>
       ) : (
         <ScrollView
@@ -279,7 +285,7 @@ export default function SalesScreen() {
 
               <View style={styles.saleContent}>
                 <Image
-                  source={{ uri: sale.product.images?.[0]?.url || 'https://via.placeholder.com/60' }}
+                  source={{ uri: getOrderProductImageUri(sale.product) }}
                   style={styles.productImage}
                 />
                 <View style={styles.saleInfo}>
@@ -373,20 +379,6 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     padding: 32,
     backgroundColor: colors.surface.DEFAULT,
-  },
-  header: {
-    backgroundColor: colors.primary[600]!,
-    paddingTop: 50,
-    paddingBottom: 16,
-    paddingHorizontal: 20,
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-  },
-  headerTitle: {
-    fontSize: 18,
-    fontWeight: 'bold',
-    color: colors.white,
   },
   title: {
     marginTop: 16,

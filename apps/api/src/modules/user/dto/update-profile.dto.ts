@@ -85,4 +85,12 @@ export class UpdateProfileDto {
   @IsOptional()
   @IsString()
   avatarUrl?: string;
+
+  @ApiPropertyOptional({
+    example: true,
+    description: 'Güven skorunun herkese açık profilde gösterilip gösterilmeyeceği',
+  })
+  @IsOptional()
+  @IsBoolean()
+  showTrustScore?: boolean;
 }

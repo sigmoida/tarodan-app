@@ -2,9 +2,11 @@
 
 import { useState, useEffect } from 'react';
 import { adminApi } from '@/lib/api';
-import { Button, Checkbox, Input, Spinner, Textarea } from '@tarodan/ui';
+import { Button, Checkbox, Input, Textarea } from '@tarodan/ui';
 import { PlusIcon, PencilIcon, TrashIcon } from '@heroicons/react/24/outline';
 import toast from 'react-hot-toast';
+import { DataTable, type ColumnDef } from '@/components/DataTable';
+import { PageHeader, ActionButtons, ActionIconButton } from '@/components/admin-list';
 
 interface Category {
   id: string;
@@ -108,76 +110,72 @@ export default function CategoriesPage() {
     }
   };
 
-  const renderCategory = (category: Category) => (
-    <div key={category.id} className="flex items-center justify-between p-4 hover:bg-surface-alt/50 transition-colors border-b border-border last:border-b-0">
-      <div className="flex-1 min-w-0">
+  const columns: ColumnDef<Category, any>[] = [
+    {
+      header: 'Kategori',
+      cell: ({ row }) => (
+        <div className="flex-1 min-w-0">
           <div className="flex items-center gap-2">
-            <span className="font-medium text-heading truncate">{category.name}</span>
-            {!category.isActive && (
+            <span className="font-medium text-heading truncate">{row.original.name}</span>
+            {!row.original.isActive && (
               <span className="px-2 py-0.5 text-xs bg-body text-muted rounded">Pasif</span>
             )}
-            <span className="text-xs text-muted">({category.productCount} ürün, {category.collectionCount} koleksiyon)</span>
+            <span className="text-xs text-muted">({row.original.productCount} ürün, {row.original.collectionCount} koleksiyon)</span>
           </div>
-          {category.description && (
-            <p className="text-xs text-muted mt-1 truncate max-w-md">{category.description}</p>
+          {row.original.description && (
+            <p className="text-xs text-muted mt-1 truncate max-w-md">{row.original.description}</p>
           )}
-      </div>
-      <div className="flex items-center gap-2 ml-4 flex-shrink-0">
-        <Button variant="secondary" onClick={() => openEditModal(category)}
-          className="p-2 text-muted hover:text-heading hover:bg-surface-alt rounded-lg"
-          title="Düzenle">
-          <PencilIcon className="h-5 w-5" />
-        </Button>
-        <Button variant="secondary" onClick={() => setDeleteConfirm(category.id)}
-          className="p-2 text-danger-600 hover:text-danger-300 hover:bg-danger-50 rounded-lg"
-          title="Sil"
-          disabled={category.productCount > 0}>
-          <TrashIcon className="h-5 w-5" />
-        </Button>
-      </div>
-    </div>
-  );
+        </div>
+      ),
+    },
+    {
+      id: 'actions',
+      header: 'İşlemler',
+      cell: ({ row }) => (
+        <ActionButtons>
+          <ActionIconButton
+            icon={PencilIcon}
+            onClick={() => openEditModal(row.original)}
+            title="Düzenle"
+          />
+          <ActionIconButton
+            icon={TrashIcon}
+            onClick={() => setDeleteConfirm(row.original.id)}
+            title="Sil"
+            variant="danger"
+            disabled={row.original.productCount > 0}
+          />
+        </ActionButtons>
+      ),
+    },
+  ];
 
   return (
     <>
       <div className="space-y-6">
-        {/* Header */}
-        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-          <div>
-            <h1 className="text-2xl font-bold text-heading">Kategoriler</h1>
-            <p className="text-muted mt-1">Kategori listesi ve yönetimi</p>
-          </div>
+        <PageHeader title="Kategoriler" description="Kategori listesi ve yönetimi">
           <Button variant="primary" size="md" onClick={openCreateModal}>
             <PlusIcon className="w-5 h-5" />
             Yeni Kategori
           </Button>
-        </div>
+        </PageHeader>
 
         {/* Categories List */}
-        <div className="admin-card overflow-hidden">
-          {loading ? (
-            <div className="text-center py-12">
-              <Spinner size="lg" className="mx-auto" />
-              <p className="text-muted mt-4">Yükleniyor...</p>
-            </div>
-          ) : categories.length === 0 ? (
-            <div className="text-center py-12 text-muted">
-              Henüz kategori yok
-            </div>
-          ) : (
-            <div>
-              {categories.map((category) => renderCategory(category))}
-            </div>
-          )}
-        </div>
+        <DataTable
+          columns={columns}
+          data={categories}
+          loading={loading}
+          emptyText="Henüz kategori yok"
+          getRowId={(c) => c.id}
+        />
       </div>
 
       {/* Create/Edit Modal */}
       {showModal && (
         <div className="fixed inset-0 bg-heading bg-opacity-50 flex items-center justify-center z-50 p-4">
           {/* Added max-h and overflow for mobile friendliness */}
-          <div className="bg-surface-elevated rounded-xl p-6 max-w-md w-full border border-border max-h-[90vh] overflow-y-auto">
-            <h2 className="text-xl font-semibold text-heading mb-4">
+          <div className="bg-surface-elevated rounded-xl px-6 pb-6 pt-5 max-w-md w-full border border-border max-h-[90vh] overflow-y-auto">
+            <h2 className="text-xl font-semibold text-heading mb-4 leading-tight">
               {editingCategory ? 'Kategori Düzenle' : 'Yeni Kategori'}
             </h2>
             <form onSubmit={handleSubmit} className="space-y-4">
@@ -225,8 +223,8 @@ export default function CategoriesPage() {
       {/* Delete Confirm Modal */}
       {deleteConfirm && (
         <div className="fixed inset-0 bg-heading bg-opacity-50 flex items-center justify-center z-50">
-          <div className="bg-surface-elevated rounded-xl p-6 max-w-md w-full mx-4 border border-border">
-            <h3 className="text-lg font-semibold text-heading mb-4">Kategoriyi Sil</h3>
+          <div className="bg-surface-elevated rounded-xl px-6 pb-6 pt-5 max-w-md w-full mx-4 border border-border">
+            <h3 className="text-lg font-semibold text-heading mb-4 leading-tight">Kategoriyi Sil</h3>
             <p className="text-muted mb-6">
               Bu kategoriyi silmek istediğinizden emin misiniz? Bu işlem geri alınamaz.
             </p>

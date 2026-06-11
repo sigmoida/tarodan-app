@@ -15,8 +15,19 @@ import {
 } from '@heroicons/react/24/outline';
 import { adminApi } from '@/lib/api';
 import { getProductEffectivePrice } from '@/lib/productPrice';
+import { cancelReasonLabel, orderOriginLabel } from '@/lib/utils';
 import toast from 'react-hot-toast';
-import { Button, Input, Select, Spinner, Textarea } from '@tarodan/ui';
+import {
+  Button,
+  Input,
+  Select,
+  Spinner,
+  Textarea,
+  enumLabel,
+  paymentStatusConfig,
+  paymentProviderConfig,
+  shipmentStatusConfig,
+} from '@tarodan/ui';
 import { AdminFinancialSummary } from '@/components/AdminFinancialSummary';
 import { colors as dsColors } from '@tarodan/ui';
 import { AwaitingConfirmationCard } from '@/components/orders/AwaitingConfirmationCard';
@@ -75,6 +86,8 @@ interface OrderDetail {
   };
   createdAt: string;
   updatedAt: string;
+  cancelReason?: string | null;
+  offerId?: string | null;
   // 48h pencere (Faz 1.2)
   deliveredAt?: string | null;
   confirmationDeadline?: string | null;
@@ -350,12 +363,16 @@ export default function OrderDetailPage() {
         <main className="max-w-6xl mx-auto px-4 py-8">
           {/* Header */}
           <div className="flex items-center gap-4 mb-8">
-            <Link
-              href="/orders"
+            <button
+              type="button"
+              onClick={() =>
+                window.history.length > 1 ? router.back() : router.push('/orders')
+              }
+              aria-label="Geri"
               className="p-2 hover:bg-border-subtle rounded-lg transition-colors"
             >
               <ArrowLeftIcon className="w-6 h-6 text-muted" />
-            </Link>
+            </button>
             <div className="flex-1">
               <h1 className="text-3xl font-bold text-heading">Sipariş #{order.orderNumber}</h1>
               <p className="text-sm text-muted">
@@ -368,6 +385,19 @@ export default function OrderDetailPage() {
               </span>
             </div>
           </div>
+
+          {/* İptal nedeni + köken (#4): stok bitti / teklif iptali gibi */}
+          {order.status === 'cancelled' && (cancelReasonLabel(order.cancelReason) || order.offerId) && (
+            <div className="mb-6 rounded-lg border border-danger-200 bg-danger-50 px-4 py-3">
+              <p className="text-sm font-medium text-danger-700">
+                İptal nedeni: {cancelReasonLabel(order.cancelReason) ?? 'Belirtilmemiş'}
+              </p>
+              <p className="text-xs text-danger-600 mt-0.5">
+                Köken: {orderOriginLabel(order.offerId)}
+                {order.cancelReason ? ` · "${order.cancelReason}"` : ''}
+              </p>
+            </div>
+          )}
 
           {/* 48h pencere kartı (Faz 4A.5) */}
           {(order.status === 'awaiting_buyer_confirmation' || order.buyerConfirmedAt) && (
@@ -476,7 +506,7 @@ export default function OrderDetailPage() {
                   <div className="space-y-2">
                     <div className="flex justify-between">
                       <span className="text-muted">Durum:</span>
-                      <span className="font-medium capitalize text-heading">{order.payment.status}</span>
+                      <span className="font-medium text-heading">{enumLabel(paymentStatusConfig, order.payment.status)}</span>
                     </div>
                     <div className="flex justify-between">
                       <span className="text-muted">Tutar:</span>
@@ -486,7 +516,7 @@ export default function OrderDetailPage() {
                     </div>
                     <div className="flex justify-between">
                       <span className="text-muted">Sağlayıcı:</span>
-                      <span className="uppercase text-heading">{order.payment.provider}</span>
+                      <span className="text-heading">{enumLabel(paymentProviderConfig, order.payment.provider)}</span>
                     </div>
                     <Link
                       href={`/payments/${order.payment.id}`}
@@ -521,7 +551,7 @@ export default function OrderDetailPage() {
                     {order.shipment.status && (
                       <div className="flex justify-between">
                         <span className="text-muted">Durum:</span>
-                        <span className="font-medium capitalize text-heading">{order.shipment.status}</span>
+                        <span className="font-medium text-heading">{enumLabel(shipmentStatusConfig, order.shipment.status)}</span>
                       </div>
                     )}
                   </div>
@@ -625,8 +655,8 @@ export default function OrderDetailPage() {
         {/* Status Update Modal */}
         {showStatusModal && (
           <div className="fixed inset-0 bg-heading bg-opacity-50 flex items-center justify-center z-50">
-            <div className="bg-surface-elevated rounded-xl p-6 max-w-md w-full mx-4">
-              <h3 className="text-lg font-semibold text-heading mb-4">Durum Güncelle</h3>
+            <div className="bg-surface-elevated rounded-xl px-6 pb-6 pt-5 max-w-md w-full mx-4">
+              <h3 className="text-lg font-semibold text-heading mb-4 leading-tight">Durum Güncelle</h3>
               <div className="mb-4">
                 <label className="block text-sm font-medium text-body mb-2">
                   Yeni Durum
@@ -664,8 +694,8 @@ export default function OrderDetailPage() {
         {/* Tracking Modal */}
         {showTrackingModal && (
           <div className="fixed inset-0 bg-heading bg-opacity-50 flex items-center justify-center z-50">
-            <div className="bg-surface-elevated rounded-xl p-6 max-w-md w-full mx-4">
-              <h3 className="text-lg font-semibold text-heading mb-4">Kargo Takibi Ekle</h3>
+            <div className="bg-surface-elevated rounded-xl px-6 pb-6 pt-5 max-w-md w-full mx-4">
+              <h3 className="text-lg font-semibold text-heading mb-4 leading-tight">Kargo Takibi Ekle</h3>
               <div className="space-y-4 mb-4">
                 <div>
                   <label className="block text-sm font-medium text-body mb-2">Kargo Firması</label>
@@ -705,8 +735,8 @@ export default function OrderDetailPage() {
         {/* Notify Modal */}
         {showNotifyModal && (
           <div className="fixed inset-0 bg-heading bg-opacity-50 flex items-center justify-center z-50">
-            <div className="bg-surface-elevated rounded-xl p-6 max-w-md w-full mx-4">
-              <h3 className="text-lg font-semibold text-heading mb-4">Bildirim Gönder</h3>
+            <div className="bg-surface-elevated rounded-xl px-6 pb-6 pt-5 max-w-md w-full mx-4">
+              <h3 className="text-lg font-semibold text-heading mb-4 leading-tight">Bildirim Gönder</h3>
               <div className="space-y-4 mb-4">
                 <div>
                   <label className="block text-sm font-medium text-body mb-2">Bildirim Türü</label>

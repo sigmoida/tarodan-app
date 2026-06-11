@@ -86,6 +86,7 @@ export enum NotificationType {
   LISTING_EXPIRING = 'listing_expiring',
   LISTING_EXPIRED = 'listing_expired',
   LISTING_VIEWS_MILESTONE = 'listing_views_milestone',
+  BOOST_EXPIRED = 'boost_expired',
 
   // Promotion notifications
   PROMOTION = 'promotion',

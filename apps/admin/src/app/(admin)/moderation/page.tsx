@@ -18,6 +18,7 @@ import {
   ArrowPathIcon,
 } from '@heroicons/react/24/outline';
 import Image from 'next/image';
+import { AdminTabs } from '@/components/AdminTabs';
 
 interface ModerationItem {
   id: string;
@@ -195,24 +196,24 @@ const ModerationPage = () => {
   };
 
   const tabs = [
-    { id: 'all', name: 'Tümü' },
-    { id: 'product', name: 'Ürünler' },
-    { id: 'message', name: 'Mesajlar' },
-    { id: 'review', name: 'Değerlendirmeler' },
+    { key: 'all', label: 'Tümü' },
+    { key: 'product', label: 'Ürünler' },
+    { key: 'message', label: 'Mesajlar' },
+    { key: 'review', label: 'Değerlendirmeler' },
   ];
 
   return (
     <>
       <div className="space-y-6">
         {/* Header */}
-        <div className="flex items-center justify-between">
-          <div>
-            <h1 className="text-2xl font-bold text-heading">Moderasyon Kuyruğu</h1>
+        <div className="flex items-center justify-between gap-3">
+          <div className="min-w-0">
+            <h1 className="text-2xl font-bold text-heading truncate">Moderasyon Kuyruğu</h1>
             <p className="text-muted mt-1">İçerik moderasyonu ve onay işlemleri</p>
           </div>
           <Button variant="secondary" onClick={() => { loadQueue(); loadStats(); }}
-            className="flex items-center px-4 py-2 bg-surface-alt text-muted rounded-lg hover:bg-surface-alt transition-colors">
-            <ArrowPathIcon className="h-5 w-5 mr-2" />
+            className="flex items-center shrink-0 px-4 py-2 bg-surface-alt text-muted rounded-lg hover:bg-surface-alt transition-colors">
+            <ArrowPathIcon className="h-5 w-5 mr-2 shrink-0" />
             Yenile
           </Button>
         </div>
@@ -220,45 +221,45 @@ const ModerationPage = () => {
         {/* Stats Cards */}
         <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
           <div className="admin-card">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm text-muted">Bekleyen Ürünler</p>
-                <p className="text-2xl font-bold text-heading mt-1">{stats?.pendingProducts || 0}</p>
+            <div className="flex items-center justify-between gap-3">
+              <div className="min-w-0">
+                <p className="text-sm text-muted truncate">Bekleyen Ürünler</p>
+                <p className="text-2xl font-bold text-heading mt-1 truncate">{stats?.pendingProducts || 0}</p>
               </div>
-              <div className="p-3 rounded-lg bg-info-500/20">
+              <div className="p-3 rounded-lg bg-info-500/20 shrink-0">
                 <CubeIcon className="h-6 w-6 text-info-700" />
               </div>
             </div>
           </div>
           <div className="admin-card">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm text-muted">Raporlanan Mesajlar</p>
-                <p className="text-2xl font-bold text-heading mt-1">{stats?.reportedMessages || 0}</p>
+            <div className="flex items-center justify-between gap-3">
+              <div className="min-w-0">
+                <p className="text-sm text-muted truncate">Raporlanan Mesajlar</p>
+                <p className="text-2xl font-bold text-heading mt-1 truncate">{stats?.reportedMessages || 0}</p>
               </div>
-              <div className="p-3 rounded-lg bg-primary-500/20">
+              <div className="p-3 rounded-lg bg-primary-500/20 shrink-0">
                 <ChatBubbleLeftIcon className="h-6 w-6 text-primary-700" />
               </div>
             </div>
           </div>
           <div className="admin-card">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm text-muted">Son 7 Gün Değerlendirme</p>
-                <p className="text-2xl font-bold text-heading mt-1">{stats?.recentReviews || 0}</p>
+            <div className="flex items-center justify-between gap-3">
+              <div className="min-w-0">
+                <p className="text-sm text-muted truncate">Son 7 Gün Değerlendirme</p>
+                <p className="text-2xl font-bold text-heading mt-1 truncate">{stats?.recentReviews || 0}</p>
               </div>
-              <div className="p-3 rounded-lg bg-warning-500/20">
+              <div className="p-3 rounded-lg bg-warning-500/20 shrink-0">
                 <StarIcon className="h-6 w-6 text-warning-700" />
               </div>
             </div>
           </div>
           <div className="admin-card">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm text-muted">Toplam Bekleyen</p>
-                <p className="text-2xl font-bold text-primary-700 mt-1">{stats?.totalPending || 0}</p>
+            <div className="flex items-center justify-between gap-3">
+              <div className="min-w-0">
+                <p className="text-sm text-muted truncate">Toplam Bekleyen</p>
+                <p className="text-2xl font-bold text-primary-700 mt-1 truncate">{stats?.totalPending || 0}</p>
               </div>
-              <div className="p-3 rounded-lg bg-primary-500/20">
+              <div className="p-3 rounded-lg bg-primary-500/20 shrink-0">
                 <ExclamationTriangleIcon className="h-6 w-6 text-primary-700" />
               </div>
             </div>
@@ -270,19 +271,12 @@ const ModerationPage = () => {
           <h3 className="text-lg font-semibold text-heading mb-4">Moderasyon Kuyruğu</h3>
           
           {/* Tabs */}
-          <div className="flex space-x-2 mb-6">
-            {tabs.map((tab) => (
-              <Button variant="secondary" key={tab.id}
-                onClick={() => { setSelectedTab(tab.id); setPage(1); }}
-                className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
-                  selectedTab === tab.id
-                    ? 'bg-primary-500 text-heading'
-                    : 'bg-surface-alt text-muted hover:bg-surface-alt'
-                }`}>
-                {tab.name}
-              </Button>
-            ))}
-          </div>
+          <AdminTabs
+            tabs={tabs}
+            value={selectedTab}
+            onChange={(k) => { setSelectedTab(k as string); setPage(1); }}
+            className="mb-6"
+          />
 
           {/* Content */}
           {loading ? (
@@ -325,9 +319,9 @@ const ModerationPage = () => {
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-2 mb-1">
                       <StatusBadge status={item.type} config={moderationTypeConfig} />
-                      <span className={`px-2 py-1 rounded text-xs font-medium ${
+                      <span className={`shrink-0 px-2 py-1 rounded text-xs font-medium ${
                         item.status === 'pending' ? 'bg-warning-500/20 text-warning-700' :
-                        item.status === 'reported' ? 'bg-danger-500/20 text-danger-600' : 
+                        item.status === 'reported' ? 'bg-danger-500/20 text-danger-600' :
                         'bg-muted/20 text-muted'
                       }`}>
                         {item.status === 'pending' ? 'Bekliyor' :
@@ -358,14 +352,14 @@ const ModerationPage = () => {
                         <span>Kategori: {item.category}</span>
                       )}
                       <span className="flex items-center gap-1">
-                        <ClockIcon className="h-3 w-3" />
+                        <ClockIcon className="h-3 w-3 shrink-0" />
                         {formatDate(item.createdAt)}
                       </span>
                     </div>
                   </div>
 
                   {/* Actions */}
-                  <div className="flex flex-col gap-2">
+                  <div className="flex flex-col gap-2 shrink-0">
                     <Button variant="success" size="sm" onClick={() => handleApprove(item)}>
                       <CheckCircleIcon className="h-4 w-4 mr-1" />
                       Onayla
@@ -411,8 +405,8 @@ const ModerationPage = () => {
       {/* Reject Modal */}
       {rejectModalOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-heading/50">
-          <div className="bg-surface-elevated rounded-lg p-6 w-full max-w-md">
-            <h3 className="text-lg font-semibold text-heading mb-2">İçeriği Reddet</h3>
+          <div className="bg-surface-elevated rounded-lg px-6 pb-6 pt-5 w-full max-w-md">
+            <h3 className="text-lg font-semibold text-heading mb-2 leading-tight">İçeriği Reddet</h3>
             <p className="text-muted text-sm mb-4">
               {selectedItem?.title} içeriğini reddetmek istediğinize emin misiniz?
             </p>
@@ -457,8 +451,8 @@ const ModerationPage = () => {
       {/* Flag Modal */}
       {flagModalOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-heading/50">
-          <div className="bg-surface-elevated rounded-lg p-6 w-full max-w-md">
-            <h3 className="text-lg font-semibold text-heading mb-2">İçeriği İşaretle</h3>
+          <div className="bg-surface-elevated rounded-lg px-6 pb-6 pt-5 w-full max-w-md">
+            <h3 className="text-lg font-semibold text-heading mb-2 leading-tight">İçeriği İşaretle</h3>
             <p className="text-muted text-sm mb-4">
               {selectedItem?.title} içeriğini öncelikli inceleme için işaretleyin.
             </p>

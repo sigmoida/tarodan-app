@@ -1,8 +1,8 @@
 import React, { useState } from 'react';
-import { View, StyleSheet, ScrollView, TouchableOpacity, Image, Alert } from 'react-native';
+import { View, StyleSheet, ScrollView, TouchableOpacity, Image } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { theme, Text, Button, Modal, Input, Textarea, Spinner } from '@tarodan/ui-native';
+import { theme, Text, Button, Modal, Input, Textarea, Spinner, appAlert } from '@tarodan/ui-native';
 import { collectionsApi } from '../../services/api';
 import { transformImageUrl } from '../../utils/imageUrl';
 
@@ -48,25 +48,41 @@ export default function AddToCollectionModal({
     queryKey: ['my-collections'],
     queryFn: async () => {
       const response = await collectionsApi.getMyCollections();
-      const list: CollectionItem[] = (response.data as any)?.data ?? response.data ?? [];
+      // /collections/me => { collections: [...], total, page, pageSize }
+      // (profile.tsx / collections/index.tsx ile aynı şekil okunmalı)
+      const body = response.data as any;
+      const list: CollectionItem[] =
+        body?.collections ?? body?.data ?? (Array.isArray(body) ? body : []);
       return Array.isArray(list) ? list : [];
     },
     enabled: visible,
   });
   const collections = myCollectionsQuery.data ?? [];
 
+  // Koleksiyon ekleme/oluşturma sonrası TÜM koleksiyon görünümlerini tazele:
+  // modal listesi (my-collections), ayarlar listesi (myCollections),
+  // profil garajı + sayaç (profile-collections) ve koleksiyon detayı.
+  // Tek tek invalidate edilmezse profildeki "Koleksiyon" sayısı bayat kalıyordu.
+  const invalidateCollectionQueries = (collectionId?: string) => {
+    queryClient.invalidateQueries({ queryKey: ['my-collections'] });
+    queryClient.invalidateQueries({ queryKey: ['myCollections'] });
+    queryClient.invalidateQueries({ queryKey: ['profile-collections'] });
+    if (collectionId) {
+      queryClient.invalidateQueries({ queryKey: ['collection', collectionId] });
+    }
+  };
+
   const addToCollectionMutation = useMutation({
     mutationFn: ({ collectionId }: { collectionId: string }) =>
       collectionsApi.addItem(collectionId, { productId }),
     onSuccess: (_data, variables) => {
-      queryClient.invalidateQueries({ queryKey: ['my-collections'] });
-      queryClient.invalidateQueries({ queryKey: ['collection', variables.collectionId] });
+      invalidateCollectionQueries(variables.collectionId);
       const found = collections.find((c) => c.id === variables.collectionId);
       onSuccess?.(found?.name ?? 'Koleksiyon');
       onDismiss();
     },
     onError: (e: any) => {
-      Alert.alert(
+      appAlert(
         'Hata',
         e?.response?.data?.message || 'Ürün koleksiyona eklenemedi.',
       );
@@ -88,12 +104,12 @@ export default function AddToCollectionModal({
       return { id: newId, name: newName.trim() };
     },
     onSuccess: (result) => {
-      queryClient.invalidateQueries({ queryKey: ['my-collections'] });
+      invalidateCollectionQueries(result.id);
       onSuccess?.(result.name);
       handleClose();
     },
     onError: (e: any) => {
-      Alert.alert(
+      appAlert(
         'Hata',
         e?.response?.data?.message || 'Koleksiyon oluşturulamadı.',
       );
@@ -110,7 +126,7 @@ export default function AddToCollectionModal({
 
   const handleCreateSubmit = () => {
     if (!newName.trim()) {
-      Alert.alert('Eksik', 'Koleksiyon adı girin.');
+      appAlert('Eksik', 'Koleksiyon adı girin.');
       return;
     }
     createCollectionMutation.mutate();

@@ -33,6 +33,10 @@ export interface CancelledOrderPayload {
   buyerId: string;
   productId: string;
   productTitle: string;
+  /** Teklif kökenli sipariş ise teklif id'si, doğrudan satışta null. */
+  offerId: string | null;
+  /** Ödeme satırı oluşmuş mu? false ise alıcı hiç ödeme başlatmamıştır. */
+  hadPayment: boolean;
 }
 
 export interface InvalidateOffersResult {
@@ -147,6 +151,17 @@ export class ProductLockService {
     const where: Prisma.OfferWhereInput = {
       productId,
       status: { in: [OfferStatus.pending, OfferStatus.accepted] },
+      // Do NOT cancel offers that already turned into a paid sale. An accepted
+      // offer keeps its `accepted` status after payment (there is no terminal
+      // "paid" OfferStatus); the real lifecycle lives on the linked Order. So
+      // only sweep offers that have no order yet (pending) or whose order is
+      // still awaiting payment / already cancelled. Without this, the buyer who
+      // drained the last unit would also see their PAID offer flipped to
+      // "İptal Edildi" alongside the genuinely unpaid ones.
+      OR: [
+        { order: { is: null } },
+        { order: { status: { in: [OrderStatus.pending_payment, OrderStatus.cancelled] } } },
+      ],
     };
     if (excludeOfferId) {
       where.id = { not: excludeOfferId };
@@ -347,6 +362,8 @@ export class ProductLockService {
         buyerId: o.buyerId,
         productId: o.productId,
         productTitle: o.product.title,
+        offerId: o.offerId,
+        hadPayment: o.payment !== null,
       })),
     };
   }

@@ -1,7 +1,11 @@
-import { Injectable, Logger } from '@nestjs/common';
+import { Injectable, Logger, Inject, forwardRef } from '@nestjs/common';
 import { Cron } from '@nestjs/schedule';
 import { PrismaService } from '../../prisma';
-import { ProductStatus } from '@prisma/client';
+import { ProductStatus, MembershipTierType } from '@prisma/client';
+import { computeQualityScore } from './helpers/quality-score';
+import { computeRelevanceScore } from './helpers/relevance-score';
+import { NotificationService } from '../notification/notification.service';
+import { NotificationType } from '../notification/dto';
 
 /**
  * Product Scheduler Service
@@ -12,11 +16,14 @@ import { ProductStatus } from '@prisma/client';
 export class ProductSchedulerService {
   private readonly logger = new Logger(ProductSchedulerService.name);
 
-  // Popularity score weights
+  // Popularity (etkileşim/aktivite) skoru ağırlıkları.
+  // Belgedeki aktivite faktörleri: görüntülenme + favori + mesaj alma (+ son aktivite).
+  // "Aratılma" ayrı izlenmez; genel etkileşimle yaklaşık temsil edilir (ürün kararı).
   private readonly WEIGHTS = {
     view: 1,
     like: 5,
     sale: 20,
+    message: 8, // Mesaj alma (ürüne gelen mesaj/konuşma) — ciddi alıcı ilgisi
     recentView: 2, // Bonus for views in last 7 days
     recentLike: 10, // Bonus for likes in last 7 days
   };
@@ -24,7 +31,11 @@ export class ProductSchedulerService {
   // Listing expiration settings
   private readonly LISTING_EXPIRY_DAYS = 60; // Listings expire after 60 days
 
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    @Inject(forwardRef(() => NotificationService))
+    private readonly notificationService: NotificationService,
+  ) {}
 
   /**
    * Calculate popularity score for a product
@@ -33,10 +44,12 @@ export class ProductSchedulerService {
     viewCount: number;
     likeCount: number;
     salesCount?: number;
+    messageCount?: number;
     recentViews?: number;
     recentLikes?: number;
   }): number {
     const salesCount = product.salesCount || 0;
+    const messageCount = product.messageCount || 0;
     const recentViews = product.recentViews || 0;
     const recentLikes = product.recentLikes || 0;
 
@@ -44,20 +57,26 @@ export class ProductSchedulerService {
       product.viewCount * this.WEIGHTS.view +
       product.likeCount * this.WEIGHTS.like +
       salesCount * this.WEIGHTS.sale +
+      messageCount * this.WEIGHTS.message +
       recentViews * this.WEIGHTS.recentView +
       recentLikes * this.WEIGHTS.recentLike
     );
   }
 
   /**
-   * Update popularity scores for all active products
-   * Runs every night at 03:00
+   * Update popularity scores + İlan Kalite Skoru (qualityScore) + rankTier reconcile
+   * for all active products. Runs every night at 03:00.
+   *
+   * - popularityScore: mevcut ağırlıklı skor (popularityScore kolonuna yazılır)
+   * - qualityScore: foto sayısı + açıklama + satıcı güven puanı (sıralamada kullanılır)
+   * - rankTier reconcile: aktif boost → 2; ücretli (free olmayan) üyeli satıcı → 1; standart → 0
    */
   @Cron('0 3 * * *') // Every day at 03:00 AM
   async updatePopularityScores() {
-    this.logger.log('Starting popularity score update...');
+    this.logger.log('Starting popularity + quality score update...');
 
     try {
+      const now = new Date();
       const sevenDaysAgo = new Date();
       sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
 
@@ -68,14 +87,15 @@ export class ProductSchedulerService {
           id: true,
           viewCount: true,
           likeCount: true,
+          description: true,
+          boostedUntil: true,
+          sellerId: true,
+          seller: { select: { isVerified: true } },
           _count: {
             select: {
-              orders: {
-                where: { status: 'completed' },
-              },
-              likes: {
-                where: { createdAt: { gte: sevenDaysAgo } },
-              },
+              images: true,
+              orders: { where: { status: 'completed' } },
+              likes: { where: { createdAt: { gte: sevenDaysAgo } } },
             },
           },
         },
@@ -83,37 +103,88 @@ export class ProductSchedulerService {
 
       this.logger.log(`Processing ${products.length} products...`);
 
-      // Update each product's popularity score
+      // Satıcı güven puanlarını tek sorguda topla (N+1 önlemek için)
+      const sellerIds = [...new Set(products.map((p) => p.sellerId))];
+      const ratingGroups = sellerIds.length
+        ? await this.prisma.rating.groupBy({
+            by: ['receiverId'],
+            where: { receiverId: { in: sellerIds }, status: 'approved' },
+            _avg: { score: true },
+          })
+        : [];
+      const sellerRatingMap = new Map<string, number>();
+      for (const g of ratingGroups) {
+        if (g._avg?.score != null) sellerRatingMap.set(g.receiverId, Number(g._avg.score));
+      }
+
+      // Ücretli (free olmayan) aktif üyeli satıcılar → rankTier 1
+      const premiumMemberships = sellerIds.length
+        ? await this.prisma.userMembership.findMany({
+            where: {
+              userId: { in: sellerIds },
+              status: 'active',
+              tier: { type: { not: MembershipTierType.free } },
+            },
+            select: { userId: true },
+          })
+        : [];
+      const premiumSet = new Set(premiumMemberships.map((m) => m.userId));
+
+      // Ürün başına mesaj (konuşma) sayısını tek sorguda topla — "Mesaj alma" aktivite faktörü
+      const productIds = products.map((p) => p.id);
+      const messageGroups = productIds.length
+        ? await this.prisma.messageThread.groupBy({
+            by: ['productId'],
+            where: { productId: { in: productIds } },
+            _count: true,
+          })
+        : [];
+      const messageCountMap = new Map<string, number>();
+      for (const g of messageGroups) {
+        if (g.productId) messageCountMap.set(g.productId, (g as any)._count ?? 0);
+      }
+
       let updatedCount = 0;
       for (const product of products) {
         const popularityScore = this.calculatePopularityScore({
           viewCount: product.viewCount,
           likeCount: product.likeCount,
           salesCount: product._count.orders,
+          messageCount: messageCountMap.get(product.id) ?? 0,
           recentLikes: product._count.likes,
-          // Note: Recent views would need a separate tracking mechanism
-          // For now, we use total views
-          recentViews: 0,
+          recentViews: 0, // TODO: gerçek son-7-gün görüntülenme takibi (ayrı view-log gerekir)
         });
+
+        const qualityScore = computeQualityScore({
+          photoCount: product._count.images,
+          description: product.description,
+          sellerRating: sellerRatingMap.get(product.sellerId) ?? null,
+          isVerifiedSeller: product.seller?.isVerified ?? false,
+        });
+
+        // rankTier reconcile
+        const hasActiveBoost =
+          product.boostedUntil != null && new Date(product.boostedUntil) > now;
+        const rankTier = hasActiveBoost ? 2 : premiumSet.has(product.sellerId) ? 1 : 0;
+
+        const relevanceScore = computeRelevanceScore({ rankTier, qualityScore, popularityScore });
 
         await this.prisma.product.update({
           where: { id: product.id },
-          data: {
-            viewCount: product.viewCount, // Keep existing value, popularity fields handled separately
-          } as any,
+          data: { popularityScore, popularityUpdatedAt: now, qualityScore, rankTier, relevanceScore } as any,
         });
 
         updatedCount++;
       }
 
-      this.logger.log(`Popularity scores updated for ${updatedCount} products`);
+      this.logger.log(`Popularity/quality scores updated for ${updatedCount} products`);
     } catch (error: any) {
-      this.logger.error(`Error updating popularity scores: ${error.message}`, error.stack);
+      this.logger.error(`Error updating scores: ${error.message}`, error.stack);
     }
   }
 
   /**
-   * Manual trigger for popularity score update
+   * Manual trigger for popularity/quality score update
    * Can be called by admin endpoints
    */
   async manualUpdatePopularityScores(): Promise<{ updated: number }> {
@@ -124,6 +195,102 @@ export class ProductSchedulerService {
       } as any,
     });
     return { updated: count };
+  }
+
+  /**
+   * Süresi dolan boost'ları düşür. Her 15 dakikada çalışır.
+   * - boostedUntil geçmişte kalan ürünlerin rankTier'ını premium(1)/standart(0)'a indirir.
+   * - İlgili ProductBoost kayıtlarını 'expired' yapar.
+   * - Uzun süredir 'pending' kalan (ödenmemiş) boost'ları 'failed' yapar.
+   */
+  @Cron('*/15 * * * *') // Her 15 dakikada
+  async expireBoosts() {
+    try {
+      const now = new Date();
+
+      // rankTier=2 ama boostedUntil süresi dolmuş ürünler
+      const expiredProducts = await this.prisma.product.findMany({
+        where: { rankTier: 2, boostedUntil: { lt: now } },
+        select: { id: true, sellerId: true, qualityScore: true, popularityScore: true },
+      });
+
+      // Şimdi sona eren aktif boost'lar (otomatik yenileme hatırlatması için)
+      const expiringBoosts = await this.prisma.productBoost.findMany({
+        where: { status: 'active', endsAt: { lt: now } },
+        select: {
+          id: true,
+          userId: true,
+          autoRenew: true,
+          product: { select: { title: true, sellerId: true } },
+        },
+      });
+
+      // İlgili tüm satıcıların premium durumunu tek sorguda topla
+      const sellerIds = [
+        ...new Set([
+          ...expiredProducts.map((p) => p.sellerId),
+          ...expiringBoosts.map((b) => b.product?.sellerId).filter(Boolean) as string[],
+        ]),
+      ];
+      const premiumSet = new Set<string>();
+      if (sellerIds.length > 0) {
+        const premiumMemberships = await this.prisma.userMembership.findMany({
+          where: {
+            userId: { in: sellerIds },
+            status: 'active',
+            tier: { type: { not: MembershipTierType.free } },
+          },
+          select: { userId: true },
+        });
+        premiumMemberships.forEach((m) => premiumSet.add(m.userId));
+      }
+
+      // rankTier'ı premium(1)/standart(0)'a indir + relevanceScore'u yeniden hesapla
+      for (const p of expiredProducts) {
+        const newRankTier = premiumSet.has(p.sellerId) ? 1 : 0;
+        await this.prisma.product.update({
+          where: { id: p.id },
+          data: {
+            rankTier: newRankTier,
+            relevanceScore: computeRelevanceScore({
+              rankTier: newRankTier,
+              qualityScore: p.qualityScore ?? 0,
+              popularityScore: p.popularityScore,
+            }),
+          },
+        });
+      }
+      if (expiredProducts.length > 0) {
+        this.logger.log(`Expired boost on ${expiredProducts.length} product(s)`);
+      }
+
+      // Otomatik yenileme açık + premium satıcı → yenileme hatırlatma bildirimi
+      // (Gerçek recurring çekim yok; üyelik auto-renew gibi hatırlatma gönderilir.)
+      for (const b of expiringBoosts) {
+        if (b.autoRenew && b.product && premiumSet.has(b.product.sellerId)) {
+          await this.notificationService
+            .createInAppNotification(b.userId, NotificationType.BOOST_EXPIRED, {
+              productTitle: b.product.title,
+            })
+            .catch(() => {});
+        }
+      }
+
+      // ProductBoost kayıtlarını expired yap
+      await this.prisma.productBoost.updateMany({
+        where: { status: 'active', endsAt: { lt: now } },
+        data: { status: 'expired' },
+      });
+
+      // 1 günden uzun süredir ödenmemiş (pending) boost'ları failed yap
+      const oneDayAgo = new Date(now.getTime() - 24 * 60 * 60 * 1000);
+      await this.prisma.productBoost.updateMany({
+        where: { status: 'pending', createdAt: { lt: oneDayAgo } },
+        data: { status: 'failed' },
+      });
+    } catch (error: any) {
+      this.logger.error(`Error expiring boosts: ${error.message}`, error.stack);
+    }
   }
 
   /**

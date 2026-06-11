@@ -1,0 +1,264 @@
+import { Test, TestingModule } from '@nestjs/testing';
+import { ConfigService } from '@nestjs/config';
+import { ModuleRef } from '@nestjs/core';
+import { BadRequestException } from '@nestjs/common';
+import { PaymentService } from './payment.service';
+import { PrismaService } from '../../prisma';
+import { CacheService } from '../cache/cache.service';
+import { PayTRService } from '../payment-providers/paytr.service';
+import { EventService } from '../events';
+import { InvoiceService } from '../invoice/invoice.service';
+import { ProductLockService } from '../product/product-lock.service';
+import { NotificationService } from '../notification/notification.service';
+import { SuratCargoService } from '../surat-cargo/surat-cargo.service';
+import { CommissionLedgerService } from '../commission/commission-ledger.service';
+import { OrderStatus, PaymentStatus, ProductStatus } from '@prisma/client';
+
+/**
+ * Grup ödemesi (CheckoutGroup): tek Payment satırı gruptaki tüm siparişleri kapsar.
+ * Bu suite başarı işleme sıralamasını (önce TÜM siparişler preparing, sonra stok),
+ * sipariş başına hold oluşturmayı ve başarısızlıkta toplu serbest bırakmayı test eder.
+ */
+describe('PaymentService group payment (checkout group)', () => {
+  let service: PaymentService;
+
+  const groupId = 'group-1';
+  const paymentId = 'pay-group-1';
+
+  const makeOrder = (n: number, overrides: Record<string, unknown> = {}) => ({
+    id: `order-${n}`,
+    orderNumber: `ORD-${n}`,
+    buyerId: 'buyer-1',
+    sellerId: `seller-${n}`,
+    productId: `product-${n}`,
+    status: OrderStatus.pending_payment,
+    totalAmount: 100 + n,
+    commissionAmount: 10,
+    buyerFeeAmount: 5,
+    shippingCost: 20,
+    paymentExpiresAt: new Date(Date.now() + 60 * 60 * 1000),
+    reservationReleasedAt: null,
+    shippingAddress: { fullName: 'Alıcı', phone: '+90555', city: 'İstanbul' },
+    buyer: { id: 'buyer-1', email: 'buyer@test.com', displayName: 'Buyer' },
+    seller: { id: `seller-${n}`, email: `s${n}@test.com`, displayName: `Seller ${n}` },
+    product: { id: `product-${n}`, title: `Ürün ${n}` },
+    ...overrides,
+  });
+
+  const basePayment = () => ({
+    id: paymentId,
+    orderId: null,
+    checkoutGroupId: groupId,
+    tradeCashPaymentId: null,
+    status: PaymentStatus.pending,
+    amount: 201,
+    provider: 'paytr',
+    providerPaymentId: null,
+    metadata: {},
+  });
+
+  let mockTx: any;
+  let callSequence: string[];
+
+  const mockPrisma: any = {
+    payment: { updateMany: jest.fn(), update: jest.fn(), findUnique: jest.fn() },
+    order: { findMany: jest.fn(), findUnique: jest.fn() },
+    product: { findUnique: jest.fn() },
+    shipment: { findFirst: jest.fn().mockResolvedValue(null), create: jest.fn() },
+    checkoutGroup: { findUnique: jest.fn() },
+    $transaction: jest.fn(),
+  };
+
+  const mockCommissionLedger = { upsertPending: jest.fn() };
+  const mockProductLock = {
+    invalidatePendingOrdersForProduct: jest
+      .fn()
+      .mockResolvedValue({ cancelledOrders: [] }),
+    invalidateRelatedOffers: jest.fn().mockResolvedValue({ rejectedOffers: [] }),
+    checkAndReserve: jest.fn(),
+  };
+  const mockEvents = {
+    emitOrderPaid: jest.fn(),
+    emitPaymentFailed: jest.fn(),
+  };
+
+  beforeEach(async () => {
+    jest.clearAllMocks();
+    callSequence = [];
+
+    mockTx = {
+      payment: {
+        updateMany: jest.fn().mockResolvedValue({ count: 1 }),
+        update: jest.fn(),
+      },
+      order: {
+        findMany: jest.fn().mockResolvedValue([makeOrder(1), makeOrder(2)]),
+        update: jest.fn().mockImplementation(({ where }: any) => {
+          callSequence.push(`order.update:${where.id}`);
+          return Promise.resolve({});
+        }),
+      },
+      product: {
+        findUnique: jest.fn().mockImplementation(({ where }: any) =>
+          Promise.resolve({
+            id: where.id,
+            quantity: 5,
+            reservedQuantity: 1,
+            categoryId: null,
+            status: ProductStatus.active,
+          }),
+        ),
+        update: jest.fn().mockImplementation(({ where }: any) => {
+          callSequence.push(`product.update:${where.id}`);
+          return Promise.resolve({});
+        }),
+      },
+      paymentHold: {
+        create: jest.fn().mockImplementation(({ data }: any) => {
+          callSequence.push(`hold.create:${data.orderId}`);
+          return Promise.resolve({ id: `hold-${data.orderId}` });
+        }),
+      },
+    };
+
+    mockPrisma.$transaction.mockImplementation(
+      async (fn: (tx: typeof mockTx) => Promise<unknown>) => fn(mockTx),
+    );
+
+    const module: TestingModule = await Test.createTestingModule({
+      providers: [
+        PaymentService,
+        { provide: PrismaService, useValue: mockPrisma },
+        {
+          provide: CacheService,
+          useValue: { del: jest.fn(), delPattern: jest.fn().mockResolvedValue(undefined) },
+        },
+        { provide: ConfigService, useValue: { get: jest.fn() } },
+        { provide: PayTRService, useValue: {} },
+        { provide: EventService, useValue: mockEvents },
+        {
+          provide: InvoiceService,
+          useValue: { generateAndSendInvoice: jest.fn() },
+        },
+        { provide: ProductLockService, useValue: mockProductLock },
+        { provide: NotificationService, useValue: {} },
+        { provide: SuratCargoService, useValue: {} },
+        { provide: CommissionLedgerService, useValue: mockCommissionLedger },
+        { provide: ModuleRef, useValue: {} },
+      ],
+    }).compile();
+
+    service = module.get(PaymentService);
+  });
+
+  it('marks ALL orders preparing BEFORE any stock decrement (stockout cascade cannot cancel siblings)', async () => {
+    const did = await (service as any).processSuccessfulGroupPayment(
+      basePayment(),
+      'txn-1',
+    );
+
+    expect(did).toBe(true);
+
+    // Sıralama: order.update'lerin TÜMÜ ilk product.update'ten önce gelmeli
+    const firstProductUpdate = callSequence.findIndex((c) => c.startsWith('product.update'));
+    const orderUpdates = callSequence
+      .map((c, i) => ({ c, i }))
+      .filter(({ c }) => c.startsWith('order.update'));
+    expect(orderUpdates).toHaveLength(2);
+    for (const { i } of orderUpdates) {
+      expect(i).toBeLessThan(firstProductUpdate);
+    }
+
+    // Tek payment'a sipariş/satıcı başına bir hold
+    expect(mockTx.paymentHold.create).toHaveBeenCalledTimes(2);
+    for (const call of mockTx.paymentHold.create.mock.calls) {
+      expect(call[0].data.paymentId).toBe(paymentId);
+    }
+    const holdOrderIds = mockTx.paymentHold.create.mock.calls.map(
+      (c: any) => c[0].data.orderId,
+    );
+    expect(holdOrderIds.sort()).toEqual(['order-1', 'order-2']);
+
+    // Ledger sipariş başına
+    expect(mockCommissionLedger.upsertPending).toHaveBeenCalledTimes(2);
+
+    // Tx sonrası: sipariş başına order.paid + shipment
+    expect(mockEvents.emitOrderPaid).toHaveBeenCalledTimes(2);
+    expect(mockPrisma.shipment.create).toHaveBeenCalledTimes(2);
+  });
+
+  it('is idempotent: second success callback does nothing (CAS claim fails)', async () => {
+    mockTx.payment.updateMany.mockResolvedValue({ count: 0 });
+
+    const did = await (service as any).processSuccessfulGroupPayment(
+      basePayment(),
+      'txn-1',
+    );
+
+    expect(did).toBe(false);
+    expect(mockTx.order.update).not.toHaveBeenCalled();
+    expect(mockTx.paymentHold.create).not.toHaveBeenCalled();
+  });
+
+  it('auto-refunds (partial) an order cancelled by cron race; siblings still complete', async () => {
+    mockTx.order.findMany.mockResolvedValue([
+      makeOrder(1),
+      makeOrder(2, { status: OrderStatus.cancelled }),
+    ]);
+    const refundSpy = jest
+      .spyOn(service as any, 'processRefund')
+      .mockResolvedValue({ success: true });
+
+    const did = await (service as any).processSuccessfulGroupPayment(
+      basePayment(),
+      'txn-1',
+    );
+
+    expect(did).toBe(true);
+    expect(refundSpy).toHaveBeenCalledWith('order-2', 102);
+    // Sadece canlı sipariş işlenir
+    expect(mockTx.paymentHold.create).toHaveBeenCalledTimes(1);
+    expect(mockTx.paymentHold.create.mock.calls[0][0].data.orderId).toBe('order-1');
+    expect(mockEvents.emitOrderPaid).toHaveBeenCalledTimes(1);
+  });
+
+  it('group payment initiation rejects when any order is no longer pending_payment', async () => {
+    mockPrisma.checkoutGroup.findUnique.mockResolvedValue({
+      id: groupId,
+      buyerId: 'buyer-1',
+      isGuest: false,
+      totalAmount: 201,
+      orders: [makeOrder(1), makeOrder(2, { status: OrderStatus.cancelled })],
+    });
+
+    await expect(
+      (service as any).initiateGroupPayment('buyer-1', {
+        checkoutGroupId: groupId,
+        provider: 'paytr',
+      }),
+    ).rejects.toThrow(BadRequestException);
+  });
+
+  it('failed group payment releases every order in the group', async () => {
+    mockPrisma.payment.update.mockResolvedValue({});
+    mockPrisma.order.findMany.mockResolvedValue([makeOrder(1), makeOrder(2)]);
+    const releaseSpy = jest
+      .spyOn(service as any, 'releaseProductForFailedPayment')
+      .mockResolvedValue(undefined);
+    const cancelSuratSpy = jest
+      .spyOn(service as any, 'cancelSuratShipmentIfExists')
+      .mockResolvedValue(undefined);
+    const logSpy = jest
+      .spyOn(service as any, 'logPaymentAction')
+      .mockResolvedValue(undefined);
+
+    await (service as any).processFailedPayment(basePayment(), 'kart reddedildi');
+
+    expect(releaseSpy).toHaveBeenCalledTimes(2);
+    expect(releaseSpy).toHaveBeenCalledWith('order-1');
+    expect(releaseSpy).toHaveBeenCalledWith('order-2');
+    expect(cancelSuratSpy).toHaveBeenCalledTimes(2);
+    expect(mockEvents.emitPaymentFailed).toHaveBeenCalledTimes(2);
+    expect(logSpy).toHaveBeenCalled();
+  });
+});

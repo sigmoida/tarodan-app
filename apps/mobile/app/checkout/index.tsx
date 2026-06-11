@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect, useMemo, useRef } from 'react';
 import {
   View,
   ScrollView,
@@ -7,7 +7,6 @@ import {
   Image,
   KeyboardAvoidingView,
   Platform,
-  Alert,
 } from 'react-native';
 import {
   Button,
@@ -19,12 +18,15 @@ import {
   Input,
   Radio,
   theme,
+  appAlert,
 } from '@tarodan/ui-native';
 import {
   CityDistrictSelector,
+  PhoneInput,
   ScreenHeader,
 } from '../../src/components/common';
-import { router } from 'expo-router';
+import { DEFAULT_COUNTRY_CODE, normalizePhoneForPayload } from '../../src/utils/phone';
+import { router, useLocalSearchParams } from 'expo-router';
 import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 import { useQuery } from '@tanstack/react-query';
 import { useCartStore } from '../../src/stores/cartStore';
@@ -46,6 +48,8 @@ const { colors } = theme;
 interface ShippingAddressInput {
   fullName: string;
   phone: string;
+  /** UI'da seçilen ülke kodu — payload'a phone prefix'i olarak gömülür, ayrıca gönderilmez. */
+  phoneCountryCode?: string;
   city: string;
   district: string;
   address: string;
@@ -77,11 +81,21 @@ const STOCKOUT_KEYWORDS = [
   'stokta yok',
   'başkası tarafından',
   'başka alıcıya satıldı',
+  'stokta bulunmamaktadır',
 ];
+
+/** Checkout idempotency anahtarı (RFC4122 v4 formatı; sunucu çift submit'i bununla dedupe eder) */
+const generateUuidV4 = (): string =>
+  'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, (c) => {
+    const r = (Math.random() * 16) | 0;
+    const v = c === 'x' ? r : (r & 0x3) | 0x8;
+    return v.toString(16);
+  });
 
 const EMPTY_ADDRESS: ShippingAddressInput = {
   fullName: '',
   phone: '',
+  phoneCountryCode: DEFAULT_COUNTRY_CODE,
   city: '',
   district: '',
   address: '',
@@ -89,16 +103,40 @@ const EMPTY_ADDRESS: ShippingAddressInput = {
 };
 
 export default function CheckoutScreen() {
-  const { items, getSubtotal, clearCart } = useCartStore();
+  const { buyNow } = useLocalSearchParams<{ buyNow?: string }>();
+  const isBuyNow = buyNow === '1';
+  const { items: cartItems, clearCart: clearCartStore, buyNowItem, clearBuyNow } = useCartStore();
   const { isAuthenticated, user } = useAuthStore();
+
+  // Hızlı Al akışında sepet yerine tek ürün kullanılır; sepet kirlenmez.
+  const items = useMemo(
+    // Hızlı Al modunda yalnızca buyNowItem; yoksa boş (sepete düşüp yanlış ürün alınmasın).
+    () => (isBuyNow ? (buyNowItem ? [buyNowItem] : []) : cartItems),
+    [isBuyNow, buyNowItem, cartItems],
+  );
+  // Akış bitince doğru kaynağı temizle (Hızlı Al → buyNowItem, normal → sepet).
+  const finalizeCart = () => {
+    if (isBuyNow) clearBuyNow();
+    else clearCartStore();
+  };
 
   // ---------- Step ----------
   const [step, setStep] = useState(1); // 1: Adres, 2: Ödeme, 3: Onay
+
+  // ---------- İdempotensi ----------
+  // Aynı sepet için tekrar denemeler (çift dokunma, ağ hatası sonrası retry)
+  // sunucuda AYNI grubu döndürür. Sepet değişirse anahtar yenilenir ki eski
+  // grup replay edilmesin.
+  const idempotencyKeyRef = useRef(generateUuidV4());
+  useEffect(() => {
+    idempotencyKeyRef.current = generateUuidV4();
+  }, [items]);
 
   // ---------- Konuk bilgileri (yalnızca isAuthenticated === false) ----------
   const [guestName, setGuestName] = useState('');
   const [guestEmail, setGuestEmail] = useState('');
   const [guestPhone, setGuestPhone] = useState('');
+  const [guestPhoneCountryCode, setGuestPhoneCountryCode] = useState(DEFAULT_COUNTRY_CODE);
 
   // ---------- Adres seçimi ----------
   /** Üye için kayıtlı adresten seçim. 'new' = yeni adres formu. */
@@ -112,9 +150,9 @@ export default function CheckoutScreen() {
 
   // ---------- Kargo / Ödeme tercihleri ----------
   // Tek kargo firması: Sürat Kargo (web ile parite — apps/web/src/app/checkout/page.tsx).
-  const selectedCarrier: 'surat' = 'surat';
+  const selectedCarrier = 'surat' as const;
   // Sadece PayTR kullanılıyor (iyzico kaldırıldı — web ile parite)
-  const paymentProvider: 'paytr' = 'paytr';
+  const paymentProvider = 'paytr' as const;
   const [shippingCost, setShippingCost] = useState(0);
   const [shippingLoading, setShippingLoading] = useState(false);
 
@@ -146,7 +184,10 @@ export default function CheckoutScreen() {
     message: '',
   });
 
-  const subtotal = getSubtotal();
+  const subtotal = useMemo(
+    () => items.reduce((sum, it) => sum + it.price * it.quantity, 0),
+    [items],
+  );
   const total = subtotal + shippingCost - (appliedDiscount?.amount ?? 0);
 
   // ---------- Üye için kayıtlı adresler ----------
@@ -190,9 +231,9 @@ export default function CheckoutScreen() {
     if (cards.length > 0 && selectedCardToken === 'webview') {
       setSelectedCardToken(cards[0].cardToken);
     }
-    // Üye + hiç kart yok → yeni kart formu varsayılan
-    if (cards.length === 0 && selectedCardToken !== 'new' && selectedCardToken !== 'webview') {
-      setSelectedCardToken('new');
+    // Üye + hiç kart yok → PayTR WebView akışı varsayılan (manuel kart girişi yok)
+    if (cards.length === 0 && selectedCardToken !== 'webview') {
+      setSelectedCardToken('webview');
     }
   }, [isAuthenticated, cards]);
 
@@ -268,13 +309,13 @@ export default function CheckoutScreen() {
   const validateGuest = () => {
     if (!guestName.trim()) return 'Lütfen adınızı girin';
     if (!/^\S+@\S+\.\S+$/.test(guestEmail.trim())) return 'Geçerli bir e-posta adresi girin';
-    if (guestPhone.trim().length < 10) return 'Geçerli bir telefon numarası girin';
+    if (guestPhone.replace(/\D/g, '').length < 10) return 'Geçerli bir telefon numarası girin';
     return null;
   };
 
   const validateInlineAddress = (a: ShippingAddressInput, label = 'Teslimat') => {
     if (!a.fullName.trim()) return `${label} adresi için ad soyad gerekli`;
-    if (!a.phone.trim() || a.phone.trim().length < 10)
+    if (a.phone.replace(/\D/g, '').length < 10)
       return `${label} adresi için telefon numarası gerekli`;
     if (!a.city.trim()) return `${label} adresi için il seçin`;
     if (!a.district.trim()) return `${label} adresi için ilçe seçin`;
@@ -341,7 +382,10 @@ export default function CheckoutScreen() {
     if (isAuthenticated && selectedAddressId !== 'new') {
       return { id: selectedAddressId };
     }
-    const phone = shippingAddress.phone.trim() || guestPhone.trim();
+    // Form alanı boşsa konuk telefonu fallback; her durumda "+90…" olarak normalize edilir.
+    const phone = shippingAddress.phone.trim()
+      ? normalizePhoneForPayload(shippingAddress.phone, shippingAddress.phoneCountryCode ?? DEFAULT_COUNTRY_CODE)
+      : normalizePhoneForPayload(guestPhone, guestPhoneCountryCode);
     return {
       inline: {
         fullName: shippingAddress.fullName.trim(),
@@ -362,7 +406,7 @@ export default function CheckoutScreen() {
     return {
       inline: {
         fullName: billingAddress.fullName.trim(),
-        phone: billingAddress.phone.trim(),
+        phone: normalizePhoneForPayload(billingAddress.phone, billingAddress.phoneCountryCode ?? DEFAULT_COUNTRY_CODE),
         city: billingAddress.city.trim(),
         district: billingAddress.district.trim(),
         address: billingAddress.address.trim(),
@@ -379,59 +423,61 @@ export default function CheckoutScreen() {
     }
     for (const item of items) {
       if (!item.productId || typeof item.productId !== 'string' || item.productId.length < 10) {
-        Alert.alert('Hata', `Geçersiz ürün ID: ${item.title}`);
+        appAlert('Hata', `Geçersiz ürün ID: ${item.title}`);
         return;
       }
     }
 
+    if (loading) return; // çift dokunma koruması (sunucu tarafı idempotencyKey ile ayrıca korur)
     setLoading(true);
     try {
       const shipping = buildShippingPayload();
       const billing = buildBillingPayload();
 
-      let firstOrderId: string | null = null;
+      // Tüm sepet TEK çağrıda, tek CheckoutGroup altında sipariş edilir;
+      // tek ödeme grubu kapsar (eski ürün-başına-sipariş döngüsü 2. siparişi ödemesiz bırakıyordu).
+      const checkoutPayload = {
+        items: items.map((item) => ({ productId: item.productId })),
+        idempotencyKey: idempotencyKeyRef.current,
+        shippingAddressId: shipping.id,
+        shippingAddress: shipping.inline,
+        billingAddressId: billing?.id,
+        billingAddress: billing?.inline,
+      };
 
-      // Sepetteki her ürün için ayrı sipariş yaratılır (web pattern'i)
-      for (const item of items) {
-        if (isAuthenticated && user) {
-          const response = await ordersApi.directBuy({
-            productId: item.productId,
-            shippingAddressId: shipping.id,
-            shippingAddress: shipping.inline,
-            billingAddressId: billing?.id,
-            billingAddress: billing?.inline,
-          });
-          const data: any = (response.data as any)?.data ?? response.data;
-          const orderId = data?.id || data?.orderId || data?.order?.id;
-          if (!firstOrderId && orderId) firstOrderId = orderId;
-        } else {
-          const response = await ordersApi.createGuest({
-            productId: item.productId,
+      const response = isAuthenticated && user
+        ? await ordersApi.checkout(checkoutPayload)
+        : await ordersApi.checkoutGuest({
+            items: checkoutPayload.items,
+            idempotencyKey: checkoutPayload.idempotencyKey,
             email: guestEmail.trim().toLowerCase(),
-            phone: guestPhone.trim(),
+            emailVerificationCode: '',
+            phone: normalizePhoneForPayload(guestPhone, guestPhoneCountryCode),
             guestName: guestName.trim(),
             shippingAddress: shipping.inline!,
             billingAddress: billing?.inline,
           });
-          const data: any = (response.data as any)?.data ?? response.data;
-          const orderId = data?.id || data?.orderId || data?.order?.id;
-          if (!firstOrderId && orderId) firstOrderId = orderId;
-        }
-      }
 
-      if (!firstOrderId) {
-        Alert.alert(
+      const data: any = (response.data as any)?.data ?? response.data;
+      const checkoutGroupId: string | null = data?.checkoutGroupId ?? null;
+      const firstOrderId: string | null = data?.orders?.[0]?.orderId ?? null;
+
+      if (!checkoutGroupId || !firstOrderId) {
+        appAlert(
           'Hata',
           'Sipariş oluşturuldu fakat ödeme başlatılamadı. Siparişlerim sayfasından devam edebilirsiniz.',
         );
-        clearCart();
+        finalizeCart();
         router.replace('/orders' as any);
         return;
       }
 
-      // Üye + kayıtlı kart seçimi → processDirect (tek tık akışı)
+      // Üye + kayıtlı kart seçimi → processDirect (tek tık akışı).
+      // NOT: processDirect tek sipariş ID'siyle çalışır; çok ürünlü grupta yalnızca
+      // ilk siparişi tahsil ederdi → grup ödemesine (WebView) düşülür.
       if (
         isAuthenticated &&
+        items.length === 1 &&
         selectedCardToken !== 'webview' &&
         selectedCardToken !== 'new'
       ) {
@@ -446,20 +492,21 @@ export default function CheckoutScreen() {
           const paymentId = directData.paymentId || directData.id || directData.payment?.id;
           // 3DS gerekiyorsa veya hala pending ise WebView akışına geç
           if (status === 'paid' || status === 'success' || status === 'completed') {
-            clearCart();
+            finalizeCart();
             router.replace({
               pathname: '/payment/success',
-              params: { paymentId, orderId: firstOrderId },
+              params: { paymentId, orderId: firstOrderId, groupId: checkoutGroupId },
             } as any);
             return;
           }
           // Aksi halde WebView akışına geçilir
-          clearCart();
+          finalizeCart();
           router.replace({
             pathname: '/payment/[id]',
             params: {
               id: paymentId || firstOrderId,
               orderId: firstOrderId,
+              groupId: checkoutGroupId,
               provider: paymentProvider,
               guest: '0',
             },
@@ -472,7 +519,7 @@ export default function CheckoutScreen() {
       }
 
       // Üye + yeni kart formu → backend kart bilgisini alır + 3DS WebView'i açar
-      if (isAuthenticated && selectedCardToken === 'new') {
+      if (isAuthenticated && items.length === 1 && selectedCardToken === 'new') {
         try {
           const directResp: any = await paymentsApi.processDirect({
             orderId: firstOrderId,
@@ -489,12 +536,13 @@ export default function CheckoutScreen() {
           });
           const directData: any = directResp.data?.data ?? directResp.data ?? {};
           const paymentId = directData.paymentId || directData.id || directData.payment?.id;
-          clearCart();
+          finalizeCart();
           router.replace({
             pathname: '/payment/[id]',
             params: {
               id: paymentId || firstOrderId,
               orderId: firstOrderId,
+              groupId: checkoutGroupId,
               provider: paymentProvider,
               guest: '0',
             },
@@ -505,11 +553,11 @@ export default function CheckoutScreen() {
         }
       }
 
-      // WebView akışı (default) — konuk veya kart akışı başarısız oldu
+      // WebView akışı (default) — grup ödemesi: tek ödeme tüm siparişleri kapsar
       try {
         const initResp: any = isAuthenticated
-          ? await paymentsApi.initiate(firstOrderId, paymentProvider)
-          : await paymentsApi.initiateGuest(firstOrderId, paymentProvider);
+          ? await paymentsApi.initiateGroup(checkoutGroupId, paymentProvider)
+          : await paymentsApi.initiateGroupGuest(checkoutGroupId, paymentProvider);
         const initData = initResp.data?.data ?? initResp.data ?? {};
         const paymentId =
           initData.paymentId || initData.id || initData.payment?.id || firstOrderId;
@@ -525,25 +573,30 @@ export default function CheckoutScreen() {
             captureException(bypassErr, {
               level: 'error',
               tags: { flow: 'checkout.bypassComplete' },
-              extra: { paymentId, orderId: firstOrderId },
+              extra: { paymentId, orderId: firstOrderId, checkoutGroupId },
             });
           }
-          clearCart();
+          finalizeCart();
           router.replace({
             pathname: '/payment/success',
-            params: { paymentId, orderId: firstOrderId },
+            params: { paymentId, orderId: firstOrderId, groupId: checkoutGroupId },
           } as any);
           return;
         }
 
-        clearCart();
+        // Token burada üretildi; ekran tekrar initiate etmesin diye URL'i geçiyoruz
+        // (PayTR token'ları tek kullanımlık — çift initiate ilk token'ı çöpe atardı).
+        const paymentUrl: string | undefined = initData.paymentUrl;
+        finalizeCart();
         router.replace({
           pathname: '/payment/[id]',
           params: {
             id: paymentId,
             orderId: firstOrderId,
+            groupId: checkoutGroupId,
             provider: paymentProvider,
             guest: isAuthenticated ? '0' : '1',
+            ...(paymentUrl ? { paymentUrl } : {}),
           },
         } as any);
       } catch (payErr: any) {
@@ -556,7 +609,8 @@ export default function CheckoutScreen() {
           typeof msg === 'string' &&
           STOCKOUT_KEYWORDS.some((kw) => msg.toLowerCase().includes(kw.toLowerCase()));
         if (isStockout) {
-          const productId = items[0]?.productId;
+          // API hata gövdesinde başarısız ürünün ID'si döner; yoksa ilk ürün
+          const productId = payErr?.response?.data?.productId || items[0]?.productId;
           if (productId) {
             router.replace({
               pathname: '/products/unavailable/[productId]',
@@ -565,7 +619,7 @@ export default function CheckoutScreen() {
             return;
           }
         }
-        Alert.alert('Ödeme Başlatılamadı', msg, [
+        appAlert('Ödeme Başlatılamadı', msg, [
           { text: 'Tamam', onPress: () => router.replace(isAuthenticated ? '/orders' : '/' as any) },
         ]);
       }
@@ -588,7 +642,7 @@ export default function CheckoutScreen() {
         typeof errorMessage === 'string' &&
         STOCKOUT_KEYWORDS.some((kw) => errorMessage.toLowerCase().includes(kw.toLowerCase()));
       if (isStockout) {
-        const productId = items[0]?.productId;
+        const productId = error?.response?.data?.productId || items[0]?.productId;
         if (productId) {
           router.replace({
             pathname: '/products/unavailable/[productId]',
@@ -597,7 +651,7 @@ export default function CheckoutScreen() {
           return;
         }
       }
-      Alert.alert('Hata', errorMessage);
+      appAlert('Hata', errorMessage);
     } finally {
       setLoading(false);
     }
@@ -614,7 +668,7 @@ export default function CheckoutScreen() {
           variant="primary"
           title="Alışverişe Başla"
           onPress={() => router.replace('/' as any)}
-          style={{ marginTop: 20 }}
+          style={{ marginTop: 20, alignSelf: 'center' }}
         />
       </View>
     );
@@ -687,19 +741,22 @@ export default function CheckoutScreen() {
               onChangeText={(text: string) => setInline({ ...inline, fullName: text })}
               containerStyle={styles.input}
             />
-            <Input
+            <PhoneInput
               label="Telefon *"
-              value={inline.phone}
-              onChangeText={(text: string) => setInline({ ...inline, phone: text })}
-              keyboardType="phone-pad"
-              placeholder="+90 5XX XXX XX XX"
+              countryCode={inline.phoneCountryCode ?? DEFAULT_COUNTRY_CODE}
+              onCountryCodeChange={(code) => setInline((prev) => ({ ...prev, phoneCountryCode: code }))}
+              phone={inline.phone}
+              onPhoneChange={(phone) => setInline((prev) => ({ ...prev, phone }))}
               containerStyle={styles.input}
             />
             <CityDistrictSelector
               city={inline.city}
               district={inline.district}
-              onChangeCity={(city) => setInline({ ...inline, city })}
-              onChangeDistrict={(district) => setInline({ ...inline, district })}
+              // Fonksiyonel güncelleme şart: il seçilince CityDistrictSelector
+              // aynı anda hem onChangeCity hem onChangeDistrict('') çağırır;
+              // stale obje ile yazılırsa ikinci çağrı şehri ezer (il seçilemiyor).
+              onChangeCity={(city) => setInline((prev) => ({ ...prev, city }))}
+              onChangeDistrict={(district) => setInline((prev) => ({ ...prev, district }))}
             />
             <Input
               label="Açık Adres *"
@@ -794,12 +851,12 @@ export default function CheckoutScreen() {
                   autoCapitalize="none"
                   containerStyle={styles.input}
                 />
-                <Input
+                <PhoneInput
                   label="Telefon *"
-                  value={guestPhone}
-                  onChangeText={setGuestPhone}
-                  keyboardType="phone-pad"
-                  placeholder="+90 5XX XXX XX XX"
+                  countryCode={guestPhoneCountryCode}
+                  onCountryCodeChange={setGuestPhoneCountryCode}
+                  phone={guestPhone}
+                  onPhoneChange={setGuestPhone}
                   containerStyle={styles.input}
                 />
                 <TouchableOpacity
@@ -909,30 +966,6 @@ export default function CheckoutScreen() {
                     </TouchableOpacity>
                   ))}
 
-                  {/* Yeni kart formu */}
-                  <TouchableOpacity
-                    style={[
-                      styles.optionCard,
-                      selectedCardToken === 'new' && styles.optionCardActive,
-                    ]}
-                    onPress={() => setSelectedCardToken('new')}
-                  >
-                    <Radio
-                      checked={selectedCardToken === 'new'}
-                      onChange={() => setSelectedCardToken('new')}
-                    />
-                    <MaterialCommunityIcons
-                      name="credit-card-plus"
-                      size={22}
-                      color={colors.primary[600]!}
-                      style={{ marginRight: 6 }}
-                    />
-                    <View style={styles.optionContent}>
-                      <Text style={styles.optionTitle}>Yeni Kart Ekle</Text>
-                      <Text style={styles.optionDescription}>3DS ile güvenli ödeme</Text>
-                    </View>
-                  </TouchableOpacity>
-
                   {/* WebView (provider-hosted) seçeneği */}
                   <TouchableOpacity
                     style={[
@@ -961,75 +994,14 @@ export default function CheckoutScreen() {
                 </View>
               ) : null}
 
-              {/* Üye + kart yok ya da yeni kart formu seçili */}
-              {isAuthenticated && selectedCardToken === 'new' ? (
-                <View>
-                  <Input
-                    label="Kart Sahibi *"
-                    value={cardForm.cardHolderName}
-                    onChangeText={(v: string) =>
-                      setCardForm({ ...cardForm, cardHolderName: v })
-                    }
-                    containerStyle={styles.input}
-                  />
-                  <Input
-                    label="Kart Numarası *"
-                    value={cardForm.cardNumber}
-                    onChangeText={(v: string) =>
-                      setCardForm({ ...cardForm, cardNumber: v.replace(/[^\d\s]/g, '') })
-                    }
-                    keyboardType="number-pad"
-                    maxLength={19}
-                    containerStyle={styles.input}
-                  />
-                  <View style={{ flexDirection: 'row', gap: 8 }}>
-                    <Input
-                      label="Ay *"
-                      value={cardForm.expireMonth}
-                      onChangeText={(v: string) =>
-                        setCardForm({ ...cardForm, expireMonth: v.replace(/[^\d]/g, '') })
-                      }
-                      keyboardType="number-pad"
-                      maxLength={2}
-                      containerStyle={{ ...styles.input, flex: 1 }}
-                    />
-                    <Input
-                      label="Yıl *"
-                      value={cardForm.expireYear}
-                      onChangeText={(v: string) =>
-                        setCardForm({ ...cardForm, expireYear: v.replace(/[^\d]/g, '') })
-                      }
-                      keyboardType="number-pad"
-                      maxLength={4}
-                      containerStyle={{ ...styles.input, flex: 1 }}
-                    />
-                    <Input
-                      label="CVC *"
-                      value={cardForm.cvc}
-                      onChangeText={(v: string) =>
-                        setCardForm({ ...cardForm, cvc: v.replace(/[^\d]/g, '') })
-                      }
-                      keyboardType="number-pad"
-                      maxLength={4}
-                      secureTextEntry
-                      containerStyle={{ ...styles.input, flex: 1 }}
-                    />
-                  </View>
-                  <Input
-                    label="Kart Takma Adı (opsiyonel)"
-                    value={cardForm.cardAlias}
-                    onChangeText={(v: string) => setCardForm({ ...cardForm, cardAlias: v })}
-                    containerStyle={styles.input}
-                  />
-                  <View style={styles.saveCardRow}>
-                    <Switch
-                      value={cardForm.saveCard}
-                      onValueChange={(v: boolean) => setCardForm({ ...cardForm, saveCard: v })}
-                    />
-                    <Text style={styles.saveCardLabel}>Bu kartı sonraki alışverişler için kaydet</Text>
-                  </View>
-                </View>
-              ) : null}
+              {/* PayTR bilgilendirme — kart bilgisi uygulamaya girilmez (PCI). */}
+              <View style={styles.paytrNotice}>
+                <Ionicons name="lock-closed" size={18} color={colors.success[600]!} />
+                <Text style={styles.paytrNoticeText}>
+                  Ödemeniz PayTR güvenli altyapısı üzerinden alınır. Kart bilgileriniz Tarodan'a
+                  kaydedilmez; bir sonraki adımda PayTR'nin 3D Secure ödeme sayfası açılır.
+                </Text>
+              </View>
 
               {/* Provider: sadece PayTR (iyzico kaldırıldı — web ile parite) */}
             </View>
@@ -1157,7 +1129,9 @@ export default function CheckoutScreen() {
             variant="primary"
             title="Devam Et"
             onPress={handleNextStep}
-            style={styles.actionButton}
+            icon="arrow-forward"
+            iconPosition="right"
+            style={[styles.actionButton, styles.continueButton]}
           />
         ) : (
           <Button
@@ -1166,6 +1140,7 @@ export default function CheckoutScreen() {
             onPress={handleCheckout}
             isLoading={loading}
             disabled={loading}
+            fullWidth
             style={styles.actionButton}
             icon="card-outline"
           />
@@ -1322,6 +1297,7 @@ const styles = StyleSheet.create({
   savedAddressRow: {
     flexDirection: 'row',
     alignItems: 'flex-start',
+    gap: 12,
     backgroundColor: colors.surface.alt,
     borderRadius: 12,
     padding: 12,
@@ -1358,6 +1334,23 @@ const styles = StyleSheet.create({
     fontSize: 13,
     color: colors.text.heading,
     flex: 1,
+  },
+  paytrNotice: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    gap: 8,
+    padding: 12,
+    borderRadius: 10,
+    backgroundColor: colors.success[50]!,
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: colors.success[600]!,
+    marginTop: 4,
+  },
+  paytrNoticeText: {
+    flex: 1,
+    fontSize: 12,
+    lineHeight: 17,
+    color: colors.success[800] ?? colors.success[600]!,
   },
   providerChip: {
     paddingHorizontal: 14,
@@ -1477,6 +1470,10 @@ const styles = StyleSheet.create({
   },
   actionButton: {
     borderRadius: 12,
+  },
+  continueButton: {
+    alignSelf: 'flex-end',
+    paddingHorizontal: 32,
   },
   emptyContainer: {
     flex: 1,

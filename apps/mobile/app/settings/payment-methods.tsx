@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { View, StyleSheet, ScrollView, Alert } from 'react-native';
+import { View, StyleSheet, ScrollView } from 'react-native';
 import {
   Button,
   Card,
@@ -9,27 +9,26 @@ import {
   Input,
   Text,
   theme,
+  appAlert,
 } from '@tarodan/ui-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 import { router } from 'expo-router';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { paymentsApi } from '../../src/services/api';
-import { ScreenHeader, ScreenLoader, EmptyState } from '../../src/components/common';
+import { ScreenHeader, ScreenLoader, EmptyState, ThemedRefreshControl } from '../../src/components/common';
+import { useRefresh } from '../../src/hooks/useRefresh';
 import { useAuthStore } from '../../src/stores/authStore';
 
 const { colors } = theme;
 
 interface PaymentMethod {
-  cardToken: string;
-  cardAlias?: string;
-  cardHolderName?: string;
-  lastFourDigits?: string;
+  id: string;
   cardBrand?: string;
-  binNumber?: string;
-  expireMonth?: string;
-  expireYear?: string;
+  lastFour?: string;
+  expiryMonth?: number;
+  expiryYear?: number;
   isDefault?: boolean;
+  createdAt?: string;
 }
 
 function brandIcon(brand?: string): React.ComponentProps<typeof MaterialCommunityIcons>['name'] {
@@ -53,15 +52,17 @@ export default function PaymentMethodsScreen() {
     cardAlias: '',
   });
 
-  const { data, isLoading } = useQuery({
+  const { data, isLoading, refetch } = useQuery({
     queryKey: ['payment-methods'],
     queryFn: async () => {
       const response = await paymentsApi.getPaymentMethods();
-      const payload = response.data?.data ?? response.data ?? [];
+      const payload = response.data?.methods ?? response.data?.data ?? response.data ?? [];
       return Array.isArray(payload) ? payload : [];
     },
     enabled: isAuthenticated,
   });
+
+  const { refreshing, onRefresh } = useRefresh(refetch);
 
   const methods: PaymentMethod[] = data ?? [];
 
@@ -81,18 +82,18 @@ export default function PaymentMethodsScreen() {
       queryClient.invalidateQueries({ queryKey: ['payment-methods'] });
       resetForm();
       setDialogOpen(false);
-      Alert.alert('Başarılı', 'Kart başarıyla kaydedildi.');
+      appAlert('Başarılı', 'Kart başarıyla kaydedildi.');
     },
     onError: (e: any) =>
-      Alert.alert('Hata', e?.response?.data?.message || 'Kart kaydedilemedi.'),
+      appAlert('Hata', e?.response?.data?.message || 'Kart kaydedilemedi.'),
   });
 
   const deleteMutation = useMutation({
-    mutationFn: (cardToken: string) => paymentsApi.deletePaymentMethod(cardToken),
+    mutationFn: (id: string) => paymentsApi.deletePaymentMethod(id),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['payment-methods'] });
     },
-    onError: () => Alert.alert('Hata', 'Kart silinemedi.'),
+    onError: () => appAlert('Hata', 'Kart silinemedi.'),
   });
 
   const resetForm = () =>
@@ -106,33 +107,33 @@ export default function PaymentMethodsScreen() {
     });
 
   const handleAdd = () => {
-    if (!form.cardHolderName.trim()) return Alert.alert('Eksik bilgi', 'Kart sahibi gerekli.');
+    if (!form.cardHolderName.trim()) return appAlert('Eksik bilgi', 'Kart sahibi gerekli.');
     const cleanNumber = form.cardNumber.replace(/\s/g, '');
     if (cleanNumber.length < 15 || cleanNumber.length > 19)
-      return Alert.alert('Eksik bilgi', 'Geçerli bir kart numarası girin.');
+      return appAlert('Eksik bilgi', 'Geçerli bir kart numarası girin.');
     if (!/^\d{1,2}$/.test(form.expireMonth) || parseInt(form.expireMonth, 10) < 1 || parseInt(form.expireMonth, 10) > 12)
-      return Alert.alert('Eksik bilgi', 'Geçerli ay (1-12) girin.');
+      return appAlert('Eksik bilgi', 'Geçerli ay (1-12) girin.');
     if (!/^\d{2,4}$/.test(form.expireYear))
-      return Alert.alert('Eksik bilgi', 'Geçerli yıl girin.');
+      return appAlert('Eksik bilgi', 'Geçerli yıl girin.');
     if (!/^\d{3,4}$/.test(form.cvc))
-      return Alert.alert('Eksik bilgi', 'Geçerli CVC girin.');
+      return appAlert('Eksik bilgi', 'Geçerli CVC girin.');
     addMutation.mutate();
   };
 
   const handleDelete = (m: PaymentMethod) => {
-    Alert.alert('Kartı Sil', 'Bu kartı silmek istediğinize emin misiniz?', [
+    appAlert('Kartı Sil', 'Bu kartı silmek istediğinize emin misiniz?', [
       { text: 'Vazgeç', style: 'cancel' },
       {
         text: 'Sil',
         style: 'destructive',
-        onPress: () => deleteMutation.mutate(m.cardToken),
+        onPress: () => deleteMutation.mutate(m.id),
       },
     ]);
   };
 
   if (!isAuthenticated) {
     return (
-      <SafeAreaView style={styles.container} edges={['top']}>
+      <View style={styles.container}>
         <ScreenHeader title="Ödeme Yöntemleri" />
         <EmptyState
           fullscreen
@@ -141,12 +142,12 @@ export default function PaymentMethodsScreen() {
           actionLabel="Giriş Yap"
           onAction={() => router.push('/(auth)/login')}
         />
-      </SafeAreaView>
+      </View>
     );
   }
 
   return (
-    <SafeAreaView style={styles.container} edges={['top']}>
+    <View style={styles.container}>
       <ScreenHeader title="Ödeme Yöntemleri" />
 
       {isLoading ? (
@@ -161,9 +162,12 @@ export default function PaymentMethodsScreen() {
           onAction={() => setDialogOpen(true)}
         />
       ) : (
-        <ScrollView contentContainerStyle={styles.list}>
+        <ScrollView
+          contentContainerStyle={styles.list}
+          refreshControl={<ThemedRefreshControl refreshing={refreshing} onRefresh={onRefresh} />}
+        >
           {methods.map(m => (
-            <Card key={m.cardToken} style={styles.cardItem}>
+            <Card key={m.id} style={styles.cardItem}>
               <View style={styles.cardContent}>
                 <View style={styles.cardIconWrap}>
                   <MaterialCommunityIcons
@@ -173,17 +177,14 @@ export default function PaymentMethodsScreen() {
                   />
                 </View>
                 <View style={styles.cardBody}>
-                  <Text style={styles.cardAlias}>{m.cardAlias || 'Kart'}</Text>
+                  <Text style={styles.cardAlias}>{m.cardBrand || 'Kart'}</Text>
                   <Text style={styles.cardNumber}>
-                    {m.cardBrand ? `${m.cardBrand} ` : ''}•••• {m.lastFourDigits || '****'}
+                    {m.cardBrand ? `${m.cardBrand} ` : ''}•••• {m.lastFour || '****'}
                   </Text>
-                  {m.expireMonth && m.expireYear ? (
+                  {m.expiryMonth && m.expiryYear ? (
                     <Text style={styles.cardExpiry}>
-                      Son Kullanım: {m.expireMonth}/{m.expireYear}
+                      Son Kullanım: {String(m.expiryMonth).padStart(2, '0')}/{m.expiryYear}
                     </Text>
-                  ) : null}
-                  {m.cardHolderName ? (
-                    <Text style={styles.cardHolder}>{m.cardHolderName}</Text>
                   ) : null}
                 </View>
                 <IconButton
@@ -277,7 +278,7 @@ export default function PaymentMethodsScreen() {
           </View>
         </ScrollView>
       </Modal>
-    </SafeAreaView>
+    </View>
   );
 }
 

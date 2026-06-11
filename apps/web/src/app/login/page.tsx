@@ -225,7 +225,7 @@ export default function LoginPage() {
                     <LockClosedIcon className="absolute left-3.5 top-1/2 -translate-y-1/2 w-[18px] h-[18px] text-subtle pointer-events-none" />
                     <Input
                       id="login-password"
-                      type={showPassword ? 'text' : 'password'}
+                      type={showPassword ? 'text' : 'password'} hidePasswordToggle
                       value={password}
                       onChange={(e) => setPassword(e.target.value)}
                       placeholder="••••••••"
@@ -238,15 +238,17 @@ export default function LoginPage() {
                         }
                       }}
                     />
-                    <Button variant="secondary" type="button"
+                    <button
+                      type="button"
                       onClick={() => setShowPassword(!showPassword)}
+                      aria-label={showPassword ? (locale === 'en' ? 'Hide password' : 'Şifreyi gizle') : (locale === 'en' ? 'Show password' : 'Şifreyi göster')}
                       className="absolute right-3.5 top-1/2 -translate-y-1/2 text-subtle hover:text-muted transition-colors duration-200">
                       {showPassword ? (
                         <EyeSlashIcon className="w-[18px] h-[18px]" />
                       ) : (
                         <EyeIcon className="w-[18px] h-[18px]" />
                       )}
-                    </Button>
+                    </button>
                   </div>
                 </motion.div>
 

@@ -1,6 +1,6 @@
 import { View, StyleSheet, TouchableOpacity, TextInput as RNTextInput, KeyboardAvoidingView, Platform } from 'react-native';
-import { Avatar, Button, Input, Spinner, Text, theme } from '@tarodan/ui-native';
-import { useState } from 'react';
+import { Avatar, Button, Input, Spinner, Text, theme, ScreenHeader } from '@tarodan/ui-native';
+import { useEffect, useState } from 'react';
 import { router, useLocalSearchParams } from 'expo-router';
 import { useQuery } from '@tanstack/react-query';
 import { Ionicons } from '@expo/vector-icons';
@@ -20,9 +20,12 @@ interface User {
 
 export default function NewMessageScreen() {
   const { t } = useTranslation();
-  const { sellerId, productId, productTitle } = useLocalSearchParams<{ sellerId?: string; productId?: string; productTitle?: string }>();
+  const { sellerId, receiverId, productId, productTitle } = useLocalSearchParams<{ sellerId?: string; receiverId?: string; productId?: string; productTitle?: string }>();
   const { canSendMessage, createThread } = useMessagesStore();
   const { limits } = useAuthStore();
+
+  // Recipient can arrive as `sellerId` (seller/product context) or `receiverId` (trade context).
+  const recipientId = sellerId || receiverId;
 
   const decodedProductTitle = productTitle ? decodeURIComponent(productTitle) : '';
 
@@ -38,41 +41,42 @@ export default function NewMessageScreen() {
 
   const canSend = canSendMessage();
 
-  // Search users
-  const { data: searchResults, isLoading: searchLoading } = useQuery({
-    queryKey: ['users', 'search', searchQuery],
-    queryFn: async () => {
-      if (!searchQuery || searchQuery.length < 2) return [];
-      try {
-        const response = await api.get('/users/search', { params: { q: searchQuery } });
-        return response.data?.data || response.data || [];
-      } catch (error) {
-        console.log('Search failed');
-        return [];
-      }
-    },
-    enabled: searchQuery.length >= 2,
-  });
+  // NOT: Backend'de isimle kullanıcı arama ucu (GET /users/search) YOK; web'de de bu
+  // özellik bulunmuyor (mesajlar yalnızca participantId/sellerId ile açılır). Bozuk uca
+  // 404 isteği atmak yerine manuel aramayı devre dışı bırakıp kullanıcıyı bilgilendiriyoruz.
+  // Alıcı, ürün/satıcı/takas akışından gelen recipientId ile otomatik seçilir.
+  const searchResults: User[] = [];
+  const searchLoading = false;
+  const searchSupported = false;
 
-  // Fetch seller details if sellerId is provided
+  // Fetch recipient profile if a recipient id is provided (seller, product, or trade context)
   const { data: preselectedUser } = useQuery({
-    queryKey: ['user', sellerId],
+    queryKey: ['user', recipientId],
     queryFn: async () => {
-      if (!sellerId) return null;
+      if (!recipientId) return null;
       try {
-        const response = await api.get(`/users/${sellerId}`);
-        return response.data;
+        const response = await api.get(`/users/${recipientId}/profile`);
+        const profile = response.data?.data || response.data;
+        if (!profile?.id) return null;
+        return {
+          id: profile.id,
+          displayName: profile.displayName,
+          avatarUrl: profile.avatarUrl,
+          isSeller: profile.isSeller,
+        } as User;
       } catch (error) {
         return null;
       }
     },
-    enabled: !!sellerId && !selectedUser,
+    enabled: !!recipientId && !selectedUser,
   });
 
   // Set preselected user
-  if (preselectedUser && !selectedUser) {
-    setSelectedUser(preselectedUser);
-  }
+  useEffect(() => {
+    if (preselectedUser && !selectedUser) {
+      setSelectedUser(preselectedUser);
+    }
+  }, [preselectedUser, selectedUser]);
 
   // Fetch product details if productId is provided
   const { data: product } = useQuery({
@@ -93,10 +97,13 @@ export default function NewMessageScreen() {
     if (!selectedUser || !messageText.trim() || sending || !canSend) return;
 
     setSending(true);
+    // API CreateThreadDto productId'yi @IsUUID('4') ile zorunlu kılıyor — UUID değilse
+    // göndermeyelim, yoksa thread oluşturma ham 400 "Geçerli bir ürün ID giriniz" döner.
+    const isUuid = !!productId && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(productId);
     const threadId = await createThread(
       selectedUser.id,
       messageText.trim(),
-      productId || undefined
+      isUuid ? productId : undefined
     );
 
     if (threadId) {
@@ -111,19 +118,19 @@ export default function NewMessageScreen() {
     setSearchQuery('');
   };
 
+  // Geri git; stack kökündeysek (deep link / replace ile gelinmişse) mesajlara düş.
+  // Düz router.back() bu durumda "GO_BACK was not handled by any navigator" hatası verir.
+  const handleBack = () => {
+    if (router.canGoBack()) router.back();
+    else router.replace('/(tabs)/messages' as never);
+  };
+
   return (
     <KeyboardAvoidingView
       style={styles.container}
       behavior={Platform.OS === 'ios' ? 'padding' : undefined}
     >
-      {/* Header */}
-      <View style={styles.header}>
-        <TouchableOpacity onPress={() => router.back()}>
-          <Ionicons name="arrow-back" size={24} color={colors.white} />
-        </TouchableOpacity>
-        <Text style={styles.headerTitle}>{t('mobile.messagesNew')}</Text>
-        <View style={{ width: 24 }} />
-      </View>
+      <ScreenHeader title={t('mobile.messagesNew')} onBack={handleBack} />
 
       {/* Content */}
       <View style={styles.content}>
@@ -168,8 +175,11 @@ export default function NewMessageScreen() {
               </View>
             )}
 
-            {searchQuery.length >= 2 && !searchLoading && (!searchResults || searchResults.length === 0) && (
-              <Text style={styles.noResults}>Kullanıcı bulunamadı</Text>
+            {searchQuery.length >= 2 && !searchSupported && (
+              <Text style={styles.noResults}>
+                İsimle kullanıcı arama şu anda desteklenmiyor. Mesaj göndermek için bir ilan
+                veya satıcı profilinden "Mesaj Gönder" seçeneğini kullanın.
+              </Text>
             )}
           </View>
         ) : (
@@ -184,9 +194,6 @@ export default function NewMessageScreen() {
               <Text variant="body" style={styles.recipientName}>
                 {selectedUser.displayName}
               </Text>
-              <TouchableOpacity onPress={() => setSelectedUser(null)}>
-                <Ionicons name="close-circle" size={24} color={colors.text.muted} />
-              </TouchableOpacity>
             </View>
           </View>
         )}
@@ -217,6 +224,7 @@ export default function NewMessageScreen() {
             <RNTextInput
               style={styles.messageInput}
               placeholder={canSend ? "Mesajınızı yazın..." : "Mesaj limiti doldu"}
+              placeholderTextColor={colors.text.subtle}
               value={messageText}
               onChangeText={setMessageText}
               multiline
@@ -245,6 +253,8 @@ export default function NewMessageScreen() {
       <View style={styles.footer}>
         <Button
           variant="primary"
+          fullWidth
+          size="lg"
           title="Gönder"
           onPress={handleSend}
           disabled={!selectedUser || !messageText.trim() || !canSend || sending}
@@ -260,20 +270,6 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: colors.surface.DEFAULT,
-  },
-  header: {
-    backgroundColor: colors.primary[600]!,
-    paddingTop: 50,
-    paddingBottom: 16,
-    paddingHorizontal: 20,
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-  },
-  headerTitle: {
-    fontSize: 18,
-    fontWeight: 'bold',
-    color: colors.white,
   },
   content: {
     flex: 1,

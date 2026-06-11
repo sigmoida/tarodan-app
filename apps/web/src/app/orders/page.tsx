@@ -17,6 +17,8 @@ import { Button, Input, Select, Spinner, StatusBadge, Textarea, orderStatusConfi
 interface Order {
   id: string;
   orderNumber: string;
+  /** Çok ürünlü checkout grubu: aynı gruptaki siparişler tek kart altında gösterilir */
+  checkoutGroupId?: string | null;
   status: string;
   totalAmount?: number;
   amount?: number;
@@ -141,6 +143,29 @@ export default function OrdersPage() {
   });
   const orders = ordersQuery.data ?? [];
   const loading = ordersQuery.isLoading;
+
+  // Alıcı siparişlerini checkout grubuna göre topla: aynı checkout'ta alınan
+  // ürünler tek kart altında alt satırlar olarak görünür (her birinin kargosu ayrı).
+  // Satıcı görünümündeki siparişler gruplanmaz.
+  const groupedOrderEntries: Array<{ key: string; orders: Order[] }> = (() => {
+    const entries: Array<{ key: string; orders: Order[] }> = [];
+    const indexByGroup = new Map<string, number>();
+    for (const order of orders) {
+      const gid = order.checkoutGroupId;
+      if (gid && (order as any).isSeller !== true) {
+        const idx = indexByGroup.get(gid);
+        if (idx != null) {
+          entries[idx].orders.push(order);
+          continue;
+        }
+        indexByGroup.set(gid, entries.length);
+        entries.push({ key: gid, orders: [order] });
+      } else {
+        entries.push({ key: order.id, orders: [order] });
+      }
+    }
+    return entries;
+  })();
 
   const openReviewModal = (order: Order) => {
     setReviewingOrder(order);
@@ -372,8 +397,8 @@ export default function OrdersPage() {
           </div>
         ) : (
           <div className="space-y-4">
-            {orders.map((order) => {
-              return (
+            {groupedOrderEntries.map((entry) => {
+              const renderOrderCard = (order: Order) => (
                 <div key={order.id} className="bg-surface-elevated rounded-xl shadow-sm p-6">
                   <div className="flex justify-between items-start mb-4">
                     <div>
@@ -539,6 +564,44 @@ export default function OrdersPage() {
                       </span>
                     )}
                   </div>
+                </div>
+              );
+
+              if (entry.orders.length === 1) {
+                return renderOrderCard(entry.orders[0]);
+              }
+
+              // Çok ürünlü sipariş grubu: tek kart altında alt siparişler
+              const groupTotal = entry.orders.reduce(
+                (sum, o) => sum + (Number(o.totalAmount) || Number(o.amount) || 0),
+                0,
+              );
+              return (
+                <div
+                  key={entry.key}
+                  className="rounded-2xl border border-border-subtle bg-surface p-3"
+                >
+                  <div className="flex flex-wrap justify-between items-center gap-2 px-3 py-2">
+                    <p className="text-sm font-semibold text-heading">
+                      {locale === 'en'
+                        ? `Multi-item order · ${entry.orders.length} items`
+                        : `Çok ürünlü sipariş · ${entry.orders.length} ürün`}
+                    </p>
+                    <p className="text-sm text-muted">
+                      {locale === 'en'
+                        ? 'Each item ships separately'
+                        : 'Her ürün ayrı kargoyla gönderilir'}
+                      {' · '}
+                      <span className="font-semibold text-primary-500">
+                        {groupTotal.toLocaleString('tr-TR', {
+                          minimumFractionDigits: 2,
+                          maximumFractionDigits: 2,
+                        })}{' '}
+                        TL
+                      </span>
+                    </p>
+                  </div>
+                  <div className="space-y-4">{entry.orders.map(renderOrderCard)}</div>
                 </div>
               );
             })}

@@ -220,8 +220,25 @@ export default function MembershipCheckoutPage() {
     }
 
     setIsProcessing(true);
-    
+
     try {
+      // Kartı kaydet (dev/mock): otomatik yenilemede kullanılacak varsayılan kart olur.
+      // (Gerçek tokenizasyon yok; kart metadata'sı saklanır.)
+      if (paymentMethod === 'card' && cardData.number) {
+        const [mm, yy] = (cardData.expiry || '').split('/');
+        if (mm && yy) {
+          await paymentsApi
+            .addMethod({
+              cardNumber: cardData.number.replace(/\s/g, ''),
+              cardHolderName: cardData.name,
+              expireMonth: mm,
+              expireYear: yy,
+              cvc: cardData.cvv,
+            })
+            .catch(() => {});
+        }
+      }
+
       // Call the membership subscription API - this will create membership and initiate payment
       const response = await membershipApi.subscribe({
         tierType: tier,

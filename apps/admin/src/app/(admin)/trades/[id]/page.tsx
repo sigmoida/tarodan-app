@@ -16,8 +16,10 @@ import {
 } from '@heroicons/react/24/outline';
 import { adminApi } from '@/lib/api';
 import { getProductEffectivePrice } from '@/lib/productPrice';
-import { Button, Modal, Select, Spinner, StatusBadge, Textarea, cn, tradeStatusConfig } from '@tarodan/ui';
+import { cancelReasonLabel } from '@/lib/utils';
+import { Button, Modal, Select, Spinner, StatusBadge, Textarea, cn, enumLabel, refundReasonConfig, shipmentStatusConfig, tradeStatusConfig } from '@tarodan/ui';
 import toast from 'react-hot-toast';
+import { useConfirm } from '@/components/ConfirmProvider';
 
 // ---------- Types ----------
 interface TradeShipment {
@@ -79,6 +81,7 @@ interface TradeDetail {
   adminNotes?: string;
   rejectionReason?: string;
   cancellationReason?: string;
+  cancelReason?: string;
   createdAt: string;
   acceptedAt?: string;
   approvedAt?: string;
@@ -133,6 +136,7 @@ export default function TradeDetailPage() {
   const router = useRouter();
   const params = useParams();
   const tradeId = params.id as string;
+  const confirm = useConfirm();
 
   const [trade, setTrade] = useState<TradeDetail | null>(null);
   const [loading, setLoading] = useState(true);
@@ -222,7 +226,7 @@ export default function TradeDetailPage() {
   };
 
   const handleMarkWarehouseReceived = async (shipmentId: string) => {
-    if (!confirm('Bu gönderinin depoya ulaştığını onaylıyor musunuz?')) return;
+    if (!(await confirm({ description: 'Bu gönderinin depoya ulaştığını onaylıyor musunuz?', destructive: true }))) return;
     setProcessingShipmentId(shipmentId);
     try {
       await adminApi.markWarehouseReceived(tradeId, shipmentId);
@@ -236,7 +240,7 @@ export default function TradeDetailPage() {
   };
 
   const handleMarkReturnDelivered = async (shipmentId: string) => {
-    if (!confirm('Bu iade gönderisinin teslim edildiğini onaylıyor musunuz?')) return;
+    if (!(await confirm({ description: 'Bu iade gönderisinin teslim edildiğini onaylıyor musunuz?', destructive: true }))) return;
     setProcessingShipmentId(shipmentId);
     try {
       await adminApi.markReturnDelivered(tradeId, shipmentId);
@@ -280,7 +284,7 @@ export default function TradeDetailPage() {
   };
 
   const handleRetryRefund = async () => {
-    if (!confirm('PayTR iadesi yeniden denenecek. Devam edilsin mi?')) return;
+    if (!(await confirm({ description: 'PayTR iadesi yeniden denenecek. Devam edilsin mi?', destructive: true }))) return;
     setProcessingRetryRefund(true);
     try {
       const response = await adminApi.retryTradeRefund(tradeId);
@@ -409,12 +413,16 @@ export default function TradeDetailPage() {
       <main className="max-w-6xl mx-auto px-4 py-8 space-y-6">
         {/* Header */}
         <div className="flex items-center gap-4">
-          <Link
-            href="/trades"
+          <button
+            type="button"
+            onClick={() =>
+              window.history.length > 1 ? router.back() : router.push('/trades')
+            }
+            aria-label="Geri"
             className="p-2 hover:bg-border-subtle rounded-lg transition-colors"
           >
             <ArrowLeftIcon className="w-6 h-6 text-muted" />
-          </Link>
+          </button>
           <div className="flex-1">
             <h1 className="text-3xl font-bold text-heading">
               Takas Detayı
@@ -719,15 +727,29 @@ export default function TradeDetailPage() {
         )}
 
         {/* Rejection / cancellation reason */}
-        {(trade.rejectionReason || trade.cancellationReason) && (
+        {(trade.rejectionReason || trade.cancellationReason || trade.cancelReason) && (
           <div className="bg-danger-50 border border-danger-200 rounded-xl p-6">
             <h2 className="text-lg font-semibold text-danger-900 mb-2 flex items-center gap-2">
               <XCircleIcon className="w-5 h-5" />
               {trade.rejectionReason ? 'Red Sebebi' : 'İptal Sebebi'}
             </h2>
-            <p className="text-sm text-danger-800 whitespace-pre-wrap">
-              {trade.rejectionReason || trade.cancellationReason}
-            </p>
+            {(() => {
+              const raw =
+                trade.rejectionReason ||
+                trade.cancellationReason ||
+                trade.cancelReason;
+              const short = trade.rejectionReason
+                ? null
+                : cancelReasonLabel(trade.cancellationReason || trade.cancelReason);
+              return (
+                <>
+                  {short && short !== raw && (
+                    <p className="text-sm font-medium text-danger-700 mb-1">{short}</p>
+                  )}
+                  <p className="text-sm text-danger-800 whitespace-pre-wrap">{raw}</p>
+                </>
+              );
+            })()}
           </div>
         )}
 
@@ -748,7 +770,7 @@ export default function TradeDetailPage() {
             </h2>
             <div className="space-y-2">
               <p>
-                <span className="font-medium">Neden:</span> {trade.dispute.reason}
+                <span className="font-medium">Neden:</span> {enumLabel(refundReasonConfig, trade.dispute.reason, trade.dispute.reason)}
               </p>
               {trade.dispute.description && (
                 <p>
@@ -1134,7 +1156,7 @@ function ShipmentLegCard({
                   )}
                   {s.status && (
                     <p>
-                      <span className="font-medium text-body">Durum:</span> {s.status}
+                      <span className="font-medium text-body">Durum:</span> {enumLabel(shipmentStatusConfig, s.status)}
                     </p>
                   )}
                   {s.shippedAt && (

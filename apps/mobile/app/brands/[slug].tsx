@@ -1,7 +1,6 @@
 import React from 'react';
 import { View, StyleSheet, Image } from 'react-native';
 
-import { SafeAreaView } from 'react-native-safe-area-context';
 import { useLocalSearchParams } from 'expo-router';
 import { useQuery } from '@tanstack/react-query';
 import { brandsApi, productsApi } from '../../src/services/api';
@@ -10,6 +9,7 @@ import { ScreenHeader } from '../../src/components/common';
 const { colors } = theme;
 import { ProductGrid } from '../../src/components/product';
 import type { ProductCardProduct } from '../../src/components/product';
+import { resolveImageUrl } from '../../src/utils/imageUrl';
 
 interface Brand {
   id: string;
@@ -40,20 +40,20 @@ export default function BrandDetailScreen() {
     refetch,
     isRefetching,
   } = useQuery({
-    queryKey: ['brand-products', slug],
+    queryKey: ['brand-products', brand?.id],
     queryFn: async () => {
-      if (!slug) return [];
-      const response = await productsApi.getAll({ brand: slug, status: 'active' });
+      if (!brand?.id) return [];
+      const response = await productsApi.getAll({ brandId: brand.id, status: 'active' });
       const payload = response.data?.data ?? response.data ?? [];
       return Array.isArray(payload) ? payload : payload?.products ?? [];
     },
-    enabled: !!slug,
+    enabled: !!brand?.id,
   });
 
   const products: ProductCardProduct[] = productsData ?? [];
 
   return (
-    <SafeAreaView style={styles.container} edges={['top']}>
+    <View style={styles.container}>
       <ScreenHeader title={brand?.name || 'Marka'} />
 
       <ProductGrid
@@ -70,7 +70,7 @@ export default function BrandDetailScreen() {
           loadingBrand ? null : brand ? (
             <View style={styles.header}>
               {brand.logo ? (
-                <Image source={{ uri: brand.logo }} style={styles.logo} resizeMode="contain" />
+                <Image source={{ uri: resolveImageUrl(brand.logo) }} style={styles.logo} resizeMode="contain" />
               ) : (
                 <View style={styles.logoFallback}>
                   <Text style={styles.logoFallbackText}>{brand.name.charAt(0).toUpperCase()}</Text>
@@ -86,7 +86,7 @@ export default function BrandDetailScreen() {
           ) : null
         }
       />
-    </SafeAreaView>
+    </View>
   );
 }
 

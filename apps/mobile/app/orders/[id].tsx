@@ -1,4 +1,5 @@
-import { View, ScrollView, StyleSheet, Pressable, Image, Linking, Alert } from 'react-native';
+import { View, ScrollView, StyleSheet, Pressable, Image, Linking, Platform } from 'react-native';
+import * as ImagePicker from 'expo-image-picker';
 import {
   Button,
   Card,
@@ -11,13 +12,17 @@ import {
   Input,
   Text,
   theme,
+  ScreenHeader,
+  appAlert,
 } from '@tarodan/ui-native';
 import type { BadgeVariant } from '@tarodan/ui-native';
 import { useState } from 'react';
 import { router, useLocalSearchParams } from 'expo-router';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { Ionicons } from '@expo/vector-icons';
-import { api, ordersApi, refundsApi } from '../../src/services/api';
+import { api, ordersApi, refundsApi, mediaApi, type RNFile } from '../../src/services/api';
+import { ThemedRefreshControl } from '../../src/components/common';
+import { useRefresh } from '../../src/hooks/useRefresh';
 import RatingModal from '../../src/components/RatingModal';
 import { AwaitingConfirmationBanner } from '../../src/components/AwaitingConfirmationBanner';
 import { captureException } from '../../src/services/sentry';
@@ -50,9 +55,11 @@ interface OrderDetail {
     fullName: string;
     phone: string;
     address: string;
+    district?: string;
     city: string;
-    postalCode: string;
-  };
+    postalCode?: string;
+    zipCode?: string;
+  } | null;
   trackingNumber?: string;
   trackingUrl?: string;
   createdAt: string;
@@ -89,6 +96,10 @@ const REFUND_REASONS: Array<{ value: string; label: string }> = [
   { value: 'other', label: 'Diğer' },
 ];
 
+// Kanıt fotoğrafı gerektiren iade sebepleri — web/backend ile birebir parite.
+const REASONS_REQUIRING_EVIDENCE = ['damaged', 'wrong_item', 'not_as_described', 'missing_parts'];
+const MAX_EVIDENCE_PHOTOS = 5;
+
 const REFUND_STATUS_LABELS: Record<string, { label: string; variant: BadgeVariant }> = {
   pending_review: { label: 'Talep İnceleniyor', variant: 'info' },
   approved: { label: 'Onaylandı, İşleniyor', variant: 'info' },
@@ -108,6 +119,7 @@ const uiOrderStatusConfig: Record<string, { label: string; variant: BadgeVariant
   processing: { label: 'Hazırlanıyor', variant: 'info' },
   shipped: { label: 'Kargoda', variant: 'primary' },
   delivered: { label: 'Teslim Edildi', variant: 'success' },
+  awaiting_confirmation: { label: 'Onayınız Bekleniyor', variant: 'warning' },
   completed: { label: 'Tamamlandı', variant: 'success' },
   cancelled: { label: 'İptal Edildi', variant: 'danger' },
   refunded: { label: 'İade', variant: 'secondary' },
@@ -123,6 +135,9 @@ export default function OrderDetailScreen() {
   const [refundModalVisible, setRefundModalVisible] = useState(false);
   const [refundReason, setRefundReason] = useState<string>('damaged');
   const [refundDescription, setRefundDescription] = useState('');
+  const [evidenceAssets, setEvidenceAssets] = useState<RNFile[]>([]);
+
+  const evidenceRequired = REASONS_REQUIRING_EVIDENCE.includes(refundReason);
   const [snackbar, setSnackbar] = useState<{ visible: boolean; message: string; variant: 'success' | 'danger' | 'default' }>({
     visible: false,
     message: '',
@@ -130,7 +145,7 @@ export default function OrderDetailScreen() {
   });
 
   // Fetch order detail
-  const { data: order, isLoading } = useQuery({
+  const { data: order, isLoading, refetch } = useQuery({
     queryKey: ['order', id],
     queryFn: async () => {
       try {
@@ -153,17 +168,30 @@ export default function OrderDetailScreen() {
     enabled: !!id,
   });
 
+  const { refreshing, onRefresh } = useRefresh(refetch);
+
   // Refund request mutation
   const refundMutation = useMutation({
     mutationFn: async () => {
-      const body: { reason: string; description?: string } = { reason: refundReason };
+      const body: { reason: string; description?: string; evidencePhotoUrls?: string[] } = {
+        reason: refundReason,
+      };
       const desc = refundDescription.trim();
       if (desc.length > 0) body.description = desc;
+      // Kanıt fotoğraflarını yükle (web ile parite: tek tek /media/upload?folder=reviews)
+      if (evidenceAssets.length > 0) {
+        const results = await Promise.all(
+          evidenceAssets.map((file) => mediaApi.uploadRefundEvidence(file)),
+        );
+        const urls = results.map((r) => r.data?.url).filter(Boolean) as string[];
+        if (urls.length > 0) body.evidencePhotoUrls = urls;
+      }
       return refundsApi.create(id as string, body);
     },
     onSuccess: () => {
       setRefundModalVisible(false);
       setRefundDescription('');
+      setEvidenceAssets([]);
       setSnackbar({ visible: true, message: 'İade talebiniz oluşturuldu.', variant: 'success' });
       queryClient.invalidateQueries({ queryKey: ['order', id] });
       queryClient.invalidateQueries({ queryKey: ['orders'] });
@@ -186,6 +214,47 @@ export default function OrderDetailScreen() {
       });
     },
   });
+
+  // Kanıt fotoğrafı seç (galeri) — en fazla MAX_EVIDENCE_PHOTOS adet.
+  const pickEvidence = async () => {
+    const remaining = MAX_EVIDENCE_PHOTOS - evidenceAssets.length;
+    if (remaining <= 0) return;
+    const perm = await ImagePicker.requestMediaLibraryPermissionsAsync();
+    if (!perm.granted) {
+      appAlert('İzin Gerekli', 'Fotoğraf eklemek için galeri erişim izni gerekiyor.');
+      return;
+    }
+    const result = await ImagePicker.launchImageLibraryAsync({
+      mediaTypes: ImagePicker.MediaTypeOptions.Images,
+      allowsMultipleSelection: true,
+      selectionLimit: remaining,
+      quality: 0.8,
+    });
+    if (result.canceled || !result.assets?.length) return;
+    const picked: RNFile[] = result.assets.slice(0, remaining).map((a, i) => ({
+      uri: Platform.OS === 'android' ? a.uri : a.uri.replace('file://', ''),
+      name: a.fileName || `evidence_${i}.jpg`,
+      type: a.mimeType || 'image/jpeg',
+    }));
+    setEvidenceAssets((prev) => [...prev, ...picked]);
+  };
+
+  const removeEvidence = (index: number) => {
+    setEvidenceAssets((prev) => prev.filter((_, i) => i !== index));
+  };
+
+  // Gönder — kanıt zorunluysa en az bir foto şartını istemci tarafında da doğrula.
+  const submitRefund = () => {
+    if (evidenceRequired && evidenceAssets.length === 0) {
+      setSnackbar({
+        visible: true,
+        message: 'Bu sebep için en az bir kanıt fotoğrafı gereklidir.',
+        variant: 'danger',
+      });
+      return;
+    }
+    refundMutation.mutate();
+  };
 
   // Refund cancel mutation (only valid in pending_review / wait_for_delivery)
   const cancelRefundMutation = useMutation({
@@ -219,7 +288,7 @@ export default function OrderDetailScreen() {
   const handleCancelRefund = () => {
     const rr = order?.activeRefundRequest;
     if (!rr) return;
-    Alert.alert(
+    appAlert(
       'İade Talebini İptal Et',
       'İade talebiniz iptal edilecek. Devam edilsin mi?',
       [
@@ -250,11 +319,11 @@ export default function OrderDetailScreen() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['order', id] });
       queryClient.invalidateQueries({ queryKey: ['orders'] });
-      Alert.alert('Teşekkürler', 'Sipariş onaylandı. Satıcıya ödeme transferi tetiklendi.');
+      appAlert('Teşekkürler', 'Sipariş onaylandı. Satıcıya ödeme transferi tetiklendi.');
     },
     onError: (err: any) => {
       const msg = err?.response?.data?.message || err?.message || 'Onay başarısız';
-      Alert.alert('Hata', msg);
+      appAlert('Hata', msg);
     },
   });
 
@@ -298,18 +367,14 @@ export default function OrderDetailScreen() {
 
   return (
     <View style={styles.container}>
-      {/* Header */}
-      <View style={styles.header}>
-        <Pressable onPress={() => router.back()}>
-          <Ionicons name="arrow-back" size={24} color={colors.white} />
-        </Pressable>
-        <Text style={styles.headerTitle}>Sipariş Detayı</Text>
-        <View style={{ width: 24 }} />
-      </View>
+      <ScreenHeader title="Sipariş Detayı" onBack={() => router.back()} />
 
-      <ScrollView style={styles.content}>
+      <ScrollView
+        style={styles.content}
+        refreshControl={<ThemedRefreshControl refreshing={refreshing} onRefresh={onRefresh} />}
+      >
         {/* 48h pencere banner (Faz 4C.4) */}
-        {order.status === 'awaiting_buyer_confirmation' &&
+        {order.status === 'awaiting_confirmation' &&
           order.confirmationDeadline &&
           (order as any).isBuyer !== false && (
             <AwaitingConfirmationBanner
@@ -318,7 +383,7 @@ export default function OrderDetailScreen() {
               onReportProblem={() =>
                 // Refund request route henüz mobile'da yok; geçici olarak order detay'da kalır.
                 // Faz 4+ kapsamında mobile refund-request flow eklenince burası güncellenecek.
-                Alert.alert(
+                appAlert(
                   'Sorun Bildirme',
                   'Sorun bildirimi için lütfen profil > Yardım üzerinden iletişime geçin. (Mobile iade akışı yakında eklenecek.)',
                 )
@@ -366,6 +431,29 @@ export default function OrderDetailScreen() {
             />
           </View>
         </Card>
+
+        {/* Ödeme Bekliyor — alıcı ödemeyi tamamlasın (örn. kabul edilen tekliften oluşan sipariş) */}
+        {order.status === 'pending' && order.isBuyer !== false && (
+          <Card variant="elevated" style={styles.card}>
+            <Text variant="label" style={styles.sectionTitle}>Ödeme Bekliyor</Text>
+            <Text variant="caption" style={styles.confirmNote}>
+              Siparişinizi tamamlamak için ödemeyi yapın.
+            </Text>
+            <Button
+              testID="order-pay-button"
+              variant="primary"
+              fullWidth
+              title={`Ödeme Yap · ${formatPrice(order.totalAmount)}`}
+              onPress={() =>
+                router.push({
+                  pathname: '/payment/[id]',
+                  params: { id: order.id, orderId: order.id, provider: 'paytr', guest: '0' },
+                } as any)
+              }
+              style={{ marginTop: 12 }}
+            />
+          </Card>
+        )}
 
         {/* Tracking Info */}
         {order.trackingNumber && (
@@ -423,16 +511,29 @@ export default function OrderDetailScreen() {
         {/* Shipping Address */}
         <Card variant="elevated" style={styles.card}>
           <Text variant="label" style={styles.sectionTitle}>Teslimat Adresi</Text>
-          <Text>{order.shippingAddress.fullName}</Text>
-          <Text variant="caption" style={styles.addressText}>
-            {order.shippingAddress.address}
-          </Text>
-          <Text variant="caption" style={styles.addressText}>
-            {order.shippingAddress.city} {order.shippingAddress.postalCode}
-          </Text>
-          <Text variant="caption" style={styles.addressText}>
-            Tel: {order.shippingAddress.phone}
-          </Text>
+          {order.shippingAddress ? (
+            <>
+              <Text>{order.shippingAddress.fullName}</Text>
+              <Text variant="caption" style={styles.addressText}>
+                {order.shippingAddress.address}
+              </Text>
+              <Text variant="caption" style={styles.addressText}>
+                {order.shippingAddress.district
+                  ? `${order.shippingAddress.district} / ${order.shippingAddress.city}`
+                  : order.shippingAddress.city}
+                {(order.shippingAddress.zipCode ?? order.shippingAddress.postalCode)
+                  ? ` ${order.shippingAddress.zipCode ?? order.shippingAddress.postalCode}`
+                  : ''}
+              </Text>
+              <Text variant="caption" style={styles.addressText}>
+                Tel: {order.shippingAddress.phone}
+              </Text>
+            </>
+          ) : (
+            <Text variant="caption" style={styles.addressText}>
+              Teslimat adresi henüz belirlenmedi. Ödemeyi tamamladığınızda adres bilgisi eklenir.
+            </Text>
+          )}
         </Card>
 
         {/* Price Summary */}
@@ -611,7 +712,10 @@ export default function OrderDetailScreen() {
       {/* Refund Request Modal */}
       <Modal
         isOpen={refundModalVisible}
-        onClose={() => setRefundModalVisible(false)}
+        onClose={() => {
+          setRefundModalVisible(false);
+          setEvidenceAssets([]);
+        }}
         title="İade Talebi Oluştur"
       >
         <ScrollView>
@@ -639,19 +743,61 @@ export default function OrderDetailScreen() {
             inputStyle={{ minHeight: 80 }}
           />
 
+          {/* Kanıt Fotoğrafı — yalnızca kanıt gerektiren sebeplerde (web ile parite) */}
+          {evidenceRequired ? (
+            <View style={styles.evidenceSection}>
+              <Text variant="caption" style={styles.refundModalLabel}>
+                Kanıt Fotoğrafı <Text style={styles.evidenceRequiredMark}>*</Text>
+              </Text>
+              <Text variant="caption" style={styles.evidenceHint}>
+                Bu sebep için en az bir fotoğraf ekleyin (en fazla {MAX_EVIDENCE_PHOTOS}).
+              </Text>
+              <View style={styles.evidenceGrid}>
+                {evidenceAssets.map((a, i) => (
+                  <View key={`${a.uri}-${i}`} style={styles.evidenceThumbWrap}>
+                    <Image source={{ uri: a.uri }} style={styles.evidenceThumb} />
+                    <Pressable
+                      style={styles.evidenceRemove}
+                      onPress={() => removeEvidence(i)}
+                      hitSlop={6}
+                      accessibilityRole="button"
+                      accessibilityLabel="Fotoğrafı kaldır"
+                    >
+                      <Ionicons name="close" size={14} color={colors.white} />
+                    </Pressable>
+                  </View>
+                ))}
+                {evidenceAssets.length < MAX_EVIDENCE_PHOTOS ? (
+                  <Pressable
+                    style={styles.evidenceAdd}
+                    onPress={pickEvidence}
+                    accessibilityRole="button"
+                    accessibilityLabel="Fotoğraf ekle"
+                  >
+                    <Ionicons name="camera-outline" size={22} color={colors.text.muted} />
+                    <Text style={styles.evidenceAddText}>Ekle</Text>
+                  </Pressable>
+                ) : null}
+              </View>
+            </View>
+          ) : null}
+
           <View style={styles.refundModalActions}>
             <Button
               variant="ghost"
               title="Vazgeç"
-              onPress={() => setRefundModalVisible(false)}
+              onPress={() => {
+                setRefundModalVisible(false);
+                setEvidenceAssets([]);
+              }}
               disabled={refundMutation.isPending}
             />
             <Button
               variant="primary"
               title="Talebi Gönder"
-              onPress={() => refundMutation.mutate()}
+              onPress={submitRefund}
               isLoading={refundMutation.isPending}
-              disabled={refundMutation.isPending}
+              disabled={refundMutation.isPending || (evidenceRequired && evidenceAssets.length === 0)}
             />
           </View>
         </ScrollView>
@@ -676,7 +822,14 @@ export default function OrderDetailScreen() {
         sellerId={order.seller.id}
         productTitle={order.product.title}
         sellerName={order.seller.displayName}
-        onSuccess={() => queryClient.invalidateQueries({ queryKey: ['order', id] })}
+        onSuccess={() => {
+          queryClient.invalidateQueries({ queryKey: ['order', id] });
+          setSnackbar({
+            visible: true,
+            variant: 'success',
+            message: 'Değerlendirmeniz alındı. Onaylandıktan sonra yayınlanacak.',
+          });
+        }}
       />
     </View>
   );
@@ -742,20 +895,6 @@ const styles = StyleSheet.create({
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
-  },
-  header: {
-    backgroundColor: colors.primary[600]!,
-    paddingTop: 50,
-    paddingBottom: 16,
-    paddingHorizontal: 20,
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-  },
-  headerTitle: {
-    fontSize: 18,
-    fontWeight: 'bold',
-    color: colors.white,
   },
   content: {
     flex: 1,
@@ -956,5 +1095,62 @@ const styles = StyleSheet.create({
     justifyContent: 'flex-end',
     gap: 8,
     marginTop: 16,
+  },
+  evidenceSection: {
+    marginTop: 12,
+  },
+  evidenceRequiredMark: {
+    color: colors.danger[600]!,
+    fontWeight: '700',
+  },
+  evidenceHint: {
+    color: colors.text.muted,
+    marginBottom: 8,
+  },
+  evidenceGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 8,
+  },
+  evidenceThumbWrap: {
+    width: 72,
+    height: 72,
+    borderRadius: radius.md,
+    overflow: 'visible',
+  },
+  evidenceThumb: {
+    width: 72,
+    height: 72,
+    borderRadius: radius.md,
+    backgroundColor: colors.gray[100],
+  },
+  evidenceRemove: {
+    position: 'absolute',
+    top: -6,
+    right: -6,
+    width: 22,
+    height: 22,
+    borderRadius: 11,
+    backgroundColor: colors.danger[600]!,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 2,
+    borderColor: colors.white,
+  },
+  evidenceAdd: {
+    width: 72,
+    height: 72,
+    borderRadius: radius.md,
+    borderWidth: 1.5,
+    borderColor: colors.border.DEFAULT,
+    borderStyle: 'dashed',
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: colors.surface.alt,
+  },
+  evidenceAddText: {
+    fontSize: 11,
+    color: colors.text.muted,
+    marginTop: 2,
   },
 });

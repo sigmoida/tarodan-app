@@ -4,6 +4,7 @@ import {
   Spinner,
   Button,
   Text,
+  ScreenHeader,
   theme,
 } from '@tarodan/ui-native';
 import { useState, useEffect } from 'react';
@@ -13,6 +14,7 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { api } from '../../src/services/api';
 import { useAuthStore } from '../../src/stores/authStore';
 import { useTranslation } from '../../src/i18n';
+import { resolveImageUrl } from '../../src/utils/imageUrl';
 
 const { colors, spacing, radius } = theme;
 
@@ -109,13 +111,7 @@ export default function BusinessDashboardScreen() {
   if (error) {
     return (
       <View style={styles.container}>
-        <View style={styles.header}>
-          <Pressable onPress={() => router.back()} style={styles.backButton}>
-            <Ionicons name="arrow-back" size={24} color={colors.text.heading} />
-          </Pressable>
-          <Text style={styles.headerTitle}>{t('mobile.settingsBusiness')}</Text>
-          <View style={{ width: 40 }} />
-        </View>
+        <ScreenHeader title={t('mobile.settingsBusiness')} onBack={() => router.back()} />
         <View style={styles.errorContainer}>
           <Ionicons name="warning-outline" size={64} color={colors.danger[600]!} />
           <Text style={styles.errorText}>{error}</Text>
@@ -128,8 +124,8 @@ export default function BusinessDashboardScreen() {
           ) : (
             <Button
               variant="primary"
-              title="Üyeliğimi Yükselt"
-              onPress={() => router.push('/pricing')}
+              title="Kurumsal Hesap Aç"
+              onPress={() => router.push('/seller/register')}
             />
           )}
         </View>
@@ -139,14 +135,7 @@ export default function BusinessDashboardScreen() {
 
   return (
     <View style={styles.container}>
-      {/* Header */}
-      <View style={styles.header}>
-        <Pressable onPress={() => router.back()} style={styles.backButton}>
-          <Ionicons name="arrow-back" size={24} color={colors.text.heading} />
-        </Pressable>
-        <Text style={styles.headerTitle}>{t('mobile.settingsBusiness')}</Text>
-        <View style={{ width: 40 }} />
-      </View>
+      <ScreenHeader title={t('mobile.settingsBusiness')} onBack={() => router.back()} />
 
       <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
         {/* Company Header */}
@@ -156,7 +145,7 @@ export default function BusinessDashboardScreen() {
         >
           <View style={styles.companyInfo}>
             {stats?.company.avatarUrl ? (
-              <Image source={{ uri: stats.company.avatarUrl }} style={styles.companyAvatar} />
+              <Image source={{ uri: resolveImageUrl(stats.company.avatarUrl) }} style={styles.companyAvatar} />
             ) : (
               <View style={styles.companyAvatarPlaceholder}>
                 <Text style={styles.companyAvatarText}>🏢</Text>
@@ -326,7 +315,7 @@ function ProductRow({ product, index, metric }: { product: ProductStats; index: 
         <Text style={styles.productRankText}>{index + 1}</Text>
       </View>
       {product.image ? (
-        <Image source={{ uri: product.image }} style={styles.productImage} />
+        <Image source={{ uri: resolveImageUrl(product.image) }} style={styles.productImage} />
       ) : (
         <View style={[styles.productImage, styles.productImagePlaceholder]}>
           <Text>📦</Text>
@@ -365,7 +354,7 @@ function CollectionRow({ collection, index }: { collection: CollectionStats; ind
         <Text style={styles.productRankText}>{index + 1}</Text>
       </View>
       {collection.coverImage ? (
-        <Image source={{ uri: collection.coverImage }} style={styles.productImage} />
+        <Image source={{ uri: resolveImageUrl(collection.coverImage) }} style={styles.productImage} />
       ) : (
         <View style={[styles.productImage, styles.productImagePlaceholder]}>
           <Text>📚</Text>
@@ -407,25 +396,6 @@ const styles = StyleSheet.create({
   loadingText: {
     marginTop: 12,
     color: colors.text.muted,
-  },
-  header: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingHorizontal: 16,
-    paddingTop: 50,
-    paddingBottom: 16,
-    backgroundColor: colors.white,
-    borderBottomWidth: 1,
-    borderBottomColor: colors.border.DEFAULT,
-  },
-  backButton: {
-    padding: 8,
-  },
-  headerTitle: {
-    fontSize: 18,
-    fontWeight: 'bold',
-    color: colors.text.heading,
   },
   errorContainer: {
     flex: 1,

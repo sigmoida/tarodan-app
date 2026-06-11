@@ -6,9 +6,9 @@ import {
   StyleSheet,
   ActivityIndicator,
 } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
 import { router, useLocalSearchParams } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
+import { ScreenHeader } from '@tarodan/ui-native';
 import { TarodanColors } from '../src/theme';
 import { api } from '../src/services/api';
 import { useTranslation } from '../src/i18n';
@@ -46,14 +46,8 @@ export default function VerifyEmailScreen() {
   };
 
   return (
-    <SafeAreaView style={styles.container} edges={['top']}>
-      <View style={styles.header}>
-        <TouchableOpacity onPress={() => router.back()} style={styles.headerBackBtn}>
-          <Ionicons name="arrow-back" size={24} color={TarodanColors.textOnPrimary} />
-        </TouchableOpacity>
-        <Text style={styles.headerTitle}>{t('mobile.verifyEmailTitle')}</Text>
-        <View style={styles.headerPlaceholder} />
-      </View>
+    <View style={styles.container}>
+      <ScreenHeader title={t('mobile.verifyEmailTitle')} onBack={() => router.back()} />
 
       <View style={styles.content}>
         {state === 'loading' && (
@@ -118,7 +112,7 @@ export default function VerifyEmailScreen() {
           </View>
         )}
       </View>
-    </SafeAreaView>
+    </View>
   );
 }
 
@@ -126,25 +120,6 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: TarodanColors.backgroundSecondary,
-  },
-  header: {
-    backgroundColor: TarodanColors.primary,
-    paddingBottom: 16,
-    paddingHorizontal: 20,
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-  },
-  headerBackBtn: {
-    padding: 4,
-  },
-  headerTitle: {
-    fontSize: 18,
-    fontWeight: 'bold',
-    color: TarodanColors.textOnPrimary,
-  },
-  headerPlaceholder: {
-    width: 32,
   },
   content: {
     flex: 1,

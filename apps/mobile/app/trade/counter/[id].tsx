@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { View, StyleSheet, ScrollView, Pressable, Image, Alert } from 'react-native';
+import { View, StyleSheet, ScrollView, Pressable, Image } from 'react-native';
 import {
   theme,
   Button,
@@ -10,13 +10,14 @@ import {
   Text,
   Input,
   Textarea,
+  appAlert,
 } from '@tarodan/ui-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { router, useLocalSearchParams } from 'expo-router';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { tradesApi, productsApi } from '../../../src/services/api';
-import { ScreenHeader, ScreenLoader, ErrorState } from '../../../src/components/common';
+import { ScreenHeader, ScreenLoader, ErrorState, ThemedRefreshControl } from '../../../src/components/common';
+import { useRefresh } from '../../../src/hooks/useRefresh';
 import { formatPrice } from '../../../src/utils/format';
 import { transformImageUrl } from '../../../src/utils/imageUrl';
 import { useAuthStore } from '../../../src/stores/authStore';
@@ -39,13 +40,26 @@ interface Trade {
   id: string;
   status: string;
   cashAmount?: number;
+  cashPayerId?: string | null;
   message?: string;
   initiatorId: string;
   receiverId: string;
+  initiatorName?: string;
+  receiverName?: string;
   initiator?: { id: string; displayName: string };
   receiver?: { id: string; displayName: string };
   initiatorItems?: TradeItem[];
   receiverItems?: TradeItem[];
+}
+
+const itemId = (p: any) => p?.productId ?? p?.id;
+
+// Teklifin değişip değişmediğini saptamak için imza (ürün setleri + nakit yön/tutar).
+function offerSignature(mine: any[], theirs: any[], dir: string, cash: string): string {
+  const cashVal = parseFloat(cash) || 0;
+  const m = mine.map(itemId).filter(Boolean).sort().join(',');
+  const t = theirs.map(itemId).filter(Boolean).sort().join(',');
+  return `${m}|${t}|${dir}:${cashVal}`;
 }
 
 export default function TradeCounterScreen() {
@@ -53,6 +67,11 @@ export default function TradeCounterScreen() {
   const { user } = useAuthStore();
   const queryClient = useQueryClient();
   const [snack, setSnack] = useState<string | null>(null);
+
+  const handleBack = () => {
+    if (router.canGoBack()) router.back();
+    else router.replace('/trades' as any);
+  };
 
   const tradeQuery = useQuery<Trade | null>({
     queryKey: ['trade', id],
@@ -72,7 +91,8 @@ export default function TradeCounterScreen() {
   const [cashAmount, setCashAmount] = useState('');
   const [cashDirection, setCashDirection] = useState<'offer' | 'request'>('offer');
   const [message, setMessage] = useState('');
-  const [initialized, setInitialized] = useState(false);
+  const [initializedId, setInitializedId] = useState<string | null>(null);
+  const [initialSig, setInitialSig] = useState('');
 
   // "Ben" tarafını belirle: mevcut kullanıcı trade'in initiator'i mi receiver'i mi?
   const amIInitiator = !!trade && user?.id === trade.initiatorId;
@@ -80,27 +100,36 @@ export default function TradeCounterScreen() {
   const theirSide = amIInitiator ? trade?.receiverItems ?? [] : trade?.initiatorItems ?? [];
   const otherPartyId = amIInitiator ? trade?.receiverId : trade?.initiatorId;
 
-  // İlk yüklenmede mevcut seçimleri state'e aktar
+  // İlk yüklenmede (ve farklı bir trade'e geçildiğinde) mevcut seçimleri state'e aktar
   useEffect(() => {
-    if (trade && !initialized) {
-      setSelectedMine(mySide);
-      setSelectedTheirs(theirSide);
-      if (trade.cashAmount) {
-        setCashAmount(Math.abs(trade.cashAmount).toString());
-        setCashDirection(trade.cashAmount > 0 ? (amIInitiator ? 'offer' : 'request') : (amIInitiator ? 'request' : 'offer'));
-      }
-      setInitialized(true);
+    if (!trade || initializedId === trade.id) return;
+    setSelectedMine(mySide);
+    setSelectedTheirs(theirSide);
+    let initDir: 'offer' | 'request' = 'offer';
+    let initCash = '';
+    if (trade.cashAmount) {
+      initCash = Math.abs(Number(trade.cashAmount)).toString();
+      // Yön cashPayerId'den belirlenir (backend nakit tutarı mutlak saklar): ödeyen
+      // ben isem 'offer' (ben öderim), değilse 'request' (karşı taraf öder).
+      initDir = trade.cashPayerId && user?.id
+        ? (trade.cashPayerId === user.id ? 'offer' : 'request')
+        : 'offer';
+      setCashAmount(initCash);
+      setCashDirection(initDir);
     }
-  }, [trade, initialized]);
+    setInitialSig(offerSignature(mySide, theirSide, initDir, initCash));
+    setInitializedId(trade.id);
+  }, [trade, initializedId, user]);
 
   // Kullanıcının aktif ürünleri (takasa uygun)
   const myProductsQuery = useQuery({
     queryKey: ['my-tradeable-products', user?.id],
     queryFn: async () => {
       if (!user?.id) return [];
-      const response = await productsApi.getAll({ sellerId: user.id, isTradeEnabled: true, status: 'active' });
+      const response = await productsApi.getAll({ sellerId: user.id, tradeOnly: true, status: 'active' });
       const payload = response.data?.data ?? response.data ?? [];
-      return Array.isArray(payload) ? payload : payload?.products ?? [];
+      const list = Array.isArray(payload) ? payload : payload?.products ?? [];
+      return list.filter((p: any) => p.isTradeEnabled && p.status === 'active');
     },
     enabled: !!user?.id,
   });
@@ -110,26 +139,29 @@ export default function TradeCounterScreen() {
     queryKey: ['other-tradeable-products', otherPartyId],
     queryFn: async () => {
       if (!otherPartyId) return [];
-      const response = await productsApi.getAll({ sellerId: otherPartyId, isTradeEnabled: true, status: 'active' });
+      const response = await productsApi.getAll({ sellerId: otherPartyId, tradeOnly: true, status: 'active' });
       const payload = response.data?.data ?? response.data ?? [];
-      return Array.isArray(payload) ? payload : payload?.products ?? [];
+      const list = Array.isArray(payload) ? payload : payload?.products ?? [];
+      return list.filter((p: any) => p.isTradeEnabled && p.status === 'active');
     },
     enabled: !!otherPartyId,
   });
+
+  const { refreshing, onRefresh } = useRefresh(
+    tradeQuery.refetch,
+    myProductsQuery.refetch,
+    theirProductsQuery.refetch,
+  );
 
   const counterMutation = useMutation({
     mutationFn: async () => {
       const cashValue = parseFloat(cashAmount) || 0;
       const finalCash = cashDirection === 'offer' ? cashValue : -cashValue;
       return tradesApi.counter(id!, {
-        initiatorItems: (amIInitiator ? selectedMine : selectedTheirs).map(p => ({
-          productId: p.productId ?? (p as any).id,
-          quantity: 1,
-        })),
-        receiverItems: (amIInitiator ? selectedTheirs : selectedMine).map(p => ({
-          productId: p.productId ?? (p as any).id,
-          quantity: 1,
-        })),
+        // Backend "Model B": karşı teklif rolleri ters çevirir; karşı teklifi yapanın
+        // (yani benim) verdiğim ürünler initiatorItems, istediklerim receiverItems olur.
+        initiatorItems: selectedMine.map(p => ({ productId: itemId(p), quantity: 1 })),
+        receiverItems: selectedTheirs.map(p => ({ productId: itemId(p), quantity: 1 })),
         cashAmount: finalCash,
         message: message || undefined,
       });
@@ -141,24 +173,24 @@ export default function TradeCounterScreen() {
       setTimeout(() => router.replace(`/trade/${id}` as any), 1200);
     },
     onError: (e: any) =>
-      Alert.alert('Hata', e?.response?.data?.message || 'Karşı teklif gönderilemedi.'),
+      appAlert('Hata', e?.response?.data?.message || 'Karşı teklif gönderilemedi.'),
   });
 
-  if (tradeQuery.isLoading || !initialized) {
+  if (tradeQuery.error || (!trade && !tradeQuery.isLoading)) {
     return (
-      <SafeAreaView style={styles.container} edges={['top']}>
-        <ScreenHeader title="Karşı Teklif" />
-        <ScreenLoader />
-      </SafeAreaView>
+      <View style={styles.container}>
+        <ScreenHeader title="Karşı Teklif" onBack={handleBack} />
+        <ErrorState fullscreen onRetry={() => tradeQuery.refetch()} />
+      </View>
     );
   }
 
-  if (tradeQuery.error || !trade) {
+  if (tradeQuery.isLoading || !trade || initializedId !== trade.id) {
     return (
-      <SafeAreaView style={styles.container} edges={['top']}>
-        <ScreenHeader title="Karşı Teklif" />
-        <ErrorState fullscreen onRetry={() => tradeQuery.refetch()} />
-      </SafeAreaView>
+      <View style={styles.container}>
+        <ScreenHeader title="Karşı Teklif" onBack={handleBack} />
+        <ScreenLoader />
+      </View>
     );
   }
 
@@ -187,6 +219,22 @@ export default function TradeCounterScreen() {
     }
   };
 
+  const handleSubmit = () => {
+    if (selectedMine.length === 0 && selectedTheirs.length === 0) {
+      appAlert('Hata', 'En az bir ürün seçmelisiniz.');
+      return;
+    }
+    const currentSig = offerSignature(selectedMine, selectedTheirs, cashDirection, cashAmount);
+    if (currentSig === initialSig) {
+      appAlert(
+        'Değişiklik yok',
+        'Karşı teklif önceki teklifle aynı. Lütfen ürün veya nakit farkında değişiklik yapın.',
+      );
+      return;
+    }
+    counterMutation.mutate();
+  };
+
   const renderPicker = (
     title: string,
     subtitle: string,
@@ -200,28 +248,32 @@ export default function TradeCounterScreen() {
       {products.length === 0 ? (
         <Text style={styles.emptyText}>Takasa uygun ürün bulunamadı.</Text>
       ) : (
-        <View style={{ gap: 8, marginTop: 8 }}>
+        <View style={styles.grid}>
           {products.map(p => {
-            const isSelected = !!selected.find(x => (x.productId ?? (x as any).id) === p.id);
+            const isSelected = !!selected.find(x => itemId(x) === p.id);
             const img = p.images?.[0]?.cardUrl || p.images?.[0]?.url || p.images?.[0];
             return (
               <Pressable
                 key={p.id}
                 style={({ pressed }) => [
-                  styles.productRow,
-                  isSelected && styles.productRowSelected,
+                  styles.gridItem,
+                  isSelected && styles.gridItemSelected,
                   pressed && { opacity: 0.85 },
                 ]}
                 onPress={() => toggle(p)}
               >
-                <Image source={{ uri: transformImageUrl(img) }} style={styles.productImg} />
-                <View style={{ flex: 1 }}>
-                  <Text style={styles.productTitle} numberOfLines={2}>{p.title}</Text>
-                  <Text style={styles.productPrice}>{formatPrice(p.price)}</Text>
+                <View style={styles.gridImgWrap}>
+                  <Image source={{ uri: transformImageUrl(img) }} style={styles.gridImg} />
+                  {isSelected ? (
+                    <View style={styles.selectedOverlay}>
+                      <View style={styles.checkBadge}>
+                        <Ionicons name="checkmark" size={16} color={colors.white} />
+                      </View>
+                    </View>
+                  ) : null}
                 </View>
-                <View style={[styles.checkbox, isSelected && styles.checkboxOn]}>
-                  {isSelected ? <Ionicons name="checkmark" size={14} color={colors.white} /> : null}
-                </View>
+                <Text style={styles.productTitle} numberOfLines={2}>{p.title}</Text>
+                <Text style={styles.productPrice}>{formatPrice(p.price)}</Text>
               </Pressable>
             );
           })}
@@ -231,10 +283,13 @@ export default function TradeCounterScreen() {
   );
 
   return (
-    <SafeAreaView style={styles.container} edges={['top']}>
-      <ScreenHeader title="Karşı Teklif Ver" />
+    <View style={styles.container}>
+      <ScreenHeader title="Karşı Teklif Ver" onBack={handleBack} />
 
-      <ScrollView contentContainerStyle={styles.scrollBody}>
+      <ScrollView
+        contentContainerStyle={styles.scrollBody}
+        refreshControl={<ThemedRefreshControl refreshing={refreshing} onRefresh={onRefresh} />}
+      >
         <View style={styles.noticeCard}>
           <Ionicons name="information-circle" size={18} color={colors.info[600]!} />
           <Text style={styles.noticeText}>
@@ -250,9 +305,15 @@ export default function TradeCounterScreen() {
           toggleMine,
         )}
 
+        <View style={styles.swapWrap}>
+          <View style={styles.swapCircle}>
+            <Ionicons name="swap-vertical" size={20} color={colors.primary[600]!} />
+          </View>
+        </View>
+
         {renderPicker(
           'İsteyeceğim Ürünler',
-          `${amIInitiator ? trade.receiver?.displayName : trade.initiator?.displayName} adlı satıcıdan istediğim ürünleri seçin.`,
+          `${amIInitiator ? trade.receiverName : trade.initiatorName} adlı satıcıdan istediğim ürünleri seçin.`,
           theirProducts,
           selectedTheirs,
           toggleTheirs,
@@ -289,11 +350,12 @@ export default function TradeCounterScreen() {
           <Text style={styles.section}>Mesaj (opsiyonel)</Text>
           <Textarea
             value={message}
-            onChangeText={setMessage}
+            onChangeText={(v: string) => setMessage(v.slice(0, 500))}
             rows={3}
             placeholder="Karşı tarafa not bırakın..."
             containerStyle={styles.messageInput}
           />
+          <Text style={styles.charCount}>{message.length}/500</Text>
         </Card>
 
         {/* Summary */}
@@ -326,7 +388,7 @@ export default function TradeCounterScreen() {
         <Button
           variant="primary"
           title="Karşı Teklifi Gönder"
-          onPress={() => counterMutation.mutate()}
+          onPress={handleSubmit}
           isLoading={counterMutation.isPending}
           disabled={counterMutation.isPending || (selectedMine.length === 0 && selectedTheirs.length === 0)}
           style={styles.submitBtn}
@@ -342,7 +404,7 @@ export default function TradeCounterScreen() {
       <Snackbar visible={!!snack} onDismiss={() => setSnack(null)} duration={2000}>
         {snack || ''}
       </Snackbar>
-    </SafeAreaView>
+    </View>
   );
 }
 
@@ -386,30 +448,56 @@ const styles = StyleSheet.create({
     color: colors.text.subtle,
     marginTop: 8,
   },
-  productRow: {
+  grid: {
     flexDirection: 'row',
+    flexWrap: 'wrap',
     gap: 10,
-    alignItems: 'center',
-    padding: 10,
+    marginTop: 10,
+  },
+  gridItem: {
+    width: '47%',
+    flexGrow: 1,
+    backgroundColor: colors.surface.alt,
     borderRadius: 10,
     borderWidth: 1,
     borderColor: 'transparent',
-    backgroundColor: colors.surface.alt,
+    padding: 8,
   },
-  productRowSelected: {
+  gridItemSelected: {
     borderColor: colors.primary[600]!,
     backgroundColor: colors.primary[50]!,
   },
-  productImg: {
-    width: 50,
-    height: 50,
+  gridImgWrap: {
+    width: '100%',
+    aspectRatio: 1,
     borderRadius: 8,
+    overflow: 'hidden',
     backgroundColor: colors.border.DEFAULT,
+    position: 'relative',
+  },
+  gridImg: {
+    width: '100%',
+    height: '100%',
+  },
+  selectedOverlay: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: colors.overlay.black20,
+    alignItems: 'flex-end',
+  },
+  checkBadge: {
+    margin: 6,
+    width: 24,
+    height: 24,
+    borderRadius: 12,
+    backgroundColor: colors.primary[600]!,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   productTitle: {
     fontSize: 13,
     fontWeight: '600',
     color: colors.text.heading,
+    marginTop: 6,
   },
   productPrice: {
     fontSize: 13,
@@ -417,18 +505,23 @@ const styles = StyleSheet.create({
     color: colors.primary[600]!,
     marginTop: 2,
   },
-  checkbox: {
-    width: 22,
-    height: 22,
-    borderRadius: 11,
-    borderWidth: 2,
-    borderColor: colors.border.DEFAULT,
+  swapWrap: {
+    alignItems: 'center',
+    marginVertical: 4,
+  },
+  swapCircle: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: colors.primary[50]!,
     alignItems: 'center',
     justifyContent: 'center',
   },
-  checkboxOn: {
-    backgroundColor: colors.primary[600]!,
-    borderColor: colors.primary[600]!,
+  charCount: {
+    fontSize: 11,
+    color: colors.text.subtle,
+    textAlign: 'right',
+    marginTop: 4,
   },
   chipsRow: {
     flexDirection: 'row',

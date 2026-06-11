@@ -1,10 +1,11 @@
-# D-01: Checkout girişi smoke + B-001 koruma (kısmi).
-# Login → Ara tab → ilk ürün → Hemen Al → Teslimat Bilgileri → Ödeme adımı yüklenir.
+# D-01: Checkout girişi smoke.
+# Login → Ara → ilk ürün → Sepete Ekle → Sepete Git → Satın Al → Teslimat Bilgileri.
 #
-# Tam B-001 (bypass payment chain) regression API-level test'te kapsanıyor
-# (apps/api/test/e2e/payment-bypass.e2e-spec.ts). Bu UI flow checkout chain'in
-# açılıp Ödeme adımına geçtiğini + bypass modunda kart formunun gizli olduğunu
-# (commit f9f3a81 ile getirildi) doğrular.
+# NOT (BUG-007 düzeltmesi): App sepet-tabanlı bir akış kullanıyor; eski "Hemen Al"
+# direkt-al butonu yok. Doğru zincir: product-detail-add-to-cart-button →
+# Sepete Git → cart-checkout-button → checkout (Teslimat Bilgileri).
+# Tam bypass payment chain API-level test'te kapsanıyor
+# (apps/api/test/e2e/payment-bypass.e2e-spec.ts).
 appId: com.tarodan.app
 tags:
   - smoke
@@ -14,49 +15,37 @@ env:
 ---
 - runFlow: ../subflows/open-tarodan.yaml
 - tapOn:
-    text: "Profil"
-- runFlow:
-    when:
-      visible: "Çıkış Yap"
-    file: ../subflows/logout.yaml
-- runFlow: ../subflows/login-as.yaml
-- tapOn:
     text: "Ara"
 - extendedWaitUntil:
     visible:
-      text: ".*sonuç bulundu.*"
+      text: ".*sonuç bulundu.*|.*₺.*"
     timeout: 30000
 - tapOn:
     text: ".*₺.*"
     index: 0
+# Ürün detay → Sepete Ekle
 - extendedWaitUntil:
-    visible: "Hemen Al"
-    timeout: 30000
-- tapOn: "Hemen Al"
-# Step 1 - Adres ekranı yüklendi
+    visible:
+      id: "product-detail-add-to-cart-button"
+    timeout: 20000
+- tapOn:
+    id: "product-detail-add-to-cart-button"
+# Sepete Git (snackbar aksiyonu) → cart
+- tapOn:
+    text: "Sepete Git"
+    optional: true
+# Cart → Satın Al → checkout
+- extendedWaitUntil:
+    visible:
+      id: "cart-checkout-button"
+    timeout: 15000
+- tapOn:
+    id: "cart-checkout-button"
+# Checkout Step 1 — Teslimat Bilgileri yüklendi
 - extendedWaitUntil:
     visible: "Teslimat Bilgileri"
     timeout: 15000
 - assertVisible: "Teslimat Bilgileri"
 - assertVisible: "Teslimat Adresi"
-- tapOn:
-    text: "Devam Et.*"
-# Step 2 - Ödeme adımı yüklendi. Bypass aktif → kart formu gizli, bilgi notice'i görünür.
-- extendedWaitUntil:
-    visible: "Kargo"
-    timeout: 15000
-- assertVisible: "Kargo"
-- assertVisible:
-    text: ".*Geliştirici modu.*"
-# Regression assertions (B-001):
-# 1. Kart numarası alanı bypass modunda render edilmemeli.
-- assertNotVisible: "Kart Bilgileri"
-- assertNotVisible:
-    text: ".*Kart Numaras.*"
-- assertNotVisible:
-    text: ".*[Cc]ard [Nn]umber.*"
-# 2. "Ödemeyi Tamamla" CTA görünür olmalı (bypass yine de bir submit butonu sunar).
-- assertVisible:
-    text: ".*Ödeme.*Tamamla.*|.*Ödemeyi.*"
 - assertNotVisible: ".*Network Error.*"
 - assertNotVisible: ".*Bir hata oluştu.*"

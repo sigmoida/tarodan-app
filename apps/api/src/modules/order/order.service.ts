@@ -23,10 +23,13 @@ import {
   DirectBuyDto,
   CheckoutQuoteDto,
   GuestSendVerificationCodeDto,
+  CheckoutDto,
+  GuestCheckoutGroupDto,
 } from './dto';
 import { OrderStatus, OfferStatus, ProductStatus, CommissionRuleType, SellerType, CommissionAppliesTo, CommissionSellerType, MembershipTierType, Prisma } from '@prisma/client';
 import { getProductStatusFromQuantity } from '../product/helpers/product-status.helper';
 import { getAvailableQuantity } from '../product/helpers/product-availability.helper';
+import { generateUniqueReference } from '../../common/helpers/generate-reference';
 import { ProductLockService } from '../product/product-lock.service';
 import { EventService } from '../events';
 import { NotificationService } from '../notification/notification.service';
@@ -394,24 +397,17 @@ export class OrderService {
   }
 
   /**
-   * Generate unique order number using atomic DB sequence.
-   * Falls back to timestamp+random if the sequence doesn't exist yet.
+   * Generate a non-guessable, unique order number (e.g. "ORD-K7X9M2QF3N").
+   * Random by design so the value leaks no sequence/order-count information and
+   * cannot be enumerated. The `order_number` column's @unique constraint is the
+   * final guard against the (negligible) chance of a collision.
    */
   private async generateOrderNumber(): Promise<string> {
-    const year = new Date().getFullYear();
-    const prefix = `ORD-${year}-`;
-
-    try {
-      const result = await this.prisma.$queryRaw<{ next_val: bigint }[]>`
-        SELECT nextval('order_number_seq') AS next_val
-      `;
-      return `${prefix}${String(result[0].next_val).padStart(6, '0')}`;
-    } catch {
-      // Sequence may not exist yet; use timestamp+random as safe fallback
-      const ts = Date.now().toString(36).toUpperCase();
-      const rand = randomInt(0, 9999).toString().padStart(4, '0');
-      return `${prefix}${ts}${rand}`;
-    }
+    return generateUniqueReference(
+      'ORD',
+      async (code) =>
+        (await this.prisma.order.count({ where: { orderNumber: code } })) > 0,
+    );
   }
 
   /**
@@ -992,6 +988,17 @@ export class OrderService {
         };
       }
 
+      // Tek siparişlik grup: legacy yol da CheckoutGroup oluşturur (grup numarası
+      // backfill konvansiyonuyla aynı: 'GRP' + orderNumber → uniqueness garantili)
+      const singleOrderGroup = await tx.checkoutGroup.create({
+        data: {
+          groupNumber: `GRP${orderNumber}`,
+          buyerId,
+          totalAmount,
+          isGuest: false,
+        },
+      });
+
       // Create order with discount info
       const order = await tx.order.create({
         data: {
@@ -999,6 +1006,7 @@ export class OrderService {
           productId: dto.productId,
           buyerId,
           sellerId: product.sellerId,
+          checkoutGroupId: singleOrderGroup.id,
           totalAmount,
           subtotal,
           discountAmount: totalDiscount,
@@ -1094,6 +1102,599 @@ export class OrderService {
     await this.invalidateProductCaches(result.productId);
 
     return result;
+  }
+
+  /**
+   * Batch checkout (üye): sepetteki tüm ürünler tek çağrıda, tek CheckoutGroup
+   * altında sipariş edilir. Tek ödeme tüm grubu kapsar (payment.checkoutGroupId).
+   * POST /orders/checkout
+   */
+  async checkout(buyerId: string, dto: CheckoutDto) {
+    const buyer = await this.prisma.user.findUnique({
+      where: { id: buyerId },
+      select: { isBanned: true },
+    });
+    if (buyer?.isBanned) {
+      throw new ForbiddenException('Hesabınız banlanmış. Yeni sipariş oluşturamazsınız.');
+    }
+
+    return this.createCheckoutGroup({ buyerId, dto, isGuest: false });
+  }
+
+  /**
+   * Batch checkout (misafir): OTP grup için bir kez tüketilir.
+   * POST /orders/checkout/guest
+   */
+  async checkoutGuest(dto: GuestCheckoutGroupDto) {
+    // İdempotensi OTP tüketiminden ÖNCE: replay yeni kod istememeli
+    const replayed = await this.findCheckoutGroupReplay(dto.idempotencyKey);
+    if (replayed) {
+      return replayed;
+    }
+
+    const normEmail = this.normalizeGuestCheckoutEmail(dto.email);
+    await this.consumeGuestCheckoutOtp(normEmail, dto.emailVerificationCode);
+
+    if (!dto.shippingAddress) {
+      throw new BadRequestException('Teslimat adresi gereklidir');
+    }
+
+    const guestUser = await this.getOrCreateSystemGuestUser();
+
+    return this.createCheckoutGroup({
+      buyerId: guestUser.id,
+      dto,
+      isGuest: true,
+      guest: {
+        email: normEmail,
+        phone: dto.phone?.trim(),
+        name: dto.guestName?.trim(),
+      },
+    });
+  }
+
+  private async getOrCreateSystemGuestUser() {
+    const SYSTEM_GUEST_EMAIL = 'guest@tarodan.system';
+    const existing = await this.prisma.user.findUnique({
+      where: { email: SYSTEM_GUEST_EMAIL },
+    });
+    if (existing) return existing;
+    return this.prisma.user.create({
+      data: {
+        email: SYSTEM_GUEST_EMAIL,
+        displayName: 'GUEST_SYSTEM',
+        passwordHash: '',
+        isVerified: false,
+        isSeller: false,
+      },
+    });
+  }
+
+  private formatCheckoutGroupCreateResponse(group: {
+    id: string;
+    groupNumber: string;
+    totalAmount: Prisma.Decimal | number;
+    orders: Array<{
+      id: string;
+      orderNumber: string;
+      productId: string;
+      totalAmount: Prisma.Decimal | number;
+      subtotal: Prisma.Decimal | number | null;
+      discountAmount: Prisma.Decimal | number;
+      discountCode: string | null;
+    }>;
+  }) {
+    return {
+      checkoutGroupId: group.id,
+      groupNumber: group.groupNumber,
+      totalAmount: Number(group.totalAmount),
+      orders: group.orders.map((o) => ({
+        orderId: o.id,
+        orderNumber: o.orderNumber,
+        productId: o.productId,
+        totalAmount: Number(o.totalAmount),
+        subtotal: o.subtotal != null ? Number(o.subtotal) : undefined,
+        discountAmount: Number(o.discountAmount || 0),
+        appliedCouponCode: o.discountCode ?? undefined,
+      })),
+      provider: 'paytr',
+      paymentUrl: '',
+    };
+  }
+
+  private async findCheckoutGroupReplay(idempotencyKey: string, buyerId?: string) {
+    const existing = await this.prisma.checkoutGroup.findUnique({
+      where: { idempotencyKey },
+      include: { orders: true },
+    });
+    if (!existing) return null;
+    if (buyerId && existing.buyerId !== buyerId) {
+      throw new ForbiddenException('Bu işlem size ait değil');
+    }
+    return { ...this.formatCheckoutGroupCreateResponse(existing), existingGroup: true };
+  }
+
+  private async createCheckoutGroup(params: {
+    buyerId: string;
+    dto: CheckoutDto;
+    isGuest: boolean;
+    guest?: { email: string; phone?: string; name?: string };
+  }) {
+    const { buyerId, dto, isGuest, guest } = params;
+
+    if (!isGuest) {
+      const replayed = await this.findCheckoutGroupReplay(dto.idempotencyKey, buyerId);
+      if (replayed) return replayed;
+    }
+
+    if (!dto.shippingAddressId && !dto.shippingAddress) {
+      throw new BadRequestException(
+        'Teslimat adresi gereklidir (shippingAddressId veya shippingAddress)',
+      );
+    }
+    if (isGuest && dto.couponCode) {
+      throw new BadRequestException('Kupon kodu misafir alışverişte desteklenmiyor');
+    }
+
+    // Dedupe + sıralı kilitleme (deadlock önleme)
+    const productIds = [...new Set(dto.items.map((i) => i.productId))].sort();
+
+    const result = await this.prisma.$transaction(
+      async (tx) => {
+        const lockedRows = await tx.$queryRaw<{ id: string }[]>`
+          SELECT p.id
+          FROM products p
+          WHERE p.id IN (${Prisma.join(productIds)})
+          ORDER BY p.id
+          FOR UPDATE
+        `;
+        if ((lockedRows?.length ?? 0) !== productIds.length) {
+          throw new NotFoundException('Sepetteki ürünlerden biri bulunamadı');
+        }
+
+        const products = await tx.product.findMany({
+          where: { id: { in: productIds } },
+          include: {
+            seller: { select: { id: true, email: true, displayName: true } },
+          },
+        });
+        const productMap = new Map(products.map((p) => [p.id, p]));
+
+        // Ürün doğrulamaları — hata gövdesinde productId döner (istemci stok ekranına yönlendirir)
+        for (const productId of productIds) {
+          const product = productMap.get(productId);
+          if (!product) {
+            throw new NotFoundException('Sepetteki ürünlerden biri bulunamadı');
+          }
+          if (product.status !== ProductStatus.active) {
+            throw new BadRequestException({
+              message: `"${product.title}" satışta değil veya başkası tarafından satın alınıyor`,
+              productId,
+            });
+          }
+          const available = getAvailableQuantity(product);
+          if (available !== null && available < 1) {
+            throw new BadRequestException({
+              message: `"${product.title}" stokta bulunmamaktadır`,
+              productId,
+            });
+          }
+          if (!isGuest && product.sellerId === buyerId) {
+            throw new ForbiddenException('Kendi ürününüzü satın alamazsınız');
+          }
+        }
+
+        // Aynı alıcının aynı ürün için eski bekleyen siparişi varsa iptal et ve
+        // rezervasyonunu bırak — yoksa terk edilmiş checkout rezervasyonu yeni
+        // denemede "stokta yok" hatasına yol açar (createDirectOrder'daki reuse'un grup karşılığı).
+        if (!isGuest) {
+          const staleOrders = await tx.order.findMany({
+            where: {
+              buyerId,
+              productId: { in: productIds },
+              status: OrderStatus.pending_payment,
+            },
+          });
+          for (const stale of staleOrders) {
+            await tx.order.update({
+              where: { id: stale.id },
+              data: {
+                status: OrderStatus.cancelled,
+                cancelReason: 'Yeni toplu sipariş ile değiştirildi',
+                reservationReleasedAt: stale.reservationReleasedAt ?? new Date(),
+              },
+            });
+            if (!stale.reservationReleasedAt) {
+              await tx.product.update({
+                where: { id: stale.productId },
+                data: { reservedQuantity: { decrement: 1 } },
+              });
+            }
+          }
+        }
+
+        // Adres çözümü (grup için bir kez)
+        let shippingAddress: any;
+        let shippingAddressId: string | null = null;
+
+        if (!isGuest && dto.shippingAddressId) {
+          const savedAddress = await tx.address.findUnique({
+            where: { id: dto.shippingAddressId },
+          });
+          if (!savedAddress || savedAddress.userId !== buyerId) {
+            throw new BadRequestException('Geçersiz teslimat adresi');
+          }
+          shippingAddress = savedAddress;
+          shippingAddressId = savedAddress.id;
+        } else if (dto.shippingAddress) {
+          const addr = dto.shippingAddress;
+          if (!addr.fullName?.trim()) {
+            throw new BadRequestException('Teslimat adresi için ad soyad gereklidir');
+          }
+          if (!addr.phone?.trim()) {
+            throw new BadRequestException('Teslimat adresi için telefon numarası gereklidir');
+          }
+          if (!addr.city?.trim()) {
+            throw new BadRequestException('Teslimat adresi için şehir gereklidir');
+          }
+          if (!addr.district?.trim()) {
+            throw new BadRequestException('Teslimat adresi için ilçe gereklidir');
+          }
+          if (!addr.address?.trim()) {
+            throw new BadRequestException('Teslimat adresi için açık adres gereklidir');
+          }
+          if (isGuest) {
+            shippingAddress = {
+              id: '',
+              title: 'Teslimat Adresi',
+              fullName: addr.fullName.trim(),
+              phone: addr.phone.trim(),
+              city: addr.city.trim(),
+              district: addr.district.trim(),
+              address: addr.address.trim(),
+              zipCode: addr.zipCode?.trim() || null,
+            };
+          } else {
+            const newAddress = await tx.address.create({
+              data: {
+                userId: buyerId,
+                title: 'Sipariş Adresi',
+                fullName: addr.fullName.trim(),
+                phone: addr.phone.trim(),
+                city: addr.city.trim(),
+                district: addr.district.trim(),
+                address: addr.address.trim(),
+                zipCode: addr.zipCode?.trim() || null,
+                isDefault: false,
+              },
+            });
+            shippingAddress = newAddress;
+            shippingAddressId = newAddress.id;
+          }
+        } else {
+          throw new BadRequestException('Teslimat adresi gereklidir');
+        }
+
+        // Fatura adresi: inline > kayıtlı ID > teslimatla aynı
+        let billingAddress = shippingAddress;
+        if (
+          dto.billingAddress &&
+          dto.billingAddress.fullName?.trim() &&
+          dto.billingAddress.city?.trim() &&
+          dto.billingAddress.address?.trim()
+        ) {
+          billingAddress = {
+            id: '',
+            title: 'Fatura Adresi',
+            fullName: dto.billingAddress.fullName.trim(),
+            phone: (dto.billingAddress.phone || shippingAddress.phone || '').trim(),
+            city: dto.billingAddress.city.trim(),
+            district: (dto.billingAddress.district || '').trim(),
+            address: dto.billingAddress.address.trim(),
+            zipCode: dto.billingAddress.zipCode?.trim() || null,
+          };
+        } else if (
+          !isGuest &&
+          dto.billingAddressId &&
+          dto.billingAddressId !== shippingAddressId
+        ) {
+          const billing = await tx.address.findUnique({
+            where: { id: dto.billingAddressId },
+          });
+          if (!billing || billing.userId !== buyerId) {
+            throw new BadRequestException('Geçersiz fatura adresi');
+          }
+          billingAddress = billing;
+        }
+
+        // Fiyatlandırma (ürün başına) — createDirectOrder ile aynı kurallar
+        const now = new Date();
+        const pricing = productIds.map((productId) => {
+          const product = productMap.get(productId)!;
+          const productPrice = Number(product.price);
+          const isSaleActive =
+            product.oldPrice != null &&
+            (!product.saleStartDate || now >= new Date(product.saleStartDate)) &&
+            (!product.saleEndDate || now <= new Date(product.saleEndDate));
+          const originalPrice =
+            isSaleActive && product.oldPrice != null ? Number(product.oldPrice) : productPrice;
+          return {
+            productId,
+            product,
+            productPrice,
+            originalPrice,
+            productDiscount: isSaleActive ? originalPrice - productPrice : 0,
+            couponDiscount: 0,
+          };
+        });
+
+        // Kupon: tüm sepetle bir kez doğrula, indirimi fiyat oranında dağıt
+        let appliedCouponCode: string | null = null;
+        let appliedDiscountId: string | null = null;
+        if (dto.couponCode) {
+          const validation = await this.discountService.validateCoupon(
+            {
+              code: dto.couponCode,
+              cartItems: productIds.map((productId) => ({ productId, quantity: 1 })),
+            },
+            buyerId,
+          );
+          if (!validation.isValid) {
+            throw new BadRequestException(validation.error || 'Kupon kodu geçersiz');
+          }
+          if (validation.discount) {
+            appliedCouponCode = dto.couponCode.toUpperCase();
+            appliedDiscountId = validation.discount.id;
+            const totalCoupon = validation.discount.estimatedDiscount;
+            const priceSum = pricing.reduce((sum, p) => sum + p.productPrice, 0);
+            let allocated = 0;
+            pricing.forEach((p, idx) => {
+              if (idx === pricing.length - 1) {
+                p.couponDiscount = Math.round((totalCoupon - allocated) * 100) / 100;
+              } else {
+                p.couponDiscount =
+                  Math.round(((totalCoupon * p.productPrice) / priceSum) * 100) / 100;
+                allocated += p.couponDiscount;
+              }
+            });
+          }
+        }
+
+        // Grup + sipariş numaraları
+        const groupNumber = await generateUniqueReference(
+          'GRP',
+          async (code) =>
+            (await this.prisma.checkoutGroup.count({ where: { groupNumber: code } })) > 0,
+        );
+
+        const paymentExpiresAt = new Date(Date.now() + 24 * 60 * 60 * 1000);
+        const orderInputs: Array<{
+          pricingEntry: (typeof pricing)[number];
+          orderNumber: string;
+          commissionResult: CommissionResult;
+          shippingCost: number;
+          totalAmount: number;
+          suratIdempotencyKey: string;
+        }> = [];
+
+        for (const entry of pricing) {
+          const discountedPrice = entry.productPrice - entry.couponDiscount;
+          const commissionResult = await this.calculateCommission(
+            discountedPrice,
+            entry.product.sellerId,
+            entry.product.categoryId,
+          );
+          const shippingCost = await this.calculateShippingCost(discountedPrice);
+          const totalAmount =
+            discountedPrice + shippingCost + commissionResult.buyerFeeAmount;
+          const orderNumber = await this.generateOrderNumber();
+          const suratIdempotencyKey = this.buildSuratIdempotencyKey([
+            dto.idempotencyKey,
+            entry.productId,
+          ]);
+
+          // Sürat gönderisi sipariş satırlarından ÖNCE fail-fast: biri başarısızsa hiç sipariş oluşmaz
+          await this.assertSuratShipmentSucceeded({
+            correlationId: randomUUID(),
+            idempotencyKey: suratIdempotencyKey,
+            recipientFullName: shippingAddress.fullName,
+            recipientPhone: shippingAddress.phone,
+            recipientCity: shippingAddress.city,
+            recipientDistrict: shippingAddress.district,
+            recipientAddressLine: shippingAddress.address,
+            productId: entry.productId,
+            productTitle: entry.product.title ?? undefined,
+            orderNumberPreview: orderNumber,
+          });
+
+          orderInputs.push({
+            pricingEntry: entry,
+            orderNumber,
+            commissionResult,
+            shippingCost,
+            totalAmount,
+            suratIdempotencyKey,
+          });
+        }
+
+        const groupTotalAmount = orderInputs.reduce((sum, o) => sum + o.totalAmount, 0);
+
+        const group = await tx.checkoutGroup.create({
+          data: {
+            groupNumber,
+            buyerId,
+            idempotencyKey: dto.idempotencyKey,
+            totalAmount: groupTotalAmount,
+            isGuest,
+          },
+        });
+
+        const createdOrders: Array<{
+          id: string;
+          orderNumber: string;
+          productId: string;
+          totalAmount: number;
+          subtotal: number;
+          discountAmount: number;
+          productTitle: string;
+          sellerId: string;
+          sellerEmail: string | null;
+          sellerName: string | null;
+        }> = [];
+
+        for (const input of orderInputs) {
+          const entry = input.pricingEntry;
+          const totalDiscount = entry.productDiscount + entry.couponDiscount;
+
+          const shippingAddressJson: Record<string, unknown> = {
+            id: shippingAddress.id,
+            title: shippingAddress.title || 'Teslimat Adresi',
+            fullName: shippingAddress.fullName,
+            phone: shippingAddress.phone,
+            city: shippingAddress.city,
+            district: shippingAddress.district,
+            address: shippingAddress.address,
+            zipCode: shippingAddress.zipCode,
+          };
+          if (isGuest && guest) {
+            shippingAddressJson.guestName = guest.name || shippingAddress.fullName;
+            shippingAddressJson.guestEmail = guest.email;
+            shippingAddressJson.guestPhone = guest.phone;
+            shippingAddressJson.isGuestOrder = true;
+          }
+          if (this.suratCargoService.isIntegrationEnabled()) {
+            shippingAddressJson.suratIdempotencyKey = input.suratIdempotencyKey;
+          }
+          if (billingAddress !== shippingAddress) {
+            (shippingAddressJson as any).billingAddress = {
+              fullName: billingAddress.fullName,
+              phone: billingAddress.phone,
+              city: billingAddress.city,
+              district: billingAddress.district,
+              address: billingAddress.address,
+              zipCode: billingAddress.zipCode,
+            };
+          }
+
+          const order = await tx.order.create({
+            data: {
+              orderNumber: input.orderNumber,
+              productId: entry.productId,
+              buyerId,
+              sellerId: entry.product.sellerId,
+              checkoutGroupId: group.id,
+              totalAmount: input.totalAmount,
+              subtotal: entry.originalPrice,
+              discountAmount: totalDiscount,
+              discountCode: entry.couponDiscount > 0 ? appliedCouponCode : null,
+              discountBreakdown:
+                totalDiscount > 0
+                  ? {
+                      productDiscount: entry.productDiscount,
+                      couponDiscount: entry.couponDiscount,
+                      appliedDiscountId,
+                      originalPrice: entry.originalPrice,
+                    }
+                  : undefined,
+              shippingCost: input.shippingCost,
+              commissionAmount: input.commissionResult.commissionAmount,
+              buyerFeeAmount: input.commissionResult.buyerFeeAmount,
+              sellerFeeAmount: input.commissionResult.sellerFeeAmount,
+              status: OrderStatus.pending_payment,
+              paymentExpiresAt,
+              shippingAddressId,
+              shippingAddress: shippingAddressJson as Prisma.InputJsonValue,
+            },
+          });
+
+          await this.recordCommissionSnapshot(
+            order.id,
+            input.orderNumber,
+            input.commissionResult.commissionAmount,
+            input.totalAmount,
+            input.commissionResult,
+          );
+
+          if (appliedDiscountId && entry.couponDiscount > 0) {
+            await this.discountService.recordUsage(
+              appliedDiscountId,
+              buyerId,
+              order.id,
+              entry.couponDiscount,
+            );
+          }
+
+          await tx.product.update({
+            where: { id: entry.productId },
+            data: { reservedQuantity: { increment: 1 } },
+          });
+
+          createdOrders.push({
+            id: order.id,
+            orderNumber: order.orderNumber,
+            productId: entry.productId,
+            totalAmount: input.totalAmount,
+            subtotal: entry.originalPrice,
+            discountAmount: totalDiscount,
+            productTitle: entry.product.title,
+            sellerId: entry.product.sellerId,
+            sellerEmail: entry.product.seller?.email ?? null,
+            sellerName: entry.product.seller?.displayName ?? null,
+          });
+        }
+
+        return { group, createdOrders };
+      },
+      { timeout: 60000 },
+    );
+
+    // Cache invalidation + order.created eventleri (tx dışı; hata sipariş oluşumunu bozmaz)
+    const buyerUser = isGuest
+      ? null
+      : await this.prisma.user.findUnique({
+          where: { id: buyerId },
+          select: { email: true, displayName: true },
+        });
+
+    for (const order of result.createdOrders) {
+      await this.invalidateProductCaches(order.productId);
+      try {
+        await this.eventService.emitOrderCreated({
+          orderId: order.id,
+          orderNumber: order.orderNumber,
+          buyerId,
+          sellerId: order.sellerId,
+          productId: order.productId,
+          productTitle: order.productTitle,
+          totalAmount: order.totalAmount,
+          buyerEmail: isGuest ? guest?.email || '' : buyerUser?.email || '',
+          buyerName: isGuest
+            ? guest?.name || 'Misafir'
+            : buyerUser?.displayName || buyerUser?.email || '',
+          sellerEmail: order.sellerEmail || '',
+          sellerName: order.sellerName || 'Satıcı',
+        });
+      } catch (error) {
+        this.logger.error(`Failed to emit order.created event: ${error}`);
+      }
+    }
+
+    return {
+      checkoutGroupId: result.group.id,
+      groupNumber: result.group.groupNumber,
+      totalAmount: Number(result.group.totalAmount),
+      orders: result.createdOrders.map((o) => ({
+        orderId: o.id,
+        orderNumber: o.orderNumber,
+        productId: o.productId,
+        totalAmount: o.totalAmount,
+        subtotal: o.subtotal,
+        discountAmount: o.discountAmount,
+        appliedCouponCode: o.discountAmount > 0 ? (dto.couponCode ?? undefined) : undefined,
+      })),
+      provider: 'paytr',
+      paymentUrl: '',
+    };
   }
 
   /**
@@ -1220,6 +1821,16 @@ export class OrderService {
         offerShippingJson.suratIdempotencyKey = suratIdempotencyKeyOffer;
       }
 
+      // Tek siparişlik grup (teklif yolu)
+      const offerOrderGroup = await tx.checkoutGroup.create({
+        data: {
+          groupNumber: `GRP${orderNumber}`,
+          buyerId,
+          totalAmount,
+          isGuest: false,
+        },
+      });
+
       // Create order
       const order = await tx.order.create({
         data: {
@@ -1228,6 +1839,7 @@ export class OrderService {
           buyerId,
           sellerId: offer.sellerId,
           offerId: dto.offerId,
+          checkoutGroupId: offerOrderGroup.id,
           totalAmount,
           commissionAmount: commissionResult.commissionAmount,
           buyerFeeAmount: commissionResult.buyerFeeAmount,
@@ -1637,6 +2249,16 @@ export class OrderService {
         };
       }
 
+      // Tek siparişlik grup (misafir yolu)
+      const guestOrderGroup = await tx.checkoutGroup.create({
+        data: {
+          groupNumber: `GRP${orderNumber}`,
+          buyerId: guestUser.id,
+          totalAmount,
+          isGuest: true,
+        },
+      });
+
       // Create order - store all guest info in shippingAddress JSON
       const order = await tx.order.create({
         data: {
@@ -1645,6 +2267,7 @@ export class OrderService {
           buyerId: guestUser.id,
           sellerId: product.sellerId,
           offerId: dto.offerId,
+          checkoutGroupId: guestOrderGroup.id,
           totalAmount,
           shippingCost,
           commissionAmount: commissionResult.commissionAmount,
@@ -1760,6 +2383,30 @@ export class OrderService {
   }
 
   /**
+   * Satıcı kazanç özeti — aktif filtreden ve sayfalamadan BAĞIMSIZ sunucu toplamı.
+   * Mobil "Kazanç Özeti" kartı bunu kullanır (önceden 20'lik sayfa + statü filtresinden
+   * türetiliyordu → filtreye basınca rakam değişiyordu).
+   *   totalEarnings   = teslim edilen + tamamlanan siparişlerin toplam tutarı
+   *   pendingEarnings = ödendi + hazırlanıyor + kargoda siparişlerin toplam tutarı
+   */
+  async getSellerEarnings(sellerId: string): Promise<{ totalEarnings: number; pendingEarnings: number }> {
+    const [realized, pending] = await Promise.all([
+      this.prisma.order.aggregate({
+        where: { sellerId, status: { in: [OrderStatus.delivered, OrderStatus.completed] } },
+        _sum: { totalAmount: true },
+      }),
+      this.prisma.order.aggregate({
+        where: { sellerId, status: { in: [OrderStatus.paid, OrderStatus.preparing, OrderStatus.shipped] } },
+        _sum: { totalAmount: true },
+      }),
+    ]);
+    return {
+      totalEarnings: Number(realized._sum.totalAmount ?? 0),
+      pendingEarnings: Number(pending._sum.totalAmount ?? 0),
+    };
+  }
+
+  /**
    * Get orders for current user
    */
   async findUserOrders(userId: string, query: OrderQueryDto) {
@@ -1784,8 +2431,14 @@ export class OrderService {
       where.status = { not: OrderStatus.cancelled };
     }
 
-    // Üyelik siparişlerini siparişlerim listesinde gösterme (sadece ürün siparişleri)
-    where.NOT = { productId: { startsWith: 'membership-' } };
+    // Üyelik ve boost (öne çıkarma) sanal siparişlerini "siparişlerim" listesinde gösterme
+    // (sadece gerçek ürün siparişleri). Boost'lar "Boostlarım"da görünür.
+    where.NOT = {
+      OR: [
+        { productId: { startsWith: 'membership-' } },
+        { productId: { startsWith: 'boost-' } },
+      ],
+    };
 
     const total = await this.prisma.order.count({ where });
 
@@ -1864,6 +2517,134 @@ export class OrderService {
     }
 
     return await this.formatOrderResponse(order, userId);
+  }
+
+  /** Grup statüsü türetme: tüm siparişler aynıysa o statü, değilse 'mixed' */
+  private deriveGroupStatus(orders: Array<{ status: OrderStatus }>): string {
+    const active = orders.filter((o) => o.status !== OrderStatus.cancelled);
+    const pool = active.length > 0 ? active : orders;
+    const first = pool[0]?.status;
+    return pool.every((o) => o.status === first) ? String(first) : 'mixed';
+  }
+
+  /**
+   * Alıcının sipariş grupları (sayfalı). Her grup tek "sipariş" kartı gibi
+   * gösterilir; içindeki siparişler ürün satırlarıdır (her birinin kendi kargosu).
+   * GET /orders/groups
+   */
+  async findUserCheckoutGroups(userId: string, page = 1, limit = 20) {
+    const where: Prisma.CheckoutGroupWhereInput = {
+      buyerId: userId,
+      // Tüm siparişleri iptal olan grupları varsayılan listede gösterme
+      orders: { some: { status: { not: OrderStatus.cancelled } } },
+    };
+
+    const total = await this.prisma.checkoutGroup.count({ where });
+    const groups = await this.prisma.checkoutGroup.findMany({
+      where,
+      orderBy: { createdAt: 'desc' },
+      skip: (page - 1) * limit,
+      take: limit,
+      include: {
+        orders: {
+          include: {
+            product: {
+              include: { images: { take: 1, orderBy: { sortOrder: 'asc' } } },
+            },
+            buyer: {
+              select: { id: true, displayName: true, isVerified: true, avatarUrl: true },
+            },
+            seller: {
+              select: { id: true, displayName: true, isVerified: true, avatarUrl: true },
+            },
+            shipment: true,
+          },
+        },
+      },
+    });
+
+    const data = await Promise.all(
+      groups.map(async (group) => {
+        const visibleOrders = group.orders.filter((o) => o.status !== OrderStatus.cancelled);
+        const orders = visibleOrders.length > 0 ? visibleOrders : group.orders;
+        return {
+          id: group.id,
+          groupNumber: group.groupNumber,
+          totalAmount: Number(group.totalAmount),
+          status: this.deriveGroupStatus(group.orders),
+          createdAt: group.createdAt,
+          orders: await Promise.all(orders.map((o) => this.formatOrderResponse(o, userId))),
+        };
+      }),
+    );
+
+    return {
+      data,
+      meta: { total, page, limit, totalPages: Math.ceil(total / limit) },
+    };
+  }
+
+  /**
+   * Tek sipariş grubu detayı: grup başlığı + tam formatlı siparişler
+   * (her ürün satırında kendi kargo takibi/eventleri).
+   * GET /orders/groups/:id
+   */
+  async findCheckoutGroup(groupId: string, userId: string) {
+    const group = await this.prisma.checkoutGroup.findUnique({
+      where: { id: groupId },
+      include: {
+        orders: {
+          include: {
+            product: {
+              include: { images: { take: 1, orderBy: { sortOrder: 'asc' } } },
+            },
+            buyer: {
+              select: { id: true, displayName: true, isVerified: true, avatarUrl: true },
+            },
+            seller: {
+              select: { id: true, displayName: true, isVerified: true, avatarUrl: true },
+            },
+            shipment: {
+              include: {
+                events: { orderBy: { createdAt: 'desc' }, take: 5 },
+              },
+            },
+            payment: true,
+            refundRequests: { orderBy: { createdAt: 'desc' } },
+          },
+        },
+        payment: {
+          select: { id: true, status: true, amount: true, provider: true, paidAt: true },
+        },
+      },
+    });
+
+    if (!group) {
+      throw new NotFoundException('Sipariş grubu bulunamadı');
+    }
+    if (group.buyerId !== userId) {
+      throw new ForbiddenException('Bu sipariş grubunu görüntüleme yetkiniz yok');
+    }
+
+    return {
+      id: group.id,
+      groupNumber: group.groupNumber,
+      totalAmount: Number(group.totalAmount),
+      status: this.deriveGroupStatus(group.orders),
+      createdAt: group.createdAt,
+      payment: group.payment
+        ? {
+            id: group.payment.id,
+            status: group.payment.status,
+            amount: Number(group.payment.amount),
+            provider: group.payment.provider,
+            paidAt: group.payment.paidAt,
+          }
+        : null,
+      orders: await Promise.all(
+        group.orders.map((o) => this.formatOrderResponse(o, userId)),
+      ),
+    };
   }
 
   /**
@@ -2507,7 +3288,16 @@ export class OrderService {
       title: order.product.title,
       imageUrl: resolvedImageUrl,
       status: order.product.status,
+      price: order.product.price != null ? Number(order.product.price) : undefined,
+      condition: order.product.condition,
     } : null;
+
+    // Tracking URL: Sürat gönderilerinde takip numarasından türetilir
+    const trackingNumber = order.shipment?.trackingNumber ?? null;
+    const trackingUrl =
+      trackingNumber && order.shipment?.provider === 'surat'
+        ? `https://www.suratkargo.com.tr/KargoTakip/?kargotakipno=${encodeURIComponent(trackingNumber)}`
+        : null;
 
     const totalAmount = Number(order.totalAmount ?? 0);
     const shippingCost = Number(order.shippingCost ?? 0);
@@ -2530,6 +3320,7 @@ export class OrderService {
     return {
       id: order.id,
       orderNumber: order.orderNumber,
+      checkoutGroupId: order.checkoutGroupId ?? null,
       amount: totalAmount,
       totalAmount,
       commissionAmount,
@@ -2558,10 +3349,14 @@ export class OrderService {
         ? {
             id: (order.shippingAddress as any).id || order.shippingAddressId || '',
             title: (order.shippingAddress as any).title || '',
+            fullName: (order.shippingAddress as any).fullName || '',
+            phone: (order.shippingAddress as any).phone || '',
+            address: (order.shippingAddress as any).address || (order.shippingAddress as any).addressLine1 || '',
             addressLine1: (order.shippingAddress as any).address || (order.shippingAddress as any).addressLine1 || '',
             addressLine2: (order.shippingAddress as any).addressLine2 || '',
             district: (order.shippingAddress as any).district || '',
             city: (order.shippingAddress as any).city || '',
+            zipCode: (order.shippingAddress as any).zipCode || (order.shippingAddress as any).postalCode || '',
             postalCode: (order.shippingAddress as any).zipCode || (order.shippingAddress as any).postalCode || '',
           }
         : null,
@@ -2571,10 +3366,22 @@ export class OrderService {
             id: order.shipment.id,
             provider: order.shipment.provider,
             trackingNumber: order.shipment.trackingNumber,
+            trackingUrl,
             status: order.shipment.status,
             cost: order.shipment.cost ? Number(order.shipment.cost) : null,
+            shippedAt: order.shipment.shippedAt ?? null,
+            deliveredAt: order.shipment.deliveredAt ?? null,
           }
         : null,
+      // Mobil sipariş detayı bu alanları üst seviyede okur (kargo kartı + zaman çizelgesi)
+      trackingNumber,
+      trackingUrl,
+      paidAt: order.payment?.paidAt ?? null,
+      shippedAt: order.shipment?.shippedAt ?? null,
+      deliveredAt: order.deliveredAt ?? order.shipment?.deliveredAt ?? null,
+      completedAt: order.completedAt ?? null,
+      confirmationDeadline: order.confirmationDeadline ?? null,
+      buyerConfirmedAt: order.buyerConfirmedAt ?? null,
       isBuyer: order.buyerId === userId,
       isSeller: order.sellerId === userId,
       ...(await this.getOrderRatingFlags(order, userId)),
