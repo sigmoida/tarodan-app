@@ -6,7 +6,7 @@
     "prebuild": "rimraf dist",
     "build": "nest build",
     "postbuild": "prisma generate",
-    "build:seed": "rimraf dist-seed && tsc -p tsconfig.seed.json",
+    "build:seed": "rimraf dist-seed && tsc -p tsconfig.seed.json && cp -r prisma/data dist-seed/prisma/data",
     "seed:prod": "node dist-seed/prisma/seed.js",
     "db:reset:prod": "prisma migrate reset --force --skip-seed --schema=prisma/schema.prisma && node dist-seed/prisma/seed.js",
     "format": "prettier --write \"src/**/*.ts\" \"test/**/*.ts\"",
