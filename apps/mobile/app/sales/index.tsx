@@ -1,4 +1,4 @@
-import { View, ScrollView, StyleSheet, Image, RefreshControl, Alert } from 'react-native';
+import { View, ScrollView, StyleSheet, Image, RefreshControl } from 'react-native';
 import {
   Button,
   Card,
@@ -10,6 +10,7 @@ import {
   StatusBadge,
   theme,
   ScreenHeader,
+  appAlert,
 } from '@tarodan/ui-native';
 import type { BadgeVariant } from '@tarodan/ui-native';
 import { useState, useCallback } from 'react';
@@ -130,10 +131,10 @@ export default function SalesScreen() {
       queryClient.invalidateQueries({ queryKey: ['orders'] });
       setShipDialog({ visible: false, order: null });
       setTrackingNumber('');
-      Alert.alert('Başarılı', 'Sipariş durumu güncellendi');
+      appAlert('Başarılı', 'Sipariş durumu güncellendi');
     },
     onError: (e: any) => {
-      Alert.alert('Hata', e?.response?.data?.message || e?.message || 'Durum güncellenemedi');
+      appAlert('Hata', e?.response?.data?.message || e?.message || 'Durum güncellenemedi');
     },
   });
 
@@ -169,7 +170,7 @@ export default function SalesScreen() {
   };
 
   const handleMarkAsProcessing = (order: Sale) => {
-    Alert.alert(
+    appAlert(
       'Siparişi Hazırlıyor Olarak İşaretle',
       'Siparişi hazırlamaya başladığınızı onaylıyor musunuz?',
       [
@@ -184,7 +185,7 @@ export default function SalesScreen() {
 
   const handleShip = () => {
     if (!trackingNumber.trim()) {
-      Alert.alert('Hata', 'Takip numarası giriniz');
+      appAlert('Hata', 'Takip numarası giriniz');
       return;
     }
     if (shipDialog.order) {

@@ -19,6 +19,8 @@ const mockState = {
   fetchFavorites: jest.fn(),
   removeFromFavorites: jest.fn().mockResolvedValue(true),
   addItem: jest.fn(),
+  removeByProductId: jest.fn(),
+  isInCart: jest.fn().mockReturnValue(false),
 };
 
 jest.mock('../../src/stores/authStore', () => ({
@@ -37,7 +39,11 @@ jest.mock('../../src/stores/favoritesStore', () => ({
 }));
 
 jest.mock('../../src/stores/cartStore', () => ({
-  useCartStore: () => ({ addItem: mockState.addItem }),
+  useCartStore: () => ({
+    addItem: mockState.addItem,
+    removeByProductId: mockState.removeByProductId,
+    isInCart: mockState.isInCart,
+  }),
 }));
 
 import FavoritesScreen from '../favorites';
@@ -62,6 +68,8 @@ beforeEach(() => {
   mockState.fetchFavorites.mockClear();
   mockState.removeFromFavorites.mockClear();
   mockState.addItem.mockClear();
+  mockState.removeByProductId.mockClear();
+  mockState.isInCart.mockClear().mockReturnValue(false);
   mockState.isAuthenticated = true;
   mockState.items = [];
 });
@@ -100,6 +108,18 @@ describe('J57 · favoriler ekranı — dolu liste', () => {
     renderWithProviders(<FavoritesScreen />);
     fireEvent.press(screen.getByLabelText('Favorilerden çıkar'));
     expect(mockState.removeFromFavorites).toHaveBeenCalledWith('p1');
+  });
+
+  it('sepet butonu toggle: sepette değilse addItem, sepetteyse removeByProductId çağırır', () => {
+    mockState.items = [makeItem('p1')];
+    renderWithProviders(<FavoritesScreen />);
+    fireEvent.press(screen.getByLabelText('Sepete ekle'));
+    expect(mockState.addItem).toHaveBeenCalledWith(expect.objectContaining({ productId: 'p1' }));
+
+    mockState.isInCart.mockReturnValue(true);
+    renderWithProviders(<FavoritesScreen />);
+    fireEvent.press(screen.getByLabelText('Sepetten çıkar'));
+    expect(mockState.removeByProductId).toHaveBeenCalledWith('p1');
   });
 
   it('ürün kartına dokununca ürün detayına push eder', () => {

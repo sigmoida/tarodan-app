@@ -46,8 +46,12 @@ export interface Message {
 interface MessagesState {
   threads: MessageThread[];
   currentThread: MessageThread | null;
+  // Açık olan thread'in id'si — thread değişiminde stale mesajları temizlemek için.
+  currentThreadId: string | null;
   messages: Message[];
   isLoading: boolean;
+  // İlk fetchThreads tamamlandı mı — tab açılışında boş ekran/spinner çakmasını önler.
+  hasLoadedThreads: boolean;
   isLoadingMessages: boolean;
   error: string | null;
   dailyMessageCount: number;
@@ -112,8 +116,10 @@ const FREE_DAILY_MESSAGE_LIMIT = 50;
 export const useMessagesStore = create<MessagesState>((set, get) => ({
   threads: [],
   currentThread: null,
+  currentThreadId: null,
   messages: [],
   isLoading: false,
+  hasLoadedThreads: false,
   isLoadingMessages: false,
   error: null,
   dailyMessageCount: 0,
@@ -139,13 +145,14 @@ export const useMessagesStore = create<MessagesState>((set, get) => ({
       set({
         threads: normalizedThreads,
         isLoading: false,
+        hasLoadedThreads: true,
         totalUnreadCount: typeof c === 'number'
           ? c
           : normalizedThreads.reduce((t, th) => t + (th.unreadCount || 0), 0),
       });
     } catch (error: any) {
       console.error('Failed to fetch threads:', error);
-      set({ error: 'Mesajlar yüklenemedi', isLoading: false, threads: [] });
+      set({ error: 'Mesajlar yüklenemedi', isLoading: false, hasLoadedThreads: true, threads: [] });
     }
   },
 
@@ -162,6 +169,10 @@ export const useMessagesStore = create<MessagesState>((set, get) => ({
 
   // Web ile aynı endpoint: GET /messages/threads/:id
   fetchThread: async (threadId: string) => {
+    // Farklı thread'e geçildiyse eski kişinin adı/avatarı header'da görünmesin.
+    if (get().currentThread?.id !== threadId) {
+      set({ currentThread: null });
+    }
     try {
       const response = await messagesApi.getThread(threadId);
       const raw = (response.data as any)?.data ?? response.data;
@@ -174,7 +185,13 @@ export const useMessagesStore = create<MessagesState>((set, get) => ({
 
   // Web ile aynı endpoint: GET /messages/threads/:id/messages
   fetchMessages: async (threadId: string, page: number = 1) => {
-    set({ isLoadingMessages: true });
+    // Thread değiştiyse önceki konuşmanın mesajları bir an bile görünmesin;
+    // aynı thread'de sessiz yenileme (mevcut mesajlar ekranda kalır).
+    if (get().currentThreadId !== threadId) {
+      set({ messages: [], currentThreadId: threadId, isLoadingMessages: true });
+    } else {
+      set({ isLoadingMessages: true });
+    }
     try {
       const response = await messagesApi.getMessages(threadId, { page, pageSize: 50 });
       const messagesData = response.data?.messages || response.data?.data || response.data || [];
@@ -262,9 +279,13 @@ export const useMessagesStore = create<MessagesState>((set, get) => ({
         await messagesApi.sendMessage(newThread.id, content);
       }
 
-      // Add to threads list
+      // Backend findOrCreate yaptığı için mevcut thread dönebilir; aynı id'yi
+      // ikinci kez eklemek listede duplicate key hatasına yol açar — dedupe et.
       set(state => ({
-        threads: [newThread, ...state.threads],
+        threads: [
+          newThread,
+          ...state.threads.filter(t => t.id !== newThread.id),
+        ],
         dailyMessageCount: state.dailyMessageCount + 1,
       }));
 

@@ -16,7 +16,7 @@ import {
   type NativeScrollEvent,
   type NativeSyntheticEvent,
 } from 'react-native';
-import { useInfiniteQuery, useQuery } from '@tanstack/react-query';
+import { keepPreviousData, useInfiniteQuery, useQuery } from '@tanstack/react-query';
 import { router, useLocalSearchParams } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import {
@@ -190,6 +190,7 @@ export default function SearchScreen() {
     data,
     isLoading,
     isError,
+    isFetching,
     fetchNextPage,
     hasNextPage,
     isFetchingNextPage,
@@ -197,6 +198,7 @@ export default function SearchScreen() {
     isRefetching,
   } = useInfiniteQuery({
     queryKey: ['products-search', filters],
+    placeholderData: keepPreviousData,
     initialPageParam: 1,
     queryFn: async ({ pageParam }) => {
       const listParams = buildListParams(filters, pageParam as number, PAGE_SIZE);
@@ -618,7 +620,9 @@ export default function SearchScreen() {
                   style={styles.activeChip}
                 />
               ))}
-              <Chip label="Temizle ✕" variant="neutral" onPress={clearAllFilters} />
+              {activeChips.length > 1 && (
+                <Chip label="Temizle ✕" variant="neutral" onPress={clearAllFilters} />
+              )}
             </ScrollView>
           )}
 
@@ -713,6 +717,7 @@ export default function SearchScreen() {
         onClear={clearAllFilters}
         options={options}
         resultCount={total}
+        countLoading={isFetching && !isFetchingNextPage}
       />
 
       {/* Sort Modal */}
@@ -970,7 +975,7 @@ const styles = StyleSheet.create({
     left: 8,
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: colors.warning[500]!,
+    backgroundColor: colors.success[500]!,
     paddingHorizontal: 8,
     paddingVertical: 4,
     borderRadius: 12,

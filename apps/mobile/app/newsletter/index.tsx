@@ -1,7 +1,6 @@
 import React, { useState } from 'react';
-import { View, StyleSheet, Alert, KeyboardAvoidingView, Platform, ScrollView } from 'react-native';
-import { theme, Button, Input, Text } from '@tarodan/ui-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { View, StyleSheet, KeyboardAvoidingView, Platform, ScrollView } from 'react-native';
+import { theme, Button, Input, Text, appAlert } from '@tarodan/ui-native';
 import { Ionicons } from '@expo/vector-icons';
 import { router } from 'expo-router';
 import { useMutation } from '@tanstack/react-query';
@@ -23,7 +22,7 @@ export default function NewsletterScreen() {
       });
     },
     onSuccess: () => {
-      Alert.alert(
+      appAlert(
         'Teşekkürler',
         'Bültenimize abone oldunuz. En yeni ürünler ve kampanyalardan ilk siz haberdar olacaksınız.',
         [{ text: 'Tamam', onPress: () => router.back() }],
@@ -31,16 +30,16 @@ export default function NewsletterScreen() {
       setEmail('');
     },
     onError: (e: any) =>
-      Alert.alert('Hata', e?.response?.data?.message || 'Abonelik kaydedilemedi.'),
+      appAlert('Hata', e?.response?.data?.message || 'Abonelik kaydedilemedi.'),
   });
 
   const handleSubmit = () => {
-    if (!/^\S+@\S+\.\S+$/.test(email)) return Alert.alert('Eksik', 'Geçerli bir e-posta girin.');
+    if (!/^\S+@\S+\.\S+$/.test(email)) return appAlert('Eksik', 'Geçerli bir e-posta girin.');
     subscribeMutation.mutate();
   };
 
   return (
-    <SafeAreaView style={styles.container} edges={['top']}>
+    <View style={styles.container}>
       <ScreenHeader title="Haber Bülteni" />
 
       <KeyboardAvoidingView
@@ -84,7 +83,7 @@ export default function NewsletterScreen() {
 
         </ScrollView>
       </KeyboardAvoidingView>
-    </SafeAreaView>
+    </View>
   );
 }
 

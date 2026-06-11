@@ -107,7 +107,7 @@ export default function NewListingPage() {
     year: "" as string | number,
     isTradeEnabled: false,
     isSet: false,
-    quantity: "" as string | number,
+    quantity: 1 as string | number,
     images: [] as Array<{ cardKey: string; detailKey: string }>,
     // Manufacturer-scoped extra attributes (e.g. Hot Wheels Segment/Assortment/...).
     // Populated only when a manufacturer with scoped groups is selected.
@@ -708,7 +708,7 @@ export default function NewListingPage() {
           formData.quantity !== null &&
           formData.quantity !== undefined
             ? Number(formData.quantity)
-            : undefined, // undefined = unlimited stock
+            : 1, // boş bırakılırsa 1 adet (sınırsız stok default değil)
         images: formData.images.length > 0 ? formData.images : undefined,
         attributes: customAttributeSlugs.length > 0 ? customAttributeSlugs : undefined,
       };
@@ -1267,13 +1267,13 @@ export default function NewListingPage() {
                       });
                     }}
                     className="px-4 py-2.5 border-border rounded text-heading placeholder-subtle"
-                    placeholder={locale === "en" ? "Unlimited" : "Sınırsız"}
+                    placeholder="1"
                     min={1}
                   />
                   <p className="text-xs text-subtle mt-1">
                     {locale === "en"
-                      ? "Leave empty for unlimited stock"
-                      : "Boş bırakırsanız sınırsız stok"}
+                      ? "Defaults to 1 if left empty"
+                      : "Boş bırakırsanız 1 adet"}
                   </p>
                 </div>
               </div>

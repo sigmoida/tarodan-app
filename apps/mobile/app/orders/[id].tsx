@@ -1,4 +1,4 @@
-import { View, ScrollView, StyleSheet, Pressable, Image, Linking, Alert, Platform } from 'react-native';
+import { View, ScrollView, StyleSheet, Pressable, Image, Linking, Platform } from 'react-native';
 import * as ImagePicker from 'expo-image-picker';
 import {
   Button,
@@ -13,6 +13,7 @@ import {
   Text,
   theme,
   ScreenHeader,
+  appAlert,
 } from '@tarodan/ui-native';
 import type { BadgeVariant } from '@tarodan/ui-native';
 import { useState } from 'react';
@@ -220,7 +221,7 @@ export default function OrderDetailScreen() {
     if (remaining <= 0) return;
     const perm = await ImagePicker.requestMediaLibraryPermissionsAsync();
     if (!perm.granted) {
-      Alert.alert('İzin Gerekli', 'Fotoğraf eklemek için galeri erişim izni gerekiyor.');
+      appAlert('İzin Gerekli', 'Fotoğraf eklemek için galeri erişim izni gerekiyor.');
       return;
     }
     const result = await ImagePicker.launchImageLibraryAsync({
@@ -287,7 +288,7 @@ export default function OrderDetailScreen() {
   const handleCancelRefund = () => {
     const rr = order?.activeRefundRequest;
     if (!rr) return;
-    Alert.alert(
+    appAlert(
       'İade Talebini İptal Et',
       'İade talebiniz iptal edilecek. Devam edilsin mi?',
       [
@@ -318,11 +319,11 @@ export default function OrderDetailScreen() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['order', id] });
       queryClient.invalidateQueries({ queryKey: ['orders'] });
-      Alert.alert('Teşekkürler', 'Sipariş onaylandı. Satıcıya ödeme transferi tetiklendi.');
+      appAlert('Teşekkürler', 'Sipariş onaylandı. Satıcıya ödeme transferi tetiklendi.');
     },
     onError: (err: any) => {
       const msg = err?.response?.data?.message || err?.message || 'Onay başarısız';
-      Alert.alert('Hata', msg);
+      appAlert('Hata', msg);
     },
   });
 
@@ -382,7 +383,7 @@ export default function OrderDetailScreen() {
               onReportProblem={() =>
                 // Refund request route henüz mobile'da yok; geçici olarak order detay'da kalır.
                 // Faz 4+ kapsamında mobile refund-request flow eklenince burası güncellenecek.
-                Alert.alert(
+                appAlert(
                   'Sorun Bildirme',
                   'Sorun bildirimi için lütfen profil > Yardım üzerinden iletişime geçin. (Mobile iade akışı yakında eklenecek.)',
                 )

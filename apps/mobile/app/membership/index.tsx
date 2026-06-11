@@ -1,8 +1,8 @@
 import React, { useState, useEffect } from 'react';
-import { View, Text, ScrollView, TouchableOpacity, StyleSheet, ActivityIndicator, Alert } from 'react-native';
+import { View, Text, ScrollView, TouchableOpacity, StyleSheet, ActivityIndicator } from 'react-native';
 import { router } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
-import { theme, ScreenHeader } from '@tarodan/ui-native';
+import { theme, ScreenHeader, appAlert } from '@tarodan/ui-native';
 import { useAuthStore } from '../../src/stores/authStore';
 import { api, membershipApi } from '../../src/services/api';
 import { useTranslation } from '../../src/i18n';
@@ -170,7 +170,7 @@ export default function MembershipScreen() {
   const handleTierAction = (tier: TierType) => {
     if (tier === 'free' || tier === currentTier) return;
     if (tierIndex(tier) < tierIndex(currentTier)) {
-      Alert.alert('Bilgi', 'Alt plana geçiş şu anda desteklenmiyor.');
+      appAlert('Bilgi', 'Alt plana geçiş şu anda desteklenmiyor.');
       return;
     }
     router.push(`/membership/checkout?tier=${tier}&period=${billingPeriod}`);

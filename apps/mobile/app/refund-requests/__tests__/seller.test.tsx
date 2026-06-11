@@ -6,8 +6,8 @@
  * Backend mantığı (kabul/red aktarımı, escrow, kargo, para iadesi) backend-only.
  */
 import React from 'react';
+import { appAlert } from '@tarodan/ui-native';
 import { screen, fireEvent, waitFor } from '@testing-library/react-native';
-import { Alert } from 'react-native';
 import { renderWithProviders } from '../../../src/test-utils';
 
 jest.mock('expo-router', () => ({
@@ -139,7 +139,7 @@ describe('J86 · Red gerekçe modalı + validasyon UI', () => {
   });
 
   it('J86.2 kısa gerekçe (<10) → validasyon uyarısı, reject çağrılmaz', async () => {
-    const alertSpy = jest.spyOn(Alert, 'alert').mockImplementation(() => {});
+    const alertSpy = (appAlert as jest.Mock).mockImplementation(() => {});
     getSellerMock.mockResolvedValue({ data: { data: [refundFixture()] } });
     renderWithProviders(<SellerRefundRequestsScreen />);
     await waitFor(() => expect(screen.getByText('Reddet')).toBeOnTheScreen());

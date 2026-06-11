@@ -3,12 +3,11 @@ import {
   Card,
   Button,
   Spinner,
-  Divider,
   Text,
   theme,
   ScreenHeader,
 } from '@tarodan/ui-native';
-import { useState, useCallback } from 'react';
+import { useCallback } from 'react';
 import { router, useFocusEffect } from 'expo-router';
 import { useQuery } from '@tanstack/react-query';
 import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
@@ -44,7 +43,7 @@ interface Analytics {
 export default function AnalyticsScreen() {
   const { t } = useTranslation();
   const { isAuthenticated, limits } = useAuthStore();
-  const [timeRange] = useState<'7d' | '30d' | 'all'>('7d');
+  const timeRange = '7d';
 
   const isPremium = limits?.maxListings === -1;
 
@@ -222,10 +221,6 @@ export default function AnalyticsScreen() {
                       %{analytics.conversionRate?.toFixed(1)}
                     </Text>
                     <Text variant="bodySm" style={styles.metricLabel}>Dönüşüm Oranı</Text>
-                    <View style={styles.metricTrend}>
-                      <Ionicons name="trending-up" size={14} color={colors.success[600]!} />
-                      <Text style={styles.trendText}>+0.5%</Text>
-                    </View>
                   </View>
 
                   <View style={styles.metricItem}>
@@ -233,10 +228,6 @@ export default function AnalyticsScreen() {
                       {analytics.avgTimeToSell} gün
                     </Text>
                     <Text variant="bodySm" style={styles.metricLabel}>Ort. Satış Süresi</Text>
-                    <View style={styles.metricTrend}>
-                      <Ionicons name="trending-down" size={14} color={colors.success[600]!} />
-                      <Text style={styles.trendText}>-2 gün</Text>
-                    </View>
                   </View>
                 </View>
               </Card>
@@ -255,31 +246,6 @@ export default function AnalyticsScreen() {
                 </View>
               </Card>
 
-              {/* Export Options */}
-              <Card style={styles.card}>
-                <Text variant="h3" style={styles.sectionTitle}>Rapor İndir</Text>
-                <Pressable style={styles.exportOption}>
-                  <Ionicons name="document-text" size={24} color={colors.primary[600]!} />
-                  <View style={styles.exportInfo}>
-                    <Text variant="body">PDF Rapor</Text>
-                    <Text variant="bodySm" style={styles.exportDesc}>
-                      Detaylı analitik raporu
-                    </Text>
-                  </View>
-                  <Ionicons name="download-outline" size={24} color={colors.primary[600]!} />
-                </Pressable>
-                <Divider style={{ marginVertical: 8 }} />
-                <Pressable style={styles.exportOption}>
-                  <Ionicons name="grid" size={24} color={colors.success[600]!} />
-                  <View style={styles.exportInfo}>
-                    <Text variant="body">Excel Rapor</Text>
-                    <Text variant="bodySm" style={styles.exportDesc}>
-                      Satış ve takas verileri
-                    </Text>
-                  </View>
-                  <Ionicons name="download-outline" size={24} color={colors.primary[600]!} />
-                </Pressable>
-              </Card>
             </>
           )}
 
@@ -501,16 +467,6 @@ const styles = StyleSheet.create({
     marginTop: 4,
     textAlign: 'center',
   },
-  metricTrend: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginTop: 4,
-  },
-  trendText: {
-    fontSize: 12,
-    color: colors.success[600]!,
-    marginLeft: 4,
-  },
   revenueHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
@@ -615,18 +571,5 @@ const styles = StyleSheet.create({
     color: colors.success[700]!,
     fontWeight: '600',
     fontSize: 12,
-  },
-  exportOption: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingVertical: 12,
-  },
-  exportInfo: {
-    flex: 1,
-    marginLeft: 12,
-  },
-  exportDesc: {
-    color: colors.text.muted,
-    marginTop: 2,
   },
 });

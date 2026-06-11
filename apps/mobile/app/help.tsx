@@ -349,11 +349,11 @@ export default function HelpScreen() {
         <View style={styles.appInfo}>
           <Text style={styles.appInfoText}>Tarodan v1.0.0</Text>
           <View style={styles.appLinks}>
-            <TouchableOpacity>
+            <TouchableOpacity onPress={() => router.push('/privacy')}>
               <Text style={styles.appLink}>Gizlilik Politikası</Text>
             </TouchableOpacity>
             <Text style={styles.appLinkDivider}>•</Text>
-            <TouchableOpacity>
+            <TouchableOpacity onPress={() => router.push('/terms')}>
               <Text style={styles.appLink}>Kullanım Koşulları</Text>
             </TouchableOpacity>
           </View>

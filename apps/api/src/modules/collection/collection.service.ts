@@ -974,19 +974,32 @@ export class CollectionService {
         _max: { sortOrder: true },
       });
 
-      const item = await this.prisma.collectionItem.create({
-        data: {
-          collectionId,
-          productId: dto.productId,
-          sortOrder: dto.sortOrder ?? (maxSort._max.sortOrder ?? 0) + 1,
-          isFeatured: dto.isFeatured ?? false,
-        },
-        include: {
-          product: {
-            include: { images: { take: 1 } },
+      let item;
+      try {
+        item = await this.prisma.collectionItem.create({
+          data: {
+            collectionId,
+            productId: dto.productId,
+            sortOrder: dto.sortOrder ?? (maxSort._max.sortOrder ?? 0) + 1,
+            isFeatured: dto.isFeatured ?? false,
           },
-        },
-      });
+          include: {
+            product: {
+              include: { images: { take: 1 } },
+            },
+          },
+        });
+      } catch (e) {
+        // Eşzamanlı istekler existence kontrolünü birlikte geçebilir; unique
+        // ihlalini (collectionId, productId) 500 yerine aynı 400'e çevir.
+        if (
+          e instanceof Prisma.PrismaClientKnownRequestError &&
+          e.code === 'P2002'
+        ) {
+          throw new BadRequestException('Ürün zaten koleksiyonda');
+        }
+        throw e;
+      }
 
       return await this.mapItemToDto(item);
     }

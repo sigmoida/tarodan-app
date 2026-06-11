@@ -5,17 +5,21 @@ import { Ionicons } from '@expo/vector-icons';
 import { theme, Text, Card, Chip, Snackbar, Input, Textarea, Button, ScreenHeader } from '@tarodan/ui-native';
 import { useAuthStore } from '../src/stores/authStore';
 import { useTranslation } from '../src/i18n';
+import { supportApi } from '../src/services/api';
 
 const { colors } = theme;
 
+// id'ler backend TicketCategory enum'u ile birebir (payment, shipping, trade, account, product, technical, other)
 const SUPPORT_CATEGORIES = [
-  { id: 'order', name: 'Sipariş Sorunu', icon: 'cube-outline' },
+  { id: 'shipping', name: 'Sipariş/Kargo Sorunu', icon: 'cube-outline' },
   { id: 'payment', name: 'Ödeme Sorunu', icon: 'card-outline' },
   { id: 'account', name: 'Hesap Sorunu', icon: 'person-outline' },
-  { id: 'listing', name: 'İlan Sorunu', icon: 'pricetag-outline' },
+  { id: 'product', name: 'İlan Sorunu', icon: 'pricetag-outline' },
   { id: 'trade', name: 'Takas Sorunu', icon: 'swap-horizontal' },
   { id: 'other', name: 'Diğer', icon: 'ellipsis-horizontal' },
 ];
+
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 const PRIORITY_OPTIONS = [
   { id: 'low', name: 'Düşük', color: colors.success[600]! },
@@ -40,19 +44,48 @@ export default function SupportScreen() {
       return;
     }
 
+    // Backend DTO ile parite (CreateTicketDto): subject @MinLength(5), message @MinLength(10).
+    if (subject.trim().length < 5) {
+      setSnackbar({ visible: true, message: 'Konu en az 5 karakter olmalıdır.' });
+      return;
+    }
+    if (description.trim().length < 10) {
+      setSnackbar({ visible: true, message: 'Açıklama en az 10 karakter olmalıdır.' });
+      return;
+    }
+
+    // orderId/tradeId backend'de UUID bekler; serbest metin girildiyse mesaja ekle.
+    const refId = orderId.trim();
+    const isUuid = UUID_RE.test(refId);
+    let message = description.trim();
+    if (refId && !isUuid) {
+      message = `Sipariş/Takas No: ${refId}\n\n${message}`;
+    }
+
     setLoading(true);
-    // Simulate API call
-    await new Promise(resolve => setTimeout(resolve, 1500));
-    setLoading(false);
+    try {
+      await supportApi.createTicket({
+        subject: subject.trim(),
+        category,
+        priority,
+        message,
+        ...(isUuid && category === 'trade' ? { tradeId: refId } : {}),
+        ...(isUuid && category !== 'trade' ? { orderId: refId } : {}),
+      });
 
-    setSnackbar({ visible: true, message: 'Destek talebiniz oluşturuldu!' });
+      setSnackbar({ visible: true, message: 'Destek talebiniz oluşturuldu!' });
 
-    // Reset form
-    setCategory('');
-    setSubject('');
-    setDescription('');
-    setOrderId('');
-    setPriority('medium');
+      // Reset form
+      setCategory('');
+      setSubject('');
+      setDescription('');
+      setOrderId('');
+      setPriority('medium');
+    } catch {
+      setSnackbar({ visible: true, message: 'Talep oluşturulamadı, lütfen tekrar deneyin.' });
+    } finally {
+      setLoading(false);
+    }
   };
 
   if (!isAuthenticated) {
@@ -124,7 +157,7 @@ export default function SupportScreen() {
 
         {/* Form Fields */}
         <Card style={styles.formCard}>
-          {(category === 'order' || category === 'trade') && (
+          {(category === 'shipping' || category === 'trade') && (
             <Input
               label="Sipariş/Takas Numarası (Opsiyonel)"
               value={orderId}

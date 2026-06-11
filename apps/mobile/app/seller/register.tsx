@@ -1,7 +1,6 @@
 import React from 'react';
 import { View, StyleSheet, ScrollView } from 'react-native';
 import { Button, Text, theme } from '@tarodan/ui-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 import { router } from 'expo-router';
 import { ScreenHeader, EmptyState } from '../../src/components/common';
@@ -21,7 +20,7 @@ export default function SellerRegisterScreen() {
 
   if (!isAuthenticated) {
     return (
-      <SafeAreaView style={styles.container} edges={['top']}>
+      <View style={styles.container}>
         <ScreenHeader title="İşletme Hesabı" />
         <EmptyState
           fullscreen
@@ -30,7 +29,7 @@ export default function SellerRegisterScreen() {
           actionLabel="Kurumsal Hesap Aç"
           onAction={() => router.push('/(auth)/register-business')}
         />
-      </SafeAreaView>
+      </View>
     );
   }
 
@@ -40,7 +39,7 @@ export default function SellerRegisterScreen() {
   // Zaten kurumsal hesap: yönlendirme yerine üyelik/yönetim aksiyonu göster.
   if (isBusinessAccount) {
     return (
-      <SafeAreaView style={styles.container} edges={['top']}>
+      <View style={styles.container}>
         <ScreenHeader title="İşletme Hesabı" />
         <ScrollView contentContainerStyle={styles.scrollBody}>
           <View style={styles.infoCard}>
@@ -64,13 +63,13 @@ export default function SellerRegisterScreen() {
 
           <Button variant="ghost" title="Geri Dön" onPress={() => router.back()} />
         </ScrollView>
-      </SafeAreaView>
+      </View>
     );
   }
 
   // Bireysel hesap: işletme olmak için ayrı hesap açması gerektiğini anlat.
   return (
-    <SafeAreaView style={styles.container} edges={['top']}>
+    <View style={styles.container}>
       <ScreenHeader title="İşletme Hesabı" />
       <ScrollView contentContainerStyle={styles.scrollBody}>
         <View style={styles.benefitsCard}>
@@ -110,7 +109,7 @@ export default function SellerRegisterScreen() {
 
         <Button variant="ghost" title="Vazgeç" onPress={() => router.back()} />
       </ScrollView>
-    </SafeAreaView>
+    </View>
   );
 }
 

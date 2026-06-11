@@ -623,6 +623,8 @@
     "invalidCardNumber": "Geçersiz kart numarası"
   },
   "collection": {
+    "share": "Paylaş",
+    "linkCopied": "Link kopyalandı",
     "collections": "Koleksiyonlar",
     "myCollections": "Koleksiyonlarım",
     "createCollection": "Koleksiyon Oluştur",

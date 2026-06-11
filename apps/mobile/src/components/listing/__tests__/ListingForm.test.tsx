@@ -1,16 +1,17 @@
 /**
  * J2/J18/J55/J56 · İlan oluşturma formu (ListingForm, mode="create") — mobil UI dilimi.
- * Form validasyonu (başlık<5, fiyat<1, boş başlık) → Alert.alert uyarısı + submit ENGELLENİR,
+ * Form validasyonu (başlık<5, fiyat<1, boş başlık) → appAlert uyarısı + submit ENGELLENİR,
  * submit butonu render, komisyon önizleme bölümü (fiyat girişi → /orders/commission-preview).
  *
- * NOT: Bu form inline doğrulamayı Alert.alert ile yapar (testID'li hata banner'ı YOK),
+ * NOT: Bu form inline doğrulamayı appAlert ile yapar (testID'li hata banner'ı YOK),
  * bu yüzden uyarı Alert spy üzerinden + productsApi.create'in ÇAĞRILMADIĞI ile doğrulanır.
  * Foto zorunluluğu validate() içinde ("En az bir fotoğraf ekleyin"): galeri seçimi
  * native ImagePicker gerektirdiği için happy-path create akışı (gerçek foto upload) E2E/backend.
  * Backend (komisyon hesabı, ilan oluşturma kalıcılığı, limit zorlaması) backendOnly.
  */
 import React from 'react';
-import { Alert } from 'react-native';
+import { appAlert } from '@tarodan/ui-native';
+import {  } from 'react-native';
 import { screen, fireEvent, waitFor } from '@testing-library/react-native';
 import { renderWithProviders } from '../../../test-utils';
 
@@ -76,12 +77,12 @@ function wireApi(commission?: { sellerFeeAmount: number; sellerNetAmount: number
 }
 
 describe('J2 · İlan formu render + submit butonu', () => {
-  let alertSpy: jest.SpyInstance;
+  let alertSpy: jest.Mock;
   beforeEach(() => {
     mockGet.mockReset();
     mockCreate.mockClear();
     wireApi();
-    alertSpy = jest.spyOn(Alert, 'alert').mockImplementation(() => {});
+    alertSpy = (appAlert as jest.Mock).mockImplementation(() => {});
   });
   afterEach(() => alertSpy.mockRestore());
 
@@ -93,12 +94,12 @@ describe('J2 · İlan formu render + submit butonu', () => {
 });
 
 describe('J18/J55 · ilan formu input validasyonu', () => {
-  let alertSpy: jest.SpyInstance;
+  let alertSpy: jest.Mock;
   beforeEach(() => {
     mockGet.mockReset();
     mockCreate.mockClear();
     wireApi();
-    alertSpy = jest.spyOn(Alert, 'alert').mockImplementation(() => {});
+    alertSpy = (appAlert as jest.Mock).mockImplementation(() => {});
   });
   afterEach(() => alertSpy.mockRestore());
 
@@ -141,11 +142,11 @@ describe('J18/J55 · ilan formu input validasyonu', () => {
 });
 
 describe('J56 · komisyon önizleme bölümü', () => {
-  let alertSpy: jest.SpyInstance;
+  let alertSpy: jest.Mock;
   beforeEach(() => {
     mockGet.mockReset();
     wireApi({ sellerFeeAmount: 25, sellerNetAmount: 475 });
-    alertSpy = jest.spyOn(Alert, 'alert').mockImplementation(() => {});
+    alertSpy = (appAlert as jest.Mock).mockImplementation(() => {});
   });
   afterEach(() => alertSpy.mockRestore());
 

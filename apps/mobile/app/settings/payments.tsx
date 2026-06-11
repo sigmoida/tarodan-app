@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
-import { View, ScrollView, StyleSheet, Pressable, Alert, RefreshControl } from 'react-native';
-import { Card, Chip, Snackbar, Spinner, Text, theme } from '@tarodan/ui-native';
+import { View, ScrollView, StyleSheet, Pressable, RefreshControl } from 'react-native';
+import { Card, Chip, Snackbar, Spinner, Text, theme, appAlert } from '@tarodan/ui-native';
 import { router } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
@@ -70,7 +70,7 @@ export default function PaymentsScreen() {
   });
 
   const handleCancel = (id: string) => {
-    Alert.alert(
+    appAlert(
       'Ödemeyi İptal Et',
       'Bu bekleyen ödemeyi iptal etmek istediğinize emin misiniz?',
       [
@@ -84,7 +84,7 @@ export default function PaymentsScreen() {
               setSnackbar({ visible: true, message: 'Ödeme iptal edildi' });
               queryClient.invalidateQueries({ queryKey: ['my-payments'] });
             } catch (e: any) {
-              Alert.alert('Hata', e?.response?.data?.message || 'Ödeme iptal edilemedi.');
+              appAlert('Hata', e?.response?.data?.message || 'Ödeme iptal edilemedi.');
             }
           },
         },
@@ -93,7 +93,7 @@ export default function PaymentsScreen() {
   };
 
   const handleRetry = (id: string) => {
-    Alert.alert(
+    appAlert(
       'Ödemeyi Yeniden Dene',
       'Bu ödeme için tekrar deneme yapılacak.',
       [
@@ -111,7 +111,7 @@ export default function PaymentsScreen() {
                 queryClient.invalidateQueries({ queryKey: ['my-payments'] });
               }
             } catch (e: any) {
-              Alert.alert('Hata', e?.response?.data?.message || 'Yeniden denenemedi.');
+              appAlert('Hata', e?.response?.data?.message || 'Yeniden denenemedi.');
             }
           },
         },

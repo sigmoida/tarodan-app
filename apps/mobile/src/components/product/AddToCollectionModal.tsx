@@ -1,8 +1,8 @@
 import React, { useState } from 'react';
-import { View, StyleSheet, ScrollView, TouchableOpacity, Image, Alert } from 'react-native';
+import { View, StyleSheet, ScrollView, TouchableOpacity, Image } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { theme, Text, Button, Modal, Input, Textarea, Spinner } from '@tarodan/ui-native';
+import { theme, Text, Button, Modal, Input, Textarea, Spinner, appAlert } from '@tarodan/ui-native';
 import { collectionsApi } from '../../services/api';
 import { transformImageUrl } from '../../utils/imageUrl';
 
@@ -82,7 +82,7 @@ export default function AddToCollectionModal({
       onDismiss();
     },
     onError: (e: any) => {
-      Alert.alert(
+      appAlert(
         'Hata',
         e?.response?.data?.message || 'Ürün koleksiyona eklenemedi.',
       );
@@ -109,7 +109,7 @@ export default function AddToCollectionModal({
       handleClose();
     },
     onError: (e: any) => {
-      Alert.alert(
+      appAlert(
         'Hata',
         e?.response?.data?.message || 'Koleksiyon oluşturulamadı.',
       );
@@ -126,7 +126,7 @@ export default function AddToCollectionModal({
 
   const handleCreateSubmit = () => {
     if (!newName.trim()) {
-      Alert.alert('Eksik', 'Koleksiyon adı girin.');
+      appAlert('Eksik', 'Koleksiyon adı girin.');
       return;
     }
     createCollectionMutation.mutate();

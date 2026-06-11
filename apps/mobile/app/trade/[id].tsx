@@ -1,4 +1,4 @@
-import { View, ScrollView, StyleSheet, Pressable, Image, Alert, Linking, Clipboard } from 'react-native';
+import { View, ScrollView, StyleSheet, Pressable, Image, Linking, Clipboard } from 'react-native';
 import {
   theme,
   Button,
@@ -11,6 +11,7 @@ import {
   StatusBadge,
   ScreenHeader,
   tradeStatusConfig,
+  appAlert,
 } from '@tarodan/ui-native';
 import { useState, useEffect } from 'react';
 import { router, useLocalSearchParams } from 'expo-router';
@@ -542,7 +543,7 @@ export default function TradeDetailScreen() {
   const theirTotal = sideTotal(theirItems);
 
   const handleAccept = () => {
-    Alert.alert(
+    appAlert(
       'Takası Kabul Et',
       'Bu takas teklifini kabul etmek istediğinize emin misiniz?',
       [
@@ -555,7 +556,7 @@ export default function TradeDetailScreen() {
   const handleReject = () => setRejectModalVisible(true);
 
   const handleCancel = () => {
-    Alert.alert(
+    appAlert(
       'Takası İptal Et',
       'Bu takas teklifini iptal etmek istediğinize emin misiniz?',
       [
@@ -1176,8 +1177,9 @@ export default function TradeDetailScreen() {
             </>
           )}
 
-          {/* Cancel — backend-derived: state eligible + not locked by warehouse arrival */}
-          {trade.canCancel && (isInitiator || isReceiver) && (
+          {/* Cancel — backend-derived: state eligible + not locked by warehouse arrival.
+              Pending'de yalnızca teklifi yapan iptal edebilir; alıcı için aksiyon "Reddet". */}
+          {trade.canCancel && (trade.status === 'pending' ? isInitiator : isInitiator || isReceiver) && (
             <Button
               variant="outline"
               title={

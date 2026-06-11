@@ -90,6 +90,25 @@ describe('J72 · Ödeme başarılı navigasyon wiring', () => {
     expect(replaceMock).toHaveBeenCalledWith('/');
   });
 
+  it('J72.4 takas nakit farkı ödemesinde takas detayına replace eder (URL paramı ile)', async () => {
+    mockParams = { paymentId: 'pay-1', tradeCash: '1', tradeId: 'trade-9' };
+    getStatusMock.mockResolvedValue({
+      data: { data: infoFixture({ order: undefined, tradeId: 'trade-9' }) },
+    });
+    renderWithProviders(<PaymentSuccessScreen />);
+    await waitFor(() => expect(replaceMock).toHaveBeenCalledWith('/trade/trade-9'));
+  });
+
+  it('J72.5 URL paramları kaybolsa bile API yanıtındaki tradeId ile takasa döner', async () => {
+    mockParams = { paymentId: 'pay-1' };
+    getStatusMock.mockResolvedValue({
+      data: { data: infoFixture({ order: undefined, tradeId: 'trade-9' }) },
+    });
+    renderWithProviders(<PaymentSuccessScreen />);
+    await waitFor(() => expect(replaceMock).toHaveBeenCalledWith('/trade/trade-9'));
+    expect(screen.queryByText('Siparişimi Gör')).toBeNull();
+  });
+
   it('J72.3 misafir ödemede "Siparişimi Gör" butonu gösterilmez', async () => {
     mockParams = { paymentId: 'pay-1', guest: '1' };
     (paymentsApi.getStatusLightGuest as jest.Mock).mockResolvedValue({

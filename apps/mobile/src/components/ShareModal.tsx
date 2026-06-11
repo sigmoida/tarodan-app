@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
-import { View, StyleSheet, Share, Linking, TouchableOpacity, Clipboard, Alert } from 'react-native';
+import { View, StyleSheet, Share, Linking, TouchableOpacity, Clipboard } from 'react-native';
 import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
-import { theme, Text, Button, Snackbar, Divider, Modal } from '@tarodan/ui-native';
+import { theme, Text, Button, Snackbar, Divider, Modal, appAlert } from '@tarodan/ui-native';
 
 const { colors } = theme;
 
@@ -62,21 +62,21 @@ export const ShareModal: React.FC<ShareModalProps> = ({
       Clipboard.setString(shareUrl);
       setSnackbar({ visible: true, message: 'Link kopyalandı!' });
     } catch (error) {
-      Alert.alert('Hata', 'Link kopyalanamadı');
+      appAlert('Hata', 'Link kopyalanamadı');
     }
   };
 
   const handleWhatsAppShare = () => {
     const whatsappUrl = `whatsapp://send?text=${encodeURIComponent(`${fullShareText}\n\n${shareUrl}`)}`;
     Linking.openURL(whatsappUrl).catch(() => {
-      Alert.alert('Hata', 'WhatsApp açılamadı');
+      appAlert('Hata', 'WhatsApp açılamadı');
     });
   };
 
   const handleTelegramShare = () => {
     const telegramUrl = `tg://msg_url?url=${encodeURIComponent(shareUrl)}&text=${encodeURIComponent(fullShareText)}`;
     Linking.openURL(telegramUrl).catch(() => {
-      Alert.alert('Hata', 'Telegram açılamadı');
+      appAlert('Hata', 'Telegram açılamadı');
     });
   };
 

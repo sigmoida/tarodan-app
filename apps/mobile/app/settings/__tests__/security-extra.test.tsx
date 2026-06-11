@@ -6,7 +6,7 @@
  * Mevcut security.test ile ÇAKIŞMA yok: o dosya yalnız 2FA durumunu test eder.
  */
 import React from 'react';
-import { Alert } from 'react-native';
+import { appAlert } from '@tarodan/ui-native';
 import { render, screen, fireEvent, waitFor } from '@testing-library/react-native';
 
 // expo-router — paylaşılan router-mock
@@ -58,7 +58,7 @@ describe('J48 · Güvenlik — tüm cihazlardan çıkış', () => {
   });
 
   it('J48.2 satıra basınca onay Alert tetiklenir', () => {
-    const alertSpy = jest.spyOn(Alert, 'alert').mockImplementation(() => {});
+    const alertSpy = (appAlert as jest.Mock).mockImplementation(() => {});
     render(<SecuritySettingsScreen />);
     fireEvent.press(screen.getByText('Tüm Cihazlardan Çıkış'));
     expect(alertSpy).toHaveBeenCalledWith(
@@ -71,8 +71,7 @@ describe('J48 · Güvenlik — tüm cihazlardan çıkış', () => {
 
   it('J48.3 onay (Çıkış Yap) → logoutAll + logout + login replace zinciri', async () => {
     let confirmOnPress: (() => void) | undefined;
-    const alertSpy = jest
-      .spyOn(Alert, 'alert')
+    const alertSpy = (appAlert as jest.Mock)
       .mockImplementation((_t, _m, buttons: any) => {
         confirmOnPress = buttons?.find((b: any) => b.style === 'destructive')?.onPress;
       });

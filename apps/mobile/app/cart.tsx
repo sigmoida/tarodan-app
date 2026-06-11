@@ -4,6 +4,7 @@ import { Button, IconButton, Divider, Text, theme, ScreenHeader } from '@tarodan
 import { router } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { useCartStore } from '../src/stores/cartStore';
+import { useAuthStore } from '../src/stores/authStore';
 import { transformImageUrl } from '../src/utils/imageUrl';
 import { asLabel } from '../src/utils/format';
 
@@ -11,6 +12,7 @@ const { colors } = theme;
 
 export default function CartScreen() {
   const { items, getSubtotal, getItemCount, removeItem, updateQuantity, cleanExpiredItems } = useCartStore();
+  const isAuthenticated = useAuthStore((s) => s.isAuthenticated);
 
   // Clean expired items on mount
   useEffect(() => {
@@ -18,8 +20,7 @@ export default function CartScreen() {
   }, []);
 
   const subtotal = getSubtotal();
-  const shipping = items.length > 0 ? 49.90 : 0;
-  const total = subtotal + shipping;
+  const total = subtotal;
   const itemCount = getItemCount();
 
   const handleRemove = (itemId: string) => {
@@ -119,8 +120,8 @@ export default function CartScreen() {
             <Text style={styles.summaryValue}>₺{subtotal.toLocaleString('tr-TR')}</Text>
           </View>
           <View style={styles.summaryRow}>
-            <Text style={styles.summaryLabel}>Tahmini Kargo</Text>
-            <Text style={styles.summaryValue}>₺{shipping.toFixed(2)}</Text>
+            <Text style={styles.summaryLabel}>Kargo</Text>
+            <Text style={styles.summaryValue}>Ödeme adımında hesaplanır</Text>
           </View>
           <Divider style={{ marginVertical: 12 }} />
           <View style={styles.summaryRow}>
@@ -129,13 +130,15 @@ export default function CartScreen() {
           </View>
         </View>
 
-        {/* Guest Checkout Info */}
-        <View style={styles.guestInfo}>
-          <Ionicons name="information-circle-outline" size={20} color={colors.info[600]!} />
-          <Text style={styles.guestInfoText}>
-            Üye olmadan da alışveriş yapabilirsiniz. Siparişinizi e-posta ile takip edebilirsiniz.
-          </Text>
-        </View>
+        {/* Guest Checkout Info — yalnızca giriş yapmamış kullanıcılara göster */}
+        {!isAuthenticated && (
+          <View style={styles.guestInfo}>
+            <Ionicons name="information-circle-outline" size={20} color={colors.info[600]!} />
+            <Text style={styles.guestInfoText}>
+              Üye olmadan da alışveriş yapabilirsiniz. Siparişinizi e-posta ile takip edebilirsiniz.
+            </Text>
+          </View>
+        )}
 
         <View style={{ height: 120 }} />
       </ScrollView>

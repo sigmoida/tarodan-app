@@ -11,6 +11,7 @@ const { colors } = theme;
 interface PaymentInfo {
   id: string;
   orderId?: string;
+  tradeId?: string;
   order?: { id: string; orderNumber?: string };
   failureReason?: string;
   errorCode?: string;
@@ -60,6 +61,8 @@ export default function PaymentFailScreen() {
   };
 
   const orderId = info?.order?.id || info?.orderId;
+  // Takas nakit farkı ödemesi: sipariş yerine takas detayına dönülür.
+  const tradeId = info?.tradeId;
   const reason = queryError || info?.failureReason || 'Ödemeniz tamamlanamadı.';
 
   return (
@@ -95,7 +98,15 @@ export default function PaymentFailScreen() {
             disabled={retrying || !paymentId}
             style={styles.btn}
           />
-          {orderId && guest !== '1' ? (
+          {tradeId ? (
+            <Button
+              variant="outline"
+              title="Takasa Dön"
+              fullWidth
+              onPress={() => router.replace(`/trade/${tradeId}` as any)}
+              style={styles.btn}
+            />
+          ) : orderId && guest !== '1' ? (
             <Button
               variant="outline"
               title="Sipariş Detayına Git"

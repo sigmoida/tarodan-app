@@ -1,7 +1,6 @@
 import React from 'react';
-import { StyleSheet, useWindowDimensions } from 'react-native';
+import { StyleSheet, useWindowDimensions, View } from 'react-native';
 
-import { SafeAreaView } from 'react-native-safe-area-context';
 import { useLocalSearchParams } from 'expo-router';
 import { useQuery } from '@tanstack/react-query';
 import { WebView } from 'react-native-webview';
@@ -84,7 +83,7 @@ export default function CMSPageScreen() {
   `;
 
   return (
-    <SafeAreaView style={styles.container} edges={['top']}>
+    <View style={styles.container}>
       <ScreenHeader
         title={data?.title || 'Sayfa'}
         subtitle={data?.updatedAt ? `Güncellendi: ${formatRelativeDate(data.updatedAt)}` : undefined}
@@ -110,7 +109,7 @@ export default function CMSPageScreen() {
           scalesPageToFit={false}
         />
       )}
-    </SafeAreaView>
+    </View>
   );
 }
 

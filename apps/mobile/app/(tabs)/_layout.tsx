@@ -124,12 +124,6 @@ export default function TabLayout() {
           href: null,
         }}
       />
-      <Tabs.Screen
-        name="trades"
-        options={{
-          href: null,
-        }}
-      />
     </Tabs>
   );
 }

@@ -27,6 +27,7 @@ import {
 import { getAvailableQuantity, safeDecrementReserved } from '../product/helpers/product-availability.helper';
 import { getProductStatusFromQuantity } from '../product/helpers/product-status.helper';
 import { createTradeWarehouseShipments } from './helpers/warehouse-shipments';
+import { ACTIVE_TRADE_STATUSES } from './trade.constants';
 import { PaymentService } from '../payment/payment.service';
 import { ProductLockService } from '../product/product-lock.service';
 import { SuratCargoService } from '../surat-cargo/surat-cargo.service';
@@ -482,21 +483,12 @@ export class TradeService {
     // Only check initiator's offered products — same product can't be offered in multiple active trades.
     // Receiver's product can be the target of multiple offers; the receiver chooses which to accept.
     const initiatorProductIds = dto.initiatorItems.map((i) => i.productId);
-    const activeStatuses = [
-      TradeStatus.pending,
-      TradeStatus.accepted,
-      TradeStatus.initiator_shipped,
-      TradeStatus.receiver_shipped,
-      TradeStatus.both_shipped,
-      TradeStatus.initiator_received,
-      TradeStatus.receiver_received,
-    ];
     if (initiatorProductIds.length > 0) {
       const existingTradeItems = await this.prisma.tradeItem.findMany({
         where: {
           productId: { in: initiatorProductIds },
           side: 'initiator',
-          trade: { status: { in: activeStatuses } },
+          trade: { status: { in: ACTIVE_TRADE_STATUSES } },
         },
       });
       if (existingTradeItems.length > 0) {

@@ -1,10 +1,9 @@
 import { useState } from 'react';
-import { Alert, View } from 'react-native';
+import { View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { router } from 'expo-router';
 import * as SecureStore from 'expo-secure-store';
 import { useMutation } from '@tanstack/react-query';
-import { SafeAreaView } from 'react-native-safe-area-context';
 import {
   Button,
   Checkbox,
@@ -15,9 +14,12 @@ import {
   Text,
   VStack,
   theme,
+  appAlert,
 } from '@tarodan/ui-native';
 import { authApi } from '../../src/services/api';
 import { useAuthStore } from '../../src/stores/authStore';
+import { PhoneInput } from '../../src/components/common';
+import { DEFAULT_COUNTRY_CODE, normalizePhoneForPayload } from '../../src/utils/phone';
 
 const { colors, spacing, radius } = theme;
 
@@ -29,6 +31,7 @@ interface BusinessForm {
   companyType: string;
   email: string;
   phone: string;
+  phoneCountryCode: string;
   password: string;
   passwordConfirm: string;
 }
@@ -43,6 +46,7 @@ export default function RegisterBusinessScreen() {
     companyType: '',
     email: '',
     phone: '',
+    phoneCountryCode: DEFAULT_COUNTRY_CODE,
     password: '',
     passwordConfirm: '',
   });
@@ -54,7 +58,7 @@ export default function RegisterBusinessScreen() {
 
   const registerMutation = useMutation({
     mutationFn: async () => {
-      const formattedPhone = '+90' + form.phone.trim().replace(/\D/g, '');
+      const formattedPhone = normalizePhoneForPayload(form.phone, form.phoneCountryCode);
       return authApi.registerBusiness({
         companyName: form.companyName.trim(),
         email: form.email.trim().toLowerCase(),
@@ -86,7 +90,7 @@ export default function RegisterBusinessScreen() {
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         await login(accessToken!, data.user as any);
       }
-      Alert.alert(
+      appAlert(
         'Kurumsal hesap oluşturuldu',
         'E-posta doğrulaması için kayıtlı e-posta adresinize gönderilen bağlantıyı kullanın.',
         [{ text: 'Devam', onPress: () => router.replace('/seller/dashboard') }],
@@ -94,30 +98,36 @@ export default function RegisterBusinessScreen() {
     },
     onError: (e: unknown) => {
       const err = e as { response?: { data?: { message?: string } } };
-      Alert.alert('Hata', err?.response?.data?.message || 'Kayıt tamamlanamadı.');
+      appAlert('Hata', err?.response?.data?.message || 'Kayıt tamamlanamadı.');
     },
   });
 
   const handleSubmit = () => {
-    if (!form.companyName.trim()) return Alert.alert('Eksik', 'Şirket adı gerekli.');
+    if (!form.companyName.trim()) return appAlert('Eksik', 'Şirket adı gerekli.');
     if (!/^\d{10,11}$/.test(form.taxId.trim()))
-      return Alert.alert('Eksik', 'Vergi / T.C. no 10 veya 11 hane olmalı.');
-    if (form.city.trim().length < 2) return Alert.alert('Eksik', 'Şehir/İl gerekli.');
-    if (!/^\S+@\S+\.\S+$/.test(form.email)) return Alert.alert('Eksik', 'Geçerli e-posta girin.');
-    if (!/^\+90[0-9]{10}$/.test('+90' + form.phone.trim().replace(/\D/g, '')))
-      return Alert.alert('Eksik', 'Geçerli bir telefon numarası girin (5XX XXX XX XX).');
+      return appAlert('Eksik', 'Vergi / T.C. no 10 veya 11 hane olmalı.');
+    if (form.city.trim().length < 2) return appAlert('Eksik', 'Şehir/İl gerekli.');
+    if (!/^\S+@\S+\.\S+$/.test(form.email)) return appAlert('Eksik', 'Geçerli e-posta girin.');
+    // TR için tam 10 hane; diğer ülke kodlarında en az 8 hane yeterli.
+    const phoneDigits = form.phone.replace(/\D/g, '');
+    const phoneValid =
+      form.phoneCountryCode === DEFAULT_COUNTRY_CODE
+        ? /^[0-9]{10}$/.test(phoneDigits)
+        : phoneDigits.length >= 8;
+    if (!phoneValid)
+      return appAlert('Eksik', 'Geçerli bir telefon numarası girin (5XX XXX XX XX).');
     if (form.password.length < 8)
-      return Alert.alert('Şifre Yetersiz', 'Şifre en az 8 karakter olmalı.');
+      return appAlert('Şifre Yetersiz', 'Şifre en az 8 karakter olmalı.');
     if (!/[A-Z]/.test(form.password))
-      return Alert.alert('Şifre Yetersiz', 'Şifre en az 1 büyük harf içermeli.');
+      return appAlert('Şifre Yetersiz', 'Şifre en az 1 büyük harf içermeli.');
     if (!/[a-z]/.test(form.password))
-      return Alert.alert('Şifre Yetersiz', 'Şifre en az 1 küçük harf içermeli.');
+      return appAlert('Şifre Yetersiz', 'Şifre en az 1 küçük harf içermeli.');
     if (!/\d/.test(form.password))
-      return Alert.alert('Şifre Yetersiz', 'Şifre en az 1 rakam içermeli.');
+      return appAlert('Şifre Yetersiz', 'Şifre en az 1 rakam içermeli.');
     if (form.password !== form.passwordConfirm)
-      return Alert.alert('Eksik', 'Şifreler eşleşmiyor.');
+      return appAlert('Eksik', 'Şifreler eşleşmiyor.');
     if (!acceptTerms)
-      return Alert.alert(
+      return appAlert(
         'Sözleşme',
         'Üyelik sözleşmesini ve KVKK aydınlatmasını kabul etmelisiniz.',
       );
@@ -125,8 +135,8 @@ export default function RegisterBusinessScreen() {
   };
 
   return (
-    <SafeAreaView style={{ flex: 1, backgroundColor: colors.surface.alt }} edges={['top']}>
-      <ScreenHeader title="Kurumsal Kayıt" variant="light" onBack={() => router.back()} />
+    <View style={{ flex: 1, backgroundColor: colors.surface.alt }}>
+      <ScreenHeader title="Kurumsal Kayıt" onBack={() => router.back()} />
 
       <Screen bg="alt" padding={4}>
         <VStack gap={3}>
@@ -202,12 +212,12 @@ export default function RegisterBusinessScreen() {
             keyboardType="email-address"
             autoCapitalize="none"
           />
-          <Input
+          <PhoneInput
             label="Telefon *"
-            placeholder="+90 5XX XXX XX XX"
-            value={form.phone}
-            onChangeText={(v) => setField('phone', v)}
-            keyboardType="phone-pad"
+            countryCode={form.phoneCountryCode}
+            onCountryCodeChange={(code) => setField('phoneCountryCode', code)}
+            phone={form.phone}
+            onPhoneChange={(v) => setField('phone', v)}
           />
           <Input
             label="Şifre *"
@@ -262,6 +272,6 @@ export default function RegisterBusinessScreen() {
           </HStack>
         </VStack>
       </Screen>
-    </SafeAreaView>
+    </View>
   );
 }

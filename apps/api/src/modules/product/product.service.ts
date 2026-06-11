@@ -22,6 +22,7 @@ import { ProductStatus, Prisma, MembershipTierType, Brand } from '@prisma/client
 import { buildProductWhere } from './helpers/build-product-where';
 import { fulltextProductSearch } from './helpers/fulltext-search';
 import { getAvailableQuantity } from './helpers/product-availability.helper';
+import { ACTIVE_TRADE_STATUSES } from '../trade/trade.constants';
 import { computeQualityScore } from './helpers/quality-score';
 import { computeRelevanceScore } from './helpers/relevance-score';
 import { DiscountService } from '../discount/discount.service';
@@ -179,7 +180,7 @@ export class ProductService implements OnModuleInit {
           price: dto.price,
           condition: dto.condition,
           status: ProductStatus.pending, // Needs admin approval
-          quantity: dto.quantity !== undefined ? dto.quantity : null, // null = unlimited stock
+          quantity: dto.quantity !== undefined ? dto.quantity : 1, // default 1 adet; sınırsız (null) yalnızca açıkça istenince
           isTradeEnabled: dto.isTradeEnabled || false,
           isPreorder: dto.isPreorder ?? false,
           isSet: dto.isSet ?? false,
@@ -527,8 +528,19 @@ export class ProductService implements OnModuleInit {
     const idOrder = new Map(esResult.ids.map((id, i) => [id, i]));
     products.sort((a, b) => (idOrder.get(a.id) ?? 0) - (idOrder.get(b.id) ?? 0));
 
+    // Stok bitenler sayfa sonunda: ES'teki inStock bayrağı rezervasyon
+    // değişiminde yeniden indekslenmez; canlı DB verisiyle (quantity − reserved)
+    // UI "STOKTA YOK" tanımına göre sayfa içinde stoktakileri öne al.
+    const isInStock = (p: { status: ProductStatus; quantity: number | null; reservedQuantity: number | null }) =>
+      p.status === ProductStatus.active &&
+      (p.quantity == null || p.quantity - (p.reservedQuantity ?? 0) > 0);
+    const pageOrdered = [
+      ...products.filter((p) => isInStock(p)),
+      ...products.filter((p) => !isInStock(p)),
+    ];
+
     const formattedProducts = await Promise.all(
-      products.map((p) => this.formatProductResponse(p)),
+      pageOrdered.map((p) => this.formatProductResponse(p)),
     );
 
     // Tutarlılık: Postgres path ile aynı şekilde, discountOnly=true iken sadece
@@ -634,30 +646,63 @@ export class ProductService implements OnModuleInit {
         ];
     }
 
-    // Stoktakiler önce: status verilmeyen kapsayıcı listelemede (aktif + tükenen + satıldı)
-    // aktif/stoklu ürünler tükenenlerden önce gelsin. Postgres enum sırası
-    // active(2) < sold(4) < inactive(5) olduğundan ORDER BY status ASC bunu doğal sağlar.
-    // (Tek-statülü carousel'lerde — status=active — etkisizdir.)
-    if (!query.status) {
-      orderBy = [{ status: 'asc' }, ...orderBy];
-    }
+    // Stok bitenler her zaman en altta — UI'daki "STOKTA YOK" rozetiyle birebir
+    // aynı tanım: stokta = aktif VE müsait adet (quantity − reserved) > 0.
+    // Sadece status'a bakmak yetmez: tamamen rezerve edilmiş ürün (quantity=1,
+    // reserved=1) aktif kalır ama UI "STOKTA YOK" gösterir. Prisma computed
+    // kolonla sıralayamadığı için liste iki kovada sayfalanır: önce stoktakiler,
+    // bittiğinde stok bitenler — seçilen sortBy her kova içinde korunur.
+    const inStockCondition: Prisma.ProductWhereInput = {
+      status: ProductStatus.active,
+      OR: [
+        { quantity: null },
+        { reservedQuantity: null, quantity: { gt: 0 } },
+        { quantity: { gt: this.prisma.product.fields.reservedQuantity } },
+      ],
+    };
+    const whereInStock: Prisma.ProductWhereInput = { AND: [where, inStockCondition] };
+    const whereOutOfStock: Prisma.ProductWhereInput = { AND: [where, { NOT: inStockCondition }] };
+    // Stok bitenler kovasında satılan, tükenenden önce gelsin (enum: sold < inactive)
+    const outOfStockOrderBy: Prisma.ProductOrderByWithRelationInput[] = [{ status: 'asc' }, ...orderBy];
 
-    const total = await this.prisma.product.count({ where });
-    const products = await this.prisma.product.findMany({
-      where,
-      orderBy,
-      skip: (page - 1) * limit,
-      take: limit,
-      include: {
-        images: { orderBy: { sortOrder: 'asc' }, take: 1 },
-        seller: { select: { id: true, displayName: true, isVerified: true, sellerType: true, avatarUrl: true } },
-        category: { select: { id: true, name: true, slug: true } },
-        brand: { select: { id: true, name: true, slug: true, logo: true } },
-        manufacturer: { select: { id: true, name: true, slug: true } },
-        carModel: { include: { brand: { select: { slug: true } } } },
-        productAttributes: { include: { attribute: { include: { group: true } } } },
-      },
-    });
+    const productInclude = {
+      images: { orderBy: { sortOrder: 'asc' as const }, take: 1 },
+      seller: { select: { id: true, displayName: true, isVerified: true, sellerType: true, avatarUrl: true } },
+      category: { select: { id: true, name: true, slug: true } },
+      brand: { select: { id: true, name: true, slug: true, logo: true } },
+      manufacturer: { select: { id: true, name: true, slug: true } },
+      carModel: { include: { brand: { select: { slug: true } } } },
+      productAttributes: { include: { attribute: { include: { group: true } } } },
+    } satisfies Prisma.ProductInclude;
+
+    const [totalInStock, totalOutOfStock] = await Promise.all([
+      this.prisma.product.count({ where: whereInStock }),
+      this.prisma.product.count({ where: whereOutOfStock }),
+    ]);
+    const total = totalInStock + totalOutOfStock;
+
+    const skip = (page - 1) * limit;
+    const inStockTake = Math.max(0, Math.min(limit, totalInStock - skip));
+    const inStockRows = inStockTake > 0
+      ? await this.prisma.product.findMany({
+          where: whereInStock,
+          orderBy,
+          skip,
+          take: inStockTake,
+          include: productInclude,
+        })
+      : [];
+    const outOfStockTake = limit - inStockRows.length;
+    const outOfStockRows = outOfStockTake > 0
+      ? await this.prisma.product.findMany({
+          where: whereOutOfStock,
+          orderBy: outOfStockOrderBy,
+          skip: Math.max(0, skip - totalInStock),
+          take: outOfStockTake,
+          include: productInclude,
+        })
+      : [];
+    const products = [...inStockRows, ...outOfStockRows];
 
     const formattedProducts = await Promise.all(
       products.map((p) => this.formatProductResponse(p)),
@@ -884,6 +929,30 @@ export class ProductService implements OnModuleInit {
   }
 
   /**
+   * Update sonrası statüyü belirler.
+   * - Reddedilen ürün düzenlenince otomatik yeniden incelemeye girsin (re-submit → pending).
+   * - Stok 0'a çekilen ürün aktif kalamaz → tükendi (inactive). Aksi halde
+   *   "aktif ama stoksuz" ürün listelerde stoktakilerin arasında kalır
+   *   (sıralama status/inStock üzerinden yapılır) ve yeniden satışa açma
+   *   akışıyla (sold/inactive → active, quantity>0 şartı) çelişir.
+   */
+  private resolveUpdatedStatus(
+    product: { status: ProductStatus; quantity: number | null },
+    dto: UpdateProductDto,
+  ): ProductStatus | undefined {
+    const status =
+      dto.status ?? (product.status === ProductStatus.rejected ? ProductStatus.pending : undefined);
+    const newQuantity =
+      dto.quantity !== undefined
+        ? (dto.quantity === null ? null : Number(dto.quantity))
+        : product.quantity;
+    if (newQuantity === 0 && (status ?? product.status) === ProductStatus.active) {
+      return ProductStatus.inactive;
+    }
+    return status;
+  }
+
+  /**
    * Update product
    * PATCH /products/:id
    */
@@ -1036,7 +1105,7 @@ export class ProductService implements OnModuleInit {
       ...(effectivePrice !== undefined ? { price: effectivePrice } : {}),
       condition: dto.condition,
       // Reddedilen ürün düzenlenince otomatik yeniden incelemeye girsin (re-submit → pending).
-      status: dto.status ?? (product.status === ProductStatus.rejected ? ProductStatus.pending : undefined),
+      status: this.resolveUpdatedStatus(product, dto),
       isTradeEnabled: dto.isTradeEnabled !== undefined ? dto.isTradeEnabled : undefined,
       isPreorder: dto.isPreorder !== undefined ? dto.isPreorder : undefined,
       isSet: dto.isSet !== undefined ? dto.isSet : undefined,
@@ -1510,7 +1579,7 @@ Bu ürünü istek listenizden kaldırmak için ürün sayfasına gidip "İstek L
    * Get seller's own products (all statuses)
    */
   async findSellerProducts(sellerId: string, query: ProductQueryDto) {
-    const { status, page = 1, limit = 20 } = query;
+    const { status, tradeEligible, page = 1, limit = 20 } = query;
 
     const where: Prisma.ProductWhereInput = {
       sellerId,
@@ -1521,13 +1590,36 @@ Bu ürünü istek listenizden kaldırmak için ürün sayfasına gidip "İstek L
           status: { notIn: [ProductStatus.draft] }
         }
       ),
+      // Takas teklifine eklenebilir ürünler: aktif + aktif takasta değil + müsait stoğu var
+      // (createTrade'in initiator validasyonuyla birebir — trade.service.ts)
+      ...(tradeEligible
+        ? {
+          status: ProductStatus.active,
+          NOT: {
+            tradeItemsOffered: {
+              some: {
+                side: 'initiator',
+                trade: { status: { in: ACTIVE_TRADE_STATUSES } },
+              },
+            },
+          },
+          OR: [
+            { quantity: null },
+            { reservedQuantity: null, quantity: { gt: 0 } },
+            { quantity: { gt: this.prisma.product.fields.reservedQuantity } },
+          ],
+        }
+        : {}),
     };
 
     const total = await this.prisma.product.count({ where });
 
     const products = await this.prisma.product.findMany({
       where,
-      orderBy: { createdAt: 'desc' },
+      // Stok bitenler (sold/inactive) ve reddedilenler her zaman en altta:
+      // enum sırası pending < active < reserved < sold < inactive < rejected
+      // olduğundan ORDER BY status ASC satılabilir ilanları üstte tutar.
+      orderBy: [{ status: 'asc' }, { createdAt: 'desc' }],
       skip: (page - 1) * limit,
       take: limit,
       include: {

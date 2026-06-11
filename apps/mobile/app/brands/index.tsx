@@ -1,7 +1,6 @@
 import React, { useMemo, useState } from 'react';
 import { View, StyleSheet, FlatList, TouchableOpacity, Image } from 'react-native';
 
-import { SafeAreaView } from 'react-native-safe-area-context';
 import { router } from 'expo-router';
 import { useQuery } from '@tanstack/react-query';
 import { brandsApi } from '../../src/services/api';
@@ -62,7 +61,7 @@ export default function BrandsScreen() {
   );
 
   return (
-    <SafeAreaView style={styles.container} edges={['top']}>
+    <View style={styles.container}>
       <ScreenHeader title="Markalar" />
 
       <View style={styles.searchBar}>
@@ -97,7 +96,7 @@ export default function BrandsScreen() {
           onRefresh={refetch}
         />
       )}
-    </SafeAreaView>
+    </View>
   );
 }
 

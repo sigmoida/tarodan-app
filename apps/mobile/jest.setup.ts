@@ -42,3 +42,16 @@ jest.mock('@expo/vector-icons', () => {
     Feather: makeIcon('Feather'),
   };
 });
+
+// appAlert: native Alert.alert yerine geçen temalı dialog (AlertDialogHost testte
+// mount edilmez) → global jest.fn mock. Testler `appAlert as jest.Mock` ile erişir.
+jest.mock('@tarodan/ui-native', () => ({
+  ...jest.requireActual('@tarodan/ui-native'),
+  appAlert: jest.fn(),
+}));
+
+// Her testte appAlert çağrı geçmişini sıfırla (testler arası sızıntı olmasın).
+beforeEach(() => {
+  const { appAlert } = jest.requireMock('@tarodan/ui-native');
+  (appAlert as jest.Mock).mockReset();
+});

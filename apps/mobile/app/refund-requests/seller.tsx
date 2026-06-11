@@ -1,4 +1,4 @@
-import { View, ScrollView, StyleSheet, RefreshControl, Alert } from 'react-native';
+import { View, ScrollView, StyleSheet, RefreshControl } from 'react-native';
 import {
   Button,
   Card,
@@ -9,6 +9,7 @@ import {
   StatusBadge,
   theme,
   ScreenHeader,
+  appAlert,
 } from '@tarodan/ui-native';
 import type { BadgeVariant } from '@tarodan/ui-native';
 import { useState, useCallback } from 'react';
@@ -86,12 +87,12 @@ export default function SellerRefundRequestsScreen() {
   const acceptMutation = useMutation({
     mutationFn: (id: string) => refundsApi.accept(id),
     onSuccess: () => {
-      Alert.alert('Talep kabul edildi', 'İade talebi kabul edildi.');
+      appAlert('Talep kabul edildi', 'İade talebi kabul edildi.');
       invalidate();
     },
     onError: (e: any) => {
       captureException(e, { level: 'error', tags: { flow: 'refund.seller.accept' } });
-      Alert.alert('Hata', e?.response?.data?.message || 'İşlem başarısız. Tekrar deneyin.');
+      appAlert('Hata', e?.response?.data?.message || 'İşlem başarısız. Tekrar deneyin.');
     },
   });
 
@@ -101,12 +102,12 @@ export default function SellerRefundRequestsScreen() {
     onSuccess: () => {
       setRejectDialog({ visible: false, id: null });
       setRejectReason('');
-      Alert.alert('Talep reddedildi', 'İade talebi reddedildi.');
+      appAlert('Talep reddedildi', 'İade talebi reddedildi.');
       invalidate();
     },
     onError: (e: any) => {
       captureException(e, { level: 'error', tags: { flow: 'refund.seller.reject' } });
-      Alert.alert('Hata', e?.response?.data?.message || 'İşlem başarısız. Tekrar deneyin.');
+      appAlert('Hata', e?.response?.data?.message || 'İşlem başarısız. Tekrar deneyin.');
     },
   });
 
@@ -125,7 +126,7 @@ export default function SellerRefundRequestsScreen() {
   const submitReject = () => {
     if (!rejectDialog.id) return;
     if (rejectReason.trim().length < 10) {
-      Alert.alert('Gerekçe gerekli', 'Red gerekçesi en az 10 karakter olmalıdır.');
+      appAlert('Gerekçe gerekli', 'Red gerekçesi en az 10 karakter olmalıdır.');
       return;
     }
     rejectMutation.mutate({ id: rejectDialog.id, response: rejectReason.trim() });
@@ -212,7 +213,7 @@ export default function SellerRefundRequestsScreen() {
                       variant="primary"
                       title="Kabul Et"
                       onPress={() =>
-                        Alert.alert(
+                        appAlert(
                           'İade talebini kabul et',
                           'Bu iade talebini kabul etmek istediğinize emin misiniz?',
                           [

@@ -9,6 +9,7 @@ import { ThemedRefreshControl } from '../../../src/components/common';
 import { useRefresh } from '../../../src/hooks/useRefresh';
 import { useAuthStore } from '../../../src/stores/authStore';
 import { transformImageUrl } from '../../../src/utils/imageUrl';
+import { buildShareContent, collectionShareUrl } from '../../../src/utils/share';
 
 const { colors } = theme;
 const { width } = Dimensions.get('window');
@@ -55,10 +56,12 @@ export default function CollectionDetailScreen() {
   const handleShare = async () => {
     if (!collection) return;
     try {
-      await Share.share({
-        message: `${collection.name}\n\n${collection.description ?? ''}\n\nTarodan'da bu koleksiyona göz atın!`,
-        title: collection.name,
-      });
+      const { content, options } = buildShareContent(
+        `${collection.name}\n\n${collection.description ?? ''}\n\nTarodan'da bu koleksiyona göz atın!`,
+        collectionShareUrl(String(collection.id ?? id)),
+        collection.name,
+      );
+      await Share.share(content, options);
     } catch (error) {
       console.error('Share error:', error);
     }
@@ -269,7 +272,7 @@ export default function CollectionDetailScreen() {
                   title="İlk ürünü ekle"
                   icon="add"
                   onPress={() => router.push(`/collections/${id}/add-items`)}
-                  style={{ marginTop: 12 }}
+                  style={{ marginTop: 12, alignSelf: 'center' }}
                 />
               )}
             </View>
@@ -315,7 +318,7 @@ export default function CollectionDetailScreen() {
               <Button
                 variant="primary"
                 title="Premium Üye Ol"
-                onPress={() => router.push('/(auth)/register')}
+                onPress={() => router.push(isAuthenticated ? '/upgrade' : '/(auth)/login')}
                 fullWidth
                 style={styles.noticeButton}
               />

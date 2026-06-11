@@ -6,7 +6,8 @@
  * uygulanması, stacking, escrow) backendOnly.
  */
 import React from 'react';
-import { Alert, TextInput } from 'react-native';
+import { appAlert } from '@tarodan/ui-native';
+import { TextInput } from 'react-native';
 import { screen, fireEvent, waitFor } from '@testing-library/react-native';
 import { renderWithProviders } from '../../../src/test-utils';
 import { resetRouterMocks, pushMock } from '../../../src/test-utils/router-mock';
@@ -62,14 +63,14 @@ function discountFixture(overrides: Record<string, unknown> = {}) {
 }
 
 describe('J114 · indirim yönetimi (settings/discounts)', () => {
-  let alertSpy: jest.SpyInstance;
+  let alertSpy: jest.Mock;
 
   beforeEach(() => {
     resetRouterMocks();
     mockAuthState = { isAuthenticated: true, user: { id: 'u1', isSeller: true } };
     mockGetAll.mockResolvedValue({ data: { items: [discountFixture()] } });
     mockGetListings.mockResolvedValue({ data: { data: [] } });
-    alertSpy = jest.spyOn(Alert, 'alert').mockImplementation(() => {});
+    alertSpy = (appAlert as jest.Mock).mockImplementation(() => {});
   });
 
   afterEach(() => {

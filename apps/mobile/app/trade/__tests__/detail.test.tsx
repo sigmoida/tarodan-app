@@ -143,6 +143,21 @@ describe('J5 · Aksiyon buton görünürlüğü', () => {
     expect(screen.queryByText('Kabul Et')).toBeNull();
   });
 
+  it('J5.9 receiver + pending → "Teklifi İptal Et" görünmez (aksiyonu Reddet)', async () => {
+    getOneMock.mockResolvedValue({ data: { data: tradeFixture({ status: 'pending', canCancel: true }) } });
+    renderWithProviders(<TradeDetailScreen />);
+    await waitFor(() => expect(screen.getByText('Reddet')).toBeOnTheScreen());
+    expect(screen.queryByText('trade.cancel.offerCta')).toBeNull();
+  });
+
+  it('J5.10 initiator + pending → "Teklifi İptal Et" görünür', async () => {
+    mockUser = { id: 'user-initiator' };
+    getOneMock.mockResolvedValue({ data: { data: tradeFixture({ status: 'pending', canCancel: true }) } });
+    renderWithProviders(<TradeDetailScreen />);
+    await waitFor(() => expect(screen.getByText('trade.cancel.offerCta')).toBeOnTheScreen());
+    expect(screen.queryByText('Reddet')).toBeNull();
+  });
+
   it('J5.8 "Karşı Teklif" → router.push counter ekranına', async () => {
     getOneMock.mockResolvedValue({ data: { data: tradeFixture({ status: 'pending' }) } });
     renderWithProviders(<TradeDetailScreen />);
