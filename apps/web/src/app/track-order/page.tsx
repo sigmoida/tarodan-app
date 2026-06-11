@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { useSearchParams } from "next/navigation";
+import { useSearchParams, useRouter } from "next/navigation";
 import Link from "next/link";
 import Image from "next/image";
 import {
@@ -56,6 +56,16 @@ const orderStatusEnLabels: Record<string, string> = {
 
 export default function TrackOrderPage() {
   const searchParams = useSearchParams();
+  const router = useRouter();
+  // Geri: tarayıcı geçmişi varsa önceki sayfaya (sipariş listesi/detayı) dön,
+  // yoksa (doğrudan/derin link) anasayfaya düş.
+  const handleBack = () => {
+    if (typeof window !== "undefined" && window.history.length > 1) {
+      router.back();
+    } else {
+      router.push("/");
+    }
+  };
   const { locale } = useTranslation();
   const [orderNumber, setOrderNumber] = useState("");
   const [email, setEmail] = useState("");
@@ -175,12 +185,14 @@ export default function TrackOrderPage() {
     <div className="min-h-screen bg-surface">
       <main className="max-w-2xl mx-auto px-4 py-8">
         <div className="flex items-center gap-4 mb-8">
-          <Link
-            href="/"
+          <button
+            type="button"
+            onClick={handleBack}
+            aria-label={locale === "en" ? "Go back" : "Geri"}
             className="p-2 hover:bg-border-subtle rounded-lg transition-colors"
           >
             <ArrowLeftIcon className="w-6 h-6 text-muted" />
-          </Link>
+          </button>
           <h1 className="text-2xl font-bold text-heading">
             {locale === "en" ? "Track your order" : "Sipariş Takip"}
           </h1>

@@ -144,6 +144,24 @@ export default function OrdersPage() {
   const orders = ordersQuery.data ?? [];
   const loading = ordersQuery.isLoading;
 
+  // Alış / satış sipariş adetleri (aktif siparişler). Filtre butonlarında ve
+  // toplam kırılımında gösterilir. limit:1 ile sadece meta.total çekilir.
+  const orderCountsQuery = useQuery({
+    queryKey: ['orders-counts'],
+    queryFn: async (): Promise<{ buyer: number; seller: number }> => {
+      const [buyerRes, sellerRes] = await Promise.all([
+        api.get('/orders', { params: { role: 'buyer', limit: 1 } }),
+        api.get('/orders', { params: { role: 'seller', limit: 1 } }),
+      ]);
+      return {
+        buyer: buyerRes.data?.meta?.total ?? 0,
+        seller: sellerRes.data?.meta?.total ?? 0,
+      };
+    },
+    enabled: !authLoading && isAuthenticated,
+  });
+  const orderCounts = orderCountsQuery.data ?? { buyer: 0, seller: 0 };
+
   // Alıcı siparişlerini checkout grubuna göre topla: aynı checkout'ta alınan
   // ürünler tek kart altında alt satırlar olarak görünür (her birinin kargosu ayrı).
   // Satıcı görünümündeki siparişler gruplanmaz.
@@ -364,7 +382,11 @@ export default function OrdersPage() {
                     ? 'bg-primary-500 text-inverted'
                     : 'bg-surface-elevated text-muted hover:bg-surface-alt border border-border'
                   }`}>
-                {f === 'buyer' ? t('profile.totalPurchases') : f === 'seller' ? t('profile.totalSales') : t('common.all')}
+                {f === 'buyer'
+                  ? `${t('profile.totalPurchases')} (${orderCounts.buyer})`
+                  : f === 'seller'
+                    ? `${t('profile.totalSales')} (${orderCounts.seller})`
+                    : `${t('common.all')} (${orderCounts.buyer + orderCounts.seller})`}
               </Button>
             ))}
             <span className="text-subtle mx-1">|</span>
@@ -558,7 +580,7 @@ export default function OrdersPage() {
                         {t('review.writeReview')}
                       </Button>
                     )}
-                    {order.status === 'delivered' && (
+                    {(order.status === 'delivered' || order.status === 'completed') && (
                       <span className="px-4 py-2 bg-success-100 text-success-700 rounded-lg text-sm font-medium">
                         {t('order.statusDelivered')}
                       </span>

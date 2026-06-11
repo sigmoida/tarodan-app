@@ -268,15 +268,20 @@ export default function SidebarFilters({
     };
 
     const toggleCustomAttribute = (groupSlug: string, attrSlug: string) => {
+        // Her custom attribute grubu çoklu seçim: aynı değere tekrar basınca o değeri kaldır,
+        // farklı değere basınca mevcut seçimlere ekle (checkbox davranışı).
         const current = filters.customAttributes?.[groupSlug] ?? [];
-        const next = current.includes(attrSlug)
-            ? current.filter((s) => s !== attrSlug)
-            : [...current, attrSlug];
+        const isSelected = current.includes(attrSlug);
         const nextMap = { ...(filters.customAttributes ?? {}) };
-        if (next.length === 0) {
-            delete nextMap[groupSlug];
+        if (isSelected) {
+            const remaining = current.filter((s) => s !== attrSlug);
+            if (remaining.length > 0) {
+                nextMap[groupSlug] = remaining;
+            } else {
+                delete nextMap[groupSlug];
+            }
         } else {
-            nextMap[groupSlug] = next;
+            nextMap[groupSlug] = [...current, attrSlug];
         }
         onFilterChange({ ...filters, customAttributes: nextMap });
     };

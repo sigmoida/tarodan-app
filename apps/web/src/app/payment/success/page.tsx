@@ -105,12 +105,19 @@ export default function PaymentSuccessPage() {
 
   const fetchPayment = async () => {
     try {
-      // PayTR callback'i (test modunda) gecikebilir; durum-sorgu ile anında tamamlamayı dene.
-      // Idempotent: zaten completed ise no-op. Başarısız olursa sessiz geç, getStatus zaten doğru durumu çeker.
-      try {
-        await paymentsApi.verify(paymentId!);
-      } catch {
-        // ignore — fetchPayment yine de güncel statüyü gösterir
+      // PayTR callback'i (test modunda) gecikebilir; durum-sorgu (verify) ile anında
+      // tamamlamayı dene. PayTR'ın status-inquiry'si ödeme bittikten birkaç saniye sonra
+      // "ödendi" dönebildiği için TEK verify çağrısı erken çalışıp başarısız olabilir
+      // (üyelik past_due kalır, ilan hakkı 5 görünür). Bu yüzden completed=true olana
+      // kadar birkaç kez tekrar dene. verify idempotent: zaten completed ise no-op.
+      for (let i = 0; i < 5; i++) {
+        try {
+          const res = await paymentsApi.verify(paymentId!);
+          if (res.data?.completed) break;
+        } catch {
+          // ignore — getStatus yine de güncel statüyü çeker
+        }
+        if (i < 4) await new Promise((r) => setTimeout(r, 1200));
       }
 
       const isGuest =

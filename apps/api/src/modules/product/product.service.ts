@@ -184,6 +184,7 @@ export class ProductService implements OnModuleInit {
           isTradeEnabled: dto.isTradeEnabled || false,
           isPreorder: dto.isPreorder ?? false,
           isSet: dto.isSet ?? false,
+          bundleSize: dto.isSet ? (dto.bundleSize ?? null) : null,
           rankTier: isPremiumSeller ? 1 : 0,
           popularityScore: FRESH_POPULARITY_BASELINE,
           popularityUpdatedAt: new Date(),
@@ -511,7 +512,7 @@ export class ProductService implements OnModuleInit {
       include: {
         images: { orderBy: { sortOrder: 'asc' }, take: 1 },
         seller: {
-          select: { id: true, displayName: true, isVerified: true, sellerType: true },
+          select: { id: true, displayName: true, avatarUrl: true, isVerified: true, sellerType: true },
         },
         category: { select: { id: true, name: true, slug: true } },
         brand: { select: { id: true, name: true, slug: true, logo: true } },
@@ -749,6 +750,7 @@ export class ProductService implements OnModuleInit {
               select: {
                 id: true,
                 displayName: true,
+                avatarUrl: true,
                 isVerified: true,
                 sellerType: true,
               },
@@ -827,6 +829,7 @@ export class ProductService implements OnModuleInit {
           select: {
             id: true,
             displayName: true,
+            avatarUrl: true,
             isVerified: true,
             sellerType: true,
           },
@@ -1109,6 +1112,12 @@ export class ProductService implements OnModuleInit {
       isTradeEnabled: dto.isTradeEnabled !== undefined ? dto.isTradeEnabled : undefined,
       isPreorder: dto.isPreorder !== undefined ? dto.isPreorder : undefined,
       isSet: dto.isSet !== undefined ? dto.isSet : undefined,
+      bundleSize:
+        dto.isSet === false
+          ? null
+          : dto.bundleSize !== undefined
+            ? dto.bundleSize
+            : undefined,
       quantity: dto.quantity !== undefined ? (dto.quantity === null ? null : Number(dto.quantity)) : undefined,
       category: dto.categoryId ? { connect: { id: dto.categoryId } } : undefined,
       brand: dto.brandId ? { connect: { id: dto.brandId } } : (dto.brandId === null ? { disconnect: true } : undefined),
@@ -1549,6 +1558,7 @@ Bu ürünü istek listenizden kaldırmak için ürün sayfasına gidip "İstek L
           select: {
             id: true,
             displayName: true,
+            avatarUrl: true,
             isVerified: true,
             sellerType: true,
           },

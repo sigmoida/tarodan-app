@@ -107,6 +107,7 @@ export default function NewListingPage() {
     year: "" as string | number,
     isTradeEnabled: false,
     isSet: false,
+    bundleSize: undefined as number | undefined,
     quantity: 1 as string | number,
     images: [] as Array<{ cardKey: string; detailKey: string }>,
     // Manufacturer-scoped extra attributes (e.g. Hot Wheels Segment/Assortment/...).
@@ -703,6 +704,10 @@ export default function NewListingPage() {
         isTradeEnabled: formData.isTradeEnabled,
         isPreorder: false,
         isSet: formData.isSet,
+        bundleSize:
+          formData.isSet && Number(formData.bundleSize) >= 2
+            ? Number(formData.bundleSize)
+            : undefined,
         quantity:
           formData.quantity !== "" &&
           formData.quantity !== null &&
@@ -765,11 +770,11 @@ export default function NewListingPage() {
     <div className="min-h-screen bg-surface">
       <main className="max-w-3xl mx-auto px-3 sm:px-6 lg:px-8 py-4 sm:py-8">
         <Link
-          href="/listings"
+          href="/profile/listings"
           className="inline-flex items-center gap-2 text-muted hover:text-primary-500 transition-colors mb-6 text-sm"
         >
           <ArrowLeftIcon className="w-4 h-4" />
-          İlanlara Dön
+          İlanlarıma Dön
         </Link>
 
         <motion.div
@@ -1220,6 +1225,34 @@ export default function NewListingPage() {
                   />
                 </Button>
               </div>
+
+              {formData.isSet && (
+                <div className="mt-3 p-3 bg-surface rounded border border-border">
+                  <label className="block text-sm font-medium text-body mb-1.5">
+                    {locale === "en" ? "Number of pieces in set" : "Set Parça Sayısı"}
+                  </label>
+                  <input
+                    type="number"
+                    min={2}
+                    value={formData.bundleSize ?? ""}
+                    onChange={(e) =>
+                      setFormData({
+                        ...formData,
+                        bundleSize: e.target.value
+                          ? parseInt(e.target.value, 10)
+                          : undefined,
+                      })
+                    }
+                    placeholder={locale === "en" ? "e.g. 5" : "örn. 5"}
+                    className="w-full px-3 py-2 rounded border border-border bg-surface-elevated text-body"
+                  />
+                  <p className="text-sm text-muted mt-1">
+                    {locale === "en"
+                      ? "Total number of pieces. Describe each piece's brand/model/color in the description."
+                      : "Setteki toplam parça sayısı. Her parçanın marka/model/renk gibi ayrıntılarını açıklamada belirtin."}
+                  </p>
+                </div>
+              )}
             </div>
 
             {/* Section: Price & Quantity */}

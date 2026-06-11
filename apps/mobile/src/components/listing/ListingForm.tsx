@@ -153,6 +153,7 @@ export default function ListingForm({ mode, productId }: ListingFormProps) {
   const [year, setYear] = useState('');
   const [isTradeEnabled, setIsTradeEnabled] = useState(false);
   const [isSet, setIsSet] = useState(false);
+  const [bundleSize, setBundleSize] = useState('');
 
   // Edit-only state
   const [status, setStatus] = useState('active');
@@ -281,6 +282,7 @@ export default function ListingForm({ mode, productId }: ListingFormProps) {
         setYear(p.year != null ? String(p.year) : '');
         setIsTradeEnabled(!!p.isTradeEnabled);
         setIsSet(!!p.isSet);
+        setBundleSize(p.bundleSize != null ? String(p.bundleSize) : '');
         setIsPreorder(!!p.isPreorder);
         setStatus(p.status ?? 'active');
 
@@ -615,6 +617,7 @@ export default function ListingForm({ mode, productId }: ListingFormProps) {
       year: year ? Number(year) : undefined,
       isTradeEnabled,
       isSet,
+      bundleSize: isSet && Number(bundleSize) >= 2 ? Number(bundleSize) : undefined,
       images: imageKeys.length > 0 ? imageKeys : undefined,
       attributes: customAttributeSlugs.length > 0 ? customAttributeSlugs : undefined,
     } as Record<string, any>;
@@ -1301,6 +1304,24 @@ export default function ListingForm({ mode, productId }: ListingFormProps) {
                 thumbColor={colors.white}
               />
             </View>
+
+            {isSet && (
+              <View style={{ marginTop: 12 }}>
+                <Text style={styles.label}>Set Parça Sayısı</Text>
+                <TextInput
+                  style={styles.input}
+                  value={bundleSize}
+                  onChangeText={(t) => setBundleSize(t.replace(/[^0-9]/g, ''))}
+                  keyboardType="number-pad"
+                  placeholder="örn. 5"
+                  placeholderTextColor={colors.gray[400]}
+                />
+                <Text style={styles.toggleHint}>
+                  Setteki toplam parça sayısı. Her parçanın marka/model/renk gibi
+                  ayrıntılarını açıklamada belirtin.
+                </Text>
+              </View>
+            )}
 
             {/* Pre-order (edit only) */}
             {isEdit && (

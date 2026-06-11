@@ -20,6 +20,7 @@ import {
   TagIcon,
   CalendarIcon,
   ArrowTrendingDownIcon,
+  ArrowTrendingUpIcon,
 } from '@heroicons/react/24/outline';
 import { CheckIcon, XMarkIcon } from '@heroicons/react/24/solid';
 import { useAuthStore } from '@/stores/authStore';
@@ -99,6 +100,9 @@ function OffersPageContent() {
   const [buyerCounterOpen, setBuyerCounterOpen] = useState(false);
   const [buyerCounterOffer, setBuyerCounterOffer] = useState<Offer | null>(null);
   const [buyerCounterAmt, setBuyerCounterAmt] = useState('');
+  const [sellerCounterOpen, setSellerCounterOpen] = useState(false);
+  const [sellerCounterOffer, setSellerCounterOffer] = useState<Offer | null>(null);
+  const [sellerCounterAmt, setSellerCounterAmt] = useState('');
 
   useEffect(() => {
     setMounted(true);
@@ -220,6 +224,40 @@ function OffersPageContent() {
       await api.post(`/offers/${buyerCounterOffer.id}/buyer-counter`, { amount });
       setBuyerCounterOpen(false);
       setBuyerCounterOffer(null);
+      await invalidateOffers();
+    } catch (err: any) {
+      alert(err.response?.data?.message || (locale === 'en' ? 'Failed to send counter' : 'Karşı teklif gönderilemedi'));
+    } finally {
+      setActionLoading(null);
+    }
+  };
+
+  const openSellerCounterModal = (offer: Offer) => {
+    setSellerCounterOffer(offer);
+    setSellerCounterAmt('');
+    setSellerCounterOpen(true);
+  };
+
+  const submitSellerCounter = async () => {
+    if (!sellerCounterOffer) return;
+    const amount = parseFloat(sellerCounterAmt.replace(',', '.'));
+    if (Number.isNaN(amount) || amount <= 0) {
+      alert(locale === 'en' ? 'Enter a valid amount' : 'Geçerli bir tutar girin');
+      return;
+    }
+    if (amount <= Number(sellerCounterOffer.amount)) {
+      alert(
+        locale === 'en'
+          ? `Your counter must be above the buyer's offer (₺${Number(sellerCounterOffer.amount).toLocaleString('tr-TR')}).`
+          : `Karşı teklifiniz alıcının teklifinden (₺${Number(sellerCounterOffer.amount).toLocaleString('tr-TR')}) yüksek olmalıdır.`,
+      );
+      return;
+    }
+    setActionLoading(sellerCounterOffer.id);
+    try {
+      await api.post(`/offers/${sellerCounterOffer.id}/counter`, { amount });
+      setSellerCounterOpen(false);
+      setSellerCounterOffer(null);
       await invalidateOffers();
     } catch (err: any) {
       alert(err.response?.data?.message || (locale === 'en' ? 'Failed to send counter' : 'Karşı teklif gönderilemedi'));
@@ -597,6 +635,17 @@ function OffersPageContent() {
                                     <XMarkIcon className="w-4 h-4" />
                                     {locale === 'en' ? 'Reject' : 'Reddet'}
                                   </Button>
+                                  <Button
+                                    type="button"
+                                    variant="primary"
+                                    size="sm"
+                                    className="flex items-center gap-2"
+                                    onClick={() => openSellerCounterModal(offer)}
+                                    disabled={actionLoading === offer.id}
+                                  >
+                                    <ArrowTrendingUpIcon className="w-4 h-4" />
+                                    {locale === 'en' ? 'Counter offer' : 'Karşı Teklif'}
+                                  </Button>
                                 </>
                               ) : offer.buyerMustAccept ? (
                                 <>
@@ -722,6 +771,51 @@ function OffersPageContent() {
                 size="md"
                 disabled={actionLoading === buyerCounterOffer.id}
                 onClick={() => submitBuyerCounter()}
+              >
+                {locale === 'en' ? 'Send' : 'Gönder'}
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {sellerCounterOpen && sellerCounterOffer && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-heading/50 p-4" role="dialog" aria-modal="true">
+          <div className="bg-surface-elevated rounded-xl shadow-xl max-w-md w-full p-6">
+            <h3 className="text-lg font-semibold text-heading mb-2">
+              {locale === 'en' ? 'Send a counter offer' : 'Karşı teklif gönder'}
+            </h3>
+            <p className="text-sm text-muted mb-4">
+              {locale === 'en' ? "Buyer's offer:" : 'Alıcının teklifi:'}{' '}
+              <strong>₺{Number(sellerCounterOffer.amount).toLocaleString('tr-TR')}</strong>.{' '}
+              {locale === 'en'
+                ? 'Enter an amount above that and below the listing price (server validates).'
+                : 'Bu tutarın üstünde ve ilan fiyatının altında bir tutar girin (sunucu doğrular).'}
+            </p>
+            <Input type="text"
+              inputMode="decimal"
+              className="mb-4"
+              placeholder={locale === 'en' ? 'Amount (TRY)' : 'Tutar (₺)'}
+              value={sellerCounterAmt}
+              onChange={(e) => setSellerCounterAmt(e.target.value)} />
+            <div className="flex gap-2 justify-end">
+              <Button
+                type="button"
+                variant="secondary"
+                size="md"
+                onClick={() => {
+                  setSellerCounterOpen(false);
+                  setSellerCounterOffer(null);
+                }}
+              >
+                {locale === 'en' ? 'Cancel' : 'Vazgeç'}
+              </Button>
+              <Button
+                type="button"
+                variant="primary"
+                size="md"
+                disabled={actionLoading === sellerCounterOffer.id}
+                onClick={() => submitSellerCounter()}
               >
                 {locale === 'en' ? 'Send' : 'Gönder'}
               </Button>

@@ -26,6 +26,7 @@ import {
   CheckIcon,
   PlusIcon,
   ShieldCheckIcon,
+  XCircleIcon,
   StarIcon as StarOutlineIcon,
 } from "@heroicons/react/24/outline";
 import { StarIcon } from "@heroicons/react/24/solid";
@@ -120,6 +121,8 @@ interface OrderDetail {
     createdAt: string;
     refundedAt?: string | null;
   } | null;
+  cancelledAt?: string | null;
+  cancelReason?: string | null;
   isBuyer: boolean;
   isSeller: boolean;
   hasProductRating?: boolean;
@@ -742,6 +745,52 @@ export default function OrderDetailPage() {
               )}
               {locale === "en" ? "Complete payment" : "Ödemeyi tamamla"}
             </Button>
+          </div>
+        )}
+
+        {/* İptal edilmiş sipariş bilgilendirme kartı: iptal durumunda kargo/ödeme/teslimat
+            kartları gizlendiği için sayfa boş kalmasın — iptal tarihi, sebebi ve iade durumu burada özetlenir. */}
+        {order.status === "cancelled" && !(order.offerId && order.isBuyer) && (
+          <div className="mb-6 p-5 bg-danger-50 border border-danger-200 rounded-xl">
+            <div className="flex items-start gap-3">
+              <XCircleIcon className="w-6 h-6 text-danger-600 flex-shrink-0 mt-0.5" />
+              <div className="flex-1 space-y-2">
+                <h2 className="text-base font-semibold text-danger-800">
+                  {locale === "en" ? "This order was cancelled" : "Bu sipariş iptal edildi"}
+                </h2>
+                {order.cancelledAt && (
+                  <p className="text-sm text-danger-700">
+                    {locale === "en" ? "Cancelled on " : "İptal tarihi: "}
+                    {new Date(order.cancelledAt).toLocaleDateString("tr-TR", {
+                      year: "numeric",
+                      month: "long",
+                      day: "numeric",
+                      hour: "2-digit",
+                      minute: "2-digit",
+                    })}
+                  </p>
+                )}
+                {order.cancelReason && (
+                  <p className="text-sm text-danger-700">
+                    {locale === "en" ? "Reason: " : "Sebep: "}
+                    {order.cancelReason}
+                  </p>
+                )}
+                {order.payment?.status === "refunded" || (order.status as string) === "refunded" ? (
+                  <p className="text-sm text-danger-700">
+                    {locale === "en"
+                      ? "The payment has been refunded."
+                      : "Ödemeniz iade edilmiştir."}
+                  </p>
+                ) : order.payment?.status === "completed" ? (
+                  <p className="text-sm text-danger-700">
+                    {locale === "en"
+                      ? "If a payment was made, the refund will be processed to your original payment method."
+                      : "Ödeme yapıldıysa, iadeniz ödemeyi yaptığınız yönteme aktarılacaktır."}
+                  </p>
+                ) : null}
+              </div>
+            </div>
           </div>
         )}
 

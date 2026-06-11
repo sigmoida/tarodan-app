@@ -4,7 +4,10 @@
 
 # Build outputs
 dist/
+dist-seed/
 .next/
+# iCloud sync bozuk ' 2' kopyalı eski .next dizinleri kenara alındı (Disk Utility First Aid sonrası silinmeli)
+_corrupt_next_*
 .turbo/
 build/
 *.tsbuildinfo

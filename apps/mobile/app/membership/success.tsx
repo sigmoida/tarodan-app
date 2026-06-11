@@ -22,15 +22,18 @@ export default function MembershipSuccessScreen() {
     let cancelled = false;
     const run = async () => {
       if (paymentId) {
-        try { await paymentsApi.verify(paymentId); } catch { /* best-effort */ }
-        // Aktivasyon (past_due → active) işlenene kadar kısa süre yokla.
-        for (let i = 0; i < 4 && !cancelled; i++) {
+        // PayTR'ın status-inquiry'si ödeme bittikten birkaç saniye sonra "ödendi"
+        // dönebildiği için TEK verify çağrısı erken çalışıp başarısız olabilir. Üyeliği
+        // gerçekten aktive eden tek çağrı verify (getStatus sadece DB'yi OKUR, aktive
+        // ETMEZ); bu yüzden completed olana kadar verify'i tekrar dene. Aksi halde
+        // üyelik past_due kalır ve ilan hakkı 5 (ücretsiz) görünür.
+        for (let i = 0; i < 5 && !cancelled; i++) {
           try {
-            const res = await paymentsApi.getStatus(paymentId);
-            const status = (res.data?.data ?? res.data)?.status;
-            if (status === 'paid' || status === 'completed' || status === 'success') break;
-          } catch { /* yoksay */ }
-          if (i < 3 && !cancelled) await new Promise((r) => setTimeout(r, 1200));
+            const res = await paymentsApi.verify(paymentId);
+            const completed = (res.data?.data ?? res.data)?.completed;
+            if (completed) break;
+          } catch { /* best-effort */ }
+          if (i < 4 && !cancelled) await new Promise((r) => setTimeout(r, 1200));
         }
       }
       if (cancelled) return;
