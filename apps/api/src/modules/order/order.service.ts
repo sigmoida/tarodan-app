@@ -3380,6 +3380,8 @@ export class OrderService {
       shippedAt: order.shipment?.shippedAt ?? null,
       deliveredAt: order.deliveredAt ?? order.shipment?.deliveredAt ?? null,
       completedAt: order.completedAt ?? null,
+      cancelledAt: order.cancelledAt ?? null,
+      cancelReason: order.cancelReason ?? null,
       confirmationDeadline: order.confirmationDeadline ?? null,
       buyerConfirmedAt: order.buyerConfirmedAt ?? null,
       isBuyer: order.buyerId === userId,

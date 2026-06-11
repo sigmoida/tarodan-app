@@ -30,7 +30,7 @@ import {
 } from '@heroicons/react/24/outline';
 import { Spinner } from '@tarodan/ui';
 import { useAuthStore } from '@/stores/authStore';
-import { api, userApi, tradesApi, collectionsApi, wishlistApi } from '@/lib/api';
+import { api, userApi, tradesApi, collectionsApi, wishlistApi, messagesApi } from '@/lib/api';
 import { useTranslation } from '@/i18n';
 import UserAvatar from '@/components/UserAvatar';
 
@@ -106,6 +106,22 @@ export default function ProfilePage() {
     meta: { page: 'profile-wishlist-count' },
   });
   const wishlistCount = wishlistQuery.data?.length ?? 0;
+
+  // Okunmamış mesaj sayısı (Navbar ile aynı kaynak: thread'lerin unreadCount toplamı)
+  const unreadMessagesQuery = useQuery({
+    queryKey: ['profile-unread-messages'],
+    queryFn: async () => {
+      const res = await messagesApi.getThreads();
+      const threads = res.data?.data || res.data?.threads || [];
+      return (Array.isArray(threads) ? threads : []).reduce(
+        (sum: number, thread: any) => sum + (thread.unreadCount || 0),
+        0,
+      );
+    },
+    enabled: !authLoading && !!isAuthenticated,
+    meta: { page: 'profile-unread-messages' },
+  });
+  const unreadMessagesCount = unreadMessagesQuery.data ?? 0;
 
   useEffect(() => {
     if (!mounted || authLoading) return;
@@ -194,7 +210,9 @@ export default function ProfilePage() {
       const [profileResponse, statsResponse, ordersResponse, productsResponse, tradesResponse, collectionsResponse, offersPendingResponse, tradesPendingResponse] = await Promise.all([
         userApi.getProfile().catch(() => null),
         userApi.getStats().catch(() => null),
-        api.get('/orders', { params: { role: 'buyer', limit: 1 } }).catch(() => null),
+        // role parametresi yok: hem alış (buyer) hem satış (seller) siparişlerini sayar,
+        // meta.total toplamı verir. Badge'de toplam sipariş adedi gösterilir.
+        api.get('/orders', { params: { limit: 1 } }).catch(() => null),
         userApi.getMyProducts({ limit: 100, _t: Date.now() }).catch(() => null), // Get more products to filter properly
         tradesApi.getAll({ limit: 1 }).catch(() => null),
         collectionsApi.getMyCollections({ limit: 1 }).catch(() => null),
@@ -500,7 +518,7 @@ export default function ProfilePage() {
                     {action.label === t('nav.myListings') && (profile?.stats?.productsCount ?? 0)}
                     {action.label === t('order.myOrders') && (profile?.stats?.ordersCount ?? 0)}
                     {action.label === t('nav.favorites') && wishlistCount}
-                    {action.label === t('nav.messages') && '—'}
+                    {action.label === t('nav.messages') && unreadMessagesCount}
                   </p>
                   <p className="text-sm text-muted">{action.label}</p>
                 </div>
