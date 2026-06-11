@@ -358,46 +358,46 @@ export default function AdsPage() {
         <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
           <div className="bg-surface-elevated rounded-xl p-4 border border-border">
             <div className="flex items-center gap-3">
-              <div className="p-2 rounded-lg bg-info-500/20">
+              <div className="p-2 rounded-lg bg-info-500/20 shrink-0">
                 <MegaphoneIcon className="h-6 w-6 text-info-500" />
               </div>
-              <div>
-                <p className="text-sm text-muted">Toplam Reklam</p>
-                <p className="text-xl font-bold text-heading">{ads.length}</p>
-                <p className="text-xs text-success-700">{activeAds} aktif</p>
+              <div className="min-w-0">
+                <p className="text-sm text-muted truncate">Toplam Reklam</p>
+                <p className="text-xl font-bold text-heading truncate">{ads.length}</p>
+                <p className="text-xs text-success-700 truncate">{activeAds} aktif</p>
               </div>
             </div>
           </div>
           <div className="bg-surface-elevated rounded-xl p-4 border border-border">
             <div className="flex items-center gap-3">
-              <div className="p-2 rounded-lg bg-primary-100">
+              <div className="p-2 rounded-lg bg-primary-100 shrink-0">
                 <CursorArrowRaysIcon className="h-6 w-6 text-primary-600" />
               </div>
-              <div>
-                <p className="text-sm text-muted">Toplam Tıklama</p>
-                <p className="text-xl font-bold text-heading">{totalClicks.toLocaleString()}</p>
+              <div className="min-w-0">
+                <p className="text-sm text-muted truncate">Toplam Tıklama</p>
+                <p className="text-xl font-bold text-heading truncate">{totalClicks.toLocaleString()}</p>
               </div>
             </div>
           </div>
           <div className="bg-surface-elevated rounded-xl p-4 border border-border">
             <div className="flex items-center gap-3">
-              <div className="p-2 rounded-lg bg-success-500/20">
+              <div className="p-2 rounded-lg bg-success-500/20 shrink-0">
                 <EyeIcon className="h-6 w-6 text-success-500" />
               </div>
-              <div>
-                <p className="text-sm text-muted">Görüntülenme</p>
-                <p className="text-xl font-bold text-heading">{totalImpressions.toLocaleString()}</p>
+              <div className="min-w-0">
+                <p className="text-sm text-muted truncate">Görüntülenme</p>
+                <p className="text-xl font-bold text-heading truncate">{totalImpressions.toLocaleString()}</p>
               </div>
             </div>
           </div>
           <div className="bg-surface-elevated rounded-xl p-4 border border-border">
             <div className="flex items-center gap-3">
-              <div className="p-2 rounded-lg bg-primary-500/20">
+              <div className="p-2 rounded-lg bg-primary-500/20 shrink-0">
                 <ChartBarIcon className="h-6 w-6 text-primary-500" />
               </div>
-              <div>
-                <p className="text-sm text-muted">Ortalama CTR</p>
-                <p className="text-xl font-bold text-heading">{avgCTR}%</p>
+              <div className="min-w-0">
+                <p className="text-sm text-muted truncate">Ortalama CTR</p>
+                <p className="text-xl font-bold text-heading truncate">{avgCTR}%</p>
               </div>
             </div>
           </div>
@@ -544,8 +544,8 @@ export default function AdsPage() {
       {modalOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-heading/60 overflow-y-auto">
           <div className="bg-surface-elevated rounded-xl border border-border w-full max-w-2xl shadow-xl my-8">
-            <div className="p-4 border-b border-border">
-              <h2 className="text-lg font-semibold text-heading">
+            <div className="px-4 pb-4 pt-3 border-b border-border">
+              <h2 className="text-lg font-semibold text-heading leading-tight">
                 {editingId ? 'Reklam Düzenle' : 'Yeni Reklam'}
               </h2>
               <p className="text-sm text-muted">IAB standartlarına uygun reklam oluşturun</p>

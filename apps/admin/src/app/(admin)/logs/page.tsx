@@ -254,8 +254,8 @@ export default function LogsPage() {
                             className="pl-10 pr-4 border-border text-heading placeholder-muted focus:ring-1" />
                     </div>
                     <Button variant="secondary" onClick={() => loadLogs()}
-                        className="p-2 bg-surface-elevated border border-border rounded-lg text-muted hover:text-heading">
-                        <ArrowPathIcon className={clsx('h-5 w-5', loading && 'animate-spin')} />
+                        className="p-2 shrink-0 bg-surface-elevated border border-border rounded-lg text-muted hover:text-heading">
+                        <ArrowPathIcon className={clsx('h-5 w-5 shrink-0', loading && 'animate-spin')} />
                     </Button>
                 </div>
 

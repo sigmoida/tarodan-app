@@ -4,6 +4,7 @@ import { useState, useEffect } from "react";
 import { adminApi } from "@/lib/api";
 import toast from "react-hot-toast";
 import { Button, Input, Select, Spinner } from "@tarodan/ui";
+import { ExclamationTriangleIcon } from "@heroicons/react/24/outline";
 import { AdminTabs } from "@/components/AdminTabs";
 
 interface Settings {
@@ -55,6 +56,7 @@ export default function SettingsPage() {
     language: "tr",
   });
   const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState(false);
   const [saving, setSaving] = useState(false);
   const [activeTab, setActiveTab] = useState<
     "general" | "listing" | "trade" | "message" | "membership"
@@ -65,6 +67,8 @@ export default function SettingsPage() {
   }, []);
 
   const loadSettings = async () => {
+    setLoading(true);
+    setLoadError(false);
     try {
       const settingsResponse = await adminApi.getSettings();
       // API response format: { data: { data: [...] } } or { data: [...] }
@@ -197,7 +201,8 @@ export default function SettingsPage() {
     } catch (error) {
       if (process.env.NODE_ENV === "development")
         console.error("Settings load error:", error);
-      toast.error("Ayarlar yüklenemedi");
+      setLoadError(true);
+      toast.error("Ayarlar yüklenemedi", { id: "settings-load" });
     } finally {
       setLoading(false);
     }
@@ -309,6 +314,22 @@ export default function SettingsPage() {
     return (
       <div className="flex items-center justify-center h-64">
         <Spinner size="xl" />
+      </div>
+    );
+  }
+
+  if (loadError) {
+    return (
+      <div className="admin-card flex flex-col items-center justify-center gap-4 py-16 text-center">
+        <ExclamationTriangleIcon className="h-12 w-12 shrink-0 text-danger-500" />
+        <div className="min-w-0">
+          <p className="text-lg font-semibold text-heading">Ayarlar yüklenemedi</p>
+          <p className="mt-1 text-sm text-muted">
+            Oturumun sona ermiş olabilir. Tekrar dene; sürerse çıkış yapıp
+            yeniden giriş yap.
+          </p>
+        </div>
+        <Button onClick={() => loadSettings()}>Tekrar Dene</Button>
       </div>
     );
   }

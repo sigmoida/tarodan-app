@@ -14,6 +14,12 @@ import {
 } from "@tarodan/ui";
 import { DataTable, type ColumnDef } from "@/components/DataTable";
 import {
+  PageHeader,
+  FilterToolbar,
+  ActionButtons,
+  ActionIconButton,
+} from "@/components/admin-list";
+import {
   MagnifyingGlassIcon,
   ArrowPathIcon,
   EyeIcon,
@@ -163,69 +169,49 @@ export default function RefundRequestsPage() {
       id: "actions",
       header: () => <span className="block text-right" />,
       cell: ({ row }) => (
-        <div className="text-right">
-          <Link href={`/refund-requests/${row.original.id}`}>
-            <Button variant="secondary" size="sm">
-              <EyeIcon className="h-4 w-4 mr-1" />
-              Detay
-            </Button>
-          </Link>
-        </div>
+        <ActionButtons>
+          <ActionIconButton
+            icon={EyeIcon}
+            href={`/refund-requests/${row.original.id}`}
+            title="Detay"
+          />
+        </ActionButtons>
       ),
     },
   ];
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-2xl font-bold text-heading">İade Talepleri</h1>
-          <p className="text-muted">
-            Aktif iade talepleri — admin müdahalesi gereken durumlar
-          </p>
-        </div>
-        <Button variant="secondary" onClick={load} className="p-2">
+      <PageHeader
+        title="İade Talepleri"
+        description="Aktif iade talepleri — admin müdahalesi gereken durumlar"
+      >
+        <Button variant="secondary" onClick={load} className="p-2 shrink-0">
           <ArrowPathIcon className="h-5 w-5" />
         </Button>
-      </div>
+      </PageHeader>
 
       {/* Filters */}
-      <div className="bg-surface-elevated rounded-xl shadow-sm p-4 grid grid-cols-1 md:grid-cols-4 gap-3 items-end">
-        <div>
-          <label className="block text-xs font-medium text-muted mb-1">Durum</label>
-          <Select value={status} onChange={(e) => setStatus(e.target.value)}>
-            {STATUS_OPTIONS.map((o) => (
-              <option key={o.value} value={o.value}>
-                {o.label}
-              </option>
-            ))}
-          </Select>
-        </div>
-        <div className="md:col-span-2">
-          <label className="block text-xs font-medium text-muted mb-1">Kullanıcı / İade No</label>
-          <Input
-            placeholder="Alıcı/satıcı adı, e-posta veya iade numarası"
-            value={userSearch}
-            onChange={(e) => setUserSearch(e.target.value)}
-          />
-        </div>
-        <div className="flex gap-2">
-          <Button variant="primary" onClick={applyFilters} className="flex-1">
-            <MagnifyingGlassIcon className="h-4 w-4 mr-1" />
-            Filtrele
-          </Button>
-        </div>
-        <div className="md:col-span-2 flex gap-2">
-          <div className="flex-1">
-            <label className="block text-xs font-medium text-muted mb-1">Başlangıç</label>
-            <Input type="date" value={from} onChange={(e) => setFrom(e.target.value)} />
-          </div>
-          <div className="flex-1">
-            <label className="block text-xs font-medium text-muted mb-1">Bitiş</label>
-            <Input type="date" value={to} onChange={(e) => setTo(e.target.value)} />
-          </div>
-        </div>
-      </div>
+      <FilterToolbar
+        search={userSearch}
+        onSearchChange={setUserSearch}
+        onSearchSubmit={applyFilters}
+        searchPlaceholder="Alıcı/satıcı adı, e-posta veya iade numarası"
+      >
+        <Select value={status} onChange={(e) => setStatus(e.target.value)} className="sm:w-56">
+          {STATUS_OPTIONS.map((o) => (
+            <option key={o.value} value={o.value}>
+              {o.label}
+            </option>
+          ))}
+        </Select>
+        <Input type="date" value={from} onChange={(e) => setFrom(e.target.value)} className="sm:w-40" />
+        <Input type="date" value={to} onChange={(e) => setTo(e.target.value)} className="sm:w-40" />
+        <Button variant="primary" onClick={applyFilters} className="shrink-0">
+          <MagnifyingGlassIcon className="h-4 w-4 mr-1" />
+          Filtrele
+        </Button>
+      </FilterToolbar>
 
       {/* List */}
       <DataTable

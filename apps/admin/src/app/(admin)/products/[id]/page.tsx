@@ -611,8 +611,8 @@ export default function ProductDetailPage() {
         {/* Reply Modal */}
         {replyModalOpen && (
           <div className="fixed inset-0 bg-heading bg-opacity-50 flex items-center justify-center z-50">
-            <div className="bg-surface-elevated rounded-xl p-6 max-w-lg w-full mx-4">
-              <h3 className="text-lg font-semibold text-heading mb-4">Yorumu Yanıtla</h3>
+            <div className="bg-surface-elevated rounded-xl px-6 pb-6 pt-5 max-w-lg w-full mx-4">
+              <h3 className="text-lg font-semibold text-heading mb-4 leading-tight">Yorumu Yanıtla</h3>
               {selectedReview && (
                 <div className="mb-4 p-3 bg-surface rounded-lg">
                   <p className="text-sm text-muted italic">"{selectedReview.review}"</p>
@@ -641,8 +641,8 @@ export default function ProductDetailPage() {
         {/* Approve Modal */}
         {showApproveModal && (
           <div className="fixed inset-0 bg-heading bg-opacity-50 flex items-center justify-center z-50">
-            <div className="bg-surface-elevated rounded-xl p-6 max-w-md w-full mx-4">
-              <h3 className="text-lg font-semibold text-heading mb-4">Ürünü Onayla</h3>
+            <div className="bg-surface-elevated rounded-xl px-6 pb-6 pt-5 max-w-md w-full mx-4">
+              <h3 className="text-lg font-semibold text-heading mb-4 leading-tight">Ürünü Onayla</h3>
               <div className="mb-4">
                 <label className="block text-sm font-medium text-body mb-2">
                   Not (Opsiyonel)
@@ -667,8 +667,8 @@ export default function ProductDetailPage() {
         {/* Reject Modal */}
         {showRejectModal && (
           <div className="fixed inset-0 bg-heading bg-opacity-50 flex items-center justify-center z-50">
-            <div className="bg-surface-elevated rounded-xl p-6 max-w-md w-full mx-4">
-              <h3 className="text-lg font-semibold text-heading mb-4">Ürünü Reddet</h3>
+            <div className="bg-surface-elevated rounded-xl px-6 pb-6 pt-5 max-w-md w-full mx-4">
+              <h3 className="text-lg font-semibold text-heading mb-4 leading-tight">Ürünü Reddet</h3>
               <div className="mb-4">
                 <label className="block text-sm font-medium text-body mb-2">
                   Red Nedeni *
@@ -693,9 +693,9 @@ export default function ProductDetailPage() {
         {/* Edit Modal */}
         {showEditModal && (
           <div className="fixed inset-0 bg-heading bg-opacity-50 flex items-center justify-center z-50 overflow-y-auto py-10">
-            <div className="bg-surface-elevated rounded-xl p-6 max-w-2xl w-full mx-4 my-auto">
+            <div className="bg-surface-elevated rounded-xl px-6 pb-6 pt-5 max-w-2xl w-full mx-4 my-auto">
               <div className="flex justify-between items-center mb-6">
-                <h3 className="text-lg font-semibold text-heading">Ürünü Düzenle</h3>
+                <h3 className="text-lg font-semibold text-heading leading-tight">Ürünü Düzenle</h3>
                 <Button variant="secondary" onClick={() => setShowEditModal(false)}
                   className="text-muted hover:text-body">
                   <XCircleIcon className="w-6 h-6" />
@@ -791,8 +791,8 @@ export default function ProductDetailPage() {
         {/* Delete Modal */}
         {showDeleteModal && (
           <div className="fixed inset-0 bg-heading bg-opacity-50 flex items-center justify-center z-50">
-            <div className="bg-surface-elevated rounded-xl p-6 max-w-md w-full mx-4">
-              <h3 className="text-lg font-semibold text-heading mb-4">Ürünü Sil</h3>
+            <div className="bg-surface-elevated rounded-xl px-6 pb-6 pt-5 max-w-md w-full mx-4">
+              <h3 className="text-lg font-semibold text-heading mb-4 leading-tight">Ürünü Sil</h3>
               <p className="text-muted mb-6">
                 Bu ürünü silmek istediğinizden emin misiniz? Bu işlem geri alınamaz.
               </p>

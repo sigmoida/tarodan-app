@@ -382,8 +382,8 @@ export default function AdminPaymentDetailPage() {
         {/* Refund Modal */}
         {showRefundModal && (
           <div className="fixed inset-0 bg-heading bg-opacity-50 flex items-center justify-center z-50">
-            <div className="bg-surface-elevated rounded-xl p-6 max-w-md w-full mx-4">
-              <h2 className="text-xl font-bold text-heading mb-4">Manuel İade</h2>
+            <div className="bg-surface-elevated rounded-xl px-6 pb-6 pt-5 max-w-md w-full mx-4">
+              <h2 className="text-xl font-bold text-heading mb-4 leading-tight">Manuel İade</h2>
               <p className="text-muted mb-4">
                 Toplam ödeme tutarı: ₺{payment.amount.toLocaleString('tr-TR', { minimumFractionDigits: 2 })}
               </p>
@@ -440,8 +440,8 @@ export default function AdminPaymentDetailPage() {
         {/* Cancel Modal */}
         {showCancelModal && (
           <div className="fixed inset-0 bg-heading bg-opacity-50 flex items-center justify-center z-50">
-            <div className="bg-surface-elevated rounded-xl p-6 max-w-md w-full mx-4">
-              <h2 className="text-xl font-bold text-heading mb-4 flex items-center gap-2">
+            <div className="bg-surface-elevated rounded-xl px-6 pb-6 pt-5 max-w-md w-full mx-4">
+              <h2 className="text-xl font-bold text-heading mb-4 leading-tight flex items-center gap-2">
                 <ExclamationTriangleIcon className="w-6 h-6 text-primary-500" />
                 Zorla İptal
               </h2>

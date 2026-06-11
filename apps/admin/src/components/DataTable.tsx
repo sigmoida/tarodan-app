@@ -1,5 +1,6 @@
 "use client";
 
+import { type ReactNode } from "react";
 import {
   useReactTable,
   getCoreRowModel,
@@ -16,8 +17,12 @@ export interface DataTableProps<T> {
   loading?: boolean;
   /** Veri boşken gösterilecek metin. */
   emptyText?: string;
+  /** Veri boşken metnin altında gösterilecek aksiyon (örn. "İlk kaydı ekle" butonu). */
+  emptyAction?: ReactNode;
   /** Satıra tıklanınca (örn. detaya git). */
   onRowClick?: (row: T) => void;
+  /** Satıra ek className (örn. seçili/itirazlı satır vurgusu). */
+  rowClassName?: (row: T) => string | undefined;
   /** Satır kimliği — seçim için gerekli. */
   getRowId?: (row: T) => string;
   // ── Çoklu seçim (opsiyonel) ──
@@ -37,7 +42,9 @@ export function DataTable<T>({
   data,
   loading,
   emptyText = "Kayıt bulunamadı",
+  emptyAction,
   onRowClick,
+  rowClassName,
   getRowId,
   selectable,
   selectedIds = [],
@@ -94,7 +101,10 @@ export function DataTable<T>({
             ) : data.length === 0 ? (
               <tr>
                 <td colSpan={colSpan} className="p-8 text-center text-muted">
-                  {emptyText}
+                  <div className="flex flex-col items-center gap-3">
+                    <span>{emptyText}</span>
+                    {emptyAction}
+                  </div>
                 </td>
               </tr>
             ) : (
@@ -104,9 +114,15 @@ export function DataTable<T>({
                   <tr
                     key={row.id}
                     onClick={onRowClick ? () => onRowClick(row.original) : undefined}
-                    className={
-                      onRowClick ? "cursor-pointer hover:bg-surface-alt/50" : ""
-                    }
+                    className={[
+                      onRowClick ? "cursor-pointer hover:bg-surface-alt/50" : "",
+                      selectable && selectedIds.includes(id)
+                        ? "bg-primary-500/5"
+                        : "",
+                      rowClassName?.(row.original) ?? "",
+                    ]
+                      .filter(Boolean)
+                      .join(" ")}
                   >
                     {selectable && (
                       <td onClick={(e) => e.stopPropagation()}>

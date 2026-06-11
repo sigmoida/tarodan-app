@@ -1,18 +1,21 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import Link from "next/link";
 import { adminApi } from "@/lib/api";
 import {
-  MagnifyingGlassIcon,
-  FunnelIcon,
   EyeIcon,
   NoSymbolIcon,
   CheckCircleIcon,
 } from "@heroicons/react/24/outline";
 import toast from "react-hot-toast";
-import { Button, Input, Select, membershipTierConfig, enumLabel } from "@tarodan/ui";
+import { Button, Select, membershipTierConfig, enumLabel } from "@tarodan/ui";
 import { DataTable, type ColumnDef } from "@/components/DataTable";
+import {
+  PageHeader,
+  FilterToolbar,
+  ActionButtons,
+  ActionIconButton,
+} from "@/components/admin-list";
 
 interface User {
   id: string;
@@ -211,65 +214,33 @@ export default function UsersPage() {
       id: "actions",
       header: "İşlemler",
       cell: ({ row }) => (
-        <div className="flex items-center gap-2 whitespace-nowrap">
-          <Link
+        <ActionButtons>
+          <ActionIconButton
+            icon={EyeIcon}
             href={`/users/${row.original.id}`}
-            className="p-2 text-muted hover:text-heading hover:bg-surface-alt rounded-lg"
             title="Detay"
-          >
-            <EyeIcon className="h-5 w-5" />
-          </Link>
-          <Button
-            variant="secondary"
+          />
+          <ActionIconButton
+            icon={row.original.isBanned ? CheckCircleIcon : NoSymbolIcon}
             onClick={() => handleBanUser(row.original.id, row.original.isBanned)}
-            className={`p-2 rounded-lg ${
-              row.original.isBanned
-                ? "text-success-700 hover:bg-success-500/10"
-                : "text-danger-600 hover:bg-danger-500/10"
-            }`}
             title={row.original.isBanned ? "Engeli Kaldır" : "Engelle"}
-          >
-            {row.original.isBanned ? (
-              <CheckCircleIcon className="h-5 w-5" />
-            ) : (
-              <NoSymbolIcon className="h-5 w-5" />
-            )}
-          </Button>
-        </div>
+            variant={row.original.isBanned ? "success" : "danger"}
+          />
+        </ActionButtons>
       ),
     },
   ];
 
   return (
     <div className="space-y-6">
-      {/* Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-        <div>
-          <h1 className="text-2xl font-bold text-heading">Kullanıcılar</h1>
-          <p className="text-muted mt-1">Toplam {total} kullanıcı</p>
-        </div>
-      </div>
+      <PageHeader title="Kullanıcılar" description={`Toplam ${total} kullanıcı`} />
 
-      {/* Filters */}
-      <div className="flex flex-col sm:flex-row gap-4">
-        <div className="relative flex-1 flex gap-2">
-          <MagnifyingGlassIcon className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-muted pointer-events-none" />
-          <Input
-            type="text"
-            placeholder="E-posta veya isim ara..."
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            onKeyDown={(e) => e.key === "Enter" && loadUsers(1)}
-            className="admin-input-with-icon-left flex-1"
-          />
-          <Button
-            type="button"
-            onClick={() => loadUsers(1)}
-            className="whitespace-nowrap"
-          >
-            Ara
-          </Button>
-        </div>
+      <FilterToolbar
+        search={search}
+        onSearchChange={setSearch}
+        onSearchSubmit={() => loadUsers(1)}
+        searchPlaceholder="E-posta veya isim ara..."
+      >
         <Select
           value={filter}
           onChange={(e) => setFilter(e.target.value)}
@@ -280,7 +251,7 @@ export default function UsersPage() {
           <option value="buyers">Alıcılar</option>
           <option value="banned">Engelliler</option>
         </Select>
-      </div>
+      </FilterToolbar>
 
       {/* Table */}
       <DataTable

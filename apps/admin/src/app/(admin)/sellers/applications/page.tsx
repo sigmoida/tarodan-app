@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { Button, Textarea, enumLabel, sellerTypeConfig } from "@tarodan/ui";
 import { DataTable, type ColumnDef } from "@/components/DataTable";
+import { PageHeader } from "@/components/admin-list";
 import {
   CheckCircleIcon,
   XCircleIcon,
@@ -128,14 +129,10 @@ export default function SellerApplicationsPage() {
   return (
     <>
       <div className="space-y-6">
-        <div>
-          <h1 className="text-2xl font-bold text-heading">
-            Satıcı Başvuruları
-          </h1>
-          <p className="text-muted mt-1">
-            Bekleyen satıcı doğrulama ve onay taleplerini yönetin
-          </p>
-        </div>
+        <PageHeader
+          title="Satıcı Başvuruları"
+          description="Bekleyen satıcı doğrulama ve onay taleplerini yönetin"
+        />
 
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
           {/* Applications List */}
@@ -146,6 +143,7 @@ export default function SellerApplicationsPage() {
               emptyText="Bekleyen başvuru yok"
               getRowId={(app) => app.id}
               onRowClick={(app) => setSelectedApplication(app)}
+              rowClassName={(app) => (app.id === selectedApplication?.id ? "bg-primary-50" : "")}
             />
           </div>
 
@@ -153,14 +151,14 @@ export default function SellerApplicationsPage() {
           <div className="lg:col-span-2">
             {selectedApplication ? (
               <div className="admin-card h-full">
-                <div className="flex justify-between items-start mb-6 border-b border-border pb-4">
-                  <div>
-                    <h2 className="text-xl font-bold text-heading">
+                <div className="flex justify-between items-start gap-3 mb-6 border-b border-border pb-4">
+                  <div className="min-w-0">
+                    <h2 className="text-xl font-bold text-heading truncate">
                       {selectedApplication.displayName}
                     </h2>
-                    <p className="text-muted">{selectedApplication.email}</p>
+                    <p className="text-muted truncate">{selectedApplication.email}</p>
                   </div>
-                  <div className="flex gap-2">
+                  <div className="flex gap-2 shrink-0">
                     <Button
                       variant="outline"
                       size="md"
@@ -215,7 +213,7 @@ export default function SellerApplicationsPage() {
                       <div className="space-y-4">
                         <div>
                           <label className="text-xs text-muted block flex items-center gap-1">
-                            <BuildingOfficeIcon className="w-4 h-4" /> Firma Adı
+                            <BuildingOfficeIcon className="w-4 h-4 shrink-0" /> Firma Adı
                           </label>
                           <p className="text-heading font-medium">
                             {selectedApplication.companyName}
@@ -251,9 +249,9 @@ export default function SellerApplicationsPage() {
                             href={doc.url}
                             className="items-center p-3 bg-surface-alt/50 hover:bg-surface-alt group"
                           >
-                            <DocumentTextIcon className="w-8 h-8 text-primary-600 mr-3 group-hover:text-primary-400" />
-                            <div>
-                              <p className="text-sm font-medium text-heading group-hover:text-primary-400 transition-colors">
+                            <DocumentTextIcon className="w-8 h-8 text-primary-600 mr-3 group-hover:text-primary-400 shrink-0" />
+                            <div className="min-w-0">
+                              <p className="text-sm font-medium text-heading group-hover:text-primary-400 transition-colors truncate">
                                 {doc.name}
                               </p>
                               <p className="text-xs text-muted">
@@ -290,8 +288,8 @@ export default function SellerApplicationsPage() {
         {isRejectModalOpen && (
           <div className="fixed inset-0 bg-heading/70 flex items-center justify-center z-50 p-4 backdrop-blur-sm">
             <div className="bg-surface-elevated rounded-xl max-w-md w-full border border-border shadow-2xl">
-              <div className="p-6">
-                <h3 className="text-xl font-bold text-heading mb-4">
+              <div className="px-6 pb-6 pt-5">
+                <h3 className="text-xl font-bold text-heading mb-4 leading-tight">
                   Başvuruyu Reddet
                 </h3>
                 <form onSubmit={handleReject}>

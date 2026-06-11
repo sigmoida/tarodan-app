@@ -424,16 +424,16 @@ export default function TaxSettingsPage() {
 
         {activeTab === "regions" && (
           <div className="admin-card overflow-hidden">
-            <div className="flex justify-between items-center p-4 border-b border-border">
-              <h2 className="text-lg font-semibold text-heading">
+            <div className="flex justify-between items-center gap-3 p-4 border-b border-border">
+              <h2 className="text-lg font-semibold text-heading truncate min-w-0">
                 Vergi Bölgeleri
               </h2>
               <Button
                 type="button"
                 onClick={openCreateRegion}
-                className="flex gap-2"
+                className="flex gap-2 shrink-0"
               >
-                <PlusIcon className="h-5 w-5" />
+                <PlusIcon className="h-5 w-5 shrink-0" />
                 Yeni Bölge
               </Button>
             </div>
@@ -526,17 +526,17 @@ export default function TaxSettingsPage() {
 
         {activeTab === "rates" && (
           <div className="admin-card overflow-hidden">
-            <div className="flex justify-between items-center p-4 border-b border-border">
-              <h2 className="text-lg font-semibold text-heading">
+            <div className="flex justify-between items-center gap-3 p-4 border-b border-border">
+              <h2 className="text-lg font-semibold text-heading truncate min-w-0">
                 Vergi Oranları
               </h2>
               <Button
                 type="button"
                 onClick={openCreateRate}
-                className="flex gap-2"
+                className="flex gap-2 shrink-0"
                 disabled={regions.length === 0}
               >
-                <PlusIcon className="h-5 w-5" />
+                <PlusIcon className="h-5 w-5 shrink-0" />
                 Yeni Oran
               </Button>
             </div>
@@ -624,17 +624,17 @@ export default function TaxSettingsPage() {
 
         {activeTab === "rules" && (
           <div className="admin-card overflow-hidden">
-            <div className="flex justify-between items-center p-4 border-b border-border">
-              <h2 className="text-lg font-semibold text-heading">
+            <div className="flex justify-between items-center gap-3 p-4 border-b border-border">
+              <h2 className="text-lg font-semibold text-heading truncate min-w-0">
                 Vergi Kuralları
               </h2>
               <Button
                 type="button"
                 onClick={openCreateRule}
-                className="flex gap-2"
+                className="flex gap-2 shrink-0"
                 disabled={regions.length === 0 || rates.length === 0}
               >
-                <PlusIcon className="h-5 w-5" />
+                <PlusIcon className="h-5 w-5 shrink-0" />
                 Yeni Kural
               </Button>
             </div>
@@ -1231,7 +1231,7 @@ export default function TaxSettingsPage() {
             onClick={() => setDeleteConfirm(null)}
           >
             <div
-              className="bg-surface-elevated rounded-xl shadow-xl p-6 max-w-sm w-full"
+              className="bg-surface-elevated rounded-xl shadow-xl px-6 pb-6 pt-5 max-w-sm w-full"
               onClick={(e) => e.stopPropagation()}
             >
               <p className="text-heading font-medium">

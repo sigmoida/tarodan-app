@@ -4,7 +4,6 @@ import { useState, useEffect } from "react";
 import Link from "next/link";
 import { adminApi } from "@/lib/api";
 import {
-  MagnifyingGlassIcon,
   ArrowPathIcon,
   BanknotesIcon,
   EyeIcon,
@@ -12,6 +11,12 @@ import {
 import toast from "react-hot-toast";
 import { Button, Input } from "@tarodan/ui";
 import { DataTable, type ColumnDef } from "@/components/DataTable";
+import {
+  PageHeader,
+  FilterToolbar,
+  ActionButtons,
+  ActionIconButton,
+} from "@/components/admin-list";
 
 interface Refund {
   id: string;
@@ -119,12 +124,13 @@ export default function RefundsPage() {
       header: "İşlemler",
       cell: ({ row }) =>
         row.original.order ? (
-          <Link
-            href={`/orders/${row.original.order.id}`}
-            className="inline-block p-2 text-muted hover:text-heading"
-          >
-            <EyeIcon className="h-5 w-5" />
-          </Link>
+          <ActionButtons>
+            <ActionIconButton
+              icon={EyeIcon}
+              href={`/orders/${row.original.order.id}`}
+              title="Detay"
+            />
+          </ActionButtons>
         ) : null,
     },
   ];
@@ -137,11 +143,7 @@ export default function RefundsPage() {
   return (
     <>
       <div className="space-y-6">
-        <div className="flex items-center justify-between">
-          <div>
-            <h1 className="text-2xl font-bold text-heading">İade Geçmişi</h1>
-            <p className="text-muted">Tamamlanmış iadeler</p>
-          </div>
+        <PageHeader title="İade Geçmişi" description="Tamamlanmış iadeler">
           <Button
             variant="secondary"
             onClick={loadRefunds}
@@ -149,32 +151,28 @@ export default function RefundsPage() {
           >
             <ArrowPathIcon className="h-5 w-5" />
           </Button>
-        </div>
+        </PageHeader>
 
-        <div className="flex flex-col sm:flex-row gap-4">
-          <div className="relative flex-1">
-            <MagnifyingGlassIcon className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-muted" />
-            <Input
-              type="text"
-              placeholder="Alıcı veya satıcı ara..."
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-              onKeyDown={(e) => e.key === "Enter" && handleSearch()}
-              className="pl-10"
-            />
-          </div>
+        <FilterToolbar
+          search={search}
+          onSearchChange={setSearch}
+          onSearchSubmit={handleSearch}
+          searchPlaceholder="Alıcı veya satıcı ara..."
+        >
           <Input
             type="date"
             value={startDate}
             onChange={(e) => setStartDate(e.target.value)}
+            className="sm:w-40"
           />
           <Input
             type="date"
             value={endDate}
             onChange={(e) => setEndDate(e.target.value)}
+            className="sm:w-40"
           />
-          <Button onClick={handleSearch}>Filtrele</Button>
-        </div>
+          <Button onClick={handleSearch} className="shrink-0">Filtrele</Button>
+        </FilterToolbar>
 
         <DataTable
           columns={columns}

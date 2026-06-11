@@ -13,6 +13,7 @@ import toast from 'react-hot-toast';
 import { Button, Input, Select, enumLabel, paymentHoldStatusConfig } from '@tarodan/ui';
 import { AdminTabs } from '@/components/AdminTabs';
 import { DataTable, type ColumnDef } from '@/components/DataTable';
+import { PageHeader, ActionButtons } from '@/components/admin-list';
 
 type TabId = 'transactions' | 'schedule';
 
@@ -237,7 +238,7 @@ export default function PayoutsPage() {
       id: 'actions',
       header: 'İşlem',
       cell: ({ row }) => (
-        <div className="whitespace-nowrap">
+        <ActionButtons>
           {row.original.status === 'held' && (
             <Button variant="secondary" type="button"
               onClick={() => handleRelease(row.original.orderId)}
@@ -247,7 +248,7 @@ export default function PayoutsPage() {
               {releasingOrderId === row.original.orderId ? 'Bırakılıyor...' : 'Serbest Bırak'}
             </Button>
           )}
-        </div>
+        </ActionButtons>
       ),
     },
   ];
@@ -279,8 +280,7 @@ export default function PayoutsPage() {
   return (
     <>
       <div className="space-y-6">
-        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-          <h1 className="text-2xl font-bold text-heading">Satıcı Ödemeleri</h1>
+        <PageHeader title="Satıcı Ödemeleri">
           <Button variant="secondary" type="button"
             onClick={handleExport}
             disabled={loadingExport}
@@ -288,32 +288,32 @@ export default function PayoutsPage() {
             <ArrowDownTrayIcon className="h-5 w-5" />
             {loadingExport ? 'Hazırlanıyor...' : 'Dışa Aktar (CSV)'}
           </Button>
-        </div>
+        </PageHeader>
 
         {/* Summary cards */}
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-          <div className="bg-surface-elevated rounded-xl p-4 border border-border">
-            <p className="text-sm text-muted">Bekleyen Toplam</p>
-            <p className="text-2xl font-semibold text-warning-500">
+          <div className="bg-surface-elevated rounded-xl p-4 border border-border min-w-0">
+            <p className="text-sm text-muted truncate">Bekleyen Toplam</p>
+            <p className="text-2xl font-semibold text-warning-500 truncate">
               {summary != null ? formatCurrency(summary.totalPending) : '—'}
             </p>
-            <p className="text-xs text-muted mt-1">{summary?.countHeld ?? 0} işlem</p>
+            <p className="text-xs text-muted mt-1 truncate">{summary?.countHeld ?? 0} işlem</p>
           </div>
-          <div className="bg-surface-elevated rounded-xl p-4 border border-border">
-            <p className="text-sm text-muted">Ödenen Toplam</p>
-            <p className="text-2xl font-semibold text-success-500">
+          <div className="bg-surface-elevated rounded-xl p-4 border border-border min-w-0">
+            <p className="text-sm text-muted truncate">Ödenen Toplam</p>
+            <p className="text-2xl font-semibold text-success-500 truncate">
               {summary != null ? formatCurrency(summary.totalReleased) : '—'}
             </p>
-            <p className="text-xs text-muted mt-1">{summary?.countReleased ?? 0} işlem</p>
+            <p className="text-xs text-muted mt-1 truncate">{summary?.countReleased ?? 0} işlem</p>
           </div>
           <div className="bg-surface-elevated rounded-xl p-4 border border-border md:col-span-2">
             <p className="text-sm text-muted">Yaklaşan Serbest Bırakmalar</p>
             <ul className="mt-2 space-y-1">
               {summary?.nextReleases?.length
                 ? summary.nextReleases.slice(0, 3).map((r) => (
-                    <li key={r.id} className="text-sm text-muted flex justify-between">
-                      <span>Sipariş #{r.orderId.slice(0, 8)}...</span>
-                      <span>{formatCurrency(r.amount)} — {formatDate(r.releaseAt)}</span>
+                    <li key={r.id} className="text-sm text-muted flex justify-between gap-2 min-w-0">
+                      <span className="truncate">Sipariş #{r.orderId.slice(0, 8)}...</span>
+                      <span className="shrink-0 whitespace-nowrap">{formatCurrency(r.amount)} — {formatDate(r.releaseAt)}</span>
                     </li>
                   ))
                 : <li className="text-sm text-muted">Bekleyen yok</li>}

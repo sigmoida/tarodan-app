@@ -2,10 +2,11 @@
 
 import { useState, useEffect } from 'react';
 import { adminApi } from '@/lib/api';
-import { Button, Input, Select, StatusBadge } from '@tarodan/ui';
+import { Button, Select, StatusBadge } from '@tarodan/ui';
 import type { StatusConfig } from '@tarodan/ui';
 import { AdminTabs } from '@/components/AdminTabs';
 import { DataTable, type ColumnDef } from '@/components/DataTable';
+import { PageHeader, FilterToolbar } from '@/components/admin-list';
 import {
     CheckCircleIcon,
     XCircleIcon,
@@ -387,53 +388,25 @@ export default function ReviewsPage() {
         <>
             <div className="space-y-6">
                 {/* Header */}
-                <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-                    <div>
-                        <h1 className="text-2xl font-bold text-heading">Yorumlar</h1>
-                        <p className="text-muted mt-1">Ürün ve satıcı yorumlarını yönetin</p>
-                    </div>
-
-                    <div className="flex items-center gap-2">
-                        {activeTab === 'product' && (
-                            <Select
-                                value={statusFilter}
-                                onChange={(e) => {
-                                    setStatusFilter(e.target.value);
-                                    setPage(1);
-                                }}
-                                className="w-auto"
-                                selectSize="sm"
-                            >
-                                <option value="">Tüm Durumlar</option>
-                                <option value="pending">Bekleyenler</option>
-                                <option value="approved">Onaylananlar</option>
-                                <option value="rejected">Reddedilenler</option>
-                                <option value="spam">Spam</option>
-                            </Select>
-                        )}
-                        {activeTab === 'seller' && (
-                            <>
-                                <Select
-                                    value={sellerStatusFilter}
-                                    onChange={(e) => { setSellerStatusFilter(e.target.value); setSellerPage(1); }}
-                                    className="w-auto"
-                                    selectSize="sm"
-                                >
-                                    <option value="">Tüm Durumlar</option>
-                                    <option value="pending">Bekleyenler</option>
-                                    <option value="approved">Onaylananlar</option>
-                                    <option value="rejected">Reddedilenler</option>
-                                    <option value="spam">Spam</option>
-                                </Select>
-                                <Input type="text"
-                                    value={sellerSearch}
-                                    onChange={(e) => { setSellerSearch(e.target.value); setSellerPage(1); }}
-                                    placeholder="Kullanıcı ara..."
-                                    className="border-border text-heading" />
-                            </>
-                        )}
-                    </div>
-                </div>
+                <PageHeader title="Yorumlar" description="Ürün ve satıcı yorumlarını yönetin">
+                    {activeTab === 'product' && (
+                        <Select
+                            value={statusFilter}
+                            onChange={(e) => {
+                                setStatusFilter(e.target.value);
+                                setPage(1);
+                            }}
+                            className="w-auto"
+                            selectSize="sm"
+                        >
+                            <option value="">Tüm Durumlar</option>
+                            <option value="pending">Bekleyenler</option>
+                            <option value="approved">Onaylananlar</option>
+                            <option value="rejected">Reddedilenler</option>
+                            <option value="spam">Spam</option>
+                        </Select>
+                    )}
+                </PageHeader>
 
                 {/* Tabs */}
                 <AdminTabs
@@ -447,7 +420,25 @@ export default function ReviewsPage() {
 
                 {/* Product Reviews List */}
                 {activeTab === 'seller' ? (
-                <div>
+                <div className="space-y-6">
+                    <FilterToolbar
+                        search={sellerSearch}
+                        onSearchChange={(v) => { setSellerSearch(v); setSellerPage(1); }}
+                        searchPlaceholder="Kullanıcı ara..."
+                    >
+                        <Select
+                            value={sellerStatusFilter}
+                            onChange={(e) => { setSellerStatusFilter(e.target.value); setSellerPage(1); }}
+                            className="sm:w-48"
+                            selectSize="sm"
+                        >
+                            <option value="">Tüm Durumlar</option>
+                            <option value="pending">Bekleyenler</option>
+                            <option value="approved">Onaylananlar</option>
+                            <option value="rejected">Reddedilenler</option>
+                            <option value="spam">Spam</option>
+                        </Select>
+                    </FilterToolbar>
                     <DataTable
                         columns={sellerColumns}
                         data={sellerRatings}
@@ -498,8 +489,8 @@ export default function ReviewsPage() {
             {/* Delete Seller Rating Confirmation */}
             {deleteSellerConfirm && (
                 <div className="fixed inset-0 bg-heading/50 flex items-center justify-center z-50">
-                    <div className="bg-surface-elevated rounded-xl p-6 max-w-md w-full mx-4 border border-border">
-                        <h3 className="text-lg font-semibold text-heading mb-4">Satıcı Yorumunu Sil</h3>
+                    <div className="bg-surface-elevated rounded-xl px-6 pb-6 pt-5 max-w-md w-full mx-4 border border-border">
+                        <h3 className="text-lg font-semibold text-heading mb-4 leading-tight">Satıcı Yorumunu Sil</h3>
                         <p className="text-muted mb-6">Bu satıcı yorumunu silmek istediğinizden emin misiniz? Bu işlem geri alınamaz.</p>
                         <div className="flex gap-3">
                             <Button variant="secondary" size="md" onClick={() => setDeleteSellerConfirm(null)} className="flex-1">İptal</Button>
@@ -512,8 +503,8 @@ export default function ReviewsPage() {
             {/* Delete Confirmation */}
             {deleteConfirm && (
                 <div className="fixed inset-0 bg-heading/50 flex items-center justify-center z-50">
-                    <div className="bg-surface-elevated rounded-xl p-6 max-w-md w-full mx-4 border border-border">
-                        <h3 className="text-lg font-semibold text-heading mb-4">Yorumu Sil</h3>
+                    <div className="bg-surface-elevated rounded-xl px-6 pb-6 pt-5 max-w-md w-full mx-4 border border-border">
+                        <h3 className="text-lg font-semibold text-heading mb-4 leading-tight">Yorumu Sil</h3>
                         <p className="text-muted mb-6">
                             Bu yorumu silmek istediğinizden emin misiniz? Bu işlem geri alınamaz.
                         </p>

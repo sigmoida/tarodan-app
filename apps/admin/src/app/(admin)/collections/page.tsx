@@ -14,6 +14,7 @@ import {
 } from '@heroicons/react/24/outline';
 import { StarIcon as StarSolidIcon } from '@heroicons/react/24/solid';
 import toast from 'react-hot-toast';
+import { PageHeader, FilterToolbar, ActionButtons, ActionIconButton } from '@/components/admin-list';
 
 interface Collection {
     id: string;
@@ -208,28 +209,29 @@ export default function CollectionsPage() {
             id: 'actions',
             header: 'İşlemler',
             cell: ({ row }) => (
-                <div className="flex items-center justify-end gap-2">
-                    <Button variant="secondary" onClick={() => toggleVisibility(row.original)}
-                        className="p-2 text-muted hover:text-heading hover:bg-surface-alt rounded-lg"
-                        title={row.original.isPublic ? 'Gizle' : 'Görünür yap'}>
-                        {row.original.isPublic ? <EyeSlashIcon className="h-5 w-5" /> : <EyeIcon className="h-5 w-5" />}
-                    </Button>
+                <ActionButtons>
+                    <ActionIconButton
+                        icon={row.original.isPublic ? EyeSlashIcon : EyeIcon}
+                        onClick={() => toggleVisibility(row.original)}
+                        title={row.original.isPublic ? 'Gizle' : 'Görünür yap'}
+                    />
                     <Button variant="secondary" onClick={() => toggleFeatured(row.original)}
                         className="p-2 text-muted hover:text-warning-700 hover:bg-surface-alt rounded-lg"
                         title={row.original.isFeatured ? 'Öne çıkarmayı kaldır' : 'Öne çıkar'}>
                         {row.original.isFeatured ? <StarSolidIcon className="h-5 w-5 text-warning-700" /> : <StarIcon className="h-5 w-5" />}
                     </Button>
-                    <Button variant="secondary" onClick={() => openEditModal(row.original)}
-                        className="p-2 text-muted hover:text-heading hover:bg-surface-alt rounded-lg"
-                        title="Düzenle">
-                        <PencilIcon className="h-5 w-5" />
-                    </Button>
-                    <Button variant="secondary" onClick={() => setDeleteConfirm(row.original.id)}
-                        className="p-2 text-danger-600 hover:text-danger-300 hover:bg-danger-50 rounded-lg"
-                        title="Sil">
-                        <TrashIcon className="h-5 w-5" />
-                    </Button>
-                </div>
+                    <ActionIconButton
+                        icon={PencilIcon}
+                        onClick={() => openEditModal(row.original)}
+                        title="Düzenle"
+                    />
+                    <ActionIconButton
+                        icon={TrashIcon}
+                        onClick={() => setDeleteConfirm(row.original.id)}
+                        title="Sil"
+                        variant="danger"
+                    />
+                </ActionButtons>
             ),
         },
     ];
@@ -237,28 +239,19 @@ export default function CollectionsPage() {
     return (
         <>
             <div className="space-y-6">
-                {/* Header */}
-                <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-                    <div>
-                        <h1 className="text-2xl font-bold text-heading">Koleksiyonlar</h1>
-                        <p className="text-muted mt-1">Koleksiyon yönetimi</p>
-                    </div>
+                <PageHeader title="Koleksiyonlar" description="Koleksiyon yönetimi">
                     <Button variant="primary" size="md" onClick={openCreateModal}>
                         <PlusIcon className="w-5 h-5" />
                         Yeni Koleksiyon
                     </Button>
-                </div>
+                </PageHeader>
 
                 {/* Search */}
-                <div className="admin-card p-4">
-                    <Input
-                        type="text"
-                        placeholder="Koleksiyon ara..."
-                        value={search}
-                        onChange={(e) => { setSearch(e.target.value); setPage(1); }}
-                        className="max-w-md"
-                    />
-                </div>
+                <FilterToolbar
+                    search={search}
+                    onSearchChange={(v) => { setSearch(v); setPage(1); }}
+                    searchPlaceholder="Koleksiyon ara..."
+                />
 
                 {/* Collections Table */}
                 <DataTable
@@ -266,6 +259,7 @@ export default function CollectionsPage() {
                     data={collections}
                     loading={loading}
                     emptyText="Henüz koleksiyon yok"
+                    emptyAction={<Button onClick={openCreateModal}><PlusIcon className="w-5 h-5 mr-2" />İlk koleksiyonu ekle</Button>}
                     getRowId={(c) => c.id}
                 />
 
@@ -292,8 +286,8 @@ export default function CollectionsPage() {
             {/* Create/Edit Modal */}
             {showModal && (
                 <div className="fixed inset-0 bg-heading bg-opacity-50 flex items-center justify-center z-50">
-                    <div className="bg-surface-elevated rounded-xl p-6 max-w-md w-full mx-4 border border-border">
-                        <h2 className="text-xl font-semibold text-heading mb-4">
+                    <div className="bg-surface-elevated rounded-xl px-6 pb-6 pt-5 max-w-md w-full mx-4 border border-border">
+                        <h2 className="text-xl font-semibold text-heading mb-4 leading-tight">
                             {editingCollection ? 'Koleksiyon Düzenle' : 'Yeni Koleksiyon'}
                         </h2>
                         <form onSubmit={handleSubmit} className="space-y-4">
@@ -349,8 +343,8 @@ export default function CollectionsPage() {
             {/* Delete Confirm Modal */}
             {deleteConfirm && (
                 <div className="fixed inset-0 bg-heading bg-opacity-50 flex items-center justify-center z-50">
-                    <div className="bg-surface-elevated rounded-xl p-6 max-w-md w-full mx-4 border border-border">
-                        <h3 className="text-lg font-semibold text-heading mb-4">Koleksiyonu Sil</h3>
+                    <div className="bg-surface-elevated rounded-xl px-6 pb-6 pt-5 max-w-md w-full mx-4 border border-border">
+                        <h3 className="text-lg font-semibold text-heading mb-4 leading-tight">Koleksiyonu Sil</h3>
                         <p className="text-muted mb-6">
                             Bu koleksiyonu silmek istediğinizden emin misiniz? Bu işlem geri alınamaz.
                         </p>

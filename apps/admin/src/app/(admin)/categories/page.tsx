@@ -6,6 +6,7 @@ import { Button, Checkbox, Input, Textarea } from '@tarodan/ui';
 import { PlusIcon, PencilIcon, TrashIcon } from '@heroicons/react/24/outline';
 import toast from 'react-hot-toast';
 import { DataTable, type ColumnDef } from '@/components/DataTable';
+import { PageHeader, ActionButtons, ActionIconButton } from '@/components/admin-list';
 
 interface Category {
   id: string;
@@ -131,19 +132,20 @@ export default function CategoriesPage() {
       id: 'actions',
       header: 'İşlemler',
       cell: ({ row }) => (
-        <div className="flex items-center gap-2 ml-4 flex-shrink-0">
-          <Button variant="secondary" onClick={() => openEditModal(row.original)}
-            className="p-2 text-muted hover:text-heading hover:bg-surface-alt rounded-lg"
-            title="Düzenle">
-            <PencilIcon className="h-5 w-5" />
-          </Button>
-          <Button variant="secondary" onClick={() => setDeleteConfirm(row.original.id)}
-            className="p-2 text-danger-600 hover:text-danger-300 hover:bg-danger-50 rounded-lg"
+        <ActionButtons>
+          <ActionIconButton
+            icon={PencilIcon}
+            onClick={() => openEditModal(row.original)}
+            title="Düzenle"
+          />
+          <ActionIconButton
+            icon={TrashIcon}
+            onClick={() => setDeleteConfirm(row.original.id)}
             title="Sil"
-            disabled={row.original.productCount > 0}>
-            <TrashIcon className="h-5 w-5" />
-          </Button>
-        </div>
+            variant="danger"
+            disabled={row.original.productCount > 0}
+          />
+        </ActionButtons>
       ),
     },
   ];
@@ -151,17 +153,12 @@ export default function CategoriesPage() {
   return (
     <>
       <div className="space-y-6">
-        {/* Header */}
-        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-          <div>
-            <h1 className="text-2xl font-bold text-heading">Kategoriler</h1>
-            <p className="text-muted mt-1">Kategori listesi ve yönetimi</p>
-          </div>
+        <PageHeader title="Kategoriler" description="Kategori listesi ve yönetimi">
           <Button variant="primary" size="md" onClick={openCreateModal}>
             <PlusIcon className="w-5 h-5" />
             Yeni Kategori
           </Button>
-        </div>
+        </PageHeader>
 
         {/* Categories List */}
         <DataTable
@@ -177,8 +174,8 @@ export default function CategoriesPage() {
       {showModal && (
         <div className="fixed inset-0 bg-heading bg-opacity-50 flex items-center justify-center z-50 p-4">
           {/* Added max-h and overflow for mobile friendliness */}
-          <div className="bg-surface-elevated rounded-xl p-6 max-w-md w-full border border-border max-h-[90vh] overflow-y-auto">
-            <h2 className="text-xl font-semibold text-heading mb-4">
+          <div className="bg-surface-elevated rounded-xl px-6 pb-6 pt-5 max-w-md w-full border border-border max-h-[90vh] overflow-y-auto">
+            <h2 className="text-xl font-semibold text-heading mb-4 leading-tight">
               {editingCategory ? 'Kategori Düzenle' : 'Yeni Kategori'}
             </h2>
             <form onSubmit={handleSubmit} className="space-y-4">
@@ -226,8 +223,8 @@ export default function CategoriesPage() {
       {/* Delete Confirm Modal */}
       {deleteConfirm && (
         <div className="fixed inset-0 bg-heading bg-opacity-50 flex items-center justify-center z-50">
-          <div className="bg-surface-elevated rounded-xl p-6 max-w-md w-full mx-4 border border-border">
-            <h3 className="text-lg font-semibold text-heading mb-4">Kategoriyi Sil</h3>
+          <div className="bg-surface-elevated rounded-xl px-6 pb-6 pt-5 max-w-md w-full mx-4 border border-border">
+            <h3 className="text-lg font-semibold text-heading mb-4 leading-tight">Kategoriyi Sil</h3>
             <p className="text-muted mb-6">
               Bu kategoriyi silmek istediğinizden emin misiniz? Bu işlem geri alınamaz.
             </p>

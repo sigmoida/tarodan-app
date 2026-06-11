@@ -801,12 +801,12 @@ function StatCard({
 }) {
   return (
     <div className="admin-card">
-      <div className="flex items-center justify-between">
-        <div>
-          <p className="text-sm text-muted">{title}</p>
-          <p className="text-2xl font-bold text-heading mt-1">{value}</p>
+      <div className="flex items-center justify-between gap-3">
+        <div className="min-w-0">
+          <p className="text-sm text-muted truncate">{title}</p>
+          <p className="text-2xl font-bold text-heading mt-1 truncate">{value}</p>
         </div>
-        <div className={`p-3 rounded-lg ${color}`}>
+        <div className={`p-3 rounded-lg shrink-0 ${color}`}>
           <Icon className="h-6 w-6 text-heading" />
         </div>
       </div>

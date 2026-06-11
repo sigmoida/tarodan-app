@@ -16,13 +16,16 @@ import {
   PlusIcon,
   PencilIcon,
   TrashIcon,
-  TagIcon,
   CheckIcon,
   XMarkIcon,
-  MagnifyingGlassIcon,
-  FunnelIcon,
 } from "@heroicons/react/24/outline";
 import toast from "react-hot-toast";
+import {
+  PageHeader,
+  FilterToolbar,
+  ActionButtons,
+  ActionIconButton,
+} from "@/components/admin-list";
 
 interface Discount {
   id: string;
@@ -449,40 +452,25 @@ export default function DiscountsPage() {
       id: "actions",
       header: "İşlemler",
       cell: ({ row }) => (
-        <div className="flex items-center justify-end gap-2">
-          <Button
-            variant="secondary"
+        <ActionButtons>
+          <ActionIconButton
+            icon={row.original.isActive ? XMarkIcon : CheckIcon}
             onClick={() => toggleDiscountStatus(row.original)}
-            className={`p-1.5 rounded-lg transition-colors ${
-              row.original.isActive
-                ? "text-muted hover:bg-surface-alt"
-                : "text-success-700 hover:bg-success-50"
-            }`}
             title={row.original.isActive ? "Devre dışı bırak" : "Aktif et"}
-          >
-            {row.original.isActive ? (
-              <XMarkIcon className="w-4 h-4" />
-            ) : (
-              <CheckIcon className="w-4 h-4" />
-            )}
-          </Button>
-          <Button
-            variant="secondary"
+            variant={row.original.isActive ? "default" : "success"}
+          />
+          <ActionIconButton
+            icon={PencilIcon}
             onClick={() => openEditModal(row.original)}
-            className="p-1.5 text-info-700 hover:bg-info-50 rounded-lg transition-colors"
             title="Düzenle"
-          >
-            <PencilIcon className="w-4 h-4" />
-          </Button>
-          <Button
-            variant="secondary"
+          />
+          <ActionIconButton
+            icon={TrashIcon}
             onClick={() => setDeleteConfirm(row.original.id)}
-            className="p-1.5 text-danger-600 hover:bg-danger-50 rounded-lg transition-colors"
             title="Sil"
-          >
-            <TrashIcon className="w-4 h-4" />
-          </Button>
-        </div>
+            variant="danger"
+          />
+        </ActionButtons>
       ),
     },
   ];
@@ -490,84 +478,69 @@ export default function DiscountsPage() {
   return (
     <>
       <div className="p-6">
-        {/* Header */}
-        <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-6">
-          <div>
-            <h1 className="text-2xl font-bold text-heading flex items-center gap-2">
-              <TagIcon className="w-7 h-7 text-primary" />
-              İndirim Yönetimi
-            </h1>
-            <p className="text-muted mt-1">
-              Kupon kodları ve otomatik kampanyaları yönetin
-            </p>
-          </div>
+        <PageHeader
+          title="İndirim Yönetimi"
+          description="Kupon kodları ve otomatik kampanyaları yönetin"
+        >
           <Button onClick={openCreateModal} className="flex gap-2">
             <PlusIcon className="w-5 h-5" />
             Yeni İndirim
           </Button>
-        </div>
+        </PageHeader>
 
         {/* Filters */}
-        <div className="admin-card p-4 mb-6">
-          <div className="flex flex-col sm:flex-row gap-4">
-            <div className="flex-1 relative">
-              <MagnifyingGlassIcon className="w-5 h-5 absolute left-3 top-1/2 transform -translate-y-1/2 text-muted" />
-              <Input
-                type="text"
-                placeholder="İsim veya kod ile ara..."
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                className="admin-input-with-icon-left"
-              />
-            </div>
-            <div className="flex gap-3">
-              <Select
-                value={filterScope}
-                onChange={(e) => setFilterScope(e.target.value)}
-                className="w-auto"
-              >
-                <option value="">Tüm Kapsamlar</option>
-                <option value="global">Tüm Site</option>
-                <option value="category">Kategori</option>
-                <option value="product">Ürün</option>
-                <option value="seller">Satıcı</option>
-              </Select>
-              <Select
-                value={filterActive}
-                onChange={(e) => setFilterActive(e.target.value)}
-                className="w-auto"
-              >
-                <option value="">Tüm Durumlar</option>
-                <option value="true">Aktif</option>
-                <option value="false">Pasif</option>
-              </Select>
-            </div>
-          </div>
+        <div className="mt-6 mb-6">
+          <FilterToolbar
+            search={searchQuery}
+            onSearchChange={setSearchQuery}
+            searchPlaceholder="İsim veya kod ile ara..."
+          >
+            <Select
+              value={filterScope}
+              onChange={(e) => setFilterScope(e.target.value)}
+              className="w-auto"
+            >
+              <option value="">Tüm Kapsamlar</option>
+              <option value="global">Tüm Site</option>
+              <option value="category">Kategori</option>
+              <option value="product">Ürün</option>
+              <option value="seller">Satıcı</option>
+            </Select>
+            <Select
+              value={filterActive}
+              onChange={(e) => setFilterActive(e.target.value)}
+              className="w-auto"
+            >
+              <option value="">Tüm Durumlar</option>
+              <option value="true">Aktif</option>
+              <option value="false">Pasif</option>
+            </Select>
+          </FilterToolbar>
         </div>
 
         {/* Stats */}
         <div className="grid grid-cols-1 sm:grid-cols-4 gap-4 mb-6">
           <div className="admin-card p-4">
-            <p className="text-sm text-muted">Toplam İndirim</p>
-            <p className="text-2xl font-bold text-heading">
+            <p className="text-sm text-muted truncate">Toplam İndirim</p>
+            <p className="text-2xl font-bold text-heading truncate">
               {pagination.total}
             </p>
           </div>
           <div className="admin-card p-4">
-            <p className="text-sm text-muted">Aktif</p>
-            <p className="text-2xl font-bold text-success-700">
+            <p className="text-sm text-muted truncate">Aktif</p>
+            <p className="text-2xl font-bold text-success-700 truncate">
               {discounts.filter((d) => d.isCurrentlyValid).length}
             </p>
           </div>
           <div className="admin-card p-4">
-            <p className="text-sm text-muted">Kupon Kodları</p>
-            <p className="text-2xl font-bold text-info-700">
+            <p className="text-sm text-muted truncate">Kupon Kodları</p>
+            <p className="text-2xl font-bold text-info-700 truncate">
               {discounts.filter((d) => d.code).length}
             </p>
           </div>
           <div className="admin-card p-4">
-            <p className="text-sm text-muted">Otomatik Kampanyalar</p>
-            <p className="text-2xl font-bold text-primary-700">
+            <p className="text-sm text-muted truncate">Otomatik Kampanyalar</p>
+            <p className="text-2xl font-bold text-primary-700 truncate">
               {discounts.filter((d) => !d.code).length}
             </p>
           </div>
@@ -580,6 +553,7 @@ export default function DiscountsPage() {
             data={discounts}
             loading={loading}
             emptyText="Henüz indirim tanımlanmamış"
+            emptyAction={<Button onClick={openCreateModal}><PlusIcon className="w-5 h-5 mr-2" />İlk indirimi ekle</Button>}
             getRowId={(d) => d.id}
           />
 
@@ -622,8 +596,8 @@ export default function DiscountsPage() {
         {showModal && (
           <div className="fixed inset-0 bg-heading/70 flex items-center justify-center p-4 z-50">
             <div className="bg-surface-elevated rounded-xl shadow-xl max-w-2xl w-full max-h-[90vh] overflow-y-auto border border-border">
-              <div className="p-6 border-b border-border">
-                <h2 className="text-xl font-bold text-heading">
+              <div className="px-6 pb-6 pt-5 border-b border-border">
+                <h2 className="text-xl font-bold text-heading leading-tight">
                   {editingDiscount
                     ? "İndirimi Düzenle"
                     : "Yeni İndirim Oluştur"}
@@ -1042,8 +1016,8 @@ export default function DiscountsPage() {
         {/* Delete Confirmation Modal */}
         {deleteConfirm && (
           <div className="fixed inset-0 bg-heading/70 flex items-center justify-center p-4 z-50">
-            <div className="bg-surface-elevated rounded-xl shadow-xl max-w-md w-full p-6 border border-border">
-              <h3 className="text-lg font-bold text-heading mb-2">
+            <div className="bg-surface-elevated rounded-xl shadow-xl max-w-md w-full px-6 pb-6 pt-5 border border-border">
+              <h3 className="text-lg font-bold text-heading mb-2 leading-tight">
                 İndirimi Sil
               </h3>
               <p className="text-muted mb-6">

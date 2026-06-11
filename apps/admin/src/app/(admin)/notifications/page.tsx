@@ -21,6 +21,7 @@ import {
 } from "@tarodan/ui";
 import { AdminTabs } from "@/components/AdminTabs";
 import { DataTable, type ColumnDef } from "@/components/DataTable";
+import { PageHeader, ActionButtons, ActionIconButton } from "@/components/admin-list";
 import { useConfirm } from "@/components/ConfirmProvider";
 
 interface NotificationLog {
@@ -285,13 +286,14 @@ export default function NotificationsPage() {
       id: "actions",
       header: "İşlem",
       cell: ({ row }) => (
-        <Button
-          variant="secondary"
-          onClick={() => handleCancelScheduled(row.original.id)}
-          className="p-2 text-danger-600 hover:text-danger-300 hover:bg-danger-500/10 rounded-lg"
-        >
-          <XCircleIcon className="h-5 w-5" />
-        </Button>
+        <ActionButtons>
+          <ActionIconButton
+            icon={XCircleIcon}
+            onClick={() => handleCancelScheduled(row.original.id)}
+            title="İptal Et"
+            variant="danger"
+          />
+        </ActionButtons>
       ),
     },
   ];
@@ -355,14 +357,10 @@ export default function NotificationsPage() {
   return (
     <>
       <div className="space-y-6">
-        <div>
-          <h1 className="text-2xl font-bold text-heading">
-            Bildirim Yönetimi
-          </h1>
-          <p className="text-muted mt-1">
-            Push, email ve SMS bildirimleri gönderin ve yönetin
-          </p>
-        </div>
+        <PageHeader
+          title="Bildirim Yönetimi"
+          description="Push, email ve SMS bildirimleri gönderin ve yönetin"
+        />
 
         {/* Tabs */}
         <AdminTabs
@@ -507,7 +505,7 @@ export default function NotificationsPage() {
 
               <div className="flex gap-4 pt-4">
                 <Button onClick={handleSendNotification} disabled={sending}>
-                  <PaperAirplaneIcon className="h-5 w-5 mr-2" />
+                  <PaperAirplaneIcon className="h-5 w-5 mr-2 shrink-0" />
                   {sending ? "Gönderiliyor..." : "Şimdi Gönder"}
                 </Button>
                 <Button
@@ -515,7 +513,7 @@ export default function NotificationsPage() {
                   onClick={() => setShowScheduleModal(true)}
                   disabled={!sendForm.title || !sendForm.body}
                 >
-                  <ClockIcon className="h-5 w-5 mr-2" />
+                  <ClockIcon className="h-5 w-5 mr-2 shrink-0" />
                   Zamanla
                 </Button>
               </div>
@@ -626,8 +624,8 @@ export default function NotificationsPage() {
       {/* Schedule Modal */}
       {showScheduleModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-heading/60">
-          <div className="bg-surface-elevated rounded-xl border border-border w-full max-w-md p-6">
-            <h2 className="text-xl font-bold text-heading mb-4">
+          <div className="bg-surface-elevated rounded-xl border border-border w-full max-w-md px-6 pb-6 pt-5">
+            <h2 className="text-xl font-bold text-heading mb-4 leading-tight">
               Bildirimi Zamanla
             </h2>
             <div className="space-y-4">

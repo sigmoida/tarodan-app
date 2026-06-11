@@ -45,6 +45,9 @@ function forceLogout() {
   localStorage.removeItem('admin_token');
   localStorage.removeItem('admin_refresh_token');
   localStorage.removeItem('admin_user');
+  // Middleware admin erişimini admin_token COOKIE'sine göre açıyor; cookie
+  // temizlenmezse ölü oturum "girişli" görünüp sonsuz 401'e sokuyor.
+  document.cookie = 'admin_token=; path=/; max-age=0; SameSite=Lax';
   window.location.href = '/login';
 }
 

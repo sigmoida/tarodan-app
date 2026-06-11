@@ -21,7 +21,6 @@ import {
 } from "@tarodan/ui";
 import { DataTable, type ColumnDef } from "@/components/DataTable";
 import {
-  MagnifyingGlassIcon,
   CheckIcon,
   XMarkIcon,
   EyeIcon,
@@ -32,6 +31,13 @@ import {
 } from "@heroicons/react/24/outline";
 import toast from "react-hot-toast";
 import { useConfirm } from "@/components/ConfirmProvider";
+import {
+  PageHeader,
+  FilterToolbar,
+  BulkActionBar,
+  ActionButtons,
+  ActionIconButton,
+} from "@/components/admin-list";
 
 interface Product {
   id: string;
@@ -434,105 +440,68 @@ export default function ProductsPage() {
       id: "actions",
       header: "İşlemler",
       cell: ({ row }) => (
-        <div className="flex items-center gap-1 whitespace-nowrap">
-          <Link
+        <ActionButtons>
+          <ActionIconButton
+            icon={EyeIcon}
             href={`/products/${row.original.id}`}
-            className="p-2 text-muted hover:text-heading hover:bg-surface-alt rounded-lg"
             title="Detay"
-          >
-            <EyeIcon className="h-5 w-5" />
-          </Link>
+          />
           {row.original.status === "pending" && (
             <>
-              <Button
-                variant="secondary"
+              <ActionIconButton
+                icon={CheckIcon}
                 onClick={() => handleApprove(row.original.id)}
-                className="p-2 text-success-700 hover:bg-success-500/10 rounded-lg"
                 title="Onayla"
-              >
-                <CheckIcon className="h-5 w-5" />
-              </Button>
-              <Button
-                variant="secondary"
+                variant="success"
+              />
+              <ActionIconButton
+                icon={XMarkIcon}
                 onClick={() => handleReject(row.original.id)}
-                className="p-2 text-danger-600 hover:bg-danger-500/10 rounded-lg"
                 title="Reddet"
-              >
-                <XMarkIcon className="h-5 w-5" />
-              </Button>
+                variant="danger"
+              />
             </>
           )}
-          <Button
-            variant="secondary"
+          <ActionIconButton
+            icon={TrashIcon}
             onClick={() => handleDelete(row.original.id)}
-            className="p-2 text-danger-600 hover:bg-danger-500/10 rounded-lg"
             title="Sil"
-          >
-            <TrashIcon className="h-5 w-5" />
-          </Button>
-        </div>
+            variant="danger"
+          />
+        </ActionButtons>
       ),
     },
   ];
 
   return (
     <div className="space-y-6">
-      {/* Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-        <div className="flex items-center gap-3">
-          <div>
-            <h1 className="text-2xl font-bold text-heading">Ürünler</h1>
-            <p className="text-muted mt-1">
-              {filter === "pending"
-                ? `${products.filter((p) => p.status === "pending").length} ürün onay bekliyor`
-                : `Toplam ${total} ürün`}
-              {selectedSellerId && (
-                <span className="ml-2">
-                  — Satıcıya göre filtreleniyor
-                  <Button
-                    variant="secondary"
-                    onClick={clearSellerFilter}
-                    className="ml-2 text-primary-600 hover:underline"
-                  >
-                    Filtreyi kaldır
-                  </Button>
-                </span>
-              )}
-            </p>
-          </div>
-          {pendingCount > 0 && (
-            <span className="px-3 py-1 bg-warning-500/20 text-warning-700 rounded-full text-sm font-medium">
-              {pendingCount} Bekleyen
-            </span>
-          )}
-        </div>
-        {selectedIds.size > 0 && (
-          <div className="flex items-center gap-2">
-            <span className="text-sm text-muted">
-              {selectedIds.size} ürün seçili
-            </span>
-            <Button
-              variant="success"
-              size="sm"
-              onClick={handleBulkApprove}
-              disabled={bulkProcessing}
-              isLoading={bulkProcessing}
-            >
-              <CheckCircleIcon className="h-4 w-4" />
-              Seçilenleri Onayla
-            </Button>
-            <Button
-              variant="danger"
-              size="sm"
-              onClick={handleBulkReject}
-              disabled={bulkProcessing}
-              isLoading={bulkProcessing}
-            >
-              <XCircleIcon className="h-4 w-4" />
-              Seçilenleri Reddet
-            </Button>
-          </div>
-        )}
+      <PageHeader
+        title="Ürünler"
+        description={
+          <>
+            {filter === "pending"
+              ? `${products.filter((p) => p.status === "pending").length} ürün onay bekliyor`
+              : `Toplam ${total} ürün`}
+            {pendingCount > 0 && (
+              <span className="ml-2 px-3 py-1 bg-warning-500/20 text-warning-700 rounded-full text-sm font-medium shrink-0 whitespace-nowrap">
+                {pendingCount} Bekleyen
+              </span>
+            )}
+            {selectedSellerId && (
+              <span className="ml-2">
+                — Satıcıya göre filtreleniyor
+                <Button
+                  variant="secondary"
+                  onClick={clearSellerFilter}
+                  className="ml-2 text-primary-600 hover:underline"
+                >
+                  Filtreyi kaldır
+                </Button>
+              </span>
+            )}
+          </>
+        }
+      >
         <Button
           variant="secondary"
           onClick={async () => {
@@ -556,29 +525,41 @@ export default function ProductsPage() {
         >
           CSV İndir
         </Button>
-      </div>
+      </PageHeader>
+
+      <BulkActionBar
+        count={selectedIds.size}
+        onClear={() => setSelectedIds(new Set())}
+      >
+        <Button
+          variant="success"
+          size="sm"
+          onClick={handleBulkApprove}
+          disabled={bulkProcessing}
+          isLoading={bulkProcessing}
+        >
+          <CheckCircleIcon className="h-4 w-4" />
+          Seçilenleri Onayla
+        </Button>
+        <Button
+          variant="danger"
+          size="sm"
+          onClick={handleBulkReject}
+          disabled={bulkProcessing}
+          isLoading={bulkProcessing}
+        >
+          <XCircleIcon className="h-4 w-4" />
+          Seçilenleri Reddet
+        </Button>
+      </BulkActionBar>
 
       {/* Filters */}
-      <div className="flex flex-col sm:flex-row gap-4">
-        <div className="relative flex-1 flex gap-2">
-          <MagnifyingGlassIcon className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-muted pointer-events-none" />
-          <Input
-            type="text"
-            placeholder="Ürün ara..."
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            onKeyDown={(e) => e.key === "Enter" && loadProducts(1)}
-            className="admin-input-with-icon-left flex-1"
-          />
-          <Button
-            type="button"
-            onClick={() => loadProducts(1)}
-            className="whitespace-nowrap"
-          >
-            Ara
-          </Button>
-        </div>
-
+      <FilterToolbar
+        search={search}
+        onSearchChange={setSearch}
+        onSearchSubmit={() => loadProducts(1)}
+        searchPlaceholder="Ürün ara..."
+      >
         {/* Seller Filter */}
         <div className="relative w-full sm:w-64">
           <UserIcon className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-muted" />
@@ -640,7 +621,7 @@ export default function ProductsPage() {
           <option value="sold">Satılanlar</option>
           <option value="inactive">Silindi</option>
         </Select>
-      </div>
+      </FilterToolbar>
 
       {/* Table */}
       <DataTable

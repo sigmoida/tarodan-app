@@ -4,6 +4,7 @@ import { useState, useEffect, useRef } from 'react';
 import { adminApi } from '@/lib/api';
 import { Button, Input, Select, Textarea } from '@tarodan/ui';
 import { DataTable, type ColumnDef } from '@/components/DataTable';
+import { PageHeader, ActionButtons, ActionIconButton } from '@/components/admin-list';
 import {
   PlusIcon,
   PencilIcon,
@@ -213,14 +214,10 @@ export default function ManufacturersPage() {
       id: 'actions',
       header: 'İşlemler',
       cell: ({ row }) => (
-        <div className="flex items-center justify-end gap-2">
-          <Button variant="secondary" onClick={() => openEditModal(row.original)} className="p-2 text-muted hover:text-muted hover:bg-surface-alt rounded-lg" title="Düzenle">
-            <PencilIcon className="w-4 h-4" />
-          </Button>
-          <Button variant="secondary" onClick={() => setDeleteConfirm(row.original.id)} className="p-2 text-muted hover:text-danger-600 hover:bg-danger-50 rounded-lg" title="Sil">
-            <TrashIcon className="w-4 h-4" />
-          </Button>
-        </div>
+        <ActionButtons>
+          <ActionIconButton icon={PencilIcon} onClick={() => openEditModal(row.original)} title="Düzenle" />
+          <ActionIconButton icon={TrashIcon} onClick={() => setDeleteConfirm(row.original.id)} title="Sil" variant="danger" />
+        </ActionButtons>
       ),
     },
   ];
@@ -228,24 +225,22 @@ export default function ManufacturersPage() {
   return (
     <>
       <div className="space-y-6">
-        <div className="flex justify-between items-center">
-          <div>
-            <h1 className="text-2xl font-bold text-heading">Üretici Yönetimi</h1>
-            <p className="mt-1 text-sm text-muted">
-              Diecast model üreticilerini (Hot Wheels, Matchbox vb.) buradan yönetebilirsiniz
-            </p>
-          </div>
-          <Button variant="primary" size="md" onClick={openCreateModal}>
+        <PageHeader
+          title="Üretici Yönetimi"
+          description="Diecast model üreticilerini (Hot Wheels, Matchbox vb.) buradan yönetebilirsiniz"
+        >
+          <Button variant="primary" size="md" onClick={openCreateModal} className="shrink-0">
             <PlusIcon className="w-5 h-5" />
             Yeni Üretici Ekle
           </Button>
-        </div>
+        </PageHeader>
 
         <DataTable
           columns={columns}
           data={manufacturers}
           loading={loading}
           emptyText="Henüz üretici eklenmemiş"
+          emptyAction={<Button onClick={openCreateModal}><PlusIcon className="w-5 h-5 mr-2" />İlk üreticiyi ekle</Button>}
           getRowId={(m) => m.id}
         />
 
@@ -253,8 +248,8 @@ export default function ManufacturersPage() {
           <div className="fixed inset-0 z-50 overflow-y-auto">
             <div className="flex min-h-full items-center justify-center p-4">
               <div className="fixed inset-0 bg-heading/50" onClick={() => setShowModal(false)} />
-              <div className="relative bg-surface-elevated rounded-xl shadow-xl w-full max-w-md p-6">
-                <h3 className="text-lg font-semibold text-heading mb-4">
+              <div className="relative bg-surface-elevated rounded-xl shadow-xl w-full max-w-md px-6 pb-6 pt-5">
+                <h3 className="text-lg font-semibold text-heading mb-4 leading-tight">
                   {editingManufacturer ? 'Üreticiyi Düzenle' : 'Yeni Üretici Ekle'}
                 </h3>
                 <form onSubmit={handleSubmit} className="space-y-4">
@@ -355,8 +350,8 @@ export default function ManufacturersPage() {
           <div className="fixed inset-0 z-50 overflow-y-auto">
             <div className="flex min-h-full items-center justify-center p-4">
               <div className="fixed inset-0 bg-heading/50" onClick={() => setDeleteConfirm(null)} />
-              <div className="relative bg-surface-elevated rounded-xl shadow-xl w-full max-w-sm p-6">
-                <h3 className="text-lg font-semibold text-heading mb-2">Üreticiyi Sil</h3>
+              <div className="relative bg-surface-elevated rounded-xl shadow-xl w-full max-w-sm px-6 pb-6 pt-5">
+                <h3 className="text-lg font-semibold text-heading mb-2 leading-tight">Üreticiyi Sil</h3>
                 <p className="text-muted mb-4">Bu üreticiyi silmek istediğinizden emin misiniz? Bu işlem geri alınamaz.</p>
                 <div className="flex justify-end gap-3">
                   <Button variant="secondary" size="md" onClick={() => setDeleteConfirm(null)}>

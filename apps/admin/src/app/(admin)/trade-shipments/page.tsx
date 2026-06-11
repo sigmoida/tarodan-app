@@ -5,13 +5,12 @@ import Link from "next/link";
 import { adminApi } from "@/lib/api";
 import {
   Button,
-  Input,
   Select,
   StatusBadge,
 } from "@tarodan/ui";
 import type { StatusConfig } from "@tarodan/ui";
 import { DataTable, type ColumnDef } from "@/components/DataTable";
-import { MagnifyingGlassIcon } from "@heroicons/react/24/outline";
+import { PageHeader, FilterToolbar } from "@/components/admin-list";
 import toast from "react-hot-toast";
 
 interface TradeShipmentRow {
@@ -215,23 +214,14 @@ export default function TradeShipmentsPage() {
 
   return (
     <div className="space-y-6">
-      <div>
-        <h1 className="text-2xl font-bold text-heading">Takas Kargoları</h1>
-        <p className="text-muted mt-1">Toplam {total} kargo</p>
-      </div>
+      <PageHeader title="Takas Kargoları" description={`Toplam ${total} kargo`} />
 
       {/* Filters */}
-      <div className="flex flex-col sm:flex-row gap-3">
-        <div className="relative flex-1">
-          <MagnifyingGlassIcon className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-subtle pointer-events-none shrink-0" />
-          <Input
-            type="text"
-            placeholder="Takas No ile ara..."
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            className="admin-input-with-icon-left"
-          />
-        </div>
+      <FilterToolbar
+        search={search}
+        onSearchChange={setSearch}
+        searchPlaceholder="Takas No ile ara..."
+      >
         <Select
           value={status}
           onChange={(e) => {
@@ -260,7 +250,7 @@ export default function TradeShipmentsPage() {
             </option>
           ))}
         </Select>
-      </div>
+      </FilterToolbar>
 
       {/* Table */}
       <DataTable

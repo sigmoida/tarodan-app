@@ -5,6 +5,7 @@ import { adminApi } from "@/lib/api";
 import { Button, StatusBadge } from "@tarodan/ui";
 import type { StatusConfig } from "@tarodan/ui";
 import { DataTable, type ColumnDef } from "@/components/DataTable";
+import { PageHeader, ActionButtons, ActionIconButton } from "@/components/admin-list";
 import {
   CheckIcon,
   XMarkIcon,
@@ -207,45 +208,33 @@ export default function MessagesPage() {
       cell: ({ row }) => {
         const message = row.original;
         return (
-          <div className="flex gap-1">
+          <ActionButtons>
             {message.status === "pending" && (
               <>
-                <Button
-                  variant="secondary"
+                <ActionIconButton
+                  icon={CheckIcon}
                   onClick={() => handleApprove(message.id)}
-                  className="p-2 text-success-700 hover:bg-success-500/10 rounded-lg"
                   title="Onayla"
-                >
-                  <CheckIcon className="h-5 w-5" />
-                </Button>
-                <Button
-                  variant="secondary"
+                  variant="success"
+                />
+                <ActionIconButton
+                  icon={XMarkIcon}
                   onClick={() => handleReject(message.id)}
-                  className="p-2 text-danger-600 hover:bg-danger-500/10 rounded-lg"
                   title="Reddet"
-                >
-                  <XMarkIcon className="h-5 w-5" />
-                </Button>
+                  variant="danger"
+                />
                 {message.senderId && (
-                  <Button
-                    variant="secondary"
+                  <ActionIconButton
+                    icon={NoSymbolIcon}
                     onClick={() => handleBanSender(message)}
-                    className="p-2 text-primary-700 hover:bg-primary-500/10 rounded-lg"
                     title="Göndereni yasakla (hesap engeli)"
-                  >
-                    <NoSymbolIcon className="h-5 w-5" />
-                  </Button>
+                    variant="primary"
+                  />
                 )}
               </>
             )}
-            <Button
-              variant="secondary"
-              className="p-2 text-muted hover:text-heading hover:bg-surface-alt rounded-lg"
-              title="Detay"
-            >
-              <EyeIcon className="h-5 w-5" />
-            </Button>
-          </div>
+            <ActionIconButton icon={EyeIcon} title="Detay" />
+          </ActionButtons>
         );
       },
     },
@@ -254,18 +243,18 @@ export default function MessagesPage() {
   return (
     <>
       <div className="space-y-6">
-        <div>
-          <h1 className="text-2xl font-bold text-heading">Mesaj Moderation</h1>
-          <p className="text-muted mt-1">
-            {filter === "all"
+        <PageHeader
+          title="Mesaj Moderation"
+          description={
+            filter === "all"
               ? `Toplam ${total} mesaj`
               : filter === "pending"
                 ? `${total} mesaj onay bekliyor — Bekleyen mesajları onaylayın, reddedin veya göndereni yasaklayın`
                 : filter === "approved"
                   ? `${total} onaylanmış mesaj`
-                  : `${total} reddedilen mesaj`}
-          </p>
-        </div>
+                  : `${total} reddedilen mesaj`
+          }
+        />
 
         <div className="flex gap-4">
           {(["all", "pending", "approved", "rejected"] as const).map((f) => (

@@ -141,49 +141,49 @@ export default function MembershipTiersPage() {
           ) : (
             tiers.map((tier) => (
               <div key={tier.id} className="admin-card">
-                <div className="flex items-start justify-between mb-4">
-                  <div>
-                    <h3 className="text-lg font-semibold text-heading">{tier.name}</h3>
-                    <p className="text-sm text-muted">{enumLabel(membershipTierConfig, tier.type)}</p>
+                <div className="flex items-start justify-between gap-3 mb-4">
+                  <div className="min-w-0">
+                    <h3 className="text-lg font-semibold text-heading truncate">{tier.name}</h3>
+                    <p className="text-sm text-muted truncate">{enumLabel(membershipTierConfig, tier.type)}</p>
                   </div>
                   <Button variant="secondary" onClick={() => openEditModal(tier)}
-                    className="p-2 text-muted hover:text-heading hover:bg-surface-alt rounded-lg"
+                    className="p-2 text-muted hover:text-heading hover:bg-surface-alt rounded-lg shrink-0"
                     title="Düzenle">
-                    <PencilIcon className="h-5 w-5" />
+                    <PencilIcon className="h-5 w-5 shrink-0" />
                   </Button>
                 </div>
                 {tier.description && (
                   <p className="text-sm text-muted mb-4">{tier.description}</p>
                 )}
                 <div className="space-y-2 text-sm">
-                  <div className="flex justify-between">
-                    <span className="text-muted">Aylık:</span>
-                    <span className="text-heading font-medium">
+                  <div className="flex justify-between gap-2">
+                    <span className="text-muted truncate min-w-0">Aylık:</span>
+                    <span className="text-heading font-medium shrink-0 whitespace-nowrap">
                       ₺{tier.monthlyPrice.toLocaleString('tr-TR', { minimumFractionDigits: 2 })}
                     </span>
                   </div>
-                  <div className="flex justify-between">
-                    <span className="text-muted">Yıllık:</span>
-                    <span className="text-heading font-medium">
+                  <div className="flex justify-between gap-2">
+                    <span className="text-muted truncate min-w-0">Yıllık:</span>
+                    <span className="text-heading font-medium shrink-0 whitespace-nowrap">
                       ₺{tier.yearlyPrice.toLocaleString('tr-TR', { minimumFractionDigits: 2 })}
                     </span>
                   </div>
-                  <div className="flex justify-between">
-                    <span className="text-muted">Ücretsiz İlan:</span>
-                    <span className="text-heading">{tier.maxFreeListings}</span>
+                  <div className="flex justify-between gap-2">
+                    <span className="text-muted truncate min-w-0">Ücretsiz İlan:</span>
+                    <span className="text-heading shrink-0 whitespace-nowrap">{tier.maxFreeListings}</span>
                   </div>
-                  <div className="flex justify-between">
-                    <span className="text-muted">Toplam İlan:</span>
-                    <span className="text-heading">{tier.maxTotalListings}</span>
+                  <div className="flex justify-between gap-2">
+                    <span className="text-muted truncate min-w-0">Toplam İlan:</span>
+                    <span className="text-heading shrink-0 whitespace-nowrap">{tier.maxTotalListings}</span>
                   </div>
-                  <div className="flex justify-between">
-                    <span className="text-muted">Görsel/İlan:</span>
-                    <span className="text-heading">{tier.maxImagesPerListing}</span>
+                  <div className="flex justify-between gap-2">
+                    <span className="text-muted truncate min-w-0">Görsel/İlan:</span>
+                    <span className="text-heading shrink-0 whitespace-nowrap">{tier.maxImagesPerListing}</span>
                   </div>
                   <div className="pt-2 border-t border-border">
-                    <div className="flex justify-between">
-                      <span className="text-muted">Kullanıcı Sayısı:</span>
-                      <span className="text-heading font-medium">{tier.userCount}</span>
+                    <div className="flex justify-between gap-2">
+                      <span className="text-muted truncate min-w-0">Kullanıcı Sayısı:</span>
+                      <span className="text-heading font-medium shrink-0 whitespace-nowrap">{tier.userCount}</span>
                     </div>
                   </div>
                 </div>
@@ -220,8 +220,8 @@ export default function MembershipTiersPage() {
       {/* Edit Modal */}
       {showModal && editingTier && (
         <div className="fixed inset-0 bg-heading bg-opacity-50 flex items-center justify-center z-50">
-          <div className="bg-surface-elevated rounded-xl p-6 max-w-2xl w-full mx-4 border border-border max-h-[90vh] overflow-y-auto">
-            <h2 className="text-xl font-semibold text-heading mb-4">Üyelik Seviyesi Düzenle</h2>
+          <div className="bg-surface-elevated rounded-xl px-6 pb-6 pt-5 max-w-2xl w-full mx-4 border border-border max-h-[90vh] overflow-y-auto">
+            <h2 className="text-xl font-semibold text-heading mb-4 leading-tight">Üyelik Seviyesi Düzenle</h2>
             <form onSubmit={handleSubmit} className="space-y-4">
               <div className="grid grid-cols-2 gap-4">
                 <div>

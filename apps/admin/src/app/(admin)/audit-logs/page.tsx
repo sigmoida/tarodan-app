@@ -3,8 +3,8 @@
 import { useState, useEffect } from 'react';
 import { adminApi } from '@/lib/api';
 import { DataTable, type ColumnDef } from '@/components/DataTable';
+import { PageHeader, FilterToolbar, ActionButtons, ActionIconButton } from '@/components/admin-list';
 import {
-  MagnifyingGlassIcon,
   EyeIcon,
   CalendarIcon,
   UserIcon,
@@ -163,14 +163,13 @@ export default function AuditLogsPage() {
       id: 'actions',
       header: 'İşlemler',
       cell: ({ row }) => (
-        <Button
-          variant="secondary"
-          onClick={() => setSelectedLog(row.original)}
-          className="p-2 text-muted hover:text-heading hover:bg-surface-alt rounded-lg"
-          title="Detay"
-        >
-          <EyeIcon className="h-5 w-5" />
-        </Button>
+        <ActionButtons>
+          <ActionIconButton
+            icon={EyeIcon}
+            onClick={() => setSelectedLog(row.original)}
+            title="Detay"
+          />
+        </ActionButtons>
       ),
     },
   ];
@@ -179,25 +178,18 @@ export default function AuditLogsPage() {
     <>
       <div className="space-y-6">
         {/* Header */}
-        <div>
-          <h1 className="text-2xl font-bold text-heading">Audit Logs</h1>
-          <p className="text-muted mt-1">Sistem işlem geçmişi</p>
-        </div>
+        <PageHeader title="Audit Logs" description="Sistem işlem geçmişi" />
 
         {/* Filters */}
         <div className="admin-card">
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-            <div className="relative">
-              <MagnifyingGlassIcon className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-muted" />
-              <Input type="text"
-                placeholder="Ara..."
-                value={filters.search}
-                onChange={(e) => setFilters({ ...filters, search: e.target.value })}
-                className="pl-10" />
-            </div>
+          <FilterToolbar
+            search={filters.search}
+            onSearchChange={(v) => setFilters({ ...filters, search: v })}
+          >
             <Select
               value={filters.action}
               onChange={(e) => setFilters({ ...filters, action: e.target.value })}
+              className="sm:w-48"
             >
               <option value="">Tüm İşlemler</option>
               <option value="user_ban">Kullanıcı Ban</option>
@@ -208,6 +200,7 @@ export default function AuditLogsPage() {
             <Select
               value={filters.entityType}
               onChange={(e) => setFilters({ ...filters, entityType: e.target.value })}
+              className="sm:w-48"
             >
               <option value="">Tüm Tipler</option>
               <option value="User">Kullanıcı</option>
@@ -215,7 +208,7 @@ export default function AuditLogsPage() {
               <option value="Order">Sipariş</option>
               <option value="Payment">Ödeme</option>
             </Select>
-          </div>
+          </FilterToolbar>
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mt-4">
             <div>
               <label className="block text-sm text-muted mb-1">Başlangıç Tarihi</label>
@@ -271,11 +264,11 @@ export default function AuditLogsPage() {
       {/* Detail Modal */}
       {selectedLog && (
         <div className="fixed inset-0 bg-heading bg-opacity-50 flex items-center justify-center z-50">
-          <div className="bg-surface-elevated rounded-xl p-6 max-w-2xl w-full mx-4 border border-border max-h-[90vh] overflow-y-auto">
-            <div className="flex items-center justify-between mb-4">
-              <h2 className="text-xl font-semibold text-heading">Audit Log Detayı</h2>
+          <div className="bg-surface-elevated rounded-xl px-6 pb-6 pt-5 max-w-2xl w-full mx-4 border border-border max-h-[90vh] overflow-y-auto">
+            <div className="flex items-center justify-between gap-3 mb-4">
+              <h2 className="text-xl font-semibold text-heading leading-tight truncate min-w-0">Audit Log Detayı</h2>
               <Button variant="secondary" onClick={() => setSelectedLog(null)}
-                className="text-muted hover:text-heading">
+                className="text-muted hover:text-heading shrink-0">
                 <DocumentTextIcon className="w-6 h-6" />
               </Button>
             </div>

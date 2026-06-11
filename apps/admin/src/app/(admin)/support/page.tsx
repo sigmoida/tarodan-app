@@ -5,7 +5,6 @@ import { adminApi } from "@/lib/api";
 import {
   Button,
   Checkbox,
-  Input,
   Select,
   StatusBadge,
   Textarea,
@@ -16,13 +15,13 @@ import {
 } from "@tarodan/ui";
 import type { StatusConfig } from "@tarodan/ui";
 import { DataTable, type ColumnDef } from "@/components/DataTable";
+import { PageHeader, FilterToolbar } from "@/components/admin-list";
 import {
   UserCircleIcon,
   ClockIcon,
   CheckCircleIcon,
   ExclamationCircleIcon,
   FunnelIcon,
-  MagnifyingGlassIcon,
   PaperAirplaneIcon,
   XMarkIcon,
 } from "@heroicons/react/24/outline";
@@ -342,27 +341,14 @@ export default function SupportPage() {
           className={`${selectedTicket ? "w-1/3" : "w-full"} border-r border-border flex flex-col`}
         >
           {/* Header */}
-          <div className="p-4 border-b border-border">
-            <h1 className="text-xl font-bold text-heading mb-4">
-              Destek Talepleri
-            </h1>
+          <div className="p-4 border-b border-border space-y-4">
+            <PageHeader title="Destek Talepleri" />
 
-            {/* Search */}
-            <div className="relative mb-4">
-              <MagnifyingGlassIcon className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-muted" />
-              <Input
-                type="text"
-                placeholder="Ara..."
-                value={filters.search}
-                onChange={(e) =>
-                  setFilters({ ...filters, search: e.target.value })
-                }
-                className="bg-surface-alt pl-10 pr-4 text-heading"
-              />
-            </div>
-
-            {/* Filters */}
-            <div className="flex gap-2 flex-wrap">
+            {/* Search + Filters */}
+            <FilterToolbar
+              search={filters.search}
+              onSearchChange={(v) => setFilters({ ...filters, search: v })}
+            >
               <Select
                 value={filters.status}
                 onChange={(e) =>
@@ -405,7 +391,7 @@ export default function SupportPage() {
                   </option>
                 ))}
               </Select>
-            </div>
+            </FilterToolbar>
           </div>
 
           {/* Ticket List */}
@@ -425,29 +411,33 @@ export default function SupportPage() {
         {selectedTicket && (
           <div className="flex-1 flex flex-col">
             {/* Detail Header */}
-            <div className="p-4 border-b border-border flex items-center justify-between">
-              <div>
+            <div className="p-4 border-b border-border flex items-center justify-between gap-3">
+              <div className="min-w-0">
                 <div className="flex items-center gap-3 mb-1">
-                  <span className="text-muted">
+                  <span className="text-muted shrink-0">
                     {selectedTicket.ticketNumber}
                   </span>
-                  <StatusBadge
-                    status={selectedTicket.status}
-                    config={supportStatusConfig}
-                  />
-                  <StatusBadge
-                    status={selectedTicket.priority}
-                    config={priorityConfig}
-                  />
+                  <span className="shrink-0">
+                    <StatusBadge
+                      status={selectedTicket.status}
+                      config={supportStatusConfig}
+                    />
+                  </span>
+                  <span className="shrink-0">
+                    <StatusBadge
+                      status={selectedTicket.priority}
+                      config={priorityConfig}
+                    />
+                  </span>
                 </div>
-                <h2 className="text-lg font-semibold text-heading">
+                <h2 className="text-lg font-semibold text-heading truncate">
                   {selectedTicket.subject}
                 </h2>
               </div>
               <Button
                 variant="secondary"
                 onClick={() => setSelectedTicket(null)}
-                className="text-muted hover:text-heading p-2"
+                className="text-muted hover:text-heading p-2 shrink-0"
               >
                 <XMarkIcon className="h-6 w-6" />
               </Button>
@@ -456,12 +446,12 @@ export default function SupportPage() {
             {/* Ticket Info */}
             <div className="p-4 border-b border-border bg-surface-elevated/50">
               <div className="grid grid-cols-3 gap-4 text-sm">
-                <div>
+                <div className="min-w-0">
                   <span className="text-muted">Oluşturan</span>
-                  <p className="text-heading">
+                  <p className="text-heading truncate">
                     {selectedTicket.creator.displayName}
                   </p>
-                  <p className="text-muted text-xs">
+                  <p className="text-muted text-xs truncate">
                     {selectedTicket.creator.email}
                   </p>
                 </div>
@@ -510,19 +500,19 @@ export default function SupportPage() {
                       : "bg-surface-alt"
                   }`}
                 >
-                  <div className="flex items-center justify-between mb-2">
-                    <div className="flex items-center gap-2">
-                      <UserCircleIcon className="h-5 w-5 text-muted" />
-                      <span className="text-heading font-medium">
+                  <div className="flex items-center justify-between gap-2 mb-2">
+                    <div className="flex items-center gap-2 min-w-0">
+                      <UserCircleIcon className="h-5 w-5 text-muted shrink-0" />
+                      <span className="text-heading font-medium truncate">
                         {message.sender.displayName}
                       </span>
                       {message.isInternal && (
-                        <span className="text-xs bg-warning-50 text-warning-700 px-2 py-0.5 rounded">
+                        <span className="shrink-0 text-xs bg-warning-50 text-warning-700 px-2 py-0.5 rounded">
                           İç Not
                         </span>
                       )}
                     </div>
-                    <span className="text-xs text-muted">
+                    <span className="text-xs text-muted shrink-0">
                       {formatTime(message.createdAt)}
                     </span>
                   </div>

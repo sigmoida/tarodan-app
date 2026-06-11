@@ -655,8 +655,8 @@ export default function OrderDetailPage() {
         {/* Status Update Modal */}
         {showStatusModal && (
           <div className="fixed inset-0 bg-heading bg-opacity-50 flex items-center justify-center z-50">
-            <div className="bg-surface-elevated rounded-xl p-6 max-w-md w-full mx-4">
-              <h3 className="text-lg font-semibold text-heading mb-4">Durum Güncelle</h3>
+            <div className="bg-surface-elevated rounded-xl px-6 pb-6 pt-5 max-w-md w-full mx-4">
+              <h3 className="text-lg font-semibold text-heading mb-4 leading-tight">Durum Güncelle</h3>
               <div className="mb-4">
                 <label className="block text-sm font-medium text-body mb-2">
                   Yeni Durum
@@ -694,8 +694,8 @@ export default function OrderDetailPage() {
         {/* Tracking Modal */}
         {showTrackingModal && (
           <div className="fixed inset-0 bg-heading bg-opacity-50 flex items-center justify-center z-50">
-            <div className="bg-surface-elevated rounded-xl p-6 max-w-md w-full mx-4">
-              <h3 className="text-lg font-semibold text-heading mb-4">Kargo Takibi Ekle</h3>
+            <div className="bg-surface-elevated rounded-xl px-6 pb-6 pt-5 max-w-md w-full mx-4">
+              <h3 className="text-lg font-semibold text-heading mb-4 leading-tight">Kargo Takibi Ekle</h3>
               <div className="space-y-4 mb-4">
                 <div>
                   <label className="block text-sm font-medium text-body mb-2">Kargo Firması</label>
@@ -735,8 +735,8 @@ export default function OrderDetailPage() {
         {/* Notify Modal */}
         {showNotifyModal && (
           <div className="fixed inset-0 bg-heading bg-opacity-50 flex items-center justify-center z-50">
-            <div className="bg-surface-elevated rounded-xl p-6 max-w-md w-full mx-4">
-              <h3 className="text-lg font-semibold text-heading mb-4">Bildirim Gönder</h3>
+            <div className="bg-surface-elevated rounded-xl px-6 pb-6 pt-5 max-w-md w-full mx-4">
+              <h3 className="text-lg font-semibold text-heading mb-4 leading-tight">Bildirim Gönder</h3>
               <div className="space-y-4 mb-4">
                 <div>
                   <label className="block text-sm font-medium text-body mb-2">Bildirim Türü</label>

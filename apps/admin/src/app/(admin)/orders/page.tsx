@@ -1,28 +1,30 @@
 "use client";
 
-import { useState, useEffect, useMemo, useCallback, useRef } from "react";
+import { useState, useEffect, useMemo } from "react";
 import Link from "next/link";
 import { useSearchParams, useRouter } from "next/navigation";
 import { adminApi } from "@/lib/api";
 import { cancelReasonLabel, orderOriginLabel } from "@/lib/utils";
 import {
   Button,
-  Input,
   Select,
   StatusBadge,
   orderStatusConfig,
 } from "@tarodan/ui";
 import { DataTable, type ColumnDef } from "@/components/DataTable";
 import {
-  MagnifyingGlassIcon,
   EyeIcon,
   PencilIcon,
   CheckIcon,
   XMarkIcon,
-  UserIcon,
-  XCircleIcon,
 } from "@heroicons/react/24/outline";
 import toast from "react-hot-toast";
+import {
+  PageHeader,
+  FilterToolbar,
+  ActionButtons,
+  ActionIconButton,
+} from "@/components/admin-list";
 
 interface Order {
   id: string;
@@ -37,12 +39,6 @@ interface Order {
   itemCount: number;
   cancelReason?: string;
   offerId?: string | null;
-}
-
-interface User {
-  id: string;
-  displayName: string;
-  email: string;
 }
 
 const statusOptions = [
@@ -80,13 +76,8 @@ export default function OrdersPage() {
   const [newStatus, setNewStatus] = useState<string>("");
   const [updatingStatus, setUpdatingStatus] = useState(false);
 
-  // User filtering
-  const [users, setUsers] = useState<User[]>([]);
+  // User filter (driven by URL ?userId= deep-links, e.g. from user detail page)
   const [selectedUserId, setSelectedUserId] = useState<string>(urlUserId);
-  const [userSearch, setUserSearch] = useState("");
-  const [showUserDropdown, setShowUserDropdown] = useState(false);
-  const [loadingUsers, setLoadingUsers] = useState(false);
-  const dropdownRef = useRef<HTMLDivElement>(null);
 
   // Debounce order search (300ms)
   useEffect(() => {
@@ -97,78 +88,13 @@ export default function OrdersPage() {
     return () => clearTimeout(timer);
   }, [search]);
 
-  // Load users for dropdown
-  const loadUsers = useCallback(async (searchTerm: string) => {
-    if (!searchTerm || searchTerm.length < 2) {
-      setUsers([]);
-      return;
-    }
-    setLoadingUsers(true);
-    try {
-      const response = await adminApi.getUsers({
-        search: searchTerm,
-        limit: 10,
-      });
-      const data = response.data.data || response.data.users || [];
-      setUsers(
-        data.map((u: any) => ({
-          id: u.id,
-          displayName: u.displayName,
-          email: u.email,
-        })),
-      );
-    } catch (error) {
-      if (process.env.NODE_ENV === "development")
-        console.error("Load users error:", error);
-    } finally {
-      setLoadingUsers(false);
-    }
-  }, []);
-
-  // Debounce user search
-  useEffect(() => {
-    const timer = setTimeout(() => {
-      if (userSearch) loadUsers(userSearch);
-    }, 300);
-    return () => clearTimeout(timer);
-  }, [userSearch, loadUsers]);
-
-  // Close dropdown on outside click
-  useEffect(() => {
-    const handleClickOutside = (e: MouseEvent) => {
-      if (
-        dropdownRef.current &&
-        !dropdownRef.current.contains(e.target as Node)
-      ) {
-        setShowUserDropdown(false);
-      }
-    };
-    document.addEventListener("mousedown", handleClickOutside);
-    return () => document.removeEventListener("mousedown", handleClickOutside);
-  }, []);
-
   // Sync URL with state
   useEffect(() => {
     setSelectedUserId(urlUserId);
   }, [urlUserId]);
 
-  const updateUrl = (userId: string) => {
-    const params = new URLSearchParams(searchParams.toString());
-    if (userId) params.set("userId", userId);
-    else params.delete("userId");
-    router.push(`/orders?${params.toString()}`);
-  };
-
-  const handleSelectUser = (user: User) => {
-    setSelectedUserId(user.id);
-    setUserSearch(user.displayName);
-    setShowUserDropdown(false);
-    updateUrl(user.id);
-  };
-
   const clearUserFilter = () => {
     setSelectedUserId("");
-    setUserSearch("");
     const params = new URLSearchParams(searchParams.toString());
     params.delete("userId");
     router.push(`/orders?${params.toString()}`);
@@ -377,133 +303,66 @@ export default function OrdersPage() {
       id: "actions",
       header: () => <span className="block text-center">İşlemler</span>,
       cell: ({ row }) => (
-        <div className="flex items-center justify-center gap-1">
-          <Button
-            variant="secondary"
+        <ActionButtons>
+          <ActionIconButton
+            icon={PencilIcon}
             onClick={() => startEditing(row.original)}
-            className="p-1.5 text-subtle hover:text-info-600 hover:bg-info-50 rounded-md transition-colors"
             title="Durumu Değiştir"
-          >
-            <PencilIcon className="h-4 w-4" />
-          </Button>
-          <Link
+          />
+          <ActionIconButton
+            icon={EyeIcon}
             href={`/orders/${row.original.id}`}
-            className="p-1.5 text-subtle hover:text-body hover:bg-surface-alt rounded-md transition-colors"
             title="Detay"
-          >
-            <EyeIcon className="h-4 w-4" />
-          </Link>
-        </div>
+          />
+        </ActionButtons>
       ),
     },
   ];
 
   return (
     <div className="space-y-6">
-      <div>
-        <h1 className="text-2xl font-bold text-heading">Siparişler</h1>
-        <p className="text-muted mt-1">
-          Toplam {total} sipariş
-          {(selectedUserId || productId) && (
-            <span className="ml-2">
-              — Filtreleniyor
-              <Button
-                variant="secondary"
-                onClick={clearUserFilter}
-                className="ml-2 text-primary-600 hover:underline"
-              >
-                Filtreyi kaldır
-              </Button>
-            </span>
-          )}
-        </p>
-      </div>
+      <PageHeader
+        title="Siparişler"
+        description={
+          <>
+            Toplam {total} sipariş
+            {(selectedUserId || productId) && (
+              <span className="ml-2">
+                — Filtreleniyor
+                <Button
+                  variant="secondary"
+                  onClick={clearUserFilter}
+                  className="ml-2 text-primary-600 hover:underline"
+                >
+                  Filtreyi kaldır
+                </Button>
+              </span>
+            )}
+          </>
+        }
+      />
 
       {/* Filters */}
-      <div className="flex flex-col gap-3">
-        {/* Row 1: Search + Status */}
-        <div className="flex flex-col sm:flex-row gap-3">
-          <div className="relative flex-1">
-            <MagnifyingGlassIcon className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-subtle pointer-events-none shrink-0" />
-            <Input
-              type="text"
-              placeholder="Sipariş no, kullanıcı veya ürün ara..."
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-              className="admin-input-with-icon-left"
-            />
-          </div>
-          <Select
-            value={status}
-            onChange={(e) => {
-              setStatus(e.target.value);
-              setPage(1);
-            }}
-            className="sm:w-48"
-          >
-            {statusOptions.map((opt) => (
-              <option key={opt.value} value={opt.value}>
-                {opt.label}
-              </option>
-            ))}
-          </Select>
-        </div>
-
-        {/* Row 2: User filter */}
-        <div className="flex flex-col sm:flex-row items-start sm:items-center gap-3">
-          <div className="relative flex-1 w-full sm:max-w-xs" ref={dropdownRef}>
-            <UserIcon className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-subtle pointer-events-none shrink-0" />
-            <Input
-              type="text"
-              placeholder="Kullanıcı ara..."
-              value={userSearch}
-              onChange={(e) => {
-                setUserSearch(e.target.value);
-                setShowUserDropdown(true);
-              }}
-              onFocus={() => setShowUserDropdown(true)}
-              className="admin-input-with-icon-left-sm pr-9"
-            />
-            {selectedUserId && (
-              <Button
-                variant="secondary"
-                onClick={clearUserFilter}
-                className="absolute right-3 top-1/2 -translate-y-1/2 text-subtle hover:text-muted"
-              >
-                <XCircleIcon className="h-4 w-4" />
-              </Button>
-            )}
-
-            {showUserDropdown && userSearch.length >= 2 && (
-              <div className="absolute z-50 w-full mt-1 bg-surface-elevated border border-border rounded-lg shadow-lg max-h-60 overflow-y-auto">
-                {loadingUsers ? (
-                  <div className="p-3 text-center text-muted text-sm">
-                    Aranıyor...
-                  </div>
-                ) : users.length > 0 ? (
-                  users.map((user) => (
-                    <Button
-                      variant="secondary"
-                      key={user.id}
-                      onClick={() => handleSelectUser(user)}
-                      className="w-full px-4 py-2 text-left hover:bg-surface text-heading"
-                    >
-                      <div className="font-medium text-sm">
-                        {user.displayName}
-                      </div>
-                      <div className="text-xs text-muted">{user.email}</div>
-                    </Button>
-                  ))
-                ) : (
-                  <div className="p-3 text-center text-muted text-sm">
-                    Kullanıcı bulunamadı
-                  </div>
-                )}
-              </div>
-            )}
-          </div>
-        </div>
-      </div>
+      <FilterToolbar
+        search={search}
+        onSearchChange={setSearch}
+        searchPlaceholder="Sipariş no, kullanıcı veya ürün ara..."
+      >
+        <Select
+          value={status}
+          onChange={(e) => {
+            setStatus(e.target.value);
+            setPage(1);
+          }}
+          className="sm:w-48"
+        >
+          {statusOptions.map((opt) => (
+            <option key={opt.value} value={opt.value}>
+              {opt.label}
+            </option>
+          ))}
+        </Select>
+      </FilterToolbar>
 
       {/* Table */}
       <DataTable

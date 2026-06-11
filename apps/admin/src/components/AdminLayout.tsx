@@ -243,6 +243,8 @@ export default function AdminLayout({ children }: AdminLayoutProps) {
     return all.filter((item) => matchesQuery(item, q));
   }, [isSearching, q, visibleTopNav, visibleGroups]);
 
+  const [accountMenuOpen, setAccountMenuOpen] = useState(false);
+
   const handleLogout = () => {
     logout();
     router.push('/login');
@@ -419,14 +421,51 @@ export default function AdminLayout({ children }: AdminLayoutProps) {
             <div className="hidden sm:flex items-center gap-2 text-sm">
               <span className="text-muted">{user?.email}</span>
             </div>
-            <Link
-              href="/settings"
-              scroll={false}
-              className="flex items-center gap-2 px-3 py-2 rounded-lg text-muted hover:text-heading hover:bg-surface-alt transition-colors"
-            >
-              <UserCircleIcon className="h-5 w-5" />
-              <span className="hidden sm:inline text-sm">Profil</span>
-            </Link>
+            <div className="relative">
+              <button
+                onClick={() => setAccountMenuOpen((v) => !v)}
+                className="flex items-center gap-2 px-3 py-2 rounded-lg text-muted hover:text-heading hover:bg-surface-alt transition-colors"
+              >
+                <UserCircleIcon className="h-5 w-5 shrink-0" />
+                <span className="hidden sm:inline text-sm">Hesabım</span>
+                <ChevronDownIcon className="h-4 w-4 shrink-0" />
+              </button>
+              {accountMenuOpen && (
+                <>
+                  <div
+                    className="fixed inset-0 z-40"
+                    onClick={() => setAccountMenuOpen(false)}
+                  />
+                  <div className="absolute right-0 z-50 mt-2 w-60 overflow-hidden rounded-lg border border-border bg-surface-elevated py-1 shadow-elevated">
+                    <div className="border-b border-border px-4 py-3">
+                      <p className="truncate text-sm font-medium text-heading">
+                        {user?.displayName || 'Yönetici'}
+                      </p>
+                      <p className="truncate text-xs text-muted">{user?.email}</p>
+                    </div>
+                    <Link
+                      href="/settings"
+                      scroll={false}
+                      onClick={() => setAccountMenuOpen(false)}
+                      className="flex items-center gap-2 px-4 py-2 text-sm text-muted hover:bg-surface-alt hover:text-heading"
+                    >
+                      <Cog6ToothIcon className="h-4 w-4 shrink-0" />
+                      Sistem Ayarları
+                    </Link>
+                    <button
+                      onClick={() => {
+                        setAccountMenuOpen(false);
+                        handleLogout();
+                      }}
+                      className="flex w-full items-center gap-2 px-4 py-2 text-left text-sm text-danger-600 hover:bg-danger-500/10"
+                    >
+                      <ArrowRightOnRectangleIcon className="h-4 w-4 shrink-0" />
+                      Çıkış Yap
+                    </button>
+                  </div>
+                </>
+              )}
+            </div>
           </div>
         </header>
 

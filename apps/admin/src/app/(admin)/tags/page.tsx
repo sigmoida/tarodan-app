@@ -6,6 +6,7 @@ import { DataTable, type ColumnDef } from '@/components/DataTable';
 import { Button, Checkbox, Input, Textarea, colors } from '@tarodan/ui';
 import { PlusIcon, PencilIcon, TrashIcon, TagIcon } from '@heroicons/react/24/outline';
 import toast from 'react-hot-toast';
+import { PageHeader, FilterToolbar, ActionButtons, ActionIconButton } from '@/components/admin-list';
 
 interface Tag {
     id: string;
@@ -73,7 +74,10 @@ export default function TagsPage() {
             id: 'actions',
             header: 'İşlemler',
             cell: ({ row }) => (
-                <div className="flex justify-end gap-1"><Button variant="secondary" onClick={() => openEdit(row.original)} className="p-1 text-muted hover:text-heading"><PencilIcon className="h-4 w-4" /></Button><Button variant="secondary" onClick={() => setDeleteConfirm(row.original.id)} className="p-1 text-danger-600 hover:text-danger-300" disabled={row.original.usageCount > 0}><TrashIcon className="h-4 w-4" /></Button></div>
+                <ActionButtons>
+                    <ActionIconButton icon={PencilIcon} onClick={() => openEdit(row.original)} title="Düzenle" />
+                    <ActionIconButton icon={TrashIcon} onClick={() => setDeleteConfirm(row.original.id)} title="Sil" variant="danger" disabled={row.original.usageCount > 0} />
+                </ActionButtons>
             ),
         },
     ];
@@ -81,21 +85,21 @@ export default function TagsPage() {
     return (
         <>
             <div className="space-y-6">
-                <div className="flex items-center justify-between">
-                    <div><h1 className="text-2xl font-bold text-heading">Etiketler</h1><p className="text-muted">Ürün etiketlerini yönetin</p></div>
+                <PageHeader title="Etiketler" description="Ürün etiketlerini yönetin">
                     <Button variant="primary" size="md" onClick={openCreate}><PlusIcon className="w-5 h-5" />Yeni Etiket</Button>
-                </div>
-                <div className="admin-card p-4"><Input type="text" placeholder="Etiket ara..." value={search} onChange={(e) => setSearch(e.target.value)} className="max-w-md" /></div>
+                </PageHeader>
+                <FilterToolbar search={search} onSearchChange={setSearch} searchPlaceholder="Etiket ara..." />
                 <DataTable
                     columns={columns}
                     data={tags}
                     loading={loading}
                     emptyText="Etiket yok"
+                    emptyAction={<Button onClick={openCreate}><PlusIcon className="w-5 h-5 mr-2" />İlk etiketi ekle</Button>}
                     getRowId={(t) => t.id}
                 />
             </div>
-            {showModal && (<div className="fixed inset-0 bg-heading bg-opacity-50 flex items-center justify-center z-50"><div className="bg-surface-elevated rounded-xl p-6 max-w-md w-full mx-4 border border-border">
-                <h2 className="text-xl font-semibold text-heading mb-4">{editingTag ? 'Düzenle' : 'Yeni Etiket'}</h2>
+            {showModal && (<div className="fixed inset-0 bg-heading bg-opacity-50 flex items-center justify-center z-50"><div className="bg-surface-elevated rounded-xl px-6 pb-6 pt-5 max-w-md w-full mx-4 border border-border">
+                <h2 className="text-xl font-semibold text-heading mb-4 leading-tight">{editingTag ? 'Düzenle' : 'Yeni Etiket'}</h2>
                 <form onSubmit={handleSubmit} className="space-y-4">
                     <div><label className="block text-sm text-muted mb-2">Ad *</label><Input type="text" value={formData.name} onChange={(e) => setFormData({ ...formData, name: e.target.value })} required /></div>
                     <div><label className="block text-sm text-muted mb-2">Açıklama</label><Textarea value={formData.description} onChange={(e) => setFormData({ ...formData, description: e.target.value })} rows={2} /></div>
@@ -104,8 +108,8 @@ export default function TagsPage() {
                     <div className="flex gap-3 pt-4"><Button variant="secondary" size="md" type="button" onClick={() => setShowModal(false)} className="flex-1">İptal</Button><Button variant="primary" size="md" type="submit" className="flex-1">{editingTag ? 'Güncelle' : 'Oluştur'}</Button></div>
                 </form>
             </div></div>)}
-            {deleteConfirm && (<div className="fixed inset-0 bg-heading bg-opacity-50 flex items-center justify-center z-50"><div className="bg-surface-elevated rounded-xl p-6 max-w-md w-full mx-4 border border-border">
-                <h3 className="text-lg font-semibold text-heading mb-4">Etiketi Sil</h3><p className="text-muted mb-6">Bu etiketi silmek istediğinizden emin misiniz?</p>
+            {deleteConfirm && (<div className="fixed inset-0 bg-heading bg-opacity-50 flex items-center justify-center z-50"><div className="bg-surface-elevated rounded-xl px-6 pb-6 pt-5 max-w-md w-full mx-4 border border-border">
+                <h3 className="text-lg font-semibold text-heading mb-4 leading-tight">Etiketi Sil</h3><p className="text-muted mb-6">Bu etiketi silmek istediğinizden emin misiniz?</p>
                 <div className="flex gap-3"><Button variant="secondary" size="md" onClick={() => setDeleteConfirm(null)} className="flex-1">İptal</Button><Button variant="danger" size="md" onClick={() => handleDelete(deleteConfirm)} className="flex-1">Sil</Button></div>
             </div></div>)}
         </>

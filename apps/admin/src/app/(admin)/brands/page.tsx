@@ -16,6 +16,7 @@ import {
     TruckIcon,
 } from '@heroicons/react/24/outline';
 import toast from 'react-hot-toast';
+import { PageHeader, ActionButtons, ActionIconButton } from '@/components/admin-list';
 
 interface CarModel {
     id: string;
@@ -405,18 +406,19 @@ export default function BrandsPage() {
             id: 'actions',
             header: 'İşlemler',
             cell: ({ row }) => (
-                <div className="flex items-center justify-end gap-2">
-                    <Button variant="secondary" onClick={() => openEditModal(row.original)}
-                        className="p-2 text-muted hover:text-muted hover:bg-surface-alt rounded-lg"
-                        title="Düzenle">
-                        <PencilIcon className="w-4 h-4" />
-                    </Button>
-                    <Button variant="secondary" onClick={() => setDeleteConfirm(row.original.id)}
-                        className="p-2 text-muted hover:text-danger-600 hover:bg-danger-50 rounded-lg"
-                        title="Sil">
-                        <TrashIcon className="w-4 h-4" />
-                    </Button>
-                </div>
+                <ActionButtons>
+                    <ActionIconButton
+                        icon={PencilIcon}
+                        onClick={() => openEditModal(row.original)}
+                        title="Düzenle"
+                    />
+                    <ActionIconButton
+                        icon={TrashIcon}
+                        onClick={() => setDeleteConfirm(row.original.id)}
+                        title="Sil"
+                        variant="danger"
+                    />
+                </ActionButtons>
             ),
         },
     ];
@@ -424,19 +426,15 @@ export default function BrandsPage() {
     return (
         <>
             <div className="space-y-6">
-                {/* Header */}
-                <div className="flex justify-between items-center">
-                    <div>
-                        <h1 className="text-2xl font-bold text-heading">Marka Yönetimi</h1>
-                        <p className="mt-1 text-sm text-muted">
-                            Uygulamada gösterilecek markaları buradan yönetebilirsiniz
-                        </p>
-                    </div>
+                <PageHeader
+                    title="Marka Yönetimi"
+                    description="Uygulamada gösterilecek markaları buradan yönetebilirsiniz"
+                >
                     <Button variant="primary" size="md" onClick={openCreateModal}>
                         <PlusIcon className="w-5 h-5" />
                         Yeni Marka Ekle
                     </Button>
-                </div>
+                </PageHeader>
 
                 {/* Brands Table */}
                 <DataTable
@@ -444,6 +442,7 @@ export default function BrandsPage() {
                     data={brands}
                     loading={loading}
                     emptyText="Henüz marka eklenmemiş"
+                    emptyAction={<Button onClick={openCreateModal}><PlusIcon className="w-5 h-5 mr-2" />İlk markayı ekle</Button>}
                     getRowId={(b) => b.id}
                 />
 
@@ -452,8 +451,8 @@ export default function BrandsPage() {
                     <div className="fixed inset-0 z-50 overflow-y-auto">
                         <div className="flex min-h-full items-center justify-center p-4">
                             <div className="fixed inset-0 bg-heading/50" onClick={() => setShowModal(false)} />
-                            <div className="relative bg-surface-elevated rounded-xl shadow-xl w-full max-w-md p-6">
-                                <h3 className="text-lg font-semibold text-heading mb-4">
+                            <div className="relative bg-surface-elevated rounded-xl shadow-xl w-full max-w-md px-6 pb-6 pt-5">
+                                <h3 className="text-lg font-semibold text-heading mb-4 leading-tight">
                                     {editingBrand ? 'Markayı Düzenle' : 'Yeni Marka Ekle'}
                                 </h3>
                                 <form onSubmit={handleSubmit} className="space-y-4">
@@ -536,8 +535,8 @@ export default function BrandsPage() {
                     <div className="fixed inset-0 z-50 overflow-y-auto">
                         <div className="flex min-h-full items-center justify-center p-4">
                             <div className="fixed inset-0 bg-heading/50" onClick={() => setDeleteConfirm(null)} />
-                            <div className="relative bg-surface-elevated rounded-xl shadow-xl w-full max-w-sm p-6">
-                                <h3 className="text-lg font-semibold text-heading mb-2">
+                            <div className="relative bg-surface-elevated rounded-xl shadow-xl w-full max-w-sm px-6 pb-6 pt-5">
+                                <h3 className="text-lg font-semibold text-heading mb-2 leading-tight">
                                     Markayı Sil
                                 </h3>
                                 <p className="text-muted mb-4">
@@ -561,8 +560,8 @@ export default function BrandsPage() {
                     <div className="fixed inset-0 z-50 overflow-y-auto">
                         <div className="flex min-h-full items-center justify-center p-4">
                             <div className="fixed inset-0 bg-heading/50" onClick={() => setShowModelModal(false)} />
-                            <div className="relative bg-surface-elevated rounded-xl shadow-xl w-full max-w-md p-6">
-                                <h3 className="text-lg font-semibold text-heading mb-4">
+                            <div className="relative bg-surface-elevated rounded-xl shadow-xl w-full max-w-md px-6 pb-6 pt-5">
+                                <h3 className="text-lg font-semibold text-heading mb-4 leading-tight">
                                     {editingModel ? 'Modeli Düzenle' : 'Yeni Model Ekle'}
                                 </h3>
                                 <form onSubmit={handleModelSubmit} className="space-y-4">
@@ -643,8 +642,8 @@ export default function BrandsPage() {
                     <div className="fixed inset-0 z-50 overflow-y-auto">
                         <div className="flex min-h-full items-center justify-center p-4">
                             <div className="fixed inset-0 bg-heading/50" onClick={() => setDeleteConfirmModel(null)} />
-                            <div className="relative bg-surface-elevated rounded-xl shadow-xl w-full max-w-sm p-6">
-                                <h3 className="text-lg font-semibold text-heading mb-2">Modeli Sil</h3>
+                            <div className="relative bg-surface-elevated rounded-xl shadow-xl w-full max-w-sm px-6 pb-6 pt-5">
+                                <h3 className="text-lg font-semibold text-heading mb-2 leading-tight">Modeli Sil</h3>
                                 <p className="text-muted mb-4">Bu modeli silmek istediğinizden emin misiniz? Bu işlem geri alınamaz.</p>
                                 <div className="flex justify-end gap-3">
                                     <Button variant="secondary" size="md" onClick={() => setDeleteConfirmModel(null)}>

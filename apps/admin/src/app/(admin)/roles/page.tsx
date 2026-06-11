@@ -5,11 +5,14 @@ import {
   ShieldCheckIcon,
   UserGroupIcon,
   PlusIcon,
+  PencilIcon,
   TrashIcon,
 } from "@heroicons/react/24/outline";
 import toast from "react-hot-toast";
 import { Button, Input, Select } from "@tarodan/ui";
 import { DataTable, type ColumnDef } from "@/components/DataTable";
+import { PageHeader, ActionButtons, ActionIconButton } from "@/components/admin-list";
+import { AdminTabs } from "@/components/AdminTabs";
 import { adminApi } from "@/lib/api";
 import { useAuthStore } from "@/lib/stores/authStore";
 import { useConfirm } from "@/components/ConfirmProvider";
@@ -279,64 +282,48 @@ export default function RolesPage() {
       id: "actions",
       header: "İşlemler",
       cell: ({ row }) => (
-        <div className="text-right whitespace-nowrap">
-          <Button
-            variant="secondary"
+        <ActionButtons>
+          <ActionIconButton
+            icon={PencilIcon}
             onClick={() => openEdit(row.original)}
-            className="text-info-700 hover:text-info-300 font-medium text-sm mr-2"
-          >
-            Düzenle
-          </Button>
-          <Button
-            variant="secondary"
+            title="Düzenle"
+          />
+          <ActionIconButton
+            icon={TrashIcon}
             onClick={() => handleRevoke(row.original)}
-            className="p-1.5 hover:bg-surface-alt rounded"
             title="Yetkiyi kaldır"
-          >
-            <TrashIcon className="w-4 h-4 text-danger-600" />
-          </Button>
-        </div>
+            variant="danger"
+          />
+        </ActionButtons>
       ),
     },
   ];
 
   return (
     <div className="space-y-6">
-      {/* Başlık + sekmeler */}
-      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
-        <div>
-          <h1 className="text-2xl font-bold text-heading">Roller ve İzinler</h1>
-          <p className="text-muted mt-1">
-            Sistem erişim seviyelerini ve kullanıcı rollerini yönetin
-          </p>
-        </div>
-        <div className="flex gap-2">
-          <Button
-            variant={activeTab === "roles" ? "primary" : "secondary"}
-            onClick={() => setActiveTab("roles")}
-            className="flex items-center"
-          >
-            <ShieldCheckIcon className="w-5 h-5 mr-2" />
-            Rol Tanımları
-          </Button>
-          <Button
-            variant={activeTab === "users" ? "primary" : "secondary"}
-            onClick={() => {
-              setRoleFilter(null);
-              setActiveTab("users");
-            }}
-            className="flex items-center"
-          >
-            <UserGroupIcon className="w-5 h-5 mr-2" />
-            Kullanıcı Atamaları
-          </Button>
-        </div>
-      </div>
+      {/* Başlık */}
+      <PageHeader
+        title="Roller ve İzinler"
+        description="Sistem erişim seviyelerini ve kullanıcı rollerini yönetin"
+      />
+
+      {/* Sekmeler */}
+      <AdminTabs
+        tabs={[
+          { key: "roles", label: "Rol Tanımları", icon: ShieldCheckIcon },
+          { key: "users", label: "Kullanıcı Atamaları", icon: UserGroupIcon },
+        ]}
+        value={activeTab}
+        onChange={(k) => {
+          setActiveTab(k as "roles" | "users");
+          if (k === "users") setRoleFilter(null);
+        }}
+      />
 
       {/* Yeni hesap geçici şifre uyarısı */}
       {createdInfo && (
         <div className="rounded-lg border border-warning-200 bg-warning-50 p-4 text-sm text-warning-800 flex items-start justify-between gap-4">
-          <div>
+          <div className="min-w-0">
             <strong>{createdInfo.email}</strong> için yeni hesap oluşturuldu.
             Geçici şifre:{" "}
             <code className="px-2 py-0.5 bg-surface-elevated rounded font-mono">
@@ -367,15 +354,15 @@ export default function RolesPage() {
               }}
               className="admin-card relative text-left flex flex-col h-full hover:ring-2 hover:ring-primary-400 transition-shadow cursor-pointer"
             >
-              <div className="mb-3">
-                <h3 className="text-lg font-semibold text-heading">
+              <div className="mb-3 min-w-0">
+                <h3 className="text-lg font-semibold text-heading truncate">
                   {role.name}
                 </h3>
                 <span className="text-sm text-primary-600 font-medium">
                   {loading ? "…" : (roleCounts[role.id] ?? 0)} kullanıcı →
                   görüntüle
                 </span>
-                <span className="ml-2 text-xs bg-surface-alt text-muted px-2 py-0.5 rounded">
+                <span className="ml-2 shrink-0 whitespace-nowrap text-xs bg-surface-alt text-muted px-2 py-0.5 rounded">
                   Sistem rolü
                 </span>
               </div>
@@ -404,8 +391,8 @@ export default function RolesPage() {
         /* ─────────── Kullanıcı atamaları (gerçek admin personeli) ─────────── */
         <div className="space-y-4">
           <div className="admin-card flex flex-wrap justify-between items-center gap-3">
-            <div className="flex items-center gap-3">
-              <h3 className="text-lg font-semibold text-heading">
+            <div className="flex items-center gap-3 min-w-0">
+              <h3 className="text-lg font-semibold text-heading truncate">
                 Yönetici Kullanıcılar
               </h3>
               {roleFilter && (
@@ -421,7 +408,7 @@ export default function RolesPage() {
                 </span>
               )}
             </div>
-            <div className="flex items-center gap-4">
+            <div className="flex items-center gap-4 shrink-0">
               {/* Süper admin: yöneticilere atama izni ver/al */}
               {isSuperAdmin && (
                 <label className="flex items-center gap-2 text-sm text-muted cursor-pointer select-none">
@@ -435,7 +422,7 @@ export default function RolesPage() {
                 </label>
               )}
               <Button onClick={openAssign} className="flex items-center">
-                <PlusIcon className="w-5 h-5 mr-2" />
+                <PlusIcon className="w-5 h-5 mr-2 shrink-0" />
                 Yönetici Ata
               </Button>
             </div>
@@ -459,9 +446,9 @@ export default function RolesPage() {
       {showModal && (
         <div className="fixed inset-0 bg-heading/70 flex items-center justify-center z-50 p-4 backdrop-blur-sm">
           <div className="bg-surface-elevated rounded-xl max-w-md w-full border border-border shadow-2xl">
-            <div className="p-6">
+            <div className="px-6 pb-6 pt-5">
               <div className="flex justify-between items-center mb-6">
-                <h3 className="text-xl font-bold text-heading">
+                <h3 className="text-xl font-bold text-heading leading-tight">
                   {editing ? "Rolü Güncelle" : "Kullanıcıya Rol Ata"}
                 </h3>
                 <Button

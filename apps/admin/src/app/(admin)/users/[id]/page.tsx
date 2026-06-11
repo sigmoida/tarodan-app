@@ -784,8 +784,8 @@ export default function UserDetailPage() {
         {/* Ban Modal */}
         {showBanModal && (
           <div className="fixed inset-0 bg-heading/70 flex items-center justify-center z-50">
-            <div className="rounded-xl p-6 max-w-md mx-4">
-              <h3 className="text-lg font-semibold text-heading mb-4">Kullanıcıyı Banla</h3>
+            <div className="rounded-xl px-6 pb-6 pt-5 max-w-md mx-4">
+              <h3 className="text-lg font-semibold text-heading mb-4 leading-tight">Kullanıcıyı Banla</h3>
               <div className="mb-4">
                 <label className="block text-sm font-medium text-muted mb-2">
                   Ban Nedeni *
@@ -811,8 +811,8 @@ export default function UserDetailPage() {
         {/* Unban Modal */}
         {showUnbanModal && (
           <div className="fixed inset-0 bg-heading/70 flex items-center justify-center z-50">
-            <div className="rounded-xl p-6 max-w-md mx-4">
-              <h3 className="text-lg font-semibold text-heading mb-4">Banı Kaldır</h3>
+            <div className="rounded-xl px-6 pb-6 pt-5 max-w-md mx-4">
+              <h3 className="text-lg font-semibold text-heading mb-4 leading-tight">Banı Kaldır</h3>
               <p className="text-muted mb-6">
                 Bu kullanıcının banını kaldırmak istediğinizden emin misiniz?
               </p>
