@@ -405,6 +405,20 @@ export const paymentsApi = {
   }) => api.post('/payments/methods', { card }),
   deleteMethod: (id: string) => api.delete(`/payments/methods/${id}`),
   setDefaultMethod: (id: string) => api.patch(`/payments/methods/${id}/default`),
+  /** PayTR Direkt API: kart bizim sayfada girilir; yanıt 3D Secure HTML'idir */
+  processDirect: (data: {
+    orderId?: string;
+    checkoutGroupId?: string;
+    card: {
+      cardHolderName: string;
+      cardNumber: string;
+      expireMonth: string;
+      expireYear: string;
+      cvc: string;
+    };
+    saveCard?: boolean;
+    provider?: string;
+  }) => api.post('/payments/process-direct', data),
   cancel: (paymentId: string) =>
     api.post(`/payments/${paymentId}/cancel`),
   /** Fail sayfasından; ödeme hâlâ pending ise rezervasyonu serbest bırakır */

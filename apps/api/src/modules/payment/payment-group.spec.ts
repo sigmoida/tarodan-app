@@ -12,6 +12,7 @@ import { ProductLockService } from '../product/product-lock.service';
 import { NotificationService } from '../notification/notification.service';
 import { SuratCargoService } from '../surat-cargo/surat-cargo.service';
 import { CommissionLedgerService } from '../commission/commission-ledger.service';
+import { StorageService } from '../storage/storage.service';
 import { OrderStatus, PaymentStatus, ProductStatus } from '@prisma/client';
 
 /**
@@ -144,6 +145,7 @@ describe('PaymentService group payment (checkout group)', () => {
         { provide: NotificationService, useValue: {} },
         { provide: SuratCargoService, useValue: {} },
         { provide: CommissionLedgerService, useValue: mockCommissionLedger },
+        { provide: StorageService, useValue: { getPublicAssetUrl: jest.fn().mockReturnValue('') } },
         { provide: ModuleRef, useValue: {} },
       ],
     }).compile();

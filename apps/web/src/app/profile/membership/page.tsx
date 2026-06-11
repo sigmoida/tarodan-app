@@ -112,7 +112,6 @@ export default function MembershipPage() {
         const membership = membershipResponse.data;
         
         if (membership) {
-          const isPaidTier = membership.tier?.type === 'basic' || membership.tier?.type === 'premium' || membership.tier?.type === 'business';
           const pendingPayment = !!membership.pendingPayment;
           setMembershipDetails({
             currentPeriodStart: membership.currentPeriodStart,
@@ -123,15 +122,15 @@ export default function MembershipPage() {
             pendingTierType: membership.pendingTierType,
             autoRenew: membership.autoRenew,
           });
-          if (isPaidTier && !pendingPayment) {
-            try {
-              const paymentMethodsResponse = await api.get('/payments/methods');
-              const methods = paymentMethodsResponse.data?.methods || paymentMethodsResponse.data || [];
-              setPaymentMethods(methods);
-            } catch (error) {
-              if (process.env.NODE_ENV === 'development') console.error('Failed to fetch payment methods:', error);
-              setPaymentMethods([]);
-            }
+          // Kayıtlı kartlar her durumda gösterilir (ödeme beklerken / ücretsizde de) —
+          // kart kaydetme/silme bölümü kademeye bağlı değildir.
+          try {
+            const paymentMethodsResponse = await api.get('/payments/methods');
+            const methods = paymentMethodsResponse.data?.methods || paymentMethodsResponse.data || [];
+            setPaymentMethods(methods);
+          } catch (error) {
+            if (process.env.NODE_ENV === 'development') console.error('Failed to fetch payment methods:', error);
+            setPaymentMethods([]);
           }
         }
       } catch (error) {
@@ -410,8 +409,8 @@ export default function MembershipPage() {
           )}
         </div>
 
-        {/* Membership Details Card for Premium/Business Users */}
-        {membershipDetails && (membershipDetails.tier === 'premium' || membershipDetails.tier === 'business') && (
+        {/* Membership Details Card — tüm ücretli kademeler (basic dahil) */}
+        {membershipDetails && membershipDetails.tier && membershipDetails.tier !== 'free' && (
           <div className="max-w-4xl mx-auto mb-12 bg-surface-elevated rounded-xl shadow-lg p-6 border border-border">
             <h2 className="text-2xl font-bold text-heading mb-6">Mevcut Üyelik Bilgileri</h2>
             
@@ -483,64 +482,69 @@ export default function MembershipPage() {
               </div>
             </div>
 
-            <div className="border-t border-border pt-6">
-              <div className="flex items-center justify-between mb-4">
-                <h3 className="text-lg font-semibold text-heading flex items-center gap-2">
-                  <CreditCardIcon className="w-5 h-5" />
-                  Kayıtlı Kartlar
-                </h3>
+          </div>
+        )}
+
+        {/* Kayıtlı Kartlar — kademeden bağımsız, her zaman görünür
+            (ödeme beklenirken ve ücretsiz üyelikte de kart eklenebilir/silinebilir) */}
+        {isAuthenticated && (
+          <div className="max-w-4xl mx-auto mb-12 bg-surface-elevated rounded-xl shadow-lg p-6 border border-border">
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="text-lg font-semibold text-heading flex items-center gap-2">
+                <CreditCardIcon className="w-5 h-5" />
+                Kayıtlı Kartlar
+              </h3>
+              <Link
+                href="/profile/payments/cards"
+                className="text-sm text-primary-500 hover:text-primary-600 font-medium"
+              >
+                Kart Yönetimi (ekle / sil)
+              </Link>
+            </div>
+
+            {paymentMethods.length > 0 ? (
+              <div className="space-y-3">
+                {paymentMethods.map((method) => (
+                  <div
+                    key={method.id}
+                    className="flex items-center justify-between p-4 bg-surface rounded-lg border border-border"
+                  >
+                    <div className="flex items-center gap-4">
+                      <div className="w-10 h-10 bg-primary-100 rounded-lg flex items-center justify-center">
+                        <CreditCardIcon className="w-6 h-6 text-primary-600" />
+                      </div>
+                      <div>
+                        <p className="font-semibold text-heading">
+                          {method.cardBrand} •••• {method.lastFour}
+                        </p>
+                        <p className="text-sm text-muted">
+                          Son kullanma: {String(method.expiryMonth).padStart(2, '0')}/{method.expiryYear}
+                        </p>
+                      </div>
+                    </div>
+                    {method.isDefault && (
+                      <span className="px-3 py-1 bg-primary-100 text-primary-700 text-xs font-medium rounded-full">
+                        Varsayılan
+                      </span>
+                    )}
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <div className="p-6 bg-surface border border-border rounded-lg text-center">
+                <p className="text-heading font-medium mb-2">Henüz kayıtlı kartınız yok</p>
+                <p className="text-sm text-muted mb-4">
+                  Kart eklemek zorunlu değildir; yenilemeyi daha hızlı tamamlamak için
+                  isterseniz kaydedebilirsiniz.
+                </p>
                 <Link
                   href="/profile/payments/cards"
-                  className="text-sm text-primary-500 hover:text-primary-600 font-medium"
+                  className="inline-block px-4 py-2 bg-primary-500 text-inverted rounded-lg hover:bg-primary-600 transition-colors text-sm font-medium"
                 >
-                  Kart Yönetimi
+                  Kart Ekle
                 </Link>
               </div>
-
-              {paymentMethods.length > 0 ? (
-                <div className="space-y-3">
-                  {paymentMethods.map((method) => (
-                    <div
-                      key={method.id}
-                      className="flex items-center justify-between p-4 bg-surface rounded-lg border border-border"
-                    >
-                      <div className="flex items-center gap-4">
-                        <div className="w-10 h-10 bg-primary-100 rounded-lg flex items-center justify-center">
-                          <CreditCardIcon className="w-6 h-6 text-primary-600" />
-                        </div>
-                        <div>
-                          <p className="font-semibold text-heading">
-                            {method.cardBrand} •••• {method.lastFour}
-                          </p>
-                          <p className="text-sm text-muted">
-                            Son kullanma: {String(method.expiryMonth).padStart(2, '0')}/{method.expiryYear}
-                          </p>
-                        </div>
-                      </div>
-                      {method.isDefault && (
-                        <span className="px-3 py-1 bg-primary-100 text-primary-700 text-xs font-medium rounded-full">
-                          Varsayılan
-                        </span>
-                      )}
-                    </div>
-                  ))}
-                </div>
-              ) : (
-                <div className="p-6 bg-surface border border-border rounded-lg text-center">
-                  <p className="text-heading font-medium mb-2">Henüz kayıtlı kartınız yok</p>
-                  <p className="text-sm text-muted mb-4">
-                    Kart eklemek zorunlu değildir; yenilemeyi daha hızlı tamamlamak için
-                    isterseniz kaydedebilirsiniz.
-                  </p>
-                  <Link
-                    href="/profile/payments/cards"
-                    className="inline-block px-4 py-2 bg-primary-500 text-inverted rounded-lg hover:bg-primary-600 transition-colors text-sm font-medium"
-                  >
-                    Kart Ekle
-                  </Link>
-                </div>
-              )}
-            </div>
+            )}
           </div>
         )}
 

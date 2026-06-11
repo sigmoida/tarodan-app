@@ -492,14 +492,17 @@ export default function OrderDetailPage() {
         return;
       }
 
-      // PayTR mode: redirect
-      if (data?.paymentUrl) {
-        window.location.href = data.paymentUrl;
+      // Kart formu akışı: ödeme sayfamıza git (site-içi kart girişi + 3D Secure;
+      // gerekirse PayTR iframe'ine düşer). paymentUrl'e doğrudan yönlendirmek
+      // kart formunu atlardı.
+      if (data?.paymentId) {
+        router.push(`/payment/${data.paymentId}`);
         return;
       }
 
-      if (data?.paymentId) {
-        router.push(`/payment/${data.paymentId}`);
+      // Yedek: paymentId yoksa PayTR sayfasına yönlendir
+      if (data?.paymentUrl) {
+        window.location.href = data.paymentUrl;
         return;
       }
 

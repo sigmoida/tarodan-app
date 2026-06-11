@@ -59,6 +59,7 @@ export default function MembershipCheckoutPage() {
     expiry: '',
     cvv: '',
   });
+  const [saveCard, setSaveCard] = useState(true);
   const [agreed, setAgreed] = useState(false);
   const [membershipPrices, setMembershipPrices] = useState<{
     basic_monthly_price?: number;
@@ -219,59 +220,106 @@ export default function MembershipCheckoutPage() {
       }
     }
 
+    // Kart alanı son doğrulama (PayTR'ye gitmeden yakala)
+    const cleanNumber = cardData.number.replace(/\s/g, '');
+    const [mm, yy] = (cardData.expiry || '').split('/');
+    if (cleanNumber.length < 15 || cleanNumber.length > 16) {
+      toast.error('Geçerli bir kart numarası girin');
+      return;
+    }
+    if (!mm || !yy || parseInt(mm, 10) < 1 || parseInt(mm, 10) > 12) {
+      toast.error('Geçerli bir son kullanma tarihi girin (AA/YY)');
+      return;
+    }
+    if (!/^\d{3,4}$/.test(cardData.cvv)) {
+      toast.error('Geçerli bir CVV girin');
+      return;
+    }
+
     setIsProcessing(true);
 
     try {
-      // Kartı kaydet (dev/mock): otomatik yenilemede kullanılacak varsayılan kart olur.
-      // (Gerçek tokenizasyon yok; kart metadata'sı saklanır.)
-      if (paymentMethod === 'card' && cardData.number) {
-        const [mm, yy] = (cardData.expiry || '').split('/');
-        if (mm && yy) {
-          await paymentsApi
-            .addMethod({
-              cardNumber: cardData.number.replace(/\s/g, ''),
-              cardHolderName: cardData.name,
-              expireMonth: mm,
-              expireYear: yy,
-              cvc: cardData.cvv,
-            })
-            .catch(() => {});
-        }
-      }
-
-      // Call the membership subscription API - this will create membership and initiate payment
+      // 1) Üyeliği hazırla + ödeme kaydını oluştur (orderId döner)
       const response = await membershipApi.subscribe({
         tierType: tier,
         billingPeriod: period,
       });
-      
-      const paymentUrl = response.data.paymentUrl || (response.data as any).paymentUrl;
-      const paymentId = response.data.paymentId || (response.data as any).paymentId;
-      
-      if (paymentUrl) {
-        // Redirect to Iyzico payment page
-        if (paymentUrl.startsWith('http')) {
-          window.location.href = paymentUrl;
-          return;
-        }
-        // If payment HTML is provided, show it
-        if ((response.data as any).paymentHtml) {
-          // For Iyzico, paymentUrl should be a redirect URL
-          window.location.href = paymentUrl;
-          return;
-        }
-      } else if (paymentId) {
-        router.push(`/payment/${paymentId}?type=membership`);
-        return;
-      } else {
-        // No payment needed (free tier)
-        toast.success('Üyeliğiniz başarıyla yükseltildi!');
+
+      const data: any = response.data;
+      const paymentId = data.paymentId;
+      const orderId = data.orderId;
+
+      // Test bypass ortamı: PayTR'ye gitmeden tamamla
+      if (data.useBypass === true && paymentId) {
+        await paymentsApi.bypassComplete(paymentId).catch(() => {});
+        toast.success('Üyeliğiniz aktifleştirildi!');
         await refreshUserData();
         router.push('/membership/success?tier=' + tier);
+        return;
       }
+
+      if (orderId) {
+        // 2) PayTR Direkt API: kart bizim formdan; yanıt 3D Secure sayfası
+        try {
+          const direct = await paymentsApi.processDirect({
+            orderId,
+            card: {
+              cardHolderName: cardData.name,
+              cardNumber: cleanNumber,
+              expireMonth: mm,
+              expireYear: yy,
+              cvc: cardData.cvv,
+            },
+            saveCard,
+          });
+          const html: string | undefined = direct.data?.threeDSHtml;
+          if (html) {
+            // Banka 3D doğrulama sayfasını aynı pencerede göster; doğrulama
+            // sonrası PayTR success/fail sayfamıza yönlendirir.
+            document.open();
+            document.write(html);
+            document.close();
+            return;
+          }
+          // non-3D anında çekim: success sayfası verify ile kesinleştirir
+          router.push(`/payment/success?paymentId=${paymentId}&type=membership`);
+          return;
+        } catch (directErr: any) {
+          const msg: string = directErr?.response?.data?.message || '';
+          // Direkt API mağazada kapalıysa PayTR iframe akışına otomatik düş
+          // (taze initiate — oid eşleşmesi için şart).
+          if (/direkt api|doğrulanamadı|paytr_token/i.test(msg)) {
+            const init = await paymentsApi.initiate(orderId, 'paytr');
+            const initData: any = init.data?.data ?? init.data ?? {};
+            if (initData.paymentUrl) {
+              window.location.href = initData.paymentUrl;
+              return;
+            }
+            if (initData.paymentId) {
+              router.push(`/payment/${initData.paymentId}?type=membership`);
+              return;
+            }
+          }
+          throw directErr;
+        }
+      }
+
+      // Yedek: eski iframe akışı (orderId dönmediyse)
+      const paymentUrl = data.paymentUrl;
+      if (paymentUrl && paymentUrl.startsWith('http')) {
+        window.location.href = paymentUrl;
+        return;
+      }
+      if (paymentId) {
+        router.push(`/payment/${paymentId}?type=membership`);
+        return;
+      }
+      toast.success('Üyeliğiniz başarıyla yükseltildi!');
+      await refreshUserData();
+      router.push('/membership/success?tier=' + tier);
     } catch (error: any) {
       if (process.env.NODE_ENV === 'development') console.error('Payment error:', error);
-      toast.error(error.response?.data?.message || 'Ödeme işlemi başarısız oldu');
+      toast.error(error.response?.data?.message || 'Ödeme işlemi başarısız oldu. Kart bilgilerinizi kontrol edin.');
     } finally {
       setIsProcessing(false);
     }
@@ -362,6 +410,22 @@ export default function MembershipCheckoutPage() {
                         maxLength={4} />
                     </div>
                   </div>
+
+                  <label className="flex items-start gap-3 cursor-pointer pt-2">
+                    <Checkbox
+                      checked={saveCard}
+                      onChange={(e) => setSaveCard(e.target.checked)}
+                      className="mt-0.5 h-5 w-5"
+                    />
+                    <span className="text-sm text-muted">
+                      Kartımı kaydet — otomatik yenilemede ve sonraki ödemelerde kullanılır.
+                      Kayıtlı kartlarınızı{' '}
+                      <Link href="/profile/payments/cards" className="text-primary-500 hover:underline">
+                        Kart Yönetimi
+                      </Link>{' '}
+                      sayfasından silebilirsiniz.
+                    </span>
+                  </label>
                 </div>
               </div>
 

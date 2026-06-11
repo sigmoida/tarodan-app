@@ -248,6 +248,18 @@ export default function MembershipScreen() {
               })}
             </Text>
           )}
+          {/* Üyelik yönetimi: otomatik yenileme + kayıtlı kartlar (tüm kademeler) */}
+          <TouchableOpacity
+            style={styles.manageButton}
+            onPress={() => router.push('/membership/manage' as any)}
+            activeOpacity={0.8}
+          >
+            <Ionicons name="settings-outline" size={16} color={colors.primary[600]!} />
+            <Text style={styles.manageButtonText}>
+              Üyelik Yönetimi (otomatik yenileme & kayıtlı kartlar)
+            </Text>
+            <Ionicons name="chevron-forward" size={16} color={colors.primary[600]!} />
+          </TouchableOpacity>
         </View>
 
         {/* Billing Period Toggle */}
@@ -476,6 +488,21 @@ const styles = StyleSheet.create({
     fontSize: 12,
     color: colors.text.subtle,
     marginTop: 6,
+  },
+  manageButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    marginTop: 12,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderRadius: 8,
+    backgroundColor: colors.primary[50]!,
+  },
+  manageButtonText: {
+    fontSize: 13,
+    fontWeight: '600',
+    color: colors.primary[600]!,
   },
 
   // Toggle

@@ -35,8 +35,9 @@ export default function MembershipSuccessScreen() {
       }
       if (cancelled) return;
       await refreshUserData?.();
-      // Tüm üyelik query'lerini (örn. ['membership','me']) tazele.
+      // Tüm üyelik query'lerini tazele (profil rozeti ['membership-me'] kullanır).
       queryClient.invalidateQueries({ queryKey: ['membership'] });
+      queryClient.invalidateQueries({ queryKey: ['membership-me'] });
     };
     run();
     return () => { cancelled = true; };

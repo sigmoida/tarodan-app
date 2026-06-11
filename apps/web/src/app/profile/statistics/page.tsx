@@ -47,6 +47,8 @@ interface UserStats {
   soldProductsCount: number;
   ordersCount: number;
   completedOrdersCount: number;
+  purchasesCount: number;
+  salesCount: number;
   tradesCount: number;
   successfulTradesCount: number;
   collectionsCount: number;
@@ -86,9 +88,10 @@ export default function StatisticsPage() {
         setStats(response.data);
       } else {
         // Fallback: fetch data from multiple endpoints
+        // (sipariş listesi GET /orders'tır; /orders/my diye bir uç yok)
         const [productsRes, ordersRes, tradesRes, collectionsRes, profileRes] = await Promise.all([
           api.get('/products/my').catch(() => ({ data: { data: [], meta: { total: 0 } } })),
-          api.get('/orders/my').catch(() => ({ data: { data: [], meta: { total: 0 } } })),
+          api.get('/orders', { params: { role: 'buyer', limit: 100 } }).catch(() => ({ data: { data: [], meta: { total: 0 } } })),
           api.get('/trades').catch(() => ({ data: { data: [] } })),
           api.get('/collections/me').catch(() => ({ data: { data: [] } })),
           api.get('/users/me').catch(() => ({ data: {} })),
@@ -109,9 +112,15 @@ export default function StatisticsPage() {
         // Calculate revenue from sold products
         const totalRevenue = soldProducts.reduce((sum: number, p: any) => sum + (parseFloat(p.price) || 0), 0);
 
-        // Calculate spent from completed orders
+        // Calculate spent from paid orders (sipariş alanı totalAmount'tur, total değil)
         const completedOrders = orders.filter((o: any) => ['delivered', 'completed'].includes(o.status));
-        const totalSpent = completedOrders.reduce((sum: number, o: any) => sum + (parseFloat(o.total) || 0), 0);
+        const paidOrders = orders.filter((o: any) =>
+          ['paid', 'preparing', 'shipped', 'delivered', 'awaiting_buyer_confirmation', 'completed'].includes(o.status)
+        );
+        const totalSpent = paidOrders.reduce(
+          (sum: number, o: any) => sum + (parseFloat(o.totalAmount ?? o.total) || 0),
+          0
+        );
 
         // Calculate successful trades
         const successfulTrades = trades.filter((t: any) => t.status === 'completed');
@@ -122,13 +131,15 @@ export default function StatisticsPage() {
           soldProductsCount: soldProducts.length,
           ordersCount: orders.length,
           completedOrdersCount: completedOrders.length,
+          purchasesCount: paidOrders.length,
+          salesCount: soldProducts.length,
           tradesCount: trades.length,
           successfulTradesCount: successfulTrades.length,
           collectionsCount: collections.length,
           totalViews,
           totalFavorites,
-          rating: profile.rating || 0,
-          reviewsCount: profile.reviewsCount || 0,
+          rating: profile.stats?.averageRating ?? profile.rating ?? 0,
+          reviewsCount: profile.stats?.totalRatings ?? profile.reviewsCount ?? 0,
           totalRevenue,
           totalSpent,
           memberSince: profile.createdAt || user?.createdAt || new Date().toISOString(),
@@ -144,6 +155,8 @@ export default function StatisticsPage() {
         soldProductsCount: 0,
         ordersCount: 0,
         completedOrdersCount: 0,
+        purchasesCount: 0,
+        salesCount: 0,
         tradesCount: 0,
         successfulTradesCount: 0,
         collectionsCount: 0,
@@ -163,7 +176,7 @@ export default function StatisticsPage() {
 
   const loadRecentSales = async () => {
     try {
-      const response = await api.get('/orders/my', { params: { role: 'seller', limit: 10 } }).catch(() => null);
+      const response = await api.get('/orders', { params: { role: 'seller', limit: 10 } }).catch(() => null);
       if (response?.data) {
         const orders = response.data.data || response.data.orders || [];
         const sales: RecentSale[] = orders
@@ -402,7 +415,7 @@ export default function StatisticsPage() {
                 </div>
                 <div className="flex items-center gap-2 text-success-100 text-sm">
                   <CheckBadgeIcon className="w-5 h-5" />
-                  <span>{stats.soldProductsCount} ürün satışından</span>
+                  <span>{stats.salesCount} satıştan</span>
                 </div>
               </motion.div>
               
@@ -421,7 +434,7 @@ export default function StatisticsPage() {
                 </div>
                 <div className="flex items-center gap-2 text-primary-100 text-sm">
                   <CheckBadgeIcon className="w-5 h-5" />
-                  <span>{stats.completedOrdersCount} sipariş tamamlandı</span>
+                  <span>{stats.purchasesCount} siparişten</span>
                 </div>
               </motion.div>
             </div>

@@ -11,6 +11,7 @@ import {
   SubscriptionStatus,
   ProductStatus,
   OrderStatus,
+  PaymentStatus,
 } from '@prisma/client';
 import {
   SubscribeDto,
@@ -101,14 +102,70 @@ export class MembershipService {
     let pendingTierType: string | undefined;
     let pendingPayment = false;
     if (membership.status === SubscriptionStatus.past_due) {
-      const freeTier = await this.prisma.membershipTier.findUnique({
-        where: { type: MembershipTierType.free },
+      // SELF-HEAL: past_due görünüyor ama ödeme aslında PayTR'de başarılı olmuş
+      // olabilir (callback ngrok'a düşemediğinde sipariş pending kalır). Kullanıcı
+      // sayfayı açtığı an, bu döneme ait BEKLEYEN PayTR ödemesini durum-sorgu ile
+      // doğrula ve tamamla → reconciliation cron'unu beklemeden anında aktive olur.
+      const virtualProductId = `membership-${membership.tierId}`;
+      // 1dk tolerans: sipariş, abonelikten (currentPeriodStart) hemen sonra oluşur.
+      const healFloor = new Date(membership.currentPeriodStart.getTime() - 60 * 1000);
+
+      // (a) Bu döneme ait BEKLEYEN ödemeyi PayTR'ye sor; ödendiyse tamamla.
+      const pendingPaymentRow = await this.prisma.payment.findFirst({
+        where: {
+          status: PaymentStatus.pending,
+          provider: PaymentProvider.paytr,
+          providerConversationId: { not: null },
+          order: { buyerId: userId, productId: virtualProductId, createdAt: { gte: healFloor } },
+        },
+        orderBy: { createdAt: 'desc' },
+        select: { id: true },
       });
-      if (freeTier) {
-        effectiveTier = freeTier;
-        pendingTierName = membership.tier.name;
-        pendingTierType = membership.tier.type;
-        pendingPayment = true;
+      if (pendingPaymentRow) {
+        try {
+          await this.paymentService.verifyPaymentFromClient(pendingPaymentRow.id);
+        } catch (err) {
+          this.logger.warn(`Membership self-heal verify failed for payment ${pendingPaymentRow.id}: ${(err as Error)?.message}`);
+        }
+      }
+
+      // (b) Tamamlanmış sipariş var mı (verify ya da cron'un işlediği) → aktive et.
+      const paidOrder = await this.prisma.order.findFirst({
+        where: {
+          buyerId: userId,
+          productId: virtualProductId,
+          status: { in: [OrderStatus.completed, OrderStatus.delivered, OrderStatus.paid, OrderStatus.preparing] },
+          createdAt: { gte: healFloor },
+        },
+        orderBy: { createdAt: 'desc' },
+      });
+
+      // Üyelik (verify aktivasyonu sonrası) güncel durumu yeniden oku.
+      const fresh = await this.prisma.userMembership.findUnique({
+        where: { userId },
+        include: { tier: true },
+      });
+      if (fresh) membership = fresh;
+
+      if (membership.status === SubscriptionStatus.active) {
+        // verify zaten aktive etti; banner gösterme.
+      } else if (paidOrder) {
+        membership = await this.prisma.userMembership.update({
+          where: { userId },
+          data: { status: SubscriptionStatus.active, cancelledAt: null },
+          include: { tier: true },
+        });
+        this.logger.log(`Self-healed membership ${membership.id} past_due → active (paid order ${paidOrder.orderNumber})`);
+      } else {
+        const freeTier = await this.prisma.membershipTier.findUnique({
+          where: { type: MembershipTierType.free },
+        });
+        if (freeTier) {
+          effectiveTier = freeTier;
+          pendingTierName = membership.tier.name;
+          pendingTierType = membership.tier.type;
+          pendingPayment = true;
+        }
       }
     }
 
@@ -403,6 +460,7 @@ export class MembershipService {
         ...(await this.getUserMembership(userId)),
         paymentUrl: paymentResult.paymentUrl,
         paymentId: paymentResult.paymentId,
+        orderId: (paymentResult as any).orderId,
         provider: paymentResult.provider,
         useBypass: paymentResult.useBypass === true,
       } as any;
@@ -486,7 +544,10 @@ export class MembershipService {
           id: virtualProductId,
           sellerId: platformSeller.id,
           categoryId: defaultCategory.id,
-          title: `${membership.tier.name} Üyelik`,
+          // tier.name zaten "… Üyelik" içerir ("Premium Üyelik Üyelik" olmasın)
+          title: membership.tier.name.includes('Üyelik')
+            ? membership.tier.name
+            : `${membership.tier.name} Üyelik`,
           description: `Üyelik ödemesi için sanal ürün`,
           price: price,
           condition: 'new',
@@ -495,26 +556,46 @@ export class MembershipService {
       });
     }
 
-    // Generate order number
-    const orderNumber = `MEM-${Date.now()}-${Math.random().toString(36).substr(2, 9).toUpperCase()}`;
-
-    // Create order for membership payment
-    const order = await this.prisma.order.create({
-      data: {
-        orderNumber,
+    // Yetim sipariş birikmesini önle: kullanıcı "Ödemeyi tamamla"ya her bastığında
+    // YENİ sipariş oluşturmak yerine, bu tier için hâlâ ödeme bekleyen siparişi
+    // yeniden kullan. (Aksi halde her denemede bir pending_payment sipariş kalıyor
+    // ve sarı "ödemeyi tamamla" uyarısı asla net şekilde temizlenmiyordu.)
+    let order = await this.prisma.order.findFirst({
+      where: {
         buyerId: userId,
-        sellerId: platformSeller.id,
         productId: product.id,
-        totalAmount: price,
-        commissionAmount: 0, // No commission for membership
-        shippingCost: 0,
         status: OrderStatus.pending_payment,
-        paymentExpiresAt: new Date(Date.now() + 24 * 60 * 60 * 1000),
-        shippingAddress: {
-          type: 'membership',
-        } as any,
       },
+      orderBy: { createdAt: 'desc' },
     });
+
+    if (order) {
+      order = await this.prisma.order.update({
+        where: { id: order.id },
+        data: {
+          totalAmount: price,
+          paymentExpiresAt: new Date(Date.now() + 24 * 60 * 60 * 1000),
+        },
+      });
+    } else {
+      const orderNumber = `MEM-${Date.now()}-${Math.random().toString(36).substr(2, 9).toUpperCase()}`;
+      order = await this.prisma.order.create({
+        data: {
+          orderNumber,
+          buyerId: userId,
+          sellerId: platformSeller.id,
+          productId: product.id,
+          totalAmount: price,
+          commissionAmount: 0, // No commission for membership
+          shippingCost: 0,
+          status: OrderStatus.pending_payment,
+          paymentExpiresAt: new Date(Date.now() + 24 * 60 * 60 * 1000),
+          shippingAddress: {
+            type: 'membership',
+          } as any,
+        },
+      });
+    }
 
     // Initiate payment with the created order
     const paymentResult = await this.paymentService.initiatePayment(
@@ -529,6 +610,7 @@ export class MembershipService {
     return {
       paymentId: paymentResult.paymentId,
       membershipPaymentId: membership.id,
+      orderId: order.id,
       paymentUrl: paymentResult.paymentUrl || '',
       paymentHtml: paymentResult.paymentHtml,
       provider: paymentResult.provider,

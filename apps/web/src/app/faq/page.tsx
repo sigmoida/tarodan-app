@@ -1,10 +1,12 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { ChevronDownIcon, MagnifyingGlassIcon } from '@heroicons/react/24/outline';
 import Link from 'next/link';
 import { useTranslation } from '@/i18n/LanguageContext';import { Button, Input } from '@tarodan/ui';
+
+const FAQ_CATEGORY_IDS = ['general', 'buying', 'selling', 'trade', 'shipping', 'account'];
 
 
 const FAQ_CATEGORIES = [
@@ -138,6 +140,34 @@ export default function FAQPage() {
   const [activeCategory, setActiveCategory] = useState('general');
   const [openQuestions, setOpenQuestions] = useState<string[]>([]);
 
+  // /faq#buying, /faq#shipping gibi linkler ilgili kategoriyi açsın (Yardım
+  // Merkezi'nden gelen derin linkler). URL hash değişince de senkronize ol.
+  useEffect(() => {
+    const applyHash = () => {
+      const hash = window.location.hash.replace('#', '');
+      if (hash && FAQ_CATEGORY_IDS.includes(hash)) {
+        setActiveCategory(hash);
+        setSearchQuery('');
+        // Yardım Merkezi'nden derin linkle gelindiğinde hero'yu geçip içeriğe kay.
+        setTimeout(() => {
+          document.getElementById('faq-topics')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        }, 100);
+      }
+    };
+    applyHash();
+    window.addEventListener('hashchange', applyHash);
+    return () => window.removeEventListener('hashchange', applyHash);
+  }, []);
+
+  // Aktif kategori değişince adres çubuğundaki hash'i de güncelle (paylaşılabilir
+  // derin link); geçmişi kirletmeme için replaceState kullan.
+  useEffect(() => {
+    if (typeof window === 'undefined' || searchQuery) return;
+    if (window.location.hash.replace('#', '') !== activeCategory) {
+      window.history.replaceState(null, '', `#${activeCategory}`);
+    }
+  }, [activeCategory, searchQuery]);
+
   // FAQ categories with locale-based content
   const FAQ_CATEGORIES_LOCALIZED = locale === 'en' ? [
     {
@@ -245,7 +275,7 @@ export default function FAQPage() {
         </div>
       </div>
 
-      <div className="max-w-6xl mx-auto px-4 py-12">
+      <div id="faq-topics" className="max-w-6xl mx-auto px-4 py-12 scroll-mt-20">
         <div className="flex flex-col lg:flex-row gap-8">
           {/* Category Sidebar */}
           {!searchQuery && (

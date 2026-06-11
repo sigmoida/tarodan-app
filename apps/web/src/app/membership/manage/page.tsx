@@ -95,7 +95,21 @@ export default function MembershipManagePage() {
     setIsLoading(true);
     try {
       const response = await api.get('/membership/me');
-      setMembership(response.data);
+      // API yanıtında tier bir nesnedir ({ type, name, ... }) ve dönem alanları
+      // currentPeriodStart/End adındadır; sayfanın beklediği düz şekle çevir.
+      const m = response.data;
+      const tierType: string = m?.tier?.type ?? 'free';
+      setMembership({
+        tier: tierType,
+        tierName: m?.tier?.name ?? tierNames[tierType] ?? 'Ücretsiz Üyelik',
+        startDate: m?.currentPeriodStart ?? '',
+        endDate: m?.currentPeriodEnd ?? '',
+        autoRenew: !!m?.autoRenew,
+        nextBillingDate: m?.autoRenew ? m?.currentPeriodEnd : undefined,
+        nextBillingAmount: m?.tier?.monthlyPrice ?? tierPrices[tierType] ?? undefined,
+        features: getFeaturesByTier(tierType),
+        paymentMethodId: m?.paymentMethodId ?? undefined,
+      });
     } catch (error) {
       if (process.env.NODE_ENV === 'development') console.error('Failed to fetch membership:', error);
       const tier = user?.membershipTier || 'free';
@@ -225,13 +239,13 @@ export default function MembershipManagePage() {
 
     setProcessingAutoRenew(true);
     try {
-      // First save the card
+      // First save the card (AddCardDto alan adları: cardHolderName/expireMonth/expireYear/cvc)
       const cardResponse = await api.post('/payments/methods', {
         cardNumber: cleanCardNumber,
-        cardHolder: newCard.cardHolder,
-        expiryMonth: parseInt(newCard.expiryMonth),
-        expiryYear: parseInt(newCard.expiryYear),
-        cvv: newCard.cvv,
+        cardHolderName: newCard.cardHolder,
+        expireMonth: newCard.expiryMonth,
+        expireYear: newCard.expiryYear,
+        cvc: newCard.cvv,
       });
 
       const newPaymentMethod = cardResponse.data;

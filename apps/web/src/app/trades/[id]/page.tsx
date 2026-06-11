@@ -475,13 +475,15 @@ export default function TradeDetailPage() {
         return;
       }
 
-      if (data?.paymentUrl) {
-        window.location.href = data.paymentUrl;
+      // Site-içi kart formu için ödeme sayfamıza git (paymentUrl'e doğrudan
+      // gitmek PayTR iframe'ini açıp kart formunu atlardı).
+      if (data?.paymentId) {
+        router.push(`/payment/${data.paymentId}`);
         return;
       }
 
-      if (data?.paymentId) {
-        router.push(`/payment/${data.paymentId}`);
+      if (data?.paymentUrl) {
+        window.location.href = data.paymentUrl;
         return;
       }
 
