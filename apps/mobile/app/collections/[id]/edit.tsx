@@ -1,5 +1,5 @@
-import { View, ScrollView, StyleSheet, TouchableOpacity, Image, Alert } from 'react-native';
-import { theme, Button, Switch, Snackbar, IconButton, Spinner, Text, Input, Textarea } from '@tarodan/ui-native';
+import { View, ScrollView, StyleSheet, TouchableOpacity, Image } from 'react-native';
+import { theme, Button, Switch, Snackbar, IconButton, Spinner, Text, Input, Textarea, appAlert } from '@tarodan/ui-native';
 import { useState, useEffect } from 'react';
 import { router, useLocalSearchParams, Stack } from 'expo-router';
 import { useForm, Controller } from 'react-hook-form';
@@ -155,7 +155,7 @@ export default function EditCollectionScreen() {
   };
 
   const handleDelete = () => {
-    Alert.alert(
+    appAlert(
       'Koleksiyonu Sil',
       'Bu koleksiyonu silmek istediğinize emin misiniz? Bu işlem geri alınamaz.',
       [
@@ -166,7 +166,7 @@ export default function EditCollectionScreen() {
   };
 
   const handleRemoveItem = (itemId: string, productTitle: string) => {
-    Alert.alert(
+    appAlert(
       'Ürünü Kaldır',
       `"${productTitle}" ürününü koleksiyondan kaldırmak istediğinize emin misiniz?`,
       [

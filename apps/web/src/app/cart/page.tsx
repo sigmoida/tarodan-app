@@ -21,11 +21,9 @@ export default function CartPage() {
     items,
     offlineItems,
     subtotal,
-    grandTotal,
     isLoading,
     fetchCart,
     removeFromCart,
-    shippingCost: apiShippingCost,
     totalDiscount,
     appliedDiscounts,
   } = useCartStore();
@@ -92,16 +90,8 @@ export default function CartPage() {
     );
   }
 
-  const shippingCost =
-    apiShippingCost != null
-      ? Number(apiShippingCost)
-      : subtotal >= 500
-        ? 0
-        : 49.9;
-  const displayGrandTotal =
-    grandTotal > 0
-      ? grandTotal
-      : Math.max(0, subtotal - (totalDiscount ?? 0) + shippingCost);
+  // Kargo sepette gösterilmez; ödeme adımında hesaplanır
+  const displayGrandTotal = Math.max(0, subtotal - (totalDiscount ?? 0));
 
   return (
     <div className="min-h-screen bg-surface py-8">
@@ -280,8 +270,10 @@ export default function CartPage() {
                   <span className="text-muted">
                     {t("checkout.shipping")}
                   </span>
-                  <span className="font-medium">
-                    ₺{shippingCost.toFixed(2)}
+                  <span className="text-subtle">
+                    {locale === "en"
+                      ? "Calculated at checkout"
+                      : "Ödeme adımında hesaplanır"}
                   </span>
                 </div>
                 <hr className="my-4" />

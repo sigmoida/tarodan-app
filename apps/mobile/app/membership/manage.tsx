@@ -1,9 +1,8 @@
 import React, { useState } from 'react';
-import { View, ScrollView, StyleSheet, Alert } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { View, ScrollView, StyleSheet } from 'react-native';
 import { router } from 'expo-router';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { theme, Button, Card, Spinner, Snackbar, Switch, Divider, Text } from '@tarodan/ui-native';
+import { theme, Button, Card, Spinner, Snackbar, Switch, Divider, Text, appAlert } from '@tarodan/ui-native';
 import { Ionicons } from '@expo/vector-icons';
 
 import { ScreenHeader, ThemedRefreshControl } from '../../src/components/common';
@@ -115,7 +114,7 @@ export default function MembershipManageScreen() {
   });
 
   const handleCancel = () => {
-    Alert.alert(
+    appAlert(
       'Üyeliği İptal Et',
       'Üyeliğinizi iptal etmek istediğinize emin misiniz? Mevcut dönem sonuna kadar özelliklerinizi kullanmaya devam edebilirsiniz.',
       [
@@ -135,17 +134,17 @@ export default function MembershipManageScreen() {
 
   if (isLoading) {
     return (
-      <SafeAreaView style={styles.container} edges={['top']}>
+      <View style={styles.container}>
         <ScreenHeader title="Üyelik Yönetimi" />
         <View style={styles.loadingBox}>
           <Spinner size="lg" />
         </View>
-      </SafeAreaView>
+      </View>
     );
   }
 
   return (
-    <SafeAreaView style={styles.container} edges={['top']}>
+    <View style={styles.container}>
       <ScreenHeader title="Üyelik Yönetimi" />
       <ScrollView
         contentContainerStyle={styles.scrollBody}
@@ -258,7 +257,7 @@ export default function MembershipManageScreen() {
       >
         {snackbar.message}
       </Snackbar>
-    </SafeAreaView>
+    </View>
   );
 }
 

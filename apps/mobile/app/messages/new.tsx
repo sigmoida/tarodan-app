@@ -194,9 +194,6 @@ export default function NewMessageScreen() {
               <Text variant="body" style={styles.recipientName}>
                 {selectedUser.displayName}
               </Text>
-              <TouchableOpacity onPress={() => setSelectedUser(null)}>
-                <Ionicons name="close-circle" size={24} color={colors.text.muted} />
-              </TouchableOpacity>
             </View>
           </View>
         )}
@@ -227,6 +224,7 @@ export default function NewMessageScreen() {
             <RNTextInput
               style={styles.messageInput}
               placeholder={canSend ? "Mesajınızı yazın..." : "Mesaj limiti doldu"}
+              placeholderTextColor={colors.text.subtle}
               value={messageText}
               onChangeText={setMessageText}
               multiline

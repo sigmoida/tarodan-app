@@ -1,4 +1,4 @@
-import { View, ScrollView, StyleSheet, TouchableOpacity, Alert, Linking } from 'react-native';
+import { View, ScrollView, StyleSheet, TouchableOpacity, Linking } from 'react-native';
 import {
   Card,
   Button,
@@ -9,6 +9,7 @@ import {
   Text,
   theme,
   ScreenHeader,
+  appAlert,
 } from '@tarodan/ui-native';
 import { useState, useEffect, useCallback } from 'react';
 import { router, useFocusEffect } from 'expo-router';
@@ -65,7 +66,7 @@ export default function SubscriptionSettingsScreen() {
   }, [error]);
 
   const handleCancel = () => {
-    Alert.alert(
+    appAlert(
       'Aboneliği İptal Et',
       'Aboneliğinizi iptal etmek istediğinize emin misiniz? Dönem sonuna kadar premium özelliklerden yararlanmaya devam edebilirsiniz.',
       [

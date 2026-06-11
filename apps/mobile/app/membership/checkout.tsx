@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
-import { View, ScrollView, StyleSheet, TouchableOpacity, Alert } from 'react-native';
-import { theme, Button, Card, Input, Radio, Text, ScreenHeader } from '@tarodan/ui-native';
+import { View, ScrollView, StyleSheet, TouchableOpacity } from 'react-native';
+import { theme, Button, Card, Input, Radio, Text, ScreenHeader, appAlert } from '@tarodan/ui-native';
 import { router, useLocalSearchParams } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { useAuthStore } from '../../src/stores/authStore';
@@ -190,7 +190,7 @@ export default function MembershipCheckoutScreen() {
         tags: { flow: 'membership.initiatePayment' },
         extra: { tierType, billingPeriod, status: e?.response?.status },
       });
-      Alert.alert(
+      appAlert(
         'Ödeme Hatası',
         e?.response?.data?.message || 'Üyelik ödemesi başlatılamadı. Lütfen tekrar deneyin.',
       );

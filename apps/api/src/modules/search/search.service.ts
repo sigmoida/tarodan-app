@@ -533,12 +533,11 @@ export class SearchService implements OnModuleInit {
           : [{ relevanceScore: 'desc' }, { viewCount: 'desc' }, { createdAt: 'desc' }];
     }
 
-    // Stoktakiler önce: status verilmeyen kapsayıcı aramada (aktif + tükenen + satıldı)
-    // stoklu ürünler tükenenlerden önce gelsin. Eski indeks dokümanlarında alan
-    // bulunmayabilir → missing '_first' ile stok-içi gibi davranır.
-    if (!status) {
-      sort = [{ inStock: { order: 'desc', missing: '_first' } }, ...sort];
-    }
+    // Stoktakiler her zaman önce: stoğu biten (tükenen/satıldı/aktif-ama-stoksuz)
+    // ürünler hangi sıralama seçilirse seçilsin en alta iner. Tek-statülü
+    // sorgularda (örn. status=active) zaten çoğunlukla no-op'tur. Eski indeks
+    // dokümanlarında alan bulunmayabilir → missing '_first' ile stok-içi sayılır.
+    sort = [{ inStock: { order: 'desc', missing: '_first' } }, ...sort];
 
     try {
       const searchBody: any = {
@@ -687,8 +686,13 @@ export class SearchService implements OnModuleInit {
       isPreorder: product.isPreorder,
       isLimited: product.isLimited,
       isSet: product.isSet,
-      // Stok-içi sıralama için denormalize bayrak (status=active ⟺ stoklu).
-      inStock: product.status === ProductStatus.active,
+      // Stok-içi sıralama için denormalize bayrak: aktif VE müsait adet
+      // (quantity − reserved) > 0; quantity=null sınırsız sayılır. Sadece
+      // status'a güvenme — tamamen rezerve edilmiş ürün de UI'da "STOKTA YOK".
+      inStock:
+        product.status === ProductStatus.active &&
+        (product.quantity == null ||
+          product.quantity - (product.reservedQuantity ?? 0) > 0),
       quantity: product.quantity,
       createdAt: product.createdAt,
       updatedAt: product.updatedAt,

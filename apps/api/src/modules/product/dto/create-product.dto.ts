@@ -130,7 +130,7 @@ export class CreateProductDto {
 
   @ApiPropertyOptional({
     example: 5,
-    description: 'Stock quantity (null for unlimited stock)',
+    description: 'Stock quantity (defaults to 1 when omitted; null for unlimited stock)',
   })
   @IsOptional()
   @IsNumber({}, { message: 'Stok miktarı sayı olmalıdır' })

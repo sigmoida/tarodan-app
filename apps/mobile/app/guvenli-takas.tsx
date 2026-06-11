@@ -109,7 +109,7 @@ export default function GuvenliTakasScreen() {
 
         <TouchableOpacity
           style={styles.ctaButton}
-          onPress={() => router.push('/(tabs)/trades')}
+          onPress={() => router.push('/trades')}
           activeOpacity={0.8}
         >
           <Ionicons name="swap-horizontal" size={20} color={colors.white} />

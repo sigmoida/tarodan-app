@@ -84,6 +84,15 @@ describe('J91 · Teklif detayı render', () => {
     expect(screen.queryByText('Karşı Teklif Ver')).toBeNull();
   });
 
+  it('J93b · karşı teklifte (buyerMustAccept) alıcıya İptal butonu gösterilmez', async () => {
+    mockUser = { id: 'buyer-1' };
+    getOneMock.mockResolvedValue({ data: { data: offerFixture({ buyerMustAccept: true }) } });
+    renderWithProviders(<OfferDetailScreen />);
+
+    await waitFor(() => expect(screen.getByText('Deri Ceket')).toBeOnTheScreen());
+    expect(screen.queryByText('Teklifi İptal Et')).toBeNull();
+  });
+
   it('J94 · pending olmayan teklifte aksiyon butonu gösterilmez', async () => {
     getOneMock.mockResolvedValue({ data: { data: offerFixture({ status: 'accepted' }) } });
     renderWithProviders(<OfferDetailScreen />);

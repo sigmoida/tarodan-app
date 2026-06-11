@@ -209,7 +209,7 @@ function toMobileRoute(link: string): string | null {
       return id ? `/product/${id}` : '/(tabs)/search';
     case 'trades':
       // web çoğul → mobil tekil; liste → tab
-      return id ? `/trade/${id}` : '/(tabs)/trades';
+      return id ? `/trade/${id}` : '/trades';
     case 'profile':
       if (id === 'listings') return '/settings/my-listings';
       if (id === 'earnings') return '/settings/payments';

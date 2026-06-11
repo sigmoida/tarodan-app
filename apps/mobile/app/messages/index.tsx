@@ -5,6 +5,7 @@ import { router, useFocusEffect } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { useMessagesStore, MessageThread } from '../../src/stores/messagesStore';
 import { useAuthStore } from '../../src/stores/authStore';
+import { formatMessagePreview } from '../../src/utils/contentFilter';
 import { useTranslation } from '../../src/i18n';
 
 const { colors } = theme;
@@ -12,7 +13,7 @@ const { colors } = theme;
 export default function MessagesListScreen() {
   const { t } = useTranslation();
   const { isAuthenticated, user, limits } = useAuthStore();
-  const { threads, isLoading, fetchThreads, getUnreadCount, getOtherParticipant, dailyMessageCount } = useMessagesStore();
+  const { threads, isLoading, hasLoadedThreads, fetchThreads, getUnreadCount, getOtherParticipant, dailyMessageCount } = useMessagesStore();
   const [refreshing, setRefreshing] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
 
@@ -132,8 +133,8 @@ export default function MessagesListScreen() {
         />
       </View>
 
-      {/* Content */}
-      {isLoading && threads.length === 0 ? (
+      {/* Content — ilk yükleme bitene dek spinner; boş ekran bir an çakmasın. */}
+      {threads.length === 0 && (isLoading || !hasLoadedThreads) ? (
         <View style={styles.loadingContainer}>
           <Spinner size="lg" />
         </View>
@@ -208,7 +209,7 @@ export default function MessagesListScreen() {
                     numberOfLines={1}
                   >
                     {thread.lastMessage?.senderId === user?.id ? 'Sen: ' : ''}
-                    {thread.lastMessage?.content || 'Henüz mesaj yok'}
+                    {formatMessagePreview(thread.lastMessage?.content ?? '') || 'Henüz mesaj yok'}
                   </Text>
                 </View>
 

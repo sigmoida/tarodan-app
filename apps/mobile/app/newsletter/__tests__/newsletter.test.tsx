@@ -6,7 +6,8 @@
  * Backend abonelik kaydı / token doğrulama backend-only.
  */
 import React from 'react';
-import { Alert, TextInput } from 'react-native';
+import { appAlert } from '@tarodan/ui-native';
+import { TextInput } from 'react-native';
 import { screen, fireEvent, waitFor } from '@testing-library/react-native';
 import { renderWithProviders } from '../../../src/test-utils';
 
@@ -31,12 +32,12 @@ const postMock = guestApi.post as jest.Mock;
 const getMock = guestApi.get as jest.Mock;
 
 describe('J39 · Bülten abone (newsletter)', () => {
-  let alertSpy: jest.SpyInstance;
+  let alertSpy: jest.Mock;
   beforeEach(() => {
     postMock.mockReset();
     mockPush.mockReset();
     mockParams = {};
-    alertSpy = jest.spyOn(Alert, 'alert').mockImplementation(() => {});
+    alertSpy = (appAlert as jest.Mock).mockImplementation(() => {});
   });
   afterEach(() => alertSpy.mockRestore());
 
@@ -74,13 +75,13 @@ describe('J39 · Bülten abone (newsletter)', () => {
 });
 
 describe('J117 · Bülten abonelik iptali (unsubscribe)', () => {
-  let alertSpy: jest.SpyInstance;
+  let alertSpy: jest.Mock;
   beforeEach(() => {
     postMock.mockReset();
     getMock.mockReset();
     mockReplace.mockReset();
     mockParams = {};
-    alertSpy = jest.spyOn(Alert, 'alert').mockImplementation(() => {});
+    alertSpy = (appAlert as jest.Mock).mockImplementation(() => {});
   });
   afterEach(() => alertSpy.mockRestore());
 

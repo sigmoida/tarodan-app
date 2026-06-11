@@ -6,10 +6,9 @@ import {
   TouchableOpacity,
   StyleSheet,
   ActivityIndicator,
-  Alert,
   RefreshControl,
 } from 'react-native';
-import { ScreenHeader } from '@tarodan/ui-native';
+import { ScreenHeader, appAlert } from '@tarodan/ui-native';
 import { router, useFocusEffect } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { TarodanColors } from '../../src/theme';
@@ -73,7 +72,7 @@ export default function PaymentHistoryScreen() {
       setPayments(data);
     } catch (err: any) {
       if (!showRefresh) {
-        Alert.alert('Hata', 'Ödeme geçmişi yüklenirken bir hata oluştu.');
+        appAlert('Hata', 'Ödeme geçmişi yüklenirken bir hata oluştu.');
       }
     } finally {
       setIsLoading(false);
@@ -88,7 +87,7 @@ export default function PaymentHistoryScreen() {
   );
 
   const handlePaymentPress = (payment: Payment) => {
-    Alert.alert(
+    appAlert(
       'Ödeme Detayı',
       [
         `Tutar: ${formatCurrency(payment.amount)}`,

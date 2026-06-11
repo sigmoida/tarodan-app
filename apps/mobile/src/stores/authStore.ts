@@ -117,7 +117,7 @@ const TIER_LIMITS: Record<MembershipTier, MembershipLimits> = {
   free: {
     maxListings: 10,
     maxImagesPerListing: 5,
-    maxAddresses: 3,
+    maxAddresses: 10,
     maxSavedSearches: 5,
     maxMessagesPerDay: 50,
     listingExpireDays: 60,
@@ -134,7 +134,7 @@ const TIER_LIMITS: Record<MembershipTier, MembershipLimits> = {
   basic: {
     maxListings: 25,
     maxImagesPerListing: 10,
-    maxAddresses: 5,
+    maxAddresses: 10,
     maxSavedSearches: 10,
     maxMessagesPerDay: 100,
     listingExpireDays: 90,
@@ -168,7 +168,7 @@ const TIER_LIMITS: Record<MembershipTier, MembershipLimits> = {
   business: {
     maxListings: -1,
     maxImagesPerListing: 20,
-    maxAddresses: -1,
+    maxAddresses: 10,
     maxSavedSearches: -1,
     maxMessagesPerDay: -1,
     listingExpireDays: -1,
@@ -338,6 +338,10 @@ export const useAuthStore = create<AuthState>((set, get) => ({
     await SecureStore.deleteItemAsync('accessToken');
     await SecureStore.deleteItemAsync('refreshToken');
     set({ isAuthenticated: false, token: null, user: null, limits: null });
+    // Kullanıcıya özel yerel state (sepet/favori/mesaj rozetleri, query cache).
+    // Lazy require: messagesStore → authStore import zinciriyle döngü oluşmasın.
+    const { resetUserStores } = require('./resetUserStores');
+    resetUserStores();
     setSentryUser(null);
   },
 

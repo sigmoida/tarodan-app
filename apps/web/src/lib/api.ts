@@ -38,6 +38,22 @@ api.interceptors.response.use(
   async (error) => {
     const originalRequest = error.config;
 
+    // Banlı kullanıcı: backend BannedUserGuard tüm istekleri 403 + USER_BANNED
+    // ile bloklar. Kullanıcıyı /banned sayfasına yönlendir (zaten oradaysa dokunma).
+    const errData = error.response?.data;
+    if (
+      error.response?.status === 403 &&
+      errData?.errorCode === 'USER_BANNED' &&
+      typeof window !== 'undefined' &&
+      window.location?.pathname !== '/banned'
+    ) {
+      const reason = errData.bannedReason
+        ? `?reason=${encodeURIComponent(errData.bannedReason)}`
+        : '';
+      window.location.href = `/banned${reason}`;
+      return Promise.reject(error);
+    }
+
     if (error.response?.status === 401 && !originalRequest._retry) {
       originalRequest._retry = true;
 
@@ -275,6 +291,61 @@ export const ordersApi = {
     offerId?: string;
     price?: number;
   }) => api.post('/orders/guest', data),
+  /** Toplu checkout (üye): sepetteki tüm ürünler tek CheckoutGroup altında, tek ödeme */
+  checkout: (data: {
+    items: Array<{ productId: string }>;
+    idempotencyKey: string;
+    shippingAddressId?: string;
+    shippingAddress?: {
+      fullName: string;
+      phone: string;
+      city: string;
+      district: string;
+      address: string;
+      zipCode?: string;
+    };
+    billingAddressId?: string;
+    billingAddress?: {
+      fullName: string;
+      phone: string;
+      city: string;
+      district: string;
+      address: string;
+      zipCode?: string;
+    };
+    couponCode?: string;
+  }) => api.post('/orders/checkout', data),
+  /** Toplu checkout (misafir) */
+  checkoutGuest: (data: {
+    items: Array<{ productId: string }>;
+    idempotencyKey: string;
+    email: string;
+    emailVerificationCode: string;
+    phone: string;
+    guestName: string;
+    shippingAddress: {
+      fullName: string;
+      phone: string;
+      city: string;
+      district: string;
+      address: string;
+      zipCode?: string;
+    };
+    billingAddress?: {
+      fullName: string;
+      phone: string;
+      city: string;
+      district: string;
+      address: string;
+      zipCode?: string;
+    };
+  }) => api.post('/orders/checkout/guest', data),
+  /** Alıcının sipariş grupları (gruplu liste) */
+  getGroups: (params?: Record<string, any>) =>
+    api.get('/orders/groups', { params }),
+  /** Tek sipariş grubu detayı */
+  getGroup: (id: string) =>
+    api.get(`/orders/groups/${id}`),
   cancel: (id: string | number, reason?: string) =>
     api.post(`/orders/${id}/cancel`, { reason }),
   confirm: (id: string | number) =>
@@ -298,8 +369,14 @@ export const ordersApi = {
 export const paymentsApi = {
   initiate: (orderId: string | number, provider: 'paytr') =>
     api.post('/payments/initiate', { orderId, provider }),
+  /** Grup ödemesi: tek ödeme checkout grubundaki tüm siparişleri kapsar */
+  initiateGroup: (checkoutGroupId: string, provider: 'paytr') =>
+    api.post('/payments/initiate', { checkoutGroupId, provider }),
   initiateGuest: (orderId: string | number, provider: 'paytr') =>
     api.post('/payments/initiate-guest', { orderId, provider }),
+  /** Grup ödemesi (misafir) */
+  initiateGroupGuest: (checkoutGroupId: string, provider: 'paytr') =>
+    api.post('/payments/initiate-guest', { checkoutGroupId, provider }),
   /** Takas nakit fark ödemesi başlat (sipariş/teklif ile aynı ödeme altyapısı) */
   initiateTradeCash: (tradeId: string) =>
     api.post('/payments/initiate-trade-cash', { tradeId }),

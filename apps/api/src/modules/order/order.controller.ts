@@ -36,6 +36,8 @@ import {
   SetShippingAddressDto,
   CheckoutQuoteDto,
   CheckoutQuoteResponseDto,
+  CheckoutDto,
+  GuestCheckoutGroupDto,
 } from './dto';
 
 @ApiTags('orders')
@@ -154,6 +156,39 @@ export class OrderController {
   }
 
   /**
+   * POST /orders/checkout - Atomik toplu checkout (üye): sepetteki tüm ürünler
+   * tek CheckoutGroup altında sipariş edilir; tek ödeme grubu kapsar.
+   */
+  @Post('checkout')
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth()
+  @ApiOperation({ summary: 'Batch checkout: create one checkout group with an order per product' })
+  @ApiResponse({
+    status: HttpStatus.CREATED,
+    description: 'Checkout group created with orders',
+  })
+  async checkout(
+    @CurrentUser('id') userId: string,
+    @Body() dto: CheckoutDto,
+  ) {
+    return this.orderService.checkout(userId, dto);
+  }
+
+  /**
+   * POST /orders/checkout/guest - Atomik toplu checkout (misafir)
+   */
+  @Post('checkout/guest')
+  @Public()
+  @ApiOperation({ summary: 'Batch guest checkout: one checkout group, order per product' })
+  @ApiResponse({
+    status: HttpStatus.CREATED,
+    description: 'Checkout group created with orders',
+  })
+  async checkoutGuest(@Body() dto: GuestCheckoutGroupDto) {
+    return this.orderService.checkoutGuest(dto);
+  }
+
+  /**
    * POST /orders/buy - Direct "Buy Now" purchase without offer
    * Requirement: Direct purchase flow (3.1)
    */
@@ -242,6 +277,39 @@ export class OrderController {
     @CurrentUser('id') userId: string,
   ): Promise<{ totalEarnings: number; pendingEarnings: number }> {
     return this.orderService.getSellerEarnings(userId);
+  }
+
+  /**
+   * GET /orders/groups - Alıcının sipariş grupları (gruplu liste).
+   * NOT: ':id' rotasından ÖNCE tanımlı olmalı (yoksa 'groups' :id'e yakalanır).
+   */
+  @Get('groups')
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth()
+  @ApiOperation({ summary: "Get current user's checkout groups (buyer view, grouped orders)" })
+  async findUserCheckoutGroups(
+    @CurrentUser('id') userId: string,
+    @Query('page') page?: string,
+    @Query('limit') limit?: string,
+  ) {
+    const pageNum = Math.max(1, parseInt(page || '1', 10) || 1);
+    const limitNum = Math.min(50, Math.max(1, parseInt(limit || '20', 10) || 20));
+    return this.orderService.findUserCheckoutGroups(userId, pageNum, limitNum);
+  }
+
+  /**
+   * GET /orders/groups/:id - Tek sipariş grubu detayı (ürün satırları + ayrı kargolar)
+   */
+  @Get('groups/:id')
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth()
+  @ApiOperation({ summary: 'Get a checkout group with all its orders and shipments' })
+  @ApiParam({ name: 'id', description: 'Checkout group ID' })
+  async findCheckoutGroup(
+    @Param('id') id: string,
+    @CurrentUser('id') userId: string,
+  ) {
+    return this.orderService.findCheckoutGroup(id, userId);
   }
 
   /**

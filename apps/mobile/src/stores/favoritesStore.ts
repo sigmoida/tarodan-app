@@ -135,27 +135,29 @@ export const useFavoritesStore = create<FavoritesState>((set, get) => ({
 
   // Web ile aynı endpoint: DELETE /wishlist/:productId
   removeFromFavorites: async (productId: string) => {
+    // Optimistic: anında listeden düş ki kalp ikonu/badge hemen güncellensin (add ile simetrik).
+    const removed = get().items.filter(item => item.productId === productId);
+    set(state => ({
+      items: state.items.filter(item => item.productId !== productId),
+      error: null,
+    }));
+
     try {
       await wishlistApi.remove(productId);
-      
-      // Remove from local state immediately
-      set(state => ({
-        items: state.items.filter(item => item.productId !== productId),
-      }));
-      
       return true;
     } catch (error: any) {
       console.error('Failed to remove from favorites:', error);
-      
-      // If not found, still return success
+
+      // If not found, already removed server-side — keep local removal
       if (error.response?.status === 404) {
-        set(state => ({
-          items: state.items.filter(item => item.productId !== productId),
-        }));
         return true;
       }
-      
-      set({ error: 'Favorilerden çıkarılamadı' });
+
+      // Rollback optimistic çıkarma.
+      set(state => ({
+        items: [...state.items, ...removed],
+        error: 'Favorilerden çıkarılamadı',
+      }));
       return false;
     }
   },

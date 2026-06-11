@@ -7,7 +7,6 @@ import {
   TouchableOpacity,
   StyleSheet,
   Image,
-  Alert,
   ActivityIndicator,
   Modal,
   FlatList,
@@ -21,7 +20,7 @@ import * as ImagePicker from 'expo-image-picker';
 import { router } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { useQueryClient } from '@tanstack/react-query';
-import { theme, DateField } from '@tarodan/ui-native';
+import { theme, DateField, appAlert } from '@tarodan/ui-native';
 
 const { colors } = theme;
 import { useAuthStore } from '../../stores/authStore';
@@ -140,7 +139,10 @@ export default function ListingForm({ mode, productId }: ListingFormProps) {
   const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');
   const [price, setPrice] = useState('');
-  const [quantity, setQuantity] = useState('');
+  const [quantity, setQuantity] = useState('1');
+  // Aktif takas/sipariş rezervasyonu (quantity − availableQuantity); alıcıların
+  // gördüğü "satışta" sayısının fiziksel stoktan neden düşük olduğunu açıklar.
+  const [reservedQty, setReservedQty] = useState(0);
   const [categoryId, setCategoryId] = useState('');
   const [condition, setCondition] = useState('very_good');
   const [brandId, setBrandId] = useState('');
@@ -218,7 +220,7 @@ export default function ListingForm({ mode, productId }: ListingFormProps) {
   useEffect(() => {
     if (authLoading || isEdit) return;
     if (!isAuthenticated) {
-      Alert.alert('Giriş Gerekli', 'İlan oluşturmak için giriş yapmalısınız.', [
+      appAlert('Giriş Gerekli', 'İlan oluşturmak için giriş yapmalısınız.', [
         { text: 'Giriş Yap', onPress: () => router.push('/(auth)/login') },
         { text: 'İptal', style: 'cancel' },
       ]);
@@ -264,6 +266,11 @@ export default function ListingForm({ mode, productId }: ListingFormProps) {
         setDescription(p.description ?? '');
         setPrice(String(onSale ? p.oldPrice : p.price ?? ''));
         setQuantity(p.quantity != null ? String(p.quantity) : '');
+        setReservedQty(
+          p.quantity != null && p.availableQuantity != null
+            ? Math.max(0, Number(p.quantity) - Number(p.availableQuantity))
+            : 0
+        );
         setCategoryId(p.category?.id ?? p.categoryId ?? '');
         setCondition(p.condition ?? 'very_good');
         setBrandId(p.brand?.id ?? '');
@@ -409,7 +416,7 @@ export default function ListingForm({ mode, productId }: ListingFormProps) {
       const cats = res.data?.data || res.data || [];
       setCategories(cats);
     } catch {
-      Alert.alert('Hata', 'Kategoriler yüklenemedi.');
+      appAlert('Hata', 'Kategoriler yüklenemedi.');
     }
   };
 
@@ -428,7 +435,7 @@ export default function ListingForm({ mode, productId }: ListingFormProps) {
       if (data.brands?.length) setBrands(data.brands);
       if (data.manufacturers?.length) setManufacturerList(data.manufacturers);
     } catch {
-      Alert.alert('Hata', 'Filtreler yüklenemedi.');
+      appAlert('Hata', 'Filtreler yüklenemedi.');
     } finally {
       setBrandsLoading(false);
     }
@@ -442,7 +449,7 @@ export default function ListingForm({ mode, productId }: ListingFormProps) {
       const data = Array.isArray(res.data) ? res.data : res.data?.data || [];
       setModels(data);
     } catch {
-      Alert.alert('Hata', 'Modeller yüklenemedi.');
+      appAlert('Hata', 'Modeller yüklenemedi.');
     } finally {
       setModelsLoading(false);
     }
@@ -496,13 +503,13 @@ export default function ListingForm({ mode, productId }: ListingFormProps) {
     const maxImages = limits?.maxImagesPerListing || 5;
     const remaining = maxImages - imageKeys.length;
     if (remaining <= 0) {
-      Alert.alert('Limit', 'Maksimum görsel sayısına ulaştınız.');
+      appAlert('Limit', 'Maksimum görsel sayısına ulaştınız.');
       return;
     }
 
     const permResult = await ImagePicker.requestMediaLibraryPermissionsAsync();
     if (!permResult.granted) {
-      Alert.alert('İzin Gerekli', 'Galeri erişim izni gerekiyor.');
+      appAlert('İzin Gerekli', 'Galeri erişim izni gerekiyor.');
       return;
     }
 
@@ -546,7 +553,7 @@ export default function ListingForm({ mode, productId }: ListingFormProps) {
       setImageUris((prev) => [...prev, ...assets.map((a, i) => newPreviewUrls[i] || a.uri)]);
     } catch (err: any) {
       const msg = err.response?.data?.message || 'Görsel yükleme başarısız.';
-      Alert.alert('Hata', msg);
+      appAlert('Hata', msg);
     } finally {
       setUploadingImages(false);
     }
@@ -615,19 +622,19 @@ export default function ListingForm({ mode, productId }: ListingFormProps) {
 
   const validate = (): boolean => {
     if (!title || title.length < 5) {
-      Alert.alert('Hata', 'Başlık en az 5 karakter olmalıdır.');
+      appAlert('Hata', 'Başlık en az 5 karakter olmalıdır.');
       return false;
     }
     if (!price || isNaN(Number(price)) || Number(price) < 1) {
-      Alert.alert('Hata', 'Geçerli bir fiyat giriniz.');
+      appAlert('Hata', 'Geçerli bir fiyat giriniz.');
       return false;
     }
     if (!categoryId) {
-      Alert.alert('Hata', 'Lütfen bir kategori seçin.');
+      appAlert('Hata', 'Lütfen bir kategori seçin.');
       return false;
     }
     if (imageKeys.length === 0) {
-      Alert.alert('Hata', 'En az bir fotoğraf ekleyin.');
+      appAlert('Hata', 'En az bir fotoğraf ekleyin.');
       return false;
     }
     return true;
@@ -637,7 +644,7 @@ export default function ListingForm({ mode, productId }: ListingFormProps) {
     if (!validate()) return;
 
     if (!isEdit && listingLimits && !listingLimits.canCreateListing) {
-      Alert.alert(
+      appAlert(
         'Limit Aşıldı',
         `İlan limitinize ulaştınız (${listingLimits.currentCount}/${listingLimits.maxListings}). Üyeliğinizi yükselterek daha fazla ilan oluşturabilirsiniz.`
       );
@@ -650,10 +657,11 @@ export default function ListingForm({ mode, productId }: ListingFormProps) {
         await productsApi.create({
           ...buildBasePayload(),
           isPreorder: false,
-          quantity: quantity ? Number(quantity) : undefined,
+          // Boş bırakılırsa 1 adet — sınırsız (null) stok bilinçli bir seçim değil, default değil.
+          quantity: quantity ? Number(quantity) : 1,
         });
 
-        Alert.alert('Başarılı', 'İlanınız oluşturuldu! Onay bekliyor.', [
+        appAlert('Başarılı', 'İlanınız oluşturuldu! Onay bekliyor.', [
           {
             text: 'Tamam',
             onPress: () => {
@@ -692,7 +700,7 @@ export default function ListingForm({ mode, productId }: ListingFormProps) {
         await productsApi.update(productId!, payload);
         invalidateListingCaches();
 
-        Alert.alert('Başarılı', 'İlan güncellendi!', [
+        appAlert('Başarılı', 'İlan güncellendi!', [
           { text: 'Tamam', onPress: () => router.back() },
         ]);
       }
@@ -701,7 +709,7 @@ export default function ListingForm({ mode, productId }: ListingFormProps) {
         err.response?.data?.message ??
         err.response?.data?.error ??
         (isEdit ? 'İlan güncellenemedi.' : 'İlan oluşturulamadı.');
-      Alert.alert('Hata', typeof msg === 'string' ? msg : 'İşlem başarısız.');
+      appAlert('Hata', typeof msg === 'string' ? msg : 'İşlem başarısız.');
     } finally {
       setIsSubmitting(false);
     }
@@ -710,7 +718,7 @@ export default function ListingForm({ mode, productId }: ListingFormProps) {
   const handleReactivate = async () => {
     const qty = Number(reactivateQuantity);
     if (!qty || qty < 1) {
-      Alert.alert('Hata', 'Geçerli bir stok miktarı giriniz.');
+      appAlert('Hata', 'Geçerli bir stok miktarı giriniz.');
       return;
     }
     setReactivating(true);
@@ -719,17 +727,17 @@ export default function ListingForm({ mode, productId }: ListingFormProps) {
       setStatus('active');
       setQuantity(String(qty));
       invalidateListingCaches();
-      Alert.alert('Başarılı', 'Ürün yeniden satışa açıldı!');
+      appAlert('Başarılı', 'Ürün yeniden satışa açıldı!');
     } catch (err: any) {
       const msg = err.response?.data?.message || 'Yeniden satışa açılamadı.';
-      Alert.alert('Hata', msg);
+      appAlert('Hata', msg);
     } finally {
       setReactivating(false);
     }
   };
 
   const handleDelete = () => {
-    Alert.alert('İlanı Sil', 'Bu ilan kalıcı olarak silinecek. Devam etmek istiyor musunuz?', [
+    appAlert('İlanı Sil', 'Bu ilan kalıcı olarak silinecek. Devam etmek istiyor musunuz?', [
       { text: 'İptal', style: 'cancel' },
       {
         text: 'Sil',
@@ -740,12 +748,12 @@ export default function ListingForm({ mode, productId }: ListingFormProps) {
             await productsApi.delete(productId!);
             invalidateListingCaches();
             await refreshUserData();
-            Alert.alert('Silindi', 'İlan silindi.', [
+            appAlert('Silindi', 'İlan silindi.', [
               { text: 'Tamam', onPress: () => router.back() },
             ]);
           } catch (err: any) {
             const msg = err.response?.data?.message || 'İlan silinemedi.';
-            Alert.alert('Hata', msg);
+            appAlert('Hata', msg);
           } finally {
             setIsSubmitting(false);
           }
@@ -758,7 +766,7 @@ export default function ListingForm({ mode, productId }: ListingFormProps) {
     setTitle('');
     setDescription('');
     setPrice('');
-    setQuantity('');
+    setQuantity('1');
     setCategoryId('');
     setCondition('very_good');
     setBrandId('');
@@ -1353,11 +1361,19 @@ export default function ListingForm({ mode, productId }: ListingFormProps) {
               style={styles.input}
               value={quantity}
               onChangeText={setQuantity}
-              placeholder="Sınırsız"
+              placeholder={isEdit ? 'Sınırsız' : '1'}
               placeholderTextColor={colors.text.subtle}
               keyboardType="number-pad"
             />
-            <Text style={styles.hint}>Boş bırakırsanız sınırsız stok</Text>
+            <Text style={styles.hint}>
+              {isEdit ? 'Boş bırakırsanız sınırsız stok' : 'Boş bırakırsanız 1 adet'}
+            </Text>
+            {isEdit && reservedQty > 0 && (
+              <Text style={styles.reservedHint}>
+                {reservedQty} adedi aktif takas/sipariş için rezerve — ilanda alıcılara{' '}
+                {Math.max(0, (Number(quantity) || 0) - reservedQty)} adet "satışta" görünür.
+              </Text>
+            )}
 
             {/* Discount (edit only) */}
             {isEdit && (
@@ -1743,6 +1759,11 @@ const styles = StyleSheet.create({
   hint: {
     fontSize: 12,
     color: colors.text.subtle,
+    marginTop: 4,
+  },
+  reservedHint: {
+    fontSize: 12,
+    color: colors.warning[700]!,
     marginTop: 4,
   },
 

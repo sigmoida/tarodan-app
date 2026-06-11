@@ -4,7 +4,8 @@
  * Strateji: docs/superpowers/specs/mobile-test-strategy.md
  */
 import React from 'react';
-import { Alert } from 'react-native';
+import { appAlert } from '@tarodan/ui-native';
+import {  } from 'react-native';
 import { screen, fireEvent, waitFor } from '@testing-library/react-native';
 import MakeOfferModal from '../MakeOfferModal';
 import { renderWithProviders } from '../../../test-utils';
@@ -37,7 +38,7 @@ function renderModal(props: Partial<React.ComponentProps<typeof MakeOfferModal>>
 describe('MakeOfferModal', () => {
   beforeEach(() => {
     createMock.mockClear();
-    jest.spyOn(Alert, 'alert').mockImplementation(() => {});
+    (appAlert as jest.Mock).mockImplementation(() => {});
   });
 
   it('boş tutarda Teklif Gönder devre dışı', () => {
@@ -67,7 +68,7 @@ describe('MakeOfferModal', () => {
     fireEvent.press(screen.getByTestId('offer-submit-button'));
 
     await waitFor(() =>
-      expect(Alert.alert).toHaveBeenCalledWith(
+      expect(appAlert).toHaveBeenCalledWith(
         'Düşük Tutar',
         expect.stringContaining('Minimum teklif'),
       ),

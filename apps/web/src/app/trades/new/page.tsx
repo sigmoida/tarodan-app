@@ -90,7 +90,8 @@ export default function NewTradePage() {
       setTargetProduct(productData);
       
       // Fetch my trade-enabled products
-      const myProductsRes = await userApi.getMyProducts();
+      // tradeEligible: aktif takasta olan veya müsait stoğu olmayan ürünler backend'de elenir
+      const myProductsRes = await userApi.getMyProducts({ status: 'active', tradeEligible: true });
       const products = myProductsRes.data.data || myProductsRes.data.products || [];
       // Filter only active and trade-enabled products
       const tradeableProducts = products.filter((p: Product) => 

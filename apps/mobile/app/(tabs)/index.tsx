@@ -296,7 +296,7 @@ export default function HomeScreen() {
             {(isTradeEnabled || item.isBoosted || item.boostedUntil) && (
               <View style={styles.topLeftStack}>
                 {isTradeEnabled && (
-                  <View style={[styles.badge, { backgroundColor: colors.success[600]! }]}>
+                  <View style={[styles.badge, { backgroundColor: colors.success[500]! }]}>
                     <Ionicons name="swap-horizontal" size={10} color={colors.white} />
                     <Text variant="caption" tone="inverted" weight="bold">
                       {' '}Takas
@@ -634,7 +634,7 @@ export default function HomeScreen() {
             <View style={styles.sectionHeader}>
               <View style={styles.sectionTitleContainer}>
                 <View style={styles.sectionIndicator} />
-                <Text style={styles.sectionTitle}>Tüm İlanlar ({products.length})</Text>
+                <Text style={styles.sectionTitle}>Tüm İlanlar</Text>
               </View>
               <TouchableOpacity onPress={() => router.push('/search')}>
                 <Text style={styles.seeAllText}>Tümünü gör {'>'}</Text>
@@ -661,9 +661,6 @@ export default function HomeScreen() {
                   <Text style={styles.businessBadgeText}>👑 Business</Text>
                 </View>
               </View>
-              <TouchableOpacity onPress={() => router.push('/search')}>
-                <Text style={styles.seeAllText}>Tümünü gör {'>'}</Text>
-              </TouchableOpacity>
             </View>
             <View style={styles.companyCard}>
               {/* Company Profile */}

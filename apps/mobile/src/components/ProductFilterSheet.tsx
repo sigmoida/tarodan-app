@@ -37,6 +37,7 @@ type Props = {
   onClear: () => void;
   options: ProductFilterOptions;
   resultCount: number;
+  countLoading?: boolean;
 };
 
 const PRICE_PRESETS: { label: string; min: string; max: string }[] = [
@@ -85,6 +86,7 @@ export default function ProductFilterSheet({
   onClear,
   options,
   resultCount,
+  countLoading,
 }: Props) {
   const [brandSearch, setBrandSearch] = useState('');
   const [modelSearch, setModelSearch] = useState('');
@@ -459,7 +461,7 @@ export default function ProductFilterSheet({
           <Button variant="outline" title="Temizle" onPress={onClear} style={styles.footerBtn} />
           <Button
             variant="primary"
-            title={`${resultCount} Sonuç Göster`}
+            title={countLoading ? 'Sonuçlar yükleniyor…' : `${resultCount} Sonuç Göster`}
             onPress={onClose}
             style={{ ...styles.footerBtn, flex: 2 }}
           />

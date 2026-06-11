@@ -28,7 +28,7 @@ export class BannedUserGuard implements CanActivate {
     // Check if user is banned
     const dbUser = await this.prisma.user.findUnique({
       where: { id: user.id },
-      select: { isBanned: true },
+      select: { isBanned: true, bannedReason: true },
     });
 
     if (!dbUser) {
@@ -36,7 +36,7 @@ export class BannedUserGuard implements CanActivate {
     }
 
     if (dbUser.isBanned) {
-      // Allow logout and support ticket creation
+      // Allow logout and support ticket flow
       const path = request.url;
       const method = request.method;
 
@@ -45,18 +45,21 @@ export class BannedUserGuard implements CanActivate {
         return true;
       }
 
-      // Allow POST /support-tickets (create support ticket)
-      if (path.includes('/support-tickets') && method === 'POST') {
+      // Allow the whole support ticket flow (create, list own, view, reply)
+      // so banned users can reach the support team. SupportController prefix: /support
+      if (path.includes('/support/tickets') || path.includes('/support/contact')) {
         return true;
       }
 
-      // Allow GET /support-tickets/:id (view own tickets)
-      if (path.includes('/support-tickets') && method === 'GET' && path.match(/\/support-tickets\/[^\/]+$/)) {
-        return true;
-      }
-
-      // Block all other requests
-      throw new ForbiddenException('Hesabınız banlanmış. Destek ekibiyle iletişime geçin.');
+      // Block all other requests. errorCode lets clients distinguish a ban
+      // from other 403s and route the user to the dedicated banned screen.
+      throw new ForbiddenException({
+        statusCode: 403,
+        error: 'Forbidden',
+        message: 'Hesabınız banlanmış. Destek ekibiyle iletişime geçin.',
+        errorCode: 'USER_BANNED',
+        bannedReason: dbUser.bannedReason ?? null,
+      });
     }
 
     return true;

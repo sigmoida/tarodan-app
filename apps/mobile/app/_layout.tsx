@@ -1,11 +1,13 @@
 import { useEffect, useState } from 'react';
 import { Stack } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
-import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import { QueryClientProvider } from '@tanstack/react-query';
 import * as SplashScreen from 'expo-splash-screen';
 import Constants from 'expo-constants';
-import { theme } from '@tarodan/ui-native';
+import { theme, AlertDialogHost } from '@tarodan/ui-native';
 import { useAuthStore } from '../src/stores/authStore';
+// Paylaşılan QueryClient — logout'ta resetUserStores aynı örneği temizler.
+import { queryClient } from '../src/lib/queryClient';
 import { registerForPushNotifications, setupPushNotificationRouting } from '../src/services/push';
 import { LanguageProvider } from '../src/i18n';
 import { initSentry } from '../src/services/sentry';
@@ -30,16 +32,6 @@ if (!isExpoGo) {
     console.log('⚠️ expo-notifications not available');
   }
 }
-
-// Query client
-const queryClient = new QueryClient({
-  defaultOptions: {
-    queries: {
-      staleTime: 1000 * 60 * 5,
-      retry: 2,
-    },
-  },
-});
 
 // Prevent splash screen from hiding
 SplashScreen.preventAutoHideAsync();
@@ -113,6 +105,8 @@ export default function RootLayout() {
         </Stack>
         {/* Kurumsal hesap business üyelik yoksa üyelik sayfasına yönlendirir (web ile aynı). */}
         <BusinessMembershipGuard />
+        {/* Native Alert.alert yerine temalı dialog — appAlert() bu host'u kullanır. */}
+        <AlertDialogHost />
         {!splashDone && (
           <AnimatedSplash appReady={appReady} onFinish={() => setSplashDone(true)} />
         )}

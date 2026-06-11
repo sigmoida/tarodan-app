@@ -5,7 +5,6 @@ import {
   TouchableOpacity,
   StyleSheet,
   ActivityIndicator,
-  Alert,
   Image,
   RefreshControl,
   Modal,
@@ -16,7 +15,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { router, useLocalSearchParams } from 'expo-router';
 import { useQueryClient } from '@tanstack/react-query';
 import { Ionicons } from '@expo/vector-icons';
-import { theme, ScreenHeader } from '@tarodan/ui-native';
+import { theme, ScreenHeader, appAlert } from '@tarodan/ui-native';
 import { useAuthStore } from '../../src/stores/authStore';
 import { offersApi, ordersApi } from '../../src/services/api';
 import { transformImageUrl } from '../../src/utils/imageUrl';
@@ -151,7 +150,7 @@ export default function OffersScreen() {
       const data = res.data?.data || res.data?.offers || [];
       setOffers(data);
     } catch (err) {
-      Alert.alert('Hata', formatApiErrorMessage(err, 'Teklifler yüklenirken bir hata oluştu'));
+      appAlert('Hata', formatApiErrorMessage(err, 'Teklifler yüklenirken bir hata oluştu'));
     }
   }, [activeTab]);
 
@@ -212,10 +211,10 @@ export default function OffersScreen() {
     try {
       await offersApi.accept(offerId);
       invalidateOfferRelatedCaches();
-      Alert.alert('Başarılı', 'Teklif kabul edildi');
+      appAlert('Başarılı', 'Teklif kabul edildi');
       await fetchOffers();
     } catch (err: unknown) {
-      Alert.alert('Hata', formatApiErrorMessage(err, 'Teklif kabul edilirken hata oluştu'));
+      appAlert('Hata', formatApiErrorMessage(err, 'Teklif kabul edilirken hata oluştu'));
     } finally {
       setActionLoading(null);
     }
@@ -226,10 +225,10 @@ export default function OffersScreen() {
     try {
       await offersApi.reject(offerId);
       invalidateOfferRelatedCaches();
-      Alert.alert('Başarılı', 'Teklif reddedildi');
+      appAlert('Başarılı', 'Teklif reddedildi');
       await fetchOffers();
     } catch (err: unknown) {
-      Alert.alert('Hata', formatApiErrorMessage(err, 'Teklif reddedilirken hata oluştu'));
+      appAlert('Hata', formatApiErrorMessage(err, 'Teklif reddedilirken hata oluştu'));
     } finally {
       setActionLoading(null);
     }
@@ -240,10 +239,10 @@ export default function OffersScreen() {
     try {
       await offersApi.cancel(offerId);
       invalidateOfferRelatedCaches();
-      Alert.alert('Başarılı', 'Teklif iptal edildi');
+      appAlert('Başarılı', 'Teklif iptal edildi');
       await fetchOffers();
     } catch (err: unknown) {
-      Alert.alert('Hata', formatApiErrorMessage(err, 'Teklif iptal edilirken hata oluştu'));
+      appAlert('Hata', formatApiErrorMessage(err, 'Teklif iptal edilirken hata oluştu'));
     } finally {
       setActionLoading(null);
     }
@@ -261,16 +260,16 @@ export default function OffersScreen() {
     if (!counterOfferId) return;
     const amount = parseFloat(counterAmount.replace(',', '.'));
     if (isNaN(amount) || amount <= 0) {
-      Alert.alert('Hata', 'Geçerli bir tutar girin');
+      appAlert('Hata', 'Geçerli bir tutar girin');
       return;
     }
     // API kuralı: karşı teklif mevcut tekliften YÜKSEK, ürün fiyatından DÜŞÜK/eşit olmalı.
     if (amount <= counterRefAmount) {
-      Alert.alert('Hata', `Karşı teklif, mevcut tekliften (₺${counterRefAmount.toLocaleString('tr-TR')}) yüksek olmalıdır`);
+      appAlert('Hata', `Karşı teklif, mevcut tekliften (₺${counterRefAmount.toLocaleString('tr-TR')}) yüksek olmalıdır`);
       return;
     }
     if (counterMaxPrice > 0 && amount > counterMaxPrice) {
-      Alert.alert('Hata', `Karşı teklif, ürün fiyatından (₺${counterMaxPrice.toLocaleString('tr-TR')}) yüksek olamaz`);
+      appAlert('Hata', `Karşı teklif, ürün fiyatından (₺${counterMaxPrice.toLocaleString('tr-TR')}) yüksek olamaz`);
       return;
     }
     setActionLoading(counterOfferId);
@@ -278,10 +277,10 @@ export default function OffersScreen() {
     try {
       await offersApi.counter(counterOfferId, amount);
       invalidateOfferRelatedCaches();
-      Alert.alert('Başarılı', 'Karşı teklif gönderildi');
+      appAlert('Başarılı', 'Karşı teklif gönderildi');
       await fetchOffers();
     } catch (err: unknown) {
-      Alert.alert('Hata', formatApiErrorMessage(err, 'Karşı teklif gönderilirken hata oluştu'));
+      appAlert('Hata', formatApiErrorMessage(err, 'Karşı teklif gönderilirken hata oluştu'));
     } finally {
       setActionLoading(null);
       setCounterOfferId(null);
@@ -299,11 +298,11 @@ export default function OffersScreen() {
     if (!buyerCounterOfferId || buyerCounterRefAmount == null) return;
     const amount = parseFloat(buyerCounterAmount.replace(',', '.'));
     if (isNaN(amount) || amount <= 0) {
-      Alert.alert('Hata', 'Geçerli bir tutar girin');
+      appAlert('Hata', 'Geçerli bir tutar girin');
       return;
     }
     if (amount >= buyerCounterRefAmount) {
-      Alert.alert(
+      appAlert(
         'Hata',
         `Satıcının karşı teklifi ₺${buyerCounterRefAmount.toLocaleString('tr-TR')}. Yeni tutar bundan düşük olmalıdır.`,
       );
@@ -314,10 +313,10 @@ export default function OffersScreen() {
     try {
       await offersApi.buyerCounter(buyerCounterOfferId, amount);
       invalidateOfferRelatedCaches();
-      Alert.alert('Başarılı', 'Karşı teklifiniz gönderildi; satıcı yanıtlayacak');
+      appAlert('Başarılı', 'Karşı teklifiniz gönderildi; satıcı yanıtlayacak');
       await fetchOffers();
     } catch (err: unknown) {
-      Alert.alert('Hata', formatApiErrorMessage(err, 'Karşı teklif gönderilirken hata oluştu'));
+      appAlert('Hata', formatApiErrorMessage(err, 'Karşı teklif gönderilirken hata oluştu'));
     } finally {
       setActionLoading(null);
       setBuyerCounterOfferId(null);
@@ -605,11 +604,9 @@ export default function OffersScreen() {
   );
 
   return (
-    <SafeAreaView style={styles.safeArea} edges={['top']}>
+    <View style={styles.safeArea}>
       <ScreenHeader
         title="Tekliflerim"
-        subtitle="Tekliflerinizi yönetin"
-        variant="light"
         onBack={() => router.back()}
       />
 
@@ -732,7 +729,7 @@ export default function OffersScreen() {
           </View>
         </View>
       </Modal>
-    </SafeAreaView>
+    </View>
   );
 }
 

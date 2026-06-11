@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Alert, Pressable, StyleSheet } from 'react-native';
+import { Pressable, StyleSheet } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useForm, Controller } from 'react-hook-form';
@@ -15,6 +15,7 @@ import {
   Screen,
   Text,
   VStack,
+  appAlert,
 } from '@tarodan/ui-native';
 import { authApi } from '../../src/services/api';
 import { useAuthStore } from '../../src/stores/authStore';
@@ -83,7 +84,7 @@ export default function LoginScreen() {
         const isBusinessTier = String(membershipTier).toLowerCase().includes('business');
         const hasBusinessInfo = !!(currentUser?.companyName && currentUser?.taxId);
         if (hasBusinessInfo && !isBusinessTier) {
-          Alert.alert(
+          appAlert(
             'Kurumsal Üyelik',
             'İşletme bilgilerinizi tamamlamışsınız. Kurumsal üyeliğe geçerek avantajlardan yararlanabilirsiniz.',
             [
@@ -116,11 +117,11 @@ export default function LoginScreen() {
   const resendVerificationMutation = useMutation({
     mutationFn: () => authApi.resendVerification(unverifiedEmail ?? getValues('email')),
     onSuccess: () => {
-      Alert.alert('Gönderildi', 'Doğrulama bağlantısı e-posta adresinize tekrar gönderildi.');
+      appAlert('Gönderildi', 'Doğrulama bağlantısı e-posta adresinize tekrar gönderildi.');
     },
     onError: (e: unknown) => {
       const err = e as { response?: { data?: { message?: string } } };
-      Alert.alert('Hata', err?.response?.data?.message || 'Doğrulama bağlantısı gönderilemedi.');
+      appAlert('Hata', err?.response?.data?.message || 'Doğrulama bağlantısı gönderilemedi.');
     },
   });
 

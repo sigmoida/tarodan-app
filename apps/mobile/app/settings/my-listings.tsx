@@ -1,4 +1,4 @@
-import { View, ScrollView, StyleSheet, Pressable, Image, RefreshControl, Alert } from 'react-native';
+import { View, ScrollView, StyleSheet, Pressable, Image, RefreshControl } from 'react-native';
 import {
   FAB,
   Chip,
@@ -12,6 +12,7 @@ import {
   Text,
   ScreenHeader,
   theme,
+  appAlert,
 } from '@tarodan/ui-native';
 import { useState, useCallback } from 'react';
 import { router, useFocusEffect } from 'expo-router';
@@ -102,10 +103,10 @@ export default function MyListingsScreen() {
       queryClient.invalidateQueries({ queryKey: ['my-listings-stats'] });
       queryClient.invalidateQueries({ queryKey: ['user-stats'] });
       refreshUserData();
-      Alert.alert('Başarılı', 'İlan deaktif edildi');
+      appAlert('Başarılı', 'İlan deaktif edildi');
     },
     onError: () => {
-      Alert.alert('Hata', 'İlan deaktif edilemedi');
+      appAlert('Hata', 'İlan deaktif edilemedi');
     },
   });
 
@@ -119,10 +120,10 @@ export default function MyListingsScreen() {
       queryClient.invalidateQueries({ queryKey: ['my-listings-stats'] });
       queryClient.invalidateQueries({ queryKey: ['user-stats'] });
       refreshUserData();
-      Alert.alert('Başarılı', 'İlan tekrar aktif edildi');
+      appAlert('Başarılı', 'İlan tekrar aktif edildi');
     },
     onError: () => {
-      Alert.alert('Hata', 'İlan aktif edilemedi');
+      appAlert('Hata', 'İlan aktif edilemedi');
     },
   });
 
@@ -138,10 +139,10 @@ export default function MyListingsScreen() {
       refreshUserData();
       setDeleteDialogVisible(false);
       setSelectedListing(null);
-      Alert.alert('Başarılı', 'İlan silindi');
+      appAlert('Başarılı', 'İlan silindi');
     },
     onError: () => {
-      Alert.alert('Hata', 'İlan silinemedi');
+      appAlert('Hata', 'İlan silinemedi');
     },
   });
 
@@ -155,10 +156,10 @@ export default function MyListingsScreen() {
       queryClient.invalidateQueries({ queryKey: ['my-listings-stats'] });
       queryClient.invalidateQueries({ queryKey: ['user-stats'] });
       refreshUserData();
-      Alert.alert('Başarılı', 'İlan yeniden yayınlandı');
+      appAlert('Başarılı', 'İlan yeniden yayınlandı');
     },
     onError: () => {
-      Alert.alert('Hata', 'İlan yeniden yayınlanamadı. İlan limitinizi kontrol edin.');
+      appAlert('Hata', 'İlan yeniden yayınlanamadı. İlan limitinizi kontrol edin.');
     },
   });
 
@@ -219,7 +220,7 @@ export default function MyListingsScreen() {
         router.push(`/product/${listing.id}`);
         break;
       case 'deactivate':
-        Alert.alert(
+        appAlert(
           'İlanı Deaktif Et',
           'Bu ilan pasif hale getirilecek. Devam etmek istiyor musunuz?',
           [
@@ -237,7 +238,7 @@ export default function MyListingsScreen() {
       case 'relist':
         // Check listing limit before relisting
         if (limits?.maxListings !== -1 && (user?.listingCount || 0) >= (limits?.maxListings || 10)) {
-          Alert.alert(
+          appAlert(
             'İlan Limiti',
             'İlan limitinize ulaştınız. Yeniden yayınlamak için Premium üyeliğe geçin.',
             [

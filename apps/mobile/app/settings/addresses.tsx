@@ -1,4 +1,4 @@
-import { View, ScrollView, StyleSheet, Pressable, Alert } from 'react-native';
+import { View, ScrollView, StyleSheet, Pressable } from 'react-native';
 import {
   Card,
   Button,
@@ -10,8 +10,10 @@ import {
   Text,
   ScreenHeader,
   theme,
+  appAlert,
 } from '@tarodan/ui-native';
-import { CityDistrictSelector, ThemedRefreshControl } from '../../src/components/common';
+import { CityDistrictSelector, PhoneInput, ThemedRefreshControl } from '../../src/components/common';
+import { DEFAULT_COUNTRY_CODE, normalizePhoneForPayload, splitPhone } from '../../src/utils/phone';
 import { useRefresh } from '../../src/hooks/useRefresh';
 import { useState, useCallback } from 'react';
 import { router, useFocusEffect } from 'expo-router';
@@ -46,6 +48,7 @@ export default function AddressesScreen() {
     title: '',
     fullName: '',
     phone: '',
+    phoneCountryCode: DEFAULT_COUNTRY_CODE,
     address: '',
     city: '',
     district: '',
@@ -53,7 +56,7 @@ export default function AddressesScreen() {
     isDefault: false,
   });
 
-  const maxAddresses = limits?.maxAddresses || 3;
+  const maxAddresses = limits?.maxAddresses || 10;
 
   // Fetch addresses
   const { data: addressesData, isLoading, refetch } = useQuery({
@@ -87,8 +90,13 @@ export default function AddressesScreen() {
   const saveMutation = useMutation({
     mutationFn: async (data: typeof formData) => {
       // API CreateAddressDto `zipCode` bekliyor (postalCode değil) — eşle, yoksa posta kodu kaybolur.
-      const { postalCode, ...rest } = data;
-      const payload = { ...rest, zipCode: postalCode };
+      // phoneCountryCode DTO'da yok; telefonu "+90…" olarak normalize edip payload'dan çıkar.
+      const { postalCode, phoneCountryCode, ...rest } = data;
+      const payload = {
+        ...rest,
+        phone: normalizePhoneForPayload(data.phone, phoneCountryCode),
+        zipCode: postalCode,
+      };
       if (editingAddress) {
         return api.patch(`/users/me/addresses/${editingAddress.id}`, payload);
       } else {
@@ -99,11 +107,11 @@ export default function AddressesScreen() {
       queryClient.invalidateQueries({ queryKey: ['addresses'] });
       setDialogVisible(false);
       resetForm();
-      Alert.alert('Başarılı', editingAddress ? 'Adres güncellendi' : 'Adres eklendi');
+      appAlert('Başarılı', editingAddress ? 'Adres güncellendi' : 'Adres eklendi');
     },
     onError: (err: any) => {
       const msg = err?.response?.data?.message;
-      Alert.alert('Hata', Array.isArray(msg) ? msg.join('\n') : msg || 'Adres kaydedilemedi');
+      appAlert('Hata', Array.isArray(msg) ? msg.join('\n') : msg || 'Adres kaydedilemedi');
     },
   });
 
@@ -114,10 +122,11 @@ export default function AddressesScreen() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['addresses'] });
-      Alert.alert('Başarılı', 'Adres silindi');
+      appAlert('Başarılı', 'Adres silindi');
     },
-    onError: () => {
-      Alert.alert('Hata', 'Adres silinemedi');
+    onError: (err: any) => {
+      const msg = err?.response?.data?.message;
+      appAlert('Hata', Array.isArray(msg) ? msg.join('\n') : msg || 'Adres silinemedi');
     },
   });
 
@@ -136,6 +145,7 @@ export default function AddressesScreen() {
       title: '',
       fullName: '',
       phone: '',
+      phoneCountryCode: DEFAULT_COUNTRY_CODE,
       address: '',
       city: '',
       district: '',
@@ -147,7 +157,7 @@ export default function AddressesScreen() {
 
   const openAddDialog = () => {
     if (addresses.length >= maxAddresses) {
-      Alert.alert(
+      appAlert(
         'Adres Limiti',
         `Ücretsiz üyeler en fazla ${maxAddresses} adres kaydedebilir. Premium üyelikle daha fazla adres ekleyin.`,
         [
@@ -163,10 +173,12 @@ export default function AddressesScreen() {
 
   const openEditDialog = (address: Address) => {
     setEditingAddress(address);
+    const { countryCode, phone } = splitPhone(address.phone);
     setFormData({
       title: address.title,
       fullName: address.fullName,
-      phone: address.phone,
+      phone,
+      phoneCountryCode: countryCode,
       address: address.address,
       city: address.city,
       district: address.district,
@@ -177,7 +189,7 @@ export default function AddressesScreen() {
   };
 
   const handleDelete = (address: Address) => {
-    Alert.alert(
+    appAlert(
       'Adresi Sil',
       `"${address.title}" adresini silmek istediğinize emin misiniz?`,
       [
@@ -189,16 +201,16 @@ export default function AddressesScreen() {
 
   const handleSubmit = () => {
     if (!formData.title || !formData.fullName || !formData.phone || !formData.address || !formData.city || !formData.district) {
-      Alert.alert('Hata', 'Lütfen zorunlu alanları doldurun (ilçe dahil)');
+      appAlert('Hata', 'Lütfen zorunlu alanları doldurun (ilçe dahil)');
       return;
     }
     // API DTO kuralları — client-side önden uygula (yoksa ham 400 "Adres kaydedilemedi")
     if (formData.address.trim().length < 10) {
-      Alert.alert('Hata', 'Adres en az 10 karakter olmalıdır');
+      appAlert('Hata', 'Adres en az 10 karakter olmalıdır');
       return;
     }
     if (formData.phone.replace(/\D/g, '').length < 10) {
-      Alert.alert('Hata', 'Geçerli bir telefon numarası giriniz (en az 10 hane)');
+      appAlert('Hata', 'Geçerli bir telefon numarası giriniz (en az 10 hane)');
       return;
     }
     saveMutation.mutate(formData);
@@ -328,11 +340,12 @@ export default function AddressesScreen() {
             onChangeText={(text) => setFormData({ ...formData, fullName: text })}
             containerStyle={styles.input}
           />
-          <Input
+          <PhoneInput
             label="Telefon *"
-            value={formData.phone}
-            onChangeText={(text) => setFormData({ ...formData, phone: text })}
-            keyboardType="phone-pad"
+            countryCode={formData.phoneCountryCode}
+            onCountryCodeChange={(code) => setFormData({ ...formData, phoneCountryCode: code })}
+            phone={formData.phone}
+            onPhoneChange={(phone) => setFormData({ ...formData, phone })}
             containerStyle={styles.input}
           />
           <Input

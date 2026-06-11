@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { View, ScrollView, StyleSheet, TouchableOpacity, Alert } from 'react-native';
+import { View, ScrollView, StyleSheet, TouchableOpacity } from 'react-native';
 import {
   Button,
   Card,
@@ -10,6 +10,7 @@ import {
   Text,
   theme,
   ScreenHeader,
+  appAlert,
 } from '@tarodan/ui-native';
 import { router } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
@@ -69,14 +70,14 @@ export default function SecuritySettingsScreen() {
 
   const handlePasswordChange = async () => {
     if (newPassword !== confirmPassword) {
-      Alert.alert('Hata', 'Şifreler eşleşmiyor');
+      appAlert('Hata', 'Şifreler eşleşmiyor');
       return;
     }
 
     // API ChangePasswordDto ile birebir aynı kural — yoksa ham 400 dönüyordu
     const strongPassword = /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[@$!%*?&])[A-Za-z\d@$!%*?&]{8,}$/;
     if (!strongPassword.test(newPassword)) {
-      Alert.alert(
+      appAlert(
         'Hata',
         'Şifre en az 8 karakter, bir büyük harf, bir küçük harf, bir rakam ve bir özel karakter (@$!%*?&) içermelidir'
       );
@@ -86,13 +87,13 @@ export default function SecuritySettingsScreen() {
     setLoading(true);
     try {
       await authApi.changePassword(currentPassword, newPassword);
-      Alert.alert('Başarılı', 'Şifreniz değiştirildi');
+      appAlert('Başarılı', 'Şifreniz değiştirildi');
       setShowPasswordDialog(false);
       setCurrentPassword('');
       setNewPassword('');
       setConfirmPassword('');
     } catch (error: any) {
-      Alert.alert('Hata', error.response?.data?.message || 'Şifre değiştirilemedi');
+      appAlert('Hata', error.response?.data?.message || 'Şifre değiştirilemedi');
     } finally {
       setLoading(false);
     }
@@ -107,7 +108,7 @@ export default function SecuritySettingsScreen() {
       setTotpQr(payload.qrCode ?? '');
       setShowTwoFactorSetup(true);
     } catch (error: any) {
-      Alert.alert('Hata', error.response?.data?.message || '2FA kurulumu başarısız');
+      appAlert('Hata', error.response?.data?.message || '2FA kurulumu başarısız');
     } finally {
       setLoading(false);
     }
@@ -115,7 +116,7 @@ export default function SecuritySettingsScreen() {
 
   const handleVerifyTwoFactor = async () => {
     if (verificationCode.length !== 6) {
-      Alert.alert('Hata', 'Lütfen 6 haneli doğrulama kodunu girin');
+      appAlert('Hata', 'Lütfen 6 haneli doğrulama kodunu girin');
       return;
     }
 
@@ -125,9 +126,9 @@ export default function SecuritySettingsScreen() {
       setTwoFactorEnabled(true);
       setShowTwoFactorSetup(false);
       setVerificationCode('');
-      Alert.alert('Başarılı', 'İki faktörlü doğrulama aktifleştirildi');
+      appAlert('Başarılı', 'İki faktörlü doğrulama aktifleştirildi');
     } catch (error: any) {
-      Alert.alert('Hata', error.response?.data?.message || 'Doğrulama başarısız');
+      appAlert('Hata', error.response?.data?.message || 'Doğrulama başarısız');
     } finally {
       setLoading(false);
     }
@@ -141,7 +142,7 @@ export default function SecuritySettingsScreen() {
 
   const confirmDisableTwoFactor = async () => {
     if (disableCode.length !== 6) {
-      Alert.alert('Hata', 'Lütfen 6 haneli doğrulama kodunu girin');
+      appAlert('Hata', 'Lütfen 6 haneli doğrulama kodunu girin');
       return;
     }
     setLoading(true);
@@ -150,9 +151,9 @@ export default function SecuritySettingsScreen() {
       setTwoFactorEnabled(false);
       setShowDisableDialog(false);
       setDisableCode('');
-      Alert.alert('Başarılı', 'İki faktörlü doğrulama kapatıldı');
+      appAlert('Başarılı', 'İki faktörlü doğrulama kapatıldı');
     } catch (error: any) {
-      Alert.alert('Hata', error.response?.data?.message || 'İşlem başarısız');
+      appAlert('Hata', error.response?.data?.message || 'İşlem başarısız');
     } finally {
       setLoading(false);
     }
@@ -160,7 +161,7 @@ export default function SecuritySettingsScreen() {
 
   const handleRegenerateBackupCodes = async () => {
     if (regenerateCode.length !== 6) {
-      Alert.alert('Hata', 'Lütfen 6 haneli doğrulama kodunu girin');
+      appAlert('Hata', 'Lütfen 6 haneli doğrulama kodunu girin');
       return;
     }
     setLoading(true);
@@ -171,14 +172,14 @@ export default function SecuritySettingsScreen() {
       setNewBackupCodes(codes);
       setRegenerateCode('');
     } catch (error: any) {
-      Alert.alert('Hata', error.response?.data?.message || 'Yedek kodlar yenilenemedi');
+      appAlert('Hata', error.response?.data?.message || 'Yedek kodlar yenilenemedi');
     } finally {
       setLoading(false);
     }
   };
 
   const handleLogoutAllDevices = () => {
-    Alert.alert(
+    appAlert(
       'Tüm Cihazlardan Çıkış',
       'Tüm cihazlardan çıkış yapılacak ve tekrar giriş yapmanız gerekecek.',
       [
@@ -192,7 +193,7 @@ export default function SecuritySettingsScreen() {
               logout();
               router.replace('/(auth)/login');
             } catch (error) {
-              Alert.alert('Hata', 'İşlem başarısız');
+              appAlert('Hata', 'İşlem başarısız');
             }
           },
         },

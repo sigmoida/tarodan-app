@@ -12,13 +12,14 @@ import {
 } from '@tarodan/ui-native';
 import { useMessagesStore } from '../../src/stores/messagesStore';
 import { useAuthStore } from '../../src/stores/authStore';
+import { formatMessagePreview } from '../../src/utils/contentFilter';
 import { TarodanColors } from '../../src/theme';
 
 const { colors } = theme;
 
 export default function MessagesTabScreen() {
   const { isAuthenticated, user, limits } = useAuthStore();
-  const { threads, isLoading, fetchThreads, getUnreadCount, getOtherParticipant, dailyMessageCount } = useMessagesStore();
+  const { threads, isLoading, hasLoadedThreads, fetchThreads, getUnreadCount, getOtherParticipant, dailyMessageCount } = useMessagesStore();
   const [refreshing, setRefreshing] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
 
@@ -129,8 +130,9 @@ export default function MessagesTabScreen() {
         />
       </View>
 
-      {/* Content */}
-      {isLoading && threads.length === 0 ? (
+      {/* Content — ilk yükleme bitene dek spinner; "Henüz mesaj yok" boş ekranı
+          fetch başlamadan bir an çakıp zıplamaya yol açmasın. */}
+      {threads.length === 0 && (isLoading || !hasLoadedThreads) ? (
         <View style={styles.loadingContainer}>
           <Spinner size="lg" />
         </View>
@@ -214,7 +216,7 @@ export default function MessagesTabScreen() {
                     style={styles.lastMessage}
                   >
                     {thread.lastMessage?.senderId === user?.id ? 'Sen: ' : ''}
-                    {thread.lastMessage?.content || 'Henüz mesaj yok'}
+                    {formatMessagePreview(thread.lastMessage?.content ?? '') || 'Henüz mesaj yok'}
                   </Text>
                 </View>
 
@@ -246,7 +248,8 @@ const styles = StyleSheet.create({
     padding: 32,
   },
   header: {
-    backgroundColor: TarodanColors.primary,
+    // Ana sayfa header'ı ile aynı turuncu (colors.primary[600]).
+    backgroundColor: colors.primary[600]!,
     paddingTop: 50,
     paddingBottom: 16,
     paddingHorizontal: 20,

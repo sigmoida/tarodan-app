@@ -45,6 +45,20 @@ interface Order {
   hasSellerRating?: boolean;
 }
 
+/** Çok ürünlü sipariş grubu (tek checkout = tek kart, ürün başına ayrı kargo) */
+interface OrderGroup {
+  id: string;
+  groupNumber: string;
+  totalAmount: number;
+  status: string; // UiOrderStatus | 'mixed'
+  createdAt: string;
+  orders: Order[];
+}
+
+type OrderListEntry =
+  | { kind: 'order'; order: Order }
+  | { kind: 'group'; group: OrderGroup };
+
 type FilterType = 'all' | 'pending' | 'processing' | 'shipped' | 'delivered' | 'completed';
 
 // UI status keys -> StatusBadge config (matches semantic Badge variants)
@@ -58,6 +72,7 @@ const uiOrderStatusConfig: Record<string, { label: string; variant: BadgeVariant
   completed: { label: 'Tamamlandı', variant: 'success' },
   cancelled: { label: 'İptal', variant: 'danger' },
   refunded: { label: 'İade', variant: 'secondary' },
+  mixed: { label: 'Karışık Durum', variant: 'info' },
 };
 
 const getStatusText = (status: UiOrderStatus) =>
@@ -79,10 +94,51 @@ export default function OrdersScreen() {
     variant: 'default',
   });
 
-  // Fetch orders
+  const normalizeOrder = (rawOrder: any): Order => ({
+    ...rawOrder,
+    status: apiStatusToUi(rawOrder.status),
+    totalAmount: Number(rawOrder.totalAmount ?? rawOrder.amount ?? 0),
+    product: {
+      ...(rawOrder.product || {}),
+      id: rawOrder.product?.id ?? '',
+      title: rawOrder.product?.title ?? '',
+      images: rawOrder.product?.images,
+      imageUrl: rawOrder.product?.imageUrl,
+    },
+  });
+
+  // Fetch orders.
+  // Alıcı + "Tümü": gruplu liste (tek checkout = tek kart, çok ürün destekli).
+  // Diğer filtreler ve satıcı sekmesi: düz sipariş listesi (durum filtreli).
+  const useGroupedList = role === 'buyer' && filter === 'all';
   const { data: ordersData, isLoading, refetch, error: ordersError } = useQuery({
     queryKey: ['orders', role, filter],
-    queryFn: async () => {
+    queryFn: async (): Promise<OrderListEntry[]> => {
+      if (useGroupedList) {
+        const response = await ordersApi.getGroups({ limit: 50, page: 1 });
+        const raw = response.data?.data ?? response.data;
+        const list = Array.isArray(raw) ? raw : [];
+        return list.map((rawGroup: any): OrderListEntry => {
+          const groupOrders: Order[] = (rawGroup.orders || []).map(normalizeOrder);
+          // Tek ürünlü grup → klasik sipariş kartı (mevcut UX korunur)
+          if (groupOrders.length === 1) {
+            return { kind: 'order', order: groupOrders[0] };
+          }
+          return {
+            kind: 'group',
+            group: {
+              id: rawGroup.id,
+              groupNumber: rawGroup.groupNumber,
+              totalAmount: Number(rawGroup.totalAmount ?? 0),
+              status:
+                rawGroup.status === 'mixed' ? 'mixed' : apiStatusToUi(rawGroup.status),
+              createdAt: rawGroup.createdAt,
+              orders: groupOrders,
+            },
+          };
+        });
+      }
+
       const params: Record<string, string | number> = { role, limit: 100, page: 1 };
       const apiStatus = uiFilterToApiStatusParam(filter);
       if (apiStatus) params.status = apiStatus;
@@ -91,28 +147,16 @@ export default function OrdersScreen() {
       const raw = response.data?.data ?? response.data;
       const list = Array.isArray(raw) ? raw : [];
 
-      const normalized: Order[] = list.map((rawOrder: any) => ({
-        ...rawOrder,
-        status: apiStatusToUi(rawOrder.status),
-        totalAmount: Number(rawOrder.totalAmount ?? rawOrder.amount ?? 0),
-        product: {
-          ...(rawOrder.product || {}),
-          id: rawOrder.product?.id ?? '',
-          title: rawOrder.product?.title ?? '',
-          images: rawOrder.product?.images,
-          imageUrl: rawOrder.product?.imageUrl,
-        },
-      }));
-
+      let normalized: Order[] = list.map(normalizeOrder);
       if (filter === 'processing') {
-        return normalized.filter((o) => o.status === 'processing');
+        normalized = normalized.filter((o) => o.status === 'processing');
       }
-      return normalized;
+      return normalized.map((order): OrderListEntry => ({ kind: 'order', order }));
     },
     enabled: isAuthenticated,
   });
 
-  const orders: Order[] = ordersData || [];
+  const entries: OrderListEntry[] = ordersData || [];
 
   // Refresh on focus
   useFocusEffect(
@@ -172,6 +216,101 @@ export default function OrdersScreen() {
     },
   });
 
+  const renderOrderCard = (order: Order) => (
+    <Card key={order.id} variant="elevated" padding={0} style={styles.orderCard}>
+      <Pressable onPress={() => router.push(`/orders/${order.id}`)}>
+        <View style={styles.orderHeader}>
+          <Text variant="caption" style={styles.orderNumber}>
+            Sipariş #{order.orderNumber}
+          </Text>
+          <StatusBadge status={order.status} config={uiOrderStatusConfig} size="sm" />
+        </View>
+
+        <View style={styles.orderContent}>
+          <Image
+            source={{ uri: getOrderProductImageUri(order.product) }}
+            style={styles.productImage}
+          />
+          <View style={styles.productInfo}>
+            <Text variant="label" numberOfLines={2}>{order.product.title}</Text>
+            <Text variant="caption" style={styles.sellerName}>
+              Satıcı: {order.seller.displayName}
+            </Text>
+            <Text variant="h3" style={styles.price}>
+              {formatPrice(order.totalAmount)}
+            </Text>
+          </View>
+        </View>
+
+        <View style={styles.orderFooter}>
+          <Text variant="caption" style={styles.dateText}>
+            {formatDate(order.createdAt)}
+          </Text>
+
+          {/* Tracking */}
+          {order.trackingNumber && order.status === 'shipped' && (
+            <Pressable
+              style={styles.trackButton}
+              onPress={() => router.push(`/order-track?orderNumber=${order.orderNumber}`)}
+            >
+              <Ionicons name="location" size={14} color={colors.primary[600]!} />
+              <Text style={styles.trackButtonText}>Takip Et</Text>
+            </Pressable>
+          )}
+        </View>
+      </Pressable>
+
+      {/* Alıcı teslim onayı — completed'e taşır, ardından değerlendirme açılır */}
+      {canConfirmReceipt(order) && (
+        <View style={styles.ratingSection}>
+          <Button
+            variant="primary"
+            size="sm"
+            icon="checkmark-circle"
+            title="Teslim Aldım"
+            onPress={() => confirmMutation.mutate(order)}
+            isLoading={confirmMutation.isPending && confirmMutation.variables?.id === order.id}
+            style={styles.rateButton}
+          />
+        </View>
+      )}
+
+      {/* Rating buttons for completed orders */}
+      {canRate(order) && (
+        <View style={styles.ratingSection}>
+          {!order.hasProductRating && (
+            <Button
+              variant="outline"
+              size="sm"
+              icon="star"
+              title="Ürünü Değerlendir"
+              onPress={() => setRatingModal({
+                visible: true,
+                type: 'product',
+                order,
+              })}
+              style={styles.rateButton}
+            />
+          )}
+          {!order.hasSellerRating && (
+            <Button
+              variant="outline"
+              size="sm"
+              icon="person"
+              title="Satıcıyı Değerlendir"
+              onPress={() => setRatingModal({
+                visible: true,
+                type: 'seller',
+                order,
+              })}
+              style={styles.rateButton}
+            />
+          )}
+        </View>
+      )}
+    </Card>
+  );
+
   // Not authenticated
   if (!isAuthenticated) {
     return (
@@ -229,11 +368,11 @@ export default function OrdersScreen() {
           </Text>
           <Button variant="primary" title="Yenile" onPress={() => refetch()} style={StyleSheet.flatten([styles.emptyButton, { marginTop: 12 }])} />
         </View>
-      ) : isLoading && orders.length === 0 ? (
+      ) : isLoading && entries.length === 0 ? (
         <View style={styles.loadingContainer}>
           <Spinner size="lg" />
         </View>
-      ) : orders.length === 0 ? (
+      ) : entries.length === 0 ? (
         <View style={styles.emptyContainer}>
           <Ionicons name="receipt-outline" size={80} color={colors.text.subtle} />
           <Text variant="h3" style={styles.emptyTitle}>
@@ -256,100 +395,57 @@ export default function OrdersScreen() {
             <RefreshControl refreshing={refreshing} onRefresh={onRefresh} colors={[colors.primary[600]!]} />
           }
         >
-          {orders.map((order) => (
-            <Card key={order.id} variant="elevated" padding={0} style={styles.orderCard}>
-              <Pressable onPress={() => router.push(`/orders/${order.id}`)}>
-                <View style={styles.orderHeader}>
-                  <Text variant="caption" style={styles.orderNumber}>
-                    Sipariş #{order.orderNumber}
-                  </Text>
-                  <StatusBadge status={order.status} config={uiOrderStatusConfig} size="sm" />
-                </View>
+          {entries.map((entry) =>
+            entry.kind === 'order' ? (
+              renderOrderCard(entry.order)
+            ) : (
+              <Card key={entry.group.id} variant="elevated" padding={0} style={styles.orderCard}>
+                <Pressable onPress={() => router.push(`/orders/group/${entry.group.id}` as any)}>
+                  <View style={styles.orderHeader}>
+                    <Text variant="caption" style={styles.orderNumber}>
+                      Sipariş #{entry.group.groupNumber}
+                    </Text>
+                    <StatusBadge status={entry.group.status} config={uiOrderStatusConfig} size="sm" />
+                  </View>
 
-                <View style={styles.orderContent}>
-                  <Image
-                    source={{ uri: getOrderProductImageUri(order.product) }}
-                    style={styles.productImage}
-                  />
-                  <View style={styles.productInfo}>
-                    <Text variant="label" numberOfLines={2}>{order.product.title}</Text>
-                    <Text variant="caption" style={styles.sellerName}>
-                      Satıcı: {order.seller.displayName}
+                  {/* Ürün satırları — her birinin kendi durumu ve kargosu var */}
+                  {entry.group.orders.map((order) => (
+                    <Pressable
+                      key={order.id}
+                      style={styles.groupItemRow}
+                      onPress={() => router.push(`/orders/${order.id}`)}
+                    >
+                      <Image
+                        source={{ uri: getOrderProductImageUri(order.product) }}
+                        style={styles.groupItemImage}
+                      />
+                      <View style={styles.productInfo}>
+                        <Text variant="label" numberOfLines={1}>{order.product.title}</Text>
+                        <Text variant="caption" style={styles.sellerName}>
+                          Satıcı: {order.seller.displayName}
+                        </Text>
+                        {order.trackingNumber ? (
+                          <Text variant="caption" style={styles.sellerName}>
+                            Kargo: {order.trackingNumber}
+                          </Text>
+                        ) : null}
+                      </View>
+                      <StatusBadge status={order.status} config={uiOrderStatusConfig} size="sm" />
+                    </Pressable>
+                  ))}
+
+                  <View style={styles.orderFooter}>
+                    <Text variant="caption" style={styles.dateText}>
+                      {formatDate(entry.group.createdAt)} · {entry.group.orders.length} ürün
                     </Text>
                     <Text variant="h3" style={styles.price}>
-                      {formatPrice(order.totalAmount)}
+                      {formatPrice(entry.group.totalAmount)}
                     </Text>
                   </View>
-                </View>
-
-                <View style={styles.orderFooter}>
-                  <Text variant="caption" style={styles.dateText}>
-                    {formatDate(order.createdAt)}
-                  </Text>
-
-                  {/* Tracking */}
-                  {order.trackingNumber && order.status === 'shipped' && (
-                    <Pressable
-                      style={styles.trackButton}
-                      onPress={() => router.push(`/order-track?orderNumber=${order.orderNumber}`)}
-                    >
-                      <Ionicons name="location" size={14} color={colors.primary[600]!} />
-                      <Text style={styles.trackButtonText}>Takip Et</Text>
-                    </Pressable>
-                  )}
-                </View>
-              </Pressable>
-
-              {/* Alıcı teslim onayı — completed'e taşır, ardından değerlendirme açılır */}
-              {canConfirmReceipt(order) && (
-                <View style={styles.ratingSection}>
-                  <Button
-                    variant="primary"
-                    size="sm"
-                    icon="checkmark-circle"
-                    title="Teslim Aldım"
-                    onPress={() => confirmMutation.mutate(order)}
-                    isLoading={confirmMutation.isPending && confirmMutation.variables?.id === order.id}
-                    style={styles.rateButton}
-                  />
-                </View>
-              )}
-
-              {/* Rating buttons for completed orders */}
-              {canRate(order) && (
-                <View style={styles.ratingSection}>
-                  {!order.hasProductRating && (
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      icon="star"
-                      title="Ürünü Değerlendir"
-                      onPress={() => setRatingModal({
-                        visible: true,
-                        type: 'product',
-                        order,
-                      })}
-                      style={styles.rateButton}
-                    />
-                  )}
-                  {!order.hasSellerRating && (
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      icon="person"
-                      title="Satıcıyı Değerlendir"
-                      onPress={() => setRatingModal({
-                        visible: true,
-                        type: 'seller',
-                        order,
-                      })}
-                      style={styles.rateButton}
-                    />
-                  )}
-                </View>
-              )}
-            </Card>
-          ))}
+                </Pressable>
+              </Card>
+            ),
+          )}
 
           <View style={{ height: 100 }} />
         </ScrollView>
@@ -512,6 +608,21 @@ const styles = StyleSheet.create({
     paddingTop: 0,
     gap: 8,
     flexWrap: 'wrap',
+  },
+  groupItemRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    gap: 4,
+    borderTopWidth: StyleSheet.hairlineWidth,
+    borderTopColor: colors.border.DEFAULT,
+  },
+  groupItemImage: {
+    width: 52,
+    height: 52,
+    borderRadius: radius.md,
+    backgroundColor: colors.surface.alt,
   },
   rateButton: {
     borderColor: colors.primary[600]!,

@@ -47,6 +47,10 @@ export class CreateTicketDto {
   @IsEnum(TicketCategory)
   category: TicketCategory;
 
+  @IsOptional()
+  @IsEnum(TicketPriority)
+  priority?: TicketPriority;
+
   @IsString()
   @MinLength(10)
   @MaxLength(2000)

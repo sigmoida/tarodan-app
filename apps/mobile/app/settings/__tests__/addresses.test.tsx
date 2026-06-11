@@ -4,7 +4,7 @@
  * telefon < 10 hane → uyarı. Validasyon geçmeden saveMutation (api) çağrılmaz.
  */
 import React from 'react';
-import { Alert } from 'react-native';
+import { appAlert } from '@tarodan/ui-native';
 import { screen, fireEvent, waitFor } from '@testing-library/react-native';
 import { renderWithProviders } from '../../../src/test-utils';
 
@@ -14,7 +14,7 @@ jest.mock('expo-router', () => ({
 }));
 
 jest.mock('../../../src/stores/authStore', () => ({
-  useAuthStore: () => ({ isAuthenticated: true, limits: { maxAddresses: 3 } }),
+  useAuthStore: () => ({ isAuthenticated: true, limits: { maxAddresses: 10 } }),
 }));
 
 jest.mock('../../../src/i18n', () => ({
@@ -35,10 +35,10 @@ const post = api.post as jest.Mock;
 import AddressesScreen from '../addresses';
 
 describe('J32 · adres ekleme form validasyonu', () => {
-  let alertSpy: jest.SpyInstance;
+  let alertSpy: jest.Mock;
   beforeEach(() => {
     post.mockReset();
-    alertSpy = jest.spyOn(Alert, 'alert').mockImplementation(() => {});
+    alertSpy = (appAlert as jest.Mock).mockImplementation(() => {});
   });
   afterEach(() => alertSpy.mockRestore());
 

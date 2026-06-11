@@ -160,6 +160,7 @@ export default function ProfileScreen() {
   });
   const effectiveTier: string = membershipData ?? user?.membershipTier ?? 'free';
   const isPaidTier = effectiveTier === 'premium' || effectiveTier === 'business';
+  const tierLabel = effectiveTier === 'business' ? 'Business' : 'Premium';
 
   // Aşağı çekince profildeki tüm sayaç/listeleri tazele (stats, garaj+koleksiyon
   // sayısı, üyelik tier'ı).
@@ -422,7 +423,7 @@ export default function ProfileScreen() {
               <View style={styles.membershipBadge}>
                 <Ionicons name="diamond" size={14} color={colors.warning[500]!} />
                 <Text variant="caption" weight="semibold" style={{ marginLeft: spacing[1] }}>
-                  {effectiveTier} Üye
+                  {tierLabel} Üye
                 </Text>
               </View>
             )}
@@ -669,7 +670,7 @@ export default function ProfileScreen() {
           <MenuItem
             icon="information-circle-outline"
             label="Hakkında"
-            onPress={() => router.push('/help')}
+            onPress={() => router.push('/about')}
           />
         </View>
 

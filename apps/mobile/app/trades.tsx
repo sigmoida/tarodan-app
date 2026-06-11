@@ -11,9 +11,9 @@ import {
   VStack,
   theme,
 } from '@tarodan/ui-native';
-import { tradesApi } from '../../src/services/api';
-import { useAuthStore } from '../../src/stores/authStore';
-import { TradeCard, type TradeCardTrade } from '../../src/components/trade/TradeCard';
+import { tradesApi } from '../src/services/api';
+import { useAuthStore } from '../src/stores/authStore';
+import { TradeCard, type TradeCardTrade } from '../src/components/trade/TradeCard';
 
 const { colors, spacing } = theme;
 

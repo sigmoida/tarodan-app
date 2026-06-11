@@ -1,9 +1,9 @@
-import { View, ScrollView, StyleSheet, TouchableOpacity, Alert } from 'react-native';
+import { View, ScrollView, StyleSheet, TouchableOpacity } from 'react-native';
 import { useState } from 'react';
 import { router } from 'expo-router';
 import { useMutation } from '@tanstack/react-query';
 import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
-import { theme, Text, Card, Button, Chip, Radio, ScreenHeader } from '@tarodan/ui-native';
+import { theme, Text, Card, Button, Chip, Radio, ScreenHeader, appAlert } from '@tarodan/ui-native';
 import { membershipApi } from '../src/services/api';
 import { useAuthStore } from '../src/stores/authStore';
 
@@ -81,7 +81,7 @@ export default function UpgradeScreen() {
       // Bypass (dev/test) ya da ödeme gerektirmeyen durum → üyelik zaten güncellendi.
       if (data.useBypass === true || (!paymentUrl && !paymentId)) {
         refreshUserData();
-        Alert.alert('Üyelik', 'Üyeliğiniz güncellendi.');
+        appAlert('Üyelik', 'Üyeliğiniz güncellendi.');
         return;
       }
 
@@ -98,7 +98,7 @@ export default function UpgradeScreen() {
       } as any);
     },
     onError: () => {
-      Alert.alert('Hata', 'Abonelik oluşturulamadı. Lütfen tekrar deneyin.');
+      appAlert('Hata', 'Abonelik oluşturulamadı. Lütfen tekrar deneyin.');
     },
   });
 

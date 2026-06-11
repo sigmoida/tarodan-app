@@ -6,8 +6,8 @@
  * Backend takas rolleri/escrow backend-only.
  */
 import React from 'react';
+import { appAlert } from '@tarodan/ui-native';
 import { screen, fireEvent, waitFor } from '@testing-library/react-native';
-import { Alert } from 'react-native';
 import { renderWithProviders } from '../../../../src/test-utils';
 
 let mockParams: Record<string, string> = { id: 'trade-1' };
@@ -74,7 +74,7 @@ describe('J6 · Karşı teklif formu', () => {
     getAllMock.mockReset();
     mockParams = { id: 'trade-1' };
     mockUser = { id: 'user-initiator' };
-    jest.spyOn(Alert, 'alert').mockImplementation(() => {});
+    (appAlert as jest.Mock).mockImplementation(() => {});
   });
 
   it('J6.1 form bölümleri render edilir (nakit fark + mesaj + özet)', async () => {

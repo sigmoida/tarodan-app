@@ -1,13 +1,19 @@
 /**
  * J20/J115 · Destek talebi ekranı — mobil UI dilimi.
  * Giriş gerekli durumu + login navigasyonu, kimliği doğrulanmış formda buton
- * disable/enable (kategori+konu+açıklama), iletişim bilgisi render.
- * Backend talep oluşturma (ticket) backend-only.
+ * disable/enable (kategori+konu+açıklama), iletişim bilgisi render,
+ * submit → POST /support/tickets çağrısı.
  */
 import React from 'react';
 import { TextInput } from 'react-native';
-import { screen, fireEvent } from '@testing-library/react-native';
+import { screen, fireEvent, waitFor } from '@testing-library/react-native';
 import { renderWithProviders } from '../../src/test-utils';
+
+jest.mock('../../src/services/api', () => ({
+  supportApi: { createTicket: jest.fn() },
+}));
+import { supportApi } from '../../src/services/api';
+const mockCreateTicket = supportApi.createTicket as jest.Mock;
 
 jest.mock('expo-router', () => ({
   router: { push: jest.fn(), back: jest.fn(), replace: jest.fn() },
@@ -69,5 +75,36 @@ describe('J20 · Destek talebi (support)', () => {
     fireEvent.changeText(inputs[0], 'Hesabıma giremiyorum');
     fireEvent.changeText(inputs[1], 'Şifre sıfırlama maili gelmiyor.');
     expect(screen.getByText('Talep Oluştur')).not.toBeDisabled();
+  });
+
+  it('J20.5 submit gerçek API çağrısı yapar (createTicket) ve başarı mesajı gösterir', async () => {
+    mockCreateTicket.mockResolvedValueOnce({ data: { ticketNumber: 'TKT-1' } });
+    renderWithProviders(<SupportScreen />);
+    fireEvent.press(screen.getByText('Hesap Sorunu'));
+    const inputs = screen.UNSAFE_getAllByType(TextInput);
+    fireEvent.changeText(inputs[0], 'Hesabıma giremiyorum');
+    fireEvent.changeText(inputs[1], 'Şifre sıfırlama maili gelmiyor.');
+    fireEvent.press(screen.getByText('Talep Oluştur'));
+    await waitFor(() => expect(mockCreateTicket).toHaveBeenCalledTimes(1));
+    expect(mockCreateTicket).toHaveBeenCalledWith({
+      subject: 'Hesabıma giremiyorum',
+      category: 'account',
+      priority: 'medium',
+      message: 'Şifre sıfırlama maili gelmiyor.',
+    });
+    expect(await screen.findByText('Destek talebiniz oluşturuldu!')).toBeOnTheScreen();
+  });
+
+  it('J20.6 API hatasında kullanıcıya hata mesajı gösterilir', async () => {
+    mockCreateTicket.mockRejectedValueOnce(new Error('network'));
+    renderWithProviders(<SupportScreen />);
+    fireEvent.press(screen.getByText('Hesap Sorunu'));
+    const inputs = screen.UNSAFE_getAllByType(TextInput);
+    fireEvent.changeText(inputs[0], 'Hesabıma giremiyorum');
+    fireEvent.changeText(inputs[1], 'Şifre sıfırlama maili gelmiyor.');
+    fireEvent.press(screen.getByText('Talep Oluştur'));
+    expect(
+      await screen.findByText('Talep oluşturulamadı, lütfen tekrar deneyin.'),
+    ).toBeOnTheScreen();
   });
 });

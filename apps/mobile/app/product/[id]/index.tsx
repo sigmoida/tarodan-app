@@ -9,6 +9,7 @@ import {
   Avatar,
   Text,
   theme,
+  appAlert,
 } from '@tarodan/ui-native';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useLocalSearchParams, router } from 'expo-router';
@@ -17,15 +18,18 @@ import { productsApi, ratingsApi, userReportsApi } from '../../../src/services/a
 import { ThemedRefreshControl } from '../../../src/components/common';
 import { useRefresh } from '../../../src/hooks/useRefresh';
 import { useAuthStore } from '../../../src/stores/authStore';
-import { Alert } from 'react-native';
+import {  } from 'react-native';
 import { useCartStore } from '../../../src/stores/cartStore';
 import { useGuestStore } from '../../../src/stores/guestStore';
 import { useFavoritesStore } from '../../../src/stores/favoritesStore';
+import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { SignupPrompt } from '../../../src/components/SignupPrompt';
+import ZoomableImage from '../../../src/components/product/ZoomableImage';
 import MakeOfferModal from '../../../src/components/product/MakeOfferModal';
 import AddToCollectionModal from '../../../src/components/product/AddToCollectionModal';
 import { transformImageUrl, getImageUrl as getImageUrlFromUtils, resolveAvatarSource } from '../../../src/utils/imageUrl';
 import { asLabel } from '../../../src/utils/format';
+import { buildShareContent, productShareUrl } from '../../../src/utils/share';
 import { isProductTradeOpen } from '../../../src/utils/isProductTradeOpen';
 import {
   getProductEffectivePrice,
@@ -116,6 +120,7 @@ export default function ProductDetailScreen() {
   // Tam ekran görsel görüntüleyici (G1 — pinch-zoom)
   const [imageViewerOpen, setImageViewerOpen] = useState(false);
   const [viewerIndex, setViewerIndex] = useState(0);
+  const [viewerZoomed, setViewerZoomed] = useState(false);
 
   // Check if product is in favorites when authenticated
   useEffect(() => {
@@ -414,10 +419,12 @@ export default function ProductDetailScreen() {
 
   const handleShare = async () => {
     try {
-      await Share.share({
-        message: `${product.title} - ₺${product.price?.toLocaleString('tr-TR')}\n\nTarodan'da bu ürüne göz atın!`,
-        title: product.title,
-      });
+      const { content, options } = buildShareContent(
+        `${product.title} - ₺${product.price?.toLocaleString('tr-TR')}\n\nTarodan'da bu ürüne göz atın!`,
+        productShareUrl(product.id),
+        product.title,
+      );
+      await Share.share(content, options);
     } catch (error) {
       console.error('Share error:', error);
     }
@@ -440,7 +447,7 @@ export default function ProductDetailScreen() {
       { key: 'other', label: 'Diğer' },
     ];
 
-    Alert.alert(
+    appAlert(
       'İlanı Raporla',
       'Bu ilanı neden raporlamak istiyorsunuz?',
       [
@@ -560,7 +567,11 @@ export default function ProductDetailScreen() {
             {isProductTradeOpen(product) && (
               <View style={[styles.badge, { backgroundColor: colors.success[500]! }]}>
                 <Ionicons name="swap-horizontal" size={14} color={colors.white} />
-                <Text style={styles.badgeText}>Takas Açık</Text>
+                {/* Android (Fabric): row+gap içinde Text genişliği yanlış ölçülüp son
+                    kelimeyi görünmez sarıyor; gap yerine marginLeft kullan. */}
+                <Text style={[styles.badgeText, { marginLeft: 4 }]} numberOfLines={1}>
+                  Takas Açık
+                </Text>
               </View>
             )}
             <View style={[styles.badge, { backgroundColor: conditionInfo.color }]}>
@@ -613,6 +624,21 @@ export default function ProductDetailScreen() {
               </Text>
             </View>
           </View>
+
+          {/* Sahip için stok/rezervasyon dökümü — alıcıların gördüğü sayı (satışta)
+              fiziksel stoktan neden farklı, burada açıklanır. */}
+          {isOwner &&
+            product.quantity != null &&
+            product.availableQuantity != null &&
+            product.quantity - product.availableQuantity > 0 ? (
+            <View style={styles.reservedInfoBox}>
+              <Ionicons name="lock-closed-outline" size={16} color={colors.warning[700]!} />
+              <Text style={styles.reservedInfoText}>
+                Stok: {product.quantity} · {product.quantity - product.availableQuantity} adedi
+                aktif takas/sipariş için rezerve · Satışta görünen: {product.availableQuantity}
+              </Text>
+            </View>
+          ) : null}
 
           <Divider style={styles.divider} />
 
@@ -938,14 +964,16 @@ export default function ProductDetailScreen() {
         )}
       </View>
 
-      {/* Tam ekran görsel görüntüleyici — pinch-zoom (G1) */}
+      {/* Tam ekran görsel görüntüleyici — pinch + double-tap zoom (G1) */}
       <Modal
         visible={imageViewerOpen}
         transparent
         animationType="fade"
         onRequestClose={() => setImageViewerOpen(false)}
+        onShow={() => setViewerZoomed(false)}
       >
-        <View style={styles.viewerContainer}>
+        {/* Modal Android'de yeni native pencere açtığı için root view modal içinde olmalı */}
+        <GestureHandlerRootView style={styles.viewerContainer}>
           <Pressable
             style={styles.viewerClose}
             onPress={() => setImageViewerOpen(false)}
@@ -957,28 +985,23 @@ export default function ProductDetailScreen() {
           <ScrollView
             horizontal
             pagingEnabled
+            scrollEnabled={!viewerZoomed}
             showsHorizontalScrollIndicator={false}
             contentOffset={{ x: viewerIndex * width, y: 0 }}
           >
             {images.map((img: any, index: number) => {
               const uri = typeof img === 'string' ? img : img.url;
               return (
-                <ScrollView
+                <ZoomableImage
                   key={index}
-                  style={styles.viewerPageScroll}
-                  contentContainerStyle={styles.viewerPage}
-                  maximumZoomScale={3}
-                  minimumZoomScale={1}
-                  showsVerticalScrollIndicator={false}
-                  showsHorizontalScrollIndicator={false}
-                  centerContent
-                >
-                  <Image source={{ uri }} style={styles.viewerImage} resizeMode="contain" />
-                </ScrollView>
+                  uri={uri}
+                  zoomed={viewerZoomed}
+                  onZoomChange={setViewerZoomed}
+                />
               );
             })}
           </ScrollView>
-        </View>
+        </GestureHandlerRootView>
       </Modal>
 
       <Snackbar
@@ -1099,18 +1122,6 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
-  viewerPageScroll: {
-    width,
-  },
-  viewerPage: {
-    flexGrow: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  viewerImage: {
-    width,
-    height: width,
-  },
   imageIndicators: {
     flexDirection: 'row',
     justifyContent: 'center',
@@ -1142,7 +1153,6 @@ const styles = StyleSheet.create({
     paddingHorizontal: 10,
     paddingVertical: 6,
     borderRadius: 16,
-    gap: 4,
   },
   badgeText: {
     color: colors.white,
@@ -1203,6 +1213,21 @@ const styles = StyleSheet.create({
   },
   divider: {
     marginVertical: 16,
+  },
+  reservedInfoBox: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    gap: 8,
+    backgroundColor: colors.warning[50]!,
+    borderRadius: 8,
+    padding: 10,
+    marginTop: 12,
+  },
+  reservedInfoText: {
+    flex: 1,
+    fontSize: 13,
+    lineHeight: 18,
+    color: colors.warning[700]!,
   },
   actionGrid: {
     flexDirection: 'row',

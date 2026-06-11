@@ -12,7 +12,7 @@ const { colors } = theme;
 export const FREE_MEMBER_LIMITS = {
   maxListings: 10,
   maxImagesPerListing: 5,
-  maxAddresses: 3,
+  maxAddresses: 10,
   maxSavedSearches: 5,
   maxMessagesPerDay: 50,
   listingExpireDays: 60,

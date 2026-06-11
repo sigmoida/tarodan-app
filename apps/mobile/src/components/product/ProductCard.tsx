@@ -394,7 +394,7 @@ const styles = StyleSheet.create({
     backgroundColor: colors.warning[500]!,
   },
   tradeBadge: {
-    backgroundColor: colors.info[600]!,
+    backgroundColor: colors.success[500]!,
   },
   boostBadge: {
     backgroundColor: colors.warning[500]!,

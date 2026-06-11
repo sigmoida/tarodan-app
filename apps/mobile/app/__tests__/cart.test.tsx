@@ -60,11 +60,12 @@ describe('J1 · sepet özeti (ürün satırı + ara toplam/kargo/toplam)', () =>
     expect(screen.getByText('Hot Wheels Mustang')).toBeOnTheScreen();
   });
 
-  it('ara toplam = price*quantity (200) ve kargo (49.90) satırı gösterilir', () => {
+  it('ara toplam = price*quantity (200) gösterilir, kargo ödeme adımına bırakılır', () => {
     renderWithProviders(<CartScreen />);
-    // ara toplam ₺200, kargo ₺49.90
-    expect(screen.getByText('₺200')).toBeOnTheScreen();
-    expect(screen.getByText('₺49.90')).toBeOnTheScreen();
+    // ara toplam ₺200, kargo sepette tutara eklenmez
+    expect(screen.getAllByText('₺200').length).toBeGreaterThan(0);
+    expect(screen.getByText('Ödeme adımında hesaplanır')).toBeOnTheScreen();
+    expect(screen.queryByText('₺49.90')).toBeNull();
   });
 });
 

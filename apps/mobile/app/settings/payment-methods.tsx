@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { View, StyleSheet, ScrollView, Alert } from 'react-native';
+import { View, StyleSheet, ScrollView } from 'react-native';
 import {
   Button,
   Card,
@@ -9,8 +9,8 @@ import {
   Input,
   Text,
   theme,
+  appAlert,
 } from '@tarodan/ui-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 import { router } from 'expo-router';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
@@ -82,10 +82,10 @@ export default function PaymentMethodsScreen() {
       queryClient.invalidateQueries({ queryKey: ['payment-methods'] });
       resetForm();
       setDialogOpen(false);
-      Alert.alert('Başarılı', 'Kart başarıyla kaydedildi.');
+      appAlert('Başarılı', 'Kart başarıyla kaydedildi.');
     },
     onError: (e: any) =>
-      Alert.alert('Hata', e?.response?.data?.message || 'Kart kaydedilemedi.'),
+      appAlert('Hata', e?.response?.data?.message || 'Kart kaydedilemedi.'),
   });
 
   const deleteMutation = useMutation({
@@ -93,7 +93,7 @@ export default function PaymentMethodsScreen() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['payment-methods'] });
     },
-    onError: () => Alert.alert('Hata', 'Kart silinemedi.'),
+    onError: () => appAlert('Hata', 'Kart silinemedi.'),
   });
 
   const resetForm = () =>
@@ -107,21 +107,21 @@ export default function PaymentMethodsScreen() {
     });
 
   const handleAdd = () => {
-    if (!form.cardHolderName.trim()) return Alert.alert('Eksik bilgi', 'Kart sahibi gerekli.');
+    if (!form.cardHolderName.trim()) return appAlert('Eksik bilgi', 'Kart sahibi gerekli.');
     const cleanNumber = form.cardNumber.replace(/\s/g, '');
     if (cleanNumber.length < 15 || cleanNumber.length > 19)
-      return Alert.alert('Eksik bilgi', 'Geçerli bir kart numarası girin.');
+      return appAlert('Eksik bilgi', 'Geçerli bir kart numarası girin.');
     if (!/^\d{1,2}$/.test(form.expireMonth) || parseInt(form.expireMonth, 10) < 1 || parseInt(form.expireMonth, 10) > 12)
-      return Alert.alert('Eksik bilgi', 'Geçerli ay (1-12) girin.');
+      return appAlert('Eksik bilgi', 'Geçerli ay (1-12) girin.');
     if (!/^\d{2,4}$/.test(form.expireYear))
-      return Alert.alert('Eksik bilgi', 'Geçerli yıl girin.');
+      return appAlert('Eksik bilgi', 'Geçerli yıl girin.');
     if (!/^\d{3,4}$/.test(form.cvc))
-      return Alert.alert('Eksik bilgi', 'Geçerli CVC girin.');
+      return appAlert('Eksik bilgi', 'Geçerli CVC girin.');
     addMutation.mutate();
   };
 
   const handleDelete = (m: PaymentMethod) => {
-    Alert.alert('Kartı Sil', 'Bu kartı silmek istediğinize emin misiniz?', [
+    appAlert('Kartı Sil', 'Bu kartı silmek istediğinize emin misiniz?', [
       { text: 'Vazgeç', style: 'cancel' },
       {
         text: 'Sil',
@@ -133,7 +133,7 @@ export default function PaymentMethodsScreen() {
 
   if (!isAuthenticated) {
     return (
-      <SafeAreaView style={styles.container} edges={['top']}>
+      <View style={styles.container}>
         <ScreenHeader title="Ödeme Yöntemleri" />
         <EmptyState
           fullscreen
@@ -142,12 +142,12 @@ export default function PaymentMethodsScreen() {
           actionLabel="Giriş Yap"
           onAction={() => router.push('/(auth)/login')}
         />
-      </SafeAreaView>
+      </View>
     );
   }
 
   return (
-    <SafeAreaView style={styles.container} edges={['top']}>
+    <View style={styles.container}>
       <ScreenHeader title="Ödeme Yöntemleri" />
 
       {isLoading ? (
@@ -278,7 +278,7 @@ export default function PaymentMethodsScreen() {
           </View>
         </ScrollView>
       </Modal>
-    </SafeAreaView>
+    </View>
   );
 }
 

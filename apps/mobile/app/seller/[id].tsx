@@ -562,7 +562,7 @@ const styles = StyleSheet.create({
     position: 'absolute',
     top: 8,
     left: 8,
-    backgroundColor: colors.warning[500]!,
+    backgroundColor: colors.success[500]!,
     padding: 6,
     borderRadius: 12,
   },

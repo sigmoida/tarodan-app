@@ -50,6 +50,7 @@ model User {
   sellerOffers            Offer[]                  @relation("SellerOffers")
   buyerOrders             Order[]                  @relation("BuyerOrders")
   sellerOrders            Order[]                  @relation("SellerOrders")
+  buyerCheckoutGroups     CheckoutGroup[]          @relation("BuyerCheckoutGroups")
   passwordResetTokens     PasswordResetToken[]
   paymentHolds            PaymentHold[]
   paymentMethods          PaymentMethod[]
@@ -995,6 +996,23 @@ model Offer {
   @@map("offers")
 }
 
+model CheckoutGroup {
+  id             String   @id @default(uuid())
+  groupNumber    String   @unique @map("group_number")
+  buyerId        String   @map("buyer_id")
+  idempotencyKey String?  @unique @map("idempotency_key")
+  totalAmount    Decimal  @map("total_amount") @db.Decimal(10, 2)
+  isGuest        Boolean  @default(false) @map("is_guest")
+  createdAt      DateTime @default(now()) @map("created_at")
+  updatedAt      DateTime @updatedAt @map("updated_at")
+  buyer          User     @relation("BuyerCheckoutGroups", fields: [buyerId], references: [id])
+  orders         Order[]
+  payment        Payment?
+
+  @@index([buyerId, createdAt])
+  @@map("checkout_groups")
+}
+
 model Order {
   id                     String          @id @default(uuid())
   orderNumber            String          @unique @map("order_number")
@@ -1002,6 +1020,7 @@ model Order {
   sellerId               String          @map("seller_id")
   productId              String          @map("product_id")
   offerId                String?         @unique @map("offer_id")
+  checkoutGroupId        String?         @map("checkout_group_id")
   shippingAddressId      String?         @map("shipping_address_id")
   totalAmount            Decimal         @map("total_amount") @db.Decimal(10, 2)
   shippingCost           Decimal         @default(0) @map("shipping_cost") @db.Decimal(10, 2)
@@ -1036,11 +1055,13 @@ model Order {
   shipment               Shipment?
   refundRequests         RefundRequest[]
   commissionLedger       CommissionLedger?
+  checkoutGroup          CheckoutGroup?  @relation(fields: [checkoutGroupId], references: [id])
 
   @@index([buyerId])
   @@index([sellerId])
   @@index([status])
   @@index([status, paymentExpiresAt])
+  @@index([checkoutGroupId])
   @@map("orders")
 }
 
@@ -1070,6 +1091,7 @@ model CommissionLedger {
 model Payment {
   id                     String            @id @default(uuid())
   orderId                String?           @unique @map("order_id")
+  checkoutGroupId        String?           @unique @map("checkout_group_id")
   tradeCashPaymentId     String?           @unique @map("trade_cash_payment_id")
   provider               String
   providerPaymentId      String?           @map("provider_payment_id")
@@ -1083,8 +1105,9 @@ model Payment {
   paidAt                 DateTime?         @map("paid_at")
   createdAt              DateTime          @default(now()) @map("created_at")
   updatedAt              DateTime          @updatedAt @map("updated_at")
-  paymentHold            PaymentHold?
+  paymentHolds           PaymentHold[]
   order                  Order?            @relation(fields: [orderId], references: [id])
+  checkoutGroup          CheckoutGroup?    @relation(fields: [checkoutGroupId], references: [id])
   tradeCashPayment       TradeCashPayment? @relation(fields: [tradeCashPaymentId], references: [id])
 
   @@map("payments")
@@ -1092,7 +1115,7 @@ model Payment {
 
 model PaymentHold {
   id             String            @id @default(uuid())
-  paymentId      String            @unique @map("payment_id")
+  paymentId      String            @map("payment_id")
   orderId        String            @map("order_id")
   sellerId       String            @map("seller_id")
   amount         Decimal           @db.Decimal(10, 2)
@@ -1105,6 +1128,8 @@ model PaymentHold {
   seller         User              @relation(fields: [sellerId], references: [id])
   payoutTransfer PayoutTransfer?   @relation("HoldPayoutTransfer")
 
+  @@unique([paymentId, orderId])
+  @@index([paymentId])
   @@map("payment_holds")
 }
 

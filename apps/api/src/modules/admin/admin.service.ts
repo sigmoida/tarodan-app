@@ -3482,7 +3482,7 @@ export class AdminService {
             product: true,
           },
         },
-        paymentHold: true,
+        paymentHolds: true,
       },
     });
 
@@ -3513,13 +3513,22 @@ export class AdminService {
         product: payment.order.product,
         shippingAddress: payment.order.shippingAddress,
       },
-      paymentHold: payment.paymentHold ? {
-        id: payment.paymentHold.id,
-        amount: Number(payment.paymentHold.amount),
-        status: payment.paymentHold.status,
-        releaseAt: payment.paymentHold.releaseAt,
-        releasedAt: payment.paymentHold.releasedAt,
+      paymentHold: payment.paymentHolds[0] ? {
+        id: payment.paymentHolds[0].id,
+        amount: Number(payment.paymentHolds[0].amount),
+        status: payment.paymentHolds[0].status,
+        releaseAt: payment.paymentHolds[0].releaseAt,
+        releasedAt: payment.paymentHolds[0].releasedAt,
       } : null,
+      paymentHolds: payment.paymentHolds.map((hold) => ({
+        id: hold.id,
+        orderId: hold.orderId,
+        sellerId: hold.sellerId,
+        amount: Number(hold.amount),
+        status: hold.status,
+        releaseAt: hold.releaseAt,
+        releasedAt: hold.releasedAt,
+      })),
       createdAt: payment.createdAt,
       updatedAt: payment.updatedAt,
       paidAt: payment.paidAt,

@@ -1,4 +1,4 @@
-import { View, ScrollView, StyleSheet, Pressable, Image, Alert } from 'react-native';
+import { View, ScrollView, StyleSheet, Pressable, Image } from 'react-native';
 import {
   theme,
   Button,
@@ -11,6 +11,7 @@ import {
   Input,
   Textarea,
   ScreenHeader,
+  appAlert,
 } from '@tarodan/ui-native';
 import { useState, useEffect } from 'react';
 import { router, useLocalSearchParams } from 'expo-router';
@@ -87,7 +88,8 @@ export default function NewTradeScreen() {
   const { data: myProducts, isLoading: loadingMyProducts } = useQuery({
     queryKey: ['my-tradeable-products', user?.id],
     queryFn: async () => {
-      const response = await productsApi.getMyListings({ status: 'active' });
+      // tradeEligible: aktif takasta olan veya müsait stoğu olmayan ürünler backend'de elenir
+      const response = await productsApi.getMyListings({ status: 'active', tradeEligible: true });
       const raw = response.data?.data || response.data?.products || response.data || [];
       const list = Array.isArray(raw) ? raw : [];
       return list.filter(
@@ -242,11 +244,11 @@ export default function NewTradeScreen() {
   const handleSubmit = () => {
     const cashVal = parseFloat(cashAmount.replace(',', '.')) || 0;
     if (selectedMyItems.length === 0 && cashVal <= 0) {
-      Alert.alert('Hata', 'En az bir ürün seçin veya nakit farkı girin');
+      appAlert('Hata', 'En az bir ürün seçin veya nakit farkı girin');
       return;
     }
     if (selectedTheirItems.length === 0) {
-      Alert.alert('Hata', 'Karşı taraftan en az bir ürün seçmelisiniz');
+      appAlert('Hata', 'Karşı taraftan en az bir ürün seçmelisiniz');
       return;
     }
     createTradeMutation.mutate();

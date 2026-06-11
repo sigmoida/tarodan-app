@@ -15,6 +15,10 @@ import { theme } from './theme';
 
 type IoniconName = React.ComponentProps<typeof Ionicons>['name'];
 
+/**
+ * Not: `style` dış sarmalayıcıya (container) uygulanır — margin/yerleşim için.
+ * İçteki TextInput'u stillemek için `inputStyle`, çerçeve için `fieldStyle` kullanın.
+ */
 export interface InputProps extends TextInputProps {
   label?: string;
   error?: string;
@@ -59,6 +63,7 @@ export const Input: React.FC<InputProps> = ({
   containerStyle,
   fieldStyle,
   inputStyle,
+  style,
   multiline,
   onFocus,
   onBlur,
@@ -103,7 +108,7 @@ export const Input: React.FC<InputProps> = ({
   const effectiveSecure = secureTextEntry ? passwordHidden : false;
 
   return (
-    <View style={[styles.container, containerStyle]}>
+    <View style={[styles.container, containerStyle, style as StyleProp<ViewStyle>]}>
       {label && <Text style={styles.label}>{label}</Text>}
       <View
         style={[
@@ -168,6 +173,8 @@ const styles = StyleSheet.create({
   input: {
     flex: 1,
     padding: 0,
+    textAlignVertical: 'center',
+    includeFontPadding: false,
   },
   inputMultiline: {
     alignSelf: 'stretch',
