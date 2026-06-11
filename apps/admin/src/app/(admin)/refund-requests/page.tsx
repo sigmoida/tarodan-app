@@ -7,10 +7,12 @@ import {
   Button,
   Input,
   Select,
-  Spinner,
   StatusBadge,
+  enumLabel,
+  refundReasonConfig,
   refundRequestStatusConfig,
 } from "@tarodan/ui";
+import { DataTable, type ColumnDef } from "@/components/DataTable";
 import {
   MagnifyingGlassIcon,
   ArrowPathIcon,
@@ -91,6 +93,88 @@ export default function RefundRequestsPage() {
 
   const totalPages = Math.max(1, Math.ceil(total / PAGE_SIZE));
 
+  const columns: ColumnDef<RefundRequestRow, any>[] = [
+    {
+      header: "İade No",
+      cell: ({ row }) => (
+        <span className="font-mono text-xs">{row.original.refundNumber}</span>
+      ),
+    },
+    {
+      header: "Sipariş",
+      cell: ({ row }) => (
+        <Link
+          href={`/orders/${row.original.order.id}`}
+          className="text-primary-600 hover:underline"
+        >
+          {row.original.order.orderNumber}
+        </Link>
+      ),
+    },
+    {
+      header: "Alıcı",
+      cell: ({ row }) => (
+        <>
+          <div>{row.original.requester.displayName}</div>
+          <div className="text-xs text-muted">{row.original.requester.email}</div>
+        </>
+      ),
+    },
+    {
+      header: "Satıcı",
+      cell: ({ row }) => (
+        <>
+          <div>{row.original.order.seller.displayName}</div>
+          <div className="text-xs text-muted">{row.original.order.seller.email}</div>
+        </>
+      ),
+    },
+    {
+      header: "Tutar",
+      cell: ({ row }) => (
+        <span className="font-medium">
+          ₺{Number(row.original.amount).toLocaleString("tr-TR", { minimumFractionDigits: 2 })}
+        </span>
+      ),
+    },
+    {
+      header: "Sebep",
+      cell: ({ row }) => (
+        <span className="text-xs">
+          {enumLabel(refundReasonConfig, row.original.reason, row.original.reason)}
+        </span>
+      ),
+    },
+    {
+      header: "Durum",
+      cell: ({ row }) => (
+        <StatusBadge status={row.original.status} config={refundRequestStatusConfig} />
+      ),
+    },
+    {
+      header: "Oluşturma",
+      cell: ({ row }) => (
+        <span className="text-xs text-muted">
+          {new Date(row.original.createdAt).toLocaleString("tr-TR")}
+        </span>
+      ),
+    },
+    {
+      id: "actions",
+      header: () => <span className="block text-right" />,
+      cell: ({ row }) => (
+        <div className="text-right">
+          <Link href={`/refund-requests/${row.original.id}`}>
+            <Button variant="secondary" size="sm">
+              <EyeIcon className="h-4 w-4 mr-1" />
+              Detay
+            </Button>
+          </Link>
+        </div>
+      ),
+    },
+  ];
+
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
@@ -144,74 +228,13 @@ export default function RefundRequestsPage() {
       </div>
 
       {/* List */}
-      <div className="bg-surface-elevated rounded-xl shadow-sm overflow-hidden">
-        {loading ? (
-          <div className="flex justify-center py-12">
-            <Spinner size="xl" color="border-primary-600 border-t-transparent" />
-          </div>
-        ) : items.length === 0 ? (
-          <div className="text-center py-12 text-muted">
-            Bu filtrelerle eşleşen iade talebi yok.
-          </div>
-        ) : (
-          <table className="w-full text-sm">
-            <thead className="bg-surface-alt text-left">
-              <tr>
-                <th className="px-4 py-3 font-medium text-muted">İade No</th>
-                <th className="px-4 py-3 font-medium text-muted">Sipariş</th>
-                <th className="px-4 py-3 font-medium text-muted">Alıcı</th>
-                <th className="px-4 py-3 font-medium text-muted">Satıcı</th>
-                <th className="px-4 py-3 font-medium text-muted">Tutar</th>
-                <th className="px-4 py-3 font-medium text-muted">Sebep</th>
-                <th className="px-4 py-3 font-medium text-muted">Durum</th>
-                <th className="px-4 py-3 font-medium text-muted">Oluşturma</th>
-                <th className="px-4 py-3" />
-              </tr>
-            </thead>
-            <tbody>
-              {items.map((rr) => (
-                <tr key={rr.id} className="border-t border-border hover:bg-surface-alt/40">
-                  <td className="px-4 py-3 font-mono text-xs">{rr.refundNumber}</td>
-                  <td className="px-4 py-3">
-                    <Link
-                      href={`/orders/${rr.order.id}`}
-                      className="text-primary-600 hover:underline"
-                    >
-                      {rr.order.orderNumber}
-                    </Link>
-                  </td>
-                  <td className="px-4 py-3">
-                    <div>{rr.requester.displayName}</div>
-                    <div className="text-xs text-muted">{rr.requester.email}</div>
-                  </td>
-                  <td className="px-4 py-3">
-                    <div>{rr.order.seller.displayName}</div>
-                    <div className="text-xs text-muted">{rr.order.seller.email}</div>
-                  </td>
-                  <td className="px-4 py-3 font-medium">
-                    ₺{Number(rr.amount).toLocaleString("tr-TR", { minimumFractionDigits: 2 })}
-                  </td>
-                  <td className="px-4 py-3 text-xs">{rr.reason}</td>
-                  <td className="px-4 py-3">
-                    <StatusBadge status={rr.status} config={refundRequestStatusConfig} />
-                  </td>
-                  <td className="px-4 py-3 text-xs text-muted">
-                    {new Date(rr.createdAt).toLocaleString("tr-TR")}
-                  </td>
-                  <td className="px-4 py-3 text-right">
-                    <Link href={`/refund-requests/${rr.id}`}>
-                      <Button variant="secondary" size="sm">
-                        <EyeIcon className="h-4 w-4 mr-1" />
-                        Detay
-                      </Button>
-                    </Link>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        )}
-      </div>
+      <DataTable
+        columns={columns}
+        data={items}
+        loading={loading}
+        emptyText="Bu filtrelerle eşleşen iade talebi yok."
+        getRowId={(rr) => rr.id}
+      />
 
       {/* Pagination */}
       {totalPages > 1 && (

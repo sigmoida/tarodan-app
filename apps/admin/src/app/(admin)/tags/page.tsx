@@ -2,7 +2,8 @@
 
 import { useState, useEffect } from 'react';
 import { adminApi } from '@/lib/api';
-import { Button, Checkbox, Input, Spinner, Textarea, colors } from '@tarodan/ui';
+import { DataTable, type ColumnDef } from '@/components/DataTable';
+import { Button, Checkbox, Input, Textarea, colors } from '@tarodan/ui';
 import { PlusIcon, PencilIcon, TrashIcon, TagIcon } from '@heroicons/react/24/outline';
 import toast from 'react-hot-toast';
 
@@ -55,6 +56,28 @@ export default function TagsPage() {
         catch (e: any) { toast.error(e.response?.data?.message || 'Silinemedi'); }
     };
 
+    const columns: ColumnDef<Tag, any>[] = [
+        {
+            header: 'Etiket',
+            cell: ({ row }) => (
+                <div className="flex items-center gap-2"><div className="w-4 h-4 rounded-full" style={{ backgroundColor: row.original.color || defaultTagColor }}></div><span className="font-medium text-heading">{row.original.name}</span></div>
+            ),
+        },
+        {
+            header: 'Kullanım',
+            cell: ({ row }) => (
+                <div className="flex items-center gap-2"><TagIcon className="h-4 w-4 text-muted" /><span className="text-sm text-muted">{row.original.usageCount} ürün</span>{!row.original.isActive && <span className="px-2 text-xs bg-body text-muted rounded">Pasif</span>}</div>
+            ),
+        },
+        {
+            id: 'actions',
+            header: 'İşlemler',
+            cell: ({ row }) => (
+                <div className="flex justify-end gap-1"><Button variant="secondary" onClick={() => openEdit(row.original)} className="p-1 text-muted hover:text-heading"><PencilIcon className="h-4 w-4" /></Button><Button variant="secondary" onClick={() => setDeleteConfirm(row.original.id)} className="p-1 text-danger-600 hover:text-danger-300" disabled={row.original.usageCount > 0}><TrashIcon className="h-4 w-4" /></Button></div>
+            ),
+        },
+    ];
+
     return (
         <>
             <div className="space-y-6">
@@ -63,19 +86,13 @@ export default function TagsPage() {
                     <Button variant="primary" size="md" onClick={openCreate}><PlusIcon className="w-5 h-5" />Yeni Etiket</Button>
                 </div>
                 <div className="admin-card p-4"><Input type="text" placeholder="Etiket ara..." value={search} onChange={(e) => setSearch(e.target.value)} className="max-w-md" /></div>
-                <div className="admin-card p-6">
-                    {loading ? (<div className="text-center py-12"><Spinner size="lg" className="mx-auto" /></div>)
-                        : tags.length === 0 ? (<div className="text-center py-12 text-muted">Etiket yok</div>)
-                            : (<div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
-                                {tags.map((t) => (<div key={t.id} className="p-4 rounded-lg border border-border hover:border-border-strong">
-                                    <div className="flex items-center justify-between">
-                                        <div className="flex items-center gap-2"><div className="w-4 h-4 rounded-full" style={{ backgroundColor: t.color || defaultTagColor }}></div><span className="font-medium text-heading">{t.name}</span></div>
-                                        <div className="flex gap-1"><Button variant="secondary" onClick={() => openEdit(t)} className="p-1 text-muted hover:text-heading"><PencilIcon className="h-4 w-4" /></Button><Button variant="secondary" onClick={() => setDeleteConfirm(t.id)} className="p-1 text-danger-600 hover:text-danger-300" disabled={t.usageCount > 0}><TrashIcon className="h-4 w-4" /></Button></div>
-                                    </div>
-                                    <div className="mt-2 flex items-center gap-2"><TagIcon className="h-4 w-4 text-muted" /><span className="text-sm text-muted">{t.usageCount} ürün</span>{!t.isActive && <span className="px-2 text-xs bg-body text-muted rounded">Pasif</span>}</div>
-                                </div>))}
-                            </div>)}
-                </div>
+                <DataTable
+                    columns={columns}
+                    data={tags}
+                    loading={loading}
+                    emptyText="Etiket yok"
+                    getRowId={(t) => t.id}
+                />
             </div>
             {showModal && (<div className="fixed inset-0 bg-heading bg-opacity-50 flex items-center justify-center z-50"><div className="bg-surface-elevated rounded-xl p-6 max-w-md w-full mx-4 border border-border">
                 <h2 className="text-xl font-semibold text-heading mb-4">{editingTag ? 'Düzenle' : 'Yeni Etiket'}</h2>

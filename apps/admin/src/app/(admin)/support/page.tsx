@@ -7,13 +7,16 @@ import {
   Checkbox,
   Input,
   Select,
-  Spinner,
   StatusBadge,
   Textarea,
+  enumLabel,
+  ticketStatusConfig,
+  ticketPriorityConfig,
+  ticketCategoryConfig,
 } from "@tarodan/ui";
 import type { StatusConfig } from "@tarodan/ui";
+import { DataTable, type ColumnDef } from "@/components/DataTable";
 import {
-  ChatBubbleLeftRightIcon,
   UserCircleIcon,
   ClockIcon,
   CheckCircleIcon,
@@ -272,6 +275,65 @@ export default function SupportPage() {
     return date.toLocaleDateString("tr-TR");
   };
 
+  const columns: ColumnDef<SupportTicket, any>[] = [
+    {
+      header: "Talep No",
+      cell: ({ row }) => (
+        <span className="text-xs text-muted">{row.original.ticketNumber}</span>
+      ),
+    },
+    {
+      header: "Konu",
+      cell: ({ row }) => (
+        <span className="text-heading font-medium line-clamp-1">
+          {row.original.subject}
+        </span>
+      ),
+    },
+    {
+      id: "creator",
+      header: () => (
+        <span className="flex items-center gap-1">
+          <UserCircleIcon className="h-4 w-4" />
+          Oluşturan
+        </span>
+      ),
+      cell: ({ row }) => (
+        <span className="text-sm text-muted">
+          {row.original.creator.displayName}
+        </span>
+      ),
+    },
+    {
+      header: "Kategori",
+      cell: ({ row }) => (
+        <span className="text-sm text-muted">
+          {enumLabel(ticketCategoryConfig, row.original.category, row.original.category)}
+        </span>
+      ),
+    },
+    {
+      header: "Öncelik",
+      cell: ({ row }) => (
+        <StatusBadge status={row.original.priority} config={priorityConfig} />
+      ),
+    },
+    {
+      header: "Durum",
+      cell: ({ row }) => (
+        <StatusBadge status={row.original.status} config={supportStatusConfig} />
+      ),
+    },
+    {
+      header: "Oluşturma",
+      cell: ({ row }) => (
+        <span className="text-xs text-muted">
+          {formatTime(row.original.createdAt)}
+        </span>
+      ),
+    },
+  ];
+
   return (
     <>
       <div className="flex h-[calc(100vh-8rem)]">
@@ -347,56 +409,15 @@ export default function SupportPage() {
           </div>
 
           {/* Ticket List */}
-          <div className="flex-1 overflow-y-auto">
-            {loading ? (
-              <div className="flex items-center justify-center h-32">
-                <Spinner size="lg" />
-              </div>
-            ) : tickets.length === 0 ? (
-              <div className="flex flex-col items-center justify-center h-32 text-muted">
-                <ChatBubbleLeftRightIcon className="h-8 w-8 mb-2" />
-                <p>Destek talebi bulunamadı</p>
-              </div>
-            ) : (
-              tickets.map((ticket) => (
-                <Button
-                  variant="secondary"
-                  key={ticket.id}
-                  onClick={() => loadTicketDetails(ticket.id)}
-                  className={`w-full p-4 border-b border-border text-left hover:bg-surface-alt/50 transition-colors ${
-                    selectedTicket?.id === ticket.id ? "bg-surface-alt" : ""
-                  }`}
-                >
-                  <div className="flex items-start justify-between gap-2 mb-2">
-                    <span className="text-xs text-muted">
-                      {ticket.ticketNumber}
-                    </span>
-                    <StatusBadge
-                      status={ticket.status}
-                      config={supportStatusConfig}
-                    />
-                  </div>
-                  <h3 className="text-heading font-medium mb-1 line-clamp-1">
-                    {ticket.subject}
-                  </h3>
-                  <div className="flex items-center gap-2 text-sm text-muted">
-                    <UserCircleIcon className="h-4 w-4" />
-                    <span>{ticket.creator.displayName}</span>
-                    <span>•</span>
-                    <span>{getCategoryLabel(ticket.category)}</span>
-                  </div>
-                  <div className="flex items-center justify-between mt-2">
-                    <StatusBadge
-                      status={ticket.priority}
-                      config={priorityConfig}
-                    />
-                    <span className="text-xs text-muted">
-                      {formatTime(ticket.createdAt)}
-                    </span>
-                  </div>
-                </Button>
-              ))
-            )}
+          <div className="flex-1 overflow-y-auto p-4">
+            <DataTable
+              columns={columns}
+              data={tickets}
+              loading={loading}
+              emptyText="Destek talebi bulunamadı"
+              getRowId={(t) => t.id}
+              onRowClick={(t) => loadTicketDetails(t.id)}
+            />
           </div>
         </div>
 

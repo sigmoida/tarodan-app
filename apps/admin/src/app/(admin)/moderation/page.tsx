@@ -18,6 +18,7 @@ import {
   ArrowPathIcon,
 } from '@heroicons/react/24/outline';
 import Image from 'next/image';
+import { AdminTabs } from '@/components/AdminTabs';
 
 interface ModerationItem {
   id: string;
@@ -195,10 +196,10 @@ const ModerationPage = () => {
   };
 
   const tabs = [
-    { id: 'all', name: 'Tümü' },
-    { id: 'product', name: 'Ürünler' },
-    { id: 'message', name: 'Mesajlar' },
-    { id: 'review', name: 'Değerlendirmeler' },
+    { key: 'all', label: 'Tümü' },
+    { key: 'product', label: 'Ürünler' },
+    { key: 'message', label: 'Mesajlar' },
+    { key: 'review', label: 'Değerlendirmeler' },
   ];
 
   return (
@@ -270,19 +271,12 @@ const ModerationPage = () => {
           <h3 className="text-lg font-semibold text-heading mb-4">Moderasyon Kuyruğu</h3>
           
           {/* Tabs */}
-          <div className="flex space-x-2 mb-6">
-            {tabs.map((tab) => (
-              <Button variant="secondary" key={tab.id}
-                onClick={() => { setSelectedTab(tab.id); setPage(1); }}
-                className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
-                  selectedTab === tab.id
-                    ? 'bg-primary-500 text-heading'
-                    : 'bg-surface-alt text-muted hover:bg-surface-alt'
-                }`}>
-                {tab.name}
-              </Button>
-            ))}
-          </div>
+          <AdminTabs
+            tabs={tabs}
+            value={selectedTab}
+            onChange={(k) => { setSelectedTab(k as string); setPage(1); }}
+            className="mb-6"
+          />
 
           {/* Content */}
           {loading ? (

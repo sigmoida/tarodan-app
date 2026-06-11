@@ -53,6 +53,9 @@ import {
   ApproveProductDto,
   RejectProductDto,
   BanUserDto,
+  AssignAdminStaffDto,
+  UpdateAdminStaffDto,
+  UpdateStaffSettingsDto,
   ResolveDisputeDto,
   AnalyticsQueryDto,
   UpdateOrderStatusDto,
@@ -214,6 +217,68 @@ export class AdminController {
   @ApiParam({ name: 'id', description: 'User ID' })
   async getUserById(@Param('id') id: string) {
     return this.adminService.getUserById(id);
+  }
+
+  // ==================== ADMIN STAFF (admin rol yönetimi) ====================
+  // Atama/güncelleme/kaldırma: super_admin her zaman; admin yalnız ayar açıksa (servis enforce eder,
+  // super_admin rolüne admin dokunamaz). Ayar değiştirme yalnız super_admin.
+
+  @Get('staff')
+  @Roles(AdminRole.super_admin, AdminRole.admin)
+  @ApiOperation({ summary: 'List admin staff with roles' })
+  async listAdminStaff() {
+    return this.adminService.listAdminStaff();
+  }
+
+  @Get('staff/settings')
+  @Roles(AdminRole.super_admin, AdminRole.admin)
+  @ApiOperation({ summary: 'Get staff-role assignment settings (admin can assign?)' })
+  async getStaffSettings() {
+    return this.adminService.getStaffSettings();
+  }
+
+  @Patch('staff/settings')
+  @Roles(AdminRole.super_admin)
+  @ApiOperation({ summary: 'Toggle whether admins can assign roles (super_admin only)' })
+  async setStaffSettings(
+    @CurrentUser('id') adminId: string,
+    @Body() dto: UpdateStaffSettingsDto,
+  ) {
+    return this.adminService.setStaffSettings(adminId, dto);
+  }
+
+  @Post('staff')
+  @Roles(AdminRole.super_admin, AdminRole.admin)
+  @HttpCode(HttpStatus.CREATED)
+  @ApiOperation({ summary: 'Assign an admin role to a user by email (creates account if missing)' })
+  async assignAdminStaff(
+    @CurrentUser('id') adminId: string,
+    @Body() dto: AssignAdminStaffDto,
+  ) {
+    return this.adminService.assignAdminStaff(adminId, dto);
+  }
+
+  @Patch('staff/:id')
+  @Roles(AdminRole.super_admin, AdminRole.admin)
+  @ApiOperation({ summary: 'Update an admin staff role/active state' })
+  @ApiParam({ name: 'id', description: 'AdminUser ID' })
+  async updateAdminStaff(
+    @Param('id') id: string,
+    @CurrentUser('id') adminId: string,
+    @Body() dto: UpdateAdminStaffDto,
+  ) {
+    return this.adminService.updateAdminStaff(adminId, id, dto);
+  }
+
+  @Delete('staff/:id')
+  @Roles(AdminRole.super_admin, AdminRole.admin)
+  @ApiOperation({ summary: 'Revoke admin access' })
+  @ApiParam({ name: 'id', description: 'AdminUser ID' })
+  async removeAdminStaff(
+    @Param('id') id: string,
+    @CurrentUser('id') adminId: string,
+  ) {
+    return this.adminService.removeAdminStaff(adminId, id);
   }
 
   // ==================== PRODUCT MANAGEMENT ====================

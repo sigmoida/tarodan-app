@@ -9,10 +9,10 @@ import {
   Button,
   Input,
   Select,
-  Spinner,
   StatusBadge,
   orderStatusConfig,
 } from "@tarodan/ui";
+import { DataTable, type ColumnDef } from "@/components/DataTable";
 import {
   MagnifyingGlassIcon,
   EyeIcon,
@@ -247,6 +247,157 @@ export default function OrdersPage() {
 
   const totalPages = Math.max(1, Math.ceil(total / 20));
 
+  const columns: ColumnDef<Order, any>[] = [
+    {
+      header: "Sipariş No",
+      cell: ({ row }) => (
+        <Link
+          href={`/orders/${row.original.id}`}
+          className="font-mono text-sm text-primary-600 hover:underline"
+        >
+          {row.original.orderNumber}
+        </Link>
+      ),
+    },
+    {
+      header: "Durum",
+      cell: ({ row }) =>
+        editingOrderId === row.original.id ? (
+          <div className="flex items-center gap-1.5">
+            <Select
+              value={newStatus}
+              onChange={(e) => setNewStatus(e.target.value)}
+              className="w-32"
+              selectSize="sm"
+              disabled={updatingStatus}
+            >
+              <option value="pending_payment">Ödeme Bekliyor</option>
+              <option value="paid">Ödendi</option>
+              <option value="preparing">Hazırlanıyor</option>
+              <option value="shipped">Kargoda</option>
+              <option value="delivered">Teslim Edildi</option>
+              <option value="completed">Tamamlandı</option>
+              <option value="cancelled">İptal</option>
+            </Select>
+            <Button
+              variant="secondary"
+              onClick={() => updateOrderStatus(row.original.id)}
+              disabled={updatingStatus}
+              className="p-1 text-success-600 hover:bg-success-50 rounded"
+              title="Kaydet"
+            >
+              <CheckIcon className="h-4 w-4" />
+            </Button>
+            <Button
+              variant="secondary"
+              onClick={cancelEditing}
+              disabled={updatingStatus}
+              className="p-1 text-danger-500 hover:bg-danger-50 rounded"
+              title="İptal"
+            >
+              <XMarkIcon className="h-4 w-4" />
+            </Button>
+          </div>
+        ) : (
+          <div className="flex flex-col items-start gap-1">
+            <StatusBadge
+              status={row.original.status}
+              config={orderStatusConfig}
+            />
+            {row.original.status === "cancelled" &&
+              cancelReasonLabel(row.original.cancelReason) && (
+                <span className="text-xs text-muted">
+                  {cancelReasonLabel(row.original.cancelReason)} ·{" "}
+                  {orderOriginLabel(row.original.offerId)} iptali
+                </span>
+              )}
+          </div>
+        ),
+    },
+    {
+      header: "Alıcı",
+      cell: ({ row }) => (
+        <Link
+          href={`/users/${row.original.buyer.id}`}
+          className="text-sm text-heading hover:text-primary-600"
+        >
+          {row.original.buyer.displayName}
+        </Link>
+      ),
+    },
+    {
+      header: "Satıcı",
+      cell: ({ row }) => (
+        <Link
+          href={`/users/${row.original.seller.id}`}
+          className="text-sm text-heading hover:text-primary-600"
+        >
+          {row.original.seller.displayName}
+        </Link>
+      ),
+    },
+    {
+      header: "Ürün",
+      cell: ({ row }) => (
+        <span
+          className="text-sm text-body truncate block max-w-[180px]"
+          title={row.original.product?.title}
+        >
+          {row.original.product?.title || `${row.original.itemCount} adet`}
+        </span>
+      ),
+    },
+    {
+      id: "amount",
+      header: () => <span className="block text-right">Tutar</span>,
+      cell: ({ row }) => (
+        <div className="text-right text-primary-600 font-medium text-sm tabular-nums">
+          ₺{row.original.totalAmount.toLocaleString("tr-TR")}
+        </div>
+      ),
+    },
+    {
+      id: "commission",
+      header: () => <span className="block text-right">Komisyon</span>,
+      cell: ({ row }) => (
+        <div className="text-right text-success-600 text-sm tabular-nums">
+          ₺{row.original.commission.toLocaleString("tr-TR")}
+        </div>
+      ),
+    },
+    {
+      header: "Tarih",
+      cell: ({ row }) => (
+        <span className="whitespace-nowrap text-sm text-muted">
+          {new Date(row.original.createdAt).toLocaleDateString("tr-TR")}
+        </span>
+      ),
+    },
+    {
+      id: "actions",
+      header: () => <span className="block text-center">İşlemler</span>,
+      cell: ({ row }) => (
+        <div className="flex items-center justify-center gap-1">
+          <Button
+            variant="secondary"
+            onClick={() => startEditing(row.original)}
+            className="p-1.5 text-subtle hover:text-info-600 hover:bg-info-50 rounded-md transition-colors"
+            title="Durumu Değiştir"
+          >
+            <PencilIcon className="h-4 w-4" />
+          </Button>
+          <Link
+            href={`/orders/${row.original.id}`}
+            className="p-1.5 text-subtle hover:text-body hover:bg-surface-alt rounded-md transition-colors"
+            title="Detay"
+          >
+            <EyeIcon className="h-4 w-4" />
+          </Link>
+        </div>
+      ),
+    },
+  ];
+
   return (
     <div className="space-y-6">
       <div>
@@ -355,162 +506,17 @@ export default function OrdersPage() {
       </div>
 
       {/* Table */}
-      <div className="admin-card overflow-hidden">
-        <div className="overflow-x-auto">
-          <table className="admin-table">
-            <thead>
-              <tr>
-                <th>Sipariş No</th>
-                <th>Durum</th>
-                <th>Alıcı</th>
-                <th>Satıcı</th>
-                <th>Ürün</th>
-                <th className="text-right">Tutar</th>
-                <th className="text-right">Komisyon</th>
-                <th>Tarih</th>
-                <th className="text-center">İşlemler</th>
-              </tr>
-            </thead>
-            <tbody>
-              {loading ? (
-                <tr>
-                  <td colSpan={9} className="text-center py-12">
-                    <Spinner size="lg" className="mx-auto" />
-                  </td>
-                </tr>
-              ) : orders.length === 0 ? (
-                <tr>
-                  <td colSpan={9} className="text-center py-12 text-subtle">
-                    {debouncedSearch || status !== "all" || selectedUserId
-                      ? "Filtreye uygun sipariş bulunamadı"
-                      : "Henüz sipariş yok"}
-                  </td>
-                </tr>
-              ) : (
-                orders.map((order) => (
-                  <tr key={order.id} className="group hover:bg-surface/50">
-                    <td>
-                      <Link
-                        href={`/orders/${order.id}`}
-                        className="font-mono text-sm text-primary-600 hover:underline"
-                      >
-                        {order.orderNumber}
-                      </Link>
-                    </td>
-                    <td>
-                      {editingOrderId === order.id ? (
-                        <div className="flex items-center gap-1.5">
-                          <Select
-                            value={newStatus}
-                            onChange={(e) => setNewStatus(e.target.value)}
-                            className="w-32"
-                            selectSize="sm"
-                            disabled={updatingStatus}
-                          >
-                            <option value="pending_payment">
-                              Ödeme Bekliyor
-                            </option>
-                            <option value="paid">Ödendi</option>
-                            <option value="preparing">Hazırlanıyor</option>
-                            <option value="shipped">Kargoda</option>
-                            <option value="delivered">Teslim Edildi</option>
-                            <option value="completed">Tamamlandı</option>
-                            <option value="cancelled">İptal</option>
-                          </Select>
-                          <Button
-                            variant="secondary"
-                            onClick={() => updateOrderStatus(order.id)}
-                            disabled={updatingStatus}
-                            className="p-1 text-success-600 hover:bg-success-50 rounded"
-                            title="Kaydet"
-                          >
-                            <CheckIcon className="h-4 w-4" />
-                          </Button>
-                          <Button
-                            variant="secondary"
-                            onClick={cancelEditing}
-                            disabled={updatingStatus}
-                            className="p-1 text-danger-500 hover:bg-danger-50 rounded"
-                            title="İptal"
-                          >
-                            <XMarkIcon className="h-4 w-4" />
-                          </Button>
-                        </div>
-                      ) : (
-                        <div className="flex flex-col items-start gap-1">
-                          <StatusBadge
-                            status={order.status}
-                            config={orderStatusConfig}
-                          />
-                          {order.status === "cancelled" &&
-                            cancelReasonLabel(order.cancelReason) && (
-                              <span className="text-xs text-muted">
-                                {cancelReasonLabel(order.cancelReason)} ·{" "}
-                                {orderOriginLabel(order.offerId)} iptali
-                              </span>
-                            )}
-                        </div>
-                      )}
-                    </td>
-                    <td>
-                      <Link
-                        href={`/users/${order.buyer.id}`}
-                        className="text-sm text-heading hover:text-primary-600"
-                      >
-                        {order.buyer.displayName}
-                      </Link>
-                    </td>
-                    <td>
-                      <Link
-                        href={`/users/${order.seller.id}`}
-                        className="text-sm text-heading hover:text-primary-600"
-                      >
-                        {order.seller.displayName}
-                      </Link>
-                    </td>
-                    <td>
-                      <span
-                        className="text-sm text-body truncate block max-w-[180px]"
-                        title={order.product?.title}
-                      >
-                        {order.product?.title || `${order.itemCount} adet`}
-                      </span>
-                    </td>
-                    <td className="text-right text-primary-600 font-medium text-sm tabular-nums">
-                      ₺{order.totalAmount.toLocaleString("tr-TR")}
-                    </td>
-                    <td className="text-right text-success-600 text-sm tabular-nums">
-                      ₺{order.commission.toLocaleString("tr-TR")}
-                    </td>
-                    <td className="whitespace-nowrap text-sm text-muted">
-                      {new Date(order.createdAt).toLocaleDateString("tr-TR")}
-                    </td>
-                    <td>
-                      <div className="flex items-center justify-center gap-1">
-                        <Button
-                          variant="secondary"
-                          onClick={() => startEditing(order)}
-                          className="p-1.5 text-subtle hover:text-info-600 hover:bg-info-50 rounded-md transition-colors"
-                          title="Durumu Değiştir"
-                        >
-                          <PencilIcon className="h-4 w-4" />
-                        </Button>
-                        <Link
-                          href={`/orders/${order.id}`}
-                          className="p-1.5 text-subtle hover:text-body hover:bg-surface-alt rounded-md transition-colors"
-                          title="Detay"
-                        >
-                          <EyeIcon className="h-4 w-4" />
-                        </Link>
-                      </div>
-                    </td>
-                  </tr>
-                ))
-              )}
-            </tbody>
-          </table>
-        </div>
-      </div>
+      <DataTable
+        columns={columns}
+        data={orders}
+        loading={loading}
+        emptyText={
+          debouncedSearch || status !== "all" || selectedUserId
+            ? "Filtreye uygun sipariş bulunamadı"
+            : "Henüz sipariş yok"
+        }
+        getRowId={(o) => o.id}
+      />
 
       {/* Pagination */}
       {total > 0 && (

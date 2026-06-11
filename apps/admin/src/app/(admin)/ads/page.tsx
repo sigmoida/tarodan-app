@@ -21,6 +21,7 @@ import {
 } from '@heroicons/react/24/outline';
 import toast from 'react-hot-toast';
 import { Badge, Button, Checkbox, IconButton, Input, Select, Spinner } from '@tarodan/ui';
+import { useConfirm } from '@/components/ConfirmProvider';
 
 // IAB Standard Ad Sizes
 const IAB_SIZES = [
@@ -77,6 +78,7 @@ const defaultForm = {
 };
 
 export default function AdsPage() {
+  const confirm = useConfirm();
   const [ads, setAds] = useState<Ad[]>([]);
   const [loading, setLoading] = useState(true);
   const [modalOpen, setModalOpen] = useState(false);
@@ -278,7 +280,7 @@ export default function AdsPage() {
   };
 
   const handleDelete = async (id: string) => {
-    if (!confirm('Bu reklamı silmek istediğinize emin misiniz?')) return;
+    if (!(await confirm({ description: 'Bu reklamı silmek istediğinize emin misiniz?', destructive: true }))) return;
     try {
       await adminApi.deleteAd(id);
       toast.success('Reklam silindi');

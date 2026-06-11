@@ -39,11 +39,40 @@ api.interceptors.request.use(
   }
 );
 
-// Response interceptor to handle errors
+// Oturumu sonlandır (refresh de başarısızsa).
+function forceLogout() {
+  if (typeof window === 'undefined') return;
+  localStorage.removeItem('admin_token');
+  localStorage.removeItem('admin_refresh_token');
+  localStorage.removeItem('admin_user');
+  window.location.href = '/login';
+}
+
+// Eşzamanlı 401'lerde tek refresh yapmak için kuyruk.
+let isRefreshing = false;
+let refreshQueue: Array<(token: string | null) => void> = [];
+const flushQueue = (token: string | null) => {
+  refreshQueue.forEach((cb) => cb(token));
+  refreshQueue = [];
+};
+
+function persistAccessToken(token: string) {
+  localStorage.setItem('admin_token', token);
+  const maxAge = 24 * 60 * 60;
+  document.cookie = `admin_token=${token}; path=/; max-age=${maxAge}; SameSite=Lax`;
+}
+
+const isAuthUrl = (url: string) =>
+  url.includes('/auth/admin/login') ||
+  url.includes('/auth/login') ||
+  url.includes('/auth/refresh') ||
+  url.includes('/auth/forgot-password') ||
+  url.includes('/auth/reset-password');
+
+// Response interceptor: 401'de refresh token'la sessizce yenile, sonra isteği tekrarla.
 api.interceptors.response.use(
   (response) => response,
-  (error) => {
-    // Log error for debugging
+  async (error) => {
     if (process.env.NODE_ENV === 'development') {
       console.error('API Error:', {
         url: error.config?.url,
@@ -54,24 +83,73 @@ api.interceptors.response.use(
       });
     }
 
-    if (error.response?.status === 401) {
-      if (typeof window !== 'undefined') {
-        localStorage.removeItem('admin_token');
-        localStorage.removeItem('admin_user');
-        window.location.href = '/login';
+    const originalRequest = error.config || {};
+    const status = error.response?.status;
+    const reqUrl: string = originalRequest.url || '';
+
+    if (
+      status === 401 &&
+      typeof window !== 'undefined' &&
+      !isAuthUrl(reqUrl) &&
+      !originalRequest._retry
+    ) {
+      const refreshToken = localStorage.getItem('admin_refresh_token');
+      if (!refreshToken) {
+        forceLogout();
+        return Promise.reject(error);
+      }
+      originalRequest._retry = true;
+
+      // Zaten bir refresh sürüyorsa kuyruğa gir, bitince tekrarla.
+      if (isRefreshing) {
+        return new Promise((resolve, reject) => {
+          refreshQueue.push((token) => {
+            if (token) {
+              originalRequest.headers = originalRequest.headers || {};
+              originalRequest.headers.Authorization = `Bearer ${token}`;
+              resolve(api(originalRequest));
+            } else {
+              reject(error);
+            }
+          });
+        });
+      }
+
+      isRefreshing = true;
+      try {
+        // Interceptor'sız ham axios ile yenile (sonsuz döngü olmasın, eski token gitmesin).
+        const resp = await axios.post(`${API_URL}/api/auth/refresh`, {
+          refreshToken,
+        });
+        const newAccess: string | undefined =
+          resp.data?.accessToken ?? resp.data?.tokens?.accessToken;
+        const newRefresh: string | undefined =
+          resp.data?.refreshToken ?? resp.data?.tokens?.refreshToken;
+        if (!newAccess) throw new Error('Yenileme yanıtında token yok');
+
+        persistAccessToken(newAccess);
+        if (newRefresh) localStorage.setItem('admin_refresh_token', newRefresh);
+        flushQueue(newAccess);
+
+        originalRequest.headers = originalRequest.headers || {};
+        originalRequest.headers.Authorization = `Bearer ${newAccess}`;
+        return api(originalRequest);
+      } catch (refreshErr) {
+        flushQueue(null);
+        forceLogout();
+        return Promise.reject(refreshErr);
+      } finally {
+        isRefreshing = false;
       }
     }
 
-    // Handle network errors
     if (!error.response) {
-      if (process.env.NODE_ENV === 'development') {
-        console.error('Network Error:', error.message);
-      }
-      error.message = 'Sunucuya bağlanılamadı. Lütfen internet bağlantınızı kontrol edin.';
+      error.message =
+        'Sunucuya bağlanılamadı. Lütfen internet bağlantınızı kontrol edin.';
     }
 
     return Promise.reject(error);
-  }
+  },
 );
 
 // API endpoints (api is the axios instance; use api.get/post etc. for custom paths)
@@ -101,6 +179,17 @@ export const adminApi = {
   updateUser: (id: string, data: any) => api.patch(`/admin/users/${id}`, data),
   banUser: (id: string, reason: string) => api.post(`/admin/users/${id}/ban`, { reason }),
   unbanUser: (id: string) => api.post(`/admin/users/${id}/unban`),
+
+  // Admin Staff (roller & atamalar)
+  getStaff: () => api.get('/admin/staff'),
+  assignStaff: (data: { email: string; role: string; password?: string; displayName?: string }) =>
+    api.post('/admin/staff', data),
+  updateStaff: (id: string, data: { role?: string; isActive?: boolean }) =>
+    api.patch(`/admin/staff/${id}`, data),
+  removeStaff: (id: string) => api.delete(`/admin/staff/${id}`),
+  getStaffSettings: () => api.get('/admin/staff/settings'),
+  setStaffSettings: (allowAdminAssign: boolean) =>
+    api.patch('/admin/staff/settings', { allowAdminAssign }),
 
   // Products
   getProducts: (params?: any) => api.get('/admin/products', { params }),

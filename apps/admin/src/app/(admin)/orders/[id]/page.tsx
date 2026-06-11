@@ -17,7 +17,17 @@ import { adminApi } from '@/lib/api';
 import { getProductEffectivePrice } from '@/lib/productPrice';
 import { cancelReasonLabel, orderOriginLabel } from '@/lib/utils';
 import toast from 'react-hot-toast';
-import { Button, Input, Select, Spinner, Textarea } from '@tarodan/ui';
+import {
+  Button,
+  Input,
+  Select,
+  Spinner,
+  Textarea,
+  enumLabel,
+  paymentStatusConfig,
+  paymentProviderConfig,
+  shipmentStatusConfig,
+} from '@tarodan/ui';
 import { AdminFinancialSummary } from '@/components/AdminFinancialSummary';
 import { colors as dsColors } from '@tarodan/ui';
 import { AwaitingConfirmationCard } from '@/components/orders/AwaitingConfirmationCard';
@@ -353,12 +363,16 @@ export default function OrderDetailPage() {
         <main className="max-w-6xl mx-auto px-4 py-8">
           {/* Header */}
           <div className="flex items-center gap-4 mb-8">
-            <Link
-              href="/orders"
+            <button
+              type="button"
+              onClick={() =>
+                window.history.length > 1 ? router.back() : router.push('/orders')
+              }
+              aria-label="Geri"
               className="p-2 hover:bg-border-subtle rounded-lg transition-colors"
             >
               <ArrowLeftIcon className="w-6 h-6 text-muted" />
-            </Link>
+            </button>
             <div className="flex-1">
               <h1 className="text-3xl font-bold text-heading">Sipariş #{order.orderNumber}</h1>
               <p className="text-sm text-muted">
@@ -492,7 +506,7 @@ export default function OrderDetailPage() {
                   <div className="space-y-2">
                     <div className="flex justify-between">
                       <span className="text-muted">Durum:</span>
-                      <span className="font-medium capitalize text-heading">{order.payment.status}</span>
+                      <span className="font-medium text-heading">{enumLabel(paymentStatusConfig, order.payment.status)}</span>
                     </div>
                     <div className="flex justify-between">
                       <span className="text-muted">Tutar:</span>
@@ -502,7 +516,7 @@ export default function OrderDetailPage() {
                     </div>
                     <div className="flex justify-between">
                       <span className="text-muted">Sağlayıcı:</span>
-                      <span className="uppercase text-heading">{order.payment.provider}</span>
+                      <span className="text-heading">{enumLabel(paymentProviderConfig, order.payment.provider)}</span>
                     </div>
                     <Link
                       href={`/payments/${order.payment.id}`}
@@ -537,7 +551,7 @@ export default function OrderDetailPage() {
                     {order.shipment.status && (
                       <div className="flex justify-between">
                         <span className="text-muted">Durum:</span>
-                        <span className="font-medium capitalize text-heading">{order.shipment.status}</span>
+                        <span className="font-medium text-heading">{enumLabel(shipmentStatusConfig, order.shipment.status)}</span>
                       </div>
                     )}
                   </div>

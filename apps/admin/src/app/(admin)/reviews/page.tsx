@@ -2,8 +2,10 @@
 
 import { useState, useEffect } from 'react';
 import { adminApi } from '@/lib/api';
-import { Button, Input, Select, Spinner, StatusBadge } from '@tarodan/ui';
+import { Button, Input, Select, StatusBadge } from '@tarodan/ui';
 import type { StatusConfig } from '@tarodan/ui';
+import { AdminTabs } from '@/components/AdminTabs';
+import { DataTable, type ColumnDef } from '@/components/DataTable';
 import {
     CheckCircleIcon,
     XCircleIcon,
@@ -180,6 +182,207 @@ export default function ReviewsPage() {
         spam: { label: 'Spam', variant: 'secondary' },
     };
 
+    const sellerColumns: ColumnDef<UserRating, any>[] = [
+        {
+            header: 'Gönderen',
+            cell: ({ row }) => (
+                <>
+                    <p className="text-sm text-heading">{row.original.giver.displayName}</p>
+                    <p className="text-xs text-muted">{row.original.giver.email}</p>
+                </>
+            ),
+        },
+        {
+            header: 'Alıcı (Satıcı)',
+            cell: ({ row }) => (
+                <>
+                    <p className="text-sm text-heading">{row.original.receiver.displayName}</p>
+                    <p className="text-xs text-muted">{row.original.receiver.email}</p>
+                </>
+            ),
+        },
+        {
+            header: 'Puan',
+            cell: ({ row }) => renderStars(row.original.score),
+        },
+        {
+            header: 'Yorum',
+            cell: ({ row }) => (
+                <p className="text-sm text-muted line-clamp-3">{row.original.comment || '-'}</p>
+            ),
+        },
+        {
+            header: 'Durum',
+            cell: ({ row }) => <StatusBadge status={row.original.status || 'approved'} config={reviewStatusConfig} />,
+        },
+        {
+            header: 'Kaynak',
+            cell: ({ row }) => (
+                <span className="text-xs text-muted">
+                    {row.original.orderId ? 'Sipariş' : row.original.tradeId ? 'Takas' : '-'}
+                </span>
+            ),
+        },
+        {
+            header: 'Tarih',
+            cell: ({ row }) => (
+                <span className="text-sm text-muted">
+                    {format(new Date(row.original.createdAt), 'dd MMM yyyy', { locale: tr })}
+                </span>
+            ),
+        },
+        {
+            id: 'actions',
+            header: 'İşlemler',
+            cell: ({ row }) => {
+                const r = row.original;
+                return (
+                    <div className="flex items-center justify-end gap-2">
+                        {(r.status === 'pending' || !r.status) && (
+                            <>
+                                <Button variant="secondary" onClick={() => handleSellerStatusUpdate(r.id, 'approved')}
+                                    className="p-1.5 text-success-700 hover:bg-success-400/10 rounded-lg"
+                                    title="Onayla">
+                                    <CheckCircleIcon className="w-5 h-5" />
+                                </Button>
+                                <Button variant="secondary" onClick={() => handleSellerStatusUpdate(r.id, 'rejected')}
+                                    className="p-1.5 text-danger-600 hover:bg-danger-400/10 rounded-lg"
+                                    title="Reddet">
+                                    <XCircleIcon className="w-5 h-5" />
+                                </Button>
+                            </>
+                        )}
+                        <Button variant="secondary" onClick={(e) => { e.stopPropagation(); setDeleteSellerConfirm(r.id); }}
+                            className="p-1.5 text-muted hover:text-danger-600 hover:bg-danger-400/10 rounded-lg"
+                            title="Sil">
+                            <TrashIcon className="w-5 h-5" />
+                        </Button>
+                    </div>
+                );
+            },
+        },
+    ];
+
+    const productColumns: ColumnDef<Review, any>[] = [
+        {
+            header: 'Ürün',
+            cell: ({ row }) => {
+                const review = row.original;
+                return (
+                    <div className="flex items-center gap-3">
+                        {review.product.images?.[0] ? (
+                            <div className="w-10 h-10 relative rounded overflow-hidden flex-shrink-0">
+                                <Image
+                                    src={review.product.images[0].url}
+                                    alt={review.product.title}
+                                    fill
+                                    className="object-cover"
+                                />
+                            </div>
+                        ) : (
+                            <div className="w-10 h-10 bg-surface-alt rounded flex-shrink-0" />
+                        )}
+                        <div className="min-w-0">
+                            <p className="text-sm font-medium text-heading truncate max-w-[200px]" title={review.product.title}>
+                                {review.product.title}
+                            </p>
+                        </div>
+                    </div>
+                );
+            },
+        },
+        {
+            header: 'Kullanıcı',
+            cell: ({ row }) => {
+                const review = row.original;
+                return (
+                    <div className="flex items-center gap-2">
+                        <div className="w-8 h-8 rounded-full bg-primary-100 flex items-center justify-center flex-shrink-0 text-primary-600 font-bold text-xs">
+                            {review.user.displayName.charAt(0)}
+                        </div>
+                        <div>
+                            <p className="text-sm text-heading">{review.user.displayName}</p>
+                            {review.isVerifiedPurchase && (
+                                <span className="text-[10px] text-success-700 flex items-center gap-1">
+                                    <CheckCircleIcon className="w-3 h-3" />
+                                    Onaylı Alıcı
+                                </span>
+                            )}
+                        </div>
+                    </div>
+                );
+            },
+        },
+        {
+            header: 'Değerlendirme',
+            cell: ({ row }) => {
+                const review = row.original;
+                return (
+                    <div className="space-y-1">
+                        {renderStars(review.score)}
+                        {review.title && <p className="font-medium text-heading text-sm">{review.title}</p>}
+                        {review.review && <p className="text-muted text-sm line-clamp-3">{review.review}</p>}
+                        {review.adminReply && (
+                            <div className="mt-2 pl-3 border-l-2 border-primary-500">
+                                <p className="text-xs text-primary-400 font-medium">Satıcı Yanıtı:</p>
+                                <p className="text-xs text-muted">{review.adminReply}</p>
+                            </div>
+                        )}
+                    </div>
+                );
+            },
+        },
+        {
+            header: 'Durum',
+            cell: ({ row }) => <StatusBadge status={row.original.status} config={reviewStatusConfig} />,
+        },
+        {
+            header: 'Tarih',
+            cell: ({ row }) => (
+                <span className="text-sm text-muted">
+                    {format(new Date(row.original.createdAt), 'dd MMM yyyy', { locale: tr })}
+                </span>
+            ),
+        },
+        {
+            id: 'actions',
+            header: 'İşlemler',
+            cell: ({ row }) => {
+                const review = row.original;
+                return (
+                    <div className="flex items-center justify-end gap-2">
+                        {review.status === 'pending' && (
+                            <>
+                                <Button variant="secondary" onClick={() => handleStatusUpdate(review.id, 'approved')}
+                                    className="p-1.5 text-success-700 hover:bg-success-400/10 rounded-lg"
+                                    title="Onayla">
+                                    <CheckCircleIcon className="w-5 h-5" />
+                                </Button>
+                                <Button variant="secondary" onClick={() => handleStatusUpdate(review.id, 'rejected')}
+                                    className="p-1.5 text-danger-600 hover:bg-danger-400/10 rounded-lg"
+                                    title="Reddet">
+                                    <XCircleIcon className="w-5 h-5" />
+                                </Button>
+                            </>
+                        )}
+                        {(review.status === 'approved' || review.status === 'pending') && (
+                            <Button variant="secondary" onClick={() => handleStatusUpdate(review.id, 'spam')}
+                                className="p-1.5 text-warning-700 hover:bg-warning-400/10 rounded-lg"
+                                title="Spam Olarak İşaretle">
+                                <ExclamationTriangleIcon className="w-5 h-5" />
+                            </Button>
+                        )}
+                        <Button variant="secondary" onClick={() => setDeleteConfirm(review.id)}
+                            className="p-1.5 text-muted hover:text-danger-600 hover:bg-danger-400/10 rounded-lg"
+                            title="Sil">
+                            <TrashIcon className="w-5 h-5" />
+                        </Button>
+                    </div>
+                );
+            },
+        },
+    ];
+
     return (
         <>
             <div className="space-y-6">
@@ -233,97 +436,25 @@ export default function ReviewsPage() {
                 </div>
 
                 {/* Tabs */}
-                <div className="flex gap-1 border-b border-border">
-                    <Button variant="secondary" onClick={() => setActiveTab('product')}
-                        className={`px-4 py-2.5 text-sm font-medium border-b-2 transition-colors ${activeTab === 'product' ? 'border-primary-500 text-primary-600' : 'border-transparent text-muted hover:text-body'}`}>
-                        Ürün Yorumları
-                    </Button>
-                    <Button variant="secondary" onClick={() => setActiveTab('seller')}
-                        className={`px-4 py-2.5 text-sm font-medium border-b-2 transition-colors ${activeTab === 'seller' ? 'border-primary-500 text-primary-600' : 'border-transparent text-muted hover:text-body'}`}>
-                        Satıcı Yorumları
-                    </Button>
-                </div>
+                <AdminTabs
+                    tabs={[
+                        { key: 'product', label: 'Ürün Yorumları' },
+                        { key: 'seller', label: 'Satıcı Yorumları' },
+                    ]}
+                    value={activeTab}
+                    onChange={(k) => setActiveTab(k as 'product' | 'seller')}
+                />
 
                 {/* Product Reviews List */}
                 {activeTab === 'seller' ? (
-                <div className="admin-card overflow-hidden">
-                    {sellerLoading ? (
-                        <div className="text-center py-12">
-                            <Spinner size="lg" className="mx-auto" />
-                            <p className="text-muted mt-4">Yükleniyor...</p>
-                        </div>
-                    ) : sellerRatings.length === 0 ? (
-                        <div className="text-center py-12 text-muted">Satıcı yorumu bulunamadı</div>
-                    ) : (
-                        <div className="overflow-x-auto">
-                            <table className="admin-table">
-                                <thead>
-                                    <tr>
-                                        <th>Gönderen</th>
-                                        <th>Alıcı (Satıcı)</th>
-                                        <th>Puan</th>
-                                        <th>Yorum</th>
-                                        <th>Durum</th>
-                                        <th>Kaynak</th>
-                                        <th>Tarih</th>
-                                        <th className="text-right">İşlemler</th>
-                                    </tr>
-                                </thead>
-                                <tbody>
-                                    {sellerRatings.map((r) => (
-                                        <tr key={r.id}>
-                                            <td>
-                                                <p className="text-sm text-heading">{r.giver.displayName}</p>
-                                                <p className="text-xs text-muted">{r.giver.email}</p>
-                                            </td>
-                                            <td>
-                                                <p className="text-sm text-heading">{r.receiver.displayName}</p>
-                                                <p className="text-xs text-muted">{r.receiver.email}</p>
-                                            </td>
-                                            <td>{renderStars(r.score)}</td>
-                                            <td className="max-w-xs">
-                                                <p className="text-sm text-muted line-clamp-3">{r.comment || '-'}</p>
-                                            </td>
-                                            <td><StatusBadge status={r.status || 'approved'} config={reviewStatusConfig} /></td>
-                                            <td>
-                                                <span className="text-xs text-muted">
-                                                    {r.orderId ? 'Sipariş' : r.tradeId ? 'Takas' : '-'}
-                                                </span>
-                                            </td>
-                                            <td>
-                                                <span className="text-sm text-muted">
-                                                    {format(new Date(r.createdAt), 'dd MMM yyyy', { locale: tr })}
-                                                </span>
-                                            </td>
-                                            <td className="text-right">
-                                                <div className="flex items-center justify-end gap-2">
-                                                    {(r.status === 'pending' || !r.status) && (
-                                                        <>
-                                                            <Button variant="secondary" onClick={() => handleSellerStatusUpdate(r.id, 'approved')}
-                                                                className="p-1.5 text-success-700 hover:bg-success-400/10 rounded-lg"
-                                                                title="Onayla">
-                                                                <CheckCircleIcon className="w-5 h-5" />
-                                                            </Button>
-                                                            <Button variant="secondary" onClick={() => handleSellerStatusUpdate(r.id, 'rejected')}
-                                                                className="p-1.5 text-danger-600 hover:bg-danger-400/10 rounded-lg"
-                                                                title="Reddet">
-                                                                <XCircleIcon className="w-5 h-5" />
-                                                            </Button>
-                                                        </>
-                                                    )}
-                                                    <Button variant="secondary" onClick={(e) => { e.stopPropagation(); setDeleteSellerConfirm(r.id); }}
-                                                        className="p-1.5 text-muted hover:text-danger-600 hover:bg-danger-400/10 rounded-lg"
-                                                        title="Sil">
-                                                        <TrashIcon className="w-5 h-5" />
-                                                    </Button>
-                                                </div>
-                                            </td>
-                                        </tr>
-                                    ))}
-                                </tbody>
-                            </table>
-                        </div>
-                    )}
+                <div>
+                    <DataTable
+                        columns={sellerColumns}
+                        data={sellerRatings}
+                        loading={sellerLoading}
+                        emptyText="Satıcı yorumu bulunamadı"
+                        getRowId={(r) => r.id}
+                    />
                     {sellerTotalPages > 1 && (
                         <div className="flex justify-center mt-6 gap-2">
                             <Button variant="secondary" onClick={() => setSellerPage(p => Math.max(1, p - 1))} disabled={sellerPage === 1} className="px-3 py-1 bg-surface-alt text-heading rounded disabled:opacity-50">Önceki</Button>
@@ -333,124 +464,14 @@ export default function ReviewsPage() {
                     )}
                 </div>
                 ) : (
-                <div className="admin-card overflow-hidden">
-                    {loading ? (
-                        <div className="text-center py-12">
-                            <Spinner size="lg" className="mx-auto" />
-                            <p className="text-muted mt-4">Yükleniyor...</p>
-                        </div>
-                    ) : reviews.length === 0 ? (
-                        <div className="text-center py-12 text-muted">
-                            Yorum bulunamadı
-                        </div>
-                    ) : (
-                        <div className="overflow-x-auto">
-                            <table className="admin-table">
-                                <thead>
-                                    <tr>
-                                        <th>Ürün</th>
-                                        <th>Kullanıcı</th>
-                                        <th>Değerlendirme</th>
-                                        <th>Durum</th>
-                                        <th>Tarih</th>
-                                        <th className="text-right">İşlemler</th>
-                                    </tr>
-                                </thead>
-                                <tbody>
-                                    {reviews.map((review) => (
-                                        <tr key={review.id}>
-                                            <td className="w-64">
-                                                <div className="flex items-center gap-3">
-                                                    {review.product.images?.[0] ? (
-                                                        <div className="w-10 h-10 relative rounded overflow-hidden flex-shrink-0">
-                                                            <Image
-                                                                src={review.product.images[0].url}
-                                                                alt={review.product.title}
-                                                                fill
-                                                                className="object-cover"
-                                                            />
-                                                        </div>
-                                                    ) : (
-                                                        <div className="w-10 h-10 bg-surface-alt rounded flex-shrink-0" />
-                                                    )}
-                                                    <div className="min-w-0">
-                                                        <p className="text-sm font-medium text-heading truncate max-w-[200px]" title={review.product.title}>
-                                                            {review.product.title}
-                                                        </p>
-                                                    </div>
-                                                </div>
-                                            </td>
-                                            <td>
-                                                <div className="flex items-center gap-2">
-                                                    <div className="w-8 h-8 rounded-full bg-primary-100 flex items-center justify-center flex-shrink-0 text-primary-600 font-bold text-xs">
-                                                        {review.user.displayName.charAt(0)}
-                                                    </div>
-                                                    <div>
-                                                        <p className="text-sm text-heading">{review.user.displayName}</p>
-                                                        {review.isVerifiedPurchase && (
-                                                            <span className="text-[10px] text-success-700 flex items-center gap-1">
-                                                                <CheckCircleIcon className="w-3 h-3" />
-                                                                Onaylı Alıcı
-                                                            </span>
-                                                        )}
-                                                    </div>
-                                                </div>
-                                            </td>
-                                            <td className="max-w-md">
-                                                <div className="space-y-1">
-                                                    {renderStars(review.score)}
-                                                    {review.title && <p className="font-medium text-heading text-sm">{review.title}</p>}
-                                                    {review.review && <p className="text-muted text-sm line-clamp-3">{review.review}</p>}
-                                                    {review.adminReply && (
-                                                        <div className="mt-2 pl-3 border-l-2 border-primary-500">
-                                                            <p className="text-xs text-primary-400 font-medium">Satıcı Yanıtı:</p>
-                                                            <p className="text-xs text-muted">{review.adminReply}</p>
-                                                        </div>
-                                                    )}
-                                                </div>
-                                            </td>
-                                            <td><StatusBadge status={review.status} config={reviewStatusConfig} /></td>
-                                            <td>
-                                                <span className="text-sm text-muted">
-                                                    {format(new Date(review.createdAt), 'dd MMM yyyy', { locale: tr })}
-                                                </span>
-                                            </td>
-                                            <td className="text-right">
-                                                <div className="flex items-center justify-end gap-2">
-                                                    {review.status === 'pending' && (
-                                                        <>
-                                                            <Button variant="secondary" onClick={() => handleStatusUpdate(review.id, 'approved')}
-                                                                className="p-1.5 text-success-700 hover:bg-success-400/10 rounded-lg"
-                                                                title="Onayla">
-                                                                <CheckCircleIcon className="w-5 h-5" />
-                                                            </Button>
-                                                            <Button variant="secondary" onClick={() => handleStatusUpdate(review.id, 'rejected')}
-                                                                className="p-1.5 text-danger-600 hover:bg-danger-400/10 rounded-lg"
-                                                                title="Reddet">
-                                                                <XCircleIcon className="w-5 h-5" />
-                                                            </Button>
-                                                        </>
-                                                    )}
-                                                    {(review.status === 'approved' || review.status === 'pending') && (
-                                                        <Button variant="secondary" onClick={() => handleStatusUpdate(review.id, 'spam')}
-                                                            className="p-1.5 text-warning-700 hover:bg-warning-400/10 rounded-lg"
-                                                            title="Spam Olarak İşaretle">
-                                                            <ExclamationTriangleIcon className="w-5 h-5" />
-                                                        </Button>
-                                                    )}
-                                                    <Button variant="secondary" onClick={() => setDeleteConfirm(review.id)}
-                                                        className="p-1.5 text-muted hover:text-danger-600 hover:bg-danger-400/10 rounded-lg"
-                                                        title="Sil">
-                                                        <TrashIcon className="w-5 h-5" />
-                                                    </Button>
-                                                </div>
-                                            </td>
-                                        </tr>
-                                    ))}
-                                </tbody>
-                            </table>
-                        </div>
-                    )}
+                <div>
+                    <DataTable
+                        columns={productColumns}
+                        data={reviews}
+                        loading={loading}
+                        emptyText="Yorum bulunamadı"
+                        getRowId={(r) => r.id}
+                    />
 
                     {/* Pagination */}
                     {totalPages > 1 && (

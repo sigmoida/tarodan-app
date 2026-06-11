@@ -1,7 +1,8 @@
 "use client";
 
 import { useState } from "react";
-import { Button, Textarea } from "@tarodan/ui";
+import { Button, Textarea, enumLabel, sellerTypeConfig } from "@tarodan/ui";
+import { DataTable, type ColumnDef } from "@/components/DataTable";
 import {
   CheckCircleIcon,
   XCircleIcon,
@@ -10,6 +11,7 @@ import {
   UserIcon,
 } from "@heroicons/react/24/outline";
 import toast from "react-hot-toast";
+import { useConfirm } from "@/components/ConfirmProvider";
 
 // Mock data based on User model structure
 const PENDING_APPLICATIONS = [
@@ -49,13 +51,14 @@ const PENDING_APPLICATIONS = [
 ];
 
 export default function SellerApplicationsPage() {
+  const confirm = useConfirm();
   const [applications, setApplications] = useState(PENDING_APPLICATIONS);
   const [selectedApplication, setSelectedApplication] = useState<any>(null);
   const [isRejectModalOpen, setIsRejectModalOpen] = useState(false);
   const [rejectReason, setRejectReason] = useState("");
 
-  const handleApprove = (id: string) => {
-    if (confirm("Bu satıcı başvurusunu onaylamak istediğinize emin misiniz?")) {
+  const handleApprove = async (id: string) => {
+    if (await confirm({ description: "Bu satıcı başvurusunu onaylamak istediğinize emin misiniz?" })) {
       // API call would go here
       setApplications((prev) => prev.filter((app) => app.id !== id));
       toast.success("Satıcı başvurusu onaylandı");
@@ -80,6 +83,48 @@ export default function SellerApplicationsPage() {
     setSelectedApplication(null);
   };
 
+  type Application = (typeof PENDING_APPLICATIONS)[number];
+
+  const columns: ColumnDef<Application, any>[] = [
+    {
+      header: "Tip",
+      cell: ({ row }) => (
+        <span
+          className={`px-2 py-1 rounded text-xs font-medium ${
+            row.original.type === "business"
+              ? "bg-primary-500/10 text-primary-700"
+              : row.original.type === "verified"
+                ? "bg-info-500/10 text-info-700"
+                : "bg-success-500/10 text-success-700"
+          }`}
+        >
+          {row.original.type === "business"
+            ? "Kurumsal"
+            : row.original.type === "verified"
+              ? "Onaylı Satıcı"
+              : "Bireysel"}
+        </span>
+      ),
+    },
+    {
+      header: "Başvuran",
+      cell: ({ row }) => (
+        <>
+          <h3 className="font-semibold text-heading">{row.original.displayName}</h3>
+          <p className="text-sm text-muted">{row.original.email}</p>
+        </>
+      ),
+    },
+    {
+      header: "Tarih",
+      cell: ({ row }) => (
+        <span className="text-xs text-muted">
+          {new Date(row.original.appliedAt).toLocaleDateString("tr-TR")}
+        </span>
+      ),
+    },
+  ];
+
   return (
     <>
       <div className="space-y-6">
@@ -94,49 +139,14 @@ export default function SellerApplicationsPage() {
 
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
           {/* Applications List */}
-          <div className="lg:col-span-1 space-y-4">
-            {applications.length === 0 ? (
-              <div className="admin-card text-center py-8 text-muted">
-                Bekleyen başvuru yok
-              </div>
-            ) : (
-              applications.map((app) => (
-                <div
-                  key={app.id}
-                  onClick={() => setSelectedApplication(app)}
-                  className={`admin-card cursor-pointer transition-all hover:bg-surface-alt ${
-                    selectedApplication?.id === app.id
-                      ? "border-primary-500 ring-1 ring-primary-500"
-                      : ""
-                  }`}
-                >
-                  <div className="flex justify-between items-start mb-2">
-                    <span
-                      className={`px-2 py-1 rounded text-xs font-medium ${
-                        app.type === "business"
-                          ? "bg-primary-500/10 text-primary-700"
-                          : app.type === "verified"
-                            ? "bg-info-500/10 text-info-700"
-                            : "bg-success-500/10 text-success-700"
-                      }`}
-                    >
-                      {app.type === "business"
-                        ? "Kurumsal"
-                        : app.type === "verified"
-                          ? "Onaylı Satıcı"
-                          : "Bireysel"}
-                    </span>
-                    <span className="text-xs text-muted">
-                      {new Date(app.appliedAt).toLocaleDateString("tr-TR")}
-                    </span>
-                  </div>
-                  <h3 className="font-semibold text-heading">
-                    {app.displayName}
-                  </h3>
-                  <p className="text-sm text-muted">{app.email}</p>
-                </div>
-              ))
-            )}
+          <div className="lg:col-span-1">
+            <DataTable
+              columns={columns}
+              data={applications}
+              emptyText="Bekleyen başvuru yok"
+              getRowId={(app) => app.id}
+              onRowClick={(app) => setSelectedApplication(app)}
+            />
           </div>
 
           {/* Application Detail */}
@@ -180,8 +190,8 @@ export default function SellerApplicationsPage() {
                         <label className="text-xs text-muted block">
                           Başvuru Tipi
                         </label>
-                        <p className="text-heading font-medium capitalize">
-                          {selectedApplication.type}
+                        <p className="text-heading font-medium">
+                          {enumLabel(sellerTypeConfig, selectedApplication.type)}
                         </p>
                       </div>
                       <div>

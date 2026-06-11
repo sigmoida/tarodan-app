@@ -10,7 +10,9 @@ import {
   CheckCircleIcon,
 } from '@heroicons/react/24/outline';
 import toast from 'react-hot-toast';
-import { Button, Input, Select } from '@tarodan/ui';
+import { Button, Input, Select, enumLabel, paymentHoldStatusConfig } from '@tarodan/ui';
+import { AdminTabs } from '@/components/AdminTabs';
+import { DataTable, type ColumnDef } from '@/components/DataTable';
 
 type TabId = 'transactions' | 'schedule';
 
@@ -190,6 +192,90 @@ export default function PayoutsPage() {
     }
   };
 
+  const transactionColumns: ColumnDef<PayoutTransaction, any>[] = [
+    {
+      header: 'Sipariş',
+      cell: ({ row }) => <span className="text-sm">{row.original.orderNumber}</span>,
+    },
+    {
+      header: 'Satıcı',
+      cell: ({ row }) => (
+        <div className="text-sm">
+          <div>{row.original.sellerName}</div>
+          <div className="text-xs text-muted">{row.original.sellerEmail}</div>
+        </div>
+      ),
+    },
+    {
+      id: 'amount',
+      header: () => <span className="text-right">Tutar</span>,
+      cell: ({ row }) => (
+        <span className="text-sm text-right font-medium">{formatCurrency(row.original.amount)}</span>
+      ),
+    },
+    {
+      header: 'Durum',
+      cell: ({ row }) => (
+        <span className={STATUS_LABELS[row.original.status]?.color ?? 'text-muted'}>
+          {enumLabel(paymentHoldStatusConfig, row.original.status)}
+        </span>
+      ),
+    },
+    {
+      header: 'Serbest Bırakma',
+      cell: ({ row }) => (
+        <span className="text-sm whitespace-nowrap">
+          {row.original.releasedAt
+            ? formatDate(row.original.releasedAt)
+            : row.original.releaseAt
+              ? formatDate(row.original.releaseAt)
+              : '-'}
+        </span>
+      ),
+    },
+    {
+      id: 'actions',
+      header: 'İşlem',
+      cell: ({ row }) => (
+        <div className="whitespace-nowrap">
+          {row.original.status === 'held' && (
+            <Button variant="secondary" type="button"
+              onClick={() => handleRelease(row.original.orderId)}
+              disabled={releasingOrderId === row.original.orderId}
+              className="inline-flex items-center gap-1 text-sm text-primary-600 hover:text-primary-400 disabled:opacity-50">
+              <CheckCircleIcon className="h-4 w-4" />
+              {releasingOrderId === row.original.orderId ? 'Bırakılıyor...' : 'Serbest Bırak'}
+            </Button>
+          )}
+        </div>
+      ),
+    },
+  ];
+
+  const scheduleColumns: ColumnDef<ScheduleItem, any>[] = [
+    {
+      header: 'Sipariş',
+      cell: ({ row }) => <span className="text-sm">{row.original.orderNumber}</span>,
+    },
+    {
+      header: 'Satıcı',
+      cell: ({ row }) => <span className="text-sm">{row.original.sellerName}</span>,
+    },
+    {
+      id: 'amount',
+      header: () => <span className="text-right">Tutar</span>,
+      cell: ({ row }) => (
+        <span className="text-sm text-right font-medium">{formatCurrency(row.original.amount)}</span>
+      ),
+    },
+    {
+      header: 'Serbest Bırakma Tarihi',
+      cell: ({ row }) => (
+        <span className="text-sm whitespace-nowrap">{formatDate(row.original.releaseAt)}</span>
+      ),
+    },
+  ];
+
   return (
     <>
       <div className="space-y-6">
@@ -236,34 +322,14 @@ export default function PayoutsPage() {
         </div>
 
         {/* Tabs */}
-        <div className="border-b border-border">
-          <nav className="flex gap-4">
-            <Button variant="secondary" type="button"
-              onClick={() => setActiveTab('transactions')}
-              className={`pb-3 px-1 border-b-2 font-medium text-sm ${
-                activeTab === 'transactions'
-                  ? 'border-primary-500 text-primary-600'
-                  : 'border-transparent text-muted hover:text-heading'
-              }`}>
-              <span className="flex items-center gap-2">
-                <ListBulletIcon className="h-4 w-4" />
-                İşlem Geçmişi
-              </span>
-            </Button>
-            <Button variant="secondary" type="button"
-              onClick={() => setActiveTab('schedule')}
-              className={`pb-3 px-1 border-b-2 font-medium text-sm ${
-                activeTab === 'schedule'
-                  ? 'border-primary-500 text-primary-600'
-                  : 'border-transparent text-muted hover:text-heading'
-              }`}>
-              <span className="flex items-center gap-2">
-                <CalendarDaysIcon className="h-4 w-4" />
-                Ödeme Takvimi
-              </span>
-            </Button>
-          </nav>
-        </div>
+        <AdminTabs
+          tabs={[
+            { key: 'transactions', label: 'İşlem Geçmişi', icon: ListBulletIcon },
+            { key: 'schedule', label: 'Ödeme Takvimi', icon: CalendarDaysIcon },
+          ]}
+          value={activeTab}
+          onChange={(k) => setActiveTab(k as TabId)}
+        />
 
         {activeTab === 'transactions' && (
           <>
@@ -291,114 +357,45 @@ export default function PayoutsPage() {
                 <ArrowPathIcon className="h-5 w-5" />
               </Button>
             </div>
-            <div className="bg-surface-elevated rounded-xl border border-border overflow-hidden">
-              {loading ? (
-                <div className="p-8 text-center text-muted">Yükleniyor...</div>
-              ) : transactions.length === 0 ? (
-                <div className="p-8 text-center text-muted">Kayıt yok</div>
-              ) : (
-                <div className="overflow-x-auto">
-                  <table className="min-w-full divide-y divide-border">
-                    <thead>
-                      <tr>
-                        <th className="px-4 py-3 text-left text-xs font-medium text-muted uppercase">Sipariş</th>
-                        <th className="px-4 py-3 text-left text-xs font-medium text-muted uppercase">Satıcı</th>
-                        <th className="px-4 py-3 text-right text-xs font-medium text-muted uppercase">Tutar</th>
-                        <th className="px-4 py-3 text-left text-xs font-medium text-muted uppercase">Durum</th>
-                        <th className="px-4 py-3 text-left text-xs font-medium text-muted uppercase">Serbest Bırakma</th>
-                        <th className="px-4 py-3 text-left text-xs font-medium text-muted uppercase">İşlem</th>
-                      </tr>
-                    </thead>
-                    <tbody className="divide-y divide-border">
-                      {transactions.map((t) => (
-                        <tr key={t.id} className="text-muted">
-                          <td className="px-4 py-3 text-sm">{t.orderNumber}</td>
-                          <td className="px-4 py-3 text-sm">
-                            <div>{t.sellerName}</div>
-                            <div className="text-xs text-muted">{t.sellerEmail}</div>
-                          </td>
-                          <td className="px-4 py-3 text-sm text-right font-medium">{formatCurrency(t.amount)}</td>
-                          <td className="px-4 py-3">
-                            <span className={STATUS_LABELS[t.status]?.color ?? 'text-muted'}>
-                              {STATUS_LABELS[t.status]?.label ?? t.status}
-                            </span>
-                          </td>
-                          <td className="px-4 py-3 text-sm whitespace-nowrap">
-                            {t.releasedAt ? formatDate(t.releasedAt) : (t.releaseAt ? formatDate(t.releaseAt) : '-')}
-                          </td>
-                          <td className="px-4 py-3 whitespace-nowrap">
-                            {t.status === 'held' && (
-                              <Button variant="secondary" type="button"
-                                onClick={() => handleRelease(t.orderId)}
-                                disabled={releasingOrderId === t.orderId}
-                                className="inline-flex items-center gap-1 text-sm text-primary-600 hover:text-primary-400 disabled:opacity-50">
-                                <CheckCircleIcon className="h-4 w-4" />
-                                {releasingOrderId === t.orderId ? 'Bırakılıyor...' : 'Serbest Bırak'}
-                              </Button>
-                            )}
-                          </td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
+            <DataTable
+              columns={transactionColumns}
+              data={transactions}
+              loading={loading}
+              emptyText="Kayıt yok"
+              getRowId={(t) => t.id}
+            />
+            {pagination.totalPages > 1 && (
+              <div className="px-4 py-3 flex items-center justify-between">
+                <p className="text-sm text-muted">
+                  Toplam {pagination.total} kayıt
+                </p>
+                <div className="flex gap-2">
+                  <Button variant="secondary" type="button"
+                    onClick={() => setPagination((p) => ({ ...p, page: p.page - 1 }))}
+                    disabled={pagination.page <= 1}
+                    className="px-3 py-1 rounded bg-surface-alt text-sm disabled:opacity-50">
+                    Önceki
+                  </Button>
+                  <Button variant="secondary" type="button"
+                    onClick={() => setPagination((p) => ({ ...p, page: p.page + 1 }))}
+                    disabled={pagination.page >= pagination.totalPages}
+                    className="px-3 py-1 rounded bg-surface-alt text-sm disabled:opacity-50">
+                    Sonraki
+                  </Button>
                 </div>
-              )}
-              {pagination.totalPages > 1 && (
-                <div className="px-4 py-3 flex items-center justify-between border-t border-border">
-                  <p className="text-sm text-muted">
-                    Toplam {pagination.total} kayıt
-                  </p>
-                  <div className="flex gap-2">
-                    <Button variant="secondary" type="button"
-                      onClick={() => setPagination((p) => ({ ...p, page: p.page - 1 }))}
-                      disabled={pagination.page <= 1}
-                      className="px-3 py-1 rounded bg-surface-alt text-sm disabled:opacity-50">
-                      Önceki
-                    </Button>
-                    <Button variant="secondary" type="button"
-                      onClick={() => setPagination((p) => ({ ...p, page: p.page + 1 }))}
-                      disabled={pagination.page >= pagination.totalPages}
-                      className="px-3 py-1 rounded bg-surface-alt text-sm disabled:opacity-50">
-                      Sonraki
-                    </Button>
-                  </div>
-                </div>
-              )}
-            </div>
+              </div>
+            )}
           </>
         )}
 
         {activeTab === 'schedule' && (
-          <div className="bg-surface-elevated rounded-xl border border-border overflow-hidden">
-            {loading ? (
-              <div className="p-8 text-center text-muted">Yükleniyor...</div>
-            ) : schedule.length === 0 ? (
-              <div className="p-8 text-center text-muted">Yaklaşan ödeme yok</div>
-            ) : (
-              <div className="overflow-x-auto">
-                <table className="min-w-full divide-y divide-border">
-                  <thead>
-                    <tr>
-                      <th className="px-4 py-3 text-left text-xs font-medium text-muted uppercase">Sipariş</th>
-                      <th className="px-4 py-3 text-left text-xs font-medium text-muted uppercase">Satıcı</th>
-                      <th className="px-4 py-3 text-right text-xs font-medium text-muted uppercase">Tutar</th>
-                      <th className="px-4 py-3 text-left text-xs font-medium text-muted uppercase">Serbest Bırakma Tarihi</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-border">
-                    {schedule.map((s) => (
-                      <tr key={s.id} className="text-muted">
-                        <td className="px-4 py-3 text-sm">{s.orderNumber}</td>
-                        <td className="px-4 py-3 text-sm">{s.sellerName}</td>
-                        <td className="px-4 py-3 text-sm text-right font-medium">{formatCurrency(s.amount)}</td>
-                        <td className="px-4 py-3 text-sm whitespace-nowrap">{formatDate(s.releaseAt)}</td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-            )}
-          </div>
+          <DataTable
+            columns={scheduleColumns}
+            data={schedule}
+            loading={loading}
+            emptyText="Yaklaşan ödeme yok"
+            getRowId={(s) => s.id}
+          />
         )}
       </div>
     </>
