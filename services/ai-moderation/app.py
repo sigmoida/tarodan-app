@@ -76,7 +76,9 @@ def _warmup_models() -> None:
     except Exception as exc:  # noqa: BLE001
         logger.warning("Detoxify ön-yükleme atlandı: %s", exc)
     try:
-        get_image_moderator()._ensure_loaded()
+        # Sadece yükleme değil gerçek bir forward pass — conv kernel'i bu
+        # CPU'da çalışmıyorsa ilk kullanıcı isteğinde değil burada görelim.
+        get_image_moderator().moderate(Image.new("RGB", (224, 224)))
         logger.info("Görsel modelleri (ResNet + NSFW) hazır")
     except Exception as exc:  # noqa: BLE001
         logger.warning("Görsel modeli ön-yükleme atlandı: %s", exc)

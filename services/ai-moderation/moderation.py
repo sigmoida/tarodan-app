@@ -13,6 +13,7 @@ Tüm modeller ilk kullanımda indirilir ve cache'lenir. Harici API / anahtar YOK
 from __future__ import annotations
 
 import logging
+import os
 from functools import lru_cache
 from typing import Any
 
@@ -56,6 +57,13 @@ class ImageModerator:
         if self._resnet is None:
             import torch
             from torchvision.models import ResNet50_Weights, resnet50
+
+            # oneDNN'in conv JIT'i bazı VPS CPU'larında (AVX bayrakları
+            # hypervisor'da maskeli) "could not create a primitive" veriyor;
+            # native kernel'e düş. Tek görsel inference için hız farkı önemsiz.
+            if os.getenv("TORCH_DISABLE_MKLDNN", "1") == "1":
+                torch.backends.mkldnn.enabled = False
+            torch.set_num_threads(int(os.getenv("TORCH_NUM_THREADS", "1")))
 
             self._torch = torch
             weights = ResNet50_Weights.DEFAULT
