@@ -7,7 +7,8 @@ import { motion } from "framer-motion";
 import { ArrowLeftIcon, PhotoIcon } from "@heroicons/react/24/outline";
 import Link from "next/link";
 import toast from "react-hot-toast";
-import { listingsApi, api, mediaApi, brandsApi } from "@/lib/api";
+import { listingsApi, api, mediaApi, brandsApi, bankAccountApi } from "@/lib/api";
+import { useQuery } from "@tanstack/react-query";
 import { useAuthStore } from "@/stores/authStore";
 import { useTranslation } from "@/i18n/LanguageContext";
 import { SimpleDropdown } from "@/components/SimpleDropdown";
@@ -66,6 +67,17 @@ export default function NewListingPage() {
     getRemainingListings,
     refreshUser,
   } = useAuthStore();
+  const bankAccountQuery = useQuery({
+    queryKey: ['bank-account'],
+    queryFn: async () => {
+      const res = await bankAccountApi.get();
+      return res.data || null;
+    },
+    enabled: isAuthenticated,
+  });
+  const hasBankAccount = !!bankAccountQuery.data;
+  const bankAccountLoading = bankAccountQuery.isLoading;
+
   const { t, locale } = useTranslation();
   const CONDITIONS = getConditions(locale);
   const OTHER_LABEL = getOtherLabel(locale);
@@ -835,6 +847,21 @@ export default function NewListingPage() {
             )
           )}
 
+          {/* Banka Hesabı Gate — IBAN yoksa ilan verilemez (no_bank_account payout fail'ini önler) */}
+          {!bankAccountLoading && !hasBankAccount && (
+            <div className="mb-5 p-4 rounded border bg-danger-50 border-danger-200">
+              <p className="font-medium text-danger-800 mb-1">
+                İlan vermeden önce banka hesabı eklemelisiniz
+              </p>
+              <p className="text-sm text-danger-700 mb-3">
+                Satışlarınızdan elde edeceğiniz tutarın size aktarılabilmesi için IBAN bilgisi
+                gereklidir.
+              </p>
+              <ButtonLink href="/profile/bank-account">IBAN Ekle</ButtonLink>
+            </div>
+          )}
+
+          {!bankAccountLoading && hasBankAccount && (
           <form onSubmit={handleSubmit} className="space-y-5">
             {/* Section: Basic Info */}
             <div className="bg-surface-elevated rounded border border-border-subtle p-5">
@@ -1454,6 +1481,7 @@ export default function NewListingPage() {
               </Button>
             </div>
           </form>
+          )}
         </motion.div>
       </main>
     </div>
