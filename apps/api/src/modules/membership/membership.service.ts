@@ -247,7 +247,6 @@ export class MembershipService {
       tier: tierDto,
       status: membership.status,
       autoRenew: membership.autoRenew,
-      paymentMethodId: membership.paymentMethodId || undefined,
       currentPeriodStart: membership.currentPeriodStart,
       currentPeriodEnd: membership.currentPeriodEnd,
       cancelledAt: membership.cancelledAt || undefined,
@@ -657,7 +656,6 @@ export class MembershipService {
   async toggleAutoRenew(
     userId: string,
     autoRenew: boolean,
-    paymentMethodId?: string,
   ): Promise<UserMembershipResponseDto> {
     const membership = await this.prisma.userMembership.findUnique({
       where: { userId },
@@ -668,25 +666,12 @@ export class MembershipService {
       throw new NotFoundException('Üyelik bulunamadı');
     }
 
-    // Otomatik yenileme hatırlatma-tabanlıdır (bitişte bildirim + tek tık yenile);
-    // kayıtlı kart GEREKMEZ. Kart verilirse doğrula, verilmezse hatırlatma yine açılır.
-    // Validate payment method belongs to user (opsiyonel)
-    if (paymentMethodId) {
-      const paymentMethod = await this.prisma.paymentMethod.findFirst({
-        where: { id: paymentMethodId, userId },
-      });
-      
-      if (!paymentMethod) {
-        throw new BadRequestException('Geçersiz ödeme yöntemi');
-      }
-    }
-
+    // Otomatik yenileme yalnızca HATIRLATMA-tabanlıdır: dönem bitişinde bildirim
+    // gönderilir ve kullanıcı normal PayTR ödeme akışından tek tıkla yeniler.
+    // Kayıtlı karttan otomatik çekim YOK (saved card özelliği kaldırıldı).
     await this.prisma.userMembership.update({
       where: { userId },
-      data: {
-        autoRenew,
-        paymentMethodId: autoRenew ? paymentMethodId : null,
-      },
+      data: { autoRenew },
     });
 
     return this.getUserMembership(userId);
