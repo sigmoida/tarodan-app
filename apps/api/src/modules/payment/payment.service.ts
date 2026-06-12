@@ -1548,65 +1548,6 @@ export class PaymentService {
             },
           });
 
-          // Save card information if provided in payment metadata
-          const paymentMetadata = payment.metadata as any;
-          if (paymentMetadata?.cardData) {
-            const cardData = paymentMetadata.cardData;
-            const cardNumber = cardData.number?.replace(/\s/g, '') || '';
-
-            if (cardNumber.length >= 13) {
-              // Extract card brand
-              let cardBrand = 'Kart';
-              if (cardNumber.startsWith('4')) {
-                cardBrand = 'Visa';
-              } else if (cardNumber.startsWith('5') || cardNumber.startsWith('2')) {
-                cardBrand = 'Mastercard';
-              } else if (cardNumber.startsWith('3')) {
-                cardBrand = 'Amex';
-              } else if (cardNumber.startsWith('9')) {
-                cardBrand = 'Troy';
-              }
-
-              const lastFour = cardNumber.slice(-4);
-
-              // Parse expiry (format: MM/YY)
-              const expiryParts = cardData.expiry?.split('/') || [];
-              const expiryMonth = parseInt(expiryParts[0] || '0', 10);
-              const expiryYear = 2000 + parseInt(expiryParts[1] || '0', 10);
-
-              // Check if card already exists
-              const existingCard = await tx.paymentMethod.findFirst({
-                where: {
-                  userId: payment.order.buyerId,
-                  lastFour,
-                  expiryMonth,
-                  expiryYear,
-                },
-              });
-
-              if (!existingCard) {
-                // Check if this is the first card (make it default)
-                const existingCount = await tx.paymentMethod.count({
-                  where: { userId: payment.order.buyerId },
-                });
-
-                await tx.paymentMethod.create({
-                  data: {
-                    userId: payment.order.buyerId,
-                    cardBrand,
-                    lastFour,
-                    expiryMonth,
-                    expiryYear,
-                    isDefault: existingCount === 0,
-                    tokenId: null, // Would be set from payment provider in real implementation
-                  },
-                });
-
-                this.logger.log(`Card saved for user ${payment.order.buyerId} after membership payment ${payment.id}`);
-              }
-            }
-          }
-
           this.logger.log(`Membership activated for user ${payment.order.buyerId} after payment ${payment.id}`);
         }
 
