@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useParams, useRouter, useSearchParams } from "next/navigation";
 import { motion } from "framer-motion";
 import {
@@ -29,6 +29,11 @@ export default function PaymentPage() {
   const [isLoading, setIsLoading] = useState(true);
   const [paymentHtml, setPaymentHtml] = useState<string | null>(null);
   const [isProcessing, setIsProcessing] = useState(false);
+  // Geri dönüşte PayTR token'ları tek kullanımlıktır → bayat HTML boş iframe gösterir.
+  // Süresi geçmiş / ürün tekrar satışta durumunu ayrı göster.
+  const [isExpired, setIsExpired] = useState(false);
+  // Mount başına tek initiate (taze token) — her render'da yeniden çağırma.
+  const didInitiateRef = useRef(false);
 
   useEffect(() => {
     if (authLoading) return;
@@ -91,6 +96,59 @@ export default function PaymentPage() {
           }
         } catch {
           // Not bypass mode or bypass failed — fall through to normal flow
+        }
+      }
+
+      // Bekleyen PayTR ödemesinde geri dönüşte taze iFrame token al:
+      // status endpoint'i bayat providerPaymentId ile iframe HTML üretir (tek kullanımlık
+      // token → boş iframe). pending ise yeniden initiate edip taze token alırız.
+      // Backend var olan Payment'ı yeniden kullanır + rezervasyonu CAS ile geri alır.
+      if (
+        paymentData.status === "pending" &&
+        (paymentData.paymentHtml || paymentData.paymentUrl) &&
+        !didInitiateRef.current
+      ) {
+        didInitiateRef.current = true;
+        try {
+          let initRes;
+          if (paymentData.checkoutGroupId) {
+            initRes = isGuest
+              ? await paymentsApi.initiateGroupGuest(
+                  paymentData.checkoutGroupId,
+                  "paytr",
+                )
+              : await paymentsApi.initiateGroup(
+                  paymentData.checkoutGroupId,
+                  "paytr",
+                );
+          } else if (paymentData.tradeId) {
+            initRes = await paymentsApi.initiateTradeCash(paymentData.tradeId);
+          } else if (paymentData.orderId) {
+            initRes = isGuest
+              ? await paymentsApi.initiateGuest(paymentData.orderId, "paytr")
+              : await paymentsApi.initiate(paymentData.orderId, "paytr");
+          }
+          if (initRes?.data) {
+            const fresh = initRes.data as any;
+            if (fresh.paymentHtml) {
+              setPaymentHtml(fresh.paymentHtml);
+              return;
+            }
+            if (fresh.paymentUrl) {
+              const url = fresh.paymentUrl as string;
+              if (!(url.includes("/payment/") && url.includes(paymentId))) {
+                window.location.href = url;
+                return;
+              }
+            }
+          }
+        } catch (initError: any) {
+          // Rezervasyon geri alınamadı (ürün tekrar satışta) veya ödeme süresi doldu
+          // → boş iframe yerine net "süre doldu" durumu göster.
+          if (process.env.NODE_ENV === "development")
+            console.error("Re-initiate failed:", initError);
+          setIsExpired(true);
+          return;
         }
       }
 
@@ -217,6 +275,38 @@ export default function PaymentPage() {
   if (payment.status === "failed") {
     router.push(`/payment/fail?paymentId=${paymentId}`);
     return null;
+  }
+
+  // Ödeme süresi doldu / taze token alınamadı (ürün tekrar satışa açıldı):
+  // boş iframe yerine net bir mesaj göster.
+  if (isExpired) {
+    return (
+      <div className="min-h-screen bg-surface flex items-center justify-center">
+        <div className="text-center max-w-md px-6">
+          <XCircleIcon className="w-12 h-12 text-danger-500 mx-auto mb-4" />
+          <h2 className="text-xl font-semibold text-heading mb-2">
+            Ödeme süresi doldu
+          </h2>
+          <p className="text-muted mb-6">
+            Bu ödemenin süresi doldu ve ürün tekrar satışa açıldı. Almak
+            istiyorsanız ilanı yeniden ziyaret edip yeniden satın alabilirsiniz.
+          </p>
+          <Button
+            onClick={() =>
+              router.push(
+                payment?.orders?.[0]?.productId
+                  ? `/products/${payment.orders[0].productId}`
+                  : payment?.order?.productId
+                    ? `/products/${payment.order.productId}`
+                    : "/products",
+              )
+            }
+          >
+            İlanlara Dön
+          </Button>
+        </div>
+      </div>
+    );
   }
 
   return (
