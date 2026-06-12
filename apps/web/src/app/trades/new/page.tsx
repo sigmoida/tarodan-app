@@ -310,36 +310,38 @@ export default function NewTradePage() {
                 {myProducts.map((product) => {
                   const isSelected = selectedProducts.includes(product.id);
                   return (
-                    <Button variant="secondary" key={product.id}
+                    <button type="button" key={product.id}
                       onClick={() => toggleProduct(product.id)}
-                      className={`relative rounded-xl overflow-hidden border-2 transition-all ${
+                      className={`relative block w-full rounded-xl border-2 p-4 transition-all ${
                         isSelected
                           ? 'border-primary-500 ring-2 ring-primary-200'
-                          : 'border-border hover:border-border'
+                          : 'border-border hover:border-primary-300'
                       }`}>
                       {isSelected && (
                         <div className="absolute top-2 right-2 z-10 w-6 h-6 bg-primary-500 rounded-full flex items-center justify-center">
                           <CheckIcon className="w-4 h-4 text-inverted" />
                         </div>
                       )}
-                      <div className="aspect-square relative bg-surface-alt">
-                        <OptimizedImage
-                          src={getProductImage(product)}
-                          alt={product.title}
-                          fill
-                          className="object-cover"
-                          logContext={{ productId: product.id, page: 'trades-new-myproduct' }}
-                        />
+                      <div className="flex flex-col items-center gap-3">
+                        <div className="relative w-full aspect-square rounded-lg overflow-hidden bg-surface-alt">
+                          <OptimizedImage
+                            src={getProductImage(product)}
+                            alt={product.title}
+                            fill
+                            className="object-cover"
+                            logContext={{ productId: product.id, page: 'trades-new-myproduct' }}
+                          />
+                        </div>
+                        <div className="text-center w-full">
+                          <h3 className="font-medium text-heading text-sm line-clamp-2 mb-1">
+                            {product.title}
+                          </h3>
+                          <p className="text-base font-bold text-primary-500">
+                            {getProductEffectivePrice(product).toLocaleString('tr-TR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} TL
+                          </p>
+                        </div>
                       </div>
-                      <div className="p-2 text-left">
-                        <p className="text-xs font-medium text-heading line-clamp-1">
-                          {product.title}
-                        </p>
-                        <p className="text-xs font-bold text-primary-500">
-                          {getProductEffectivePrice(product).toLocaleString('tr-TR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} TL
-                        </p>
-                      </div>
-                    </Button>
+                    </button>
                   );
                 })}
               </div>
