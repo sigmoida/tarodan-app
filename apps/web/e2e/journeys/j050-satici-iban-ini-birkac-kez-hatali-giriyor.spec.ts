@@ -202,3 +202,52 @@ test.describe('J50 — IBAN doğrulama (red kontrolü + normalize)', () => {
     await clearBankAccount(request, sellerToken);
   });
 });
+
+// ════════════════════════════════════════════════════════════════════════════
+// J50-UI — Tarayıcı üzerinden hatalı IBAN toast + geçerli IBAN kayıt akışı
+// ════════════════════════════════════════════════════════════════════════════
+
+test.describe('J50-UI — IBAN sayfası UI akışı', () => {
+  test('UI: hatalı IBAN toast görünür; geçerli IBAN kaydedilir', async ({ page, request }) => {
+    test.setTimeout(60_000);
+
+    // Temiz başlangıç: önceki çalışmadan kalan banka hesabı varsa sil.
+    const sellerToken = await apiLogin(request, USERS.sellerFree);
+    await clearBankAccount(request, sellerToken);
+
+    // Tarayıcıya token enjekte et, ardından sayfaya git.
+    await loginViaToken(page, sellerToken);
+    await page.goto('/profile/bank-account');
+
+    // Sayfa yüklenene kadar bekle (form görünmeli).
+    const holderInput = page.getByPlaceholder('Ad Soyad / Firma Ünvanı');
+    await holderInput.waitFor({ state: 'visible', timeout: 15_000 });
+
+    // Hesap sahibi alanını doldur.
+    await holderInput.fill('');
+    await holderInput.fill('Zeynep Kaya');
+
+    // Hatalı IBAN gir ve kaydet.
+    const ibanInput = page.getByPlaceholder('TR.. .... .... .... .... .... ..');
+    await ibanInput.fill('');
+    await ibanInput.fill('TR123');
+
+    const saveBtn = page.getByRole('button', { name: /Kaydet|Güncelle/ });
+    await saveBtn.click();
+
+    // Hata toastı görünmeli.
+    await expect(page.getByText('Geçerli bir TR IBAN', { exact: false })).toBeVisible({ timeout: 8_000 });
+
+    // Geçerli IBAN gir (TR + 24 rakam, boşluklu → sayfa normalize eder).
+    await ibanInput.fill('');
+    await ibanInput.fill('TR12 0006 2000 0000 0000 0000 00');
+
+    await saveBtn.click();
+
+    // Başarı toastı görünmeli.
+    await expect(page.getByText('Banka hesabı kaydedildi', { exact: false })).toBeVisible({ timeout: 12_000 });
+
+    // Temizlik.
+    await clearBankAccount(request, sellerToken);
+  });
+});
