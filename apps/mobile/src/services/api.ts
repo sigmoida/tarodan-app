@@ -641,35 +641,6 @@ export const paymentsApi = {
     api.post('/payments/refund', { orderId, refundAmount }),
   retry: (paymentId: string) =>
     api.post(`/payments/${paymentId}/retry`),
-
-  processDirect: (data: {
-    orderId: string;
-    card?: {
-      cardHolderName: string;
-      cardNumber: string;
-      expireMonth: string;
-      expireYear: string;
-      cvc: string;
-      cardAlias?: string;
-    };
-    cardToken?: string;
-    saveCard?: boolean;
-    provider?: string;
-  }) => api.post('/payments/process-direct', data),
-
-  getPaymentMethods: () => api.get('/payments/methods'),
-  addPaymentMethod: (data: {
-    card: {
-      cardHolderName: string;
-      cardNumber: string;
-      expireMonth: string;
-      expireYear: string;
-      cvc: string;
-      cardAlias?: string;
-    };
-  }) => api.post('/payments/methods', data),
-  deletePaymentMethod: (cardToken: string) =>
-    api.delete(`/payments/methods/${cardToken}`),
 };
 
 // Membership API - Web ile aynı endpoint'ler

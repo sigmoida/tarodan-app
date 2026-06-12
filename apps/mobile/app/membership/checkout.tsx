@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
-import { View, ScrollView, StyleSheet, TouchableOpacity } from 'react-native';
-import { theme, Button, Card, Input, Radio, Switch, Text, ScreenHeader, appAlert } from '@tarodan/ui-native';
+import { View, ScrollView, StyleSheet } from 'react-native';
+import { theme, Button, Card, Text, ScreenHeader, appAlert } from '@tarodan/ui-native';
 import { router, useLocalSearchParams } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { useAuthStore } from '../../src/stores/authStore';
@@ -80,13 +80,7 @@ const MEMBERSHIP_TIERS = {
 export default function MembershipCheckoutScreen() {
   const { tier: tierParam, period: periodParam } = useLocalSearchParams<{ tier: string; period?: string }>();
   const { isAuthenticated, refreshUserData } = useAuthStore();
-  const [paymentMethod, setPaymentMethod] = useState('card');
   const [loading, setLoading] = useState(false);
-  const [cardNumber, setCardNumber] = useState('');
-  const [cardExpiry, setCardExpiry] = useState('');
-  const [cardCvc, setCardCvc] = useState('');
-  const [cardName, setCardName] = useState('');
-  const [saveCard, setSaveCard] = useState(true);
   const [settings, setSettings] = useState<PlatformSettings>({});
 
   const tier = MEMBERSHIP_TIERS[tierParam as keyof typeof MEMBERSHIP_TIERS] || MEMBERSHIP_TIERS.premium;
@@ -132,38 +126,10 @@ export default function MembershipCheckoutScreen() {
   }
 
   const handlePayment = async () => {
-    // Web üyelik checkout'u ile parite: kart alanları zorunlu — kart hem
-    // kaydedilir (otomatik yenilemede varsayılan olur) hem PayTR'e geçilir.
-    if (paymentMethod === 'card') {
-      if (!cardName.trim()) return appAlert('Eksik Bilgi', 'Kart üzerindeki ismi girin.');
-      const cleanNumber = cardNumber.replace(/\s/g, '');
-      if (cleanNumber.length < 15 || cleanNumber.length > 16)
-        return appAlert('Eksik Bilgi', 'Geçerli bir kart numarası girin.');
-      const [mm, yy] = cardExpiry.split('/');
-      if (!mm || !yy || parseInt(mm, 10) < 1 || parseInt(mm, 10) > 12)
-        return appAlert('Eksik Bilgi', 'Geçerli son kullanma tarihi girin (AA/YY).');
-      if (!/^\d{3,4}$/.test(cardCvc)) return appAlert('Eksik Bilgi', 'Geçerli CVC girin.');
-    }
-
     setLoading(true);
     try {
-      // Kartı kaydet (kullanıcı onaylıysa) — duplikasyon ("Bu kart zaten kayıtlı")
-      // veya ağ hatası ödemeyi engellemesin.
-      if (paymentMethod === 'card' && saveCard) {
-        const [mm, yy] = cardExpiry.split('/');
-        await paymentsApi
-          .addPaymentMethod({
-            card: {
-              cardHolderName: cardName.trim(),
-              cardNumber: cardNumber.replace(/\s/g, ''),
-              expireMonth: mm,
-              expireYear: yy,
-              cvc: cardCvc,
-            },
-          })
-          .catch(() => {});
-      }
-
+      // Ödeme PayTR'nin barındırılan 3DS sayfasında alınır; uygulamada kart
+      // formu yok (web ile parite).
       // subscribe: hedef kademeyi (ör. premium) past_due olarak AYARLAR ve ardından
       // ödemeyi başlatır (paymentId/paymentUrl/useBypass döner). Web ile parite.
       // Doğrudan initiatePayment çağırırsak backend ödemeyi kullanıcının MEVCUT
@@ -226,20 +192,6 @@ export default function MembershipCheckoutScreen() {
     }
   };
 
-  const formatCardNumber = (text: string) => {
-    const cleaned = text.replace(/\D/g, '');
-    const groups = cleaned.match(/.{1,4}/g);
-    return groups ? groups.join(' ').slice(0, 19) : cleaned;
-  };
-
-  const formatExpiry = (text: string) => {
-    const cleaned = text.replace(/\D/g, '');
-    if (cleaned.length >= 2) {
-      return `${cleaned.slice(0, 2)}/${cleaned.slice(2, 4)}`;
-    }
-    return cleaned;
-  };
-
   return (
     <View style={styles.container}>
       <ScreenHeader title="Üyelik Satın Al" onBack={() => router.back()} />
@@ -276,73 +228,15 @@ export default function MembershipCheckoutScreen() {
         {/* Payment Method */}
         <Text style={styles.sectionTitle}>Ödeme Yöntemi</Text>
         <Card style={styles.paymentCard}>
-          <TouchableOpacity
-            style={styles.paymentOption}
-            onPress={() => setPaymentMethod('card')}
-          >
-            <Radio
-              checked={paymentMethod === 'card'}
-              onChange={() => setPaymentMethod('card')}
-              label=""
-            />
-            <Ionicons name="card-outline" size={24} color={colors.text.heading} />
-            <Text style={styles.paymentOptionText}>Kredi/Banka Kartı</Text>
-          </TouchableOpacity>
-        </Card>
-
-        {/* Card Details */}
-        {paymentMethod === 'card' && (
-          <View style={styles.cardForm}>
-            <Input
-              label="Kart Üzerindeki İsim"
-              value={cardName}
-              onChangeText={setCardName}
-              containerStyle={styles.input}
-            />
-            <Input
-              label="Kart Numarası"
-              value={cardNumber}
-              onChangeText={(text: string) => setCardNumber(formatCardNumber(text))}
-              keyboardType="numeric"
-              maxLength={19}
-              leftIconName="card-outline"
-              containerStyle={styles.input}
-            />
-            <View style={styles.cardRow}>
-              <View style={styles.halfInput}>
-                <Input
-                  label="Son Kullanma"
-                  value={cardExpiry}
-                  onChangeText={(text: string) => setCardExpiry(formatExpiry(text))}
-                  keyboardType="numeric"
-                  maxLength={5}
-                  placeholder="MM/YY"
-                />
-              </View>
-              <View style={styles.halfInput}>
-                <Input
-                  label="CVC"
-                  value={cardCvc}
-                  onChangeText={setCardCvc}
-                  keyboardType="numeric"
-                  maxLength={4}
-                  secureTextEntry
-                />
-              </View>
-            </View>
-
-            <View style={styles.saveCardRow}>
-              <View style={{ flex: 1 }}>
-                <Text style={styles.saveCardTitle}>Kartımı kaydet</Text>
-                <Text style={styles.saveCardSub}>
-                  Otomatik yenilemede ve sonraki ödemelerde kullanılır. Ödeme
-                  Yöntemleri'nden silebilirsiniz.
-                </Text>
-              </View>
-              <Switch value={saveCard} onValueChange={setSaveCard} />
-            </View>
+          <View style={styles.paymentOption}>
+            <Ionicons name="lock-closed" size={20} color={colors.success[600]!} />
+            <Text style={styles.paymentOptionText}>
+              Ödemeniz PayTR güvenli altyapısı üzerinden alınır. Kart bilgileriniz
+              Tarodan'a kaydedilmez; bir sonraki adımda PayTR'nin 3D Secure ödeme
+              sayfası açılır.
+            </Text>
           </View>
-        )}
+        </Card>
 
         {/* Order Summary */}
         <Text style={styles.sectionTitle}>Sipariş Özeti</Text>
@@ -377,7 +271,7 @@ export default function MembershipCheckoutScreen() {
           title={loading ? 'İşleniyor...' : `₺${(displayPrice * 1.2).toFixed(2)} Öde`}
           onPress={handlePayment}
           isLoading={loading}
-          disabled={loading || !cardNumber || !cardExpiry || !cardCvc || !cardName}
+          disabled={loading}
           fullWidth
           style={styles.payButton}
         />
@@ -463,44 +357,14 @@ const styles = StyleSheet.create({
   },
   paymentOption: {
     flexDirection: 'row',
-    alignItems: 'center',
+    alignItems: 'flex-start',
     gap: 8,
   },
   paymentOptionText: {
-    fontSize: 15,
-    color: colors.text.heading,
-  },
-  cardForm: {
-    marginBottom: 24,
-  },
-  saveCardRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 12,
-    marginTop: 4,
-    padding: 12,
-    borderRadius: 10,
-    backgroundColor: colors.surface.alt,
-  },
-  saveCardTitle: {
-    fontWeight: '600',
-    color: colors.text.heading,
-    marginBottom: 2,
-  },
-  saveCardSub: {
-    fontSize: 12,
-    color: colors.text.muted,
-    lineHeight: 16,
-  },
-  input: {
-    marginBottom: 12,
-  },
-  cardRow: {
-    flexDirection: 'row',
-    gap: 12,
-  },
-  halfInput: {
     flex: 1,
+    fontSize: 13,
+    lineHeight: 18,
+    color: colors.text.muted,
   },
   summaryCard: {
     marginBottom: 16,
