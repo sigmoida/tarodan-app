@@ -34,6 +34,11 @@ export default function PaymentPage() {
   const [isExpired, setIsExpired] = useState(false);
   // Mount başına tek initiate (taze token) — her render'da yeniden çağırma.
   const didInitiateRef = useRef(false);
+  // fetchPayment mount başına TEK kez çalışmalı. StrictMode çift-effect'i ve
+  // auth hidrasyonu (authLoading/isAuthenticated değişimi) effect'i birden çok
+  // tetikler; her tetikte initiate çağırmak PayTR token'ını yeniden mint edip
+  // (tek kullanımlık) önceki iframe'i geçersiz kılar → boş/açılmayan iframe.
+  const startedRef = useRef(false);
 
   useEffect(() => {
     if (authLoading) return;
@@ -49,6 +54,8 @@ export default function PaymentPage() {
       return;
     }
 
+    if (startedRef.current) return;
+    startedRef.current = true;
     fetchPayment();
   }, [paymentId, authLoading, isAuthenticated, isGuestCheckout]);
 
