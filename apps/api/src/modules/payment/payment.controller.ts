@@ -14,7 +14,6 @@ import {
   NotFoundException,
   ForbiddenException,
   UnauthorizedException,
-  BadRequestException,
   Logger,
   GoneException,
 } from '@nestjs/common';
@@ -43,7 +42,6 @@ import {
   RefundPaymentResponseDto,
   CancelPaymentResponseDto,
   RetryPaymentResponseDto,
-  AddCardDto,
   DirectPaymentDto,
 } from './dto';
 
@@ -176,83 +174,6 @@ export class PaymentController {
   @ApiOperation({ summary: 'PayTR payment callback (webhook)' })
   async paytrCallback(@Body() dto: PayTRCallbackDto) {
     return this.paymentService.handlePayTRCallback(dto);
-  }
-
-  // ============================================================
-  // PAYMENT METHODS - Must be BEFORE :id routes
-  // ============================================================
-
-  // ============================================================
-  // SAVED CARDS (local records; ödeme PayTR iframe)
-  // ============================================================
-
-  /**
-   * GET /payments/methods - Get user's saved payment method records
-   */
-  @Get('methods')
-  @UseGuards(JwtAuthGuard)
-  @ApiBearerAuth()
-  @ApiOperation({ summary: 'Get saved payment methods' })
-  async getPaymentMethods(@CurrentUser('id') userId: string) {
-    return this.paymentService.getPaymentMethods(userId);
-  }
-
-  /**
-   * POST /payments/methods - Add payment method record
-   */
-  @Post('methods')
-  @UseGuards(JwtAuthGuard)
-  @ApiBearerAuth()
-  @ApiOperation({ summary: 'Add new payment method' })
-  async addPaymentMethod(
-    @CurrentUser('id') userId: string,
-    @Body() dto: AddCardDto,
-  ) {
-    // İstemci kart alanlarını nested ({ card: {...} }) ya da düz ({ cardNumber, ... })
-    // gönderebiliyor; ikisini de destekle. Eksikse 500 yerine 400 dön.
-    const c = dto.card ?? dto;
-    if (!c?.cardNumber || !c?.expireYear || !c?.expireMonth || !c?.cvc) {
-      throw new BadRequestException('Kart bilgileri eksik veya hatalı.');
-    }
-    const y = c.expireYear.length === 2 ? parseInt(`20${c.expireYear}`, 10) : parseInt(c.expireYear, 10);
-    return this.paymentService.addPaymentMethod(userId, {
-      cardNumber: c.cardNumber,
-      cardHolder: c.cardHolderName,
-      expiryMonth: parseInt(c.expireMonth, 10),
-      expiryYear: y,
-      cvv: c.cvc,
-    });
-  }
-
-  /**
-   * DELETE /payments/methods/:id - Delete payment method by id
-   */
-  @Delete('methods/:id')
-  @UseGuards(JwtAuthGuard)
-  @ApiBearerAuth()
-  @HttpCode(HttpStatus.NO_CONTENT)
-  @ApiOperation({ summary: 'Delete payment method' })
-  @ApiParam({ name: 'id', description: 'Payment method ID' })
-  async deletePaymentMethodRoute(
-    @CurrentUser('id') userId: string,
-    @Param('id') id: string,
-  ) {
-    return this.paymentService.deletePaymentMethod(userId, id);
-  }
-
-  /**
-   * PATCH /payments/methods/:id/default - Set as default payment method
-   */
-  @Patch('methods/:id/default')
-  @UseGuards(JwtAuthGuard)
-  @ApiBearerAuth()
-  @ApiOperation({ summary: 'Set default payment method' })
-  @ApiParam({ name: 'id', description: 'Payment method ID' })
-  async setDefaultPaymentMethod(
-    @CurrentUser('id') userId: string,
-    @Param('id') id: string,
-  ) {
-    return this.paymentService.setDefaultPaymentMethod(userId, id);
   }
 
   // ============================================================
