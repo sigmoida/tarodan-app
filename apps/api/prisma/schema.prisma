@@ -53,7 +53,6 @@ model User {
   buyerCheckoutGroups     CheckoutGroup[]          @relation("BuyerCheckoutGroups")
   passwordResetTokens     PasswordResetToken[]
   paymentHolds            PaymentHold[]
-  paymentMethods          PaymentMethod[]
   productLikes            ProductLike[]
   productRatings          ProductRating[]
   products                Product[]                @relation("SellerProducts")
@@ -78,23 +77,6 @@ model User {
   @@index([email])
   @@index([isSeller])
   @@map("users")
-}
-
-model PaymentMethod {
-  id          String   @id @default(uuid())
-  userId      String   @map("user_id")
-  cardBrand   String   @map("card_brand")
-  lastFour    String   @map("last_four")
-  expiryMonth Int      @map("expiry_month")
-  expiryYear  Int      @map("expiry_year")
-  isDefault   Boolean  @default(false) @map("is_default")
-  tokenId     String?  @map("token_id")
-  createdAt   DateTime @default(now()) @map("created_at")
-  updatedAt   DateTime @updatedAt @map("updated_at")
-  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-
-  @@index([userId])
-  @@map("payment_methods")
 }
 
 model TwoFactorSecret {
@@ -258,7 +240,6 @@ model UserMembership {
   createdAt          DateTime            @default(now()) @map("created_at")
   updatedAt          DateTime            @updatedAt @map("updated_at")
   autoRenew          Boolean             @default(false) @map("auto_renew")
-  paymentMethodId    String?             @map("payment_method_id")
   payments           MembershipPayment[]
   tier               MembershipTier      @relation(fields: [tierId], references: [id])
   user               User                @relation(fields: [userId], references: [id], onDelete: Cascade)
