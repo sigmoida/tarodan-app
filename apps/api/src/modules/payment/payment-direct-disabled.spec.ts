@@ -21,6 +21,6 @@ describe('PaymentController process-direct disabled (Faz 1)', () => {
   });
 
   it('process-direct artık desteklenmiyor → GoneException', () => {
-    expect(() => (controller as any).processDirect({}, {})).toThrow(GoneException);
+    expect(() => controller.processDirect({} as any, {} as any)).toThrow(GoneException);
   });
 });

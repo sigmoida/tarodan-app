@@ -158,10 +158,8 @@ export class PaymentController {
    * (istemci render eder), sonuç callback/verify ile işlenir.
    */
   @Post('process-direct')
-  @Throttle({ default: { limit: 10, ttl: 60000 } })
-  @UseGuards(JwtAuthGuard)
-  @ApiBearerAuth()
-  @ApiOperation({ summary: 'KULLANIM DIŞI — Direct API kart ödemesi (Faz 1 itibarıyla kapalı)' })
+  @Public()
+  @ApiOperation({ summary: 'KULLANIM DIŞI — Direct API kart ödemesi (Faz 1 itibarıyla kapalı)', deprecated: true })
   @ApiResponse({ status: HttpStatus.GONE, description: 'Endpoint devre dışı' })
   processDirect(@Body() _dto: unknown, @Req() _req: unknown): never {
     throw new GoneException(
