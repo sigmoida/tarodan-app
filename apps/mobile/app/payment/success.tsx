@@ -67,13 +67,15 @@ export default function PaymentSuccessScreen() {
     const run = async () => {
       if (!paymentId) { setLoading(false); return; }
 
-      // durum-sorgu (verify) ile sunucu tarafı tamamlamayı hemen tetikle —
-      // PayTR callback'i gecikse bile ödeme/sipariş anında işlenir. Idempotent & public.
-      try { await paymentsApi.verify(paymentId); } catch { /* best-effort */ }
-
-      // Callback/verify işlenene kadar birkaç kez yokla.
+      // Callback/verify işlenene kadar birkaç kez yokla. PayTR'ın status-inquiry'si
+      // ödeme bittikten birkaç sn sonra "ödendi" döndüğü için TEK verify çağrısı erken
+      // çalışıp başarısız olabilir; ödemeyi/siparişi sunucu tarafında AKTİVE eden tek
+      // çağrı verify (getStatus yalnız DB OKUR). Bu yüzden her turda verify'i tekrar
+      // dene — aksi halde localhost'ta callback ulaşmadığında ödeme pending takılır.
       let last: PaymentInfo | null = null;
       for (let attempt = 0; attempt < 5 && !cancelled; attempt++) {
+        // Idempotent & public: zaten completed ise no-op.
+        try { await paymentsApi.verify(paymentId); } catch { /* best-effort */ }
         try {
           const data = await fetchStatus();
           last = data;

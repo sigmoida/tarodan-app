@@ -146,6 +146,23 @@ export class UserController {
   }
 
   /**
+   * GET /users/me/stats
+   * Kullanıcının özet istatistikleri (İstatistikler sayfası)
+   */
+  @Get('me/stats')
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth()
+  @ApiOperation({
+    summary: 'Kullanıcı özet istatistikleri',
+    description:
+      'İlan, sipariş, takas, koleksiyon sayıları ile toplam harcama/gelir ve değerlendirme puanını döner.',
+  })
+  @ApiResponse({ status: 200, description: 'Özet istatistikler' })
+  async getMyStats(@CurrentUser('id') userId: string) {
+    return this.userService.getMyStats(userId);
+  }
+
+  /**
    * POST /users/me/seller
    * Upgrade to seller account
    */

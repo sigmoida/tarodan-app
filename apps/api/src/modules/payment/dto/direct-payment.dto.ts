@@ -35,11 +35,22 @@ export class CreditCardDto {
 }
 
 export class DirectPaymentDto {
-    @ApiProperty({ description: 'Order ID' })
+    @ApiPropertyOptional({ description: 'Order ID (tekil sipariş ödemesi)' })
+    @IsOptional()
     @IsString()
-    orderId: string;
+    orderId?: string;
 
-    @ApiPropertyOptional({ description: 'Payment Provider (default: iyzico)' })
+    @ApiPropertyOptional({ description: 'Checkout Group ID (sepet ödemesi)' })
+    @IsOptional()
+    @IsString()
+    checkoutGroupId?: string;
+
+    @ApiPropertyOptional({ description: 'Trade ID (takas nakit farkı ödemesi)' })
+    @IsOptional()
+    @IsString()
+    tradeId?: string;
+
+    @ApiPropertyOptional({ description: 'Payment Provider (default: paytr)' })
     @IsOptional()
     @IsString()
     provider?: string;
@@ -51,6 +62,8 @@ export class DirectPaymentDto {
 
     @ApiPropertyOptional({ description: 'New Card Details' })
     @IsOptional()
+    @ValidateNested()
+    @Type(() => CreditCardDto)
     card?: CreditCardDto;
 
     @ApiPropertyOptional({ description: 'Save this card for future use' })

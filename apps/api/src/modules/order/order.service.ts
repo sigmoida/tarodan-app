@@ -36,6 +36,7 @@ import { NotificationService } from '../notification/notification.service';
 import { NotificationType } from '../notification/dto';
 import { DiscountService, DiscountCalculator } from '../discount';
 import { SuratCargoService } from '../surat-cargo/surat-cargo.service';
+import { normalizeSuratPhone, normalizeSuratLocation } from '../surat-cargo/surat-address.util';
 import { CommissionLedgerService } from '../commission/commission-ledger.service';
 import { mapSuratFailureToHttpException } from '../surat-cargo/surat-result.mapper';
 import type { SuratShipmentFailure } from '../surat-cargo/surat-cargo.types';
@@ -346,9 +347,9 @@ export class OrderService {
       payload: {
         KisiKurum: ctx.recipientFullName,
         AliciAdresi: ctx.recipientAddressLine,
-        Il: ctx.recipientCity,
-        Ilce: ctx.recipientDistrict,
-        TelefonCep: ctx.recipientPhone,
+        Il: normalizeSuratLocation(ctx.recipientCity),
+        Ilce: normalizeSuratLocation(ctx.recipientDistrict),
+        TelefonCep: normalizeSuratPhone(ctx.recipientPhone),
         SahisBirim: ctx.productTitle,
         KargoTuru: SuratKargoTuru.Koli,
         OdemeTipi: SuratOdemeTipi.Pesin,
@@ -3380,6 +3381,8 @@ export class OrderService {
       shippedAt: order.shipment?.shippedAt ?? null,
       deliveredAt: order.deliveredAt ?? order.shipment?.deliveredAt ?? null,
       completedAt: order.completedAt ?? null,
+      cancelledAt: order.cancelledAt ?? null,
+      cancelReason: order.cancelReason ?? null,
       confirmationDeadline: order.confirmationDeadline ?? null,
       buyerConfirmedAt: order.buyerConfirmedAt ?? null,
       isBuyer: order.buyerId === userId,

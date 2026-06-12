@@ -20,7 +20,7 @@ import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 import { format } from 'date-fns';
 import { tr } from 'date-fns/locale';
 import { tradesApi, paymentsApi } from '../../src/services/api';
-import { ThemedRefreshControl } from '../../src/components/common';
+import { ThemedRefreshControl, TradeAddressPicker } from '../../src/components/common';
 import { useRefresh } from '../../src/hooks/useRefresh';
 import { useAuthStore } from '../../src/stores/authStore';
 import { useTranslation } from '../../src/i18n';
@@ -337,6 +337,7 @@ export default function TradeDetailScreen() {
 
   const [snackbar, setSnackbar] = useState({ visible: false, message: '' });
   const [rejectModalVisible, setRejectModalVisible] = useState(false);
+  const [tradeAddressId, setTradeAddressId] = useState<string | null>(null);
   const [rejectReason, setRejectReason] = useState('');
   const [now, setNow] = useState(() => Date.now());
   const [disputeModalVisible, setDisputeModalVisible] = useState(false);
@@ -359,7 +360,7 @@ export default function TradeDetailScreen() {
 
   // Accept trade mutation
   const acceptMutation = useMutation({
-    mutationFn: () => tradesApi.accept(id as string),
+    mutationFn: () => tradesApi.accept(id as string, undefined, tradeAddressId ?? undefined),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['trade', id] });
       queryClient.invalidateQueries({ queryKey: ['trades'] });
@@ -543,6 +544,10 @@ export default function TradeDetailScreen() {
   const theirTotal = sideTotal(theirItems);
 
   const handleAccept = () => {
+    if (!tradeAddressId) {
+      appAlert('Teslimat Adresi', 'Lütfen bir teslimat adresi seçin veya ekleyin.');
+      return;
+    }
     appAlert(
       'Takası Kabul Et',
       'Bu takas teklifini kabul etmek istediğinize emin misiniz?',
@@ -1152,6 +1157,10 @@ export default function TradeDetailScreen() {
           {/* Pending: Accept/Reject/Counter for receiver */}
           {trade.status === 'pending' && isReceiver && (
             <>
+              {/* Kabul ederken teslimat adresi (kargo kabulde başlar) */}
+              <View style={{ marginBottom: 12 }}>
+                <TradeAddressPicker label="Teslimat Adresi" onChange={setTradeAddressId} />
+              </View>
               <Button
                 variant="primary"
                 title="Kabul Et"

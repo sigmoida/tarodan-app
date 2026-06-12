@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { View, Text, ScrollView, TouchableOpacity, StyleSheet, ActivityIndicator } from 'react-native';
-import { router } from 'expo-router';
+import { router, useFocusEffect } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { theme, ScreenHeader, appAlert } from '@tarodan/ui-native';
 import { useAuthStore } from '../../src/stores/authStore';
@@ -79,10 +79,17 @@ export default function MembershipScreen() {
   useEffect(() => {
     if (!isAuthenticated) {
       router.replace('/(auth)/login');
-      return;
     }
-    fetchData();
   }, [isAuthenticated]);
+
+  // Ekrana her dönüşte güncel kademeyi çek (üyelik yükseltme sonrası "mevcut
+  // plan" anında güncellensin; mount'ta da çalışır).
+  useFocusEffect(
+    React.useCallback(() => {
+      if (isAuthenticated) fetchData();
+      // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [isAuthenticated]),
+  );
 
   const fetchData = async () => {
     setLoading(true);
@@ -241,6 +248,18 @@ export default function MembershipScreen() {
               })}
             </Text>
           )}
+          {/* Üyelik yönetimi: otomatik yenileme + kayıtlı kartlar (tüm kademeler) */}
+          <TouchableOpacity
+            style={styles.manageButton}
+            onPress={() => router.push('/membership/manage' as any)}
+            activeOpacity={0.8}
+          >
+            <Ionicons name="settings-outline" size={16} color={colors.primary[600]!} />
+            <Text style={styles.manageButtonText}>
+              Üyelik Yönetimi (otomatik yenileme & kayıtlı kartlar)
+            </Text>
+            <Ionicons name="chevron-forward" size={16} color={colors.primary[600]!} />
+          </TouchableOpacity>
         </View>
 
         {/* Billing Period Toggle */}
@@ -469,6 +488,21 @@ const styles = StyleSheet.create({
     fontSize: 12,
     color: colors.text.subtle,
     marginTop: 6,
+  },
+  manageButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    marginTop: 12,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderRadius: 8,
+    backgroundColor: colors.primary[50]!,
+  },
+  manageButtonText: {
+    fontSize: 13,
+    fontWeight: '600',
+    color: colors.primary[600]!,
   },
 
   // Toggle

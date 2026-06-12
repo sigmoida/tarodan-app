@@ -139,7 +139,7 @@ const NOTIFICATION_TEMPLATES: Record<NotificationType, { title: string; message:
     title: 'Karşı Teklif Aldınız',
     message: '{{productTitle}} için satıcı {{amount}} TL karşı teklif yaptı.',
     icon: '🔄',
-    link: '/listings/{{productId}}',
+    link: '/offers?tab=sent',
   },
   [NotificationType.OFFER_COUNTER_DECLINED]: {
     title: 'Karşı Teklif Reddedildi',

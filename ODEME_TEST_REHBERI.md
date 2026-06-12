@@ -224,18 +224,30 @@ Taksit: 2, 3, 6, 9, 12
 
 ### PayTR Test Kartları
 
-**Test modunda** (`PAYTR_TEST_MODE=true`) PayTR iframe açıldığında aşağıdaki test kartlarını kullanın.
-Resmi listeyi PayTR panelinden alabilirsiniz; yaygın örnekler:
+**Test modunda** (`PAYTR_TEST_MODE=true`) PayTR ödeme ekranında (iframe veya site-içi kart formu)
+aşağıdaki **PayTR resmi test kartlarını** kullanın (2026-06-11'de PayTR API yanıtından doğrulandı):
 
-| Sonuç       | Kart No (boşluksuz)     | Son Kullanma | CVV  | Kart Sahibi  |
-|------------|--------------------------|--------------|------|---------------|
-| Başarılı   | `0000000000000000` (16 sıfır) | 12/30        | 000  | Test User     |
-| Başarısız  | `4508345678901235` vb.        | 12/30        | 000  | Test User     |
+| Sonuç       | Kart No (boşluksuz)   | Son Kullanma | CVV  | Kart Sahibi |
+|------------|------------------------|--------------|------|--------------|
+| Başarılı   | `4355084355084358` (Visa)       | ileri tarih (örn. 12/30) | 000 | Test User |
+| Başarılı   | `5406675406675403` (MasterCard) | ileri tarih | 000 | Test User |
+| Başarılı   | `9792030394440796` (Troy)       | ileri tarih | 000 | Test User |
+| Başarılı   | `4242424242424242` (Visa)       | ileri tarih | 000 | Test User |
 
-- Kart numarasını **aralıksız** girin (başarılı test kartı: `0000000000000000`).
-- **Başarılı ödeme** için: Yukarıdaki başarılı kart + geçerli son kullanma (ileri tarih) + CVV (örn. 000).
+- **CVV mutlaka `000`** olmalı; son kullanma için ileri tarihli herhangi bir değer geçerli.
+- ⚠️ `0000000000000000` (16 sıfır) PayTR kartı DEĞİLDİR — yalnızca `PAYMENT_BYPASS=true`
+  modundaki site-içi "Test ödeme (bypass)" formunda geçerlidir.
 - `apps/api/.env` içinde `PAYTR_TEST_MODE=true` ve geçerli `PAYTR_MERCHANT_ID`, `PAYTR_MERCHANT_KEY`, `PAYTR_MERCHANT_SALT` olmalı.
 - `merchant_oid` hatası alıyorsanız: Backend artık sipariş numarasını tire olmadan gönderiyor (örn. `ORD2026000032`); API’yi güncelleyip tekrar deneyin.
+
+### Site-içi Kart Formu (PayTR Direkt API)
+
+Web'de `/payment/[id]` ve üyelik checkout'u kartı **kendi sayfamızda** alır ve
+`POST /payments/process-direct` ile PayTR Direkt API'ye iletir (3D Secure ekranı döner).
+**ÖNEMLİ:** Direkt API, PayTR tarafından mağazaya özel AKTİVASYON ister
+(Mağaza Paneli → Destek & Kurulum üzerinden talep edilir). Aktivasyon yoksa API
+"Direkt API yetkisi gerekli olabilir" hatası döner ve site otomatik olarak PayTR
+iframe akışına düşer — ödeme yine alınır, sadece kart PayTR sayfasında girilir.
 
 ---
 

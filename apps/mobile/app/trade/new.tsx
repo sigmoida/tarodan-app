@@ -19,6 +19,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 // listingsApi → productsApi (parite migrasyonu); userApi.getMyProducts → productsApi.getMyListings
 import { productsApi as listingsApi, tradesApi, productsApi } from '../../src/services/api';
+import { TradeAddressPicker } from '../../src/components/common';
 import { useAuthStore } from '../../src/stores/authStore';
 import { getUpgradeMessage } from '../../src/utils/membershipLimits';
 import { getImageUrl } from '../../src/utils/imageUrl';
@@ -65,6 +66,7 @@ export default function NewTradeScreen() {
   const [cashAmount, setCashAmount] = useState('');
   const [cashDirection, setCashDirection] = useState<'offer' | 'request'>('offer'); // offer = I pay, request = they pay
   const [message, setMessage] = useState('');
+  const [tradeAddressId, setTradeAddressId] = useState<string | null>(null);
   const [snackbar, setSnackbar] = useState({ visible: false, message: '' });
 
   /** Web trades/new ile aynı: limits yüklüyse onu kullan; değilse üyelik kademesi */
@@ -153,6 +155,7 @@ export default function NewTradeScreen() {
         receiverItems: selectedTheirItems.map((p) => ({ productId: p.id, quantity: 1 })),
         cashAmount: finalCash,
         message: message.trim() || undefined,
+        shippingAddressId: tradeAddressId || undefined,
       });
     },
     onSuccess: () => {
@@ -249,6 +252,10 @@ export default function NewTradeScreen() {
     }
     if (selectedTheirItems.length === 0) {
       appAlert('Hata', 'Karşı taraftan en az bir ürün seçmelisiniz');
+      return;
+    }
+    if (!tradeAddressId) {
+      appAlert('Teslimat Adresi', 'Lütfen bir teslimat adresi seçin veya ekleyin.');
       return;
     }
     createTradeMutation.mutate();
@@ -496,6 +503,11 @@ export default function NewTradeScreen() {
             <Text variant="caption" tone="subtle" style={styles.charCount}>
               {message.length}/500
             </Text>
+
+            {/* Teslimat adresi (takas kabul edilince kargo bu adrese gelir) */}
+            <View style={styles.messageInput}>
+              <TradeAddressPicker label="Teslimat Adresiniz" onChange={setTradeAddressId} />
+            </View>
 
             {/* Trade Protection Info */}
             <Card style={styles.protectionCard}>

@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { useRouter } from "next/navigation";
 import { RocketLaunchIcon, XMarkIcon } from "@heroicons/react/24/outline";
 import toast from "react-hot-toast";
 import { Button, Spinner } from "@tarodan/ui";
@@ -35,6 +36,7 @@ export default function BoostModal({
   open,
   onClose,
 }: BoostModalProps) {
+  const router = useRouter();
   const [loadingPricing, setLoadingPricing] = useState(false);
   const [options, setOptions] = useState<BoostOption[]>([]);
   const [enabled, setEnabled] = useState(true);
@@ -77,9 +79,13 @@ export default function BoostModal({
         durationDays: selected,
         autoRenew: isPremium ? autoRenew : false,
       });
-      const paymentUrl = res.data?.paymentUrl;
-      if (paymentUrl && String(paymentUrl).startsWith("http")) {
-        window.location.href = paymentUrl;
+      // Üyelik/sipariş akışıyla parite: tüm tarayıcıyı PayTR'a atmak yerine uygulama-içi
+      // ödeme ekranına (/payment/[id]) git — PayTR kart formu iframe içinde gösterilir,
+      // bypass modunda da aynı ekran otomatik tamamlar.
+      const paymentId = res.data?.paymentId;
+      if (paymentId) {
+        onClose();
+        router.push(`/payment/${paymentId}?type=boost`);
         return;
       }
       toast.error("Ödeme başlatılamadı");

@@ -4,6 +4,7 @@ import {
   IsOptional,
   IsNumber,
   IsEnum,
+  IsUUID,
   ValidateNested,
   MaxLength,
   ArrayMinSize,
@@ -23,6 +24,14 @@ export class AcceptTradeDto {
   @IsString()
   @MaxLength(500)
   message?: string;
+
+  /**
+   * Kabul edenin (receiver) bu takas için teslimat adresi.
+   * Verilmezse varsayılan adresine düşülür.
+   */
+  @IsOptional()
+  @IsUUID()
+  shippingAddressId?: string;
 }
 
 export class RejectTradeDto {

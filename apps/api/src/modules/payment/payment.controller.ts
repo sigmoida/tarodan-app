@@ -43,6 +43,7 @@ import {
   CancelPaymentResponseDto,
   RetryPaymentResponseDto,
   AddCardDto,
+  DirectPaymentDto,
 } from './dto';
 
 @ApiTags('payments')
@@ -151,6 +152,25 @@ export class PaymentController {
   }
 
   /**
+   * POST /payments/process-direct - PayTR Direkt API ile ödeme.
+   * Kart bilgisi bizim checkout sayfamızda alınır; yanıt 3D Secure HTML'idir
+   * (istemci render eder), sonuç callback/verify ile işlenir.
+   */
+  @Post('process-direct')
+  @Throttle({ default: { limit: 10, ttl: 60000 } })
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth()
+  @ApiOperation({ summary: 'Process payment with card details (PayTR Direct API, 3D Secure)' })
+  @ApiResponse({ status: HttpStatus.CREATED, description: 'Payment initiated; threeDSHtml returned' })
+  async processDirect(
+    @CurrentUser('id') userId: string,
+    @Body() dto: DirectPaymentDto,
+    @Req() req: Request,
+  ) {
+    return this.paymentService.processDirectPayment(userId, dto, req);
+  }
+
+  /**
    * POST /payments/callback/paytr - PayTR webhook
    */
   @Post('callback/paytr')
@@ -253,6 +273,36 @@ export class PaymentController {
     return this.paymentService.getSellerHolds(userId);
   }
 
+  /**
+   * GET /payments/me - Get user's payment history
+   */
+  @Get('me')
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth()
+  @ApiOperation({ summary: 'Get current user\'s payment history' })
+  @ApiResponse({
+    status: HttpStatus.OK,
+    description: 'List of payments',
+  })
+  async getMyPayments(
+    @CurrentUser('id') userId: string,
+    @Query('status') status?: string,
+    @Query('provider') provider?: string,
+    @Query('startDate') startDate?: string,
+    @Query('endDate') endDate?: string,
+    @Query('page') page?: string,
+    @Query('limit') limit?: string,
+  ) {
+    return this.paymentService.getUserPayments(userId, {
+      status: status as any,
+      provider,
+      startDate: startDate ? new Date(startDate) : undefined,
+      endDate: endDate ? new Date(endDate) : undefined,
+      page: page ? parseInt(page, 10) : undefined,
+      limit: limit ? parseInt(limit, 10) : undefined,
+    });
+  }
+
   // ============================================================
   // GENERIC :id routes - Must be LAST
   // ============================================================
@@ -317,36 +367,6 @@ export class PaymentController {
     @CurrentUser('id') userId: string,
   ): Promise<PaymentResponseDto> {
     return this.paymentService.findOne(id, userId);
-  }
-
-  /**
-   * GET /payments/me - Get user's payment history
-   */
-  @Get('me')
-  @UseGuards(JwtAuthGuard)
-  @ApiBearerAuth()
-  @ApiOperation({ summary: 'Get current user\'s payment history' })
-  @ApiResponse({
-    status: HttpStatus.OK,
-    description: 'List of payments',
-  })
-  async getMyPayments(
-    @CurrentUser('id') userId: string,
-    @Query('status') status?: string,
-    @Query('provider') provider?: string,
-    @Query('startDate') startDate?: string,
-    @Query('endDate') endDate?: string,
-    @Query('page') page?: string,
-    @Query('limit') limit?: string,
-  ) {
-    return this.paymentService.getUserPayments(userId, {
-      status: status as any,
-      provider,
-      startDate: startDate ? new Date(startDate) : undefined,
-      endDate: endDate ? new Date(endDate) : undefined,
-      page: page ? parseInt(page, 10) : undefined,
-      limit: limit ? parseInt(limit, 10) : undefined,
-    });
   }
 
   /**

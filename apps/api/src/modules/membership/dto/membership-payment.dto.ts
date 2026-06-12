@@ -19,6 +19,9 @@ export class MembershipPaymentInitResponseDto {
   @ApiProperty({ example: 'uuid' })
   membershipPaymentId: string;
 
+  @ApiPropertyOptional({ example: 'uuid', description: 'Üyelik sipariş ID — Direkt API (process-direct) için' })
+  orderId?: string;
+
   @ApiProperty({ example: 'https://example.com/payment/...' })
   paymentUrl: string;
 

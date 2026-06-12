@@ -7,13 +7,14 @@ import {
   StyleSheet,
   ActivityIndicator,
   RefreshControl,
+  Image,
 } from 'react-native';
 import { ScreenHeader, appAlert } from '@tarodan/ui-native';
 import { router, useFocusEffect } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { TarodanColors } from '../../src/theme';
 import { useAuthStore } from '../../src/stores/authStore';
-import { api, paymentsApi } from '../../src/services/api';
+import { paymentsApi } from '../../src/services/api';
 
 interface Payment {
   id: string;
@@ -25,6 +26,7 @@ interface Payment {
   periodStart?: string;
   periodEnd?: string;
   invoiceUrl?: string;
+  imageUrl?: string;
 }
 
 const STATUS_CONFIG: Record<string, { label: string; color: string; icon: string }> = {
@@ -59,16 +61,24 @@ export default function PaymentHistoryScreen() {
     else setIsLoading(true);
 
     try {
-      let data: Payment[] = [];
-      try {
-        const res = await api.get('/payments/history');
-        data = res.data?.data || res.data || [];
-      } catch {
-        // Backend'de membership/billing-history endpoint'i yok; web ile aynı: paymentsApi.getMyPayments
-        const res = await paymentsApi.getMyPayments({ limit: 50 });
-        const raw: any = res.data;
-        data = raw?.payments || raw?.data || raw || [];
-      }
+      // Web ile aynı kaynak: GET /payments/me. Yanıt alanları (orderNumber,
+      // product, provider) ekran modeline (description, method) burada çevrilir.
+      const res = await paymentsApi.getMyPayments({ limit: 50 });
+      const raw: any = res.data;
+      const items: any[] = raw?.payments || raw?.data || (Array.isArray(raw) ? raw : []);
+      const data: Payment[] = items.map((p: any) => ({
+        id: p.id,
+        amount: Number(p.amount) || 0,
+        status: p.status,
+        method: p.method || (p.provider ? String(p.provider).toUpperCase() : ''),
+        description:
+          p.description ||
+          p.product?.title ||
+          (p.orderNumber ? `Sipariş #${p.orderNumber}` : 'Ödeme'),
+        createdAt: p.createdAt,
+        invoiceUrl: p.invoiceUrl,
+        imageUrl: p.product?.images?.[0] || undefined,
+      }));
       setPayments(data);
     } catch (err: any) {
       if (!showRefresh) {
@@ -107,9 +117,13 @@ export default function PaymentHistoryScreen() {
 
     return (
       <TouchableOpacity style={styles.paymentItem} onPress={() => handlePaymentPress(item)} activeOpacity={0.7}>
-        <View style={[styles.statusIconContainer, { backgroundColor: statusCfg.color + '15' }]}>
-          <Ionicons name={statusCfg.icon as any} size={24} color={statusCfg.color} />
-        </View>
+        {item.imageUrl ? (
+          <Image source={{ uri: item.imageUrl }} style={styles.productImage} />
+        ) : (
+          <View style={[styles.statusIconContainer, { backgroundColor: statusCfg.color + '15' }]}>
+            <Ionicons name={statusCfg.icon as any} size={24} color={statusCfg.color} />
+          </View>
+        )}
 
         <View style={styles.paymentInfo}>
           <Text style={styles.paymentDescription} numberOfLines={1}>
@@ -217,6 +231,13 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
     marginRight: 12,
+  },
+  productImage: {
+    width: 44,
+    height: 44,
+    borderRadius: 8,
+    marginRight: 12,
+    backgroundColor: TarodanColors.backgroundTertiary,
   },
   paymentInfo: {
     flex: 1,

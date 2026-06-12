@@ -80,6 +80,7 @@ export default function EditListingPage() {
     isTradeEnabled: false,
     isPreorder: false,
     isSet: false,
+    bundleSize: undefined as number | undefined,
     quantity: '' as string | number,
     images: [] as Array<{ cardKey: string; detailKey: string }>,
     status: 'active' as string,
@@ -505,6 +506,7 @@ export default function EditListingPage() {
           isTradeEnabled: savedData?.isTradeEnabled !== undefined ? savedData.isTradeEnabled : (listing.isTradeEnabled || listing.trade_available || prev.isTradeEnabled || false),
           isPreorder: savedData?.isPreorder !== undefined ? savedData.isPreorder : ((listing as any).isPreorder ?? prev.isPreorder ?? false),
           isSet: savedData?.isSet !== undefined ? savedData.isSet : ((listing as any).isSet ?? prev.isSet ?? false),
+          bundleSize: savedData?.bundleSize ?? (listing as any).bundleSize ?? prev.bundleSize ?? undefined,
           quantity: quantityToUse,
           images: savedData?.images?.length > 0 ? savedData.images : (savedData?.imageUrls?.length > 0 ? savedData.imageUrls.map((k: string) => ({ cardKey: k, detailKey: k })) : (listing.images?.map((img: any) => ({ cardKey: img.cardKey ?? img.url, detailKey: img.detailKey ?? img.url })) || prev.images || [])),
           status: savedData?.status || listing.status || prev.status || 'active',
@@ -680,6 +682,10 @@ export default function EditListingPage() {
         isTradeEnabled: formData.isTradeEnabled,
         isPreorder: formData.isPreorder,
         isSet: formData.isSet,
+        bundleSize:
+          formData.isSet && Number(formData.bundleSize) >= 2
+            ? Number(formData.bundleSize)
+            : null,
         quantity: formData.quantity && formData.quantity !== '' ? Number(formData.quantity) : null,
         images: formData.images.length > 0 ? formData.images : undefined,
         status: formData.status,
@@ -1077,6 +1083,28 @@ export default function EditListingPage() {
                 <span className={`absolute top-1 left-1 w-6 h-6 bg-surface-elevated rounded-full shadow transition-transform ${formData.isSet ? 'translate-x-6' : 'translate-x-0'}`} />
               </Button>
             </div>
+
+            {formData.isSet && (
+              <div className="p-4 bg-surface rounded-xl border border-border">
+                <label className="block text-sm font-medium text-body mb-1.5">Set Parça Sayısı</label>
+                <input
+                  type="number"
+                  min={2}
+                  value={formData.bundleSize ?? ''}
+                  onChange={(e) =>
+                    setFormData({
+                      ...formData,
+                      bundleSize: e.target.value ? parseInt(e.target.value, 10) : undefined,
+                    })
+                  }
+                  placeholder="örn. 5"
+                  className="w-full px-3 py-2 rounded border border-border bg-surface-elevated text-body"
+                />
+                <p className="text-sm text-muted mt-1">
+                  Setteki toplam parça sayısı. Her parçanın marka/model/renk gibi ayrıntılarını açıklamada belirtin.
+                </p>
+              </div>
+            )}
 
             {/* Price & Quantity */}
             <div className="grid md:grid-cols-2 gap-6">

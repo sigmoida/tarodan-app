@@ -28,6 +28,7 @@ import {
   paymentsApi,
 } from "@/lib/api";
 import { getProductEffectivePrice } from "@/lib/productPrice";
+import TradeAddressPicker from "@/components/TradeAddressPicker";
 import { useTranslation } from "@/i18n/LanguageContext";
 import { ShieldCheckIcon } from "@heroicons/react/24/outline";
 import {
@@ -311,6 +312,7 @@ export default function TradeDetailPage() {
       : tradeStatusConfig[s]?.label || tradeStatusTrLabels[s] || s;
 
   const [isActionLoading, setIsActionLoading] = useState(false);
+  const [tradeAddressId, setTradeAddressId] = useState<string | null>(null);
   const [cashPaymentLoading, setCashPaymentLoading] = useState(false);
   const [showRejectModal, setShowRejectModal] = useState(false);
   const [rejectReason, setRejectReason] = useState("");
@@ -475,13 +477,15 @@ export default function TradeDetailPage() {
         return;
       }
 
-      if (data?.paymentUrl) {
-        window.location.href = data.paymentUrl;
+      // Site-içi kart formu için ödeme sayfamıza git (paymentUrl'e doğrudan
+      // gitmek PayTR iframe'ini açıp kart formunu atlardı).
+      if (data?.paymentId) {
+        router.push(`/payment/${data.paymentId}`);
         return;
       }
 
-      if (data?.paymentId) {
-        router.push(`/payment/${data.paymentId}`);
+      if (data?.paymentUrl) {
+        window.location.href = data.paymentUrl;
         return;
       }
 
@@ -631,10 +635,19 @@ export default function TradeDetailPage() {
 
   const handleAccept = async () => {
     if (!trade) return;
+    if (!tradeAddressId) {
+      toast.error(
+        locale === "en"
+          ? "Please select or add a delivery address"
+          : "Lütfen bir teslimat adresi seçin veya ekleyin",
+        { id: "trade-address-required" },
+      );
+      return;
+    }
 
     setIsActionLoading(true);
     try {
-      await tradesApi.accept(trade.id);
+      await tradesApi.accept(trade.id, undefined, tradeAddressId);
       toast.success(
         locale === "en" ? "Trade accepted!" : "Takas kabul edildi!",
       );
@@ -1154,16 +1167,16 @@ export default function TradeDetailPage() {
                         const isSelected =
                           selectedCounterTargetProducts.includes(product.id);
                         return (
-                          <Button
-                            variant="secondary"
+                          <button
+                            type="button"
                             key={product.id}
                             onClick={() =>
                               toggleCounterTargetProduct(product.id)
                             }
-                            className={`relative rounded-xl overflow-hidden border-2 transition-all ${
+                            className={`relative block w-full rounded-xl border-2 p-4 transition-all ${
                               isSelected
                                 ? "border-primary-500 ring-2 ring-primary-200"
-                                : "border-border hover:border-border"
+                                : "border-border hover:border-primary-300"
                             }`}
                           >
                             {isSelected && (
@@ -1171,33 +1184,35 @@ export default function TradeDetailPage() {
                                 <CheckIcon className="w-4 h-4 text-inverted" />
                               </div>
                             )}
-                            <div className="aspect-square relative bg-surface-alt">
-                              <OptimizedImage
-                                src={getProductImage(product)}
-                                alt={product.title}
-                                fill
-                                className="object-cover"
-                                logContext={{
-                                  productId: product.id,
-                                  page: "trades-detail-receiver",
-                                }}
-                              />
+                            <div className="flex flex-col items-center gap-3">
+                              <div className="relative w-full aspect-square rounded-lg overflow-hidden bg-surface-alt">
+                                <OptimizedImage
+                                  src={getProductImage(product)}
+                                  alt={product.title}
+                                  fill
+                                  className="object-cover"
+                                  logContext={{
+                                    productId: product.id,
+                                    page: "trades-detail-receiver",
+                                  }}
+                                />
+                              </div>
+                              <div className="text-center w-full">
+                                <h3 className="font-medium text-heading text-sm line-clamp-2 mb-1">
+                                  {product.title}
+                                </h3>
+                                <p className="text-base font-bold text-primary-500">
+                                  {getProductEffectivePrice(
+                                    product,
+                                  ).toLocaleString("tr-TR", {
+                                    minimumFractionDigits: 2,
+                                    maximumFractionDigits: 2,
+                                  })}{" "}
+                                  TL
+                                </p>
+                              </div>
                             </div>
-                            <div className="p-2 text-left">
-                              <p className="text-xs font-medium text-heading line-clamp-1">
-                                {product.title}
-                              </p>
-                              <p className="text-xs font-bold text-primary-500">
-                                {getProductEffectivePrice(
-                                  product,
-                                ).toLocaleString("tr-TR", {
-                                  minimumFractionDigits: 2,
-                                  maximumFractionDigits: 2,
-                                })}{" "}
-                                TL
-                              </p>
-                            </div>
-                          </Button>
+                          </button>
                         );
                       })}
                     </div>
@@ -1241,14 +1256,14 @@ export default function TradeDetailPage() {
                           product.id,
                         );
                         return (
-                          <Button
-                            variant="secondary"
+                          <button
+                            type="button"
                             key={product.id}
                             onClick={() => toggleCounterProduct(product.id)}
-                            className={`relative rounded-xl overflow-hidden border-2 transition-all ${
+                            className={`relative block w-full rounded-xl border-2 p-4 transition-all ${
                               isSelected
                                 ? "border-primary-500 ring-2 ring-primary-200"
-                                : "border-border hover:border-border"
+                                : "border-border hover:border-primary-300"
                             }`}
                           >
                             {isSelected && (
@@ -1256,33 +1271,35 @@ export default function TradeDetailPage() {
                                 <CheckIcon className="w-4 h-4 text-inverted" />
                               </div>
                             )}
-                            <div className="aspect-square relative bg-surface-alt">
-                              <OptimizedImage
-                                src={getProductImage(product)}
-                                alt={product.title}
-                                fill
-                                className="object-cover"
-                                logContext={{
-                                  productId: product.id,
-                                  page: "trades-detail-counter",
-                                }}
-                              />
+                            <div className="flex flex-col items-center gap-3">
+                              <div className="relative w-full aspect-square rounded-lg overflow-hidden bg-surface-alt">
+                                <OptimizedImage
+                                  src={getProductImage(product)}
+                                  alt={product.title}
+                                  fill
+                                  className="object-cover"
+                                  logContext={{
+                                    productId: product.id,
+                                    page: "trades-detail-counter",
+                                  }}
+                                />
+                              </div>
+                              <div className="text-center w-full">
+                                <h3 className="font-medium text-heading text-sm line-clamp-2 mb-1">
+                                  {product.title}
+                                </h3>
+                                <p className="text-base font-bold text-primary-500">
+                                  {getProductEffectivePrice(
+                                    product,
+                                  ).toLocaleString("tr-TR", {
+                                    minimumFractionDigits: 2,
+                                    maximumFractionDigits: 2,
+                                  })}{" "}
+                                  TL
+                                </p>
+                              </div>
                             </div>
-                            <div className="p-2 text-left">
-                              <p className="text-xs font-medium text-heading line-clamp-1">
-                                {product.title}
-                              </p>
-                              <p className="text-xs font-bold text-primary-500">
-                                {getProductEffectivePrice(
-                                  product,
-                                ).toLocaleString("tr-TR", {
-                                  minimumFractionDigits: 2,
-                                  maximumFractionDigits: 2,
-                                })}{" "}
-                                TL
-                              </p>
-                            </div>
-                          </Button>
+                          </button>
                         );
                       })}
                     </div>
@@ -2369,6 +2386,15 @@ export default function TradeDetailPage() {
         {/* Action Buttons */}
         {(canAccept || canReject || canCounter || canCancel || showCancelDisabled) && (
           <div className="card p-6">
+            {/* Kabul ederken teslimat adresi seçimi (kargo kabulde başlar) */}
+            {canAccept && (
+              <div className="mb-5">
+                <TradeAddressPicker
+                  label={locale === "en" ? "Delivery Address" : "Teslimat Adresi"}
+                  onChange={setTradeAddressId}
+                />
+              </div>
+            )}
             <div className="flex flex-wrap gap-3">
               {canAccept && (
                 <Button

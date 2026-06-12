@@ -18,8 +18,10 @@ import { Button, Input, Select, Spinner, StatusBadge, paymentStatusConfig } from
 
 interface Payment {
   id: string;
-  orderId: string;
-  orderNumber: string;
+  type?: 'order' | 'checkout_group' | 'trade_cash';
+  description?: string;
+  orderId: string | null;
+  orderNumber: string | null;
   amount: number;
   currency: string;
   provider: string;
@@ -30,15 +32,15 @@ interface Payment {
     id: string;
     title: string;
     images?: string[];
-  };
+  } | null;
   buyer: {
     id: string;
     displayName: string;
-  };
+  } | null;
   seller: {
     id: string;
     displayName: string;
-  };
+  } | null;
   createdAt: string;
   updatedAt: string;
   paidAt?: string;
@@ -291,16 +293,22 @@ export default function PaymentHistoryPage() {
                       return (
                         <tr key={payment.id} className="hover:bg-surface">
                           <td className="px-6 py-4 whitespace-nowrap">
-                            <Link
-                              href={`/orders/${payment.orderId}`}
-                              className="text-primary-600 hover:text-primary-700 font-medium"
-                            >
-                              #{payment.orderNumber}
-                            </Link>
+                            {payment.orderId ? (
+                              <Link
+                                href={`/orders/${payment.orderId}`}
+                                className="text-primary-600 hover:text-primary-700 font-medium"
+                              >
+                                #{payment.orderNumber}
+                              </Link>
+                            ) : (
+                              <span className="text-muted font-medium">
+                                {payment.orderNumber ? `#${payment.orderNumber}` : '—'}
+                              </span>
+                            )}
                           </td>
                           <td className="px-6 py-4">
                             <div className="flex items-center gap-3">
-                              {payment.product.images && payment.product.images[0] ? (
+                              {payment.product?.images && payment.product.images[0] ? (
                                 <img
                                   src={payment.product.images[0]}
                                   alt={payment.product.title}
@@ -313,14 +321,16 @@ export default function PaymentHistoryPage() {
                               )}
                               <div>
                                 <p className="text-sm font-medium text-heading">
-                                  {payment.product.title}
+                                  {payment.description || payment.product?.title || (locale === 'en' ? 'Payment' : 'Ödeme')}
                                 </p>
-                                <p className="text-xs text-muted">
-                                  {user?.id === payment.buyer.id ? (locale === 'en' ? 'Buyer' : 'Alıcı') : (locale === 'en' ? 'Seller' : 'Satıcı')}:{' '}
-                                  {user?.id === payment.buyer.id
-                                    ? payment.seller.displayName
-                                    : payment.buyer.displayName}
-                                </p>
+                                {payment.buyer && payment.seller && (
+                                  <p className="text-xs text-muted">
+                                    {user?.id === payment.buyer.id ? (locale === 'en' ? 'Buyer' : 'Alıcı') : (locale === 'en' ? 'Seller' : 'Satıcı')}:{' '}
+                                    {user?.id === payment.buyer.id
+                                      ? payment.seller.displayName
+                                      : payment.buyer.displayName}
+                                  </p>
+                                )}
                               </div>
                             </div>
                           </td>
@@ -356,12 +366,14 @@ export default function PaymentHistoryPage() {
                           </td>
                           <td className="px-6 py-4 whitespace-nowrap text-sm">
                             <div className="flex items-center gap-2">
-                              <Link
-                                href={`/orders/${payment.orderId}`}
-                                className="text-primary-600 hover:text-primary-700"
-                              >
-                                {t('common.details')}
-                              </Link>
+                              {payment.orderId && (
+                                <Link
+                                  href={`/orders/${payment.orderId}`}
+                                  className="text-primary-600 hover:text-primary-700"
+                                >
+                                  {t('common.details')}
+                                </Link>
+                              )}
                               {payment.status === 'pending' && (
                                 <Button variant="secondary" onClick={() => handleCancel(payment.id)}
                                   className="text-danger-600 hover:text-danger-700">

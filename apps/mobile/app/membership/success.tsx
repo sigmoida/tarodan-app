@@ -1,19 +1,50 @@
 import { useEffect } from 'react';
 import { View, StyleSheet } from 'react-native';
 import { theme, Button, Text } from '@tarodan/ui-native';
-import { router } from 'expo-router';
+import { router, useLocalSearchParams } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
+import { useQueryClient } from '@tanstack/react-query';
 import { useAuthStore } from '../../src/stores/authStore';
+import { paymentsApi } from '../../src/services/api';
 
 const { colors } = theme;
 
 export default function MembershipSuccessScreen() {
+  const { paymentId } = useLocalSearchParams<{ paymentId?: string }>();
   const { refreshUserData } = useAuthStore();
+  const queryClient = useQueryClient();
 
-  // PayTR dönüşü sonrası yeni üyelik kademesi yerel kullanıcıya yansısın.
+  // PayTR dönüşü sonrası: üyeliği sunucu tarafında KESİNLEŞTİR, sonra yerel
+  // kullanıcı + üyelik query'lerini tazele. Callback (ngrok) gecikse/ulaşmasa
+  // bile verify (durum-sorgu) ile ödeme işlenir; aksi halde üyelik `past_due`
+  // kalır ve "mevcut plan" Temel/ücretsiz görünür (order success ile aynı desen).
   useEffect(() => {
-    refreshUserData?.();
-  }, [refreshUserData]);
+    let cancelled = false;
+    const run = async () => {
+      if (paymentId) {
+        // PayTR'ın status-inquiry'si ödeme bittikten birkaç saniye sonra "ödendi"
+        // dönebildiği için TEK verify çağrısı erken çalışıp başarısız olabilir. Üyeliği
+        // gerçekten aktive eden tek çağrı verify (getStatus sadece DB'yi OKUR, aktive
+        // ETMEZ); bu yüzden completed olana kadar verify'i tekrar dene. Aksi halde
+        // üyelik past_due kalır ve ilan hakkı 5 (ücretsiz) görünür.
+        for (let i = 0; i < 5 && !cancelled; i++) {
+          try {
+            const res = await paymentsApi.verify(paymentId);
+            const completed = (res.data?.data ?? res.data)?.completed;
+            if (completed) break;
+          } catch { /* best-effort */ }
+          if (i < 4 && !cancelled) await new Promise((r) => setTimeout(r, 1200));
+        }
+      }
+      if (cancelled) return;
+      await refreshUserData?.();
+      // Tüm üyelik query'lerini tazele (profil rozeti ['membership-me'] kullanır).
+      queryClient.invalidateQueries({ queryKey: ['membership'] });
+      queryClient.invalidateQueries({ queryKey: ['membership-me'] });
+    };
+    run();
+    return () => { cancelled = true; };
+  }, [paymentId, refreshUserData, queryClient]);
 
   return (
     <View style={styles.container}>

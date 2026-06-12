@@ -15,6 +15,8 @@ import {
   TagIcon,
   Squares2X2Icon,
   ListBulletIcon,
+  EyeIcon,
+  HeartIcon,
 } from '@heroicons/react/24/outline';
 import { StarIcon as StarIconSolid } from '@heroicons/react/24/solid';
 import { listingsApi, categoriesApi } from '@/lib/api';
@@ -55,6 +57,8 @@ interface Listing {
     average: number | null;
     count: number;
   };
+  viewCount?: number;
+  likeCount?: number;
   seller?: {
     id: string | number;
     displayName?: string;
@@ -335,6 +339,13 @@ export default function ListingsPage() {
             count += 1;
             counted.add('price');
           }
+        } else if (k === 'customAttributes') {
+          // Count each non-empty custom attribute group (e.g. each Hot Wheels attribute filter).
+          if (v && typeof v === 'object') {
+            for (const sel of Object.values(v as Record<string, string[]>)) {
+              if (Array.isArray(sel) && sel.length > 0) count += 1;
+            }
+          }
         } else {
           count += 1;
         }
@@ -613,13 +624,28 @@ export default function ListingsPage() {
                             <span className="text-[10px] text-subtle bg-surface-alt px-1.5 py-0.5 rounded inline-block mt-1">{formatCondition(listing.condition, locale)}</span>
                           </div>
                           <div className="flex items-center gap-3 ml-4">
-                            {listing.rating && listing.rating.average !== null && listing.rating.count > 0 && (
-                              <div className="flex items-center gap-1">
-                                <StarIconSolid className="w-3.5 h-3.5 text-warning-400" />
-                                <span className="text-xs font-semibold text-heading">{listing.rating.average.toFixed(1)}</span>
-                                <span className="text-[11px] text-subtle">({listing.rating.count})</span>
-                              </div>
-                            )}
+                            <div className="flex items-center gap-2.5 text-[11px] text-subtle">
+                              {listing.rating && listing.rating.average !== null && listing.rating.count > 0 ? (
+                                <span className="flex items-center gap-1">
+                                  <StarIconSolid className="w-3.5 h-3.5 text-warning-400" />
+                                  <span className="text-xs font-semibold text-heading">{listing.rating.average.toFixed(1)}</span>
+                                  <span className="text-subtle">({listing.rating.count})</span>
+                                </span>
+                              ) : (
+                                <span className="flex items-center gap-1">
+                                  <StarIcon className="w-3.5 h-3.5 text-subtle" />
+                                  <span className="text-subtle">{t('product.noReviewsShort')}</span>
+                                </span>
+                              )}
+                              <span className="flex items-center gap-0.5">
+                                <EyeIcon className="w-3.5 h-3.5" />
+                                {listing.viewCount ?? 0}
+                              </span>
+                              <span className="flex items-center gap-0.5">
+                                <HeartIcon className="w-3.5 h-3.5" />
+                                {listing.likeCount ?? 0}
+                              </span>
+                            </div>
                             {isProductOnSaleDisplay(listing) && (
                               <span className="text-xs text-danger-500 font-semibold bg-danger-50 px-1.5 py-0.5 rounded">%{listing.discountPercent ?? 0}</span>
                             )}
@@ -673,13 +699,28 @@ export default function ListingsPage() {
                           <p className="text-[10px] text-subtle mb-1.5">
                             {typeof listing.brand === 'object' ? listing.brand.name : listing.brand}{listing.scale ? ` · ${listing.scale}` : ''}{listing.year ? ` · ${listing.year}` : ''}
                           </p>
-                          {listing.rating && listing.rating.average !== null && listing.rating.count > 0 && (
-                            <div className="flex items-center gap-0.5 mb-1.5">
-                              <StarIconSolid className="w-3 h-3 text-warning-400" />
-                              <span className="text-[10px] font-semibold text-heading">{listing.rating.average.toFixed(1)}</span>
-                              <span className="text-[10px] text-subtle">({listing.rating.count})</span>
-                            </div>
-                          )}
+                          <div className="flex items-center gap-2 mb-1.5 text-[10px] text-subtle">
+                            {listing.rating && listing.rating.average !== null && listing.rating.count > 0 ? (
+                              <span className="flex items-center gap-0.5">
+                                <StarIconSolid className="w-3 h-3 text-warning-400" />
+                                <span className="font-semibold text-heading">{listing.rating.average.toFixed(1)}</span>
+                                <span>({listing.rating.count})</span>
+                              </span>
+                            ) : (
+                              <span className="flex items-center gap-0.5">
+                                <StarIcon className="w-3 h-3" />
+                                <span>{t('product.noReviewsShort')}</span>
+                              </span>
+                            )}
+                            <span className="flex items-center gap-0.5">
+                              <EyeIcon className="w-3 h-3" />
+                              {listing.viewCount ?? 0}
+                            </span>
+                            <span className="flex items-center gap-0.5">
+                              <HeartIcon className="w-3 h-3" />
+                              {listing.likeCount ?? 0}
+                            </span>
+                          </div>
                           <div className="mt-auto pt-1.5 border-t border-border-subtle">
                             <span className="text-[9px] text-subtle bg-surface px-1 py-0.5 rounded inline-block mb-1">{formatCondition(listing.condition, locale)}</span>
                             {isProductOnSaleDisplay(listing) && (

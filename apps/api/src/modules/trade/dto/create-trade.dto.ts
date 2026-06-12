@@ -61,4 +61,12 @@ export class CreateTradeDto {
   @IsString()
   @MaxLength(500)
   message?: string;
+
+  /**
+   * Teklifi başlatanın (initiator) bu takas için teslimat adresi.
+   * Verilmezse varsayılan adresine düşülür.
+   */
+  @IsOptional()
+  @IsUUID()
+  shippingAddressId?: string;
 }

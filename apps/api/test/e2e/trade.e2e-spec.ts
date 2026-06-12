@@ -132,6 +132,7 @@ describe('Trade Flow (Safe-Trade Warehouse Escrow) (E2E)', () => {
     it('creates a pending trade and does NOT reserve stock yet', async () => {
       const initiator = await createUser(ctx.module, { isSeller: true });
       const receiver = await createUser(ctx.module, { isSeller: true });
+      await createAddress({ userId: initiator.id }); // takas için teslimat adresi gerekli
       const initiatorProduct = await createProduct({
         sellerId: initiator.id,
         categoryId: baseline.categoryId,
@@ -543,6 +544,7 @@ describe('Trade Flow (Safe-Trade Warehouse Escrow) (E2E)', () => {
     it('autoCancelExpiredTrades flips a stale pending trade to cancelled', async () => {
       const initiator = await createUser(ctx.module, { isSeller: true });
       const receiver = await createUser(ctx.module, { isSeller: true });
+      await createAddress({ userId: initiator.id }); // takas için teslimat adresi gerekli
       const ip = await createProduct({
         sellerId: initiator.id,
         categoryId: baseline.categoryId,
@@ -583,6 +585,7 @@ describe('Trade Flow (Safe-Trade Warehouse Escrow) (E2E)', () => {
     it('forbids non-receiver from accepting', async () => {
       const initiator = await createUser(ctx.module, { isSeller: true });
       const receiver = await createUser(ctx.module, { isSeller: true });
+      await createAddress({ userId: initiator.id }); // takas için teslimat adresi gerekli
       const intruder = await createUser(ctx.module);
       const ip = await createProduct({
         sellerId: initiator.id,
@@ -614,6 +617,7 @@ describe('Trade Flow (Safe-Trade Warehouse Escrow) (E2E)', () => {
     it('forbids non-admin from approving the warehouse trade', async () => {
       const initiator = await createUser(ctx.module, { isSeller: true });
       const receiver = await createUser(ctx.module, { isSeller: true });
+      await createAddress({ userId: initiator.id }); // takas için teslimat adresi gerekli
       const intruder = await createUser(ctx.module);
       const ip = await createProduct({
         sellerId: initiator.id,

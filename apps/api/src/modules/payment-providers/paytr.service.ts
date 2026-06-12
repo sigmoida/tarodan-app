@@ -525,19 +525,23 @@ export class PayTRService {
 
   // ==========================================================================
   // DIRECT API PAYMENT (Alternative to iframe)
+  // https://dev.paytr.com/direkt-api
   // ==========================================================================
 
   /**
-   * Create direct API payment (requires PCI DSS compliance)
-   * Note: Most merchants should use iframe method instead
+   * PayTR Direkt API ile ödeme: kart bilgisi BİZİM sayfamızda alınır,
+   * PayTR'ye sunucudan POST edilir. non_3d=0 (varsayılan) → yanıt, kullanıcıya
+   * gösterilecek 3D Secure HTML sayfasıdır; banka doğrulaması sonrası PayTR
+   * kullanıcıyı merchant_ok_url/merchant_fail_url'e yönlendirir ve sonucu
+   * Bildirim URL'ine POST'lar (iframe akışıyla aynı callback/durum-sorgu).
    */
   async createDirectPayment(
-    orderId: string,
-    amount: number,
+    merchantOid: string,
+    amount: number, // TL
     card: {
       number: string;
-      expireMonth: string;
-      expireYear: string;
+      expireMonth: string; // MM
+      expireYear: string; // YY veya YYYY
       cvv: string;
       holderName: string;
     },
@@ -545,23 +549,150 @@ export class PayTRService {
     basketItems: PayTRBasketItem[],
     options?: {
       installmentCount?: number;
-      is3D?: boolean;
+      non3d?: boolean;
+      /** e.g. "paymentId=...&type=membership" — success sayfası verify için kullanır */
+      successQueryParams?: string;
     },
-  ): Promise<{
-    status: 'success' | 'failed';
-    paymentId?: string;
-    threeDSUrl?: string;
-    errorMessage?: string;
-  }> {
-    void orderId;
-    void amount;
-    void card;
-    void buyer;
-    void basketItems;
-    void options;
-    throw new BadRequestException(
-      'PayTR Direct API bu projede kullanılmıyor; checkout iFrame (get-token) akışını kullanın.',
+  ): Promise<{ status: 'success'; threeDSHtml?: string }> {
+    if (!this.merchantId || !this.merchantKey || !this.merchantSalt) {
+      throw new BadRequestException('PayTR yapılandırılmamış (merchant bilgileri eksik)');
+    }
+
+    const paymentAmountStr = String(Math.round(amount * 100)); // kuruş
+    const paymentType = 'card';
+    // Tek çekim için '0' gönderilir (Direkt API kuralı)
+    const installmentCount = String(
+      options?.installmentCount && options.installmentCount > 1 ? options.installmentCount : 0,
     );
+    const currency = 'TL';
+    const testModeStr = this.testMode ? '1' : '0';
+    const non3d = options?.non3d ? '1' : '0';
+
+    const successBase = `${this.configService.get('FRONTEND_URL')}/payment/success`;
+    const merchantOkUrl = options?.successQueryParams
+      ? `${successBase}?${options.successQueryParams}`
+      : successBase;
+    const merchantFailUrl = `${this.configService.get('FRONTEND_URL')}/payment/fail`;
+
+    // Direkt API token:
+    // hashStr = merchant_id + user_ip + merchant_oid + email + payment_amount
+    //           + payment_type + installment_count + currency + test_mode + non_3d
+    const hashStr =
+      this.merchantId +
+      buyer.ip +
+      merchantOid +
+      buyer.email +
+      paymentAmountStr +
+      paymentType +
+      installmentCount +
+      currency +
+      testModeStr +
+      non3d;
+    const paytrToken = crypto
+      .createHmac('sha256', this.merchantKey)
+      .update(hashStr + this.merchantSalt)
+      .digest('base64');
+
+    const expiryYear2 = card.expireYear.length === 4 ? card.expireYear.slice(-2) : card.expireYear;
+    // Direkt API basket: htmlEntities'li düz JSON (iframe'in base64'ünden farklı —
+    // resmi PayTR Postman koleksiyonundaki pre-request script ile birebir)
+    const basketJson = JSON.stringify(
+      basketItems.map((item) => [item.name, (item.price * 100).toFixed(0), item.quantity]),
+    );
+    const userBasket = basketJson
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;')
+      .replace(/"/g, '&quot;');
+
+    const formData = new URLSearchParams({
+      merchant_id: this.merchantId,
+      user_ip: buyer.ip,
+      merchant_oid: merchantOid,
+      email: buyer.email,
+      payment_amount: paymentAmountStr,
+      payment_type: paymentType,
+      installment_count: installmentCount,
+      currency,
+      test_mode: testModeStr,
+      non_3d: non3d,
+      paytr_token: paytrToken,
+      cc_owner: card.holderName,
+      card_number: card.number.replace(/\s/g, ''),
+      expiry_month: card.expireMonth.padStart(2, '0'),
+      expiry_year: expiryYear2,
+      cvv: card.cvv,
+      merchant_ok_url: merchantOkUrl,
+      merchant_fail_url: merchantFailUrl,
+      user_name: `${buyer.name} ${buyer.surname}`.trim(),
+      user_address: buyer.address,
+      user_phone: buyer.phone,
+      user_basket: userBasket,
+      debug_on: this.testMode ? '1' : '0',
+      client_lang: 'tr',
+      // /odeme doğrulayıcısı bu alanları da zorunlu tutuyor (iframe ortak şeması)
+      no_installment: '0',
+      max_installment: '0',
+      lang: 'tr',
+      timeout_limit: '30',
+    });
+
+    let rawText: string;
+    let httpStatus: number;
+    try {
+      const response = await fetch(this.baseUrl, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+        body: formData.toString(),
+      });
+      httpStatus = response.status;
+      rawText = await response.text();
+    } catch (error: any) {
+      this.logger.error(`PayTR direct API connection error: ${error?.message}`);
+      throw new BadRequestException('PayTR bağlantı hatası, lütfen tekrar deneyin.');
+    }
+
+    const trimmed = (rawText || '').trim();
+    if (!trimmed) {
+      this.logger.error(`PayTR direct API boş yanıt. HTTP ${httpStatus}`);
+      throw new BadRequestException(`PayTR yanıt vermedi (HTTP ${httpStatus}).`);
+    }
+
+    // Hata yanıtları JSON'dır (bazen kısa bir HTML kabuğun İÇİNE gömülü gelir);
+    // gerçek 3D yanıtı banka formunu içeren büyük bir HTML sayfasıdır.
+    const embeddedError = trimmed.slice(0, 3000).match(/\{"status"\s*:\s*"failed".*?\}/);
+    const jsonText = trimmed.startsWith('{') ? trimmed : embeddedError?.[0];
+    if (jsonText) {
+      let data: any;
+      try {
+        data = JSON.parse(jsonText);
+      } catch {
+        data = null;
+      }
+      if (data?.status === 'success') {
+        // non_3d=1: çekim anında yapıldı; sonuç ayrıca Bildirim URL'ine düşer.
+        return { status: 'success' };
+      }
+      let reason: string = data?.err_msg || data?.reason || 'PayTR ödemeyi reddetti';
+      if (/paytr_token/i.test(reason)) {
+        // Bu hata pratikte mağazada Direkt API yetkisinin tanımlı olmamasında da
+        // dönüyor — istemci bu mesajla iframe akışına düşer.
+        reason =
+          'PayTR kart ödemesi bu mağaza için doğrulanamadı (Direkt API yetkisi gerekli olabilir).';
+      }
+      this.logger.warn(`PayTR direct API failed oid=${merchantOid}: ${data?.reason || reason}`);
+      throw new BadRequestException(reason);
+    }
+
+    const lower = trimmed.slice(0, 500).toLowerCase();
+    if (lower.includes('<html') || lower.includes('<!doctype') || lower.includes('<form')) {
+      return { status: 'success', threeDSHtml: rawText };
+    }
+
+    this.logger.error(
+      `PayTR direct API beklenmeyen yanıt oid=${merchantOid} HTTP ${httpStatus}: ${trimmed.slice(0, 300)}`,
+    );
+    throw new BadRequestException('PayTR beklenmeyen yanıt döndü; kart bilgilerinizi kontrol edin.');
   }
 
   // ==========================================================================

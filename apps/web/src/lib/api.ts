@@ -196,9 +196,10 @@ export const tradesApi = {
     receiverItems: Array<{ productId: string; quantity: number }>;
     cashAmount?: number;
     message?: string;
+    shippingAddressId?: string;
   }) => api.post('/trades', data),
-  accept: (id: string | number, message?: string) =>
-    api.post(`/trades/${id}/accept`, { message }),
+  accept: (id: string | number, message?: string, shippingAddressId?: string) =>
+    api.post(`/trades/${id}/accept`, { message, shippingAddressId }),
   reject: (id: string | number, reason?: string) =>
     api.post(`/trades/${id}/reject`, { reason }),
   counter: (id: string | number, data: {
@@ -405,6 +406,20 @@ export const paymentsApi = {
   }) => api.post('/payments/methods', { card }),
   deleteMethod: (id: string) => api.delete(`/payments/methods/${id}`),
   setDefaultMethod: (id: string) => api.patch(`/payments/methods/${id}/default`),
+  /** PayTR Direkt API: kart bizim sayfada girilir; yanıt 3D Secure HTML'idir */
+  processDirect: (data: {
+    orderId?: string;
+    checkoutGroupId?: string;
+    card: {
+      cardHolderName: string;
+      cardNumber: string;
+      expireMonth: string;
+      expireYear: string;
+      cvc: string;
+    };
+    saveCard?: boolean;
+    provider?: string;
+  }) => api.post('/payments/process-direct', data),
   cancel: (paymentId: string) =>
     api.post(`/payments/${paymentId}/cancel`),
   /** Fail sayfasından; ödeme hâlâ pending ise rezervasyonu serbest bırakır */

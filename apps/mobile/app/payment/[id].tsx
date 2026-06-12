@@ -240,9 +240,13 @@ export default function PaymentWebViewScreen() {
 
     if (isSuccessMarker) {
       resolvedRef.current = true;
-      // durum-sorgu ile sunucu tarafı tamamlamayı hızlandır (callback gecikse bile).
-      paymentsApi.verify(paymentIdRef.current).catch(() => {});
-      routeToSuccess();
+      // durum-sorgu ile sunucu tarafı tamamlamayı hızlandır (callback localhost'a
+      // ulaşamadığında üyelik/sipariş "bekliyor"da kalır). verify bitince yönlen —
+      // success ekranı/üyelik rozetinin güncel veriyi görmesi için. 4sn üst sınır.
+      Promise.race([
+        paymentsApi.verify(paymentIdRef.current).catch(() => {}),
+        new Promise((resolve) => setTimeout(resolve, 4000)),
+      ]).finally(() => routeToSuccess());
       return true;
     }
     if (isFailMarker) {

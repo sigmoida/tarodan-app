@@ -1222,14 +1222,18 @@ export default function CheckoutPage() {
               await clearCart();
             }
 
-            if (paymentData.paymentUrl) {
+            // Üyeler: site-içi kart formu + 3D Secure için ödeme sayfamıza git
+            // (paymentUrl'e doğrudan gitmek PayTR iframe'ini açıp kart formunu
+            // atlardı). Misafirler kart formunu kullanamaz (auth gerekli) →
+            // doğrudan PayTR sayfasına.
+            if (hasSession && paymentData.paymentId) {
+              router.push(`/payment/${paymentData.paymentId}`);
+              return;
+            } else if (paymentData.paymentUrl) {
               window.location.href = paymentData.paymentUrl;
               return;
             } else if (paymentData.paymentId) {
-              const paymentPageUrl = hasSession
-                ? `/payment/${paymentData.paymentId}`
-                : `/payment/${paymentData.paymentId}?guest=true`;
-              router.push(paymentPageUrl);
+              router.push(`/payment/${paymentData.paymentId}?guest=true`);
               return;
             } else {
               throw new Error(

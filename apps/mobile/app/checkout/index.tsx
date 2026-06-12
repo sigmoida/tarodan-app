@@ -472,6 +472,33 @@ export default function CheckoutScreen() {
         return;
       }
 
+      // "Kartımı kaydet" işaretliyse kartı burada kaydet (web üyelik checkout'u
+      // ile aynı desen: POST /payments/methods). Ödeme akışı hangi yola düşerse
+      // düşsün (direct ya da PayTR WebView) kart bilgisi bir daha elimize
+      // geçmiyor; tek güvenilir nokta burası. Hata ödemeyi engellemesin.
+      if (isAuthenticated && selectedCardToken === 'new' && cardForm.saveCard) {
+        const cleanNumber = cardForm.cardNumber.replace(/\s/g, '');
+        if (cleanNumber.length >= 15) {
+          paymentsApi
+            .addPaymentMethod({
+              card: {
+                cardHolderName: cardForm.cardHolderName.trim(),
+                cardNumber: cleanNumber,
+                expireMonth: cardForm.expireMonth,
+                expireYear: cardForm.expireYear,
+                cvc: cardForm.cvc,
+                cardAlias: cardForm.cardAlias.trim() || undefined,
+              },
+            })
+            .catch((saveErr: any) => {
+              captureException(saveErr, {
+                level: 'warning',
+                tags: { flow: 'checkout.saveCard' },
+              });
+            });
+        }
+      }
+
       // Üye + kayıtlı kart seçimi → processDirect (tek tık akışı).
       // NOT: processDirect tek sipariş ID'siyle çalışır; çok ürünlü grupta yalnızca
       // ilk siparişi tahsil ederdi → grup ödemesine (WebView) düşülür.

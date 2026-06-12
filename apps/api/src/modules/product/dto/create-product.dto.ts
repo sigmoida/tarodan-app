@@ -6,6 +6,7 @@ import {
   IsArray,
   IsUUID,
   IsBoolean,
+  IsInt,
   Min,
   Max,
   MinLength,
@@ -103,6 +104,15 @@ export class CreateProductDto {
   @IsOptional()
   @IsBoolean({ message: 'Set/paket boolean olmalıdır' })
   isSet?: boolean;
+
+  @ApiPropertyOptional({
+    example: 5,
+    description: 'Number of pieces in the set/bundle (only relevant when isSet is true)',
+  })
+  @IsOptional()
+  @IsInt({ message: 'Set parça sayısı tam sayı olmalıdır' })
+  @Min(2, { message: 'Set parça sayısı en az 2 olmalıdır' })
+  bundleSize?: number;
 
   @ApiPropertyOptional({
     example: 'uuid-brand-id',

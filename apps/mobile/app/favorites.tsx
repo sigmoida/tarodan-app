@@ -70,14 +70,17 @@ export default function FavoritesScreen() {
   // Not authenticated
   if (!isAuthenticated) {
     return (
-      <View style={styles.centeredContainer}>
-        <Ionicons name="heart-outline" size={64} color={colors.primary[600]!} />
-        <Text variant="h2" style={styles.title}>Favorilerim</Text>
-        <Text variant="body" style={styles.subtitle}>
-          Favorilerinizi görmek için giriş yapın
-        </Text>
-        <Button variant="primary" title="Giriş Yap" onPress={() => router.push('/(auth)/login')} style={styles.button} />
-        <Button variant="ghost" title="Hesap Oluştur" onPress={() => router.push('/(auth)/register')} style={{ alignSelf: 'center' }} />
+      <View style={styles.container}>
+        <ScreenHeader title="Favorilerim" onBack={() => router.back()} />
+        <View style={styles.centeredContainer}>
+          <Ionicons name="heart-outline" size={64} color={colors.primary[600]!} />
+          <Text variant="h2" style={styles.title}>Favorilerim</Text>
+          <Text variant="body" style={styles.subtitle}>
+            Favorilerinizi görmek için giriş yapın
+          </Text>
+          <Button variant="primary" title="Giriş Yap" onPress={() => router.push('/(auth)/login')} style={styles.button} />
+          <Button variant="ghost" title="Hesap Oluştur" onPress={() => router.push('/(auth)/register')} style={{ alignSelf: 'center' }} />
+        </View>
       </View>
     );
   }

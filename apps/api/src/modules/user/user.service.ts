@@ -1045,15 +1045,198 @@ export class UserService {
   }
 
   /**
+   * Satıcı panosu özet istatistikleri (her satıcı için).
+   * Toplam gelir: ödemesi alınmış ve iptal/iade edilmemiş siparişler (pending_payment
+   * ve cancelled/refunded hariç) → bir satış yapıldığında gelir hemen görünür.
+   */
+  async getSellerSummaryStats(userId: string) {
+    const REVENUE_STATUSES: OrderStatus[] = [
+      OrderStatus.paid,
+      OrderStatus.preparing,
+      OrderStatus.shipped,
+      OrderStatus.delivered,
+      OrderStatus.awaiting_buyer_confirmation,
+      OrderStatus.completed,
+    ];
+
+    const [revenue, soldOrdersCount, activeProductsCount, followersCount] = await Promise.all([
+      this.prisma.order.aggregate({
+        where: { sellerId: userId, status: { in: REVENUE_STATUSES } },
+        _sum: { totalAmount: true },
+      }),
+      this.prisma.order.count({
+        where: { sellerId: userId, status: { in: REVENUE_STATUSES } },
+      }),
+      this.prisma.product.count({
+        where: { sellerId: userId, status: ProductStatus.active },
+      }),
+      this.prisma.userFollow.count({ where: { followingId: userId } }),
+    ]);
+
+    return {
+      totalRevenue: Number(revenue._sum.totalAmount || 0),
+      soldProductsCount: soldOrdersCount,
+      activeProductsCount,
+      followersCount,
+    };
+  }
+
+  /**
    * Get user analytics data
    * Available for all authenticated users
    */
+  /**
+   * Kullanıcının özet istatistikleri — İstatistikler sayfasının tek veri
+   * kaynağı. "Satış/harcama" için ödemesi alınmış tüm siparişler sayılır
+   * (paid → completed); yalnızca completed/delivered sayılırsa kargo
+   * sürecindeki siparişler 0 olarak görünür.
+   */
+  async getMyStats(userId: string) {
+    const PAID_STATUSES = [
+      'paid',
+      'preparing',
+      'shipped',
+      'delivered',
+      'awaiting_buyer_confirmation',
+      'completed',
+    ] as const;
+
+    // "Satıldı" ürün durumundan (sold) DEĞİL, ödemesi alınmış SATIŞ SİPARİŞİNDEN
+    // türetilir — çünkü seed/eski veride satılmış ürünler 'active' kalmış olabilir.
+    // Böylece "1465 TL kazanç ama 0 satış" tutarsızlığı oluşmaz.
+    const [
+      user,
+      productsCount,
+      activeProductsCount,
+      soldProductsCount,
+      viewsAgg,
+      likesAgg,
+      ordersCount,
+      completedOrdersCount,
+      purchasesCount,
+      salesCount,
+      spentAgg,
+      revenueAgg,
+      tradesCount,
+      successfulTradesCount,
+      collectionsCount,
+      ratingAgg,
+    ] = await Promise.all([
+      this.prisma.user.findUnique({
+        where: { id: userId },
+        select: {
+          createdAt: true,
+          membership: { select: { tier: { select: { type: true } } } },
+        },
+      }),
+      this.prisma.product.count({
+        where: { sellerId: userId, status: { notIn: ['draft'] } },
+      }),
+      // Gerçekten satılabilir aktif ilan = active VE ödenmiş satış siparişi YOK
+      this.prisma.product.count({
+        where: {
+          sellerId: userId,
+          status: 'active',
+          orders: { none: { status: { in: [...PAID_STATUSES] } } },
+        },
+      }),
+      // Satılmış ilan = en az bir ödenmiş satış siparişi OLAN farklı ürün sayısı
+      this.prisma.product.count({
+        where: {
+          sellerId: userId,
+          status: { notIn: ['draft'] },
+          orders: { some: { status: { in: [...PAID_STATUSES] } } },
+        },
+      }),
+      this.prisma.product.aggregate({
+        where: { sellerId: userId },
+        _sum: { viewCount: true },
+      }),
+      this.prisma.product.aggregate({
+        where: { sellerId: userId },
+        _sum: { likeCount: true },
+      }),
+      this.prisma.order.count({ where: { buyerId: userId } }),
+      this.prisma.order.count({
+        where: { buyerId: userId, status: { in: ['delivered', 'completed'] } },
+      }),
+      // Harcama yapılan (ödemesi alınmış) alıcı siparişi sayısı
+      this.prisma.order.count({
+        where: { buyerId: userId, status: { in: [...PAID_STATUSES] } },
+      }),
+      // Yapılan satış (ödemesi alınmış satıcı siparişi) sayısı
+      this.prisma.order.count({
+        where: { sellerId: userId, status: { in: [...PAID_STATUSES] } },
+      }),
+      this.prisma.order.aggregate({
+        where: { buyerId: userId, status: { in: [...PAID_STATUSES] } },
+        _sum: { totalAmount: true },
+      }),
+      this.prisma.order.aggregate({
+        where: { sellerId: userId, status: { in: [...PAID_STATUSES] } },
+        _sum: { totalAmount: true },
+      }),
+      this.prisma.trade.count({
+        where: { OR: [{ initiatorId: userId }, { receiverId: userId }] },
+      }),
+      this.prisma.trade.count({
+        where: {
+          OR: [{ initiatorId: userId }, { receiverId: userId }],
+          status: 'completed',
+        },
+      }),
+      this.prisma.collection.count({ where: { userId } }),
+      this.prisma.rating.aggregate({
+        where: { receiverId: userId, status: 'approved' },
+        _avg: { score: true },
+        _count: true,
+      }),
+    ]);
+
+    if (!user) {
+      throw new NotFoundException('Kullanıcı bulunamadı');
+    }
+
+    return {
+      productsCount,
+      activeProductsCount,
+      soldProductsCount,
+      ordersCount,
+      completedOrdersCount,
+      purchasesCount,
+      salesCount,
+      tradesCount,
+      successfulTradesCount,
+      collectionsCount,
+      totalViews: viewsAgg._sum.viewCount || 0,
+      totalFavorites: likesAgg._sum.likeCount || 0,
+      rating: ratingAgg._avg?.score || 0,
+      reviewsCount: ratingAgg._count || 0,
+      totalRevenue: Number(revenueAgg._sum.totalAmount || 0),
+      totalSpent: Number(spentAgg._sum.totalAmount || 0),
+      memberSince: user.createdAt,
+      membershipTier: user.membership?.tier?.type || 'free',
+    };
+  }
+
   async getUserAnalytics(userId: string, period: '7d' | '30d' | '90d' = '30d') {
     const now = new Date();
     const daysMap = { '7d': 7, '30d': 30, '90d': 90 };
     const days = daysMap[period];
     const periodStart = new Date(now.getTime() - days * 24 * 60 * 60 * 1000);
     const previousPeriodStart = new Date(periodStart.getTime() - days * 24 * 60 * 60 * 1000);
+
+    // Satış = ödemesi alınmış sipariş (paid → completed). Yalnızca
+    // completed/delivered sayılırsa kargo sürecindeki satışlar 0 görünür
+    // (detaylı analiz/admin tarafıyla tutarsızlık).
+    const SOLD_STATUSES = [
+      'paid',
+      'preparing',
+      'shipped',
+      'delivered',
+      'awaiting_buyer_confirmation',
+      'completed',
+    ];
 
     // Get current period stats
     const [
@@ -1082,14 +1265,14 @@ export class UserService {
       this.prisma.order.count({
         where: { 
           sellerId: userId, 
-          status: { in: ['completed', 'delivered'] },
+          status: { in: SOLD_STATUSES as any },
           createdAt: { gte: periodStart },
         },
       }),
       this.prisma.order.aggregate({
         where: { 
           sellerId: userId, 
-          status: { in: ['completed', 'delivered'] },
+          status: { in: SOLD_STATUSES as any },
           createdAt: { gte: periodStart },
         },
         _sum: { totalAmount: true },
@@ -1106,7 +1289,7 @@ export class UserService {
       this.prisma.order.count({
         where: {
           sellerId: userId,
-          status: { in: ['completed', 'delivered'] },
+          status: { in: SOLD_STATUSES as any },
         },
       }),
       // Previous period for comparison
@@ -1125,14 +1308,14 @@ export class UserService {
       this.prisma.order.count({
         where: { 
           sellerId: userId, 
-          status: { in: ['completed', 'delivered'] },
+          status: { in: SOLD_STATUSES as any },
           createdAt: { gte: previousPeriodStart, lt: periodStart },
         },
       }),
       this.prisma.order.aggregate({
         where: { 
           sellerId: userId, 
-          status: { in: ['completed', 'delivered'] },
+          status: { in: SOLD_STATUSES as any },
           createdAt: { gte: previousPeriodStart, lt: periodStart },
         },
         _sum: { totalAmount: true },
@@ -1295,7 +1478,7 @@ export class UserService {
           where: {
             sellerId: userId,
             product: { categoryId: cat.categoryId },
-            status: { in: ['completed', 'delivered'] },
+            status: { in: SOLD_STATUSES as any },
           },
         });
         return { categoryId: cat.categoryId, sales };

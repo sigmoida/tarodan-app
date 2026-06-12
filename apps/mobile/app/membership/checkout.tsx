@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { View, ScrollView, StyleSheet, TouchableOpacity } from 'react-native';
-import { theme, Button, Card, Input, Radio, Text, ScreenHeader, appAlert } from '@tarodan/ui-native';
+import { theme, Button, Card, Input, Radio, Switch, Text, ScreenHeader, appAlert } from '@tarodan/ui-native';
 import { router, useLocalSearchParams } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { useAuthStore } from '../../src/stores/authStore';
@@ -86,6 +86,7 @@ export default function MembershipCheckoutScreen() {
   const [cardExpiry, setCardExpiry] = useState('');
   const [cardCvc, setCardCvc] = useState('');
   const [cardName, setCardName] = useState('');
+  const [saveCard, setSaveCard] = useState(true);
   const [settings, setSettings] = useState<PlatformSettings>({});
 
   const tier = MEMBERSHIP_TIERS[tierParam as keyof typeof MEMBERSHIP_TIERS] || MEMBERSHIP_TIERS.premium;
@@ -131,15 +132,43 @@ export default function MembershipCheckoutScreen() {
   }
 
   const handlePayment = async () => {
+    // Web üyelik checkout'u ile parite: kart alanları zorunlu — kart hem
+    // kaydedilir (otomatik yenilemede varsayılan olur) hem PayTR'e geçilir.
+    if (paymentMethod === 'card') {
+      if (!cardName.trim()) return appAlert('Eksik Bilgi', 'Kart üzerindeki ismi girin.');
+      const cleanNumber = cardNumber.replace(/\s/g, '');
+      if (cleanNumber.length < 15 || cleanNumber.length > 16)
+        return appAlert('Eksik Bilgi', 'Geçerli bir kart numarası girin.');
+      const [mm, yy] = cardExpiry.split('/');
+      if (!mm || !yy || parseInt(mm, 10) < 1 || parseInt(mm, 10) > 12)
+        return appAlert('Eksik Bilgi', 'Geçerli son kullanma tarihi girin (AA/YY).');
+      if (!/^\d{3,4}$/.test(cardCvc)) return appAlert('Eksik Bilgi', 'Geçerli CVC girin.');
+    }
+
     setLoading(true);
     try {
-      // Gerçek üyelik ödemesi — backend POST /membership/payments/initiate
-      // (Önceden bu ekran setTimeout ile sahte başarı veriyordu; ödeme/abonelik oluşmuyordu.)
-      const initResp: any = await membershipApi.initiatePayment({
-        tierType,
-        billingPeriod,
-        provider: 'paytr',
-      });
+      // Kartı kaydet (kullanıcı onaylıysa) — duplikasyon ("Bu kart zaten kayıtlı")
+      // veya ağ hatası ödemeyi engellemesin.
+      if (paymentMethod === 'card' && saveCard) {
+        const [mm, yy] = cardExpiry.split('/');
+        await paymentsApi
+          .addPaymentMethod({
+            card: {
+              cardHolderName: cardName.trim(),
+              cardNumber: cardNumber.replace(/\s/g, ''),
+              expireMonth: mm,
+              expireYear: yy,
+              cvc: cardCvc,
+            },
+          })
+          .catch(() => {});
+      }
+
+      // subscribe: hedef kademeyi (ör. premium) past_due olarak AYARLAR ve ardından
+      // ödemeyi başlatır (paymentId/paymentUrl/useBypass döner). Web ile parite.
+      // Doğrudan initiatePayment çağırırsak backend ödemeyi kullanıcının MEVCUT
+      // kademesine göre yapar → yükseltme gerçekleşmez, plan "Temel" kalır.
+      const initResp: any = await membershipApi.subscribe({ tierType, billingPeriod });
       const initData = initResp?.data?.data ?? initResp?.data ?? {};
       const paymentId = initData.paymentId || initData.id || initData.payment?.id;
 
@@ -301,6 +330,17 @@ export default function MembershipCheckoutScreen() {
                 />
               </View>
             </View>
+
+            <View style={styles.saveCardRow}>
+              <View style={{ flex: 1 }}>
+                <Text style={styles.saveCardTitle}>Kartımı kaydet</Text>
+                <Text style={styles.saveCardSub}>
+                  Otomatik yenilemede ve sonraki ödemelerde kullanılır. Ödeme
+                  Yöntemleri'nden silebilirsiniz.
+                </Text>
+              </View>
+              <Switch value={saveCard} onValueChange={setSaveCard} />
+            </View>
           </View>
         )}
 
@@ -338,6 +378,7 @@ export default function MembershipCheckoutScreen() {
           onPress={handlePayment}
           isLoading={loading}
           disabled={loading || !cardNumber || !cardExpiry || !cardCvc || !cardName}
+          fullWidth
           style={styles.payButton}
         />
 
@@ -431,6 +472,25 @@ const styles = StyleSheet.create({
   },
   cardForm: {
     marginBottom: 24,
+  },
+  saveCardRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+    marginTop: 4,
+    padding: 12,
+    borderRadius: 10,
+    backgroundColor: colors.surface.alt,
+  },
+  saveCardTitle: {
+    fontWeight: '600',
+    color: colors.text.heading,
+    marginBottom: 2,
+  },
+  saveCardSub: {
+    fontSize: 12,
+    color: colors.text.muted,
+    lineHeight: 16,
   },
   input: {
     marginBottom: 12,

@@ -26,11 +26,11 @@ import {
 } from '@prisma/client';
 import { getAvailableQuantity, safeDecrementReserved } from '../product/helpers/product-availability.helper';
 import { getProductStatusFromQuantity } from '../product/helpers/product-status.helper';
-import { createTradeWarehouseShipments } from './helpers/warehouse-shipments';
 import { ACTIVE_TRADE_STATUSES } from './trade.constants';
 import { PaymentService } from '../payment/payment.service';
 import { ProductLockService } from '../product/product-lock.service';
 import { SuratCargoService } from '../surat-cargo/surat-cargo.service';
+import { normalizeSuratPhone, normalizeSuratLocation } from '../surat-cargo/surat-address.util';
 import {
   SuratKargoTuru,
   SuratOdemeTipi,
@@ -139,6 +139,49 @@ export class TradeService {
    *
    * Never throws — all errors are swallowed/logged so callers can fire-and-forget.
    */
+  /**
+   * Takas için bir tarafın teslimat adresini çözer ve doğrular.
+   *   - `providedId` verilmişse: o adresin gerçekten kullanıcıya ait olduğunu
+   *     doğrular (değilse hata).
+   *   - Verilmemişse: kullanıcının varsayılan (yoksa en eski) adresine düşer.
+   *   - Hiç adres yoksa: net bir hata fırlatır (sessiz kırılma yerine kullanıcı
+   *     "adres ekle" yönlendirmesi alır).
+   */
+  private async resolveTradeShippingAddressId(
+    userId: string,
+    providedId?: string,
+    opts?: { required?: boolean; db?: any },
+  ): Promise<string | null> {
+    const db = opts?.db ?? this.prisma;
+    const required = opts?.required ?? true;
+    if (providedId) {
+      const addr = await db.address.findFirst({
+        where: { id: providedId, userId },
+        select: { id: true },
+      });
+      if (!addr) {
+        throw new BadRequestException(
+          'Seçilen teslimat adresi bulunamadı veya size ait değil.',
+        );
+      }
+      return addr.id;
+    }
+    const fallback = await db.address.findFirst({
+      where: { userId },
+      orderBy: { isDefault: 'desc' },
+      select: { id: true },
+    });
+    if (!fallback) {
+      if (required) {
+        throw new BadRequestException(
+          'Takas için bir teslimat adresi ekleyin. Profil → Adreslerim üzerinden adres ekleyebilirsiniz.',
+        );
+      }
+      return null;
+    }
+    return fallback.id;
+  }
+
   async createInboundTradeShipments(tradeId: string): Promise<void> {
     try {
       // Resolve trade + sides + addresses outside the create-tx so we don't
@@ -171,19 +214,37 @@ export class TradeService {
         return;
       }
 
-      // Fallback: if neither user has a default address, take their first.
-      const initiatorAddress =
-        trade.initiator.addresses[0] ??
-        (await this.prisma.address.findFirst({
-          where: { userId: trade.initiatorId },
-          orderBy: { createdAt: 'asc' },
-        }));
-      const receiverAddress =
-        trade.receiver.addresses[0] ??
-        (await this.prisma.address.findFirst({
-          where: { userId: trade.receiverId },
-          orderBy: { createdAt: 'asc' },
-        }));
+      // Adres önceliği: takasta SEÇİLEN adres (initiator/receiverAddressId) →
+      // varsayılan adres → en eski adres. (Geriye dönük uyum için fallback'ler.)
+      const resolveSideAddress = async (
+        chosenId: string | null,
+        userId: string,
+        defaultAddr: any,
+      ) => {
+        if (chosenId) {
+          const chosen = await this.prisma.address.findFirst({
+            where: { id: chosenId, userId },
+          });
+          if (chosen) return chosen;
+        }
+        return (
+          defaultAddr ??
+          (await this.prisma.address.findFirst({
+            where: { userId },
+            orderBy: { createdAt: 'asc' },
+          }))
+        );
+      };
+      const initiatorAddress = await resolveSideAddress(
+        trade.initiatorAddressId,
+        trade.initiatorId,
+        trade.initiator.addresses[0],
+      );
+      const receiverAddress = await resolveSideAddress(
+        trade.receiverAddressId,
+        trade.receiverId,
+        trade.receiver.addresses[0],
+      );
 
       type SideKey = 'INI' | 'REC';
       type Side = {
@@ -217,20 +278,6 @@ export class TradeService {
 
       await this.prisma.$transaction(async (tx) => {
         for (const side of sides) {
-          const existing = await tx.tradeShipment.findFirst({
-            where: {
-              tradeId: trade.id,
-              shipperId: side.shipperId,
-              leg: 'to_warehouse',
-            },
-          });
-          if (existing) {
-            this.logger.log(
-              `Inbound shipment for trade ${trade.tradeNumber} side ${side.suffix} already exists (id=${existing.id}); skipping`,
-            );
-            continue;
-          }
-
           if (!side.address) {
             this.logger.warn(
               `Trade ${trade.tradeNumber} side ${side.suffix} (user=${side.shipperId}) has no address; inbound shipment NOT created — admin must intervene`,
@@ -238,36 +285,56 @@ export class TradeService {
             continue;
           }
 
-          // tradeNumber zaten "TRD-..." formatında geliyor; çift "TRD-" ön
-          // ekini önlemek için doğrudan tradeNumber'ı kullan.
-          const ozelKargoTakipNo = `${trade.tradeNumber}-WH-${side.suffix}`
-            .replace(/[^a-zA-Z0-9-]/g, '')
-            .slice(0, 50);
-
-          const created = await tx.tradeShipment.create({
-            data: {
+          // Bu taraf için to_warehouse satırı VARSA yeniden kullan, YOKSA oluştur.
+          // (Tek kaynak: artık ayrı bir "warehouse-shipments" helper'ı yok; etiket
+          // oluşturma + adres + Sürat sevkiyatı yalnız burada yapılır.)
+          let row = await tx.tradeShipment.findFirst({
+            where: {
               tradeId: trade.id,
               shipperId: side.shipperId,
-              fromAddressId: side.address.id,
-              carrier: 'surat',
-              trackingNumber: ozelKargoTakipNo,
-              status: ShipmentStatus.label_created,
               leg: 'to_warehouse',
-              recipientType: 'warehouse',
-              recipientUserId: null,
             },
           });
+
+          if (row) {
+            // Eski/yarım kalmış satır adres içermiyorsa şimdi doldur.
+            if (!row.fromAddressId) {
+              row = await tx.tradeShipment.update({
+                where: { id: row.id },
+                data: { fromAddressId: side.address.id },
+              });
+            }
+          } else {
+            // tradeNumber zaten "TRD-..." formatında geliyor; çift "TRD-" önekini
+            // önlemek için doğrudan tradeNumber'ı kullan.
+            const ozelKargoTakipNo = `${trade.tradeNumber}-WH-${side.suffix}`
+              .replace(/[^a-zA-Z0-9-]/g, '')
+              .slice(0, 50);
+            row = await tx.tradeShipment.create({
+              data: {
+                tradeId: trade.id,
+                shipperId: side.shipperId,
+                fromAddressId: side.address.id,
+                carrier: 'surat',
+                trackingNumber: ozelKargoTakipNo,
+                status: ShipmentStatus.label_created,
+                leg: 'to_warehouse',
+                recipientType: 'warehouse',
+                recipientUserId: null,
+              },
+            });
+          }
 
           const payload = this.buildSuratPayloadForInboundLeg(
             side.user,
             side.address,
-            ozelKargoTakipNo,
+            row.trackingNumber,
             trade.tradeNumber,
           );
 
           dispatched.push({
-            shipmentId: created.id,
-            ozelKargoTakipNo,
+            shipmentId: row.id,
+            ozelKargoTakipNo: row.trackingNumber,
             payload,
           });
         }
@@ -386,9 +453,9 @@ export class TradeService {
       KisiKurum: warehouseName,
       SahisBirim: `Takas Inbound: ${tradeNumber} (Gönderen: ${senderLabel})`,
       AliciAdresi: warehouseAddress,
-      Il: warehouseCity,
-      Ilce: warehouseDistrict,
-      TelefonCep: warehousePhone,
+      Il: normalizeSuratLocation(warehouseCity),
+      Ilce: normalizeSuratLocation(warehouseDistrict),
+      TelefonCep: normalizeSuratPhone(warehousePhone),
       KargoTuru: SuratKargoTuru.Koli,
       OdemeTipi: SuratOdemeTipi.Pesin,
       OzelKargoTakipNo: ozelKargoTakipNo,
@@ -529,6 +596,17 @@ export class TradeService {
       cashPayerId = dto.cashAmount > 0 ? initiatorId : dto.receiverId;
     }
 
+    // Teklifi başlatanın teslimat adresi (tx dışı okuma). Takas fiziksel gönderim
+    // gerektirir; teklifi yapanın bir teslimat adresi OLMASI ZORUNLU (yoksa depo→
+    // kullanıcı ayağında adres boş kalır, takas takılır). Ancak SEÇMESİ zorunlu
+    // değil: varsayılan adresi varsa otomatik kullanılır. Hiç adresi yoksa net
+    // hata → kullanıcı önce adres ekler (ön yüzdeki adres seçici bunu sağlar).
+    const initiatorAddressId = await this.resolveTradeShippingAddressId(
+      initiatorId,
+      dto.shippingAddressId,
+      { required: true },
+    );
+
     // Create trade in transaction
     const trade = await this.prisma.$transaction(async (tx) => {
       // CRITICAL: Don't reserve products when trade is pending
@@ -546,6 +624,7 @@ export class TradeService {
           cashAmount: dto.cashAmount ? Math.abs(dto.cashAmount) : null,
           cashPayerId,
           initiatorMessage: dto.message,
+          initiatorAddressId,
           responseDeadline,
         },
         include: {
@@ -777,6 +856,7 @@ export class TradeService {
 
     let tradeInitiatorId: string;
     let acceptedNextStatus: TradeStatus | null = null;
+    let receiverAddressId: string | null = null;
 
     await this.prisma.$transaction(async (tx) => {
       // Lock trade row first
@@ -795,6 +875,15 @@ export class TradeService {
       if (new Date() > trade.responseDeadline) {
         throw new BadRequestException('Yanıt süresi dolmuş');
       }
+
+      // Yetki/durum kontrolleri geçti → kabul edenin teslimat adresini ZORUNLU
+      // olarak çöz (kargo kabulde başlar). Adres yoksa net hata. (Yetki
+      // kontrollerinden SONRA: 403'ü adres hatasıyla maskelememek için.)
+      receiverAddressId = await this.resolveTradeShippingAddressId(
+        userId,
+        dto.shippingAddressId,
+        { required: true, db: tx },
+      );
 
       tradeInitiatorId = trade.initiatorId;
 
@@ -861,6 +950,7 @@ export class TradeService {
         data: {
           status: nextStatus,
           receiverMessage: dto.message,
+          receiverAddressId,
           acceptedAt: now,
           paymentDeadline: trade.cashPayerId ? paymentDeadline : null,
           // shippingDeadline only set when shipping begins (either immediately
@@ -873,16 +963,10 @@ export class TradeService {
         },
       });
 
-      // Non-cash takas kabul edildi → her iki taraf için depo etiketini ŞİMDİ oluştur (BUG B).
-      // (Nakit takas awaiting_payment'a gider; etiketler ödeme tamamlanınca payment.service'te oluşur.)
-      if (nextStatus === TradeStatus.shipping_to_warehouse) {
-        await createTradeWarehouseShipments(tx, {
-          id: tradeId,
-          tradeNumber: trade.tradeNumber,
-          initiatorId: trade.initiatorId,
-          receiverId: trade.receiverId,
-        });
-      }
+      // Non-cash takas kabul edildi → depo etiketleri + Sürat sevkiyatı tx SONRASI
+      // tek kaynaktan (createInboundTradeShipments) yapılır. Burada ayrıca etiket
+      // oluşturmuyoruz; aksi halde inbound fonksiyon "zaten var" deyip Sürat'a
+      // göndermeyi atlıyordu (her iki tarafın etiketi yine oluşur, BUG B korunur).
 
       if (trade.cashAmount && trade.cashPayerId) {
         const commission = trade.cashAmount.toNumber() * 0.05;
