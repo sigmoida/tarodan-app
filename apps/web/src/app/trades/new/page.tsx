@@ -10,6 +10,7 @@ import toast from 'react-hot-toast';
 import { useAuthStore } from '@/stores/authStore';
 import { listingsApi, userApi } from '@/lib/api';
 import api from '@/lib/api';
+import TradeAddressPicker from '@/components/TradeAddressPicker';
 import { getProductEffectivePrice } from '@/lib/productPrice';
 import { useTranslation } from '@/i18n/LanguageContext';
 
@@ -62,6 +63,7 @@ export default function NewTradePage() {
   const [cashAmount, setCashAmount] = useState<string>('');
   const [cashPayer, setCashPayer] = useState<'me' | 'them'>('me');
   const [message, setMessage] = useState('');
+  const [tradeAddressId, setTradeAddressId] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
@@ -149,6 +151,15 @@ export default function NewTradePage() {
       return;
     }
 
+    if (!tradeAddressId) {
+      toast.error(
+        locale === 'en'
+          ? 'Please select or add a delivery address'
+          : 'Lütfen bir teslimat adresi seçin veya ekleyin',
+      );
+      return;
+    }
+
     // Get sellerId from targetProduct
     const sellerId = (targetProduct as any).sellerId || (targetProduct as any).seller?.id;
     if (!sellerId) {
@@ -170,6 +181,7 @@ export default function NewTradePage() {
         receiverItems: [{ productId: targetProduct.id, quantity: 1 }],
         cashAmount: finalCashAmount,
         message: message || undefined,
+        shippingAddressId: tradeAddressId || undefined,
       };
 
       await api.post('/trades', payload);
@@ -439,6 +451,14 @@ export default function NewTradePage() {
               <span className="font-medium">{getProductEffectivePrice(targetProduct).toLocaleString('tr-TR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} TL</span>
             </div>
           </div>
+        </div>
+
+        {/* Teslimat adresi (takas kabul edilince kargo bu adrese gelir) */}
+        <div className="bg-surface-elevated rounded-xl p-5 border border-border">
+          <TradeAddressPicker
+            label={locale === 'en' ? 'Your Delivery Address' : 'Teslimat Adresiniz'}
+            onChange={setTradeAddressId}
+          />
         </div>
 
         {/* Submit */}

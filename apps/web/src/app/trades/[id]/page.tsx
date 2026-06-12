@@ -28,6 +28,7 @@ import {
   paymentsApi,
 } from "@/lib/api";
 import { getProductEffectivePrice } from "@/lib/productPrice";
+import TradeAddressPicker from "@/components/TradeAddressPicker";
 import { useTranslation } from "@/i18n/LanguageContext";
 import { ShieldCheckIcon } from "@heroicons/react/24/outline";
 import {
@@ -311,6 +312,7 @@ export default function TradeDetailPage() {
       : tradeStatusConfig[s]?.label || tradeStatusTrLabels[s] || s;
 
   const [isActionLoading, setIsActionLoading] = useState(false);
+  const [tradeAddressId, setTradeAddressId] = useState<string | null>(null);
   const [cashPaymentLoading, setCashPaymentLoading] = useState(false);
   const [showRejectModal, setShowRejectModal] = useState(false);
   const [rejectReason, setRejectReason] = useState("");
@@ -633,10 +635,19 @@ export default function TradeDetailPage() {
 
   const handleAccept = async () => {
     if (!trade) return;
+    if (!tradeAddressId) {
+      toast.error(
+        locale === "en"
+          ? "Please select or add a delivery address"
+          : "Lütfen bir teslimat adresi seçin veya ekleyin",
+        { id: "trade-address-required" },
+      );
+      return;
+    }
 
     setIsActionLoading(true);
     try {
-      await tradesApi.accept(trade.id);
+      await tradesApi.accept(trade.id, undefined, tradeAddressId);
       toast.success(
         locale === "en" ? "Trade accepted!" : "Takas kabul edildi!",
       );
@@ -2371,6 +2382,15 @@ export default function TradeDetailPage() {
         {/* Action Buttons */}
         {(canAccept || canReject || canCounter || canCancel || showCancelDisabled) && (
           <div className="card p-6">
+            {/* Kabul ederken teslimat adresi seçimi (kargo kabulde başlar) */}
+            {canAccept && (
+              <div className="mb-5">
+                <TradeAddressPicker
+                  label={locale === "en" ? "Delivery Address" : "Teslimat Adresi"}
+                  onChange={setTradeAddressId}
+                />
+              </div>
+            )}
             <div className="flex flex-wrap gap-3">
               {canAccept && (
                 <Button

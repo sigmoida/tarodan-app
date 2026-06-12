@@ -505,6 +505,11 @@ model Trade {
   cashCommission       Decimal?          @map("cash_commission") @db.Decimal(10, 2)
   initiatorMessage     String?           @map("initiator_message")
   receiverMessage      String?           @map("receiver_message")
+  // Tarafların TAKAS için seçtiği teslimat adresi. Depo→kullanıcı (çıkış)
+  // ayağında ve gönderici etiketinde kullanılır. Null ise kullanıcının
+  // varsayılan adresine düşülür (geriye dönük uyum).
+  initiatorAddressId   String?           @map("initiator_address_id")
+  receiverAddressId    String?           @map("receiver_address_id")
   responseDeadline     DateTime          @map("response_deadline")
   paymentDeadline      DateTime?         @map("payment_deadline")
   shippingDeadline     DateTime?         @map("shipping_deadline")

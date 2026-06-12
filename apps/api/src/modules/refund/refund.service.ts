@@ -19,6 +19,7 @@ import { PrismaService } from '../../prisma';
 import { generateUniqueReference } from '../../common/helpers/generate-reference';
 import { PaymentService } from '../payment/payment.service';
 import { SuratCargoService } from '../surat-cargo/surat-cargo.service';
+import { normalizeSuratPhone, normalizeSuratLocation } from '../surat-cargo/surat-address.util';
 import {
   SuratGonderiSekli,
   SuratKargoTuru,
@@ -429,9 +430,9 @@ export class RefundService {
         KisiKurum: sellerAddr.fullName || rr.order.seller.displayName,
         SahisBirim: `İade: ${rr.order.orderNumber}`,
         AliciAdresi: sellerAddr.address,
-        Il: sellerAddr.city,
-        Ilce: sellerAddr.district,
-        TelefonCep: sellerAddr.phone,
+        Il: normalizeSuratLocation(sellerAddr.city),
+        Ilce: normalizeSuratLocation(sellerAddr.district),
+        TelefonCep: normalizeSuratPhone(sellerAddr.phone),
         KargoTuru: SuratKargoTuru.Koli,
         OdemeTipi: SuratOdemeTipi.Pesin,
         OzelKargoTakipNo: rr.refundNumber,

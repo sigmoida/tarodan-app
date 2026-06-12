@@ -14,7 +14,6 @@ import { PaymentStatus, PaymentHoldStatus, OrderStatus, ProductStatus, Subscript
 import { getProductStatusFromQuantity } from '../product/helpers/product-status.helper';
 import { safeDecrementReserved } from '../product/helpers/product-availability.helper';
 import { computeRelevanceScore, RELEVANCE_PREMIUM_BONUS } from '../product/helpers/relevance-score';
-import { createTradeWarehouseShipments } from '../trade/helpers/warehouse-shipments';
 import { PayTRService } from '../payment-providers/paytr.service';
 import { EventService } from '../events';
 import { InvoiceService } from '../invoice/invoice.service';
@@ -2536,14 +2535,8 @@ export class PaymentService {
           },
         });
 
-        // Nakit takas ödemesi tamamlandı → her iki taraf için depo etiketini oluştur (BUG B)
-        await createTradeWarehouseShipments(tx, {
-          id: trade.id,
-          tradeNumber: trade.tradeNumber,
-          initiatorId: trade.initiatorId,
-          receiverId: trade.receiverId,
-        });
-
+        // Etiketler + Sürat sevkiyatı tx SONRASI tek kaynaktan
+        // (TradeService.createInboundTradeShipments) yapılır — aşağıda çağrılıyor.
         tradeTransitioned = true;
       }
 

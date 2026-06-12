@@ -15,4 +15,5 @@ export { default as AuthRequiredSheet } from './AuthRequiredSheet';
 export { default as CommissionPreview } from './CommissionPreview';
 export { default as CityDistrictSelector } from './CityDistrictSelector';
 export { default as PhoneInput } from './PhoneInput';
+export { TradeAddressPicker } from './TradeAddressPicker';
 export { ThemedRefreshControl } from './ThemedRefreshControl';

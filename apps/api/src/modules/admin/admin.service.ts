@@ -77,6 +77,7 @@ import { RefundService } from '../refund/refund.service';
 import { NotificationService } from '../notification/notification.service';
 import { NotificationType } from '../notification/dto/notification.dto';
 import { SuratCargoService } from '../surat-cargo/surat-cargo.service';
+import { normalizeSuratPhone, normalizeSuratLocation } from '../surat-cargo/surat-address.util';
 import { OrderService } from '../order/order.service';
 import {
   SuratKargoTuru,
@@ -4757,9 +4758,9 @@ export class AdminService {
         KisiKurum: address.fullName || user?.displayName || 'Takas İade',
         SahisBirim: 'Takas İade Gönderisi',
         AliciAdresi: address.address,
-        Il: address.city,
-        Ilce: address.district,
-        TelefonCep: address.phone,
+        Il: normalizeSuratLocation(address.city),
+        Ilce: normalizeSuratLocation(address.district),
+        TelefonCep: normalizeSuratPhone(address.phone),
         KargoTuru: SuratKargoTuru.Koli,
         OdemeTipi: SuratOdemeTipi.Pesin,
         OzelKargoTakipNo: oid,
@@ -4921,6 +4922,25 @@ export class AdminService {
    * the other party's items) and transitions trade to
    * `shipping_to_recipients`.
    */
+  /**
+   * Takasta bir tarafın teslimat adresini çözer: önce takasta SEÇİLEN adres
+   * (Trade.initiator/receiverAddressId), yoksa kullanıcının varsayılan adresi.
+   */
+  private async pickTradeSideAddress(
+    tx: any,
+    chosenId: string | null,
+    userId: string,
+  ): Promise<any> {
+    if (chosenId) {
+      const chosen = await tx.address.findFirst({ where: { id: chosenId, userId } });
+      if (chosen) return chosen;
+    }
+    return tx.address.findFirst({
+      where: { userId },
+      orderBy: { isDefault: 'desc' },
+    });
+  }
+
   async approveWarehouseTrade(
     adminId: string,
     tradeId: string,
@@ -4949,14 +4969,8 @@ export class AdminService {
       }
 
       const [initiatorAddress, receiverAddress] = await Promise.all([
-        tx.address.findFirst({
-          where: { userId: trade.initiatorId },
-          orderBy: { isDefault: 'desc' },
-        }),
-        tx.address.findFirst({
-          where: { userId: trade.receiverId },
-          orderBy: { isDefault: 'desc' },
-        }),
+        this.pickTradeSideAddress(tx, trade.initiatorAddressId, trade.initiatorId),
+        this.pickTradeSideAddress(tx, trade.receiverAddressId, trade.receiverId),
       ]);
 
       if (!initiatorAddress) {
@@ -5000,9 +5014,9 @@ export class AdminService {
               KisiKurum: addr.fullName || user?.displayName || 'Takas Alıcısı',
               SahisBirim: 'Takas Gönderisi',
               AliciAdresi: addr.address,
-              Il: addr.city,
-              Ilce: addr.district,
-              TelefonCep: addr.phone,
+              Il: normalizeSuratLocation(addr.city),
+              Ilce: normalizeSuratLocation(addr.district),
+              TelefonCep: normalizeSuratPhone(addr.phone),
               KargoTuru: SuratKargoTuru.Koli,
               OdemeTipi: SuratOdemeTipi.Pesin,
               OzelKargoTakipNo: oid,
@@ -5177,14 +5191,8 @@ export class AdminService {
       }
 
       const [initiatorAddress, receiverAddress] = await Promise.all([
-        tx.address.findFirst({
-          where: { userId: trade.initiatorId },
-          orderBy: { isDefault: 'desc' },
-        }),
-        tx.address.findFirst({
-          where: { userId: trade.receiverId },
-          orderBy: { isDefault: 'desc' },
-        }),
+        this.pickTradeSideAddress(tx, trade.initiatorAddressId, trade.initiatorId),
+        this.pickTradeSideAddress(tx, trade.receiverAddressId, trade.receiverId),
       ]);
       if (!initiatorAddress) {
         throw new BadRequestException(
@@ -5731,9 +5739,9 @@ export class AdminService {
                 arrivedAddress.fullName || arrivedUser?.displayName || 'Takas İade',
               SahisBirim: 'Takas Kayıp İade',
               AliciAdresi: arrivedAddress.address,
-              Il: arrivedAddress.city,
-              Ilce: arrivedAddress.district,
-              TelefonCep: arrivedAddress.phone,
+              Il: normalizeSuratLocation(arrivedAddress.city),
+              Ilce: normalizeSuratLocation(arrivedAddress.district),
+              TelefonCep: normalizeSuratPhone(arrivedAddress.phone),
               KargoTuru: SuratKargoTuru.Koli,
               OdemeTipi: SuratOdemeTipi.Pesin,
               OzelKargoTakipNo: txResult.returnShipmentDraft.oid,

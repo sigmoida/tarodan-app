@@ -196,9 +196,10 @@ export const tradesApi = {
     receiverItems: Array<{ productId: string; quantity: number }>;
     cashAmount?: number;
     message?: string;
+    shippingAddressId?: string;
   }) => api.post('/trades', data),
-  accept: (id: string | number, message?: string) =>
-    api.post(`/trades/${id}/accept`, { message }),
+  accept: (id: string | number, message?: string, shippingAddressId?: string) =>
+    api.post(`/trades/${id}/accept`, { message, shippingAddressId }),
   reject: (id: string | number, reason?: string) =>
     api.post(`/trades/${id}/reject`, { reason }),
   counter: (id: string | number, data: {
