@@ -119,9 +119,9 @@ export class MembershipController {
   @Patch('auto-renew')
   async toggleAutoRenew(
     @Request() req: any,
-    @Body() dto: { autoRenew: boolean; paymentMethodId?: string },
+    @Body() dto: { autoRenew: boolean },
   ): Promise<UserMembershipResponseDto> {
-    return this.membershipService.toggleAutoRenew(req.user.id, dto.autoRenew, dto.paymentMethodId);
+    return this.membershipService.toggleAutoRenew(req.user.id, dto.autoRenew);
   }
 
   // ==========================================================================

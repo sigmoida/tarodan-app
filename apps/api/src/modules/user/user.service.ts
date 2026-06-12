@@ -504,9 +504,6 @@ export class UserService {
         // 15. User blocks - skip if model doesn't exist
         // Blocks are handled via other means in this app
         
-        // 16. Delete payment methods
-        await tx.paymentMethod.deleteMany({ where: { userId } });
-        
         // 17. Delete addresses
         await tx.address.deleteMany({ where: { userId } });
         

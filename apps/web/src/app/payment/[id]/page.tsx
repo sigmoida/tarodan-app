@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useParams, useRouter, useSearchParams } from "next/navigation";
 import { motion } from "framer-motion";
 import {
@@ -14,7 +14,7 @@ import toast from "react-hot-toast";
 import { paymentsApi } from "@/lib/api";
 import { useAuthStore } from "@/stores/authStore";
 import AuthLoadingScreen from "@/components/AuthLoadingScreen";
-import { Button, Checkbox, Input } from "@tarodan/ui";
+import { Button } from "@tarodan/ui";
 
 export default function PaymentPage() {
   const params = useParams();
@@ -29,11 +29,11 @@ export default function PaymentPage() {
   const [isLoading, setIsLoading] = useState(true);
   const [paymentHtml, setPaymentHtml] = useState<string | null>(null);
   const [isProcessing, setIsProcessing] = useState(false);
-  // Kart formu (PayTR Direkt API): kart bizim sayfada girilir, 3D ekranına geçilir
-  const [payMode, setPayMode] = useState<"card" | "iframe">("card");
-  const [cardForm, setCardForm] = useState({ name: "", number: "", expiry: "", cvv: "" });
-  const [saveCard, setSaveCard] = useState(true);
-  const [cardSubmitting, setCardSubmitting] = useState(false);
+  // Geri dönüşte PayTR token'ları tek kullanımlıktır → bayat HTML boş iframe gösterir.
+  // Süresi geçmiş / ürün tekrar satışta durumunu ayrı göster.
+  const [isExpired, setIsExpired] = useState(false);
+  // Mount başına tek initiate (taze token) — her render'da yeniden çağırma.
+  const didInitiateRef = useRef(false);
 
   useEffect(() => {
     if (authLoading) return;
@@ -99,6 +99,59 @@ export default function PaymentPage() {
         }
       }
 
+      // Bekleyen PayTR ödemesinde geri dönüşte taze iFrame token al:
+      // status endpoint'i bayat providerPaymentId ile iframe HTML üretir (tek kullanımlık
+      // token → boş iframe). pending ise yeniden initiate edip taze token alırız.
+      // Backend var olan Payment'ı yeniden kullanır + rezervasyonu CAS ile geri alır.
+      if (
+        paymentData.status === "pending" &&
+        (paymentData.paymentHtml || paymentData.paymentUrl) &&
+        !didInitiateRef.current
+      ) {
+        didInitiateRef.current = true;
+        try {
+          let initRes;
+          if (paymentData.checkoutGroupId) {
+            initRes = isGuest
+              ? await paymentsApi.initiateGroupGuest(
+                  paymentData.checkoutGroupId,
+                  "paytr",
+                )
+              : await paymentsApi.initiateGroup(
+                  paymentData.checkoutGroupId,
+                  "paytr",
+                );
+          } else if (paymentData.tradeId) {
+            initRes = await paymentsApi.initiateTradeCash(paymentData.tradeId);
+          } else if (paymentData.orderId) {
+            initRes = isGuest
+              ? await paymentsApi.initiateGuest(paymentData.orderId, "paytr")
+              : await paymentsApi.initiate(paymentData.orderId, "paytr");
+          }
+          if (initRes?.data) {
+            const fresh = initRes.data as any;
+            if (fresh.paymentHtml) {
+              setPaymentHtml(fresh.paymentHtml);
+              return;
+            }
+            if (fresh.paymentUrl) {
+              const url = fresh.paymentUrl as string;
+              if (!(url.includes("/payment/") && url.includes(paymentId))) {
+                window.location.href = url;
+                return;
+              }
+            }
+          }
+        } catch (initError: any) {
+          // Rezervasyon geri alınamadı (ürün tekrar satışta) veya ödeme süresi doldu
+          // → boş iframe yerine net "süre doldu" durumu göster.
+          if (process.env.NODE_ENV === "development")
+            console.error("Re-initiate failed:", initError);
+          setIsExpired(true);
+          return;
+        }
+      }
+
       // If payment has HTML content (PayTR iframe), set it
       if (paymentData.paymentHtml) {
         setPaymentHtml(paymentData.paymentHtml);
@@ -124,107 +177,6 @@ export default function PaymentPage() {
       );
     } finally {
       setIsLoading(false);
-    }
-  };
-
-  const formatCardNumber = (value: string) => {
-    const v = value.replace(/\D/g, "").slice(0, 16);
-    return v.replace(/(.{4})/g, "$1 ").trim();
-  };
-
-  const formatExpiry = (value: string) => {
-    const v = value.replace(/\D/g, "").slice(0, 4);
-    return v.length >= 3 ? `${v.slice(0, 2)}/${v.slice(2)}` : v;
-  };
-
-  /** PayTR Direkt API: kartı bizim formdan al, 3D Secure sayfasına geç */
-  const handleDirectPay = async (e: React.FormEvent) => {
-    e.preventDefault();
-    const cleanNumber = cardForm.number.replace(/\s/g, "");
-    const [mm, yy] = cardForm.expiry.split("/");
-    if (!cardForm.name.trim()) return toast.error("Kart üzerindeki ismi girin");
-    if (cleanNumber.length < 15 || cleanNumber.length > 16)
-      return toast.error("Geçerli bir kart numarası girin");
-    if (!mm || !yy || parseInt(mm, 10) < 1 || parseInt(mm, 10) > 12)
-      return toast.error("Geçerli bir son kullanma tarihi girin (AA/YY)");
-    if (!/^\d{3,4}$/.test(cardForm.cvv)) return toast.error("Geçerli bir CVV girin");
-
-    setCardSubmitting(true);
-    try {
-      const target = payment.checkoutGroupId
-        ? { checkoutGroupId: payment.checkoutGroupId }
-        : payment.tradeId
-          ? { tradeId: payment.tradeId }
-          : { orderId: payment.orderId };
-      const direct = await paymentsApi.processDirect({
-        ...target,
-        card: {
-          cardHolderName: cardForm.name.trim(),
-          cardNumber: cleanNumber,
-          expireMonth: mm,
-          expireYear: yy,
-          cvc: cardForm.cvv,
-        },
-        saveCard,
-      });
-      const data: any = direct.data;
-      if (data?.useBypass === true) {
-        await paymentsApi.bypassComplete(paymentId).catch(() => {});
-        router.push(
-          isMembershipPayment
-            ? "/membership/success"
-            : `/payment/success?paymentId=${paymentId}`,
-        );
-        return;
-      }
-      const html: string | undefined = data?.threeDSHtml;
-      if (html) {
-        // Banka 3D doğrulama sayfası aynı pencerede; doğrulama sonrası PayTR
-        // success/fail sayfamıza yönlendirir.
-        document.open();
-        document.write(html);
-        document.close();
-        return;
-      }
-      // non-3D anında çekim
-      router.push(
-        isMembershipPayment
-          ? "/membership/success"
-          : payment.tradeId
-            ? `/trades/${payment.tradeId}?paid=1`
-            : `/payment/success?paymentId=${paymentId}`,
-      );
-    } catch (error: any) {
-      const msg: string =
-        error?.response?.data?.message ||
-        "Ödeme başlatılamadı. Kart bilgilerinizi kontrol edin.";
-      // Direkt API bu mağazada kapalıysa / PayTR reddettiyse iframe akışına
-      // otomatik düş: taze token initiate et (oid eşleşmesi için yeniden başlatma şart).
-      if (/direkt api|doğrulanamadı|paytr_token/i.test(msg)) {
-        try {
-          const init = payment.checkoutGroupId
-            ? await paymentsApi.initiateGroup(payment.checkoutGroupId, "paytr")
-            : payment.tradeId
-              ? await paymentsApi.initiateTradeCash(payment.tradeId)
-              : await paymentsApi.initiate(payment.orderId, "paytr");
-          const initData: any = init.data?.data ?? init.data ?? {};
-          if (initData.paymentHtml) {
-            setPaymentHtml(initData.paymentHtml);
-            setPayMode("iframe");
-            toast("Güvenli PayTR ödeme sayfasına yönlendirildiniz.", { icon: "🔒" });
-            return;
-          }
-          if (initData.paymentUrl) {
-            window.location.href = initData.paymentUrl;
-            return;
-          }
-        } catch {
-          /* iframe fallback da başarısız — orijinal hata gösterilir */
-        }
-      }
-      toast.error(msg);
-    } finally {
-      setCardSubmitting(false);
     }
   };
 
@@ -325,6 +277,38 @@ export default function PaymentPage() {
     return null;
   }
 
+  // Ödeme süresi doldu / taze token alınamadı (ürün tekrar satışa açıldı):
+  // boş iframe yerine net bir mesaj göster.
+  if (isExpired) {
+    return (
+      <div className="min-h-screen bg-surface flex items-center justify-center">
+        <div className="text-center max-w-md px-6">
+          <XCircleIcon className="w-12 h-12 text-danger-500 mx-auto mb-4" />
+          <h2 className="text-xl font-semibold text-heading mb-2">
+            Ödeme süresi doldu
+          </h2>
+          <p className="text-muted mb-6">
+            Bu ödemenin süresi doldu ve ürün tekrar satışa açıldı. Almak
+            istiyorsanız ilanı yeniden ziyaret edip yeniden satın alabilirsiniz.
+          </p>
+          <Button
+            onClick={() =>
+              router.push(
+                payment?.orders?.[0]?.productId
+                  ? `/products/${payment.orders[0].productId}`
+                  : payment?.order?.productId
+                    ? `/products/${payment.order.productId}`
+                    : "/products",
+              )
+            }
+          >
+            İlanlara Dön
+          </Button>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="min-h-screen bg-surface py-8">
       <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8">
@@ -373,130 +357,8 @@ export default function PaymentPage() {
           </div>
         </div>
 
-        {/* Kart formu (Direkt API) / PayTR iframe / yönlendirme */}
-        {payment.status === "pending" &&
-        !isGuestCheckout &&
-        !urlGuest &&
-        (payment.orderId || payment.checkoutGroupId || payment.tradeId) &&
-        payMode === "card" ? (
-          <motion.div
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            className="bg-surface-elevated rounded-xl shadow-sm p-6"
-          >
-            <h2 className="text-lg font-semibold mb-4 flex items-center gap-2">
-              <CreditCardIcon className="w-6 h-6 text-primary-500" />
-              Kart Bilgileri
-            </h2>
-            <form onSubmit={handleDirectPay} className="space-y-4">
-              <div>
-                <label className="block text-sm font-medium text-body mb-2">
-                  Kart Üzerindeki İsim
-                </label>
-                <Input
-                  type="text"
-                  value={cardForm.name}
-                  onChange={(e) =>
-                    setCardForm({ ...cardForm, name: e.target.value.toUpperCase() })
-                  }
-                  placeholder="AD SOYAD"
-                  className="px-4 py-3"
-                />
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-body mb-2">
-                  Kart Numarası
-                </label>
-                <Input
-                  type="text"
-                  inputMode="numeric"
-                  value={cardForm.number}
-                  onChange={(e) =>
-                    setCardForm({ ...cardForm, number: formatCardNumber(e.target.value) })
-                  }
-                  placeholder="0000 0000 0000 0000"
-                  className="px-4 py-3"
-                  maxLength={19}
-                />
-              </div>
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-sm font-medium text-body mb-2">
-                    Son Kullanma Tarihi
-                  </label>
-                  <Input
-                    type="text"
-                    inputMode="numeric"
-                    value={cardForm.expiry}
-                    onChange={(e) =>
-                      setCardForm({ ...cardForm, expiry: formatExpiry(e.target.value) })
-                    }
-                    placeholder="AA/YY"
-                    className="px-4 py-3"
-                    maxLength={5}
-                  />
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-body mb-2">CVV</label>
-                  <Input
-                    type="text"
-                    inputMode="numeric"
-                    value={cardForm.cvv}
-                    onChange={(e) =>
-                      setCardForm({
-                        ...cardForm,
-                        cvv: e.target.value.replace(/\D/g, "").slice(0, 4),
-                      })
-                    }
-                    placeholder="000"
-                    className="px-4 py-3"
-                    maxLength={4}
-                  />
-                </div>
-              </div>
-
-              <label className="flex items-start gap-3 cursor-pointer pt-1">
-                <Checkbox
-                  checked={saveCard}
-                  onChange={(e) => setSaveCard(e.target.checked)}
-                  className="mt-0.5 h-5 w-5"
-                />
-                <span className="text-sm text-muted">
-                  Kartımı kaydet — sonraki ödemelerde ve otomatik yenilemede kullanılır.
-                </span>
-              </label>
-
-              <Button
-                type="submit"
-                disabled={cardSubmitting}
-                isLoading={cardSubmitting}
-                className="w-full py-4 bg-primary-500 text-inverted text-lg font-semibold rounded-xl hover:bg-primary-600"
-              >
-                {payment.amount?.toLocaleString("tr-TR", {
-                  minimumFractionDigits: 2,
-                  maximumFractionDigits: 2,
-                })}{" "}
-                TL Öde
-              </Button>
-            </form>
-            <p className="text-xs text-muted mt-3 text-center">
-              Ödemeniz 3D Secure ile doğrulanır; banka doğrulama ekranına
-              yönlendirileceksiniz.
-            </p>
-            {(paymentHtml || payment.paymentUrl) && (
-              <p className="text-sm text-center mt-2">
-                <Button
-                  variant="link"
-                  type="button"
-                  onClick={() => setPayMode("iframe")}
-                  className="text-primary-600"
-                >
-                  PayTR güvenli ödeme sayfasını kullanmak istiyorum
-                </Button>
-              </p>
-            )}
-          </motion.div>
-        ) : paymentHtml ? (
+        {/* PayTR iframe / yönlendirme */}
+        {paymentHtml ? (
           // PayTR iframe
           <motion.div
             initial={{ opacity: 0, y: 20 }}
@@ -514,21 +376,6 @@ export default function PaymentPage() {
             <p className="text-sm text-muted mt-4 text-center">
               Ödeme tamamlandıktan sonra otomatik olarak yönlendirileceksiniz.
             </p>
-            {payment.status === "pending" &&
-              !isGuestCheckout &&
-              !urlGuest &&
-              (payment.orderId || payment.checkoutGroupId || payment.tradeId) && (
-                <p className="text-sm text-center mt-2">
-                  <Button
-                    variant="link"
-                    type="button"
-                    onClick={() => setPayMode("card")}
-                    className="text-primary-600"
-                  >
-                    Kart bilgilerimi bu sayfada girmek istiyorum
-                  </Button>
-                </p>
-              )}
           </motion.div>
         ) : payment.paymentUrl ? (
           // Generic redirect (fallback)

@@ -27,7 +27,7 @@ import {
 } from '../../src/components/common';
 import { DEFAULT_COUNTRY_CODE, normalizePhoneForPayload } from '../../src/utils/phone';
 import { router, useLocalSearchParams } from 'expo-router';
-import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
+import { Ionicons } from '@expo/vector-icons';
 import { useQuery } from '@tanstack/react-query';
 import { useCartStore } from '../../src/stores/cartStore';
 import { captureException } from '../../src/services/sentry';
@@ -66,14 +66,6 @@ interface SavedAddress {
   address: string;
   zipCode?: string;
   isDefault?: boolean;
-}
-
-interface SavedCard {
-  cardToken: string;
-  cardAlias?: string;
-  cardHolderName?: string;
-  lastFourDigits?: string;
-  cardBrand?: string;
 }
 
 const STOCKOUT_KEYWORDS = [
@@ -156,20 +148,6 @@ export default function CheckoutScreen() {
   const [shippingCost, setShippingCost] = useState(0);
   const [shippingLoading, setShippingLoading] = useState(false);
 
-  // ---------- Kayıtlı kart / yeni kart ----------
-  const [selectedCardToken, setSelectedCardToken] = useState<string | 'new' | 'webview'>(
-    'webview', // varsayılan: WebView 3DS akışı
-  );
-  const [cardForm, setCardForm] = useState({
-    cardHolderName: '',
-    cardNumber: '',
-    expireMonth: '',
-    expireYear: '',
-    cvc: '',
-    cardAlias: '',
-    saveCard: true,
-  });
-
   // ---------- Kupon / İndirim ----------
   const [couponCode, setCouponCode] = useState('');
   const [appliedDiscount, setAppliedDiscount] = useState<{ code: string; amount: number } | null>(
@@ -209,33 +187,6 @@ export default function CheckoutScreen() {
     const def = addresses.find(a => a.isDefault) ?? addresses[0];
     setSelectedAddressId(def.id);
   }, [isAuthenticated, addresses]);
-
-  // ---------- Üye için kayıtlı kartlar ----------
-  const cardsQuery = useQuery({
-    queryKey: ['my-payment-methods'],
-    queryFn: async () => {
-      const response = await paymentsApi.getPaymentMethods();
-      const list: SavedCard[] = (response.data as any)?.data ?? response.data ?? [];
-      return Array.isArray(list) ? list : [];
-    },
-    enabled: isAuthenticated,
-  });
-  const cards = cardsQuery.data ?? [];
-
-  useEffect(() => {
-    if (!isAuthenticated) {
-      setSelectedCardToken('webview');
-      return;
-    }
-    // Üye + en az 1 kart var → varsayılan olarak ilk kartı seç
-    if (cards.length > 0 && selectedCardToken === 'webview') {
-      setSelectedCardToken(cards[0].cardToken);
-    }
-    // Üye + hiç kart yok → PayTR WebView akışı varsayılan (manuel kart girişi yok)
-    if (cards.length === 0 && selectedCardToken !== 'webview') {
-      setSelectedCardToken('webview');
-    }
-  }, [isAuthenticated, cards]);
 
   // ---------- Kargo ücreti hesaplama ----------
   const effectiveShippingCity = useMemo(() => {
@@ -359,19 +310,8 @@ export default function CheckoutScreen() {
       return;
     }
     if (step === 2) {
-      // Kart seçim doğrulaması
-      if (isAuthenticated && selectedCardToken === 'new') {
-        const c = cardForm;
-        if (!c.cardHolderName.trim()) return showSnackbar('Kart sahibi adını girin');
-        const cleanNumber = c.cardNumber.replace(/\s/g, '');
-        if (cleanNumber.length < 15 || cleanNumber.length > 19)
-          return showSnackbar('Geçerli bir kart numarası girin');
-        const month = parseInt(c.expireMonth, 10);
-        if (isNaN(month) || month < 1 || month > 12)
-          return showSnackbar('Geçerli son kullanma ayı girin (1-12)');
-        if (!/^\d{2,4}$/.test(c.expireYear)) return showSnackbar('Geçerli son kullanma yılı girin');
-        if (!/^\d{3,4}$/.test(c.cvc)) return showSnackbar('Geçerli CVC girin');
-      }
+      // Ödeme PayTR'nin barındırılan 3DS sayfasında alınır; uygulamada kart
+      // formu yok, ek doğrulama gerekmez.
       setStep(3);
       return;
     }
@@ -472,115 +412,8 @@ export default function CheckoutScreen() {
         return;
       }
 
-      // "Kartımı kaydet" işaretliyse kartı burada kaydet (web üyelik checkout'u
-      // ile aynı desen: POST /payments/methods). Ödeme akışı hangi yola düşerse
-      // düşsün (direct ya da PayTR WebView) kart bilgisi bir daha elimize
-      // geçmiyor; tek güvenilir nokta burası. Hata ödemeyi engellemesin.
-      if (isAuthenticated && selectedCardToken === 'new' && cardForm.saveCard) {
-        const cleanNumber = cardForm.cardNumber.replace(/\s/g, '');
-        if (cleanNumber.length >= 15) {
-          paymentsApi
-            .addPaymentMethod({
-              card: {
-                cardHolderName: cardForm.cardHolderName.trim(),
-                cardNumber: cleanNumber,
-                expireMonth: cardForm.expireMonth,
-                expireYear: cardForm.expireYear,
-                cvc: cardForm.cvc,
-                cardAlias: cardForm.cardAlias.trim() || undefined,
-              },
-            })
-            .catch((saveErr: any) => {
-              captureException(saveErr, {
-                level: 'warning',
-                tags: { flow: 'checkout.saveCard' },
-              });
-            });
-        }
-      }
-
-      // Üye + kayıtlı kart seçimi → processDirect (tek tık akışı).
-      // NOT: processDirect tek sipariş ID'siyle çalışır; çok ürünlü grupta yalnızca
-      // ilk siparişi tahsil ederdi → grup ödemesine (WebView) düşülür.
-      if (
-        isAuthenticated &&
-        items.length === 1 &&
-        selectedCardToken !== 'webview' &&
-        selectedCardToken !== 'new'
-      ) {
-        try {
-          const directResp: any = await paymentsApi.processDirect({
-            orderId: firstOrderId,
-            cardToken: selectedCardToken,
-            provider: paymentProvider,
-          });
-          const directData: any = directResp.data?.data ?? directResp.data ?? {};
-          const status = directData.status || directData.payment?.status;
-          const paymentId = directData.paymentId || directData.id || directData.payment?.id;
-          // 3DS gerekiyorsa veya hala pending ise WebView akışına geç
-          if (status === 'paid' || status === 'success' || status === 'completed') {
-            finalizeCart();
-            router.replace({
-              pathname: '/payment/success',
-              params: { paymentId, orderId: firstOrderId, groupId: checkoutGroupId },
-            } as any);
-            return;
-          }
-          // Aksi halde WebView akışına geçilir
-          finalizeCart();
-          router.replace({
-            pathname: '/payment/[id]',
-            params: {
-              id: paymentId || firstOrderId,
-              orderId: firstOrderId,
-              groupId: checkoutGroupId,
-              provider: paymentProvider,
-              guest: '0',
-            },
-          } as any);
-          return;
-        } catch (directErr: any) {
-          // Direct ödeme başarısızsa, WebView akışına düşer
-          console.warn('processDirect failed, falling back to WebView:', directErr?.message);
-        }
-      }
-
-      // Üye + yeni kart formu → backend kart bilgisini alır + 3DS WebView'i açar
-      if (isAuthenticated && items.length === 1 && selectedCardToken === 'new') {
-        try {
-          const directResp: any = await paymentsApi.processDirect({
-            orderId: firstOrderId,
-            card: {
-              cardHolderName: cardForm.cardHolderName.trim(),
-              cardNumber: cardForm.cardNumber.replace(/\s/g, ''),
-              expireMonth: cardForm.expireMonth,
-              expireYear: cardForm.expireYear,
-              cvc: cardForm.cvc,
-              cardAlias: cardForm.cardAlias.trim() || undefined,
-            },
-            saveCard: cardForm.saveCard,
-            provider: paymentProvider,
-          });
-          const directData: any = directResp.data?.data ?? directResp.data ?? {};
-          const paymentId = directData.paymentId || directData.id || directData.payment?.id;
-          finalizeCart();
-          router.replace({
-            pathname: '/payment/[id]',
-            params: {
-              id: paymentId || firstOrderId,
-              orderId: firstOrderId,
-              groupId: checkoutGroupId,
-              provider: paymentProvider,
-              guest: '0',
-            },
-          } as any);
-          return;
-        } catch (newCardErr: any) {
-          console.warn('processDirect (new card) failed, fallback to WebView:', newCardErr?.message);
-        }
-      }
-
-      // WebView akışı (default) — grup ödemesi: tek ödeme tüm siparişleri kapsar
+      // Ödeme her zaman PayTR'nin barındırılan 3DS sayfasında alınır (kayıtlı
+      // kart / Direct API yok). Grup ödemesi: tek ödeme tüm siparişleri kapsar.
       try {
         const initResp: any = isAuthenticated
           ? await paymentsApi.initiateGroup(checkoutGroupId, paymentProvider)
@@ -959,68 +792,6 @@ export default function CheckoutScreen() {
                 <Text style={styles.sectionTitle}>Ödeme Yöntemi</Text>
               </View>
 
-              {/* Üye + kayıtlı kart varsa */}
-              {isAuthenticated && cards.length > 0 ? (
-                <View style={{ marginBottom: 8 }}>
-                  {cards.map(card => (
-                    <TouchableOpacity
-                      key={card.cardToken}
-                      style={[
-                        styles.optionCard,
-                        selectedCardToken === card.cardToken && styles.optionCardActive,
-                      ]}
-                      onPress={() => setSelectedCardToken(card.cardToken)}
-                    >
-                      <Radio
-                        checked={selectedCardToken === card.cardToken}
-                        onChange={() => setSelectedCardToken(card.cardToken)}
-                      />
-                      <MaterialCommunityIcons
-                        name="credit-card"
-                        size={22}
-                        color={colors.primary[600]!}
-                        style={{ marginRight: 6 }}
-                      />
-                      <View style={styles.optionContent}>
-                        <Text style={styles.optionTitle}>
-                          {card.cardAlias || card.cardBrand || 'Kart'} ····{' '}
-                          {card.lastFourDigits || '****'}
-                        </Text>
-                        <Text style={styles.optionDescription}>
-                          {card.cardHolderName || 'Tek tıkla öde'}
-                        </Text>
-                      </View>
-                    </TouchableOpacity>
-                  ))}
-
-                  {/* WebView (provider-hosted) seçeneği */}
-                  <TouchableOpacity
-                    style={[
-                      styles.optionCard,
-                      selectedCardToken === 'webview' && styles.optionCardActive,
-                    ]}
-                    onPress={() => setSelectedCardToken('webview')}
-                  >
-                    <Radio
-                      checked={selectedCardToken === 'webview'}
-                      onChange={() => setSelectedCardToken('webview')}
-                    />
-                    <MaterialCommunityIcons
-                      name="shield-key-outline"
-                      size={22}
-                      color={colors.primary[600]!}
-                      style={{ marginRight: 6 }}
-                    />
-                    <View style={styles.optionContent}>
-                      <Text style={styles.optionTitle}>Sağlayıcı Sayfasında Öde</Text>
-                      <Text style={styles.optionDescription}>
-                        PayTR 3DS sayfası
-                      </Text>
-                    </View>
-                  </TouchableOpacity>
-                </View>
-              ) : null}
-
               {/* PayTR bilgilendirme — kart bilgisi uygulamaya girilmez (PCI). */}
               <View style={styles.paytrNotice}>
                 <Ionicons name="lock-closed" size={18} color={colors.success[600]!} />
@@ -1350,17 +1121,6 @@ const styles = StyleSheet.create({
     fontSize: 11,
     color: colors.success[600]!,
     fontWeight: '600',
-  },
-  saveCardRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-    marginTop: 4,
-  },
-  saveCardLabel: {
-    fontSize: 13,
-    color: colors.text.heading,
-    flex: 1,
   },
   paytrNotice: {
     flexDirection: 'row',

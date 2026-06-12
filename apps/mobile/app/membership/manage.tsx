@@ -194,7 +194,7 @@ export default function MembershipManageScreen() {
                   <Text style={styles.autoTitle}>Otomatik Yenileme</Text>
                   <Text style={styles.autoSub}>
                     {autoRenew
-                      ? 'Üyeliğiniz dönem sonunda otomatik yenilenecek.'
+                      ? 'Dönem sonunda yenileme hatırlatması gönderilecek — tek tıkla yenileyebilirsiniz.'
                       : 'Kapalı — dönem sonunda üyeliğiniz sona erecek.'}
                   </Text>
                 </View>
@@ -210,25 +210,6 @@ export default function MembershipManageScreen() {
               Şu anda ücretsiz üyeliği kullanıyorsunuz. Daha fazla özellik için planınızı yükseltin.
             </Text>
           )}
-        </Card>
-
-        {/* Kart yönetimi — tüm üyelik seviyelerinde görünür (temel dahil).
-            Kayıtlı kartlar hem hızlı ödemede hem otomatik yenilemede kullanılır. */}
-        <Card style={styles.card}>
-          <View style={styles.autoRow}>
-            <Ionicons name="card-outline" size={22} color={colors.primary[600]!} />
-            <View style={{ flex: 1 }}>
-              <Text style={styles.autoTitle}>Kart Yönetimi</Text>
-              <Text style={styles.autoSub}>
-                Kayıtlı kartlarınızı görüntüleyin, yeni kart ekleyin veya silin.
-              </Text>
-            </View>
-            <Button
-              variant="outline"
-              title="Kartlarım"
-              onPress={() => router.push('/settings/payment-methods' as any)}
-            />
-          </View>
         </Card>
 
         {/* Actions */}

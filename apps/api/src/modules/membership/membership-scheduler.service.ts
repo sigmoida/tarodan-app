@@ -9,7 +9,6 @@ import { Cron } from '@nestjs/schedule';
 import { PrismaService } from '../../prisma';
 import { InjectQueue } from '@nestjs/bull';
 import { Queue } from 'bull';
-import { MembershipTierType } from '@prisma/client';
 import { MembershipService } from './membership.service';
 
 @Injectable()
@@ -248,85 +247,17 @@ export class MembershipSchedulerService {
   }
 
   /**
-   * Otomatik yenileme (dev/mock). Süresi 24 saat içinde dolan/dolmuş, autoRenew AÇIK ve kayıtlı
-   * VARSAYILAN kartı olan ücretli üyelikleri "çeker" ve dönemi (aylık/yıllık) uzatır.
+   * Otomatik yenileme: HATIRLATMA-tabanlıdır, kayıtlı karttan çekim YAPMAZ.
    *
-   * ⚠️ Gerçek para çekimi YOK — PayTR iframe token döndürmediği için SİMÜLASYON.
-   * Production'da bu noktada gateway token charge yapılır; başarılıysa dönem uzatılır,
-   * başarısızsa status=past_due'ya alınır. Kart yoksa çekim yapılmaz (hatırlatma akışı devrede).
-   * Her saat çalışır; manuel de çağrılabilir (manualProcessAutoRenewals).
+   * Saved-card özelliği kaldırıldığı için (Faz 1) depolanmış karttan otomatik çekim
+   * mümkün değildir. Dönem bitişinde kullanıcı normal PayTR hosted-iframe akışından
+   * tek tıkla yeniler; gerekli hatırlatmalar ayrı bir akışta (expiry reminders)
+   * gönderilir. Bu job artık çekim yapmayan bir no-op'tur.
    */
   @Cron('0 * * * *') // Her saat
   async processAutoRenewals() {
-    try {
-      const now = new Date();
-      const within24h = new Date(now.getTime() + 24 * 60 * 60 * 1000);
-      const due = await this.prisma.userMembership.findMany({
-        where: {
-          status: 'active',
-          autoRenew: true,
-          currentPeriodEnd: { lte: within24h },
-          tier: { type: { not: MembershipTierType.free } },
-        },
-        include: {
-          tier: true,
-          user: { select: { id: true, email: true, displayName: true } },
-        },
-      });
-
-      let renewed = 0;
-      for (const m of due) {
-        const card = await this.prisma.paymentMethod.findFirst({
-          where: { userId: m.userId, isDefault: true },
-        });
-        if (!card) continue; // kayıtlı kart yok → çekilemez (hatırlatma ayrıca gönderiliyor)
-
-        const periodDays = Math.round(
-          (m.currentPeriodEnd.getTime() - m.currentPeriodStart.getTime()) / 86400000,
-        );
-        const isYearly = periodDays > 180;
-        const price = isYearly ? Number(m.tier.yearlyPrice) : Number(m.tier.monthlyPrice);
-
-        // ── MOCK CHARGE ── (production: gateway token ile `price` çek; başarısızsa past_due)
-        const newStart = new Date(m.currentPeriodEnd);
-        const newEnd = new Date(newStart);
-        if (isYearly) newEnd.setFullYear(newEnd.getFullYear() + 1);
-        else newEnd.setMonth(newEnd.getMonth() + 1);
-
-        await this.prisma.userMembership.update({
-          where: { userId: m.userId },
-          data: { currentPeriodStart: newStart, currentPeriodEnd: newEnd, status: 'active' },
-        });
-
-        this.logger.warn(
-          `[MOCK AUTO-RENEW] ${m.user.email}: ${price} TL "${isYearly ? 'yearly' : 'monthly'}" charged from card ****${card.lastFour} → extended to ${newEnd.toISOString()}`,
-        );
-
-        await this.emailQueue
-          .add('send-template', {
-            to: m.user.email,
-            subject: `${m.tier.name} üyeliğin yenilendi`,
-            template: 'membership-renewed',
-            data: {
-              userName: m.user.displayName,
-              tierName: m.tier.name,
-              amount: price,
-              cardLast4: card.lastFour,
-              billingPeriod: isYearly ? 'yıllık' : 'aylık',
-              nextRenewal: newEnd.toLocaleDateString('tr-TR'),
-            },
-          })
-          .catch(() => {});
-
-        renewed++;
-      }
-
-      if (renewed > 0) this.logger.log(`Auto-renewed ${renewed} membership(s) [MOCK]`);
-      return { renewed };
-    } catch (error: any) {
-      this.logger.error(`Error processing auto-renewals: ${error.message}`, error.stack);
-      return { renewed: 0, error: error.message };
-    }
+    // Kayıtlı karttan otomatik çekim kaldırıldı; yenileme manuel PayTR akışıyla yapılır.
+    return { renewed: 0 };
   }
 
   /** Manuel tetikleme (test/admin) */

@@ -284,22 +284,6 @@ export default function SubscriptionSettingsScreen() {
 
               <TouchableOpacity
                 style={styles.actionRow}
-                onPress={() => router.push('/settings/payment-methods' as any)}
-              >
-                <Ionicons name="card-outline" size={24} color={colors.text.muted} />
-                <View style={styles.actionTextWrap}>
-                  <Text variant="body" style={styles.actionTitle}>Ödeme Yöntemi</Text>
-                  <Text variant="bodySm" style={styles.actionDesc}>
-                    Kredi kartı bilgilerinizi güncelleyin
-                  </Text>
-                </View>
-                <Ionicons name="chevron-forward" size={20} color={colors.text.subtle} />
-              </TouchableOpacity>
-
-              <Divider style={styles.divider} />
-
-              <TouchableOpacity
-                style={styles.actionRow}
                 onPress={() => router.push('/upgrade')}
               >
                 <Ionicons name="swap-vertical" size={24} color={colors.text.muted} />
