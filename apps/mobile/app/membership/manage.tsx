@@ -194,7 +194,7 @@ export default function MembershipManageScreen() {
                   <Text style={styles.autoTitle}>Otomatik Yenileme</Text>
                   <Text style={styles.autoSub}>
                     {autoRenew
-                      ? 'Üyeliğiniz dönem sonunda otomatik yenilenecek.'
+                      ? 'Dönem sonunda yenileme hatırlatması gönderilecek — tek tıkla yenileyebilirsiniz.'
                       : 'Kapalı — dönem sonunda üyeliğiniz sona erecek.'}
                   </Text>
                 </View>
