@@ -621,6 +621,11 @@ export default function ProfileScreen() {
             onPress={() => router.push('/settings/addresses')}
           />
           <MenuItem
+            icon="card-outline"
+            label="Banka Hesabı / IBAN"
+            onPress={() => router.push('/settings/bank-account')}
+          />
+          <MenuItem
             testID="profile-membership-link"
             icon="diamond-outline"
             label="Üyelik Planı"
