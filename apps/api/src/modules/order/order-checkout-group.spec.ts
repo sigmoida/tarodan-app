@@ -264,6 +264,50 @@ describe('OrderService checkout group (batch checkout)', () => {
     });
   });
 
+  it('second checkout of own still-reserved product cancels the stale order and succeeds (no false stockout)', async () => {
+    // Senaryo: kullanıcı "onayla ve öde"ye bastı (ilk sipariş ürünü rezerve etti:
+    // quantity=1, reservedQuantity=1 → available=0). Geri dönüp tekrar bastı.
+    // Kendi bekleyen siparişi iptal edilip rezervasyon serbest bırakılmalı, sonra
+    // doğrulama serbest kalmış stoğu görmeli → yanlış "stokta yok" OLMAMALI.
+    mockTx.$queryRaw.mockResolvedValue([{ id: productA }]);
+    const productState = { reservedQuantity: 1 };
+    mockTx.product.findMany.mockImplementation(() =>
+      Promise.resolve([
+        makeProduct(productA, { quantity: 1, reservedQuantity: productState.reservedQuantity }),
+      ]),
+    );
+    mockTx.product.update.mockImplementation(({ where, data }: any) => {
+      if (where.id === productA && data?.reservedQuantity?.decrement) {
+        productState.reservedQuantity -= data.reservedQuantity.decrement;
+      }
+      if (where.id === productA && data?.reservedQuantity?.increment) {
+        productState.reservedQuantity += data.reservedQuantity.increment;
+      }
+      return Promise.resolve({});
+    });
+    mockTx.order.findMany.mockResolvedValue([
+      { id: 'stale-order-1', productId: productA, reservationReleasedAt: null },
+    ]);
+
+    const dto = {
+      items: [{ productId: productA }],
+      idempotencyKey,
+      shippingAddressId: addressId,
+    };
+    const result: any = await service.checkout(buyerId, dto as any);
+
+    // Kendi bekleyen siparişi iptal edildi
+    expect(mockTx.order.update).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: { id: 'stale-order-1' },
+        data: expect.objectContaining({ status: OrderStatus.cancelled }),
+      }),
+    );
+    // Stockout fırlatılmadı; yeni grup + sipariş oluştu
+    expect(result.checkoutGroupId).toBe('group-1');
+    expect(mockTx.order.create).toHaveBeenCalledTimes(1);
+  });
+
   it('missing shipping address is rejected before any transaction', async () => {
     await expect(
       service.checkout(buyerId, {

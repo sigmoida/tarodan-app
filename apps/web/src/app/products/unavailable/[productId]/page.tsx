@@ -15,6 +15,7 @@ interface ProductLike {
   condition: string;
   status: string;
   quantity?: number | null;
+  availableQuantity?: number | null;
   price: number;
   originalPrice?: number | null;
   salePrice?: number | null;
@@ -73,8 +74,12 @@ export default function ProductUnavailablePage() {
 
   // Stok geri gelmiş olabilir (admin restock veya refund). Bu durumda
   // "stokta yok" demek yanıltır; kullanıcıyı doğrudan ürüne yönlendirelim.
+  // MÜSAIT adede bak (quantity - reservedQuantity); rezerve edilmiş (örn. başka
+  // bir alıcının bekleyen siparişi) ürünü "tekrar satışta" gösterme. availableQuantity
+  // null/undefined ise sınırsız stok demektir.
+  const available = product?.availableQuantity;
   const isBackInStock =
-    !!product && product.status === 'active' && (product.quantity ?? 0) > 0;
+    !!product && product.status === 'active' && (available == null || available > 0);
 
   return (
     <div className="container mx-auto px-4 py-10 max-w-6xl">

@@ -1253,6 +1253,36 @@ export class OrderService {
           throw new NotFoundException('Sepetteki ürünlerden biri bulunamadı');
         }
 
+        // Aynı alıcının aynı ürün için eski bekleyen siparişi varsa iptal et ve
+        // rezervasyonunu bırak — yoksa terk edilmiş checkout rezervasyonu yeni
+        // denemede "stokta yok" hatasına yol açar. Bu, stok doğrulamasından ÖNCE
+        // yapılmalı ki serbest kalan rezervasyon aşağıdaki product fetch'inde görünsün.
+        if (!isGuest) {
+          const staleOrders = await tx.order.findMany({
+            where: {
+              buyerId,
+              productId: { in: productIds },
+              status: OrderStatus.pending_payment,
+            },
+          });
+          for (const stale of staleOrders) {
+            await tx.order.update({
+              where: { id: stale.id },
+              data: {
+                status: OrderStatus.cancelled,
+                cancelReason: 'Yeni toplu sipariş ile değiştirildi',
+                reservationReleasedAt: stale.reservationReleasedAt ?? new Date(),
+              },
+            });
+            if (!stale.reservationReleasedAt) {
+              await tx.product.update({
+                where: { id: stale.productId },
+                data: { reservedQuantity: { decrement: 1 } },
+              });
+            }
+          }
+        }
+
         const products = await tx.product.findMany({
           where: { id: { in: productIds } },
           include: {
@@ -1282,35 +1312,6 @@ export class OrderService {
           }
           if (!isGuest && product.sellerId === buyerId) {
             throw new ForbiddenException('Kendi ürününüzü satın alamazsınız');
-          }
-        }
-
-        // Aynı alıcının aynı ürün için eski bekleyen siparişi varsa iptal et ve
-        // rezervasyonunu bırak — yoksa terk edilmiş checkout rezervasyonu yeni
-        // denemede "stokta yok" hatasına yol açar (createDirectOrder'daki reuse'un grup karşılığı).
-        if (!isGuest) {
-          const staleOrders = await tx.order.findMany({
-            where: {
-              buyerId,
-              productId: { in: productIds },
-              status: OrderStatus.pending_payment,
-            },
-          });
-          for (const stale of staleOrders) {
-            await tx.order.update({
-              where: { id: stale.id },
-              data: {
-                status: OrderStatus.cancelled,
-                cancelReason: 'Yeni toplu sipariş ile değiştirildi',
-                reservationReleasedAt: stale.reservationReleasedAt ?? new Date(),
-              },
-            });
-            if (!stale.reservationReleasedAt) {
-              await tx.product.update({
-                where: { id: stale.productId },
-                data: { reservedQuantity: { decrement: 1 } },
-              });
-            }
           }
         }
 
