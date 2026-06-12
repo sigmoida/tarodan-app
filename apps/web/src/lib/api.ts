@@ -395,31 +395,6 @@ export const paymentsApi = {
     page?: number;
     limit?: number;
   }) => api.get('/payments/me', { params }),
-  // Saklı kart yönetimi
-  getMethods: () => api.get('/payments/methods'),
-  addMethod: (card: {
-    cardNumber: string;
-    cardHolderName: string;
-    expireMonth: string;
-    expireYear: string;
-    cvc: string;
-  }) => api.post('/payments/methods', { card }),
-  deleteMethod: (id: string) => api.delete(`/payments/methods/${id}`),
-  setDefaultMethod: (id: string) => api.patch(`/payments/methods/${id}/default`),
-  /** PayTR Direkt API: kart bizim sayfada girilir; yanıt 3D Secure HTML'idir */
-  processDirect: (data: {
-    orderId?: string;
-    checkoutGroupId?: string;
-    card: {
-      cardHolderName: string;
-      cardNumber: string;
-      expireMonth: string;
-      expireYear: string;
-      cvc: string;
-    };
-    saveCard?: boolean;
-    provider?: string;
-  }) => api.post('/payments/process-direct', data),
   cancel: (paymentId: string) =>
     api.post(`/payments/${paymentId}/cancel`),
   /** Fail sayfasından; ödeme hâlâ pending ise rezervasyonu serbest bırakır */
@@ -435,21 +410,6 @@ export const paymentsApi = {
   /** Dev/test: PayTR olmadan ödemeyi tamamla */
   bypassComplete: (paymentId: string, _card?: string) =>
     api.post<{ success: boolean }>(`/payments/${paymentId}/bypass-complete`),
-
-  getPaymentMethods: () => api.get('/payments/methods'),
-
-  addPaymentMethod: (data: {
-    card: {
-      cardHolderName: string;
-      cardNumber: string;
-      expireMonth: string;
-      expireYear: string;
-      cvc: string;
-      cardAlias?: string;
-    };
-  }) => api.post('/payments/methods', data),
-
-  deletePaymentMethod: (paymentMethodId: string) => api.delete(`/payments/methods/${paymentMethodId}`),
 };
 
 export type RefundReason =
