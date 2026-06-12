@@ -16,6 +16,7 @@ import {
   UnauthorizedException,
   BadRequestException,
   Logger,
+  GoneException,
 } from '@nestjs/common';
 import { Throttle } from '@nestjs/throttler';
 import { Request } from 'express';
@@ -160,14 +161,12 @@ export class PaymentController {
   @Throttle({ default: { limit: 10, ttl: 60000 } })
   @UseGuards(JwtAuthGuard)
   @ApiBearerAuth()
-  @ApiOperation({ summary: 'Process payment with card details (PayTR Direct API, 3D Secure)' })
-  @ApiResponse({ status: HttpStatus.CREATED, description: 'Payment initiated; threeDSHtml returned' })
-  async processDirect(
-    @CurrentUser('id') userId: string,
-    @Body() dto: DirectPaymentDto,
-    @Req() req: Request,
-  ) {
-    return this.paymentService.processDirectPayment(userId, dto, req);
+  @ApiOperation({ summary: 'KULLANIM DIŞI — Direct API kart ödemesi (Faz 1 itibarıyla kapalı)' })
+  @ApiResponse({ status: HttpStatus.GONE, description: 'Endpoint devre dışı' })
+  processDirect(@Body() _dto: unknown, @Req() _req: unknown): never {
+    throw new GoneException(
+      'Kart ile doğrudan ödeme kaldırıldı. Lütfen güvenli ödeme sayfasını kullanın.',
+    );
   }
 
   /**
