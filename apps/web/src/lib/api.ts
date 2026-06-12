@@ -462,6 +462,18 @@ export const addressesApi = {
   setDefault: (id: string) => api.patch(`/users/me/addresses/${id}`, { isDefault: true }),
 };
 
+// Seller Bank Account (IBAN) — backend: user.controller.ts GET/PATCH/DELETE /users/me/bank-account
+export const bankAccountApi = {
+  get: () => api.get('/users/me/bank-account'),
+  upsert: (data: {
+    accountHolder: string;
+    iban: string;
+    tcKimlikNo?: string;
+    taxId?: string;
+  }) => api.patch('/users/me/bank-account', data),
+  delete: () => api.delete('/users/me/bank-account'),
+};
+
 // User Profile
 export const userApi = {
   getProfile: () => api.get('/users/me'),
