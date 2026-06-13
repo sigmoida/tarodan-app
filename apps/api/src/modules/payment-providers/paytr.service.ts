@@ -217,6 +217,7 @@ export class PayTRService {
     });
 
     try {
+      this.logger.log(`PayTR get-token POST → merchant_oid=${orderId} amount=${paymentAmountStr} test=${testModeStr}`);
       const response = await fetch(`${this.baseUrl}/api/get-token`, {
         method: 'POST',
         headers: {
@@ -226,6 +227,7 @@ export class PayTRService {
       });
 
       const rawText = await response.text();
+      this.logger.log(`PayTR get-token response: HTTP ${response.status} body=${rawText.slice(0, 400)}`);
       if (!rawText?.trim()) {
         this.logger.error(`PayTR API boş yanıt döndü. HTTP ${response.status}`);
         throw new BadRequestException(
