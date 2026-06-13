@@ -3662,6 +3662,71 @@ export class PaymentService {
   }
 
   /**
+   * Ground-truth reconciliation: bir ürünün reservedQuantity'si, o ürün için
+   * gerçekten rezervasyon tutan sipariş sayısına (status=pending_payment AND
+   * reservationReleasedAt IS NULL) eşit olmalı. Sipariş satırı silindiğinde veya
+   * release adımı kaçırıldığında sayaç yukarıda takılı kalabilir; bu da
+   * availableQuantity = quantity - reservedQuantity'yi yanlışlıkla 0 yaparak
+   * stokta olan ürünü "Stok bitti" gösterir. Bu metod sapan sayaçları düzeltir.
+   *
+   * releaseExpiredOrderReservations() yalnızca HÂLÂ var olan süresi geçmiş
+   * siparişleri serbest bırakır; orphan (siparişsiz) rezervasyonları yakalayamaz —
+   * bu metod o boşluğu kapatan emniyet ağıdır.
+   */
+  async reconcileReservedQuantities(): Promise<{ count: number }> {
+    const candidates = await this.prisma.product.findMany({
+      where: { reservedQuantity: { gt: 0 } },
+      select: { id: true },
+    });
+
+    let fixed = 0;
+    for (const { id } of candidates) {
+      try {
+        const held = await this.prisma.order.count({
+          where: {
+            productId: id,
+            status: OrderStatus.pending_payment,
+            reservationReleasedAt: null,
+          },
+        });
+        await this.prisma.$transaction(async (tx) => {
+          await tx.$queryRaw`SELECT id FROM products WHERE id = ${id} FOR UPDATE`;
+          const product = await tx.product.findUnique({
+            where: { id },
+            select: { reservedQuantity: true, quantity: true, status: true },
+          });
+          if (!product || product.reservedQuantity === held) return;
+
+          const remaining = (product.quantity ?? 0) - held;
+          // Sayacı yanlışlıkla "reserved" yaptıysa ve stok varsa active'e döndür;
+          // gerçekten satılmış/pasif (quantity 0) ürünlere dokunma.
+          const nextStatus =
+            product.status === ProductStatus.reserved && held === 0 && (product.quantity == null || remaining > 0)
+              ? ProductStatus.active
+              : undefined;
+
+          await tx.product.update({
+            where: { id },
+            data: {
+              reservedQuantity: held,
+              ...(nextStatus ? { status: nextStatus } : {}),
+            },
+          });
+          fixed++;
+        });
+        await this.cache.del(`products:detail:${id}`).catch(() => undefined);
+      } catch (error: any) {
+        this.logger.error(`reconcileReservedQuantities failed for ${id}: ${error?.message}`);
+      }
+    }
+
+    if (fixed > 0) {
+      await this.cache.delPattern('products:list:*').catch(() => undefined);
+    }
+    return { count: fixed };
+  }
+
+  /**
    * 24h kill-switch: pending_payment siparişleri paymentExpiresAt geçtiğinde
    * iptal eder. Eğer rezerv hâlâ tutuluyorsa (cron 30dk pas'ı kaçırdıysa) önce
    * onu serbest bırakır. Bağlı offer payment_expired olur.

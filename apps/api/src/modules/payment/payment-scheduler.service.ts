@@ -25,31 +25,63 @@ export class PaymentSchedulerService {
    * payments, then sweep any quantity=0 products to ensure pending offers/trades
    * are cancelled.
    */
+  /**
+   * Run a single scheduler step in isolation. A failure in one step (ör. eksik
+   * migration nedeniyle bir tablo/kolon yoksa) DİĞER adımları bloklamamalı —
+   * aksi halde örn. reconcilePendingPaytrPayments patlayınca
+   * releaseExpiredOrderReservations hiç çalışmaz ve rezervasyonlar takılı kalır.
+   */
+  private async runStep(name: string, fn: () => Promise<void>): Promise<void> {
+    try {
+      await fn();
+    } catch (error: any) {
+      this.logger.error(`Step "${name}" failed: ${error.message}`, error.stack);
+    }
+  }
+
   @Cron('*/5 * * * *') // Every 5 minutes
   async handleExpiredPayments() {
     this.logger.log('Checking for expired reservations and payments...');
 
-    try {
+    await this.runStep('reconcilePendingPaytrPayments', async () => {
       const reconcile = await this.paymentService.reconcilePendingPaytrPayments();
       if (reconcile.completed > 0) {
         this.logger.log(
           `PayTR reconcile: completed ${reconcile.completed} of ${reconcile.checked} checked payment(s)`,
         );
       }
+    });
+
+    await this.runStep('releaseExpiredOrderReservations', async () => {
       const released = await this.paymentService.releaseExpiredOrderReservations();
       if (released.count > 0) {
         this.logger.log(`Released ${released.count} expired order reservation(s)`);
       }
+    });
+
+    await this.runStep('reconcileReservedQuantities', async () => {
+      const recon = await this.paymentService.reconcileReservedQuantities();
+      if (recon.count > 0) {
+        this.logger.log(`Reconciled reservedQuantity drift on ${recon.count} product(s)`);
+      }
+    });
+
+    await this.runStep('expireUnpaidOrders', async () => {
       const expired = await this.paymentService.expireUnpaidOrders();
       if (expired.count > 0) {
         this.logger.log(`Expired ${expired.count} unpaid order(s) past 24h TTL`);
       }
+    });
+
+    await this.runStep('cancelExpiredPayments', async () => {
       const result = await this.paymentService.cancelExpiredPayments();
       if (result.count > 0) {
         this.logger.log(`Cancelled ${result.count} expired payment(s)`);
       }
+    });
 
-      // Safety net: sweep out-of-stock products and cancel lingering offers/trades
+    // Safety net: sweep out-of-stock products and cancel lingering offers/trades
+    await this.runStep('sweepOutOfStockProducts', async () => {
       const sweepResult = await this.productLockService.sweepOutOfStockProducts();
       if (sweepResult.offersCancelled > 0 || sweepResult.tradesCancelled > 0) {
         this.logger.log(
@@ -77,9 +109,7 @@ export class PaymentSchedulerService {
           }
         }
       }
-    } catch (error: any) {
-      this.logger.error(`Error in expired payments job: ${error.message}`, error.stack);
-    }
+    });
   }
 
   /**
