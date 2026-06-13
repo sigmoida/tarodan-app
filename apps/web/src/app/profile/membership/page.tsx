@@ -440,9 +440,10 @@ export default function MembershipPage() {
                 <div>
                   <h3 className="text-lg font-semibold text-heading">Otomatik Yenileme</h3>
                   <p className="text-sm text-muted mt-1">
-                    Açıkken üyeliğin bitiminde kayıtlı kartından (aylık/yıllık seçimine göre)
-                    otomatik yenilenir. Kapatırsan çekim yapılmaz. Kayıtlı kartın yoksa
-                    "Kart Ekle"den ekleyebilirsin.
+                    Etkinleştirildiğinde üyeliğiniz dönem sonunda, seçtiğiniz plana (aylık
+                    veya yıllık) göre kayıtlı kartınızdan otomatik olarak yenilenir. Devre dışı
+                    bırakırsanız herhangi bir ücret tahsil edilmez. Kayıtlı kartınız yoksa
+                    "Kart Ekle" ile ekleyebilirsiniz.
                   </p>
                 </div>
                 <button
