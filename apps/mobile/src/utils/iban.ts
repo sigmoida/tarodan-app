@@ -9,9 +9,25 @@ export function normalizeIban(raw: string): string {
   return (raw || '').replace(/\s/g, '').toUpperCase();
 }
 
-/** Backend regex'i ile birebir: TR + 24 rakam (toplam 26 karakter). */
+/** IBAN ISO 7064 mod-97 kontrolü: ilk 4 karakter sona alınır, harfler sayıya çevrilir, %97===1 olmalı. */
+function ibanMod97(iban: string): number {
+  const rearranged = iban.slice(4) + iban.slice(0, 4);
+  const expanded = rearranged.replace(/[A-Z]/g, (c) => (c.charCodeAt(0) - 55).toString());
+  let remainder = 0;
+  for (const digit of expanded) {
+    remainder = (remainder * 10 + Number(digit)) % 97;
+  }
+  return remainder;
+}
+
+/**
+ * Backend regex'i (TR + 24 rakam) + ISO mod-97 kontrol hanesi doğrulaması.
+ * Format doğru ama kontrol hanesi tutmuyorsa (typo) reddeder.
+ */
 export function isValidTrIban(raw: string): boolean {
-  return /^TR\d{24}$/.test(normalizeIban(raw));
+  const normalized = normalizeIban(raw);
+  if (!/^TR\d{24}$/.test(normalized)) return false;
+  return ibanMod97(normalized) === 1;
 }
 
 /** Girişte gösterim: normalize edip 4'erli bloklara böler. */

@@ -167,6 +167,8 @@ export class PayoutService {
               processedAt: new Date(),
             },
           });
+          // Başarılı transfer = IBAN gerçek ve çalışıyor → otomatik doğrula.
+          await this.syncBankAccountVerification(payout.sellerId, payout.transferIban, true);
           processed++;
           this.logger.log(
             `Payout ${payout.transId} completed: ${payout.netAmount} TL → ${payout.transferIban}`,
@@ -246,6 +248,8 @@ export class PayoutService {
               providerResponse: returned as any,
             },
           });
+          // Transfer geri döndü = IBAN sorunlu → doğrulamayı geri al.
+          await this.syncBankAccountVerification(transfer.sellerId, transfer.transferIban, false);
           updated++;
           this.logger.warn(`Payout ${transfer.transId} returned: ${returned.reason}`);
         }
@@ -255,6 +259,34 @@ export class PayoutService {
     } catch (error: any) {
       this.logger.error(`Check returned transfers failed: ${error.message}`);
       return 0;
+    }
+  }
+
+  /**
+   * Satıcının banka hesabının doğrulama durumunu payout sonucuna göre günceller.
+   * IBAN, transfer anındaki IBAN ile eşleşmiyorsa (satıcı sonradan değiştirmişse) dokunmaz.
+   */
+  private async syncBankAccountVerification(
+    sellerId: string,
+    transferIban: string,
+    verified: boolean,
+  ): Promise<void> {
+    if (!sellerId || !transferIban) return;
+    try {
+      const account = await this.prisma.sellerBankAccount.findUnique({
+        where: { userId: sellerId },
+      });
+      if (!account || account.iban !== transferIban) return;
+      if (account.isVerified === verified) return;
+      await this.prisma.sellerBankAccount.update({
+        where: { userId: sellerId },
+        data: { isVerified: verified, verifiedAt: verified ? new Date() : null },
+      });
+      this.logger.log(
+        `Bank account for seller ${sellerId} isVerified=${verified} (payout sonucu).`,
+      );
+    } catch (error: any) {
+      this.logger.error(`syncBankAccountVerification failed: ${error.message}`);
     }
   }
 

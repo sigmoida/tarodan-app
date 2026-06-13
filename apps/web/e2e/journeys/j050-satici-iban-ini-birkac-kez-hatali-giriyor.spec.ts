@@ -238,9 +238,9 @@ test.describe('J50-UI — IBAN sayfası UI akışı', () => {
     // Hata toastı görünmeli.
     await expect(page.getByText('Geçerli bir TR IBAN', { exact: false })).toBeVisible({ timeout: 8_000 });
 
-    // Geçerli IBAN gir (TR + 24 rakam, boşluklu → sayfa normalize eder).
+    // Geçerli IBAN gir (mod-97 checksum'ı geçen gerçek-format TR IBAN, boşluklu → sayfa normalize eder).
     await ibanInput.fill('');
-    await ibanInput.fill('TR12 0006 2000 0000 0000 0000 00');
+    await ibanInput.fill('TR33 0006 1005 1978 6457 8413 26');
 
     await saveBtn.click();
 

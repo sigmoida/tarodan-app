@@ -10,11 +10,16 @@ describe('normalizeIban', () => {
 });
 
 describe('isValidTrIban', () => {
-  it('accepts a 26-char TR IBAN with spaces', () => {
-    expect(isValidTrIban('TR12 0006 2000 0000 0000 0000 00')).toBe(true);
+  it('accepts a checksum-valid TR IBAN with spaces', () => {
+    expect(isValidTrIban('TR33 0006 1005 1978 6457 8413 26')).toBe(true);
   });
-  it('accepts a normalized 26-char TR IBAN', () => {
-    expect(isValidTrIban('TR120006200000000000000000')).toBe(true);
+  it('accepts a checksum-valid normalized TR IBAN', () => {
+    expect(isValidTrIban('TR330006100519786457841326')).toBe(true);
+  });
+  it('rejects a format-valid but checksum-invalid IBAN (typo)', () => {
+    expect(isValidTrIban('TR120006200000000000000000')).toBe(false);
+    // doğru IBAN'ın tek hanesi bozulmuş hali — mod-97 yakalar
+    expect(isValidTrIban('TR330006100519786457841327')).toBe(false);
   });
   it('rejects too-short IBAN', () => {
     expect(isValidTrIban('TR1200062000')).toBe(false);
