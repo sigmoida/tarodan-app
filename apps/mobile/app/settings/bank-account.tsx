@@ -173,10 +173,11 @@ export default function BankAccountScreen() {
                 testID="bank-account-iban-input"
                 label="IBAN *"
                 value={value}
-                onChangeText={(t) => onChange(formatIbanDisplay(t))}
+                onChangeText={(t) => onChange(formatIbanDisplay(normalizeIban(t).slice(0, 26)))}
                 error={errors.iban?.message}
                 placeholder="TR.. .... .... ...."
                 autoCapitalize="characters"
+                maxLength={32}
                 containerStyle={styles.input}
               />
             )}

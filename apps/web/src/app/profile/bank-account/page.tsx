@@ -3,8 +3,9 @@
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
+import Link from 'next/link';
 import { motion } from 'framer-motion';
-import { TrashIcon } from '@heroicons/react/24/outline';
+import { TrashIcon, ArrowLeftIcon } from '@heroicons/react/24/outline';
 import toast from 'react-hot-toast';
 import { bankAccountApi } from '@/lib/api';
 import { useAuthStore } from '@/stores/authStore';
@@ -114,6 +115,14 @@ export default function BankAccountPage() {
   return (
     <div className="min-h-screen bg-surface">
       <main className="max-w-2xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+        <Link
+          href="/profile"
+          className="inline-flex items-center gap-2 text-muted hover:text-primary-500 transition-colors mb-6 text-sm"
+        >
+          <ArrowLeftIcon className="w-4 h-4" />
+          Profilime Dön
+        </Link>
+
         <div className="mb-8">
           <h1 className="text-3xl font-bold mb-2">Banka Hesabı / IBAN</h1>
           <p className="text-muted">
@@ -162,9 +171,12 @@ export default function BankAccountPage() {
               <Input
                 type="text"
                 value={form.iban}
-                onChange={(e) => setForm({ ...form, iban: formatIbanDisplay(e.target.value) })}
+                onChange={(e) =>
+                  setForm({ ...form, iban: formatIbanDisplay(normalizeIban(e.target.value).slice(0, 26)) })
+                }
                 className="rounded font-mono"
                 placeholder="TR.. .... .... .... .... .... .."
+                inputMode="text"
                 required
               />
               <p className="text-xs text-muted mt-1">TR ile başlayan 26 karakterli IBAN</p>
