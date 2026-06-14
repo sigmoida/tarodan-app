@@ -1371,9 +1371,15 @@ export class AdminService {
     if (dto.oldPrice !== undefined) data.oldPrice = dto.oldPrice;
     if (dto.quantity !== undefined) {
       data.quantity = dto.quantity;
-      data.status = getProductStatusFromQuantity(dto.quantity);
-    } else if (dto.status !== undefined) {
+    }
+    // Açıkça seçilen status admin'in override'ı olarak öncelikli — aksi halde
+    // düzenleme formu quantity'yi de gönderdiğinden status her zaman miktardan
+    // türetilir ve stoklu ürün "Pasif"e alınamazdı. Status verilmediyse ve
+    // quantity değiştiyse, status'ü miktardan türet (0 → inactive).
+    if (dto.status !== undefined) {
       data.status = dto.status;
+    } else if (dto.quantity !== undefined) {
+      data.status = getProductStatusFromQuantity(dto.quantity);
     }
     if (dto.condition !== undefined) data.condition = dto.condition;
     if (dto.categoryId !== undefined) {
