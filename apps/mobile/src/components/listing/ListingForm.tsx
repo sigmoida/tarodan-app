@@ -749,10 +749,10 @@ export default function ListingForm({ mode, productId }: ListingFormProps) {
     setReactivating(true);
     try {
       await productsApi.update(productId!, { status: 'active', quantity: qty });
-      setStatus('active');
+      setStatus('pending');
       setQuantity(String(qty));
       invalidateListingCaches();
-      appAlert('Başarılı', 'Ürün yeniden satışa açıldı!');
+      appAlert('Başarılı', 'İlanınız incelemeye gönderildi. Onaylandığında yeniden yayına girer.');
     } catch (err: any) {
       const msg = err.response?.data?.message || 'Yeniden satışa açılamadı.';
       appAlert('Hata', msg);

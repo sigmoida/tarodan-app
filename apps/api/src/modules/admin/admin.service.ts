@@ -1437,6 +1437,16 @@ export class AdminService {
     await this.cache.del(`product:${productId}`);
     await this.cache.delPattern('products:list:*');
 
+    // Yeniden satışa açılan (eski sold/inactive) ilan onaylanıp yayına girince
+    // wishlist + son 7 gün stockout-cancelled alıcılara back-in-stock bildirimi
+    // gönder. Yeni ilanlarda wishlist boş olacağından zararsızdır. Bildirim
+    // hatası onayı bloke etmesin.
+    this.notificationService
+      .broadcastBackInStock(productId, product.title)
+      .catch((err) =>
+        this.logger.warn(`broadcastBackInStock failed for ${productId}: ${err?.message}`),
+      );
+
     return { success: true, productId, status: 'active' };
   }
 

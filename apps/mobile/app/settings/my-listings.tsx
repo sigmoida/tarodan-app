@@ -120,7 +120,7 @@ export default function MyListingsScreen() {
       queryClient.invalidateQueries({ queryKey: ['my-listings-stats'] });
       queryClient.invalidateQueries({ queryKey: ['user-stats'] });
       refreshUserData();
-      appAlert('Başarılı', 'İlan tekrar aktif edildi');
+      appAlert('Başarılı', 'İlan incelemeye gönderildi. Onaylandığında yeniden yayına girer.');
     },
     onError: () => {
       appAlert('Hata', 'İlan aktif edilemedi');
@@ -156,7 +156,7 @@ export default function MyListingsScreen() {
       queryClient.invalidateQueries({ queryKey: ['my-listings-stats'] });
       queryClient.invalidateQueries({ queryKey: ['user-stats'] });
       refreshUserData();
-      appAlert('Başarılı', 'İlan yeniden yayınlandı');
+      appAlert('Başarılı', 'İlan incelemeye gönderildi. Onaylandığında yeniden yayına girer.');
     },
     onError: () => {
       appAlert('Hata', 'İlan yeniden yayınlanamadı. İlan limitinizi kontrol edin.');

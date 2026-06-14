@@ -636,8 +636,8 @@ export default function EditListingPage() {
     setReactivating(true);
     try {
       await listingsApi.update(id, { status: 'active', quantity: qty } as any);
-      toast.success('Ürün yeniden satışa açıldı!');
-      router.push(`/listings/${id}`);
+      toast.success('İlanınız incelemeye gönderildi. Onaylandığında yeniden yayına girecek.');
+      router.push('/profile/listings');
     } catch (error: any) {
       toast.error(error.response?.data?.message || 'Yeniden satışa açılamadı');
     } finally {
@@ -743,12 +743,13 @@ export default function EditListingPage() {
     }
   };
 
+  // Satıcı doğrudan aktifleştiremez: istek admin onayına (pending) gider.
   const handleActivate = async () => {
     setIsLoading(true);
     try {
       await listingsApi.update(id, { status: 'active' } as any);
-      setFormData({ ...formData, status: 'active' });
-      toast.success('İlan aktif edildi');
+      setFormData({ ...formData, status: 'pending' });
+      toast.success('İlanınız incelemeye gönderildi. Onaylandığında yayına girecek.');
     } catch (error: any) {
       toast.error(error.response?.data?.message || 'İşlem başarısız');
     } finally {
@@ -816,7 +817,8 @@ export default function EditListingPage() {
                 {formData.status === 'sold' ? 'Bu ürün satılmış' : 'Bu ürün stokta yok'}
               </h2>
               <p className="text-sm text-warning-700 mb-4">
-                Yeniden satışa açmak için stok miktarı belirleyip aşağıdaki butonu kullanın.
+                Yeniden satışa açmak için stok miktarı belirleyin. İlanınız onaya
+                gönderilir; admin onayından sonra yeniden yayına girer.
               </p>
               <div className="flex items-end gap-3">
                 <div>
@@ -836,7 +838,7 @@ export default function EditListingPage() {
                   onClick={handleReactivate}
                   disabled={reactivating}
                 >
-                  {reactivating ? 'İşleniyor...' : 'Yeniden Satışa Aç'}
+                  {reactivating ? 'İşleniyor...' : 'Onaya Gönder'}
                 </Button>
               </div>
             </div>
@@ -1387,6 +1389,16 @@ export default function EditListingPage() {
                   >
                     🔒 İlanı Pasife Al
                   </Button>
+                ) : formData.status === 'pending' ? (
+                  <Button
+                    type="button"
+                    variant="secondary"
+                    size="lg"
+                    className="flex-1"
+                    disabled
+                  >
+                    ⏳ İnceleme Bekleniyor
+                  </Button>
                 ) : (
                   <Button
                     type="button"
@@ -1396,7 +1408,7 @@ export default function EditListingPage() {
                     onClick={handleActivate}
                     disabled={isLoading}
                   >
-                    ✅ İlanı Aktif Et
+                    📤 İncelemeye Gönder
                   </Button>
                 )}
                 <Button
@@ -1413,7 +1425,9 @@ export default function EditListingPage() {
               <p className="text-sm text-muted mt-2">
                 {formData.status === 'active'
                   ? 'Pasife alınan ilanlar listelemede görünmez ama silinmez.'
-                  : 'Aktif ilanlar listelemede görünür.'}
+                  : formData.status === 'pending'
+                    ? 'İlanınız onay bekliyor; admin onayından sonra yayına girer.'
+                    : 'İlanlar yayına girmeden önce admin onayından geçer.'}
               </p>
             </div>
           </form>

@@ -943,16 +943,35 @@ export class ProductService implements OnModuleInit {
     product: { status: ProductStatus; quantity: number | null },
     dto: UpdateProductDto,
   ): ProductStatus | undefined {
-    const status =
-      dto.status ?? (product.status === ProductStatus.rejected ? ProductStatus.pending : undefined);
+    const requested = dto.status;
     const newQuantity =
       dto.quantity !== undefined
         ? (dto.quantity === null ? null : Number(dto.quantity))
         : product.quantity;
-    if (newQuantity === 0 && (status ?? product.status) === ProductStatus.active) {
+
+    // Satıcı kendi ilanını pasife alabilir.
+    if (requested === ProductStatus.inactive) {
       return ProductStatus.inactive;
     }
-    return status;
+
+    // Reddedilen ürün düzenlenince otomatik yeniden incelemeye girer.
+    if (product.status === ProductStatus.rejected) {
+      return ProductStatus.pending;
+    }
+
+    // Satıcı DOĞRUDAN aktifleştiremez: aktif olmayan bir ilanı aktif etme isteği
+    // admin onayına (pending) yönlendirilir. Zaten aktif ilanda statü değişmez.
+    if (requested === ProductStatus.active && product.status !== ProductStatus.active) {
+      return ProductStatus.pending;
+    }
+
+    // Aktif ilanın stoğu 0'a düşerse otomatik pasif.
+    if (newQuantity === 0 && product.status === ProductStatus.active) {
+      return ProductStatus.inactive;
+    }
+
+    // Diğer tüm izinsiz/anlamsız statü istekleri yok sayılır (statü değişmez).
+    return undefined;
   }
 
   /**
@@ -989,32 +1008,35 @@ export class ProductService implements OnModuleInit {
       throw new BadRequestException('Rezerve edilmiş ürünler güncellenemez');
     }
 
-    // Sold or inactive (stok biten): only allow reactivation (status → active + quantity update)
+    // Sold or inactive (stok biten / pasife alınmış): satıcı yeniden satışa
+    // açmak isteyebilir ama DOĞRUDAN aktifleştiremez — istek admin onayına
+    // (pending) gider. Onaylanınca yayına girer. Stok girilmesi/var olması şart.
     if (product.status === ProductStatus.sold || product.status === ProductStatus.inactive) {
-      if (dto.status === ProductStatus.active && dto.quantity != null && Number(dto.quantity) > 0) {
+      if (dto.status === ProductStatus.active) {
+        const newQuantity =
+          dto.quantity != null ? Number(dto.quantity) : product.quantity;
+        if (newQuantity != null && newQuantity <= 0) {
+          throw new BadRequestException('Yeniden satışa açmak için stok miktarı belirleyin');
+        }
         await this.prisma.product.update({
           where: { id },
           data: {
-            status: ProductStatus.active,
-            quantity: Number(dto.quantity),
+            status: ProductStatus.pending,
+            ...(dto.quantity != null ? { quantity: Number(dto.quantity) } : {}),
           },
         });
         await this.cache.del(`products:detail:${id}`);
         await this.cache.delPattern('products:list:*');
-        // Stok geri geldi — wishlist + son 7 gün stockout-cancelled alıcılara
-        // back-in-stock bildirimi gönder. Hata atarsa kullanıcı reaktivasyonunu
-        // yine de başarılı say.
-        this.notificationService
-          .broadcastBackInStock(id, product.title)
-          .catch((err) =>
-            this.logger.warn(`broadcastBackInStock failed for ${id}: ${err?.message}`),
-          );
+        // NOT: back-in-stock bildirimi burada GÖNDERİLMEZ — ilan henüz yayında
+        // değil (pending). Bildirim, admin onayıyla active'e geçtiğinde gider.
         const updated = await this.prisma.product.findUnique({
           where: { id },
           include: { images: true, category: true, brand: true, carModel: true },
         });
         return updated;
       }
+      // status=active dışı bir istek (ör. sadece düzenleme) sold/inactive ilanda
+      // anlamsız; mevcut akışı korumak için yeniden satışa açma yönlendirmesi ver.
       throw new BadRequestException('Yeniden satışa açmak için stok miktarı belirleyin');
     }
 
@@ -1029,10 +1051,10 @@ export class ProductService implements OnModuleInit {
       }
     }
 
-    // Sellers can only set status to active or inactive
-    if (dto.status && dto.status !== ProductStatus.active && dto.status !== ProductStatus.inactive) {
-      throw new ForbiddenException('Sadece aktif veya pasif duruma geçirebilirsiniz');
-    }
+    // NOT: Statü politikası resolveUpdatedStatus()'te merkezi olarak uygulanır.
+    // Satıcı kendi ilanını DOĞRUDAN aktifleştiremez (aktivasyon isteği pending'e
+    // gider); yalnızca pasife alabilir. Geçersiz/izinsiz statü istekleri sessizce
+    // yok sayılır (mevcut statü korunur) — böylece düzenleme akışı kırılmaz.
 
     // Check membership for trade feature
     let canEnableTrade = false;
