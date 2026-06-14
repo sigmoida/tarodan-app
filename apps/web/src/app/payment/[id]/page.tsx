@@ -195,7 +195,7 @@ export default function PaymentPage() {
         // Use guest endpoint if guest checkout
         const response = isGuestCheckout
           ? await paymentsApi.getStatusLightGuest(paymentId)
-          : await paymentsApi.getStatus(paymentId);
+          : await paymentsApi.getStatusLight(paymentId);
         const paymentData = response.data;
 
         if (paymentData.status === "completed") {
