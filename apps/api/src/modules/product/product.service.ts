@@ -1008,6 +1008,12 @@ export class ProductService implements OnModuleInit {
       throw new BadRequestException('Rezerve edilmiş ürünler güncellenemez');
     }
 
+    // Silinen (yönetici tarafından kaldırılan) ürün düzenlenemez/yeniden açılamaz.
+    // "Pasife alma"dan AYRI bir durumdur; satıcı bunu geri getiremez.
+    if (product.status === ProductStatus.deleted) {
+      throw new BadRequestException('Bu ürün kaldırılmış ve yeniden açılamaz. Yeniden satmak için yeni ilan oluşturun.');
+    }
+
     // Sold or inactive (stok biten / pasife alınmış): satıcı yeniden satışa
     // açmak isteyebilir ama DOĞRUDAN aktifleştiremez — istek admin onayına
     // (pending) gider. Onaylanınca yayına girer. Stok girilmesi/var olması şart.
@@ -1552,10 +1558,12 @@ Bu ürünü istek listenizden kaldırmak için ürün sayfasına gidip "İstek L
       throw new BadRequestException('Satılmış veya rezerve edilmiş ürünler silinemez');
     }
 
-    // Soft delete: set status to inactive
+    // Soft delete: set status to deleted (pasiften AYRI state — silinen ürün
+    // yeniden aktive edilemez; "pasife alma"dan farklı). Tekrar satmak için
+    // satıcı yeni ilan açar.
     await this.prisma.product.update({
       where: { id },
-      data: { status: ProductStatus.inactive },
+      data: { status: ProductStatus.deleted },
     });
 
     // Invalidate cache
@@ -1618,8 +1626,9 @@ Bu ürünü istek listenizden kaldırmak için ürün sayfasına gidip "İstek L
       ...(status && status.trim() !== ''
         ? { status: status as ProductStatus }
         : {
-          // "Tümü": show all except draft (so sold, inactive, reserved, active, pending, rejected visible)
-          status: { notIn: [ProductStatus.draft] }
+          // "Tümü": draft ve deleted hariç hepsi (sold, inactive, reserved, active,
+          // pending, rejected görünür). Kaldırılan ürünler ayrı 'deleted' filtresinde.
+          status: { notIn: [ProductStatus.draft, ProductStatus.deleted] }
         }
       ),
       // Takas teklifine eklenebilir ürünler: aktif + aktif takasta değil + müsait stoğu var
@@ -2287,27 +2296,29 @@ Bu ürünü istek listenizden kaldırmak için ürün sayfasına gidip "İstek L
         throw new BadRequestException('Satıcı kimliği bulunamadı');
       }
 
-      // Get all listing counts by status (exclude inactive and draft)
-      const [pending, active, reserved, sold, rejected, inactive, total, all] = await Promise.all([
+      // Get all listing counts by status (exclude inactive, draft, deleted)
+      const [pending, active, reserved, sold, rejected, inactive, deleted, total, all] = await Promise.all([
         this.prisma.product.count({ where: { sellerId, status: ProductStatus.pending } }),
         this.prisma.product.count({ where: { sellerId, status: ProductStatus.active } }),
         this.prisma.product.count({ where: { sellerId, status: ProductStatus.reserved } }),
         this.prisma.product.count({ where: { sellerId, status: ProductStatus.sold } }),
         this.prisma.product.count({ where: { sellerId, status: ProductStatus.rejected } }),
         this.prisma.product.count({ where: { sellerId, status: ProductStatus.inactive } }),
-        // Total should exclude inactive and draft listings (limit/usage card uses this)
+        // Kaldırılan (yönetici/satıcı silmesi) — ayrı sayaç.
+        this.prisma.product.count({ where: { sellerId, status: ProductStatus.deleted } }),
+        // Total should exclude inactive, draft and deleted listings (limit/usage card uses this)
         this.prisma.product.count({
           where: {
             sellerId,
-            status: { notIn: [ProductStatus.inactive, ProductStatus.draft] }
+            status: { notIn: [ProductStatus.inactive, ProductStatus.draft, ProductStatus.deleted] }
           }
         }),
-        // "Tümü" sayacı: draft hariç her şey (inactive DAHİL). Liste "Tümü" filtresi
-        // (findSellerProducts: notIn[draft]) ve profil İlanlarım tile'ı ile birebir.
+        // "Tümü" sayacı: draft ve deleted hariç (inactive DAHİL). Liste "Tümü"
+        // filtresi (findSellerProducts: notIn[draft, deleted]) ile birebir.
         this.prisma.product.count({
           where: {
             sellerId,
-            status: { notIn: [ProductStatus.draft] }
+            status: { notIn: [ProductStatus.draft, ProductStatus.deleted] }
           }
         }),
       ]);
@@ -2333,8 +2344,9 @@ Bu ürünü istek listenizden kaldırmak için ürün sayfasına gidip "İstek L
           sold,
           rejected,
           inactive,
-          total, // Total excluding inactive and draft
-          all, // "Tümü": draft hariç hepsi (inactive dahil) — liste 'Tümü' ve profil tile ile aynı
+          deleted, // Kaldırılan (yönetici/satıcı silmesi) — ayrı state
+          total, // Total excluding inactive, draft and deleted
+          all, // "Tümü": draft ve deleted hariç (inactive dahil) — liste 'Tümü' ile aynı
           activeListings, // This counts against the limit
         },
         // Membership limits

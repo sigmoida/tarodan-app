@@ -26,7 +26,7 @@ export interface Listing {
   condition: string;
   category?: string;
   trade_available: boolean;
-  status: 'pending' | 'active' | 'sold' | 'inactive';
+  status: 'pending' | 'active' | 'sold' | 'inactive' | 'reserved' | 'rejected' | 'deleted';
   seller: User;
   created_at: string;
   updated_at: string;

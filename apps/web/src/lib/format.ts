@@ -107,6 +107,7 @@ export function formatProductStatus(status: string | null | undefined, locale: s
     'sold': { tr: 'Satıldı', en: 'Sold' },
     'inactive': { tr: 'Pasif', en: 'Inactive' },
     'rejected': { tr: 'Reddedildi', en: 'Rejected' },
+    'deleted': { tr: 'Kaldırıldı', en: 'Removed' },
   };
 
   const normalized = status.toLowerCase().trim();

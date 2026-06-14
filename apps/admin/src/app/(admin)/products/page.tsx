@@ -46,7 +46,7 @@ interface Product {
   originalPrice?: number | null;
   salePrice?: number | null;
   isOnSale?: boolean;
-  status: "pending" | "active" | "rejected" | "sold" | "inactive";
+  status: "pending" | "active" | "rejected" | "sold" | "inactive" | "reserved" | "deleted";
   condition: string;
   seller: {
     id: string;
@@ -619,7 +619,8 @@ export default function ProductsPage() {
           <option value="active">Aktif</option>
           <option value="rejected">Reddedilenler</option>
           <option value="sold">Satılanlar</option>
-          <option value="inactive">Silindi</option>
+          <option value="inactive">Pasif</option>
+          <option value="deleted">Kaldırılanlar</option>
         </Select>
       </FilterToolbar>
 

@@ -853,7 +853,17 @@ export default function EditListingPage() {
             </div>
           )}
 
-          <form onSubmit={handleSubmit} className="space-y-6" style={{ display: ['sold', 'reserved', 'inactive'].includes(formData.status) ? 'none' : undefined }}>
+          {formData.status === 'deleted' && (
+            <div className="mb-6 p-5 bg-danger-50 border border-danger-200 rounded-xl">
+              <h2 className="text-lg font-semibold text-danger-800 mb-2">Bu ürün kaldırıldı</h2>
+              <p className="text-sm text-danger-700">
+                Bu ürün yönetici tarafından kaldırılmış ve yeniden açılamaz. Tekrar satmak
+                için yeni bir ilan oluşturabilirsiniz.
+              </p>
+            </div>
+          )}
+
+          <form onSubmit={handleSubmit} className="space-y-6" style={{ display: ['sold', 'reserved', 'inactive', 'deleted'].includes(formData.status) ? 'none' : undefined }}>
             {/* Title */}
             <div>
               <label className="block text-sm font-medium text-body mb-2">

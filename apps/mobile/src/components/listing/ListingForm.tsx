@@ -1085,9 +1085,20 @@ export default function ListingForm({ mode, productId }: ListingFormProps) {
                 {reactivating ? (
                   <ActivityIndicator size="small" color={colors.white} />
                 ) : (
-                  <Text style={styles.submitButtonText}>Yeniden Satışa Aç</Text>
+                  <Text style={styles.submitButtonText}>Onaya Gönder</Text>
                 )}
               </TouchableOpacity>
+            </View>
+          )}
+
+          {/* Kaldırılmış ürün: düzenlenemez/yeniden açılamaz (yönetici kaldırması) */}
+          {isEdit && status === 'deleted' && (
+            <View style={[styles.card, styles.reactivateCard]}>
+              <Text style={styles.reactivateTitle}>Bu ürün kaldırıldı</Text>
+              <Text style={styles.hint}>
+                Bu ürün yönetici tarafından kaldırılmış ve yeniden açılamaz. Tekrar satmak
+                için yeni bir ilan oluşturabilirsiniz.
+              </Text>
             </View>
           )}
 

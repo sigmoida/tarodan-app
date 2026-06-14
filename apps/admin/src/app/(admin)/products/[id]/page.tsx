@@ -81,6 +81,7 @@ const statusConfig: Record<string, { label: string; color: string; bg: string }>
   rejected: { label: 'Reddedildi', color: 'text-danger-600', bg: 'bg-danger-100' },
   reserved: { label: 'Rezerve', color: 'text-info-600', bg: 'bg-info-100' },
   sold: { label: 'Satıldı', color: 'text-primary-600', bg: 'bg-primary-100' },
+  deleted: { label: 'Kaldırıldı', color: 'text-danger-600', bg: 'bg-danger-100' },
 };
 
 export default function ProductDetailPage() {

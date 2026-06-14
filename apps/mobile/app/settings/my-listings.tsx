@@ -30,7 +30,7 @@ interface Listing {
   id: string;
   title: string;
   price: number;
-  status: 'active' | 'pending' | 'sold' | 'inactive' | 'reserved' | 'rejected';
+  status: 'active' | 'pending' | 'sold' | 'inactive' | 'reserved' | 'rejected' | 'deleted';
   viewCount: number;
   likeCount?: number;
   images: Array<{ url: string }>;
@@ -42,7 +42,7 @@ interface Listing {
   boostedUntil?: string | null;
 }
 
-type FilterType = 'all' | 'active' | 'pending' | 'sold' | 'reserved' | 'inactive' | 'rejected';
+type FilterType = 'all' | 'active' | 'pending' | 'sold' | 'reserved' | 'inactive' | 'rejected' | 'deleted';
 
 export default function MyListingsScreen() {
   const { t } = useTranslation();
@@ -94,6 +94,7 @@ export default function MyListingsScreen() {
     reserved: statCounts.reserved ?? 0,
     rejected: statCounts.rejected ?? 0,
     inactive: statCounts.inactive ?? 0,
+    deleted: statCounts.deleted ?? 0,
   };
 
   // Deactivate listing mutation - Web ile aynı: PATCH /products/:id
@@ -196,6 +197,7 @@ export default function MyListingsScreen() {
       case 'rejected': return colors.danger[600]!;
       case 'reserved': return colors.primary[600]!;
       case 'inactive': return colors.text.subtle;
+      case 'deleted': return colors.danger[600]!;
       default: return colors.text.muted;
     }
   };
@@ -208,6 +210,7 @@ export default function MyListingsScreen() {
       case 'rejected': return 'Reddedildi';
       case 'reserved': return 'Rezerve';
       case 'inactive': return 'Deaktif';
+      case 'deleted': return 'Kaldırıldı';
       default: return status;
     }
   };
@@ -369,6 +372,12 @@ export default function MyListingsScreen() {
             variant={filter === 'rejected' ? 'primary' : 'neutral'}
             onPress={() => setFilter('rejected')}
           />
+          <Chip
+            label={`Kaldırılan (${counts.deleted})`}
+            selected={filter === 'deleted'}
+            variant={filter === 'deleted' ? 'primary' : 'neutral'}
+            onPress={() => setFilter('deleted')}
+          />
         </ScrollView>
       </View>
 
@@ -476,11 +485,13 @@ export default function MyListingsScreen() {
       >
         {actionMenuListing && (
           <View>
-            <Pressable style={styles.menuItem} onPress={() => handleMenuAction('view', actionMenuListing)}>
-              <Ionicons name="eye" size={20} color={colors.text.heading} />
-              <Text style={styles.menuItemText}>Görüntüle</Text>
-            </Pressable>
-            {actionMenuListing.status !== 'sold' && (
+            {actionMenuListing.status !== 'deleted' && (
+              <Pressable style={styles.menuItem} onPress={() => handleMenuAction('view', actionMenuListing)}>
+                <Ionicons name="eye" size={20} color={colors.text.heading} />
+                <Text style={styles.menuItemText}>Görüntüle</Text>
+              </Pressable>
+            )}
+            {actionMenuListing.status !== 'sold' && actionMenuListing.status !== 'deleted' && (
               <Pressable style={styles.menuItem} onPress={() => handleMenuAction('edit', actionMenuListing)}>
                 <Ionicons name="pencil" size={20} color={colors.text.heading} />
                 <Text style={styles.menuItemText}>Düzenle</Text>

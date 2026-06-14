@@ -118,7 +118,7 @@ interface Listing {
   quantity?: number | null;
   /** Müsait adet (quantity - reserved); teklif/takas rezervasyonu düşülmüş stok */
   availableQuantity?: number | null;
-  status?: "pending" | "active" | "reserved" | "sold" | "inactive" | "rejected";
+  status?: "pending" | "active" | "reserved" | "sold" | "inactive" | "rejected" | "deleted";
   sellerId?: string;
   seller?: {
     id: string;
@@ -1988,6 +1988,8 @@ export default function ListingDetailClient() {
                         t("product.statusInactive")}
                       {listing.status === "rejected" &&
                         t("product.statusRejected")}
+                      {listing.status === "deleted" &&
+                        (locale === "en" ? "Removed" : "Kaldırıldı")}
                     </p>
                     <p className="text-sm text-muted">
                       {listing.status === "reserved" &&

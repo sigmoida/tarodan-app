@@ -7740,19 +7740,20 @@ export class AdminService {
 
       return { success: true, productId, deleted: true };
     } else {
-      // Soft delete - set to inactive
+      // Soft delete - set to deleted (pasif/inactive'den AYRI state: yönetici
+      // kaldırması. Satıcı bunu yeniden aktive edemez; kendi pasifiyle karışmaz.)
       await this.prisma.product.update({
         where: { id: productId },
-        data: { status: ProductStatus.inactive },
+        data: { status: ProductStatus.deleted },
       });
 
       // Create audit log
       await this.createAuditLog(adminId, 'product_delete_soft', 'Product', productId, oldProduct, {
         ...oldProduct,
-        status: ProductStatus.inactive,
+        status: ProductStatus.deleted,
       });
 
-      return { success: true, productId, deleted: false, status: 'inactive' };
+      return { success: true, productId, deleted: false, status: 'deleted' };
     }
   }
 

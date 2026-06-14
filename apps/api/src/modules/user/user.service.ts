@@ -135,7 +135,7 @@ export class UserService {
     const listingCount = await this.prisma.product.count({
       where: {
         sellerId: id,
-        status: { notIn: [ProductStatus.inactive, ProductStatus.draft] },
+        status: { notIn: [ProductStatus.inactive, ProductStatus.draft, ProductStatus.deleted] },
       },
     });
 
@@ -792,7 +792,7 @@ export class UserService {
 
     // İlan/koleksiyon sayımı viewer'a göre değişir (sahip → tümü, başkası → görünür olanlar).
     const listingWhere = isOwner
-      ? { sellerId: userId, status: { notIn: ['draft'] } as any }
+      ? { sellerId: userId, status: { notIn: ['draft', 'deleted'] } as any }
       : { sellerId: userId, status: 'active' };
     const collectionWhere = isOwner
       ? { userId }
@@ -1127,7 +1127,7 @@ export class UserService {
         },
       }),
       this.prisma.product.count({
-        where: { sellerId: userId, status: { notIn: ['draft'] } },
+        where: { sellerId: userId, status: { notIn: ['draft', 'deleted'] } },
       }),
       // Gerçekten satılabilir aktif ilan = active VE ödenmiş satış siparişi YOK
       this.prisma.product.count({
@@ -1141,7 +1141,7 @@ export class UserService {
       this.prisma.product.count({
         where: {
           sellerId: userId,
-          status: { notIn: ['draft'] },
+          status: { notIn: ['draft', 'deleted'] },
           orders: { some: { status: { in: [...PAID_STATUSES] } } },
         },
       }),
@@ -1595,12 +1595,12 @@ export class UserService {
       recentViews,
       recentLikes,
     ] = await Promise.all([
-      // Total products excluding inactive and draft
-      this.prisma.product.count({ 
-        where: { 
+      // Total products excluding inactive, draft and deleted
+      this.prisma.product.count({
+        where: {
           sellerId: userId,
-          status: { notIn: ['inactive', 'draft'] }
-        } 
+          status: { notIn: ['inactive', 'draft', 'deleted'] }
+        }
       }),
       this.prisma.product.count({ where: { sellerId: userId, status: 'active' } }),
       this.prisma.product.aggregate({
