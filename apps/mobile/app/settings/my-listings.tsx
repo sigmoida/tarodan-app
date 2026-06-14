@@ -83,6 +83,9 @@ export default function MyListingsScreen() {
     retry: 1,
   });
   const statCounts = (statsResp?.data as any)?.counts ?? {};
+  // İlan kotası tek doğru kaynaktan: GET /products/my/stats summary.
+  // used = aktif+beklemede+rezerve (satılan/pasif sayılmaz), max = maxTotalListings, canCreate = sunucu kararı.
+  const quotaSummary = (statsResp?.data as any)?.summary;
   const counts = {
     all: statCounts.all ?? 0,
     active: statCounts.active ?? 0,
@@ -236,8 +239,8 @@ export default function MyListingsScreen() {
         setBoostListing(listing);
         break;
       case 'relist':
-        // Check listing limit before relisting
-        if (limits?.maxListings !== -1 && (user?.listingCount || 0) >= (limits?.maxListings || 10)) {
+        // Check listing limit before relisting — sunucu kotası (aktif sayım) baz alınır.
+        if (quotaSummary?.canCreate === false) {
           appAlert(
             'İlan Limiti',
             'İlan limitinize ulaştınız. Yeniden yayınlamak için Premium üyeliğe geçin.',
@@ -270,9 +273,11 @@ export default function MyListingsScreen() {
     return Math.ceil(diff / (1000 * 60 * 60 * 24));
   };
 
-  const listingLimit = limits?.maxListings || 10;
-  const currentCount = user?.listingCount || listings.filter(l => l.status === 'active' || l.status === 'pending').length;
-  const canCreateNew = listingLimit === -1 || currentCount < listingLimit;
+  const listingLimit = quotaSummary?.max ?? (limits?.maxListings || 10);
+  const currentCount =
+    quotaSummary?.used ??
+    listings.filter((l) => l.status === 'active' || l.status === 'pending' || l.status === 'reserved').length;
+  const canCreateNew = quotaSummary?.canCreate ?? (listingLimit === -1 || currentCount < listingLimit);
 
   const progressColor =
     listingLimit === -1

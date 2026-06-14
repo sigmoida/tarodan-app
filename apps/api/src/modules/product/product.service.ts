@@ -2318,10 +2318,11 @@ Bu ürünü istek listenizden kaldırmak için ürün sayfasına gidip "İstek L
       // Get membership limits
       const limits = await this.membershipService.getUserLimits(sellerId);
 
-      // For free tier, use maxFreeListings (which includes platform setting override)
-      // For other tiers, use maxTotalListings
-      const maxLimit = limits.tierType === MembershipTierType.free ? limits.maxFreeListings : limits.maxTotalListings;
-      const remainingLimit = limits.tierType === MembershipTierType.free ? limits.remainingFreeListings : limits.remainingTotalListings;
+      // İlan hakkı = maxTotalListings (tüm tier'lar için). Gösterim = uygulama:
+      // canCreateListing zaten remainingTotalListings'e dayanıyor, bu yüzden
+      // gösterilen "X/Y" ile engelleme aynı sayıyı kullanır. (free=10)
+      const maxLimit = limits.maxTotalListings;
+      const remainingLimit = limits.remainingTotalListings;
 
       return {
         // Counts by status

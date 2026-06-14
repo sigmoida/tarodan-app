@@ -489,19 +489,18 @@ export default function ListingForm({ mode, productId }: ListingFormProps) {
         remainingListings: remaining,
       });
     } catch {
+      // Stats çekilemezse: yanıltıcı sayı GÖSTERME ve kullanıcıyı BLOKLAMA.
+      // (user.listingCount ömür-boyu toplamdır, kotayı yanlış şişirir.) Sunucu POST'ta zaten doğrular.
       const membershipTier = user?.membershipTier || 'free';
-      const count = user?.listingCount || 0;
-      const max = limits?.maxListings ?? 10;
       const isPremium = membershipTier === 'premium' || membershipTier === 'business';
-      const isUnlimited = max === -1;
 
       setListingLimits({
-        currentCount: count,
-        maxListings: isUnlimited ? -1 : max,
-        canCreateListing: isUnlimited || count < max,
+        currentCount: 0,
+        maxListings: -1,
+        canCreateListing: true,
         isPremium,
         membershipTier,
-        remainingListings: isUnlimited ? -1 : max - count,
+        remainingListings: -1,
       });
     } finally {
       setLimitsLoading(false);

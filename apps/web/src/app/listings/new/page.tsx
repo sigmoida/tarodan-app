@@ -379,21 +379,19 @@ export default function NewListingPage() {
     } catch (error: any) {
       if (process.env.NODE_ENV === "development")
         console.error("Failed to update listing limits:", error);
-      // Fallback to auth store data
+      // Stats çekilemezse: yanıltıcı sayı GÖSTERME ve kullanıcıyı BLOKLAMA.
+      // (user.listingCount ömür-boyu toplamdır, kotayı yanlış şişirir.) Sunucu POST'ta zaten doğrular.
       const membershipTier = user?.membershipTier || "free";
-      const currentCount = user?.listingCount || 0;
-      const maxListings = limits?.maxListings ?? 10;
       const isPremium =
         membershipTier === "premium" || membershipTier === "business";
-      const isUnlimited = maxListings === -1;
 
       setListingLimits({
-        currentCount,
-        maxListings: isUnlimited ? -1 : maxListings,
-        canCreateListing: isUnlimited || currentCount < maxListings,
+        currentCount: 0,
+        maxListings: -1,
+        canCreateListing: true,
         isPremium,
         membershipTier,
-        remainingListings: isUnlimited ? -1 : maxListings - currentCount,
+        remainingListings: -1,
       });
     } finally {
       setLimitsLoading(false);
