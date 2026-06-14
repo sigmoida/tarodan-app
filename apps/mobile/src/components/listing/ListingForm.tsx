@@ -19,12 +19,12 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import * as ImagePicker from 'expo-image-picker';
 import { router } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
-import { useQueryClient } from '@tanstack/react-query';
+import { useQueryClient, useQuery } from '@tanstack/react-query';
 import { theme, DateField, appAlert } from '@tarodan/ui-native';
 
 const { colors } = theme;
 import { useAuthStore } from '../../stores/authStore';
-import { api, productsApi, categoriesApi } from '../../services/api';
+import { api, productsApi, categoriesApi, bankAccountApi } from '../../services/api';
 
 // ---------------------------------------------------------------------------
 // Types
@@ -118,6 +118,16 @@ const YEAR_OPTIONS = Array.from({ length: currentYear - 1950 + 1 }, (_, i) => cu
 export default function ListingForm({ mode, productId }: ListingFormProps) {
   const isEdit = mode === 'edit';
   const queryClient = useQueryClient();
+
+  const bankAccountQuery = useQuery({
+    queryKey: ['bank-account'],
+    queryFn: async () => {
+      const res = await bankAccountApi.get();
+      return res.data || null;
+    },
+    enabled: !isEdit,
+  });
+  const hasBankAccount = isEdit || !!bankAccountQuery.data;
 
   const {
     isAuthenticated,
@@ -479,19 +489,18 @@ export default function ListingForm({ mode, productId }: ListingFormProps) {
         remainingListings: remaining,
       });
     } catch {
+      // Stats çekilemezse: yanıltıcı sayı GÖSTERME ve kullanıcıyı BLOKLAMA.
+      // (user.listingCount ömür-boyu toplamdır, kotayı yanlış şişirir.) Sunucu POST'ta zaten doğrular.
       const membershipTier = user?.membershipTier || 'free';
-      const count = user?.listingCount || 0;
-      const max = limits?.maxListings ?? 10;
       const isPremium = membershipTier === 'premium' || membershipTier === 'business';
-      const isUnlimited = max === -1;
 
       setListingLimits({
-        currentCount: count,
-        maxListings: isUnlimited ? -1 : max,
-        canCreateListing: isUnlimited || count < max,
+        currentCount: 0,
+        maxListings: -1,
+        canCreateListing: true,
         isPremium,
         membershipTier,
-        remainingListings: isUnlimited ? -1 : max - count,
+        remainingListings: -1,
       });
     } finally {
       setLimitsLoading(false);
@@ -646,6 +655,18 @@ export default function ListingForm({ mode, productId }: ListingFormProps) {
   const handleSubmit = async () => {
     if (!validate()) return;
 
+    if (!isEdit && !hasBankAccount) {
+      appAlert(
+        'Banka Hesabı Gerekli',
+        "İlan vermeden önce IBAN bilgilerinizi eklemelisiniz. Satışlarınızdan elde edeceğiniz tutar bu IBAN'a aktarılır.",
+        [
+          { text: 'Vazgeç', style: 'cancel' },
+          { text: 'IBAN Ekle', onPress: () => router.push('/settings/bank-account') },
+        ],
+      );
+      return;
+    }
+
     if (!isEdit && listingLimits && !listingLimits.canCreateListing) {
       appAlert(
         'Limit Aşıldı',
@@ -727,10 +748,10 @@ export default function ListingForm({ mode, productId }: ListingFormProps) {
     setReactivating(true);
     try {
       await productsApi.update(productId!, { status: 'active', quantity: qty });
-      setStatus('active');
+      setStatus('pending');
       setQuantity(String(qty));
       invalidateListingCaches();
-      appAlert('Başarılı', 'Ürün yeniden satışa açıldı!');
+      appAlert('Başarılı', 'İlanınız incelemeye gönderildi. Onaylandığında yeniden yayına girer.');
     } catch (err: any) {
       const msg = err.response?.data?.message || 'Yeniden satışa açılamadı.';
       appAlert('Hata', msg);
@@ -965,6 +986,22 @@ export default function ListingForm({ mode, productId }: ListingFormProps) {
             </>
           )}
 
+          {/* Bank Account Banner (create only) */}
+          {!isEdit && !bankAccountQuery.isLoading && !hasBankAccount && (
+            <View style={styles.ibanBanner}>
+              <Text style={styles.ibanBannerTitle}>İlan vermeden önce banka hesabı ekleyin</Text>
+              <Text style={styles.ibanBannerBody}>
+                Satışlarınızdan elde edeceğiniz tutarın aktarılabilmesi için IBAN gereklidir.
+              </Text>
+              <TouchableOpacity
+                style={styles.ibanBannerButton}
+                onPress={() => router.push('/settings/bank-account')}
+              >
+                <Text style={styles.ibanBannerButtonText}>IBAN Ekle</Text>
+              </TouchableOpacity>
+            </View>
+          )}
+
           {/* Listing Limits (create only) */}
           {!isEdit && limitsLoading ? (
             <View style={styles.limitsPlaceholder}>
@@ -1048,9 +1085,20 @@ export default function ListingForm({ mode, productId }: ListingFormProps) {
                 {reactivating ? (
                   <ActivityIndicator size="small" color={colors.white} />
                 ) : (
-                  <Text style={styles.submitButtonText}>Yeniden Satışa Aç</Text>
+                  <Text style={styles.submitButtonText}>Onaya Gönder</Text>
                 )}
               </TouchableOpacity>
+            </View>
+          )}
+
+          {/* Kaldırılmış ürün: düzenlenemez/yeniden açılamaz (yönetici kaldırması) */}
+          {isEdit && status === 'deleted' && (
+            <View style={[styles.card, styles.reactivateCard]}>
+              <Text style={styles.reactivateTitle}>Bu ürün kaldırıldı</Text>
+              <Text style={styles.hint}>
+                Bu ürün yönetici tarafından kaldırılmış ve yeniden açılamaz. Tekrar satmak
+                için yeni bir ilan oluşturabilirsiniz.
+              </Text>
             </View>
           )}
 
@@ -1654,6 +1702,39 @@ const styles = StyleSheet.create({
   },
 
   // Limits
+  ibanBanner: {
+    margin: 16,
+    marginBottom: 0,
+    padding: 16,
+    backgroundColor: colors.warning[50] ?? '#fffbeb',
+    borderRadius: 10,
+    borderWidth: 1,
+    borderColor: colors.warning[300] ?? '#fcd34d',
+  },
+  ibanBannerTitle: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: colors.warning[800] ?? '#92400e',
+    marginBottom: 4,
+  },
+  ibanBannerBody: {
+    fontSize: 13,
+    color: colors.warning[700] ?? '#b45309',
+    marginBottom: 10,
+    lineHeight: 18,
+  },
+  ibanBannerButton: {
+    backgroundColor: colors.warning[600] ?? '#d97706',
+    borderRadius: 8,
+    paddingVertical: 8,
+    paddingHorizontal: 16,
+    alignSelf: 'flex-start',
+  },
+  ibanBannerButtonText: {
+    color: colors.white,
+    fontWeight: '600',
+    fontSize: 14,
+  },
   limitsPlaceholder: {
     backgroundColor: colors.gray[200],
     borderRadius: 10,

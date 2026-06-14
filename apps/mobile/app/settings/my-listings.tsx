@@ -30,7 +30,7 @@ interface Listing {
   id: string;
   title: string;
   price: number;
-  status: 'active' | 'pending' | 'sold' | 'inactive' | 'reserved' | 'rejected';
+  status: 'active' | 'pending' | 'sold' | 'inactive' | 'reserved' | 'rejected' | 'deleted';
   viewCount: number;
   likeCount?: number;
   images: Array<{ url: string }>;
@@ -42,7 +42,7 @@ interface Listing {
   boostedUntil?: string | null;
 }
 
-type FilterType = 'all' | 'active' | 'pending' | 'sold' | 'reserved' | 'inactive' | 'rejected';
+type FilterType = 'all' | 'active' | 'pending' | 'sold' | 'reserved' | 'inactive' | 'rejected' | 'deleted';
 
 export default function MyListingsScreen() {
   const { t } = useTranslation();
@@ -83,6 +83,9 @@ export default function MyListingsScreen() {
     retry: 1,
   });
   const statCounts = (statsResp?.data as any)?.counts ?? {};
+  // İlan kotası tek doğru kaynaktan: GET /products/my/stats summary.
+  // used = aktif+beklemede+rezerve (satılan/pasif sayılmaz), max = maxTotalListings, canCreate = sunucu kararı.
+  const quotaSummary = (statsResp?.data as any)?.summary;
   const counts = {
     all: statCounts.all ?? 0,
     active: statCounts.active ?? 0,
@@ -91,6 +94,7 @@ export default function MyListingsScreen() {
     reserved: statCounts.reserved ?? 0,
     rejected: statCounts.rejected ?? 0,
     inactive: statCounts.inactive ?? 0,
+    deleted: statCounts.deleted ?? 0,
   };
 
   // Deactivate listing mutation - Web ile aynı: PATCH /products/:id
@@ -120,7 +124,7 @@ export default function MyListingsScreen() {
       queryClient.invalidateQueries({ queryKey: ['my-listings-stats'] });
       queryClient.invalidateQueries({ queryKey: ['user-stats'] });
       refreshUserData();
-      appAlert('Başarılı', 'İlan tekrar aktif edildi');
+      appAlert('Başarılı', 'İlan incelemeye gönderildi. Onaylandığında yeniden yayına girer.');
     },
     onError: () => {
       appAlert('Hata', 'İlan aktif edilemedi');
@@ -156,7 +160,7 @@ export default function MyListingsScreen() {
       queryClient.invalidateQueries({ queryKey: ['my-listings-stats'] });
       queryClient.invalidateQueries({ queryKey: ['user-stats'] });
       refreshUserData();
-      appAlert('Başarılı', 'İlan yeniden yayınlandı');
+      appAlert('Başarılı', 'İlan incelemeye gönderildi. Onaylandığında yeniden yayına girer.');
     },
     onError: () => {
       appAlert('Hata', 'İlan yeniden yayınlanamadı. İlan limitinizi kontrol edin.');
@@ -193,6 +197,7 @@ export default function MyListingsScreen() {
       case 'rejected': return colors.danger[600]!;
       case 'reserved': return colors.primary[600]!;
       case 'inactive': return colors.text.subtle;
+      case 'deleted': return colors.danger[600]!;
       default: return colors.text.muted;
     }
   };
@@ -205,6 +210,7 @@ export default function MyListingsScreen() {
       case 'rejected': return 'Reddedildi';
       case 'reserved': return 'Rezerve';
       case 'inactive': return 'Deaktif';
+      case 'deleted': return 'Kaldırıldı';
       default: return status;
     }
   };
@@ -236,8 +242,8 @@ export default function MyListingsScreen() {
         setBoostListing(listing);
         break;
       case 'relist':
-        // Check listing limit before relisting
-        if (limits?.maxListings !== -1 && (user?.listingCount || 0) >= (limits?.maxListings || 10)) {
+        // Check listing limit before relisting — sunucu kotası (aktif sayım) baz alınır.
+        if (quotaSummary?.canCreate === false) {
           appAlert(
             'İlan Limiti',
             'İlan limitinize ulaştınız. Yeniden yayınlamak için Premium üyeliğe geçin.',
@@ -270,9 +276,11 @@ export default function MyListingsScreen() {
     return Math.ceil(diff / (1000 * 60 * 60 * 24));
   };
 
-  const listingLimit = limits?.maxListings || 10;
-  const currentCount = user?.listingCount || listings.filter(l => l.status === 'active' || l.status === 'pending').length;
-  const canCreateNew = listingLimit === -1 || currentCount < listingLimit;
+  const listingLimit = quotaSummary?.max ?? (limits?.maxListings || 10);
+  const currentCount =
+    quotaSummary?.used ??
+    listings.filter((l) => l.status === 'active' || l.status === 'pending' || l.status === 'reserved').length;
+  const canCreateNew = quotaSummary?.canCreate ?? (listingLimit === -1 || currentCount < listingLimit);
 
   const progressColor =
     listingLimit === -1
@@ -363,6 +371,12 @@ export default function MyListingsScreen() {
             selected={filter === 'rejected'}
             variant={filter === 'rejected' ? 'primary' : 'neutral'}
             onPress={() => setFilter('rejected')}
+          />
+          <Chip
+            label={`Kaldırılan (${counts.deleted})`}
+            selected={filter === 'deleted'}
+            variant={filter === 'deleted' ? 'primary' : 'neutral'}
+            onPress={() => setFilter('deleted')}
           />
         </ScrollView>
       </View>
@@ -471,11 +485,13 @@ export default function MyListingsScreen() {
       >
         {actionMenuListing && (
           <View>
-            <Pressable style={styles.menuItem} onPress={() => handleMenuAction('view', actionMenuListing)}>
-              <Ionicons name="eye" size={20} color={colors.text.heading} />
-              <Text style={styles.menuItemText}>Görüntüle</Text>
-            </Pressable>
-            {actionMenuListing.status !== 'sold' && (
+            {actionMenuListing.status !== 'deleted' && (
+              <Pressable style={styles.menuItem} onPress={() => handleMenuAction('view', actionMenuListing)}>
+                <Ionicons name="eye" size={20} color={colors.text.heading} />
+                <Text style={styles.menuItemText}>Görüntüle</Text>
+              </Pressable>
+            )}
+            {actionMenuListing.status !== 'sold' && actionMenuListing.status !== 'deleted' && (
               <Pressable style={styles.menuItem} onPress={() => handleMenuAction('edit', actionMenuListing)}>
                 <Ionicons name="pencil" size={20} color={colors.text.heading} />
                 <Text style={styles.menuItemText}>Düzenle</Text>

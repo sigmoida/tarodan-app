@@ -44,6 +44,7 @@ import {
   wishlistApi,
   collectionsApi,
   offersApi,
+  userApi,
   api,
 } from "@/lib/api";
 import { formatCondition } from "@/lib/format";
@@ -117,7 +118,7 @@ interface Listing {
   quantity?: number | null;
   /** Müsait adet (quantity - reserved); teklif/takas rezervasyonu düşülmüş stok */
   availableQuantity?: number | null;
-  status?: "pending" | "active" | "reserved" | "sold" | "inactive" | "rejected";
+  status?: "pending" | "active" | "reserved" | "sold" | "inactive" | "rejected" | "deleted";
   sellerId?: string;
   seller?: {
     id: string;
@@ -226,7 +227,20 @@ export default function ListingDetailClient() {
   const listingQuery = useQuery({
     queryKey: ["listing", id],
     queryFn: async (): Promise<Listing> => {
-      const response = await listingsApi.getOne(id);
+      let response;
+      try {
+        response = await listingsApi.getOne(id);
+      } catch (err: any) {
+        // Public uç pending / pasif (stoklu) ilanı döndürmez. Sahibi kendi
+        // ilanını yine de görebilsin: owner ucuna düş. Sahip değilse/giriş yoksa
+        // bu da hata verir ve "İlan bulunamadı" gösterilir.
+        const sts = err?.response?.status;
+        if (sts === 404 || sts === 403) {
+          response = await userApi.getMyProductById(id);
+        } else {
+          throw err;
+        }
+      }
       const productData = response.data.product || response.data;
       if (!viewCountedRef.current) {
         viewCountedRef.current = true;
@@ -1974,6 +1988,8 @@ export default function ListingDetailClient() {
                         t("product.statusInactive")}
                       {listing.status === "rejected" &&
                         t("product.statusRejected")}
+                      {listing.status === "deleted" &&
+                        (locale === "en" ? "Removed" : "Kaldırıldı")}
                     </p>
                     <p className="text-sm text-muted">
                       {listing.status === "reserved" &&

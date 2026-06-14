@@ -14,7 +14,7 @@ import {
   TagIcon,
   ArrowsRightLeftIcon,
   MapPinIcon,
-  CreditCardIcon,
+  BanknotesIcon,
   ChartBarIcon,
   StarIcon,
   CheckBadgeIcon,
@@ -376,7 +376,7 @@ export default function ProfilePage() {
       items: [
         { icon: UserCircleIcon, label: t('profile.editProfile'), href: '/profile/edit', desc: 'Profil bilgilerinizi düzenleyin' },
         { icon: MapPinIcon, label: t('address.myAddresses'), href: '/profile/addresses', desc: 'Teslimat adresleriniz' },
-        { icon: CreditCardIcon, label: t('payment.paymentMethods'), href: '/payment-methods', desc: 'Kayıtlı kartlarınız' },
+        { icon: BanknotesIcon, label: 'Banka Hesabı / IBAN', href: '/profile/bank-account', desc: 'Ödemeleriniz bu IBAN\'a aktarılır' },
         { icon: ClockIcon, label: t('payment.history'), href: '/profile/payments', desc: 'Ödeme geçmişiniz' },
         { icon: BellIcon, label: t('nav.notifications'), href: '/notifications', desc: 'Bildirim ayarları' },
         { icon: ShieldCheckIcon, label: 'Güvenlik', href: '/profile/change-password', desc: 'Şifre ve güvenlik ayarları' },

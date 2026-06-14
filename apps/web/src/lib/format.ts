@@ -107,6 +107,7 @@ export function formatProductStatus(status: string | null | undefined, locale: s
     'sold': { tr: 'Satıldı', en: 'Sold' },
     'inactive': { tr: 'Pasif', en: 'Inactive' },
     'rejected': { tr: 'Reddedildi', en: 'Rejected' },
+    'deleted': { tr: 'Kaldırıldı', en: 'Removed' },
   };
 
   const normalized = status.toLowerCase().trim();
@@ -170,6 +171,13 @@ export function formatTradeStatus(status: string | null | undefined, locale: str
     'both_shipped': { tr: 'Her İki Taraf Kargoda', en: 'Both Shipped' },
     'initiator_received': { tr: 'Gönderen Teslim Aldı', en: 'Initiator Received' },
     'receiver_received': { tr: 'Alıcı Teslim Aldı', en: 'Receiver Received' },
+    // Escrow / güvenli takas statüleri
+    'awaiting_payment': { tr: 'Ödeme Bekleniyor', en: 'Awaiting Payment' },
+    'shipping_to_warehouse': { tr: 'Depoya Gönderiliyor', en: 'Shipping to Warehouse' },
+    'at_warehouse': { tr: 'Depoda', en: 'At Warehouse' },
+    'admin_reviewing': { tr: 'İnceleniyor', en: 'Under Review' },
+    'shipping_to_recipients': { tr: 'Alıcılara Gönderiliyor', en: 'Shipping to Recipients' },
+    'returning': { tr: 'İade Ediliyor', en: 'Returning' },
     'disputed': { tr: 'Anlaşmazlık', en: 'Disputed' },
   };
 

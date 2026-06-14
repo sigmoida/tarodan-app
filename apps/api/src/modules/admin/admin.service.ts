@@ -1373,9 +1373,15 @@ export class AdminService {
     if (dto.oldPrice !== undefined) data.oldPrice = dto.oldPrice;
     if (dto.quantity !== undefined) {
       data.quantity = dto.quantity;
-      data.status = getProductStatusFromQuantity(dto.quantity);
-    } else if (dto.status !== undefined) {
+    }
+    // Açıkça seçilen status admin'in override'ı olarak öncelikli — aksi halde
+    // düzenleme formu quantity'yi de gönderdiğinden status her zaman miktardan
+    // türetilir ve stoklu ürün "Pasif"e alınamazdı. Status verilmediyse ve
+    // quantity değiştiyse, status'ü miktardan türet (0 → inactive).
+    if (dto.status !== undefined) {
       data.status = dto.status;
+    } else if (dto.quantity !== undefined) {
+      data.status = getProductStatusFromQuantity(dto.quantity);
     }
     if (dto.condition !== undefined) data.condition = dto.condition;
     if (dto.categoryId !== undefined) {
@@ -1432,6 +1438,16 @@ export class AdminService {
     // Invalidate product cache so the product appears in listings
     await this.cache.del(`product:${productId}`);
     await this.cache.delPattern('products:list:*');
+
+    // Yeniden satışa açılan (eski sold/inactive) ilan onaylanıp yayına girince
+    // wishlist + son 7 gün stockout-cancelled alıcılara back-in-stock bildirimi
+    // gönder. Yeni ilanlarda wishlist boş olacağından zararsızdır. Bildirim
+    // hatası onayı bloke etmesin.
+    this.notificationService
+      .broadcastBackInStock(productId, product.title)
+      .catch((err) =>
+        this.logger.warn(`broadcastBackInStock failed for ${productId}: ${err?.message}`),
+      );
 
     return { success: true, productId, status: 'active' };
   }
@@ -7824,19 +7840,20 @@ export class AdminService {
 
       return { success: true, productId, deleted: true };
     } else {
-      // Soft delete - set to inactive
+      // Soft delete - set to deleted (pasif/inactive'den AYRI state: yönetici
+      // kaldırması. Satıcı bunu yeniden aktive edemez; kendi pasifiyle karışmaz.)
       await this.prisma.product.update({
         where: { id: productId },
-        data: { status: ProductStatus.inactive },
+        data: { status: ProductStatus.deleted },
       });
 
       // Create audit log
       await this.createAuditLog(adminId, 'product_delete_soft', 'Product', productId, oldProduct, {
         ...oldProduct,
-        status: ProductStatus.inactive,
+        status: ProductStatus.deleted,
       });
 
-      return { success: true, productId, deleted: false, status: 'inactive' };
+      return { success: true, productId, deleted: false, status: 'deleted' };
     }
   }
 

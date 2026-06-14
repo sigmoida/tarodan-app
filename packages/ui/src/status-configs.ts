@@ -102,6 +102,7 @@ export const productStatusConfig: Record<string, StatusConfig> = {
   sold: { label: 'Satıldı', variant: 'info' },
   reserved: { label: 'Rezerve', variant: 'info' },
   rejected: { label: 'Reddedildi', variant: 'danger' },
+  deleted: { label: 'Kaldırıldı', variant: 'danger' },
 };
 
 /**

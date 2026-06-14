@@ -11,7 +11,7 @@ import {
   ArrowLeftIcon,
 } from '@heroicons/react/24/outline';
 import toast from 'react-hot-toast';
-import { Button, Checkbox, Input, Spinner } from '@tarodan/ui';
+import { Button, Checkbox, Spinner } from '@tarodan/ui';
 import { useAuthStore } from '@/stores/authStore';
 import AuthLoadingScreen from '@/components/AuthLoadingScreen';
 import { membershipApi, api, paymentsApi } from '@/lib/api';
@@ -52,14 +52,6 @@ export default function MembershipCheckoutPage() {
   const required = searchParams.get('required') === 'true';
   
   const [isProcessing, setIsProcessing] = useState(false);
-  const paymentMethod = 'card';
-  const [cardData, setCardData] = useState({
-    number: '',
-    name: '',
-    expiry: '',
-    cvv: '',
-  });
-  const [saveCard, setSaveCard] = useState(true);
   const [agreed, setAgreed] = useState(false);
   const [membershipPrices, setMembershipPrices] = useState<{
     basic_monthly_price?: number;
@@ -191,48 +183,11 @@ export default function MembershipCheckoutPage() {
   const basePrice = tierInfo.basePrice;
   const monthlyPrice = period === 'yearly' ? Math.round(finalPrice / 12) : finalPrice;
 
-  const formatCardNumber = (value: string) => {
-    const cleaned = value.replace(/\D/g, '');
-    const groups = cleaned.match(/.{1,4}/g);
-    return groups ? groups.join(' ').slice(0, 19) : '';
-  };
-
-  const formatExpiry = (value: string) => {
-    const cleaned = value.replace(/\D/g, '');
-    if (cleaned.length >= 2) {
-      return `${cleaned.slice(0, 2)}/${cleaned.slice(2, 4)}`;
-    }
-    return cleaned;
-  };
-
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
     if (!agreed) {
       toast.error('Lütfen kullanım koşullarını kabul edin');
-      return;
-    }
-
-    if (paymentMethod === 'card') {
-      if (!cardData.number || !cardData.name || !cardData.expiry || !cardData.cvv) {
-        toast.error('Lütfen tüm kart bilgilerini doldurun');
-        return;
-      }
-    }
-
-    // Kart alanı son doğrulama (PayTR'ye gitmeden yakala)
-    const cleanNumber = cardData.number.replace(/\s/g, '');
-    const [mm, yy] = (cardData.expiry || '').split('/');
-    if (cleanNumber.length < 15 || cleanNumber.length > 16) {
-      toast.error('Geçerli bir kart numarası girin');
-      return;
-    }
-    if (!mm || !yy || parseInt(mm, 10) < 1 || parseInt(mm, 10) > 12) {
-      toast.error('Geçerli bir son kullanma tarihi girin (AA/YY)');
-      return;
-    }
-    if (!/^\d{3,4}$/.test(cardData.cvv)) {
-      toast.error('Geçerli bir CVV girin');
       return;
     }
 
@@ -258,60 +213,29 @@ export default function MembershipCheckoutPage() {
         return;
       }
 
+      // 2) PayTR hosted-iframe: kart bilgileri iframe'de alınır; ödeme
+      // sayfamıza yönlendirip orada iframe'i gösteriyoruz.
       if (orderId) {
-        // 2) PayTR Direkt API: kart bizim formdan; yanıt 3D Secure sayfası
-        try {
-          const direct = await paymentsApi.processDirect({
-            orderId,
-            card: {
-              cardHolderName: cardData.name,
-              cardNumber: cleanNumber,
-              expireMonth: mm,
-              expireYear: yy,
-              cvc: cardData.cvv,
-            },
-            saveCard,
-          });
-          const html: string | undefined = direct.data?.threeDSHtml;
-          if (html) {
-            // Banka 3D doğrulama sayfasını aynı pencerede göster; doğrulama
-            // sonrası PayTR success/fail sayfamıza yönlendirir.
-            document.open();
-            document.write(html);
-            document.close();
-            return;
-          }
-          // non-3D anında çekim: success sayfası verify ile kesinleştirir
-          router.push(`/payment/success?paymentId=${paymentId}&type=membership`);
+        const init = await paymentsApi.initiate(orderId, 'paytr');
+        const initData: any = init.data?.data ?? init.data ?? {};
+        if (initData.paymentId) {
+          router.push(`/payment/${initData.paymentId}?type=membership`);
           return;
-        } catch (directErr: any) {
-          const msg: string = directErr?.response?.data?.message || '';
-          // Direkt API mağazada kapalıysa PayTR iframe akışına otomatik düş
-          // (taze initiate — oid eşleşmesi için şart).
-          if (/direkt api|doğrulanamadı|paytr_token/i.test(msg)) {
-            const init = await paymentsApi.initiate(orderId, 'paytr');
-            const initData: any = init.data?.data ?? init.data ?? {};
-            if (initData.paymentUrl) {
-              window.location.href = initData.paymentUrl;
-              return;
-            }
-            if (initData.paymentId) {
-              router.push(`/payment/${initData.paymentId}?type=membership`);
-              return;
-            }
-          }
-          throw directErr;
+        }
+        if (initData.paymentUrl) {
+          window.location.href = initData.paymentUrl;
+          return;
         }
       }
 
-      // Yedek: eski iframe akışı (orderId dönmediyse)
+      // Yedek: subscribe yanıtında doğrudan paymentId/paymentUrl döndüyse
       const paymentUrl = data.paymentUrl;
-      if (paymentUrl && paymentUrl.startsWith('http')) {
-        window.location.href = paymentUrl;
-        return;
-      }
       if (paymentId) {
         router.push(`/payment/${paymentId}?type=membership`);
+        return;
+      }
+      if (paymentUrl && paymentUrl.startsWith('http')) {
+        window.location.href = paymentUrl;
         return;
       }
       toast.success('Üyeliğiniz başarıyla yükseltildi!');
@@ -319,7 +243,7 @@ export default function MembershipCheckoutPage() {
       router.push('/membership/success?tier=' + tier);
     } catch (error: any) {
       if (process.env.NODE_ENV === 'development') console.error('Payment error:', error);
-      toast.error(error.response?.data?.message || 'Ödeme işlemi başarısız oldu. Kart bilgilerinizi kontrol edin.');
+      toast.error(error.response?.data?.message || 'Ödeme işlemi başarısız oldu. Lütfen tekrar deneyin.');
     } finally {
       setIsProcessing(false);
     }
@@ -357,76 +281,16 @@ export default function MembershipCheckoutPage() {
           {/* Payment Form */}
           <div className="lg:col-span-2">
             <form onSubmit={handleSubmit} className="space-y-6">
-              {/* Payment Method */}
+              {/* Payment Info */}
               <div className="bg-surface-elevated rounded-xl shadow-sm p-6">
-                <h2 className="text-lg font-semibold text-heading mb-4 flex items-center gap-2">
+                <h2 className="text-lg font-semibold text-heading mb-2 flex items-center gap-2">
                   <CreditCardIcon className="w-5 h-5 text-primary-500" />
-                  Kart Bilgileri
+                  Güvenli Ödeme
                 </h2>
-                
-                <div className="space-y-4">
-                  <div>
-                    <label className="block text-sm font-medium text-body mb-2">
-                      Kart Numarası
-                    </label>
-                    <Input type="text"
-                      value={cardData.number}
-                      onChange={(e) => setCardData({ ...cardData, number: formatCardNumber(e.target.value) })}
-                      placeholder="0000 0000 0000 0000"
-                      className="px-4 py-3"
-                      maxLength={19} />
-                  </div>
-                  <div>
-                    <label className="block text-sm font-medium text-body mb-2">
-                      Kart Üzerindeki İsim
-                    </label>
-                    <Input type="text"
-                      value={cardData.name}
-                      onChange={(e) => setCardData({ ...cardData, name: e.target.value.toUpperCase() })}
-                      placeholder="AD SOYAD"
-                      className="px-4 py-3" />
-                  </div>
-                  <div className="grid grid-cols-2 gap-4">
-                    <div>
-                      <label className="block text-sm font-medium text-body mb-2">
-                        Son Kullanma Tarihi
-                      </label>
-                      <Input type="text"
-                        value={cardData.expiry}
-                        onChange={(e) => setCardData({ ...cardData, expiry: formatExpiry(e.target.value) })}
-                        placeholder="AA/YY"
-                        className="px-4 py-3"
-                        maxLength={5} />
-                    </div>
-                    <div>
-                      <label className="block text-sm font-medium text-body mb-2">
-                        CVV
-                      </label>
-                      <Input type="text"
-                        value={cardData.cvv}
-                        onChange={(e) => setCardData({ ...cardData, cvv: e.target.value.replace(/\D/g, '').slice(0, 4) })}
-                        placeholder="000"
-                        className="px-4 py-3"
-                        maxLength={4} />
-                    </div>
-                  </div>
-
-                  <label className="flex items-start gap-3 cursor-pointer pt-2">
-                    <Checkbox
-                      checked={saveCard}
-                      onChange={(e) => setSaveCard(e.target.checked)}
-                      className="mt-0.5 h-5 w-5"
-                    />
-                    <span className="text-sm text-muted">
-                      Kartımı kaydet — otomatik yenilemede ve sonraki ödemelerde kullanılır.
-                      Kayıtlı kartlarınızı{' '}
-                      <Link href="/profile/payments/cards" className="text-primary-500 hover:underline">
-                        Kart Yönetimi
-                      </Link>{' '}
-                      sayfasından silebilirsiniz.
-                    </span>
-                  </label>
-                </div>
+                <p className="text-sm text-muted">
+                  Onayladıktan sonra güvenli PayTR ödeme ekranına yönlendirileceksiniz.
+                  Kart bilgilerinizi orada gireceksiniz.
+                </p>
               </div>
 
               {/* Terms */}

@@ -90,6 +90,11 @@ const STATUS_CONFIG: Record<
     color: "bg-surface-alt text-body",
     icon: XCircleIcon,
   },
+  deleted: {
+    label: "Kaldırıldı",
+    color: "bg-danger-100 text-danger-700",
+    icon: XCircleIcon,
+  },
 };
 
 const FILTER_TABS = [
@@ -99,6 +104,7 @@ const FILTER_TABS = [
   { value: "reserved", label: "Rezerve" },
   { value: "sold", label: "Satılan" },
   { value: "inactive", label: "Pasif" },
+  { value: "deleted", label: "Kaldırılan" },
 ];
 
 export default function ProfileListingsPage() {

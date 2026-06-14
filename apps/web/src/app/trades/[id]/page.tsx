@@ -2349,40 +2349,6 @@ export default function TradeDetailPage() {
           </div>
         )}
 
-        {/* Shipment Info */}
-        {(trade.initiatorShipment || trade.receiverShipment) && (
-          <div className="card p-6 mb-6">
-            <h3 className="font-semibold mb-4 flex items-center gap-2">
-              <TruckIcon className="w-5 h-5" />
-              Kargo Bilgileri
-            </h3>
-            <div className="space-y-4">
-              {trade.initiatorShipment && (
-                <div>
-                  <p className="text-sm font-medium text-body mb-1">
-                    {trade.initiatorName}:
-                  </p>
-                  <p className="text-muted">
-                    {trade.initiatorShipment.carrier} -{" "}
-                    {trade.initiatorShipment.trackingNumber}
-                  </p>
-                </div>
-              )}
-              {trade.receiverShipment && (
-                <div>
-                  <p className="text-sm font-medium text-body mb-1">
-                    {trade.receiverName}:
-                  </p>
-                  <p className="text-muted">
-                    {trade.receiverShipment.carrier} -{" "}
-                    {trade.receiverShipment.trackingNumber}
-                  </p>
-                </div>
-              )}
-            </div>
-          </div>
-        )}
-
         {/* Action Buttons */}
         {(canAccept || canReject || canCounter || canCancel || showCancelDisabled) && (
           <div className="card p-6">

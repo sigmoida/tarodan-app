@@ -4,6 +4,7 @@ import Constants from 'expo-constants';
 import { router } from 'expo-router';
 import { theme } from '@tarodan/ui-native';
 import { api } from './api';
+import { toMobileRoute } from '../utils/notificationRoute';
 
 const { colors } = theme;
 
@@ -167,8 +168,15 @@ export function addNotificationResponseReceivedListener(
 export function routeFromNotification(data: any): void {
   try {
     if (data?.link && typeof data.link === 'string') {
-      router.push(data.link as any);
-      return;
+      // Backend link'leri WEB rotaları için interpole edilir (ör.
+      // /messages?thread=<id>). Mobilde geçerli rotaya çevir; aksi halde
+      // /messages?thread=<id> gibi linkler boş ekran açıyordu. Eşleşme yoksa
+      // data.type tabanlı fallback'e düş.
+      const mobileRoute = toMobileRoute(data.link);
+      if (mobileRoute) {
+        router.push(mobileRoute as any);
+        return;
+      }
     }
     switch (data?.type) {
       case 'order_cancelled_out_of_stock':

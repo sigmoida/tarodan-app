@@ -38,6 +38,11 @@ jest.mock('../../../services/api', () => ({
     delete: jest.fn(),
   },
   categoriesApi: { getAll: jest.fn(async () => ({ data: { data: [] } })) },
+  bankAccountApi: {
+    get: jest.fn(async () => ({
+      data: { id: 'x', accountHolder: 'Test User', iban: 'TR000000000000000000000001', isVerified: false },
+    })),
+  },
 }));
 import { api, productsApi } from '../../../services/api';
 
