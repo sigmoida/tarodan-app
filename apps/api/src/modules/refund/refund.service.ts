@@ -108,6 +108,13 @@ export class RefundService {
     if (!order) {
       throw new NotFoundException('Sipariş bulunamadı');
     }
+    // Üyelik/dijital siparişler (sanal ürün + platform satıcısı) genel iade akışına girmez;
+    // üyeliğin kendi iptal akışı vardır.
+    if (order.orderNumber?.startsWith('MEM-')) {
+      throw new BadRequestException(
+        'Üyelik siparişleri için iade talebi oluşturulamaz; üyeliğinizi üyelik ayarlarından iptal edebilirsiniz.',
+      );
+    }
     if (order.buyerId !== requesterId) {
       throw new ForbiddenException('Sadece alıcı iade talebi oluşturabilir');
     }

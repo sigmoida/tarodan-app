@@ -7155,10 +7155,8 @@ export class AdminService {
   private readonly EMAIL_TEMPLATE_KEYS: Array<{ key: string; name: string }> = [
     { key: 'welcome', name: 'Hoş geldin' },
     { key: 'order-confirmation', name: 'Sipariş onayı' },
-    { key: 'order-created-buyer', name: 'Sipariş alındı (alıcı)' },
-    { key: 'order-created-seller', name: 'Yeni sipariş (satıcı)' },
     { key: 'order-paid', name: 'Ödeme alındı (alıcı)' },
-    { key: 'order-paid-seller', name: 'Ödeme alındı (satıcı)' },
+    { key: 'order-paid-seller', name: 'Yeni sipariş (satıcı)' },
     { key: 'order-shipped', name: 'Kargoya verildi' },
     { key: 'order-delivered', name: 'Teslim edildi' },
     { key: 'password-reset', name: 'Şifre sıfırlama' },

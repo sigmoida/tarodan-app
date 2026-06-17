@@ -1908,20 +1908,13 @@ export class OrderService {
       if (!product) return;
       
       const actualSellerId = sellerId || product.sellerId;
-      
-      // 1. Notify seller that product was sold
-      if (actualSellerId) {
-        await this.notificationService.createInAppNotification(
-          actualSellerId,
-          NotificationType.ORDER_CREATED,
-          {
-            productId: product.id,
-            productTitle: product.title,
-          },
-        );
-      }
-      
-      // 2. Notify users who have this product in wishlist
+
+      // NOTE: We intentionally do NOT notify the seller here. This runs at order creation
+      // (status pending_payment) — e.g. when a buyer turns an accepted offer into an order —
+      // before payment is confirmed and the order may still be abandoned. The seller is
+      // notified only after payment succeeds, via the order.paid event ("Yeni Sipariş" email + push).
+
+      // Notify users who have this product in wishlist
       const wishlistEntries = await this.prisma.wishlistItem.findMany({
         where: { productId },
         include: { wishlist: { select: { userId: true } } },
@@ -2503,6 +2496,9 @@ export class OrderService {
           },
         },
         payment: true,
+        // canReactivate hesabı için teklif durumu gerekir ("Ödemeyi tamamla"
+        // yalnız teklif hâlâ accepted iken gösterilmeli)
+        offer: { select: { status: true } },
         refundRequests: {
           orderBy: { createdAt: 'desc' },
         },
@@ -3281,6 +3277,43 @@ export class OrderService {
   }
 
   /**
+   * Sipariş "Ödemeyi tamamla" ile yeniden aktive edilebilir mi?
+   * reactivate() ile birebir aynı kural — UI yalnızca gerçekten reactivate
+   * edilebilen siparişte butonu göstersin (backend'in reddedeceği yerde asla).
+   * offer/product include edilmemişse güvenli şekilde false döner (liste görünümleri).
+   */
+  private computeCanReactivate(order: any, userId: string): boolean {
+    if (order.status !== OrderStatus.cancelled) return false;
+    if (order.buyerId !== userId) return false;
+    if (!order.offerId || !order.offer) return false;
+    if (order.offer.status !== OfferStatus.accepted) return false;
+    if (!order.product) return false;
+    const available = getAvailableQuantity(order.product);
+    if (available !== null && available < 1) return false;
+    return true;
+  }
+
+  /**
+   * Ham cancelReason'ı stabil bir kategoriye eşler; frontend bu kategoriye göre
+   * kullanıcı dostu mesaj gösterir. Admin'in yazdığı serbest metinler 'other'
+   * olarak kalır ve ham haliyle gösterilir. Sadece iptal edilmiş siparişler için
+   * anlamlıdır; aksi halde null döner.
+   */
+  private deriveCancelCategory(order: any): string | null {
+    if (order.status !== OrderStatus.cancelled) return null;
+    const reason = (order.cancelReason ?? '').trim();
+    if (!reason) return 'buyer_cancelled';
+    if (reason === 'Ödeme süresi (24 saat) doldu') return 'payment_timeout';
+    if (reason.startsWith('Satıcı belirlenen süre')) return 'seller_no_ship';
+    if (reason.includes('Stok tüken')) return 'stockout';
+    if (reason.includes('takas')) return 'trade_reserved';
+    if (reason === 'Yeni toplu sipariş ile değiştirildi') return 'bulk_replaced';
+    if (reason === 'Alıcı lehine iptal edildi') return 'admin_buyer_favor';
+    if (reason === 'Admin tarafından iptal edildi' || reason.startsWith('Admin force-cancel')) return 'admin';
+    return 'other';
+  }
+
+  /**
    * Format order response
    */
   private async formatOrderResponse(order: any, userId: string) {
@@ -3322,6 +3355,13 @@ export class OrderService {
     return {
       id: order.id,
       orderNumber: order.orderNumber,
+      // Üyelik/dijital siparişler sanal ürün + platform satıcısı olarak modellenir
+      // (orderNumber "MEM-" öneki, shippingAddress { type: 'membership' }). Bu siparişlerde
+      // yorum/iade/teslimat adresi gibi fiziksel-ürün aksiyonları geçerli değildir.
+      isMembership:
+        (order.orderNumber?.startsWith('MEM-') ?? false) ||
+        (typeof order.shippingAddress === 'object' &&
+          (order.shippingAddress as any)?.type === 'membership'),
       checkoutGroupId: order.checkoutGroupId ?? null,
       amount: totalAmount,
       totalAmount,
@@ -3384,6 +3424,8 @@ export class OrderService {
       completedAt: order.completedAt ?? null,
       cancelledAt: order.cancelledAt ?? null,
       cancelReason: order.cancelReason ?? null,
+      cancelCategory: this.deriveCancelCategory(order),
+      canReactivate: this.computeCanReactivate(order, userId),
       confirmationDeadline: order.confirmationDeadline ?? null,
       buyerConfirmedAt: order.buyerConfirmedAt ?? null,
       isBuyer: order.buyerId === userId,

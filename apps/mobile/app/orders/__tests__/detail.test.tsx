@@ -142,3 +142,73 @@ describe('J79 · İade talep butonu görünürlüğü', () => {
     expect(screen.queryByTestId('refund-request-button')).toBeNull();
   });
 });
+
+describe('Üyelik/dijital sipariş — fiziksel ürün aksiyonları gizlenir', () => {
+  beforeEach(() => {
+    getMock.mockReset();
+    mockParams = { id: 'order-1' };
+  });
+
+  // Üyelik siparişi: sanal ürün + platform satıcısı, "MEM-" sipariş no, isMembership=true
+  const membershipFixture = (overrides: Record<string, unknown> = {}) =>
+    orderFixture({
+      orderNumber: 'MEM-1781257318265-BENIPST9F',
+      isMembership: true,
+      status: 'completed',
+      isBuyer: true,
+      payment: { status: 'completed' },
+      activeRefundRequest: null,
+      hasProductRating: false,
+      hasSellerRating: false,
+      shippingAddress: null,
+      ...overrides,
+    });
+
+  it('değerlendirme bölümü gösterilmez', async () => {
+    getMock.mockResolvedValue({ data: { data: membershipFixture() } });
+    renderWithProviders(<OrderDetailScreen />);
+    await waitFor(() =>
+      expect(
+        screen.getByText('Sipariş #MEM-1781257318265-BENIPST9F'),
+      ).toBeOnTheScreen(),
+    );
+    expect(screen.queryByText('Değerlendirme')).toBeNull();
+    expect(screen.queryByText('Ürünü Değerlendir')).toBeNull();
+  });
+
+  it('iade talep butonu gösterilmez', async () => {
+    getMock.mockResolvedValue({ data: { data: membershipFixture() } });
+    renderWithProviders(<OrderDetailScreen />);
+    await waitFor(() =>
+      expect(
+        screen.getByText('Sipariş #MEM-1781257318265-BENIPST9F'),
+      ).toBeOnTheScreen(),
+    );
+    expect(screen.queryByTestId('refund-request-button')).toBeNull();
+  });
+
+  it('teslimat adresi bölümü gösterilmez', async () => {
+    getMock.mockResolvedValue({ data: { data: membershipFixture() } });
+    renderWithProviders(<OrderDetailScreen />);
+    await waitFor(() =>
+      expect(
+        screen.getByText('Sipariş #MEM-1781257318265-BENIPST9F'),
+      ).toBeOnTheScreen(),
+    );
+    expect(screen.queryByText('Teslimat Adresi')).toBeNull();
+  });
+
+  it('isMembership alanı yoksa "MEM-" önekiyle de gizlenir (geriye dönük)', async () => {
+    getMock.mockResolvedValue({
+      data: { data: membershipFixture({ isMembership: undefined }) },
+    });
+    renderWithProviders(<OrderDetailScreen />);
+    await waitFor(() =>
+      expect(
+        screen.getByText('Sipariş #MEM-1781257318265-BENIPST9F'),
+      ).toBeOnTheScreen(),
+    );
+    expect(screen.queryByText('Değerlendirme')).toBeNull();
+    expect(screen.queryByTestId('refund-request-button')).toBeNull();
+  });
+});

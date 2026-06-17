@@ -159,47 +159,17 @@ export class EventService {
 
   /**
    * Emit order.created event
-   * - Sends confirmation email to buyer
-   * - Sends notification to seller about new order
-   * - Queues analytics event
+   * - Sends NO buyer/seller notification (payment not yet confirmed; order may be abandoned).
+   *   Both sides are notified only on order.paid.
+   * - Queues analytics event for the checkout-initiated funnel
    */
   async emitOrderCreated(payload: OrderCreatedPayload): Promise<void> {
     this.logger.log(`Emitting order.created event for order ${payload.orderNumber}`);
 
-    // Skip order-created-buyer email: buyer is already on site; they get order-paid + invoice after payment (2 emails total, industry standard).
-    // Only notify seller about new order.
-
-    // Queue email to seller - New order notification
-    await this.emailQueue.add('send-template', {
-      to: payload.sellerEmail,
-      template: 'order-created-seller',
-      subject: `Yeni sipariş - ${payload.orderNumber}`,
-      templateData: {
-        orderNumber: payload.orderNumber,
-        sellerName: payload.sellerName,
-        productTitle: payload.productTitle,
-        totalAmount: payload.totalAmount,
-        orderId: payload.orderId,
-      },
-    }, {
-      priority: 1,
-      attempts: 3,
-      backoff: { type: 'exponential', delay: 2000 },
-    });
-
-    // Queue push notification to seller
-    await this.pushQueue.add('send-notification', {
-      userId: payload.sellerId,
-      title: 'Yeni Sipariş',
-      body: `${payload.productTitle} ürününüz için yeni sipariş alındı`,
-      data: {
-        type: 'order_created',
-        orderId: payload.orderId,
-        orderNumber: payload.orderNumber,
-      },
-    }, {
-      priority: 2,
-    });
+    // No buyer/seller notification on order.created: payment is not yet confirmed and the order
+    // may be abandoned. Both sides are notified only after payment succeeds (order.paid):
+    // buyer gets order-paid + invoice, seller gets the "Yeni Sipariş" email + push.
+    // Here we only track analytics for the checkout-initiated funnel.
 
     // Queue analytics event
     await this.analyticsQueue.add('track-event', {
@@ -256,7 +226,7 @@ export class EventService {
     await this.emailQueue.add('send-template', {
       to: payload.sellerEmail,
       template: 'order-paid-seller',
-      subject: `Ödeme alındı, kargoya hazırlayın - ${payload.orderNumber}`,
+      subject: `Yeni sipariş - ${payload.orderNumber}`,
       templateData: {
         orderNumber: payload.orderNumber,
         sellerName: payload.sellerName,
@@ -287,11 +257,12 @@ export class EventService {
       priority: 1,
     });
 
-    // Queue push notification to seller
+    // Queue push notification to seller — this is the seller's first ("new order") alert,
+    // fired only after payment is confirmed.
     await this.pushQueue.add('send-notification', {
       userId: payload.sellerId,
-      title: 'Ödeme Alındı',
-      body: `${payload.productTitle} siparişi için ödeme alındı. Kargoya hazırlayın!`,
+      title: 'Yeni Sipariş',
+      body: `${payload.productTitle} ürününüz satıldı! Kargoya hazırlayın.`,
       data: {
         type: 'payment_received',
         orderId: payload.orderId,
