@@ -903,32 +903,36 @@ export class TradeService {
         byProduct.set(item.productId, (byProduct.get(item.productId) ?? 0) + item.quantity);
       }
 
-      // Takas kabul: ürünleri REZERVE ETME. Ürün, taraflardan biri "Kargoya
-      // Verdim" diyene kadar herkese açık ve satın alınabilir kalır; kilit
-      // markShippedToWarehouse'ta status=inactive ile uygulanır. Burada yalnız
-      // müsaitlik DOĞRULANIR — stoğu kalmamış bir ürün için takas kabul edilemez.
-      // (FOR UPDATE satır kilidi yine alınır ki kabul, eşzamanlı bir satın alma
-      // ile yarışırken tutarlı görsün.)
+      // Takas kabul: her iki taraf için reservedQuantity++ (FOR UPDATE pessimistic lock)
       for (const [productId, qty] of byProduct) {
-        const product = await this.productLockService.lockProductForUpdate(
-          tx,
-          productId,
-        );
-        if (!product) {
-          throw new BadRequestException(`Ürün bulunamadı: ${productId}`);
-        }
-        if (
-          product.status !== ProductStatus.active &&
-          product.status !== ProductStatus.reserved
-        ) {
-          throw new BadRequestException(
-            'Takastaki ürünlerden biri artık satışta değil',
+        await this.productLockService.checkAndReserve(tx, productId, qty);
+      }
+
+      // Safe-trade stock cascade: if this trade depleted the last available
+      // unit, cancel OTHER pending offers, trades, and pending_payment orders.
+      for (const productId of byProduct.keys()) {
+        const product = await tx.product.findUnique({
+          where: { id: productId },
+          select: { quantity: true, reservedQuantity: true },
+        });
+        if (!product || product.quantity === null) continue;
+        const available =
+          (product.quantity ?? 0) - (product.reservedQuantity ?? 0);
+        if (available <= 0) {
+          const reason = 'Stok takas icin ayrildi';
+          await this.productLockService.invalidateRelatedOffers(
+            tx,
+            productId,
           );
-        }
-        const available = getAvailableQuantity(product);
-        if (available !== null && available < qty) {
-          throw new BadRequestException(
-            'Takastaki ürünlerden biri artık stokta yok',
+          await this.productLockService.invalidateRelatedTrades(
+            tx,
+            productId,
+            tradeId, // exclude the current trade
+          );
+          await this.productLockService.invalidatePendingOrdersForProduct(
+            tx,
+            productId,
+            reason,
           );
         }
       }
@@ -1538,100 +1542,6 @@ export class TradeService {
         },
       });
     });
-
-    return this.getTradeById(tradeId, userId);
-  }
-
-  // ==========================================================================
-  // MARK SHIPPED TO WAREHOUSE ("Kargoya Verdim")
-  //
-  // Safe-trade akışında her iki tarafın depoya gönderisi kabulde otomatik
-  // oluşur (Sürat takip no). Kullanıcı ürünü fiziksel olarak kargoya teslim
-  // ettiğinde bu uçla onaylar. KRİTİK kural: taraflardan BİRİ bile "kargoya
-  // verdim" derse, takastaki HER İKİ tarafın ürünleri de pasifleştirilir
-  // (status=inactive) → listelerde görünmez + satın alınamaz olur. Takas
-  // ilerleyen aşamada başarısız olur / iptal / iade edilirse mevcut iptal-red-
-  // iade yolları ürünleri zaten status=active'e geri döndürür.
-  // ==========================================================================
-  async markShippedToWarehouse(
-    tradeId: string,
-    userId: string,
-  ): Promise<TradeResponseDto> {
-    const cancelledOrderBuyers: {
-      buyerId: string;
-      productId: string;
-      productTitle: string;
-    }[] = [];
-    await this.prisma.$transaction(async (tx) => {
-      const trade = await this.getTradeWithLock(tradeId, tx);
-
-      const isInitiator = trade.initiatorId === userId;
-      const isReceiver = trade.receiverId === userId;
-      if (!isInitiator && !isReceiver) {
-        throw new ForbiddenException('Bu takas işlemi için yetkiniz yok');
-      }
-
-      if (trade.status !== TradeStatus.shipping_to_warehouse) {
-        throw new BadRequestException(
-          'Yalnızca depoya gönderim aşamasındaki takaslarda kargo teslimi onaylanabilir',
-        );
-      }
-
-      // Kullanıcının depoya giden gönderisi
-      const myShipment = await tx.tradeShipment.findFirst({
-        where: { tradeId, shipperId: userId, leg: 'to_warehouse' },
-      });
-      if (!myShipment) {
-        throw new BadRequestException('Size ait depo gönderisi bulunamadı');
-      }
-      if (myShipment.shippedAt) {
-        throw new BadRequestException('Ürününüzü zaten kargoya verdiniz');
-      }
-
-      // Gönderiyi "kargoya verildi" olarak işaretle
-      await tx.tradeShipment.update({
-        where: { id: myShipment.id },
-        data: { status: ShipmentStatus.picked_up, shippedAt: new Date() },
-      });
-
-      // Taraflardan biri kargoya verdiyse: her iki tarafın TÜM ürünlerini
-      // pasifleştir (idempotent — ikinci taraf onayında tekrar set edilse de
-      // sorun olmaz). reservedQuantity'ye dokunulmaz; iade/iptal yolları
-      // status'ü active'e geri çevirir.
-      const items = await tx.tradeItem.findMany({
-        where: { tradeId },
-        select: { productId: true },
-      });
-      const productIds = [...new Set(items.map((i) => i.productId))];
-      if (productIds.length > 0) {
-        await tx.product.updateMany({
-          where: { id: { in: productIds } },
-          data: { status: ProductStatus.inactive },
-        });
-        // Kilit anında bu ürünler için bekleyen (pending_payment) siparişleri
-        // iptal et — biri kargoya verdiyse takas kazanır, yarım kalmış bir
-        // checkout sonradan tamamlanamamalı (rezervasyonları da serbest kalır).
-        for (const productId of productIds) {
-          const res = await this.productLockService.invalidatePendingOrdersForProduct(
-            tx,
-            productId,
-            'Ürün takas için kargoya verildi',
-          );
-          cancelledOrderBuyers.push(...res.cancelledOrders);
-        }
-      }
-    });
-
-    await this.invalidateProductCachesForTrade(tradeId);
-
-    // Bildirimleri tx commit sonrası gönder.
-    for (const o of cancelledOrderBuyers) {
-      await this.notificationService
-        .notifyOrderCancelledOutOfStock(o.buyerId, o.productId, o.productTitle, null)
-        .catch((err) =>
-          this.logger.warn(`ship-lock order-notify failed for ${o.buyerId}: ${err.message}`),
-        );
-    }
 
     return this.getTradeById(tradeId, userId);
   }

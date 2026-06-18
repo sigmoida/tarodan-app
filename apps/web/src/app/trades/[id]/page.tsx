@@ -566,31 +566,6 @@ export default function TradeDetailPage() {
     }
   };
 
-  const handleMarkShipped = async () => {
-    if (!trade) return;
-    setIsActionLoading(true);
-    try {
-      await tradesApi.markShipped(trade.id);
-      toast.success(
-        locale === "en"
-          ? "Marked as handed to cargo"
-          : "Kargoya verildi olarak işaretlendi",
-      );
-      await invalidateTrade();
-    } catch (error: any) {
-      if (process.env.NODE_ENV === "development")
-        console.error("Failed to mark shipped:", error);
-      toast.error(
-        error.response?.data?.message ||
-          (locale === "en"
-            ? "Failed to mark as shipped"
-            : "Kargoya verildi işaretlenemedi"),
-      );
-    } finally {
-      setIsActionLoading(false);
-    }
-  };
-
   // Countdown timer effect
   useEffect(() => {
     if (!trade) return;
@@ -2138,26 +2113,6 @@ export default function TradeDetailPage() {
                 <div className="mt-3">
                   <ShipmentStatusChip status={myToWarehouseShipment?.status} />
                 </div>
-                {myToWarehouseShipment && !myToWarehouseShipment.shippedAt && (
-                  <div className="mt-4">
-                    <Button
-                      onClick={handleMarkShipped}
-                      isLoading={isActionLoading}
-                      disabled={isActionLoading}
-                      leftIcon={<TruckIcon className="w-4 h-4" />}
-                      className="w-full sm:w-auto"
-                    >
-                      {locale === "en"
-                        ? "I handed it to cargo"
-                        : "Kargoya Verdim"}
-                    </Button>
-                    <p className="text-xs text-warning-700 mt-2">
-                      {locale === "en"
-                        ? "Once either party confirms shipping, both items become invisible and can no longer be purchased by others."
-                        : "Taraflardan biri kargoya verdiğini onayladığında her iki ürün de görünmez olur ve başkaları tarafından satın alınamaz."}
-                    </p>
-                  </div>
-                )}
               </div>
 
               {/* Karşı tarafın durumu — numara YOK, sadece tek satırlık ipucu.

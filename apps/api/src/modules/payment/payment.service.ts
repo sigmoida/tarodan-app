@@ -1088,7 +1088,6 @@ export class PaymentService {
       hadPayment: boolean;
     }[] = [];
     const cancelledOffers: { buyerId: string; productId: string; productTitle: string }[] = [];
-    const cancelledTrades: { tradeId: string; initiatorId: string; receiverId: string }[] = [];
     let stockoutCategoryId: string | null = null;
 
     const result = await this.prisma.$transaction(async (tx) => {
@@ -1340,13 +1339,6 @@ export class PaymentService {
             tx,
             payment.order.productId,
           );
-          // İlk finalize eden kazanır: ürün satıldı → henüz kargoya verilmemiş
-          // takasları (pending/accepted/shipping_to_warehouse) iptal et.
-          const tradeResult = await this.productLockService.invalidateRelatedTrades(
-            tx,
-            payment.order.productId,
-          );
-          cancelledTrades.push(...tradeResult.cancelledTrades);
           cancelledOrders.push(
             ...orderResult.cancelledOrders.map((o) => ({
               buyerId: o.buyerId,
@@ -1479,17 +1471,6 @@ export class PaymentService {
           this.logger.warn(`stockout-notify (offer) failed for ${o.buyerId}: ${err.message}`),
         );
     }
-    // Ürün satıldı → iptal edilen takasların iki tarafını da bilgilendir.
-    for (const t of cancelledTrades) {
-      for (const uid of [t.initiatorId, t.receiverId]) {
-        if (!uid) continue;
-        await this.notificationService
-          .notifyTradeAutoCancelled(uid, t.tradeId)
-          .catch((err) =>
-            this.logger.warn(`stockout-trade-notify failed for ${uid}: ${err.message}`),
-          );
-      }
-    }
 
     // Emit order.paid event AFTER transaction commits (only for regular product orders, not membership/boost)
     // This publishes jobs to email, push, and shipping queues
@@ -1614,7 +1595,6 @@ export class PaymentService {
       hadPayment: boolean;
     }[] = [];
     const cancelledOffers: { buyerId: string; productId: string; productTitle: string }[] = [];
-    const cancelledTrades: { tradeId: string; initiatorId: string; receiverId: string }[] = [];
     let stockoutCategoryId: string | null = null;
 
     const result = await this.prisma.$transaction(
@@ -1710,12 +1690,6 @@ export class PaymentService {
               tx,
               order.productId,
             );
-            // İlk finalize eden kazanır: henüz kargoya verilmemiş takasları iptal et.
-            const tradeResult = await this.productLockService.invalidateRelatedTrades(
-              tx,
-              order.productId,
-            );
-            cancelledTrades.push(...tradeResult.cancelledTrades);
             cancelledOrders.push(
               ...orderResult.cancelledOrders.map((o) => ({
                 buyerId: o.buyerId,
@@ -1810,17 +1784,6 @@ export class PaymentService {
         .catch((err) =>
           this.logger.warn(`stockout-notify (offer) failed for ${o.buyerId}: ${err.message}`),
         );
-    }
-    // Ürün satıldı → iptal edilen takasların iki tarafını da bilgilendir.
-    for (const t of cancelledTrades) {
-      for (const uid of [t.initiatorId, t.receiverId]) {
-        if (!uid) continue;
-        await this.notificationService
-          .notifyTradeAutoCancelled(uid, t.tradeId)
-          .catch((err) =>
-            this.logger.warn(`stockout-trade-notify failed for ${uid}: ${err.message}`),
-          );
-      }
     }
 
     // Sipariş başına: order.paid eventi, fatura, kargo kaydı

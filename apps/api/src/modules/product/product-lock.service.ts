@@ -217,25 +217,12 @@ export class ProductLockService {
     productId: string,
     excludeTradeId?: string,
   ): Promise<InvalidateTradesResult> {
-    // "İlk finalize eden kazanır": ürün bir alıcıya satıldığında (stok tükendi),
-    // HENÜZ kimsenin kargoya vermediği takaslar iptal edilir. Kapsam: pending +
-    // accepted + shipping_to_warehouse. Biri kargoya verdiyse (herhangi bir
-    // to_warehouse gönderisinde shippedAt set) ürün zaten inactive olur ve
-    // satın alınamazdı; o takaslara DOKUNULMAZ (depo/teslim sürecindeler).
+    // Sadece PENDING takaslari iptal et (accepted'a dokunma!)
     const tradeItems = await tx.tradeItem.findMany({
       where: {
         productId,
         trade: {
-          status: {
-            in: [
-              TradeStatus.pending,
-              TradeStatus.accepted,
-              TradeStatus.shipping_to_warehouse,
-            ],
-          },
-          shipments: {
-            none: { leg: 'to_warehouse', shippedAt: { not: null } },
-          },
+          status: TradeStatus.pending,
           ...(excludeTradeId ? { id: { not: excludeTradeId } } : {}),
         },
       },
@@ -261,7 +248,7 @@ export class ProductLockService {
     });
 
     this.logger.log(
-      `Auto-cancelled ${tradeIds.length} not-yet-shipped trade(s) for product ${productId} (sold/out-of-stock)`,
+      `Auto-cancelled ${tradeIds.length} pending trade(s) for product ${productId}`,
     );
 
     return {
@@ -409,7 +396,6 @@ export class ProductLockService {
     for (const product of outOfStockProducts) {
       try {
         const productRejectedOffers: RejectedOfferPayload[] = [];
-        const productCancelledTrades: CancelledTradePayload[] = [];
         await this.prisma.$transaction(async (tx) => {
           const offers = await this.invalidateRelatedOffers(tx, product.id);
           const trades = await this.invalidateRelatedTrades(tx, product.id);
@@ -418,7 +404,6 @@ export class ProductLockService {
           allRejectedOffers.push(...offers.rejectedOffers);
           allCancelledTrades.push(...trades.cancelledTrades);
           productRejectedOffers.push(...offers.rejectedOffers);
-          productCancelledTrades.push(...trades.cancelledTrades);
         });
 
         // Dispatch notifications AFTER tx commit so a rollback can't emit phantom messages.
@@ -428,17 +413,6 @@ export class ProductLockService {
             .catch((err) =>
               this.logger.warn(`sweep-notify failed for ${o.buyerId}: ${err.message}`),
             );
-        }
-        // İptal edilen takaslarda iki tarafı da bilgilendir.
-        for (const t of productCancelledTrades) {
-          for (const uid of [t.initiatorId, t.receiverId]) {
-            if (!uid) continue;
-            await this.notificationService
-              .notifyTradeAutoCancelled(uid, t.tradeId)
-              .catch((err) =>
-                this.logger.warn(`sweep-trade-notify failed for ${uid}: ${err.message}`),
-              );
-          }
         }
       } catch (e: any) {
         this.logger.error(
