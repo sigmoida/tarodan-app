@@ -1547,6 +1547,75 @@ export class TradeService {
   }
 
   // ==========================================================================
+  // MARK SHIPPED TO WAREHOUSE ("Kargoya Verdim")
+  //
+  // Safe-trade akışında her iki tarafın depoya gönderisi kabulde otomatik
+  // oluşur (Sürat takip no). Kullanıcı ürünü fiziksel olarak kargoya teslim
+  // ettiğinde bu uçla onaylar. KRİTİK kural: taraflardan BİRİ bile "kargoya
+  // verdim" derse, takastaki HER İKİ tarafın ürünleri de pasifleştirilir
+  // (status=inactive) → listelerde görünmez + satın alınamaz olur. Takas
+  // ilerleyen aşamada başarısız olur / iptal / iade edilirse mevcut iptal-red-
+  // iade yolları ürünleri zaten status=active'e geri döndürür.
+  // ==========================================================================
+  async markShippedToWarehouse(
+    tradeId: string,
+    userId: string,
+  ): Promise<TradeResponseDto> {
+    await this.prisma.$transaction(async (tx) => {
+      const trade = await this.getTradeWithLock(tradeId, tx);
+
+      const isInitiator = trade.initiatorId === userId;
+      const isReceiver = trade.receiverId === userId;
+      if (!isInitiator && !isReceiver) {
+        throw new ForbiddenException('Bu takas işlemi için yetkiniz yok');
+      }
+
+      if (trade.status !== TradeStatus.shipping_to_warehouse) {
+        throw new BadRequestException(
+          'Yalnızca depoya gönderim aşamasındaki takaslarda kargo teslimi onaylanabilir',
+        );
+      }
+
+      // Kullanıcının depoya giden gönderisi
+      const myShipment = await tx.tradeShipment.findFirst({
+        where: { tradeId, shipperId: userId, leg: 'to_warehouse' },
+      });
+      if (!myShipment) {
+        throw new BadRequestException('Size ait depo gönderisi bulunamadı');
+      }
+      if (myShipment.shippedAt) {
+        throw new BadRequestException('Ürününüzü zaten kargoya verdiniz');
+      }
+
+      // Gönderiyi "kargoya verildi" olarak işaretle
+      await tx.tradeShipment.update({
+        where: { id: myShipment.id },
+        data: { status: ShipmentStatus.picked_up, shippedAt: new Date() },
+      });
+
+      // Taraflardan biri kargoya verdiyse: her iki tarafın TÜM ürünlerini
+      // pasifleştir (idempotent — ikinci taraf onayında tekrar set edilse de
+      // sorun olmaz). reservedQuantity'ye dokunulmaz; iade/iptal yolları
+      // status'ü active'e geri çevirir.
+      const items = await tx.tradeItem.findMany({
+        where: { tradeId },
+        select: { productId: true },
+      });
+      const productIds = [...new Set(items.map((i) => i.productId))];
+      if (productIds.length > 0) {
+        await tx.product.updateMany({
+          where: { id: { in: productIds } },
+          data: { status: ProductStatus.inactive },
+        });
+      }
+    });
+
+    await this.invalidateProductCachesForTrade(tradeId);
+
+    return this.getTradeById(tradeId, userId);
+  }
+
+  // ==========================================================================
   // SHIP TO WAREHOUSE (DEPRECATED — auto-flow runs in createInboundTradeShipments)
   //
   // The user-driven form (address + carrier + tracking) is no longer the path

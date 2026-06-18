@@ -179,6 +179,18 @@ export class TradeController {
   }
 
   /**
+   * Mark own item as handed to cargo ("Kargoya Verdim"). One party shipping
+   * deactivates both sides' products. POST /trades/:id/mark-shipped
+   */
+  @Post(':id/mark-shipped')
+  async markShippedToWarehouse(
+    @Request() req: any,
+    @Param('id', ParseUUIDPipe) id: string,
+  ): Promise<TradeResponseDto> {
+    return this.tradeService.markShippedToWarehouse(id, this.getUserId(req));
+  }
+
+  /**
    * Ship items to Tarodan warehouse (safe-trade flow)
    * POST /trades/:id/ship-to-warehouse
    */

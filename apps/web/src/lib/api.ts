@@ -212,6 +212,8 @@ export const tradesApi = {
     api.post(`/trades/${id}/cancel`, { reason }),
   ship: (id: string | number, data: { fromAddressId: string; carrier: string }) =>
     api.post(`/trades/${id}/ship`, data),
+  markShipped: (id: string | number) =>
+    api.post(`/trades/${id}/mark-shipped`),
   confirmReceipt: (id: string | number) =>
     api.post(`/trades/${id}/confirm-receipt`),
   raiseDispute: (id: string | number, data: { reason: string; description: string; evidenceUrls?: string[] }) =>
