@@ -1184,6 +1184,15 @@ export class NotificationService {
     });
   }
 
+  async notifyTradeAutoCancelled(userId: string, tradeId: string) {
+    return this.send({
+      userId,
+      type: NotificationType.TRADE_AUTO_CANCELLED,
+      channels: [NotificationChannel.EMAIL, NotificationChannel.PUSH, NotificationChannel.IN_APP],
+      data: { tradeId },
+    });
+  }
+
   /**
    * Send welcome email
    */

@@ -278,16 +278,16 @@ export class TradeService {
 
       await this.prisma.$transaction(async (tx) => {
         for (const side of sides) {
-          if (!side.address) {
-            this.logger.warn(
-              `Trade ${trade.tradeNumber} side ${side.suffix} (user=${side.shipperId}) has no address; inbound shipment NOT created — admin must intervene`,
-            );
-            continue;
-          }
+          // Sentetik depo takip no'su ADRES GEREKTİRMEZ; bu yüzden satır + takip
+          // no HER DURUMDA oluşur ki iki taraf da kendi numarasını ve "Kargoya
+          // Verdim" butonunu görebilsin. Adres yoksa yalnız Sürat SOAP sevkiyatı
+          // ertelenir (kullanıcı/admin adresi girince yeniden çağrılır).
+          // tradeNumber zaten "TRD-..." formatında → çift önek olmasın diye direkt kullan.
+          const ozelKargoTakipNo = `${trade.tradeNumber}-WH-${side.suffix}`
+            .replace(/[^a-zA-Z0-9-]/g, '')
+            .slice(0, 50);
 
           // Bu taraf için to_warehouse satırı VARSA yeniden kullan, YOKSA oluştur.
-          // (Tek kaynak: artık ayrı bir "warehouse-shipments" helper'ı yok; etiket
-          // oluşturma + adres + Sürat sevkiyatı yalnız burada yapılır.)
           let row = await tx.tradeShipment.findFirst({
             where: {
               tradeId: trade.id,
@@ -297,24 +297,26 @@ export class TradeService {
           });
 
           if (row) {
-            // Eski/yarım kalmış satır adres içermiyorsa şimdi doldur.
-            if (!row.fromAddressId) {
+            // Eski/yarım kalmış satırda eksik alanları (adres + takip no) doldur.
+            const patch: Prisma.TradeShipmentUpdateInput = {};
+            if (!row.fromAddressId && side.address) {
+              patch.fromAddress = { connect: { id: side.address.id } };
+            }
+            if (!row.trackingNumber) {
+              patch.trackingNumber = ozelKargoTakipNo;
+            }
+            if (Object.keys(patch).length > 0) {
               row = await tx.tradeShipment.update({
                 where: { id: row.id },
-                data: { fromAddressId: side.address.id },
+                data: patch,
               });
             }
           } else {
-            // tradeNumber zaten "TRD-..." formatında geliyor; çift "TRD-" önekini
-            // önlemek için doğrudan tradeNumber'ı kullan.
-            const ozelKargoTakipNo = `${trade.tradeNumber}-WH-${side.suffix}`
-              .replace(/[^a-zA-Z0-9-]/g, '')
-              .slice(0, 50);
             row = await tx.tradeShipment.create({
               data: {
                 tradeId: trade.id,
                 shipperId: side.shipperId,
-                fromAddressId: side.address.id,
+                fromAddressId: side.address?.id ?? null,
                 carrier: 'surat',
                 trackingNumber: ozelKargoTakipNo,
                 status: ShipmentStatus.label_created,
@@ -325,16 +327,24 @@ export class TradeService {
             });
           }
 
-          const payload = this.buildSuratPayloadForInboundLeg(
-            side.user,
-            side.address,
-            row.trackingNumber,
-            trade.tradeNumber,
-          );
+          // Sürat sevkiyatı yalnız adres VARSA hazırlanır; yoksa ertelenir.
+          const payload = side.address
+            ? this.buildSuratPayloadForInboundLeg(
+                side.user,
+                side.address,
+                row.trackingNumber,
+                trade.tradeNumber,
+              )
+            : null;
+          if (!side.address) {
+            this.logger.warn(
+              `Trade ${trade.tradeNumber} side ${side.suffix} (user=${side.shipperId}) has no address; tracking issued but Sürat dispatch deferred`,
+            );
+          }
 
           dispatched.push({
             shipmentId: row.id,
-            ozelKargoTakipNo: row.trackingNumber,
+            ozelKargoTakipNo: row.trackingNumber ?? ozelKargoTakipNo,
             payload,
           });
         }
@@ -903,36 +913,32 @@ export class TradeService {
         byProduct.set(item.productId, (byProduct.get(item.productId) ?? 0) + item.quantity);
       }
 
-      // Takas kabul: her iki taraf için reservedQuantity++ (FOR UPDATE pessimistic lock)
+      // Takas kabul: ürünleri REZERVE ETME. Ürün, taraflardan biri "Kargoya
+      // Verdim" diyene kadar herkese açık ve satın alınabilir kalır; kilit
+      // markShippedToWarehouse'ta status=inactive ile uygulanır. Burada yalnız
+      // müsaitlik DOĞRULANIR — stoğu kalmamış bir ürün için takas kabul edilemez.
+      // (FOR UPDATE satır kilidi yine alınır ki kabul, eşzamanlı bir satın alma
+      // ile yarışırken tutarlı görsün.)
       for (const [productId, qty] of byProduct) {
-        await this.productLockService.checkAndReserve(tx, productId, qty);
-      }
-
-      // Safe-trade stock cascade: if this trade depleted the last available
-      // unit, cancel OTHER pending offers, trades, and pending_payment orders.
-      for (const productId of byProduct.keys()) {
-        const product = await tx.product.findUnique({
-          where: { id: productId },
-          select: { quantity: true, reservedQuantity: true },
-        });
-        if (!product || product.quantity === null) continue;
-        const available =
-          (product.quantity ?? 0) - (product.reservedQuantity ?? 0);
-        if (available <= 0) {
-          const reason = 'Stok takas icin ayrildi';
-          await this.productLockService.invalidateRelatedOffers(
-            tx,
-            productId,
+        const product = await this.productLockService.lockProductForUpdate(
+          tx,
+          productId,
+        );
+        if (!product) {
+          throw new BadRequestException(`Ürün bulunamadı: ${productId}`);
+        }
+        if (
+          product.status !== ProductStatus.active &&
+          product.status !== ProductStatus.reserved
+        ) {
+          throw new BadRequestException(
+            'Takastaki ürünlerden biri artık satışta değil',
           );
-          await this.productLockService.invalidateRelatedTrades(
-            tx,
-            productId,
-            tradeId, // exclude the current trade
-          );
-          await this.productLockService.invalidatePendingOrdersForProduct(
-            tx,
-            productId,
-            reason,
+        }
+        const available = getAvailableQuantity(product);
+        if (available !== null && available < qty) {
+          throw new BadRequestException(
+            'Takastaki ürünlerden biri artık stokta yok',
           );
         }
       }
@@ -1561,6 +1567,11 @@ export class TradeService {
     tradeId: string,
     userId: string,
   ): Promise<TradeResponseDto> {
+    const cancelledOrderBuyers: {
+      buyerId: string;
+      productId: string;
+      productTitle: string;
+    }[] = [];
     await this.prisma.$transaction(async (tx) => {
       const trade = await this.getTradeWithLock(tradeId, tx);
 
@@ -1607,10 +1618,30 @@ export class TradeService {
           where: { id: { in: productIds } },
           data: { status: ProductStatus.inactive },
         });
+        // Kilit anında bu ürünler için bekleyen (pending_payment) siparişleri
+        // iptal et — biri kargoya verdiyse takas kazanır, yarım kalmış bir
+        // checkout sonradan tamamlanamamalı (rezervasyonları da serbest kalır).
+        for (const productId of productIds) {
+          const res = await this.productLockService.invalidatePendingOrdersForProduct(
+            tx,
+            productId,
+            'Ürün takas için kargoya verildi',
+          );
+          cancelledOrderBuyers.push(...res.cancelledOrders);
+        }
       }
     });
 
     await this.invalidateProductCachesForTrade(tradeId);
+
+    // Bildirimleri tx commit sonrası gönder.
+    for (const o of cancelledOrderBuyers) {
+      await this.notificationService
+        .notifyOrderCancelledOutOfStock(o.buyerId, o.productId, o.productTitle, null)
+        .catch((err) =>
+          this.logger.warn(`ship-lock order-notify failed for ${o.buyerId}: ${err.message}`),
+        );
+    }
 
     return this.getTradeById(tradeId, userId);
   }
