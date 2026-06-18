@@ -278,16 +278,16 @@ export class TradeService {
 
       await this.prisma.$transaction(async (tx) => {
         for (const side of sides) {
-          // Sentetik depo takip no'su ADRES GEREKTİRMEZ; bu yüzden satır + takip
-          // no HER DURUMDA oluşur ki iki taraf da kendi numarasını ve "Kargoya
-          // Verdim" butonunu görebilsin. Adres yoksa yalnız Sürat SOAP sevkiyatı
-          // ertelenir (kullanıcı/admin adresi girince yeniden çağrılır).
-          // tradeNumber zaten "TRD-..." formatında → çift önek olmasın diye direkt kullan.
-          const ozelKargoTakipNo = `${trade.tradeNumber}-WH-${side.suffix}`
-            .replace(/[^a-zA-Z0-9-]/g, '')
-            .slice(0, 50);
+          if (!side.address) {
+            this.logger.warn(
+              `Trade ${trade.tradeNumber} side ${side.suffix} (user=${side.shipperId}) has no address; inbound shipment NOT created — admin must intervene`,
+            );
+            continue;
+          }
 
           // Bu taraf için to_warehouse satırı VARSA yeniden kullan, YOKSA oluştur.
+          // (Tek kaynak: artık ayrı bir "warehouse-shipments" helper'ı yok; etiket
+          // oluşturma + adres + Sürat sevkiyatı yalnız burada yapılır.)
           let row = await tx.tradeShipment.findFirst({
             where: {
               tradeId: trade.id,
@@ -297,26 +297,24 @@ export class TradeService {
           });
 
           if (row) {
-            // Eski/yarım kalmış satırda eksik alanları (adres + takip no) doldur.
-            const patch: Prisma.TradeShipmentUpdateInput = {};
-            if (!row.fromAddressId && side.address) {
-              patch.fromAddress = { connect: { id: side.address.id } };
-            }
-            if (!row.trackingNumber) {
-              patch.trackingNumber = ozelKargoTakipNo;
-            }
-            if (Object.keys(patch).length > 0) {
+            // Eski/yarım kalmış satır adres içermiyorsa şimdi doldur.
+            if (!row.fromAddressId) {
               row = await tx.tradeShipment.update({
                 where: { id: row.id },
-                data: patch,
+                data: { fromAddressId: side.address.id },
               });
             }
           } else {
+            // tradeNumber zaten "TRD-..." formatında geliyor; çift "TRD-" önekini
+            // önlemek için doğrudan tradeNumber'ı kullan.
+            const ozelKargoTakipNo = `${trade.tradeNumber}-WH-${side.suffix}`
+              .replace(/[^a-zA-Z0-9-]/g, '')
+              .slice(0, 50);
             row = await tx.tradeShipment.create({
               data: {
                 tradeId: trade.id,
                 shipperId: side.shipperId,
-                fromAddressId: side.address?.id ?? null,
+                fromAddressId: side.address.id,
                 carrier: 'surat',
                 trackingNumber: ozelKargoTakipNo,
                 status: ShipmentStatus.label_created,
@@ -327,24 +325,16 @@ export class TradeService {
             });
           }
 
-          // Sürat sevkiyatı yalnız adres VARSA hazırlanır; yoksa ertelenir.
-          const payload = side.address
-            ? this.buildSuratPayloadForInboundLeg(
-                side.user,
-                side.address,
-                row.trackingNumber,
-                trade.tradeNumber,
-              )
-            : null;
-          if (!side.address) {
-            this.logger.warn(
-              `Trade ${trade.tradeNumber} side ${side.suffix} (user=${side.shipperId}) has no address; tracking issued but Sürat dispatch deferred`,
-            );
-          }
+          const payload = this.buildSuratPayloadForInboundLeg(
+            side.user,
+            side.address,
+            row.trackingNumber,
+            trade.tradeNumber,
+          );
 
           dispatched.push({
             shipmentId: row.id,
-            ozelKargoTakipNo: row.trackingNumber ?? ozelKargoTakipNo,
+            ozelKargoTakipNo: row.trackingNumber,
             payload,
           });
         }
