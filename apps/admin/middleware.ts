@@ -12,15 +12,12 @@ export function middleware(request: NextRequest) {
     return NextResponse.next();
   }
 
-  // Check for auth token in cookies
-  const token = request.cookies.get('admin_token')?.value;
-  console.log(`Middleware Path: ${pathname}, Token present: ${!!token}`);
+  // Oturum varlığını REFRESH cookie'sine göre belirle. Access cookie (admin_token)
+  // 30dk'da düşer ama refresh 7g geçerlidir; navigasyonda erken login'e atılmayı önler.
+  const session = request.cookies.get('admin_refresh_token')?.value;
 
-  // If no token, redirect to login
-  if (!token) {
-    console.log('No token found, redirecting to /login');
+  if (!session) {
     const loginUrl = new URL('/login', request.url);
-
     loginUrl.searchParams.set('redirect', pathname);
     return NextResponse.redirect(loginUrl);
   }

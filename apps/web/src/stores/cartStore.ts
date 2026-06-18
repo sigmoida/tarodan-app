@@ -94,7 +94,8 @@ interface CartState {
   error: string | null;
   warnings: string[];
   
-  // Auth token (set by auth store)
+  // Giriş durumu işaretçisi (authStore set eder). Gerçek token DEĞİL; sadece "girişli mi"
+  // bilgisi — auth artık httpOnly cookie ile taşınır, sepet fetch'leri credentials:'include' kullanır.
   authToken: string | null;
   setAuthToken: (token: string | null) => void;
   
@@ -143,7 +144,7 @@ export const useCartStore = create<CartState>()(
       },
       
       fetchCart: async () => {
-        const token = get().authToken ?? (typeof window !== 'undefined' ? localStorage.getItem('auth_token') : null);
+        const token = get().authToken ?? (typeof window !== 'undefined' && localStorage.getItem('tarodan_authed') === '1' ? '1' : null);
         if (!token) {
           // Use offline cart
           const offlineItems = get().offlineItems;
@@ -162,8 +163,8 @@ export const useCartStore = create<CartState>()(
         
         try {
           const response = await fetch(`${API_URL}/api/cart`, {
+            credentials: 'include',
             headers: {
-              'Authorization': `Bearer ${token}`,
               'Content-Type': 'application/json',
             },
           });
@@ -202,7 +203,7 @@ export const useCartStore = create<CartState>()(
           console.warn('addToCart: productId is required');
           return;
         }
-        const token = get().authToken ?? (typeof window !== 'undefined' ? localStorage.getItem('auth_token') : null);
+        const token = get().authToken ?? (typeof window !== 'undefined' && localStorage.getItem('tarodan_authed') === '1' ? '1' : null);
         
         if (!token) {
           set({ isLoading: true, error: null });
@@ -236,8 +237,8 @@ export const useCartStore = create<CartState>()(
         try {
           const response = await fetch(`${API_URL}/api/cart/items`, {
             method: 'POST',
+            credentials: 'include',
             headers: {
-              'Authorization': `Bearer ${token}`,
               'Content-Type': 'application/json',
             },
             body: JSON.stringify({ productId: id, quantity }),
@@ -285,7 +286,7 @@ export const useCartStore = create<CartState>()(
       },
       
       removeFromCart: async (productId) => {
-        const token = get().authToken ?? (typeof window !== 'undefined' ? localStorage.getItem('auth_token') : null);
+        const token = get().authToken ?? (typeof window !== 'undefined' && localStorage.getItem('tarodan_authed') === '1' ? '1' : null);
         
         const id = typeof productId === 'string' ? productId : (productId as any)?.productId;
         if (!id) return;
@@ -310,9 +311,7 @@ export const useCartStore = create<CartState>()(
         try {
           const response = await fetch(`${API_URL}/api/cart/items/${id}`, {
             method: 'DELETE',
-            headers: {
-              'Authorization': `Bearer ${token}`,
-            },
+            credentials: 'include',
           });
           
           if (!response.ok) {
@@ -344,7 +343,7 @@ export const useCartStore = create<CartState>()(
       },
       
       updateQuantity: async (productId, quantity) => {
-        const token = get().authToken ?? (typeof window !== 'undefined' ? localStorage.getItem('auth_token') : null);
+        const token = get().authToken ?? (typeof window !== 'undefined' && localStorage.getItem('tarodan_authed') === '1' ? '1' : null);
         if (!token) return;
         
         set({ isLoading: true, error: null });
@@ -352,8 +351,8 @@ export const useCartStore = create<CartState>()(
         try {
           const response = await fetch(`${API_URL}/api/cart/items/${productId}`, {
             method: 'PATCH',
+            credentials: 'include',
             headers: {
-              'Authorization': `Bearer ${token}`,
               'Content-Type': 'application/json',
             },
             body: JSON.stringify({ quantity }),
@@ -389,7 +388,7 @@ export const useCartStore = create<CartState>()(
       },
       
       applyCoupon: async (code) => {
-        const token = get().authToken ?? (typeof window !== 'undefined' ? localStorage.getItem('auth_token') : null);
+        const token = get().authToken ?? (typeof window !== 'undefined' && localStorage.getItem('tarodan_authed') === '1' ? '1' : null);
         if (!token) {
           return { success: false, error: 'Giriş yapmanız gerekiyor' };
         }
@@ -399,8 +398,8 @@ export const useCartStore = create<CartState>()(
         try {
           const response = await fetch(`${API_URL}/api/cart/coupon`, {
             method: 'POST',
+            credentials: 'include',
             headers: {
-              'Authorization': `Bearer ${token}`,
               'Content-Type': 'application/json',
             },
             body: JSON.stringify({ code }),
@@ -448,9 +447,7 @@ export const useCartStore = create<CartState>()(
         try {
           const response = await fetch(`${API_URL}/api/cart/coupon`, {
             method: 'DELETE',
-            headers: {
-              'Authorization': `Bearer ${authToken}`,
-            },
+            credentials: 'include',
           });
           
           if (!response.ok) {
@@ -482,7 +479,7 @@ export const useCartStore = create<CartState>()(
       },
       
       clearCart: async () => {
-        const token = get().authToken ?? (typeof window !== 'undefined' ? localStorage.getItem('auth_token') : null);
+        const token = get().authToken ?? (typeof window !== 'undefined' && localStorage.getItem('tarodan_authed') === '1' ? '1' : null);
         if (!token) {
           set({ offlineItems: [], subtotal: 0, grandTotal: 0, itemCount: 0 });
           return;
@@ -493,9 +490,7 @@ export const useCartStore = create<CartState>()(
         try {
           await fetch(`${API_URL}/api/cart`, {
             method: 'DELETE',
-            headers: {
-              'Authorization': `Bearer ${token}`,
-            },
+            credentials: 'include',
           });
           
           set({
@@ -565,7 +560,7 @@ export const useCartStore = create<CartState>()(
       },
       
       syncOfflineCart: async () => {
-        const token = get().authToken ?? (typeof window !== 'undefined' ? localStorage.getItem('auth_token') : null);
+        const token = get().authToken ?? (typeof window !== 'undefined' && localStorage.getItem('tarodan_authed') === '1' ? '1' : null);
         const { offlineItems } = get();
         if (!token || offlineItems.length === 0) return;
         
@@ -584,9 +579,9 @@ export const useCartStore = create<CartState>()(
     }),
     {
       name: 'cart-storage',
+      // authToken'ı KALICI yapma — hassas olmasa da girişli durumu authStore bootstrap'ı belirler.
       partialize: (state) => ({
         offlineItems: state.offlineItems,
-        authToken: state.authToken,
       }),
     }
   )

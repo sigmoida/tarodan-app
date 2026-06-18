@@ -4,75 +4,61 @@ const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001';
 
 export const api = axios.create({
   baseURL: `${API_URL}/api`,
+  // Auth artık httpOnly cookie'lerde; her istekte cookie gönderilsin.
+  withCredentials: true,
   headers: {
     'Content-Type': 'application/json',
   },
 });
 
-// Request interceptor to add auth token
-api.interceptors.request.use(
-  (config) => {
-    if (typeof window !== 'undefined') {
-      const token = localStorage.getItem('admin_token');
-      if (token) {
-        config.headers.Authorization = `Bearer ${token}`;
-      } else if (process.env.NODE_ENV === 'development') {
-        console.warn('No admin token found in localStorage');
-      }
-    }
-
-    // Log request in development
-    if (process.env.NODE_ENV === 'development') {
-      console.log('API Request:', {
-        method: config.method?.toUpperCase(),
-        url: config.url,
-        baseURL: config.baseURL,
-        fullURL: `${config.baseURL}${config.url}`,
-        hasAuth: !!config.headers.Authorization,
-      });
-    }
-
+// Dev'de istek loglama. Auth localStorage'da DEĞİL; token'a hiç dokunmuyoruz (cookie taşıyor).
+if (process.env.NODE_ENV === 'development') {
+  api.interceptors.request.use((config) => {
+    console.log('API Request:', {
+      method: config.method?.toUpperCase(),
+      url: config.url,
+      fullURL: `${config.baseURL}${config.url}`,
+    });
     return config;
-  },
-  (error) => {
-    return Promise.reject(error);
-  }
-);
+  });
+}
 
-// Oturumu sonlandır (refresh de başarısızsa).
-function forceLogout() {
-  if (typeof window === 'undefined') return;
-  localStorage.removeItem('admin_token');
-  localStorage.removeItem('admin_refresh_token');
-  localStorage.removeItem('admin_user');
-  // Middleware admin erişimini admin_token COOKIE'sine göre açıyor; cookie
-  // temizlenmezse ölü oturum "girişli" görünüp sonsuz 401'e sokuyor.
-  document.cookie = 'admin_token=; path=/; max-age=0; SameSite=Lax';
+// Oturumu sonlandır (refresh de başarısızsa): sunucu cookie'leri silsin, login'e dön.
+let isLoggingOut = false;
+async function forceLogout() {
+  if (typeof window === 'undefined' || isLoggingOut) return;
+  // Zaten /login'deysek yönlendirme yapma — yoksa bootstrap probe'unun 401'i sonsuz reload döngüsü kurar.
+  if (window.location.pathname === '/login') return;
+  isLoggingOut = true;
+  try {
+    await axios.post(`${API_URL}/api/auth/admin/logout`, null, {
+      withCredentials: true,
+    });
+  } catch {
+    // yoksay — yine de login'e gidiyoruz
+  }
   window.location.href = '/login';
 }
 
 // Eşzamanlı 401'lerde tek refresh yapmak için kuyruk.
 let isRefreshing = false;
-let refreshQueue: Array<(token: string | null) => void> = [];
-const flushQueue = (token: string | null) => {
-  refreshQueue.forEach((cb) => cb(token));
+let refreshQueue: Array<(ok: boolean) => void> = [];
+const flushQueue = (ok: boolean) => {
+  refreshQueue.forEach((cb) => cb(ok));
   refreshQueue = [];
 };
-
-function persistAccessToken(token: string) {
-  localStorage.setItem('admin_token', token);
-  const maxAge = 24 * 60 * 60;
-  document.cookie = `admin_token=${token}; path=/; max-age=${maxAge}; SameSite=Lax`;
-}
 
 const isAuthUrl = (url: string) =>
   url.includes('/auth/admin/login') ||
   url.includes('/auth/login') ||
+  url.includes('/auth/admin/logout') ||
+  url.includes('/auth/logout') ||
+  url.includes('/auth/admin/refresh') ||
   url.includes('/auth/refresh') ||
   url.includes('/auth/forgot-password') ||
   url.includes('/auth/reset-password');
 
-// Response interceptor: 401'de refresh token'la sessizce yenile, sonra isteği tekrarla.
+// Response interceptor: 401'de refresh cookie ile sessizce yenile, sonra isteği tekrarla.
 api.interceptors.response.use(
   (response) => response,
   async (error) => {
@@ -82,7 +68,6 @@ api.interceptors.response.use(
         method: error.config?.method,
         status: error.response?.status,
         message: error.message,
-        response: error.response?.data,
       });
     }
 
@@ -96,50 +81,30 @@ api.interceptors.response.use(
       !isAuthUrl(reqUrl) &&
       !originalRequest._retry
     ) {
-      const refreshToken = localStorage.getItem('admin_refresh_token');
-      if (!refreshToken) {
-        forceLogout();
-        return Promise.reject(error);
-      }
       originalRequest._retry = true;
 
       // Zaten bir refresh sürüyorsa kuyruğa gir, bitince tekrarla.
       if (isRefreshing) {
         return new Promise((resolve, reject) => {
-          refreshQueue.push((token) => {
-            if (token) {
-              originalRequest.headers = originalRequest.headers || {};
-              originalRequest.headers.Authorization = `Bearer ${token}`;
-              resolve(api(originalRequest));
-            } else {
-              reject(error);
-            }
+          refreshQueue.push((ok) => {
+            if (ok) resolve(api(originalRequest));
+            else reject(error);
           });
         });
       }
 
       isRefreshing = true;
       try {
-        // Interceptor'sız ham axios ile yenile (sonsuz döngü olmasın, eski token gitmesin).
-        const resp = await axios.post(`${API_URL}/api/auth/refresh`, {
-          refreshToken,
+        // Refresh token httpOnly cookie'de — body göndermiyoruz. Admin'e özel uçtan yenile
+        // (aynı tarayıcıda kullanıcı oturumu da varsa doğru admin cookie'si yenilensin).
+        await axios.post(`${API_URL}/api/auth/admin/refresh`, null, {
+          withCredentials: true,
         });
-        const newAccess: string | undefined =
-          resp.data?.accessToken ?? resp.data?.tokens?.accessToken;
-        const newRefresh: string | undefined =
-          resp.data?.refreshToken ?? resp.data?.tokens?.refreshToken;
-        if (!newAccess) throw new Error('Yenileme yanıtında token yok');
-
-        persistAccessToken(newAccess);
-        if (newRefresh) localStorage.setItem('admin_refresh_token', newRefresh);
-        flushQueue(newAccess);
-
-        originalRequest.headers = originalRequest.headers || {};
-        originalRequest.headers.Authorization = `Bearer ${newAccess}`;
+        flushQueue(true);
         return api(originalRequest);
       } catch (refreshErr) {
-        flushQueue(null);
-        forceLogout();
+        flushQueue(false);
+        await forceLogout();
         return Promise.reject(refreshErr);
       } finally {
         isRefreshing = false;

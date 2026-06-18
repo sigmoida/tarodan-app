@@ -21,7 +21,6 @@ export default function LoginPage() {
   const {
     user,
     setUser,
-    setToken,
     isAuthenticated,
     isLoading: isAuthLoading,
   } = useAuthStore();
@@ -68,23 +67,10 @@ export default function LoginPage() {
       }
 
       if (response.data.tokens?.accessToken) {
-        const accessToken = response.data.tokens.accessToken;
-        const refreshToken = response.data.tokens?.refreshToken;
-        setToken(accessToken);
+        // Token'lar httpOnly cookie olarak backend tarafından set edildi; JS'te saklamıyoruz.
         setUser(response.data.user);
+        toast.success("Giriş başarılı!");
         if (typeof window !== "undefined") {
-          localStorage.setItem("admin_token", accessToken);
-          if (refreshToken)
-            localStorage.setItem("admin_refresh_token", refreshToken);
-          localStorage.setItem(
-            "admin_user",
-            JSON.stringify(response.data.user),
-          );
-          const maxAge = 24 * 60 * 60;
-          document.cookie = `admin_token=${accessToken}; path=/; max-age=${maxAge}; SameSite=Lax`;
-
-          toast.success("Giriş başarılı!");
-
           window.location.href = landingFor(response.data.user?.role);
         }
       } else {

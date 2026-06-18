@@ -66,7 +66,8 @@ export function createTarodanClient(config: ClientConfig): TarodanClient {
   return new TarodanClient(config);
 }
 
-// Default configuration for web apps
+// Default configuration for web apps.
+// Auth httpOnly cookie ile taşınır: withCredentials açık, token localStorage'dan OKUNMAZ.
 export function createWebClient(options?: {
   baseURL?: string;
   getToken?: () => string | null;
@@ -74,15 +75,11 @@ export function createWebClient(options?: {
 }): TarodanClient {
   return new TarodanClient({
     baseURL: options?.baseURL || process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001',
-    getToken: options?.getToken || (() => {
-      if (typeof window !== 'undefined') {
-        return localStorage.getItem('token');
-      }
-      return null;
-    }),
+    withCredentials: true,
+    // Varsayılan token getter YOK (cookie auth). Bearer gerekiyorsa çağıran açıkça geçsin.
+    getToken: options?.getToken,
     onUnauthorized: options?.onUnauthorized || (() => {
       if (typeof window !== 'undefined') {
-        localStorage.removeItem('token');
         window.location.href = '/login';
       }
     }),

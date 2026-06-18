@@ -3,8 +3,9 @@
 import { useEffect, useMemo, useState, type ComponentType } from 'react';
 import Link from 'next/link';
 import Image from 'next/image';
-import { usePathname, useRouter } from 'next/navigation';
+import { usePathname } from 'next/navigation';
 import { useAuthStore } from '@/lib/stores/authStore';
+import { useIdleLogout } from '@/hooks/useIdleLogout';
 import clsx from 'clsx';
 import { Button, Input, adminRoleConfig, enumLabel } from '@tarodan/ui';
 import {
@@ -171,8 +172,9 @@ interface AdminLayoutProps {
 
 export default function AdminLayout({ children }: AdminLayoutProps) {
   const pathname = usePathname();
-  const router = useRouter();
   const { user, logout } = useAuthStore();
+  // 1 saat hareketsizlikte otomatik logout (Balanced politika).
+  useIdleLogout();
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [navQuery, setNavQuery] = useState('');
 
@@ -247,8 +249,8 @@ export default function AdminLayout({ children }: AdminLayoutProps) {
   const [accountMenuOpen, setAccountMenuOpen] = useState(false);
 
   const handleLogout = () => {
-    logout();
-    router.push('/login');
+    // logout() cookie'leri sunucuda temizler ve /login'e yönlendirir.
+    void logout();
   };
 
   const renderNavLink = (item: NavItem, opts?: { nested?: boolean }) => {

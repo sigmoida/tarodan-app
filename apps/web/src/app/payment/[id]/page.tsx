@@ -46,7 +46,8 @@ export default function PaymentPage() {
       typeof window !== "undefined" &&
       window.location.search.includes("guest=true");
     const hasToken =
-      typeof window !== "undefined" && !!localStorage.getItem("auth_token");
+      typeof window !== "undefined" &&
+      localStorage.getItem("tarodan_authed") === "1";
     // Oturum token'ı varken yalnızca isAuthenticated=false ise (ör. ağ hatası) girişe atma;
     // GET /payments/:id/status zaten isteğe bağlı JWT ile çalışır.
     if (!isAuthenticated && !isGuestCheckout && !urlGuest && !hasToken) {
@@ -95,7 +96,7 @@ export default function PaymentPage() {
             const hasSession =
               isAuthenticated ||
               (typeof window !== "undefined" &&
-                !!localStorage.getItem("auth_token"));
+                localStorage.getItem("tarodan_authed") === "1");
             router.push(
               `/payment/success?paymentId=${paymentId}${!hasSession ? "&guest=true" : ""}`,
             );

@@ -150,13 +150,14 @@ function getInitialAuthFromStorage(): Pick<AuthState, 'token' | 'refreshToken' |
   if (typeof window === 'undefined') {
     return { token: null, refreshToken: null, isAuthenticated: false, isLoading: true };
   }
-  const token = localStorage.getItem('auth_token');
-  const refreshToken = localStorage.getItem('refresh_token');
+  // Token artık JS'te tutulmuyor (httpOnly cookie). Girişli olabileceğimizi hassas OLMAYAN
+  // işaretçiden tahmin et; kesin karar checkAuth() ile cookie üzerinden verilir.
+  const maybeAuthed = localStorage.getItem('tarodan_authed') === '1';
   return {
-    token,
-    refreshToken,
+    token: null,
+    refreshToken: null,
     isAuthenticated: false,
-    isLoading: !!token,
+    isLoading: maybeAuthed,
   };
 }
 
@@ -174,21 +175,17 @@ export const useAuthStore = create<AuthState>()(
       
       login: async (email: string, password: string) => {
         const response = await authApi.login(email, password);
-        const { user: apiUser, tokens } = response.data;
-        const token = tokens.accessToken;
-        const refreshToken = tokens.refreshToken;
-        
+        const { user: apiUser } = response.data;
+        // Token'lar httpOnly cookie olarak backend tarafından set edildi; JS'te saklamıyoruz.
+        // Sadece hassas olmayan "girişli" işaretçisini bırakırız (interceptor/cart için).
         if (typeof window !== 'undefined') {
-          localStorage.setItem('auth_token', token);
-          if (refreshToken) {
-            localStorage.setItem('refresh_token', refreshToken);
-          }
+          localStorage.setItem('tarodan_authed', '1');
         }
-        
+
         const user = mapApiUser(apiUser);
         const limits = TIER_LIMITS[user.membershipTier];
-        
-        set({ user, token, refreshToken, isAuthenticated: true, limits });
+
+        set({ user, token: null, refreshToken: null, isAuthenticated: true, limits });
       },
       
       register: async (displayName: string, email: string, password: string, phone?: string, birthDate?: string, acceptMarketing?: boolean) => {
@@ -199,48 +196,52 @@ export const useAuthStore = create<AuthState>()(
       
       logout: async () => {
         try {
-          await authApi.logout();
+          await authApi.logout(); // sunucu httpOnly cookie'leri temizler
         } catch (e) {
           // Ignore logout errors
         }
-        
+
         if (typeof window !== 'undefined') {
+          localStorage.removeItem('tarodan_authed');
+          // Eski anahtarların tek seferlik temizliği (token artık cookie'de).
           localStorage.removeItem('auth_token');
           localStorage.removeItem('refresh_token');
         }
-        
+
         set({ user: null, token: null, refreshToken: null, isAuthenticated: false, limits: null, isLoading: false });
       },
       
       checkAuth: async () => {
-        const token = typeof window !== 'undefined' 
-          ? localStorage.getItem('auth_token') 
-          : null;
-        const refreshToken = typeof window !== 'undefined'
-          ? localStorage.getItem('refresh_token')
-          : null;
+        // Eski (güvensiz) token anahtarlarının tek seferlik temizliği — artık httpOnly cookie kullanıyoruz.
+        if (typeof window !== 'undefined') {
+          localStorage.removeItem('auth_token');
+          localStorage.removeItem('refresh_token');
+        }
+        // Girişli olabilir miyiz? Hassas olmayan işaretçi. Yoksa profil çağrısı yapmadan misafir say.
+        const maybeAuthed =
+          typeof window !== 'undefined' && localStorage.getItem('tarodan_authed') === '1';
 
-        if (!token) {
+        if (!maybeAuthed) {
           set({ user: null, token: null, refreshToken: null, isAuthenticated: false, limits: null, isLoading: false });
           return;
         }
 
         set({ isLoading: true });
         try {
-          // Use /users/me for more complete profile data
+          // /users/me — 401 olursa api interceptor'ı cookie ile sessiz refresh deneyip tekrarlar.
           const response = await userApi.getProfile();
           const apiUser = response.data.user || response.data;
           const user = mapApiUser(apiUser);
           const limits = TIER_LIMITS[user.membershipTier];
-          set({ user, token, refreshToken, isAuthenticated: true, limits });
+          if (typeof window !== 'undefined') localStorage.setItem('tarodan_authed', '1');
+          set({ user, token: null, refreshToken: null, isAuthenticated: true, limits });
         } catch (error: unknown) {
           const status = (error as { response?: { status?: number } })?.response?.status;
           const isUnauthorized = status === 401 || status === 403;
           if (isUnauthorized) {
-            // Token gerçekten geçersiz → temizle ve oturumu kapat.
+            // Oturum gerçekten geçersiz → işaretçiyi temizle ve oturumu kapat.
             if (typeof window !== 'undefined') {
-              localStorage.removeItem('auth_token');
-              localStorage.removeItem('refresh_token');
+              localStorage.removeItem('tarodan_authed');
             }
             set({ user: null, token: null, refreshToken: null, isAuthenticated: false, limits: null });
           } else {
@@ -303,7 +304,8 @@ export const useAuthStore = create<AuthState>()(
     },
     {
       name: 'auth-storage',
-      partialize: (state) => ({ token: state.token, refreshToken: state.refreshToken }),
+      // Token'lar artık httpOnly cookie'de; localStorage'a hiçbir hassas alan yazılmaz.
+      partialize: () => ({}),
     }
   )
 );
