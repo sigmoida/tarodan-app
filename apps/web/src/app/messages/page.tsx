@@ -38,6 +38,7 @@ interface Message {
   senderId: string;
   createdAt: string;
   status: 'sent' | 'delivered' | 'read' | 'pending' | 'rejected';
+  readAt?: string | null;
   isFiltered?: boolean;
   filterReason?: string;
 }
@@ -625,6 +626,20 @@ export default function MessagesPage() {
                             </span>
                             {message.status === 'pending' && <span className="text-xs">⏳</span>}
                             {message.status === 'rejected' && <span className="text-xs">❌</span>}
+                            {isFromMe &&
+                              (message.status === 'sent' ||
+                                message.status === 'delivered' ||
+                                message.status === 'read') && (
+                                <span
+                                  className={`text-xs leading-none ${
+                                    message.readAt ? 'text-sky-300' : 'text-inverted/70'
+                                  }`}
+                                  title={message.readAt ? 'Okundu' : 'İletildi'}
+                                  aria-label={message.readAt ? 'Okundu' : 'İletildi'}
+                                >
+                                  {message.readAt ? '✓✓' : '✓'}
+                                </span>
+                              )}
                           </div>
                         </div>
                       </div>
