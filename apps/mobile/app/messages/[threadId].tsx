@@ -10,6 +10,7 @@ import { detectViolations, getViolationMessage, parseMessageContent } from '../.
 import { mediaApi, userApi } from '../../src/services/api';
 import { resolveImageUrl } from '../../src/utils/imageUrl';
 import ReportModal from '../../src/components/ReportModal';
+import { getSocket } from '../../src/services/socket';
 
 const { colors } = theme;
 
@@ -51,7 +52,11 @@ export default function MessageThreadScreen() {
         fetchThread(threadId);
         fetchMessages(threadId);
         markAsRead(threadId);
+        getSocket()?.emit('join:thread', { threadId });
       }
+      return () => {
+        if (threadId) getSocket()?.emit('leave:thread', { threadId });
+      };
     }, [threadId])
   );
 

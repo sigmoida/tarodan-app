@@ -13,11 +13,6 @@
     "test:e2e:report": "playwright show-report"
   },
   "dependencies": {
-    "@tarodan/types": "workspace:*",
-    "@tarodan/api-client": "workspace:*",
-    "@tarodan/core": "workspace:*",
-    "@tarodan/ui": "workspace:*",
-    "@tarodan/design-tokens": "workspace:*",
     "@headlessui/react": "^1.7.18",
     "@heroicons/react": "^2.1.1",
     "@hookform/resolvers": "^3.3.4",
@@ -37,6 +32,11 @@
     "@radix-ui/react-tooltip": "^1.0.7",
     "@sentry/nextjs": "^7.91.0",
     "@tanstack/react-query": "^5.17.0",
+    "@tarodan/api-client": "workspace:*",
+    "@tarodan/core": "workspace:*",
+    "@tarodan/design-tokens": "workspace:*",
+    "@tarodan/types": "workspace:*",
+    "@tarodan/ui": "workspace:*",
     "axios": "^1.6.2",
     "class-variance-authority": "^0.7.0",
     "clsx": "^2.1.0",
@@ -47,6 +47,7 @@
     "react-dom": "^18.2.0",
     "react-hook-form": "^7.49.3",
     "react-hot-toast": "^2.4.1",
+    "socket.io-client": "^4.8.3",
     "tailwind-merge": "^2.2.0",
     "zod": "^3.22.4",
     "zustand": "^4.4.7"

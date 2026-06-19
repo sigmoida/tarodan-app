@@ -19,6 +19,7 @@ import { ExpoPushProvider } from './providers/expo-push.provider';
 import { SmsProvider } from './providers/sms.provider';
 import { SmtpProvider } from './providers/smtp.provider';
 import { StorageService } from '../storage/storage.service';
+import { RealtimeService } from '../websocket/realtime.service';
 
 // Notification templates (Turkish)
 const NOTIFICATION_TEMPLATES: Record<NotificationType, { title: string; message: string; icon?: string; link?: string }> = {
@@ -454,6 +455,7 @@ export class NotificationService {
     private readonly smsProvider: SmsProvider,
     private readonly smtpProvider: SmtpProvider,
     private readonly storageService: StorageService,
+    private readonly realtime: RealtimeService,
   ) {}
 
   /**
@@ -507,7 +509,7 @@ export class NotificationService {
           // getInAppNotifications() would surface the notification twice in the
           // bell. logNotification is only a delivery tracker for the external
           // channels (email/push/sms).
-          results.in_app = await this.saveInAppNotification(dto.userId, dto.type, title, message, dto.data);
+          results.in_app = !!(await this.saveInAppNotification(dto.userId, dto.type, title, message, dto.data));
           break;
 
         case NotificationChannel.SMS:
@@ -599,7 +601,7 @@ export class NotificationService {
     title: string,
     message: string,
     data?: Record<string, any>,
-  ): Promise<boolean> {
+  ): Promise<string | null> {
     this.logger.log(`[saveInAppNotification] Saving for userId=${userId}, type=${type}`);
     try {
       const template = NOTIFICATION_TEMPLATES[type];
@@ -653,7 +655,7 @@ export class NotificationService {
           this.logger.log(
             `[saveInAppNotification] Collapsed into existing notification id=${existing.id} (messageCount=${messageCount})`,
           );
-          return true;
+          return existing.id;
         }
       }
 
@@ -676,10 +678,10 @@ export class NotificationService {
       });
 
       this.logger.log(`[saveInAppNotification] Successfully saved notification id=${notification.id}`);
-      return true;
+      return notification.id;
     } catch (error) {
       this.logger.error(`[saveInAppNotification] Failed to save for ${userId}:`, error);
-      return false;
+      return null;
     }
   }
 
@@ -705,9 +707,25 @@ export class NotificationService {
     
     this.logger.log(`[createInAppNotification] Saving notification: title="${title}", message="${message}"`);
 
-    const result = await this.saveInAppNotification(userId, type, title, message, data);
-    this.logger.log(`[createInAppNotification] Result: ${result}`);
-    return result;
+    const notificationId = await this.saveInAppNotification(userId, type, title, message, data);
+    this.logger.log(`[createInAppNotification] Result: ${notificationId}`);
+
+    if (notificationId) {
+      try {
+        this.realtime.emitNotification(userId, {
+          id: notificationId,
+          type,
+          title,
+          message,
+          data,
+          createdAt: new Date().toISOString(),
+        });
+      } catch (e) {
+        this.logger.warn(`[createInAppNotification] realtime emit failed: ${e}`);
+      }
+    }
+
+    return !!notificationId;
   }
 
   /**

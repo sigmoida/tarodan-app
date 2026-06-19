@@ -10,6 +10,7 @@ import { useAuthStore } from '@/stores/authStore';
 import { Button, Input, Spinner } from '@tarodan/ui';
 import { messagesApi, listingsApi, api, mediaApi } from '@/lib/api';
 import { useTranslation } from '@/i18n';
+import { useMessagingSocket } from '@/hooks/useMessagingSocket';
 
 interface MessageThread {
   id: string;
@@ -37,6 +38,7 @@ interface Message {
   senderId: string;
   createdAt: string;
   status: 'sent' | 'delivered' | 'read' | 'pending' | 'rejected';
+  readAt?: string | null;
   isFiltered?: boolean;
   filterReason?: string;
 }
@@ -115,6 +117,42 @@ const checkContentFilter = (text: string, locale: string): { passed: boolean; wa
   
   return { passed: true };
 };
+
+/**
+ * Okundu durumu göstergesi.
+ * read=false → tek çentik (iletildi), read=true → mavi çift çentik (okundu).
+ * Lucide tarzı stroke ikonlar.
+ */
+function MessageTicks({ read }: { read: boolean }) {
+  return (
+    <span
+      className={`inline-flex shrink-0 ${read ? 'text-sky-400' : 'text-inverted/60'}`}
+      title={read ? 'Okundu' : 'İletildi'}
+      aria-label={read ? 'Okundu' : 'İletildi'}
+    >
+      <svg
+        width="15"
+        height="15"
+        viewBox="0 0 24 24"
+        fill="none"
+        stroke="currentColor"
+        strokeWidth="2.5"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        xmlns="http://www.w3.org/2000/svg"
+      >
+        {read ? (
+          <>
+            <path d="M18 6 7 17l-5-5" />
+            <path d="m22 10-7.5 7.5L13 16" />
+          </>
+        ) : (
+          <path d="M20 6 9 17l-5-5" />
+        )}
+      </svg>
+    </span>
+  );
+}
 
 export default function MessagesPage() {
   const router = useRouter();
@@ -220,6 +258,8 @@ export default function MessagesPage() {
     meta: { page: 'messages' },
   });
   const messages = messagesQuery.data ?? [];
+
+  const { typingUserIds } = useMessagingSocket({ activeThreadId: selectedThread?.id });
 
   useEffect(() => {
     if (selectedThread?.id && messagesQuery.isSuccess) {
@@ -573,9 +613,13 @@ export default function MessagesPage() {
                   <p className="font-semibold text-heading text-sm truncate">
                     {selectedThread.otherUser?.displayName || 'Kullanıcı'}
                   </p>
-                  {selectedThread.product && (
+                  {typingUserIds.length > 0 ? (
+                    <p className="text-xs text-primary-600 truncate">
+                      {locale === 'en' ? 'typing…' : 'yazıyor…'}
+                    </p>
+                  ) : selectedThread.product ? (
                     <p className="text-xs text-primary-600 truncate">📦 {selectedThread.product.title}</p>
-                  )}
+                  ) : null}
                 </div>
               </div>
 
@@ -627,6 +671,12 @@ export default function MessagesPage() {
                             </span>
                             {message.status === 'pending' && <span className="text-xs">⏳</span>}
                             {message.status === 'rejected' && <span className="text-xs">❌</span>}
+                            {isFromMe &&
+                              (message.status === 'sent' ||
+                                message.status === 'delivered' ||
+                                message.status === 'read') && (
+                                <MessageTicks read={!!message.readAt} />
+                              )}
                           </div>
                         </div>
                       </div>

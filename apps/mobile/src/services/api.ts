@@ -28,6 +28,12 @@ const getApiUrl = () => {
 
 const API_URL = getApiUrl();
 
+/** Çözümlenmiş API base URL'i (örn. http://host:3001/api). socket.ts gibi
+ *  modüller buradan okur; URL çözümleme davranışını değiştirmez. */
+export function getApiBaseUrl(): string {
+  return API_URL;
+}
+
 /**
  * Stabil avatar URL'i. Backend `GET /users/:id/avatar` taze bir presigned URL'e
  * 302 redirect eder; URL hep aynı kaldığı için 24s'lik presigned expiry'sinden

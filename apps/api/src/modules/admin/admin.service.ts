@@ -2225,6 +2225,7 @@ export class AdminService {
       where: { id: orderId },
       include: {
         product: true,
+        shipment: true,
       },
     });
 
@@ -2236,6 +2237,49 @@ export class AdminService {
     const validStatuses = Object.values(OrderStatus);
     if (!validStatuses.includes(dto.status as OrderStatus)) {
       throw new BadRequestException('Geçersiz sipariş durumu');
+    }
+
+    // Sipariş durumu elle ilerletildiğinde kargo (shipment) durumunu da senkronize et.
+    // Aksi halde web tarafında kargo kartı shipment.status'e bakıp "Satıcı hazırlıyor"
+    // gibi yanıltıcı bilgi göstermeye devam ediyor (kaynak: tutarsız shipment.status).
+    if (order.shipment) {
+      const current = order.shipment.status;
+      const isReturnFlow =
+        current === ShipmentStatus.return_in_progress ||
+        current === ShipmentStatus.returned;
+      let targetShipmentStatus: ShipmentStatus | null = null;
+
+      switch (dto.status as OrderStatus) {
+        case OrderStatus.shipped:
+          if (
+            current === ShipmentStatus.pending ||
+            current === ShipmentStatus.label_created
+          ) {
+            targetShipmentStatus = ShipmentStatus.in_transit;
+          }
+          break;
+        case OrderStatus.delivered:
+        case OrderStatus.awaiting_buyer_confirmation:
+        case OrderStatus.completed:
+          if (current !== ShipmentStatus.delivered && !isReturnFlow) {
+            targetShipmentStatus = ShipmentStatus.delivered;
+          }
+          break;
+        case OrderStatus.cancelled:
+          if (current === ShipmentStatus.pending) {
+            targetShipmentStatus = ShipmentStatus.cancelled;
+          }
+          break;
+        default:
+          break;
+      }
+
+      if (targetShipmentStatus && targetShipmentStatus !== current) {
+        await this.prisma.shipment.update({
+          where: { id: order.shipment.id },
+          data: { status: targetShipmentStatus },
+        });
+      }
     }
 
     // If order is being marked as completed, update product status based on remaining quantity
@@ -6219,14 +6263,33 @@ export class AdminService {
               orderNumber: true,
               totalAmount: true,
               seller: { select: { id: true, displayName: true, email: true } },
-              product: { select: { id: true, title: true } },
+              product: {
+                select: {
+                  id: true,
+                  title: true,
+                  images: {
+                    take: 1,
+                    orderBy: { sortOrder: 'asc' },
+                    select: { cardKey: true },
+                  },
+                },
+              },
             },
           },
         },
       }),
       this.prisma.refundRequest.count({ where }),
     ]);
-    return { items, total, page, limit };
+    const mapped = items.map((rr: any) => {
+      const product = rr?.order?.product;
+      if (product) {
+        product.images = (product.images ?? [])
+          .map((img: any) => ({ url: this.resolveProductImageUrl(img?.cardKey) }))
+          .filter((img: any) => img.url);
+      }
+      return rr;
+    });
+    return { items: mapped, total, page, limit };
   }
 
   async getRefundRequestDetail(refundRequestId: string) {
@@ -6249,6 +6312,12 @@ export class AdminService {
       },
     });
     if (!rr) throw new NotFoundException('İade talebi bulunamadı');
+    const product = (rr as any)?.order?.product;
+    if (product) {
+      product.images = (product.images ?? [])
+        .map((img: any) => ({ url: this.resolveProductImageUrl(img?.cardKey) }))
+        .filter((img: any) => img.url);
+    }
     return rr;
   }
 

@@ -957,7 +957,34 @@ export default function OrderDetailPage() {
                 yola çıktıktan sonra (pending durumunda satıcının zaten 'Kargo Referans Numarası'
                 kartı var, çift bilgi olmasın) */}
             {order.shipment && (() => {
-              const s = order.shipment.status;
+              // Sipariş durumu (order.status) admin tarafından elle ileri alındığında
+              // shipment.status geride kalabiliyor. Bu durumda kargo kartının "Satıcı
+              // hazırlıyor" gibi yanıltıcı bilgi göstermemesi için sipariş durumunu
+              // gerçeğin kaynağı kabul edip etkin (effective) bir kargo durumu türetiyoruz.
+              const orderShipped = [
+                "shipped",
+                "delivered",
+                "awaiting_buyer_confirmation",
+                "completed",
+              ].includes(order.status);
+              const orderDelivered = [
+                "delivered",
+                "awaiting_buyer_confirmation",
+                "completed",
+              ].includes(order.status);
+
+              let s = order.shipment.status;
+              const isReturnFlow =
+                s === "return_in_progress" || s === "returned";
+              if (orderDelivered && s !== "delivered" && !isReturnFlow) {
+                s = "delivered";
+              } else if (
+                orderShipped &&
+                (s === "pending" || s === "label_created")
+              ) {
+                s = "in_transit";
+              }
+
               const isPending = s === "pending";
               const isCancelled = s === "cancelled" || s === "failed";
               const isShippedActive =
@@ -1702,14 +1729,14 @@ export default function OrderDetailPage() {
                 {locale === "en" ? "Help" : "Yardım"}
               </h2>
               <div className="space-y-2">
-                <Button
-                  variant="secondary"
-                  className="w-full text-left px-4 py-2 text-muted hover:bg-surface rounded-lg transition-colors"
+                <Link
+                  href={`/support?orderId=${orderId}`}
+                  className="block w-full text-left px-4 py-2 text-muted hover:bg-surface rounded-lg transition-colors"
                 >
                   {locale === "en"
                     ? "Report Order Issue"
                     : "Sipariş Sorunu Bildir"}
-                </Button>
+                </Link>
                 <Link
                   href="/refund-requests"
                   className="block w-full text-left px-4 py-2 text-muted hover:bg-surface rounded-lg transition-colors"

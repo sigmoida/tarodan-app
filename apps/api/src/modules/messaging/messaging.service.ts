@@ -13,6 +13,7 @@ import { StorageService } from '../storage/storage.service';
 import { ContentFilterService } from './content-filter.service';
 import { NotificationService } from '../notification/notification.service';
 import { NotificationType } from '../notification/dto';
+import { RealtimeService } from '../websocket/realtime.service';
 import { MessageStatus, Prisma } from '@prisma/client';
 import {
   CreateThreadDto,
@@ -40,6 +41,7 @@ export class MessagingService {
     private readonly notificationService: NotificationService,
     @Optional()
     private readonly storageService: StorageService,
+    private readonly realtime: RealtimeService,
   ) {}
 
   private async resolveAvatarUrl(avatarUrl: string | null | undefined): Promise<string | null> {
@@ -238,6 +240,19 @@ export class MessagingService {
             messagePreview,
           },
         );
+
+        const unreadCount = await this.getUnreadMessageCount(receiverId);
+        this.realtime.emitNewMessage(
+          threadId,
+          receiverId,
+          this.mapMessageToDto(message),
+          {
+            threadId,
+            lastMessagePreview: messagePreview,
+            lastMessageAt: new Date().toISOString(),
+            unreadCount,
+          },
+        );
       } catch (error) {
         this.logger.error('Failed to send message notification:', error);
       }
@@ -269,6 +284,9 @@ export class MessagingService {
           messages: {
             take: 1,
             orderBy: { createdAt: 'desc' },
+            // Reddedilmiş/onay bekleyen mesajları önizlemeye yansıtma — detay
+            // ekranı da bunları gizliyor (bkz. getThreadMessages); tutarlı olsun.
+            where: { status: { in: [MessageStatus.sent, MessageStatus.approved] } },
             include: {
               sender: { select: { id: true, displayName: true } },
               receiver: { select: { id: true, displayName: true } },
@@ -438,7 +456,7 @@ export class MessagingService {
     userId: string,
     query: MessageQueryDto,
   ): Promise<MessageListResponseDto> {
-    const { page = 1, pageSize = 50 } = query;
+    const { page = 1, pageSize = 50, since } = query;
 
     // Verify access
     const thread = await this.prisma.messageThread.findUnique({
@@ -458,6 +476,10 @@ export class MessagingService {
       status: { in: [MessageStatus.sent, MessageStatus.approved] },
     };
 
+    if (since) {
+      where.createdAt = { gt: new Date(since) };
+    }
+
     const [messages, total] = await Promise.all([
       this.prisma.message.findMany({
         where,
@@ -473,15 +495,23 @@ export class MessagingService {
     ]);
 
     // Mark messages as read
-    await this.prisma.message.updateMany({
+    const unread = await this.prisma.message.findMany({
       where: {
         threadId,
         receiverId: userId,
         readAt: null,
         status: { in: [MessageStatus.sent, MessageStatus.approved] },
       },
-      data: { readAt: new Date() },
+      select: { id: true },
     });
+    if (unread.length > 0) {
+      const ids = unread.map((m) => m.id);
+      await this.prisma.message.updateMany({
+        where: { id: { in: ids } },
+        data: { readAt: new Date() },
+      });
+      this.realtime.emitMessageRead(threadId, userId, ids);
+    }
 
     return {
       messages: messages.map((m) => this.mapMessageToDto(m)),

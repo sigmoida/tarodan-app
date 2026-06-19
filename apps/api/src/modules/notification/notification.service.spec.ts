@@ -7,6 +7,7 @@ import { ExpoPushProvider } from './providers/expo-push.provider';
 import { SmsProvider } from './providers/sms.provider';
 import { SmtpProvider } from './providers/smtp.provider';
 import { StorageService } from '../storage/storage.service';
+import { RealtimeService } from '../websocket/realtime.service';
 import { NotificationType, NotificationChannel } from './dto';
 
 /**
@@ -55,6 +56,7 @@ describe('NotificationService in-app dedupe', () => {
         { provide: SmsProvider, useValue: { sendSms: jest.fn().mockResolvedValue({ success: true }), isConfigured: () => false } },
         { provide: SmtpProvider, useValue: { isConfigured: () => false } },
         { provide: StorageService, useValue: { getPublicAssetUrl: jest.fn().mockReturnValue(null) } },
+        { provide: RealtimeService, useValue: { emitNotification: jest.fn() } },
       ],
     }).compile();
 

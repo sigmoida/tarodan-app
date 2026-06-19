@@ -11,6 +11,7 @@ import { useAuthStore } from '../../src/stores/authStore';
 import { useGuestStore } from '../../src/stores/guestStore';
 import { useCartStore } from '../../src/stores/cartStore';
 import { useFavoritesStore } from '../../src/stores/favoritesStore';
+import { useMessagesStore } from '../../src/stores/messagesStore';
 import { SignupPrompt } from '../../src/components/SignupPrompt';
 import { getImageUrl as getImageUrlFromUtils } from '../../src/utils/imageUrl';
 import { isProductOutOfStock } from '../../src/utils/productPrice';
@@ -38,9 +39,15 @@ export default function HomeScreen() {
   const cartProductIds = useMemo(() => new Set(cartItems.map((i) => i.productId)), [cartItems]);
   const favCount = useFavoritesStore((s) => s.items.length);
   const fetchFavorites = useFavoritesStore((s) => s.fetchFavorites);
+  // Okunmamış mesaj sayısı — header mesaj rozeti için (tab-bar ile aynı kaynak).
+  const messageUnreadCount = useMessagesStore((s) => s.totalUnreadCount);
+  const fetchMessageUnreadCount = useMessagesStore((s) => s.fetchUnreadCount);
   useEffect(() => {
     if (isAuthenticated) fetchFavorites();
   }, [isAuthenticated]);
+  useEffect(() => {
+    if (isAuthenticated) fetchMessageUnreadCount();
+  }, [isAuthenticated, fetchMessageUnreadCount]);
 
   // Okunmamış bildirim sayısı — header zil rozeti için (profil ile aynı query key).
   const { data: unreadData } = useQuery({
@@ -357,6 +364,17 @@ export default function HomeScreen() {
             />
           </View>
           <View style={styles.headerActions}>
+            <TouchableOpacity
+              style={styles.headerIconBtn}
+              onPress={() => router.push('/messages')}
+            >
+              <Ionicons name="chatbubbles-outline" size={24} color={colors.white} />
+              {messageUnreadCount > 0 && (
+                <View style={styles.headerBadge}>
+                  <Text style={styles.headerBadgeText}>{messageUnreadCount > 99 ? '99+' : messageUnreadCount}</Text>
+                </View>
+              )}
+            </TouchableOpacity>
             <TouchableOpacity
               style={styles.headerIconBtn}
               onPress={() => router.push('/notifications')}

@@ -16,6 +16,9 @@ export * from './trade';
 // Message types
 export * from './message';
 
+// WebSocket types
+export * from './websocket';
+
 // Notification types
 export * from './notification';
 

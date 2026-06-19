@@ -1,4 +1,4 @@
-import { View, ScrollView, StyleSheet, RefreshControl } from 'react-native';
+import { View, ScrollView, StyleSheet, RefreshControl, Image } from 'react-native';
 import {
   Button,
   Card,
@@ -49,7 +49,7 @@ interface SellerRefund {
   amount?: number;
   description?: string;
   createdAt?: string;
-  order?: { orderNumber?: string; product?: { title?: string } };
+  order?: { orderNumber?: string; product?: { title?: string; images?: string[] } };
   requester?: { displayName?: string };
 }
 
@@ -180,12 +180,26 @@ export default function SellerRefundRequestsScreen() {
                 </View>
 
                 <View style={styles.cardBody}>
-                  <Text variant="label" numberOfLines={1}>
-                    {rr.order?.product?.title ?? 'Ürün'}
-                  </Text>
-                  <Text variant="caption" style={styles.muted}>
-                    Sebep: {reasonLabels[rr.reason] ?? rr.reason}
-                  </Text>
+                  <View style={styles.productRow}>
+                    {rr.order?.product?.images?.[0] ? (
+                      <Image
+                        source={{ uri: rr.order.product.images[0] }}
+                        style={styles.productImage}
+                      />
+                    ) : (
+                      <View style={[styles.productImage, styles.productImagePlaceholder]}>
+                        <Ionicons name="image-outline" size={22} color={colors.text.subtle} />
+                      </View>
+                    )}
+                    <View style={styles.productInfo}>
+                      <Text variant="label" numberOfLines={2}>
+                        {rr.order?.product?.title ?? 'Ürün'}
+                      </Text>
+                      <Text variant="caption" style={styles.muted}>
+                        Sebep: {reasonLabels[rr.reason] ?? rr.reason}
+                      </Text>
+                    </View>
+                  </View>
                   {rr.requester?.displayName ? (
                     <Text variant="caption" style={styles.muted}>
                       Alıcı: {rr.requester.displayName}
@@ -298,6 +312,10 @@ const styles = StyleSheet.create({
   },
   orderNumber: { color: colors.text.muted },
   cardBody: { gap: 4 },
+  productRow: { flexDirection: 'row', gap: 10, alignItems: 'center' },
+  productImage: { width: 52, height: 52, borderRadius: 8, backgroundColor: colors.surface.alt },
+  productImagePlaceholder: { alignItems: 'center', justifyContent: 'center' },
+  productInfo: { flex: 1, gap: 2 },
   muted: { color: colors.text.muted },
   amount: { marginTop: 6, color: colors.primary[600]! },
   actions: { flexDirection: 'row', gap: 12, marginTop: 14 },

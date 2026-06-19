@@ -6,6 +6,7 @@ import CookieConsentBanner from '@/components/CookieConsentBanner';
 import { PlatformFeeAnnouncementBanner } from '@/components/banners/PlatformFeeAnnouncementBanner';
 import { LanguageProvider } from '@/i18n/LanguageContext';
 import QueryProvider from './QueryProvider';
+import { RealtimeProvider } from '@/components/realtime/RealtimeProvider';
 
 export const metadata: Metadata = {
   metadataBase: new URL(process.env.NEXT_PUBLIC_APP_URL || 'https://tarodan.com'),
@@ -52,6 +53,7 @@ export default function RootLayout({
       <body className="min-h-screen flex flex-col" suppressHydrationWarning>
         <LanguageProvider>
           <QueryProvider>
+            <RealtimeProvider />
             <PlatformFeeAnnouncementBanner />
             <LayoutShell>
               {children}

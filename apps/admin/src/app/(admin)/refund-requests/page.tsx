@@ -39,7 +39,7 @@ interface RefundRequestRow {
     orderNumber: string;
     totalAmount: number | string;
     seller: { id: string; displayName: string; email: string };
-    product: { id: string; title: string };
+    product: { id: string; title: string; images?: { url: string }[] };
   };
 }
 
@@ -116,6 +116,29 @@ export default function RefundRequestsPage() {
           {row.original.order.orderNumber}
         </Link>
       ),
+    },
+    {
+      header: "Ürün",
+      cell: ({ row }) => {
+        const img = row.original.order.product.images?.[0]?.url;
+        return (
+          <div className="flex items-center gap-2 max-w-[220px]">
+            <div className="w-10 h-10 rounded-md bg-surface-alt flex items-center justify-center overflow-hidden flex-shrink-0">
+              {img ? (
+                // eslint-disable-next-line @next/next/no-img-element
+                <img
+                  src={img}
+                  alt={row.original.order.product.title}
+                  className="w-full h-full object-cover"
+                />
+              ) : (
+                <span className="text-base">📦</span>
+              )}
+            </div>
+            <span className="text-xs truncate">{row.original.order.product.title}</span>
+          </div>
+        );
+      },
     },
     {
       header: "Alıcı",

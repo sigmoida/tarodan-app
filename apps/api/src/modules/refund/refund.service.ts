@@ -31,6 +31,7 @@ import { CreateRefundRequestDto } from './dto/create-refund-request.dto';
 import { RejectRefundRequestDto } from './dto/reject-refund-request.dto';
 import { NotificationService } from '../notification/notification.service';
 import { NotificationType } from '../notification/dto/notification.dto';
+import { StorageService } from '../storage/storage.service';
 
 const COOLING_OFF_DAYS = 14;
 const SELLER_RESPONSE_DEADLINE_HOURS = 48;
@@ -51,7 +52,30 @@ export class RefundService {
     @Inject(forwardRef(() => PaymentService)) private readonly paymentService: PaymentService,
     private readonly suratCargoService: SuratCargoService,
     private readonly notificationService: NotificationService,
+    private readonly storageService: StorageService,
   ) {}
+
+  /**
+   * Refund yanıtlarında ürün resimlerini ham ProductImage kaydı yerine
+   * herkesin doğrudan <img src> olarak kullanabileceği public URL dizisine
+   * çevirir. Web/mobil/admin tüm iade ekranları bu şekli bekliyor.
+   */
+  private toProductImageUrls(images: unknown): string[] {
+    if (!Array.isArray(images)) return [];
+    return images
+      .map((img: any) =>
+        img?.cardKey ? this.storageService.getPublicAssetUrl(img.cardKey) : '',
+      )
+      .filter(Boolean);
+  }
+
+  private withResolvedImages<T extends Record<string, any>>(rr: T): T {
+    const product = rr?.order?.product;
+    if (product?.images) {
+      product.images = this.toProductImageUrls(product.images);
+    }
+    return rr;
+  }
 
   /**
    * Append a transition entry to RefundRequest.metadata.history. Used as a
@@ -333,11 +357,11 @@ export class RefundService {
     if (!isAdmin && rr.requesterId !== userId && rr.order.sellerId !== userId) {
       throw new ForbiddenException('Bu talebi görüntüleme yetkiniz yok');
     }
-    return rr;
+    return this.withResolvedImages(rr);
   }
 
   async listForBuyer(userId: string) {
-    return this.prisma.refundRequest.findMany({
+    const rows = await this.prisma.refundRequest.findMany({
       where: { requesterId: userId },
       orderBy: { createdAt: 'desc' },
       include: {
@@ -351,10 +375,11 @@ export class RefundService {
         },
       },
     });
+    return rows.map((rr) => this.withResolvedImages(rr));
   }
 
   async listForSeller(userId: string) {
-    return this.prisma.refundRequest.findMany({
+    const rows = await this.prisma.refundRequest.findMany({
       where: { order: { sellerId: userId } },
       orderBy: { createdAt: 'desc' },
       include: {
@@ -369,6 +394,7 @@ export class RefundService {
         requester: { select: { id: true, displayName: true } },
       },
     });
+    return rows.map((rr) => this.withResolvedImages(rr));
   }
 
   async openReturnShipment(refundRequestId: string) {
@@ -608,6 +634,7 @@ export class RefundService {
 
   private classifyOrderPhase(order: {
     status: OrderStatus;
+    deliveredAt?: Date | null;
     shipment: { status: ShipmentStatus; deliveredAt: Date | null } | null;
   }): 'paid' | 'preparing' | 'in_cooling_off' | 'past_cooling_off' | 'unknown' {
     if (order.status === OrderStatus.paid || order.status === OrderStatus.preparing) {
@@ -624,8 +651,15 @@ export class RefundService {
     if (order.status === OrderStatus.shipped) {
       return 'in_cooling_off';
     }
-    if (order.status === OrderStatus.delivered || order.status === OrderStatus.completed) {
-      const deliveredAt = order.shipment?.deliveredAt;
+    if (
+      order.status === OrderStatus.delivered ||
+      order.status === OrderStatus.awaiting_buyer_confirmation ||
+      order.status === OrderStatus.completed
+    ) {
+      // Teslim tarihi order.deliveredAt'e yazılır (shipping.worker). Track
+      // güncellemesinde shipment.deliveredAt set edilmediği için order alanı
+      // birincil kaynaktır; shipment yalnızca yedek.
+      const deliveredAt = order.deliveredAt ?? order.shipment?.deliveredAt ?? null;
       if (!deliveredAt) return 'in_cooling_off';
       const ageDays = (Date.now() - deliveredAt.getTime()) / (1000 * 3600 * 24);
       return ageDays <= COOLING_OFF_DAYS ? 'in_cooling_off' : 'past_cooling_off';

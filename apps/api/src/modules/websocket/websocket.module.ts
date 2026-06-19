@@ -5,10 +5,13 @@
 import { Module } from '@nestjs/common';
 import { JwtModule } from '@nestjs/jwt';
 import { ConfigModule, ConfigService } from '@nestjs/config';
+import { PrismaModule } from '../../prisma';
 import { TarodanWebSocketGateway } from './websocket.gateway';
+import { RealtimeService } from './realtime.service';
 
 @Module({
   imports: [
+    PrismaModule,
     ConfigModule,
     JwtModule.registerAsync({
       imports: [ConfigModule],
@@ -21,7 +24,7 @@ import { TarodanWebSocketGateway } from './websocket.gateway';
       inject: [ConfigService],
     }),
   ],
-  providers: [TarodanWebSocketGateway],
-  exports: [TarodanWebSocketGateway],
+  providers: [TarodanWebSocketGateway, RealtimeService],
+  exports: [TarodanWebSocketGateway, RealtimeService],
 })
 export class WebSocketModule {}

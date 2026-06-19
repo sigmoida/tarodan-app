@@ -340,7 +340,33 @@ export default function TrackOrderPage() {
             </div>
 
             {order.shipment && (() => {
-              const s = order.shipment.status;
+              // Sipariş durumu elle ilerletildiğinde shipment.status geride kalabiliyor;
+              // yanıltıcı "hazırlanıyor" bilgisi göstermemek için sipariş durumundan
+              // etkin kargo durumu türet (bkz. orders/[id] aynı mantık).
+              const orderShipped = [
+                "shipped",
+                "delivered",
+                "awaiting_buyer_confirmation",
+                "completed",
+              ].includes(order.status);
+              const orderDelivered = [
+                "delivered",
+                "awaiting_buyer_confirmation",
+                "completed",
+              ].includes(order.status);
+
+              let s = order.shipment.status;
+              const isReturnFlow =
+                s === "return_in_progress" || s === "returned";
+              if (orderDelivered && s !== "delivered" && !isReturnFlow) {
+                s = "delivered";
+              } else if (
+                orderShipped &&
+                (s === "pending" || s === "label_created")
+              ) {
+                s = "in_transit";
+              }
+
               const isPending = s === "pending";
               const isCancelled = s === "cancelled" || s === "failed";
               const showTracking =
