@@ -54,7 +54,7 @@ export default function PaymentFailPage() {
           window.location.search.includes("guest=true"));
       const response = isGuest
         ? await paymentsApi.getStatusLightGuest(paymentId!)
-        : await paymentsApi.getStatus(paymentId!);
+        : await paymentsApi.getStatusLight(paymentId!);
       setPayment(response.data);
       // Ödeme hâlâ pending ise (PayTR callback ulaşmamış olabilir) rezervasyonu hemen serbest bırak
       if (response.data?.status === "pending") {

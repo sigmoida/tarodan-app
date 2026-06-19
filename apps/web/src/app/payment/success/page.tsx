@@ -126,7 +126,7 @@ export default function PaymentSuccessPage() {
           window.location.search.includes("guest=true"));
       const response = isGuest
         ? await paymentsApi.getStatusLightGuest(paymentId!)
-        : await paymentsApi.getStatus(paymentId!);
+        : await paymentsApi.getStatusLight(paymentId!);
 
       const paymentData = response.data;
       setPayment(paymentData);

@@ -212,7 +212,7 @@ export class EmailWorker {
       'order-created-buyer': `Siparişiniz alındı - ${data?.orderNumber || ''}`,
       'order-created-seller': `Yeni sipariş - ${data?.orderNumber || ''}`,
       'order-paid': `Ödeme alındı - ${data?.orderNumber || ''}`,
-      'order-paid-seller': `Ödeme alındı, kargoya hazırlayın - ${data?.orderNumber || ''}`,
+      'order-paid-seller': `Yeni sipariş - ${data?.orderNumber || ''}`,
       'order-shipped': 'Siparişiniz Kargoya Verildi',
       'order-delivered': 'Siparişiniz Teslim Edildi',
       'password-reset': 'Şifre Sıfırlama Talebi',
@@ -482,10 +482,10 @@ export class EmailWorker {
       `, 'Ödeme Alındı'),
 
       'order-paid-seller': wrapEmail(`
-        ${title('Ödeme Alındı - Kargoya Hazırlayın', '💰')}
+        ${title('Yeni Sipariş!', '🎉')}
         ${greeting(data?.sellerName)}
         <p style="font-size: 15px; color: #4b5563; line-height: 1.6; margin: 0 0 20px 0;">
-          Siparişiniz için ödeme alındı. Lütfen ürünü <strong style="color: #dc2626;">en geç 3 iş günü</strong> içinde kargoya veriniz.
+          Tebrikler! Ürününüz satıldı ve ödemesi alındı. Lütfen ürünü <strong style="color: #dc2626;">en geç 3 iş günü</strong> içinde kargoya veriniz.
         </p>
         ${successBox(`
           <p style="margin: 0; font-size: 16px; color: #166534; font-weight: 600;">
@@ -518,7 +518,7 @@ export class EmailWorker {
             ℹ️ Not: Ödemeniz, alıcı ürünü teslim aldıktan 7 gün sonra hesabınıza aktarılacaktır.
           </p>
         `)}
-      `, 'Ödeme Alındı - Kargoya Hazırlayın'),
+      `, 'Yeni Sipariş!'),
 
       'order-shipped': wrapEmail(`
         ${title('Siparişiniz Kargoya Verildi', '📦')}
