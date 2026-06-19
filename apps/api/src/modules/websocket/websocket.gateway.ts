@@ -16,6 +16,7 @@ import { Server, Socket } from 'socket.io';
 import { Logger, UseGuards } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
 import { ConfigService } from '@nestjs/config';
+import { PrismaService } from '../../prisma';
 
 interface AuthenticatedSocket extends Socket {
   userId?: string;
@@ -52,6 +53,7 @@ export class TarodanWebSocketGateway
   constructor(
     private readonly jwtService: JwtService,
     private readonly configService: ConfigService,
+    private readonly prisma: PrismaService,
   ) {}
 
   afterInit(server: Server) {
@@ -122,10 +124,27 @@ export class TarodanWebSocketGateway
   // ==================== MESSAGING ====================
 
   @SubscribeMessage('join:thread')
-  handleJoinThread(
+  async handleJoinThread(
     @ConnectedSocket() client: AuthenticatedSocket,
     @MessageBody() data: { threadId: string },
   ) {
+    const thread = await this.prisma.messageThread.findUnique({
+      where: { id: data.threadId },
+    });
+
+    const isParticipant =
+      !!thread &&
+      (client.userId === thread.participant1Id ||
+        client.userId === thread.participant2Id);
+
+    if (!isParticipant) {
+      this.logger.warn(
+        `User ${client.userId} denied join to thread ${data.threadId}`,
+      );
+      client.emit('error', { message: 'Bu konuya erişim yetkiniz yok' });
+      return { event: 'error', data: { threadId: data.threadId } };
+    }
+
     client.join(`thread:${data.threadId}`);
     this.logger.log(`User ${client.userId} joined thread ${data.threadId}`);
     return { event: 'joined:thread', data: { threadId: data.threadId } };
