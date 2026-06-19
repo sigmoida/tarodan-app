@@ -41,6 +41,10 @@ export class MessageQueryDto {
   @IsOptional()
   @IsString()
   before?: string; // Message ID to fetch before (pagination)
+
+  @IsOptional()
+  @IsString()
+  since?: string; // ISO createdAt — bu andan SONRAKİ mesajları getir (catch-up)
 }
 
 export class PendingMessageQueryDto {

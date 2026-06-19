@@ -456,7 +456,7 @@ export class MessagingService {
     userId: string,
     query: MessageQueryDto,
   ): Promise<MessageListResponseDto> {
-    const { page = 1, pageSize = 50 } = query;
+    const { page = 1, pageSize = 50, since } = query;
 
     // Verify access
     const thread = await this.prisma.messageThread.findUnique({
@@ -476,6 +476,10 @@ export class MessagingService {
       status: { in: [MessageStatus.sent, MessageStatus.approved] },
     };
 
+    if (since) {
+      where.createdAt = { gt: new Date(since) };
+    }
+
     const [messages, total] = await Promise.all([
       this.prisma.message.findMany({
         where,
@@ -491,15 +495,23 @@ export class MessagingService {
     ]);
 
     // Mark messages as read
-    await this.prisma.message.updateMany({
+    const unread = await this.prisma.message.findMany({
       where: {
         threadId,
         receiverId: userId,
         readAt: null,
         status: { in: [MessageStatus.sent, MessageStatus.approved] },
       },
-      data: { readAt: new Date() },
+      select: { id: true },
     });
+    if (unread.length > 0) {
+      const ids = unread.map((m) => m.id);
+      await this.prisma.message.updateMany({
+        where: { id: { in: ids } },
+        data: { readAt: new Date() },
+      });
+      this.realtime.emitMessageRead(threadId, userId, ids);
+    }
 
     return {
       messages: messages.map((m) => this.mapMessageToDto(m)),
