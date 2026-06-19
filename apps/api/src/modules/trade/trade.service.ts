@@ -920,6 +920,14 @@ export class TradeService {
           (product.quantity ?? 0) - (product.reservedQuantity ?? 0);
         if (available <= 0) {
           const reason = 'Stok takas icin ayrildi';
+          // Müsait adet bittiyse ürünü 'reserved' yap: status=active filtreleri
+          // (liste/arama/öne çıkanlar) ve detay (findOne) artık gizler, başka
+          // kullanıcı göremez/satın alamaz. Takas iptal/red/iade/tamamlanınca
+          // ilgili yollar status'u tekrar active'e (ya da sold/inactive) çevirir.
+          await tx.product.update({
+            where: { id: productId },
+            data: { status: ProductStatus.reserved },
+          });
           await this.productLockService.invalidateRelatedOffers(
             tx,
             productId,
