@@ -330,7 +330,6 @@ export default function TradeDetailPage() {
   const [counterMessage, setCounterMessage] = useState("");
   const [isLoadingCounterData, setIsLoadingCounterData] = useState(false);
   const [shipAddressId, setShipAddressId] = useState("");
-  const [shipCarrier, setShipCarrier] = useState("aras");
 
   useEffect(() => {
     if (authLoading) return;
@@ -505,11 +504,11 @@ export default function TradeDetailPage() {
   };
 
   const handleShipSubmit = async () => {
-    if (!trade || !shipAddressId || !shipCarrier) {
+    if (!trade || !shipAddressId) {
       toast.error(
         locale === "en"
-          ? "Please select address and carrier"
-          : "Lütfen adres ve kargo firması seçin",
+          ? "Please select an address"
+          : "Lütfen adres seçin",
       );
       return;
     }
@@ -517,7 +516,7 @@ export default function TradeDetailPage() {
     try {
       await tradesApi.ship(trade.id, {
         fromAddressId: shipAddressId,
-        carrier: shipCarrier,
+        carrier: "surat",
       });
       toast.success(
         locale === "en"
@@ -525,7 +524,6 @@ export default function TradeDetailPage() {
           : "Kargo bilgisi gönderildi",
       );
       setShipAddressId("");
-      setShipCarrier("aras");
       await invalidateTrade();
     } catch (error: any) {
       if (process.env.NODE_ENV === "development")
@@ -2034,20 +2032,6 @@ export default function TradeDetailPage() {
                     {locale === "en" ? "" : " bölümünden ekleyebilirsiniz."}
                   </p>
                 )}
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-body mb-2">
-                  {locale === "en" ? "Carrier" : "Kargo firması"}
-                </label>
-                <Select
-                  value={shipCarrier}
-                  onChange={(e) => setShipCarrier(e.target.value)}
-                  className="rounded-xl"
-                >
-                  <option value="aras">Aras Kargo</option>
-                  <option value="yurtici">Yurtiçi Kargo</option>
-                  <option value="mng">MNG Kargo</option>
-                </Select>
               </div>
               <Button
                 variant="primary"

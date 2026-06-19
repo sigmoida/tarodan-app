@@ -35,6 +35,7 @@ const { colors, spacing, radius } = theme;
 interface OrderDetail {
   id: string;
   orderNumber: string;
+  isMembership?: boolean;
   status: string;
   totalAmount: number;
   shippingCost: number;
@@ -345,7 +346,13 @@ export default function OrderDetailScreen() {
     return `₺${price.toLocaleString('tr-TR')}`;
   };
 
-  const canRate = order && ['delivered', 'completed'].includes(order.status);
+  // Üyelik/dijital siparişler (sanal ürün + platform satıcısı, "MEM-" sipariş no) fiziksel
+  // ürün gibi davranmaz: değerlendirme/iade/teslimat adresi/kargo gösterilmez.
+  const isMembershipOrder =
+    !!order && (order.isMembership ?? order.orderNumber?.startsWith('MEM-') ?? false);
+
+  const canRate =
+    order && !isMembershipOrder && ['delivered', 'completed'].includes(order.status);
 
   if (isLoading) {
     return (
@@ -508,7 +515,8 @@ export default function OrderDetailScreen() {
           </Pressable>
         </Card>
 
-        {/* Shipping Address */}
+        {/* Shipping Address — üyelik/dijital siparişlerde gösterilmez */}
+        {!isMembershipOrder && (
         <Card variant="elevated" style={styles.card}>
           <Text variant="label" style={styles.sectionTitle}>Teslimat Adresi</Text>
           {order.shippingAddress ? (
@@ -535,6 +543,7 @@ export default function OrderDetailScreen() {
             </Text>
           )}
         </Card>
+        )}
 
         {/* Price Summary */}
         <Card variant="elevated" style={styles.card}>
@@ -543,10 +552,12 @@ export default function OrderDetailScreen() {
             <Text>Ürün Tutarı</Text>
             <Text>{formatPrice(order.product.price)}</Text>
           </View>
-          <View style={styles.priceRow}>
-            <Text>Kargo</Text>
-            <Text>{formatPrice(order.shippingCost)}</Text>
-          </View>
+          {!isMembershipOrder && (
+            <View style={styles.priceRow}>
+              <Text>Kargo</Text>
+              <Text>{formatPrice(order.shippingCost)}</Text>
+            </View>
+          )}
           <Divider style={{ marginVertical: 8 }} />
           <View style={styles.priceRow}>
             <Text variant="h3">Toplam</Text>
@@ -671,7 +682,9 @@ export default function OrderDetailScreen() {
         )}
 
         {/* Refund — request button (paid+ orders, buyer only, no active request) */}
+        {/* Üyelik/dijital siparişler genel iade akışına girmez (kendi iptal akışı var) */}
         {order.isBuyer &&
+          !isMembershipOrder &&
           !order.activeRefundRequest &&
           order.payment?.status === 'completed' &&
           !['cancelled', 'refunded'].includes(order.status) && (

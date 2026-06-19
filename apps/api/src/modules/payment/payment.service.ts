@@ -3108,6 +3108,7 @@ export class PaymentService {
         amount: Number(payment.amount),
         currency: payment.currency,
         provider: payment.provider,
+        providerTransactionId: payment.providerPaymentId || payment.providerConversationId,
         pricing: {
           subtotal,
           shippingAmount,
@@ -3183,6 +3184,7 @@ export class PaymentService {
       amount: Number(payment.amount),
       currency: payment.currency,
       provider: payment.provider,
+      providerTransactionId: payment.providerPaymentId || payment.providerConversationId,
       pricing,
       createdAt: payment.createdAt,
       updatedAt: payment.updatedAt,
@@ -3223,6 +3225,13 @@ export class PaymentService {
 
     if (!payment) {
       throw new NotFoundException('Ödeme bulunamadı');
+    }
+
+    // Grup veya takas ödemelerinde tekil sipariş yoktur; durum sorgusu için unified endpoint kullanılmalı
+    if (!payment.order) {
+      throw new BadRequestException(
+        'Bu ödeme bir sipariş grubuna veya takasa ait. Lütfen ödeme durumunu sipariş grubuyla sorgulayın.',
+      );
     }
 
     // Only buyer or seller can view

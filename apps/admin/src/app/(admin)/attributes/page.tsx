@@ -6,6 +6,7 @@ import { adminApi } from '@/lib/api';
 import { Button, Checkbox, Input, Spinner, Textarea, colors } from '@tarodan/ui';
 import { PlusIcon, PencilIcon, TrashIcon, Squares2X2Icon, ChevronRightIcon } from '@heroicons/react/24/outline';
 import toast from 'react-hot-toast';
+import { FilterToolbar } from '@/components/admin-list';
 
 interface AttributeGroup {
     id: string;
@@ -46,6 +47,9 @@ export default function AttributesPage() {
     const [groupForm, setGroupForm] = useState({ name: '', description: '', isRequired: false, isActive: true, sortOrder: 0 });
     const [attrForm, setAttrForm] = useState({ value: '', displayValue: '', color: defaultAttributeColor, sortOrder: 0, isActive: true });
 
+    // Arama — backend search parametresine bağlı; Enter/buton ile tetiklenir
+    const [search, setSearch] = useState('');
+
     useEffect(() => { loadGroups(); }, []);
 
     useEffect(() => {
@@ -55,22 +59,37 @@ export default function AttributesPage() {
         }
     }, [groups, groupIdFromUrl]);
 
-    const loadGroups = async () => {
+    const loadGroups = async (searchOverride?: string) => {
         setLoading(true);
         try {
-            const res = await adminApi.getAttributeGroups({ limit: 100 });
+            const currentSearch = searchOverride !== undefined ? searchOverride : search;
+            const res = await adminApi.getAttributeGroups({
+                limit: 100,
+                search: currentSearch || undefined,
+            });
             setGroups(res.data.data || []);
         } catch (e: any) { toast.error('Gruplar yüklenemedi'); }
         finally { setLoading(false); }
     };
 
-    const loadAttributes = async (groupId: string) => {
+    const loadAttributes = async (groupId: string, searchOverride?: string) => {
         setLoadingAttrs(true);
         try {
-            const res = await adminApi.getAttributes({ groupId, limit: 100 });
+            const currentSearch = searchOverride !== undefined ? searchOverride : search;
+            const res = await adminApi.getAttributes({
+                groupId,
+                limit: 100,
+                search: currentSearch || undefined,
+            });
             setAttributes(res.data.data || []);
         } catch (e: any) { toast.error('Özellikler yüklenemedi'); }
         finally { setLoadingAttrs(false); }
+    };
+
+    // Arama tetikleyicisi — hem grupları hem seçili grubun özelliklerini yeniler
+    const handleSearchSubmit = () => {
+        loadGroups(search);
+        if (selectedGroup) loadAttributes(selectedGroup.id, search);
     };
 
     const selectGroup = (g: AttributeGroup) => { setSelectedGroup(g); loadAttributes(g.id); };
@@ -115,6 +134,15 @@ export default function AttributesPage() {
                     <div className="min-w-0"><h1 className="text-2xl font-bold text-heading">Ürün Özellikleri</h1><p className="text-muted">Özellik grupları ve değerleri</p></div>
                     <Button variant="primary" size="md" onClick={openGroupCreate} className="shrink-0"><PlusIcon className="w-5 h-5" />Yeni Grup</Button>
                 </div>
+
+                {/* Arama — backend search parametresine bağlı; Enter veya buton ile tetiklenir */}
+                <FilterToolbar
+                    search={search}
+                    onSearchChange={setSearch}
+                    onSearchSubmit={handleSearchSubmit}
+                    searchPlaceholder="Grup adı veya özellik değeri ara..."
+                />
+
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-6 items-start">
                     {/* Groups Panel */}
                     <div className="admin-card p-4">

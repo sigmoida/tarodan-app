@@ -67,3 +67,26 @@ export function cancelReasonLabel(reason?: string | null): string | null {
 export function orderOriginLabel(offerId?: string | null): 'Teklif' | 'Doğrudan Satış' {
   return offerId ? 'Teklif' : 'Doğrudan Satış';
 }
+
+/**
+ * Bir status config'inden (StatusConfig map'i) liste filtresi için { value, label }
+ * seçenekleri türetir; başa "Tümü" (all) eklenir. Etiketler hep config'ten gelir →
+ * filtre seçenekleri badge'lerle birebir tutarlı kalır.
+ *
+ * - `keys` verilmezse config'teki TÜM durumlar listelenir (enum tam kapsanır).
+ * - `keys` verilirse SADECE o durumlar (o sırayla) listelenir — badge config tam kalır
+ *   ama filtreden gereksiz/ara durumları (örn. takasta per-side ara durumlar) gizlemek için.
+ */
+export function statusFilterOptions(
+  config: Record<string, { label: string }>,
+  opts: { keys?: string[]; allLabel?: string } = {},
+): { value: string; label: string }[] {
+  const { keys, allLabel = 'Tümü' } = opts;
+  const entries = keys
+    ? keys.map((k) => [k, config[k]] as const).filter(([, v]) => Boolean(v))
+    : (Object.entries(config) as [string, { label: string }][]);
+  return [
+    { value: 'all', label: allLabel },
+    ...entries.map(([value, cfg]) => ({ value, label: cfg!.label })),
+  ];
+}

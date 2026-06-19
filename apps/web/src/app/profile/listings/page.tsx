@@ -137,11 +137,8 @@ export default function ProfileListingsPage() {
       const params: Record<string, any> = { limit: 100, page: 1 };
       if (activeFilter?.trim()) params.status = activeFilter;
       const response = await userApi.getMyProducts(params);
-      let data =
+      const data =
         response.data?.data || response.data?.products || response.data || [];
-      if (!activeFilter?.trim()) {
-        data = data.filter((listing: Listing) => listing.status !== "draft");
-      }
       return Array.isArray(data) ? data : [];
     },
     enabled: isAuthenticated,

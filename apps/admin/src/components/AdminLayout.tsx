@@ -79,12 +79,11 @@ const navGroups: NavGroup[] = [
         keywords: ['takas', 'trade', 'barter', 'değişim', 'safe trade'],
       },
       {
-        name: 'Takas Kargoları',
-        href: '/trade-shipments',
+        name: 'Kargo',
+        href: '/shipping',
         icon: TruckIcon,
-        keywords: ['trade shipment', 'takas kargo', 'depoya', 'from warehouse'],
+        keywords: ['kargo', 'shipping', 'gönderi', 'takas kargo', 'iade kargo', 'etiket', 'takip', 'depoya'],
       },
-      { name: 'Kargo', href: '/shipping', icon: TruckIcon },
       {
         name: 'İade Talepleri',
         href: '/refund-requests',
@@ -408,17 +407,6 @@ export default function AdminLayout({ children }: AdminLayoutProps) {
               onClick={() => setSidebarOpen(true)}>
               <Bars3Icon className="h-6 w-6" />
             </Button>
-            <div className="hidden lg:flex items-center">
-              <Image
-                src="/tarodan-logo.jpg"
-                alt="Tarodan Logo"
-                width={100}
-                height={32}
-                className="object-contain"
-                style={{ width: 'auto', height: 'auto', maxWidth: '100%', maxHeight: '32px' }}
-              />
-              <span className="ml-2 text-sm text-muted">Admin Panel</span>
-            </div>
           </div>
           <div className="flex items-center space-x-4">
             <div className="hidden sm:flex items-center gap-2 text-sm">

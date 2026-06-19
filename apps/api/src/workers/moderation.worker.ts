@@ -16,8 +16,10 @@ import { QUEUE_NAMES } from './constants';
 
 export interface ProductModerationJob {
   productId: string;
-  /** Denetlenecek görsel S3 anahtarları (card varyantı yeterli). */
-  cardKeys: string[];
+  /** Denetlenecek görsel S3 anahtarları (detail varyantı tercih edilir; crop riski yok). */
+  imageKeys?: string[];
+  /** Eski job'lar için geriye uyumluluk. */
+  cardKeys?: string[];
 }
 
 @Processor(QUEUE_NAMES.MODERATION)
@@ -32,11 +34,12 @@ export class ModerationWorker {
 
   @Process('product-image')
   async handleProductImage(job: Job<ProductModerationJob>) {
-    const { productId, cardKeys } = job.data;
+    const { productId } = job.data;
+    const imageKeys = job.data.imageKeys?.length ? job.data.imageKeys : job.data.cardKeys;
     if (!this.ai.isEnabled) {
       return { skipped: true, reason: 'ai_disabled' };
     }
-    if (!cardKeys?.length) {
+    if (!imageKeys?.length) {
       return { skipped: true, reason: 'no_images' };
     }
 
@@ -47,7 +50,7 @@ export class ModerationWorker {
     let checked = 0;
     let topLabels: unknown = null;
 
-    for (const key of cardKeys) {
+    for (const key of imageKeys) {
       const url = this.storage.getPublicAssetUrl(key);
       if (!url) continue;
       const result = await this.ai.moderateImage(url);

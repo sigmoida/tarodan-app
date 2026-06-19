@@ -101,7 +101,6 @@ export function formatProductStatus(status: string | null | undefined, locale: s
   if (!status) return locale === 'en' ? 'Unknown' : 'Bilinmiyor';
 
   const statusMap: Record<string, { tr: string; en: string }> = {
-    'draft': { tr: 'Taslak', en: 'Draft' },
     'pending': { tr: 'Onay Bekliyor', en: 'Pending' },
     'active': { tr: 'Aktif', en: 'Active' },
     'reserved': { tr: 'Rezerve', en: 'Reserved' },

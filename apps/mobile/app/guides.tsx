@@ -44,7 +44,7 @@ const GUIDES = [
       'Orijinal kutuyu bir dış karton kutuya yerleştirin (çift kutu yöntemi).',
       'Dış kutuyu kargo bandı ile güvenli bir şekilde kapatın.',
       '"Kırılacak" etiketi kullanın.',
-      'Anlaşmalı kargo firmasından (Yurtiçi, Aras, MNG, PTT) birini seçin.',
+      'Anlaşmalı kargo firmamız Sürat Kargo ile gönderinizi oluşturun.',
       'Kargo kodunu sisteme girerek takip bilgisini paylaşın.',
       'Sigortalı gönderi seçeneğini kullanmanız tavsiye edilir.',
     ],

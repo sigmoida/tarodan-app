@@ -131,11 +131,11 @@ export class UserService {
       throw new NotFoundException('Kullanıcı bulunamadı');
     }
 
-    // Count only active listings (exclude inactive and draft)
+    // Count only active listings (exclude inactive and deleted)
     const listingCount = await this.prisma.product.count({
       where: {
         sellerId: id,
-        status: { notIn: [ProductStatus.inactive, ProductStatus.draft, ProductStatus.deleted] },
+        status: { notIn: [ProductStatus.inactive, ProductStatus.deleted] },
       },
     });
 
@@ -792,7 +792,7 @@ export class UserService {
 
     // İlan/koleksiyon sayımı viewer'a göre değişir (sahip → tümü, başkası → görünür olanlar).
     const listingWhere = isOwner
-      ? { sellerId: userId, status: { notIn: ['draft', 'deleted'] } as any }
+      ? { sellerId: userId, status: { notIn: ['deleted'] } as any }
       : { sellerId: userId, status: 'active' };
     const collectionWhere = isOwner
       ? { userId }
@@ -1127,7 +1127,7 @@ export class UserService {
         },
       }),
       this.prisma.product.count({
-        where: { sellerId: userId, status: { notIn: ['draft', 'deleted'] } },
+        where: { sellerId: userId, status: { notIn: ['deleted'] } },
       }),
       // Gerçekten satılabilir aktif ilan = active VE ödenmiş satış siparişi YOK
       this.prisma.product.count({
@@ -1141,7 +1141,7 @@ export class UserService {
       this.prisma.product.count({
         where: {
           sellerId: userId,
-          status: { notIn: ['draft', 'deleted'] },
+          status: { notIn: ['deleted'] },
           orders: { some: { status: { in: [...PAID_STATUSES] } } },
         },
       }),
@@ -1595,11 +1595,11 @@ export class UserService {
       recentViews,
       recentLikes,
     ] = await Promise.all([
-      // Total products excluding inactive, draft and deleted
+      // Total products excluding inactive and deleted
       this.prisma.product.count({
         where: {
           sellerId: userId,
-          status: { notIn: ['inactive', 'draft', 'deleted'] }
+          status: { notIn: ['inactive', 'deleted'] }
         }
       }),
       this.prisma.product.count({ where: { sellerId: userId, status: 'active' } }),

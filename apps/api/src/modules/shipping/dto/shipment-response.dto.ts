@@ -24,13 +24,13 @@ export class ShipmentResponseDto {
   @ApiProperty({ example: 'uuid-order-id' })
   orderId: string;
 
-  @ApiProperty({ example: 'aras' })
+  @ApiProperty({ example: 'surat' })
   provider: string;
 
   @ApiPropertyOptional({ example: '1234567890' })
   trackingNumber?: string;
 
-  @ApiPropertyOptional({ example: 'https://aras.com.tr/track/1234567890' })
+  @ApiPropertyOptional({ example: 'https://www.suratkargo.com.tr/KargoTakip/?kargotakipno=1234567890' })
   trackingUrl?: string;
 
   @ApiProperty({ example: 'pending' })
@@ -53,10 +53,10 @@ export class ShipmentResponseDto {
 }
 
 export class ShippingRateDto {
-  @ApiProperty({ example: 'aras' })
+  @ApiProperty({ example: 'surat' })
   provider: string;
 
-  @ApiProperty({ example: 'Aras Kargo' })
+  @ApiProperty({ example: 'Sürat Kargo' })
   providerName: string;
 
   @ApiProperty({ example: 25.50 })

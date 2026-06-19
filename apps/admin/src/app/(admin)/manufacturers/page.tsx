@@ -1,10 +1,10 @@
 'use client';
 
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useMemo, useRef } from 'react';
 import { adminApi } from '@/lib/api';
 import { Button, Input, Select, Textarea } from '@tarodan/ui';
 import { DataTable, type ColumnDef } from '@/components/DataTable';
-import { PageHeader, ActionButtons, ActionIconButton } from '@/components/admin-list';
+import { PageHeader, FilterToolbar, ActionButtons, ActionIconButton } from '@/components/admin-list';
 import {
   PlusIcon,
   PencilIcon,
@@ -40,6 +40,7 @@ interface ManufacturerFormData {
 
 export default function ManufacturersPage() {
   const [manufacturers, setManufacturers] = useState<Manufacturer[]>([]);
+  const [search, setSearch] = useState('');
   const [loading, setLoading] = useState(true);
   const [showModal, setShowModal] = useState(false);
   const [editingManufacturer, setEditingManufacturer] = useState<Manufacturer | null>(null);
@@ -55,6 +56,23 @@ export default function ManufacturersPage() {
     country: '',
     isActive: true,
   });
+
+  const filteredManufacturers = useMemo(() => {
+    const term = search.trim().toLocaleLowerCase('tr');
+    if (!term) return manufacturers;
+
+    return manufacturers.filter((manufacturer) =>
+      [
+        manufacturer.name,
+        manufacturer.slug,
+        manufacturer.country,
+        manufacturer.website,
+        manufacturer.description,
+      ]
+        .filter(Boolean)
+        .some((value) => value!.toLocaleLowerCase('tr').includes(term))
+    );
+  }, [manufacturers, search]);
 
   useEffect(() => {
     loadManufacturers();
@@ -235,12 +253,18 @@ export default function ManufacturersPage() {
           </Button>
         </PageHeader>
 
+        <FilterToolbar
+          search={search}
+          onSearchChange={setSearch}
+          searchPlaceholder="Üretici ara..."
+        />
+
         <DataTable
           columns={columns}
-          data={manufacturers}
+          data={filteredManufacturers}
           loading={loading}
-          emptyText="Henüz üretici eklenmemiş"
-          emptyAction={<Button onClick={openCreateModal}><PlusIcon className="w-5 h-5 mr-2" />İlk üreticiyi ekle</Button>}
+          emptyText={search ? 'Arama kriterine uygun üretici bulunamadı' : 'Henüz üretici eklenmemiş'}
+          emptyAction={!search ? <Button onClick={openCreateModal}><PlusIcon className="w-5 h-5 mr-2" />İlk üreticiyi ekle</Button> : undefined}
           getRowId={(m) => m.id}
         />
 

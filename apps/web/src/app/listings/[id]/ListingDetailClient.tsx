@@ -2368,17 +2368,6 @@ export default function ListingDetailClient() {
                           ))}
                         </div>
                       )}
-                      {/* Admin Reply */}
-                      {review.adminReply && (
-                        <div className="mt-3 p-3 bg-info-50 rounded-lg border-l-4 border-info-400">
-                          <p className="text-xs font-semibold text-info-700 mb-1">
-                            {locale === "en" ? "Seller Reply" : "Satıcı Yanıtı"}
-                          </p>
-                          <p className="text-sm text-info-900">
-                            {review.adminReply}
-                          </p>
-                        </div>
-                      )}
                     </div>
                   </div>
                 </div>

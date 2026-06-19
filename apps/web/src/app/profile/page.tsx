@@ -235,11 +235,10 @@ export default function ProfilePage() {
       let productsCount = 0;
       if (productsResponse?.data) {
         const products = productsResponse.data?.data || productsResponse.data?.products || [];
-        // Filter out deleted, inactive, and draft listings
-        productsCount = products.filter((p: any) => 
-          p.status !== 'deleted' && 
-          p.status !== 'inactive' && 
-          p.status !== 'draft'
+        // Filter out deleted and inactive listings
+        productsCount = products.filter((p: any) =>
+          p.status !== 'deleted' &&
+          p.status !== 'inactive'
         ).length;
       } else {
         // Fallback to meta total if available

@@ -107,6 +107,7 @@ export {
   messageStatusConfig,
   severityConfig,
   paymentProviderConfig,
+  shipmentProviderConfig,
   enumLabel,
   type StatusConfig,
   type BadgeVariant,

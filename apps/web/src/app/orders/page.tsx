@@ -12,7 +12,7 @@ import { StarIcon } from '@heroicons/react/24/solid';
 import { StarIcon as StarOutlineIcon, TruckIcon, DocumentTextIcon } from '@heroicons/react/24/outline';
 import { useTranslation } from '@/i18n';
 import { formatOrderStatus } from '@/lib/format';
-import { Button, Input, Select, Spinner, StatusBadge, Textarea, orderStatusConfig } from '@tarodan/ui';
+import { Button, Input, Spinner, StatusBadge, Textarea, orderStatusConfig } from '@tarodan/ui';
 
 interface Order {
   id: string;
@@ -117,7 +117,6 @@ export default function OrdersPage() {
   const [showShippingModal, setShowShippingModal] = useState(false);
   const [shippingOrderId, setShippingOrderId] = useState<string | null>(null);
   const [trackingNumber, setTrackingNumber] = useState('');
-  const [shippingCarrier, setShippingCarrier] = useState('');
   const [submittingShipping, setSubmittingShipping] = useState(false);
 
   useEffect(() => {
@@ -316,7 +315,6 @@ export default function OrdersPage() {
   const openShippingModal = (orderId: string) => {
     setShippingOrderId(orderId);
     setTrackingNumber('');
-    setShippingCarrier('');
     setShowShippingModal(true);
   };
 
@@ -329,7 +327,7 @@ export default function OrdersPage() {
     try {
       await api.post(`/orders/${shippingOrderId}/ship`, {
         trackingNumber: trackingNumber.trim(),
-        carrier: shippingCarrier.trim() || undefined,
+        carrier: 'Sürat Kargo',
       });
       toast.success(locale === 'en' ? 'Shipping info saved!' : 'Kargo bilgileri kaydedildi!');
       setShowShippingModal(false);
@@ -853,22 +851,9 @@ export default function OrdersPage() {
                   <label className="block text-sm font-medium text-body mb-1">
                     {locale === 'en' ? 'Shipping Company' : 'Kargo Firması'}
                   </label>
-                  <Select
-                    value={shippingCarrier}
-                    onChange={(e) => setShippingCarrier(e.target.value)}
-                  >
-                    <option value="">{locale === 'en' ? 'Select carrier' : 'Kargo firması seçin'}</option>
-                    <option value="Yurtiçi Kargo">Yurtiçi Kargo</option>
-                    <option value="Aras Kargo">Aras Kargo</option>
-                    <option value="MNG Kargo">MNG Kargo</option>
-                    <option value="PTT Kargo">PTT Kargo</option>
-                    <option value="Sürat Kargo">Sürat Kargo</option>
-                    <option value="UPS">UPS</option>
-                    <option value="DHL">DHL</option>
-                    <option value="FedEx">FedEx</option>
-                    <option value="Trendyol Express">Trendyol Express</option>
-                    <option value="Diğer">{locale === 'en' ? 'Other' : 'Diğer'}</option>
-                  </Select>
+                  <div className="px-3 py-2 rounded-lg bg-surface-muted text-body font-medium">
+                    Sürat Kargo
+                  </div>
                 </div>
 
                 <div>

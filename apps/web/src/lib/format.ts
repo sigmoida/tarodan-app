@@ -94,13 +94,12 @@ export function formatOrderStatus(status: string | null | undefined, locale: str
 
 /**
  * Format product status to Turkish
- * Converts: draft, pending, active, reserved, sold, inactive, rejected
+ * Converts: pending, active, reserved, sold, inactive, rejected
  */
 export function formatProductStatus(status: string | null | undefined, locale: string = 'tr'): string {
   if (!status) return locale === 'en' ? 'Unknown' : 'Bilinmiyor';
 
   const statusMap: Record<string, { tr: string; en: string }> = {
-    'draft': { tr: 'Taslak', en: 'Draft' },
     'pending': { tr: 'Onay Bekliyor', en: 'Pending' },
     'active': { tr: 'Aktif', en: 'Active' },
     'reserved': { tr: 'Rezerve', en: 'Reserved' },

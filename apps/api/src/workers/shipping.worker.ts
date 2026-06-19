@@ -16,7 +16,7 @@ export interface ShippingJobData {
   type: 'create-shipment' | 'track-update' | 'webhook' | 'generate-label' | 'surat-sync' | 'surat-sync-all';
   orderId?: string;
   shipmentId?: string;
-  carrier?: 'aras' | 'yurtici' | 'mng' | 'surat';
+  carrier?: 'surat';
   trackingNumber?: string;
   webhookData?: Record<string, any>;
 }
@@ -41,7 +41,7 @@ export class ShippingWorker {
   async handleCreateShipment(job: Job<ShippingJobData>) {
     this.logger.log(`Processing create shipment job ${job.id} for order ${job.data.orderId}`);
 
-    const { orderId, carrier = 'aras' } = job.data;
+    const { orderId, carrier = 'surat' } = job.data;
 
     try {
       const order = await this.prisma.order.findUnique({
@@ -105,13 +105,13 @@ export class ShippingWorker {
         throw new Error(`Shipment not found: ${shipmentId || trackingNumber}`);
       }
 
-      // Sürat Kargo uses its own tracking service
+      // Sürat Kargo uses its own tracking service (the only active carrier)
       if (shipment.provider === 'surat') {
         const success = await this.suratTrackingService.syncShipmentTracking(shipment.id);
         return { success, shipmentId: shipment.id, provider: 'surat' };
       }
 
-      // Other carriers: call their tracking API
+      // Legacy/fallback tracking path for any non-Sürat records (mock)
       const trackingInfo = await this.fetchTrackingInfo(
         shipment.provider,
         shipment.trackingNumber || '',
@@ -316,7 +316,7 @@ export class ShippingWorker {
   async handleGenerateLabel(job: Job<ShippingJobData>) {
     this.logger.log(`Processing label generation job ${job.id}`);
 
-    const { orderId, carrier = 'aras' } = job.data;
+    const { orderId, carrier = 'surat' } = job.data;
 
     try {
       const order = await this.prisma.order.findUnique({
@@ -372,8 +372,9 @@ export class ShippingWorker {
     return `${prefix}${timestamp}${random}`;
   }
 
-  private calculateEstimatedDelivery(carrier: string): Date {
-    const days = carrier === 'aras' ? 3 : carrier === 'yurtici' ? 2 : carrier === 'surat' ? 3 : 4;
+  private calculateEstimatedDelivery(_carrier: string): Date {
+    // Sürat Kargo: 3 iş günü tahmini teslim
+    const days = 3;
     const date = new Date();
     date.setDate(date.getDate() + days);
     return date;

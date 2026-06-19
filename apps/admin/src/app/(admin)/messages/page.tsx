@@ -1,11 +1,10 @@
 "use client";
 
-import { useState, useEffect } from "react";
 import { adminApi } from "@/lib/api";
 import { Button, StatusBadge } from "@tarodan/ui";
 import type { StatusConfig } from "@tarodan/ui";
-import { DataTable, type ColumnDef } from "@/components/DataTable";
-import { PageHeader, ActionButtons, ActionIconButton } from "@/components/admin-list";
+import { type ColumnDef } from "@/components/DataTable";
+import { ActionButtons, ActionIconButton } from "@/components/admin-list";
 import {
   CheckIcon,
   XMarkIcon,
@@ -13,6 +12,11 @@ import {
   NoSymbolIcon,
 } from "@heroicons/react/24/outline";
 import toast from "react-hot-toast";
+import { ResourceListPage } from "@/components/ResourceListPage";
+import { useAdminResource } from "@/hooks/useAdminResource";
+import { useMemo } from "react";
+
+// ─── Tipler ────────────────────────────────────────────────────────────────
 
 interface Message {
   id: string;
@@ -27,75 +31,93 @@ interface Message {
   threadId: string;
 }
 
-export default function MessagesPage() {
-  const [messages, setMessages] = useState<Message[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [filter, setFilter] = useState<
-    "all" | "pending" | "approved" | "rejected"
-  >("pending");
-  const [page, setPage] = useState(1);
-  const [total, setTotal] = useState(0);
+// ─── Sabitler ──────────────────────────────────────────────────────────────
 
-  useEffect(() => {
-    loadMessages();
-  }, [page, filter]);
+const filterOptions = [
+  { value: "all", label: "Tümü" },
+  { value: "pending", label: "Bekleyenler" },
+  { value: "approved", label: "Onaylananlar" },
+  { value: "rejected", label: "Reddedilenler" },
+] as const;
 
-  // Map frontend filter values to API status values
-  const mapFilterToApiStatus = (f: string) => {
-    if (f === "all") return undefined;
-    if (f === "pending") return "pending_approval";
-    return f; // 'approved' and 'rejected' stay the same
+/** Frontend filtre değerini API status değerine çevirir */
+function mapFilterToApiStatus(f: string): string | undefined {
+  if (f === "all") return undefined;
+  if (f === "pending") return "pending_approval";
+  return f; // 'approved' ve 'rejected' olduğu gibi kalır
+}
+
+/** Ham API satırını Message tipine dönüştürür */
+function mapMessage(m: any): Message {
+  return {
+    id: m.id,
+    content: m.content || m.originalContent || "",
+    originalContent: m.content || m.originalContent || "",
+    senderId: m.senderId || m.sender?.id || "",
+    sender: {
+      displayName: m.sender?.displayName || m.senderName || "Bilinmeyen",
+      email: m.sender?.email || "",
+    },
+    receiver: {
+      displayName: m.receiver?.displayName || m.receiverName || "Bilinmeyen",
+      email: m.receiver?.email || "",
+    },
+    status: (m.status === "pending_approval"
+      ? "pending"
+      : m.status) as Message["status"],
+    flaggedReason: m.flaggedReason || "",
+    createdAt: m.createdAt,
+    threadId: m.threadId || m.thread?.id || "",
   };
+}
 
-  const loadMessages = async () => {
-    setLoading(true);
-    try {
-      const apiStatus = mapFilterToApiStatus(filter);
-      const response = await adminApi.getMessages({
-        page,
-        limit: 20,
+const messageStatusConfig: Record<string, StatusConfig> = {
+  pending: { label: "Onay Bekliyor", variant: "warning" },
+  approved: { label: "Onaylandı", variant: "success" },
+  rejected: { label: "Reddedildi", variant: "danger" },
+};
+
+// ─── Sayfa ─────────────────────────────────────────────────────────────────
+
+export default function MessagesPage() {
+  const {
+    rows: rawRows,
+    total,
+    page,
+    setPage,
+    totalPages,
+    filters,
+    setFilter,
+    isLoading,
+    refetch,
+  } = useAdminResource<any>({
+    queryKey: "messages",
+    fetcher: (params) => {
+      const { status: filterStatus, ...rest } = params;
+      const apiStatus = mapFilterToApiStatus(filterStatus ?? "all");
+      return adminApi.getMessages({
+        ...rest,
         status: apiStatus,
       });
-      const apiMessages = response.data.data || response.data.messages || [];
-      const meta = response.data.meta || {};
-      const mappedMessages: Message[] = apiMessages.map((m: any) => ({
-        id: m.id,
-        content: m.content || m.originalContent || "",
-        originalContent: m.content || m.originalContent || "",
-        senderId: m.senderId || m.sender?.id || "",
-        sender: {
-          displayName: m.sender?.displayName || m.senderName || "Bilinmeyen",
-          email: m.sender?.email || "",
-        },
-        receiver: {
-          displayName:
-            m.receiver?.displayName || m.receiverName || "Bilinmeyen",
-          email: m.receiver?.email || "",
-        },
-        status: (m.status === "pending_approval"
-          ? "pending"
-          : m.status) as Message["status"],
-        flaggedReason: m.flaggedReason || "",
-        createdAt: m.createdAt,
-        threadId: m.threadId || m.thread?.id || "",
-      }));
-      setMessages(mappedMessages);
-      setTotal(meta.total ?? response.data.total ?? 0);
-    } catch (error) {
-      if (process.env.NODE_ENV === "development")
-        console.error("Load messages error:", error);
-      toast.error("Mesajlar yüklenemedi");
-    } finally {
-      setLoading(false);
-    }
-  };
+    },
+    limit: 20,
+    initialFilters: { status: "pending" },
+    errorMessage: "Mesajlar yüklenemedi",
+  });
+
+  const messages: Message[] = useMemo(
+    () => rawRows.map(mapMessage),
+    [rawRows],
+  );
+
+  // ── Aksiyonlar ─────────────────────────────────────────────────────────────
 
   const handleApprove = async (messageId: string) => {
     try {
       await adminApi.approveMessage(messageId);
       toast.success("Mesaj onaylandı");
-      loadMessages();
-    } catch (error) {
+      refetch();
+    } catch {
       toast.error("İşlem başarısız");
     }
   };
@@ -109,7 +131,7 @@ export default function MessagesPage() {
     try {
       await adminApi.rejectMessage(messageId, reason);
       toast.success("Mesaj reddedildi");
-      loadMessages();
+      refetch();
     } catch (error: any) {
       toast.error(error.response?.data?.message || "İşlem başarısız");
     }
@@ -131,17 +153,13 @@ export default function MessagesPage() {
         reason.trim() || "Mesaj kuralları ihlali",
       );
       toast.success("Gönderen kullanıcı engellendi");
-      loadMessages();
+      refetch();
     } catch (error: any) {
       toast.error(error.response?.data?.message || "İşlem başarısız");
     }
   };
 
-  const messageStatusConfig: Record<string, StatusConfig> = {
-    pending: { label: "Onay Bekliyor", variant: "warning" },
-    approved: { label: "Onaylandı", variant: "success" },
-    rejected: { label: "Reddedildi", variant: "danger" },
-  };
+  // ── Kolon tanımları ────────────────────────────────────────────────────────
 
   const columns: ColumnDef<Message, any>[] = [
     {
@@ -240,75 +258,55 @@ export default function MessagesPage() {
     },
   ];
 
+  // ── Filtre butonları ───────────────────────────────────────────────────────
+
+  const currentFilter = filters.status ?? "pending";
+
+  const filterButtons = (
+    <div className="flex gap-4">
+      {filterOptions.map((opt) => (
+        <Button
+          variant="secondary"
+          key={opt.value}
+          onClick={() => setFilter("status", opt.value)}
+          className={`px-4 py-2 rounded-lg transition-colors ${
+            currentFilter === opt.value
+              ? "bg-primary-500 text-heading"
+              : "bg-surface-alt text-muted hover:text-heading"
+          }`}
+        >
+          {opt.label}
+        </Button>
+      ))}
+    </div>
+  );
+
+  // ── Description ────────────────────────────────────────────────────────────
+
+  const description =
+    currentFilter === "all"
+      ? `Toplam ${total} mesaj`
+      : currentFilter === "pending"
+        ? `${total} mesaj onay bekliyor — Bekleyen mesajları onaylayın, reddedin veya göndereni yasaklayın`
+        : currentFilter === "approved"
+          ? `${total} onaylanmış mesaj`
+          : `${total} reddedilen mesaj`;
+
+  // ── Render ─────────────────────────────────────────────────────────────────
+
   return (
-    <>
-      <div className="space-y-6">
-        <PageHeader
-          title="Mesaj Moderation"
-          description={
-            filter === "all"
-              ? `Toplam ${total} mesaj`
-              : filter === "pending"
-                ? `${total} mesaj onay bekliyor — Bekleyen mesajları onaylayın, reddedin veya göndereni yasaklayın`
-                : filter === "approved"
-                  ? `${total} onaylanmış mesaj`
-                  : `${total} reddedilen mesaj`
-          }
-        />
-
-        <div className="flex gap-4">
-          {(["all", "pending", "approved", "rejected"] as const).map((f) => (
-            <Button
-              variant="secondary"
-              key={f}
-              onClick={() => setFilter(f)}
-              className={`px-4 py-2 rounded-lg transition-colors ${
-                filter === f
-                  ? "bg-primary-500 text-heading"
-                  : "bg-surface-alt text-muted hover:text-heading"
-              }`}
-            >
-              {f === "all"
-                ? "Tümü"
-                : f === "pending"
-                  ? "Bekleyenler"
-                  : f === "approved"
-                    ? "Onaylananlar"
-                    : "Reddedilenler"}
-            </Button>
-          ))}
-        </div>
-
-        <DataTable
-          columns={columns}
-          data={messages}
-          loading={loading}
-          emptyText="Mesaj bulunamadı"
-          getRowId={(m) => m.id}
-        />
-
-        <div className="flex items-center justify-between">
-          <p className="text-sm text-muted">
-            Sayfa {page} / {Math.ceil(total / 20)}
-          </p>
-          <div className="flex gap-2">
-            <Button
-              variant="secondary"
-              onClick={() => setPage((p) => Math.max(1, p - 1))}
-              disabled={page === 1}
-            >
-              Önceki
-            </Button>
-            <Button
-              variant="secondary"
-              onClick={() => setPage((p) => p + 1)}
-              disabled={page >= Math.ceil(total / 20)}
-            >
-              Sonraki
-            </Button>
-          </div>
-        </div>
-      </div>
-    </>
+    <ResourceListPage<Message>
+      title="Mesaj Moderation"
+      description={description}
+      filters={filterButtons}
+      columns={columns}
+      data={messages}
+      loading={isLoading}
+      emptyText="Mesaj bulunamadı"
+      getRowId={(m) => m.id}
+      page={page}
+      totalPages={totalPages}
+      onPageChange={setPage}
+    />
   );
 }

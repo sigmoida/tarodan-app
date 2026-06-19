@@ -18,7 +18,7 @@ import {
 import { AuthService } from './auth.service';
 import { LoginDto, AdminAuthResponseDto, RefreshTokenDto, TokensDto } from './dto';
 import { AdminAuthGuard, JwtRefreshGuard } from './guards';
-import { CurrentUser, Public } from './decorators';
+import { CurrentUser, Public, AdminRoute } from './decorators';
 import { RequestUser } from './interfaces';
 import { setAuthCookies, clearAuthCookies } from './utils/auth-cookies';
 
@@ -82,6 +82,10 @@ export class AdminAuthController {
    * Get admin profile
    */
   @Get('profile')
+  // @AdminRoute: global JwtAuthGuard'ı atla (o normal access_token cookie'sini ister;
+  // admin oturumunda yalnızca admin_token var → aksi halde "Oturum açmanız gerekiyor" 401).
+  // Gerçek doğrulamayı AdminAuthGuard (admin-jwt / admin_token) yapar.
+  @AdminRoute()
   @UseGuards(AdminAuthGuard)
   @ApiBearerAuth()
   @ApiOperation({ summary: 'Admin profili' })
@@ -94,18 +98,19 @@ export class AdminAuthController {
   /**
    * POST /auth/admin/logout
    * Admin logout
+   *
+   * Public: süresi dolmuş/geçersiz token'a sahip bir istemci de oturumunu kapatıp
+   * cookie'lerini temizleyebilmeli. Guard'lıyken ölü admin_token 401 alıp
+   * clearAuthCookies'e hiç ulaşmıyordu → bayat httpOnly cookie tarayıcıda kalıyor ve
+   * login↔dashboard döngüsüne yol açıyordu. logout() zaten userId kullanmayan no-op.
    */
   @Post('logout')
-  @UseGuards(AdminAuthGuard)
+  @Public()
   @HttpCode(HttpStatus.OK)
-  @ApiBearerAuth()
   @ApiOperation({ summary: 'Admin çıkış' })
   @ApiResponse({ status: 200, description: 'Çıkış yapıldı' })
-  async adminLogout(
-    @CurrentUser('id') userId: string,
-    @Res({ passthrough: true }) res: Response,
-  ) {
+  async adminLogout(@Res({ passthrough: true }) res: Response) {
     clearAuthCookies(res, { admin: true });
-    return this.authService.logout(userId);
+    return this.authService.logout('');
   }
 }

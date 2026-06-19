@@ -32,6 +32,7 @@ import { PaymentService } from './payment.service';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { Public } from '../auth/decorators/public.decorator';
 import { CurrentUser } from '../auth/decorators/current-user.decorator';
+import { COOKIE_NAMES, readCookie } from '../auth/utils/auth-cookies';
 import {
   InitiatePaymentDto,
   PayTRCallbackDto,
@@ -55,6 +56,27 @@ export class PaymentController {
     private readonly jwtService: JwtService,
     private readonly configService: ConfigService,
   ) { }
+
+  /**
+   * @Public uçlarda kullanıcıyı manuel çıkarır: önce httpOnly cookie (tarayıcı),
+   * yoksa Authorization header (mobil/araçlar) — JwtStrategy ile AYNI sıra.
+   * Web auth artık cookie'de olduğundan yalnızca Bearer header'a bakmak misafir
+   * olmayan oturumlu kullanıcıyı "giriş yapmanız gerekiyor"a düşürüyordu.
+   * Token yok/çözülemezse null döner (misafir akışı).
+   */
+  private extractUserId(req: Request): string | null {
+    const authHeader = req.headers.authorization;
+    const token =
+      readCookie(req, [COOKIE_NAMES.user.access]) ??
+      (authHeader?.startsWith('Bearer ') ? authHeader.substring(7) : null);
+    if (!token) return null;
+    try {
+      const decoded = this.jwtService.verify(token, { ignoreExpiration: true }) as any;
+      return decoded.sub || decoded.id || null;
+    } catch {
+      return null;
+    }
+  }
 
   /**
    * GET /payments/config — public, no auth.
@@ -85,19 +107,8 @@ export class PaymentController {
     @Body() dto: InitiatePaymentDto,
     @Req() req: Request,
   ): Promise<PaymentInitResponseDto> {
-    // Extract user ID from JWT if present (optional auth)
-    const authHeader = req.headers.authorization;
-    let userId: string | null = null;
-
-    if (authHeader && authHeader.startsWith('Bearer ')) {
-      try {
-        const token = authHeader.substring(7);
-        const decoded = this.jwtService.verify(token, { ignoreExpiration: true }) as any;
-        userId = decoded.sub || decoded.id;
-      } catch (e) {
-        userId = null;
-      }
-    }
+    // Optional auth: cookie (web) veya Bearer (mobil) — yoksa misafir olarak devam.
+    const userId = this.extractUserId(req);
 
     return this.paymentService.initiatePaymentUnified(userId, dto, req);
   }
@@ -134,20 +145,10 @@ export class PaymentController {
     @Body() body: { tradeId: string },
     @Req() req: Request,
   ) {
-    const authHeader = req.headers.authorization;
-    if (!authHeader || !authHeader.startsWith('Bearer ')) {
-      throw new UnauthorizedException('Oturum açmanız gerekiyor');
-    }
-    try {
-      const token = authHeader.substring(7);
-      const decoded = this.jwtService.verify(token, { ignoreExpiration: true }) as any;
-      const userId = decoded.sub || decoded.id;
-      if (!userId) throw new UnauthorizedException('Oturum açmanız gerekiyor');
-      return this.paymentService.initiateTradeCashPayment(body.tradeId, userId, req);
-    } catch (e: any) {
-      if (e instanceof UnauthorizedException) throw e;
-      throw new UnauthorizedException('Oturum açmanız gerekiyor');
-    }
+    // Trade-cash zorunlu auth: cookie (web) veya Bearer (mobil).
+    const userId = this.extractUserId(req);
+    if (!userId) throw new UnauthorizedException('Oturum açmanız gerekiyor');
+    return this.paymentService.initiateTradeCashPayment(body.tradeId, userId, req);
   }
 
   /**
@@ -240,19 +241,8 @@ export class PaymentController {
     @Param('id') id: string,
     @Req() req: Request,
   ) {
-    // Extract user ID from JWT if present
-    const authHeader = req.headers.authorization;
-    let userId: string | null = null;
-
-    if (authHeader && authHeader.startsWith('Bearer ')) {
-      try {
-        const token = authHeader.substring(7);
-        const decoded = this.jwtService.verify(token, { ignoreExpiration: true }) as any;
-        userId = decoded.sub || decoded.id;
-      } catch (e) {
-        userId = null;
-      }
-    }
+    // Optional auth: cookie (web) veya Bearer (mobil) — yoksa misafir.
+    const userId = this.extractUserId(req);
 
     return this.paymentService.getPaymentStatusUnified(id, userId);
   }

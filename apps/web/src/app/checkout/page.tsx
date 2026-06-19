@@ -1268,13 +1268,15 @@ export default function CheckoutPage() {
               router.push(`/products/unavailable/${stockoutProductId}`);
               return;
             }
+            // Tek toast: hata burada gösterildi; dıştaki catch'e tekrar fırlatma
+            // (yoksa outer catch ikinci bir toast.error atıyor → hata 2 kez görünüyor).
             toast.error(
               msg ||
                 (locale === "en"
                   ? "Failed to initiate payment. Please try again."
                   : "Ödeme başlatılamadı. Lütfen tekrar deneyin."),
             );
-            throw paymentError;
+            return;
           }
         }
       }

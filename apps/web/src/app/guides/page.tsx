@@ -193,7 +193,7 @@ const GUIDES = [
       },
       {
         title: 'Kargoya Verin',
-        content: 'Aras Kargo şubesine götürün, takip numarasını sisteme girin.',
+        content: 'Sürat Kargo şubesine götürün, takip numarasını sisteme girin.',
       },
     ],
   },

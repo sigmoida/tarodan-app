@@ -99,6 +99,11 @@ export class RatingService {
         throw new NotFoundException('Sipariş bulunamadı');
       }
 
+      // Üyelik/dijital siparişler (sanal ürün + platform satıcısı) puanlanamaz
+      if (order.orderNumber?.startsWith('MEM-')) {
+        throw new BadRequestException('Üyelik siparişleri için değerlendirme yapılamaz');
+      }
+
       // Allow rating only for delivered or completed orders (must receive before rating)
       const allowedStatuses: OrderStatus[] = [OrderStatus.completed, OrderStatus.delivered];
       if (!allowedStatuses.includes(order.status)) {
@@ -219,6 +224,11 @@ export class RatingService {
 
     if (!order) {
       throw new NotFoundException('Sipariş bulunamadı');
+    }
+
+    // Üyelik/dijital siparişler (sanal ürün + platform satıcısı) puanlanamaz
+    if (order.orderNumber?.startsWith('MEM-')) {
+      throw new BadRequestException('Üyelik siparişleri için değerlendirme yapılamaz');
     }
 
     if (order.buyerId !== userId) {
