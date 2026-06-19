@@ -141,23 +141,6 @@ export class TarodanWebSocketGateway
     return { event: 'left:thread', data: { threadId: data.threadId } };
   }
 
-  @SubscribeMessage('message:send')
-  handleSendMessage(
-    @ConnectedSocket() client: AuthenticatedSocket,
-    @MessageBody() data: { threadId: string; content: string },
-  ) {
-    // Broadcast message to thread participants
-    this.server.to(`thread:${data.threadId}`).emit('message:new', {
-      threadId: data.threadId,
-      content: data.content,
-      senderId: client.userId,
-      senderName: client.user?.displayName,
-      timestamp: new Date().toISOString(),
-    });
-
-    return { event: 'message:sent', data: { threadId: data.threadId } };
-  }
-
   @SubscribeMessage('typing:start')
   handleTypingStart(
     @ConnectedSocket() client: AuthenticatedSocket,
@@ -286,6 +269,16 @@ export class TarodanWebSocketGateway
    */
   sendAdminStats(stats: any) {
     this.server.to('admin:dashboard').emit('admin:stats', stats);
+  }
+
+  // ==================== GENERIC EMITTERS ====================
+
+  emitToThread(threadId: string, event: string, payload: unknown): void {
+    this.server.to(`thread:${threadId}`).emit(event, payload);
+  }
+
+  emitToUser(userId: string, event: string, payload: unknown): void {
+    this.server.to(`user:${userId}`).emit(event, payload);
   }
 
   // ==================== UTILITY METHODS ====================
