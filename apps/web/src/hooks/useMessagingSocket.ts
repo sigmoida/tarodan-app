@@ -2,8 +2,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import type {
-  MessageNewEvent, ThreadUpdatedEvent, MessageReadEvent,
-  NotificationNewEvent, TypingEvent,
+  MessageNewEvent, MessageReadEvent, TypingEvent,
 } from '@tarodan/types';
 import { useAuthStore } from '@/stores/authStore';
 import { getSocket, disconnectSocket } from '@/lib/socket';
@@ -29,21 +28,14 @@ export function useMessagingSocket({ activeThreadId }: { activeThreadId?: string
           mergeMessages(old ?? [], payload.message as any),
         );
       }
-      // Önizleme listesini tazele
+      // Önizleme listesini tazele (thread-scoped UX; global tazeleme
+      // RealtimeProvider'daki thread:updated dinleyicisi tarafından yapılır)
       queryClient.invalidateQueries({ queryKey: ['message-threads'] });
-    };
-    const onThreadUpdated = (_p: ThreadUpdatedEvent) => {
-      queryClient.invalidateQueries({ queryKey: ['message-threads'] });
-      queryClient.invalidateQueries({ queryKey: ['notifications-unread-count'] });
     };
     const onMessageRead = (p: MessageReadEvent) => {
       if (p.threadId === activeRef.current) {
         queryClient.invalidateQueries({ queryKey: ['messages', p.threadId] });
       }
-    };
-    const onNotification = (_n: NotificationNewEvent) => {
-      queryClient.invalidateQueries({ queryKey: ['notifications-unread-count'] });
-      queryClient.invalidateQueries({ queryKey: ['notifications'] });
     };
     const onTypingStart = (t: TypingEvent) => {
       if (t.threadId === activeRef.current && t.userId !== currentUserId) {
@@ -63,18 +55,14 @@ export function useMessagingSocket({ activeThreadId }: { activeThreadId?: string
     };
 
     socket.on('message:new', onMessageNew);
-    socket.on('thread:updated', onThreadUpdated);
     socket.on('message:read', onMessageRead);
-    socket.on('notification:new', onNotification);
     socket.on('typing:started', onTypingStart);
     socket.on('typing:stopped', onTypingStop);
     socket.io.on('reconnect', onReconnect);
 
     return () => {
       socket.off('message:new', onMessageNew);
-      socket.off('thread:updated', onThreadUpdated);
       socket.off('message:read', onMessageRead);
-      socket.off('notification:new', onNotification);
       socket.off('typing:started', onTypingStart);
       socket.off('typing:stopped', onTypingStop);
       socket.io.off('reconnect', onReconnect);
