@@ -55,11 +55,7 @@ export const MEMBERSHIP_TIERS = {
   BUSINESS: { label: 'Business', maxListings: -1, commissionRate: 4 }, // -1 = unlimited
 } as const;
 
-// Shipping carriers
+// Shipping carriers — platform tek kargo (Sürat) ile çalışır
 export const SHIPPING_CARRIERS = {
-  ARAS: { name: 'Aras Kargo', trackingUrl: 'https://araskargo.com.tr/tslm_gonderi_sorgulama.php?kession=' },
-  YK: { name: 'Yurtiçi Kargo', trackingUrl: 'https://selfservis.yurticikargo.com/reports/SSWDocumentDetail.aspx?DocNo=' },
-  MNG: { name: 'MNG Kargo', trackingUrl: 'https://www.mngkargo.com.tr/gonderi-takip/' },
-  PTT: { name: 'PTT Kargo', trackingUrl: 'https://gonderitakip.ptt.gov.tr/?bession=' },
-  SURAT: { name: 'Sürat Kargo', trackingUrl: 'https://suratkargo.com.tr/KargoTakip?kno=' },
+  SURAT: { name: 'Sürat Kargo', trackingUrl: 'https://www.suratkargo.com.tr/KargoTakip/?kargotakipno=' },
 } as const;

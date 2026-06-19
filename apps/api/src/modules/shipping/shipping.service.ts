@@ -18,17 +18,11 @@ export class ShippingService {
 
   // Provider display names
   private readonly providerNames: Record<ShippingProvider, string> = {
-    [ShippingProvider.aras]: 'Aras Kargo',
-    [ShippingProvider.yurtici]: 'Yurtiçi Kargo',
-    [ShippingProvider.mng]: 'MNG Kargo',
     [ShippingProvider.surat]: 'Sürat Kargo',
   };
 
   // Base tracking URLs
   private readonly trackingUrls: Record<ShippingProvider, string> = {
-    [ShippingProvider.aras]: 'https://www.araskargo.com.tr/trs/trsTak662.aspx?kod=',
-    [ShippingProvider.yurtici]: 'https://www.yurticikargo.com/tr/online-servisler/gonderi-sorgula?code=',
-    [ShippingProvider.mng]: 'https://www.mngkargo.com.tr/gonderi-takip/?code=',
     [ShippingProvider.surat]: 'https://www.suratkargo.com.tr/KargoTakip/?kargotakipno=',
   };
 
@@ -118,7 +112,7 @@ export class ShippingService {
   async getRateByCity(city: string, carrier: string, weightKg: number): Promise<{ rate: number }> {
     const provider = Object.values(ShippingProvider).includes(carrier as ShippingProvider)
       ? (carrier as ShippingProvider)
-      : ShippingProvider.aras;
+      : ShippingProvider.surat;
     const weight = weightKg > 0 ? weightKg : 0.5;
     const fromCity = 'İstanbul'; // Default origin for rate calculation
     const toCity = city?.trim() || 'İstanbul';
@@ -139,9 +133,6 @@ export class ShippingService {
     const baseRate = baseSetting ? parseFloat(baseSetting.settingValue) : 29.99;
 
     const baseRates: Record<ShippingProvider, number> = {
-      [ShippingProvider.aras]: baseRate,
-      [ShippingProvider.yurtici]: baseRate,
-      [ShippingProvider.mng]: baseRate,
       [ShippingProvider.surat]: baseRate,
     };
 
@@ -266,7 +257,9 @@ export class ShippingService {
       throw new ForbiddenException('Bu kargoyu güncelleme yetkiniz yok');
     }
 
-    const trackingUrl = this.trackingUrls[shipment.provider as ShippingProvider] + dto.trackingNumber;
+    const trackingUrl =
+      (this.trackingUrls[shipment.provider as ShippingProvider] ??
+        this.trackingUrls[ShippingProvider.surat]) + dto.trackingNumber;
 
     return this.prisma.$transaction(async (tx) => {
       // Update shipment

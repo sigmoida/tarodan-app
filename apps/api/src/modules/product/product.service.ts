@@ -1314,10 +1314,6 @@ export class ProductService implements OnModuleInit {
           dto.material,
           dto.attributes,
         );
-        // Reindex in ES so search/list shows updated scale/material
-        if (this.searchService.isAvailable()) {
-          this.searchService.indexProduct(id).catch((err) => this.logger.warn(`ES index update failed for ${id}:`, err));
-        }
       }
 
       // İlan Kalite Skoru + rankTier yeniden hesapla (foto/açıklama değişmiş olabilir)
@@ -1326,6 +1322,13 @@ export class ProductService implements OnModuleInit {
       // Invalidate cache for this product and product lists
       await this.cache.del(`products:detail:${id}`);
       await this.cache.delPattern('products:list:*');
+
+      // Arama index'ini güncel durum/stok/skora göre senkronla: listelenebilir
+      // ise indexle (scale/material/ranking güncel), değilse (pasife alındı vb.)
+      // ES'ten kaldır. Recompute + cache invalidation sonrası çağrılır.
+      this.searchService
+        .syncProduct(id)
+        .catch((err) => this.logger.warn(`ES sync failed for ${id}: ${err?.message}`));
 
       // If price changed, notify users who have this product in their wishlist
       if (priceChanged && updated.status === ProductStatus.active) {
@@ -1620,6 +1623,12 @@ Bu ürünü istek listenizden kaldırmak için ürün sayfasına gidip "İstek L
     await this.cache.del(`membership:limits:${sellerId}`);
     await this.cache.del(`membership:${sellerId}`);
 
+    // Arama index'inden kaldır: "Kaldırıldı" durumu listelenemez. Aksi halde
+    // ES dokümanı eski (active) haliyle kalıp aramada görünür ama detay 404 olur.
+    this.searchService
+      .syncProduct(id)
+      .catch((err) => this.logger.warn(`ES sync failed for ${id}: ${err?.message}`));
+
     return { message: 'Ürün silindi' };
   }
 
@@ -1673,9 +1682,9 @@ Bu ürünü istek listenizden kaldırmak için ürün sayfasına gidip "İstek L
       ...(status && status.trim() !== ''
         ? { status: status as ProductStatus }
         : {
-          // "Tümü": draft ve deleted hariç hepsi (sold, inactive, reserved, active,
+          // "Tümü": deleted hariç hepsi (sold, inactive, reserved, active,
           // pending, rejected görünür). Kaldırılan ürünler ayrı 'deleted' filtresinde.
-          status: { notIn: [ProductStatus.draft, ProductStatus.deleted] }
+          status: { notIn: [ProductStatus.deleted] }
         }
       ),
       // Takas teklifine eklenebilir ürünler: aktif + aktif takasta değil + müsait stoğu var
@@ -2353,19 +2362,19 @@ Bu ürünü istek listenizden kaldırmak için ürün sayfasına gidip "İstek L
         this.prisma.product.count({ where: { sellerId, status: ProductStatus.inactive } }),
         // Kaldırılan (yönetici/satıcı silmesi) — ayrı sayaç.
         this.prisma.product.count({ where: { sellerId, status: ProductStatus.deleted } }),
-        // Total should exclude inactive, draft and deleted listings (limit/usage card uses this)
+        // Total should exclude inactive and deleted listings (limit/usage card uses this)
         this.prisma.product.count({
           where: {
             sellerId,
-            status: { notIn: [ProductStatus.inactive, ProductStatus.draft, ProductStatus.deleted] }
+            status: { notIn: [ProductStatus.inactive, ProductStatus.deleted] }
           }
         }),
-        // "Tümü" sayacı: draft ve deleted hariç (inactive DAHİL). Liste "Tümü"
-        // filtresi (findSellerProducts: notIn[draft, deleted]) ile birebir.
+        // "Tümü" sayacı: deleted hariç (inactive DAHİL). Liste "Tümü"
+        // filtresi (findSellerProducts: notIn[deleted]) ile birebir.
         this.prisma.product.count({
           where: {
             sellerId,
-            status: { notIn: [ProductStatus.draft, ProductStatus.deleted] }
+            status: { notIn: [ProductStatus.deleted] }
           }
         }),
       ]);

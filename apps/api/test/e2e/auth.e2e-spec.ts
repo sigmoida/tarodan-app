@@ -197,10 +197,19 @@ describe('Auth (E2E)', () => {
         .expect(200);
     });
 
-    it('rejects unauthenticated logout (401)', async () => {
-      await request(ctx.app.getHttpServer())
+    it('allows unauthenticated logout (idempotent cookie clear)', async () => {
+      // Logout public: süresi dolmuş/geçersiz token'a sahip istemci de cookie'lerini
+      // temizleyebilmeli. Guard'lıyken ölü token 401 alıp cookie hiç silinmiyordu →
+      // bayat httpOnly cookie kalıyor ve login↔dashboard döngüsü kuruluyordu.
+      const res = await request(ctx.app.getHttpServer())
         .post('/api/auth/logout')
-        .expect(401);
+        .expect(200);
+
+      // Cookie'leri her durumda temizler (maxAge=0 / expired Set-Cookie).
+      const setCookie = res.headers['set-cookie'] as unknown as string[] | undefined;
+      expect(setCookie).toBeDefined();
+      expect(setCookie!.join(';')).toContain('access_token=');
+      expect(setCookie!.join(';')).toContain('refresh_token=');
     });
   });
 

@@ -1,10 +1,9 @@
 "use client";
 
-import { useState, useEffect, useMemo } from "react";
+import { useMemo } from "react";
 import Link from "next/link";
-import { useSearchParams, useRouter } from "next/navigation";
 import { adminApi } from "@/lib/api";
-import { cancelReasonLabel } from "@/lib/utils";
+import { cancelReasonLabel, statusFilterOptions } from "@/lib/utils";
 import {
   Button,
   Select,
@@ -12,13 +11,17 @@ import {
   tradeStatusConfig,
 } from "@tarodan/ui";
 import type { StatusConfig } from "@tarodan/ui";
-import { DataTable, type ColumnDef } from "@/components/DataTable";
-import { PageHeader, ActionButtons, ActionIconButton } from "@/components/admin-list";
+import { type ColumnDef } from "@/components/DataTable";
+import { ActionButtons, ActionIconButton } from "@/components/admin-list";
+import { ResourceListPage } from "@/components/ResourceListPage";
+import { useAdminResource } from "@/hooks/useAdminResource";
+import { useQuery } from "@tanstack/react-query";
 import {
   EyeIcon,
   ExclamationTriangleIcon,
 } from "@heroicons/react/24/outline";
-import toast from "react-hot-toast";
+
+// ─── Tipler ────────────────────────────────────────────────────────────────
 
 interface Trade {
   id: string;
@@ -26,125 +29,108 @@ interface Trade {
   status: string;
   initiator: { id: string; displayName: string };
   receiver: { id: string; displayName: string };
-  initiatorItemsCount: number;
-  receiverItemsCount: number;
   cashAmount?: number;
   hasDispute: boolean;
   createdAt: string;
   cancelReason?: string;
 }
 
-const statusOptions = [
-  { value: "all", label: "Tümü" },
-  { value: "pending", label: "Bekliyor" },
-  { value: "accepted", label: "Kabul Edildi" },
-  { value: "awaiting_payment", label: "Ödeme Bekleniyor" },
-  { value: "shipping_to_warehouse", label: "Depoya Gönderim" },
-  { value: "at_warehouse", label: "Tarodan Deposunda (İnceleme)" },
-  { value: "admin_reviewing", label: "İnceleniyor" },
-  { value: "shipping_to_recipients", label: "Alıcılara Gönderim" },
-  { value: "returning", label: "İade Yolda" },
-  { value: "both_shipped", label: "Gönderildi" },
-  { value: "completed", label: "Tamamlandı" },
-  { value: "disputed", label: "İtirazlı" },
-  { value: "cancelled", label: "İptal" },
+// ─── Sabitler ──────────────────────────────────────────────────────────────
+
+// Filtrede gösterilen takas durumları — etiketler tradeStatusConfig'ten gelir (badge'lerle tutarlı).
+// Ara/per-side durumlar (initiator_shipped, receiver_shipped, initiator_received, receiver_received)
+// bilerek gizli: admin için gereksiz detay; badge'de yine doğru görünürler.
+const TRADE_FILTER_STATUSES = [
+  "pending",
+  "accepted",
+  "rejected",
+  "awaiting_payment",
+  "shipping_to_warehouse",
+  "at_warehouse",
+  "admin_reviewing",
+  "shipping_to_recipients",
+  "returning",
+  "both_shipped",
+  "completed",
+  "disputed",
+  "cancelled",
 ];
+const statusOptions = statusFilterOptions(tradeStatusConfig, { keys: TRADE_FILTER_STATUSES });
+
+// Local dispute config entry
+const disputeConfig: Record<string, StatusConfig> = {
+  disputed_override: { label: "İtirazlı", variant: "destructive" },
+};
+
+// ─── Yardımcı: API yanıtından Trade dizisine dönüştür ──────────────────────
+
+function mapTrades(raw: any[]): Trade[] {
+  return raw.map((t: any) => ({
+    id: t.id,
+    tradeNumber: t.tradeNumber || `TRD-${t.id.slice(0, 8)}`,
+    status: t.status,
+    initiator: t.initiator || { id: "", displayName: "Başlatan" },
+    receiver: t.receiver || { id: "", displayName: "Alıcı" },
+    cashAmount: Number(t.cashAmount || 0),
+    hasDispute: !!t.dispute,
+    createdAt: t.createdAt,
+    cancelReason: t.cancelReason ?? undefined,
+  }));
+}
+
+// ─── Sayfa ─────────────────────────────────────────────────────────────────
 
 export default function TradesPage() {
-  const searchParams = useSearchParams();
-  const router = useRouter();
-  const urlUserId = useMemo(
-    () => searchParams.get("userId") || "",
-    [searchParams],
-  );
+  // ── Veri çekme (useAdminResource) ─────────────────────────────────────────
+  // status + userId hook-yönetimli filtreler (syncUrl ile URL'de yaşar: ?status= / ?userId=).
+  // userId, kullanıcı detay sayfasından ?userId= deep-link'i ile gelir. queryKey'in parçası
+  // olduğu için değişince doğru yeniden fetch tetikler (cache çakışması olmaz, "Filtreyi kaldır" çalışır).
+  const {
+    rows: rawRows,
+    total,
+    page,
+    setPage,
+    totalPages,
+    search,
+    setSearch,
+    onSearchSubmit,
+    filters,
+    setFilter,
+    isLoading,
+  } = useAdminResource<any>({
+    queryKey: "trades",
+    fetcher: (params) => adminApi.getTrades(params),
+    limit: 20,
+    syncUrl: true,
+    initialFilters: { status: "all", userId: "" },
+    errorMessage: "Takaslar yüklenemedi",
+  });
 
-  const [trades, setTrades] = useState<Trade[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [status, setStatus] = useState("all");
-  const [page, setPage] = useState(1);
-  const [total, setTotal] = useState(0);
-  const [reviewQueueCount, setReviewQueueCount] = useState(0);
+  // ?userId= deep-link filtresi artık hook filtresi; temizleme = filtreyi boşalt (URL'i de temizler).
+  const userIdFilter = filters.userId ?? "";
+  const clearUserFilter = () => setFilter("userId", "");
 
-  // User filter (driven by URL ?userId= deep-links, e.g. from user detail page)
-  const [selectedUserId, setSelectedUserId] = useState<string>(urlUserId);
+  // Mevcut satırları Trade tipine dönüştür
+  const trades: Trade[] = useMemo(() => mapTrades(rawRows), [rawRows]);
 
-  // Sync URL userId with state
-  useEffect(() => {
-    setSelectedUserId(urlUserId);
-  }, [urlUserId]);
+  // ── İnceleme kuyruğu sayacı (at_warehouse) — ayrı küçük query ─────────────
+  // Geçerli filtreden bağımsız: her zaman at_warehouse count'unu gösterir.
+  const { data: reviewQueueData } = useQuery({
+    queryKey: ["trades-review-queue-count"],
+    queryFn: async () => {
+      const res = await adminApi.getTrades({ page: 1, limit: 1, status: "at_warehouse" });
+      const meta = res.data?.meta || {};
+      const data = res.data?.data || res.data?.trades || [];
+      return (meta.total ?? data.length ?? 0) as number;
+    },
+    staleTime: 60_000, // 1 dakika taze — fazla refetch istemiyoruz
+  });
+  const reviewQueueCount = reviewQueueData ?? 0;
 
-  const clearUserFilter = () => {
-    setSelectedUserId("");
-    router.push("/trades");
-  };
-
-  useEffect(() => {
-    loadTrades();
-  }, [page, status, selectedUserId]);
-
-  // Load the admin-review queue count (at_warehouse) regardless of current filter
-  useEffect(() => {
-    const loadReviewQueueCount = async () => {
-      try {
-        const response = await adminApi.getTrades({
-          page: 1,
-          limit: 1,
-          status: "at_warehouse",
-        });
-        const meta = response.data.meta || {};
-        const data = response.data.data || response.data.trades || [];
-        setReviewQueueCount(meta.total ?? data.length ?? 0);
-      } catch (error) {
-        if (process.env.NODE_ENV === "development")
-          console.error("Review queue count error:", error);
-      }
-    };
-    loadReviewQueueCount();
-  }, [status]);
-
-  const loadTrades = async () => {
-    setLoading(true);
-    try {
-      const response = await adminApi.getTrades({
-        page,
-        limit: 20,
-        status: status === "all" ? undefined : status,
-        userId: selectedUserId || undefined,
-      });
-      const data = response.data.data || response.data.trades || [];
-      const meta = response.data.meta || {};
-      setTrades(
-        data.map((t: any) => ({
-          id: t.id,
-          tradeNumber: t.tradeNumber || `TRD-${t.id.slice(0, 8)}`,
-          status: t.status,
-          initiator: t.initiator || { id: "", displayName: "Başlatan" },
-          receiver: t.receiver || { id: "", displayName: "Alıcı" },
-          initiatorItemsCount: t.initiatorItems?.length || 0,
-          receiverItemsCount: t.receiverItems?.length || 0,
-          cashAmount: Number(t.cashAmount || 0),
-          hasDispute: !!t.dispute,
-          createdAt: t.createdAt,
-          cancelReason: t.cancelReason ?? undefined,
-        })),
-      );
-      setTotal(meta.total || data.length);
-    } catch (error) {
-      if (process.env.NODE_ENV === "development")
-        console.error("Trades load error:", error);
-      toast.error("Takaslar yüklenemedi");
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  // Local dispute config entry
-  const disputeConfig: Record<string, StatusConfig> = {
-    disputed_override: { label: "İtirazlı", variant: "destructive" },
-  };
-
+  // ── Lokaldeki itirazlı takas sayısı ───────────────────────────────────────
   const disputedCount = trades.filter((t) => t.hasDispute).length;
 
+  // ── Kolon tanımları ────────────────────────────────────────────────────────
   const columns: ColumnDef<Trade, any>[] = [
     {
       header: "Takas No",
@@ -196,14 +182,6 @@ export default function TradesPage() {
       ),
     },
     {
-      header: "Ürünler",
-      cell: ({ row }) => (
-        <>
-          {row.original.initiatorItemsCount} ↔️ {row.original.receiverItemsCount}
-        </>
-      ),
-    },
-    {
       header: "Nakit",
       cell: ({ row }) =>
         row.original.cashAmount ? (
@@ -246,38 +224,37 @@ export default function TradesPage() {
     },
   ];
 
+  // ── Render ─────────────────────────────────────────────────────────────────
   return (
-    <>
-      <div className="space-y-6">
-        <PageHeader
-          title="Takaslar"
-          description={
-            <>
-              Toplam {total} takas
-              {selectedUserId && (
-                <span className="ml-2">
-                  — Kullanıcıya göre filtreleniyor
-                  <Button
-                    variant="secondary"
-                    onClick={clearUserFilter}
-                    className="ml-2 text-primary-600 hover:underline"
-                  >
-                    Filtreyi kaldır
-                  </Button>
-                </span>
-              )}
-            </>
-          }
-        >
+    <ResourceListPage<Trade>
+      title="Takaslar"
+      description={
+        <>
+          Toplam {total} takas
+          {userIdFilter && (
+            <span className="ml-2">
+              — Kullanıcıya göre filtreleniyor
+              <Button
+                variant="secondary"
+                onClick={clearUserFilter}
+                className="ml-2 text-primary-600 hover:underline"
+              >
+                Filtreyi kaldır
+              </Button>
+            </span>
+          )}
+        </>
+      }
+      headerActions={
+        <>
           {reviewQueueCount > 0 && (
             <Button
               variant="secondary"
               onClick={() => {
-                setStatus("at_warehouse");
-                setPage(1);
+                setFilter("status", "at_warehouse");
               }}
               className={`flex items-center gap-2 px-4 py-2 rounded-lg border font-medium transition-colors ${
-                status === "at_warehouse"
+                filters.status === "at_warehouse"
                   ? "bg-warning-500 text-inverted border-warning-600"
                   : "bg-warning-100 text-warning-900 border-warning-400 hover:bg-warning-200"
               }`}
@@ -295,53 +272,34 @@ export default function TradesPage() {
               </span>
             </div>
           )}
-        </PageHeader>
-
-        <div className="flex flex-col sm:flex-row gap-4">
-          <Select
-            value={status}
-            onChange={(e) => setStatus(e.target.value)}
-            className="sm:w-48"
-          >
-            {statusOptions.map((opt) => (
-              <option key={opt.value} value={opt.value}>
-                {opt.label}
-              </option>
-            ))}
-          </Select>
-        </div>
-
-        <DataTable
-          columns={columns}
-          data={trades}
-          loading={loading}
-          emptyText="Takas bulunamadı"
-          getRowId={(t) => t.id}
-          rowClassName={(t) => (t.hasDispute ? "bg-danger-900/10" : "")}
-        />
-
-        <div className="flex items-center justify-between">
-          <p className="text-sm text-muted">
-            Sayfa {page} / {Math.ceil(total / 20)}
-          </p>
-          <div className="flex gap-2">
-            <Button
-              variant="secondary"
-              onClick={() => setPage((p) => Math.max(1, p - 1))}
-              disabled={page === 1}
-            >
-              Önceki
-            </Button>
-            <Button
-              variant="secondary"
-              onClick={() => setPage((p) => p + 1)}
-              disabled={page >= Math.ceil(total / 20)}
-            >
-              Sonraki
-            </Button>
-          </div>
-        </div>
-      </div>
-    </>
+        </>
+      }
+      search={{ placeholder: "Takas no, başlatan veya alıcı ara..." }}
+      searchValue={search}
+      onSearchChange={setSearch}
+      onSearchSubmit={onSearchSubmit}
+      filters={
+        <Select
+          value={filters.status ?? "all"}
+          onChange={(e) => setFilter("status", e.target.value)}
+          className="sm:w-48"
+        >
+          {statusOptions.map((opt) => (
+            <option key={opt.value} value={opt.value}>
+              {opt.label}
+            </option>
+          ))}
+        </Select>
+      }
+      columns={columns}
+      data={trades}
+      loading={isLoading}
+      emptyText="Takas bulunamadı"
+      getRowId={(t) => t.id}
+      rowClassName={(t) => (t.hasDispute ? "bg-danger-900/10" : "")}
+      page={page}
+      totalPages={totalPages}
+      onPageChange={setPage}
+    />
   );
 }

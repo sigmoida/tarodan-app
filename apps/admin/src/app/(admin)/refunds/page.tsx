@@ -1,22 +1,15 @@
 "use client";
 
-import { useState, useEffect } from "react";
 import Link from "next/link";
 import { adminApi } from "@/lib/api";
-import {
-  ArrowPathIcon,
-  BanknotesIcon,
-  EyeIcon,
-} from "@heroicons/react/24/outline";
-import toast from "react-hot-toast";
-import { Button, Input } from "@tarodan/ui";
-import { DataTable, type ColumnDef } from "@/components/DataTable";
-import {
-  PageHeader,
-  FilterToolbar,
-  ActionButtons,
-  ActionIconButton,
-} from "@/components/admin-list";
+import { EyeIcon } from "@heroicons/react/24/outline";
+import { Input } from "@tarodan/ui";
+import { type ColumnDef } from "@/components/DataTable";
+import { ActionButtons, ActionIconButton } from "@/components/admin-list";
+import { ResourceListPage } from "@/components/ResourceListPage";
+import { useAdminResource } from "@/hooks/useAdminResource";
+
+// ─── Tipler ────────────────────────────────────────────────────────────────
 
 interface Refund {
   id: string;
@@ -31,38 +24,38 @@ interface Refund {
   } | null;
 }
 
+// ─── Sayfa ─────────────────────────────────────────────────────────────────
+
 export default function RefundsPage() {
-  const [refunds, setRefunds] = useState<Refund[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [search, setSearch] = useState("");
-  const [startDate, setStartDate] = useState("");
-  const [endDate, setEndDate] = useState("");
-  const [page, setPage] = useState(1);
-  const [total, setTotal] = useState(0);
+  // Tarih filtreleri initialFilters'a alındı — hook bunları fetcher'a iletir
+  const {
+    rows,
+    total,
+    page,
+    setPage,
+    totalPages,
+    search,
+    setSearch,
+    onSearchSubmit,
+    filters,
+    setFilter,
+    isLoading,
+  } = useAdminResource<Refund>({
+    queryKey: "refunds",
+    fetcher: (params) =>
+      adminApi.getRefundHistory({
+        search: params.search,
+        startDate: params.startDate || undefined,
+        endDate: params.endDate || undefined,
+        page: params.page,
+        limit: params.limit,
+      }),
+    limit: 20,
+    initialFilters: { startDate: "", endDate: "" },
+    errorMessage: "İade geçmişi yüklenemedi",
+  });
 
-  useEffect(() => {
-    loadRefunds();
-  }, [page]);
-
-  const loadRefunds = async () => {
-    setLoading(true);
-    try {
-      const res = await adminApi.getRefundHistory({
-        search: search || undefined,
-        startDate: startDate || undefined,
-        endDate: endDate || undefined,
-        page,
-        limit: 20,
-      });
-      setRefunds(res.data.data || []);
-      setTotal(res.data.meta?.total || 0);
-    } catch (e: any) {
-      toast.error("İade geçmişi yüklenemedi");
-    } finally {
-      setLoading(false);
-    }
-  };
-
+  // ── Kolon tanımları ────────────────────────────────────────────────────────
   const columns: ColumnDef<Refund, any>[] = [
     {
       header: "ID",
@@ -135,73 +128,39 @@ export default function RefundsPage() {
     },
   ];
 
-  const handleSearch = () => {
-    setPage(1);
-    loadRefunds();
-  };
-
+  // ── Render ─────────────────────────────────────────────────────────────────
   return (
-    <>
-      <div className="space-y-6">
-        <PageHeader title="İade Geçmişi" description="Tamamlanmış iadeler">
-          <Button
-            variant="secondary"
-            onClick={loadRefunds}
-            className="p-2 text-muted hover:text-heading"
-          >
-            <ArrowPathIcon className="h-5 w-5" />
-          </Button>
-        </PageHeader>
-
-        <FilterToolbar
-          search={search}
-          onSearchChange={setSearch}
-          onSearchSubmit={handleSearch}
-          searchPlaceholder="Alıcı veya satıcı ara..."
-        >
+    <ResourceListPage<Refund>
+      title="İade Geçmişi"
+      description="Tamamlanmış iadeler"
+      search={{ placeholder: "Alıcı veya satıcı ara..." }}
+      searchValue={search}
+      onSearchChange={setSearch}
+      onSearchSubmit={onSearchSubmit}
+      filters={
+        <>
           <Input
             type="date"
-            value={startDate}
-            onChange={(e) => setStartDate(e.target.value)}
+            value={filters.startDate ?? ""}
+            onChange={(e) => setFilter("startDate", e.target.value)}
             className="sm:w-40"
           />
           <Input
             type="date"
-            value={endDate}
-            onChange={(e) => setEndDate(e.target.value)}
+            value={filters.endDate ?? ""}
+            onChange={(e) => setFilter("endDate", e.target.value)}
             className="sm:w-40"
           />
-          <Button onClick={handleSearch} className="shrink-0">Filtrele</Button>
-        </FilterToolbar>
-
-        <DataTable
-          columns={columns}
-          data={refunds}
-          loading={loading}
-          emptyText="İade bulunamadı"
-          getRowId={(r) => r.id}
-        />
-
-        <div className="flex items-center justify-between">
-          <p className="text-sm text-muted">Toplam {total} iade</p>
-          <div className="flex gap-2">
-            <Button
-              variant="secondary"
-              onClick={() => setPage((p) => Math.max(1, p - 1))}
-              disabled={page === 1}
-            >
-              Önceki
-            </Button>
-            <Button
-              variant="secondary"
-              onClick={() => setPage((p) => p + 1)}
-              disabled={page >= Math.ceil(total / 20)}
-            >
-              Sonraki
-            </Button>
-          </div>
-        </div>
-      </div>
-    </>
+        </>
+      }
+      columns={columns}
+      data={rows}
+      loading={isLoading}
+      emptyText="İade bulunamadı"
+      getRowId={(r) => r.id}
+      page={page}
+      totalPages={totalPages}
+      onPageChange={setPage}
+    />
   );
 }

@@ -101,7 +101,7 @@ const FAQ_CATEGORIES = [
     faqs: [
       {
         question: 'Kargo firması hangisi?',
-        answer: 'Aras Kargo ile çalışıyoruz. Siparişiniz 1-3 iş günü içinde kargoya verilir ve ortalama 2-4 iş günü içinde teslim edilir.',
+        answer: 'Sürat Kargo ile çalışıyoruz. Siparişiniz 1-3 iş günü içinde kargoya verilir ve ortalama 2-4 iş günü içinde teslim edilir.',
       },
       {
         question: 'Kargo takip numarasını nereden bulabilirim?',
@@ -217,7 +217,7 @@ export default function FAQPage() {
       title: 'Shipping & Delivery',
       icon: '📦',
       faqs: [
-        { question: 'Which shipping company do you use?', answer: 'We work with Aras Kargo. Your order will be shipped within 1-3 business days and delivered within an average of 2-4 business days.' },
+        { question: 'Which shipping company do you use?', answer: 'We work with Sürat Kargo. Your order will be shipped within 1-3 business days and delivered within an average of 2-4 business days.' },
         { question: 'Where can I find the tracking number?', answer: 'You will be notified by email when your order is shipped. You can also access the tracking number from the "My Orders" page.' },
         { question: 'What should I do if the product arrives damaged?', answer: 'Inspect the package while the courier is present. If there is damage, have it recorded and contact us within 24 hours.' },
       ],

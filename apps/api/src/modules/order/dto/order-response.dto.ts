@@ -79,7 +79,7 @@ export class OrderShipmentDto {
   @ApiProperty({ example: 'uuid' })
   id: string;
 
-  @ApiProperty({ example: 'aras' })
+  @ApiProperty({ example: 'surat' })
   provider: string;
 
   @ApiPropertyOptional({ example: '123456789' })

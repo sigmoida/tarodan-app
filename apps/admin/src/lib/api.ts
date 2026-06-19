@@ -171,6 +171,7 @@ export const adminApi = {
   bulkApproveProducts: (ids: string[], note?: string) => api.post('/admin/products/bulk-approve', { ids, note }),
   bulkRejectProducts: (ids: string[], reason: string) => api.post('/admin/products/bulk-reject', { ids, reason }),
   deleteProduct: (id: string) => api.delete(`/admin/products/${id}`),
+  restoreProduct: (id: string) => api.post(`/admin/products/${id}/restore`),
   exportProducts: (params?: { status?: string; categoryId?: string; sellerId?: string }) =>
     api.get('/admin/products-export', { params, responseType: 'blob' }),
 
@@ -191,10 +192,6 @@ export const adminApi = {
   getOrders: (params?: any) => api.get('/admin/orders', { params }),
   getOrder: (id: string) => api.get(`/admin/orders/${id}`),
   updateOrderStatus: (id: string, status: string) => api.patch(`/admin/orders/${id}`, { status }),
-  addOrderTracking: (id: string, trackingNumber: string, carrier: string, trackingUrl?: string) =>
-    api.post(`/admin/orders/${id}/tracking`, { trackingNumber, carrier, trackingUrl }),
-  sendOrderNotification: (id: string, type: string, message?: string) =>
-    api.post(`/admin/orders/${id}/notify`, { type, message }),
   getOrderInvoice: (id: string) => api.get(`/admin/orders/${id}/invoice`),
   // 48h pencere (Faz 4A.1)
   forceCompleteOrder: (id: string, reason?: string) =>
@@ -433,79 +430,11 @@ export const adminApi = {
   sendTestEmail: (key: string, data: { to: string; templateData?: Record<string, any> }) =>
     api.post(`/admin/email-templates/${encodeURIComponent(key)}/send-test`, data),
 
-  // Shipping Methods
-  getShippingMethods: (params?: { isActive?: boolean; search?: string }) =>
-    api.get('/admin/shipping/methods', { params }),
-  createShippingMethod: (data: { name: string; code: string; description?: string; isActive?: boolean; sortOrder?: number }) =>
-    api.post('/admin/shipping/methods', data),
-  updateShippingMethod: (id: string, data: any) =>
-    api.patch(`/admin/shipping/methods/${id}`, data),
-  deleteShippingMethod: (id: string) =>
-    api.delete(`/admin/shipping/methods/${id}`),
-
-  // Shipping Carriers
-  getShippingCarriers: (params?: { isActive?: boolean; supportsLabels?: boolean; search?: string }) =>
-    api.get('/admin/shipping/carriers', { params }),
-  createShippingCarrier: (data: {
-    name: string;
-    code: string;
-    logo?: string;
-    trackingUrl?: string;
-    apiEndpoint?: string;
-    apiKey?: string;
-    apiSecret?: string;
-    isActive?: boolean;
-    supportsLabels?: boolean;
-  }) => api.post('/admin/shipping/carriers', data),
-  updateShippingCarrier: (id: string, data: any) =>
-    api.patch(`/admin/shipping/carriers/${id}`, data),
-  deleteShippingCarrier: (id: string) =>
-    api.delete(`/admin/shipping/carriers/${id}`),
-
-  // Shipping Zones
-  getShippingZones: (params?: { isActive?: boolean; country?: string; search?: string }) =>
-    api.get('/admin/shipping/zones', { params }),
-  createShippingZone: (data: {
-    name: string;
-    description?: string;
-    countries?: string[];
-    regions?: string[];
-    cities?: string[];
-    isDefault?: boolean;
-    isActive?: boolean;
-  }) => api.post('/admin/shipping/zones', data),
-  updateShippingZone: (id: string, data: any) =>
-    api.patch(`/admin/shipping/zones/${id}`, data),
-  deleteShippingZone: (id: string) =>
-    api.delete(`/admin/shipping/zones/${id}`),
-
-  // Shipping Rates
-  getShippingRates: (params?: { zoneId?: string; methodId?: string; carrierId?: string; isActive?: boolean }) =>
-    api.get('/admin/shipping/rates', { params }),
-  createShippingRate: (data: {
-    zoneId: string;
-    methodId: string;
-    carrierId: string;
-    basePrice: number;
-    pricePerKg?: number;
-    freeShippingMin?: number;
-    minDeliveryDays: number;
-    maxDeliveryDays: number;
-    isActive?: boolean;
-  }) => api.post('/admin/shipping/rates', data),
-  updateShippingRate: (id: string, data: any) =>
-    api.patch(`/admin/shipping/rates/${id}`, data),
-  deleteShippingRate: (id: string) =>
-    api.delete(`/admin/shipping/rates/${id}`),
-
-  // Shipping Labels
+  // Shipping (operations) — sipariş gönderilerini görüntüleme/takip (salt-okunur).
+  // Konfig (methods/carriers/zones/rates) ve etiket üretimi kaldırıldı; gerçek kargo Sürat entegrasyonu.
   getShipments(params?: any) {
     return api.get('/admin/shipping/shipments', { params });
   },
-  generateShippingLabel: (shipmentId: string) =>
-    api.post('/admin/shipping/labels/generate', { shipmentId }),
-  bulkGenerateShippingLabels: (shipmentIds: string[]) =>
-    api.post('/admin/shipping/labels/bulk-generate', { shipmentIds }),
 
   // Notifications
   getNotificationHistory: (params?: {

@@ -18,8 +18,10 @@ export const orderStatusConfig: Record<string, StatusConfig> = {
   preparing: { label: 'Hazırlanıyor', variant: 'info' },
   shipped: { label: 'Kargoda', variant: 'info' },
   delivered: { label: 'Teslim Edildi', variant: 'success' },
+  awaiting_buyer_confirmation: { label: 'Alıcı Onayı Bekleniyor', variant: 'warning' },
   completed: { label: 'Tamamlandı', variant: 'success' },
   cancelled: { label: 'İptal Edildi', variant: 'danger' },
+  refund_requested: { label: 'İade Talep Edildi', variant: 'warning' },
   refunded: { label: 'İade Edildi', variant: 'secondary' },
 };
 
@@ -88,7 +90,6 @@ export const paymentStatusConfig: Record<string, StatusConfig> = {
   completed: { label: 'Tamamlandı', variant: 'success' },
   failed: { label: 'Başarısız', variant: 'danger' },
   refunded: { label: 'İade Edildi', variant: 'secondary' },
-  cancelled: { label: 'İptal Edildi', variant: 'danger' },
 };
 
 /**
@@ -273,7 +274,6 @@ export const messageStatusConfig: Record<string, StatusConfig> = {
   pending_approval: { label: 'Onay Bekliyor', variant: 'warning' },
   approved: { label: 'Onaylandı', variant: 'success' },
   rejected: { label: 'Reddedildi', variant: 'danger' },
-  filtered: { label: 'Filtrelendi', variant: 'warning' },
 };
 
 /** Log önem derecesi (severity). */
@@ -291,6 +291,11 @@ export const paymentProviderConfig: Record<string, StatusConfig> = {
   iyzico: { label: 'iyzico', variant: 'default' },
   stripe: { label: 'Stripe', variant: 'default' },
   manual: { label: 'Manuel', variant: 'secondary' },
+};
+
+/** Kargo sağlayıcı (markalı; sadece okunur biçim). */
+export const shipmentProviderConfig: Record<string, StatusConfig> = {
+  surat: { label: 'Sürat Kargo', variant: 'default' },
 };
 
 /**

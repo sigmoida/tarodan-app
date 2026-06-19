@@ -1739,79 +1739,6 @@ model CartItem {
   @@map("cart_items")
 }
 
-model ShippingMethod {
-  id          String         @id @default(uuid())
-  name        String         @unique
-  code        String         @unique
-  description String?
-  isActive    Boolean        @default(true) @map("is_active")
-  sortOrder   Int            @default(0) @map("sort_order")
-  createdAt   DateTime       @default(now()) @map("created_at")
-  updatedAt   DateTime       @updatedAt @map("updated_at")
-  rates       ShippingRate[]
-
-  @@index([isActive])
-  @@map("shipping_methods")
-}
-
-model ShippingCarrier {
-  id             String         @id @default(uuid())
-  name           String         @unique
-  code           String         @unique
-  logo           String?
-  trackingUrl    String?        @map("tracking_url")
-  apiEndpoint    String?        @map("api_endpoint")
-  apiKey         String?        @map("api_key")
-  apiSecret      String?        @map("api_secret")
-  isActive       Boolean        @default(true) @map("is_active")
-  supportsLabels Boolean        @default(true) @map("supports_labels")
-  createdAt      DateTime       @default(now()) @map("created_at")
-  updatedAt      DateTime       @updatedAt @map("updated_at")
-  rates          ShippingRate[]
-
-  @@index([isActive])
-  @@map("shipping_carriers")
-}
-
-model ShippingZone {
-  id          String         @id @default(uuid())
-  name        String
-  description String?
-  countries   String[]
-  regions     String[]
-  cities      String[]
-  isDefault   Boolean        @default(false) @map("is_default")
-  isActive    Boolean        @default(true) @map("is_active")
-  createdAt   DateTime       @default(now()) @map("created_at")
-  updatedAt   DateTime       @updatedAt @map("updated_at")
-  rates       ShippingRate[]
-
-  @@index([isActive])
-  @@map("shipping_zones")
-}
-
-model ShippingRate {
-  id              String          @id @default(uuid())
-  zoneId          String          @map("zone_id")
-  methodId        String          @map("method_id")
-  carrierId       String          @map("carrier_id")
-  basePrice       Decimal         @map("base_price") @db.Decimal(10, 2)
-  pricePerKg      Decimal         @default(0) @map("price_per_kg") @db.Decimal(10, 2)
-  freeShippingMin Decimal?        @map("free_shipping_min") @db.Decimal(10, 2)
-  minDeliveryDays Int             @map("min_delivery_days")
-  maxDeliveryDays Int             @map("max_delivery_days")
-  isActive        Boolean         @default(true) @map("is_active")
-  createdAt       DateTime        @default(now()) @map("created_at")
-  updatedAt       DateTime        @updatedAt @map("updated_at")
-  carrier         ShippingCarrier @relation(fields: [carrierId], references: [id], onDelete: Cascade)
-  method          ShippingMethod  @relation(fields: [methodId], references: [id], onDelete: Cascade)
-  zone            ShippingZone    @relation(fields: [zoneId], references: [id], onDelete: Cascade)
-
-  @@unique([zoneId, methodId, carrierId])
-  @@index([isActive])
-  @@map("shipping_rates")
-}
-
 model ScheduledNotification {
   id           String    @id @default(uuid())
   title        String
@@ -1834,7 +1761,6 @@ model ScheduledNotification {
 }
 
 enum ProductStatus {
-  draft
   pending
   active
   reserved

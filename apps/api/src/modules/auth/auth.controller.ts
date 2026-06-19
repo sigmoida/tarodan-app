@@ -130,19 +130,19 @@ export class AuthController {
   /**
    * POST /auth/logout
    * Logout current user
+   *
+   * Public: süresi dolmuş/geçersiz token'a sahip istemci de cookie'lerini
+   * temizleyebilmeli. Guard'lıyken ölü access_token 401 alıp clearAuthCookies'e hiç
+   * ulaşmıyordu → bayat httpOnly cookie tarayıcıda kalıyordu. logout() userId kullanmaz.
    */
   @Post('logout')
-  @UseGuards(JwtAuthGuard)
+  @Public()
   @HttpCode(HttpStatus.OK)
-  @ApiBearerAuth()
   @ApiOperation({ summary: 'Çıkış yap' })
   @ApiResponse({ status: 200, description: 'Çıkış yapıldı' })
-  async logout(
-    @CurrentUser('id') userId: string,
-    @Res({ passthrough: true }) res: Response,
-  ) {
+  async logout(@Res({ passthrough: true }) res: Response) {
     clearAuthCookies(res, { admin: false });
-    return this.authService.logout(userId);
+    return this.authService.logout('');
   }
 
   /**

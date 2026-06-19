@@ -1534,7 +1534,7 @@ export class TradeService {
           tradeId,
           shipperId: userId,
           fromAddressId: dto.fromAddressId,
-          carrier: dto.carrier,
+          carrier: 'surat',
           trackingNumber,
           status: ShipmentStatus.label_created,
           shippedAt: new Date(),

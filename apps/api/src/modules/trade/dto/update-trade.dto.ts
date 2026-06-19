@@ -80,8 +80,9 @@ export class CancelTradeDto {
 }
 
 export class ShipTradeDto {
+  @IsOptional()
   @IsString()
-  carrier: string; // "aras", "yurtici", "mng"
+  carrier?: string; // Sürat Kargo (tek kargo); değer yok sayılır, backend 'surat' kullanır
 
   @IsString()
   fromAddressId: string;

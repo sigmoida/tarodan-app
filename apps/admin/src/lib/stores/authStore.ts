@@ -67,9 +67,17 @@ export const useAuthStore = create<AuthState>()(
               isAuthenticated: true,
             });
           }
-        } catch {
+        } catch (error: unknown) {
+          const status = (error as { response?: { status?: number } })?.response
+            ?.status;
+          // Kesin yetki hatası (401/403): oturum gerçekten bitmiş → state'i ve persist
+          // edilmiş kullanıcıyı TEMİZLE. Aksi halde bayat cookie + persist edilmiş user,
+          // login sayfasını sürekli /dashboard'a, middleware'i /login'e atarak
+          // login↔dashboard döngüsü kurar (cookie elle silinene dek).
+          if (status === 401 || status === 403) {
+            set({ user: null, isAuthenticated: false });
+          }
           // Geçici hata (ağ/5xx) menüyü uçurmasın: persist edilmiş kullanıcıyı SİLME.
-          // Oturum gerçekten bittiyse middleware + api interceptor zaten /login'e atar.
         } finally {
           set({ isLoading: false });
         }

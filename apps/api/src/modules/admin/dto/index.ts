@@ -3,7 +3,6 @@ export * from './platform-setting.dto';
 export * from './admin-query.dto';
 export * from './admin-action.dto';
 export * from './admin-staff.dto';
-export * from './shipping-admin.dto';
 export * from './notifications-admin.dto';
 export {
   AnalyticsGroupBy,

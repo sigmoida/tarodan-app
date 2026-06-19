@@ -63,6 +63,11 @@ export function DataTable<T>({
     selectable && rowIds.length > 0 && rowIds.every((id) => selectedIds.includes(id));
   const colSpan = columns.length + (selectable ? 1 : 0);
 
+  // İlk yükleme (veri yokken) tam spinner gösterir; arama/filtre refetch'inde
+  // ise mevcut satırlar korunur ve hafifçe soluklaşır (web'deki keepPreviousData davranışı).
+  const isInitialLoad = loading && data.length === 0;
+  const isRefetching = loading && data.length > 0;
+
   return (
     <div className="admin-card overflow-hidden">
       <div className="overflow-x-auto">
@@ -91,8 +96,14 @@ export function DataTable<T>({
               </tr>
             ))}
           </thead>
-          <tbody>
-            {loading ? (
+          <tbody
+            className={
+              isRefetching
+                ? "opacity-60 transition-opacity duration-200 pointer-events-none"
+                : "transition-opacity duration-200"
+            }
+          >
+            {isInitialLoad ? (
               <tr>
                 <td colSpan={colSpan} className="p-8 text-center text-muted">
                   <Spinner size="md" className="mx-auto" />

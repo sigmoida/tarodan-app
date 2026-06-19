@@ -1090,6 +1090,7 @@ export class AdminController {
     @Query('userId') userId?: string,
     @Query('fromDate') fromDate?: string,
     @Query('toDate') toDate?: string,
+    @Query('search') search?: string,
     @Query('page') page?: string,
     @Query('limit') limit?: string,
   ) {
@@ -1100,6 +1101,7 @@ export class AdminController {
       userId,
       fromDate,
       toDate,
+      search,
       page: page ? parseInt(page, 10) : 1,
       limit: limit ? parseInt(limit, 10) : 20,
     });
@@ -2003,287 +2005,20 @@ export class AdminController {
     return this.adminService.deleteProduct(adminId, id, hardDelete === 'true');
   }
 
-  // ==================== SHIPPING METHODS ====================
-
-  @Get('shipping/methods')
-  @Roles(AdminRole.super_admin, AdminRole.admin)
-  @ApiOperation({ summary: 'Get all shipping methods' })
-  @ApiQuery({ name: 'isActive', required: false })
-  @ApiQuery({ name: 'search', required: false })
-  @ApiResponse({ status: HttpStatus.OK, description: 'List of shipping methods' })
-  async getShippingMethods(
-    @Query('isActive') isActive?: string,
-    @Query('search') search?: string,
-  ) {
-    return this.adminService.getShippingMethods({
-      isActive: isActive === 'true' ? true : isActive === 'false' ? false : undefined,
-      search,
-    });
-  }
-
-  @Post('shipping/methods')
-  @Roles(AdminRole.super_admin, AdminRole.admin)
-  @ApiOperation({ summary: 'Create shipping method' })
-  @ApiResponse({ status: HttpStatus.CREATED, description: 'Shipping method created' })
-  async createShippingMethod(
-    @CurrentUser('id') adminId: string,
-    @Body() body: { name: string; code: string; description?: string; isActive?: boolean; sortOrder?: number },
-  ) {
-    return this.adminService.createShippingMethod(adminId, body);
-  }
-
-  @Patch('shipping/methods/:id')
-  @Roles(AdminRole.super_admin, AdminRole.admin)
-  @ApiOperation({ summary: 'Update shipping method' })
-  @ApiParam({ name: 'id', description: 'Shipping method ID' })
-  async updateShippingMethod(
-    @Param('id') id: string,
-    @CurrentUser('id') adminId: string,
-    @Body() body: { name?: string; code?: string; description?: string; isActive?: boolean; sortOrder?: number },
-  ) {
-    return this.adminService.updateShippingMethod(adminId, id, body);
-  }
-
-  @Delete('shipping/methods/:id')
+  @Post('products/:id/restore')
   @Roles(AdminRole.super_admin, AdminRole.admin)
   @HttpCode(HttpStatus.OK)
-  @ApiOperation({ summary: 'Delete shipping method' })
-  @ApiParam({ name: 'id', description: 'Shipping method ID' })
-  async deleteShippingMethod(
+  @ApiOperation({ summary: 'Restore a soft-deleted product (admin only)' })
+  @ApiParam({ name: 'id', description: 'Product ID' })
+  @ApiResponse({ status: HttpStatus.OK, description: 'Product restored' })
+  async restoreProduct(
     @Param('id') id: string,
     @CurrentUser('id') adminId: string,
   ) {
-    return this.adminService.deleteShippingMethod(adminId, id);
+    return this.adminService.restoreProduct(adminId, id);
   }
 
-  // ==================== SHIPPING CARRIERS ====================
-
-  @Get('shipping/carriers')
-  @Roles(AdminRole.super_admin, AdminRole.admin)
-  @ApiOperation({ summary: 'Get all shipping carriers' })
-  @ApiQuery({ name: 'isActive', required: false })
-  @ApiQuery({ name: 'supportsLabels', required: false })
-  @ApiQuery({ name: 'search', required: false })
-  @ApiResponse({ status: HttpStatus.OK, description: 'List of shipping carriers' })
-  async getShippingCarriers(
-    @Query('isActive') isActive?: string,
-    @Query('supportsLabels') supportsLabels?: string,
-    @Query('search') search?: string,
-  ) {
-    return this.adminService.getShippingCarriers({
-      isActive: isActive === 'true' ? true : isActive === 'false' ? false : undefined,
-      supportsLabels: supportsLabels === 'true' ? true : supportsLabels === 'false' ? false : undefined,
-      search,
-    });
-  }
-
-  @Post('shipping/carriers')
-  @Roles(AdminRole.super_admin, AdminRole.admin)
-  @ApiOperation({ summary: 'Create shipping carrier' })
-  @ApiResponse({ status: HttpStatus.CREATED, description: 'Shipping carrier created' })
-  async createShippingCarrier(
-    @CurrentUser('id') adminId: string,
-    @Body() body: {
-      name: string;
-      code: string;
-      logo?: string;
-      trackingUrl?: string;
-      apiEndpoint?: string;
-      apiKey?: string;
-      apiSecret?: string;
-      isActive?: boolean;
-      supportsLabels?: boolean;
-    },
-  ) {
-    return this.adminService.createShippingCarrier(adminId, body);
-  }
-
-  @Patch('shipping/carriers/:id')
-  @Roles(AdminRole.super_admin, AdminRole.admin)
-  @ApiOperation({ summary: 'Update shipping carrier' })
-  @ApiParam({ name: 'id', description: 'Shipping carrier ID' })
-  async updateShippingCarrier(
-    @Param('id') id: string,
-    @CurrentUser('id') adminId: string,
-    @Body() body: {
-      name?: string;
-      code?: string;
-      logo?: string;
-      trackingUrl?: string;
-      apiEndpoint?: string;
-      apiKey?: string;
-      apiSecret?: string;
-      isActive?: boolean;
-      supportsLabels?: boolean;
-    },
-  ) {
-    return this.adminService.updateShippingCarrier(adminId, id, body);
-  }
-
-  @Delete('shipping/carriers/:id')
-  @Roles(AdminRole.super_admin, AdminRole.admin)
-  @HttpCode(HttpStatus.OK)
-  @ApiOperation({ summary: 'Delete shipping carrier' })
-  @ApiParam({ name: 'id', description: 'Shipping carrier ID' })
-  async deleteShippingCarrier(
-    @Param('id') id: string,
-    @CurrentUser('id') adminId: string,
-  ) {
-    return this.adminService.deleteShippingCarrier(adminId, id);
-  }
-
-  // ==================== SHIPPING ZONES ====================
-
-  @Get('shipping/zones')
-  @Roles(AdminRole.super_admin, AdminRole.admin)
-  @ApiOperation({ summary: 'Get all shipping zones' })
-  @ApiQuery({ name: 'isActive', required: false })
-  @ApiQuery({ name: 'country', required: false })
-  @ApiQuery({ name: 'search', required: false })
-  @ApiResponse({ status: HttpStatus.OK, description: 'List of shipping zones' })
-  async getShippingZones(
-    @Query('isActive') isActive?: string,
-    @Query('country') country?: string,
-    @Query('search') search?: string,
-  ) {
-    return this.adminService.getShippingZones({
-      isActive: isActive === 'true' ? true : isActive === 'false' ? false : undefined,
-      country,
-      search,
-    });
-  }
-
-  @Post('shipping/zones')
-  @Roles(AdminRole.super_admin, AdminRole.admin)
-  @ApiOperation({ summary: 'Create shipping zone' })
-  @ApiResponse({ status: HttpStatus.CREATED, description: 'Shipping zone created' })
-  async createShippingZone(
-    @CurrentUser('id') adminId: string,
-    @Body() body: {
-      name: string;
-      description?: string;
-      countries?: string[];
-      regions?: string[];
-      cities?: string[];
-      isDefault?: boolean;
-      isActive?: boolean;
-    },
-  ) {
-    return this.adminService.createShippingZone(adminId, body);
-  }
-
-  @Patch('shipping/zones/:id')
-  @Roles(AdminRole.super_admin, AdminRole.admin)
-  @ApiOperation({ summary: 'Update shipping zone' })
-  @ApiParam({ name: 'id', description: 'Shipping zone ID' })
-  async updateShippingZone(
-    @Param('id') id: string,
-    @CurrentUser('id') adminId: string,
-    @Body() body: {
-      name?: string;
-      description?: string;
-      countries?: string[];
-      regions?: string[];
-      cities?: string[];
-      isDefault?: boolean;
-      isActive?: boolean;
-    },
-  ) {
-    return this.adminService.updateShippingZone(adminId, id, body);
-  }
-
-  @Delete('shipping/zones/:id')
-  @Roles(AdminRole.super_admin, AdminRole.admin)
-  @HttpCode(HttpStatus.OK)
-  @ApiOperation({ summary: 'Delete shipping zone' })
-  @ApiParam({ name: 'id', description: 'Shipping zone ID' })
-  async deleteShippingZone(
-    @Param('id') id: string,
-    @CurrentUser('id') adminId: string,
-  ) {
-    return this.adminService.deleteShippingZone(adminId, id);
-  }
-
-  // ==================== SHIPPING RATES ====================
-
-  @Get('shipping/rates')
-  @Roles(AdminRole.super_admin, AdminRole.admin)
-  @ApiOperation({ summary: 'Get shipping rates' })
-  @ApiQuery({ name: 'zoneId', required: false })
-  @ApiQuery({ name: 'methodId', required: false })
-  @ApiQuery({ name: 'carrierId', required: false })
-  @ApiQuery({ name: 'isActive', required: false })
-  @ApiResponse({ status: HttpStatus.OK, description: 'List of shipping rates' })
-  async getShippingRates(
-    @Query('zoneId') zoneId?: string,
-    @Query('methodId') methodId?: string,
-    @Query('carrierId') carrierId?: string,
-    @Query('isActive') isActive?: string,
-  ) {
-    return this.adminService.getShippingRates({
-      zoneId,
-      methodId,
-      carrierId,
-      isActive: isActive === 'true' ? true : isActive === 'false' ? false : undefined,
-    });
-  }
-
-  @Post('shipping/rates')
-  @Roles(AdminRole.super_admin, AdminRole.admin)
-  @ApiOperation({ summary: 'Create shipping rate' })
-  @ApiResponse({ status: HttpStatus.CREATED, description: 'Shipping rate created' })
-  async createShippingRate(
-    @CurrentUser('id') adminId: string,
-    @Body() body: {
-      zoneId: string;
-      methodId: string;
-      carrierId: string;
-      basePrice: number;
-      pricePerKg?: number;
-      freeShippingMin?: number;
-      minDeliveryDays: number;
-      maxDeliveryDays: number;
-      isActive?: boolean;
-    },
-  ) {
-    return this.adminService.createShippingRate(adminId, body);
-  }
-
-  @Patch('shipping/rates/:id')
-  @Roles(AdminRole.super_admin, AdminRole.admin)
-  @ApiOperation({ summary: 'Update shipping rate' })
-  @ApiParam({ name: 'id', description: 'Shipping rate ID' })
-  async updateShippingRate(
-    @Param('id') id: string,
-    @CurrentUser('id') adminId: string,
-    @Body() body: {
-      zoneId?: string;
-      methodId?: string;
-      carrierId?: string;
-      basePrice?: number;
-      pricePerKg?: number;
-      freeShippingMin?: number;
-      minDeliveryDays?: number;
-      maxDeliveryDays?: number;
-      isActive?: boolean;
-    },
-  ) {
-    return this.adminService.updateShippingRate(adminId, id, body);
-  }
-
-  @Delete('shipping/rates/:id')
-  @Roles(AdminRole.super_admin, AdminRole.admin)
-  @HttpCode(HttpStatus.OK)
-  @ApiOperation({ summary: 'Delete shipping rate' })
-  @ApiParam({ name: 'id', description: 'Shipping rate ID' })
-  async deleteShippingRate(
-    @Param('id') id: string,
-    @CurrentUser('id') adminId: string,
-  ) {
-    return this.adminService.deleteShippingRate(adminId, id);
-  }
-
-  // ==================== SHIPPING LABELS ====================
+  // ==================== SHIPPING (view-only) ====================
 
   @Get('shipping/shipments')
   @Roles(AdminRole.super_admin, AdminRole.admin)
@@ -2305,30 +2040,6 @@ export class AdminController {
       status,
       carrierId,
     });
-  }
-
-  @Post('shipping/labels/generate')
-  @Roles(AdminRole.super_admin, AdminRole.admin)
-  @HttpCode(HttpStatus.OK)
-  @ApiOperation({ summary: 'Generate shipping label for a shipment' })
-  @ApiResponse({ status: HttpStatus.OK, description: 'Label generated' })
-  async generateShippingLabel(
-    @CurrentUser('id') adminId: string,
-    @Body() body: { shipmentId: string },
-  ) {
-    return this.adminService.generateShippingLabel(adminId, body.shipmentId);
-  }
-
-  @Post('shipping/labels/bulk-generate')
-  @Roles(AdminRole.super_admin, AdminRole.admin)
-  @HttpCode(HttpStatus.OK)
-  @ApiOperation({ summary: 'Bulk generate shipping labels' })
-  @ApiResponse({ status: HttpStatus.OK, description: 'Labels generated' })
-  async bulkGenerateShippingLabels(
-    @CurrentUser('id') adminId: string,
-    @Body() body: { shipmentIds: string[] },
-  ) {
-    return this.adminService.bulkGenerateShippingLabels(adminId, body.shipmentIds);
   }
 
   // ==================== NOTIFICATION MANAGEMENT ====================

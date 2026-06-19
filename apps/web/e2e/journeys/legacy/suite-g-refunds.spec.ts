@@ -412,7 +412,7 @@ test.describe('J76 — İade para akışını tersine çevirir (payment/hold/ord
     // 5) Stok geri gelince istek listesindekiler bilgilendirilir (event/cron kapsamı).
     //    Burada en azından ürünün yeniden satın alınabilir statüye döndüğünü doğrula.
     const prodStatus = await dbFind(request, 'product', { id: product.id }, { status: true });
-    expect(['active', 'sold', 'draft', 'pending', 'inactive']).toContain(prodStatus.status);
+    expect(['active', 'sold', 'pending', 'inactive']).toContain(prodStatus.status);
   });
 });
 

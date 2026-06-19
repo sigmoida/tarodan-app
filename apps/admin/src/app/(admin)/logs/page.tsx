@@ -1,20 +1,26 @@
 'use client';
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useCallback, useRef } from 'react';
 import { adminApi } from '@/lib/api';
 import clsx from 'clsx';
-import { Button, Input, enumLabel, severityConfig } from '@tarodan/ui';
+import { Button, Select, enumLabel, severityConfig } from '@tarodan/ui';
 import { AdminTabs } from '@/components/AdminTabs';
+import { FilterToolbar } from '@/components/admin-list';
+import { DataTable } from '@/components/DataTable';
+import { Pagination } from '@/components/Pagination';
+import { useAdminResource } from '@/hooks/useAdminResource';
+import type { ColumnDef } from '@/components/DataTable';
 import {
     ExclamationTriangleIcon,
     ShieldExclamationIcon,
     EnvelopeIcon,
-    MagnifyingGlassIcon,
     CheckCircleIcon,
     ClockIcon,
     ArrowPathIcon,
 } from '@heroicons/react/24/outline';
 import toast from 'react-hot-toast';
+
+// ─── Tipler ────────────────────────────────────────────────────────────────
 
 type LogTab = 'errors' | 'security' | 'emails';
 
@@ -65,7 +71,9 @@ interface EmailLog {
     createdAt: string;
 }
 
-const tabs = [
+// ─── Sabit veriler ──────────────────────────────────────────────────────────
+
+const LOG_TABS = [
     { id: 'errors' as LogTab, name: 'Hata Logları', icon: ExclamationTriangleIcon },
     { id: 'security' as LogTab, name: 'Güvenlik Logları', icon: ShieldExclamationIcon },
     { id: 'emails' as LogTab, name: 'E-posta Logları', icon: EnvelopeIcon },
@@ -97,337 +105,172 @@ const eventTypeLabels: Record<string, string> = {
     account_locked: 'Hesap Kilitlendi',
 };
 
-export default function LogsPage() {
-    const [activeTab, setActiveTab] = useState<LogTab>('errors');
-    const [loading, setLoading] = useState(true);
-    const [search, setSearch] = useState('');
-    const [page, setPage] = useState(1);
-    const [logs, setLogs] = useState<any[]>([]);
-    const [meta, setMeta] = useState<any>(null);
-    const [stats, setStats] = useState<any>(null);
-    const [filters, setFilters] = useState<Record<string, string>>({});
+const SEARCH_PLACEHOLDERS: Record<LogTab, string> = {
+    errors: 'Hata mesajı ara...',
+    security: 'Olay/IP/e-posta ara...',
+    emails: 'Alıcı/konu ara...',
+};
 
-    const loadLogs = useCallback(async () => {
-        setLoading(true);
-        try {
-            let response;
-            const params = { page, limit: 20, search, ...filters };
+// ─── Yardımcılar ────────────────────────────────────────────────────────────
 
-            switch (activeTab) {
-                case 'errors':
-                    response = await adminApi.getErrorLogs(params);
-                    break;
-                case 'security':
-                    response = await adminApi.getSecurityLogs(params);
-                    break;
-                case 'emails':
-                    response = await adminApi.getEmailLogs(params);
-                    break;
-            }
-
-            if (response && response.data) {
-                setLogs(response.data.data || []);
-                setMeta(response.data.meta || null);
-                setStats(response.data.stats || null);
-            }
-        } catch (error: any) {
-            toast.error('Loglar yüklenirken bir hata oluştu');
-            console.error('Load logs error:', error);
-        } finally {
-            setLoading(false);
-        }
-    }, [activeTab, page, search, filters]);
-
-    useEffect(() => {
-        loadLogs();
-    }, [loadLogs]);
-
-    const handleResolve = async (id: string) => {
-        try {
-            await adminApi.resolveSecurityIssue(id);
-            toast.success('Sorun çözümlendi');
-            loadLogs();
-        } catch (error: any) {
-            toast.error('İşlem başarısız');
-        }
-    };
-
-    const handleTabChange = (tab: LogTab) => {
-        setActiveTab(tab);
-        setPage(1);
-        setSearch('');
-        setFilters({});
-        setLogs([]);
-    };
-
-    const formatDate = (date: string) => {
-        return new Date(date).toLocaleString('tr-TR', {
-            day: '2-digit',
-            month: '2-digit',
-            year: 'numeric',
-            hour: '2-digit',
-            minute: '2-digit',
-        });
-    };
-
-    return (
-        <>
-            <div className="p-6">
-                {/* Header */}
-                <div className="mb-6">
-                    <h1 className="text-2xl font-bold text-heading">Sistem Logları</h1>
-                    <p className="text-muted mt-1">Hata, güvenlik ve e-posta loglarını inceleyin</p>
-                </div>
-
-                {/* Tabs */}
-                <div className="mb-6">
-                    <AdminTabs
-                        tabs={tabs.map(tab => ({ key: tab.id, label: tab.name, icon: tab.icon }))}
-                        value={activeTab}
-                        onChange={(k) => handleTabChange(k as LogTab)}
-                    />
-                </div>
-
-                {/* Stats Cards */}
-                {stats && (
-                    <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
-                        {activeTab === 'errors' && (
-                            <>
-                                <StatCard label="Kritik" value={stats.critical || 0} color="red" />
-                                <StatCard label="Hata" value={stats.error || 0} color="yellow" />
-                                <StatCard label="Uyarı" value={stats.warning || 0} color="blue" />
-                                <StatCard label="Toplam" value={meta?.total || 0} color="gray" />
-                            </>
-                        )}
-                        {activeTab === 'security' && (
-                            <>
-                                <StatCard
-                                    label="Çözülmemiş Kritik"
-                                    value={stats.unresolvedHighSeverity || 0}
-                                    color="red"
-                                />
-                                <StatCard
-                                    label="Başarısız Giriş"
-                                    value={stats.byEventType?.failed_login || 0}
-                                    color="yellow"
-                                />
-                                <StatCard
-                                    label="IP Engelleme"
-                                    value={stats.byEventType?.ip_block || 0}
-                                    color="blue"
-                                />
-                                <StatCard label="Toplam" value={meta?.total || 0} color="gray" />
-                            </>
-                        )}
-                        {activeTab === 'emails' && (
-                            <>
-                                <StatCard
-                                    label="Teslim Oranı"
-                                    value={`${stats.deliveryRate || 0}%`}
-                                    color="green"
-                                />
-                                <StatCard
-                                    label="Bounce Oranı"
-                                    value={`${stats.bounceRate || 0}%`}
-                                    color="red"
-                                />
-                                <StatCard
-                                    label="Gönderilen"
-                                    value={stats.byStatus?.sent || 0}
-                                    color="blue"
-                                />
-                                <StatCard label="Toplam" value={meta?.total || 0} color="gray" />
-                            </>
-                        )}
-                    </div>
-                )}
-
-                {/* Search and Filters */}
-                <div className="flex items-center gap-4 mb-6">
-                    <div className="relative flex-1 max-w-md">
-                        <MagnifyingGlassIcon className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-muted" />
-                        <Input type="text"
-                            placeholder="Ara..."
-                            value={search}
-                            onChange={(e) => setSearch(e.target.value)}
-                            onKeyDown={(e) => e.key === 'Enter' && loadLogs()}
-                            className="pl-10 pr-4 border-border text-heading placeholder-muted focus:ring-1" />
-                    </div>
-                    <Button variant="secondary" onClick={() => loadLogs()}
-                        className="p-2 shrink-0 bg-surface-elevated border border-border rounded-lg text-muted hover:text-heading">
-                        <ArrowPathIcon className={clsx('h-5 w-5 shrink-0', loading && 'animate-spin')} />
-                    </Button>
-                </div>
-
-                {/* Content */}
-                {loading && logs.length === 0 ? (
-                    <div className="flex items-center justify-center h-64">
-                        <ArrowPathIcon className="h-8 w-8 text-primary-600 animate-spin" />
-                    </div>
-                ) : (
-                    <>
-                        {/* Error Logs Table */}
-                        {activeTab === 'errors' && (
-                            <div className="bg-surface-elevated rounded-lg border border-border overflow-hidden">
-                                <div className="overflow-x-auto">
-                                    <table className="w-full">
-                                        <thead className="bg-surface-alt">
-                                            <tr>
-                                                <th className="px-4 py-3 text-left text-xs font-medium text-muted uppercase">Seviye</th>
-                                                <th className="px-4 py-3 text-left text-xs font-medium text-muted uppercase">Mesaj</th>
-                                                <th className="px-4 py-3 text-left text-xs font-medium text-muted uppercase">Kaynak</th>
-                                                <th className="px-4 py-3 text-left text-xs font-medium text-muted uppercase">Tarih</th>
-                                            </tr>
-                                        </thead>
-                                        <tbody className="divide-y divide-border">
-                                            {logs.length === 0 ? (
-                                                <tr><td colSpan={4} className="text-center py-8 text-muted">Log bulunamadı</td></tr>
-                                            ) : (
-                                                logs.map((log: ErrorLog) => (
-                                                    <tr key={log.id} className="hover:bg-surface-alt/50">
-                                                        <td className="px-4 py-3">
-                                                            <span className={clsx('px-2 py-1 text-xs rounded-full border', severityColors[log.severity])}>
-                                                                {enumLabel(severityConfig, log.severity)}
-                                                            </span>
-                                                        </td>
-                                                        <td className="px-4 py-3 text-sm text-heading max-w-md truncate">{log.message}</td>
-                                                        <td className="px-4 py-3 text-sm text-muted">{log.source}</td>
-                                                        <td className="px-4 py-3 text-sm text-muted whitespace-nowrap">{formatDate(log.createdAt)}</td>
-                                                    </tr>
-                                                ))
-                                            )}
-                                        </tbody>
-                                    </table>
-                                </div>
-                            </div>
-                        )}
-
-                        {/* Security Logs Table */}
-                        {activeTab === 'security' && (
-                            <div className="bg-surface-elevated rounded-lg border border-border overflow-hidden">
-                                <div className="overflow-x-auto">
-                                    <table className="w-full">
-                                        <thead className="bg-surface-alt">
-                                            <tr>
-                                                <th className="px-4 py-3 text-left text-xs font-medium text-muted uppercase">Olay</th>
-                                                <th className="px-4 py-3 text-left text-xs font-medium text-muted uppercase">Seviye</th>
-                                                <th className="px-4 py-3 text-left text-xs font-medium text-muted uppercase">IP / E-posta</th>
-                                                <th className="px-4 py-3 text-left text-xs font-medium text-muted uppercase">Durum</th>
-                                                <th className="px-4 py-3 text-left text-xs font-medium text-muted uppercase">Tarih</th>
-                                                <th className="px-4 py-3 text-left text-xs font-medium text-muted uppercase">İşlem</th>
-                                            </tr>
-                                        </thead>
-                                        <tbody className="divide-y divide-border">
-                                            {logs.length === 0 ? (
-                                                <tr><td colSpan={6} className="text-center py-8 text-muted">Log bulunamadı</td></tr>
-                                            ) : (
-                                                logs.map((log: SecurityLog) => (
-                                                    <tr key={log.id} className="hover:bg-surface-alt/50">
-                                                        <td className="px-4 py-3 text-sm text-heading">
-                                                            {eventTypeLabels[log.eventType] || log.eventType}
-                                                        </td>
-                                                        <td className="px-4 py-3">
-                                                            <span className={clsx('px-2 py-1 text-xs rounded-full border', severityColors[log.severity])}>
-                                                                {enumLabel(severityConfig, log.severity)}
-                                                            </span>
-                                                        </td>
-                                                        <td className="px-4 py-3 text-sm text-muted">
-                                                            {log.ipAddress || log.email || '-'}
-                                                        </td>
-                                                        <td className="px-4 py-3">
-                                                            {log.resolved ? (
-                                                                <span className="flex items-center text-success-700 text-sm">
-                                                                    <CheckCircleIcon className="h-4 w-4 mr-1" /> Çözüldü
-                                                                </span>
-                                                            ) : (
-                                                                <span className="flex items-center text-warning-700 text-sm">
-                                                                    <ClockIcon className="h-4 w-4 mr-1" /> Bekliyor
-                                                                </span>
-                                                            )}
-                                                        </td>
-                                                        <td className="px-4 py-3 text-sm text-muted whitespace-nowrap">{formatDate(log.createdAt)}</td>
-                                                        <td className="px-4 py-3">
-                                                            {!log.resolved && (
-                                                                <Button variant="secondary" onClick={() => handleResolve(log.id)}
-                                                                    className="text-xs px-2 py-1 bg-success-500/10 text-success-700 rounded hover:bg-success-500/20">
-                                                                    Çöz
-                                                                </Button>
-                                                            )}
-                                                        </td>
-                                                    </tr>
-                                                ))
-                                            )}
-                                        </tbody>
-                                    </table>
-                                </div>
-                            </div>
-                        )}
-
-                        {/* Email Logs Table */}
-                        {activeTab === 'emails' && (
-                            <div className="bg-surface-elevated rounded-lg border border-border overflow-hidden">
-                                <div className="overflow-x-auto">
-                                    <table className="w-full">
-                                        <thead className="bg-surface-alt">
-                                            <tr>
-                                                <th className="px-4 py-3 text-left text-xs font-medium text-muted uppercase">Alıcı</th>
-                                                <th className="px-4 py-3 text-left text-xs font-medium text-muted uppercase">Konu</th>
-                                                <th className="px-4 py-3 text-left text-xs font-medium text-muted uppercase">Şablon</th>
-                                                <th className="px-4 py-3 text-left text-xs font-medium text-muted uppercase">Durum</th>
-                                                <th className="px-4 py-3 text-left text-xs font-medium text-muted uppercase">Tarih</th>
-                                            </tr>
-                                        </thead>
-                                        <tbody className="divide-y divide-border">
-                                            {logs.length === 0 ? (
-                                                <tr><td colSpan={5} className="text-center py-8 text-muted">Log bulunamadı</td></tr>
-                                            ) : (
-                                                logs.map((log: EmailLog) => (
-                                                    <tr key={log.id} className="hover:bg-surface-alt/50">
-                                                        <td className="px-4 py-3 text-sm text-heading">{log.to}</td>
-                                                        <td className="px-4 py-3 text-sm text-muted max-w-xs truncate">{log.subject}</td>
-                                                        <td className="px-4 py-3 text-sm text-muted">{log.template || '-'}</td>
-                                                        <td className="px-4 py-3">
-                                                            <span className={clsx('px-2 py-1 text-xs rounded-full', statusColors[log.status])}>
-                                                                {log.status.toUpperCase()}
-                                                            </span>
-                                                        </td>
-                                                        <td className="px-4 py-3 text-sm text-muted whitespace-nowrap">{formatDate(log.createdAt)}</td>
-                                                    </tr>
-                                                ))
-                                            )}
-                                        </tbody>
-                                    </table>
-                                </div>
-                            </div>
-                        )}
-
-                        {/* Pagination */}
-                        {meta && meta.totalPages > 1 && (
-                            <div className="flex items-center justify-between mt-4">
-                                <p className="text-sm text-muted">
-                                    Sayfa {page} / {meta.totalPages}
-                                    ({meta.total} kayıt)
-                                </p>
-                                <div className="flex space-x-2">
-                                    <Button variant="secondary" onClick={() => setPage(p => Math.max(1, p - 1))}
-                                        disabled={page === 1}
-                                        className="px-3 py-1 bg-surface-elevated border border-border rounded text-sm text-muted hover:text-heading disabled:opacity-50">
-                                        Önceki
-                                    </Button>
-                                    <Button variant="secondary" onClick={() => setPage(p => p + 1)}
-                                        disabled={page >= meta.totalPages}
-                                        className="px-3 py-1 bg-surface-elevated border border-border rounded text-sm text-muted hover:text-heading disabled:opacity-50">
-                                        Sonraki
-                                    </Button>
-                                </div>
-                            </div>
-                        )}
-                    </>
-                )}
-            </div>
-        </>
-    );
+function formatDate(date: string) {
+    return new Date(date).toLocaleString('tr-TR', {
+        day: '2-digit',
+        month: '2-digit',
+        year: 'numeric',
+        hour: '2-digit',
+        minute: '2-digit',
+    });
 }
+
+// ─── Kolonlar ───────────────────────────────────────────────────────────────
+
+function buildErrorColumns(): ColumnDef<ErrorLog, any>[] {
+    return [
+        {
+            id: 'severity',
+            header: 'Seviye',
+            cell: ({ row }) => (
+                <span
+                    className={clsx('px-2 py-1 text-xs rounded-full border', severityColors[row.original.severity])}
+                >
+                    {enumLabel(severityConfig, row.original.severity)}
+                </span>
+            ),
+        },
+        {
+            id: 'message',
+            header: 'Mesaj',
+            cell: ({ row }) => (
+                <span className="text-sm text-heading max-w-md truncate block">{row.original.message}</span>
+            ),
+        },
+        {
+            id: 'source',
+            header: 'Kaynak',
+            cell: ({ row }) => <span className="text-sm text-muted">{row.original.source}</span>,
+        },
+        {
+            id: 'createdAt',
+            header: 'Tarih',
+            cell: ({ row }) => (
+                <span className="text-sm text-muted whitespace-nowrap">{formatDate(row.original.createdAt)}</span>
+            ),
+        },
+    ];
+}
+
+function buildSecurityColumns(onResolve: (id: string) => void): ColumnDef<SecurityLog, any>[] {
+    return [
+        {
+            id: 'eventType',
+            header: 'Olay',
+            cell: ({ row }) => (
+                <span className="text-sm text-heading">
+                    {eventTypeLabels[row.original.eventType] || row.original.eventType}
+                </span>
+            ),
+        },
+        {
+            id: 'severity',
+            header: 'Seviye',
+            cell: ({ row }) => (
+                <span
+                    className={clsx(
+                        'px-2 py-1 text-xs rounded-full border',
+                        severityColors[row.original.severity],
+                    )}
+                >
+                    {enumLabel(severityConfig, row.original.severity)}
+                </span>
+            ),
+        },
+        {
+            id: 'ipEmail',
+            header: 'IP / E-posta',
+            cell: ({ row }) => (
+                <span className="text-sm text-muted">
+                    {row.original.ipAddress || row.original.email || '-'}
+                </span>
+            ),
+        },
+        {
+            id: 'resolved',
+            header: 'Durum',
+            cell: ({ row }) =>
+                row.original.resolved ? (
+                    <span className="flex items-center text-success-700 text-sm">
+                        <CheckCircleIcon className="h-4 w-4 mr-1" /> Çözüldü
+                    </span>
+                ) : (
+                    <span className="flex items-center text-warning-700 text-sm">
+                        <ClockIcon className="h-4 w-4 mr-1" /> Bekliyor
+                    </span>
+                ),
+        },
+        {
+            id: 'createdAt',
+            header: 'Tarih',
+            cell: ({ row }) => (
+                <span className="text-sm text-muted whitespace-nowrap">{formatDate(row.original.createdAt)}</span>
+            ),
+        },
+        {
+            id: 'actions',
+            header: 'İşlem',
+            cell: ({ row }) =>
+                !row.original.resolved ? (
+                    <Button
+                        variant="secondary"
+                        onClick={() => onResolve(row.original.id)}
+                        className="text-xs px-2 py-1 bg-success-500/10 text-success-700 rounded hover:bg-success-500/20"
+                    >
+                        Çöz
+                    </Button>
+                ) : null,
+        },
+    ];
+}
+
+function buildEmailColumns(): ColumnDef<EmailLog, any>[] {
+    return [
+        {
+            id: 'to',
+            header: 'Alıcı',
+            cell: ({ row }) => <span className="text-sm text-heading">{row.original.to}</span>,
+        },
+        {
+            id: 'subject',
+            header: 'Konu',
+            cell: ({ row }) => (
+                <span className="text-sm text-muted max-w-xs truncate block">{row.original.subject}</span>
+            ),
+        },
+        {
+            id: 'template',
+            header: 'Şablon',
+            cell: ({ row }) => <span className="text-sm text-muted">{row.original.template || '-'}</span>,
+        },
+        {
+            id: 'status',
+            header: 'Durum',
+            cell: ({ row }) => (
+                <span className={clsx('px-2 py-1 text-xs rounded-full', statusColors[row.original.status])}>
+                    {row.original.status.toUpperCase()}
+                </span>
+            ),
+        },
+        {
+            id: 'createdAt',
+            header: 'Tarih',
+            cell: ({ row }) => (
+                <span className="text-sm text-muted whitespace-nowrap">{formatDate(row.original.createdAt)}</span>
+            ),
+        },
+    ];
+}
+
+// ─── StatCard ────────────────────────────────────────────────────────────────
 
 function StatCard({ label, value, color }: { label: string; value: string | number; color: string }) {
     const colorClasses: Record<string, string> = {
@@ -442,6 +285,256 @@ function StatCard({ label, value, color }: { label: string; value: string | numb
         <div className={clsx('p-4 rounded-lg border', colorClasses[color])}>
             <p className="text-sm opacity-80">{label}</p>
             <p className="text-2xl font-bold mt-1">{value}</p>
+        </div>
+    );
+}
+
+// ─── Sayfa ───────────────────────────────────────────────────────────────────
+
+export default function LogsPage() {
+    const [activeTab, setActiveTab] = useState<LogTab>('errors');
+
+    // stats: useAdminResource hook'u stats dönmediğinden fetcher yan etkisiyle yakalanır
+    const statsRef = useRef<any>(null);
+    const [stats, setStats] = useState<any>(null);
+    const [metaTotal, setMetaTotal] = useState<number>(0);
+
+    // Fetcher — activeTab'a göre doğru API çağrısı; stats'ı yan etki ile yakalar
+    const fetcher = useCallback(
+        (params: Record<string, any>) => {
+            const call =
+                activeTab === 'errors'
+                    ? adminApi.getErrorLogs(params)
+                    : activeTab === 'security'
+                    ? adminApi.getSecurityLogs(params)
+                    : adminApi.getEmailLogs(params);
+
+            call.then((res) => {
+                const d = res?.data;
+                const newStats = d?.stats ?? null;
+                const newTotal: number = d?.meta?.total ?? 0;
+                if (JSON.stringify(newStats) !== JSON.stringify(statsRef.current)) {
+                    statsRef.current = newStats;
+                    setStats(newStats);
+                }
+                setMetaTotal(newTotal);
+            });
+
+            return call;
+        },
+        [activeTab],
+    );
+
+    // Tek useAdminResource; queryKey'e activeTab eklenerek sekme değişiminde yeni fetch tetiklenir.
+    // Arama artık yazarken smooth (debounce, varsayılan 300 ms); Enter şart değil.
+    const r = useAdminResource<ErrorLog | SecurityLog | EmailLog>({
+        queryKey: `logs:${activeTab}`,
+        fetcher,
+        limit: 20,
+        syncUrl: true,
+        errorMessage: 'Loglar yüklenirken bir hata oluştu',
+    });
+
+    // Sekme değişimi — queryKey değişir → hook yeni veri çeker
+    const handleTabChange = (key: string) => {
+        setActiveTab(key as LogTab);
+        setStats(null);
+        statsRef.current = null;
+    };
+
+    // Security logu çözümleme
+    const handleResolve = async (id: string) => {
+        try {
+            await adminApi.resolveSecurityIssue(id);
+            toast.success('Sorun çözümlendi');
+            r.refetch();
+        } catch {
+            toast.error('İşlem başarısız');
+        }
+    };
+
+    // Kolonlar ve emptyText sekmeye göre dallanır
+    const columns: ColumnDef<any, any>[] =
+        activeTab === 'errors'
+            ? (buildErrorColumns() as ColumnDef<any, any>[])
+            : activeTab === 'security'
+            ? (buildSecurityColumns(handleResolve) as ColumnDef<any, any>[])
+            : (buildEmailColumns() as ColumnDef<any, any>[]);
+
+    const emptyText =
+        activeTab === 'errors'
+            ? 'Hata logu bulunamadı'
+            : activeTab === 'security'
+            ? 'Güvenlik logu bulunamadı'
+            : 'E-posta logu bulunamadı';
+
+    // Sekmeye özgü filtre widget'ları
+    const filterWidgets =
+        activeTab === 'errors' ? (
+            <Select
+                value={r.filters.severity ?? 'all'}
+                onChange={(e) => r.setFilter('severity', e.target.value)}
+                className="sm:w-48"
+                selectSize="sm"
+            >
+                <option value="all">Tüm Seviyeler</option>
+                <option value="critical">Kritik</option>
+                <option value="error">Hata</option>
+                <option value="warning">Uyarı</option>
+                <option value="low">Düşük</option>
+            </Select>
+        ) : activeTab === 'security' ? (
+            <>
+                <Select
+                    value={r.filters.severity ?? 'all'}
+                    onChange={(e) => r.setFilter('severity', e.target.value)}
+                    className="sm:w-48"
+                    selectSize="sm"
+                >
+                    <option value="all">Tüm Seviyeler</option>
+                    <option value="critical">Kritik</option>
+                    <option value="high">Yüksek</option>
+                    <option value="medium">Orta</option>
+                    <option value="low">Düşük</option>
+                </Select>
+                <Select
+                    value={r.filters.resolved ?? 'all'}
+                    onChange={(e) => r.setFilter('resolved', e.target.value)}
+                    className="sm:w-44"
+                    selectSize="sm"
+                >
+                    <option value="all">Tüm Durumlar</option>
+                    <option value="false">Bekleyenler</option>
+                    <option value="true">Çözülenler</option>
+                </Select>
+            </>
+        ) : (
+            <>
+                <Select
+                    value={r.filters.status ?? 'all'}
+                    onChange={(e) => r.setFilter('status', e.target.value)}
+                    className="sm:w-48"
+                    selectSize="sm"
+                >
+                    <option value="all">Tüm Durumlar</option>
+                    <option value="sent">Gönderildi</option>
+                    <option value="delivered">Teslim Edildi</option>
+                    <option value="queued">Kuyrukta</option>
+                    <option value="bounced">Geri Döndü</option>
+                    <option value="failed">Başarısız</option>
+                </Select>
+                <Select
+                    value={r.filters.template ?? 'all'}
+                    onChange={(e) => r.setFilter('template', e.target.value)}
+                    className="sm:w-48"
+                    selectSize="sm"
+                >
+                    <option value="all">Tüm Şablonlar</option>
+                    <option value="welcome">Hoş Geldiniz</option>
+                    <option value="password_reset">Şifre Sıfırlama</option>
+                    <option value="order_confirmation">Sipariş Onayı</option>
+                    <option value="shipping_update">Kargo Güncelleme</option>
+                </Select>
+            </>
+        );
+
+    return (
+        <div className="space-y-6 p-6">
+            {/* Başlık */}
+            <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+                <div>
+                    <h1 className="text-2xl font-bold text-heading">Sistem Logları</h1>
+                    <p className="text-muted mt-1">Hata, güvenlik ve e-posta loglarını inceleyin</p>
+                </div>
+                <div className="flex flex-wrap items-center gap-2">
+                    <Button
+                        variant="secondary"
+                        onClick={() => r.refetch()}
+                        className="p-2 shrink-0 bg-surface-elevated border border-border rounded-lg text-muted hover:text-heading"
+                    >
+                        <ArrowPathIcon className={clsx('h-5 w-5 shrink-0', r.isLoading && 'animate-spin')} />
+                    </Button>
+                </div>
+            </div>
+
+            {/* Sekmeler — ikonlu */}
+            <AdminTabs
+                tabs={LOG_TABS.map((t) => ({ key: t.id, label: t.name, icon: t.icon }))}
+                value={activeTab}
+                onChange={handleTabChange}
+            />
+
+            {/* İstatistik kartları — API yanıtından gelen stats */}
+            {stats && (
+                <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+                    {activeTab === 'errors' && (
+                        <>
+                            <StatCard label="Kritik" value={stats.critical ?? 0} color="red" />
+                            <StatCard label="Hata" value={stats.error ?? 0} color="yellow" />
+                            <StatCard label="Uyarı" value={stats.warning ?? 0} color="blue" />
+                            <StatCard label="Toplam" value={metaTotal} color="gray" />
+                        </>
+                    )}
+                    {activeTab === 'security' && (
+                        <>
+                            <StatCard
+                                label="Çözülmemiş Kritik"
+                                value={stats.unresolvedHighSeverity ?? 0}
+                                color="red"
+                            />
+                            <StatCard
+                                label="Başarısız Giriş"
+                                value={stats.byEventType?.failed_login ?? 0}
+                                color="yellow"
+                            />
+                            <StatCard
+                                label="IP Engelleme"
+                                value={stats.byEventType?.ip_block ?? 0}
+                                color="blue"
+                            />
+                            <StatCard label="Toplam" value={metaTotal} color="gray" />
+                        </>
+                    )}
+                    {activeTab === 'emails' && (
+                        <>
+                            <StatCard
+                                label="Teslim Oranı"
+                                value={`${stats.deliveryRate ?? 0}%`}
+                                color="green"
+                            />
+                            <StatCard
+                                label="Bounce Oranı"
+                                value={`${stats.bounceRate ?? 0}%`}
+                                color="red"
+                            />
+                            <StatCard label="Gönderilen" value={stats.byStatus?.sent ?? 0} color="blue" />
+                            <StatCard label="Toplam" value={metaTotal} color="gray" />
+                        </>
+                    )}
+                </div>
+            )}
+
+            {/* Arama + Filtreler — smooth debounce ile (useAdminResource) */}
+            <FilterToolbar
+                search={r.search}
+                onSearchChange={r.setSearch}
+                onSearchSubmit={r.onSearchSubmit}
+                searchPlaceholder={SEARCH_PLACEHOLDERS[activeTab]}
+            >
+                {filterWidgets}
+            </FilterToolbar>
+
+            {/* Tablo */}
+            <DataTable<any>
+                columns={columns}
+                data={r.rows}
+                loading={r.isLoading}
+                emptyText={emptyText}
+                getRowId={(row) => row.id}
+            />
+
+            {/* Sayfalama */}
+            <Pagination page={r.page} totalPages={r.totalPages} onPageChange={r.setPage} />
         </div>
     );
 }

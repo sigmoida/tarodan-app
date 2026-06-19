@@ -11,7 +11,6 @@ import {
   MapPinIcon,
   ClockIcon,
   PrinterIcon,
-  BellIcon,
 } from '@heroicons/react/24/outline';
 import { adminApi } from '@/lib/api';
 import { getProductEffectivePrice } from '@/lib/productPrice';
@@ -19,14 +18,13 @@ import { cancelReasonLabel, orderOriginLabel } from '@/lib/utils';
 import toast from 'react-hot-toast';
 import {
   Button,
-  Input,
   Select,
   Spinner,
-  Textarea,
   enumLabel,
   paymentStatusConfig,
   paymentProviderConfig,
   shipmentStatusConfig,
+  shipmentProviderConfig,
 } from '@tarodan/ui';
 import { AdminFinancialSummary } from '@/components/AdminFinancialSummary';
 import { colors as dsColors } from '@tarodan/ui';
@@ -108,17 +106,6 @@ const statusConfig: Record<string, { label: string; color: string; bg: string }>
   refunded: { label: 'İade Edildi', color: 'text-muted', bg: 'bg-surface-alt' },
 };
 
-const carriers = [
-  'Yurtiçi Kargo',
-  'Aras Kargo',
-  'MNG Kargo',
-  'PTT Kargo',
-  'Sürat Kargo',
-  'UPS',
-  'DHL',
-  'Diğer',
-];
-
 export default function OrderDetailPage() {
   const router = useRouter();
   const params = useParams();
@@ -127,18 +114,8 @@ export default function OrderDetailPage() {
   const [order, setOrder] = useState<OrderDetail | null>(null);
   const [loading, setLoading] = useState(true);
   const [showStatusModal, setShowStatusModal] = useState(false);
-  const [showTrackingModal, setShowTrackingModal] = useState(false);
-  const [showNotifyModal, setShowNotifyModal] = useState(false);
   const [newStatus, setNewStatus] = useState('');
   const [processing, setProcessing] = useState(false);
-
-  // Tracking form
-  const [trackingNumber, setTrackingNumber] = useState('');
-  const [carrier, setCarrier] = useState('');
-
-  // Notify form
-  const [notifyType, setNotifyType] = useState<string>('status_update');
-  const [notifyMessage, setNotifyMessage] = useState('');
   // 48h pencere (Faz 4A.5)
   const [extendOpen, setExtendOpen] = useState(false);
   const [forceOpen, setForceOpen] = useState(false);
@@ -204,40 +181,6 @@ export default function OrderDetailPage() {
       loadOrder();
     } catch (error: any) {
       toast.error(error.response?.data?.message || 'Durum güncelleme başarısız');
-    } finally {
-      setProcessing(false);
-    }
-  };
-
-  const handleAddTracking = async () => {
-    if (!trackingNumber || !carrier) {
-      toast.error('Takip numarası ve kargo firması gerekli');
-      return;
-    }
-    setProcessing(true);
-    try {
-      await adminApi.addOrderTracking(orderId, trackingNumber, carrier);
-      toast.success('Kargo takibi eklendi');
-      setShowTrackingModal(false);
-      setTrackingNumber('');
-      setCarrier('');
-      loadOrder();
-    } catch (error: any) {
-      toast.error(error.response?.data?.message || 'Kargo takibi eklenemedi');
-    } finally {
-      setProcessing(false);
-    }
-  };
-
-  const handleSendNotification = async () => {
-    setProcessing(true);
-    try {
-      await adminApi.sendOrderNotification(orderId, notifyType, notifyMessage || undefined);
-      toast.success('Bildirim gönderildi');
-      setShowNotifyModal(false);
-      setNotifyMessage('');
-    } catch (error: any) {
-      toast.error(error.response?.data?.message || 'Bildirim gönderilemedi');
     } finally {
       setProcessing(false);
     }
@@ -419,18 +362,8 @@ export default function OrderDetailPage() {
               className="px-4 py-2 bg-primary-600 text-heading rounded-lg hover:bg-primary-700 transition-colors">
               Durum Güncelle
             </Button>
-            <Button variant="secondary" onClick={() => setShowTrackingModal(true)}
-              className="px-4 py-2 bg-info-600 text-heading rounded-lg hover:bg-info-700 transition-colors flex items-center gap-2">
-              <TruckIcon className="w-5 h-5" />
-              Kargo Takibi Ekle
-            </Button>
-            <Button variant="secondary" onClick={() => setShowNotifyModal(true)}
-              className="px-4 py-2 bg-primary-600 text-heading rounded-lg hover:bg-primary-700 transition-colors flex items-center gap-2">
-              <BellIcon className="w-5 h-5" />
-              Bildirim Gönder
-            </Button>
             <Button variant="secondary" onClick={handlePrintInvoice}
-              className="px-4 py-2 bg-body text-heading rounded-lg hover:bg-surface-alt transition-colors flex items-center gap-2">
+              className="px-4 py-2 bg-surface-alt text-heading rounded-lg hover:bg-border-subtle transition-colors flex items-center gap-2">
               <PrinterIcon className="w-5 h-5" />
               Fatura Yazdır
             </Button>
@@ -545,7 +478,7 @@ export default function OrderDetailPage() {
                     {order.shipment.carrier && (
                       <div className="flex justify-between">
                         <span className="text-muted">Kargo Firması:</span>
-                        <span className="text-heading">{order.shipment.carrier}</span>
+                        <span className="text-heading">{enumLabel(shipmentProviderConfig, order.shipment.carrier)}</span>
                       </div>
                     )}
                     {order.shipment.status && (
@@ -685,92 +618,6 @@ export default function OrderDetailPage() {
                   className="flex-1 px-4 py-2 bg-primary-600 text-heading rounded-lg hover:bg-primary-700 transition-colors disabled:opacity-50"
                   disabled={processing}>
                   {processing ? 'İşleniyor...' : 'Güncelle'}
-                </Button>
-              </div>
-            </div>
-          </div>
-        )}
-
-        {/* Tracking Modal */}
-        {showTrackingModal && (
-          <div className="fixed inset-0 bg-heading bg-opacity-50 flex items-center justify-center z-50">
-            <div className="bg-surface-elevated rounded-xl px-6 pb-6 pt-5 max-w-md w-full mx-4">
-              <h3 className="text-lg font-semibold text-heading mb-4 leading-tight">Kargo Takibi Ekle</h3>
-              <div className="space-y-4 mb-4">
-                <div>
-                  <label className="block text-sm font-medium text-body mb-2">Kargo Firması</label>
-                  <Select
-                    value={carrier}
-                    onChange={(e) => setCarrier(e.target.value)}
-                  >
-                    <option value="">Seçiniz</option>
-                    {carriers.map((c) => (<option key={c} value={c}>{c}</option>))}
-                  </Select>
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-body mb-2">Takip Numarası</label>
-                  <Input type="text"
-                    value={trackingNumber}
-                    onChange={(e) => setTrackingNumber(e.target.value)}
-                    className="text-heading"
-                    placeholder="Örn: 123456789" />
-                </div>
-              </div>
-              <div className="flex gap-3">
-                <Button variant="secondary" onClick={() => setShowTrackingModal(false)}
-                  className="flex-1 px-4 text-body hover:bg-surface"
-                  disabled={processing}>
-                  İptal
-                </Button>
-                <Button variant="secondary" onClick={handleAddTracking}
-                  className="flex-1 px-4 py-2 bg-info-600 text-heading rounded-lg hover:bg-info-700 transition-colors disabled:opacity-50"
-                  disabled={processing}>
-                  {processing ? 'İşleniyor...' : 'Kaydet'}
-                </Button>
-              </div>
-            </div>
-          </div>
-        )}
-
-        {/* Notify Modal */}
-        {showNotifyModal && (
-          <div className="fixed inset-0 bg-heading bg-opacity-50 flex items-center justify-center z-50">
-            <div className="bg-surface-elevated rounded-xl px-6 pb-6 pt-5 max-w-md w-full mx-4">
-              <h3 className="text-lg font-semibold text-heading mb-4 leading-tight">Bildirim Gönder</h3>
-              <div className="space-y-4 mb-4">
-                <div>
-                  <label className="block text-sm font-medium text-body mb-2">Bildirim Türü</label>
-                  <Select
-                    value={notifyType}
-                    onChange={(e) => setNotifyType(e.target.value)}
-                  >
-                    <option value="status_update">Durum Güncelleme</option>
-                    <option value="shipped">Kargoya Verildi</option>
-                    <option value="delivered">Teslim Edildi</option>
-                    <option value="custom">Özel Mesaj</option>
-                  </Select>
-                </div>
-                {notifyType === 'custom' && (
-                  <div>
-                    <label className="block text-sm font-medium text-body mb-2">Mesaj</label>
-                    <Textarea value={notifyMessage}
-                      onChange={(e) => setNotifyMessage(e.target.value)}
-                      className="text-heading"
-                      rows={3}
-                      placeholder="Alıcıya gönderilecek mesajı yazın..." />
-                  </div>
-                )}
-              </div>
-              <div className="flex gap-3">
-                <Button variant="secondary" onClick={() => setShowNotifyModal(false)}
-                  className="flex-1 px-4 text-body hover:bg-surface"
-                  disabled={processing}>
-                  İptal
-                </Button>
-                <Button variant="secondary" onClick={handleSendNotification}
-                  className="flex-1 px-4 py-2 bg-primary-600 text-heading rounded-lg hover:bg-primary-700 transition-colors disabled:opacity-50"
-                  disabled={processing}>
-                  {processing ? 'İşleniyor...' : 'Gönder'}
                 </Button>
               </div>
             </div>

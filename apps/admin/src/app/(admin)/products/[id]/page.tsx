@@ -9,6 +9,7 @@ import {
   CheckCircleIcon,
   XCircleIcon,
   TrashIcon,
+  ArrowUturnLeftIcon,
   PhotoIcon,
   PencilIcon,
   StarIcon,
@@ -270,10 +271,32 @@ export default function ProductDetailPage() {
     setProcessing(true);
     try {
       await adminApi.deleteProduct(productId);
-      toast.success('Ürün silindi');
+      toast.success('Ürün kaldırıldı');
       router.push('/products');
     } catch (error: any) {
       toast.error(error.response?.data?.message || 'Silme işlemi başarısız');
+      setProcessing(false);
+    }
+  };
+
+  const handleRestore = async () => {
+    if (
+      !(await confirm({
+        title: 'Ürünü geri yükle',
+        description:
+          'Ürün yeniden onaya (Beklemede) düşecek ve onaylandıktan sonra yayınlanacak.',
+        confirmLabel: 'Geri Yükle',
+      }))
+    )
+      return;
+    setProcessing(true);
+    try {
+      await adminApi.restoreProduct(productId);
+      toast.success('Ürün geri yüklendi (onay bekliyor)');
+      loadProduct();
+    } catch (error: any) {
+      toast.error(error.response?.data?.message || 'Geri yükleme başarısız');
+    } finally {
       setProcessing(false);
     }
   };
@@ -322,7 +345,11 @@ export default function ProductDetailPage() {
   const statusInfo = statusConfig[product.status] || statusConfig.pending;
   const canApprove = product.status === 'pending';
   const canReject = product.status === 'pending';
-  const canDelete = product.status !== 'sold' && product.status !== 'reserved';
+  const canRestore = product.status === 'deleted';
+  const canDelete =
+    product.status !== 'sold' &&
+    product.status !== 'reserved' &&
+    product.status !== 'deleted';
 
   return (
       <div className="min-h-screen bg-surface">
@@ -519,10 +546,16 @@ export default function ProductDetailPage() {
                         Reddet
                       </Button>
                     )}
+                    {canRestore && (
+                      <Button variant="success" size="md" onClick={handleRestore} disabled={processing} isLoading={processing} className="w-full flex items-center justify-center gap-2">
+                        <ArrowUturnLeftIcon className="w-5 h-5" />
+                        Geri Yükle
+                      </Button>
+                    )}
                     {canDelete && (
                       <Button variant="secondary" size="md" onClick={() => setShowDeleteModal(true)} className="w-full flex items-center justify-center gap-2">
                         <TrashIcon className="w-5 h-5" />
-                        Sil
+                        Kaldır
                       </Button>
                     )}
                   </div>
@@ -828,16 +861,16 @@ export default function ProductDetailPage() {
         {showDeleteModal && (
           <div className="fixed inset-0 bg-heading bg-opacity-50 flex items-center justify-center z-50">
             <div className="bg-surface-elevated rounded-xl px-6 pb-6 pt-5 max-w-md w-full mx-4">
-              <h3 className="text-lg font-semibold text-heading mb-4 leading-tight">Ürünü Sil</h3>
+              <h3 className="text-lg font-semibold text-heading mb-4 leading-tight">Ürünü Kaldır</h3>
               <p className="text-muted mb-6">
-                Bu ürünü silmek istediğinizden emin misiniz? Bu işlem geri alınamaz.
+                Ürün listelerden kaldırılacak (Kaldırıldı durumuna alınır). İstediğinde Geri Yükle ile geri getirebilirsin.
               </p>
               <div className="flex gap-3">
                 <Button variant="secondary" size="md" onClick={() => setShowDeleteModal(false)} disabled={processing} className="flex-1">
                   İptal
                 </Button>
                 <Button variant="danger" size="md" onClick={handleDelete} disabled={processing} isLoading={processing} className="flex-1">
-                  {processing ? 'İşleniyor...' : 'Sil'}
+                  {processing ? 'İşleniyor...' : 'Kaldır'}
                 </Button>
               </div>
             </div>

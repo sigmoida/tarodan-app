@@ -21,9 +21,6 @@ import {
   fulltextPaymentSearch,
   fulltextOrderSearch,
   fulltextDiscountSearch,
-  fulltextShippingMethodSearch,
-  fulltextShippingCarrierSearch,
-  fulltextShippingZoneSearch,
   fulltextErrorLogSearch,
   fulltextSecurityLogSearch,
   fulltextEmailLogSearch,
@@ -1407,6 +1404,12 @@ export class AdminService {
       await this.cache.delPattern('products:list:*');
     }
 
+    // Arama index'ini güncelle: status/quantity değişmiş olabilir →
+    // listelenebilir ise indexle, değilse (pasif-stoklu/kaldırıldı vb.) kaldır
+    this.searchService
+      .syncProduct(productId)
+      .catch((err) => this.logger.warn(`ES sync failed for ${productId}: ${err?.message}`));
+
     return updated;
   }
 
@@ -1438,6 +1441,11 @@ export class AdminService {
     // Invalidate product cache so the product appears in listings
     await this.cache.del(`product:${productId}`);
     await this.cache.delPattern('products:list:*');
+
+    // Arama index'ini güncelle: onaylanan ürün artık aktif → ES'e indexlensin
+    this.searchService
+      .syncProduct(productId)
+      .catch((err) => this.logger.warn(`ES sync failed for ${productId}: ${err?.message}`));
 
     // Yeniden satışa açılan (eski sold/inactive) ilan onaylanıp yayına girince
     // wishlist + son 7 gün stockout-cancelled alıcılara back-in-stock bildirimi
@@ -1486,6 +1494,11 @@ export class AdminService {
     await this.cache.del(`product:${productId}`);
     await this.cache.delPattern('products:list:*');
 
+    // Arama index'ini güncelle: reddedilen ürün listelenemez → ES'ten kaldır
+    this.searchService
+      .syncProduct(productId)
+      .catch((err) => this.logger.warn(`ES sync failed for ${productId}: ${err?.message}`));
+
     return { success: true, productId, status: 'rejected', reason: dto.reason };
   }
 
@@ -1525,6 +1538,11 @@ export class AdminService {
 
         // Invalidate product cache
         await this.cache.del(`product:${productId}`);
+
+        // Arama index'ini güncelle: onaylanan ürün aktif → ES'e indexlensin
+        this.searchService
+          .syncProduct(productId)
+          .catch((err) => this.logger.warn(`ES sync failed for ${productId}: ${err?.message}`));
 
         results.push({ id: productId, success: true });
       } catch (error) {
@@ -1579,6 +1597,11 @@ export class AdminService {
 
         // Invalidate product cache
         await this.cache.del(`product:${productId}`);
+
+        // Arama index'ini güncelle: reddedilen ürün listelenemez → ES'ten kaldır
+        this.searchService
+          .syncProduct(productId)
+          .catch((err) => this.logger.warn(`ES sync failed for ${productId}: ${err?.message}`));
 
         results.push({ id: productId, success: true });
       } catch (error) {
@@ -2212,6 +2235,10 @@ export class AdminService {
       payment: order.payment ? {
         ...order.payment,
         amount: Number(order.payment.amount),
+      } : null,
+      shipment: order.shipment ? {
+        ...order.shipment,
+        carrier: order.shipment.provider,
       } : null,
     };
   }
@@ -4540,10 +4567,11 @@ export class AdminService {
     userId?: string;
     fromDate?: string;
     toDate?: string;
+    search?: string;
     page?: number;
     limit?: number;
   }) {
-    const { status, initiatorId, receiverId, userId, fromDate, toDate, page = 1, limit = 20 } = query;
+    const { status, initiatorId, receiverId, userId, fromDate, toDate, search, page = 1, limit = 20 } = query;
 
     const where: Prisma.TradeWhereInput = {};
 
@@ -4551,18 +4579,33 @@ export class AdminService {
       where.status = status;
     }
 
+    // AND koşulları: userId/initiatorId/receiverId filtresi ile search çakışmasın
+    const and: Prisma.TradeWhereInput[] = [];
+
     if (userId) {
-      where.OR = [
-        { initiatorId: userId },
-        { receiverId: userId },
-      ];
+      // Kullanıcıya ait tüm takaslar (başlatan VEYA alan)
+      and.push({ OR: [{ initiatorId: userId }, { receiverId: userId }] });
     } else {
-      if (initiatorId) {
-        where.initiatorId = initiatorId;
-      }
-      if (receiverId) {
-        where.receiverId = receiverId;
-      }
+      // Tekil id filtresi: AND içinde ayrı ayrı koy
+      if (initiatorId) and.push({ initiatorId });
+      if (receiverId) and.push({ receiverId });
+    }
+
+    if (search) {
+      // Takas no, başlatan displayName/email veya alıcı displayName/email araması
+      and.push({
+        OR: [
+          { tradeNumber: { contains: search, mode: 'insensitive' } },
+          { initiator: { displayName: { contains: search, mode: 'insensitive' } } },
+          { receiver:  { displayName: { contains: search, mode: 'insensitive' } } },
+          { initiator: { email: { contains: search, mode: 'insensitive' } } },
+          { receiver:  { email: { contains: search, mode: 'insensitive' } } },
+        ],
+      });
+    }
+
+    if (and.length) {
+      where.AND = and;
     }
 
     if (fromDate || toDate) {
@@ -4728,6 +4771,18 @@ export class AdminService {
 
     if (!trade) {
       throw new NotFoundException('Takas bulunamadı');
+    }
+
+    // Resolve product image S3 keys (cardKey) into usable URLs. The frontend
+    // renders `item.product.images[0].url`, but ProductImage stores cardKey/detailKey
+    // (no `url` column), so without this mapping the photos would not show.
+    for (const item of (trade as any).items ?? []) {
+      const product = item?.product;
+      if (product) {
+        product.images = (product.images ?? [])
+          .map((img: any) => ({ url: this.resolveProductImageUrl(img?.cardKey) }))
+          .filter((img: any) => img.url);
+      }
     }
 
     return trade;
@@ -7905,6 +7960,11 @@ export class AdminService {
       // Create audit log
       await this.createAuditLog(adminId, 'product_delete_hard', 'Product', productId, oldProduct, null);
 
+      // Arama index'inden kaldır (ürün artık DB'de yok)
+      this.searchService
+        .syncProduct(productId)
+        .catch((err) => this.logger.warn(`ES sync failed for ${productId}: ${err?.message}`));
+
       return { success: true, productId, deleted: true };
     } else {
       // Soft delete - set to deleted (pasif/inactive'den AYRI state: yönetici
@@ -7920,8 +7980,55 @@ export class AdminService {
         status: ProductStatus.deleted,
       });
 
+      // Arama index'inden kaldır: "Kaldırıldı" durumu listelenemez. Aksi halde
+      // ES dokümanı eski (active) haliyle kalıp aramada görünür ama detay 404 olur.
+      this.searchService
+        .syncProduct(productId)
+        .catch((err) => this.logger.warn(`ES sync failed for ${productId}: ${err?.message}`));
+
       return { success: true, productId, deleted: false, status: 'deleted' };
     }
+  }
+
+  /**
+   * Restore a soft-deleted product (admin only)
+   * - Only products in the `deleted` ("Kaldırıldı") state can be restored
+   * - Restored products go back to `pending` so they re-enter moderation
+   */
+  async restoreProduct(adminId: string, productId: string) {
+    const product = await this.prisma.product.findUnique({
+      where: { id: productId },
+    });
+
+    if (!product) {
+      throw new NotFoundException('Ürün bulunamadı');
+    }
+
+    if (product.status !== ProductStatus.deleted) {
+      throw new BadRequestException('Yalnızca kaldırılmış ürünler geri yüklenebilir');
+    }
+
+    const updated = await this.prisma.product.update({
+      where: { id: productId },
+      data: { status: ProductStatus.pending },
+    });
+
+    // Create audit log
+    await this.createAuditLog(adminId, 'product_restore', 'Product', productId, product, updated);
+
+    // Invalidate caches
+    if (this.cache) {
+      await this.cache.del(`product:${productId}`);
+      await this.cache.delPattern('products:list:*');
+    }
+
+    // Arama index'ini güncelle: geri yüklenen ürün "pending" → henüz listelenemez,
+    // ES'ten kaldırılır; onaylanınca approveProduct yeniden indexler.
+    this.searchService
+      .syncProduct(productId)
+      .catch((err) => this.logger.warn(`ES sync failed for ${productId}: ${err?.message}`));
+
+    return { success: true, productId, status: ProductStatus.pending };
   }
 
   // ==================== BRAND MANAGEMENT ====================
@@ -8285,645 +8392,7 @@ export class AdminService {
     return { success: true };
   }
 
-  // ==================== SHIPPING METHODS ====================
-
-  /**
-   * Get all shipping methods
-   */
-  async getShippingMethods(query?: { isActive?: boolean; search?: string }) {
-    const where: Prisma.ShippingMethodWhereInput = {};
-
-    if (query?.isActive !== undefined) {
-      where.isActive = query.isActive;
-    }
-
-    if (query?.search) {
-      const ids = await fulltextShippingMethodSearch(this.prisma, query.search);
-      if (ids.length === 0) return [];
-      where.id = { in: ids };
-    }
-
-    const methods = await this.prisma.shippingMethod.findMany({
-      where,
-      orderBy: [{ sortOrder: 'asc' }, { name: 'asc' }],
-    });
-
-    return methods;
-  }
-
-  /**
-   * Create shipping method
-   */
-  async createShippingMethod(adminId: string, dto: {
-    name: string;
-    code: string;
-    description?: string;
-    isActive?: boolean;
-    sortOrder?: number;
-  }) {
-    // Check if code exists
-    const existing = await this.prisma.shippingMethod.findUnique({
-      where: { code: dto.code },
-    });
-
-    if (existing) {
-      throw new BadRequestException('Bu kod zaten kullanılıyor');
-    }
-
-    const method = await this.prisma.shippingMethod.create({
-      data: {
-        name: dto.name,
-        code: dto.code.toLowerCase(),
-        description: dto.description,
-        isActive: dto.isActive ?? true,
-        sortOrder: dto.sortOrder ?? 0,
-      },
-    });
-
-    await this.createAuditLog(adminId, 'shipping_method_create', 'ShippingMethod', method.id, null, method);
-
-    this.logger.log(`Shipping method created: ${method.name} by admin ${adminId}`);
-
-    return method;
-  }
-
-  /**
-   * Update shipping method
-   */
-  async updateShippingMethod(adminId: string, methodId: string, dto: {
-    name?: string;
-    code?: string;
-    description?: string;
-    isActive?: boolean;
-    sortOrder?: number;
-  }) {
-    const existing = await this.prisma.shippingMethod.findUnique({
-      where: { id: methodId },
-    });
-
-    if (!existing) {
-      throw new NotFoundException('Kargo yöntemi bulunamadı');
-    }
-
-    // Check if new code conflicts
-    if (dto.code && dto.code !== existing.code) {
-      const conflict = await this.prisma.shippingMethod.findUnique({
-        where: { code: dto.code },
-      });
-      if (conflict) {
-        throw new BadRequestException('Bu kod zaten kullanılıyor');
-      }
-    }
-
-    const updated = await this.prisma.shippingMethod.update({
-      where: { id: methodId },
-      data: {
-        name: dto.name,
-        code: dto.code?.toLowerCase(),
-        description: dto.description,
-        isActive: dto.isActive,
-        sortOrder: dto.sortOrder,
-      },
-    });
-
-    await this.createAuditLog(adminId, 'shipping_method_update', 'ShippingMethod', methodId, existing, updated);
-
-    return updated;
-  }
-
-  /**
-   * Delete shipping method
-   */
-  async deleteShippingMethod(adminId: string, methodId: string) {
-    const existing = await this.prisma.shippingMethod.findUnique({
-      where: { id: methodId },
-      include: { _count: { select: { rates: true } } },
-    });
-
-    if (!existing) {
-      throw new NotFoundException('Kargo yöntemi bulunamadı');
-    }
-
-    if (existing._count.rates > 0) {
-      throw new BadRequestException('Bu yönteme bağlı fiyatlandırmalar var. Önce onları silin.');
-    }
-
-    await this.prisma.shippingMethod.delete({
-      where: { id: methodId },
-    });
-
-    await this.createAuditLog(adminId, 'shipping_method_delete', 'ShippingMethod', methodId, existing, null);
-
-    return { success: true };
-  }
-
-  // ==================== SHIPPING CARRIERS ====================
-
-  /**
-   * Get all shipping carriers
-   */
-  async getShippingCarriers(query?: { isActive?: boolean; supportsLabels?: boolean; search?: string }) {
-    const where: Prisma.ShippingCarrierWhereInput = {};
-
-    if (query?.isActive !== undefined) {
-      where.isActive = query.isActive;
-    }
-
-    if (query?.supportsLabels !== undefined) {
-      where.supportsLabels = query.supportsLabels;
-    }
-
-    if (query?.search) {
-      const ids = await fulltextShippingCarrierSearch(this.prisma, query.search);
-      if (ids.length === 0) return [];
-      where.id = { in: ids };
-    }
-
-    const carriers = await this.prisma.shippingCarrier.findMany({
-      where,
-      orderBy: { name: 'asc' },
-      select: {
-        id: true,
-        name: true,
-        code: true,
-        logo: true,
-        trackingUrl: true,
-        isActive: true,
-        supportsLabels: true,
-        createdAt: true,
-        updatedAt: true,
-        // Don't expose API credentials
-      },
-    });
-
-    return carriers;
-  }
-
-  /**
-   * Create shipping carrier
-   */
-  async createShippingCarrier(adminId: string, dto: {
-    name: string;
-    code: string;
-    logo?: string;
-    trackingUrl?: string;
-    apiEndpoint?: string;
-    apiKey?: string;
-    apiSecret?: string;
-    isActive?: boolean;
-    supportsLabels?: boolean;
-  }) {
-    const existing = await this.prisma.shippingCarrier.findUnique({
-      where: { code: dto.code },
-    });
-
-    if (existing) {
-      throw new BadRequestException('Bu kargo firması kodu zaten kullanılıyor');
-    }
-
-    const carrier = await this.prisma.shippingCarrier.create({
-      data: {
-        name: dto.name,
-        code: dto.code.toLowerCase(),
-        logo: dto.logo,
-        trackingUrl: dto.trackingUrl,
-        apiEndpoint: dto.apiEndpoint,
-        apiKey: dto.apiKey,
-        apiSecret: dto.apiSecret,
-        isActive: dto.isActive ?? true,
-        supportsLabels: dto.supportsLabels ?? true,
-      },
-    });
-
-    // Don't include secrets in audit log
-    const safeCarrier = { ...carrier, apiKey: '***', apiSecret: '***' };
-    await this.createAuditLog(adminId, 'shipping_carrier_create', 'ShippingCarrier', carrier.id, null, safeCarrier);
-
-    this.logger.log(`Shipping carrier created: ${carrier.name} by admin ${adminId}`);
-
-    return {
-      id: carrier.id,
-      name: carrier.name,
-      code: carrier.code,
-      logo: carrier.logo,
-      trackingUrl: carrier.trackingUrl,
-      isActive: carrier.isActive,
-      supportsLabels: carrier.supportsLabels,
-      createdAt: carrier.createdAt,
-      updatedAt: carrier.updatedAt,
-    };
-  }
-
-  /**
-   * Update shipping carrier
-   */
-  async updateShippingCarrier(adminId: string, carrierId: string, dto: {
-    name?: string;
-    code?: string;
-    logo?: string;
-    trackingUrl?: string;
-    apiEndpoint?: string;
-    apiKey?: string;
-    apiSecret?: string;
-    isActive?: boolean;
-    supportsLabels?: boolean;
-  }) {
-    const existing = await this.prisma.shippingCarrier.findUnique({
-      where: { id: carrierId },
-    });
-
-    if (!existing) {
-      throw new NotFoundException('Kargo firması bulunamadı');
-    }
-
-    if (dto.code && dto.code !== existing.code) {
-      const conflict = await this.prisma.shippingCarrier.findUnique({
-        where: { code: dto.code },
-      });
-      if (conflict) {
-        throw new BadRequestException('Bu kargo firması kodu zaten kullanılıyor');
-      }
-    }
-
-    const updated = await this.prisma.shippingCarrier.update({
-      where: { id: carrierId },
-      data: {
-        name: dto.name,
-        code: dto.code?.toLowerCase(),
-        logo: dto.logo,
-        trackingUrl: dto.trackingUrl,
-        apiEndpoint: dto.apiEndpoint,
-        apiKey: dto.apiKey,
-        apiSecret: dto.apiSecret,
-        isActive: dto.isActive,
-        supportsLabels: dto.supportsLabels,
-      },
-    });
-
-    await this.createAuditLog(adminId, 'shipping_carrier_update', 'ShippingCarrier', carrierId,
-      { ...existing, apiKey: '***', apiSecret: '***' },
-      { ...updated, apiKey: '***', apiSecret: '***' });
-
-    return {
-      id: updated.id,
-      name: updated.name,
-      code: updated.code,
-      logo: updated.logo,
-      trackingUrl: updated.trackingUrl,
-      isActive: updated.isActive,
-      supportsLabels: updated.supportsLabels,
-      createdAt: updated.createdAt,
-      updatedAt: updated.updatedAt,
-    };
-  }
-
-  /**
-   * Delete shipping carrier
-   */
-  async deleteShippingCarrier(adminId: string, carrierId: string) {
-    const existing = await this.prisma.shippingCarrier.findUnique({
-      where: { id: carrierId },
-      include: { _count: { select: { rates: true } } },
-    });
-
-    if (!existing) {
-      throw new NotFoundException('Kargo firması bulunamadı');
-    }
-
-    if (existing._count.rates > 0) {
-      throw new BadRequestException('Bu kargo firmasına bağlı fiyatlandırmalar var. Önce onları silin.');
-    }
-
-    await this.prisma.shippingCarrier.delete({
-      where: { id: carrierId },
-    });
-
-    await this.createAuditLog(adminId, 'shipping_carrier_delete', 'ShippingCarrier', carrierId, existing, null);
-
-    return { success: true };
-  }
-
-  // ==================== SHIPPING ZONES ====================
-
-  /**
-   * Get all shipping zones
-   */
-  async getShippingZones(query?: { isActive?: boolean; country?: string; search?: string }) {
-    const where: Prisma.ShippingZoneWhereInput = {};
-
-    if (query?.isActive !== undefined) {
-      where.isActive = query.isActive;
-    }
-
-    if (query?.country) {
-      where.countries = { has: query.country.toUpperCase() };
-    }
-
-    if (query?.search) {
-      const ids = await fulltextShippingZoneSearch(this.prisma, query.search);
-      if (ids.length === 0) return [];
-      where.id = { in: ids };
-    }
-
-    const zones = await this.prisma.shippingZone.findMany({
-      where,
-      orderBy: [{ isDefault: 'desc' }, { name: 'asc' }],
-      include: {
-        _count: { select: { rates: true } },
-      },
-    });
-
-    return zones.map(z => ({
-      ...z,
-      ratesCount: z._count.rates,
-    }));
-  }
-
-  /**
-   * Create shipping zone
-   */
-  async createShippingZone(adminId: string, dto: {
-    name: string;
-    description?: string;
-    countries?: string[];
-    regions?: string[];
-    cities?: string[];
-    isDefault?: boolean;
-    isActive?: boolean;
-  }) {
-    // If setting as default, remove default from others
-    if (dto.isDefault) {
-      await this.prisma.shippingZone.updateMany({
-        where: { isDefault: true },
-        data: { isDefault: false },
-      });
-    }
-
-    const zone = await this.prisma.shippingZone.create({
-      data: {
-        name: dto.name,
-        description: dto.description,
-        countries: dto.countries?.map(c => c.toUpperCase()) || [],
-        regions: dto.regions || [],
-        cities: dto.cities || [],
-        isDefault: dto.isDefault ?? false,
-        isActive: dto.isActive ?? true,
-      },
-    });
-
-    await this.createAuditLog(adminId, 'shipping_zone_create', 'ShippingZone', zone.id, null, zone);
-
-    this.logger.log(`Shipping zone created: ${zone.name} by admin ${adminId}`);
-
-    return zone;
-  }
-
-  /**
-   * Update shipping zone
-   */
-  async updateShippingZone(adminId: string, zoneId: string, dto: {
-    name?: string;
-    description?: string;
-    countries?: string[];
-    regions?: string[];
-    cities?: string[];
-    isDefault?: boolean;
-    isActive?: boolean;
-  }) {
-    const existing = await this.prisma.shippingZone.findUnique({
-      where: { id: zoneId },
-    });
-
-    if (!existing) {
-      throw new NotFoundException('Kargo bölgesi bulunamadı');
-    }
-
-    // If setting as default, remove default from others
-    if (dto.isDefault && !existing.isDefault) {
-      await this.prisma.shippingZone.updateMany({
-        where: { isDefault: true, id: { not: zoneId } },
-        data: { isDefault: false },
-      });
-    }
-
-    const updated = await this.prisma.shippingZone.update({
-      where: { id: zoneId },
-      data: {
-        name: dto.name,
-        description: dto.description,
-        countries: dto.countries?.map(c => c.toUpperCase()),
-        regions: dto.regions,
-        cities: dto.cities,
-        isDefault: dto.isDefault,
-        isActive: dto.isActive,
-      },
-    });
-
-    await this.createAuditLog(adminId, 'shipping_zone_update', 'ShippingZone', zoneId, existing, updated);
-
-    return updated;
-  }
-
-  /**
-   * Delete shipping zone
-   */
-  async deleteShippingZone(adminId: string, zoneId: string) {
-    const existing = await this.prisma.shippingZone.findUnique({
-      where: { id: zoneId },
-      include: { _count: { select: { rates: true } } },
-    });
-
-    if (!existing) {
-      throw new NotFoundException('Kargo bölgesi bulunamadı');
-    }
-
-    if (existing._count.rates > 0) {
-      throw new BadRequestException('Bu bölgeye bağlı fiyatlandırmalar var. Önce onları silin.');
-    }
-
-    await this.prisma.shippingZone.delete({
-      where: { id: zoneId },
-    });
-
-    await this.createAuditLog(adminId, 'shipping_zone_delete', 'ShippingZone', zoneId, existing, null);
-
-    return { success: true };
-  }
-
-  // ==================== SHIPPING RATES ====================
-
-  /**
-   * Get shipping rates
-   */
-  async getShippingRates(query?: { zoneId?: string; methodId?: string; carrierId?: string; isActive?: boolean }) {
-    const where: Prisma.ShippingRateWhereInput = {};
-
-    if (query?.zoneId) where.zoneId = query.zoneId;
-    if (query?.methodId) where.methodId = query.methodId;
-    if (query?.carrierId) where.carrierId = query.carrierId;
-    if (query?.isActive !== undefined) where.isActive = query.isActive;
-
-    const rates = await this.prisma.shippingRate.findMany({
-      where,
-      include: {
-        zone: { select: { id: true, name: true } },
-        method: { select: { id: true, name: true, code: true } },
-        carrier: { select: { id: true, name: true, code: true } },
-      },
-      orderBy: [{ zone: { name: 'asc' } }, { method: { name: 'asc' } }],
-    });
-
-    return rates.map(r => ({
-      ...r,
-      basePrice: Number(r.basePrice),
-      pricePerKg: Number(r.pricePerKg),
-      freeShippingMin: r.freeShippingMin ? Number(r.freeShippingMin) : null,
-    }));
-  }
-
-  /**
-   * Create shipping rate
-   */
-  async createShippingRate(adminId: string, dto: {
-    zoneId: string;
-    methodId: string;
-    carrierId: string;
-    basePrice: number;
-    pricePerKg?: number;
-    freeShippingMin?: number;
-    minDeliveryDays: number;
-    maxDeliveryDays: number;
-    isActive?: boolean;
-  }) {
-    // Validate references exist
-    const [zone, method, carrier] = await Promise.all([
-      this.prisma.shippingZone.findUnique({ where: { id: dto.zoneId } }),
-      this.prisma.shippingMethod.findUnique({ where: { id: dto.methodId } }),
-      this.prisma.shippingCarrier.findUnique({ where: { id: dto.carrierId } }),
-    ]);
-
-    if (!zone) throw new NotFoundException('Kargo bölgesi bulunamadı');
-    if (!method) throw new NotFoundException('Kargo yöntemi bulunamadı');
-    if (!carrier) throw new NotFoundException('Kargo firması bulunamadı');
-
-    // Check for duplicate combination
-    const existing = await this.prisma.shippingRate.findUnique({
-      where: {
-        zoneId_methodId_carrierId: {
-          zoneId: dto.zoneId,
-          methodId: dto.methodId,
-          carrierId: dto.carrierId,
-        },
-      },
-    });
-
-    if (existing) {
-      throw new BadRequestException('Bu kombinasyon için zaten bir fiyatlandırma mevcut');
-    }
-
-    const rate = await this.prisma.shippingRate.create({
-      data: {
-        zoneId: dto.zoneId,
-        methodId: dto.methodId,
-        carrierId: dto.carrierId,
-        basePrice: dto.basePrice,
-        pricePerKg: dto.pricePerKg ?? 0,
-        freeShippingMin: dto.freeShippingMin,
-        minDeliveryDays: dto.minDeliveryDays,
-        maxDeliveryDays: dto.maxDeliveryDays,
-        isActive: dto.isActive ?? true,
-      },
-      include: {
-        zone: { select: { id: true, name: true } },
-        method: { select: { id: true, name: true, code: true } },
-        carrier: { select: { id: true, name: true, code: true } },
-      },
-    });
-
-    await this.createAuditLog(adminId, 'shipping_rate_create', 'ShippingRate', rate.id, null, rate);
-
-    return {
-      ...rate,
-      basePrice: Number(rate.basePrice),
-      pricePerKg: Number(rate.pricePerKg),
-      freeShippingMin: rate.freeShippingMin ? Number(rate.freeShippingMin) : null,
-    };
-  }
-
-  /**
-   * Update shipping rate
-   */
-  async updateShippingRate(adminId: string, rateId: string, dto: {
-    zoneId?: string;
-    methodId?: string;
-    carrierId?: string;
-    basePrice?: number;
-    pricePerKg?: number;
-    freeShippingMin?: number;
-    minDeliveryDays?: number;
-    maxDeliveryDays?: number;
-    isActive?: boolean;
-  }) {
-    const existing = await this.prisma.shippingRate.findUnique({
-      where: { id: rateId },
-    });
-
-    if (!existing) {
-      throw new NotFoundException('Kargo fiyatlandırması bulunamadı');
-    }
-
-    const updated = await this.prisma.shippingRate.update({
-      where: { id: rateId },
-      data: {
-        zoneId: dto.zoneId,
-        methodId: dto.methodId,
-        carrierId: dto.carrierId,
-        basePrice: dto.basePrice,
-        pricePerKg: dto.pricePerKg,
-        freeShippingMin: dto.freeShippingMin,
-        minDeliveryDays: dto.minDeliveryDays,
-        maxDeliveryDays: dto.maxDeliveryDays,
-        isActive: dto.isActive,
-      },
-      include: {
-        zone: { select: { id: true, name: true } },
-        method: { select: { id: true, name: true, code: true } },
-        carrier: { select: { id: true, name: true, code: true } },
-      },
-    });
-
-    await this.createAuditLog(adminId, 'shipping_rate_update', 'ShippingRate', rateId, existing, updated);
-
-    return {
-      ...updated,
-      basePrice: Number(updated.basePrice),
-      pricePerKg: Number(updated.pricePerKg),
-      freeShippingMin: updated.freeShippingMin ? Number(updated.freeShippingMin) : null,
-    };
-  }
-
-  /**
-   * Delete shipping rate
-   */
-  async deleteShippingRate(adminId: string, rateId: string) {
-    const existing = await this.prisma.shippingRate.findUnique({
-      where: { id: rateId },
-    });
-
-    if (!existing) {
-      throw new NotFoundException('Kargo fiyatlandırması bulunamadı');
-    }
-
-    await this.prisma.shippingRate.delete({
-      where: { id: rateId },
-    });
-
-    await this.createAuditLog(adminId, 'shipping_rate_delete', 'ShippingRate', rateId, existing, null);
-
-    return { success: true };
-  }
-
-  // ==================== SHIPPING LABELS ====================
+  // ==================== SHIPPING (view-only) ====================
 
   /**
    * Get list of shipments
@@ -8966,79 +8435,6 @@ export class AdminService {
         limit,
         totalPages: Math.ceil(total / limit),
       },
-    };
-  }
-
-  /**
-   * Generate shipping label for a shipment
-   */
-  async generateShippingLabel(adminId: string, shipmentId: string) {
-    const shipment = await this.prisma.shipment.findUnique({
-      where: { id: shipmentId },
-      include: {
-        order: {
-          include: {
-            buyer: { select: { displayName: true, email: true, phone: true } },
-          },
-        },
-      },
-    });
-
-    if (!shipment) {
-      throw new NotFoundException('Gönderi bulunamadı');
-    }
-
-    // Get carrier info
-    const carrier = await this.prisma.shippingCarrier.findUnique({
-      where: { code: shipment.provider },
-    });
-
-    // Mock label generation - in production, this would call carrier API
-    const labelUrl = `https://labels.example.com/${shipmentId}.pdf`;
-    const trackingNumber = shipment.trackingNumber || `TRK${Date.now()}${Math.random().toString(36).substr(2, 6).toUpperCase()}`;
-
-    // Update shipment with label info
-    const updated = await this.prisma.shipment.update({
-      where: { id: shipmentId },
-      data: {
-        labelUrl,
-        trackingNumber,
-        trackingUrl: carrier?.trackingUrl?.replace('{{tracking}}', trackingNumber),
-      },
-    });
-
-    await this.createAuditLog(adminId, 'shipping_label_generate', 'Shipment', shipmentId, shipment, updated);
-
-    this.logger.log(`Shipping label generated for shipment ${shipmentId} by admin ${adminId}`);
-
-    return {
-      shipmentId,
-      labelUrl,
-      trackingNumber,
-      carrier: shipment.provider,
-      generatedAt: new Date(),
-    };
-  }
-
-  /**
-   * Bulk generate shipping labels
-   */
-  async bulkGenerateShippingLabels(adminId: string, shipmentIds: string[]) {
-    const results = await Promise.allSettled(
-      shipmentIds.map(id => this.generateShippingLabel(adminId, id))
-    );
-
-    const successful = results.filter((r): r is PromiseFulfilledResult<any> => r.status === 'fulfilled')
-      .map(r => r.value);
-    const failed = results.filter((r): r is PromiseRejectedResult => r.status === 'rejected')
-      .map((r, i) => ({ shipmentId: shipmentIds[i], error: r.reason?.message || 'Unknown error' }));
-
-    return {
-      successful,
-      failed,
-      totalRequested: shipmentIds.length,
-      successCount: successful.length,
-      failCount: failed.length,
     };
   }
 

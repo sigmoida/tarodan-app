@@ -4,9 +4,13 @@ import { useState, useEffect } from "react";
 import Link from "next/link";
 import { adminApi } from "@/lib/api";
 import { Button, Select } from "@tarodan/ui";
-import { DataTable, type ColumnDef } from "@/components/DataTable";
-import { PageHeader } from "@/components/admin-list";
+import { type ColumnDef } from "@/components/DataTable";
+import { ResourceListPage } from "@/components/ResourceListPage";
+import { useAdminResource } from "@/hooks/useAdminResource";
+import { useMemo } from "react";
 import toast from "react-hot-toast";
+
+// ─── Tipler ────────────────────────────────────────────────────────────────
 
 interface AiCheckItem {
   id: string;
@@ -21,17 +25,31 @@ interface AiCheckItem {
   aiCheckedAt?: string | null;
 }
 
+// ─── Yardımcı: AI rozeti ───────────────────────────────────────────────────
+
+function aiBadge(s?: string | null) {
+  const [cls, label] =
+    s === "flagged"
+      ? ["bg-danger-500/20 text-danger-600", "Uygunsuz şüphesi"]
+      : s === "review"
+        ? ["bg-warning-500/20 text-warning-700", "Düşük ilgililik"]
+        : ["bg-success-500/20 text-success-700", "Temiz · oto-onay"];
+  return (
+    <span className={`px-2 py-1 rounded text-xs font-medium ${cls}`}>
+      {label}
+    </span>
+  );
+}
+
+// ─── Sayfa ─────────────────────────────────────────────────────────────────
+
 export default function AiModerationPage() {
-  const [items, setItems] = useState<AiCheckItem[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [status, setStatus] = useState("");
-  const [page, setPage] = useState(1);
-  const [total, setTotal] = useState(0);
-  // Görsel Test Et aracı
+  // ── Görsel Test Et aracı ───────────────────────────────────────────────────
   const [testUrl, setTestUrl] = useState("");
   const [testResult, setTestResult] = useState<any>(null);
   const [testing, setTesting] = useState(false);
-  // Kabul eşiği (ilgililik %)
+
+  // ── Kabul eşiği (ilgililik %) ──────────────────────────────────────────────
   const [relThreshold, setRelThreshold] = useState(20);
   const [savingCfg, setSavingCfg] = useState(false);
 
@@ -90,115 +108,111 @@ export default function AiModerationPage() {
     e.target.value = "";
   };
 
-  useEffect(() => {
-    load();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [status, page]);
-
-  const load = async () => {
-    setLoading(true);
-    try {
-      const res = await adminApi.get("/admin/moderation/ai-checks", {
-        params: { status: status || undefined, page, pageSize: 20 },
+  // ── Liste verisi (useAdminResource) ───────────────────────────────────────
+  const {
+    rows: items,
+    total,
+    page,
+    setPage,
+    totalPages,
+    filters,
+    setFilter,
+    isLoading,
+  } = useAdminResource<AiCheckItem>({
+    queryKey: "ai-checks",
+    fetcher: (params) => {
+      const { status, ...rest } = params;
+      return adminApi.get("/admin/moderation/ai-checks", {
+        params: { ...rest, status: status || undefined, pageSize: rest.limit },
       });
-      setItems(res.data.data || []);
-      setTotal(res.data.meta?.total || 0);
-    } catch {
-      toast.error("AI denetim listesi yüklenemedi");
-    } finally {
-      setLoading(false);
-    }
-  };
+    },
+    limit: 20,
+    initialFilters: { status: "" },
+    errorMessage: "AI denetim listesi yüklenemedi",
+  });
 
-  const aiBadge = (s?: string | null) => {
-    const [cls, label] =
-      s === "flagged"
-        ? ["bg-danger-500/20 text-danger-600", "Uygunsuz şüphesi"]
-        : s === "review"
-          ? ["bg-warning-500/20 text-warning-700", "Düşük ilgililik"]
-          : ["bg-success-500/20 text-success-700", "Temiz · oto-onay"];
-    return (
-      <span className={`px-2 py-1 rounded text-xs font-medium ${cls}`}>
-        {label}
-      </span>
-    );
-  };
+  // ── Kolon tanımları ────────────────────────────────────────────────────────
 
-  const columns: ColumnDef<AiCheckItem, any>[] = [
-    {
-      header: "Görsel",
-      cell: ({ row }) =>
-        row.original.imageUrl ? (
-          // eslint-disable-next-line @next/next/no-img-element
-          <img
-            src={row.original.imageUrl}
-            alt={row.original.title}
-            className="w-12 h-12 rounded object-cover shrink-0"
-          />
-        ) : (
-          <div className="w-12 h-12 rounded bg-surface-alt shrink-0" />
+  const columns: ColumnDef<AiCheckItem, any>[] = useMemo(
+    () => [
+      {
+        header: "Görsel",
+        cell: ({ row }) =>
+          row.original.imageUrl ? (
+            // eslint-disable-next-line @next/next/no-img-element
+            <img
+              src={row.original.imageUrl}
+              alt={row.original.title}
+              className="w-12 h-12 rounded object-cover shrink-0"
+            />
+          ) : (
+            <div className="w-12 h-12 rounded bg-surface-alt shrink-0" />
+          ),
+      },
+      {
+        header: "Ürün",
+        cell: ({ row }) => (
+          <Link
+            href={`/products/${row.original.id}`}
+            className="text-heading hover:text-primary-400 line-clamp-1"
+          >
+            {row.original.title}
+          </Link>
         ),
-    },
-    {
-      header: "Ürün",
-      cell: ({ row }) => (
-        <Link
-          href={`/products/${row.original.id}`}
-          className="text-heading hover:text-primary-400 line-clamp-1"
-        >
-          {row.original.title}
-        </Link>
-      ),
-    },
-    { header: "AI Sonuç", cell: ({ row }) => aiBadge(row.original.aiCheckStatus) },
-    {
-      header: "İlgililik",
-      cell: ({ row }) => (
-        <span className="text-sm whitespace-nowrap">
-          %{Math.round((row.original.aiRelevanceScore ?? 0) * 100)}
-        </span>
-      ),
-    },
-    {
-      header: "Uygunsuzluk",
-      cell: ({ row }) => (
-        <span className="text-sm whitespace-nowrap">
-          %{((row.original.aiNsfwScore ?? 0) * 100).toFixed(2)}
-        </span>
-      ),
-    },
-    {
-      header: "Ürün Durumu",
-      cell: ({ row }) => (
-        <span className="text-sm text-muted">{row.original.status}</span>
-      ),
-    },
-    {
-      header: "Satıcı",
-      cell: ({ row }) => (
-        <span className="text-sm">
-          {row.original.seller?.displayName || "-"}
-        </span>
-      ),
-    },
-    {
-      header: "Denetim",
-      cell: ({ row }) => (
-        <span className="text-xs text-muted whitespace-nowrap">
-          {row.original.aiCheckedAt
-            ? new Date(row.original.aiCheckedAt).toLocaleString("tr-TR")
-            : "-"}
-        </span>
-      ),
-    },
-  ];
+      },
+      {
+        header: "AI Sonuç",
+        cell: ({ row }) => aiBadge(row.original.aiCheckStatus),
+      },
+      {
+        header: "İlgililik",
+        cell: ({ row }) => (
+          <span className="text-sm whitespace-nowrap">
+            %{Math.round((row.original.aiRelevanceScore ?? 0) * 100)}
+          </span>
+        ),
+      },
+      {
+        header: "Uygunsuzluk",
+        cell: ({ row }) => (
+          <span className="text-sm whitespace-nowrap">
+            %{((row.original.aiNsfwScore ?? 0) * 100).toFixed(2)}
+          </span>
+        ),
+      },
+      {
+        header: "Ürün Durumu",
+        cell: ({ row }) => (
+          <span className="text-sm text-muted">{row.original.status}</span>
+        ),
+      },
+      {
+        header: "Satıcı",
+        cell: ({ row }) => (
+          <span className="text-sm">
+            {row.original.seller?.displayName || "-"}
+          </span>
+        ),
+      },
+      {
+        header: "Denetim",
+        cell: ({ row }) => (
+          <span className="text-xs text-muted whitespace-nowrap">
+            {row.original.aiCheckedAt
+              ? new Date(row.original.aiCheckedAt).toLocaleString("tr-TR")
+              : "-"}
+          </span>
+        ),
+      },
+    ],
+    [],
+  );
+
+  // ── Render ─────────────────────────────────────────────────────────────────
 
   return (
     <div className="space-y-6">
-      <PageHeader
-        title="AI Denetim"
-        description={`AI ile denetlenmiş ${total} ürün`}
-      />
+      {/* Görsel Test Et aracı */}
       <div className="admin-card p-4 space-y-3">
         <h3 className="font-medium text-heading">
           Görsel Test Et (ürün oluşturmadan skor gör)
@@ -268,6 +282,8 @@ export default function AiModerationPage() {
           </div>
         )}
       </div>
+
+      {/* Kabul Eşiği */}
       <div className="admin-card p-4 space-y-3">
         <h3 className="font-medium text-heading">Kabul Eşiği (ilgililik %)</h3>
         <p className="text-sm text-muted">
@@ -292,49 +308,34 @@ export default function AiModerationPage() {
           </Button>
         </div>
       </div>
-      <div className="flex flex-wrap gap-3">
-        <Select
-          value={status}
-          onChange={(e) => {
-            setStatus(e.target.value);
-            setPage(1);
-          }}
-          className="sm:w-56"
-        >
-          <option value="">Tümü</option>
-          <option value="passed">Temiz (oto-onaylanan)</option>
-          <option value="review">Düşük ilgililik (admin incelemesi)</option>
-          <option value="flagged">Uygunsuz şüphesi</option>
-        </Select>
-      </div>
-      <DataTable
+
+      {/* AI denetim listesi */}
+      <ResourceListPage<AiCheckItem>
+        title="AI Denetim"
+        description={`AI ile denetlenmiş ${total} ürün`}
+        filters={
+          <Select
+            value={filters.status ?? ""}
+            onChange={(e) => {
+              setFilter("status", e.target.value);
+            }}
+            className="sm:w-56"
+          >
+            <option value="">Tümü</option>
+            <option value="passed">Temiz (oto-onaylanan)</option>
+            <option value="review">Düşük ilgililik (admin incelemesi)</option>
+            <option value="flagged">Uygunsuz şüphesi</option>
+          </Select>
+        }
         columns={columns}
         data={items}
-        loading={loading}
+        loading={isLoading}
         emptyText="AI ile denetlenmiş ürün yok"
         getRowId={(r) => r.id}
+        page={page}
+        totalPages={totalPages}
+        onPageChange={setPage}
       />
-      {total > 20 && (
-        <div className="flex items-center justify-between">
-          <p className="text-sm text-muted">Toplam {total} ürün</p>
-          <div className="flex gap-2">
-            <button
-              className="px-3 py-1 rounded border border-border text-sm disabled:opacity-50"
-              onClick={() => setPage((p) => Math.max(1, p - 1))}
-              disabled={page === 1}
-            >
-              Önceki
-            </button>
-            <button
-              className="px-3 py-1 rounded border border-border text-sm disabled:opacity-50"
-              onClick={() => setPage((p) => p + 1)}
-              disabled={page >= Math.ceil(total / 20)}
-            >
-              Sonraki
-            </button>
-          </div>
-        </div>
-      )}
     </div>
   );
 }

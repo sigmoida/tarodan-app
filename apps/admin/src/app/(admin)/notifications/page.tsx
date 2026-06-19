@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
+import { useState, useCallback } from "react";
 import { adminApi } from "@/lib/api";
 import {
   BellIcon,
@@ -19,10 +19,15 @@ import {
   notificationChannelConfig,
   deliveryStatusConfig,
 } from "@tarodan/ui";
+import { type ColumnDef } from "@/components/DataTable";
+import { ActionButtons, ActionIconButton } from "@/components/admin-list";
+import { PageHeader } from "@/components/admin-list";
 import { AdminTabs } from "@/components/AdminTabs";
-import { DataTable, type ColumnDef } from "@/components/DataTable";
-import { PageHeader, ActionButtons, ActionIconButton } from "@/components/admin-list";
+import { ResourceListPage } from "@/components/ResourceListPage";
+import { useAdminResource } from "@/hooks/useAdminResource";
 import { useConfirm } from "@/components/ConfirmProvider";
+
+// ─── Tipler ────────────────────────────────────────────────────────────────
 
 interface NotificationLog {
   id: string;
@@ -52,11 +57,21 @@ interface ScheduledNotification {
 
 type TabType = "send" | "scheduled" | "history";
 
+// ─── Sabitler ──────────────────────────────────────────────────────────────
+
+const TABS = [
+  { key: "send", label: "Bildirim Gönder", icon: PaperAirplaneIcon },
+  { key: "scheduled", label: "Zamanlanmış", icon: ClockIcon },
+  { key: "history", label: "Geçmiş", icon: BellIcon },
+];
+
+// ─── Sayfa ─────────────────────────────────────────────────────────────────
+
 export default function NotificationsPage() {
   const confirm = useConfirm();
   const [activeTab, setActiveTab] = useState<TabType>("send");
 
-  // Send notification state
+  // ── Gönderim formu ────────────────────────────────────────────────────────
   const [sendForm, setSendForm] = useState({
     title: "",
     body: "",
@@ -68,69 +83,257 @@ export default function NotificationsPage() {
   });
   const [sending, setSending] = useState(false);
 
-  // Scheduled notifications state
-  const [scheduled, setScheduled] = useState<ScheduledNotification[]>([]);
-  const [loadingScheduled, setLoadingScheduled] = useState(false);
-
-  // History state
-  const [history, setHistory] = useState<NotificationLog[]>([]);
-  const [loadingHistory, setLoadingHistory] = useState(false);
-  const [historyFilters, setHistoryFilters] = useState({
-    page: 1,
-    limit: 20,
-    channel: "",
-    status: "",
-  });
-  const [totalHistory, setTotalHistory] = useState(0);
-
-  // Schedule modal state
+  // ── Zamanlama modalı ──────────────────────────────────────────────────────
   const [showScheduleModal, setShowScheduleModal] = useState(false);
   const [scheduleDate, setScheduleDate] = useState("");
   const [scheduling, setScheduling] = useState(false);
 
-  const loadScheduled = useCallback(async () => {
-    setLoadingScheduled(true);
-    try {
-      const response = await adminApi.getScheduledNotifications({
-        status: "pending",
-      });
-      setScheduled(response.data?.data || []);
-    } catch (error: any) {
-      toast.error("Zamanlanmış bildirimler yüklenemedi");
-    } finally {
-      setLoadingScheduled(false);
-    }
-  }, []);
+  // ── useAdminResource — tek çağrı; queryKey + fetcher activeTab'a göre branşlar ──
+  // "send" sekmesinde list API çağrısı yapılmaz (fetcher null-safe boş yanıt döner).
+  // "scheduled" sekmesinde getScheduledNotifications, "history" sekmesinde getNotificationHistory.
+  // History sekmesinde search desteklenmiyor → search prop'u ResourceListPage'e verilmez.
+  const {
+    rows,
+    page,
+    setPage,
+    totalPages,
+    filters,
+    setFilter,
+    isLoading,
+    refetch,
+  } = useAdminResource<ScheduledNotification | NotificationLog>({
+    queryKey: `notifications-${activeTab}`,
+    fetcher: (params) => {
+      if (activeTab === "scheduled") {
+        return adminApi.getScheduledNotifications({ status: "pending" });
+      }
+      if (activeTab === "history") {
+        return adminApi.getNotificationHistory({
+          page: params.page,
+          limit: params.limit,
+          channel: params.channel || undefined,
+          status: params.status || undefined,
+        });
+      }
+      // "send" sekmesinde liste fetch yapılmaz — boş yanıt
+      return Promise.resolve({ data: { data: [], meta: { total: 0 } } } as any);
+    },
+    limit: activeTab === "history" ? 20 : 100,
+    initialFilters: activeTab === "history" ? { channel: "", status: "" } : {},
+    errorMessage:
+      activeTab === "scheduled"
+        ? "Zamanlanmış bildirimler yüklenemedi"
+        : "Bildirim geçmişi yüklenemedi",
+  });
 
-  const loadHistory = useCallback(async () => {
-    setLoadingHistory(true);
-    try {
-      const response = await adminApi.getNotificationHistory({
-        page: historyFilters.page,
-        limit: historyFilters.limit,
-        channel: historyFilters.channel || undefined,
-        status: historyFilters.status || undefined,
-      });
-      setHistory(response.data?.data || []);
-      setTotalHistory(response.data?.meta?.total || 0);
-    } catch (error: any) {
-      toast.error("Bildirim geçmişi yüklenemedi");
-    } finally {
-      setLoadingHistory(false);
-    }
-  }, [historyFilters]);
+  // ── İptal aksiyonu ────────────────────────────────────────────────────────
+  const handleCancelScheduled = useCallback(
+    async (id: string) => {
+      if (
+        !(await confirm({
+          description:
+            "Bu zamanlanmış bildirimi iptal etmek istiyor musunuz?",
+          destructive: true,
+        }))
+      )
+        return;
 
-  useEffect(() => {
-    if (activeTab === "scheduled") loadScheduled();
-    if (activeTab === "history") loadHistory();
-  }, [activeTab, loadScheduled, loadHistory]);
+      try {
+        await adminApi.cancelScheduledNotification(id);
+        toast.success("Bildirim iptal edildi");
+        refetch();
+      } catch (error: any) {
+        toast.error(error.response?.data?.message || "İptal başarısız");
+      }
+    },
+    [confirm, refetch],
+  );
+
+  // ── Kolon tanımları ────────────────────────────────────────────────────────
+
+  const scheduledColumns: ColumnDef<ScheduledNotification, any>[] = [
+    {
+      header: "Başlık",
+      cell: ({ row }) => (
+        <span className="font-medium text-heading">
+          {(row.original as ScheduledNotification).title}
+        </span>
+      ),
+    },
+    {
+      header: "Kanallar",
+      cell: ({ row }) => (
+        <span className="text-muted">
+          {(row.original as ScheduledNotification).channels?.join(", ")}
+        </span>
+      ),
+    },
+    {
+      header: "Hedef",
+      cell: ({ row }) => (
+        <span className="text-muted">
+          {(row.original as ScheduledNotification).targetType}
+        </span>
+      ),
+    },
+    {
+      header: "Tarih",
+      cell: ({ row }) => (
+        <span className="text-muted">
+          {new Date(
+            (row.original as ScheduledNotification).scheduledFor,
+          ).toLocaleString("tr-TR")}
+        </span>
+      ),
+    },
+    {
+      header: "Durum",
+      cell: ({ row }) => (
+        <span className="badge badge-warning">
+          {enumLabel(
+            deliveryStatusConfig,
+            (row.original as ScheduledNotification).status,
+          )}
+        </span>
+      ),
+    },
+    {
+      id: "actions",
+      header: "İşlem",
+      cell: ({ row }) => (
+        <ActionButtons>
+          <ActionIconButton
+            icon={XCircleIcon}
+            onClick={() =>
+              handleCancelScheduled((row.original as ScheduledNotification).id)
+            }
+            title="İptal Et"
+            variant="danger"
+          />
+        </ActionButtons>
+      ),
+    },
+  ];
+
+  const historyColumns: ColumnDef<NotificationLog, any>[] = [
+    {
+      header: "Kullanıcı",
+      cell: ({ row }) => (
+        <span className="text-heading">
+          {(row.original as NotificationLog).user?.displayName ||
+            (row.original as NotificationLog).userId}
+        </span>
+      ),
+    },
+    {
+      header: "Kanal",
+      cell: ({ row }) => (
+        <span className="text-muted">
+          {enumLabel(
+            notificationChannelConfig,
+            (row.original as NotificationLog).channel,
+          )}
+        </span>
+      ),
+    },
+    {
+      header: "Başlık",
+      cell: ({ row }) => (
+        <span className="text-heading">
+          {(row.original as NotificationLog).title}
+        </span>
+      ),
+    },
+    {
+      header: "Durum",
+      cell: ({ row }) => {
+        const status = (row.original as NotificationLog).status;
+        return (
+          <span
+            className={`badge ${
+              status === "sent" || status === "delivered"
+                ? "badge-success"
+                : status === "failed"
+                  ? "badge-danger"
+                  : "badge-warning"
+            }`}
+          >
+            {enumLabel(deliveryStatusConfig, status)}
+          </span>
+        );
+      },
+    },
+    {
+      header: "Tarih",
+      cell: ({ row }) => (
+        <span className="text-muted">
+          {new Date(
+            (row.original as NotificationLog).createdAt,
+          ).toLocaleString("tr-TR")}
+        </span>
+      ),
+    },
+  ];
+
+  // ── Aktif sekme: liste prop'ları ──────────────────────────────────────────
+  const activeColumns =
+    activeTab === "scheduled"
+      ? (scheduledColumns as ColumnDef<any, any>[])
+      : activeTab === "history"
+        ? (historyColumns as ColumnDef<any, any>[])
+        : ([] as ColumnDef<any, any>[]);
+
+  const activeEmptyText =
+    activeTab === "scheduled"
+      ? "Zamanlanmış bildirim yok"
+      : activeTab === "history"
+        ? "Bildirim geçmişi boş"
+        : undefined;
+
+  // History filtreler (channel + status); search yok
+  const historyFilters =
+    activeTab === "history" ? (
+      <>
+        <Select
+          value={filters.channel ?? ""}
+          onChange={(e) => setFilter("channel", e.target.value)}
+          className="w-48"
+        >
+          <option value="">Tüm Kanallar</option>
+          <option value="push">Push</option>
+          <option value="email">Email</option>
+          <option value="sms">SMS</option>
+        </Select>
+        <Select
+          value={filters.status ?? ""}
+          onChange={(e) => setFilter("status", e.target.value)}
+          className="w-48"
+        >
+          <option value="">Tüm Durumlar</option>
+          <option value="pending">Beklemede</option>
+          <option value="sent">Gönderildi</option>
+          <option value="delivered">Teslim Edildi</option>
+          <option value="failed">Başarısız</option>
+        </Select>
+      </>
+    ) : undefined;
+
+  // ── Gönderim formu yardımcıları ───────────────────────────────────────────
+
+  const toggleChannel = (channel: string) => {
+    setSendForm((prev) => ({
+      ...prev,
+      channels: prev.channels.includes(channel)
+        ? prev.channels.filter((c) => c !== channel)
+        : [...prev.channels, channel],
+    }));
+  };
 
   const handleSendNotification = async () => {
     if (!sendForm.title || !sendForm.body) {
       toast.error("Başlık ve içerik zorunludur");
       return;
     }
-
     if (sendForm.channels.length === 0) {
       toast.error("En az bir kanal seçmelisiniz");
       return;
@@ -217,7 +420,8 @@ export default function NotificationsPage() {
       toast.success("Bildirim zamanlandı");
       setShowScheduleModal(false);
       setScheduleDate("");
-      loadScheduled();
+      // Zamanlanmış sekmesine geç (refetch queryKey değişimiyle otomatik gerçekleşir)
+      setActiveTab("scheduled");
     } catch (error: any) {
       toast.error(error.response?.data?.message || "Zamanlama başarısız");
     } finally {
@@ -225,152 +429,26 @@ export default function NotificationsPage() {
     }
   };
 
-  const handleCancelScheduled = async (id: string) => {
-    if (!(await confirm({ description: "Bu zamanlanmış bildirimi iptal etmek istiyor musunuz?", destructive: true })))
-      return;
+  // ── Render ─────────────────────────────────────────────────────────────────
 
-    try {
-      await adminApi.cancelScheduledNotification(id);
-      toast.success("Bildirim iptal edildi");
-      loadScheduled();
-    } catch (error: any) {
-      toast.error(error.response?.data?.message || "İptal başarısız");
-    }
-  };
-
-  const toggleChannel = (channel: string) => {
-    setSendForm((prev) => ({
-      ...prev,
-      channels: prev.channels.includes(channel)
-        ? prev.channels.filter((c) => c !== channel)
-        : [...prev.channels, channel],
-    }));
-  };
-
-  const scheduledColumns: ColumnDef<ScheduledNotification, any>[] = [
-    {
-      header: "Başlık",
-      cell: ({ row }) => (
-        <span className="font-medium text-heading">{row.original.title}</span>
-      ),
-    },
-    {
-      header: "Kanallar",
-      cell: ({ row }) => (
-        <span className="text-muted">{row.original.channels?.join(", ")}</span>
-      ),
-    },
-    {
-      header: "Hedef",
-      cell: ({ row }) => (
-        <span className="text-muted">{row.original.targetType}</span>
-      ),
-    },
-    {
-      header: "Tarih",
-      cell: ({ row }) => (
-        <span className="text-muted">
-          {new Date(row.original.scheduledFor).toLocaleString("tr-TR")}
-        </span>
-      ),
-    },
-    {
-      header: "Durum",
-      cell: ({ row }) => (
-        <span className="badge badge-warning">
-          {enumLabel(deliveryStatusConfig, row.original.status)}
-        </span>
-      ),
-    },
-    {
-      id: "actions",
-      header: "İşlem",
-      cell: ({ row }) => (
-        <ActionButtons>
-          <ActionIconButton
-            icon={XCircleIcon}
-            onClick={() => handleCancelScheduled(row.original.id)}
-            title="İptal Et"
-            variant="danger"
+  // "send" sekmesi: liste değil, form içeriği → ResourceListPage kullanılmaz;
+  // PageHeader + AdminTabs + form manuel render edilir.
+  if (activeTab === "send") {
+    return (
+      <>
+        <div className="space-y-6">
+          <PageHeader
+            title="Bildirim Yönetimi"
+            description="Push, email ve SMS bildirimleri gönderin ve yönetin"
           />
-        </ActionButtons>
-      ),
-    },
-  ];
 
-  const historyColumns: ColumnDef<NotificationLog, any>[] = [
-    {
-      header: "Kullanıcı",
-      cell: ({ row }) => (
-        <span className="text-heading">
-          {row.original.user?.displayName || row.original.userId}
-        </span>
-      ),
-    },
-    {
-      header: "Kanal",
-      cell: ({ row }) => (
-        <span className="text-muted">
-          {enumLabel(notificationChannelConfig, row.original.channel)}
-        </span>
-      ),
-    },
-    {
-      header: "Başlık",
-      cell: ({ row }) => (
-        <span className="text-heading">{row.original.title}</span>
-      ),
-    },
-    {
-      header: "Durum",
-      cell: ({ row }) => (
-        <span
-          className={`badge ${
-            row.original.status === "sent" ||
-            row.original.status === "delivered"
-              ? "badge-success"
-              : row.original.status === "failed"
-                ? "badge-danger"
-                : "badge-warning"
-          }`}
-        >
-          {enumLabel(deliveryStatusConfig, row.original.status)}
-        </span>
-      ),
-    },
-    {
-      header: "Tarih",
-      cell: ({ row }) => (
-        <span className="text-muted">
-          {new Date(row.original.createdAt).toLocaleString("tr-TR")}
-        </span>
-      ),
-    },
-  ];
+          <AdminTabs
+            tabs={TABS}
+            value={activeTab}
+            onChange={(k) => setActiveTab(k as TabType)}
+          />
 
-  const tabs = [
-    { key: "send", label: "Bildirim Gönder", icon: PaperAirplaneIcon },
-    { key: "scheduled", label: "Zamanlanmış", icon: ClockIcon },
-    { key: "history", label: "Geçmiş", icon: BellIcon },
-  ];
-
-  return (
-    <>
-      <div className="space-y-6">
-        <PageHeader
-          title="Bildirim Yönetimi"
-          description="Push, email ve SMS bildirimleri gönderin ve yönetin"
-        />
-
-        {/* Tabs */}
-        <AdminTabs
-          tabs={tabs}
-          value={activeTab}
-          onChange={(k) => setActiveTab(k as TabType)}
-        />
-
-        {/* Send Tab */}
-        {activeTab === "send" && (
+          {/* Gönderim formu */}
           <div className="admin-card p-6 max-w-2xl">
             <div className="space-y-6">
               <div>
@@ -411,7 +489,11 @@ export default function NotificationsPage() {
                       key={channel}
                       checked={sendForm.channels.includes(channel)}
                       onChange={() => toggleChannel(channel)}
-                      label={<span>{enumLabel(notificationChannelConfig, channel)}</span>}
+                      label={
+                        <span>
+                          {enumLabel(notificationChannelConfig, channel)}
+                        </span>
+                      }
                     />
                   ))}
                 </div>
@@ -439,7 +521,7 @@ export default function NotificationsPage() {
               {sendForm.targetType === "user_ids" && (
                 <div>
                   <label className="block text-sm font-medium text-muted mb-2">
-                    Kullanıcı ID'leri (virgülle ayırın)
+                    Kullanıcı ID&apos;leri (virgülle ayırın)
                   </label>
                   <Input
                     type="text"
@@ -519,146 +601,68 @@ export default function NotificationsPage() {
               </div>
             </div>
           </div>
-        )}
+        </div>
 
-        {/* Scheduled Tab */}
-        {activeTab === "scheduled" && (
-          <DataTable
-            columns={scheduledColumns}
-            data={scheduled}
-            loading={loadingScheduled}
-            emptyText="Zamanlanmış bildirim yok"
-            getRowId={(r) => r.id}
-          />
-        )}
-
-        {/* History Tab */}
-        {activeTab === "history" && (
-          <div className="space-y-4">
-            <div className="flex gap-4 items-center">
-              <Select
-                value={historyFilters.channel}
-                onChange={(e) =>
-                  setHistoryFilters({
-                    ...historyFilters,
-                    channel: e.target.value,
-                    page: 1,
-                  })
-                }
-                className="w-48"
-              >
-                <option value="">Tüm Kanallar</option>
-                <option value="push">Push</option>
-                <option value="email">Email</option>
-                <option value="sms">SMS</option>
-              </Select>
-              <Select
-                value={historyFilters.status}
-                onChange={(e) =>
-                  setHistoryFilters({
-                    ...historyFilters,
-                    status: e.target.value,
-                    page: 1,
-                  })
-                }
-                className="w-48"
-              >
-                <option value="">Tüm Durumlar</option>
-                <option value="pending">Beklemede</option>
-                <option value="sent">Gönderildi</option>
-                <option value="delivered">Teslim Edildi</option>
-                <option value="failed">Başarısız</option>
-              </Select>
-            </div>
-
-            <DataTable
-              columns={historyColumns}
-              data={history}
-              loading={loadingHistory}
-              emptyText="Bildirim geçmişi boş"
-              getRowId={(r) => r.id}
-            />
-
-            {/* Pagination */}
-            {totalHistory > historyFilters.limit && (
-              <div className="flex items-center justify-between">
-                <p className="text-sm text-muted">
-                  Sayfa {historyFilters.page} /{" "}
-                  {Math.ceil(totalHistory / historyFilters.limit)}
-                </p>
-                <div className="flex gap-2">
+        {/* Zamanlama modalı */}
+        {showScheduleModal && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-heading/60">
+            <div className="bg-surface-elevated rounded-xl border border-border w-full max-w-md px-6 pb-6 pt-5">
+              <h2 className="text-xl font-bold text-heading mb-4 leading-tight">
+                Bildirimi Zamanla
+              </h2>
+              <div className="space-y-4">
+                <div>
+                  <label className="block text-sm font-medium text-muted mb-2">
+                    Gönderim Tarihi ve Saati
+                  </label>
+                  <Input
+                    type="datetime-local"
+                    value={scheduleDate}
+                    onChange={(e) => setScheduleDate(e.target.value)}
+                    min={new Date().toISOString().slice(0, 16)}
+                  />
+                </div>
+                <div className="flex justify-end gap-3 pt-4">
                   <Button
                     variant="secondary"
-                    onClick={() =>
-                      setHistoryFilters({
-                        ...historyFilters,
-                        page: historyFilters.page - 1,
-                      })
-                    }
-                    disabled={historyFilters.page === 1}
+                    type="button"
+                    onClick={() => setShowScheduleModal(false)}
                   >
-                    Önceki
+                    İptal
                   </Button>
                   <Button
-                    variant="secondary"
-                    onClick={() =>
-                      setHistoryFilters({
-                        ...historyFilters,
-                        page: historyFilters.page + 1,
-                      })
-                    }
-                    disabled={
-                      historyFilters.page >=
-                      Math.ceil(totalHistory / historyFilters.limit)
-                    }
+                    onClick={handleScheduleNotification}
+                    disabled={scheduling || !scheduleDate}
                   >
-                    Sonraki
+                    {scheduling ? "Kaydediliyor..." : "Zamanla"}
                   </Button>
                 </div>
               </div>
-            )}
-          </div>
-        )}
-      </div>
-
-      {/* Schedule Modal */}
-      {showScheduleModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-heading/60">
-          <div className="bg-surface-elevated rounded-xl border border-border w-full max-w-md px-6 pb-6 pt-5">
-            <h2 className="text-xl font-bold text-heading mb-4 leading-tight">
-              Bildirimi Zamanla
-            </h2>
-            <div className="space-y-4">
-              <div>
-                <label className="block text-sm font-medium text-muted mb-2">
-                  Gönderim Tarihi ve Saati
-                </label>
-                <Input
-                  type="datetime-local"
-                  value={scheduleDate}
-                  onChange={(e) => setScheduleDate(e.target.value)}
-                  min={new Date().toISOString().slice(0, 16)}
-                />
-              </div>
-              <div className="flex justify-end gap-3 pt-4">
-                <Button
-                  variant="secondary"
-                  type="button"
-                  onClick={() => setShowScheduleModal(false)}
-                >
-                  İptal
-                </Button>
-                <Button
-                  onClick={handleScheduleNotification}
-                  disabled={scheduling || !scheduleDate}
-                >
-                  {scheduling ? "Kaydediliyor..." : "Zamanla"}
-                </Button>
-              </div>
             </div>
           </div>
-        </div>
-      )}
-    </>
+        )}
+      </>
+    );
+  }
+
+  // "scheduled" veya "history" sekmesi — ResourceListPage liste çatısı
+  return (
+    <ResourceListPage<any>
+      title="Bildirim Yönetimi"
+      description="Push, email ve SMS bildirimleri gönderin ve yönetin"
+      tabs={TABS}
+      activeTab={activeTab}
+      onTabChange={(k) => setActiveTab(k as TabType)}
+      // Arama yok (backend desteklemiyor); sadece filtreler (history sekmesinde)
+      filters={historyFilters}
+      columns={activeColumns}
+      data={rows}
+      loading={isLoading}
+      emptyText={activeEmptyText}
+      getRowId={(r) => (r as any).id}
+      page={page}
+      totalPages={totalPages}
+      onPageChange={setPage}
+    />
   );
 }

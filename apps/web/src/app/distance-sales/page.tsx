@@ -88,7 +88,7 @@ export default function DistanceSalesPage() {
             <li>Teslimat adresi: Sipariş sırasında belirtilen adres</li>
             <li>Teslim edilecek kişi: Sipariş sırasında belirtilen alıcı</li>
             <li>Tahmini teslimat süresi: 3-7 iş günü</li>
-            <li>Kargo firması: Aras Kargo</li>
+            <li>Kargo firması: Sürat Kargo</li>
           </ul>
 
           <h2>MADDE 4 - GENEL HÜKÜMLER</h2>

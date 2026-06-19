@@ -36,7 +36,7 @@ const SAMPLE_DATA: Record<string, Record<string, unknown>> = {
   'order-created-seller': { sellerName: 'Satıcı', orderNumber: 'TRD-12345', productTitle: 'Örnek Ürün', totalAmount: 199.99 },
   'order-paid': { buyerName: 'Alıcı', orderNumber: 'TRD-12345', productTitle: 'Örnek Ürün', totalAmount: 199.99 },
   'order-paid-seller': { sellerName: 'Satıcı', orderNumber: 'TRD-12345', productTitle: 'Örnek Ürün', totalAmount: 199.99 },
-  'order-shipped': { buyerName: 'Alıcı', orderNumber: 'TRD-12345', trackingNumber: '1234567890', provider: 'Aras' },
+  'order-shipped': { buyerName: 'Alıcı', orderNumber: 'TRD-12345', trackingNumber: '1234567890', provider: 'Sürat Kargo' },
   'order-delivered': { buyerName: 'Alıcı', orderNumber: 'TRD-12345' },
   'password-reset': { name: 'Kullanıcı', resetUrl: 'https://example.com/reset' },
   'offer-received': { sellerName: 'Satıcı', productTitle: 'Ürün', offerAmount: 150, buyerName: 'Alıcı' },

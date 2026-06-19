@@ -13,6 +13,9 @@ import {
   OrderStatus,
   PaymentStatus,
   ShipmentStatus,
+  RefundReason,
+  RefundRequestStatus,
+  ReturnShippingPayer,
   MessageStatus,
   TicketStatus,
   TicketPriority,
@@ -737,7 +740,7 @@ async function main() {
     prisma.platformSetting.upsert({ where: { settingKey: 'payment_hold_days' }, update: {}, create: { settingKey: 'payment_hold_days', settingValue: '3', settingType: 'number', description: 'Ödeme bekletme süresi (gün)' } }),
     prisma.platformSetting.upsert({ where: { settingKey: 'min_offer_percentage' }, update: {}, create: { settingKey: 'min_offer_percentage', settingValue: '50', settingType: 'number', description: 'Minimum teklif yüzdesi' } }),
     prisma.platformSetting.upsert({ where: { settingKey: 'platform_name' }, update: {}, create: { settingKey: 'platform_name', settingValue: 'Tarodan', settingType: 'string', description: 'Platform adı' } }),
-    prisma.platformSetting.upsert({ where: { settingKey: 'default_carrier' }, update: {}, create: { settingKey: 'default_carrier', settingValue: 'aras', settingType: 'string', description: 'Varsayılan kargo firması' } }),
+    prisma.platformSetting.upsert({ where: { settingKey: 'default_carrier' }, update: {}, create: { settingKey: 'default_carrier', settingValue: 'surat', settingType: 'string', description: 'Varsayılan kargo firması' } }),
     prisma.platformSetting.upsert({ where: { settingKey: 'trade_response_deadline_hours' }, update: {}, create: { settingKey: 'trade_response_deadline_hours', settingValue: '72', settingType: 'number', description: 'Takas teklifi yanıt süresi' } }),
   ]);
 
@@ -1148,13 +1151,15 @@ async function main() {
     catActiveAssigned[d.cat] = 0;
   }
 
-  // 70% active, 15% pending, 5% reserved, 5% sold, 5% draft (for categories with >5 products)
+  // 70% active, 15% pending, 5% reserved, 5% sold, 5% inactive (for categories with >5 products)
+  // NOT: draft, gerçek uygulamada hiçbir akışla oluşmaz (oluşturma → pending), bu yüzden
+  // demo veride de üretmiyoruz. inactive (quantity>0) = elle pasife alınmış geçerli durum.
   const statusPool = [
     ...Array(14).fill(ProductStatus.active),
     ...Array(3).fill(ProductStatus.pending),
     ProductStatus.reserved,
     ProductStatus.sold,
-    ProductStatus.draft,
+    ProductStatus.inactive,
   ];
 
   for (let i = 0; i < productData.length; i++) {
@@ -1547,7 +1552,7 @@ async function main() {
 
   const shippedOrders = orders.filter(o => [OrderStatus.shipped, OrderStatus.delivered, OrderStatus.completed].includes(o.status));
   for (const order of shippedOrders) {
-    const carrier = ['aras', 'yurtici', 'mng'][Math.floor(Math.random() * 3)];
+    const carrier = 'surat';
     const shipmentStatus = order.status === OrderStatus.shipped ? ShipmentStatus.in_transit : ShipmentStatus.delivered;
     
     try {
@@ -1556,7 +1561,7 @@ async function main() {
           orderId: order.id,
           provider: carrier,
           trackingNumber: `${carrier.toUpperCase()}${Math.random().toString().substring(2, 14)}`,
-          trackingUrl: `https://${carrier}.com.tr/tracking/`,
+          trackingUrl: `https://www.suratkargo.com.tr/KargoTakip/?kargotakipno=`,
           status: shipmentStatus,
           shippedAt: new Date(order.createdAt.getTime() + 86400000), // 1 day after order
           deliveredAt: shipmentStatus === ShipmentStatus.delivered ? new Date(order.createdAt.getTime() + 259200000) : null, // 3 days after
@@ -1568,6 +1573,203 @@ async function main() {
   }
 
   console.log(`✅ Created shipments`);
+
+  // ==========================================================================
+  // 17.5 Create Refund Requests + Refunded Payments
+  //   Admin "İade Talepleri" (RefundRequest — tüm statüler) ve
+  //   "İade Geçmişi" (Payment.status = refunded) sayfaları için veri.
+  // ==========================================================================
+  console.log('Creating refund requests & refunds...');
+
+  // Benzersiz iade numarası — runtime RFD-XXXXXXXXXX formatıyla uyumlu (dev/seed).
+  const generateRefundNumber = () =>
+    `RFD-${Array.from({ length: 10 }, () => REF_ALPHABET[Math.floor(Math.random() * REF_ALPHABET.length)]).join('')}`;
+
+  const daysAgoDate = (days: number) => new Date(Date.now() - days * 86400000);
+
+  // Statüye göre RefundRequest alanlarını üretir (karar / iade kargosu / para iadesi).
+  const buildRefundFields = (
+    status: RefundRequestStatus,
+    sellerId: string,
+    createdAt: Date,
+  ): Record<string, any> => {
+    const plus = (days: number) => new Date(createdAt.getTime() + days * 86400000);
+    const trackingNo = `RFD${Math.random().toString().substring(2, 14)}`;
+    const approve = 'Talebinizi inceledik, iade onaylandı. İade kargosu hazırlanıyor.';
+    const reject = 'Talebiniz tarafımızca uygun bulunmadı, ürün açıklamayla uyumlu.';
+
+    const decided = {
+      sellerResponse: approve,
+      decidedBy: sellerId,
+      decidedAt: plus(0.5),
+      returnShippingPayer: ReturnShippingPayer.seller,
+    };
+    const returnOpened = {
+      ...decided,
+      returnProvider: 'surat',
+      returnTrackingNumber: trackingNo,
+      returnCreatedAt: plus(1),
+    };
+
+    switch (status) {
+      case RefundRequestStatus.pending_review:
+        return {}; // satıcı henüz yanıt vermedi
+      case RefundRequestStatus.approved:
+      case RefundRequestStatus.wait_for_delivery:
+        return decided;
+      case RefundRequestStatus.return_shipment_open:
+        return { ...returnOpened, returnStatus: ShipmentStatus.label_created };
+      case RefundRequestStatus.return_in_transit:
+        return {
+          ...returnOpened,
+          returnShippedAt: plus(1.5),
+          returnStatus: ShipmentStatus.in_transit,
+        };
+      case RefundRequestStatus.return_delivered:
+        return {
+          ...returnOpened,
+          returnShippedAt: plus(1.5),
+          returnDeliveredAt: plus(3),
+          returnStatus: ShipmentStatus.delivered,
+        };
+      case RefundRequestStatus.disputed:
+        return { sellerResponse: reject }; // admin kararı bekleniyor (decidedBy yok)
+      case RefundRequestStatus.rejected:
+        return { sellerResponse: reject, decidedBy: sellerId, decidedAt: plus(0.5) };
+      case RefundRequestStatus.cancelled:
+        return {}; // alıcı talebi iptal etti
+      case RefundRequestStatus.refunded:
+        return {
+          ...returnOpened,
+          returnShippedAt: plus(1.5),
+          returnDeliveredAt: plus(3),
+          returnStatus: ShipmentStatus.returned,
+          refundedAt: plus(4),
+          providerRefundId: `REFUND-${randomUUID().substring(0, 8)}`,
+        };
+      default:
+        return {};
+    }
+  };
+
+  // Her RefundRequestStatus için en az bir senaryo; refunded'lar Payment.refunded eşleniğiyle.
+  const refundScenarios: {
+    status: RefundRequestStatus;
+    reason: RefundReason;
+    description: string;
+    daysAgo: number;
+    orderStatus: OrderStatus;
+  }[] = [
+    { status: RefundRequestStatus.pending_review, reason: RefundReason.not_as_described, description: 'Ürün açıklamadakinden farklı, beklediğim gibi değil.', daysAgo: 1, orderStatus: OrderStatus.delivered },
+    { status: RefundRequestStatus.pending_review, reason: RefundReason.damaged, description: 'Kargo sırasında hasar görmüş, kutusu ezilmiş.', daysAgo: 2, orderStatus: OrderStatus.delivered },
+    { status: RefundRequestStatus.approved, reason: RefundReason.wrong_item, description: 'Yanlış ürün gönderilmiş, farklı bir model geldi.', daysAgo: 4, orderStatus: OrderStatus.delivered },
+    { status: RefundRequestStatus.wait_for_delivery, reason: RefundReason.changed_mind, description: 'Fikrim değişti, ürünü iade etmek istiyorum.', daysAgo: 5, orderStatus: OrderStatus.delivered },
+    { status: RefundRequestStatus.return_shipment_open, reason: RefundReason.missing_parts, description: 'Eksik parça var, set tam değil.', daysAgo: 6, orderStatus: OrderStatus.delivered },
+    { status: RefundRequestStatus.return_in_transit, reason: RefundReason.not_as_described, description: 'Renk fotoğraftakinden çok farklı çıktı.', daysAgo: 8, orderStatus: OrderStatus.delivered },
+    { status: RefundRequestStatus.return_delivered, reason: RefundReason.damaged, description: 'Ürün arızalı çıktı, çalışmıyor.', daysAgo: 10, orderStatus: OrderStatus.delivered },
+    { status: RefundRequestStatus.disputed, reason: RefundReason.counterfeit, description: 'Ürünün orijinal olduğundan şüpheliyim, admin incelemesi istiyorum.', daysAgo: 7, orderStatus: OrderStatus.delivered },
+    { status: RefundRequestStatus.rejected, reason: RefundReason.changed_mind, description: 'Vazgeçtim ama satıcı iade talebini kabul etmedi.', daysAgo: 12, orderStatus: OrderStatus.completed },
+    { status: RefundRequestStatus.cancelled, reason: RefundReason.other, description: 'Talebi yanlışlıkla açtım, iptal ediyorum.', daysAgo: 9, orderStatus: OrderStatus.delivered },
+    { status: RefundRequestStatus.refunded, reason: RefundReason.not_as_described, description: 'Ürün açıklamayla uyuşmuyordu, iade tamamlandı.', daysAgo: 14, orderStatus: OrderStatus.completed },
+    { status: RefundRequestStatus.refunded, reason: RefundReason.damaged, description: 'Hasarlı ürün, ücret iadesi yapıldı.', daysAgo: 18, orderStatus: OrderStatus.completed },
+    { status: RefundRequestStatus.refunded, reason: RefundReason.lost_in_transit, description: 'Kargo kayboldu, ödeme iade edildi.', daysAgo: 22, orderStatus: OrderStatus.completed },
+  ];
+
+  const refundRequests: any[] = [];
+  let refundedPaymentCount = 0;
+
+  for (let i = 0; i < refundScenarios.length; i++) {
+    const sc = refundScenarios[i];
+    const product = activeProducts[i % activeProducts.length];
+    if (!product) continue;
+    const candidateBuyers = users.filter(u => u.id !== product.sellerId);
+    if (candidateBuyers.length === 0) continue;
+    const buyer = candidateBuyers[i % candidateBuyers.length];
+    const buyerAddress = addresses.find(a => a.userId === buyer.id);
+
+    const subtotal = Number(product.price);
+    const shippingCost = 30;
+    const totalAmount = subtotal + shippingCost;
+    const commission = subtotal * 0.05;
+    const createdAt = daysAgoDate(sc.daysAgo);
+    const isCompleted = sc.orderStatus === OrderStatus.completed;
+    const isRefunded = sc.status === RefundRequestStatus.refunded;
+
+    try {
+      const order = await prisma.order.create({
+        data: {
+          orderNumber: generateOrderNumber(),
+          buyerId: buyer.id,
+          sellerId: product.sellerId,
+          productId: product.id,
+          totalAmount,
+          subtotal,
+          shippingCost,
+          commissionAmount: commission,
+          status: sc.orderStatus,
+          paymentExpiresAt: new Date(createdAt.getTime() + 24 * 60 * 60 * 1000),
+          deliveredAt: new Date(createdAt.getTime() + 3 * 86400000),
+          completedAt: isCompleted ? new Date(createdAt.getTime() + 5 * 86400000) : null,
+          shippingAddress: buyerAddress ? {
+            fullName: buyerAddress.fullName,
+            phone: buyerAddress.phone,
+            city: buyerAddress.city,
+            district: buyerAddress.district,
+            address: buyerAddress.address,
+          } : undefined,
+          createdAt,
+        },
+      });
+
+      // İade tamamlandıysa Payment.refunded → "İade Geçmişi" sayfasını besler.
+      await prisma.payment.create({
+        data: {
+          orderId: order.id,
+          provider: 'paytr',
+          providerPaymentId: `PAY-${randomUUID().substring(0, 8)}`,
+          amount: totalAmount,
+          currency: 'TRY',
+          status: isRefunded ? PaymentStatus.refunded : PaymentStatus.completed,
+          paidAt: new Date(createdAt.getTime() + 3600000),
+          // İade geçmişi updatedAt'i "iade tarihi" olarak gösterir.
+          updatedAt: isRefunded ? new Date(createdAt.getTime() + 4 * 86400000) : undefined,
+        },
+      });
+      if (isRefunded) refundedPaymentCount++;
+
+      // Teslim edilmiş kargo (detay/iade akışı tutarlılığı için).
+      await prisma.shipment.create({
+        data: {
+          orderId: order.id,
+          provider: 'surat',
+          trackingNumber: `SURAT${Math.random().toString().substring(2, 14)}`,
+          trackingUrl: 'https://www.suratkargo.com.tr/KargoTakip/?kargotakipno=',
+          status: ShipmentStatus.delivered,
+          shippedAt: new Date(createdAt.getTime() + 86400000),
+          deliveredAt: new Date(createdAt.getTime() + 3 * 86400000),
+        },
+      });
+
+      const refundRequest = await prisma.refundRequest.create({
+        data: {
+          refundNumber: generateRefundNumber(),
+          orderId: order.id,
+          requesterId: buyer.id,
+          reason: sc.reason,
+          description: sc.description,
+          amount: totalAmount,
+          status: sc.status,
+          createdAt,
+          ...buildRefundFields(sc.status, product.sellerId, createdAt),
+        },
+      });
+      refundRequests.push(refundRequest);
+    } catch (e: any) {
+      console.error(`⚠️ Refund scenario ${sc.status} failed:`, e?.message);
+    }
+  }
+
+  console.log(`✅ Created ${refundRequests.length} refund requests (${refundedPaymentCount} refunded payments)`);
 
   // ==========================================================================
   // 18. Create Trades (15+ trades in various states)
@@ -1636,6 +1838,154 @@ async function main() {
   }
 
   console.log(`✅ Created ${trades.length} trades`);
+
+  // ==========================================================================
+  // 18b. Create Trade Shipments — populates the "Takas Kargoları" admin page
+  // Mirrors the escrow legs the real flow produces (admin.service.ts):
+  //   to_warehouse   : user → Tarodan deposu (recipientType 'warehouse')
+  //   from_warehouse : depo → kullanıcı (shipper = admin, recipientType 'user')
+  //   return         : depo → asıl sahip (iade)
+  // ==========================================================================
+  console.log('Creating trade shipments...');
+
+  const tsCarriers = ['surat'];
+  const tsTracking = (carrier: string) =>
+    `${carrier.toUpperCase()}${Math.random().toString().substring(2, 14)}`;
+  const tsAddrOf = (userId: string) =>
+    addresses.find((a) => a.userId === userId)?.id ?? null;
+
+  // Statuses that imply the parcel has physically moved (→ shippedAt set).
+  const tsMoved = new Set<ShipmentStatus>([
+    ShipmentStatus.picked_up,
+    ShipmentStatus.in_transit,
+    ShipmentStatus.at_delivery_branch,
+    ShipmentStatus.out_for_delivery,
+    ShipmentStatus.delivered,
+    ShipmentStatus.failed,
+    ShipmentStatus.return_in_progress,
+    ShipmentStatus.returned,
+  ]);
+  const tsDelivered = new Set<ShipmentStatus>([
+    ShipmentStatus.delivered,
+    ShipmentStatus.returned,
+  ]);
+
+  // Build a single shipment payload with status-appropriate dates / tracking.
+  const tsBuild = (
+    trade: any,
+    idx: number,
+    opts: {
+      shipperId: string;
+      status: ShipmentStatus;
+      leg: 'to_warehouse' | 'from_warehouse' | 'return';
+      recipientUserId: string | null;
+    },
+  ) => {
+    const carrier = tsCarriers[idx % tsCarriers.length];
+    const fromWarehouse = opts.leg !== 'to_warehouse';
+    const shippedAt = tsMoved.has(opts.status) ? randomPastDate(8) : null;
+    const deliveredAt =
+      tsDelivered.has(opts.status) && shippedAt
+        ? new Date(shippedAt.getTime() + 2 * 86400000)
+        : null;
+    return {
+      tradeId: trade.id,
+      shipperId: opts.shipperId,
+      fromAddressId: fromWarehouse ? warehouseAddress.id : tsAddrOf(opts.shipperId),
+      carrier,
+      // pending = etiket henüz yok; sonraki tüm durumlarda takip no mevcut.
+      trackingNumber:
+        opts.status === ShipmentStatus.pending ? null : tsTracking(carrier),
+      status: opts.status,
+      shippedAt,
+      deliveredAt,
+      confirmedAt:
+        fromWarehouse && opts.status === ShipmentStatus.delivered && deliveredAt
+          ? new Date(deliveredAt.getTime() + 86400000)
+          : null,
+      leg: opts.leg,
+      recipientType: fromWarehouse ? 'user' : 'warehouse',
+      recipientUserId: opts.recipientUserId,
+    };
+  };
+
+  const tsData: any[] = [];
+
+  // Pass A — realistic shipments derived from each trade's status.
+  trades.forEach((trade, idx) => {
+    switch (trade.status) {
+      case TradeStatus.accepted:
+        // Etiketler oluştu, taraflar henüz kargoya vermedi.
+        tsData.push(
+          tsBuild(trade, idx, { shipperId: trade.initiatorId, status: ShipmentStatus.label_created, leg: 'to_warehouse', recipientUserId: null }),
+          tsBuild(trade, idx, { shipperId: trade.receiverId, status: ShipmentStatus.label_created, leg: 'to_warehouse', recipientUserId: null }),
+        );
+        break;
+      case TradeStatus.initiator_shipped:
+        // Başlatan depoya yolladı, alıcı henüz beklemede.
+        tsData.push(
+          tsBuild(trade, idx, { shipperId: trade.initiatorId, status: ShipmentStatus.in_transit, leg: 'to_warehouse', recipientUserId: null }),
+          tsBuild(trade, idx, { shipperId: trade.receiverId, status: ShipmentStatus.pending, leg: 'to_warehouse', recipientUserId: null }),
+        );
+        break;
+      case TradeStatus.both_shipped:
+        // Her iki ürün de depoya ulaştı.
+        tsData.push(
+          tsBuild(trade, idx, { shipperId: trade.initiatorId, status: ShipmentStatus.delivered, leg: 'to_warehouse', recipientUserId: null }),
+          tsBuild(trade, idx, { shipperId: trade.receiverId, status: ShipmentStatus.delivered, leg: 'to_warehouse', recipientUserId: null }),
+        );
+        break;
+      case TradeStatus.completed:
+        // Tam yaşam döngüsü: depoya geliş + alıcılara teslim.
+        tsData.push(
+          tsBuild(trade, idx, { shipperId: trade.initiatorId, status: ShipmentStatus.delivered, leg: 'to_warehouse', recipientUserId: null }),
+          tsBuild(trade, idx, { shipperId: trade.receiverId, status: ShipmentStatus.delivered, leg: 'to_warehouse', recipientUserId: null }),
+          tsBuild(trade, idx, { shipperId: superAdmin.id, status: ShipmentStatus.delivered, leg: 'from_warehouse', recipientUserId: trade.initiatorId }),
+          tsBuild(trade, idx, { shipperId: superAdmin.id, status: ShipmentStatus.delivered, leg: 'from_warehouse', recipientUserId: trade.receiverId }),
+        );
+        break;
+      default:
+        // pending / rejected → henüz kargo yok.
+        break;
+    }
+  });
+
+  // Pass B — backfill so every status + leg appears and all admin filters return rows.
+  if (trades.length > 0) {
+    const tsBackfill: Array<{ status: ShipmentStatus; leg: 'to_warehouse' | 'from_warehouse' | 'return' }> = [
+      { status: ShipmentStatus.picked_up, leg: 'to_warehouse' },
+      { status: ShipmentStatus.at_delivery_branch, leg: 'from_warehouse' },
+      { status: ShipmentStatus.out_for_delivery, leg: 'from_warehouse' },
+      { status: ShipmentStatus.failed, leg: 'from_warehouse' },
+      { status: ShipmentStatus.return_in_progress, leg: 'return' },
+      { status: ShipmentStatus.returned, leg: 'return' },
+      { status: ShipmentStatus.cancelled, leg: 'to_warehouse' },
+    ];
+    tsBackfill.forEach((b, k) => {
+      const trade = trades[k % trades.length];
+      const warehouseLeg = b.leg === 'to_warehouse';
+      tsData.push(
+        tsBuild(trade, k, {
+          shipperId: warehouseLeg ? trade.initiatorId : superAdmin.id,
+          status: b.status,
+          leg: b.leg,
+          recipientUserId: warehouseLeg ? null : trade.receiverId,
+        }),
+      );
+    });
+  }
+
+  let tsCreated = 0;
+  for (const data of tsData) {
+    try {
+      await prisma.tradeShipment.create({ data });
+      tsCreated++;
+    } catch (e) {
+      // Ignore individual failures (e.g. missing optional refs)
+    }
+  }
+
+  console.log(`✅ Created ${tsCreated} trade shipments`);
 
   // ==========================================================================
   // 19. Create Messages/Conversations
@@ -1933,6 +2283,7 @@ async function main() {
   console.log(`   - Collections: ${collections.length} (with covers)`);
   console.log(`   - Offers: ${offers.length}`);
   console.log(`   - Orders: ${orders.length}`);
+  console.log(`   - Refund Requests: ${refundRequests.length} (${refundedPaymentCount} refunded payments)`);
   console.log(`   - Trades: ${trades.length}`);
   console.log(`   - Conversations: ${conversations.length}`);
   console.log(`   - Support Tickets: ${tickets.length}`);

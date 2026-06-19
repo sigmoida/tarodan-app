@@ -73,7 +73,7 @@ export default function PrivacyPage() {
           <h3>5.1 Verilerinizi Paylaştığımız Taraflar</h3>
           <ul>
             <li><strong>Ödeme Sağlayıcıları:</strong> PayTR, ödeme işlemleri için</li>
-            <li><strong>Kargo Şirketleri:</strong> Aras Kargo, teslimat için</li>
+            <li><strong>Kargo Şirketleri:</strong> Sürat Kargo, teslimat için</li>
             <li><strong>Bulut Hizmeti Sağlayıcıları:</strong> Veri depolama için</li>
             <li><strong>Analitik Hizmetler:</strong> Platform analizi için</li>
             <li><strong>Yasal Makamlar:</strong> Yasal zorunluluk halinde</li>
