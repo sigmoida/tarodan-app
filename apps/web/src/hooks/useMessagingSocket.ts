@@ -34,7 +34,7 @@ export function useMessagingSocket({ activeThreadId }: { activeThreadId?: string
     };
     const onThreadUpdated = (_p: ThreadUpdatedEvent) => {
       queryClient.invalidateQueries({ queryKey: ['message-threads'] });
-      queryClient.invalidateQueries({ queryKey: ['unread-count'] });
+      queryClient.invalidateQueries({ queryKey: ['notifications-unread-count'] });
     };
     const onMessageRead = (p: MessageReadEvent) => {
       if (p.threadId === activeRef.current) {
@@ -42,7 +42,7 @@ export function useMessagingSocket({ activeThreadId }: { activeThreadId?: string
       }
     };
     const onNotification = (_n: NotificationNewEvent) => {
-      queryClient.invalidateQueries({ queryKey: ['unread-count'] });
+      queryClient.invalidateQueries({ queryKey: ['notifications-unread-count'] });
       queryClient.invalidateQueries({ queryKey: ['notifications'] });
     };
     const onTypingStart = (t: TypingEvent) => {
