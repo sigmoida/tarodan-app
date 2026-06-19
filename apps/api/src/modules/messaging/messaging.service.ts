@@ -13,6 +13,7 @@ import { StorageService } from '../storage/storage.service';
 import { ContentFilterService } from './content-filter.service';
 import { NotificationService } from '../notification/notification.service';
 import { NotificationType } from '../notification/dto';
+import { RealtimeService } from '../websocket/realtime.service';
 import { MessageStatus, Prisma } from '@prisma/client';
 import {
   CreateThreadDto,
@@ -40,6 +41,7 @@ export class MessagingService {
     private readonly notificationService: NotificationService,
     @Optional()
     private readonly storageService: StorageService,
+    private readonly realtime: RealtimeService,
   ) {}
 
   private async resolveAvatarUrl(avatarUrl: string | null | undefined): Promise<string | null> {
@@ -236,6 +238,19 @@ export class MessagingService {
             threadId,
             senderName: message.sender?.displayName || 'Bir kullanıcı',
             messagePreview,
+          },
+        );
+
+        const unreadCount = await this.getUnreadMessageCount(receiverId);
+        this.realtime.emitNewMessage(
+          threadId,
+          receiverId,
+          this.mapMessageToDto(message),
+          {
+            threadId,
+            lastMessagePreview: messagePreview,
+            lastMessageAt: new Date().toISOString(),
+            unreadCount,
           },
         );
       } catch (error) {
