@@ -44,5 +44,6 @@ describe('NotificationService realtime emit', () => {
     expect(userId).toBe('u1');
     expect(payload.type).toBe(NotificationType.NEW_MESSAGE);
     expect(payload.title).toBeTruthy();
+    expect(payload.id).toBe('log-1');
   });
 });
