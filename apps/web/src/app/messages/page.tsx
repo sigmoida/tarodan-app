@@ -118,6 +118,31 @@ const checkContentFilter = (text: string, locale: string): { passed: boolean; wa
   return { passed: true };
 };
 
+/**
+ * Okundu durumu göstergesi (WhatsApp tarzı çift çentik).
+ * read=false → tek çentik (iletildi), read=true → mavi çift çentik (okundu).
+ */
+function MessageTicks({ read }: { read: boolean }) {
+  return (
+    <span
+      className={`inline-flex shrink-0 ${read ? 'text-sky-400' : 'text-inverted/60'}`}
+      title={read ? 'Okundu' : 'İletildi'}
+      aria-label={read ? 'Okundu' : 'İletildi'}
+    >
+      <svg width="16" height="11" viewBox="0 0 16 11" fill="none" xmlns="http://www.w3.org/2000/svg">
+        <path
+          d="M6.07 8.4 1.3 3.63a.6.6 0 0 0-.85.85l5.2 5.2a.6.6 0 0 0 .85 0l.42-.42-.85-.85-.01.01Z"
+          fill="currentColor"
+        />
+        <path
+          d="M15.2 3.2a.6.6 0 0 0-.85 0L8.3 9.25 5.95 6.9a.6.6 0 1 0-.85.85l2.78 2.77a.6.6 0 0 0 .85 0l6.47-6.47a.6.6 0 0 0 0-.85Z"
+          fill="currentColor"
+        />
+      </svg>
+    </span>
+  );
+}
+
 export default function MessagesPage() {
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -630,15 +655,7 @@ export default function MessagesPage() {
                               (message.status === 'sent' ||
                                 message.status === 'delivered' ||
                                 message.status === 'read') && (
-                                <span
-                                  className={`text-xs leading-none ${
-                                    message.readAt ? 'text-sky-300' : 'text-inverted/70'
-                                  }`}
-                                  title={message.readAt ? 'Okundu' : 'İletildi'}
-                                  aria-label={message.readAt ? 'Okundu' : 'İletildi'}
-                                >
-                                  {message.readAt ? '✓✓' : '✓'}
-                                </span>
+                                <MessageTicks read={!!message.readAt} />
                               )}
                           </div>
                         </div>

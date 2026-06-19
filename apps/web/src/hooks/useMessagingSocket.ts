@@ -27,6 +27,12 @@ export function useMessagingSocket({ activeThreadId }: { activeThreadId?: string
         queryClient.setQueryData<any[]>(['messages', payload.threadId], (old) =>
           mergeMessages(old ?? [], payload.message as any),
         );
+        // Karşı taraftan gelen mesajı, sohbet açıkken anında "okundu" yap:
+        // getThreadMessages refetch'i okunmamışları işaretleyip göndericiye
+        // message:read yayar (çift tik canlı güncellensin, refresh gerekmesin).
+        if (payload.message?.senderId && payload.message.senderId !== currentUserId) {
+          queryClient.invalidateQueries({ queryKey: ['messages', payload.threadId] });
+        }
       }
       // Önizleme listesini tazele (thread-scoped UX; global tazeleme
       // RealtimeProvider'daki thread:updated dinleyicisi tarafından yapılır)
