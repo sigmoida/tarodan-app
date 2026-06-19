@@ -10,6 +10,7 @@ import { useAuthStore } from '@/stores/authStore';
 import { Button, Input, Spinner } from '@tarodan/ui';
 import { messagesApi, listingsApi, api, mediaApi } from '@/lib/api';
 import { useTranslation } from '@/i18n';
+import { useMessagingSocket } from '@/hooks/useMessagingSocket';
 
 interface MessageThread {
   id: string;
@@ -220,6 +221,8 @@ export default function MessagesPage() {
     meta: { page: 'messages' },
   });
   const messages = messagesQuery.data ?? [];
+
+  const { typingUserIds } = useMessagingSocket({ activeThreadId: selectedThread?.id });
 
   useEffect(() => {
     if (selectedThread?.id && messagesQuery.isSuccess) {
@@ -564,9 +567,13 @@ export default function MessagesPage() {
                   <p className="font-semibold text-heading text-sm truncate">
                     {selectedThread.otherUser?.displayName || 'Kullanıcı'}
                   </p>
-                  {selectedThread.product && (
+                  {typingUserIds.length > 0 ? (
+                    <p className="text-xs text-primary-600 truncate">
+                      {locale === 'en' ? 'typing…' : 'yazıyor…'}
+                    </p>
+                  ) : selectedThread.product ? (
                     <p className="text-xs text-primary-600 truncate">📦 {selectedThread.product.title}</p>
-                  )}
+                  ) : null}
                 </div>
               </div>
 
