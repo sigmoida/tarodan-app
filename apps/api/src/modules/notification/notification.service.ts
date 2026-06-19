@@ -19,6 +19,7 @@ import { ExpoPushProvider } from './providers/expo-push.provider';
 import { SmsProvider } from './providers/sms.provider';
 import { SmtpProvider } from './providers/smtp.provider';
 import { StorageService } from '../storage/storage.service';
+import { RealtimeService } from '../websocket/realtime.service';
 
 // Notification templates (Turkish)
 const NOTIFICATION_TEMPLATES: Record<NotificationType, { title: string; message: string; icon?: string; link?: string }> = {
@@ -454,6 +455,7 @@ export class NotificationService {
     private readonly smsProvider: SmsProvider,
     private readonly smtpProvider: SmtpProvider,
     private readonly storageService: StorageService,
+    private readonly realtime: RealtimeService,
   ) {}
 
   /**
@@ -707,6 +709,22 @@ export class NotificationService {
 
     const result = await this.saveInAppNotification(userId, type, title, message, data);
     this.logger.log(`[createInAppNotification] Result: ${result}`);
+
+    if (result) {
+      try {
+        this.realtime.emitNotification(userId, {
+          id: '',
+          type,
+          title,
+          message,
+          data,
+          createdAt: new Date().toISOString(),
+        });
+      } catch (e) {
+        this.logger.warn(`[createInAppNotification] realtime emit failed: ${e}`);
+      }
+    }
+
     return result;
   }
 
