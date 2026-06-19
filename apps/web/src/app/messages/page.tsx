@@ -119,8 +119,9 @@ const checkContentFilter = (text: string, locale: string): { passed: boolean; wa
 };
 
 /**
- * Okundu durumu göstergesi (WhatsApp tarzı çift çentik).
+ * Okundu durumu göstergesi.
  * read=false → tek çentik (iletildi), read=true → mavi çift çentik (okundu).
+ * Lucide tarzı stroke ikonlar.
  */
 function MessageTicks({ read }: { read: boolean }) {
   return (
@@ -129,15 +130,25 @@ function MessageTicks({ read }: { read: boolean }) {
       title={read ? 'Okundu' : 'İletildi'}
       aria-label={read ? 'Okundu' : 'İletildi'}
     >
-      <svg width="16" height="11" viewBox="0 0 16 11" fill="none" xmlns="http://www.w3.org/2000/svg">
-        <path
-          d="M6.07 8.4 1.3 3.63a.6.6 0 0 0-.85.85l5.2 5.2a.6.6 0 0 0 .85 0l.42-.42-.85-.85-.01.01Z"
-          fill="currentColor"
-        />
-        <path
-          d="M15.2 3.2a.6.6 0 0 0-.85 0L8.3 9.25 5.95 6.9a.6.6 0 1 0-.85.85l2.78 2.77a.6.6 0 0 0 .85 0l6.47-6.47a.6.6 0 0 0 0-.85Z"
-          fill="currentColor"
-        />
+      <svg
+        width="15"
+        height="15"
+        viewBox="0 0 24 24"
+        fill="none"
+        stroke="currentColor"
+        strokeWidth="2.5"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        xmlns="http://www.w3.org/2000/svg"
+      >
+        {read ? (
+          <>
+            <path d="M18 6 7 17l-5-5" />
+            <path d="m22 10-7.5 7.5L13 16" />
+          </>
+        ) : (
+          <path d="M20 6 9 17l-5-5" />
+        )}
       </svg>
     </span>
   );
