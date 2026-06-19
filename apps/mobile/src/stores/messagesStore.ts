@@ -67,7 +67,8 @@ interface MessagesState {
   sendMessage: (threadId: string, content: string) => Promise<boolean>;
   createThread: (recipientId: string, content: string, productId?: string) => Promise<string | null>;
   markAsRead: (threadId: string) => Promise<void>;
-  
+  applyIncomingMessage: (threadId: string, message: any) => void;
+
   // Helpers
   getUnreadCount: () => number;
   canSendMessage: () => boolean;
@@ -318,6 +319,26 @@ export const useMessagesStore = create<MessagesState>((set, get) => ({
     } catch {
       // endpoint may not exist yet - local state already updated
     }
+  },
+
+  applyIncomingMessage: (threadId, message) => {
+    const state = get();
+    // Açık thread ise mesaj listesine id-dedupe ile ekle, createdAt'e göre sırala
+    if (state.currentThreadId === threadId) {
+      const exists = state.messages.some((m: any) => m.id === message.id);
+      if (!exists) {
+        const next = [...state.messages, message].sort(
+          (a: any, b: any) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime(),
+        );
+        set({ messages: next });
+      }
+    }
+    // Önizleme: ilgili thread'in lastMessage'ını güncelle
+    set({
+      threads: get().threads.map((t: any) =>
+        t.id === threadId ? { ...t, lastMessage: message, lastMessageAt: message.createdAt } : t,
+      ),
+    });
   },
 
   getUnreadCount: () => {

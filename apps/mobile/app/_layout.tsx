@@ -6,6 +6,8 @@ import * as SplashScreen from 'expo-splash-screen';
 import Constants from 'expo-constants';
 import { theme, AlertDialogHost } from '@tarodan/ui-native';
 import { useAuthStore } from '../src/stores/authStore';
+import { useMessagesStore } from '../src/stores/messagesStore';
+import { connectSocket, disconnectSocket } from '../src/services/socket';
 // Paylaşılan QueryClient — logout'ta resetUserStores aynı örneği temizler.
 import { queryClient } from '../src/lib/queryClient';
 import { registerForPushNotifications, setupPushNotificationRouting } from '../src/services/push';
@@ -53,6 +55,7 @@ if (!isExpoGo && Notifications) {
 
 export default function RootLayout() {
   const { loadToken, isAuthenticated } = useAuthStore();
+  const token = useAuthStore((s) => s.token);
   // appReady: hazırlık bitti. splashDone: animasyonlu splash çıkışını tamamladı.
   // Native splash'i AnimatedSplash kapatır (onLayout) → beyaz parlama olmaz.
   const [appReady, setAppReady] = useState(false);
@@ -78,6 +81,31 @@ export default function RootLayout() {
     }
     prepare();
   }, []);
+
+  // Oturum açıkken socket bağlan + global mesaj dinleyicileri; kapanınca kopar.
+  useEffect(() => {
+    if (!token) { disconnectSocket(); return; }
+    const socket = connectSocket(token);
+    const onMessageNew = (p: { threadId: string; message: any }) =>
+      useMessagesStore.getState().applyIncomingMessage(p.threadId, p.message);
+    const onThreadUpdated = () => useMessagesStore.getState().fetchUnreadCount();
+    const onReconnect = () => {
+      const tid = useMessagesStore.getState().currentThreadId;
+      if (tid) {
+        socket.emit('join:thread', { threadId: tid });
+        useMessagesStore.getState().fetchMessages(tid);
+      }
+      useMessagesStore.getState().fetchThreads();
+    };
+    socket.on('message:new', onMessageNew);
+    socket.on('thread:updated', onThreadUpdated);
+    socket.io.on('reconnect', onReconnect);
+    return () => {
+      socket.off('message:new', onMessageNew);
+      socket.off('thread:updated', onThreadUpdated);
+      socket.io.off('reconnect', onReconnect);
+    };
+  }, [token]);
 
   // Wire push notification deep-link routing (tap + foreground-received).
   // Safe in Expo Go (no-op when expo-notifications isn't available).
