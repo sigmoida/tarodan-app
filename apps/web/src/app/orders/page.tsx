@@ -580,11 +580,6 @@ export default function OrdersPage() {
                         {t('review.writeReview')}
                       </Button>
                     )}
-                    {(order.status === 'delivered' || order.status === 'completed') && (
-                      <span className="px-4 py-2 bg-success-100 text-success-700 rounded-lg text-sm font-medium">
-                        {t('order.statusDelivered')}
-                      </span>
-                    )}
                   </div>
                 </div>
               );

@@ -62,6 +62,21 @@ export default function SupportPage() {
     subject: '',
     message: '',
   });
+  const [orderId, setOrderId] = useState<string | undefined>(undefined);
+
+  // Sipariş detayından "Sipariş Sorunu Bildir" ile gelindiğinde formu önceden doldur
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const oid = params.get('orderId') || undefined;
+    if (!oid) return;
+    setOrderId(oid);
+    setShowForm(true);
+    setForm((prev) => ({
+      ...prev,
+      category: prev.category || 'shipping',
+      subject: prev.subject || `Sipariş sorunu (#${oid.slice(0, 8)})`,
+    }));
+  }, []);
 
   const loadTickets = useCallback(async () => {
     setTicketsLoading(true);
@@ -103,9 +118,11 @@ export default function SupportPage() {
         subject: form.subject.trim(),
         category: form.category,
         message: form.message.trim(),
+        ...(orderId ? { orderId } : {}),
       });
       toast.success('Destek talebiniz oluşturuldu. En kısa sürede dönüş yapacağız.');
       setForm({ category: '', subject: '', message: '' });
+      setOrderId(undefined);
       setShowForm(false);
       loadTickets();
     } catch (error: any) {

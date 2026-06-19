@@ -269,6 +269,9 @@ export class MessagingService {
           messages: {
             take: 1,
             orderBy: { createdAt: 'desc' },
+            // Reddedilmiş/onay bekleyen mesajları önizlemeye yansıtma — detay
+            // ekranı da bunları gizliyor (bkz. getThreadMessages); tutarlı olsun.
+            where: { status: { in: [MessageStatus.sent, MessageStatus.approved] } },
             include: {
               sender: { select: { id: true, displayName: true } },
               receiver: { select: { id: true, displayName: true } },

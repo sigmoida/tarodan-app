@@ -82,6 +82,9 @@ export default function ListingsPage() {
     ? KNOWN_BRANDS.find(b => b.toLowerCase() === urlSearch.toLowerCase()) || ''
     : '';
   const [showMobileSidebar, setShowMobileSidebar] = useState(false);
+  // Navbar + CategoryNavBar aşağı kaydırınca gizlenir; filtre kutusunun sticky
+  // top değerini buna göre ayarla ki çubuklar gizliyken üstte boşluk kalmasın.
+  const [barsHidden, setBarsHidden] = useState(false);
   const [productLayout, setProductLayout] = useState<ProductLayout>('grid-6');
   const [currentPage, setCurrentPage] = useState(1);
   const pageLimit = 48;
@@ -161,6 +164,17 @@ export default function ListingsPage() {
     if (page > 1) params.set('page', page.toString());
     return params;
   };
+
+  const lastScrollY = useRef(0);
+  useEffect(() => {
+    const onScroll = () => {
+      const y = window.scrollY;
+      setBarsHidden(y > lastScrollY.current && y > 80);
+      lastScrollY.current = y;
+    };
+    window.addEventListener('scroll', onScroll, { passive: true });
+    return () => window.removeEventListener('scroll', onScroll);
+  }, []);
 
   const hasSyncedToUrl = useRef(false);
   useEffect(() => {
@@ -451,7 +465,13 @@ export default function ListingsPage() {
         <div className="flex gap-6">
           {/* Sidebar Filters (Desktop) */}
           <div className="hidden lg:block w-56 flex-shrink-0">
-            <div className="sticky top-[80px] max-h-[calc(100vh-80px)] overflow-y-auto bg-surface-elevated rounded border border-border">
+            <div
+              className="sticky overflow-y-auto bg-surface-elevated rounded border border-border transition-[top] duration-300"
+              style={{
+                top: barsHidden ? 8 : 116,
+                maxHeight: `calc(100vh - ${barsHidden ? 16 : 124}px)`,
+              }}
+            >
               <SidebarFilters
                 filters={filtersForSidebar}
                 onFilterChange={handleFiltersChange}

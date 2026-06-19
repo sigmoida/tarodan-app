@@ -331,8 +331,22 @@ export default function RefundRequestDetailPage() {
               {rr.order.orderNumber}
             </Link>
           </div>
-          <div>
-            <span className="font-medium text-body">Ürün:</span> {rr.order.product.title}
+          <div className="flex items-center gap-3">
+            <div className="w-14 h-14 rounded-lg bg-surface-alt flex items-center justify-center overflow-hidden flex-shrink-0">
+              {rr.order.product.images?.[0]?.url ? (
+                // eslint-disable-next-line @next/next/no-img-element
+                <img
+                  src={rr.order.product.images[0].url}
+                  alt={rr.order.product.title}
+                  className="w-full h-full object-cover"
+                />
+              ) : (
+                <span className="text-2xl">📦</span>
+              )}
+            </div>
+            <span>
+              <span className="font-medium text-body">Ürün:</span> {rr.order.product.title}
+            </span>
           </div>
           <div>
             <span className="font-medium text-body">Sipariş tutarı:</span> ₺

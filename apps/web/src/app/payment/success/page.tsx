@@ -425,7 +425,9 @@ export default function PaymentSuccessPage() {
             {isAuthenticated ? (
               <ButtonLink
                 href={
-                  payment?.orderId ? `/orders/${payment.orderId}` : "/orders"
+                  payment?.orderId || orderIdFromUrl
+                    ? `/orders/${payment?.orderId || orderIdFromUrl}`
+                    : "/orders"
                 }
                 className="flex gap-2"
               >

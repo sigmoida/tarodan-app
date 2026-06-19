@@ -102,6 +102,18 @@ export default function MyRefundRequestsPage() {
                   className="block bg-surface-elevated rounded-xl p-4 hover:shadow-md transition-shadow"
                 >
                   <div className="flex items-start justify-between gap-3">
+                    <div className="w-14 h-14 rounded-lg bg-surface flex items-center justify-center overflow-hidden flex-shrink-0">
+                      {rr.order?.product?.images?.[0] ? (
+                        // eslint-disable-next-line @next/next/no-img-element
+                        <img
+                          src={rr.order.product.images[0]}
+                          alt={rr.order?.product?.title ?? ""}
+                          className="w-full h-full object-cover"
+                        />
+                      ) : (
+                        <span className="text-2xl">📦</span>
+                      )}
+                    </div>
                     <div className="flex-1 min-w-0">
                       <p className="text-sm text-muted">
                         {locale === "en" ? "Refund" : "İade"} #
