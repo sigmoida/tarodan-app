@@ -182,11 +182,8 @@ export const adminApi = {
   // Reviews
   getReviews: (params?: any) => api.get('/admin/reviews', { params }),
   updateReviewStatus: (id: string, status: string) => api.patch(`/admin/reviews/${id}/status`, { status }),
-  replyToReview: (id: string, reply: string) => api.post(`/admin/reviews/${id}/reply`, { reply }),
-  deleteReview: (id: string) => api.delete(`/admin/reviews/${id}`),
   getUserRatings: (params?: any) => api.get('/admin/user-ratings', { params }),
   updateUserRatingStatus: (id: string, status: string) => api.patch(`/admin/user-ratings/${id}/status`, { status }),
-  deleteUserRating: (id: string) => api.delete(`/admin/user-ratings/${id}`),
 
   // Orders
   getOrders: (params?: any) => api.get('/admin/orders', { params }),

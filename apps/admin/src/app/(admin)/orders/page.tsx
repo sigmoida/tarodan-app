@@ -86,10 +86,20 @@ export default function OrdersPage() {
     errorMessage: "Siparişler yüklenemedi",
   });
 
-  // Deep-link filtresini temizle = filtreyi boşalt (URL'i de temizler).
-  const clearUserFilter = () => setFilter("userId", "");
+  // Deep-link filtresini (ürün veya kullanıcı) temizle = filtreyi boşalt (URL'i de temizler).
+  // userId/productId deep-link'leri pratikte aynı anda set olmaz; hangisi etkinse onu boşaltırız.
+  const clearDeepLinkFilter = () =>
+    setFilter(filters.productId ? "productId" : "userId", "");
 
   const orders: Order[] = useMemo(() => mapOrders(rawRows), [rawRows]);
+
+  // Ürün/kullanıcı detayından gelen deep-link filtresinin görünür etiketi.
+  // Ürün filtresinde tüm satırlar aynı ürüne ait → başlığı ilk satırdan türetiriz.
+  const deepLinkFilterLabel = filters.productId
+    ? `Ürüne göre filtreleniyor${orders[0]?.product?.title ? `: ${orders[0].product.title}` : ""}`
+    : filters.userId
+      ? "Kullanıcıya göre filtreleniyor"
+      : null;
 
   const startEditing = (order: Order) => {
     setEditingOrderId(order.id);
@@ -270,12 +280,12 @@ export default function OrdersPage() {
       description={
         <>
           Toplam {total} sipariş
-          {(filters.userId || filters.productId) && (
+          {deepLinkFilterLabel && (
             <span className="ml-2">
-              — Filtreleniyor
+              — {deepLinkFilterLabel}
               <Button
                 variant="secondary"
-                onClick={clearUserFilter}
+                onClick={clearDeepLinkFilter}
                 className="ml-2 text-primary-600 hover:underline"
               >
                 Filtreyi kaldır

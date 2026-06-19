@@ -29,7 +29,7 @@ export class MediaController {
     private readonly moderationAi: ModerationAiClient,
   ) {}
 
-  /** Mesaj görselini (dosyanın kendisini) AI ile NSFW denetle — uygunsuzsa yüklemeyi engelle. */
+  /** Görsel dosyasını AI ile NSFW denetle — uygunsuzsa yüklemeyi engelle. */
   private async assertCleanImageFile(file: Express.Multer.File): Promise<void> {
     if (
       !this.moderationAi.isEnabled ||
@@ -114,6 +114,10 @@ export class MediaController {
 
     if (files.length > maxImages) {
       throw new BadRequestException(`En fazla ${maxImages} resim yükleyebilirsiniz`);
+    }
+
+    for (const file of files) {
+      await this.assertCleanImageFile(file);
     }
 
     const results = await Promise.all(

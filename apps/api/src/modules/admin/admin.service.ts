@@ -55,7 +55,6 @@ import {
   UpdateProductDto,
   RatingQueryDto,
   UpdateRatingStatusDto,
-  ReplyToRatingDto,
   RatingStatus,
   ApproveWarehouseTradeDto,
   RejectWarehouseTradeDto,
@@ -1197,11 +1196,14 @@ export class AdminService {
     const where: Prisma.ProductWhereInput = {};
 
     if (search) {
+      // Tek arama kutusu: ürün metni (fulltext) VEYA satıcı adı/e-postası eşleşsin.
+      // Bu OR, diğer filtrelerle (status, categoryId, sellerId) AND'lenir.
       const productIds = await fulltextProductSearch(this.prisma, search);
-      if (productIds.length === 0) {
-        return { data: [], total: 0, page, limit, totalPages: 0 };
-      }
-      where.id = { in: productIds };
+      where.OR = [
+        { id: { in: productIds } },
+        { seller: { displayName: { contains: search, mode: 'insensitive' } } },
+        { seller: { email: { contains: search, mode: 'insensitive' } } },
+      ];
     }
 
     if (status) {
@@ -10173,34 +10175,6 @@ export class AdminService {
   }
 
   /**
-   * Reply to review
-   */
-  async replyToReview(adminId: string, reviewId: string, reply: string) {
-    const review = await this.prisma.productRating.findUnique({
-      where: { id: reviewId },
-    });
-
-    if (!review) {
-      throw new NotFoundException('Yorum bulunamadı');
-    }
-
-    const updated = await this.prisma.productRating.update({
-      where: { id: reviewId },
-      data: {
-        adminReply: reply,
-        adminReplyAt: new Date(),
-        status: RatingStatus.approved as any, // Auto approve if admin replies
-      } as any,
-    });
-
-    await this.createAuditLog(adminId, 'review_reply', 'Rating', reviewId, review, updated);
-
-    await this.ratingService.updateProductRatingStats(review.productId);
-
-    return updated;
-  }
-
-  /**
    * Get seller (user) ratings for admin panel
    */
   async getUserRatings(query: { page?: number; limit?: number; search?: string; status?: string }) {
@@ -10217,7 +10191,7 @@ export class AdminService {
         { comment: { contains: search, mode: 'insensitive' } },
       ];
     }
-    if (status && ['pending', 'approved', 'rejected', 'spam'].includes(status)) {
+    if (status && ['pending', 'approved', 'rejected'].includes(status)) {
       where.status = status;
     }
 
@@ -10256,38 +10230,5 @@ export class AdminService {
     return { success: true };
   }
 
-  /**
-   * Delete a seller (user) rating
-   */
-  async deleteUserRating(adminId: string, ratingId: string) {
-    const rating = await this.prisma.rating.findUnique({ where: { id: ratingId } });
-    if (!rating) throw new NotFoundException('Kullanıcı yorumu bulunamadı');
-    await this.prisma.rating.delete({ where: { id: ratingId } });
-    await this.createAuditLog(adminId, 'user_rating_delete', 'Rating', ratingId, rating, null);
-    return { success: true };
-  }
-
-  /**
-   * Delete review
-   */
-  async deleteReview(adminId: string, reviewId: string) {
-    const review = await this.prisma.productRating.findUnique({
-      where: { id: reviewId },
-    });
-
-    if (!review) {
-      throw new NotFoundException('Yorum bulunamadı');
-    }
-
-    await this.prisma.productRating.delete({
-      where: { id: reviewId },
-    });
-
-    await this.createAuditLog(adminId, 'review_delete', 'Rating', reviewId, review, null);
-
-    await this.ratingService.updateProductRatingStats(review.productId);
-
-    return { success: true };
-  }
 }
 

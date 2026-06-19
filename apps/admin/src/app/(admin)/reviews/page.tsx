@@ -10,8 +10,6 @@ import { useAdminResource } from '@/hooks/useAdminResource';
 import {
     CheckCircleIcon,
     XCircleIcon,
-    TrashIcon,
-    ExclamationTriangleIcon,
     StarIcon,
 } from '@heroicons/react/24/outline';
 import { StarIcon as StarIconSolid } from '@heroicons/react/24/solid';
@@ -25,7 +23,7 @@ interface Review {
     score: number;
     title?: string;
     review?: string;
-    status: 'pending' | 'approved' | 'rejected' | 'spam';
+    status: 'pending' | 'approved' | 'rejected';
     adminReply?: string;
     adminReplyAt?: string;
     createdAt: string;
@@ -47,7 +45,7 @@ interface UserRating {
     id: string;
     score: number;
     comment?: string;
-    status?: 'pending' | 'approved' | 'rejected' | 'spam';
+    status?: 'pending' | 'approved' | 'rejected';
     createdAt: string;
     orderId?: string;
     tradeId?: string;
@@ -59,7 +57,6 @@ const reviewStatusConfig: Record<string, StatusConfig> = {
     approved: { label: 'Onaylı', variant: 'success' },
     pending: { label: 'Bekliyor', variant: 'warning' },
     rejected: { label: 'Reddedildi', variant: 'danger' },
-    spam: { label: 'Spam', variant: 'secondary' },
 };
 
 function renderStars(score: number) {
@@ -78,10 +75,6 @@ function renderStars(score: number) {
 
 export default function ReviewsPage() {
     const [activeTab, setActiveTab] = useState<'product' | 'seller'>('product');
-
-    // Modal states
-    const [deleteConfirm, setDeleteConfirm] = useState<string | null>(null);
-    const [deleteSellerConfirm, setDeleteSellerConfirm] = useState<string | null>(null);
 
     // ── Tek useAdminResource çağrısı — queryKey'e activeTab katıyoruz ──────────
     const r = useAdminResource<Review | UserRating>({
@@ -121,17 +114,6 @@ export default function ReviewsPage() {
         }
     };
 
-    const handleDelete = async (id: string) => {
-        try {
-            await adminApi.deleteReview(id);
-            toast.success('Yorum silindi');
-            setDeleteConfirm(null);
-            r.refetch();
-        } catch {
-            toast.error('Silme işlemi başarısız');
-        }
-    };
-
     // ── Satıcı yorumu aksiyonları ──────────────────────────────────────────────
     const handleSellerStatusUpdate = async (id: string, status: string) => {
         try {
@@ -142,17 +124,6 @@ export default function ReviewsPage() {
             r.refetch();
         } catch {
             toast.error('Güncelleme başarısız');
-        }
-    };
-
-    const handleDeleteSellerRating = async (id: string) => {
-        try {
-            await adminApi.deleteUserRating(id);
-            toast.success('Satıcı yorumu silindi');
-            setDeleteSellerConfirm(null);
-            r.refetch();
-        } catch {
-            toast.error('Silme işlemi başarısız');
         }
     };
 
@@ -223,12 +194,6 @@ export default function ReviewsPage() {
                         {review.review && (
                             <p className="text-muted text-sm line-clamp-3">{review.review}</p>
                         )}
-                        {review.adminReply && (
-                            <div className="mt-2 pl-3 border-l-2 border-primary-500">
-                                <p className="text-xs text-primary-400 font-medium">Satıcı Yanıtı:</p>
-                                <p className="text-xs text-muted">{review.adminReply}</p>
-                            </div>
-                        )}
                     </div>
                 );
             },
@@ -254,44 +219,26 @@ export default function ReviewsPage() {
                 const review = row.original;
                 return (
                     <div className="flex items-center justify-end gap-2">
-                        {review.status === 'pending' && (
-                            <>
-                                <Button
-                                    variant="secondary"
-                                    onClick={() => handleStatusUpdate(review.id, 'approved')}
-                                    className="p-1.5 text-success-700 hover:bg-success-400/10 rounded-lg"
-                                    title="Onayla"
-                                >
-                                    <CheckCircleIcon className="w-5 h-5" />
-                                </Button>
-                                <Button
-                                    variant="secondary"
-                                    onClick={() => handleStatusUpdate(review.id, 'rejected')}
-                                    className="p-1.5 text-danger-600 hover:bg-danger-400/10 rounded-lg"
-                                    title="Reddet"
-                                >
-                                    <XCircleIcon className="w-5 h-5" />
-                                </Button>
-                            </>
-                        )}
-                        {(review.status === 'approved' || review.status === 'pending') && (
+                        {review.status !== 'approved' && (
                             <Button
                                 variant="secondary"
-                                onClick={() => handleStatusUpdate(review.id, 'spam')}
-                                className="p-1.5 text-warning-700 hover:bg-warning-400/10 rounded-lg"
-                                title="Spam Olarak İşaretle"
+                                onClick={() => handleStatusUpdate(review.id, 'approved')}
+                                className="p-1.5 text-success-700 hover:bg-success-400/10 rounded-lg"
+                                title="Onayla"
                             >
-                                <ExclamationTriangleIcon className="w-5 h-5" />
+                                <CheckCircleIcon className="w-5 h-5" />
                             </Button>
                         )}
-                        <Button
-                            variant="secondary"
-                            onClick={() => setDeleteConfirm(review.id)}
-                            className="p-1.5 text-muted hover:text-danger-600 hover:bg-danger-400/10 rounded-lg"
-                            title="Sil"
-                        >
-                            <TrashIcon className="w-5 h-5" />
-                        </Button>
+                        {review.status !== 'rejected' && (
+                            <Button
+                                variant="secondary"
+                                onClick={() => handleStatusUpdate(review.id, 'rejected')}
+                                className="p-1.5 text-danger-600 hover:bg-danger-400/10 rounded-lg"
+                                title="Reddet"
+                            >
+                                <XCircleIcon className="w-5 h-5" />
+                            </Button>
+                        )}
                     </div>
                 );
             },
@@ -361,37 +308,26 @@ export default function ReviewsPage() {
                 const rating = row.original;
                 return (
                     <div className="flex items-center justify-end gap-2">
-                        {(rating.status === 'pending' || !rating.status) && (
-                            <>
-                                <Button
-                                    variant="secondary"
-                                    onClick={() => handleSellerStatusUpdate(rating.id, 'approved')}
-                                    className="p-1.5 text-success-700 hover:bg-success-400/10 rounded-lg"
-                                    title="Onayla"
-                                >
-                                    <CheckCircleIcon className="w-5 h-5" />
-                                </Button>
-                                <Button
-                                    variant="secondary"
-                                    onClick={() => handleSellerStatusUpdate(rating.id, 'rejected')}
-                                    className="p-1.5 text-danger-600 hover:bg-danger-400/10 rounded-lg"
-                                    title="Reddet"
-                                >
-                                    <XCircleIcon className="w-5 h-5" />
-                                </Button>
-                            </>
+                        {rating.status !== 'approved' && (
+                            <Button
+                                variant="secondary"
+                                onClick={() => handleSellerStatusUpdate(rating.id, 'approved')}
+                                className="p-1.5 text-success-700 hover:bg-success-400/10 rounded-lg"
+                                title="Onayla"
+                            >
+                                <CheckCircleIcon className="w-5 h-5" />
+                            </Button>
                         )}
-                        <Button
-                            variant="secondary"
-                            onClick={(e) => {
-                                e.stopPropagation();
-                                setDeleteSellerConfirm(rating.id);
-                            }}
-                            className="p-1.5 text-muted hover:text-danger-600 hover:bg-danger-400/10 rounded-lg"
-                            title="Sil"
-                        >
-                            <TrashIcon className="w-5 h-5" />
-                        </Button>
+                        {rating.status !== 'rejected' && (
+                            <Button
+                                variant="secondary"
+                                onClick={() => handleSellerStatusUpdate(rating.id, 'rejected')}
+                                className="p-1.5 text-danger-600 hover:bg-danger-400/10 rounded-lg"
+                                title="Reddet"
+                            >
+                                <XCircleIcon className="w-5 h-5" />
+                            </Button>
+                        )}
                     </div>
                 );
             },
@@ -416,7 +352,6 @@ export default function ReviewsPage() {
             <option value="pending">Bekleyenler</option>
             <option value="approved">Onaylananlar</option>
             <option value="rejected">Reddedilenler</option>
-            <option value="spam">Spam</option>
         </Select>
     );
 
@@ -447,71 +382,6 @@ export default function ReviewsPage() {
                 totalPages={r.totalPages}
                 onPageChange={r.setPage}
             />
-
-            {/* Delete Seller Rating Confirmation */}
-            {deleteSellerConfirm && (
-                <div className="fixed inset-0 bg-heading/50 flex items-center justify-center z-50">
-                    <div className="bg-surface-elevated rounded-xl px-6 pb-6 pt-5 max-w-md w-full mx-4 border border-border">
-                        <h3 className="text-lg font-semibold text-heading mb-4 leading-tight">
-                            Satıcı Yorumunu Sil
-                        </h3>
-                        <p className="text-muted mb-6">
-                            Bu satıcı yorumunu silmek istediğinizden emin misiniz? Bu işlem geri
-                            alınamaz.
-                        </p>
-                        <div className="flex gap-3">
-                            <Button
-                                variant="secondary"
-                                size="md"
-                                onClick={() => setDeleteSellerConfirm(null)}
-                                className="flex-1"
-                            >
-                                İptal
-                            </Button>
-                            <Button
-                                variant="danger"
-                                size="md"
-                                onClick={() => handleDeleteSellerRating(deleteSellerConfirm)}
-                                className="flex-1"
-                            >
-                                Sil
-                            </Button>
-                        </div>
-                    </div>
-                </div>
-            )}
-
-            {/* Delete Confirmation */}
-            {deleteConfirm && (
-                <div className="fixed inset-0 bg-heading/50 flex items-center justify-center z-50">
-                    <div className="bg-surface-elevated rounded-xl px-6 pb-6 pt-5 max-w-md w-full mx-4 border border-border">
-                        <h3 className="text-lg font-semibold text-heading mb-4 leading-tight">
-                            Yorumu Sil
-                        </h3>
-                        <p className="text-muted mb-6">
-                            Bu yorumu silmek istediğinizden emin misiniz? Bu işlem geri alınamaz.
-                        </p>
-                        <div className="flex gap-3">
-                            <Button
-                                variant="secondary"
-                                size="md"
-                                onClick={() => setDeleteConfirm(null)}
-                                className="flex-1"
-                            >
-                                İptal
-                            </Button>
-                            <Button
-                                variant="danger"
-                                size="md"
-                                onClick={() => handleDelete(deleteConfirm)}
-                                className="flex-1"
-                            >
-                                Sil
-                            </Button>
-                        </div>
-                    </div>
-                </div>
-            )}
         </>
     );
 }

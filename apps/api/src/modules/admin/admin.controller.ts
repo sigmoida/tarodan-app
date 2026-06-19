@@ -78,7 +78,6 @@ import {
   SendTestEmailDto,
   RatingQueryDto,
   UpdateRatingStatusDto,
-  ReplyToRatingDto,
   ApproveWarehouseTradeDto,
   RejectWarehouseTradeDto,
   MarkShipmentDto,
@@ -2726,31 +2725,6 @@ export class AdminController {
     return this.adminService.updateReviewStatus(adminId, id, dto.status);
   }
 
-  @Post('reviews/:id/reply')
-  @Roles(AdminRole.super_admin, AdminRole.admin, AdminRole.moderator)
-  @ApiOperation({ summary: 'Reply to review' })
-  @ApiParam({ name: 'id', description: 'Review ID' })
-  @ApiResponse({ status: HttpStatus.OK, description: 'Reply added' })
-  async replyToReview(
-    @Param('id') id: string,
-    @CurrentUser('id') adminId: string,
-    @Body() dto: ReplyToRatingDto,
-  ) {
-    return this.adminService.replyToReview(adminId, id, dto.reply);
-  }
-
-  @Delete('reviews/:id')
-  @Roles(AdminRole.super_admin, AdminRole.admin)
-  @HttpCode(HttpStatus.OK)
-  @ApiOperation({ summary: 'Delete review' })
-  @ApiParam({ name: 'id', description: 'Review ID' })
-  async deleteReview(
-    @Param('id') id: string,
-    @CurrentUser('id') adminId: string,
-  ) {
-    return this.adminService.deleteReview(adminId, id);
-  }
-
   // ==================== SELLER (USER) RATINGS ====================
 
   @Get('user-ratings')
@@ -2772,17 +2746,5 @@ export class AdminController {
     @Body() dto: UpdateRatingStatusDto,
   ) {
     return this.adminService.updateUserRatingStatus(adminId, id, dto.status);
-  }
-
-  @Delete('user-ratings/:id')
-  @Roles(AdminRole.super_admin, AdminRole.admin)
-  @HttpCode(HttpStatus.OK)
-  @ApiOperation({ summary: 'Delete a seller/user rating' })
-  @ApiParam({ name: 'id', description: 'User Rating ID' })
-  async deleteUserRating(
-    @Param('id') id: string,
-    @CurrentUser('id') adminId: string,
-  ) {
-    return this.adminService.deleteUserRating(adminId, id);
   }
 }

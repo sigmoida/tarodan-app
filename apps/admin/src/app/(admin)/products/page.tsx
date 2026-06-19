@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useMemo, useCallback } from "react";
+import { useMemo } from "react";
 import Link from "next/link";
 import { adminApi } from "@/lib/api";
 import {
@@ -11,7 +11,6 @@ import {
 import Image from "next/image";
 import {
   Button,
-  Input,
   Select,
   StatusBadge,
   productStatusConfig,
@@ -24,8 +23,6 @@ import {
   XMarkIcon,
   EyeIcon,
   TrashIcon,
-  XCircleIcon,
-  UserIcon,
   ArrowUturnLeftIcon,
 } from "@heroicons/react/24/outline";
 import toast from "react-hot-toast";
@@ -55,12 +52,6 @@ interface Product {
   };
   imageUrl?: string;
   createdAt: string;
-}
-
-interface UserOption {
-  id: string;
-  displayName: string;
-  email: string;
 }
 
 // ─── Mapper ────────────────────────────────────────────────────────────────
@@ -95,56 +86,11 @@ const statusOptions = statusFilterOptions(productStatusConfig, { allLabel: "Tüm
 export default function ProductsPage() {
   const confirm = useConfirm();
 
-  // Satıcı autocomplete UI state. Seçilen sellerId artık hook filtresi (filters.sellerId)
-  // — queryKey'in parçası olduğu için değişince doğru yeniden fetch eder ve "Filtreyi kaldır" çalışır.
-  const [users, setUsers] = useState<UserOption[]>([]);
-  const [sellerSearch, setSellerSearch] = useState("");
-  const [showSellerDropdown, setShowSellerDropdown] = useState(false);
-  const [loadingUsers, setLoadingUsers] = useState(false);
-
-  const loadUsers = useCallback(async (searchTerm: string) => {
-    if (!searchTerm || searchTerm.length < 2) {
-      setUsers([]);
-      return;
-    }
-    setLoadingUsers(true);
-    try {
-      const response = await adminApi.getUsers({
-        search: searchTerm,
-        limit: 10,
-        isSeller: true,
-      });
-      const data = response.data.data || response.data.users || [];
-      setUsers(
-        data.map((u: any) => ({
-          id: u.id,
-          displayName: u.displayName,
-          email: u.email,
-        })),
-      );
-    } catch (error) {
-      if (process.env.NODE_ENV === "development")
-        console.error("Load users error:", error);
-    } finally {
-      setLoadingUsers(false);
-    }
-  }, []);
-
-  // Debounce seller search — manual because this is a custom UI not tied to hook search
-  const handleSellerSearchChange = (value: string) => {
-    setSellerSearch(value);
-    setShowSellerDropdown(true);
-    const timer = setTimeout(() => {
-      if (value) loadUsers(value);
-    }, 300);
-    // Note: timer cleanup is best-effort here; this is a simple pattern used in the original
-    return () => clearTimeout(timer);
-  };
-
   // ── useAdminResource ────────────────────────────────────────────────────────
   // Server-side filtreler: search, status, sellerId — hepsi backend getProducts(AdminProductQueryDto)
   // tarafından desteklenir ve hook filters'ı (queryKey'in parçası) ile yönetilir.
-  // sellerId, ?sellerId= deep-link'i ile gelir; syncUrl URL'i yönetir.
+  // Tek arama kutusu (search) backend'de ürün metni VEYA satıcı adı/e-postasıyla eşleşir.
+  // sellerId yalnızca ?sellerId= deep-link'i (kullanıcı detayından) ile gelir; syncUrl URL'i yönetir.
   const {
     rows: rawRows,
     total,
@@ -167,15 +113,9 @@ export default function ProductsPage() {
     errorMessage: "Ürünler yüklenemedi",
   });
 
-  const handleSelectSeller = (user: UserOption) => {
-    setFilter("sellerId", user.id);
-    setSellerSearch(user.displayName);
-    setShowSellerDropdown(false);
-  };
-
+  // Deep-link (?sellerId=) ile gelen satıcı filtresini kaldırır.
   const clearSellerFilter = () => {
     setFilter("sellerId", "");
-    setSellerSearch("");
   };
 
   const products: Product[] = useMemo(() => mapProducts(rawRows), [rawRows]);
@@ -458,56 +398,12 @@ export default function ProductsPage() {
           CSV İndir
         </Button>
       }
-      search={{ placeholder: "Ürün ara..." }}
+      search={{ placeholder: "Ürün veya satıcı ara..." }}
       searchValue={search}
       onSearchChange={setSearch}
       onSearchSubmit={onSearchSubmit}
       filters={
         <>
-          {/* Seller Filter — custom autocomplete (client-side UI, server-side filter) */}
-          <div className="relative w-full sm:w-64">
-            <UserIcon className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-muted" />
-            <Input
-              type="text"
-              placeholder="Satıcı ara..."
-              value={sellerSearch}
-              onChange={(e) => handleSellerSearchChange(e.target.value)}
-              onFocus={() => setShowSellerDropdown(true)}
-              className="admin-input-with-icon-left pr-10"
-            />
-            {filters.sellerId && (
-              <Button
-                variant="secondary"
-                onClick={clearSellerFilter}
-                className="absolute right-3 top-1/2 -translate-y-1/2 text-muted hover:text-heading"
-              >
-                <XCircleIcon className="h-5 w-5" />
-              </Button>
-            )}
-
-            {showSellerDropdown && sellerSearch.length >= 2 && (
-              <div className="absolute z-50 mt-1 bg-surface-alt shadow-lg max-h-60 overflow-y-auto">
-                {loadingUsers ? (
-                  <div className="p-3 text-center text-muted">Aranıyor...</div>
-                ) : users.length > 0 ? (
-                  users.map((user) => (
-                    <Button
-                      variant="secondary"
-                      key={user.id}
-                      onClick={() => handleSelectSeller(user)}
-                      className="w-full px-4 py-2 text-left hover:bg-surface-alt text-heading"
-                    >
-                      <div className="font-medium">{user.displayName}</div>
-                      <div className="text-xs text-muted">{user.email}</div>
-                    </Button>
-                  ))
-                ) : (
-                  <div className="p-3 text-center text-muted">Satıcı bulunamadı</div>
-                )}
-              </div>
-            )}
-          </div>
-
           {/* Status Filter — server-side */}
           <Select
             value={filters.status ?? "all"}

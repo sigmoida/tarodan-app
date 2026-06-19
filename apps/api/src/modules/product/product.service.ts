@@ -106,10 +106,10 @@ export class ProductService implements OnModuleInit {
     }
 
     // AI görsel moderasyonu (senkron): uygunsuz/NSFW görselde ilanı ENGELLE + net mesaj.
-    // (İlgililik/oto-onay kararı async worker'da; burada sadece uygunsuzu durdururuz.)
+    // Düşük ilgililik admin incelemesine kalabilir; burada sadece uygunsuzu durdururuz.
     if (dto.images?.length && this.moderationAi.isEnabled) {
       for (const img of dto.images) {
-        const url = this.storageService.getPublicAssetUrl(img.cardKey);
+        const url = this.storageService.getPublicAssetUrl(img.detailKey || img.cardKey);
         if (!url) continue;
         const verdict = await this.moderationAi.moderateImage(url);
         if (verdict?.decision === 'flag') {
@@ -279,7 +279,7 @@ export class ProductService implements OnModuleInit {
         this.moderationQueue
           .add('product-image', {
             productId: product.id,
-            cardKeys: product.images.map((img) => img.cardKey),
+            imageKeys: product.images.map((img) => img.detailKey || img.cardKey),
           })
           .catch((err) =>
             this.logger.warn(`Moderation job eklenemedi: ${err.message}`),

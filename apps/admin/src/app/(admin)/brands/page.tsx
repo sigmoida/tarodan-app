@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { adminApi } from '@/lib/api';
 import { Button, Input, Select, Spinner, Textarea } from '@tarodan/ui';
 import { DataTable, type ColumnDef } from '@/components/DataTable';
@@ -8,7 +8,6 @@ import {
     PlusIcon,
     PencilIcon,
     TrashIcon,
-    GlobeAltIcon,
     CheckCircleIcon,
     XCircleIcon,
     ChevronDownIcon,
@@ -16,7 +15,7 @@ import {
     TruckIcon,
 } from '@heroicons/react/24/outline';
 import toast from 'react-hot-toast';
-import { PageHeader, ActionButtons, ActionIconButton } from '@/components/admin-list';
+import { PageHeader, FilterToolbar, ActionButtons, ActionIconButton } from '@/components/admin-list';
 
 interface CarModel {
     id: string;
@@ -35,7 +34,6 @@ interface Brand {
     slug: string;
     logo?: string;
     description?: string;
-    website?: string;
     isActive: boolean;
     createdAt: string;
     updatedAt: string;
@@ -45,7 +43,6 @@ interface BrandFormData {
     name: string;
     logo: string;
     description: string;
-    website: string;
     isActive: boolean;
 }
 
@@ -59,6 +56,7 @@ interface CarModelFormData {
 
 export default function BrandsPage() {
     const [brands, setBrands] = useState<Brand[]>([]);
+    const [search, setSearch] = useState('');
     const [loading, setLoading] = useState(true);
     const [showModal, setShowModal] = useState(false);
     const [editingBrand, setEditingBrand] = useState<Brand | null>(null);
@@ -80,9 +78,19 @@ export default function BrandsPage() {
         name: '',
         logo: '',
         description: '',
-        website: '',
         isActive: true,
     });
+
+    const filteredBrands = useMemo(() => {
+        const term = search.trim().toLocaleLowerCase('tr');
+        if (!term) return brands;
+
+        return brands.filter((brand) =>
+            [brand.name, brand.slug, brand.description]
+                .filter(Boolean)
+                .some((value) => value!.toLocaleLowerCase('tr').includes(term))
+        );
+    }, [brands, search]);
 
     useEffect(() => {
         loadBrands();
@@ -128,7 +136,6 @@ export default function BrandsPage() {
             name: '',
             logo: '',
             description: '',
-            website: '',
             isActive: true,
         });
         setShowModal(true);
@@ -140,7 +147,6 @@ export default function BrandsPage() {
             name: brand.name,
             logo: brand.logo || '',
             description: brand.description || '',
-            website: brand.website || '',
             isActive: brand.isActive,
         });
         setShowModal(true);
@@ -281,24 +287,6 @@ export default function BrandsPage() {
             ),
         },
         {
-            header: 'Website',
-            cell: ({ row }) => (
-                row.original.website ? (
-                    <a
-                        href={row.original.website}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="text-sm text-info-600 hover:text-info-800 flex items-center gap-1"
-                    >
-                        <GlobeAltIcon className="w-4 h-4" />
-                        Ziyaret Et
-                    </a>
-                ) : (
-                    <span className="text-muted text-sm">-</span>
-                )
-            ),
-        },
-        {
             header: 'Durum',
             cell: ({ row }) => (
                 <Button variant="secondary" onClick={() => toggleStatus(row.original)}
@@ -436,13 +424,19 @@ export default function BrandsPage() {
                     </Button>
                 </PageHeader>
 
+                <FilterToolbar
+                    search={search}
+                    onSearchChange={setSearch}
+                    searchPlaceholder="Marka ara..."
+                />
+
                 {/* Brands Table */}
                 <DataTable
                     columns={columns}
-                    data={brands}
+                    data={filteredBrands}
                     loading={loading}
-                    emptyText="Henüz marka eklenmemiş"
-                    emptyAction={<Button onClick={openCreateModal}><PlusIcon className="w-5 h-5 mr-2" />İlk markayı ekle</Button>}
+                    emptyText={search ? 'Arama kriterine uygun marka bulunamadı' : 'Henüz marka eklenmemiş'}
+                    emptyAction={!search ? <Button onClick={openCreateModal}><PlusIcon className="w-5 h-5 mr-2" />İlk markayı ekle</Button> : undefined}
                     getRowId={(b) => b.id}
                 />
 
@@ -478,18 +472,6 @@ export default function BrandsPage() {
                                             value={formData.logo}
                                             onChange={(e) => setFormData({ ...formData, logo: e.target.value })}
                                             placeholder="https://example.com/logo.png"
-                                        />
-                                    </div>
-
-                                    <div>
-                                        <label className="block text-sm font-medium text-body mb-1">
-                                            Website
-                                        </label>
-                                        <Input
-                                            type="url"
-                                            value={formData.website}
-                                            onChange={(e) => setFormData({ ...formData, website: e.target.value })}
-                                            placeholder="https://www.ferrari.com"
                                         />
                                     </div>
 
