@@ -1657,10 +1657,11 @@ Bu ürünü istek listenizden kaldırmak için ürün sayfasına gidip "İstek L
 
     const products = await this.prisma.product.findMany({
       where,
-      // Stok bitenler (sold/inactive) ve reddedilenler her zaman en altta:
-      // enum sırası pending < active < reserved < sold < inactive < rejected
-      // olduğundan ORDER BY status ASC satılabilir ilanları üstte tutar.
-      orderBy: [{ status: 'asc' }, { createdAt: 'desc' }],
+      // Birincil sıralama: en yeni ilan en üstte (createdAt DESC). Satılabilir
+      // ilanların durumuna göre değil tarihe göre sıralanması istenir; satılan/
+      // pasif/reddedilen ilanlar aşağıdaki adımda en alta taşınır (yine en yeni
+      // önce). Öne çıkarma (boost) bu sorguya dahil değildir, dokunulmaz.
+      orderBy: [{ createdAt: 'desc' }],
       skip: (page - 1) * limit,
       take: limit,
       include: {
@@ -1679,6 +1680,18 @@ Bu ürünü istek listenizden kaldırmak için ürün sayfasına gidip "İstek L
         },
       },
     });
+
+    // Satılabilir ilanlar üstte, terminal durumdakiler (sold/inactive/rejected)
+    // en altta — her iki grup da kendi içinde en yeni önce (kararlı sıralama,
+    // createdAt DESC zaten uygulandı).
+    const TERMINAL_STATUSES: ProductStatus[] = [
+      ProductStatus.sold,
+      ProductStatus.inactive,
+      ProductStatus.rejected,
+    ];
+    const isTerminal = (p: { status: ProductStatus }) =>
+      TERMINAL_STATUSES.includes(p.status);
+    products.sort((a, b) => Number(isTerminal(a)) - Number(isTerminal(b)));
 
     const formattedProducts = await Promise.all(
       products.map(async (p) => ({
