@@ -22,6 +22,7 @@ import toast from 'react-hot-toast';
 import { format } from 'date-fns';
 import { tr } from 'date-fns/locale';
 import { useConfirm } from '@/components/ConfirmProvider';
+import { ModerationEventsPanel } from '@/components/ModerationEventsPanel';
 
 interface ProductDetail {
   id: string;
@@ -103,7 +104,7 @@ export default function ProductDetailPage() {
   const [processing, setProcessing] = useState(false);
 
   // Tab and Reviews state
-  const [activeTab, setActiveTab] = useState<'info' | 'reviews'>('info');
+  const [activeTab, setActiveTab] = useState<'info' | 'reviews' | 'ai'>('info');
   const [reviews, setReviews] = useState<Review[]>([]);
   const [reviewsLoading, setReviewsLoading] = useState(false);
 
@@ -305,9 +306,10 @@ export default function ProductDetailPage() {
               tabs={[
                 { key: 'info', label: 'Ürün Bilgileri', icon: CubeIcon },
                 { key: 'reviews', label: 'Yorumlar', icon: StarIcon, badge: reviews.filter((rv) => rv.status !== 'deleted').length },
+                { key: 'ai', label: 'AI Denetim' },
               ]}
               value={activeTab}
-              onChange={(k) => setActiveTab(k as 'info' | 'reviews')}
+              onChange={(k) => setActiveTab(k as 'info' | 'reviews' | 'ai')}
             />
           </div>
 
@@ -499,6 +501,14 @@ export default function ProductDetailPage() {
                 </div>
               </div>
             </div>
+          ) : activeTab === 'ai' ? (
+            /* AI Denetim Tab */
+            <ModerationEventsPanel
+              entityType="product"
+              entityId={productId}
+              title="AI Denetim"
+              description="Bu ürüne ait tüm AI moderasyon olayları"
+            />
           ) : (
             /* Reviews Tab */
             <div className="bg-surface-elevated rounded-xl shadow-sm">

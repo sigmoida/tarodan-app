@@ -60,6 +60,7 @@ interface Product {
   };
   imageUrl?: string;
   createdAt: string;
+  aiCheckStatus?: string | null;
 }
 
 // ─── Mapper ────────────────────────────────────────────────────────────────
@@ -83,6 +84,7 @@ function mapProducts(raw: any[]): Product[] {
       return url || "https://placehold.co/100x100/f3f4f6/666?text=Ürün";
     })(),
     createdAt: p.createdAt,
+    aiCheckStatus: p.aiCheckStatus ?? null,
   }));
 }
 
@@ -288,6 +290,20 @@ export default function ProductsPage() {
       cell: ({ row }) => (
         <StatusBadge status={row.original.status} config={productStatusConfig} />
       ),
+    },
+    {
+      header: "AI",
+      cell: ({ row }) => {
+        const s = row.original.aiCheckStatus;
+        if (!s) return <span className="text-muted text-xs">—</span>;
+        const [cls, label] =
+          s === "flagged"
+            ? ["bg-danger-500/20 text-danger-600", "Uygunsuz"]
+            : s === "review"
+              ? ["bg-warning-500/20 text-warning-700", "İnceleme"]
+              : ["bg-success-500/20 text-success-700", "Temiz"];
+        return <span className={`px-1.5 py-0.5 rounded text-xs font-medium ${cls}`}>{label}</span>;
+      },
     },
     {
       header: "Kondisyon",

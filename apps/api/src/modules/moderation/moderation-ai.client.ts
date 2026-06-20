@@ -123,6 +123,18 @@ export class ModerationAiClient {
         'Yüklediğiniz resim uygun değildir. Lütfen uygun bir görsel seçin.',
       );
     }
+    // Temiz/inceleme sonuçlarını da kaydet (admin "AI Denetim" > "Temiz" filtresi için)
+    if (verdict && ctx) {
+      await this.recordEvent({
+        ...ctx,
+        kind: 'image',
+        decision: verdict.decision, // 'pass' | 'review'
+        relevanceScore: verdict.relevanceScore,
+        nsfwScore: verdict.nsfwScore,
+        labels: verdict.topLabels,
+        reason: verdict.reason || null,
+      });
+    }
   }
 
   /**

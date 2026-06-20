@@ -23,6 +23,7 @@ import {
   CollectionItemResponseDto,
 } from './dto';
 import { MembershipService } from '../membership/membership.service';
+import { ModerationAiClient } from '../moderation/moderation-ai.client';
 import { NotificationService } from '../notification/notification.service';
 import { NotificationType } from '../notification/dto';
 import { MediaService } from '../media/media.service';
@@ -64,6 +65,7 @@ export class CollectionService {
     private readonly storageService: StorageService,
     private readonly searchService: SearchService,
     private readonly searchIndexing: SearchIndexingService,
+    private readonly moderationAi: ModerationAiClient,
   ) {}
 
   // ==========================================================================
@@ -79,6 +81,22 @@ export class CollectionService {
       throw new ForbiddenException(
         canCreate.reason || 'Koleksiyon oluşturma yetkiniz yok',
       );
+    }
+
+    // Koleksiyon adı ve açıklaması metin denetimi
+    await this.moderationAi.assertTextClean(dto.name, {
+      entityType: 'collection',
+      userId,
+      field: 'name',
+      label: 'koleksiyon adı',
+    });
+    if (dto.description) {
+      await this.moderationAi.assertTextClean(dto.description, {
+        entityType: 'collection',
+        userId,
+        field: 'description',
+        label: 'koleksiyon açıklaması',
+      });
     }
 
     // Generate slug from name
@@ -638,6 +656,26 @@ export class CollectionService {
 
     if (collection.userId !== userId) {
       throw new ForbiddenException('Bu koleksiyonu düzenleme yetkiniz yok');
+    }
+
+    // Değişen metin alanları denetimi
+    if (dto.name && dto.name !== collection.name) {
+      await this.moderationAi.assertTextClean(dto.name, {
+        entityType: 'collection',
+        entityId: collectionId,
+        userId,
+        field: 'name',
+        label: 'koleksiyon adı',
+      });
+    }
+    if (dto.description !== undefined && dto.description !== collection.description) {
+      await this.moderationAi.assertTextClean(dto.description, {
+        entityType: 'collection',
+        entityId: collectionId,
+        userId,
+        field: 'description',
+        label: 'koleksiyon açıklaması',
+      });
     }
 
     let newSlug = collection.slug;

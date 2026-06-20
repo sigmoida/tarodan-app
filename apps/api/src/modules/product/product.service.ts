@@ -121,16 +121,20 @@ export class ProductService implements OnModuleInit {
       }
     }
 
-    // Başlık + açıklama küfür/uygunsuz dil kontrolü (senkron) — uygunsuzsa engelle.
-    if (this.moderationAi.isEnabled) {
-      const textCheck = await this.moderationAi.checkText(
-        `${dto.title} ${dto.description ?? ''}`,
-      );
-      if (!textCheck.clean) {
-        throw new BadRequestException(
-          `Ürün başlığı/açıklaması uygun değildir (${textCheck.reason}). Lütfen düzenleyin.`,
-        );
-      }
+    // Başlık + açıklama küfür/uygunsuz dil kontrolü (senkron) — uygunsuzsa engelle + event yaz.
+    await this.moderationAi.assertTextClean(dto.title, {
+      entityType: 'product',
+      userId: sellerId,
+      field: 'title',
+      label: 'ürün başlığı',
+    });
+    if (dto.description) {
+      await this.moderationAi.assertTextClean(dto.description, {
+        entityType: 'product',
+        userId: sellerId,
+        field: 'description',
+        label: 'ürün açıklaması',
+      });
     }
 
     // Auto-enable seller mode when user creates their first listing
