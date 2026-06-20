@@ -3,6 +3,11 @@ import { ApiPropertyOptional } from '@nestjs/swagger';
 import { Type } from 'class-transformer';
 
 export class PayoutTransactionsQueryDto {
+  @ApiPropertyOptional({ description: 'Search by seller name, email or order number' })
+  @IsOptional()
+  @IsString()
+  search?: string;
+
   @ApiPropertyOptional({ description: 'Filter by seller ID' })
   @IsOptional()
   @IsString()

@@ -31,6 +31,7 @@ import { InjectQueue } from '@nestjs/bull';
 import { Queue } from 'bull';
 import { QUEUE_NAMES } from '../../workers/constants';
 import { ModerationAiClient } from '../moderation/moderation-ai.client';
+import { renderEmailTemplate, getEmailTemplateSubject, substituteEmailVariables } from '../../common/helpers/email-template-renderer';
 
 @Injectable()
 export class ProductService implements OnModuleInit {
@@ -359,6 +360,7 @@ export class ProductService implements OnModuleInit {
             { displayValue: scaleTrim },
           ],
         },
+        orderBy: { sortOrder: 'asc' },
         select: { id: true },
       });
       if (scaleAttr) toLink.push(scaleAttr.id);
@@ -1440,35 +1442,26 @@ export class ProductService implements OnModuleInit {
         try {
           const acceptsMarketingEmails = user.acceptsMarketingEmails === true;
           if (acceptsMarketingEmails) {
-            const htmlContent = this.generatePriceChangeEmailHtml(
-              user.displayName,
+            const frontendUrl = process.env.FRONTEND_URL || 'https://tarodan.com';
+            const templateData = {
+              userName: user.displayName,
               productTitle,
               oldPrice,
               newPrice,
-              priceChange,
-              priceChangePercent,
+              priceChange: Math.abs(priceChange),
+              priceChangePercent: Math.abs(Number(priceChangePercent)),
               isPriceDrop,
-              productId,
-            );
-            const textContent = this.generatePriceChangeEmailText(
-              user.displayName,
-              productTitle,
-              oldPrice,
-              newPrice,
-              priceChange,
-              priceChangePercent,
-              isPriceDrop,
-              productId,
-            );
+              productUrl: `${frontendUrl}/products/${productId}`,
+            };
+            const priceDbTemplate = await this.prisma.emailTemplate.findUnique({ where: { key: 'wishlist-price-change' } });
+            const html = priceDbTemplate?.bodyHtml
+              ? substituteEmailVariables(priceDbTemplate.bodyHtml, templateData)
+              : renderEmailTemplate('wishlist-price-change', templateData, frontendUrl);
+            const subject = priceDbTemplate?.subject
+              ? substituteEmailVariables(priceDbTemplate.subject, templateData)
+              : getEmailTemplateSubject('wishlist-price-change', templateData);
 
-            await this.smtpProvider.sendEmail({
-              to: user.email,
-              subject: isPriceDrop
-                ? `🎉 Fiyat Düştü: ${productTitle}`
-                : `📈 Fiyat Değişti: ${productTitle}`,
-              html: htmlContent,
-              text: textContent,
-            });
+            await this.smtpProvider.sendEmail({ to: user.email, subject, html });
           }
         } catch (emailError: any) {
           // Email failure shouldn't stop in-app notification
@@ -1765,9 +1758,11 @@ Bu ürünü istek listenizden kaldırmak için ürün sayfasına gidip "İstek L
         p.attribute?.group?.slug === groupSlug ||
         (groupNameFallback && p.attribute?.group?.name?.toLowerCase() === groupNameFallback.toLowerCase()),
     );
-    const val = pa?.attribute?.displayValue ?? pa?.attribute?.value ?? undefined;
+    // Use || (not ??) so that empty-string displayValue correctly falls through to value.
+    const val = pa?.attribute?.displayValue || pa?.attribute?.value || undefined;
     if (val) return val;
-    // Normalize scale slug to value format for dropdown match (e.g. "164" -> "1:64", "118" -> "1:18")
+    // Normalize scale slug to value format for dropdown match (e.g. "164" -> "1:64", "118" -> "1:18").
+    // Only runs when both displayValue and value are falsy (null/undefined/empty).
     if (groupSlug === 'scale' && pa?.attribute?.slug && /^\d+$/.test(pa.attribute.slug)) {
       const s = pa.attribute.slug;
       if (s.length >= 2) return `1:${s.slice(1)}`;

@@ -113,8 +113,7 @@ export class SupportController {
     @Request() req: any,
     @Body() dto: AddTicketMessageDto,
   ): Promise<TicketResponseDto> {
-    const isAdmin = !!req.user.adminId;
-    return this.supportService.addMessage(id, req.user.id, dto, isAdmin);
+    return this.supportService.addMessage(id, req.user.id, dto, false);
   }
 
   // ==========================================================================
@@ -210,6 +209,22 @@ export class SupportController {
     @Body() body: { priority: TicketPriority },
   ): Promise<TicketResponseDto> {
     return this.supportService.updatePriority(id, body.priority);
+  }
+
+  /**
+   * Add message to ticket (Admin) — supports internal notes
+   * POST /support/admin/tickets/:id/messages
+   */
+  @Post('admin/tickets/:id/messages')
+  @AdminRoute()
+  @UseGuards(AdminJwtAuthGuard, RolesGuard)
+  @Roles(AdminRole.admin, AdminRole.super_admin, AdminRole.moderator)
+  async addAdminMessage(
+    @Param('id', ParseUUIDPipe) id: string,
+    @Request() req: any,
+    @Body() dto: AddTicketMessageDto,
+  ): Promise<TicketResponseDto> {
+    return this.supportService.addMessage(id, req.user.id, dto, true);
   }
 
   /**

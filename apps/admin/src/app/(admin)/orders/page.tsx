@@ -2,6 +2,7 @@
 
 import { useState, useMemo } from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { adminApi } from "@/lib/api";
 import { cancelReasonLabel, orderOriginLabel, statusFilterOptions } from "@/lib/utils";
 import {
@@ -12,7 +13,6 @@ import {
 } from "@tarodan/ui";
 import { type ColumnDef } from "@/components/DataTable";
 import {
-  EyeIcon,
   PencilIcon,
   CheckIcon,
   XMarkIcon,
@@ -58,6 +58,7 @@ function mapOrders(raw: any[]): Order[] {
 }
 
 export default function OrdersPage() {
+  const router = useRouter();
   // Inline status edit state (mutation-only, not list state)
   const [editingOrderId, setEditingOrderId] = useState<string | null>(null);
   const [newStatus, setNewStatus] = useState<string>("");
@@ -264,11 +265,6 @@ export default function OrdersPage() {
             onClick={() => startEditing(row.original)}
             title="Durumu Değiştir"
           />
-          <ActionIconButton
-            icon={EyeIcon}
-            href={`/orders/${row.original.id}`}
-            title="Detay"
-          />
         </ActionButtons>
       ),
     },
@@ -320,6 +316,11 @@ export default function OrdersPage() {
           : "Henüz sipariş yok"
       }
       getRowId={(o) => o.id}
+      onRowClick={(o) => {
+        // Satır içinde durum düzenleniyorken tıklama detaya gitmesin.
+        if (editingOrderId === o.id) return;
+        router.push(`/orders/${o.id}`);
+      }}
       page={page}
       totalPages={totalPages}
       onPageChange={setPage}

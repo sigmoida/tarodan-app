@@ -1,12 +1,13 @@
 "use client";
 
-import { type ReactNode } from "react";
+import { Fragment, type ReactNode } from "react";
 import {
   useReactTable,
   getCoreRowModel,
   flexRender,
   type ColumnDef,
 } from "@tanstack/react-table";
+import { AnimatePresence, motion } from "framer-motion";
 import { Spinner } from "@tarodan/ui";
 
 export type { ColumnDef };
@@ -30,6 +31,11 @@ export interface DataTableProps<T> {
   selectedIds?: string[];
   onToggleRow?: (id: string) => void;
   onToggleAll?: (ids: string[]) => void;
+  // ── Genişletilebilir satır (opsiyonel) ──
+  /** Açık satırın altına tam genişlikte render edilecek panel (örn. marka modelleri). */
+  renderExpanded?: (row: T) => ReactNode;
+  /** O an açık olan satırın kimliği (getRowId ile eşleşir). Verilince yumuşak açılır/kapanır. */
+  expandedId?: string | null;
 }
 
 /**
@@ -50,6 +56,8 @@ export function DataTable<T>({
   selectedIds = [],
   onToggleRow,
   onToggleAll,
+  renderExpanded,
+  expandedId,
 }: DataTableProps<T>) {
   const table = useReactTable({
     data,
@@ -121,10 +129,25 @@ export function DataTable<T>({
             ) : (
               table.getRowModel().rows.map((row) => {
                 const id = getRowId ? getRowId(row.original) : row.id;
+                const isExpanded = renderExpanded != null && expandedId === id;
                 return (
+                  <Fragment key={row.id}>
                   <tr
-                    key={row.id}
-                    onClick={onRowClick ? () => onRowClick(row.original) : undefined}
+                    onClick={
+                      onRowClick
+                        ? (e) => {
+                            // Satır içindeki interaktif öğelere (link, buton, input, label)
+                            // tıklama satır tıklamasını tetiklemez — kendi davranışları çalışır.
+                            if (
+                              (e.target as HTMLElement).closest(
+                                "a, button, input, select, textarea, label, [role='button']",
+                              )
+                            )
+                              return;
+                            onRowClick(row.original);
+                          }
+                        : undefined
+                    }
                     className={[
                       onRowClick ? "cursor-pointer hover:bg-surface-alt/50" : "",
                       selectable && selectedIds.includes(id)
@@ -152,6 +175,27 @@ export function DataTable<T>({
                       </td>
                     ))}
                   </tr>
+                  {renderExpanded && (
+                    <tr className="hover:bg-transparent">
+                      <td colSpan={colSpan} className="!p-0 !border-0">
+                        <AnimatePresence initial={false}>
+                          {isExpanded && (
+                            <motion.div
+                              key="expanded"
+                              initial={{ height: 0, opacity: 0 }}
+                              animate={{ height: "auto", opacity: 1 }}
+                              exit={{ height: 0, opacity: 0 }}
+                              transition={{ duration: 0.25, ease: "easeInOut" }}
+                              className="overflow-hidden"
+                            >
+                              {renderExpanded(row.original)}
+                            </motion.div>
+                          )}
+                        </AnimatePresence>
+                      </td>
+                    </tr>
+                  )}
+                  </Fragment>
                 );
               })
             )}

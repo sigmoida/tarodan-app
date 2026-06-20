@@ -64,6 +64,18 @@ export interface UseAdminResourceResult<T> {
   isLoading: boolean;
   /** react-query refetch'ini manuel tetikler */
   refetch: () => void;
+  /**
+   * Tab URL senkronu: mevcut arama/filtre parametrelerini koruyarak "tab" param'ını günceller.
+   * Sadece syncUrl=true iken etkindir. Sayfa her zaman 1'e sıfırlanır.
+   * @param key - Yeni tab değeri
+   * @param opts.defaultTab - Varsayılan tab; URL'e yazılmaz (temiz URL). Varsayılan: ""
+   * @param opts.resetFilters - true ise filtreler initialFilters'a sıfırlanır. Varsayılan: false
+   * @param opts.resetSearch - true ise arama kutusu temizlenir. Varsayılan: false
+   */
+  setTabUrl: (
+    key: string,
+    opts?: { defaultTab?: string; resetFilters?: boolean; resetSearch?: boolean },
+  ) => void;
 }
 
 // ─── Yardımcı: backend yanıtından data ve total çıkar ──────────────────────
@@ -137,6 +149,9 @@ export function useAdminResource<T>({
   const router = useRouter();
   const pathname = usePathname();
   const searchParams = useSearchParams();
+  // Her zaman güncel searchParams'a erişmek için ref; syncToUrl bağımlılığını şişirmez.
+  const searchParamsRef = useRef(searchParams);
+  useEffect(() => { searchParamsRef.current = searchParams; }, [searchParams]);
 
   // ── URL'den ilk değerleri oku (syncUrl) ──────────────────────────────────
   const getInitialPage = () => {
@@ -173,7 +188,12 @@ export function useAdminResource<T>({
   const syncToUrl = useCallback(
     (p: number, q: string, f: Record<string, string>) => {
       if (!syncUrl) return;
-      const params = new URLSearchParams();
+      // Mevcut URL'den başla → "tab" gibi hook'un yönetmediği parametreler korunur.
+      const params = new URLSearchParams(searchParamsRef.current.toString());
+      // Hook'un sahip olduğu anahtarları sıfırla, ardından yeniden yaz.
+      params.delete("page");
+      params.delete("q");
+      Object.keys(initialFilters).forEach((key) => params.delete(key));
       if (p > 1) params.set("page", String(p));
       if (q) params.set("q", q);
       Object.entries(f).forEach(([key, val]) => {
@@ -299,6 +319,7 @@ export function useAdminResource<T>({
       return response.data;
     },
     placeholderData: keepPreviousData, // yazarken liste titremesin (smooth arama)
+    refetchOnMount: 'always', // sayfaya her dönüşte (detail→liste navigasyonu) taze veri
   });
 
   // Hata → toast (queryResult.error değişince)
@@ -310,6 +331,46 @@ export function useAdminResource<T>({
     }
     if (!queryResult.error) lastErrorRef.current = null;
   }, [queryResult.error, errorMessage]);
+
+  // ── Tab URL senkronu ──────────────────────────────────────────────────────
+  const setTabUrl = useCallback(
+    (
+      key: string,
+      opts: { defaultTab?: string; resetFilters?: boolean; resetSearch?: boolean } = {},
+    ) => {
+      if (!syncUrl) return;
+      const { defaultTab = "", resetFilters = false, resetSearch = false } = opts;
+      // Mevcut URL'den başla; hook'un yönetmediği parametreler korunur.
+      const params = new URLSearchParams(searchParamsRef.current.toString());
+      // Tab
+      if (key && key !== defaultTab) {
+        params.set("tab", key);
+      } else {
+        params.delete("tab");
+      }
+      // Sayfa her zaman 1'e sıfırlanır
+      params.delete("page");
+      setPageState(1);
+      // Filtre sıfırlama (isteğe bağlı)
+      if (resetFilters) {
+        Object.keys(initialFilters).forEach((k) => params.delete(k));
+        setFiltersState({ ...initialFilters });
+      }
+      // Arama sıfırlama (isteğe bağlı)
+      if (resetSearch) {
+        params.delete("q");
+        if (debounceTimerRef.current !== null) {
+          clearTimeout(debounceTimerRef.current);
+          debounceTimerRef.current = null;
+        }
+        setInputSearch("");
+        setCommittedSearch("");
+      }
+      const qs = params.toString();
+      router.replace(qs ? `${pathname}?${qs}` : pathname, { scroll: false });
+    },
+    [syncUrl, pathname, router, initialFilters],
+  );
 
   // ── Veri çıkarma ─────────────────────────────────────────────────────────
   const { rows, total } = queryResult.data
@@ -330,5 +391,6 @@ export function useAdminResource<T>({
     setFilter,
     isLoading: queryResult.isLoading || queryResult.isFetching,
     refetch: queryResult.refetch,
+    setTabUrl,
   };
 }

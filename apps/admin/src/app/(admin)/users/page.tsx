@@ -1,8 +1,8 @@
 "use client";
 
 import { useMemo } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
 import {
-  EyeIcon,
   NoSymbolIcon,
   CheckCircleIcon,
 } from "@heroicons/react/24/outline";
@@ -11,8 +11,16 @@ import { Button, Select, membershipTierConfig, enumLabel } from "@tarodan/ui";
 import { type ColumnDef } from "@/components/DataTable";
 import { ActionButtons, ActionIconButton } from "@/components/admin-list";
 import { ResourceListPage } from "@/components/ResourceListPage";
+import { ModerationEventsPanel } from "@/components/ModerationEventsPanel";
 import { useAdminResource } from "@/hooks/useAdminResource";
+import { usePrompt } from "@/components/PromptProvider";
 import { adminApi } from "@/lib/api";
+
+// Kullanıcılar ↔ AI Denetim sekmeleri (ortak AdminTabs yapısı)
+const USER_TABS = [
+  { key: "list", label: "Kullanıcılar" },
+  { key: "ai", label: "AI Denetim" },
+];
 
 interface User {
   id: string;
@@ -40,13 +48,17 @@ function mapUsers(raw: any[]): User[] {
     isBanned: Boolean(u.isBanned),
     createdAt: u.createdAt,
     lastLoginAt: u.lastLoginAt,
-    membershipTier: u.membershipTier?.name ?? "basic",
+    membershipTier: u.membership?.tier?.type ?? "free",
     ordersCount: u._count?.buyerOrders ?? u._count?.sellerOrders ?? 0,
     productsCount: u._count?.products ?? 0,
   }));
 }
 
 export default function UsersPage() {
+  const router = useRouter();
+  const searchParams = useSearchParams();
+  // Tab URL'den türetilir
+  const tab = searchParams.get("tab") === "ai" ? "ai" : "list";
   const {
     rows: rawRows,
     total,
@@ -60,6 +72,7 @@ export default function UsersPage() {
     setFilter,
     isLoading,
     refetch,
+    setTabUrl,
   } = useAdminResource<any>({
     queryKey: "users",
     fetcher: (params) => {
@@ -77,24 +90,43 @@ export default function UsersPage() {
       });
     },
     limit: 20,
+    syncUrl: true,
     initialFilters: { filter: "all" },
     errorMessage: "Kullanıcılar yüklenemedi",
   });
 
+  const handleTabChange = (key: string) => {
+    setTabUrl(key, { defaultTab: "list" });
+  };
+
   const users: User[] = useMemo(() => mapUsers(rawRows), [rawRows]);
 
+  const prompt = usePrompt();
+
   const handleBanUser = async (userId: string, isBanned: boolean) => {
-    try {
-      if (isBanned) {
+    if (isBanned) {
+      try {
         await adminApi.unbanUser(userId);
         toast.success("Kullanıcı engeli kaldırıldı");
-      } else {
-        const reason =
-          window.prompt("Engelleme sebebi (isteğe bağlı):") ??
-          "Admin tarafından engellendi";
-        await adminApi.banUser(userId, reason);
-        toast.success("Kullanıcı engellendi");
+        refetch();
+      } catch (error: any) {
+        toast.error(error.response?.data?.message ?? "İşlem başarısız");
       }
+      return;
+    }
+
+    const reason = await prompt({
+      title: "Kullanıcıyı Engelle",
+      label: "Engelleme sebebi (isteğe bağlı)",
+      defaultValue: "Admin tarafından engellendi",
+      confirmLabel: "Engelle",
+      destructive: true,
+      required: false,
+    });
+    if (reason === null) return;
+    try {
+      await adminApi.banUser(userId, reason || "Admin tarafından engellendi");
+      toast.success("Kullanıcı engellendi");
       refetch();
     } catch (error: any) {
       toast.error(error.response?.data?.message ?? "İşlem başarısız");
@@ -195,11 +227,6 @@ export default function UsersPage() {
       cell: ({ row }) => (
         <ActionButtons>
           <ActionIconButton
-            icon={EyeIcon}
-            href={`/users/${row.original.id}`}
-            title="Detay"
-          />
-          <ActionIconButton
             icon={row.original.isBanned ? CheckCircleIcon : NoSymbolIcon}
             onClick={() =>
               handleBanUser(row.original.id, row.original.isBanned)
@@ -212,10 +239,26 @@ export default function UsersPage() {
     },
   ];
 
+  // AI Denetim sekmesi → ortak ModerationEventsPanel (kullanıcı olayları: avatar/bio/ad)
+  if (tab === "ai") {
+    return (
+      <ModerationEventsPanel
+        entityType="user"
+        title="Kullanıcılar"
+        tabs={USER_TABS}
+        activeTab={tab}
+        onTabChange={handleTabChange}
+      />
+    );
+  }
+
   return (
     <ResourceListPage<User>
       title="Kullanıcılar"
       description={`Toplam ${total} kullanıcı`}
+      tabs={USER_TABS}
+      activeTab={tab}
+      onTabChange={handleTabChange}
       search={{ placeholder: "E-posta veya isim ara..." }}
       searchValue={search}
       onSearchChange={setSearch}
@@ -237,6 +280,7 @@ export default function UsersPage() {
       loading={isLoading}
       emptyText="Kullanıcı bulunamadı"
       getRowId={(u) => u.id}
+      onRowClick={(u) => router.push(`/users/${u.id}`)}
       page={page}
       totalPages={totalPages}
       onPageChange={setPage}

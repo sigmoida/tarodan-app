@@ -1,6 +1,7 @@
 'use client';
 
 import { useState } from 'react';
+import { useSearchParams } from 'next/navigation';
 import { adminApi } from '@/lib/api';
 import { Button, Select, StatusBadge } from '@tarodan/ui';
 import type { StatusConfig } from '@tarodan/ui';
@@ -11,6 +12,7 @@ import {
     CheckCircleIcon,
     XCircleIcon,
     StarIcon,
+    ArrowUturnLeftIcon,
 } from '@heroicons/react/24/outline';
 import { StarIcon as StarIconSolid } from '@heroicons/react/24/solid';
 import toast from 'react-hot-toast';
@@ -18,12 +20,14 @@ import Image from 'next/image';
 import { format } from 'date-fns';
 import { tr } from 'date-fns/locale';
 
+type ReviewStatus = 'pending' | 'approved' | 'rejected';
+
 interface Review {
     id: string;
     score: number;
     title?: string;
     review?: string;
-    status: 'pending' | 'approved' | 'rejected';
+    status: ReviewStatus;
     adminReply?: string;
     adminReplyAt?: string;
     createdAt: string;
@@ -45,7 +49,7 @@ interface UserRating {
     id: string;
     score: number;
     comment?: string;
-    status?: 'pending' | 'approved' | 'rejected';
+    status?: ReviewStatus;
     createdAt: string;
     orderId?: string;
     tradeId?: string;
@@ -73,8 +77,15 @@ function renderStars(score: number) {
     );
 }
 
+const VALID_REVIEW_TABS = ['product', 'seller'] as const;
+
 export default function ReviewsPage() {
-    const [activeTab, setActiveTab] = useState<'product' | 'seller'>('product');
+    const searchParams = useSearchParams();
+    // URL'den ilk tab değeri; geçersiz değer 'product'e düşer
+    const [activeTab, setActiveTab] = useState<'product' | 'seller'>(() => {
+        const t = searchParams.get('tab');
+        return VALID_REVIEW_TABS.includes(t as any) ? (t as 'product' | 'seller') : 'product';
+    });
 
     // ── Tek useAdminResource çağrısı — queryKey'e activeTab katıyoruz ──────────
     const r = useAdminResource<Review | UserRating>({
@@ -93,21 +104,27 @@ export default function ReviewsPage() {
         debounceMs: 300,
     });
 
-    // Sekme değişince sayfa + filtre sıfırla
+    // Sekme değişince URL + sayfa + filtre sıfırla (tek router.replace çağrısı)
     const handleTabChange = (key: string) => {
         setActiveTab(key as 'product' | 'seller');
-        r.setPage(1);
-        r.setFilter('status', '');
-        if (key === 'product') {
-            r.setSearch('');
-        }
+        r.setTabUrl(key, {
+            defaultTab: 'product',
+            resetFilters: true,
+            resetSearch: key !== 'product',
+        });
+    };
+
+    const statusLabels: Record<ReviewStatus, string> = {
+        approved: 'onaylandı',
+        pending: 'beklemeye alındı',
+        rejected: 'reddedildi',
     };
 
     // ── Ürün yorumu aksiyonları ────────────────────────────────────────────────
-    const handleStatusUpdate = async (id: string, status: string) => {
+    const handleStatusUpdate = async (id: string, status: ReviewStatus) => {
         try {
             await adminApi.updateReviewStatus(id, status);
-            toast.success(`Yorum durumu güncellendi: ${status}`);
+            toast.success(`Yorum ${statusLabels[status]}`);
             r.refetch();
         } catch {
             toast.error('Güncelleme başarısız');
@@ -115,12 +132,10 @@ export default function ReviewsPage() {
     };
 
     // ── Satıcı yorumu aksiyonları ──────────────────────────────────────────────
-    const handleSellerStatusUpdate = async (id: string, status: string) => {
+    const handleSellerStatusUpdate = async (id: string, status: ReviewStatus) => {
         try {
             await adminApi.updateUserRatingStatus(id, status);
-            toast.success(
-                `Satıcı yorumu ${status === 'approved' ? 'onaylandı' : 'reddedildi'}`
-            );
+            toast.success(`Satıcı yorumu ${statusLabels[status]}`);
             r.refetch();
         } catch {
             toast.error('Güncelleme başarısız');
@@ -229,7 +244,16 @@ export default function ReviewsPage() {
                                 <CheckCircleIcon className="w-5 h-5" />
                             </Button>
                         )}
-                        {review.status !== 'rejected' && (
+                        {review.status === 'rejected' ? (
+                            <Button
+                                variant="secondary"
+                                onClick={() => handleStatusUpdate(review.id, 'pending')}
+                                className="p-1.5 text-muted hover:bg-surface-alt rounded-lg"
+                                title="Geri Al (Bekleyene çevir)"
+                            >
+                                <ArrowUturnLeftIcon className="w-5 h-5" />
+                            </Button>
+                        ) : (
                             <Button
                                 variant="secondary"
                                 onClick={() => handleStatusUpdate(review.id, 'rejected')}
@@ -318,7 +342,16 @@ export default function ReviewsPage() {
                                 <CheckCircleIcon className="w-5 h-5" />
                             </Button>
                         )}
-                        {rating.status !== 'rejected' && (
+                        {rating.status === 'rejected' ? (
+                            <Button
+                                variant="secondary"
+                                onClick={() => handleSellerStatusUpdate(rating.id, 'pending')}
+                                className="p-1.5 text-muted hover:bg-surface-alt rounded-lg"
+                                title="Geri Al (Bekleyene çevir)"
+                            >
+                                <ArrowUturnLeftIcon className="w-5 h-5" />
+                            </Button>
+                        ) : (
                             <Button
                                 variant="secondary"
                                 onClick={() => handleSellerStatusUpdate(rating.id, 'rejected')}

@@ -40,8 +40,6 @@ export {
 // Collection Management
 export * from './collection-admin.dto';
 
-// Tag Management
-export * from './tag-admin.dto';
 
 // Attribute Management
 export * from './attribute-admin.dto';// Rating Management
@@ -52,3 +50,6 @@ export * from './warehouse-trade.dto';
 
 // RefundRequest admin actions
 export * from './refund-request.dto';
+
+// Role permissions matrix
+export * from './role-permissions.dto';

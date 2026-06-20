@@ -12,7 +12,7 @@ import toast from 'react-hot-toast';
 import { Button, Input, Select, enumLabel, paymentHoldStatusConfig } from '@tarodan/ui';
 import { useQuery } from '@tanstack/react-query';
 import { type ColumnDef } from '@/components/DataTable';
-import { ActionButtons, PageHeader } from '@/components/admin-list';
+import { ActionButtons, FilterToolbar, PageHeader } from '@/components/admin-list';
 import { AdminTabs } from '@/components/AdminTabs';
 import { DataTable } from '@/components/DataTable';
 import { Pagination } from '@/components/Pagination';
@@ -106,13 +106,14 @@ export default function PayoutsPage() {
   });
 
   // ── useAdminResource — tek çağrı; queryKey + fetcher activeTab'a göre branşlar ──
-  // getPayoutsTransactions: status/tarih destekliyor, search yok.
-  // getPayoutsSchedule: filtre/search yok.
   const {
     rows,
     page,
     setPage,
     totalPages,
+    search,
+    setSearch,
+    onSearchSubmit,
     filters,
     setFilter,
     isLoading,
@@ -122,6 +123,7 @@ export default function PayoutsPage() {
     fetcher: (params) => {
       if (activeTab === 'transactions') {
         return adminApi.getPayoutsTransactions({
+          search: params.search || undefined,
           page: params.page,
           limit: params.limit,
           status: params.status || undefined,
@@ -133,7 +135,6 @@ export default function PayoutsPage() {
       return adminApi.getPayoutsSchedule({ limit: 50 });
     },
     limit: 20,
-    // transactions sekmesinde status/tarih filtreler; schedule'da yok
     initialFilters: activeTab === 'transactions' ? { status: '', dateFrom: '', dateTo: '' } : {},
     errorMessage:
       activeTab === 'transactions'
@@ -382,29 +383,35 @@ export default function PayoutsPage() {
 
       {/* Transactions sekmesinde filtreler */}
       {activeTab === 'transactions' && (
-        <div className="flex flex-wrap gap-3 items-center">
+        <FilterToolbar
+          search={search}
+          onSearchChange={setSearch}
+          onSearchSubmit={onSearchSubmit}
+          searchPlaceholder="Satıcı adı, e-posta veya sipariş no..."
+        >
           <Select
             value={filters.status ?? ''}
             onChange={(e) => setFilter('status', e.target.value)}
-            className="w-auto"
-            selectSize="sm"
+            className="sm:w-44"
           >
             <option value="">Tüm durumlar</option>
-            <option value="held">Beklemede</option>
-            <option value="released">Ödendi</option>
-            <option value="cancelled">İptal</option>
+            <option value="held">Tutuluyor</option>
+            <option value="released">Serbest Bırakıldı</option>
+            <option value="cancelled">İptal Edildi</option>
           </Select>
           <Input
             type="date"
             value={filters.dateFrom ?? ''}
             onChange={(e) => setFilter('dateFrom', e.target.value)}
+            className="sm:w-40"
           />
           <Input
             type="date"
             value={filters.dateTo ?? ''}
             onChange={(e) => setFilter('dateTo', e.target.value)}
+            className="sm:w-40"
           />
-        </div>
+        </FilterToolbar>
       )}
 
       {/* Liste */}

@@ -361,7 +361,14 @@
     "continueShopping": "Continue Shopping",
     "itemsInCart": "items in cart",
     "removeItem": "Remove Item",
-    "updateQuantity": "Update Quantity"
+    "updateQuantity": "Update Quantity",
+    "couponCode": "Coupon Code",
+    "couponPlaceholder": "Enter your coupon code",
+    "applyCoupon": "Apply",
+    "couponApplied": "Coupon Applied",
+    "removeCoupon": "Remove Coupon",
+    "couponApplyError": "Coupon could not be applied",
+    "couponLoginRequired": "Please login to use a coupon"
   },
   "favorites": {
     "myFavorites": "My Favorites",

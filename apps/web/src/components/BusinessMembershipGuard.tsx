@@ -12,17 +12,31 @@ export default function BusinessMembershipGuard({ children }: { children: React.
   useEffect(() => {
     if (!isAuthenticated || !user) return;
 
-    // Check if user is business account without business membership
-    const isBusinessAccount = user.companyName && user.taxId;
+    const isBusinessAccount = !!(user.companyName && user.taxId);
+    if (!isBusinessAccount) return;
+
+    // Pending: sadece /business-pending ve /contact'a izin ver
+    if (user.businessStatus === 'pending') {
+      const allowedPaths = ['/business-pending', '/contact'];
+      if (!allowedPaths.some((p) => pathname.startsWith(p))) {
+        router.replace('/business-pending');
+      }
+      return;
+    }
+
+    // Rejected: sadece /business-rejected ve /contact'a izin ver
+    if (user.businessStatus === 'rejected') {
+      const allowedPaths = ['/business-rejected', '/contact', '/login'];
+      if (!allowedPaths.some((p) => pathname.startsWith(p))) {
+        router.replace('/business-rejected');
+      }
+      return;
+    }
+
+    // Approved ama business üyeliği yoksa üyelik sayfasına yönlendir
     const isBusinessTier = user.membershipTier === 'business';
-
-    // Allow navigation to membership and checkout pages
-    const allowedPaths = ['/profile/membership', '/membership/checkout'];
-    const isAllowedPath = allowedPaths.some(path => pathname.startsWith(path));
-
-    // If business account without business membership, redirect to membership page
-    // (allow checkout so user can complete payment)
-    if (isBusinessAccount && !isBusinessTier && !isAllowedPath) {
+    const allowedPaths = ['/profile/membership', '/membership'];
+    if (!isBusinessTier && !allowedPaths.some((p) => pathname.startsWith(p))) {
       router.push('/profile/membership?required=true');
     }
   }, [isAuthenticated, user, pathname, router]);

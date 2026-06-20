@@ -10,6 +10,7 @@ import { NotificationModule } from '../notification/notification.module';
 import { CacheModule } from '../cache/cache.module';
 import { StorageModule } from '../storage/storage.module';
 import { BannedUserGuard } from './guards/banned-user.guard';
+import { RolesGuard } from './guards/roles.guard';
 
 @Module({
   imports: [
@@ -35,7 +36,8 @@ import { BannedUserGuard } from './guards/banned-user.guard';
     JwtRefreshStrategy,
     AdminJwtStrategy,
     BannedUserGuard,
+    RolesGuard,
   ],
-  exports: [AuthService, JwtModule, BannedUserGuard],
+  exports: [AuthService, JwtModule, BannedUserGuard, RolesGuard],
 })
 export class AuthModule {}

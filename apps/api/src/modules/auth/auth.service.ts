@@ -173,7 +173,6 @@ export class AuthService {
       try {
         await this.notificationService.sendWelcomeEmail(user.id);
       } catch (error) {
-        // Don't fail registration if welcome email fails
         this.logger.error(`Failed to send welcome email to ${user.email}: ${error.message}`);
       }
     }
@@ -321,8 +320,8 @@ export class AuthService {
         displayName: dto.companyName,
         companyName: dto.companyName,
         taxId: dto.taxId,
-        isSeller: true, // Business accounts are always sellers
-        sellerType: SellerType.individual, // Business accounts use individual type (distinguished by companyName/taxId)
+        isSeller: false,
+        businessStatus: 'pending',
         isVerified: false, // Email verification required
         isEmailVerified: false,
         acceptsMarketingEmails: dto.acceptsMarketingEmails ?? false,

@@ -8,6 +8,7 @@ import { Job } from 'bull';
 import { ConfigService } from '@nestjs/config';
 import { PrismaService } from '../prisma';
 import * as nodemailer from 'nodemailer';
+import { renderEmailTemplate, getEmailTemplateSubject } from '../common/helpers/email-template-renderer';
 
 export interface EmailJobData {
   to: string;
@@ -162,17 +163,22 @@ export class EmailWorker {
       throw new Error('Template name is required');
     }
 
+    const frontendUrl = this.configService.get<string>('FRONTEND_URL') ||
+      (this.configService.get('NODE_ENV') === 'production' ? 'https://tarodan.com' : 'http://localhost:3000');
+
     // Check DB for custom template first
     const dbTemplate = await this.prisma.emailTemplate.findUnique({ where: { key: template } });
     let html: string;
     let subject: string;
-    if (dbTemplate?.subject && dbTemplate?.bodyHtml) {
-      subject = this.substituteVariables(dbTemplate.subject, data);
+    if (dbTemplate?.bodyHtml) {
       html = this.substituteVariables(dbTemplate.bodyHtml, data);
+      // Use DB subject if set, otherwise fall back to producer-supplied or default
+      subject = dbTemplate.subject
+        ? this.substituteVariables(dbTemplate.subject, data)
+        : job.data.subject || getEmailTemplateSubject(template, data);
     } else {
-      html = this.renderTemplate(template, data);
-      // Prefer the subject the producer supplied; only fall back to the per-template default.
-      subject = job.data.subject || this.getTemplateSubject(template, data);
+      html = renderEmailTemplate(template, data, frontendUrl);
+      subject = job.data.subject || getEmailTemplateSubject(template, data);
     }
 
     return this.handleSend({

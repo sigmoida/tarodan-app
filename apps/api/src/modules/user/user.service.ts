@@ -5,6 +5,7 @@ import { NotificationService } from '../notification/notification.service';
 import { NotificationType } from '../notification/dto';
 import { StorageService } from '../storage/storage.service';
 import { RatingService } from '../rating/rating.service';
+import { ModerationAiClient } from '../moderation/moderation-ai.client';
 import { computeTrustScore } from './helpers/trust-score';
 
 // In-memory storage for user blocks until schema is updated
@@ -39,6 +40,7 @@ export class UserService {
     @Optional()
     private readonly storageService: StorageService,
     private readonly ratingService: RatingService,
+    private readonly moderationAi: ModerationAiClient,
   ) {}
 
   /**
@@ -240,6 +242,22 @@ export class UserService {
       showTrustScore?: boolean;
     },
   ) {
+    // Profil serbest metinlerini AI moderasyonundan geçir (uygunsuz → engelle)
+    await this.moderationAi.assertTextClean(data.displayName, {
+      entityType: 'user',
+      entityId: userId,
+      userId,
+      field: 'display_name',
+      label: 'görünen ad',
+    });
+    await this.moderationAi.assertTextClean(data.bio, {
+      entityType: 'user',
+      entityId: userId,
+      userId,
+      field: 'bio',
+      label: 'biyografi',
+    });
+
     // Check if user is business tier - only business tier users should have business info
     const user = await this.prisma.user.findUnique({
       where: { id: userId },
@@ -1815,36 +1833,43 @@ export class UserService {
   }
 
   async getFeaturedCollector() {
-    // Get all public collections with items
-    const collections = await this.prisma.collection.findMany({
-      where: {
-        isPublic: true,
-        items: { some: {} }, // Has at least one item
-      },
-      include: {
-        user: {
-          select: {
-            id: true,
-            displayName: true,
-            avatarUrl: true,
-            bio: true,
-            isVerified: true,
-          },
+    const collectionWhere = {
+      isPublic: true,
+      items: { some: {} }, // Has at least one item
+    };
+
+    const includeShape = {
+      user: {
+        select: {
+          id: true,
+          displayName: true,
+          avatarUrl: true,
+          bio: true,
+          isVerified: true,
         },
-        items: {
-          include: {
-            product: {
-              select: {
-                id: true,
-                status: true,
-              },
+      },
+      items: {
+        include: {
+          product: {
+            select: {
+              id: true,
+              status: true,
             },
           },
         },
-        _count: {
-          select: { items: true, likes: true },
-        },
       },
+      _count: {
+        select: { items: true, likes: true },
+      },
+    };
+
+    // Prefer admin-featured collections first; fall back to score-based selection
+    const collections = await this.prisma.collection.findMany({
+      where: { ...collectionWhere, isFeatured: true },
+      include: includeShape,
+    }).then(async (featured) => {
+      if (featured.length > 0) return featured;
+      return this.prisma.collection.findMany({ where: collectionWhere, include: includeShape });
     });
 
     if (collections.length === 0) {

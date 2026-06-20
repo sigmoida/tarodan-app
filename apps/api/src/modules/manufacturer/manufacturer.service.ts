@@ -42,7 +42,9 @@ export class ManufacturerService {
         name: true,
         slug: true,
         logo: true,
+        description: true,
         country: true,
+        foundedYear: true,
         _count: { select: { products: { where: { status: 'active' } } } },
       },
     });
@@ -63,6 +65,7 @@ export class ManufacturerService {
         description: true,
         website: true,
         country: true,
+        foundedYear: true,
         _count: { select: { products: { where: { status: 'active' } } } },
       },
     });
@@ -87,6 +90,7 @@ export class ManufacturerService {
         description: true,
         website: true,
         country: true,
+        foundedYear: true,
         _count: { select: { products: { where: { status: 'active' } } } },
       },
     });

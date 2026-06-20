@@ -1,7 +1,7 @@
 "use client";
 
 import { ButtonLink } from "@/components/ui/ButtonLink";
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import { motion } from "framer-motion";
 import Image from "next/image";
 import Link from "next/link";
@@ -9,6 +9,8 @@ import {
   TrashIcon,
   ShoppingCartIcon,
   LockClosedIcon,
+  TagIcon,
+  XMarkIcon,
 } from "@heroicons/react/24/outline";
 import toast from "react-hot-toast";
 import { useCartStore } from "@/stores/cartStore";
@@ -26,9 +28,15 @@ export default function CartPage() {
     removeFromCart,
     totalDiscount,
     appliedDiscounts,
+    appliedCouponCode,
+    applyCoupon,
+    removeCoupon,
   } = useCartStore();
   const { isAuthenticated } = useAuthStore();
   const { t, locale } = useTranslation();
+
+  const [couponInput, setCouponInput] = useState("");
+  const [couponLoading, setCouponLoading] = useState(false);
 
   useEffect(() => {
     fetchCart();
@@ -48,6 +56,26 @@ export default function CartPage() {
     useCartStore.setState({ offlineItems: filtered });
     fetchCart();
     toast.success(t("product.removedFromCart"));
+  };
+
+  const handleApplyCoupon = async () => {
+    const code = couponInput.trim().toUpperCase();
+    if (!code) return;
+    setCouponLoading(true);
+    const result = await applyCoupon(code);
+    setCouponLoading(false);
+    if (result.success) {
+      setCouponInput("");
+      toast.success(t("cart.couponApplied"));
+    } else {
+      toast.error(result.error || t("cart.couponApplyError"));
+    }
+  };
+
+  const handleRemoveCoupon = async () => {
+    setCouponLoading(true);
+    await removeCoupon();
+    setCouponLoading(false);
   };
 
   if (isLoading && items.length === 0) {
@@ -222,11 +250,58 @@ export default function CartPage() {
                 {t("checkout.orderSummary")}
               </h2>
 
+              {/* Kupon Kodu girişi veya aktif kupon badge'i */}
+              {isAuthenticated && (
+                <div className="mb-4">
+                  {appliedCouponCode ? (
+                    <div className="flex items-center justify-between rounded-lg bg-success-50 border border-success-200 px-3 py-2">
+                      <div className="flex items-center gap-2 text-sm text-success-700 min-w-0">
+                        <TagIcon className="w-4 h-4 shrink-0" />
+                        <span className="font-mono font-semibold truncate">{appliedCouponCode}</span>
+                        {totalDiscount > 0 && (
+                          <span className="shrink-0 font-medium">
+                            -{totalDiscount.toLocaleString("tr-TR", { minimumFractionDigits: 2, maximumFractionDigits: 2 })} TL
+                          </span>
+                        )}
+                      </div>
+                      <button
+                        type="button"
+                        onClick={handleRemoveCoupon}
+                        disabled={couponLoading}
+                        aria-label={t("cart.removeCoupon")}
+                        className="text-success-600 hover:text-danger-600 transition-colors disabled:opacity-50"
+                      >
+                        <XMarkIcon className="w-4 h-4" />
+                      </button>
+                    </div>
+                  ) : (
+                    <div className="flex gap-2">
+                      <input
+                        type="text"
+                        value={couponInput}
+                        onChange={(e) => setCouponInput(e.target.value.toUpperCase())}
+                        onKeyDown={(e) => { if (e.key === "Enter") handleApplyCoupon(); }}
+                        placeholder={t("cart.couponPlaceholder")}
+                        disabled={couponLoading}
+                        className="flex-1 min-w-0 px-3 py-2 text-sm border border-border rounded-lg bg-surface text-heading placeholder:text-muted focus:outline-none focus:ring-2 focus:ring-primary-500 font-mono uppercase disabled:opacity-50"
+                      />
+                      <button
+                        type="button"
+                        onClick={handleApplyCoupon}
+                        disabled={couponLoading || !couponInput.trim()}
+                        className="px-3 py-2 text-sm font-medium bg-primary-600 text-white rounded-lg hover:bg-primary-700 disabled:opacity-50 transition-colors whitespace-nowrap"
+                      >
+                        {couponLoading ? "..." : t("cart.applyCoupon")}
+                      </button>
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {/* Fiyat özeti */}
               <div className="space-y-3 text-sm">
                 <div className="flex justify-between">
-                  <span className="text-muted">
-                    {t("checkout.subtotal")}
-                  </span>
+                  <span className="text-muted">{t("checkout.subtotal")}</span>
                   <span className="font-medium">
                     {(subtotal ?? 0).toLocaleString("tr-TR", {
                       minimumFractionDigits: 2,
@@ -235,17 +310,18 @@ export default function CartPage() {
                     TL
                   </span>
                 </div>
-                {appliedDiscounts && appliedDiscounts.length > 0 && (
-                  <>
-                    {appliedDiscounts.map((d) => (
+                {/* Otomatik kampanya indirimleri (kodu olmayanlar) */}
+                {appliedDiscounts &&
+                  appliedDiscounts
+                    .filter((d) => !d.discountCode)
+                    .map((d) => (
                       <div
                         key={d.discountId}
                         className="flex justify-between text-success-600"
                       >
                         <span>{d.discountName}</span>
                         <span className="font-medium">
-                          -
-                          {Number(d.appliedAmount).toLocaleString("tr-TR", {
+                          -{Number(d.appliedAmount).toLocaleString("tr-TR", {
                             minimumFractionDigits: 2,
                             maximumFractionDigits: 2,
                           })}{" "}
@@ -253,30 +329,15 @@ export default function CartPage() {
                         </span>
                       </div>
                     ))}
-                    <div className="flex justify-between text-muted">
-                      <span>Toplam indirim</span>
-                      <span className="font-medium">
-                        -
-                        {(Number(totalDiscount) || 0).toLocaleString("tr-TR", {
-                          minimumFractionDigits: 2,
-                          maximumFractionDigits: 2,
-                        })}{" "}
-                        TL
-                      </span>
-                    </div>
-                  </>
-                )}
                 <div className="flex justify-between">
-                  <span className="text-muted">
-                    {t("checkout.shipping")}
-                  </span>
+                  <span className="text-muted">{t("checkout.shipping")}</span>
                   <span className="text-subtle">
                     {locale === "en"
                       ? "Calculated at checkout"
                       : "Ödeme adımında hesaplanır"}
                   </span>
                 </div>
-                <hr className="my-4" />
+                <hr className="my-1" />
                 <div className="flex justify-between text-lg">
                   <span className="font-semibold">{t("checkout.total")}</span>
                   <span className="font-bold text-primary-500">

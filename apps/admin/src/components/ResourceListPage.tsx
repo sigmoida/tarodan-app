@@ -68,6 +68,15 @@ export interface ResourceListPageProps<T> {
   emptyText?: string;
   getRowId: (row: T) => string;
   rowClassName?: (row: T) => string | undefined;
+  /**
+   * Satıra tıklanınca çağrılır (örn. detaya git). Verilirse satırlar tıklanabilir
+   * görünür; satır içindeki link/buton/input'lara tıklama bunu tetiklemez.
+   */
+  onRowClick?: (row: T) => void;
+  /** Açık satırın altına tam genişlikte render edilecek detay paneli */
+  renderExpanded?: (row: T) => ReactNode;
+  /** Şu an açık olan satırın id'si (getRowId ile eşleşir) */
+  expandedId?: string | null;
 
   // ── Toplu seçim (opsiyonel) ───────────────────────────────────────────────
   /** true ise DataTable'da satır başı checkbox gösterilir */
@@ -157,6 +166,9 @@ export function ResourceListPage<T>({
   emptyText = "Kayıt bulunamadı",
   getRowId,
   rowClassName,
+  onRowClick,
+  renderExpanded,
+  expandedId,
   // Toplu seçim
   selectable,
   selectedIds = [],
@@ -223,6 +235,9 @@ export function ResourceListPage<T>({
         emptyText={emptyText}
         getRowId={getRowId}
         rowClassName={rowClassName}
+        onRowClick={onRowClick}
+        renderExpanded={renderExpanded}
+        expandedId={expandedId}
         selectable={selectable}
         selectedIds={selectedIds}
         onToggleRow={onToggleRow}

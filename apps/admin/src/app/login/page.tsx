@@ -25,9 +25,7 @@ export default function LoginPage() {
     isLoading: isAuthLoading,
   } = useAuthStore();
 
-  // Rol bazlı açılış sayfası: moderatör dashboard/finans göremez → ürünlere düş.
-  const landingFor = (role?: string) =>
-    role === "moderator" ? "/products" : "/dashboard";
+  const landingFor = (_role?: string) => "/dashboard";
   const [isLoading, setIsLoading] = useState(false);
   const [requires2FA, setRequires2FA] = useState(false);
   const [loginError, setLoginError] = useState<string | null>(null);

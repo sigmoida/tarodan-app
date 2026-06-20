@@ -1,5 +1,21 @@
-import { Injectable, Logger } from '@nestjs/common';
+import { BadRequestException, Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
+import { PrismaService } from '../../prisma';
+
+/**
+ * Bir AI denetiminin hangi varlığa ait olduğunu tarif eden bağlam.
+ * `assertImageClean`/`assertTextClean` çağrılırken verilirse, engellenen
+ * içerik birleşik `moderation_events` günlüğüne yazılır (admin "AI Denetim").
+ */
+export interface ModerationContext {
+  /** Hedef varlık türü: product | user | collection | upload | message */
+  entityType: string;
+  entityId?: string | null;
+  /** İçeriği üreten/yükleyen kullanıcı id'si */
+  userId?: string | null;
+  /** Alan anahtarı: avatar | bio | display_name | cover | item | upload ... */
+  field?: string;
+}
 
 export interface ImageModerationResult {
   relevanceScore: number;
@@ -30,7 +46,10 @@ export class ModerationAiClient {
   private readonly enabled: boolean;
   private readonly timeoutMs: number;
 
-  constructor(private readonly config: ConfigService) {
+  constructor(
+    private readonly config: ConfigService,
+    private readonly prisma: PrismaService,
+  ) {
     this.baseUrl = this.config
       .get<string>('AI_MODERATION_URL', 'http://localhost:8000')
       .replace(/\/$/, '');
@@ -69,6 +88,107 @@ export class ModerationAiClient {
     const ai = await this.moderateText(text);
     if (ai?.toxic) return { clean: false, reason: 'uygunsuz içerik' };
     return { clean: true, reason: null };
+  }
+
+  /**
+   * Yüklenen görsel dosyasını NSFW için denetle; uygunsuzsa isteği engelle.
+   * Servis kapalıysa veya dosya görsel değilse no-op (fail-open) — sistem
+   * bu yüzden asla bloklanmaz. Tüm görsel yükleme uçları bu tek noktayı çağırır.
+   */
+  async assertImageClean(
+    file?: {
+      buffer?: Buffer;
+      mimetype?: string;
+    },
+    ctx?: ModerationContext,
+  ): Promise<void> {
+    if (!this.enabled || !file?.buffer || !file.mimetype?.startsWith('image/')) {
+      return;
+    }
+    const dataUri = `data:${file.mimetype};base64,${file.buffer.toString('base64')}`;
+    const verdict = await this.moderateImage(dataUri);
+    if (verdict?.decision === 'flag') {
+      if (ctx) {
+        await this.recordEvent({
+          ...ctx,
+          kind: 'image',
+          decision: 'blocked',
+          relevanceScore: verdict.relevanceScore,
+          nsfwScore: verdict.nsfwScore,
+          labels: verdict.topLabels,
+          reason: verdict.reason || 'nsfw',
+        });
+      }
+      throw new BadRequestException(
+        'Yüklediğiniz resim uygun değildir. Lütfen uygun bir görsel seçin.',
+      );
+    }
+  }
+
+  /**
+   * Serbest metni (profil adı, biyografi, yorum vb.) küfür/toksisite için
+   * denetle; uygunsuzsa isteği engelle. Boş metin veya servis kapalıysa no-op.
+   */
+  async assertTextClean(
+    text: string | null | undefined,
+    ctx?: ModerationContext & { label?: string },
+  ): Promise<void> {
+    if (!text?.trim() || !this.enabled) return;
+    const check = await this.checkText(text);
+    if (!check.clean) {
+      if (ctx) {
+        await this.recordEvent({
+          entityType: ctx.entityType,
+          entityId: ctx.entityId,
+          userId: ctx.userId,
+          field: ctx.field,
+          kind: 'text',
+          decision: 'blocked',
+          reason: check.reason,
+        });
+      }
+      throw new BadRequestException(
+        `Girdiğiniz ${ctx?.label ?? 'içerik'} uygun değildir (${check.reason}). Lütfen düzenleyin.`,
+      );
+    }
+  }
+
+  /**
+   * Birleşik AI moderasyon günlüğüne bir olay yaz (admin "AI Denetim").
+   * Asla isteği bozmaz: yazma hatası yutulur ve sadece loglanır.
+   */
+  async recordEvent(input: {
+    entityType: string;
+    entityId?: string | null;
+    userId?: string | null;
+    kind: 'image' | 'text';
+    field?: string | null;
+    decision: 'pass' | 'review' | 'flag' | 'blocked';
+    relevanceScore?: number | null;
+    nsfwScore?: number | null;
+    labels?: unknown;
+    reason?: string | null;
+  }): Promise<void> {
+    try {
+      await this.prisma.moderationEvent.create({
+        data: {
+          entityType: input.entityType,
+          entityId: input.entityId ?? null,
+          userId: input.userId ?? null,
+          kind: input.kind,
+          field: input.field ?? null,
+          decision: input.decision,
+          relevanceScore: input.relevanceScore ?? null,
+          nsfwScore: input.nsfwScore ?? null,
+          labels: (input.labels ?? undefined) as object | undefined,
+          reason: input.reason ?? null,
+        },
+      });
+    } catch (err) {
+      this.logger.warn(
+        `ModerationEvent kaydedilemedi: ${(err as Error).message}`,
+      );
+    }
   }
 
   private async post<T>(path: string, body: unknown): Promise<T | null> {

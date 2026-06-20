@@ -3,6 +3,7 @@ import {
   NotFoundException,
   BadRequestException,
   ForbiddenException,
+  ConflictException,
   Optional,
   Logger,
 } from '@nestjs/common';
@@ -15,7 +16,6 @@ import {
   fulltextProductRatingSearch,
   fulltextUserDisplayNameSearch,
   fulltextCollectionSearch,
-  fulltextTagSearch,
   fulltextAttributeGroupSearch,
   fulltextAttributeSearch,
   fulltextPaymentSearch,
@@ -26,6 +26,7 @@ import {
   fulltextEmailLogSearch,
 } from '../../common/helpers/fulltext-search';
 import { fulltextProductSearch } from '../product/helpers/fulltext-search';
+import { renderEmailTemplate, getEmailTemplateSubject } from '../../common/helpers/email-template-renderer';
 import {
   CreateCommissionRuleDto,
   UpdateCommissionRuleDto,
@@ -40,6 +41,10 @@ import {
   AssignAdminStaffDto,
   UpdateAdminStaffDto,
   UpdateStaffSettingsDto,
+  SetRolePermissionsDto,
+  DEFAULT_ROLE_PERMISSIONS,
+  ADMIN_PERMISSION_KEYS,
+  migrateLegacyPermissions,
   ResolveDisputeDto,
   AnalyticsQueryDto,
   AnalyticsGroupBy,
@@ -59,7 +64,7 @@ import {
   ApproveWarehouseTradeDto,
   RejectWarehouseTradeDto,
 } from './dto';
-import { ProductStatus, OrderStatus, Prisma, PaymentStatus, PaymentHoldStatus, OfferStatus, TradeStatus, ShipmentStatus, MessageStatus, TicketStatus, TicketPriority, TicketCategory, Brand, AdminRole } from '@prisma/client';
+import { ProductStatus, OrderStatus, Prisma, PaymentStatus, PaymentHoldStatus, OfferStatus, TradeStatus, ShipmentStatus, MessageStatus, TicketStatus, TicketPriority, TicketCategory, Brand, AdminRole, BusinessStatus } from '@prisma/client';
 import { safeDecrementReserved } from '../product/helpers/product-availability.helper';
 import { getProductStatusFromQuantity } from '../product/helpers/product-status.helper';
 import { PaymentService } from '../payment/payment.service';
@@ -72,7 +77,7 @@ import { EventService } from '../events/event.service';
 import { RatingService } from '../rating/rating.service';
 import { RefundService } from '../refund/refund.service';
 import { NotificationService } from '../notification/notification.service';
-import { NotificationType } from '../notification/dto/notification.dto';
+import { NotificationType, NotificationChannel } from '../notification/dto/notification.dto';
 import { SuratCargoService } from '../surat-cargo/surat-cargo.service';
 import { normalizeSuratPhone, normalizeSuratLocation } from '../surat-cargo/surat-address.util';
 import { OrderService } from '../order/order.service';
@@ -159,6 +164,16 @@ export class AdminService {
 
   private resolveProductImageUrl(imageKeyOrUrl: string | null | undefined): string | null {
     if (!imageKeyOrUrl) return null;
+    // Strip expired presigned S3 query params to get the clean public URL
+    if ((imageKeyOrUrl.startsWith('http://') || imageKeyOrUrl.startsWith('https://')) && imageKeyOrUrl.includes('X-Amz-Signature')) {
+      try {
+        const parsed = new URL(imageKeyOrUrl);
+        parsed.search = '';
+        return parsed.toString();
+      } catch {
+        // fall through
+      }
+    }
     if (imageKeyOrUrl.startsWith('http://') || imageKeyOrUrl.startsWith('https://') || imageKeyOrUrl.startsWith('/')) return imageKeyOrUrl;
     // Try to resolve any non-URL string as an S3 key (covers dev/, prod/, and other prefixes)
     if (this.storageService) {
@@ -683,6 +698,18 @@ export class AdminService {
           createdAt: true,
           lastLoginAt: true,
           lastActivityAt: true,
+          membership: {
+            select: {
+              status: true,
+              currentPeriodEnd: true,
+              tier: {
+                select: {
+                  type: true,
+                  name: true,
+                },
+              },
+            },
+          },
           _count: {
             select: {
               products: true,
@@ -947,6 +974,44 @@ export class AdminService {
     return { allowAdminAssign: dto.allowAdminAssign };
   }
 
+  private readonly ROLE_PERMISSIONS_SETTING_KEY = 'admin_role_permissions';
+
+  /** Rol → izin eşleşmesini döner (platform_settings'ten; yoksa varsayılanı kullan). */
+  async getRolePermissions(): Promise<Record<string, string[]>> {
+    const s = await this.prisma.platformSetting.findUnique({
+      where: { settingKey: this.ROLE_PERMISSIONS_SETTING_KEY },
+    });
+    if (!s) return DEFAULT_ROLE_PERMISSIONS;
+    try {
+      const raw = JSON.parse(s.settingValue) as Record<string, string[]>;
+      return migrateLegacyPermissions(raw);
+    } catch {
+      return DEFAULT_ROLE_PERMISSIONS;
+    }
+  }
+
+  /** Rol → izin eşleşmesini güncelle (yalnız super_admin). */
+  async setRolePermissions(
+    actingUserId: string,
+    dto: SetRolePermissionsDto,
+  ): Promise<Record<string, string[]>> {
+    const updatedBy = await this.resolveAdminUserId(actingUserId);
+    const merged = { ...dto.permissions, super_admin: [...ADMIN_PERMISSION_KEYS] };
+    const value = JSON.stringify(merged);
+    await this.prisma.platformSetting.upsert({
+      where: { settingKey: this.ROLE_PERMISSIONS_SETTING_KEY },
+      create: {
+        settingKey: this.ROLE_PERMISSIONS_SETTING_KEY,
+        settingValue: value,
+        settingType: 'json',
+        description: 'Admin rolleri için izin matrisi (super_admin her zaman tam yetkili)',
+        updatedBy,
+      },
+      update: { settingValue: value, updatedBy },
+    });
+    return merged;
+  }
+
   /** İşlemi yapan kişi, ilgili rol(ler) üzerinde işlem yapabilir mi? */
   private async assertCanManage(
     actingUserId: string,
@@ -1191,7 +1256,7 @@ export class AdminService {
    * Get products with filters
    */
   async getProducts(query: AdminProductQueryDto) {
-    const { search, status, categoryId, sellerId, page = 1, limit = 20 } = query;
+    const { search, status, categoryId, sellerId, brandId, carModelId, page = 1, limit = 20 } = query;
 
     const where: Prisma.ProductWhereInput = {};
 
@@ -1208,6 +1273,14 @@ export class AdminService {
 
     if (status) {
       where.status = status;
+    }
+
+    if (brandId) {
+      where.brandId = brandId;
+    }
+
+    if (carModelId) {
+      where.carModelId = carModelId;
     }
 
     if (categoryId) {
@@ -2521,9 +2594,11 @@ export class AdminService {
         title: order.product.title,
         quantity: 1,
         unitPrice: Number(order.product.price),
-        total: Number(order.totalAmount) - Number(order.shippingCost || 0),
+        total: Number(order.product.price),
       }],
-      subtotal: Number(order.totalAmount) - Number(order.shippingCost || 0),
+      subtotal: Number(order.product.price),
+      discountAmount: Number(order.discountAmount ?? 0),
+      discountCode: order.discountCode ?? null,
       shippingCost: Number(order.shippingCost || 0),
       total: Number(order.totalAmount),
       payment: order.payment ? {
@@ -3082,10 +3157,18 @@ export class AdminService {
       ? new Date(query.startDate)
       : new Date(endDate.getTime() - 30 * 24 * 60 * 60 * 1000);
 
-    const [totalCommission, commissionByMonth, commissionByCategory] = await Promise.all([
+    const [totalCommission, totalFees, commissionByMonth, commissionByCategory] = await Promise.all([
       // Total commission in period
       this.prisma.order.aggregate({
         _sum: { commissionAmount: true },
+        where: {
+          createdAt: { gte: startDate, lte: endDate },
+          status: { in: [OrderStatus.completed, OrderStatus.delivered] },
+        },
+      }),
+      // Buyer/seller fee breakdown
+      this.prisma.order.aggregate({
+        _sum: { buyerFeeAmount: true, sellerFeeAmount: true },
         where: {
           createdAt: { gte: startDate, lte: endDate },
           status: { in: [OrderStatus.completed, OrderStatus.delivered] },
@@ -3134,6 +3217,8 @@ export class AdminService {
 
     return {
       totalCommission: Number(totalCommission._sum.commissionAmount || 0),
+      totalBuyerFee: Number(totalFees._sum.buyerFeeAmount || 0),
+      totalSellerFee: Number(totalFees._sum.sellerFeeAmount || 0),
       byMonth: commissionByMonth.map((m) => ({
         month: m.month,
         total: Number(m.total || 0),
@@ -3341,6 +3426,25 @@ export class AdminService {
       }
       const resolvedAdminUserId = adminUser.id;
 
+      // Fields that must never appear in audit logs
+      const SENSITIVE_KEYS = new Set([
+        'password', 'passwordHash', 'passwordConfirm', 'newPassword', 'oldPassword', 'currentPassword',
+        'token', 'accessToken', 'refreshToken', 'resetToken', 'verifyToken', 'confirmToken', 'idToken',
+        'secret', 'apiKey', 'apiSecret', 'clientSecret', 'signingKey',
+        'creditCard', 'cardNumber', 'cvv', 'cvc', 'pin', 'otp',
+      ]);
+
+      const redactSensitive = (obj: any): any => {
+        if (obj === null || obj === undefined || typeof obj !== 'object') return obj;
+        if (Array.isArray(obj)) return obj.map(redactSensitive);
+        return Object.fromEntries(
+          Object.entries(obj).map(([k, v]) => [
+            k,
+            SENSITIVE_KEYS.has(k) ? '[GİZLİ]' : redactSensitive(v),
+          ]),
+        );
+      };
+
       // Serialize values to ensure they can be stored as JSON
       const serializeValue = (value: any) => {
         if (value === null || value === undefined) {
@@ -3348,7 +3452,7 @@ export class AdminService {
         }
         try {
           // Use JSON.parse/stringify to handle Date, Decimal, etc.
-          return JSON.parse(JSON.stringify(value, (key, val) => {
+          const serialized = JSON.parse(JSON.stringify(value, (key, val) => {
             // Convert Date to ISO string
             if (val instanceof Date) {
               return val.toISOString();
@@ -3359,6 +3463,7 @@ export class AdminService {
             }
             return val;
           }));
+          return redactSensitive(serialized);
         } catch (e) {
           // Fallback: convert to string if serialization fails
           this.logger.warn(`Failed to serialize audit log value for ${entityType}:${entityId}`, e);
@@ -3595,6 +3700,78 @@ export class AdminService {
         aiNsfwScore: p.aiNsfwScore,
         aiCheckReason: p.aiCheckReason,
         aiCheckedAt: p.aiCheckedAt,
+      })),
+      meta: { total, page, pageSize, totalPages: Math.ceil(total / pageSize) },
+    };
+  }
+
+  /**
+   * Birleşik AI moderasyon günlüğü (admin "AI Denetim" tab'ı + Sistem sayfası).
+   * Tüm varlıklar ortak `moderation_events` tablosundan; entityType/entityId ile
+   * sayfa-bazlı (ör. tek ürün/kullanıcı/koleksiyon) süzülebilir.
+   */
+  async getModerationEvents(options: {
+    entityType?: string;
+    entityId?: string;
+    userId?: string;
+    decision?: string;
+    kind?: string;
+    page?: number;
+    pageSize?: number;
+  }) {
+    const {
+      entityType,
+      entityId,
+      userId,
+      decision,
+      kind,
+      page = 1,
+      pageSize = 20,
+    } = options;
+    const where: Prisma.ModerationEventWhereInput = {
+      ...(entityType ? { entityType } : {}),
+      ...(entityId ? { entityId } : {}),
+      ...(userId ? { userId } : {}),
+      ...(decision ? { decision } : {}),
+      ...(kind ? { kind } : {}),
+    };
+    const [rows, total] = await Promise.all([
+      this.prisma.moderationEvent.findMany({
+        where,
+        orderBy: { createdAt: 'desc' },
+        skip: (page - 1) * pageSize,
+        take: pageSize,
+      }),
+      this.prisma.moderationEvent.count({ where }),
+    ]);
+
+    // Aktör (içeriği üreten) kullanıcı bilgisini tek sorguda zenginleştir
+    const userIds = [
+      ...new Set(rows.map((r) => r.userId).filter((x): x is string => !!x)),
+    ];
+    const users = userIds.length
+      ? await this.prisma.user.findMany({
+          where: { id: { in: userIds } },
+          select: { id: true, displayName: true, email: true },
+        })
+      : [];
+    const userMap = new Map(users.map((u) => [u.id, u]));
+
+    return {
+      data: rows.map((r) => ({
+        id: r.id,
+        entityType: r.entityType,
+        entityId: r.entityId,
+        userId: r.userId,
+        user: r.userId ? (userMap.get(r.userId) ?? null) : null,
+        kind: r.kind,
+        field: r.field,
+        decision: r.decision,
+        relevanceScore: r.relevanceScore,
+        nsfwScore: r.nsfwScore,
+        reason: r.reason,
+        labels: r.labels,
+        createdAt: r.createdAt,
       })),
       meta: { total, page, pageSize, totalPages: Math.ceil(total / pageSize) },
     };
@@ -4355,7 +4532,7 @@ export class AdminService {
    * Payout transaction history (payment holds with order/seller info)
    */
   async getPayoutsTransactions(query: PayoutTransactionsQueryDto) {
-    const { sellerId, status, dateFrom, dateTo, page = 1, limit = 20 } = query;
+    const { search, sellerId, status, dateFrom, dateTo, page = 1, limit = 20 } = query;
     const where: Prisma.PaymentHoldWhereInput = {};
     if (sellerId) where.sellerId = sellerId;
     if (status) where.status = status as PaymentHoldStatus;
@@ -4363,6 +4540,26 @@ export class AdminService {
       where.createdAt = {};
       if (dateFrom) where.createdAt.gte = new Date(dateFrom);
       if (dateTo) where.createdAt.lte = new Date(dateTo);
+    }
+    if (search) {
+      const searchOr: Prisma.PaymentHoldWhereInput[] = [
+        {
+          seller: {
+            OR: [
+              { displayName: { contains: search, mode: 'insensitive' } },
+              { email: { contains: search, mode: 'insensitive' } },
+            ],
+          },
+        },
+      ];
+      const matchingOrders = await this.prisma.order.findMany({
+        where: { orderNumber: { contains: search, mode: 'insensitive' } },
+        select: { id: true },
+      });
+      if (matchingOrders.length > 0) {
+        searchOr.push({ orderId: { in: matchingOrders.map((o) => o.id) } });
+      }
+      where.OR = searchOr;
     }
 
     const [total, holds] = await Promise.all([
@@ -6792,22 +6989,17 @@ export class AdminService {
       throw new NotFoundException('Mesaj bulunamadı');
     }
 
-    // Use MessagingService to approve
-    const result = await this.messagingService.moderateMessage(messageId, adminId, 'approve');
-
-    // Create audit log
-    await this.createAuditLog(adminId, 'message_approve', 'Message', messageId, message, {
-      ...result,
-      notes,
+    await this.prisma.message.update({
+      where: { id: messageId },
+      data: { status: MessageStatus.approved, reviewedById: adminId, reviewedAt: new Date() },
     });
+
+    await this.createAuditLog(adminId, 'message_approve', 'Message', messageId, message, { notes });
 
     return { success: true, messageId, status: 'approved' };
   }
 
-  /**
-   * Reject message
-   */
-  async rejectMessage(adminId: string, messageId: string, reason: string) {
+  async rejectMessage(adminId: string, messageId: string, reason?: string) {
     const message = await this.prisma.message.findUnique({
       where: { id: messageId },
     });
@@ -6816,15 +7008,33 @@ export class AdminService {
       throw new NotFoundException('Mesaj bulunamadı');
     }
 
-    // Use MessagingService to reject
-    await this.messagingService.moderateMessage(messageId, adminId, 'reject');
-
-    // Create audit log
-    await this.createAuditLog(adminId, 'message_reject', 'Message', messageId, message, {
-      reason,
+    await this.prisma.message.update({
+      where: { id: messageId },
+      data: { status: MessageStatus.rejected, reviewedById: adminId, reviewedAt: new Date() },
     });
 
+    await this.createAuditLog(adminId, 'message_reject', 'Message', messageId, message, { reason });
+
     return { success: true, messageId, status: 'rejected', reason };
+  }
+
+  async revertMessage(adminId: string, messageId: string) {
+    const message = await this.prisma.message.findUnique({
+      where: { id: messageId },
+    });
+
+    if (!message) {
+      throw new NotFoundException('Mesaj bulunamadı');
+    }
+
+    await this.prisma.message.update({
+      where: { id: messageId },
+      data: { status: MessageStatus.pending_approval, reviewedById: null, reviewedAt: null },
+    });
+
+    await this.createAuditLog(adminId, 'message_revert', 'Message', messageId, message, {});
+
+    return { success: true, messageId, status: 'pending_approval' };
   }
 
   // ==================== SUPPORT TICKET MANAGEMENT ====================
@@ -7278,19 +7488,52 @@ export class AdminService {
 
   // ==================== EMAIL TEMPLATES ====================
 
-  private readonly EMAIL_TEMPLATE_KEYS: Array<{ key: string; name: string }> = [
-    { key: 'welcome', name: 'Hoş geldin' },
-    { key: 'order-confirmation', name: 'Sipariş onayı' },
-    { key: 'order-paid', name: 'Ödeme alındı (alıcı)' },
-    { key: 'order-paid-seller', name: 'Yeni sipariş (satıcı)' },
-    { key: 'order-shipped', name: 'Kargoya verildi' },
-    { key: 'order-delivered', name: 'Teslim edildi' },
-    { key: 'password-reset', name: 'Şifre sıfırlama' },
-    { key: 'offer-received', name: 'Yeni teklif' },
-    { key: 'offer-accepted', name: 'Teklif kabul edildi' },
-    { key: 'wishlist-price-change', name: 'Fiyat değişimi (istek listesi)' },
-    { key: 'marketing-newsletter', name: 'Haftalık bülten' },
-    { key: 'marketing-monthly', name: 'Aylık fırsatlar' },
+  private readonly EMAIL_TEMPLATE_KEYS: Array<{ key: string; name: string; group: string }> = [
+    // Hesap
+    { key: 'welcome',                    name: 'Hoş geldin',                          group: 'Hesap' },
+    { key: 'email-verification',         name: 'E-posta doğrulama',                   group: 'Hesap' },
+    { key: 'password-reset',             name: 'Şifre sıfırlama',                     group: 'Hesap' },
+    // Sipariş
+    { key: 'order-confirmation',         name: 'Sipariş onayı (alıcı)',               group: 'Sipariş' },
+    { key: 'order-created-buyer',        name: 'Sipariş oluşturuldu (alıcı)',         group: 'Sipariş' },
+    { key: 'order-created-seller',       name: 'Yeni sipariş (satıcı)',               group: 'Sipariş' },
+    { key: 'order-paid',                 name: 'Ödeme alındı (alıcı)',                group: 'Sipariş' },
+    { key: 'order-paid-seller',          name: 'Ödeme alındı (satıcı)',               group: 'Sipariş' },
+    { key: 'order-shipped',              name: 'Kargoya verildi',                     group: 'Sipariş' },
+    { key: 'order-delivered',            name: 'Teslim edildi',                       group: 'Sipariş' },
+    // Ödeme
+    { key: 'payment-received',           name: 'Ödeme alındı',                        group: 'Ödeme' },
+    { key: 'payment-failed',             name: 'Ödeme başarısız',                     group: 'Ödeme' },
+    { key: 'payment-refunded',           name: 'İade tamamlandı (alıcı)',             group: 'Ödeme' },
+    { key: 'payment-refunded-seller',    name: 'İade bildirimi (satıcı)',             group: 'Ödeme' },
+    // Teklif
+    { key: 'offer-received',             name: 'Yeni teklif (satıcı)',                group: 'Teklif' },
+    { key: 'offer-accepted',             name: 'Teklif kabul edildi (alıcı)',         group: 'Teklif' },
+    // Ürün
+    { key: 'product-approved',           name: 'Ürün onaylandı',                      group: 'Ürün' },
+    { key: 'wishlist-price-change',      name: 'Fiyat değişimi (istek listesi)',      group: 'Ürün' },
+    // Üyelik
+    { key: 'premium-offer',              name: 'Premium üyelik teklifi',              group: 'Üyelik' },
+    { key: 'membership-expiring',        name: 'Üyelik bitiyor (7 gün)',              group: 'Üyelik' },
+    { key: 'membership-expiring-urgent', name: 'Üyelik bitiyor (yarın)',              group: 'Üyelik' },
+    // Pazarlama
+    { key: 'marketing-newsletter',       name: 'Haftalık bülten',                     group: 'Pazarlama' },
+    { key: 'marketing-monthly',          name: 'Aylık fırsatlar',                     group: 'Pazarlama' },
+    // İş Başvurusu
+    { key: 'seller-application-approved', name: 'Kurumsal başvuru onaylandı',          group: 'İş Başvurusu' },
+    { key: 'seller-application-rejected', name: 'Kurumsal başvuru reddedildi',         group: 'İş Başvurusu' },
+    // Sipariş / İade
+    { key: 'seller-did-not-ship-refunded', name: 'Satıcı kargoya vermedi (iade)',      group: 'İade' },
+    // Takas
+    { key: 'trade-received',              name: 'Yeni takas teklifi (alıcı)',           group: 'Takas' },
+    { key: 'trade-accepted',              name: 'Takas kabul edildi',                   group: 'Takas' },
+    { key: 'trade-shipped',               name: 'Takas kargoya verildi',                group: 'Takas' },
+    { key: 'trade-completed',             name: 'Takas tamamlandı',                     group: 'Takas' },
+    // Misafir
+    { key: 'guest-checkout-otp',          name: 'Misafir sipariş OTP kodu',             group: 'Misafir' },
+    // Fatura
+    { key: 'invoice-buyer',               name: 'Fatura (alıcı)',                       group: 'Fatura' },
+    { key: 'invoice-seller',              name: 'Satış faturası (satıcı)',               group: 'Fatura' },
   ];
 
   substituteVariables(text: string, data: Record<string, any>): string {
@@ -7304,11 +7547,12 @@ export class AdminService {
   async getEmailTemplates() {
     const dbTemplates = await this.prisma.emailTemplate.findMany();
     const dbMap = new Map(dbTemplates.map((t) => [t.key, t]));
-    const list = this.EMAIL_TEMPLATE_KEYS.map(({ key, name }) => {
+    const list = this.EMAIL_TEMPLATE_KEYS.map(({ key, name, group }) => {
       const db = dbMap.get(key);
       return {
         key,
         name: db?.name ?? name,
+        group,
         subject: db?.subject ?? null,
         hasCustomBody: !!db?.bodyHtml,
         variablesJson: db?.variablesJson,
@@ -7351,8 +7595,23 @@ export class AdminService {
     return template;
   }
 
-  async previewEmailTemplate(key: string, templateData?: Record<string, any>) {
-    const db = await this.prisma.emailTemplate.findUnique({ where: { key } });
+  async resetEmailTemplate(adminId: string, key: string) {
+    const meta = this.EMAIL_TEMPLATE_KEYS.find((m) => m.key === key);
+    if (!meta) throw new NotFoundException('Geçersiz şablon anahtarı');
+    const existing = await this.prisma.emailTemplate.findUnique({ where: { key } });
+    if (existing) {
+      await this.prisma.emailTemplate.delete({ where: { key } });
+      await this.createAuditLog(adminId, 'email_template_reset', 'EmailTemplate', existing.id, existing, null);
+    }
+    return { success: true };
+  }
+
+  async previewEmailTemplate(
+    key: string,
+    templateData?: Record<string, any>,
+    overrideHtml?: string,
+    overrideSubject?: string,
+  ) {
     const sample = templateData || {
       name: 'Örnek Kullanıcı',
       buyerName: 'Alıcı',
@@ -7361,16 +7620,36 @@ export class AdminService {
       orderId: 'sample-order-id',
       productTitle: 'Örnek Ürün',
       totalAmount: 199.99,
-      verifyUrl: 'https://example.com/verify',
-      resetUrl: 'https://example.com/reset',
+      verifyUrl: 'https://tarodan.com/verify?token=sample',
+      resetUrl: 'https://tarodan.com/reset?token=sample',
+      trackingNumber: '1234567890',
+      provider: 'Sürat Kargo',
     };
-    if (db) {
+
+    // Draft preview — admin is editing but hasn't saved yet
+    if (overrideHtml !== undefined || overrideSubject !== undefined) {
+      const html = overrideHtml
+        ? this.substituteVariables(overrideHtml, sample)
+        : renderEmailTemplate(key, sample, 'https://tarodan.com');
+      const subject = overrideSubject
+        ? this.substituteVariables(overrideSubject, sample)
+        : getEmailTemplateSubject(key, sample);
+      return { subject, html };
+    }
+
+    const db = await this.prisma.emailTemplate.findUnique({ where: { key } });
+    if (db?.bodyHtml) {
       return {
-        subject: this.substituteVariables(db.subject, sample),
+        subject: this.substituteVariables(db.subject || getEmailTemplateSubject(key, sample), sample),
         html: this.substituteVariables(db.bodyHtml, sample),
       };
     }
-    return { subject: '(Varsayılan şablon)', html: '<p>Bu şablon için özel içerik kaydedilmemiş. Düzenleyerek özelleştirebilirsiniz.</p>' };
+
+    // No custom template — return the actual default so admin can see what's being sent
+    return {
+      subject: getEmailTemplateSubject(key, sample),
+      html: renderEmailTemplate(key, sample, 'https://tarodan.com'),
+    };
   }
 
   async sendTestEmail(key: string, dto: { to: string; templateData?: Record<string, any> }) {
@@ -8051,6 +8330,8 @@ export class AdminService {
         logo: b.logo,
         description: b.description,
         website: b.website,
+        country: b.country,
+        foundedYear: b.foundedYear,
         sortOrder: b.sortOrder,
         isActive: b.isActive,
         createdAt: b.createdAt,
@@ -8069,6 +8350,8 @@ export class AdminService {
       logo?: string;
       description?: string;
       website?: string;
+      country?: string;
+      foundedYear?: number;
       sortOrder?: number;
       isActive?: boolean;
     },
@@ -8102,6 +8385,8 @@ export class AdminService {
         logo: dto.logo,
         description: dto.description,
         website: dto.website,
+        country: dto.country,
+        foundedYear: dto.foundedYear,
         sortOrder: dto.sortOrder ?? 0,
         isActive: dto.isActive ?? true,
       },
@@ -8126,6 +8411,8 @@ export class AdminService {
       logo?: string;
       description?: string;
       website?: string;
+      country?: string;
+      foundedYear?: number | null;
       sortOrder?: number;
       isActive?: boolean;
     },
@@ -8171,6 +8458,8 @@ export class AdminService {
         logo: dto.logo,
         description: dto.description,
         website: dto.website,
+        country: dto.country,
+        foundedYear: dto.foundedYear,
         sortOrder: dto.sortOrder,
         isActive: dto.isActive,
       },
@@ -8190,10 +8479,20 @@ export class AdminService {
   async deleteBrand(adminId: string, brandId: string) {
     const existing = await this.prisma.brand.findUnique({
       where: { id: brandId },
+      include: {
+        _count: { select: { products: true, carModels: true } },
+      },
     });
 
     if (!existing) {
       throw new NotFoundException('Marka bulunamadı');
+    }
+
+    const { products: productCount, carModels: carModelCount } = (existing as any)._count;
+    if (productCount > 0 || carModelCount > 0) {
+      throw new ConflictException(
+        `Bu marka silinemez: ${productCount} ürün ve ${carModelCount} araç modeli ile ilişkili.`,
+      );
     }
 
     await this.prisma.brand.delete({
@@ -8224,7 +8523,7 @@ export class AdminService {
 
   async createManufacturer(
     adminId: string,
-    dto: { name: string; logo?: string; description?: string; website?: string; country?: string; sortOrder?: number; isActive?: boolean },
+    dto: { name: string; logo?: string; description?: string; website?: string; country?: string; foundedYear?: number; sortOrder?: number; isActive?: boolean },
   ) {
     const slug = dto.name
       .toLowerCase()
@@ -8246,6 +8545,7 @@ export class AdminService {
         description: dto.description,
         website: dto.website,
         country: dto.country,
+        foundedYear: dto.foundedYear,
         sortOrder: dto.sortOrder ?? 0,
         isActive: dto.isActive ?? true,
       },
@@ -8257,7 +8557,7 @@ export class AdminService {
   async updateManufacturer(
     adminId: string,
     id: string,
-    dto: { name?: string; logo?: string; description?: string; website?: string; country?: string; sortOrder?: number; isActive?: boolean },
+    dto: { name?: string; logo?: string; description?: string; website?: string; country?: string; foundedYear?: number | null; sortOrder?: number; isActive?: boolean },
   ) {
     const existing = await this.prisma.manufacturer.findUnique({ where: { id } });
     if (!existing) throw new NotFoundException('Üretici bulunamadı');
@@ -8280,6 +8580,7 @@ export class AdminService {
         description: dto.description,
         website: dto.website,
         country: dto.country,
+        foundedYear: dto.foundedYear,
         sortOrder: dto.sortOrder,
         isActive: dto.isActive,
       },
@@ -9065,7 +9366,7 @@ export class AdminService {
         const collections = await this.prisma.collection.findMany({
           where: { id: { in: esResult.ids } },
           include: {
-            user: { select: { id: true, displayName: true, avatarUrl: true } },
+            user: { select: { id: true, displayName: true, avatarUrl: true, membership: { select: { tier: { select: { type: true } } } } } },
             _count: { select: { items: true } },
           },
         });
@@ -9076,7 +9377,7 @@ export class AdminService {
             id: c.id, name: c.name, slug: c.slug, description: c.description,
             coverImageUrl: c.coverImageKey ? this.storageService.getPublicAssetUrl(c.coverImageKey) : undefined, isPublic: c.isPublic, isFeatured: c.isFeatured,
             viewCount: c.viewCount, likeCount: c.likeCount, itemCount: c._count.items,
-            owner: c.user, createdAt: c.createdAt, updatedAt: c.updatedAt,
+            owner: { ...c.user, membershipTier: c.user.membership?.tier?.type ?? null }, createdAt: c.createdAt, updatedAt: c.updatedAt,
           })),
           total: esResult.total, page, limit, totalPages: Math.ceil(esResult.total / limit),
         };
@@ -9103,7 +9404,7 @@ export class AdminService {
       this.prisma.collection.findMany({
         where,
         include: {
-          user: { select: { id: true, displayName: true, avatarUrl: true } },
+          user: { select: { id: true, displayName: true, avatarUrl: true, membership: { select: { tier: { select: { type: true } } } } } },
           _count: { select: { items: true } },
         },
         orderBy: { [sortBy]: sortOrder },
@@ -9117,7 +9418,7 @@ export class AdminService {
         id: c.id, name: c.name, slug: c.slug, description: c.description,
         coverImageUrl: c.coverImageKey ? this.storageService.getPublicAssetUrl(c.coverImageKey) : undefined, isPublic: c.isPublic, isFeatured: c.isFeatured,
         viewCount: c.viewCount, likeCount: c.likeCount, itemCount: c._count.items,
-        owner: c.user, createdAt: c.createdAt, updatedAt: c.updatedAt,
+        owner: { ...c.user, membershipTier: c.user.membership?.tier?.type ?? null }, createdAt: c.createdAt, updatedAt: c.updatedAt,
       })),
       total, page, limit, totalPages: Math.ceil(total / limit),
     };
@@ -9411,307 +9712,6 @@ export class AdminService {
     return { success: true, isFeatured: updated.isFeatured };
   }
 
-  // ==================== TAG MANAGEMENT ====================
-
-  /**
-   * Get tags with filtering and pagination
-   */
-  async getTags(query: {
-    search?: string;
-    isActive?: boolean;
-    page?: number;
-    limit?: number;
-    sortBy?: 'name' | 'usageCount' | 'createdAt';
-    sortOrder?: 'asc' | 'desc';
-  }) {
-    const { page = 1, limit = 20, search, isActive, sortBy = 'usageCount', sortOrder = 'desc' } = query;
-    const where: Prisma.TagWhereInput = {};
-
-    if (search) {
-      const ids = await fulltextTagSearch(this.prisma, search);
-      if (ids.length === 0) {
-        return { data: [], total: 0, page, limit, totalPages: 0 };
-      }
-      where.id = { in: ids };
-    }
-    if (isActive !== undefined) where.isActive = isActive;
-
-    const [total, tags] = await Promise.all([
-      this.prisma.tag.count({ where }),
-      this.prisma.tag.findMany({
-        where,
-        orderBy: { [sortBy]: sortOrder },
-        skip: (page - 1) * limit,
-        take: limit,
-      }),
-    ]);
-
-    return {
-      data: tags,
-      total,
-      page,
-      limit,
-      totalPages: Math.ceil(total / limit),
-    };
-  }
-
-  /**
-   * Create a new tag
-   */
-  async createTag(adminId: string, dto: {
-    name: string;
-    description?: string;
-    color?: string;
-    isActive?: boolean;
-  }) {
-    const slug = this.generateSlug(dto.name);
-
-    // Check for existing tag
-    const existing = await this.prisma.tag.findFirst({
-      where: { OR: [{ name: dto.name }, { slug }] },
-    });
-
-    if (existing) {
-      throw new BadRequestException('Bu isimde bir etiket zaten mevcut');
-    }
-
-    const tag = await this.prisma.tag.create({
-      data: {
-        name: dto.name,
-        slug,
-        description: dto.description,
-        color: dto.color,
-        isActive: dto.isActive ?? true,
-      },
-    });
-
-    await this.createAuditLog(adminId, 'tag_create', 'Tag', tag.id, null, tag);
-
-    return tag;
-  }
-
-  /**
-   * Update a tag
-   */
-  async updateTag(adminId: string, tagId: string, dto: {
-    name?: string;
-    description?: string;
-    color?: string;
-    isActive?: boolean;
-  }) {
-    const existing = await this.prisma.tag.findUnique({
-      where: { id: tagId },
-    });
-
-    if (!existing) {
-      throw new NotFoundException('Etiket bulunamadı');
-    }
-
-    const updateData: Prisma.TagUpdateInput = {};
-    if (dto.name !== undefined) {
-      updateData.name = dto.name;
-      updateData.slug = this.generateSlug(dto.name);
-    }
-    if (dto.description !== undefined) updateData.description = dto.description;
-    if (dto.color !== undefined) updateData.color = dto.color;
-    if (dto.isActive !== undefined) updateData.isActive = dto.isActive;
-
-    const updated = await this.prisma.tag.update({
-      where: { id: tagId },
-      data: updateData,
-    });
-
-    await this.createAuditLog(adminId, 'tag_update', 'Tag', tagId, existing, updated);
-
-    return updated;
-  }
-
-  /**
-   * Delete a tag
-   */
-  async deleteTag(adminId: string, tagId: string) {
-    const existing = await this.prisma.tag.findUnique({
-      where: { id: tagId },
-      include: { _count: { select: { products: true } } },
-    });
-
-    if (!existing) {
-      throw new NotFoundException('Etiket bulunamadı');
-    }
-
-    if (existing._count.products > 0) {
-      throw new BadRequestException(`Bu etiket ${existing._count.products} üründe kullanılıyor. Önce etiketleri kaldırın veya birleştirin.`);
-    }
-
-    await this.prisma.tag.delete({
-      where: { id: tagId },
-    });
-
-    await this.createAuditLog(adminId, 'tag_delete', 'Tag', tagId, existing, null);
-
-    return { success: true };
-  }
-
-  /**
-   * Merge multiple tags into one
-   */
-  async mergeTags(adminId: string, sourceTagIds: string[], targetTagId: string) {
-    // Validate target tag
-    const targetTag = await this.prisma.tag.findUnique({
-      where: { id: targetTagId },
-    });
-
-    if (!targetTag) {
-      throw new NotFoundException('Hedef etiket bulunamadı');
-    }
-
-    if (sourceTagIds.includes(targetTagId)) {
-      throw new BadRequestException('Hedef etiket kaynak etiketler arasında olamaz');
-    }
-
-    // Get source tags
-    const sourceTags = await this.prisma.tag.findMany({
-      where: { id: { in: sourceTagIds } },
-    });
-
-    if (sourceTags.length !== sourceTagIds.length) {
-      throw new BadRequestException('Bazı kaynak etiketler bulunamadı');
-    }
-
-    // Merge in a transaction
-    const result = await this.prisma.$transaction(async (tx) => {
-      // Get all product-tag relations for source tags
-      const sourceProductTags = await tx.productTag.findMany({
-        where: { tagId: { in: sourceTagIds } },
-      });
-
-      // Update product tags to target tag (skip duplicates)
-      let mergedCount = 0;
-      for (const pt of sourceProductTags) {
-        const exists = await tx.productTag.findUnique({
-          where: { productId_tagId: { productId: pt.productId, tagId: targetTagId } },
-        });
-
-        if (!exists) {
-          await tx.productTag.update({
-            where: { id: pt.id },
-            data: { tagId: targetTagId },
-          });
-          mergedCount++;
-        } else {
-          await tx.productTag.delete({ where: { id: pt.id } });
-        }
-      }
-
-      // Delete source tags
-      await tx.tag.deleteMany({
-        where: { id: { in: sourceTagIds } },
-      });
-
-      // Update usage count on target tag
-      const newUsageCount = await tx.productTag.count({
-        where: { tagId: targetTagId },
-      });
-
-      await tx.tag.update({
-        where: { id: targetTagId },
-        data: { usageCount: newUsageCount },
-      });
-
-      return { mergedCount };
-    });
-
-    await this.createAuditLog(adminId, 'tags_merge', 'Tag', targetTagId, { sourceTagIds }, { targetTagId, mergedCount: result.mergedCount });
-
-    const updatedTargetTag = await this.prisma.tag.findUnique({
-      where: { id: targetTagId },
-    });
-
-    return {
-      success: true,
-      message: `${sourceTagIds.length} etiket birleştirildi`,
-      mergedCount: result.mergedCount,
-      targetTag: updatedTargetTag,
-    };
-  }
-
-  /**
-   * Bulk assign tags to products
-   */
-  async bulkAssignTags(adminId: string, productIds: string[], tagIds: string[]) {
-    // Validate tags exist
-    const tags = await this.prisma.tag.findMany({
-      where: { id: { in: tagIds } },
-    });
-
-    if (tags.length !== tagIds.length) {
-      throw new BadRequestException('Bazı etiketler bulunamadı');
-    }
-
-    // Create product-tag relations
-    const createData: Prisma.ProductTagCreateManyInput[] = [];
-    for (const productId of productIds) {
-      for (const tagId of tagIds) {
-        createData.push({ productId, tagId });
-      }
-    }
-
-    const result = await this.prisma.productTag.createMany({
-      data: createData,
-      skipDuplicates: true,
-    });
-
-    // Update usage counts
-    for (const tagId of tagIds) {
-      const count = await this.prisma.productTag.count({
-        where: { tagId },
-      });
-      await this.prisma.tag.update({
-        where: { id: tagId },
-        data: { usageCount: count },
-      });
-    }
-
-    await this.createAuditLog(adminId, 'tags_bulk_assign', 'ProductTag', 'bulk', null, { productIds, tagIds, assignedCount: result.count });
-
-    return {
-      success: true,
-      message: `${result.count} etiket ataması yapıldı`,
-      assignedCount: result.count,
-    };
-  }
-
-  /**
-   * Bulk remove tags from products
-   */
-  async bulkRemoveTags(adminId: string, productIds: string[], tagIds: string[]) {
-    const result = await this.prisma.productTag.deleteMany({
-      where: {
-        productId: { in: productIds },
-        tagId: { in: tagIds },
-      },
-    });
-
-    // Update usage counts
-    for (const tagId of tagIds) {
-      const count = await this.prisma.productTag.count({
-        where: { tagId },
-      });
-      await this.prisma.tag.update({
-        where: { id: tagId },
-        data: { usageCount: count },
-      });
-    }
-
-    await this.createAuditLog(adminId, 'tags_bulk_remove', 'ProductTag', 'bulk', null, { productIds, tagIds, removedCount: result.count });
-
-    return {
-      success: true,
-      message: `${result.count} etiket kaldırıldı`,
-      removedCount: result.count,
-    };
-  }
-
   // ==================== ATTRIBUTE GROUP MANAGEMENT ====================
 
   /**
@@ -9985,7 +9985,7 @@ export class AdminService {
         groupId: dto.groupId,
         value: dto.value,
         slug,
-        displayValue: dto.displayValue,
+        displayValue: dto.displayValue?.trim() || null,
         color: dto.color,
         sortOrder: dto.sortOrder ?? 0,
         isActive: dto.isActive ?? true,
@@ -10027,7 +10027,7 @@ export class AdminService {
           ? dto.value.replace(/\s/g, '').replace(/[:\/]/g, '').toLowerCase() || this.generateSlug(dto.value)
           : this.generateSlug(dto.value);
     }
-    if (dto.displayValue !== undefined) updateData.displayValue = dto.displayValue;
+    if (dto.displayValue !== undefined) updateData.displayValue = dto.displayValue?.trim() || null;
     if (dto.color !== undefined) updateData.color = dto.color;
     if (dto.sortOrder !== undefined) updateData.sortOrder = dto.sortOrder;
     if (dto.isActive !== undefined) updateData.isActive = dto.isActive;
@@ -10215,6 +10215,122 @@ export class AdminService {
     };
   }
 
+  // ==================== SELLER APPLICATIONS ====================
+
+  async getSellerApplications(query: { page?: number; limit?: number; search?: string; status?: string }) {
+    const p = Number(query.page) || 1;
+    const lim = Number(query.limit) || 20;
+    const search = query.search?.trim();
+    const status = query.status as BusinessStatus | undefined;
+
+    const where: Prisma.UserWhereInput = {
+      companyName: { not: null },
+      businessStatus: status ?? undefined,
+    };
+
+    if (search) {
+      where.OR = [
+        { displayName: { contains: search, mode: 'insensitive' } },
+        { email: { contains: search, mode: 'insensitive' } },
+        { companyName: { contains: search, mode: 'insensitive' } },
+        { taxId: { contains: search, mode: 'insensitive' } },
+      ];
+    }
+
+    const [total, applications] = await Promise.all([
+      this.prisma.user.count({ where }),
+      this.prisma.user.findMany({
+        where,
+        orderBy: { createdAt: 'desc' },
+        skip: (p - 1) * lim,
+        take: lim,
+        select: {
+          id: true,
+          displayName: true,
+          email: true,
+          phone: true,
+          companyName: true,
+          taxId: true,
+          businessStatus: true,
+          isSeller: true,
+          createdAt: true,
+        },
+      }),
+    ]);
+
+    return {
+      data: applications,
+      meta: { total, page: p, limit: lim, totalPages: Math.ceil(total / lim) },
+    };
+  }
+
+  async approveSellerApplication(adminId: string, userId: string) {
+    const user = await this.prisma.user.findUnique({ where: { id: userId } });
+    if (!user) throw new NotFoundException('Kullanıcı bulunamadı');
+    if (!user.companyName) throw new BadRequestException('Bu kullanıcı kurumsal hesap değil');
+    if (user.businessStatus === BusinessStatus.approved) throw new BadRequestException('Bu başvuru zaten onaylanmış');
+
+    const previous = { businessStatus: user.businessStatus, isSeller: user.isSeller };
+    await this.prisma.user.update({
+      where: { id: userId },
+      data: { businessStatus: BusinessStatus.approved, isSeller: true, sellerType: 'individual' },
+    });
+    await this.createAuditLog(adminId, 'seller_application_approve', 'User', userId, previous, { businessStatus: 'approved', isSeller: true });
+
+    // In-app + push bildirimi
+    await this.notificationService.send({
+      userId,
+      type: NotificationType.SELLER_APPLICATION_APPROVED,
+      channels: [NotificationChannel.IN_APP, NotificationChannel.PUSH],
+      data: {},
+    });
+    // E-posta template sistemi üzerinden (admin panelinden özelleştirilebilir)
+    await this.eventService.queueEmail({
+      to: user.email,
+      subject: '',
+      template: 'seller-application-approved',
+      templateData: {
+        name: user.displayName || user.email,
+        companyName: user.companyName || '',
+      },
+    });
+    return { success: true };
+  }
+
+  async rejectSellerApplication(adminId: string, userId: string, reason: string) {
+    const user = await this.prisma.user.findUnique({ where: { id: userId } });
+    if (!user) throw new NotFoundException('Kullanıcı bulunamadı');
+    if (!user.companyName) throw new BadRequestException('Bu kullanıcı kurumsal hesap değil');
+    if (user.businessStatus === BusinessStatus.rejected) throw new BadRequestException('Bu başvuru zaten reddedilmiş');
+
+    const previous = { businessStatus: user.businessStatus };
+    await this.prisma.user.update({
+      where: { id: userId },
+      data: { businessStatus: BusinessStatus.rejected, isSeller: false },
+    });
+    await this.createAuditLog(adminId, 'seller_application_reject', 'User', userId, previous, { businessStatus: 'rejected', reason });
+
+    // In-app + push bildirimi
+    await this.notificationService.send({
+      userId,
+      type: NotificationType.SELLER_APPLICATION_REJECTED,
+      channels: [NotificationChannel.IN_APP, NotificationChannel.PUSH],
+      data: { reason: reason ? ` Neden: ${reason}` : '' },
+    });
+    // E-posta template sistemi üzerinden (admin panelinden özelleştirilebilir)
+    await this.eventService.queueEmail({
+      to: user.email,
+      subject: '',
+      template: 'seller-application-rejected',
+      templateData: {
+        name: user.displayName || user.email,
+        companyName: user.companyName || '',
+        reason: reason || '',
+      },
+    });
+    return { success: true };
+  }
+
   /**
    * Update seller (user) rating status (approve/reject)
    */
@@ -10228,6 +10344,76 @@ export class AdminService {
     });
     await this.createAuditLog(adminId, 'user_rating_status_update', 'Rating', ratingId, previous, { status });
     return { success: true };
+  }
+
+  async applyOrderCoupon(orderId: string, adminId: string, code: string | null) {
+    const order = await this.prisma.order.findUnique({
+      where: { id: orderId },
+      include: { product: true },
+    });
+
+    if (!order) throw new NotFoundException('Sipariş bulunamadı');
+
+    // Kuponu kaldırma
+    if (!code) {
+      const previous = { discountCode: order.discountCode, discountAmount: order.discountAmount };
+      const baseTotal = Number(order.totalAmount) + Number(order.discountAmount ?? 0);
+      await this.prisma.order.update({
+        where: { id: orderId },
+        data: {
+          discountCode: null,
+          discountAmount: new Prisma.Decimal(0),
+          discountBreakdown: Prisma.JsonNull,
+          ...(order.status === OrderStatus.pending_payment ? { totalAmount: new Prisma.Decimal(baseTotal) } : {}),
+        },
+      });
+      await this.createAuditLog(adminId, 'order_coupon_removed', 'Order', orderId, previous, { discountCode: null });
+      return { success: true, discountCode: null, discountAmount: 0 };
+    }
+
+    const discount = await this.prisma.discount.findUnique({
+      where: { code: code.toUpperCase() },
+    });
+
+    if (!discount) throw new BadRequestException('Kupon kodu bulunamadı');
+    if (!discount.isActive) throw new BadRequestException('Bu kupon aktif değil');
+    const now = new Date();
+    if (now < discount.startDate) throw new BadRequestException('Bu kupon henüz başlamadı');
+    if (now > discount.endDate) throw new BadRequestException('Bu kuponun süresi doldu');
+    if (discount.usageLimitTotal && discount.usedCount >= discount.usageLimitTotal) {
+      throw new BadRequestException('Bu kupon kullanım limitine ulaştı');
+    }
+
+    const productPrice = Number(order.product.price);
+    const baseTotal = Number(order.totalAmount) + Number(order.discountAmount ?? 0);
+    const subtotal = productPrice;
+
+    let discountAmount = 0;
+    if (discount.type === 'percentage') {
+      discountAmount = subtotal * (Number(discount.value) / 100);
+    } else if (discount.type === 'fixed_amount') {
+      discountAmount = Math.min(Number(discount.value), subtotal);
+    }
+
+    if (discount.maxDiscountAmount) {
+      discountAmount = Math.min(discountAmount, Number(discount.maxDiscountAmount));
+    }
+
+    const newTotal = Math.max(0, baseTotal - discountAmount);
+
+    const previous = { discountCode: order.discountCode, discountAmount: order.discountAmount, totalAmount: order.totalAmount };
+    await this.prisma.order.update({
+      where: { id: orderId },
+      data: {
+        discountCode: discount.code,
+        discountAmount: new Prisma.Decimal(discountAmount),
+        discountBreakdown: { couponDiscount: discountAmount, appliedDiscountId: discount.id } as any,
+        ...(order.status === OrderStatus.pending_payment ? { totalAmount: new Prisma.Decimal(newTotal) } : {}),
+      },
+    });
+
+    await this.createAuditLog(adminId, 'order_coupon_applied', 'Order', orderId, previous, { discountCode: discount.code, discountAmount });
+    return { success: true, discountCode: discount.code, discountAmount, discountName: discount.name };
   }
 
 }

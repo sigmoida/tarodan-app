@@ -1,6 +1,6 @@
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
-import { api } from '@/lib/api';
+import { api, markLoggingOut } from '@/lib/api';
 
 interface User {
   id: string;
@@ -84,6 +84,12 @@ export const useAuthStore = create<AuthState>()(
       },
 
       logout: async () => {
+        // Devam eden token refresh'lerinin yeni cookie set etmesini engelle.
+        markLoggingOut();
+        // Login sayfasındaki otomatik checkAuth'u atla (cookie race condition'a karşı).
+        if (typeof window !== 'undefined') {
+          try { sessionStorage.setItem('admin-just-logged-out', '1'); } catch {}
+        }
         try {
           await api.post('/auth/admin/logout');
         } catch {

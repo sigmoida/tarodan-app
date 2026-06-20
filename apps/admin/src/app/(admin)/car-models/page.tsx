@@ -57,12 +57,21 @@ export default function CarModelsPage() {
     loadModels(selectedBrandId || undefined);
   }, [selectedBrandId]);
 
+  useEffect(() => {
+    const handleEsc = (e: KeyboardEvent) => {
+      if (e.key !== 'Escape') return;
+      if (deleteConfirm) setDeleteConfirm(null);
+      else if (showModal) setShowModal(false);
+    };
+    document.addEventListener('keydown', handleEsc);
+    return () => document.removeEventListener('keydown', handleEsc);
+  }, [deleteConfirm, showModal]);
+
   const loadBrands = async () => {
     try {
       const response = await adminApi.getBrands();
       const data = response.data.data || response.data || [];
       setBrands(data);
-      if (data.length > 0 && !selectedBrandId) setSelectedBrandId(data[0].id);
     } catch (error: any) {
       toast.error(error.response?.data?.message || 'Markalar yüklenemedi');
     }

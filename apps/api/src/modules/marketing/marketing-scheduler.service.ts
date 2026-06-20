@@ -10,6 +10,7 @@ import { Cron } from '@nestjs/schedule';
 import { PrismaService } from '../../prisma';
 import { SmtpProvider } from '../notification/providers/smtp.provider';
 import { StorageService } from '../storage/storage.service';
+import { renderEmailTemplate, getEmailTemplateSubject, substituteEmailVariables } from '../../common/helpers/email-template-renderer';
 
 @Injectable()
 export class MarketingSchedulerService {
@@ -83,17 +84,19 @@ export class MarketingSchedulerService {
         productUrl: `${baseUrl}/listings/${p.id}`,
       }));
 
+      const newsletterDbTemplate = await this.prisma.emailTemplate.findUnique({ where: { key: 'marketing-newsletter' } });
+
       for (const user of filteredUsers) {
         try {
-          const htmlContent = this.generateNewsletterHtml(user.displayName, mappedTrending);
-          const textContent = this.generateNewsletterText(user.displayName, mappedTrending);
-          
-          await this.smtpProvider.sendEmail({
-            to: user.email,
-            subject: '📰 Tarodan Haftalık Bülteni',
-            html: htmlContent,
-            text: textContent,
-          });
+          const templateData = { userName: user.displayName, trendingProducts: mappedTrending };
+          const html = newsletterDbTemplate?.bodyHtml
+            ? substituteEmailVariables(newsletterDbTemplate.bodyHtml, templateData)
+            : renderEmailTemplate('marketing-newsletter', templateData, baseUrl);
+          const subject = newsletterDbTemplate?.subject
+            ? substituteEmailVariables(newsletterDbTemplate.subject, templateData)
+            : getEmailTemplateSubject('marketing-newsletter', templateData);
+
+          await this.smtpProvider.sendEmail({ to: user.email, subject, html });
         } catch (error: any) {
           this.logger.error(`Failed to send newsletter email for user ${user.id}: ${error.message}`);
         }
@@ -171,17 +174,19 @@ export class MarketingSchedulerService {
         productUrl: `${baseUrl}/listings/${p.id}`,
       }));
 
+      const monthlyDbTemplate = await this.prisma.emailTemplate.findUnique({ where: { key: 'marketing-monthly' } });
+
       for (const user of filteredUsers) {
         try {
-          const htmlContent = this.generateMonthlyPromotionHtml(user.displayName, mappedFeatured);
-          const textContent = this.generateMonthlyPromotionText(user.displayName, mappedFeatured);
-          
-          await this.smtpProvider.sendEmail({
-            to: user.email,
-            subject: '🎁 Tarodan Aylık Özel Fırsatlar',
-            html: htmlContent,
-            text: textContent,
-          });
+          const templateData = { userName: user.displayName, featuredProducts: mappedFeatured };
+          const html = monthlyDbTemplate?.bodyHtml
+            ? substituteEmailVariables(monthlyDbTemplate.bodyHtml, templateData)
+            : renderEmailTemplate('marketing-monthly', templateData, baseUrl);
+          const subject = monthlyDbTemplate?.subject
+            ? substituteEmailVariables(monthlyDbTemplate.subject, templateData)
+            : getEmailTemplateSubject('marketing-monthly', templateData);
+
+          await this.smtpProvider.sendEmail({ to: user.email, subject, html });
         } catch (error: any) {
           this.logger.error(`Failed to send monthly promotion email for user ${user.id}: ${error.message}`);
         }

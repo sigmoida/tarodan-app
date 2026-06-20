@@ -60,6 +60,16 @@ export class AdminProductQueryDto {
   @IsString()
   sellerId?: string;
 
+  @ApiPropertyOptional({ example: 'uuid-brand-id' })
+  @IsOptional()
+  @IsString()
+  brandId?: string;
+
+  @ApiPropertyOptional({ example: 'uuid-car-model-id' })
+  @IsOptional()
+  @IsString()
+  carModelId?: string;
+
   @ApiPropertyOptional({ example: 1 })
   @IsOptional()
   @IsNumber()

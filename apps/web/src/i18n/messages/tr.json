@@ -360,7 +360,14 @@
     "continueShopping": "Alışverişe Devam Et",
     "itemsInCart": "ürün sepetinizde",
     "removeItem": "Ürünü Kaldır",
-    "updateQuantity": "Adedi Güncelle"
+    "updateQuantity": "Adedi Güncelle",
+    "couponCode": "Kupon Kodu",
+    "couponPlaceholder": "Kupon kodunuzu girin",
+    "applyCoupon": "Uygula",
+    "couponApplied": "Kupon Uygulandı",
+    "removeCoupon": "Kuponu Kaldır",
+    "couponApplyError": "Kupon uygulanamadı",
+    "couponLoginRequired": "Kupon kullanmak için giriş yapmanız gerekiyor"
   },
   "favorites": {
     "myFavorites": "Favorilerim",

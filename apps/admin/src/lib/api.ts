@@ -25,6 +25,12 @@ if (process.env.NODE_ENV === 'development') {
 
 // Oturumu sonlandır (refresh de başarısızsa): sunucu cookie'leri silsin, login'e dön.
 let isLoggingOut = false;
+
+/** Aktif refresh girişimlerini iptal et (kullanıcı logout başlatınca çağrılır). */
+export function markLoggingOut() {
+  isLoggingOut = true;
+}
+
 async function forceLogout() {
   if (typeof window === 'undefined' || isLoggingOut) return;
   // Zaten /login'deysek yönlendirme yapma — yoksa bootstrap probe'unun 401'i sonsuz reload döngüsü kurar.
@@ -79,7 +85,8 @@ api.interceptors.response.use(
       status === 401 &&
       typeof window !== 'undefined' &&
       !isAuthUrl(reqUrl) &&
-      !originalRequest._retry
+      !originalRequest._retry &&
+      !isLoggingOut
     ) {
       originalRequest._retry = true;
 
@@ -158,6 +165,9 @@ export const adminApi = {
   getStaffSettings: () => api.get('/admin/staff/settings'),
   setStaffSettings: (allowAdminAssign: boolean) =>
     api.patch('/admin/staff/settings', { allowAdminAssign }),
+  getRolePermissions: () => api.get<Record<string, string[]>>('/admin/staff/role-permissions'),
+  setRolePermissions: (permissions: Record<string, string[]>) =>
+    api.put<Record<string, string[]>>('/admin/staff/role-permissions', { permissions }),
 
   // Products
   getProducts: (params?: any) => api.get('/admin/products', { params }),
@@ -190,6 +200,8 @@ export const adminApi = {
   getOrder: (id: string) => api.get(`/admin/orders/${id}`),
   updateOrderStatus: (id: string, status: string) => api.patch(`/admin/orders/${id}`, { status }),
   getOrderInvoice: (id: string) => api.get(`/admin/orders/${id}/invoice`),
+  applyOrderCoupon: (id: string, code: string | null) =>
+    api.post(`/admin/orders/${id}/apply-coupon`, { code }),
   // 48h pencere (Faz 4A.1)
   forceCompleteOrder: (id: string, reason?: string) =>
     api.post(`/admin/orders/${id}/force-complete`, reason ? { reason } : {}),
@@ -263,13 +275,16 @@ export const adminApi = {
   getMessages: (params?: any) => api.get('/admin/messages', { params }),
   getMessage: (id: string) => api.get(`/admin/messages/${id}`),
   approveMessage: (id: string, notes?: string) => api.post(`/admin/messages/${id}/approve`, notes ? { notes } : {}),
-  rejectMessage: (id: string, reason: string) => api.post(`/admin/messages/${id}/reject`, { reason }),
+  rejectMessage: (id: string, reason?: string) => api.post(`/admin/messages/${id}/reject`, { reason }),
+  revertMessage: (id: string) => api.post(`/admin/messages/${id}/revert`),
 
   // Support Tickets
-  getTickets: (params?: any) => api.get('/admin/support-tickets', { params }),
-  getTicket: (id: string) => api.get(`/admin/support-tickets/${id}`),
-  updateTicket: (id: string, data: any) => api.patch(`/admin/support-tickets/${id}`, data),
-  replyToTicket: (id: string, message: string) => api.post(`/admin/support-tickets/${id}/reply`, { message }),
+  getTickets: (params?: any) => api.get('/support/admin/tickets', { params }),
+  getTicket: (id: string) => api.get(`/support/admin/tickets/${id}`),
+  updateTicketStatus: (id: string, status: string, note?: string) =>
+    api.patch(`/support/admin/tickets/${id}/status`, { status, ...(note ? { note } : {}) }),
+  replyToTicket: (id: string, content: string, isInternal = false) =>
+    api.post(`/support/admin/tickets/${id}/messages`, { content, isInternal }),
 
   // Reports
   getSalesReport: (params?: { startDate?: string; endDate?: string; format?: string }) =>
@@ -286,6 +301,8 @@ export const adminApi = {
   getSettings: () => api.get('/admin/settings'),
   updateSettings: (data: any) => api.patch('/admin/settings', data),
   updateSetting: (key: string, value: string) => api.patch(`/admin/settings/${key}`, { value }),
+  getCommissionRevenue: (params?: { fromDate?: string; toDate?: string }) =>
+    api.get('/admin/commission/revenue', { params }),
   getCommissionRules: () => api.get('/admin/commission-rules'),
   createCommissionRule: (data: any) => api.post('/admin/commission-rules', data),
   updateCommissionRule: (id: string, data: any) => api.patch(`/admin/commission-rules/${id}`, data),
@@ -374,6 +391,7 @@ export const adminApi = {
   // Seller Payouts
   getPayoutsSummary: () => api.get('/admin/payouts/summary'),
   getPayoutsTransactions: (params?: {
+    search?: string;
     sellerId?: string;
     status?: string;
     dateFrom?: string;
@@ -422,8 +440,18 @@ export const adminApi = {
   getEmailTemplate: (key: string) => api.get(`/admin/email-templates/${encodeURIComponent(key)}`),
   updateEmailTemplate: (key: string, data: any) =>
     api.patch(`/admin/email-templates/${encodeURIComponent(key)}`, data),
-  previewEmailTemplate: (key: string, templateData?: Record<string, any>) =>
-    api.post(`/admin/email-templates/${encodeURIComponent(key)}/preview`, { templateData }),
+  previewEmailTemplate: (
+    key: string,
+    templateData?: Record<string, any>,
+    draft?: { html?: string; subject?: string },
+  ) =>
+    api.post(`/admin/email-templates/${encodeURIComponent(key)}/preview`, {
+      templateData,
+      ...(draft?.html !== undefined && { overrideHtml: draft.html }),
+      ...(draft?.subject !== undefined && { overrideSubject: draft.subject }),
+    }),
+  resetEmailTemplate: (key: string) =>
+    api.delete(`/admin/email-templates/${encodeURIComponent(key)}`),
   sendTestEmail: (key: string, data: { to: string; templateData?: Record<string, any> }) =>
     api.post(`/admin/email-templates/${encodeURIComponent(key)}/send-test`, data),
 
@@ -511,35 +539,6 @@ export const adminApi = {
   setCollectionFeatured: (id: string, isFeatured: boolean) =>
     api.patch(`/admin/collections/${id}/featured`, { isFeatured }),
 
-  // Tags
-  getTags: (params?: {
-    search?: string;
-    isActive?: boolean;
-    page?: number;
-    limit?: number;
-    sortBy?: string;
-    sortOrder?: string;
-  }) => api.get('/admin/tags', { params }),
-  createTag: (data: {
-    name: string;
-    description?: string;
-    color?: string;
-    isActive?: boolean;
-  }) => api.post('/admin/tags', data),
-  updateTag: (id: string, data: {
-    name?: string;
-    description?: string;
-    color?: string;
-    isActive?: boolean;
-  }) => api.patch(`/admin/tags/${id}`, data),
-  deleteTag: (id: string) => api.delete(`/admin/tags/${id}`),
-  mergeTags: (sourceTagIds: string[], targetTagId: string) =>
-    api.post('/admin/tags/merge', { sourceTagIds, targetTagId }),
-  bulkAssignTags: (productIds: string[], tagIds: string[]) =>
-    api.post('/admin/tags/bulk-assign', { productIds, tagIds }),
-  bulkRemoveTags: (productIds: string[], tagIds: string[]) =>
-    api.post('/admin/tags/bulk-remove', { productIds, tagIds }),
-
   // Attribute Groups
   getAttributeGroups: (params?: {
     search?: string;
@@ -588,6 +587,14 @@ export const adminApi = {
     isActive?: boolean;
   }) => api.patch(`/admin/attributes/${id}`, data),
   deleteAttribute: (id: string) => api.delete(`/admin/attributes/${id}`),
+
+  // Seller Applications
+  getSellerApplications: (params?: { page?: number; limit?: number; search?: string; status?: string }) =>
+    api.get('/admin/seller-applications', { params }),
+  approveSellerApplication: (id: string) =>
+    api.post(`/admin/seller-applications/${id}/approve`),
+  rejectSellerApplication: (id: string, reason: string) =>
+    api.post(`/admin/seller-applications/${id}/reject`, { reason }),
 };
 
 

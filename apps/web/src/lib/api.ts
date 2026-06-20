@@ -50,7 +50,8 @@ api.interceptors.response.use(
       error.response?.status === 403 &&
       errData?.errorCode === 'USER_BANNED' &&
       typeof window !== 'undefined' &&
-      window.location?.pathname !== '/banned'
+      window.location?.pathname !== '/banned' &&
+      window.location?.pathname !== '/contact'
     ) {
       const reason = errData.bannedReason
         ? `?reason=${encodeURIComponent(errData.bannedReason)}`
