@@ -402,6 +402,16 @@ export class AuthService {
         throw new UnauthorizedException('Email veya şifre hatalı');
       }
 
+      // Guard: OAuth-only accounts have no passwordHash — avoid bcrypt throwing on null
+      if (!user.passwordHash) {
+        await this.logSecurityEvent('failed_login', 'medium', {
+          email: dto.email,
+          userId: user.id,
+          reason: 'oauth_only_account',
+        });
+        throw new UnauthorizedException('Email veya şifre hatalı');
+      }
+
       // Verify password
       const isPasswordValid = await bcrypt.compare(dto.password, user.passwordHash);
 
