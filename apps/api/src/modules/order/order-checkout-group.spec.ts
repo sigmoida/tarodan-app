@@ -11,6 +11,7 @@ import { DiscountCalculator } from '../discount/discount-calculator';
 import { SuratCargoService } from '../surat-cargo/surat-cargo.service';
 import { ProductLockService } from '../product/product-lock.service';
 import { CommissionLedgerService } from '../commission/commission-ledger.service';
+import { TaxService } from '../tax/tax.service';
 import { OrderStatus, ProductStatus } from '@prisma/client';
 
 /**
@@ -137,6 +138,7 @@ describe('OrderService checkout group (batch checkout)', () => {
         },
         { provide: ProductLockService, useValue: {} },
         { provide: CommissionLedgerService, useValue: {} },
+        { provide: TaxService, useValue: { resolveTaxRate: jest.fn().mockResolvedValue(null), calculateTaxAmount: jest.fn().mockReturnValue(0) } },
       ],
     }).compile();
 
