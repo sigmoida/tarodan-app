@@ -43,10 +43,15 @@ export function RealtimeProvider({ children }: { children?: React.ReactNode }) {
     };
   }, [token, queryClient]);
 
-  // Disconnect on logout (mirror useMessagingSocket)
+  // Logout: socket'i kapat + React Query cache'ini temizle. Aksi halde aynı
+  // QueryClient bir sonraki hesaba taşınır ve önceki kullanıcının bildirim/
+  // sayaç verisi görünür. Tüm logout yolları için çalışır (buton, 401, token).
   useEffect(() => {
-    if (!token) disconnectSocket();
-  }, [token]);
+    if (!token) {
+      disconnectSocket();
+      queryClient.clear();
+    }
+  }, [token, queryClient]);
 
   return <>{children ?? null}</>;
 }

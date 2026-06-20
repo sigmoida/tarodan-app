@@ -99,7 +99,13 @@ export default function NotificationsPage() {
   });
   const notifications = notificationsQuery.data ?? [];
   const loading = notificationsQuery.isLoading;
-  const invalidateNotifications = () => queryClient.invalidateQueries({ queryKey: ['notifications'] });
+  const invalidateNotifications = async () => {
+    await Promise.all([
+      queryClient.invalidateQueries({ queryKey: ['notifications'] }),
+      queryClient.invalidateQueries({ queryKey: ['notifications-unread-count'] }),
+      queryClient.invalidateQueries({ queryKey: ['notifications-bell'] }),
+    ]);
+  };
 
   const markAsRead = async (id: string) => {
     try {
