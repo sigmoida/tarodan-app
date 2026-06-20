@@ -23,6 +23,7 @@ import {
   TokensDto,
   ForgotPasswordDto,
   ResetPasswordDto,
+  GoogleAuthDto,
 } from './dto';
 import { JwtAuthGuard, JwtRefreshGuard } from './guards';
 import { Public, CurrentUser } from './decorators';
@@ -85,6 +86,16 @@ export class AuthController {
   @ApiResponse({ status: 401, description: 'Email veya şifre hatalı' })
   async login(@Body() dto: LoginDto): Promise<AuthResponseDto> {
     return this.authService.login(dto);
+  }
+
+  /**
+   * POST /auth/google — Google id_token ile giriş/kayıt
+   */
+  @Post('google')
+  @Public()
+  @HttpCode(HttpStatus.OK)
+  async google(@Body() dto: GoogleAuthDto): Promise<AuthResponseDto> {
+    return this.authService.loginWithGoogle(dto.idToken);
   }
 
   /**
