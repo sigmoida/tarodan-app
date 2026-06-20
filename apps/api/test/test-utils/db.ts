@@ -44,7 +44,6 @@ const TABLES_TO_TRUNCATE = [
   'collection_items',
   'collection_likes',
   'collections',
-  'product_tags',
   'product_attributes',
   'product_images',
   'product_likes',
@@ -76,7 +75,6 @@ const TABLES_TO_TRUNCATE = [
   'admin_users',
   'users',
   // Reference data (also truncated so seedBaseline can re-insert deterministically)
-  'tags',
   'attributes',
   'attribute_groups',
   'commission_rules',
