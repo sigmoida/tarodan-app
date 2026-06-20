@@ -3,7 +3,7 @@
 import { useState, useEffect } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import { motion } from 'framer-motion';
-import { ArrowLeftIcon, TagIcon, ChevronDownIcon, ChevronUpIcon, TrashIcon, ReceiptPercentIcon } from '@heroicons/react/24/outline';
+import { ArrowLeftIcon, TagIcon, ChevronDownIcon, ChevronUpIcon, TrashIcon, ReceiptPercentIcon, PhotoIcon } from '@heroicons/react/24/outline';
 import Link from 'next/link';
 import toast from 'react-hot-toast';
 import { useQueryClient } from '@tanstack/react-query';
@@ -1320,17 +1320,32 @@ export default function EditListingPage() {
                 Ürün Görselleri (En fazla {limits?.maxImagesPerListing || 3})
               </label>
               <div className="space-y-3">
-                <div>
-                  <Input type="file"
-                    accept="image/*"
-                    multiple
-                    onChange={(e) => handleFileUpload(e.target.files)}
-                    disabled={uploadingImages || formData.images.length >= (limits?.maxImagesPerListing || 3)}
-                    className="px-4 py-3 rounded-xl text-heading disabled:bg-surface-alt disabled:cursor-not-allowed" />
-                  {uploadingImages && (
-                    <p className="text-sm text-primary-600 mt-2">Resimler yükleniyor...</p>
-                  )}
-                </div>
+                {formData.images.length < (limits?.maxImagesPerListing || 3) ? (
+                  <label className="flex flex-col items-center justify-center gap-2 py-8 border-2 border-dashed border-border rounded-xl cursor-pointer hover:border-primary-400 hover:bg-primary-50/30 transition-colors">
+                    <PhotoIcon className="w-8 h-8 text-subtle" />
+                    <span className="text-sm text-muted font-medium">
+                      Görsel yüklemek için tıklayın
+                    </span>
+                    <span className="text-xs text-subtle">
+                      {formData.images.length} / {limits?.maxImagesPerListing || 3} yüklendi
+                    </span>
+                    <input
+                      type="file"
+                      accept="image/*"
+                      multiple
+                      onChange={(e) => handleFileUpload(e.target.files)}
+                      disabled={uploadingImages}
+                      className="hidden"
+                    />
+                  </label>
+                ) : (
+                  <div className="py-4 border border-success-200 bg-success-50 rounded-xl text-success-700 text-sm text-center">
+                    Maksimum görsel sayısına ulaştınız
+                  </div>
+                )}
+                {uploadingImages && (
+                  <p className="text-sm text-primary-600">Resimler yükleniyor...</p>
+                )}
 
                 {formData.images.length > 0 && (
                   <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
