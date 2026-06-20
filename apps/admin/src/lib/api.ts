@@ -285,6 +285,7 @@ export const adminApi = {
     api.patch(`/support/admin/tickets/${id}/status`, { status, ...(note ? { note } : {}) }),
   replyToTicket: (id: string, content: string, isInternal = false) =>
     api.post(`/support/admin/tickets/${id}/messages`, { content, isInternal }),
+  getGuestContacts: () => api.get('/support/admin/guest-contacts'),
 
   // Reports
   getSalesReport: (params?: { startDate?: string; endDate?: string; format?: string }) =>
