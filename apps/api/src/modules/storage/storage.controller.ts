@@ -16,12 +16,16 @@ import {
 } from '@nestjs/common';
 import { FileInterceptor, FilesInterceptor } from '@nestjs/platform-express';
 import { StorageService } from './storage.service';
+import { ModerationAiClient } from '../moderation/moderation-ai.client';
 import { Roles } from '../auth/decorators/roles.decorator';
 import { AdminRole } from '@prisma/client';
 
 @Controller('storage')
 export class StorageController {
-  constructor(private readonly storageService: StorageService) {}
+  constructor(
+    private readonly storageService: StorageService,
+    private readonly moderationAi: ModerationAiClient,
+  ) {}
 
   /**
    * Upload single file
@@ -113,6 +117,13 @@ export class StorageController {
     )
     file: Express.Multer.File,
   ) {
+    await this.moderationAi.assertImageClean(file, {
+      entityType: 'user',
+      entityId: req.user?.id,
+      userId: req.user?.id,
+      field: 'avatar',
+    });
+
     return this.storageService.uploadFile(
       file.buffer,
       {
