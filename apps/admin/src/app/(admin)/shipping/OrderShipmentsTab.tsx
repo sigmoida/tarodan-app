@@ -1,13 +1,12 @@
 "use client";
 
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { adminApi } from "@/lib/api";
 import { Select, StatusBadge } from "@tarodan/ui";
 import { DataTable, type ColumnDef } from "@/components/DataTable";
-import { ActionButtons, ActionIconButton } from "@/components/admin-list";
 import { Pagination } from "@/components/Pagination";
 import { useAdminResource } from "@/hooks/useAdminResource";
-import { EyeIcon } from "@heroicons/react/24/outline";
 import { shipmentStatusConfig, statusOptions } from "./_shared";
 
 // ─── Tip ─────────────────────────────────────────────────────────────────────
@@ -84,25 +83,10 @@ const columns: ColumnDef<ShipmentRow, any>[] = [
       />
     ),
   },
-  {
-    id: "actions",
-    header: "İşlemler",
-    cell: ({ row }) =>
-      row.original.order ? (
-        <ActionButtons>
-          <ActionIconButton
-            icon={EyeIcon}
-            href={`/orders/${row.original.order.id}`}
-            title="Detay"
-          />
-        </ActionButtons>
-      ) : (
-        <span className="text-subtle text-sm">—</span>
-      ),
-  },
 ];
 
 export function OrderShipmentsTab() {
+  const router = useRouter();
   const {
     rows,
     total,
@@ -142,6 +126,8 @@ export function OrderShipmentsTab() {
         loading={isLoading}
         emptyText="Gönderi bulunamadı"
         getRowId={(r) => r.id}
+        onRowClick={(r) => r.order && router.push(`/orders/${r.order.id}`)}
+        rowClassName={(r) => (r.order ? undefined : "cursor-default")}
       />
 
       <p className="text-sm text-muted">Toplam {total} gönderi</p>

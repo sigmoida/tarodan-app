@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useMemo } from "react";
+import { useMemo, useState } from "react";
 import { adminApi } from "@/lib/api";
 import { Select } from "@tarodan/ui";
 import { type ColumnDef } from "@/components/DataTable";
@@ -21,6 +21,7 @@ export interface ModerationEvent {
   decision: string; // pass | review | flag | blocked
   relevanceScore: number | null;
   nsfwScore: number | null;
+  labels?: Array<{ label: string; score: number }> | null;
   reason: string | null;
   createdAt: string;
 }
@@ -44,6 +45,10 @@ const FIELD_LABELS: Record<string, string> = {
   product_image: "Ürün görseli",
   message_image: "Mesaj görseli",
   upload: "Yükleme",
+  name: "Ad",
+  description: "Açıklama",
+  title: "Başlık",
+  comment: "Yorum",
 };
 
 function decisionBadge(d: string) {
@@ -105,6 +110,8 @@ export function ModerationEventsPanel({
   activeTab,
   onTabChange,
 }: ModerationEventsPanelProps) {
+  const [expandedId, setExpandedId] = useState<string | null>(null);
+
   const { rows, total, page, setPage, totalPages, filters, setFilter, isLoading } =
     useAdminResource<ModerationEvent>({
       queryKey: `moderation-events:${entityType ?? "all"}:${entityId ?? ""}:${userId ?? ""}`,
@@ -235,6 +242,34 @@ export function ModerationEventsPanel({
       loading={isLoading}
       emptyText="AI denetim kaydı yok"
       getRowId={(r) => r.id}
+      expandedId={expandedId}
+      onRowClick={(r) => setExpandedId(expandedId === r.id ? null : r.id)}
+      renderExpanded={(r) => (
+        <div className="px-4 py-3 space-y-2 text-sm bg-surface-secondary">
+          {r.reason && (
+            <div>
+              <span className="font-medium text-heading">Sebep: </span>
+              <span className="text-muted">{r.reason}</span>
+            </div>
+          )}
+          {r.relevanceScore != null && (
+            <div>
+              <span className="font-medium text-heading">İlgililik: </span>
+              <span className="text-muted">%{Math.round(r.relevanceScore * 100)}</span>
+              <span className="font-medium text-heading ml-4">Uygunsuzluk: </span>
+              <span className="text-muted">%{(r.nsfwScore! * 100).toFixed(2)}</span>
+            </div>
+          )}
+          {r.labels && r.labels.length > 0 && (
+            <div>
+              <span className="font-medium text-heading">Etiketler: </span>
+              <span className="text-muted">
+                {r.labels.map((l) => `${l.label} (%${Math.round(l.score * 100)})`).join(" · ")}
+              </span>
+            </div>
+          )}
+        </div>
+      )}
       page={page}
       totalPages={totalPages}
       onPageChange={setPage}

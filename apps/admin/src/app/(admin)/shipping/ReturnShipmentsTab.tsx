@@ -1,13 +1,13 @@
 "use client";
 
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { adminApi } from "@/lib/api";
 import { Input, Select, StatusBadge } from "@tarodan/ui";
 import { DataTable, type ColumnDef } from "@/components/DataTable";
-import { FilterToolbar, ActionButtons, ActionIconButton } from "@/components/admin-list";
+import { FilterToolbar } from "@/components/admin-list";
 import { Pagination } from "@/components/Pagination";
 import { useAdminResource } from "@/hooks/useAdminResource";
-import { EyeIcon } from "@heroicons/react/24/outline";
 import { shipmentStatusConfig, formatDate } from "./_shared";
 
 // ─── Tip ─────────────────────────────────────────────────────────────────────
@@ -106,22 +106,10 @@ const columns: ColumnDef<ReturnShipmentRow, any>[] = [
       </span>
     ),
   },
-  {
-    id: "actions",
-    header: "İşlemler",
-    cell: ({ row }) => (
-      <ActionButtons>
-        <ActionIconButton
-          icon={EyeIcon}
-          href={`/refund-requests/${row.original.id}`}
-          title="Detay"
-        />
-      </ActionButtons>
-    ),
-  },
 ];
 
 export function ReturnShipmentsTab() {
+  const router = useRouter();
   const {
     rows,
     total,
@@ -200,6 +188,7 @@ export function ReturnShipmentsTab() {
         loading={isLoading}
         emptyText="İade kargosu bulunamadı"
         getRowId={(r) => r.id}
+        onRowClick={(r) => router.push(`/refund-requests/${r.id}`)}
       />
 
       <p className="text-sm text-muted">Toplam {total} iade talebi</p>
