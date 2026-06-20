@@ -53,3 +53,6 @@ scripts/generate-images.mjs
 
 # Seed tarafından photos/ kopyalanır; kaynak photos/ root'ta
 apps/web/public/photos/
+
+# PayTR Direkt API vendor PDF/örnek klasörü — lokal referans, repoya girmez
+PayTR Direkt API/
