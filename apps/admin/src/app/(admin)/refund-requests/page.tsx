@@ -144,8 +144,8 @@ export default function RefundRequestsPage() {
       header: "Alıcı",
       cell: ({ row }) => (
         <>
-          <div>{row.original.requester.displayName}</div>
-          <div className="text-xs text-muted">{row.original.requester.email}</div>
+          <div>{row.original.requester?.displayName ?? "—"}</div>
+          <div className="text-xs text-muted">{row.original.requester?.email ?? ""}</div>
         </>
       ),
     },
@@ -153,8 +153,8 @@ export default function RefundRequestsPage() {
       header: "Satıcı",
       cell: ({ row }) => (
         <>
-          <div>{row.original.order.seller.displayName}</div>
-          <div className="text-xs text-muted">{row.original.order.seller.email}</div>
+          <div>{row.original.order?.seller?.displayName ?? "—"}</div>
+          <div className="text-xs text-muted">{row.original.order?.seller?.email ?? ""}</div>
         </>
       ),
     },
