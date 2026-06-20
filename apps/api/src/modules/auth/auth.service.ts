@@ -17,6 +17,7 @@ import { SellerType } from '@prisma/client';
 import { NotificationService } from '../notification/notification.service';
 import { CacheService } from '../cache/cache.service';
 import { StorageService } from '../storage/storage.service';
+import { GoogleAuthService } from './google-auth.service';
 
 @Injectable()
 export class AuthService {
@@ -29,6 +30,7 @@ export class AuthService {
     private readonly notificationService: NotificationService,
     private readonly cacheService: CacheService,
     private readonly storageService: StorageService,
+    private readonly googleAuthService: GoogleAuthService,
   ) { }
 
   private async resolveAvatarUrl(avatarUrl: string | null | undefined): Promise<string | null> {
@@ -830,6 +832,94 @@ export class AuthService {
     });
 
     return { message: 'Şifre başarıyla sıfırlandı' };
+  }
+
+  /**
+   * Verilen userId için AuthResponseDto üretir (login response ile aynı şekil).
+   */
+  private async buildUserAuthResponse(userId: string): Promise<AuthResponseDto> {
+    const user = await this.prisma.user.findUnique({
+      where: { id: userId },
+      include: { membership: { include: { tier: true } } },
+    });
+    if (!user) {
+      throw new UnauthorizedException('Kullanıcı bulunamadı');
+    }
+
+    const tokens = await this.generateTokens(user.id, user.email, user.isSeller);
+
+    let membershipData = undefined;
+    if (user.membership && user.membership.tier) {
+      const tier = user.membership.tier;
+      if (tier?.type && tier?.name) {
+        membershipData = {
+          tier: { type: String(tier.type), name: String(tier.name) },
+          expiresAt: user.membership.currentPeriodEnd
+            ? new Date(user.membership.currentPeriodEnd).toISOString()
+            : undefined,
+        };
+      }
+    }
+
+    const resolvedAvatarUrl = await this.resolveAvatarUrl(user.avatarUrl);
+
+    return {
+      user: {
+        id: user.id,
+        email: user.email,
+        phone: user.phone ?? undefined,
+        displayName: user.displayName,
+        avatarUrl: resolvedAvatarUrl,
+        isVerified: user.isVerified,
+        isSeller: user.isSeller,
+        sellerType: user.sellerType ?? undefined,
+        createdAt: user.createdAt,
+        membership: membershipData,
+      },
+      tokens,
+    };
+  }
+
+  /**
+   * Google id_token ile giriş: doğrula → OAuthAccount bul → email ile oto-bağla
+   * → yoksa yeni kullanıcı. Mevcut JWT akışını kullanır.
+   */
+  async loginWithGoogle(idToken: string): Promise<AuthResponseDto> {
+    const profile = await this.googleAuthService.verifyIdToken(idToken);
+
+    // 1) Mevcut OAuthAccount?
+    const existing = await this.prisma.oAuthAccount.findUnique({
+      where: { provider_providerUserId: { provider: 'google', providerUserId: profile.sub } },
+    });
+    if (existing) {
+      return this.buildUserAuthResponse(existing.userId);
+    }
+
+    // 2) Aynı e-postalı kullanıcı? → oto-bağla
+    const byEmail = await this.prisma.user.findUnique({ where: { email: profile.email } });
+    if (byEmail) {
+      await this.prisma.oAuthAccount.create({
+        data: { provider: 'google', providerUserId: profile.sub, email: profile.email, userId: byEmail.id },
+      });
+      return this.buildUserAuthResponse(byEmail.id);
+    }
+
+    // 3) Yeni kullanıcı
+    const displayName = profile.name?.trim() || profile.email.split('@')[0];
+    const created = await this.prisma.user.create({
+      data: {
+        email: profile.email,
+        passwordHash: null,
+        displayName,
+        avatarUrl: profile.picture ?? null,
+        isEmailVerified: true,
+        isSeller: false,
+      },
+    });
+    await this.prisma.oAuthAccount.create({
+      data: { provider: 'google', providerUserId: profile.sub, email: profile.email, userId: created.id },
+    });
+    return this.buildUserAuthResponse(created.id);
   }
 
   /**
