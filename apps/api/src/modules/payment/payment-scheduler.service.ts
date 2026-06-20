@@ -80,6 +80,27 @@ export class PaymentSchedulerService {
       }
     });
 
+    // K3: Alıcının iptal ettiği (status=refunded) ama henüz iade edilmemiş siparişleri
+    // bul ve iadeyi tetikle. OrderService.cancel yalnız status'u refunded yapıyordu;
+    // bu adım gerçek PayTR iadesini + hold iptalini güvenilir şekilde tamamlar.
+    await this.runStep('processRefundedOrders', async () => {
+      const result = await this.paymentService.processRefundedOrders();
+      if (result.refunded > 0 || result.failed > 0) {
+        this.logger.log(
+          `Auto-refund: ${result.refunded} iptal edilen sipariş iade edildi, ${result.failed} başarısız`,
+        );
+      }
+    });
+
+    // O6: Ödendi ama faturası oluşmamış siparişleri telafi et (tx-sonrası best-effort
+    // fatura üretimi hata vermişse güvenilir retry).
+    await this.runStep('reconcileMissingInvoices', async () => {
+      const result = await this.paymentService.reconcileMissingInvoices();
+      if (result.generated > 0) {
+        this.logger.log(`Eksik fatura telafisi: ${result.generated} fatura üretildi`);
+      }
+    });
+
     // Safety net: sweep out-of-stock products and cancel lingering offers/trades
     await this.runStep('sweepOutOfStockProducts', async () => {
       const sweepResult = await this.productLockService.sweepOutOfStockProducts();
@@ -119,7 +140,7 @@ export class PaymentSchedulerService {
   async handleReleaseHoldsDue() {
     this.logger.log('Checking for payment holds due for release...');
 
-    try {
+    await this.runStep('releaseHoldsDue', async () => {
       const result = await this.paymentService.releaseHoldsDue();
       if (result.count > 0) {
         this.logger.log(`Released ${result.count} payment hold(s)`);
@@ -127,16 +148,19 @@ export class PaymentSchedulerService {
       if (result.tradeCashReleased > 0) {
         this.logger.log(`Released ${result.tradeCashReleased} trade cash payment(s)`);
       }
+    });
 
-      // Create PayoutTransfer records for newly released holds
-      if (this.payoutService && (result.count > 0 || result.tradeCashReleased > 0)) {
-        const payoutsCreated = await this.payoutService.createPayoutsForReleasedHolds();
+    // Y2 (payout starvation): Payout oluşturmayı release SONUCUNDAN BAĞIMSIZ her turda
+    // çalıştır. Teslimat/48h/manuel gibi başka yollarla released olmuş ama henüz payout'u
+    // olmayan hold'lar da yakalanır. createPayoutsForReleasedHolds idempotenttir
+    // (payoutTransfer:null filtresi → payout'u olanları atlar), bu yüzden koşulsuz güvenli.
+    if (this.payoutService) {
+      await this.runStep('createPayoutsForReleasedHolds', async () => {
+        const payoutsCreated = await this.payoutService!.createPayoutsForReleasedHolds();
         if (payoutsCreated > 0) {
           this.logger.log(`Created ${payoutsCreated} payout transfer(s) for released holds`);
         }
-      }
-    } catch (error: any) {
-      this.logger.error(`Error releasing payment holds: ${error.message}`, error.stack);
+      });
     }
   }
 

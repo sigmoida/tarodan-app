@@ -43,7 +43,6 @@ import {
   RefundPaymentResponseDto,
   CancelPaymentResponseDto,
   RetryPaymentResponseDto,
-  DirectPaymentDto,
 } from './dto';
 
 @ApiTags('payments')
@@ -415,11 +414,8 @@ export class PaymentController {
     @CurrentUser('id') userId: string,
     @Body() dto: RefundPaymentDto,
   ): Promise<RefundPaymentResponseDto> {
-    // Verify user owns the order
-    const order = await this.paymentService['prisma'].order.findUnique({
-      where: { id: dto.orderId },
-      select: { buyerId: true, sellerId: true },
-    });
+    // Verify user owns the order (kapsülleme: private prisma'ya erişmek yerine servis metodu)
+    const order = await this.paymentService.findOrderParties(dto.orderId);
 
     if (!order) {
       throw new NotFoundException('Sipariş bulunamadı');

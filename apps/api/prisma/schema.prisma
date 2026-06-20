@@ -1118,7 +1118,7 @@ model SellerBankAccount {
 model PayoutTransfer {
   id                 String            @id @default(uuid())
   paymentHoldId      String?           @unique @map("payment_hold_id")
-  tradeCashPaymentId String?           @map("trade_cash_payment_id")
+  tradeCashPaymentId String?           @unique @map("trade_cash_payment_id")
   sellerId           String            @map("seller_id")
   amount             Decimal           @db.Decimal(10, 2)
   commission         Decimal           @db.Decimal(10, 2)

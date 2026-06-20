@@ -983,8 +983,9 @@ export class AdminController {
   async releasePayout(
     @Param('orderId') orderId: string,
     @CurrentUser('id') adminId: string,
+    @Body('reason') reason: string,
   ) {
-    return this.adminService.releasePayout(adminId, orderId);
+    return this.adminService.releasePayout(adminId, orderId, reason);
   }
 
   @Post('payouts/release-trade/:tradeId')

@@ -4695,9 +4695,14 @@ export class AdminService {
   /**
    * Release payment hold to seller (admin manual release)
    */
-  async releasePayout(adminId: string, orderId: string) {
+  async releasePayout(adminId: string, orderId: string, reason?: string) {
+    // Y13: Escrow→satıcı release'i geri DÖNÜLEMEZ. Sebep zorunlu kılınarak kazara/
+    // gerekçesiz tetikleme engellenir ve audit izine sebep yazılır.
+    if (!reason || !reason.trim()) {
+      throw new BadRequestException('Escrow serbest bırakma için sebep (reason) zorunludur');
+    }
     await this.paymentService.releasePayment(orderId);
-    await this.createAuditLog(adminId, 'payout_release', 'PaymentHold', orderId, { action: 'release' }, { releasedAt: new Date() });
+    await this.createAuditLog(adminId, 'payout_release', 'PaymentHold', orderId, { action: 'release', reason: reason.trim() }, { releasedAt: new Date() });
     return { success: true, orderId, message: 'Ödeme satıcıya serbest bırakıldı' };
   }
 
@@ -4728,11 +4733,26 @@ export class AdminService {
       throw new BadRequestException(`Transfer durumu '${transfer.status}' tekrar denenebilir değil`);
     }
 
+    // Y10: 'returned' transfer ZATEN PayTR'de işlenip geri döndü → aynı transId ile yeniden
+    // göndermek PayTR idempotency'sine takılabilir. Bu yüzden returned retry'da YENİ transId
+    // üret (taze transfer). 'failed' (hiç işlenmedi) ise mevcut transId korunur. Geri dönüş
+    // çoğunlukla IBAN sorunundandır; satıcı IBAN'ı düzeltince cron işleme anında GÜNCEL
+    // IBAN'ı okur (Y5) ve doğru hesaba gönderir.
+    const isReturned = transfer.status === 'returned';
+    const newTransId = isReturned
+      ? `ORD${transfer.id.replace(/-/g, '').slice(0, 16)}R${Date.now()}`
+      : undefined;
     await this.prisma.payoutTransfer.update({
       where: { id: transferId },
-      data: { status: 'pending', failureReason: null, retryCount: 0, nextRetryAt: null },
+      data: {
+        status: 'pending',
+        failureReason: null,
+        retryCount: 0,
+        nextRetryAt: null,
+        ...(newTransId ? { transId: newTransId } : {}),
+      },
     });
-    await this.createAuditLog(adminId, 'payout_retry', 'PayoutTransfer', transferId, { action: 'admin_retry' }, { status: 'pending' });
+    await this.createAuditLog(adminId, 'payout_retry', 'PayoutTransfer', transferId, { action: 'admin_retry', wasReturned: isReturned }, { status: 'pending' });
     return { success: true, transferId, message: 'Transfer tekrar denenmek üzere sıraya alındı' };
   }
 
@@ -5494,10 +5514,22 @@ export class AdminService {
         },
       });
 
+      // Y12: Safe-trade depodan-çıkış sevkinde confirmationDeadline SET ET. Eskiden
+      // set edilmediği için autoConfirmExpiredReceipts (confirmationDeadline < now filtresi)
+      // safe-trade'lerde hiç eşleşmiyordu → alıcı onaylamazsa para shipping_to_recipients'te
+      // süresiz askıda kalıyordu. Direct akıştaki (both_shipped) ile aynı setting kullanılır.
+      const confirmationDaysSetting = await tx.platformSetting.findUnique({
+        where: { settingKey: 'trade_confirmation_deadline_days' },
+      });
+      const confirmationDays = parseInt(confirmationDaysSetting?.settingValue ?? '3');
+      const confirmationDeadline = new Date(now);
+      confirmationDeadline.setDate(confirmationDeadline.getDate() + confirmationDays);
+
       const updatedTrade = await tx.trade.update({
         where: { id: tradeId },
         data: {
           status: TradeStatus.shipping_to_recipients,
+          confirmationDeadline,
           updatedAt: now,
         },
       });
@@ -6741,6 +6773,13 @@ export class AdminService {
     }
     if (trade.compensationResolvedAt) {
       throw new BadRequestException('Tazminat zaten kapatılmış');
+    }
+
+    // O13: Gerçek tazminat ödemesi bu akışın DIŞINDA (manuel) yapılır; bu metot yalnız
+    // işareti kapatır. Kazara/kanıtsız kapatmayı önlemek için açıklama/dekont (note) ZORUNLU
+    // — audit izine yazılır.
+    if (!note || !note.trim()) {
+      throw new BadRequestException('Tazminat kapatma için açıklama/dekont (note) zorunludur');
     }
 
     const now = new Date();

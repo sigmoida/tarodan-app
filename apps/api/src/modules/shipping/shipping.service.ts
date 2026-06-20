@@ -329,6 +329,14 @@ export class ShippingService {
 
     const newStatus = statusMap[payload.status] || ShipmentStatus.in_transit;
 
+    // Y11: Teslimat işlemini shipping.worker ile TUTARLI yap. 48h penceresi açıkken
+    // (FEATURE_48H_CONFIRMATION_WINDOW), webhook yolu da hold'u ANINDA serbest bırakmamalı;
+    // siparişi awaiting_buyer_confirmation'a alıp 48h deadline koymalı (release, alıcı onayı
+    // veya autoConfirmExpiredReceipts ile olur). Eskiden webhook flag'i yok sayıp daima
+    // legacy davranıyordu → aynı teslimat olayı geldiği yola göre farklı sonuç veriyordu.
+    const use48h =
+      this.configService.get<string>('FEATURE_48H_CONFIRMATION_WINDOW') === 'true';
+
     const result = await this.prisma.$transaction(async (tx) => {
       // Update shipment status
       await tx.shipment.update({
@@ -349,20 +357,34 @@ export class ShippingService {
 
       // Update order status if delivered
       if (newStatus === ShipmentStatus.delivered) {
-        await tx.order.update({
-          where: { id: shipment.orderId },
-          data: {
-            status: OrderStatus.delivered,
-            version: { increment: 1 },
-          },
-        });
+        if (use48h) {
+          const deliveredAt = new Date();
+          await tx.order.update({
+            where: { id: shipment.orderId },
+            data: {
+              status: OrderStatus.awaiting_buyer_confirmation,
+              deliveredAt,
+              confirmationDeadline: new Date(deliveredAt.getTime() + 48 * 60 * 60 * 1000),
+              version: { increment: 1 },
+            },
+          });
+        } else {
+          await tx.order.update({
+            where: { id: shipment.orderId },
+            data: {
+              status: OrderStatus.delivered,
+              version: { increment: 1 },
+            },
+          });
+        }
       }
 
       return { status: 'ok' };
     });
 
-    // Release payment hold when order is marked delivered (after transaction commits)
-    if (newStatus === ShipmentStatus.delivered) {
+    // Hold'u yalnız LEGACY modda (48h kapalı) teslimatta anında serbest bırak. 48h modda
+    // release, alıcı onayı veya autoConfirmExpiredReceipts (deadline) ile yapılır — burada DEĞİL.
+    if (newStatus === ShipmentStatus.delivered && !use48h) {
       try {
         const released = await this.paymentService.releasePaymentIfHeld(shipment.orderId);
         if (released) {

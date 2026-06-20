@@ -20,7 +20,7 @@ export interface PayTRBuyer {
 
 export interface PayTRBasketItem {
   name: string;
-  price: number; // in kuruş (1 TL = 100 kuruş)
+  price: number; // in TL — encodeBasket/createDirectPayment ×100 ile kuruşa çevirir (çağıran TL geçmeli)
   quantity: number;
 }
 
@@ -139,6 +139,27 @@ export class PayTRService {
     }
   }
 
+  // O1: Tüm PayTR fetch'lerine uygulama-seviyesi HTTP timeout. Aksi halde PayTR
+  // yanıt vermezse istek undici varsayılan ~300s'ye kadar askıda kalıp kullanıcı
+  // isteğini bloke eder. (Retry, çift-submit riski nedeniyle bilinçli eklenmedi.)
+  private readonly httpTimeoutMs = parseInt(
+    this.configService.get('PAYTR_HTTP_TIMEOUT_MS') || '20000',
+    10,
+  );
+
+  /**
+   * O2: PayTR yanıtını güvenli parse et. PayTR boş veya HTML (WAF/hata sayfası)
+   * dönerse ham JSON.parse SyntaxError fırlatır; bunun yerine null döner.
+   */
+  private parsePaytrJson<T = any>(rawText: string): T | null {
+    if (!rawText?.trim()) return null;
+    try {
+      return JSON.parse(rawText) as T;
+    } catch {
+      return null;
+    }
+  }
+
   // ==========================================================================
   // IFRAME PAYMENT (Recommended by PayTR)
   // ==========================================================================
@@ -224,6 +245,7 @@ export class PayTRService {
           'Content-Type': 'application/x-www-form-urlencoded',
         },
         body: formData.toString(),
+        signal: AbortSignal.timeout(this.httpTimeoutMs),
       });
 
       const rawText = await response.text();
@@ -298,6 +320,7 @@ export class PayTRService {
           'Content-Type': 'application/x-www-form-urlencoded',
         },
         body: formData.toString(),
+        signal: AbortSignal.timeout(this.httpTimeoutMs),
       });
 
       const rawText = await response.text();
@@ -379,7 +402,14 @@ export class PayTRService {
       .update(hashStr)
       .digest('base64');
 
-    return callback.hash === expectedHash;
+    // Wave 4: sabit-zamanlı karşılaştırma (timing yan-kanalına karşı defense-in-depth).
+    // timingSafeEqual eşit uzunluk ister → farklı uzunlukta erken false.
+    const expected = Buffer.from(expectedHash);
+    const received = Buffer.from(callback.hash || '');
+    return (
+      expected.length === received.length &&
+      crypto.timingSafeEqual(expected, received)
+    );
   }
 
   /**
@@ -435,9 +465,14 @@ export class PayTRService {
           'Content-Type': 'application/x-www-form-urlencoded',
         },
         body: formData.toString(),
+        signal: AbortSignal.timeout(this.httpTimeoutMs),
       });
 
-      const data: PayTRRefundResponse = await response.json();
+      const rawText = await response.text();
+      const data = this.parsePaytrJson<PayTRRefundResponse>(rawText);
+      if (!data) {
+        throw new BadRequestException('PayTR iade yanıtı geçersiz/boş');
+      }
 
       if (data.status !== 'success') {
         throw new BadRequestException(data.err_msg || 'PayTR iade başarısız');
@@ -496,9 +531,14 @@ export class PayTRService {
           'Content-Type': 'application/x-www-form-urlencoded',
         },
         body: formData.toString(),
+        signal: AbortSignal.timeout(this.httpTimeoutMs),
       });
 
-      const data = await response.json();
+      const rawText = await response.text();
+      const data = this.parsePaytrJson(rawText);
+      if (!data) {
+        throw new BadRequestException('PayTR taksit yanıtı geçersiz/boş');
+      }
 
       if (data.status !== 'success') {
         throw new BadRequestException('Taksit bilgileri alınamadı');
@@ -646,6 +686,7 @@ export class PayTRService {
         method: 'POST',
         headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
         body: formData.toString(),
+        signal: AbortSignal.timeout(this.httpTimeoutMs),
       });
       httpStatus = response.status;
       rawText = await response.text();
@@ -829,8 +870,14 @@ export class PayTRService {
         method: 'POST',
         headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
         body: postData,
+        signal: AbortSignal.timeout(this.httpTimeoutMs),
       });
-      const parsed = await response.json();
+      const rawText = await response.text();
+      const parsed =
+        this.parsePaytrJson<{ status: string; err_no?: string; err_msg?: string }>(rawText) ?? {
+          status: 'failed',
+          err_msg: 'PayTR geçersiz/boş yanıt',
+        };
       this.logger.log(
         `Platform transfer ${params.transId}: status=${parsed.status}${parsed.err_msg ? ` err=${parsed.err_msg}` : ''}`,
       );
@@ -870,8 +917,10 @@ export class PayTRService {
         method: 'POST',
         headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
         body: postData,
+        signal: AbortSignal.timeout(this.httpTimeoutMs),
       });
-      return await response.json();
+      const rawText = await response.text();
+      return this.parsePaytrJson(rawText) ?? { status: 'failed' };
     } catch (error: any) {
       this.logger.error(`Get returned transfers failed: ${error.message}`);
       throw new BadRequestException(
@@ -912,8 +961,10 @@ export class PayTRService {
         method: 'POST',
         headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
         body: postData,
+        signal: AbortSignal.timeout(this.httpTimeoutMs),
       });
-      return await response.json();
+      const rawText = await response.text();
+      return this.parsePaytrJson(rawText) ?? { status: 'failed' };
     } catch (error: any) {
       this.logger.error(`Resend returned transfers failed: ${error.message}`);
       throw new BadRequestException(
