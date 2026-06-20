@@ -27,6 +27,9 @@ COPY photos ./photos
 # Copy app source
 COPY apps/api ./apps/api
 
+# Build workspace packages that API imports at compile time
+RUN pnpm --filter @tarodan/types build
+
 # Generate Prisma client
 WORKDIR /app/apps/api
 RUN pnpm prisma generate
