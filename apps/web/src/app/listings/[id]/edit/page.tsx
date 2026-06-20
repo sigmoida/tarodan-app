@@ -1141,9 +1141,6 @@ export default function EditListingPage() {
                 <label className="block text-sm font-medium text-body mb-2">
                   Stok Miktarı
                 </label>
-                <p className="text-xs text-muted mb-2">
-                  Boş bırakırsanız sınırsız stok olur
-                </p>
                 <Input
                   type="number"
                   value={formData.quantity === '' || formData.quantity === null || formData.quantity === undefined ? '' : formData.quantity}
@@ -1161,6 +1158,9 @@ export default function EditListingPage() {
                   placeholder="Sınırsız"
                   min={1}
                 />
+                <p className="text-xs text-muted mt-1.5">
+                  Boş bırakırsanız sınırsız stok olur
+                </p>
               </div>
             </div>
             {(commissionPreviewLoading || commissionPreview) && (
