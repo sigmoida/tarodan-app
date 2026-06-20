@@ -7,6 +7,7 @@ import { PlatformFeeAnnouncementBanner } from '@/components/banners/PlatformFeeA
 import { LanguageProvider } from '@/i18n/LanguageContext';
 import QueryProvider from './QueryProvider';
 import { RealtimeProvider } from '@/components/realtime/RealtimeProvider';
+import { GoogleOAuthProvider } from '@react-oauth/google';
 
 export const metadata: Metadata = {
   metadataBase: new URL(process.env.NEXT_PUBLIC_APP_URL || 'https://tarodan.com'),
@@ -53,6 +54,7 @@ export default function RootLayout({
       <body className="min-h-screen flex flex-col" suppressHydrationWarning>
         <LanguageProvider>
           <QueryProvider>
+            <GoogleOAuthProvider clientId={process.env.NEXT_PUBLIC_GOOGLE_CLIENT_ID || ''}>
             <RealtimeProvider />
             <PlatformFeeAnnouncementBanner />
             <LayoutShell>
@@ -80,6 +82,7 @@ export default function RootLayout({
                 },
               }}
             />
+            </GoogleOAuthProvider>
           </QueryProvider>
         </LanguageProvider>
       </body>

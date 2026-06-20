@@ -131,6 +131,7 @@ interface AuthState {
   limits: MembershipLimits | null;
   
   login: (email: string, password: string) => Promise<void>;
+  loginWithGoogle: (idToken: string) => Promise<void>;
   register: (username: string, email: string, password: string, phone?: string, birthDate?: string, acceptMarketing?: boolean) => Promise<void>;
   logout: () => Promise<void>;
   checkAuth: () => Promise<void>;
@@ -190,7 +191,21 @@ export const useAuthStore = create<AuthState>()(
         
         set({ user, token, refreshToken, isAuthenticated: true, limits });
       },
-      
+
+      loginWithGoogle: async (idToken: string) => {
+        const response = await authApi.loginWithGoogle(idToken);
+        const { user: apiUser, tokens } = response.data;
+        const token = tokens.accessToken;
+        const refreshToken = tokens.refreshToken;
+        if (typeof window !== 'undefined') {
+          localStorage.setItem('auth_token', token);
+          if (refreshToken) localStorage.setItem('refresh_token', refreshToken);
+        }
+        const user = mapApiUser(apiUser);
+        const limits = TIER_LIMITS[user.membershipTier];
+        set({ user, token, refreshToken, isAuthenticated: true, limits });
+      },
+
       register: async (displayName: string, email: string, password: string, phone?: string, birthDate?: string, acceptMarketing?: boolean) => {
         await authApi.register({ displayName, email, password, phone, birthDate, acceptsMarketingEmails: acceptMarketing });
         // Don't auto-login after registration - user must verify email first
