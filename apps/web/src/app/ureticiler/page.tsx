@@ -4,11 +4,13 @@ import React, { useState, useMemo } from 'react';
 import Link from 'next/link';
 import Image from 'next/image';
 import { useQuery } from '@tanstack/react-query';
-import { manufacturersApi } from '@/lib/api';
+import { manufacturersApi, listingsApi } from '@/lib/api';
 import { useTranslation } from '@/i18n/LanguageContext';
 import { useAuthStore } from '@/stores/authStore';
 import { motion, AnimatePresence } from 'framer-motion';
-import { MagnifyingGlassIcon, ChevronRightIcon, GlobeAltIcon, CalendarIcon, SparklesIcon } from '@heroicons/react/24/outline';import { Button, Input } from '@tarodan/ui';
+import { MagnifyingGlassIcon, ChevronRightIcon, CalendarIcon } from '@heroicons/react/24/outline';
+import { Button, Input } from '@tarodan/ui';
+import { getProductEffectivePrice, isProductOnSaleDisplay } from '@/lib/productPrice';
 
 
 interface BrandData {
@@ -270,18 +272,84 @@ const BRANDS_DATA: BrandData[] = [
   },
 ];
 
-const SCALE_GROUPS = [
-  { scale: '1:18', label: 'Premium Ölçek', desc: 'Vitrin ve sergi için ideal büyük modeller' },
-  { scale: '1:43', label: 'Koleksiyoner Ölçeği', desc: 'Detay ve boyut dengesi' },
-  { scale: '1:64', label: 'Popüler Ölçek', desc: 'En çok toplanan, uygun fiyatlı modeller' },
-  { scale: '1:24', label: 'Model Kit Ölçeği', desc: 'Kendin yap setleri için standart' },
-];
+function ExpandedManufacturerPanel({ manufacturerId, manufacturerName }: { manufacturerId: string; manufacturerName: string }) {
+  const { data: listings = [], isLoading } = useQuery({
+    queryKey: ['manufacturer-listings-preview', manufacturerId],
+    queryFn: async () => {
+      const res = await listingsApi.getAll({ manufacturerId, limit: 4, status: 'active' });
+      const raw = res.data;
+      return Array.isArray(raw) ? raw : (raw?.data ?? raw?.products ?? []);
+    },
+    staleTime: 60_000,
+  });
+
+  const conditionLabels: Record<string, string> = { new: 'Sıfır', used: 'İkinci El', as_new: 'Yeni Gibi' };
+
+  const getImageUrl = (img: any) => {
+    if (!img) return null;
+    if (typeof img === 'string') return img;
+    return img.cardUrl ?? img.detailUrl ?? img.url ?? null;
+  };
+
+  if (isLoading) {
+    return (
+      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+        {[1, 2, 3, 4].map((n) => (
+          <div key={n} className="bg-surface rounded-lg h-40 animate-pulse" />
+        ))}
+      </div>
+    );
+  }
+
+  if (listings.length === 0) {
+    return (
+      <p className="text-sm text-muted py-2">Bu üreticiye ait aktif ilan yok.</p>
+    );
+  }
+
+  return (
+    <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+      {listings.map((product: any) => {
+        const isSale = isProductOnSaleDisplay(product);
+        const effectivePrice = getProductEffectivePrice(product);
+        const imgUrl = getImageUrl(product.images?.[0]);
+
+        return (
+          <Link key={product.id} href={`/listings/${product.id}`}
+            className="group block bg-surface rounded-lg overflow-hidden border border-border hover:border-primary-300 hover:shadow-md transition-all duration-200"
+          >
+            <div className="aspect-square relative bg-surface-alt">
+              {imgUrl ? (
+                <Image src={imgUrl} alt={product.title} fill className="object-cover group-hover:scale-105 transition-transform duration-300" sizes="200px" unoptimized />
+              ) : (
+                <div className="w-full h-full flex items-center justify-center text-subtle text-xs">Görsel yok</div>
+              )}
+              {isSale && product.discountPercent && (
+                <span className="absolute top-2 right-2 bg-danger-500 text-inverted text-[10px] font-black px-1.5 py-0.5 rounded">
+                  %{product.discountPercent}
+                </span>
+              )}
+            </div>
+            <div className="p-2">
+              {product.condition && (
+                <span className="text-[10px] font-semibold text-primary-600 bg-primary-50 px-1.5 py-0.5 rounded-full">
+                  {conditionLabels[product.condition] || product.condition}
+                </span>
+              )}
+              <p className="text-xs font-semibold text-heading mt-1 line-clamp-2 leading-snug">{product.title}</p>
+              <p className="text-sm font-black text-heading mt-1">₺{effectivePrice.toLocaleString('tr-TR')}</p>
+            </div>
+          </Link>
+        );
+      })}
+    </div>
+  );
+}
 
 export default function UreticilerPage() {
   const { t, locale } = useTranslation();
   const { isAuthenticated } = useAuthStore();
   const [searchQuery, setSearchQuery] = useState('');
-  const [selectedScale, setSelectedScale] = useState<string | null>(null);
   const [selectedCountry, setSelectedCountry] = useState<string | null>(null);
   const [expandedBrand, setExpandedBrand] = useState<string | null>(null);
 
@@ -304,18 +372,14 @@ export default function UreticilerPage() {
       );
       const productCount = m._count?.products ?? 0;
       return {
+        id: m.id as string,
         name: m.name,
         slug: m.slug,
         logoUrl: m.logo || fromData?.logoUrl || '',
         country: m.country || fromData?.country || '',
         countryFlag: fromData?.countryFlag ?? '🌐',
-        founded: fromData?.founded ?? 0,
-        parent: fromData?.parent ?? '',
-        scale: fromData?.scale ?? '',
-        description: m.description || fromData?.description || '',
-        history: fromData?.history ?? '',
-        specialty: fromData?.specialty ?? '',
-        popularModels: fromData?.popularModels ?? [],
+        founded: m.foundedYear || fromData?.founded || 0,
+        description: m.description || '',
         productCount,
       };
     });
@@ -328,11 +392,10 @@ export default function UreticilerPage() {
         b.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
         (b.description || '').toLowerCase().includes(searchQuery.toLowerCase()) ||
         (b.country || '').toLowerCase().includes(searchQuery.toLowerCase());
-      const matchesScale = !selectedScale || b.scale === selectedScale;
       const matchesCountry = !selectedCountry || b.country === selectedCountry;
-      return matchesSearch && matchesScale && matchesCountry;
+      return matchesSearch && matchesCountry;
     });
-  }, [brandsForPage, searchQuery, selectedScale, selectedCountry]);
+  }, [brandsForPage, searchQuery, selectedCountry]);
 
   const countries = useMemo(() => {
     const map = new Map<string, { flag: string; count: number }>();
@@ -362,7 +425,6 @@ export default function UreticilerPage() {
             className="text-center"
           >
             <div className="inline-flex items-center gap-2 bg-primary-100 text-primary-700 text-xs font-bold uppercase tracking-widest px-4 py-1.5 mb-5" style={{ borderRadius: '4px' }}>
-              <SparklesIcon className="w-3.5 h-3.5" />
               {brandsForPage.length} Üretici &middot; {totalProducts.toLocaleString('tr-TR')}+ Ürün
             </div>
             <h1 className="text-4xl sm:text-5xl font-black text-heading mb-4 tracking-tight">
@@ -410,23 +472,6 @@ export default function UreticilerPage() {
                 style={{ borderRadius: '4px' }} />
             </div>
 
-            {/* Scale Filter */}
-            <div className="flex items-center gap-1.5 flex-wrap">
-              <Button variant="secondary" onClick={() => setSelectedScale(null)}
-                className={`px-3 py-1.5 text-xs font-semibold border transition-colors ${!selectedScale ? 'bg-heading text-inverted border-border-strong' : 'bg-surface-elevated text-muted border-border hover:border-border-strong'}`}
-                style={{ borderRadius: '4px' }}>
-                Tümü
-              </Button>
-              {SCALE_GROUPS.map((sg) => (
-                <Button variant="secondary" key={sg.scale}
-                  onClick={() => setSelectedScale(selectedScale === sg.scale ? null : sg.scale)}
-                  className={`px-3 py-1.5 text-xs font-semibold border transition-colors ${selectedScale === sg.scale ? 'bg-primary-500 text-inverted border-primary-500' : 'bg-surface-elevated text-muted border-border hover:border-primary-300'}`}
-                  style={{ borderRadius: '4px' }}>
-                  {sg.scale}
-                </Button>
-              ))}
-            </div>
-
             {/* Country Filter */}
             <div className="flex items-center gap-1.5 flex-wrap">
               {selectedCountry && (
@@ -448,26 +493,6 @@ export default function UreticilerPage() {
         </div>
       </div>
 
-      {/* Scale Info Cards */}
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 mt-6">
-        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-          {SCALE_GROUPS.map((sg) => {
-            const count = brandsForPage.filter((b) => b.scale === sg.scale).length;
-            return (
-              <button type="button" key={sg.scale}
-                onClick={() => setSelectedScale(selectedScale === sg.scale ? null : sg.scale)}
-                className={`block w-full text-left p-3 sm:p-4 border transition-all ${selectedScale === sg.scale ? 'bg-primary-50 border-primary-300 shadow-sm' : 'bg-surface-elevated border-border hover:border-primary-200 hover:shadow-sm'}`}
-                style={{ borderRadius: '4px' }}>
-                <div className="text-lg sm:text-xl font-black text-heading">{sg.scale}</div>
-                <div className="text-[11px] font-semibold text-primary-600 mt-0.5">{sg.label}</div>
-                <div className="text-[10px] text-subtle mt-1 leading-snug">{sg.desc}</div>
-                <div className="text-[10px] text-muted mt-2 font-medium">{count} üretici</div>
-              </button>
-            );
-          })}
-        </div>
-      </div>
-
       {/* Brand Cards */}
       <div className="max-w-7xl mx-auto px-4 sm:px-6 mt-8">
         {filteredBrands.length === 0 ? (
@@ -481,7 +506,7 @@ export default function UreticilerPage() {
             </div>
             <h3 className="text-lg font-bold text-heading mb-1">Sonuç Bulunamadı</h3>
             <p className="text-sm text-muted mb-4">&quot;{searchQuery}&quot; aramasıyla eşleşen üretici yok.</p>
-            <Button variant="secondary" onClick={() => { setSearchQuery(''); setSelectedScale(null); setSelectedCountry(null); }}
+            <Button variant="secondary" onClick={() => { setSearchQuery(''); setSelectedCountry(null); }}
               className="px-5 py-2 bg-heading text-inverted text-sm font-semibold hover:bg-primary-600 transition-colors"
               style={{ borderRadius: '4px' }}>
               Filtreleri Temizle
@@ -521,22 +546,16 @@ export default function UreticilerPage() {
                       <div className="flex items-center gap-2 mb-1">
                         <h2 className="text-lg sm:text-xl font-bold text-heading truncate">{brand.name}</h2>
                         <span className="text-sm">{brand.countryFlag}</span>
-                        <span className="ml-auto flex-shrink-0 bg-primary-50 text-primary-700 text-[11px] font-bold px-2.5 py-0.5" style={{ borderRadius: '4px' }}>
-                          {brand.scale}
-                        </span>
                       </div>
                       <p className="text-sm text-muted line-clamp-1">{brand.description}</p>
-                      <div className="flex items-center gap-4 mt-2 text-xs text-subtle">
-                        <span className="flex items-center gap-1">
-                          <CalendarIcon className="w-3.5 h-3.5" />
-                          {brand.founded}
-                        </span>
-                        <span className="flex items-center gap-1">
-                          <GlobeAltIcon className="w-3.5 h-3.5" />
-                          {brand.parent}
-                        </span>
-                        <span className="font-medium text-muted">{brand.scale}</span>
-                      </div>
+                      {brand.founded > 0 && (
+                        <div className="flex items-center gap-4 mt-2 text-xs text-subtle">
+                          <span className="flex items-center gap-1">
+                            <CalendarIcon className="w-3.5 h-3.5" />
+                            {brand.founded}
+                          </span>
+                        </div>
+                      )}
                     </div>
                     <ChevronRightIcon className={`w-5 h-5 text-subtle flex-shrink-0 transition-transform duration-200 ${expandedBrand === brand.slug ? 'rotate-90' : ''}`} />
                   </button>
@@ -551,78 +570,31 @@ export default function UreticilerPage() {
                         transition={{ duration: 0.25 }}
                         className="overflow-hidden"
                       >
-                        <div className="px-4 sm:px-5 pb-5 border-t border-border-subtle pt-4">
-                          <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
-                            {/* History - only when we have content */}
-                            {(brand.history || brand.specialty) && (
-                              <div className="md:col-span-2">
-                                <h3 className="text-sm font-bold text-heading mb-2 flex items-center gap-1.5">
-                                  <CalendarIcon className="w-4 h-4 text-primary-500" />
-                                  Üretici Tarihi
-                                </h3>
-                                {brand.history && <p className="text-sm text-muted leading-relaxed">{brand.history}</p>}
-                                {brand.specialty && (
-                                  <div className="mt-4 p-3 bg-primary-50/50 border border-primary-100" style={{ borderRadius: '4px' }}>
-                                    <h4 className="text-xs font-bold text-primary-700 mb-1">Uzmanlık Alanı</h4>
-                                    <p className="text-xs text-primary-600">{brand.specialty}</p>
-                                  </div>
-                                )}
-                              </div>
-                            )}
+                        <div className="px-4 sm:px-5 pb-5 border-t border-border-subtle pt-4 space-y-4">
+                          {/* Listings preview */}
+                          <ExpandedManufacturerPanel manufacturerId={brand.id} manufacturerName={brand.name} />
 
-                            {/* Popular Models - only when we have models */}
-                            <div className={!(brand.history || brand.specialty) ? 'md:col-span-3' : ''}>
-                              <h3 className="text-sm font-bold text-heading mb-2 flex items-center gap-1.5">
-                                <SparklesIcon className="w-4 h-4 text-primary-500" />
-                                Popüler Modeller
-                              </h3>
-                              {Array.isArray(brand.popularModels) && brand.popularModels.length > 0 ? (
-                              <ul className="space-y-1.5">
-                                {brand.popularModels.map((model) => (
-                                  <li key={model}>
-                                    <Link
-                                      href={`/listings?manufacturer=${encodeURIComponent(brand.name)}&search=${encodeURIComponent(model)}`}
-                                      className="flex items-center gap-2 text-sm text-muted hover:text-primary-600 transition-colors group"
-                                    >
-                                      <span className="w-1.5 h-1.5 bg-border-strong group-hover:bg-primary-500 transition-colors flex-shrink-0" style={{ borderRadius: '1px' }} />
-                                      {model}
-                                      <ChevronRightIcon className="w-3 h-3 ml-auto opacity-0 group-hover:opacity-100 transition-opacity" />
-                                    </Link>
-                                  </li>
-                                ))}
-                              </ul>
-                              ) : (
-                                <p className="text-sm text-muted">Bu üretici için popüler model listesi yok.</p>
+                          {/* Footer row */}
+                          <div className="flex flex-wrap items-center justify-between gap-3 pt-3 border-t border-border-subtle">
+                            <div className="flex flex-wrap items-center gap-3">
+                              {(brand.founded > 0 || brand.country) && (
+                                <div className="flex items-center gap-2 bg-surface px-3 py-1.5 text-xs" style={{ borderRadius: '4px' }}>
+                                  <span className="font-bold text-heading">Kuruluş:</span>
+                                  <span className="text-muted">{[brand.founded > 0 ? brand.founded : null, brand.country].filter(Boolean).join(', ')}</span>
+                                </div>
                               )}
-
-                              <Link
-                                href={`/listings?manufacturer=${encodeURIComponent(brand.name)}`}
-                                className="inline-flex items-center gap-1 mt-4 text-sm font-semibold text-primary-600 hover:text-primary-700 transition-colors"
-                              >
-                                Tüm {brand.name} ilanları
-                                <ChevronRightIcon className="w-3.5 h-3.5" />
-                              </Link>
+                              <div className="flex items-center gap-2 bg-surface px-3 py-1.5 text-xs" style={{ borderRadius: '4px' }}>
+                                <span className="font-bold text-heading">Aktif İlan:</span>
+                                <span className="text-primary-600 font-semibold">{brand.productCount ?? 0}</span>
+                              </div>
                             </div>
-                          </div>
-
-                          {/* Quick Info Bar */}
-                          <div className="flex flex-wrap items-center gap-3 mt-5 pt-4 border-t border-border-subtle">
-                            <div className="flex items-center gap-2 bg-surface px-3 py-1.5 text-xs" style={{ borderRadius: '4px' }}>
-                              <span className="font-bold text-heading">Kuruluş:</span>
-                              <span className="text-muted">{brand.founded}, {brand.country}</span>
-                            </div>
-                            <div className="flex items-center gap-2 bg-surface px-3 py-1.5 text-xs" style={{ borderRadius: '4px' }}>
-                              <span className="font-bold text-heading">Ana Şirket:</span>
-                              <span className="text-muted">{brand.parent}</span>
-                            </div>
-                            <div className="flex items-center gap-2 bg-surface px-3 py-1.5 text-xs" style={{ borderRadius: '4px' }}>
-                              <span className="font-bold text-heading">Ölçek:</span>
-                              <span className="text-muted">{brand.scale}</span>
-                            </div>
-                            <div className="flex items-center gap-2 bg-surface px-3 py-1.5 text-xs" style={{ borderRadius: '4px' }}>
-                              <span className="font-bold text-heading">Aktif İlan:</span>
-                              <span className="text-primary-600 font-semibold">{brand.productCount ?? 0}</span>
-                            </div>
+                            <Link
+                              href={`/listings?manufacturer=${encodeURIComponent(brand.name)}`}
+                              className="inline-flex items-center gap-1 text-sm font-semibold text-primary-600 hover:text-primary-700 transition-colors"
+                            >
+                              Tüm {brand.name} ilanları
+                              <ChevronRightIcon className="w-3.5 h-3.5" />
+                            </Link>
                           </div>
                         </div>
                       </motion.div>

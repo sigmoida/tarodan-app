@@ -83,7 +83,7 @@ export class ModerationWorker {
     }
 
     // AI sonuçlarını ürüne yaz
-    await this.prisma.product.update({
+    const updated = await this.prisma.product.update({
       where: { id: productId },
       data: {
         aiCheckStatus: status,
@@ -93,6 +93,21 @@ export class ModerationWorker {
         aiCheckReason: reason,
         aiCheckedAt: new Date(),
       },
+      select: { sellerId: true },
+    });
+
+    // Birleşik AI denetim günlüğüne yaz (admin "AI Denetim" — tüm varlıklar ortak)
+    await this.ai.recordEvent({
+      entityType: 'product',
+      entityId: productId,
+      userId: updated.sellerId,
+      kind: 'image',
+      field: 'product_image',
+      decision: status === 'passed' ? 'pass' : status === 'flagged' ? 'flag' : 'review',
+      relevanceScore: minRelevance,
+      nsfwScore: maxNsfw,
+      labels: topLabels,
+      reason,
     });
 
     // Temiz + ilgili -> OTO-ONAY (yalnızca hâlâ pending ise; admin kararını ezme)

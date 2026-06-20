@@ -21,6 +21,7 @@ interface User {
   // Business account fields
   companyName?: string;
   taxId?: string;
+  businessStatus?: 'pending' | 'approved' | 'rejected';
   
   // Membership
   membershipTier: MembershipTier;
@@ -110,6 +111,7 @@ const mapApiUser = (apiUser: any): User => ({
   role: apiUser.role,
   companyName: apiUser.companyName || apiUser.company_name,
   taxId: apiUser.taxId || apiUser.tax_id,
+  businessStatus: apiUser.businessStatus || apiUser.business_status,
   membershipTier: extractMembershipTier(apiUser),
   membership: apiUser.membership,
   listingCount: apiUser.listingCount || apiUser.listing_count || apiUser._count?.products || 0,

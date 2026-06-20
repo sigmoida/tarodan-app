@@ -24,6 +24,7 @@ interface Manufacturer {
   description?: string;
   website?: string;
   country?: string;
+  foundedYear?: number | null;
   isActive: boolean;
   createdAt: string;
   updatedAt: string;
@@ -35,6 +36,7 @@ interface ManufacturerFormData {
   description: string;
   website: string;
   country: string;
+  foundedYear: string;
   isActive: boolean;
 }
 
@@ -54,6 +56,7 @@ export default function ManufacturersPage() {
     description: '',
     website: '',
     country: '',
+    foundedYear: '',
     isActive: true,
   });
 
@@ -78,6 +81,16 @@ export default function ManufacturersPage() {
     loadManufacturers();
   }, []);
 
+  useEffect(() => {
+    const handleEsc = (e: KeyboardEvent) => {
+      if (e.key !== 'Escape') return;
+      if (deleteConfirm) setDeleteConfirm(null);
+      else if (showModal) setShowModal(false);
+    };
+    document.addEventListener('keydown', handleEsc);
+    return () => document.removeEventListener('keydown', handleEsc);
+  }, [deleteConfirm, showModal]);
+
   const loadManufacturers = async () => {
     setLoading(true);
     try {
@@ -100,6 +113,7 @@ export default function ManufacturersPage() {
       description: '',
       website: '',
       country: '',
+      foundedYear: '',
       isActive: true,
     });
     setShowModal(true);
@@ -114,6 +128,7 @@ export default function ManufacturersPage() {
       description: m.description || '',
       website: m.website || '',
       country: m.country || '',
+      foundedYear: m.foundedYear != null ? String(m.foundedYear) : '',
       isActive: m.isActive,
     });
     setShowModal(true);
@@ -133,7 +148,7 @@ export default function ManufacturersPage() {
     setUploadingLogo(true);
     try {
       const res = await adminApi.uploadManufacturerLogo(file);
-      const uploadedUrl = res.data.url || res.data.key;
+      const uploadedUrl = res.data.key || res.data.url;
       setFormData(prev => ({ ...prev, logo: uploadedUrl }));
       setLogoPreview(URL.createObjectURL(file));
       toast.success('Logo yüklendi');
@@ -148,11 +163,20 @@ export default function ManufacturersPage() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     try {
+      const payload = {
+        name: formData.name,
+        logo: formData.logo || null,
+        description: formData.description || null,
+        website: formData.website || null,
+        country: formData.country || null,
+        foundedYear: formData.foundedYear ? parseInt(formData.foundedYear, 10) : null,
+        isActive: formData.isActive,
+      };
       if (editingManufacturer) {
-        await adminApi.updateManufacturer(editingManufacturer.id, formData);
+        await adminApi.updateManufacturer(editingManufacturer.id, payload);
         toast.success('Üretici güncellendi');
       } else {
-        await adminApi.createManufacturer(formData);
+        await adminApi.createManufacturer(payload);
         toast.success('Üretici oluşturuldu');
       }
       setShowModal(false);
@@ -330,14 +354,27 @@ export default function ManufacturersPage() {
                       placeholder="https://www.hotwheels.com"
                     />
                   </div>
-                  <div>
-                    <label className="block text-sm font-medium text-body mb-1">Ülke</label>
-                    <Input
-                      type="text"
-                      value={formData.country}
-                      onChange={(e) => setFormData({ ...formData, country: e.target.value })}
-                      placeholder="Örn: ABD"
-                    />
+                  <div className="flex gap-4">
+                    <div className="flex-1">
+                      <label className="block text-sm font-medium text-body mb-1">Ülke</label>
+                      <Input
+                        type="text"
+                        value={formData.country}
+                        onChange={(e) => setFormData({ ...formData, country: e.target.value })}
+                        placeholder="Örn: ABD"
+                      />
+                    </div>
+                    <div className="flex-1">
+                      <label className="block text-sm font-medium text-body mb-1">Kuruluş Yılı</label>
+                      <Input
+                        type="number"
+                        value={formData.foundedYear}
+                        onChange={(e) => setFormData({ ...formData, foundedYear: e.target.value })}
+                        min="1800"
+                        max="2100"
+                        placeholder="Örn: 1968"
+                      />
+                    </div>
                   </div>
                   <div>
                     <label className="block text-sm font-medium text-body mb-1">Açıklama</label>

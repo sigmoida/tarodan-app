@@ -8,13 +8,15 @@ import { ActionButtons, ActionIconButton } from "@/components/admin-list";
 import {
   CheckIcon,
   XMarkIcon,
-  EyeIcon,
   NoSymbolIcon,
+  ArrowUturnLeftIcon,
 } from "@heroicons/react/24/outline";
 import toast from "react-hot-toast";
 import { ResourceListPage } from "@/components/ResourceListPage";
 import { useAdminResource } from "@/hooks/useAdminResource";
+import { usePrompt } from "@/components/PromptProvider";
 import { useMemo } from "react";
+import { useRouter } from "next/navigation";
 
 // ─── Tipler ────────────────────────────────────────────────────────────────
 
@@ -72,7 +74,9 @@ function mapMessage(m: any): Message {
 }
 
 const messageStatusConfig: Record<string, StatusConfig> = {
+  sent: { label: "Gönderildi", variant: "default" },
   pending: { label: "Onay Bekliyor", variant: "warning" },
+  pending_approval: { label: "Onay Bekliyor", variant: "warning" },
   approved: { label: "Onaylandı", variant: "success" },
   rejected: { label: "Reddedildi", variant: "danger" },
 };
@@ -101,6 +105,7 @@ export default function MessagesPage() {
       });
     },
     limit: 20,
+    syncUrl: true,
     initialFilters: { status: "pending" },
     errorMessage: "Mesajlar yüklenemedi",
   });
@@ -109,6 +114,9 @@ export default function MessagesPage() {
     () => rawRows.map(mapMessage),
     [rawRows],
   );
+
+  const prompt = usePrompt();
+  const router = useRouter();
 
   // ── Aksiyonlar ─────────────────────────────────────────────────────────────
 
@@ -122,14 +130,19 @@ export default function MessagesPage() {
     }
   };
 
-  const handleReject = async (messageId: string) => {
-    const reason = prompt("Red nedeni:");
-    if (!reason || !reason.trim()) {
-      toast.error("Red nedeni gereklidir");
-      return;
-    }
+  const handleRevert = async (messageId: string) => {
     try {
-      await adminApi.rejectMessage(messageId, reason);
+      await adminApi.revertMessage(messageId);
+      toast.success("Mesaj bekleyene alındı");
+      refetch();
+    } catch (error: any) {
+      toast.error(error.response?.data?.message || "İşlem başarısız");
+    }
+  };
+
+  const handleReject = async (messageId: string) => {
+    try {
+      await adminApi.rejectMessage(messageId);
       toast.success("Mesaj reddedildi");
       refetch();
     } catch (error: any) {
@@ -142,10 +155,14 @@ export default function MessagesPage() {
       toast.error("Gönderen bilgisi bulunamadı");
       return;
     }
-    const reason = window.prompt(
-      "Yasaklama sebebi (mesaj ihlali):",
-      "Mesaj kuralları ihlali",
-    );
+    const reason = await prompt({
+      title: "Göndereni Yasakla",
+      label: "Yasaklama sebebi (mesaj ihlali)",
+      defaultValue: "Mesaj kuralları ihlali",
+      confirmLabel: "Yasakla",
+      destructive: true,
+      required: false,
+    });
     if (reason === null) return;
     try {
       await adminApi.banUser(
@@ -227,31 +244,37 @@ export default function MessagesPage() {
         const message = row.original;
         return (
           <ActionButtons>
-            {message.status === "pending" && (
-              <>
-                <ActionIconButton
-                  icon={CheckIcon}
-                  onClick={() => handleApprove(message.id)}
-                  title="Onayla"
-                  variant="success"
-                />
-                <ActionIconButton
-                  icon={XMarkIcon}
-                  onClick={() => handleReject(message.id)}
-                  title="Reddet"
-                  variant="danger"
-                />
-                {message.senderId && (
-                  <ActionIconButton
-                    icon={NoSymbolIcon}
-                    onClick={() => handleBanSender(message)}
-                    title="Göndereni yasakla (hesap engeli)"
-                    variant="primary"
-                  />
-                )}
-              </>
+            {(message.status === "pending" || message.status === "rejected") && (
+              <ActionIconButton
+                icon={CheckIcon}
+                onClick={() => handleApprove(message.id)}
+                title="Onayla"
+                variant="success"
+              />
             )}
-            <ActionIconButton icon={EyeIcon} title="Detay" />
+            {message.status === "rejected" ? (
+              <ActionIconButton
+                icon={ArrowUturnLeftIcon}
+                onClick={() => handleRevert(message.id)}
+                title="Geri Al (Bekleyene çevir)"
+                variant="primary"
+              />
+            ) : (
+              <ActionIconButton
+                icon={XMarkIcon}
+                onClick={() => handleReject(message.id)}
+                title="Reddet"
+                variant="danger"
+              />
+            )}
+            {message.senderId && (
+              <ActionIconButton
+                icon={NoSymbolIcon}
+                onClick={() => handleBanSender(message)}
+                title="Göndereni yasakla"
+                variant="primary"
+              />
+            )}
           </ActionButtons>
         );
       },
@@ -307,6 +330,7 @@ export default function MessagesPage() {
       page={page}
       totalPages={totalPages}
       onPageChange={setPage}
+      onRowClick={(m) => router.push(`/messages/${m.id}`)}
     />
   );
 }

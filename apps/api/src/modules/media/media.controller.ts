@@ -29,27 +29,10 @@ export class MediaController {
     private readonly moderationAi: ModerationAiClient,
   ) {}
 
-  /** Görsel dosyasını AI ile NSFW denetle — uygunsuzsa yüklemeyi engelle. */
-  private async assertCleanImageFile(file: Express.Multer.File): Promise<void> {
-    if (
-      !this.moderationAi.isEnabled ||
-      !file?.buffer ||
-      !file.mimetype?.startsWith('image/')
-    ) {
-      return;
-    }
-    const dataUri = `data:${file.mimetype};base64,${file.buffer.toString('base64')}`;
-    const verdict = await this.moderationAi.moderateImage(dataUri);
-    if (verdict?.decision === 'flag') {
-      throw new BadRequestException(
-        'Yüklediğiniz resim uygun değildir. Lütfen uygun bir görsel seçin.',
-      );
-    }
-  }
-
   @Post('upload')
   @UseInterceptors(FileInterceptor('file'))
   async uploadFile(
+    @Request() req: any,
     @UploadedFile() file: Express.Multer.File,
     @Query('folder') folder?: string,
     @Query('resize') resize?: string,
@@ -59,10 +42,12 @@ export class MediaController {
       throw new BadRequestException('No file provided');
     }
 
-    // Mesaj görseli ise dosyanın kendisini AI ile denetle (uygunsuz/NSFW → engelle)
-    if ((folder || '') === 'messages') {
-      await this.assertCleanImageFile(file);
-    }
+    // Yüklenen her görseli AI ile denetle (uygunsuz/NSFW → engelle)
+    await this.moderationAi.assertImageClean(file, {
+      entityType: 'upload',
+      userId: req.user?.id,
+      field: folder || 'upload',
+    });
 
     const options: UploadOptions = {
       folder: folder || 'uploads',
@@ -117,7 +102,12 @@ export class MediaController {
     }
 
     for (const file of files) {
-      await this.assertCleanImageFile(file);
+      await this.moderationAi.assertImageClean(file, {
+        entityType: 'product',
+        entityId: productId,
+        userId: req.user?.id,
+        field: 'product_image',
+      });
     }
 
     const results = await Promise.all(
@@ -133,10 +123,20 @@ export class MediaController {
 
   @Post('upload/avatar')
   @UseInterceptors(FileInterceptor('avatar'))
-  async uploadAvatar(@UploadedFile() file: Express.Multer.File): Promise<UploadResult> {
+  async uploadAvatar(
+    @Request() req: any,
+    @UploadedFile() file: Express.Multer.File,
+  ): Promise<UploadResult> {
     if (!file) {
       throw new BadRequestException('No file provided');
     }
+
+    await this.moderationAi.assertImageClean(file, {
+      entityType: 'user',
+      entityId: req.user?.id,
+      userId: req.user?.id,
+      field: 'avatar',
+    });
 
     return this.mediaService.upload(file, {
       folder: 'avatars',

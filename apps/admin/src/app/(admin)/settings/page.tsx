@@ -3,7 +3,7 @@
 import { useState, useEffect } from "react";
 import { adminApi } from "@/lib/api";
 import toast from "react-hot-toast";
-import { Button, Input, Select, Spinner } from "@tarodan/ui";
+import { Button, Input, Spinner } from "@tarodan/ui";
 import { ExclamationTriangleIcon } from "@heroicons/react/24/outline";
 import { AdminTabs } from "@/components/AdminTabs";
 
@@ -19,24 +19,14 @@ interface Settings {
   minProductPrice: number;
   maxProductPrice: number;
   maxMessageLength: number;
-  basicMonthlyPrice: number;
-  premiumMonthlyPrice: number;
-  businessMonthlyPrice: number;
-  yearlyDiscountPercentage: number;
-  siteName: string;
-  logoUrl: string;
-  supportEmail: string;
-  timezone: string;
-  currency: string;
-  language: string;
 }
 
 export default function SettingsPage() {
   const [settings, setSettings] = useState<Settings>({
     freeListingLimit: 10,
     basicListingLimit: 50,
-    premiumListingLimit: -1, // -1 means unlimited
-    businessListingLimit: -1, // -1 means unlimited
+    premiumListingLimit: -1,
+    businessListingLimit: -1,
     tradeResponseHours: 72,
     tradePaymentHours: 48,
     tradeShippingDays: 7,
@@ -44,23 +34,13 @@ export default function SettingsPage() {
     minProductPrice: 10,
     maxProductPrice: 100000,
     maxMessageLength: 1000,
-    basicMonthlyPrice: 49,
-    premiumMonthlyPrice: 99,
-    businessMonthlyPrice: 499,
-    yearlyDiscountPercentage: 20,
-    siteName: "Tarotaro",
-    logoUrl: "",
-    supportEmail: "support@tarotaro.com",
-    timezone: "Europe/Istanbul",
-    currency: "TRY",
-    language: "tr",
   });
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState(false);
   const [saving, setSaving] = useState(false);
-  const [activeTab, setActiveTab] = useState<
-    "general" | "listing" | "trade" | "message" | "membership"
-  >("general");
+  const [activeTab, setActiveTab] = useState<"listing" | "trade" | "message">(
+    "listing",
+  );
 
   useEffect(() => {
     loadSettings();
@@ -71,13 +51,10 @@ export default function SettingsPage() {
     setLoadError(false);
     try {
       const settingsResponse = await adminApi.getSettings();
-      // API response format: { data: { data: [...] } } or { data: [...] }
       const settingsData =
         settingsResponse.data?.data || settingsResponse.data || [];
       const settingsObj: Record<string, any> = {};
 
-      // Handle both array and object formats
-      // Backend returns Prisma model with settingKey and settingValue fields
       if (Array.isArray(settingsData)) {
         settingsData.forEach((s: any) => {
           const key = s.settingKey || s.key;
@@ -92,67 +69,6 @@ export default function SettingsPage() {
         });
       }
 
-      if (process.env.NODE_ENV === "development")
-        console.log("Loaded settings:", settingsObj);
-
-      // Load membership tier prices if not in platform settings
-      let basicMonthlyPrice = settingsObj.basic_monthly_price
-        ? Number(settingsObj.basic_monthly_price)
-        : null;
-      let premiumMonthlyPrice = settingsObj.premium_monthly_price
-        ? Number(settingsObj.premium_monthly_price)
-        : null;
-      let businessMonthlyPrice = settingsObj.business_monthly_price
-        ? Number(settingsObj.business_monthly_price)
-        : null;
-      let yearlyDiscountPercentage = settingsObj.yearly_discount_percentage
-        ? Number(settingsObj.yearly_discount_percentage)
-        : null;
-
-      if (
-        basicMonthlyPrice === null ||
-        premiumMonthlyPrice === null ||
-        businessMonthlyPrice === null ||
-        yearlyDiscountPercentage === null
-      ) {
-        try {
-          const tiersResponse = await adminApi.getMembershipTiers();
-          const tiers = tiersResponse.data?.tiers || tiersResponse.data || [];
-
-          const basicTier = tiers.find((t: any) => t.type === "basic");
-          const premiumTier = tiers.find((t: any) => t.type === "premium");
-          const businessTier = tiers.find((t: any) => t.type === "business");
-
-          if (basicMonthlyPrice === null && basicTier) {
-            basicMonthlyPrice = Number(basicTier.monthlyPrice) || 49;
-          }
-          if (premiumMonthlyPrice === null && premiumTier) {
-            premiumMonthlyPrice = Number(premiumTier.monthlyPrice) || 99;
-          }
-          if (businessMonthlyPrice === null && businessTier) {
-            businessMonthlyPrice = Number(businessTier.monthlyPrice) || 499;
-          }
-          // Calculate discount percentage from existing prices if available
-          if (yearlyDiscountPercentage === null && premiumTier) {
-            const monthly = Number(premiumTier.monthlyPrice) || 99;
-            const yearly = Number(premiumTier.yearlyPrice) || 960;
-            if (monthly > 0 && yearly > 0) {
-              // Calculate: yearly = monthly * 12 * (1 - discount/100)
-              // discount = (1 - yearly/(monthly*12)) * 100
-              yearlyDiscountPercentage = Math.round(
-                (1 - yearly / (monthly * 12)) * 100,
-              );
-            } else {
-              yearlyDiscountPercentage = 20; // Default
-            }
-          }
-        } catch (error) {
-          if (process.env.NODE_ENV === "development")
-            console.error("Failed to load membership tiers:", error);
-        }
-      }
-
-      // Map platform setting keys to local settings
       setSettings({
         freeListingLimit: settingsObj.free_listing_limit
           ? Number(settingsObj.free_listing_limit)
@@ -187,20 +103,8 @@ export default function SettingsPage() {
         maxMessageLength: settingsObj.max_message_length
           ? Number(settingsObj.max_message_length)
           : 1000,
-        basicMonthlyPrice: basicMonthlyPrice ?? 49,
-        premiumMonthlyPrice: premiumMonthlyPrice ?? 99,
-        businessMonthlyPrice: businessMonthlyPrice ?? 499,
-        yearlyDiscountPercentage: yearlyDiscountPercentage ?? 20,
-        siteName: settingsObj.site_name || "Tarotaro",
-        logoUrl: settingsObj.logo_url || "",
-        supportEmail: settingsObj.support_email || "support@tarotaro.com",
-        timezone: settingsObj.timezone || "Europe/Istanbul",
-        currency: settingsObj.currency || "TRY",
-        language: settingsObj.language || "tr",
       });
     } catch (error) {
-      if (process.env.NODE_ENV === "development")
-        console.error("Settings load error:", error);
       setLoadError(true);
       toast.error("Ayarlar yüklenemedi", { id: "settings-load" });
     } finally {
@@ -211,7 +115,6 @@ export default function SettingsPage() {
   const handleSaveSettings = async () => {
     setSaving(true);
     try {
-      // Save each setting individually with correct keys
       const settingsToSave = [];
 
       if (activeTab === "listing") {
@@ -241,15 +144,6 @@ export default function SettingsPage() {
             settings.maxProductPrice.toString(),
           ),
         );
-      } else if (activeTab === "general") {
-        settingsToSave.push(
-          adminApi.updateSetting("site_name", settings.siteName),
-          adminApi.updateSetting("logo_url", settings.logoUrl),
-          adminApi.updateSetting("support_email", settings.supportEmail),
-          adminApi.updateSetting("timezone", settings.timezone),
-          adminApi.updateSetting("currency", settings.currency),
-          adminApi.updateSetting("language", settings.language),
-        );
       } else if (activeTab === "trade") {
         settingsToSave.push(
           adminApi.updateSetting(
@@ -276,34 +170,12 @@ export default function SettingsPage() {
             settings.maxMessageLength.toString(),
           ),
         );
-      } else if (activeTab === "membership") {
-        settingsToSave.push(
-          adminApi.updateSetting(
-            "basic_monthly_price",
-            settings.basicMonthlyPrice.toString(),
-          ),
-          adminApi.updateSetting(
-            "premium_monthly_price",
-            settings.premiumMonthlyPrice.toString(),
-          ),
-          adminApi.updateSetting(
-            "business_monthly_price",
-            settings.businessMonthlyPrice.toString(),
-          ),
-          adminApi.updateSetting(
-            "yearly_discount_percentage",
-            settings.yearlyDiscountPercentage.toString(),
-          ),
-        );
       }
 
       await Promise.all(settingsToSave);
       toast.success("Ayarlar kaydedildi");
-      // Reload settings after save to reflect changes
       await loadSettings();
     } catch (error) {
-      if (process.env.NODE_ENV === "development")
-        console.error("Settings save error:", error);
       toast.error("Ayarlar kaydedilemedi");
     } finally {
       setSaving(false);
@@ -337,124 +209,20 @@ export default function SettingsPage() {
   return (
     <div className="space-y-6">
       <div>
-        <h1 className="text-2xl font-bold text-heading">Platform Ayarları</h1>
+        <h1 className="text-2xl font-bold text-heading">Sistem Ayarları</h1>
         <p className="text-muted mt-1">Sistem yapılandırmasını yönetin</p>
       </div>
 
-      {/* Tabs */}
       <AdminTabs
         tabs={[
-          { key: "general", label: "Genel" },
           { key: "listing", label: "İlan" },
           { key: "trade", label: "Takas" },
           { key: "message", label: "Mesaj" },
-          { key: "membership", label: "Üyelik" },
         ]}
         value={activeTab}
-        onChange={(k) =>
-          setActiveTab(
-            k as "general" | "listing" | "trade" | "message" | "membership",
-          )
-        }
+        onChange={(k) => setActiveTab(k as "listing" | "trade" | "message")}
       />
 
-      {/* General Settings */}
-      {activeTab === "general" && (
-        <div className="admin-card">
-          <h2 className="text-lg font-semibold text-heading mb-4">
-            Genel Ayarlar
-          </h2>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-            <div>
-              <label className="block text-sm text-muted mb-2">
-                Site Adı
-              </label>
-              <Input
-                type="text"
-                value={settings.siteName}
-                onChange={(e) =>
-                  setSettings({ ...settings, siteName: e.target.value })
-                }
-              />
-            </div>
-            <div>
-              <label className="block text-sm text-muted mb-2">
-                Destek E-posta
-              </label>
-              <Input
-                type="email"
-                value={settings.supportEmail}
-                onChange={(e) =>
-                  setSettings({ ...settings, supportEmail: e.target.value })
-                }
-              />
-            </div>
-            <div>
-              <label className="block text-sm text-muted mb-2">
-                Logo URL
-              </label>
-              <Input
-                type="text"
-                value={settings.logoUrl}
-                onChange={(e) =>
-                  setSettings({ ...settings, logoUrl: e.target.value })
-                }
-                placeholder="https://..."
-              />
-              <p className="text-xs text-muted mt-1">
-                Logo görseli için doğrudan URL
-              </p>
-            </div>
-            <div>
-              <label className="block text-sm text-muted mb-2">
-                Saat Dilimi
-              </label>
-              <Select
-                value={settings.timezone}
-                onChange={(e) =>
-                  setSettings({ ...settings, timezone: e.target.value })
-                }
-              >
-                <option value="Europe/Istanbul">Europe/Istanbul (GMT+3)</option>
-                <option value="UTC">UTC (GMT+0)</option>
-                <option value="Europe/London">Europe/London (GMT+0/+1)</option>
-                <option value="America/New_York">
-                  America/New_York (GMT-5/-4)
-                </option>
-              </Select>
-            </div>
-            <div>
-              <label className="block text-sm text-muted mb-2">
-                Para Birimi
-              </label>
-              <Select
-                value={settings.currency}
-                onChange={(e) =>
-                  setSettings({ ...settings, currency: e.target.value })
-                }
-              >
-                <option value="TRY">Türk Lirası (₺)</option>
-                <option value="USD">Amerikan Doları ($)</option>
-                <option value="EUR">Euro (€)</option>
-              </Select>
-            </div>
-            <div>
-              <label className="block text-sm text-muted mb-2">Dil</label>
-              <Select
-                value={settings.language}
-                onChange={(e) =>
-                  setSettings({ ...settings, language: e.target.value })
-                }
-              >
-                <option value="tr">Türkçe</option>
-                <option value="en">English</option>
-              </Select>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* Listing Settings */}
       {activeTab === "listing" && (
         <div className="admin-card">
           <h2 className="text-lg font-semibold text-heading mb-4">
@@ -581,7 +349,6 @@ export default function SettingsPage() {
         </div>
       )}
 
-      {/* Trade Settings */}
       {activeTab === "trade" && (
         <div className="admin-card">
           <h2 className="text-lg font-semibold text-heading mb-4">
@@ -664,7 +431,6 @@ export default function SettingsPage() {
         </div>
       )}
 
-      {/* Message Settings */}
       {activeTab === "message" && (
         <div className="admin-card">
           <h2 className="text-lg font-semibold text-heading mb-4">
@@ -694,200 +460,6 @@ export default function SettingsPage() {
         </div>
       )}
 
-      {/* Membership Settings */}
-      {activeTab === "membership" && (
-        <div className="admin-card">
-          <h2 className="text-lg font-semibold text-heading mb-4">
-            Üyelik Fiyatları
-          </h2>
-          <div className="space-y-6">
-            {/* Discount Percentage */}
-            <div className="border border-border rounded-lg p-4">
-              <h3 className="text-md font-semibold text-heading mb-4">
-                Yıllık İndirim Oranı
-              </h3>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                <div>
-                  <label className="block text-sm text-muted mb-2">
-                    İndirim Yüzdesi (%)
-                  </label>
-                  <Input
-                    type="number"
-                    step="0.1"
-                    min="0"
-                    max="100"
-                    value={settings.yearlyDiscountPercentage}
-                    onChange={(e) =>
-                      setSettings({
-                        ...settings,
-                        yearlyDiscountPercentage: Number(e.target.value),
-                      })
-                    }
-                  />
-                  <p className="text-xs text-muted mt-1">
-                    Yıllık üyelik için uygulanacak indirim yüzdesi
-                  </p>
-                  <p className="text-xs text-info-700 mt-2">
-                    Yıllık fiyat = (Aylık Fiyat × 12) × (1 - İndirim%)
-                  </p>
-                </div>
-              </div>
-            </div>
-
-            {/* Basic Tier */}
-            <div className="border border-border rounded-lg p-4">
-              <h3 className="text-md font-semibold text-heading mb-4">
-                Temel Üyelik
-              </h3>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                <div>
-                  <label className="block text-sm text-muted mb-2">
-                    Aylık Fiyat (₺)
-                  </label>
-                  <Input
-                    type="number"
-                    step="0.01"
-                    min="0"
-                    value={settings.basicMonthlyPrice}
-                    onChange={(e) =>
-                      setSettings({
-                        ...settings,
-                        basicMonthlyPrice: Number(e.target.value),
-                      })
-                    }
-                  />
-                  <p className="text-xs text-muted mt-1">
-                    Temel üyeliğin aylık fiyatı
-                  </p>
-                </div>
-                <div>
-                  <label className="block text-sm text-muted mb-2">
-                    Yıllık Fiyat (₺){" "}
-                    <span className="text-xs text-muted">
-                      (Otomatik Hesaplanır)
-                    </span>
-                  </label>
-                  <div className="text-muted cursor-not-allowed">
-                    {Math.round(
-                      settings.basicMonthlyPrice *
-                        12 *
-                        (1 - settings.yearlyDiscountPercentage / 100) *
-                        100,
-                    ) / 100}
-                  </div>
-                  <p className="text-xs text-muted mt-1">
-                    Yıllık fiyat otomatik hesaplanır:{" "}
-                    {settings.basicMonthlyPrice} × 12 × (1 -{" "}
-                    {settings.yearlyDiscountPercentage}%)
-                  </p>
-                </div>
-              </div>
-            </div>
-
-            {/* Premium Tier */}
-            <div className="border border-border rounded-lg p-4">
-              <h3 className="text-md font-semibold text-heading mb-4">
-                Premium Üyelik
-              </h3>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                <div>
-                  <label className="block text-sm text-muted mb-2">
-                    Aylık Fiyat (₺)
-                  </label>
-                  <Input
-                    type="number"
-                    step="0.01"
-                    min="0"
-                    value={settings.premiumMonthlyPrice}
-                    onChange={(e) =>
-                      setSettings({
-                        ...settings,
-                        premiumMonthlyPrice: Number(e.target.value),
-                      })
-                    }
-                  />
-                  <p className="text-xs text-muted mt-1">
-                    Premium üyeliğin aylık fiyatı
-                  </p>
-                </div>
-                <div>
-                  <label className="block text-sm text-muted mb-2">
-                    Yıllık Fiyat (₺){" "}
-                    <span className="text-xs text-muted">
-                      (Otomatik Hesaplanır)
-                    </span>
-                  </label>
-                  <div className="text-muted cursor-not-allowed">
-                    {Math.round(
-                      settings.premiumMonthlyPrice *
-                        12 *
-                        (1 - settings.yearlyDiscountPercentage / 100) *
-                        100,
-                    ) / 100}
-                  </div>
-                  <p className="text-xs text-muted mt-1">
-                    Yıllık fiyat otomatik hesaplanır:{" "}
-                    {settings.premiumMonthlyPrice} × 12 × (1 -{" "}
-                    {settings.yearlyDiscountPercentage}%)
-                  </p>
-                </div>
-              </div>
-            </div>
-
-            {/* Business Tier */}
-            <div className="border border-border rounded-lg p-4">
-              <h3 className="text-md font-semibold text-heading mb-4">
-                Business Üyelik
-              </h3>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                <div>
-                  <label className="block text-sm text-muted mb-2">
-                    Aylık Fiyat (₺)
-                  </label>
-                  <Input
-                    type="number"
-                    step="0.01"
-                    min="0"
-                    value={settings.businessMonthlyPrice}
-                    onChange={(e) =>
-                      setSettings({
-                        ...settings,
-                        businessMonthlyPrice: Number(e.target.value),
-                      })
-                    }
-                  />
-                  <p className="text-xs text-muted mt-1">
-                    Business üyeliğin aylık fiyatı
-                  </p>
-                </div>
-                <div>
-                  <label className="block text-sm text-muted mb-2">
-                    Yıllık Fiyat (₺){" "}
-                    <span className="text-xs text-muted">
-                      (Otomatik Hesaplanır)
-                    </span>
-                  </label>
-                  <div className="text-muted cursor-not-allowed">
-                    {Math.round(
-                      settings.businessMonthlyPrice *
-                        12 *
-                        (1 - settings.yearlyDiscountPercentage / 100) *
-                        100,
-                    ) / 100}
-                  </div>
-                  <p className="text-xs text-muted mt-1">
-                    Yıllık fiyat otomatik hesaplanır:{" "}
-                    {settings.businessMonthlyPrice} × 12 × (1 -{" "}
-                    {settings.yearlyDiscountPercentage}%)
-                  </p>
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* Save Button */}
       <div className="flex justify-end">
         <Button onClick={handleSaveSettings} disabled={saving} className="px-6">
           {saving ? "Kaydediliyor..." : "Ayarları Kaydet"}

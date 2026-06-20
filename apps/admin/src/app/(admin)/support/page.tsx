@@ -109,7 +109,7 @@ export default function SupportPage() {
       setLoading(true);
       const params: any = {
         page,
-        limit: 20,
+        pageSize: 20,
       };
       if (filters.status) params.status = filters.status;
       if (filters.priority) params.priority = filters.priority;
@@ -207,9 +207,10 @@ export default function SupportPage() {
     if (!selectedTicket || !replyContent.trim()) return;
 
     try {
-      await adminApi.replyToTicket(selectedTicket.id, replyContent);
+      await adminApi.replyToTicket(selectedTicket.id, replyContent, isInternalNote);
       toast.success("Yanıt gönderildi");
       setReplyContent("");
+      setIsInternalNote(false);
       loadTicketDetails(selectedTicket.id);
     } catch (error) {
       if (process.env.NODE_ENV === "development")
@@ -220,7 +221,7 @@ export default function SupportPage() {
 
   const handleStatusChange = async (ticketId: string, newStatus: string) => {
     try {
-      await adminApi.updateTicket(ticketId, { status: newStatus });
+      await adminApi.updateTicketStatus(ticketId, newStatus);
       toast.success("Durum güncellendi");
       loadTickets();
       if (selectedTicket?.id === ticketId) {

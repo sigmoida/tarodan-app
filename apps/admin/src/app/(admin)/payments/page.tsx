@@ -2,6 +2,7 @@
 
 import { useMemo } from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { ChartBarIcon } from "@heroicons/react/24/outline";
 import { adminApi } from "@/lib/api";
 import { Button, Input, Select } from "@tarodan/ui";
@@ -67,6 +68,7 @@ function mapPayments(raw: any[]): Payment[] {
 }
 
 export default function AdminPaymentsPage() {
+  const router = useRouter();
   const {
     rows: rawRows,
     total,
@@ -170,18 +172,6 @@ export default function AdminPaymentsPage() {
         </span>
       ),
     },
-    {
-      id: "actions",
-      header: "İşlemler",
-      cell: ({ row }) => (
-        <Link
-          href={`/payments/${row.original.id}`}
-          className="text-primary-600 hover:text-primary-700 text-sm"
-        >
-          Detay
-        </Link>
-      ),
-    },
   ];
 
   return (
@@ -245,6 +235,7 @@ export default function AdminPaymentsPage() {
       loading={isLoading}
       emptyText="Ödeme bulunamadı"
       getRowId={(p) => p.id}
+      onRowClick={(p) => router.push(`/payments/${p.id}`)}
       page={page}
       totalPages={totalPages}
       onPageChange={setPage}

@@ -10,12 +10,8 @@ import {
   refundReasonConfig,
   refundRequestStatusConfig,
 } from "@tarodan/ui";
+import { useRouter } from "next/navigation";
 import { type ColumnDef } from "@/components/DataTable";
-import {
-  ActionButtons,
-  ActionIconButton,
-} from "@/components/admin-list";
-import { EyeIcon } from "@heroicons/react/24/outline";
 import { ResourceListPage } from "@/components/ResourceListPage";
 import { useAdminResource } from "@/hooks/useAdminResource";
 
@@ -59,6 +55,7 @@ const PAGE_SIZE = 20;
 // ─── Sayfa ─────────────────────────────────────────────────────────────────
 
 export default function RefundRequestsPage() {
+  const router = useRouter();
   // status, from, to → backend desteklediği için initialFilters'a alındı.
   // userSearch → hook'un "search" alanına eşlendi (backend: userSearch param).
   const {
@@ -191,19 +188,6 @@ export default function RefundRequestsPage() {
         </span>
       ),
     },
-    {
-      id: "actions",
-      header: () => <span className="block text-right" />,
-      cell: ({ row }) => (
-        <ActionButtons>
-          <ActionIconButton
-            icon={EyeIcon}
-            href={`/refund-requests/${row.original.id}`}
-            title="Detay"
-          />
-        </ActionButtons>
-      ),
-    },
   ];
 
   // ── Render ─────────────────────────────────────────────────────────────────
@@ -247,6 +231,7 @@ export default function RefundRequestsPage() {
       loading={isLoading}
       emptyText="Bu filtrelerle eşleşen iade talebi yok."
       getRowId={(rr) => rr.id}
+      onRowClick={(rr) => router.push(`/refund-requests/${rr.id}`)}
       page={page}
       totalPages={totalPages}
       onPageChange={setPage}

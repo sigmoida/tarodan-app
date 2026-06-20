@@ -7,6 +7,7 @@ import { PlatformFeeAnnouncementBanner } from '@/components/banners/PlatformFeeA
 import { LanguageProvider } from '@/i18n/LanguageContext';
 import QueryProvider from './QueryProvider';
 import { RealtimeProvider } from '@/components/realtime/RealtimeProvider';
+import BusinessMembershipGuard from '@/components/BusinessMembershipGuard';
 
 export const metadata: Metadata = {
   metadataBase: new URL(process.env.NEXT_PUBLIC_APP_URL || 'https://tarodan.com'),
@@ -55,9 +56,11 @@ export default function RootLayout({
           <QueryProvider>
             <RealtimeProvider />
             <PlatformFeeAnnouncementBanner />
-            <LayoutShell>
-              {children}
-            </LayoutShell>
+            <BusinessMembershipGuard>
+              <LayoutShell>
+                {children}
+              </LayoutShell>
+            </BusinessMembershipGuard>
             <CookieConsentBanner />
             <Toaster
               position="bottom-right"

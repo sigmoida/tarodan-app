@@ -43,14 +43,15 @@ function VerifyEmailContent() {
         if (process.env.NODE_ENV === 'development') console.error('Email verification failed:', error);
         setStatus('error');
         setErrorMessage(
-          error.response?.data?.message || 
+          error.response?.data?.message ||
           (locale === 'tr' ? 'Doğrulama başarısız' : 'Verification failed')
         );
       }
     };
 
     verifyEmail();
-  }, [token, locale]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [token]); // locale intentionally excluded — changing locale must not re-trigger the API call
 
   const handleResendVerification = async (e: React.FormEvent) => {
     e.preventDefault();

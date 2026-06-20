@@ -1,31 +1,13 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import Link from "next/link";
 import { adminApi } from "@/lib/api";
-import { Button, Select } from "@tarodan/ui";
-import { type ColumnDef } from "@/components/DataTable";
-import { ResourceListPage } from "@/components/ResourceListPage";
-import { useAdminResource } from "@/hooks/useAdminResource";
-import { useMemo } from "react";
+import { Button } from "@tarodan/ui";
+import { PageHeader } from "@/components/admin-list";
+import { ModerationEventsPanel } from "@/components/ModerationEventsPanel";
 import toast from "react-hot-toast";
 
-// ─── Tipler ────────────────────────────────────────────────────────────────
-
-interface AiCheckItem {
-  id: string;
-  title: string;
-  status: string;
-  imageUrl?: string | null;
-  seller?: { id: string; displayName: string; email: string };
-  aiCheckStatus?: string | null;
-  aiRelevanceScore?: number | null;
-  aiNsfwScore?: number | null;
-  aiCheckReason?: string | null;
-  aiCheckedAt?: string | null;
-}
-
-// ─── Yardımcı: AI rozeti ───────────────────────────────────────────────────
+// ─── Yardımcı: AI sonuç rozeti (görsel test çıktısı için) ───────────────────
 
 function aiBadge(s?: string | null) {
   const [cls, label] =
@@ -35,13 +17,11 @@ function aiBadge(s?: string | null) {
         ? ["bg-warning-500/20 text-warning-700", "Düşük ilgililik"]
         : ["bg-success-500/20 text-success-700", "Temiz · oto-onay"];
   return (
-    <span className={`px-2 py-1 rounded text-xs font-medium ${cls}`}>
-      {label}
-    </span>
+    <span className={`px-2 py-1 rounded text-xs font-medium ${cls}`}>{label}</span>
   );
 }
 
-// ─── Sayfa ─────────────────────────────────────────────────────────────────
+// ─── Sayfa (Sistem → AI Denetim) ─────────────────────────────────────────────
 
 export default function AiModerationPage() {
   // ── Görsel Test Et aracı ───────────────────────────────────────────────────
@@ -49,28 +29,31 @@ export default function AiModerationPage() {
   const [testResult, setTestResult] = useState<any>(null);
   const [testing, setTesting] = useState(false);
 
-  // ── Kabul eşiği (ilgililik %) ──────────────────────────────────────────────
+  // ── Eşikler (ilgililik + uygunsuzluk %) ────────────────────────────────────
+  const [enabled, setEnabled] = useState(true);
   const [relThreshold, setRelThreshold] = useState(20);
+  const [nsfwThreshold, setNsfwThreshold] = useState(70);
   const [savingCfg, setSavingCfg] = useState(false);
 
   useEffect(() => {
     adminApi
       .get("/admin/moderation/ai-config")
-      .then((res) =>
-        setRelThreshold(
-          Math.round((res.data?.relevanceThreshold ?? 0.2) * 100),
-        ),
-      )
+      .then((res) => {
+        setEnabled(res.data?.enabled !== false);
+        setRelThreshold(Math.round((res.data?.relevanceThreshold ?? 0.2) * 100));
+        setNsfwThreshold(Math.round((res.data?.nsfwThreshold ?? 0.7) * 100));
+      })
       .catch(() => {});
   }, []);
 
-  const saveThreshold = async () => {
+  const saveThresholds = async () => {
     setSavingCfg(true);
     try {
       await adminApi.post("/admin/moderation/ai-config", {
         relevanceThreshold: relThreshold / 100,
+        nsfwThreshold: nsfwThreshold / 100,
       });
-      toast.success(`Kabul eşiği %${relThreshold} olarak kaydedildi`);
+      toast.success("Eşikler kaydedildi");
     } catch {
       toast.error("Eşik kaydedilemedi (AI servisi kapalı olabilir)");
     } finally {
@@ -108,114 +91,26 @@ export default function AiModerationPage() {
     e.target.value = "";
   };
 
-  // ── Liste verisi (useAdminResource) ───────────────────────────────────────
-  const {
-    rows: items,
-    total,
-    page,
-    setPage,
-    totalPages,
-    filters,
-    setFilter,
-    isLoading,
-  } = useAdminResource<AiCheckItem>({
-    queryKey: "ai-checks",
-    fetcher: (params) => {
-      const { status, ...rest } = params;
-      return adminApi.get("/admin/moderation/ai-checks", {
-        params: { ...rest, status: status || undefined, pageSize: rest.limit },
-      });
-    },
-    limit: 20,
-    initialFilters: { status: "" },
-    errorMessage: "AI denetim listesi yüklenemedi",
-  });
-
-  // ── Kolon tanımları ────────────────────────────────────────────────────────
-
-  const columns: ColumnDef<AiCheckItem, any>[] = useMemo(
-    () => [
-      {
-        header: "Görsel",
-        cell: ({ row }) =>
-          row.original.imageUrl ? (
-            // eslint-disable-next-line @next/next/no-img-element
-            <img
-              src={row.original.imageUrl}
-              alt={row.original.title}
-              className="w-12 h-12 rounded object-cover shrink-0"
-            />
-          ) : (
-            <div className="w-12 h-12 rounded bg-surface-alt shrink-0" />
-          ),
-      },
-      {
-        header: "Ürün",
-        cell: ({ row }) => (
-          <Link
-            href={`/products/${row.original.id}`}
-            className="text-heading hover:text-primary-400 line-clamp-1"
-          >
-            {row.original.title}
-          </Link>
-        ),
-      },
-      {
-        header: "AI Sonuç",
-        cell: ({ row }) => aiBadge(row.original.aiCheckStatus),
-      },
-      {
-        header: "İlgililik",
-        cell: ({ row }) => (
-          <span className="text-sm whitespace-nowrap">
-            %{Math.round((row.original.aiRelevanceScore ?? 0) * 100)}
-          </span>
-        ),
-      },
-      {
-        header: "Uygunsuzluk",
-        cell: ({ row }) => (
-          <span className="text-sm whitespace-nowrap">
-            %{((row.original.aiNsfwScore ?? 0) * 100).toFixed(2)}
-          </span>
-        ),
-      },
-      {
-        header: "Ürün Durumu",
-        cell: ({ row }) => (
-          <span className="text-sm text-muted">{row.original.status}</span>
-        ),
-      },
-      {
-        header: "Satıcı",
-        cell: ({ row }) => (
-          <span className="text-sm">
-            {row.original.seller?.displayName || "-"}
-          </span>
-        ),
-      },
-      {
-        header: "Denetim",
-        cell: ({ row }) => (
-          <span className="text-xs text-muted whitespace-nowrap">
-            {row.original.aiCheckedAt
-              ? new Date(row.original.aiCheckedAt).toLocaleString("tr-TR")
-              : "-"}
-          </span>
-        ),
-      },
-    ],
-    [],
-  );
-
   // ── Render ─────────────────────────────────────────────────────────────────
 
   return (
     <div className="space-y-6">
+      <PageHeader
+        title="AI Denetim"
+        description="Tüm varlıklar (ürün · kullanıcı · koleksiyon · görsel · metin) için ortak AI moderasyonu — eşikler, görsel testi ve birleşik olay günlüğü"
+      />
+
+      {!enabled && (
+        <div className="admin-card p-4 text-sm text-warning-700 bg-warning-500/10">
+          AI moderasyon servisi kapalı (AI_MODERATION_ENABLED=false). Eşik ayarı
+          ve görsel testi devre dışı; geçmiş günlük kayıtları yine listelenir.
+        </div>
+      )}
+
       {/* Görsel Test Et aracı */}
       <div className="admin-card p-4 space-y-3">
         <h3 className="font-medium text-heading">
-          Görsel Test Et (ürün oluşturmadan skor gör)
+          Görsel Test Et (yükleme yapmadan skor gör)
         </h3>
         <div className="flex flex-wrap gap-2">
           <input
@@ -283,58 +178,64 @@ export default function AiModerationPage() {
         )}
       </div>
 
-      {/* Kabul Eşiği */}
-      <div className="admin-card p-4 space-y-3">
-        <h3 className="font-medium text-heading">Kabul Eşiği (ilgililik %)</h3>
-        <p className="text-sm text-muted">
-          Ürün görseli bu yüzdenin üstünde ilgililik alırsa otomatik kabul
-          edilir; altındakiler admin onayına düşer. Düşürürsen daha çok ürün
-          oto-onaylanır, yükseltirsen daha çok admine gelir.
-        </p>
-        <div className="flex flex-wrap items-center gap-3">
+      {/* AI Eşikleri */}
+      <div className="admin-card p-4 space-y-4">
+        <h3 className="font-medium text-heading">AI Eşikleri</h3>
+
+        <div className="space-y-2">
+          <div className="flex items-center justify-between">
+            <span className="text-sm font-medium text-heading">
+              Kabul eşiği (ilgililik %)
+            </span>
+            <span className="font-semibold text-heading">%{relThreshold}</span>
+          </div>
+          <p className="text-sm text-muted">
+            Ürün görseli bu yüzdenin üstünde ilgililik alırsa otomatik kabul
+            edilir; altındakiler admin onayına düşer.
+          </p>
           <input
             type="range"
             min={0}
             max={100}
             value={relThreshold}
             onChange={(e) => setRelThreshold(Number(e.target.value))}
-            className="flex-1 min-w-[200px] accent-primary-500"
+            className="w-full accent-primary-500"
           />
-          <span className="font-semibold text-heading w-12 text-right">
-            %{relThreshold}
-          </span>
-          <Button onClick={saveThreshold} disabled={savingCfg}>
-            {savingCfg ? "Kaydediliyor..." : "Kaydet"}
+        </div>
+
+        <div className="space-y-2">
+          <div className="flex items-center justify-between">
+            <span className="text-sm font-medium text-heading">
+              Uygunsuzluk eşiği (NSFW %)
+            </span>
+            <span className="font-semibold text-heading">%{nsfwThreshold}</span>
+          </div>
+          <p className="text-sm text-muted">
+            Bir görselin uygunsuzluk skoru bu yüzdeyi aşarsa engellenir (avatar,
+            koleksiyon, ürün ve diğer tüm görsel yüklemeleri kapsar).
+          </p>
+          <input
+            type="range"
+            min={0}
+            max={100}
+            value={nsfwThreshold}
+            onChange={(e) => setNsfwThreshold(Number(e.target.value))}
+            className="w-full accent-primary-500"
+          />
+        </div>
+
+        <div className="flex justify-end">
+          <Button onClick={saveThresholds} disabled={savingCfg || !enabled}>
+            {savingCfg ? "Kaydediliyor..." : "Eşikleri Kaydet"}
           </Button>
         </div>
       </div>
 
-      {/* AI denetim listesi */}
-      <ResourceListPage<AiCheckItem>
-        title="AI Denetim"
-        description={`AI ile denetlenmiş ${total} ürün`}
-        filters={
-          <Select
-            value={filters.status ?? ""}
-            onChange={(e) => {
-              setFilter("status", e.target.value);
-            }}
-            className="sm:w-56"
-          >
-            <option value="">Tümü</option>
-            <option value="passed">Temiz (oto-onaylanan)</option>
-            <option value="review">Düşük ilgililik (admin incelemesi)</option>
-            <option value="flagged">Uygunsuz şüphesi</option>
-          </Select>
-        }
-        columns={columns}
-        data={items}
-        loading={isLoading}
-        emptyText="AI ile denetlenmiş ürün yok"
-        getRowId={(r) => r.id}
-        page={page}
-        totalPages={totalPages}
-        onPageChange={setPage}
+      {/* Birleşik AI denetim günlüğü (tüm varlıklar) */}
+      <ModerationEventsPanel
+        showEntityColumn
+        title="Denetim Günlüğü"
+        description="Tüm varlıklarda AI tarafından engellenen / işaretlenen içerikler"
       />
     </div>
   );

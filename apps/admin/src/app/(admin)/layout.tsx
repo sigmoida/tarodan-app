@@ -1,5 +1,6 @@
 import AdminLayout from '@/components/AdminLayout';
 import { ConfirmProvider } from '@/components/ConfirmProvider';
+import { PromptProvider } from '@/components/PromptProvider';
 import { QueryProvider } from '@/components/QueryProvider';
 
 export default function AdminRouteLayout({
@@ -10,7 +11,9 @@ export default function AdminRouteLayout({
   return (
     <QueryProvider>
       <ConfirmProvider>
-        <AdminLayout>{children}</AdminLayout>
+        <PromptProvider>
+          <AdminLayout>{children}</AdminLayout>
+        </PromptProvider>
       </ConfirmProvider>
     </QueryProvider>
   );

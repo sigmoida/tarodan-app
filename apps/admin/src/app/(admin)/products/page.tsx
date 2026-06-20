@@ -2,6 +2,7 @@
 
 import { useMemo } from "react";
 import Link from "next/link";
+import { useRouter, useSearchParams } from "next/navigation";
 import { adminApi } from "@/lib/api";
 import {
   getProductEffectivePrice,
@@ -11,7 +12,6 @@ import {
 import Image from "next/image";
 import {
   Button,
-  Select,
   StatusBadge,
   productStatusConfig,
   productConditionConfig,
@@ -21,16 +21,24 @@ import { type ColumnDef } from "@/components/DataTable";
 import {
   CheckIcon,
   XMarkIcon,
-  EyeIcon,
   TrashIcon,
   ArrowUturnLeftIcon,
 } from "@heroicons/react/24/outline";
 import toast from "react-hot-toast";
 import { useConfirm } from "@/components/ConfirmProvider";
+import { usePrompt } from "@/components/PromptProvider";
 import { ActionButtons, ActionIconButton } from "@/components/admin-list";
 import { ResourceListPage } from "@/components/ResourceListPage";
+import { ModerationEventsPanel } from "@/components/ModerationEventsPanel";
 import { useAdminResource } from "@/hooks/useAdminResource";
 import { statusFilterOptions } from "@/lib/utils";
+import { AdminProductFilters } from "@/components/AdminProductFilters";
+
+// Ürünler ↔ AI Denetim sekmeleri (tek ortak AdminTabs yapısı; bkz. ModerationEventsPanel)
+const PRODUCT_TABS = [
+  { key: "list", label: "Ürünler" },
+  { key: "ai", label: "AI Denetim" },
+];
 
 // ─── Tipler ────────────────────────────────────────────────────────────────
 
@@ -84,7 +92,12 @@ const statusOptions = statusFilterOptions(productStatusConfig, { allLabel: "Tüm
 // ─── Sayfa ─────────────────────────────────────────────────────────────────
 
 export default function ProductsPage() {
+  const router = useRouter();
+  const searchParams = useSearchParams();
   const confirm = useConfirm();
+  const prompt = usePrompt();
+  // Tab URL'den türetilir; URL değişince otomatik güncellenir.
+  const tab = searchParams.get("tab") === "ai" ? "ai" : "list";
 
   // ── useAdminResource ────────────────────────────────────────────────────────
   // Server-side filtreler: search, status, sellerId — hepsi backend getProducts(AdminProductQueryDto)
@@ -104,14 +117,19 @@ export default function ProductsPage() {
     setFilter,
     isLoading,
     refetch,
+    setTabUrl,
   } = useAdminResource<any>({
     queryKey: "products",
     fetcher: (params) => adminApi.getProducts(params),
     limit: 20,
     syncUrl: true,
-    initialFilters: { status: "all", sellerId: "" },
+    initialFilters: { status: "all", sellerId: "", brandId: "", carModelId: "" },
     errorMessage: "Ürünler yüklenemedi",
   });
+
+  const handleTabChange = (key: string) => {
+    setTabUrl(key, { defaultTab: "list" });
+  };
 
   // Deep-link (?sellerId=) ile gelen satıcı filtresini kaldırır.
   const clearSellerFilter = () => {
@@ -148,8 +166,15 @@ export default function ProductsPage() {
   };
 
   const handleReject = async (productId: string) => {
-    const reason = prompt("Reddetme sebebi:");
-    if (!reason) return;
+    const reason = await prompt({
+      title: "Ürünü Reddet",
+      label: "Reddetme sebebi",
+      placeholder: "Ürünün neden reddedildiğini yaz...",
+      confirmLabel: "Reddet",
+      destructive: true,
+      requiredMessage: "Reddetme sebebi gereklidir",
+    });
+    if (reason === null) return;
     try {
       await adminApi.rejectProduct(productId, reason);
       toast.success("Ürün reddedildi");
@@ -300,11 +325,6 @@ export default function ProductsPage() {
       header: "İşlemler",
       cell: ({ row }) => (
         <ActionButtons>
-          <ActionIconButton
-            icon={EyeIcon}
-            href={`/products/${row.original.id}`}
-            title="Detay"
-          />
           {row.original.status === "pending" && (
             <>
               <ActionIconButton
@@ -346,9 +366,25 @@ export default function ProductsPage() {
 
   // ── Render ──────────────────────────────────────────────────────────────────
 
+  // AI Denetim sekmesi → ortak ModerationEventsPanel (ürün olayları)
+  if (tab === "ai") {
+    return (
+      <ModerationEventsPanel
+        entityType="product"
+        title="Ürünler"
+        tabs={PRODUCT_TABS}
+        activeTab={tab}
+        onTabChange={handleTabChange}
+      />
+    );
+  }
+
   return (
     <ResourceListPage<Product>
       title="Ürünler"
+      tabs={PRODUCT_TABS}
+      activeTab={tab}
+      onTabChange={handleTabChange}
       description={
         <>
           {filters.status === "pending"
@@ -398,31 +434,26 @@ export default function ProductsPage() {
           CSV İndir
         </Button>
       }
-      search={{ placeholder: "Ürün veya satıcı ara..." }}
-      searchValue={search}
-      onSearchChange={setSearch}
-      onSearchSubmit={onSearchSubmit}
       filters={
-        <>
-          {/* Status Filter — server-side */}
-          <Select
-            value={filters.status ?? "all"}
-            onChange={(e) => setFilter("status", e.target.value)}
-            className="sm:w-48"
-          >
-            {statusOptions.map((opt) => (
-              <option key={opt.value} value={opt.value}>
-                {opt.label}
-              </option>
-            ))}
-          </Select>
-        </>
+        <AdminProductFilters
+          search={search}
+          onSearchChange={setSearch}
+          onSearchSubmit={onSearchSubmit}
+          status={filters.status ?? "all"}
+          onStatusChange={(v) => setFilter("status", v)}
+          brandId={filters.brandId ?? ""}
+          onBrandChange={(v) => { setFilter("brandId", v); setFilter("carModelId", ""); }}
+          carModelId={filters.carModelId ?? ""}
+          onCarModelChange={(v) => setFilter("carModelId", v)}
+          statusOptions={statusOptions}
+        />
       }
       columns={columns}
       data={products}
       loading={isLoading}
       emptyText="Ürün bulunamadı"
       getRowId={(p) => p.id}
+      onRowClick={(p) => router.push(`/products/${p.id}`)}
       page={page}
       totalPages={totalPages}
       onPageChange={setPage}

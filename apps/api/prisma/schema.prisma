@@ -23,6 +23,7 @@ model User {
   sellerType              SellerType?              @map("seller_type")
   taxId                   String?                  @map("tax_id")
   companyName             String?                  @unique @map("company_name")
+  businessStatus          BusinessStatus?          @map("business_status")
   fcmToken                String?                  @map("fcm_token")
   createdAt               DateTime                 @default(now()) @map("created_at")
   updatedAt               DateTime                 @updatedAt @map("updated_at")
@@ -335,6 +336,7 @@ model Manufacturer {
   description String?
   website     String?
   country     String?
+  foundedYear Int?      @map("founded_year")
   sortOrder   Int       @default(0) @map("sort_order")
   isActive    Boolean   @default(true) @map("is_active")
   createdAt   DateTime  @default(now()) @map("created_at")
@@ -408,7 +410,6 @@ model Product {
   likes               ProductLike[]
   productRatings      ProductRating[]
   boosts              ProductBoost[]
-  tags                ProductTag[]
   brand               Brand?             @relation(fields: [brandId], references: [id])
   carModel            CarModel?          @relation(fields: [carModelId], references: [id])
   category            Category           @relation(fields: [categoryId], references: [id])
@@ -679,6 +680,7 @@ model Message {
   reviewedById    String?       @map("reviewed_by_id")
   reviewedAt      DateTime?     @map("reviewed_at")
   readAt          DateTime?     @map("read_at")
+  deletedAt       DateTime?     @map("deleted_at")
   createdAt       DateTime      @default(now()) @map("created_at")
   receiver        User          @relation("MessageReceiver", fields: [receiverId], references: [id])
   sender          User          @relation("MessageSender", fields: [senderId], references: [id])
@@ -840,36 +842,6 @@ model CollectionLike {
   @@map("collection_likes")
 }
 
-model Tag {
-  id          String       @id @default(uuid())
-  name        String       @unique
-  slug        String       @unique
-  description String?
-  color       String?
-  isActive    Boolean      @default(true) @map("is_active")
-  usageCount  Int          @default(0) @map("usage_count")
-  createdAt   DateTime     @default(now()) @map("created_at")
-  updatedAt   DateTime     @updatedAt @map("updated_at")
-  products    ProductTag[]
-
-  @@index([isActive])
-  @@index([usageCount(sort: Desc)])
-  @@map("tags")
-}
-
-model ProductTag {
-  id        String   @id @default(uuid())
-  productId String   @map("product_id")
-  tagId     String   @map("tag_id")
-  createdAt DateTime @default(now()) @map("created_at")
-  product   Product  @relation(fields: [productId], references: [id], onDelete: Cascade)
-  tag       Tag      @relation(fields: [tagId], references: [id], onDelete: Cascade)
-
-  @@unique([productId, tagId])
-  @@index([productId])
-  @@index([tagId])
-  @@map("product_tags")
-}
 
 model AttributeGroup {
   id               String      @id @default(uuid())
@@ -1029,6 +1001,7 @@ model Order {
   discountBreakdown      Json?           @map("discount_breakdown")
   discountCode           String?         @map("discount_code")
   subtotal               Decimal?        @db.Decimal(10, 2)
+  taxAmount              Decimal         @default(0) @map("tax_amount") @db.Decimal(10, 2)
   cancelReason           String?         @map("cancel_reason")
   preparingDeadline      DateTime?       @map("preparing_deadline")
   preparingWarningSentAt DateTime?       @map("preparing_warning_sent_at")
@@ -1439,6 +1412,30 @@ model AuditLog {
   @@index([entityType, entityId])
   @@index([createdAt])
   @@map("audit_logs")
+}
+
+/// AI moderasyon olay günlüğü — tüm varlıklar için ortak (ürün/kullanıcı/koleksiyon/yükleme).
+/// Polimorfik (entityType + entityId) ve FK içermez: hedef varlık silinse de denetim kaydı kalır.
+/// Yazma anında engellenen görsel/metin (decision=blocked) ve ürün worker sonuçları (pass/review/flag) buraya yazılır.
+model ModerationEvent {
+  id             String   @id @default(uuid())
+  entityType     String   @map("entity_type") // product | user | collection | upload | message
+  entityId       String?  @map("entity_id")
+  userId         String?  @map("user_id") // içeriği üreten/yükleyen kullanıcı
+  kind           String // image | text
+  field          String? // avatar | bio | display_name | cover | item | product_image | message_image | upload
+  decision       String // pass | review | flag | blocked
+  relevanceScore Float?   @map("relevance_score")
+  nsfwScore      Float?   @map("nsfw_score")
+  labels         Json?
+  reason         String?
+  createdAt      DateTime @default(now()) @map("created_at")
+
+  @@index([entityType, entityId])
+  @@index([entityType, decision])
+  @@index([userId])
+  @@index([createdAt])
+  @@map("moderation_events")
 }
 
 model AnalyticsSnapshot {
@@ -1886,6 +1883,12 @@ enum CommissionRuleType {
   category
   seller_type
   category_seller
+}
+
+enum BusinessStatus {
+  pending
+  approved
+  rejected
 }
 
 enum SellerType {

@@ -148,7 +148,7 @@ export function RefundPolicyCard({
             disabled={disabled || savingPolicy}
           />
           <PolicyRow
-            label={`%3 Platform fee iade (${fmt(Number(order.buyerFeeAmount))})`}
+            label={`Platform hizmet bedeli (%3) iade (${fmt(Number(order.buyerFeeAmount))})`}
             checked={refundBuyerFee}
             onChange={setRefundBuyerFee}
             disabled={disabled || savingPolicy}
@@ -162,7 +162,7 @@ export function RefundPolicyCard({
         </div>
 
         <div className="rounded-md bg-info-50 p-3 text-sm">
-          <div className="text-gray-600">Alıcıya iade edilecek tutar</div>
+          <div className="text-muted">Alıcıya iade edilecek tutar</div>
           <div className="text-2xl font-bold text-info-700">{fmt(refundAmount)}</div>
         </div>
 
@@ -183,21 +183,24 @@ export function RefundPolicyCard({
               value="buyer"
               current={returnShippingPayer}
               onChange={setReturnShippingPayerState}
-              label="Alıcı (Senaryo D — keyfi vazgeçme)"
+              label="Alıcı"
+              helper="Vazgeçme / keyfi iade durumunda"
               disabled={disabled || savingPayer}
             />
             <PayerRadio
               value="seller"
               current={returnShippingPayer}
               onChange={setReturnShippingPayerState}
-              label="Satıcı (Senaryo B — haklı dispute)"
+              label="Satıcı"
+              helper="Haklı iade (hatalı, eksik ya da yanlış ürün)"
               disabled={disabled || savingPayer}
             />
             <PayerRadio
               value="platform"
               current={returnShippingPayer}
               onChange={setReturnShippingPayerState}
-              label="Platform (kargo kaybı / istisna)"
+              label="Platform"
+              helper="Kargo kaybı veya istisnai durum"
               disabled={disabled || savingPayer}
             />
           </div>
@@ -211,7 +214,7 @@ export function RefundPolicyCard({
           </div>
         </div>
 
-        {error && <div className="text-sm text-red-600">{error}</div>}
+        {error && <div className="text-sm text-danger-600">{error}</div>}
       </CardContent>
     </Card>
   );
@@ -245,16 +248,18 @@ function PayerRadio({
   current,
   onChange,
   label,
+  helper,
   disabled,
 }: {
   value: ReturnShippingPayer;
   current: ReturnShippingPayer | null;
   onChange: (v: ReturnShippingPayer) => void;
   label: string;
+  helper?: string;
   disabled?: boolean;
 }) {
   return (
-    <label className="flex items-center gap-2 cursor-pointer">
+    <label className="flex items-start gap-2 cursor-pointer">
       <input
         type="radio"
         name="returnShippingPayer"
@@ -262,9 +267,12 @@ function PayerRadio({
         checked={current === value}
         onChange={() => onChange(value)}
         disabled={disabled}
-        className="cursor-pointer"
+        className="mt-0.5 cursor-pointer"
       />
-      <span className="text-sm">{label}</span>
+      <span className="text-sm">
+        <span className="font-medium">{label}</span>
+        {helper && <span className="text-muted"> — {helper}</span>}
+      </span>
     </label>
   );
 }

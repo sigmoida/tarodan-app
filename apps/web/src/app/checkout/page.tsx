@@ -82,7 +82,9 @@ export default function CheckoutPage() {
     items: cartItems,
     offlineItems,
     subtotal: cartSubtotal,
+    totalDiscount: cartTotalDiscount,
     clearCart,
+    appliedCouponCode,
   } = useCartStore();
   const { user, isAuthenticated, token: authToken } = useAuthStore();
   const { t, locale } = useTranslation();
@@ -231,6 +233,7 @@ export default function CheckoutPage() {
       buyerFeeAmount: number;
       sellerFeeAmount: number;
       commissionAmount: number;
+      taxAmount: number;
       totalAmount: number;
       sellerNetAmount: number;
     };
@@ -275,8 +278,11 @@ export default function CheckoutPage() {
     };
   }, [checkoutItems.length, checkoutItems.map((i) => i.productId).join(",")]);
 
-  const displayTotal =
-    quote?.pricing?.totalAmount ?? Math.max(0, subtotal + shippingCost);
+  const couponDiscount = directProduct ? 0 : (cartTotalDiscount ?? 0);
+  const displayTotal = Math.max(
+    0,
+    (quote?.pricing?.totalAmount ?? (subtotal + shippingCost)) - couponDiscount,
+  );
   const grandTotal = displayTotal;
 
   useEffect(() => {
@@ -968,9 +974,11 @@ export default function CheckoutPage() {
                 address: string;
                 zipCode?: string;
               };
+              couponCode?: string;
             } = {
               items: checkoutGroupItems,
               idempotencyKey: getCheckoutIdempotencyKey(),
+              ...(appliedCouponCode ? { couponCode: appliedCouponCode } : {}),
             };
 
             if (validAddressId) {
@@ -2095,6 +2103,24 @@ export default function CheckoutPage() {
                     </span>
                   </div>
 
+                  {couponDiscount > 0 && (
+                    <div className="flex justify-between text-success-600">
+                      <span className="flex items-center gap-1">
+                        <TagIcon className="w-3.5 h-3.5 shrink-0" />
+                        {appliedCouponCode
+                          ? `Kupon (${appliedCouponCode})`
+                          : locale === "en" ? "Discount" : "İndirim"}
+                      </span>
+                      <span className="font-medium">
+                        -{couponDiscount.toLocaleString("tr-TR", {
+                          minimumFractionDigits: 2,
+                          maximumFractionDigits: 2,
+                        })}{" "}
+                        TL
+                      </span>
+                    </div>
+                  )}
+
                   {(quote?.pricing?.buyerFeeAmount ?? 0) > 0 && (
                     <div className="flex justify-between items-center">
                       <span className="text-muted flex items-center gap-1">
@@ -2123,6 +2149,19 @@ export default function CheckoutPage() {
                             maximumFractionDigits: 2,
                           },
                         )}{" "}
+                        TL
+                      </span>
+                    </div>
+                  )}
+
+                  {(quote?.pricing?.taxAmount ?? 0) > 0 && (
+                    <div className="flex justify-between items-center">
+                      <span className="text-muted">KDV</span>
+                      <span className="font-medium">
+                        {Number(quote!.pricing.taxAmount).toLocaleString("tr-TR", {
+                          minimumFractionDigits: 2,
+                          maximumFractionDigits: 2,
+                        })}{" "}
                         TL
                       </span>
                     </div>

@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { useSearchParams } from "next/navigation";
 import { adminApi } from "@/lib/api";
 import {
   Button,
@@ -15,14 +16,19 @@ import {
   TrashIcon,
   EyeIcon,
   EyeSlashIcon,
-  StarIcon,
 } from "@heroicons/react/24/outline";
-import { StarIcon as StarSolidIcon } from "@heroicons/react/24/solid";
 import toast from "react-hot-toast";
 import { ActionButtons, ActionIconButton } from "@/components/admin-list";
 import { type ColumnDef } from "@/components/DataTable";
 import { ResourceListPage } from "@/components/ResourceListPage";
+import { ModerationEventsPanel } from "@/components/ModerationEventsPanel";
 import { useAdminResource } from "@/hooks/useAdminResource";
+
+// Koleksiyonlar ↔ AI Denetim sekmeleri (ortak AdminTabs yapısı)
+const COLLECTION_TABS = [
+  { key: "list", label: "Koleksiyonlar" },
+  { key: "ai", label: "AI Denetim" },
+];
 
 // ─── Tipler ────────────────────────────────────────────────────────────────
 
@@ -37,7 +43,7 @@ interface Collection {
   viewCount: number;
   likeCount: number;
   itemCount: number;
-  owner: { id: string; displayName: string; avatarUrl?: string };
+  owner: { id: string; displayName: string; avatarUrl?: string; membershipTier?: string | null };
   createdAt: string;
   updatedAt: string;
 }
@@ -53,6 +59,9 @@ interface CollectionFormData {
 // ─── Sayfa ─────────────────────────────────────────────────────────────────
 
 export default function CollectionsPage() {
+  const searchParams = useSearchParams();
+  // Tab URL'den türetilir
+  const tab = searchParams.get("tab") === "ai" ? "ai" : "list";
   // Modal / form state — mutasyon mantığı için zorunlu, veri çekme için değil
   const [showModal, setShowModal] = useState(false);
   const [editingCollection, setEditingCollection] = useState<Collection | null>(null);
@@ -79,6 +88,7 @@ export default function CollectionsPage() {
     setFilter,
     isLoading,
     refetch,
+    setTabUrl,
   } = useAdminResource<Collection>({
     queryKey: "collections",
     fetcher: (params) =>
@@ -98,6 +108,10 @@ export default function CollectionsPage() {
     initialFilters: { isPublic: "all", isFeatured: "all", sortBy: "", sortOrder: "" },
     errorMessage: "Koleksiyonlar yüklenemedi",
   });
+
+  const handleTabChange = (key: string) => {
+    setTabUrl(key, { defaultTab: "list" });
+  };
 
   // ── Modal yardımcıları ─────────────────────────────────────────────────────
 
@@ -167,18 +181,6 @@ export default function CollectionsPage() {
     }
   };
 
-  const toggleFeatured = async (collection: Collection) => {
-    try {
-      await adminApi.setCollectionFeatured(collection.id, !collection.isFeatured);
-      toast.success(
-        collection.isFeatured ? "Öne çıkarma kaldırıldı" : "Koleksiyon öne çıkarıldı"
-      );
-      refetch();
-    } catch (error: any) {
-      toast.error(error.response?.data?.message || "İşlem başarısız");
-    }
-  };
-
   // ── Kolon tanımları ────────────────────────────────────────────────────────
 
   const columns: ColumnDef<Collection, any>[] = [
@@ -210,9 +212,21 @@ export default function CollectionsPage() {
     },
     {
       header: "Sahibi",
-      cell: ({ row }) => (
-        <span className="text-muted">{row.original.owner?.displayName || "-"}</span>
-      ),
+      cell: ({ row }) => {
+        const tier = row.original.owner?.membershipTier;
+        return (
+          <div className="flex items-center gap-2">
+            <span className="text-muted">{row.original.owner?.displayName || "-"}</span>
+            {(tier === "premium" || tier === "business") && (
+              <span className={`px-1.5 py-0.5 text-[10px] font-semibold rounded ${
+                tier === "business" ? "bg-info-50 text-info-700" : "bg-warning-50 text-warning-700"
+              }`}>
+                {tier === "business" ? "İş" : "Premium"}
+              </span>
+            )}
+          </div>
+        );
+      },
     },
     {
       id: "itemCount",
@@ -245,12 +259,7 @@ export default function CollectionsPage() {
               Görünür
             </span>
           ) : (
-            <span className="px-2 py-1 text-xs bg-body text-muted rounded">Gizli</span>
-          )}
-          {row.original.isFeatured && (
-            <span className="px-2 py-1 text-xs bg-warning-50 text-warning-700 rounded">
-              Öne Çıkan
-            </span>
+            <span className="px-2 py-1 text-xs bg-gray-100 text-gray-600 rounded">Gizli</span>
           )}
         </div>
       ),
@@ -265,18 +274,6 @@ export default function CollectionsPage() {
             onClick={() => toggleVisibility(row.original)}
             title={row.original.isPublic ? "Gizle" : "Görünür yap"}
           />
-          <Button
-            variant="secondary"
-            onClick={() => toggleFeatured(row.original)}
-            className="p-2 text-muted hover:text-warning-700 hover:bg-surface-alt rounded-lg"
-            title={row.original.isFeatured ? "Öne çıkarmayı kaldır" : "Öne çıkar"}
-          >
-            {row.original.isFeatured ? (
-              <StarSolidIcon className="h-5 w-5 text-warning-700" />
-            ) : (
-              <StarIcon className="h-5 w-5" />
-            )}
-          </Button>
           <ActionIconButton
             icon={PencilIcon}
             onClick={() => openEditModal(row.original)}
@@ -295,11 +292,27 @@ export default function CollectionsPage() {
 
   // ── Render ─────────────────────────────────────────────────────────────────
 
+  // AI Denetim sekmesi → ortak ModerationEventsPanel (koleksiyon olayları: kapak/öğe)
+  if (tab === "ai") {
+    return (
+      <ModerationEventsPanel
+        entityType="collection"
+        title="Koleksiyonlar"
+        tabs={COLLECTION_TABS}
+        activeTab={tab}
+        onTabChange={handleTabChange}
+      />
+    );
+  }
+
   return (
     <>
       <ResourceListPage<Collection>
         title="Koleksiyonlar"
         description={`Toplam ${total} koleksiyon`}
+        tabs={COLLECTION_TABS}
+        activeTab={tab}
+        onTabChange={handleTabChange}
         headerActions={
           <Button variant="primary" size="md" onClick={openCreateModal}>
             <PlusIcon className="w-5 h-5" />
@@ -326,9 +339,8 @@ export default function CollectionsPage() {
               onChange={(e) => setFilter("isFeatured", e.target.value)}
               className="sm:w-40"
             >
-              <option value="all">Tüm Öne Çıkan</option>
+              <option value="all">Tümü</option>
               <option value="true">Öne Çıkan</option>
-              <option value="false">Normal</option>
             </Select>
           </>
         }

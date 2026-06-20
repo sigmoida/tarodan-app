@@ -2,6 +2,7 @@
 
 import { useMemo } from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { adminApi } from "@/lib/api";
 import { cancelReasonLabel, statusFilterOptions } from "@/lib/utils";
 import {
@@ -12,14 +13,11 @@ import {
 } from "@tarodan/ui";
 import type { StatusConfig } from "@tarodan/ui";
 import { type ColumnDef } from "@/components/DataTable";
-import { ActionButtons, ActionIconButton } from "@/components/admin-list";
+import { ActionButtons } from "@/components/admin-list";
 import { ResourceListPage } from "@/components/ResourceListPage";
 import { useAdminResource } from "@/hooks/useAdminResource";
 import { useQuery } from "@tanstack/react-query";
-import {
-  EyeIcon,
-  ExclamationTriangleIcon,
-} from "@heroicons/react/24/outline";
+import { ExclamationTriangleIcon } from "@heroicons/react/24/outline";
 
 // ─── Tipler ────────────────────────────────────────────────────────────────
 
@@ -81,6 +79,7 @@ function mapTrades(raw: any[]): Trade[] {
 // ─── Sayfa ─────────────────────────────────────────────────────────────────
 
 export default function TradesPage() {
+  const router = useRouter();
   // ── Veri çekme (useAdminResource) ─────────────────────────────────────────
   // status + userId hook-yönetimli filtreler (syncUrl ile URL'de yaşar: ?status= / ?userId=).
   // userId, kullanıcı detay sayfasından ?userId= deep-link'i ile gelir. queryKey'in parçası
@@ -205,11 +204,6 @@ export default function TradesPage() {
       header: "İşlemler",
       cell: ({ row }) => (
         <ActionButtons>
-          <ActionIconButton
-            icon={EyeIcon}
-            href={`/trades/${row.original.id}`}
-            title="Detay"
-          />
           {row.original.hasDispute && (
             <Button
               variant="secondary"
@@ -296,6 +290,7 @@ export default function TradesPage() {
       loading={isLoading}
       emptyText="Takas bulunamadı"
       getRowId={(t) => t.id}
+      onRowClick={(t) => router.push(`/trades/${t.id}`)}
       rowClassName={(t) => (t.hasDispute ? "bg-danger-900/10" : "")}
       page={page}
       totalPages={totalPages}

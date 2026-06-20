@@ -747,6 +747,97 @@ async function main() {
   console.log(`✅ Created ${settings.length} platform settings`);
 
   // ==========================================================================
+  // 5b. Tax Regions, Rates & Rules (Türkiye KDV)
+  // ==========================================================================
+  console.log('Creating tax data...');
+
+  const taxRegionTR = await prisma.taxRegion.upsert({
+    where: { id: 'tax-region-tr' },
+    update: {},
+    create: {
+      id: 'tax-region-tr',
+      name: 'Türkiye',
+      countryCode: 'TR',
+      regionCode: null,
+      isDefault: true,
+      sortOrder: 0,
+      isActive: true,
+    },
+  });
+
+  const [taxRate20, taxRate10, taxRate1, taxRate0] = await Promise.all([
+    prisma.taxRate.upsert({
+      where: { id: 'tax-rate-kdv-20' },
+      update: {},
+      create: {
+        id: 'tax-rate-kdv-20',
+        taxRegionId: taxRegionTR.id,
+        name: 'KDV %20',
+        rate: 20,
+        isDefault: true,
+        sortOrder: 0,
+        isActive: true,
+      },
+    }),
+    prisma.taxRate.upsert({
+      where: { id: 'tax-rate-kdv-10' },
+      update: {},
+      create: {
+        id: 'tax-rate-kdv-10',
+        taxRegionId: taxRegionTR.id,
+        name: 'KDV %10',
+        rate: 10,
+        isDefault: false,
+        sortOrder: 1,
+        isActive: true,
+      },
+    }),
+    prisma.taxRate.upsert({
+      where: { id: 'tax-rate-kdv-1' },
+      update: {},
+      create: {
+        id: 'tax-rate-kdv-1',
+        taxRegionId: taxRegionTR.id,
+        name: 'KDV %1',
+        rate: 1,
+        isDefault: false,
+        sortOrder: 2,
+        isActive: true,
+      },
+    }),
+    prisma.taxRate.upsert({
+      where: { id: 'tax-rate-kdv-0' },
+      update: {},
+      create: {
+        id: 'tax-rate-kdv-0',
+        taxRegionId: taxRegionTR.id,
+        name: 'KDV Muaf',
+        rate: 0,
+        isDefault: false,
+        sortOrder: 3,
+        isActive: true,
+      },
+    }),
+  ]);
+
+  // Varsayılan kural: tüm ürünler için %20
+  await prisma.taxRule.upsert({
+    where: { id: 'tax-rule-tr-default' },
+    update: {},
+    create: {
+      id: 'tax-rule-tr-default',
+      taxRegionId: taxRegionTR.id,
+      taxRateId: taxRate20.id,
+      scope: 'default_rate',
+      categoryId: null,
+      priority: 0,
+      isActive: true,
+    },
+  });
+
+  console.log('✅ Created tax region (TR), 4 rates, 1 default rule');
+
+  // ==========================================================================
   // 6. Create Users (20+ users with different roles)
   // ==========================================================================
   console.log('Creating users...');
@@ -2114,57 +2205,216 @@ async function main() {
   // ==========================================================================
   console.log('Creating support tickets...');
 
-  const ticketTemplates = [
-    { cat: TicketCategory.payment, subj: 'Ödeme başarısız oldu', pri: TicketPriority.high },
-    { cat: TicketCategory.shipping, subj: 'Kargom nerede?', pri: TicketPriority.medium },
-    { cat: TicketCategory.trade, subj: 'Takas anlaşmazlığı', pri: TicketPriority.high },
-    { cat: TicketCategory.account, subj: 'Şifre sıfırlama sorunu', pri: TicketPriority.medium },
-    { cat: TicketCategory.product, subj: 'Ürün açıklamasıyla uyuşmuyor', pri: TicketPriority.high },
-    { cat: TicketCategory.technical, subj: 'Uygulama çöküyor', pri: TicketPriority.urgent },
-    { cat: TicketCategory.other, subj: 'Genel soru', pri: TicketPriority.low },
+  // Senaryo tabanlı ticket şablonları — her kategori ve durumdan gerçekçi örnek
+  const ticketScenarios: Array<{
+    cat: TicketCategory;
+    subj: string;
+    pri: TicketPriority;
+    status: TicketStatus;
+    messages: Array<{ fromAdmin: boolean; content: string; isInternal?: boolean }>;
+  }> = [
+    {
+      cat: TicketCategory.payment,
+      subj: 'Ödeme başarısız oldu ama kartımdan para çekildi',
+      pri: TicketPriority.urgent,
+      status: TicketStatus.in_progress,
+      messages: [
+        { fromAdmin: false, content: 'Merhaba, sipariş #ORD-00123 için ödeme yapmaya çalıştım. Banka hesabımdan 450 TL çekildi ancak sipariş "Ödeme Bekleniyor" durumunda kalmaya devam ediyor. Ne yapmalıyım?' },
+        { fromAdmin: true, content: 'Merhaba, başvurunuzu aldık. Ödeme işleminizi sistemimizden inceliyoruz. Bankanızın referans numarasını paylaşabilir misiniz?', isInternal: false },
+        { fromAdmin: true, content: 'Ödeme gateway logları kontrol edildi. İşlem 14:32\'de alındı ancak sipariş sistemine yansımamış. Teknik ekibe iletildi.', isInternal: true },
+      ],
+    },
+    {
+      cat: TicketCategory.shipping,
+      subj: 'Kargom 10 gündür teslim edilmedi',
+      pri: TicketPriority.high,
+      status: TicketStatus.waiting_customer,
+      messages: [
+        { fromAdmin: false, content: 'Merhaba, 10 gün önce satın aldığım ürün hâlâ gelmedi. Takip numarası: SRT-887654321. Sürat Kargo sitesinde "Dağıtıma Çıktı" yazıyor ama teslim edilmiyor.' },
+        { fromAdmin: true, content: 'Merhaba, kargo takip numaranızı kontrol ettik. Sürat Kargo\'ya başvuruldu. Teslimat adresinizde kapıcı veya güvenlik görevlisi var mı? Bazen bırıakma notu bırakılıyor.', isInternal: false },
+        { fromAdmin: false, content: 'Evet, kapıcı var ama not bırakılmamış. Komşulara da sormadım, sorayım.' },
+        { fromAdmin: true, content: 'Lütfen komşularınızı kontrol edin ve bize geri dönün. Çözülmezse kargo firmasına resmi kayıp bildirimi açacağız.', isInternal: false },
+      ],
+    },
+    {
+      cat: TicketCategory.trade,
+      subj: 'Takas teklifim kabul edildi ama ürün gönderilmedi',
+      pri: TicketPriority.high,
+      status: TicketStatus.in_progress,
+      messages: [
+        { fromAdmin: false, content: 'Kullanıcı "ahmet_koleksiyoncu" ile takas anlaştık. 5 gün önce teklifim kabul edildi. Ben kendi ürünümü gönderdim ve teslim alındı (kargo takibi var) ama karşı taraf hâlâ göndermedi. Yardımcı olur musunuz?' },
+        { fromAdmin: true, content: 'Merhaba, takas talebinizi aldık. Takas ID\'nizi (TRD-XXXXX formatında) paylaşabilir misiniz?', isInternal: false },
+        { fromAdmin: true, content: 'Kullanıcı ahmet_koleksiyoncu 3 benzer şikayetle işaretlenmiş. Hesap incelemeye alındı.', isInternal: true },
+        { fromAdmin: false, content: 'Takas numarası: TRD-1A2B3C4D. Teşekkürler.' },
+        { fromAdmin: true, content: 'Takas kaydınızı inceledik. Karşı tarafla iletişime geçildi; 48 saat içinde göndermezse takas iptal edilerek ürününüz iade sürecine alınacak.', isInternal: false },
+      ],
+    },
+    {
+      cat: TicketCategory.account,
+      subj: 'İki faktörlü doğrulama kodunu almıyorum',
+      pri: TicketPriority.medium,
+      status: TicketStatus.resolved,
+      messages: [
+        { fromAdmin: false, content: 'Hesabıma giriş yapmaya çalışıyorum ama SMS kodu gelmiyor. Telefon numaram doğru: 0532 *** **45. Spam klasörünü de kontrol ettim, yok.' },
+        { fromAdmin: true, content: 'Merhaba, SMS gönderim loglarını kontrol ettik. Operatör kaynaklı gecikme gözüküyor. Alternatif olarak e-posta ile doğrulama yapmak ister misiniz?', isInternal: false },
+        { fromAdmin: false, content: 'Evet, e-posta ile olabilir.' },
+        { fromAdmin: true, content: 'E-posta doğrulama bağlantısı gönderildi. Lütfen gelen kutunuzu (spam dahil) kontrol edin.', isInternal: false },
+        { fromAdmin: false, content: 'Geldi, giriş yapabildim. Çok teşekkürler!' },
+        { fromAdmin: true, content: 'Rica ederiz. Başka sorunuz olursa yardımcı olmaktan memnuniyet duyarız.', isInternal: false },
+      ],
+    },
+    {
+      cat: TicketCategory.product,
+      subj: 'Ürün açıklamasıyla gerçek hali uyuşmuyor',
+      pri: TicketPriority.high,
+      status: TicketStatus.open,
+      messages: [
+        { fromAdmin: false, content: 'Aldığım 1:18 ölçekli Porsche 911 modeli ilan fotoğraflarında "mint condition, orijinal kutu" yazıyordu. Ancak ürün hasarlı geldi ve kutusuz. Fotoğraf ekledim: [ek-1.jpg, ek-2.jpg]. İade veya tam tazminat istiyorum.' },
+      ],
+    },
+    {
+      cat: TicketCategory.technical,
+      subj: 'Mobil uygulamada ödeme sayfası açılmıyor',
+      pri: TicketPriority.urgent,
+      status: TicketStatus.in_progress,
+      messages: [
+        { fromAdmin: false, content: 'iPhone 14 Pro, iOS 17.4 kullanıyorum. Uygulama v2.3.1. Ödeme sayfasına geçince uygulama aniden kapanıyor. 3 kez denedim, hep aynı. Satın almayı tamamlayamıyorum.' },
+        { fromAdmin: true, content: 'Merhaba, bildirdiğiniz için teşekkürler. Bu sorunu geliştirme ekibimize bildirdik. Geçici çözüm olarak web tarayıcısı (Safari/Chrome) üzerinden satın alma işlemini gerçekleştirebilirsiniz.', isInternal: false },
+        { fromAdmin: true, content: 'iOS crash log alındı. Ödeme iframe\'inde WKWebView hatası. Bir sonraki patch\'te düzelecek. Öncelik: P1.', isInternal: true },
+      ],
+    },
+    {
+      cat: TicketCategory.other,
+      subj: 'Satıcı hesabı başvurusu hakkında bilgi almak istiyorum',
+      pri: TicketPriority.low,
+      status: TicketStatus.closed,
+      messages: [
+        { fromAdmin: false, content: 'Merhaba, koleksiyonumun bir kısmını satmak istiyorum. Satıcı hesabı başvurusu nasıl yapılıyor ve onay süreci ne kadar sürüyor?' },
+        { fromAdmin: true, content: 'Merhaba! Satıcı başvurusu için profil sayfanızdaki "Satıcı Ol" butonuna tıklayabilirsiniz. Belgelerinizi (kimlik + IBAN) yükledikten sonra genellikle 1-3 iş günü içinde inceleme tamamlanır.', isInternal: false },
+        { fromAdmin: false, content: 'Anladım, teşekkürler. Hemen başvuracağım.' },
+        { fromAdmin: true, content: 'Başarılar! Başvurunuzu aldığımızda size e-posta ile bilgi vereceğiz. Başka sorunuz olursa tekrar yazabilirsiniz.', isInternal: false },
+      ],
+    },
+    {
+      cat: TicketCategory.payment,
+      subj: 'Yanlış tutarda fatura kesildi',
+      pri: TicketPriority.medium,
+      status: TicketStatus.open,
+      messages: [
+        { fromAdmin: false, content: 'Sipariş toplam tutarım 1.250 TL iken faturamda 1.450 TL yazıyor. Aradaki 200 TL fark nereden kaynaklanıyor? Faturamı düzeltmenizi talep ediyorum.' },
+      ],
+    },
+    {
+      cat: TicketCategory.shipping,
+      subj: 'Yanlış adrese gönderim yapıldı',
+      pri: TicketPriority.high,
+      status: TicketStatus.waiting_customer,
+      messages: [
+        { fromAdmin: false, content: 'Siparişim eski adresime gönderilmiş. Adres değişikliğini sipariş onayından önce yaptım ama sanırım sisteme işlenmedi. Ürünü nasıl alabilirim?' },
+        { fromAdmin: true, content: 'Merhaba, kargo firmasına iade talimatı verildi. Paket depoya döndükten sonra doğru adresinize tekrar göndereceğiz. Yeni adresinizi onaylayabilir misiniz?', isInternal: false },
+        { fromAdmin: false, content: 'Yeni adresim: Kadıköy, Moda Cad. No:45/3, 34710 İstanbul.' },
+        { fromAdmin: true, content: 'Adresinizi güncelledik. Paket depoya ulaştığında (tahminen 2-3 iş günü) size tekrar bilgilendirme yapacağız.', isInternal: false },
+      ],
+    },
+    {
+      cat: TicketCategory.account,
+      subj: 'Hesabım sebepsiz askıya alındı',
+      pri: TicketPriority.high,
+      status: TicketStatus.open,
+      messages: [
+        { fromAdmin: false, content: 'Bugün sisteme giriş yapamadım ve "Hesabınız askıya alınmıştır" mesajı aldım. Herhangi bir kural ihlali yapmadım, neden askıya alındığını anlamıyorum. Acil yardım lütfen.' },
+      ],
+    },
   ];
 
   const tickets: any[] = [];
-  for (let i = 0; i < 15; i++) {
-    const template = ticketTemplates[i % ticketTemplates.length];
+  for (let i = 0; i < ticketScenarios.length; i++) {
+    const scenario = ticketScenarios[i];
     const user = users[3 + (i % (users.length - 3))];
-    const status = [TicketStatus.open, TicketStatus.in_progress, TicketStatus.waiting_customer, TicketStatus.resolved, TicketStatus.closed][Math.floor(Math.random() * 5)];
+    const isResolved = scenario.status === TicketStatus.resolved || scenario.status === TicketStatus.closed;
 
     try {
+      const createdAt = randomPastDate(20);
+      const ticket = await prisma.supportTicket.create({
+        data: {
+          ticketNumber: generateTicketNumber(),
+          creatorId: user.id,
+          assigneeId: scenario.status !== TicketStatus.open ? moderator.id : null,
+          category: scenario.cat,
+          priority: scenario.pri,
+          status: scenario.status,
+          subject: scenario.subj,
+          resolvedAt: isResolved ? randomPastDate(2) : null,
+          closedAt: scenario.status === TicketStatus.closed ? randomPastDate(1) : null,
+          createdAt,
+        },
+      });
+
+      // Mesajları zaman sırasıyla ekle
+      for (let m = 0; m < scenario.messages.length; m++) {
+        const msg = scenario.messages[m];
+        const msgDate = new Date(createdAt.getTime() + (m + 1) * 3_600_000); // her mesaj 1 saat arayla
+        await prisma.ticketMessage.create({
+          data: {
+            ticketId: ticket.id,
+            senderId: msg.fromAdmin ? moderator.id : user.id,
+            content: msg.content,
+            isInternal: msg.isInternal ?? false,
+            createdAt: msgDate,
+          },
+        });
+      }
+
+      tickets.push(ticket);
+    } catch (e) {
+      // Ignore errors
+    }
+  }
+
+  // Ek: kısa konuşmalı basit biletler (hacim için)
+  const simpleTemplates = [
+    { cat: TicketCategory.trade, subj: 'Takas fiyatı konusunda anlaşamadık', pri: TicketPriority.low },
+    { cat: TicketCategory.technical, subj: 'Fotoğraf yükleme çalışmıyor', pri: TicketPriority.medium },
+    { cat: TicketCategory.product, subj: 'İlan onayı ne zaman gelecek?', pri: TicketPriority.low },
+    { cat: TicketCategory.other, subj: 'Kampanya kodu çalışmıyor', pri: TicketPriority.medium },
+    { cat: TicketCategory.shipping, subj: 'Kargo bedelini satıcı mı öder?', pri: TicketPriority.low },
+  ];
+  for (let i = 0; i < simpleTemplates.length; i++) {
+    const tpl = simpleTemplates[i];
+    const user = users[3 + ((i + ticketScenarios.length) % (users.length - 3))];
+    const status = i % 3 === 0 ? TicketStatus.open : TicketStatus.in_progress;
+    try {
+      const createdAt = randomPastDate(7);
       const ticket = await prisma.supportTicket.create({
         data: {
           ticketNumber: generateTicketNumber(),
           creatorId: user.id,
           assigneeId: status !== TicketStatus.open ? moderator.id : null,
-          category: template.cat,
-          priority: template.pri,
-          status: status,
-          subject: `${template.subj} #${i + 1}`,
-          resolvedAt: status === TicketStatus.resolved || status === TicketStatus.closed ? randomPastDate(2) : null,
-          closedAt: status === TicketStatus.closed ? randomPastDate(1) : null,
-          createdAt: randomPastDate(14),
+          category: tpl.cat,
+          priority: tpl.pri,
+          status,
+          subject: tpl.subj,
+          createdAt,
         },
       });
-
-      // Add messages to ticket
       await prisma.ticketMessage.create({
         data: {
           ticketId: ticket.id,
           senderId: user.id,
-          content: `Merhaba, ${template.subj.toLowerCase()} konusunda yardıma ihtiyacım var. Lütfen en kısa sürede dönüş yapabilir misiniz?`,
+          content: `Merhaba, "${tpl.subj.toLowerCase()}" konusunda yardıma ihtiyacım var.`,
+          createdAt: new Date(createdAt.getTime() + 300_000),
         },
       });
-
       if (status !== TicketStatus.open) {
         await prisma.ticketMessage.create({
           data: {
             ticketId: ticket.id,
             senderId: moderator.id,
-            content: 'Merhaba, talebinizi aldık. İnceliyoruz ve en kısa sürede size dönüş yapacağız.',
+            content: 'Merhaba, talebinizi aldık. İnceliyoruz ve kısa sürede dönüş yapacağız.',
+            createdAt: new Date(createdAt.getTime() + 7_200_000),
           },
         });
       }
-
       tickets.push(ticket);
     } catch (e) {
       // Ignore errors

@@ -2,6 +2,7 @@ import {
   Controller,
   Get,
   Post,
+  Put,
   Patch,
   Delete,
   Body,
@@ -33,6 +34,8 @@ import { DiscountService } from '../discount/discount.service';
 import { CreateDiscountDto, UpdateDiscountDto, DiscountQueryDto } from '../discount/dto';
 import { AdminJwtAuthGuard } from '../auth/guards/admin-jwt-auth.guard';
 import { Roles } from '../auth/decorators/roles.decorator';
+import { RequirePermission } from '../auth/decorators/require-permission.decorator';
+import { BypassPermissionMatrix } from '../auth/decorators/bypass-permission-matrix.decorator';
 import { RolesGuard } from '../auth/guards/roles.guard';
 import { CurrentUser } from '../auth/decorators/current-user.decorator';
 import { AdminRoute } from '../auth/decorators/admin-route.decorator';
@@ -56,6 +59,7 @@ import {
   AssignAdminStaffDto,
   UpdateAdminStaffDto,
   UpdateStaffSettingsDto,
+  SetRolePermissionsDto,
   ResolveDisputeDto,
   AnalyticsQueryDto,
   UpdateOrderStatusDto,
@@ -99,12 +103,13 @@ export class AdminController {
     private readonly advertisementService: AdvertisementService,
     private readonly mediaService: MediaService,
     private readonly discountService: DiscountService,
+    private readonly rolesGuard: RolesGuard,
   ) { }
 
   // ==================== COMMISSION RULES ====================
 
   @Get('commission-rules')
-  @Roles(AdminRole.super_admin, AdminRole.admin)
+  @Roles(AdminRole.super_admin, AdminRole.admin, AdminRole.moderator)
   @ApiOperation({ summary: 'Get all commission rules' })
   @ApiResponse({ status: HttpStatus.OK, type: [CommissionRuleResponseDto] })
   async getCommissionRules() {
@@ -186,7 +191,7 @@ export class AdminController {
   }
 
   @Post('users/:id/ban')
-  @Roles(AdminRole.super_admin, AdminRole.admin)
+  @Roles(AdminRole.super_admin, AdminRole.admin, AdminRole.moderator)
   @HttpCode(HttpStatus.OK)
   @ApiOperation({ summary: 'Ban a user' })
   @ApiParam({ name: 'id', description: 'User ID' })
@@ -199,7 +204,7 @@ export class AdminController {
   }
 
   @Post('users/:id/unban')
-  @Roles(AdminRole.super_admin, AdminRole.admin)
+  @Roles(AdminRole.super_admin, AdminRole.admin, AdminRole.moderator)
   @HttpCode(HttpStatus.OK)
   @ApiOperation({ summary: 'Unban a user' })
   @ApiParam({ name: 'id', description: 'User ID' })
@@ -269,6 +274,26 @@ export class AdminController {
     return this.adminService.updateAdminStaff(adminId, id, dto);
   }
 
+  @Get('staff/role-permissions')
+  @Roles(AdminRole.super_admin, AdminRole.admin, AdminRole.moderator)
+  @BypassPermissionMatrix()  // İzin matrisi DB'de bozuk olsa bile bu endpoint her zaman erişilebilir olmalı
+  @ApiOperation({ summary: 'Get role → permission matrix (defaults + any overrides)' })
+  async getRolePermissions() {
+    return this.adminService.getRolePermissions();
+  }
+
+  @Put('staff/role-permissions')
+  @Roles(AdminRole.super_admin)
+  @ApiOperation({ summary: 'Update role → permission matrix (super_admin only)' })
+  async setRolePermissions(
+    @CurrentUser('id') adminId: string,
+    @Body() dto: SetRolePermissionsDto,
+  ) {
+    const result = await this.adminService.setRolePermissions(adminId, dto);
+    this.rolesGuard.invalidateCache();
+    return result;
+  }
+
   @Delete('staff/:id')
   @Roles(AdminRole.super_admin, AdminRole.admin)
   @ApiOperation({ summary: 'Revoke admin access' })
@@ -310,7 +335,7 @@ export class AdminController {
   }
 
   @Get('products-export')
-  @Roles(AdminRole.super_admin, AdminRole.admin)
+  @Roles(AdminRole.super_admin, AdminRole.admin, AdminRole.moderator)
   @ApiOperation({ summary: 'Export products to CSV' })
   async exportProducts(
     @Query('status') status?: string,
@@ -455,21 +480,21 @@ export class AdminController {
   // ==================== ORDER MANAGEMENT ====================
 
   @Get('orders')
-  @Roles(AdminRole.super_admin, AdminRole.admin)
+  @Roles(AdminRole.super_admin, AdminRole.admin, AdminRole.moderator)
   @ApiOperation({ summary: 'Get orders with filters' })
   async getOrders(@Query() query: AdminOrderQueryDto) {
     return this.adminService.getOrders(query);
   }
 
   @Get('orders/disputes')
-  @Roles(AdminRole.super_admin, AdminRole.admin)
+  @Roles(AdminRole.super_admin, AdminRole.admin, AdminRole.moderator)
   @ApiOperation({ summary: 'Get disputed orders' })
   async getDisputedOrders(@Query() query: AdminOrderQueryDto) {
     return this.adminService.getDisputedOrders(query);
   }
 
   @Get('orders/:id')
-  @Roles(AdminRole.super_admin, AdminRole.admin)
+  @Roles(AdminRole.super_admin, AdminRole.admin, AdminRole.moderator)
   @ApiOperation({ summary: 'Get single order details' })
   @ApiParam({ name: 'id', description: 'Order ID' })
   async getOrderById(@Param('id') id: string) {
@@ -477,7 +502,7 @@ export class AdminController {
   }
 
   @Patch('orders/:id')
-  @Roles(AdminRole.super_admin, AdminRole.admin)
+  @Roles(AdminRole.super_admin, AdminRole.admin, AdminRole.moderator)
   @ApiOperation({ summary: 'Update order status' })
   @ApiParam({ name: 'id', description: 'Order ID' })
   async updateOrderStatus(
@@ -489,7 +514,7 @@ export class AdminController {
   }
 
   @Post('orders/:id/resolve')
-  @Roles(AdminRole.super_admin, AdminRole.admin)
+  @Roles(AdminRole.super_admin, AdminRole.admin, AdminRole.moderator)
   @HttpCode(HttpStatus.OK)
   @ApiOperation({ summary: 'Resolve order dispute' })
   @ApiParam({ name: 'id', description: 'Order ID' })
@@ -502,7 +527,7 @@ export class AdminController {
   }
 
   @Post('orders/:id/tracking')
-  @Roles(AdminRole.super_admin, AdminRole.admin)
+  @Roles(AdminRole.super_admin, AdminRole.admin, AdminRole.moderator)
   @HttpCode(HttpStatus.OK)
   @ApiOperation({ summary: 'Add tracking information to order' })
   @ApiParam({ name: 'id', description: 'Order ID' })
@@ -515,7 +540,7 @@ export class AdminController {
   }
 
   @Post('orders/:id/notify')
-  @Roles(AdminRole.super_admin, AdminRole.admin)
+  @Roles(AdminRole.super_admin, AdminRole.admin, AdminRole.moderator)
   @HttpCode(HttpStatus.OK)
   @ApiOperation({ summary: 'Send notification about order' })
   @ApiParam({ name: 'id', description: 'Order ID' })
@@ -570,25 +595,38 @@ export class AdminController {
     return this.adminService.generateOrderInvoice(id);
   }
 
+  @Post('orders/:id/apply-coupon')
+  @Roles(AdminRole.super_admin, AdminRole.admin)
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({ summary: 'Apply or remove a coupon code on an order (admin override)' })
+  @ApiParam({ name: 'id', description: 'Order ID' })
+  async applyOrderCoupon(
+    @Param('id') id: string,
+    @CurrentUser('id') adminId: string,
+    @Body() dto: { code: string | null },
+  ) {
+    return this.adminService.applyOrderCoupon(id, adminId, dto.code);
+  }
+
   // ==================== ANALYTICS & REPORTS ====================
 
 
   @Get('dashboard')
-  @Roles(AdminRole.super_admin, AdminRole.admin)
+  @Roles(AdminRole.super_admin, AdminRole.admin, AdminRole.moderator)
   @ApiOperation({ summary: 'Get dashboard statistics' })
   async getDashboardStats() {
     return this.adminService.getDashboardStats();
   }
 
   @Get('dashboard/recent-orders')
-  @Roles(AdminRole.super_admin, AdminRole.admin)
+  @Roles(AdminRole.super_admin, AdminRole.admin, AdminRole.moderator)
   @ApiOperation({ summary: 'Get recent orders for dashboard' })
   async getRecentOrders(@Query('limit') limit?: string) {
     return this.adminService.getRecentOrders(limit ? parseInt(limit, 10) : 10);
   }
 
   @Get('dashboard/pending-actions')
-  @Roles(AdminRole.super_admin, AdminRole.admin)
+  @Roles(AdminRole.super_admin, AdminRole.admin, AdminRole.moderator)
   @ApiOperation({ summary: 'Get pending actions count for dashboard' })
   async getPendingActions() {
     return this.adminService.getPendingActions();
@@ -690,7 +728,8 @@ export class AdminController {
   // ==================== AUDIT LOGS ====================
 
   @Get('audit-logs')
-  @Roles(AdminRole.super_admin)
+  @Roles(AdminRole.super_admin, AdminRole.admin, AdminRole.moderator)
+  @RequirePermission('logs')
   @ApiOperation({ summary: 'Get audit logs' })
   async getAuditLogs(@Query() query: AuditLogQueryDto) {
     return this.adminService.getAuditLogs(query);
@@ -737,6 +776,32 @@ export class AdminController {
     });
   }
 
+  @Get('moderation/events')
+  @Roles(AdminRole.super_admin, AdminRole.admin, AdminRole.moderator)
+  @ApiOperation({
+    summary:
+      'Birleşik AI moderasyon günlüğü (tüm varlıklar; entityType/entityId ile süzülebilir)',
+  })
+  async getModerationEvents(
+    @Query('entityType') entityType?: string,
+    @Query('entityId') entityId?: string,
+    @Query('userId') userId?: string,
+    @Query('decision') decision?: string,
+    @Query('kind') kind?: string,
+    @Query('page') page?: string,
+    @Query('pageSize') pageSize?: string,
+  ) {
+    return this.adminService.getModerationEvents({
+      entityType,
+      entityId,
+      userId,
+      decision,
+      kind,
+      page: page ? parseInt(page, 10) : 1,
+      pageSize: pageSize ? parseInt(pageSize, 10) : 20,
+    });
+  }
+
   @Post('moderation/test-image')
   @Roles(AdminRole.super_admin, AdminRole.admin, AdminRole.moderator)
   @ApiOperation({ summary: 'Tek görseli AI ile test et (skor gör)' })
@@ -752,7 +817,8 @@ export class AdminController {
   }
 
   @Post('moderation/ai-config')
-  @Roles(AdminRole.super_admin, AdminRole.admin)
+  @Roles(AdminRole.super_admin, AdminRole.admin, AdminRole.moderator)
+  @RequirePermission('ai_moderation')
   @ApiOperation({ summary: 'AI eşiklerini ayarla (canlı + kalıcı)' })
   async setAiConfig(
     @Body() body: { relevanceThreshold?: number; nsfwThreshold?: number },
@@ -811,7 +877,7 @@ export class AdminController {
   // ==================== PAYMENT MANAGEMENT ====================
 
   @Get('payments')
-  @Roles(AdminRole.super_admin, AdminRole.admin)
+  @Roles(AdminRole.super_admin, AdminRole.admin, AdminRole.moderator)
   @ApiOperation({ summary: 'Get all payments with filters' })
   @ApiResponse({ status: HttpStatus.OK, description: 'List of payments' })
   async getPayments(@Query() query: AdminPaymentQueryDto) {
@@ -819,7 +885,7 @@ export class AdminController {
   }
 
   @Get('payments/:id')
-  @Roles(AdminRole.super_admin, AdminRole.admin)
+  @Roles(AdminRole.super_admin, AdminRole.admin, AdminRole.moderator)
   @ApiOperation({ summary: 'Get payment details by ID' })
   @ApiParam({ name: 'id', description: 'Payment ID' })
   @ApiResponse({ status: HttpStatus.OK, description: 'Payment details' })
@@ -828,7 +894,7 @@ export class AdminController {
   }
 
   @Get('payments/statistics')
-  @Roles(AdminRole.super_admin, AdminRole.admin)
+  @Roles(AdminRole.super_admin, AdminRole.admin, AdminRole.moderator)
   @ApiOperation({ summary: 'Get payment statistics' })
   @ApiResponse({ status: HttpStatus.OK, description: 'Payment statistics' })
   async getPaymentStatistics(@Query() query: PaymentStatisticsQueryDto) {
@@ -836,7 +902,7 @@ export class AdminController {
   }
 
   @Get('payments/failed')
-  @Roles(AdminRole.super_admin, AdminRole.admin)
+  @Roles(AdminRole.super_admin, AdminRole.admin, AdminRole.moderator)
   @ApiOperation({ summary: 'Get failed payments' })
   @ApiResponse({ status: HttpStatus.OK, description: 'List of failed payments' })
   async getFailedPayments(@Query() query: AdminPaymentQueryDto) {
@@ -844,7 +910,7 @@ export class AdminController {
   }
 
   @Post('payments/:id/manual-refund')
-  @Roles(AdminRole.super_admin, AdminRole.admin)
+  @Roles(AdminRole.super_admin, AdminRole.admin, AdminRole.moderator)
   @HttpCode(HttpStatus.OK)
   @ApiOperation({ summary: 'Manual refund by admin' })
   @ApiParam({ name: 'id', description: 'Payment ID' })
@@ -858,7 +924,7 @@ export class AdminController {
   }
 
   @Post('payments/:id/force-cancel')
-  @Roles(AdminRole.super_admin, AdminRole.admin)
+  @Roles(AdminRole.super_admin, AdminRole.admin, AdminRole.moderator)
   @HttpCode(HttpStatus.OK)
   @ApiOperation({ summary: 'Force cancel payment by admin' })
   @ApiParam({ name: 'id', description: 'Payment ID' })
@@ -874,7 +940,7 @@ export class AdminController {
   // ==================== SELLER PAYOUTS ====================
 
   @Get('payouts/summary')
-  @Roles(AdminRole.super_admin, AdminRole.admin)
+  @Roles(AdminRole.super_admin, AdminRole.admin, AdminRole.moderator)
   @ApiOperation({ summary: 'Get payout summary (pending, released, next releases)' })
   @ApiResponse({ status: HttpStatus.OK, description: 'Payout summary' })
   async getPayoutsSummary() {
@@ -882,7 +948,7 @@ export class AdminController {
   }
 
   @Get('payouts/transactions')
-  @Roles(AdminRole.super_admin, AdminRole.admin)
+  @Roles(AdminRole.super_admin, AdminRole.admin, AdminRole.moderator)
   @ApiOperation({ summary: 'Get payout transaction history' })
   @ApiResponse({ status: HttpStatus.OK, description: 'List of payout transactions' })
   async getPayoutsTransactions(@Query() query: PayoutTransactionsQueryDto) {
@@ -890,7 +956,7 @@ export class AdminController {
   }
 
   @Get('payouts/schedule')
-  @Roles(AdminRole.super_admin, AdminRole.admin)
+  @Roles(AdminRole.super_admin, AdminRole.admin, AdminRole.moderator)
   @ApiOperation({ summary: 'Get payout schedule (upcoming releases)' })
   @ApiResponse({ status: HttpStatus.OK, description: 'Payout schedule' })
   async getPayoutsSchedule(
@@ -901,7 +967,7 @@ export class AdminController {
   }
 
   @Get('payouts/export')
-  @Roles(AdminRole.super_admin, AdminRole.admin)
+  @Roles(AdminRole.super_admin, AdminRole.admin, AdminRole.moderator)
   @ApiOperation({ summary: 'Export payout transactions as CSV' })
   @ApiResponse({ status: HttpStatus.OK, description: 'CSV content and filename' })
   async getPayoutsExport(@Query() query: PayoutExportQueryDto) {
@@ -909,7 +975,7 @@ export class AdminController {
   }
 
   @Post('payouts/release/:orderId')
-  @Roles(AdminRole.super_admin, AdminRole.admin)
+  @Roles(AdminRole.super_admin, AdminRole.admin, AdminRole.moderator)
   @HttpCode(HttpStatus.OK)
   @ApiOperation({ summary: 'Release payment hold to seller (manual)' })
   @ApiParam({ name: 'orderId', description: 'Order ID' })
@@ -922,7 +988,7 @@ export class AdminController {
   }
 
   @Post('payouts/release-trade/:tradeId')
-  @Roles(AdminRole.super_admin, AdminRole.admin)
+  @Roles(AdminRole.super_admin, AdminRole.admin, AdminRole.moderator)
   @HttpCode(HttpStatus.OK)
   @ApiOperation({ summary: 'Release trade cash payment hold (manual)' })
   @ApiParam({ name: 'tradeId', description: 'Trade ID' })
@@ -935,7 +1001,7 @@ export class AdminController {
   }
 
   @Post('payouts/:transferId/retry')
-  @Roles(AdminRole.super_admin, AdminRole.admin)
+  @Roles(AdminRole.super_admin, AdminRole.admin, AdminRole.moderator)
   @HttpCode(HttpStatus.OK)
   @ApiOperation({ summary: 'Retry a failed payout transfer' })
   @ApiParam({ name: 'transferId', description: 'PayoutTransfer ID' })
@@ -948,7 +1014,7 @@ export class AdminController {
   }
 
   @Get('payouts/failed')
-  @Roles(AdminRole.super_admin, AdminRole.admin)
+  @Roles(AdminRole.super_admin, AdminRole.admin, AdminRole.moderator)
   @ApiOperation({ summary: 'Get failed/returned payout transfers' })
   @ApiResponse({ status: HttpStatus.OK, description: 'Failed payouts list' })
   async getFailedPayouts(
@@ -964,7 +1030,7 @@ export class AdminController {
   // ==================== STATIC PAGES ====================
 
   @Get('pages')
-  @Roles(AdminRole.super_admin, AdminRole.admin)
+  @Roles(AdminRole.super_admin, AdminRole.admin, AdminRole.moderator)
   @ApiOperation({ summary: 'Get all static pages' })
   @ApiResponse({ status: HttpStatus.OK, description: 'List of static pages' })
   async getPages() {
@@ -972,7 +1038,7 @@ export class AdminController {
   }
 
   @Get('pages/slug/:slug')
-  @Roles(AdminRole.super_admin, AdminRole.admin)
+  @Roles(AdminRole.super_admin, AdminRole.admin, AdminRole.moderator)
   @ApiOperation({ summary: 'Get static page by slug' })
   @ApiParam({ name: 'slug', description: 'Page slug' })
   async getPageBySlug(@Param('slug') slug: string) {
@@ -980,7 +1046,7 @@ export class AdminController {
   }
 
   @Get('pages/:id')
-  @Roles(AdminRole.super_admin, AdminRole.admin)
+  @Roles(AdminRole.super_admin, AdminRole.admin, AdminRole.moderator)
   @ApiOperation({ summary: 'Get static page by ID' })
   @ApiParam({ name: 'id', description: 'Page ID' })
   async getPageById(@Param('id') id: string) {
@@ -988,7 +1054,7 @@ export class AdminController {
   }
 
   @Post('pages')
-  @Roles(AdminRole.super_admin, AdminRole.admin)
+  @Roles(AdminRole.super_admin, AdminRole.admin, AdminRole.moderator)
   @ApiOperation({ summary: 'Create static page' })
   @ApiResponse({ status: HttpStatus.CREATED, description: 'Page created' })
   async createPage(
@@ -999,7 +1065,7 @@ export class AdminController {
   }
 
   @Patch('pages/:id')
-  @Roles(AdminRole.super_admin, AdminRole.admin)
+  @Roles(AdminRole.super_admin, AdminRole.admin, AdminRole.moderator)
   @ApiOperation({ summary: 'Update static page' })
   @ApiParam({ name: 'id', description: 'Page ID' })
   async updatePage(
@@ -1011,7 +1077,7 @@ export class AdminController {
   }
 
   @Delete('pages/:id')
-  @Roles(AdminRole.super_admin, AdminRole.admin)
+  @Roles(AdminRole.super_admin, AdminRole.admin, AdminRole.moderator)
   @HttpCode(HttpStatus.NO_CONTENT)
   @ApiOperation({ summary: 'Delete static page' })
   @ApiParam({ name: 'id', description: 'Page ID' })
@@ -1025,7 +1091,7 @@ export class AdminController {
   // ==================== EMAIL TEMPLATES ====================
 
   @Get('email-templates')
-  @Roles(AdminRole.super_admin, AdminRole.admin)
+  @Roles(AdminRole.super_admin, AdminRole.admin, AdminRole.moderator)
   @ApiOperation({ summary: 'Get all email templates' })
   @ApiResponse({ status: HttpStatus.OK, description: 'List of email templates' })
   async getEmailTemplates() {
@@ -1033,7 +1099,7 @@ export class AdminController {
   }
 
   @Get('email-templates/:key')
-  @Roles(AdminRole.super_admin, AdminRole.admin)
+  @Roles(AdminRole.super_admin, AdminRole.admin, AdminRole.moderator)
   @ApiOperation({ summary: 'Get email template by key' })
   @ApiParam({ name: 'key', description: 'Template key' })
   async getEmailTemplate(@Param('key') key: string) {
@@ -1041,7 +1107,7 @@ export class AdminController {
   }
 
   @Patch('email-templates/:key')
-  @Roles(AdminRole.super_admin, AdminRole.admin)
+  @Roles(AdminRole.super_admin, AdminRole.admin, AdminRole.moderator)
   @ApiOperation({ summary: 'Update email template' })
   @ApiParam({ name: 'key', description: 'Template key' })
   async updateEmailTemplate(
@@ -1053,19 +1119,31 @@ export class AdminController {
   }
 
   @Post('email-templates/:key/preview')
-  @Roles(AdminRole.super_admin, AdminRole.admin)
+  @Roles(AdminRole.super_admin, AdminRole.admin, AdminRole.moderator)
   @HttpCode(HttpStatus.OK)
   @ApiOperation({ summary: 'Preview email template with sample data' })
   @ApiParam({ name: 'key', description: 'Template key' })
   async previewEmailTemplate(
     @Param('key') key: string,
-    @Body() body: { templateData?: Record<string, any> },
+    @Body() body: { templateData?: Record<string, any>; overrideHtml?: string; overrideSubject?: string },
   ) {
-    return this.adminService.previewEmailTemplate(key, body.templateData);
+    return this.adminService.previewEmailTemplate(key, body.templateData, body.overrideHtml, body.overrideSubject);
+  }
+
+  @Delete('email-templates/:key')
+  @Roles(AdminRole.super_admin, AdminRole.admin, AdminRole.moderator)
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({ summary: 'Reset email template to default (delete custom)' })
+  @ApiParam({ name: 'key', description: 'Template key' })
+  async resetEmailTemplate(
+    @CurrentUser('id') adminId: string,
+    @Param('key') key: string,
+  ) {
+    return this.adminService.resetEmailTemplate(adminId, key);
   }
 
   @Post('email-templates/:key/send-test')
-  @Roles(AdminRole.super_admin, AdminRole.admin)
+  @Roles(AdminRole.super_admin, AdminRole.admin, AdminRole.moderator)
   @HttpCode(HttpStatus.OK)
   @ApiOperation({ summary: 'Send test email' })
   @ApiParam({ name: 'key', description: 'Template key' })
@@ -1079,7 +1157,7 @@ export class AdminController {
   // ==================== TRADE MANAGEMENT ====================
 
   @Get('trades')
-  @Roles(AdminRole.super_admin, AdminRole.admin)
+  @Roles(AdminRole.super_admin, AdminRole.admin, AdminRole.moderator)
   @ApiOperation({ summary: 'Get trades with filters' })
   @ApiResponse({ status: HttpStatus.OK, description: 'List of trades' })
   async getTrades(
@@ -1107,7 +1185,7 @@ export class AdminController {
   }
 
   @Get('trade-shipments')
-  @Roles(AdminRole.super_admin, AdminRole.admin)
+  @Roles(AdminRole.super_admin, AdminRole.admin, AdminRole.moderator)
   @ApiOperation({ summary: 'List trade shipments across all trades' })
   @ApiResponse({ status: HttpStatus.OK, description: 'Paginated trade shipments' })
   async getTradeShipments(@Query() query: TradeShipmentQueryDto) {
@@ -1115,7 +1193,7 @@ export class AdminController {
   }
 
   @Get('trades/:id')
-  @Roles(AdminRole.super_admin, AdminRole.admin)
+  @Roles(AdminRole.super_admin, AdminRole.admin, AdminRole.moderator)
   @ApiOperation({ summary: 'Get trade details by ID' })
   @ApiParam({ name: 'id', description: 'Trade ID' })
   @ApiResponse({ status: HttpStatus.OK, description: 'Trade details' })
@@ -1124,7 +1202,7 @@ export class AdminController {
   }
 
   @Post('trades/:id/resolve')
-  @Roles(AdminRole.super_admin, AdminRole.admin)
+  @Roles(AdminRole.super_admin, AdminRole.admin, AdminRole.moderator)
   @HttpCode(HttpStatus.OK)
   @ApiOperation({ summary: 'Resolve trade dispute or cancel trade' })
   @ApiParam({ name: 'id', description: 'Trade ID' })
@@ -1140,7 +1218,7 @@ export class AdminController {
   // -------- Safe-trade (warehouse escrow) admin actions --------
 
   @Post('trades/:id/mark-warehouse-received')
-  @Roles(AdminRole.super_admin, AdminRole.admin)
+  @Roles(AdminRole.super_admin, AdminRole.admin, AdminRole.moderator)
   @HttpCode(HttpStatus.OK)
   @ApiOperation({
     summary:
@@ -1161,7 +1239,7 @@ export class AdminController {
   }
 
   @Post('trades/:id/approve')
-  @Roles(AdminRole.super_admin, AdminRole.admin)
+  @Roles(AdminRole.super_admin, AdminRole.admin, AdminRole.moderator)
   @HttpCode(HttpStatus.OK)
   @ApiOperation({
     summary:
@@ -1182,7 +1260,7 @@ export class AdminController {
   }
 
   @Post('trades/:id/reject')
-  @Roles(AdminRole.super_admin, AdminRole.admin)
+  @Roles(AdminRole.super_admin, AdminRole.admin, AdminRole.moderator)
   @HttpCode(HttpStatus.OK)
   @ApiOperation({
     summary:
@@ -1203,7 +1281,7 @@ export class AdminController {
   }
 
   @Post('trades/:id/mark-return-delivered')
-  @Roles(AdminRole.super_admin, AdminRole.admin)
+  @Roles(AdminRole.super_admin, AdminRole.admin, AdminRole.moderator)
   @HttpCode(HttpStatus.OK)
   @ApiOperation({
     summary:
@@ -1224,7 +1302,7 @@ export class AdminController {
   }
 
   @Post('trades/:id/resolve-compensation')
-  @Roles(AdminRole.super_admin, AdminRole.admin)
+  @Roles(AdminRole.super_admin, AdminRole.admin, AdminRole.moderator)
   @HttpCode(HttpStatus.OK)
   @ApiOperation({
     summary:
@@ -1244,7 +1322,7 @@ export class AdminController {
   }
 
   @Post('trades/:id/retry-refund')
-  @Roles(AdminRole.super_admin, AdminRole.admin)
+  @Roles(AdminRole.super_admin, AdminRole.admin, AdminRole.moderator)
   @HttpCode(HttpStatus.OK)
   @ApiOperation({
     summary:
@@ -1285,7 +1363,7 @@ export class AdminController {
   }
 
   @Post('trades/:id/force-cancel-stuck')
-  @Roles(AdminRole.super_admin, AdminRole.admin)
+  @Roles(AdminRole.super_admin, AdminRole.admin, AdminRole.moderator)
   @HttpCode(HttpStatus.OK)
   @ApiOperation({
     summary:
@@ -1308,7 +1386,7 @@ export class AdminController {
   // ==================== REFUND REQUEST ADMIN ====================
 
   @Get('refund-requests')
-  @Roles(AdminRole.super_admin, AdminRole.admin)
+  @Roles(AdminRole.super_admin, AdminRole.admin, AdminRole.moderator)
   @ApiOperation({ summary: 'List refund requests for admin operations queue' })
   @ApiResponse({ status: HttpStatus.OK, description: 'Paginated refund requests' })
   async listRefundRequests(@Query() query: RefundRequestQueryDto) {
@@ -1323,7 +1401,7 @@ export class AdminController {
   }
 
   @Get('refund-requests/:id')
-  @Roles(AdminRole.super_admin, AdminRole.admin)
+  @Roles(AdminRole.super_admin, AdminRole.admin, AdminRole.moderator)
   @ApiOperation({ summary: 'Get refund request detail with order/buyer/seller/tracking' })
   @ApiParam({ name: 'id', description: 'RefundRequest ID' })
   @ApiResponse({ status: HttpStatus.OK, description: 'Refund request detail' })
@@ -1332,7 +1410,7 @@ export class AdminController {
   }
 
   @Post('refund-requests/:id/resolve-dispute')
-  @Roles(AdminRole.super_admin, AdminRole.admin)
+  @Roles(AdminRole.super_admin, AdminRole.admin, AdminRole.moderator)
   @HttpCode(HttpStatus.OK)
   @ApiOperation({
     summary: 'Resolve a disputed refund: approve (open return) or reject (close)',
@@ -1348,7 +1426,7 @@ export class AdminController {
   }
 
   @Post('refund-requests/:id/force-finalize')
-  @Roles(AdminRole.super_admin, AdminRole.admin)
+  @Roles(AdminRole.super_admin, AdminRole.admin, AdminRole.moderator)
   @HttpCode(HttpStatus.OK)
   @ApiOperation({
     summary:
@@ -1366,7 +1444,7 @@ export class AdminController {
   // ---------- RefundRequest policy override (Faz 4B.1) ----------
 
   @Patch('refund-requests/:id/override-policy')
-  @Roles(AdminRole.super_admin, AdminRole.admin)
+  @Roles(AdminRole.super_admin, AdminRole.admin, AdminRole.moderator)
   @HttpCode(HttpStatus.OK)
   @ApiOperation({
     summary: 'Override refund policy (4 boolean flags)',
@@ -1381,7 +1459,7 @@ export class AdminController {
   }
 
   @Patch('refund-requests/:id/set-shipping-payer')
-  @Roles(AdminRole.super_admin, AdminRole.admin)
+  @Roles(AdminRole.super_admin, AdminRole.admin, AdminRole.moderator)
   @HttpCode(HttpStatus.OK)
   @ApiOperation({ summary: 'Set return shipping payer (buyer/seller/platform)' })
   @ApiParam({ name: 'id', description: 'RefundRequest ID' })
@@ -1447,9 +1525,22 @@ export class AdminController {
   async rejectMessage(
     @Param('id') id: string,
     @CurrentUser('id') adminId: string,
-    @Body() body: { reason: string },
+    @Body() body?: { reason?: string },
   ) {
-    return this.adminService.rejectMessage(adminId, id, body.reason);
+    return this.adminService.rejectMessage(adminId, id, body?.reason);
+  }
+
+  @Post('messages/:id/revert')
+  @Roles(AdminRole.super_admin, AdminRole.admin, AdminRole.moderator)
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({ summary: 'Revert message to pending approval' })
+  @ApiParam({ name: 'id', description: 'Message ID' })
+  @ApiResponse({ status: HttpStatus.OK, description: 'Message reverted to pending' })
+  async revertMessage(
+    @Param('id') id: string,
+    @CurrentUser('id') adminId: string,
+  ) {
+    return this.adminService.revertMessage(adminId, id);
   }
 
   // ==================== SUPPORT TICKET MANAGEMENT ====================
@@ -1526,7 +1617,7 @@ export class AdminController {
   // ==================== CATEGORY MANAGEMENT ====================
 
   @Get('categories')
-  @Roles(AdminRole.super_admin, AdminRole.admin)
+  @Roles(AdminRole.super_admin, AdminRole.admin, AdminRole.moderator)
   @ApiOperation({ summary: 'Get all categories with tree structure' })
   @ApiResponse({ status: HttpStatus.OK, description: 'List of categories' })
   async getCategories() {
@@ -1534,7 +1625,7 @@ export class AdminController {
   }
 
   @Post('categories')
-  @Roles(AdminRole.super_admin, AdminRole.admin)
+  @Roles(AdminRole.super_admin, AdminRole.admin, AdminRole.moderator)
   @ApiOperation({ summary: 'Create a new category' })
   @ApiResponse({ status: HttpStatus.CREATED, description: 'Category created' })
   async createCategory(
@@ -1545,7 +1636,7 @@ export class AdminController {
   }
 
   @Patch('categories/:id')
-  @Roles(AdminRole.super_admin, AdminRole.admin)
+  @Roles(AdminRole.super_admin, AdminRole.admin, AdminRole.moderator)
   @ApiOperation({ summary: 'Update category' })
   @ApiParam({ name: 'id', description: 'Category ID' })
   @ApiResponse({ status: HttpStatus.OK, description: 'Category updated' })
@@ -1558,7 +1649,7 @@ export class AdminController {
   }
 
   @Delete('categories/:id')
-  @Roles(AdminRole.super_admin, AdminRole.admin)
+  @Roles(AdminRole.super_admin, AdminRole.admin, AdminRole.moderator)
   @HttpCode(HttpStatus.OK)
   @ApiOperation({ summary: 'Delete category' })
   @ApiParam({ name: 'id', description: 'Category ID' })
@@ -1573,7 +1664,7 @@ export class AdminController {
   // ==================== TAX SETTINGS (Regions, Rates, Rules, Reporting) ====================
 
   @Get('tax/regions')
-  @Roles(AdminRole.super_admin, AdminRole.admin)
+  @Roles(AdminRole.super_admin, AdminRole.admin, AdminRole.moderator)
   @ApiOperation({ summary: 'Get all tax regions' })
   @ApiResponse({ status: HttpStatus.OK, description: 'List of tax regions' })
   async getTaxRegions() {
@@ -1617,7 +1708,7 @@ export class AdminController {
   }
 
   @Get('tax/rates')
-  @Roles(AdminRole.super_admin, AdminRole.admin)
+  @Roles(AdminRole.super_admin, AdminRole.admin, AdminRole.moderator)
   @ApiOperation({ summary: 'Get tax rates (optional filter by region)' })
   @ApiQuery({ name: 'regionId', required: false })
   @ApiResponse({ status: HttpStatus.OK, description: 'List of tax rates' })
@@ -1662,7 +1753,7 @@ export class AdminController {
   }
 
   @Get('tax/rules')
-  @Roles(AdminRole.super_admin, AdminRole.admin)
+  @Roles(AdminRole.super_admin, AdminRole.admin, AdminRole.moderator)
   @ApiOperation({ summary: 'Get tax rules (optional filter by region)' })
   @ApiQuery({ name: 'regionId', required: false })
   @ApiResponse({ status: HttpStatus.OK, description: 'List of tax rules' })
@@ -1707,7 +1798,7 @@ export class AdminController {
   }
 
   @Get('tax/report')
-  @Roles(AdminRole.super_admin, AdminRole.admin)
+  @Roles(AdminRole.super_admin, AdminRole.admin, AdminRole.moderator)
   @ApiOperation({ summary: 'Tax report by period (from invoices)' })
   @ApiResponse({ status: HttpStatus.OK, description: 'Tax report summary and breakdown' })
   async getTaxReport(@Query() query: TaxReportQueryDto) {
@@ -1717,7 +1808,7 @@ export class AdminController {
   // ==================== MEMBERSHIP TIER MANAGEMENT ====================
 
   @Get('membership-tiers')
-  @Roles(AdminRole.super_admin, AdminRole.admin)
+  @Roles(AdminRole.super_admin, AdminRole.admin, AdminRole.moderator)
   @ApiOperation({ summary: 'Get all membership tiers' })
   @ApiResponse({ status: HttpStatus.OK, description: 'List of membership tiers' })
   async getMembershipTiers() {
@@ -1725,7 +1816,7 @@ export class AdminController {
   }
 
   @Patch('membership-tiers/:id')
-  @Roles(AdminRole.super_admin, AdminRole.admin)
+  @Roles(AdminRole.super_admin, AdminRole.admin, AdminRole.moderator)
   @ApiOperation({ summary: 'Update membership tier' })
   @ApiParam({ name: 'id', description: 'Membership tier ID' })
   @ApiResponse({ status: HttpStatus.OK, description: 'Membership tier updated' })
@@ -1755,7 +1846,7 @@ export class AdminController {
   // ==================== BRAND MANAGEMENT ====================
 
   @Get('brands')
-  @Roles(AdminRole.super_admin, AdminRole.admin)
+  @Roles(AdminRole.super_admin, AdminRole.admin, AdminRole.moderator)
   @ApiOperation({ summary: 'Get all brands' })
   @ApiResponse({ status: HttpStatus.OK, description: 'List of brands' })
   async getBrands() {
@@ -1763,7 +1854,7 @@ export class AdminController {
   }
 
   @Post('brands')
-  @Roles(AdminRole.super_admin, AdminRole.admin)
+  @Roles(AdminRole.super_admin, AdminRole.admin, AdminRole.moderator)
   @ApiOperation({ summary: 'Create a new brand' })
   @ApiResponse({ status: HttpStatus.CREATED, description: 'Brand created' })
   async createBrand(
@@ -1774,7 +1865,7 @@ export class AdminController {
   }
 
   @Patch('brands/:id')
-  @Roles(AdminRole.super_admin, AdminRole.admin)
+  @Roles(AdminRole.super_admin, AdminRole.admin, AdminRole.moderator)
   @ApiOperation({ summary: 'Update brand' })
   @ApiParam({ name: 'id', description: 'Brand ID' })
   @ApiResponse({ status: HttpStatus.OK, description: 'Brand updated' })
@@ -1787,7 +1878,7 @@ export class AdminController {
   }
 
   @Delete('brands/:id')
-  @Roles(AdminRole.super_admin, AdminRole.admin)
+  @Roles(AdminRole.super_admin, AdminRole.admin, AdminRole.moderator)
   @HttpCode(HttpStatus.OK)
   @ApiOperation({ summary: 'Delete brand' })
   @ApiParam({ name: 'id', description: 'Brand ID' })
@@ -1802,7 +1893,7 @@ export class AdminController {
   // ==================== MANUFACTURER MANAGEMENT ====================
 
   @Get('manufacturers')
-  @Roles(AdminRole.super_admin, AdminRole.admin)
+  @Roles(AdminRole.super_admin, AdminRole.admin, AdminRole.moderator)
   @ApiOperation({ summary: 'Get all manufacturers' })
   @ApiResponse({ status: HttpStatus.OK, description: 'List of manufacturers' })
   async getManufacturers() {
@@ -1810,7 +1901,7 @@ export class AdminController {
   }
 
   @Post('manufacturers')
-  @Roles(AdminRole.super_admin, AdminRole.admin)
+  @Roles(AdminRole.super_admin, AdminRole.admin, AdminRole.moderator)
   @ApiOperation({ summary: 'Create a new manufacturer' })
   @ApiResponse({ status: HttpStatus.CREATED, description: 'Manufacturer created' })
   async createManufacturer(
@@ -1821,7 +1912,7 @@ export class AdminController {
   }
 
   @Patch('manufacturers/:id')
-  @Roles(AdminRole.super_admin, AdminRole.admin)
+  @Roles(AdminRole.super_admin, AdminRole.admin, AdminRole.moderator)
   @ApiOperation({ summary: 'Update manufacturer' })
   @ApiParam({ name: 'id', description: 'Manufacturer ID' })
   @ApiResponse({ status: HttpStatus.OK, description: 'Manufacturer updated' })
@@ -1834,7 +1925,7 @@ export class AdminController {
   }
 
   @Delete('manufacturers/:id')
-  @Roles(AdminRole.super_admin, AdminRole.admin)
+  @Roles(AdminRole.super_admin, AdminRole.admin, AdminRole.moderator)
   @HttpCode(HttpStatus.OK)
   @ApiOperation({ summary: 'Delete manufacturer' })
   @ApiParam({ name: 'id', description: 'Manufacturer ID' })
@@ -1849,7 +1940,7 @@ export class AdminController {
   // ==================== CAR MODEL MANAGEMENT ====================
 
   @Get('car-models')
-  @Roles(AdminRole.super_admin, AdminRole.admin)
+  @Roles(AdminRole.super_admin, AdminRole.admin, AdminRole.moderator)
   @ApiOperation({ summary: 'Get all car models' })
   @ApiQuery({ name: 'brandId', required: false })
   @ApiResponse({ status: HttpStatus.OK, description: 'List of car models' })
@@ -1858,7 +1949,7 @@ export class AdminController {
   }
 
   @Post('car-models')
-  @Roles(AdminRole.super_admin, AdminRole.admin)
+  @Roles(AdminRole.super_admin, AdminRole.admin, AdminRole.moderator)
   @ApiOperation({ summary: 'Create a new car model' })
   @ApiResponse({ status: HttpStatus.CREATED, description: 'Car model created' })
   async createCarModel(
@@ -1869,7 +1960,7 @@ export class AdminController {
   }
 
   @Patch('car-models/:id')
-  @Roles(AdminRole.super_admin, AdminRole.admin)
+  @Roles(AdminRole.super_admin, AdminRole.admin, AdminRole.moderator)
   @ApiOperation({ summary: 'Update car model' })
   @ApiParam({ name: 'id', description: 'Car Model ID' })
   @ApiResponse({ status: HttpStatus.OK, description: 'Car model updated' })
@@ -1882,7 +1973,7 @@ export class AdminController {
   }
 
   @Delete('car-models/:id')
-  @Roles(AdminRole.super_admin, AdminRole.admin)
+  @Roles(AdminRole.super_admin, AdminRole.admin, AdminRole.moderator)
   @HttpCode(HttpStatus.OK)
   @ApiOperation({ summary: 'Delete car model' })
   @ApiParam({ name: 'id', description: 'Car Model ID' })
@@ -1897,7 +1988,7 @@ export class AdminController {
   // ==================== ADVERTISEMENT MANAGEMENT ====================
 
   @Get('ads')
-  @Roles(AdminRole.super_admin, AdminRole.admin)
+  @Roles(AdminRole.super_admin, AdminRole.admin, AdminRole.moderator)
   @ApiOperation({ summary: 'List all advertisements' })
   @ApiQuery({ name: 'position', required: false, description: 'Filter by position' })
   @ApiQuery({ name: 'deviceType', required: false, description: 'Filter by device type' })
@@ -1913,7 +2004,7 @@ export class AdminController {
   }
 
   @Get('ads/statistics')
-  @Roles(AdminRole.super_admin, AdminRole.admin)
+  @Roles(AdminRole.super_admin, AdminRole.admin, AdminRole.moderator)
   @ApiOperation({ summary: 'Get advertisement statistics' })
   @ApiResponse({ status: HttpStatus.OK, description: 'Statistics summary' })
   async getAdStatistics() {
@@ -1921,7 +2012,7 @@ export class AdminController {
   }
 
   @Get('ads/iab-sizes')
-  @Roles(AdminRole.super_admin, AdminRole.admin)
+  @Roles(AdminRole.super_admin, AdminRole.admin, AdminRole.moderator)
   @ApiOperation({ summary: 'Get IAB standard ad sizes' })
   @ApiResponse({ status: HttpStatus.OK, description: 'List of IAB sizes' })
   async getIABSizes() {
@@ -1929,7 +2020,7 @@ export class AdminController {
   }
 
   @Get('ads/:id')
-  @Roles(AdminRole.super_admin, AdminRole.admin)
+  @Roles(AdminRole.super_admin, AdminRole.admin, AdminRole.moderator)
   @ApiOperation({ summary: 'Get single advertisement' })
   @ApiParam({ name: 'id', description: 'Ad ID' })
   @ApiResponse({ status: HttpStatus.OK, description: 'Ad details' })
@@ -1938,7 +2029,7 @@ export class AdminController {
   }
 
   @Post('ads')
-  @Roles(AdminRole.super_admin, AdminRole.admin)
+  @Roles(AdminRole.super_admin, AdminRole.admin, AdminRole.moderator)
   @ApiOperation({ summary: 'Create advertisement' })
   @ApiResponse({ status: HttpStatus.CREATED, description: 'Ad created' })
   async createAd(@Body() dto: CreateAdvertisementDto) {
@@ -1946,7 +2037,7 @@ export class AdminController {
   }
 
   @Patch('ads/reorder')
-  @Roles(AdminRole.super_admin, AdminRole.admin)
+  @Roles(AdminRole.super_admin, AdminRole.admin, AdminRole.moderator)
   @HttpCode(HttpStatus.OK)
   @ApiOperation({ summary: 'Reorder advertisements' })
   @ApiResponse({ status: HttpStatus.OK, description: 'Ads reordered' })
@@ -1955,7 +2046,7 @@ export class AdminController {
   }
 
   @Patch('ads/:id')
-  @Roles(AdminRole.super_admin, AdminRole.admin)
+  @Roles(AdminRole.super_admin, AdminRole.admin, AdminRole.moderator)
   @ApiOperation({ summary: 'Update advertisement' })
   @ApiParam({ name: 'id', description: 'Ad ID' })
   @ApiResponse({ status: HttpStatus.OK, description: 'Ad updated' })
@@ -1964,7 +2055,7 @@ export class AdminController {
   }
 
   @Delete('ads/:id')
-  @Roles(AdminRole.super_admin, AdminRole.admin)
+  @Roles(AdminRole.super_admin, AdminRole.admin, AdminRole.moderator)
   @HttpCode(HttpStatus.NO_CONTENT)
   @ApiOperation({ summary: 'Delete advertisement' })
   @ApiParam({ name: 'id', description: 'Ad ID' })
@@ -1973,7 +2064,7 @@ export class AdminController {
   }
 
   @Post('media/upload')
-  @Roles(AdminRole.super_admin, AdminRole.admin)
+  @Roles(AdminRole.super_admin, AdminRole.admin, AdminRole.moderator)
   @UseInterceptors(FileInterceptor('file'))
   @ApiOperation({ summary: 'Upload image (e.g. for ad banner)' })
   @ApiResponse({ status: HttpStatus.CREATED, description: 'Returns { url, key }' })
@@ -1991,7 +2082,7 @@ export class AdminController {
   // ==================== PRODUCT DELETION (ADMIN) ====================
 
   @Delete('products/:id')
-  @Roles(AdminRole.super_admin, AdminRole.admin)
+  @Roles(AdminRole.super_admin, AdminRole.admin, AdminRole.moderator)
   @HttpCode(HttpStatus.OK)
   @ApiOperation({ summary: 'Delete product (admin only)' })
   @ApiParam({ name: 'id', description: 'Product ID' })
@@ -2005,7 +2096,7 @@ export class AdminController {
   }
 
   @Post('products/:id/restore')
-  @Roles(AdminRole.super_admin, AdminRole.admin)
+  @Roles(AdminRole.super_admin, AdminRole.admin, AdminRole.moderator)
   @HttpCode(HttpStatus.OK)
   @ApiOperation({ summary: 'Restore a soft-deleted product (admin only)' })
   @ApiParam({ name: 'id', description: 'Product ID' })
@@ -2020,7 +2111,7 @@ export class AdminController {
   // ==================== SHIPPING (view-only) ====================
 
   @Get('shipping/shipments')
-  @Roles(AdminRole.super_admin, AdminRole.admin)
+  @Roles(AdminRole.super_admin, AdminRole.admin, AdminRole.moderator)
   @ApiOperation({ summary: 'Get shipments' })
   @ApiQuery({ name: 'page', required: false })
   @ApiQuery({ name: 'limit', required: false })
@@ -2044,7 +2135,7 @@ export class AdminController {
   // ==================== NOTIFICATION MANAGEMENT ====================
 
   @Get('notifications/history')
-  @Roles(AdminRole.super_admin, AdminRole.admin)
+  @Roles(AdminRole.super_admin, AdminRole.admin, AdminRole.moderator)
   @ApiOperation({ summary: 'Get notification history' })
   @ApiQuery({ name: 'page', required: false })
   @ApiQuery({ name: 'limit', required: false })
@@ -2078,7 +2169,7 @@ export class AdminController {
   }
 
   @Post('notifications/send')
-  @Roles(AdminRole.super_admin, AdminRole.admin)
+  @Roles(AdminRole.super_admin, AdminRole.admin, AdminRole.moderator)
   @HttpCode(HttpStatus.OK)
   @ApiOperation({ summary: 'Send notification to users' })
   @ApiResponse({ status: HttpStatus.OK, description: 'Notification sent' })
@@ -2098,7 +2189,7 @@ export class AdminController {
   }
 
   @Post('notifications/schedule')
-  @Roles(AdminRole.super_admin, AdminRole.admin)
+  @Roles(AdminRole.super_admin, AdminRole.admin, AdminRole.moderator)
   @ApiOperation({ summary: 'Schedule a notification' })
   @ApiResponse({ status: HttpStatus.CREATED, description: 'Notification scheduled' })
   async scheduleNotification(
@@ -2117,7 +2208,7 @@ export class AdminController {
   }
 
   @Get('notifications/scheduled')
-  @Roles(AdminRole.super_admin, AdminRole.admin)
+  @Roles(AdminRole.super_admin, AdminRole.admin, AdminRole.moderator)
   @ApiOperation({ summary: 'Get scheduled notifications' })
   @ApiQuery({ name: 'page', required: false })
   @ApiQuery({ name: 'limit', required: false })
@@ -2136,7 +2227,7 @@ export class AdminController {
   }
 
   @Delete('notifications/scheduled/:id')
-  @Roles(AdminRole.super_admin, AdminRole.admin)
+  @Roles(AdminRole.super_admin, AdminRole.admin, AdminRole.moderator)
   @HttpCode(HttpStatus.OK)
   @ApiOperation({ summary: 'Cancel scheduled notification' })
   @ApiParam({ name: 'id', description: 'Scheduled notification ID' })
@@ -2150,7 +2241,7 @@ export class AdminController {
   // ==================== LOGS MANAGEMENT ====================
 
   @Get('logs/errors')
-  @Roles(AdminRole.super_admin, AdminRole.admin)
+  @Roles(AdminRole.super_admin, AdminRole.admin, AdminRole.moderator)
   @ApiOperation({ summary: 'Get error logs' })
   @ApiQuery({ name: 'page', required: false })
   @ApiQuery({ name: 'limit', required: false })
@@ -2184,7 +2275,7 @@ export class AdminController {
   }
 
   @Get('logs/security')
-  @Roles(AdminRole.super_admin, AdminRole.admin)
+  @Roles(AdminRole.super_admin, AdminRole.admin, AdminRole.moderator)
   @ApiOperation({ summary: 'Get security logs' })
   @ApiQuery({ name: 'page', required: false })
   @ApiQuery({ name: 'limit', required: false })
@@ -2224,7 +2315,8 @@ export class AdminController {
   }
 
   @Patch('logs/security/:id/resolve')
-  @Roles(AdminRole.super_admin, AdminRole.admin)
+  @Roles(AdminRole.super_admin, AdminRole.admin, AdminRole.moderator)
+  @RequirePermission('logs')
   @HttpCode(HttpStatus.OK)
   @ApiOperation({ summary: 'Resolve a security issue' })
   @ApiParam({ name: 'id', description: 'Security log ID' })
@@ -2238,6 +2330,7 @@ export class AdminController {
 
   @Post('logs/security/block-ip')
   @Roles(AdminRole.super_admin)
+  @RequirePermission('logs')
   @HttpCode(HttpStatus.OK)
   @ApiOperation({ summary: 'Block an IP address' })
   @ApiResponse({ status: HttpStatus.OK, description: 'IP blocked' })
@@ -2249,7 +2342,7 @@ export class AdminController {
   }
 
   @Get('logs/emails')
-  @Roles(AdminRole.super_admin, AdminRole.admin)
+  @Roles(AdminRole.super_admin, AdminRole.admin, AdminRole.moderator)
   @ApiOperation({ summary: 'Get email logs' })
   @ApiQuery({ name: 'page', required: false })
   @ApiQuery({ name: 'limit', required: false })
@@ -2331,7 +2424,7 @@ export class AdminController {
   }
 
   @Post('collections')
-  @Roles(AdminRole.super_admin, AdminRole.admin)
+  @Roles(AdminRole.super_admin, AdminRole.admin, AdminRole.moderator)
   @ApiOperation({ summary: 'Create a new collection' })
   @ApiResponse({ status: HttpStatus.CREATED, description: 'Collection created' })
   async createCollection(
@@ -2349,7 +2442,7 @@ export class AdminController {
   }
 
   @Patch('collections/:id')
-  @Roles(AdminRole.super_admin, AdminRole.admin)
+  @Roles(AdminRole.super_admin, AdminRole.admin, AdminRole.moderator)
   @ApiOperation({ summary: 'Update a collection' })
   @ApiParam({ name: 'id', description: 'Collection ID' })
   @ApiResponse({ status: HttpStatus.OK, description: 'Collection updated' })
@@ -2368,7 +2461,7 @@ export class AdminController {
   }
 
   @Delete('collections/:id')
-  @Roles(AdminRole.super_admin, AdminRole.admin)
+  @Roles(AdminRole.super_admin, AdminRole.admin, AdminRole.moderator)
   @HttpCode(HttpStatus.NO_CONTENT)
   @ApiOperation({ summary: 'Delete a collection' })
   @ApiParam({ name: 'id', description: 'Collection ID' })
@@ -2380,7 +2473,7 @@ export class AdminController {
   }
 
   @Post('collections/:id/items')
-  @Roles(AdminRole.super_admin, AdminRole.admin)
+  @Roles(AdminRole.super_admin, AdminRole.admin, AdminRole.moderator)
   @HttpCode(HttpStatus.OK)
   @ApiOperation({ summary: 'Add products to a collection' })
   @ApiParam({ name: 'id', description: 'Collection ID' })
@@ -2394,7 +2487,7 @@ export class AdminController {
   }
 
   @Delete('collections/:collectionId/items/:itemId')
-  @Roles(AdminRole.super_admin, AdminRole.admin)
+  @Roles(AdminRole.super_admin, AdminRole.admin, AdminRole.moderator)
   @HttpCode(HttpStatus.NO_CONTENT)
   @ApiOperation({ summary: 'Remove an item from a collection' })
   @ApiParam({ name: 'collectionId', description: 'Collection ID' })
@@ -2408,7 +2501,7 @@ export class AdminController {
   }
 
   @Patch('collections/:id/visibility')
-  @Roles(AdminRole.super_admin, AdminRole.admin)
+  @Roles(AdminRole.super_admin, AdminRole.admin, AdminRole.moderator)
   @HttpCode(HttpStatus.OK)
   @ApiOperation({ summary: 'Set collection visibility' })
   @ApiParam({ name: 'id', description: 'Collection ID' })
@@ -2421,7 +2514,7 @@ export class AdminController {
   }
 
   @Patch('collections/:id/featured')
-  @Roles(AdminRole.super_admin, AdminRole.admin)
+  @Roles(AdminRole.super_admin, AdminRole.admin, AdminRole.moderator)
   @HttpCode(HttpStatus.OK)
   @ApiOperation({ summary: 'Set collection featured status' })
   @ApiParam({ name: 'id', description: 'Collection ID' })
@@ -2433,117 +2526,6 @@ export class AdminController {
     return this.adminService.setCollectionFeatured(adminId, id, body.isFeatured);
   }
 
-  // ==================== TAG MANAGEMENT ====================
-
-  @Get('tags')
-  @Roles(AdminRole.super_admin, AdminRole.admin, AdminRole.moderator)
-  @ApiOperation({ summary: 'Get all tags with filters' })
-  @ApiQuery({ name: 'search', required: false })
-  @ApiQuery({ name: 'isActive', required: false })
-  @ApiQuery({ name: 'page', required: false })
-  @ApiQuery({ name: 'limit', required: false })
-  @ApiQuery({ name: 'sortBy', required: false, enum: ['name', 'usageCount', 'createdAt'] })
-  @ApiQuery({ name: 'sortOrder', required: false, enum: ['asc', 'desc'] })
-  @ApiResponse({ status: HttpStatus.OK, description: 'List of tags' })
-  async getTags(
-    @Query('search') search?: string,
-    @Query('isActive') isActive?: string,
-    @Query('page') page?: string,
-    @Query('limit') limit?: string,
-    @Query('sortBy') sortBy?: 'name' | 'usageCount' | 'createdAt',
-    @Query('sortOrder') sortOrder?: 'asc' | 'desc',
-  ) {
-    return this.adminService.getTags({
-      search,
-      isActive: isActive === 'true' ? true : isActive === 'false' ? false : undefined,
-      page: page ? parseInt(page, 10) : undefined,
-      limit: limit ? parseInt(limit, 10) : undefined,
-      sortBy,
-      sortOrder,
-    });
-  }
-
-  @Post('tags')
-  @Roles(AdminRole.super_admin, AdminRole.admin)
-  @ApiOperation({ summary: 'Create a new tag' })
-  @ApiResponse({ status: HttpStatus.CREATED, description: 'Tag created' })
-  async createTag(
-    @CurrentUser('id') adminId: string,
-    @Body() body: {
-      name: string;
-      description?: string;
-      color?: string;
-      isActive?: boolean;
-    },
-  ) {
-    return this.adminService.createTag(adminId, body);
-  }
-
-  @Patch('tags/:id')
-  @Roles(AdminRole.super_admin, AdminRole.admin)
-  @ApiOperation({ summary: 'Update a tag' })
-  @ApiParam({ name: 'id', description: 'Tag ID' })
-  @ApiResponse({ status: HttpStatus.OK, description: 'Tag updated' })
-  async updateTag(
-    @Param('id') id: string,
-    @CurrentUser('id') adminId: string,
-    @Body() body: {
-      name?: string;
-      description?: string;
-      color?: string;
-      isActive?: boolean;
-    },
-  ) {
-    return this.adminService.updateTag(adminId, id, body);
-  }
-
-  @Delete('tags/:id')
-  @Roles(AdminRole.super_admin, AdminRole.admin)
-  @HttpCode(HttpStatus.NO_CONTENT)
-  @ApiOperation({ summary: 'Delete a tag' })
-  @ApiParam({ name: 'id', description: 'Tag ID' })
-  async deleteTag(
-    @Param('id') id: string,
-    @CurrentUser('id') adminId: string,
-  ) {
-    return this.adminService.deleteTag(adminId, id);
-  }
-
-  @Post('tags/merge')
-  @Roles(AdminRole.super_admin, AdminRole.admin)
-  @HttpCode(HttpStatus.OK)
-  @ApiOperation({ summary: 'Merge multiple tags into one' })
-  @ApiResponse({ status: HttpStatus.OK, description: 'Tags merged' })
-  async mergeTags(
-    @CurrentUser('id') adminId: string,
-    @Body() body: { sourceTagIds: string[]; targetTagId: string },
-  ) {
-    return this.adminService.mergeTags(adminId, body.sourceTagIds, body.targetTagId);
-  }
-
-  @Post('tags/bulk-assign')
-  @Roles(AdminRole.super_admin, AdminRole.admin)
-  @HttpCode(HttpStatus.OK)
-  @ApiOperation({ summary: 'Bulk assign tags to products' })
-  @ApiResponse({ status: HttpStatus.OK, description: 'Tags assigned' })
-  async bulkAssignTags(
-    @CurrentUser('id') adminId: string,
-    @Body() body: { productIds: string[]; tagIds: string[] },
-  ) {
-    return this.adminService.bulkAssignTags(adminId, body.productIds, body.tagIds);
-  }
-
-  @Post('tags/bulk-remove')
-  @Roles(AdminRole.super_admin, AdminRole.admin)
-  @HttpCode(HttpStatus.OK)
-  @ApiOperation({ summary: 'Bulk remove tags from products' })
-  @ApiResponse({ status: HttpStatus.OK, description: 'Tags removed' })
-  async bulkRemoveTags(
-    @CurrentUser('id') adminId: string,
-    @Body() body: { productIds: string[]; tagIds: string[] },
-  ) {
-    return this.adminService.bulkRemoveTags(adminId, body.productIds, body.tagIds);
-  }
 
   // ==================== ATTRIBUTE GROUP MANAGEMENT ====================
 
@@ -2579,7 +2561,7 @@ export class AdminController {
   }
 
   @Post('attribute-groups')
-  @Roles(AdminRole.super_admin, AdminRole.admin)
+  @Roles(AdminRole.super_admin, AdminRole.admin, AdminRole.moderator)
   @ApiOperation({ summary: 'Create a new attribute group' })
   @ApiResponse({ status: HttpStatus.CREATED, description: 'Attribute group created' })
   async createAttributeGroup(
@@ -2596,7 +2578,7 @@ export class AdminController {
   }
 
   @Patch('attribute-groups/:id')
-  @Roles(AdminRole.super_admin, AdminRole.admin)
+  @Roles(AdminRole.super_admin, AdminRole.admin, AdminRole.moderator)
   @ApiOperation({ summary: 'Update an attribute group' })
   @ApiParam({ name: 'id', description: 'Attribute Group ID' })
   @ApiResponse({ status: HttpStatus.OK, description: 'Attribute group updated' })
@@ -2615,7 +2597,7 @@ export class AdminController {
   }
 
   @Delete('attribute-groups/:id')
-  @Roles(AdminRole.super_admin, AdminRole.admin)
+  @Roles(AdminRole.super_admin, AdminRole.admin, AdminRole.moderator)
   @HttpCode(HttpStatus.NO_CONTENT)
   @ApiOperation({ summary: 'Delete an attribute group' })
   @ApiParam({ name: 'id', description: 'Attribute Group ID' })
@@ -2654,7 +2636,7 @@ export class AdminController {
   }
 
   @Post('attributes')
-  @Roles(AdminRole.super_admin, AdminRole.admin)
+  @Roles(AdminRole.super_admin, AdminRole.admin, AdminRole.moderator)
   @ApiOperation({ summary: 'Create a new attribute value' })
   @ApiResponse({ status: HttpStatus.CREATED, description: 'Attribute created' })
   async createAttribute(
@@ -2672,7 +2654,7 @@ export class AdminController {
   }
 
   @Patch('attributes/:id')
-  @Roles(AdminRole.super_admin, AdminRole.admin)
+  @Roles(AdminRole.super_admin, AdminRole.admin, AdminRole.moderator)
   @ApiOperation({ summary: 'Update an attribute value' })
   @ApiParam({ name: 'id', description: 'Attribute ID' })
   @ApiResponse({ status: HttpStatus.OK, description: 'Attribute updated' })
@@ -2691,7 +2673,7 @@ export class AdminController {
   }
 
   @Delete('attributes/:id')
-  @Roles(AdminRole.super_admin, AdminRole.admin)
+  @Roles(AdminRole.super_admin, AdminRole.admin, AdminRole.moderator)
   @HttpCode(HttpStatus.NO_CONTENT)
   @ApiOperation({ summary: 'Delete an attribute value' })
   @ApiParam({ name: 'id', description: 'Attribute ID' })
@@ -2723,6 +2705,41 @@ export class AdminController {
     @Body() dto: UpdateRatingStatusDto,
   ) {
     return this.adminService.updateReviewStatus(adminId, id, dto.status);
+  }
+
+  // ==================== SELLER APPLICATIONS ====================
+
+  @Get('seller-applications')
+  @Roles(AdminRole.super_admin, AdminRole.admin, AdminRole.moderator)
+  @ApiOperation({ summary: 'List corporate seller applications' })
+  @ApiResponse({ status: HttpStatus.OK, description: 'Seller applications list' })
+  async getSellerApplications(@Query() query: { page?: number; limit?: number; search?: string; status?: string }) {
+    return this.adminService.getSellerApplications(query);
+  }
+
+  @Post('seller-applications/:id/approve')
+  @Roles(AdminRole.super_admin, AdminRole.admin, AdminRole.moderator)
+  @ApiOperation({ summary: 'Approve a corporate seller application' })
+  @ApiParam({ name: 'id', description: 'User ID' })
+  @ApiResponse({ status: HttpStatus.OK, description: 'Application approved' })
+  async approveSellerApplication(
+    @Param('id') id: string,
+    @CurrentUser('id') adminId: string,
+  ) {
+    return this.adminService.approveSellerApplication(adminId, id);
+  }
+
+  @Post('seller-applications/:id/reject')
+  @Roles(AdminRole.super_admin, AdminRole.admin, AdminRole.moderator)
+  @ApiOperation({ summary: 'Reject a corporate seller application' })
+  @ApiParam({ name: 'id', description: 'User ID' })
+  @ApiResponse({ status: HttpStatus.OK, description: 'Application rejected' })
+  async rejectSellerApplication(
+    @Param('id') id: string,
+    @CurrentUser('id') adminId: string,
+    @Body('reason') reason: string,
+  ) {
+    return this.adminService.rejectSellerApplication(adminId, id, reason);
   }
 
   // ==================== SELLER (USER) RATINGS ====================

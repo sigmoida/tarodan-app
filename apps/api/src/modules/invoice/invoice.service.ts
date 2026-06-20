@@ -15,6 +15,7 @@ import { SmtpProvider } from '../notification/providers/smtp.provider';
 import { NotificationType, NotificationChannel } from '../notification/dto';
 import { TaxService } from '../tax';
 import * as PDFDocument from 'pdfkit';
+import { renderEmailTemplate, getEmailTemplateSubject, substituteEmailVariables } from '../../common/helpers/email-template-renderer';
 
 // Invoice generation service using pdfkit for reliable PDF creation
 // Turkish character support via system font fallbacks or embedded fonts
@@ -204,20 +205,21 @@ export class InvoiceService {
     const buyerAddress = shippingAddr
       ? `${shippingAddr.addressLine1 || ''}, ${shippingAddr.district || ''}, ${shippingAddr.city || ''}`
       : 'Türkiye';
-    const countryCode = (shippingAddr?.country as string) || 'TR';
-    const regionCode = (shippingAddr?.regionCode as string) || (shippingAddr?.district as string) || null;
 
-    // Resolve tax from admin-configured rules (region + category)
-    const subtotal = Number(order.totalAmount) - Number(order.shippingCost || 0);
-    const resolvedTax = await this.taxService.resolveTaxRate(
-      countryCode,
-      regionCode,
-      order.product?.categoryId ?? null,
-    );
-    const taxRate = resolvedTax ? resolvedTax.rate : 18;
-    const taxAmount = resolvedTax
-      ? this.taxService.calculateTaxAmount(subtotal, resolvedTax)
-      : 0;
+    // Ürün mal bedeli: subtotal yoksa totalAmount - shippingCost - buyerFee - taxAmount ile türet
+    const taxAmount = Number(order.taxAmount || 0);
+    const buyerFeeAmount = Number(order.buyerFeeAmount || 0);
+    const subtotal = order.subtotal != null
+      ? Number(order.subtotal)
+      : Number(order.totalAmount) - Number(order.shippingCost || 0) - buyerFeeAmount - taxAmount;
+
+    // Gösterim için vergi oranı: taxAmount > 0 ise oranı çek, yoksa 0 göster
+    let taxRate = 0;
+    if (taxAmount > 0) {
+      const regionCode = (shippingAddr?.regionCode as string) || (shippingAddr?.district as string) || null;
+      const resolvedTax = await this.taxService.resolveTaxRate('TR', regionCode, order.product?.categoryId ?? null);
+      taxRate = resolvedTax ? resolvedTax.rate : 0;
+    }
 
     // Build invoice data
     const invoiceData: InvoiceData = {
@@ -364,7 +366,7 @@ export class InvoiceService {
         : `${frontendUrl}/orders/${orderId}`;
 
       // Send invoice email to BUYER
-      const buyerEmailHtml = this.generateInvoiceEmailHtml({
+      const buyerTemplateData = {
         buyerName,
         invoiceNumber,
         orderNumber: order.orderNumber,
@@ -373,13 +375,19 @@ export class InvoiceService {
         sellerName,
         invoiceUrl: buyerOrderUrl,
         orderId,
-        frontendUrl,
-      });
+      };
+      const buyerDbTemplate = await this.prisma.emailTemplate.findUnique({ where: { key: 'invoice-buyer' } });
+      const buyerHtml = buyerDbTemplate?.bodyHtml
+        ? substituteEmailVariables(buyerDbTemplate.bodyHtml, buyerTemplateData)
+        : renderEmailTemplate('invoice-buyer', buyerTemplateData, frontendUrl);
+      const buyerSubject = buyerDbTemplate?.subject
+        ? substituteEmailVariables(buyerDbTemplate.subject, buyerTemplateData)
+        : getEmailTemplateSubject('invoice-buyer', buyerTemplateData);
 
       const buyerResult = await this.smtpProvider.sendEmail({
         to: buyerEmail,
-        subject: `Faturanız - ${invoiceNumber} | Tarodan`,
-        html: buyerEmailHtml,
+        subject: buyerSubject,
+        html: buyerHtml,
       });
 
       if (buyerResult.success) {
@@ -389,7 +397,7 @@ export class InvoiceService {
       }
 
       // Send invoice email to SELLER
-      const sellerEmailHtml = this.generateSellerInvoiceEmailHtml({
+      const sellerTemplateData = {
         sellerName,
         invoiceNumber,
         orderNumber: order.orderNumber,
@@ -397,14 +405,20 @@ export class InvoiceService {
         totalAmount: Number(order.totalAmount),
         commissionAmount: Number(order.commissionAmount || 0),
         buyerName,
-        frontendUrl,
         orderId,
-      });
+      };
+      const sellerDbTemplate = await this.prisma.emailTemplate.findUnique({ where: { key: 'invoice-seller' } });
+      const sellerHtml = sellerDbTemplate?.bodyHtml
+        ? substituteEmailVariables(sellerDbTemplate.bodyHtml, sellerTemplateData)
+        : renderEmailTemplate('invoice-seller', sellerTemplateData, frontendUrl);
+      const sellerSubject = sellerDbTemplate?.subject
+        ? substituteEmailVariables(sellerDbTemplate.subject, sellerTemplateData)
+        : getEmailTemplateSubject('invoice-seller', sellerTemplateData);
 
       const sellerResult = await this.smtpProvider.sendEmail({
         to: order.seller.email,
-        subject: `Satış Faturası - ${invoiceNumber} | Tarodan`,
-        html: sellerEmailHtml,
+        subject: sellerSubject,
+        html: sellerHtml,
       });
 
       if (sellerResult.success) {
@@ -911,7 +925,9 @@ export class InvoiceService {
       }],
 
       subtotal: Number(invoice.subtotal),
-      taxRate: 18,
+      taxRate: Number(invoice.taxAmount) > 0 && Number(invoice.subtotal) > 0
+        ? Math.round((Number(invoice.taxAmount) / Number(invoice.subtotal)) * 100)
+        : 0,
       taxAmount: Number(invoice.taxAmount),
       shippingCost: Number(invoice.shippingCost),
       commission: Number(invoice.order.commissionAmount ?? 0),

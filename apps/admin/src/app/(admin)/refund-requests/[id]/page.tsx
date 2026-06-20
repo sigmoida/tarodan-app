@@ -13,21 +13,26 @@ import {
   enumLabel,
   refundReasonConfig,
   refundRequestStatusConfig,
+  orderStatusConfig,
+  shipmentStatusConfig,
+  shipmentProviderConfig,
 } from "@tarodan/ui";
 import {
   ArrowLeftIcon,
   CheckCircleIcon,
   XCircleIcon,
-  ExclamationTriangleIcon,
   TruckIcon,
-  BanknotesIcon,
   UserIcon,
+  ClockIcon,
 } from "@heroicons/react/24/outline";
 import toast from "react-hot-toast";
 import {
   RefundPolicyCard,
   type ReturnShippingPayer,
 } from "@/components/refunds/RefundPolicyCard";
+import { RefundStatusStepper } from "@/components/refunds/RefundStatusStepper";
+import { RefundNextActionPanel } from "@/components/refunds/RefundNextActionPanel";
+import { payerLabels, refundActionLabel } from "@/components/refunds/refund-guidance";
 import { useConfirm } from "@/components/ConfirmProvider";
 
 interface HistoryEntry {
@@ -80,6 +85,14 @@ interface RefundRequestDetail {
     payment?: { id: string; status: string; amount: number | string } | null;
     shipment?: { status: string; deliveredAt?: string | null } | null;
   };
+}
+
+function fmtTry(n: number | string): string {
+  return `₺${Number(n).toLocaleString("tr-TR", { minimumFractionDigits: 2 })}`;
+}
+
+function fmtDate(d?: string | null): string {
+  return d ? new Date(d).toLocaleString("tr-TR") : "—";
 }
 
 export default function RefundRequestDetailPage() {
@@ -184,6 +197,12 @@ export default function RefundRequestDetailPage() {
     ? (rr.metadata!.history as HistoryEntry[])
     : [];
 
+  const payer = rr.returnShippingPayer ? payerLabels[rr.returnShippingPayer] : null;
+  const providerLabel =
+    rr.returnProvider === "manual"
+      ? "Manuel"
+      : enumLabel(shipmentProviderConfig, rr.returnProvider ?? undefined, rr.returnProvider ?? "—");
+
   return (
     <div className="max-w-5xl mx-auto space-y-6">
       {/* Header */}
@@ -199,90 +218,29 @@ export default function RefundRequestDetailPage() {
             İade Talebi <span className="font-mono text-base text-muted ml-2">{rr.refundNumber}</span>
           </h1>
           <p className="text-sm text-muted">
-            Oluşturma: {new Date(rr.createdAt).toLocaleString("tr-TR")} — Tutar: ₺
-            {Number(rr.amount).toLocaleString("tr-TR", { minimumFractionDigits: 2 })}
+            Oluşturma: {fmtDate(rr.createdAt)} — İade tutarı: {fmtTry(rr.amount)}
           </p>
         </div>
         <StatusBadge status={rr.status} config={refundRequestStatusConfig} />
       </div>
 
-      {/* counterfeit uyarısı (Faz 4B.3) */}
-      {rr.reason === "counterfeit" && (
-        <div className="bg-warning-50 border-2 border-warning-500 rounded-xl p-4">
-          <div className="flex items-start gap-3">
-            <ExclamationTriangleIcon className="h-6 w-6 text-warning-600 flex-shrink-0 mt-0.5" />
-            <div>
-              <div className="font-semibold text-warning-900">
-                Sahte ürün şikayeti
-              </div>
-              <div className="text-sm text-warning-800">
-                Satıcı yaptırımını değerlendirin (geçici askı, uyarı, fesh).
-                İade onaylandıktan sonra satıcının diğer ürünleri için risk
-                değerlendirmesi yapılmalı.
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
+      {/* Durum çizelgesi */}
+      <RefundStatusStepper status={rr.status} />
 
-      {/* Senaryo D rozeti kaldırıldı — keyfi vazgeçme talebi artık kabul edilmiyor */}
+      {/* Şimdi ne yapmalısınız? */}
+      <RefundNextActionPanel
+        status={rr.status}
+        reason={rr.reason}
+        sellerResponse={rr.sellerResponse}
+        amount={Number(rr.amount)}
+        isDisputed={isDisputed}
+        canForceFinalize={canForceFinalize}
+        finalizing={processingFinalize}
+        onResolve={() => setShowResolveModal(true)}
+        onFinalize={handleForceFinalize}
+      />
 
-      {/* Action panels */}
-      {isDisputed && (
-        <div className="bg-warning-50 border-2 border-warning-400 rounded-xl p-6 shadow-sm">
-          <div className="flex items-start justify-between gap-4">
-            <div className="flex items-start gap-3">
-              <ExclamationTriangleIcon className="h-8 w-8 text-warning-600 flex-shrink-0" />
-              <div>
-                <h2 className="text-lg font-semibold text-warning-900">
-                  İtiraz İncelemesi Gerekiyor
-                </h2>
-                <p className="text-sm text-warning-800 mt-1">
-                  Satıcı talebi reddetti. Alıcının kanıtlarını ve satıcının yanıtını
-                  inceleyip iade kargosunu açın (onayla) veya talebi kapatın (reddet).
-                </p>
-                {rr.sellerResponse && (
-                  <p className="text-sm text-warning-900 mt-2">
-                    <strong>Satıcı yanıtı:</strong> {rr.sellerResponse}
-                  </p>
-                )}
-              </div>
-            </div>
-            <Button variant="primary" onClick={() => setShowResolveModal(true)}>
-              İtirazı Çöz
-            </Button>
-          </div>
-        </div>
-      )}
-
-      {canForceFinalize && (
-        <div className="bg-info-50 border-2 border-info-400 rounded-xl p-6 shadow-sm">
-          <div className="flex items-start justify-between gap-4">
-            <div className="flex items-start gap-3">
-              <BanknotesIcon className="h-8 w-8 text-info-600 flex-shrink-0" />
-              <div>
-                <h2 className="text-lg font-semibold text-info-900">
-                  Para İadesi Bekleniyor
-                </h2>
-                <p className="text-sm text-info-800 mt-1">
-                  İade kargosu satıcıya ulaştı ama para iadesi otomatik tamamlanmadı.
-                  Manuel olarak tetikleyebilirsiniz.
-                </p>
-              </div>
-            </div>
-            <Button
-              variant="primary"
-              onClick={handleForceFinalize}
-              isLoading={processingFinalize}
-              disabled={processingFinalize}
-            >
-              Para İadesini Tamamla
-            </Button>
-          </div>
-        </div>
-      )}
-
-      {/* Talep detayı */}
+      {/* Kim — Alıcı & Satıcı */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         <div className="bg-surface-elevated rounded-xl shadow-sm p-6 space-y-3">
           <h2 className="text-lg font-semibold text-heading flex items-center gap-2">
@@ -319,141 +277,134 @@ export default function RefundRequestDetailPage() {
         </div>
       </div>
 
-      <div className="bg-surface-elevated rounded-xl shadow-sm p-6 space-y-3">
-        <h2 className="text-lg font-semibold text-heading">Sipariş & Talep</h2>
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-3 text-sm">
-          <div>
-            <span className="font-medium text-body">Sipariş:</span>{" "}
+      {/* Neden — Sipariş & Talep */}
+      <div className="bg-surface-elevated rounded-xl shadow-sm p-6 space-y-4">
+        <h2 className="text-lg font-semibold text-heading">Neden iade isteniyor?</h2>
+
+        <div className="flex items-center gap-3">
+          <div className="w-14 h-14 rounded-lg bg-surface-alt flex items-center justify-center overflow-hidden flex-shrink-0">
+            {rr.order.product.images?.[0]?.url ? (
+              // eslint-disable-next-line @next/next/no-img-element
+              <img
+                src={rr.order.product.images[0].url}
+                alt={rr.order.product.title}
+                className="w-full h-full object-cover"
+              />
+            ) : (
+              <span className="text-2xl">📦</span>
+            )}
+          </div>
+          <div className="min-w-0">
+            <div className="font-medium text-body truncate">{rr.order.product.title}</div>
             <Link
               href={`/orders/${rr.order.id}`}
-              className="text-primary-600 hover:underline"
+              className="text-sm text-primary-600 hover:underline font-mono"
             >
               {rr.order.orderNumber}
             </Link>
           </div>
-          <div className="flex items-center gap-3">
-            <div className="w-14 h-14 rounded-lg bg-surface-alt flex items-center justify-center overflow-hidden flex-shrink-0">
-              {rr.order.product.images?.[0]?.url ? (
-                // eslint-disable-next-line @next/next/no-img-element
-                <img
-                  src={rr.order.product.images[0].url}
-                  alt={rr.order.product.title}
-                  className="w-full h-full object-cover"
-                />
-              ) : (
-                <span className="text-2xl">📦</span>
-              )}
-            </div>
-            <span>
-              <span className="font-medium text-body">Ürün:</span> {rr.order.product.title}
-            </span>
-          </div>
-          <div>
-            <span className="font-medium text-body">Sipariş tutarı:</span> ₺
-            {Number(rr.order.totalAmount).toLocaleString("tr-TR", {
-              minimumFractionDigits: 2,
-            })}
-          </div>
-          <div>
-            <span className="font-medium text-body">İade tutarı:</span> ₺
-            {Number(rr.amount).toLocaleString("tr-TR", { minimumFractionDigits: 2 })}
-          </div>
-          <div>
-            <span className="font-medium text-body">Sebep:</span> {enumLabel(refundReasonConfig, rr.reason, rr.reason)}
-          </div>
-          <div>
-            <span className="font-medium text-body">Sipariş durumu:</span>{" "}
-            {rr.order.status}
-          </div>
         </div>
+
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-x-6 gap-y-3 text-sm">
+          <Field label="İade sebebi">
+            <StatusBadge status={rr.reason} config={refundReasonConfig} />
+          </Field>
+          <Field label="Sipariş durumu">
+            <StatusBadge status={rr.order.status} config={orderStatusConfig} />
+          </Field>
+          <Field label="Sipariş tutarı">{fmtTry(rr.order.totalAmount)}</Field>
+          <Field label="İade tutarı">
+            <span className="font-semibold">{fmtTry(rr.amount)}</span>
+          </Field>
+        </div>
+
         {rr.description && (
           <div className="text-sm">
-            <span className="font-medium text-body">Açıklama:</span>
+            <span className="font-medium text-body">Alıcının açıklaması:</span>
             <p className="text-muted mt-1 whitespace-pre-wrap">{rr.description}</p>
           </div>
         )}
+
         {rr.evidencePhotoUrls && rr.evidencePhotoUrls.length > 0 && (
           <div>
             <span className="font-medium text-body block mb-2">Kanıt fotoğrafları:</span>
             <div className="grid grid-cols-3 md:grid-cols-6 gap-2">
               {rr.evidencePhotoUrls.map((url, i) => (
-                /* eslint-disable-next-line @next/next/no-img-element */
-                <img
-                  key={i}
-                  src={url}
-                  alt={`Kanıt ${i + 1}`}
-                  className="w-full h-24 object-cover rounded border border-border"
-                />
+                <a key={i} href={url} target="_blank" rel="noopener noreferrer">
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img
+                    src={url}
+                    alt={`Kanıt ${i + 1}`}
+                    className="w-full h-24 object-cover rounded border border-border hover:opacity-90 transition-opacity"
+                  />
+                </a>
               ))}
             </div>
           </div>
         )}
       </div>
 
-      {/* Return tracking */}
-      {rr.returnTrackingNumber && (
-        <div className="bg-surface-elevated rounded-xl shadow-sm p-6 space-y-2">
-          <h2 className="text-lg font-semibold text-heading flex items-center gap-2">
-            <TruckIcon className="w-5 h-5" />
-            İade Kargosu
-          </h2>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-3 text-sm">
-            <div>
-              <span className="font-medium text-body">Provider:</span>{" "}
-              {rr.returnProvider}
-            </div>
-            <div>
-              <span className="font-medium text-body">Takip no:</span>{" "}
-              <span className="font-mono">{rr.returnTrackingNumber}</span>
-            </div>
-            <div>
-              <span className="font-medium text-body">Durum:</span>{" "}
-              {rr.returnStatus ?? "-"}
-            </div>
-            <div>
-              <span className="font-medium text-body">Oluşturma:</span>{" "}
-              {rr.returnCreatedAt
-                ? new Date(rr.returnCreatedAt).toLocaleString("tr-TR")
-                : "-"}
-            </div>
-            <div>
-              <span className="font-medium text-body">Kargolama:</span>{" "}
-              {rr.returnShippedAt
-                ? new Date(rr.returnShippedAt).toLocaleString("tr-TR")
-                : "-"}
-            </div>
-            <div>
-              <span className="font-medium text-body">Teslim:</span>{" "}
-              {rr.returnDeliveredAt
-                ? new Date(rr.returnDeliveredAt).toLocaleString("tr-TR")
-                : "-"}
-            </div>
-          </div>
-        </div>
-      )}
+      {/* Kargo nasıl çalışacak — İade kargosu */}
+      <div className="bg-surface-elevated rounded-xl shadow-sm p-6 space-y-4">
+        <h2 className="text-lg font-semibold text-heading flex items-center gap-2">
+          <TruckIcon className="w-5 h-5" />
+          İade Kargosu
+        </h2>
+        <p className="text-sm text-muted">
+          Alıcı ürünü satıcıya geri gönderir. Ürün satıcıya ulaştığında para iadesi otomatik başlatılır.
+        </p>
 
-      {/* Refund result */}
+        <div className="rounded-lg bg-surface-alt p-3 text-sm">
+          <span className="font-medium text-body">İade kargosunu kim öder? </span>
+          {payer ? (
+            <>
+              <span className="font-semibold">{payer.label}</span>
+              <span className="text-muted"> — {payer.helper}</span>
+            </>
+          ) : (
+            <span className="text-muted">Henüz belirlenmedi (aşağıdaki “İade Politikası” bölümünden seçin).</span>
+          )}
+        </div>
+
+        {rr.returnTrackingNumber ? (
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-x-6 gap-y-3 text-sm">
+            <Field label="Kargo firması">{providerLabel}</Field>
+            <Field label="Takip no">
+              <span className="font-mono">{rr.returnTrackingNumber}</span>
+            </Field>
+            <Field label="Kargo durumu">
+              {rr.returnStatus ? (
+                <StatusBadge status={rr.returnStatus} config={shipmentStatusConfig} />
+              ) : (
+                "—"
+              )}
+            </Field>
+            <Field label="Kargo oluşturma">{fmtDate(rr.returnCreatedAt)}</Field>
+            <Field label="Kargoya verildi">{fmtDate(rr.returnShippedAt)}</Field>
+            <Field label="Satıcıya ulaştı">{fmtDate(rr.returnDeliveredAt)}</Field>
+          </div>
+        ) : (
+          <div className="text-sm text-muted">
+            İade kargosu henüz oluşturulmadı — talep onaylandığında otomatik açılır.
+          </div>
+        )}
+      </div>
+
+      {/* Para nasıl iade edilecek — sonuç + politika */}
       {rr.refundedAt && (
         <div className="bg-success-50 border border-success-200 rounded-xl p-4">
           <div className="flex items-center gap-3">
-            <CheckCircleIcon className="w-6 h-6 text-success-600" />
+            <CheckCircleIcon className="w-6 h-6 text-success-600 flex-shrink-0" />
             <div>
-              <div className="font-semibold text-success-900">Para İadesi Tamamlandı</div>
-              <div className="text-sm text-success-800">
-                {new Date(rr.refundedAt).toLocaleString("tr-TR")}
-                {rr.providerRefundId && (
-                  <>
-                    {" — "}Provider Refund ID:{" "}
-                    <span className="font-mono">{rr.providerRefundId}</span>
-                  </>
-                )}
+              <div className="font-semibold text-success-900">
+                Para iadesi tamamlandı — {fmtTry(rr.amount)}
               </div>
+              <div className="text-sm text-success-800">{fmtDate(rr.refundedAt)}</div>
             </div>
           </div>
         </div>
       )}
 
-      {/* İade Politikası Kartı (Faz 4B.3) */}
       <RefundPolicyCard
         initial={{
           refundProductAmount: rr.refundProductAmount ?? true,
@@ -474,27 +425,51 @@ export default function RefundRequestDetailPage() {
         disabled={rr.status === "refunded" || rr.status === "cancelled"}
       />
 
-      {/* Audit timeline */}
+      {/* İşlem geçmişi */}
       {history.length > 0 && (
         <div className="bg-surface-elevated rounded-xl shadow-sm p-6">
-          <h2 className="text-lg font-semibold text-heading mb-4">Audit Trail</h2>
+          <h2 className="text-lg font-semibold text-heading mb-4 flex items-center gap-2">
+            <ClockIcon className="w-5 h-5" />
+            İşlem Geçmişi
+          </h2>
           <ol className="space-y-3">
-            {history.map((h, i) => (
-              <li key={i} className="border-l-2 border-primary-200 pl-4 py-1">
-                <div className="text-sm font-medium">{h.action}</div>
-                <div className="text-xs text-muted">
-                  {new Date(h.at).toLocaleString("tr-TR")} — {h.by}
-                </div>
-                {h.details && Object.keys(h.details).length > 0 && (
-                  <pre className="text-xs text-muted mt-1 whitespace-pre-wrap">
-                    {JSON.stringify(h.details, null, 2)}
-                  </pre>
-                )}
-              </li>
-            ))}
+            {history
+              .slice()
+              .reverse()
+              .map((h, i) => {
+                const a = refundActionLabel(h.action);
+                return (
+                  <li key={i} className="border-l-2 border-primary-200 pl-4 py-1">
+                    <div className="text-sm font-medium text-body">{a.label}</div>
+                    <div className="text-xs text-muted">
+                      {fmtDate(h.at)} — {a.actor}
+                    </div>
+                  </li>
+                );
+              })}
           </ol>
         </div>
       )}
+
+      {/* Teknik detaylar (varsayılan kapalı) */}
+      <details className="bg-surface-elevated rounded-xl shadow-sm p-6">
+        <summary className="cursor-pointer text-sm font-medium text-muted select-none">
+          Teknik detaylar
+        </summary>
+        <div className="mt-4 space-y-2 text-xs">
+          <TechRow label="Talep ID" value={rr.id} mono />
+          <TechRow label="İade kargo sağlayıcı (ham)" value={rr.returnProvider} mono />
+          <TechRow label="Provider Refund ID" value={rr.providerRefundId} mono />
+          {history.length > 0 && (
+            <div>
+              <div className="font-medium text-body mb-1">Ham işlem geçmişi</div>
+              <pre className="whitespace-pre-wrap rounded bg-surface-alt p-3 text-muted overflow-x-auto">
+                {JSON.stringify(history, null, 2)}
+              </pre>
+            </div>
+          )}
+        </div>
+      </details>
 
       {/* Resolve modal */}
       <Modal
@@ -553,6 +528,40 @@ export default function RefundRequestDetailPage() {
           </div>
         </div>
       </Modal>
+    </div>
+  );
+}
+
+function Field({
+  label,
+  children,
+}: {
+  label: string;
+  children: React.ReactNode;
+}) {
+  return (
+    <div className="flex items-center gap-2">
+      <span className="font-medium text-body">{label}:</span>
+      <span>{children}</span>
+    </div>
+  );
+}
+
+function TechRow({
+  label,
+  value,
+  mono,
+}: {
+  label: string;
+  value?: string | null;
+  mono?: boolean;
+}) {
+  return (
+    <div className="flex gap-2">
+      <span className="font-medium text-body">{label}:</span>
+      <span className={mono ? "font-mono text-muted break-all" : "text-muted"}>
+        {value || "—"}
+      </span>
     </div>
   );
 }

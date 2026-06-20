@@ -124,9 +124,6 @@ export const fulltextPaymentSearch = (p: PrismaService, q: string, limit?: numbe
 export const fulltextOrderSearch = (p: PrismaService, q: string, limit?: number) =>
   fulltextSearch(p, 'orders', tsvExpr(['order_number']), q, limit);
 
-export const fulltextTagSearch = (p: PrismaService, q: string, limit?: number) =>
-  fulltextSearch(p, 'tags', tsvExpr(['name', 'description']), q, limit);
-
 export const fulltextAttributeGroupSearch = (p: PrismaService, q: string, limit?: number) =>
   fulltextSearch(p, 'attribute_groups', tsvExpr(['name', 'description']), q, limit);
 

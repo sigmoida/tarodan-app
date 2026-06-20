@@ -35,6 +35,7 @@ export interface User {
   companyName?: string;
   taxId?: string;
   taxOffice?: string;
+  businessStatus?: 'pending' | 'approved' | 'rejected';
   
   // Stats for verification criteria
   totalSales: number;
@@ -235,6 +236,7 @@ const mapApiUserToUser = (apiUser: any): User => {
   companyName: apiUser.companyName ?? apiUser.company_name ?? undefined,
   taxId: apiUser.taxId ?? apiUser.tax_id ?? undefined,
   taxOffice: apiUser.taxOffice ?? apiUser.tax_office ?? undefined,
+  businessStatus: apiUser.businessStatus ?? apiUser.business_status ?? undefined,
   
   // Stats
   totalSales: apiUser.totalSales || apiUser.total_sales || 0,

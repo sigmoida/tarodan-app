@@ -17,6 +17,7 @@ interface AttributeGroup {
     isActive: boolean;
     sortOrder: number;
     attributeCount?: number;
+    manufacturerSlug?: string | null;
 }
 
 interface Attribute {
@@ -172,7 +173,7 @@ export default function AttributesPage() {
                                     : attributes.length === 0 ? <div className="text-center py-8 text-muted">Değer yok</div>
                                         : <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">{attributes.map((a) => (
                                             <div key={a.id} className="p-3 rounded-lg bg-surface-alt flex items-center justify-between gap-3">
-                                                <div className="flex items-center gap-2 min-w-0">{a.color && <div className="w-4 h-4 rounded-full shrink-0" style={{ backgroundColor: a.color }}></div>}<span className="text-heading truncate">{a.displayValue || a.value}</span>{!a.isActive && <span className="px-1.5 text-xs bg-body text-muted rounded shrink-0">Pasif</span>}</div>
+                                                <div className="flex items-center gap-2 min-w-0">{selectedGroup?.manufacturerSlug && a.color && <div className="w-4 h-4 rounded-full shrink-0" style={{ backgroundColor: a.color }}></div>}<span className="text-heading truncate">{a.displayValue || a.value}</span>{!a.isActive && <span className="px-1.5 text-xs bg-body text-muted rounded shrink-0">Pasif</span>}</div>
                                                 <div className="flex gap-1 shrink-0"><Button variant="secondary" onClick={() => openAttrEdit(a)} className="p-1 text-muted hover:text-heading"><PencilIcon className="h-4 w-4" /></Button><Button variant="secondary" onClick={() => setDeleteConfirm({ type: 'attr', id: a.id })} className="p-1 text-danger-600 hover:text-danger-300"><TrashIcon className="h-4 w-4" /></Button></div>
                                             </div>
                                         ))}</div>}
@@ -198,7 +199,7 @@ export default function AttributesPage() {
                 <form onSubmit={handleAttrSubmit} className="space-y-4">
                     <div><label className="block text-sm text-muted mb-2">Değer *</label><Input type="text" value={attrForm.value} onChange={(e) => setAttrForm({ ...attrForm, value: e.target.value })} required /></div>
                     <div><label className="block text-sm text-muted mb-2">Görüntülenen Değer</label><Input type="text" value={attrForm.displayValue} onChange={(e) => setAttrForm({ ...attrForm, displayValue: e.target.value })} /></div>
-                    <div className="flex gap-4"><div><label className="block text-sm text-muted mb-2">Renk</label><Input type="color" value={attrForm.color || defaultAttributeColor} onChange={(e) => setAttrForm({ ...attrForm, color: e.target.value })} className="w-10 h-10 rounded" /></div>
+                    <div className="flex gap-4">{selectedGroup?.manufacturerSlug && <div><label className="block text-sm text-muted mb-2">Renk</label><Input type="color" value={attrForm.color || defaultAttributeColor} onChange={(e) => setAttrForm({ ...attrForm, color: e.target.value })} className="w-10 h-10 rounded" /></div>}
                         <div><label className="block text-sm text-muted mb-2">Sıra</label><Input type="number" value={attrForm.sortOrder} onChange={(e) => setAttrForm({ ...attrForm, sortOrder: parseInt(e.target.value) || 0 })} className="w-20" /></div></div>
                     <Checkbox checked={attrForm.isActive} onChange={(e) => setAttrForm({ ...attrForm, isActive: e.target.checked })} label="Aktif" />
                     <div className="flex gap-3 pt-4"><Button variant="secondary" size="md" type="button" onClick={() => setShowAttrModal(false)} className="flex-1">İptal</Button><Button variant="primary" size="md" type="submit" className="flex-1">{editingAttr ? 'Güncelle' : 'Oluştur'}</Button></div>

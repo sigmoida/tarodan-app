@@ -158,12 +158,15 @@ export class PushWorker {
 
     const { userId, title, body, data } = job.data;
 
-    // 1. Always store as in-app notification (for web and mobile app notification centers)
-    try {
-      await this.saveInAppNotification(userId, title, body, data);
-      this.logger.log(`In-app notification stored for user ${userId}`);
-    } catch (error: any) {
-      this.logger.error(`Failed to store in-app notification: ${error.message}`);
+    // 1. Store as in-app notification — skip for admin_broadcast because
+    // admin.service.ts already creates the in_app log before queuing this job.
+    if (data?.type !== 'admin_broadcast') {
+      try {
+        await this.saveInAppNotification(userId, title, body, data);
+        this.logger.log(`In-app notification stored for user ${userId}`);
+      } catch (error: any) {
+        this.logger.error(`Failed to store in-app notification: ${error.message}`);
+      }
     }
 
     // 2. Try to send push notification

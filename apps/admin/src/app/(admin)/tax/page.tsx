@@ -5,8 +5,6 @@ import { adminApi } from "@/lib/api";
 import { Button, Select, Checkbox, Input, Modal } from "@tarodan/ui";
 import {
   PlusIcon,
-  PencilIcon,
-  TrashIcon,
   ChartBarIcon,
   MapPinIcon,
   CalculatorIcon,
@@ -14,6 +12,7 @@ import {
 } from "@heroicons/react/24/outline";
 import toast from "react-hot-toast";
 import { AdminTabs } from "@/components/AdminTabs";
+import { useConfirm } from "@/components/ConfirmProvider";
 
 type TabId = "regions" | "rates" | "rules" | "report";
 
@@ -75,6 +74,7 @@ const SCOPE_LABELS: Record<string, string> = {
 };
 
 export default function TaxSettingsPage() {
+  const confirm = useConfirm();
   const [activeTab, setActiveTab] = useState<TabId>("regions");
   const [regions, setRegions] = useState<TaxRegion[]>([]);
   const [rates, setRates] = useState<TaxRate[]>([]);
@@ -103,10 +103,6 @@ export default function TaxSettingsPage() {
   const [editingRegion, setEditingRegion] = useState<TaxRegion | null>(null);
   const [editingRate, setEditingRate] = useState<TaxRate | null>(null);
   const [editingRule, setEditingRule] = useState<TaxRule | null>(null);
-  const [deleteConfirm, setDeleteConfirm] = useState<{
-    type: string;
-    id: string;
-  } | null>(null);
 
   const [regionForm, setRegionForm] = useState({
     name: "",
@@ -148,10 +144,10 @@ export default function TaxSettingsPage() {
   );
 
   useEffect(() => {
-    loadRegions();
-    loadRates();
-    loadRules();
-    loadCategories();
+    setLoading(true);
+    Promise.all([loadRegions(), loadRates(), loadRules(), loadCategories()]).finally(() =>
+      setLoading(false),
+    );
   }, []);
 
   useEffect(() => {
@@ -212,10 +208,6 @@ export default function TaxSettingsPage() {
       setReport(null);
     }
   };
-
-  useEffect(() => {
-    setLoading(false);
-  }, [regions, rates, rules]);
 
   const openCreateRegion = () => {
     setEditingRegion(null);
@@ -385,12 +377,25 @@ export default function TaxSettingsPage() {
   };
 
   const handleDelete = async (type: string, id: string) => {
+    const labels: Record<string, string> = {
+      region: "Vergi Bölgesi",
+      rate: "Vergi Oranı",
+      rule: "Vergi Kuralı",
+    };
+    if (
+      !(await confirm({
+        title: `${labels[type] ?? "Kayıt"} silinsin mi?`,
+        description: "Bu işlem geri alınamaz.",
+        confirmLabel: "Sil",
+        destructive: true,
+      }))
+    )
+      return;
     try {
       if (type === "region") await adminApi.deleteTaxRegion(id);
       else if (type === "rate") await adminApi.deleteTaxRate(id);
       else if (type === "rule") await adminApi.deleteTaxRule(id);
       toast.success("Silindi");
-      setDeleteConfirm(null);
       loadRegions();
       loadRates();
       loadRules();
@@ -506,9 +511,7 @@ export default function TaxSettingsPage() {
                           {r.ratesCount === 0 && (
                             <Button
                               variant="secondary"
-                              onClick={() =>
-                                setDeleteConfirm({ type: "region", id: r.id })
-                              }
+                              onClick={() => handleDelete("region", r.id)}
                               className="text-danger-600 hover:text-danger-300"
                             >
                               Sil
@@ -605,9 +608,7 @@ export default function TaxSettingsPage() {
                           </Button>
                           <Button
                             variant="secondary"
-                            onClick={() =>
-                              setDeleteConfirm({ type: "rate", id: r.id })
-                            }
+                            onClick={() => handleDelete("rate", r.id)}
                             className="text-danger-600 hover:text-danger-300"
                           >
                             Sil
@@ -701,9 +702,7 @@ export default function TaxSettingsPage() {
                           </Button>
                           <Button
                             variant="secondary"
-                            onClick={() =>
-                              setDeleteConfirm({ type: "rule", id: r.id })
-                            }
+                            onClick={() => handleDelete("rule", r.id)}
                             className="text-danger-600 hover:text-danger-300"
                           >
                             Sil
@@ -1224,41 +1223,6 @@ export default function TaxSettingsPage() {
           </Modal>
         )}
 
-        {/* Delete confirmation */}
-        {deleteConfirm && (
-          <div
-            className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-heading/60"
-            onClick={() => setDeleteConfirm(null)}
-          >
-            <div
-              className="bg-surface-elevated rounded-xl shadow-xl px-6 pb-6 pt-5 max-w-sm w-full"
-              onClick={(e) => e.stopPropagation()}
-            >
-              <p className="text-heading font-medium">
-                Bu kaydı silmek istediğinize emin misiniz?
-              </p>
-              <div className="flex justify-end gap-2 mt-4">
-                <Button
-                  variant="secondary"
-                  type="button"
-                  onClick={() => setDeleteConfirm(null)}
-                >
-                  Vazgeç
-                </Button>
-                <Button
-                  variant="danger"
-                  size="md"
-                  type="button"
-                  onClick={() =>
-                    handleDelete(deleteConfirm.type, deleteConfirm.id)
-                  }
-                >
-                  Sil
-                </Button>
-              </div>
-            </div>
-          </div>
-        )}
       </div>
     </>
   );

@@ -1,11 +1,10 @@
 "use client";
 
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { adminApi } from "@/lib/api";
-import { EyeIcon } from "@heroicons/react/24/outline";
 import { Input } from "@tarodan/ui";
 import { type ColumnDef } from "@/components/DataTable";
-import { ActionButtons, ActionIconButton } from "@/components/admin-list";
 import { ResourceListPage } from "@/components/ResourceListPage";
 import { useAdminResource } from "@/hooks/useAdminResource";
 
@@ -27,6 +26,7 @@ interface Refund {
 // ─── Sayfa ─────────────────────────────────────────────────────────────────
 
 export default function RefundsPage() {
+  const router = useRouter();
   // Tarih filtreleri initialFilters'a alındı — hook bunları fetcher'a iletir
   const {
     rows,
@@ -112,20 +112,6 @@ export default function RefundsPage() {
       cell: ({ row }) =>
         new Date(row.original.refundedAt).toLocaleDateString("tr-TR"),
     },
-    {
-      id: "actions",
-      header: "İşlemler",
-      cell: ({ row }) =>
-        row.original.order ? (
-          <ActionButtons>
-            <ActionIconButton
-              icon={EyeIcon}
-              href={`/orders/${row.original.order.id}`}
-              title="Detay"
-            />
-          </ActionButtons>
-        ) : null,
-    },
   ];
 
   // ── Render ─────────────────────────────────────────────────────────────────
@@ -158,6 +144,9 @@ export default function RefundsPage() {
       loading={isLoading}
       emptyText="İade bulunamadı"
       getRowId={(r) => r.id}
+      onRowClick={(r) =>
+        r.order && router.push(`/orders/${r.order.id}`)
+      }
       page={page}
       totalPages={totalPages}
       onPageChange={setPage}
