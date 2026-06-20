@@ -578,7 +578,7 @@ function buildAuditColumns(
                 <div className="flex items-center gap-2">
                     <UserIcon className="w-4 h-4 text-muted shrink-0" />
                     <span className="text-sm truncate max-w-[160px]">
-                        {row.original.admin?.email ?? row.original.adminUserId.substring(0, 8) + '…'}
+                        {row.original.admin?.email ?? (row.original.adminUserId?.substring(0, 8) ?? 'Sistem') + '…'}
                     </span>
                 </div>
             ),
@@ -606,7 +606,7 @@ function buildAuditColumns(
             header: 'ID',
             cell: ({ row }) => (
                 <span className="font-mono text-xs text-muted">
-                    {row.original.entityId.substring(0, 8)}…
+                    {row.original.entityId?.substring(0, 8) ?? '—'}…
                 </span>
             ),
         },

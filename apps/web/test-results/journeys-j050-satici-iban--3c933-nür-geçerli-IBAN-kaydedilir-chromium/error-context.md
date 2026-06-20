@@ -1,0 +1,80 @@
+# Page snapshot
+
+```yaml
+- generic [active] [ref=e1]:
+  - main [ref=e2]:
+    - generic [ref=e3]:
+      - generic [ref=e4]:
+        - link "Tarodan Tarodan" [ref=e6] [cursor=pointer]:
+          - /url: /
+          - img "Tarodan" [ref=e7]
+          - generic [ref=e8]: Tarodan
+        - generic [ref=e10]:
+          - generic [ref=e11]:
+            - heading "Welcome back!" [level=1] [ref=e12]
+            - paragraph [ref=e13]: Sign in to your account
+          - generic [ref=e16]:
+            - generic [ref=e17]:
+              - generic [ref=e18]: Email
+              - generic [ref=e19]:
+                - img
+                - textbox "Email" [ref=e20]:
+                  - /placeholder: example@email.com
+            - generic [ref=e21]:
+              - generic [ref=e22]: Password
+              - generic [ref=e23]:
+                - img
+                - textbox "Password" [ref=e24]:
+                  - /placeholder: ••••••••
+                - button "Show password" [ref=e25] [cursor=pointer]:
+                  - img [ref=e26]
+            - generic [ref=e29]:
+              - generic [ref=e31] [cursor=pointer]:
+                - checkbox "Remember me" [ref=e32]
+                - generic [ref=e33]: Remember me
+              - link "Forgot Password?" [ref=e34] [cursor=pointer]:
+                - /url: /forgot-password
+            - button "Login" [ref=e36] [cursor=pointer]
+          - paragraph [ref=e37]:
+            - text: Don't have an account?
+            - link "Sign Up" [ref=e38] [cursor=pointer]:
+              - /url: /register
+      - generic [ref=e39]:
+        - img "Diecast model araba koleksiyonu" [ref=e40]
+        - generic [ref=e43]:
+          - heading "The Meeting Point for Collectors" [level=2] [ref=e44]
+          - paragraph [ref=e45]: Find what you're looking for among thousands of diecast models.
+          - generic [ref=e46]:
+            - generic [ref=e47]:
+              - paragraph [ref=e48]: 10K+
+              - paragraph [ref=e49]: Listings
+            - generic [ref=e51]:
+              - paragraph [ref=e52]: 5K+
+              - paragraph [ref=e53]: Members
+            - generic [ref=e55]:
+              - paragraph [ref=e56]: 2K+
+              - paragraph [ref=e57]: Trades
+  - generic [ref=e62]:
+    - img [ref=e64]
+    - generic [ref=e66]:
+      - heading "🍪 Çerez Kullanımı" [level=3] [ref=e67]
+      - paragraph [ref=e68]:
+        - text: Sitemizde deneyiminizi geliştirmek, trafiği analiz etmek ve size kişiselleştirilmiş içerik sunmak için çerezler kullanıyoruz. Detaylı bilgi için
+        - link "Çerez Politikamızı" [ref=e69] [cursor=pointer]:
+          - /url: /cookies
+        - text: inceleyebilirsiniz.
+      - generic [ref=e70]:
+        - button "Tümünü Kabul Et" [ref=e71] [cursor=pointer]:
+          - img [ref=e72]
+          - text: Tümünü Kabul Et
+        - button "Sadece Gerekli Olanlar" [ref=e74] [cursor=pointer]
+        - button "Ayarlar" [ref=e75] [cursor=pointer]:
+          - img [ref=e76]
+          - text: Ayarlar
+  - alert [ref=e79]
+  - generic [ref=e82] [cursor=pointer]:
+    - img [ref=e83]
+    - generic [ref=e85]: 1 error
+    - button "Hide Errors" [ref=e86]:
+      - img [ref=e87]
+```

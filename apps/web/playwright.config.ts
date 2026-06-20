@@ -8,13 +8,14 @@ export default defineConfig({
   forbidOnly: !!process.env.CI,
   retries: process.env.CI ? 2 : 1,
   workers: process.env.CI ? 1 : 1,
-  reporter: 'html',
+  reporter: process.env.E2E_LITE ? 'list' : 'html',
   use: {
     baseURL: 'http://localhost:3000',
     // Hata izlenebilirliği (Kural 6): trace + video + ekran görüntüsü HER testte saklanır (sunum/arşiv).
-    trace: 'on',
-    video: 'on',
-    screenshot: 'on',
+    // E2E_LITE=1 ile hızlı koşu moduna geç (CI rapor arşivi için kapalı tutma).
+    trace: process.env.E2E_LITE ? 'off' : 'on',
+    video: process.env.E2E_LITE ? 'off' : 'on',
+    screenshot: process.env.E2E_LITE ? 'off' : 'on',
   },
   projects: [
     {
