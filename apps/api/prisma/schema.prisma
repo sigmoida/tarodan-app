@@ -11,7 +11,7 @@ model User {
   id                      String                   @id @default(uuid())
   email                   String                   @unique
   phone                   String?                  @unique
-  passwordHash            String                   @map("password_hash")
+  passwordHash            String?                  @map("password_hash")
   displayName             String                   @map("display_name")
   avatarUrl               String?                  @map("avatar_url")
   bio                     String?
@@ -73,10 +73,25 @@ model User {
   bankAccount             SellerBankAccount?
   payoutTransfers         PayoutTransfer[]         @relation("SellerPayoutTransfers")
   refundRequests          RefundRequest[]          @relation("UserRefundRequests")
+  oauthAccounts           OAuthAccount[]
 
   @@index([email])
   @@index([isSeller])
   @@map("users")
+}
+
+model OAuthAccount {
+  id             String   @id @default(uuid())
+  userId         String   @map("user_id")
+  provider       String
+  providerUserId String   @map("provider_user_id")
+  email          String?
+  createdAt      DateTime @default(now()) @map("created_at")
+  user           User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([provider, providerUserId])
+  @@index([userId])
+  @@map("oauth_accounts")
 }
 
 model TwoFactorSecret {
