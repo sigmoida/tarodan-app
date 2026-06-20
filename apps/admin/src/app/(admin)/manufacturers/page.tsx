@@ -148,7 +148,7 @@ export default function ManufacturersPage() {
     setUploadingLogo(true);
     try {
       const res = await adminApi.uploadManufacturerLogo(file);
-      const uploadedUrl = res.data.key || res.data.url;
+      const uploadedUrl = res.data.url || res.data.key;
       setFormData(prev => ({ ...prev, logo: uploadedUrl }));
       setLogoPreview(URL.createObjectURL(file));
       toast.success('Logo yüklendi');

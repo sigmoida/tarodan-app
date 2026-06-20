@@ -2424,23 +2424,114 @@ async function main() {
   console.log(`✅ Created ${tickets.length} support tickets`);
 
   // ==========================================================================
-  // 21b. Create Static Pages (About, FAQ)
+  // 21b. Create Static Pages
   // ==========================================================================
-  if (prisma.staticPage) {
-    console.log('Creating static pages...');
-    const pages = [
-      { slug: 'about', title: 'Hakkımızda', content: '<h1>Hakkımızda</h1><p>Tarodan, Türkiye\'nin diecast model araba koleksiyoncuları için en büyük pazaryeridir.</p>', metaTitle: 'Hakkımızda | Tarodan', metaDescription: 'Tarodan hakkında bilgi edinin.', sortOrder: 0 },
-      { slug: 'faq', title: 'Sıkça Sorulan Sorular', content: '<h1>SSS</h1><p>Genel sorular ve cevaplar. Bu içerik admin panelinden düzenlenebilir.</p>', metaTitle: 'SSS | Tarodan', metaDescription: 'Sıkça sorulan sorular.', sortOrder: 1 },
-    ];
-    for (const p of pages) {
-      await (prisma as any).staticPage.upsert({
-        where: { slug: p.slug },
-        create: p,
-        update: { title: p.title, content: p.content, metaTitle: p.metaTitle, metaDescription: p.metaDescription, sortOrder: p.sortOrder },
-      });
-    }
-    console.log(`✅ Created ${pages.length} static pages`);
+  console.log('Creating static pages...');
+  const staticPageDefs = [
+    {
+      slug: 'about',
+      title: 'Hakkımızda',
+      content: '<h1>Hakkımızda</h1><p>Tarodan, Türkiye\'nin diecast model araba koleksiyoncuları için en büyük pazaryeridir.</p>',
+      metaTitle: 'Hakkımızda | Tarodan',
+      metaDescription: 'Tarodan hakkında bilgi edinin.',
+      sortOrder: 0,
+    },
+    {
+      slug: 'faq',
+      title: 'Sıkça Sorulan Sorular',
+      content: '<h1>SSS</h1><p>Genel sorular ve cevaplar. Bu içerik admin panelinden düzenlenebilir.</p>',
+      metaTitle: 'SSS | Tarodan',
+      metaDescription: 'Sıkça sorulan sorular.',
+      sortOrder: 1,
+    },
+    {
+      slug: 'privacy',
+      title: 'Gizlilik Politikası',
+      content: `<h1>Gizlilik Politikası</h1>
+<p><strong>Son güncelleme:</strong> Haziran 2026</p>
+<p>Tarodan olarak kişisel verilerinizin güvenliğine önem veriyoruz. Bu Gizlilik Politikası, tarodan.shop adresini ziyaret ettiğinizde hangi verileri topladığımızı, nasıl kullandığımızı ve koruduğumuzu açıklamaktadır.</p>
+<h2>1. Toplanan Veriler</h2>
+<ul>
+  <li><strong>Kimlik verileri:</strong> Ad, soyad, e-posta adresi, telefon numarası, doğum tarihi.</li>
+  <li><strong>İşlem verileri:</strong> Satın alma geçmişi, teklif ve takas kayıtları. Kart numaraları yalnızca PayTR altyapısında saklanır.</li>
+  <li><strong>Teknik veriler:</strong> IP adresi, tarayıcı türü, çerezler, sayfa görüntüleme istatistikleri.</li>
+  <li><strong>İletişim verileri:</strong> Platform içi mesajlar ve destek talepleri.</li>
+</ul>
+<h2>2. Verilerin Kullanım Amaçları</h2>
+<ul>
+  <li>Hesap oluşturma ve kimlik doğrulama.</li>
+  <li>Sipariş, kargo ve ödeme işlemlerinin yönetimi.</li>
+  <li>Müşteri desteği ve şikayet yönetimi.</li>
+  <li>Platform güvenliği ve sahteciliğin önlenmesi.</li>
+  <li>Yasal yükümlülüklerin yerine getirilmesi (KVKK).</li>
+</ul>
+<h2>3. KVKK Kapsamındaki Haklarınız</h2>
+<p>6698 sayılı Kişisel Verilerin Korunması Kanunu uyarınca verilerinize erişim, düzeltme, silme ve itiraz haklarına sahipsiniz.</p>
+<p>Talepleriniz için: <a href="mailto:kvkk@tarodan.com">kvkk@tarodan.com</a></p>
+<h2>4. İletişim</h2>
+<p><a href="mailto:destek@tarodan.com">destek@tarodan.com</a></p>`,
+      metaTitle: 'Gizlilik Politikası | Tarodan',
+      metaDescription: 'Tarodan gizlilik politikası ve KVKK aydınlatma metni.',
+      sortOrder: 2,
+    },
+    {
+      slug: 'terms',
+      title: 'Kullanım Koşulları',
+      content: `<h1>Kullanım Koşulları</h1>
+<p><strong>Son güncelleme:</strong> Haziran 2026</p>
+<p>Bu Kullanım Koşulları, tarodan.shop platformunu kullanan tüm kullanıcılar için geçerlidir. Platforma erişerek bu koşulları kabul etmiş sayılırsınız.</p>
+<h2>1. Hizmet Tanımı</h2>
+<p>Tarodan, diecast ve koleksiyon model araba alım-satım ve takas işlemlerini kolaylaştıran bir çevrimiçi pazar yeridir.</p>
+<h2>2. Üyelik Koşulları</h2>
+<ul>
+  <li>Üyelik için 18 yaşında veya daha büyük olmanız gerekmektedir.</li>
+  <li>Doğru ve güncel bilgiler sağlamakla yükümlüsünüz.</li>
+  <li>Hesap güvenliğinden siz sorumlusunuz.</li>
+</ul>
+<h2>3. İlan Verme Kuralları</h2>
+<ul>
+  <li>Yalnızca gerçekten sahip olduğunuz ürünleri listeleyebilirsiniz.</li>
+  <li>Yanıltıcı, sahte veya telif hakkı ihlali içeren ilanlar yasaktır.</li>
+  <li>Ürün durumu, fotoğraflar ve açıklama doğru olmalıdır.</li>
+</ul>
+<h2>4. Ödeme ve Güvence</h2>
+<p>Ödemeler PayTR güvenli ödeme altyapısı üzerinden gerçekleştirilir. Alıcının ödediği tutar, ürünün teslim edildiği doğrulanana kadar Tarodan güvencesinde bekletilir.</p>
+<h2>5. İptal ve İade</h2>
+<ul>
+  <li>Sipariş kargo öncesinde iptal edilebilir.</li>
+  <li>Teslim alınan ürün açıklamaya uymuyorsa 3 iş günü içinde iade talebi açılabilir.</li>
+</ul>
+<h2>6. İletişim</h2>
+<p><a href="mailto:destek@tarodan.com">destek@tarodan.com</a></p>`,
+      metaTitle: 'Kullanım Koşulları | Tarodan',
+      metaDescription: 'Tarodan platform kullanım koşulları ve üyelik sözleşmesi.',
+      sortOrder: 3,
+    },
+    {
+      slug: 'cookie-policy',
+      title: 'Çerez Politikası',
+      content: `<h1>Çerez Politikası</h1>
+<p><strong>Son güncelleme:</strong> Haziran 2026</p>
+<p>Tarodan olarak web sitemizde çerezler kullanmaktayız.</p>
+<h2>Zorunlu Çerezler</h2>
+<p>Oturum yönetimi ve güvenlik için gereklidir. Devre dışı bırakılamaz.</p>
+<h2>Analitik Çerezler</h2>
+<p>Kullanıcı davranışını anlamamıza yardımcı olur. Tarayıcı ayarlarınızdan devre dışı bırakılabilir.</p>
+<h2>Çerez Yönetimi</h2>
+<p>Tarayıcınızın ayarlar menüsünden veya sayfamızdaki "Çerez Ayarları" butonundan tercihlerinizi yönetebilirsiniz.</p>`,
+      metaTitle: 'Çerez Politikası | Tarodan',
+      metaDescription: 'Tarodan çerez politikası.',
+      sortOrder: 4,
+    },
+  ];
+  for (const p of staticPageDefs) {
+    await prisma.staticPage.upsert({
+      where: { slug: p.slug },
+      create: { ...p, isPublished: true },
+      update: { title: p.title, content: p.content, metaTitle: p.metaTitle, metaDescription: p.metaDescription, sortOrder: p.sortOrder, isPublished: true },
+    });
   }
+  console.log(`✅ Created/updated ${staticPageDefs.length} static pages`);
 
   // ==========================================================================
   // 22. Create Analytics Snapshots
@@ -2514,6 +2605,268 @@ async function main() {
   });
 
   console.log(`✅ Created search indexes`);
+
+  // ==========================================================================
+  // 24. Email Templates
+  // ==========================================================================
+  console.log('Creating email templates...');
+  const emailTemplates = [
+    {
+      key: 'welcome',
+      name: 'Hoş Geldiniz',
+      subject: 'Tarodan\'a Hoş Geldiniz, {{displayName}}!',
+      bodyHtml: `<h1>Merhaba {{displayName}},</h1>
+<p>Tarodan ailesine hoş geldiniz! Artık diecast model araba koleksiyonunuzu büyütmeye hazırsınız.</p>
+<p>Başlamak için: <a href="{{frontendUrl}}/listings">İlanları Keşfet</a></p>
+<p>İyi koleksiyonlar,<br>Tarodan Ekibi</p>`,
+      variablesJson: JSON.stringify(['displayName', 'frontendUrl']),
+    },
+    {
+      key: 'email_verification',
+      name: 'E-posta Doğrulama',
+      subject: 'E-posta Adresinizi Doğrulayın',
+      bodyHtml: `<h1>E-posta Doğrulama</h1>
+<p>Merhaba {{displayName}},</p>
+<p>Hesabınızı doğrulamak için aşağıdaki bağlantıya tıklayın:</p>
+<p><a href="{{verificationUrl}}">E-postamı Doğrula</a></p>
+<p>Bu bağlantı 24 saat geçerlidir. Talebi siz yapmadıysanız bu e-postayı görmezden gelebilirsiniz.</p>`,
+      variablesJson: JSON.stringify(['displayName', 'verificationUrl']),
+    },
+    {
+      key: 'password_reset',
+      name: 'Şifre Sıfırlama',
+      subject: 'Şifre Sıfırlama Talebi',
+      bodyHtml: `<h1>Şifre Sıfırlama</h1>
+<p>Merhaba {{displayName}},</p>
+<p>Şifrenizi sıfırlamak için aşağıdaki bağlantıya tıklayın:</p>
+<p><a href="{{resetUrl}}">Şifremi Sıfırla</a></p>
+<p>Bu bağlantı 1 saat geçerlidir. Talebi siz yapmadıysanız bu e-postayı görmezden gelebilirsiniz.</p>`,
+      variablesJson: JSON.stringify(['displayName', 'resetUrl']),
+    },
+    {
+      key: 'order_placed',
+      name: 'Sipariş Oluşturuldu',
+      subject: 'Siparişiniz Alındı — #{{orderNumber}}',
+      bodyHtml: `<h1>Siparişiniz Alındı!</h1>
+<p>Merhaba {{buyerName}},</p>
+<p><strong>#{{orderNumber}}</strong> numaralı siparişiniz başarıyla oluşturuldu.</p>
+<p>Ürün: {{productTitle}}</p>
+<p>Tutar: {{amount}} TL</p>
+<p>Sipariş durumunuzu takip etmek için: <a href="{{orderUrl}}">Siparişimi Görüntüle</a></p>`,
+      variablesJson: JSON.stringify(['buyerName', 'orderNumber', 'productTitle', 'amount', 'orderUrl']),
+    },
+    {
+      key: 'order_shipped',
+      name: 'Sipariş Kargoya Verildi',
+      subject: 'Siparişiniz Kargoya Verildi — #{{orderNumber}}',
+      bodyHtml: `<h1>Siparişiniz Yola Çıktı!</h1>
+<p>Merhaba {{buyerName}},</p>
+<p><strong>#{{orderNumber}}</strong> numaralı siparişiniz kargoya verildi.</p>
+<p>Kargo Firması: Sürat Kargo</p>
+<p>Takip No: <strong>{{trackingNumber}}</strong></p>
+<p><a href="{{trackingUrl}}">Kargomu Takip Et</a></p>`,
+      variablesJson: JSON.stringify(['buyerName', 'orderNumber', 'trackingNumber', 'trackingUrl']),
+    },
+    {
+      key: 'offer_received',
+      name: 'Yeni Teklif Alındı',
+      subject: '{{productTitle}} için yeni bir teklif aldınız',
+      bodyHtml: `<h1>Yeni Teklif!</h1>
+<p>Merhaba {{sellerName}},</p>
+<p><strong>{{buyerName}}</strong> adlı kullanıcı <strong>{{productTitle}}</strong> ilanınıza <strong>{{offerAmount}} TL</strong> teklif verdi.</p>
+<p><a href="{{offerUrl}}">Teklifi İncele</a></p>`,
+      variablesJson: JSON.stringify(['sellerName', 'buyerName', 'productTitle', 'offerAmount', 'offerUrl']),
+    },
+    {
+      key: 'trade_request',
+      name: 'Takas Talebi',
+      subject: 'Yeni Takas Talebi — {{productTitle}}',
+      bodyHtml: `<h1>Takas Talebi</h1>
+<p>Merhaba {{sellerName}},</p>
+<p><strong>{{requesterName}}</strong> adlı kullanıcı <strong>{{productTitle}}</strong> ilanınız için takas teklif etti.</p>
+<p><a href="{{tradeUrl}}">Takası İncele</a></p>`,
+      variablesJson: JSON.stringify(['sellerName', 'requesterName', 'productTitle', 'tradeUrl']),
+    },
+    {
+      key: 'payout_sent',
+      name: 'Ödeme Gönderildi',
+      subject: 'Satış geliriniz IBAN\'ınıza aktarıldı',
+      bodyHtml: `<h1>Ödemeniz Gönderildi</h1>
+<p>Merhaba {{sellerName}},</p>
+<p><strong>{{amount}} TL</strong> tutarındaki satış geliriniz IBAN\'ınıza aktarıldı.</p>
+<p>İşlem Tarihi: {{date}}</p>`,
+      variablesJson: JSON.stringify(['sellerName', 'amount', 'date']),
+    },
+  ];
+
+  for (const t of emailTemplates) {
+    await prisma.emailTemplate.upsert({
+      where: { key: t.key },
+      update: { name: t.name, subject: t.subject, bodyHtml: t.bodyHtml, variablesJson: t.variablesJson },
+      create: t,
+    });
+  }
+  console.log(`✅ Created/updated ${emailTemplates.length} email templates`);
+
+  // ==========================================================================
+  // 25. Discounts
+  // ==========================================================================
+  console.log('Creating discounts...');
+  const discountNow = new Date();
+  const inOneYear = new Date(discountNow.getFullYear() + 1, discountNow.getMonth(), discountNow.getDate());
+  const lastWeek = new Date(discountNow.getTime() - 7 * 24 * 60 * 60 * 1000);
+
+  const discounts = [
+    {
+      code: 'HOSGELDIN10',
+      name: 'Hoş Geldin İndirimi',
+      description: 'Yeni üyeler için ilk alışverişte %10 indirim',
+      type: 'percentage' as const,
+      value: 10,
+      scope: 'global' as const,
+      minCartValue: 100,
+      usageLimitTotal: 1000,
+      usageLimitPerUser: 1,
+      isActive: true,
+      startDate: discountNow,
+      endDate: inOneYear,
+      priority: 1,
+    },
+    {
+      code: 'TARODAN50',
+      name: '50 TL İndirim Kuponu',
+      description: '500 TL ve üzeri alışverişlerde 50 TL indirim',
+      type: 'fixed_amount' as const,
+      value: 50,
+      scope: 'global' as const,
+      minCartValue: 500,
+      usageLimitTotal: 500,
+      usageLimitPerUser: 1,
+      isActive: true,
+      startDate: discountNow,
+      endDate: inOneYear,
+      priority: 2,
+    },
+    {
+      code: 'DIECAST20',
+      name: 'Diecast Severlere %20',
+      description: 'Diecast kategorisinde %20 indirim',
+      type: 'percentage' as const,
+      value: 20,
+      scope: 'global' as const,
+      minCartValue: 200,
+      maxDiscountAmount: 300,
+      usageLimitTotal: 200,
+      usageLimitPerUser: 2,
+      isActive: true,
+      startDate: discountNow,
+      endDate: inOneYear,
+      priority: 3,
+    },
+    {
+      code: 'FLASHSALE',
+      name: 'Flash Satış',
+      description: 'Sınırlı süreli fırsat — %30 indirim',
+      type: 'percentage' as const,
+      value: 30,
+      scope: 'global' as const,
+      usageLimitTotal: 50,
+      usageLimitPerUser: 1,
+      isActive: false,
+      isFlashSale: true,
+      startDate: lastWeek,
+      endDate: discountNow,
+      priority: 10,
+    },
+  ];
+
+  for (const d of discounts) {
+    await prisma.discount.upsert({
+      where: { code: d.code },
+      update: { name: d.name, isActive: d.isActive },
+      create: d,
+    });
+  }
+  console.log(`✅ Created/updated ${discounts.length} discounts`);
+
+  // ==========================================================================
+  // 26. Advertisements
+  // ==========================================================================
+  console.log('Creating advertisements...');
+  const ads = [
+    {
+      title: 'Premium Koleksiyon — Yeni Gelenler',
+      imageUrl: 'https://amzn-tarodan.s3.eu-west-1.amazonaws.com/dev/ads/banner-premium.jpg',
+      linkUrl: '/listings?sortBy=created_desc',
+      altText: 'Yeni gelen premium diecast modeller',
+      position: 'header' as const,
+      deviceType: 'all' as const,
+      displayOrder: 1,
+      isActive: true,
+      startDate: discountNow,
+      endDate: inOneYear,
+    },
+    {
+      title: 'Hot Wheels Koleksiyonu',
+      imageUrl: 'https://amzn-tarodan.s3.eu-west-1.amazonaws.com/dev/ads/banner-hotwheels.jpg',
+      linkUrl: '/listings?manufacturer=Hot+Wheels',
+      altText: 'Hot Wheels model araba koleksiyonu',
+      position: 'sidebar' as const,
+      deviceType: 'desktop' as const,
+      displayOrder: 1,
+      isActive: true,
+      startDate: discountNow,
+      endDate: inOneYear,
+    },
+    {
+      title: 'İndirimli Ürünler',
+      content: 'Bu hafta özel fiyatlar — %30\'a varan indirim!',
+      linkUrl: '/listings?discountOnly=true',
+      altText: 'İndirimli model arabalar',
+      position: 'footer' as const,
+      deviceType: 'all' as const,
+      displayOrder: 1,
+      isActive: true,
+      startDate: discountNow,
+      endDate: inOneYear,
+    },
+  ];
+
+  for (const ad of ads) {
+    await prisma.advertisement.create({ data: ad }).catch(() => {/* skip duplicate */});
+  }
+  const adCount = await prisma.advertisement.count();
+  console.log(`✅ Created advertisements (total: ${adCount})`);
+
+  // ==========================================================================
+  // 27. Moderation Events (örnek AI denetim kayıtları)
+  // ==========================================================================
+  console.log('Creating moderation events...');
+  const sampleProducts = products.slice(0, 5);
+  const sampleUsers = users.slice(0, 4);
+
+  const moderationEvents = [
+    { entityType: 'product', entityId: sampleProducts[0]?.id, userId: sampleUsers[0]?.id, kind: 'image', field: 'product_image', decision: 'pass', relevanceScore: 0.95, nsfwScore: 0.01, labels: { diecast: 0.95, car: 0.92 } },
+    { entityType: 'product', entityId: sampleProducts[1]?.id, userId: sampleUsers[1]?.id, kind: 'image', field: 'product_image', decision: 'pass', relevanceScore: 0.88, nsfwScore: 0.02, labels: { model_car: 0.88, vehicle: 0.85 } },
+    { entityType: 'product', entityId: sampleProducts[2]?.id, userId: sampleUsers[2]?.id, kind: 'text', field: 'description', decision: 'review', relevanceScore: 0.55, nsfwScore: 0.05, reason: 'Düşük alaka skoru — manuel inceleme gerekiyor' },
+    { entityType: 'product', entityId: sampleProducts[3]?.id, userId: sampleUsers[3]?.id, kind: 'image', field: 'product_image', decision: 'flag', nsfwScore: 0.72, reason: 'Yüksek NSFW skoru — içerik politikasını ihlal edebilir' },
+    { entityType: 'user', entityId: sampleUsers[0]?.id, userId: sampleUsers[0]?.id, kind: 'image', field: 'avatar', decision: 'pass', relevanceScore: 0.90, nsfwScore: 0.01, labels: { person: 0.90 } },
+    { entityType: 'user', entityId: sampleUsers[1]?.id, userId: sampleUsers[1]?.id, kind: 'text', field: 'bio', decision: 'pass', relevanceScore: 0.80, nsfwScore: 0.00, reason: null },
+    { entityType: 'upload', entityId: null, userId: sampleUsers[2]?.id, kind: 'image', field: 'upload', decision: 'blocked', nsfwScore: 0.93, reason: 'Uygunsuz içerik — yükleme engellendi' },
+    { entityType: 'product', entityId: sampleProducts[4]?.id, userId: sampleUsers[0]?.id, kind: 'image', field: 'product_image', decision: 'pass', relevanceScore: 0.91, nsfwScore: 0.00, labels: { diecast: 0.91, sports_car: 0.87 } },
+  ];
+
+  const existingModCount = await prisma.moderationEvent.count();
+  if (existingModCount === 0) {
+    for (const ev of moderationEvents) {
+      if (ev.entityId || ev.entityType === 'upload') {
+        await prisma.moderationEvent.create({ data: ev as any });
+      }
+    }
+    console.log(`✅ Created ${moderationEvents.length} moderation events`);
+  } else {
+    console.log(`✅ Moderation events already exist (${existingModCount})`);
+  }
 
   // ==========================================================================
   // Summary

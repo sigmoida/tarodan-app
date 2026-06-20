@@ -447,7 +447,7 @@ export default function OrderDetailPage() {
                   )}
                   <div className="flex-1">
                     <Link
-                      href={`/admin/products/${order.product.id}`}
+                      href={`/products/${order.product.id}`}
                       className="text-primary-600 hover:text-primary-700 font-medium"
                     >
                       {order.product.title}
