@@ -25,6 +25,7 @@ import {
   Tooltip,
   Legend,
   ArcElement,
+  Filler,
 } from 'chart.js';
 import { Line, Bar, Doughnut } from 'react-chartjs-2';
 import { colors as dsColors } from '@tarodan/ui';
@@ -38,7 +39,8 @@ ChartJS.register(
   ArcElement,
   Title,
   Tooltip,
-  Legend
+  Legend,
+  Filler,
 );
 
 interface DashboardStats {

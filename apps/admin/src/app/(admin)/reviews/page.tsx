@@ -274,8 +274,8 @@ export default function ReviewsPage() {
             header: 'Gönderen',
             cell: ({ row }) => (
                 <>
-                    <p className="text-sm text-heading">{row.original.giver.displayName}</p>
-                    <p className="text-xs text-muted">{row.original.giver.email}</p>
+                    <p className="text-sm text-heading">{row.original.giver?.displayName ?? '—'}</p>
+                    <p className="text-xs text-muted">{row.original.giver?.email ?? ''}</p>
                 </>
             ),
         },
@@ -283,8 +283,8 @@ export default function ReviewsPage() {
             header: 'Alıcı (Satıcı)',
             cell: ({ row }) => (
                 <>
-                    <p className="text-sm text-heading">{row.original.receiver.displayName}</p>
-                    <p className="text-xs text-muted">{row.original.receiver.email}</p>
+                    <p className="text-sm text-heading">{row.original.receiver?.displayName ?? '—'}</p>
+                    <p className="text-xs text-muted">{row.original.receiver?.email ?? ''}</p>
                 </>
             ),
         },

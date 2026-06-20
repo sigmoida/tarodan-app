@@ -300,7 +300,7 @@ export default function SupportPage() {
       ),
       cell: ({ row }) => (
         <span className="text-sm text-muted">
-          {row.original.creator.displayName}
+          {row.original.creator?.displayName ?? '—'}
         </span>
       ),
     },
