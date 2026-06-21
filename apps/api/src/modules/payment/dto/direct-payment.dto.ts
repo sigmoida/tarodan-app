@@ -60,6 +60,17 @@ export class DirectPaymentDto {
     @IsString()
     cardToken?: string;
 
+    @ApiPropertyOptional({ description: 'Kayıtlı kart ID (SavedCard.id) ile öde (Flow B)' })
+    @IsOptional()
+    @IsString()
+    savedCardId?: string;
+
+    @ApiPropertyOptional({ description: 'CVV — yalnız require_cvv kayıtlı kartlar için' })
+    @IsOptional()
+    @IsString()
+    @Length(3, 4)
+    cvv?: string;
+
     @ApiPropertyOptional({ description: 'New Card Details' })
     @IsOptional()
     @ValidateNested()

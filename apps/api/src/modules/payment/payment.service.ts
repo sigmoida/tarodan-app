@@ -11,7 +11,7 @@ import { ConfigService } from '@nestjs/config';
 import { PrismaService } from '../../prisma';
 import { CacheService } from '../cache/cache.service';
 import { InitiatePaymentDto, PaymentProvider, PayTRCallbackDto, DirectPaymentDto } from './dto';
-import { PaymentStatus, PaymentHoldStatus, OrderStatus, ProductStatus, SubscriptionStatus, TradeStatus, OfferStatus, RefundRequestStatus } from '@prisma/client';
+import { PaymentStatus, PaymentHoldStatus, OrderStatus, ProductStatus, SubscriptionStatus, TradeStatus, OfferStatus, RefundRequestStatus, SavedCardStatus } from '@prisma/client';
 import { getProductStatusFromQuantity } from '../product/helpers/product-status.helper';
 import { safeDecrementReserved } from '../product/helpers/product-availability.helper';
 import { computeRelevanceScore, RELEVANCE_PREMIUM_BONUS } from '../product/helpers/relevance-score';
@@ -351,7 +351,9 @@ export class PaymentService {
    * - 3D Secure ile (non3d=false). Yanıt 3DS HTML'i; kesin sonuç callback ile işlenir.
    * - storeCard=true ise kart PayTR'da saklanır → callback'te utoken → SavedCard.
    *
-   * Bu adım kapsamı: tekil orderId + yeni kart (CIT). Grup/takas/kayıtlı-kart sonraki adım.
+   * Kapsam: tekil orderId + (a) yeni kart → 3D/CIT (createDirectPayment) VEYA
+   * (b) kayıtlı kart → Non3D recurring servisi (chargeRecurring; PayTR'da kayıtlı kartla
+   * ödeme bu yolla yapılır, require_cvv ise CVV ile). Grup/takas sonraki adım.
    */
   async processDirectPayment(userId: string, dto: DirectPaymentDto, req?: Request) {
     if (this.configService.get('PAYTR_DIRECT_ENABLED') !== 'true') {
@@ -365,11 +367,8 @@ export class PaymentService {
     if (!dto.orderId) {
       throw new BadRequestException('orderId zorunludur.');
     }
-    if (!dto.card) {
-      // Kayıtlı kartla ödeme (cardToken) sonraki adımda eklenecek.
-      throw new BadRequestException(
-        'Kart bilgisi zorunludur (kayıtlı kartla ödeme henüz aktif değil).',
-      );
+    if (!dto.card && !dto.savedCardId) {
+      throw new BadRequestException('Kart bilgisi veya kayıtlı kart seçimi zorunludur.');
     }
 
     const order = await this.prisma.order.findUnique({
@@ -461,7 +460,43 @@ export class PaymentService {
       ? `paymentId=${payment.id}&type=membership`
       : `paymentId=${payment.id}`;
 
-    // PayTR Direct API: 3D ile (non3d=false). storeCard ise kart saklanır (recurring için).
+    // Flow B — KAYITLI KARTLA ÖDEME: PayTR'da kayıtlı kartla ödeme Non3D recurring servisiyle
+    // yapılır (chargeRecurring). Kart sahibi kullanıcı olmalı; require_cvv ise CVV zorunlu.
+    // Sonuç callback ile kesinleşir (success/wait_callback) — sipariş/escrow ortak yoldan akar.
+    if (dto.savedCardId) {
+      const saved = await this.prisma.savedCard.findFirst({
+        where: { id: dto.savedCardId, userId, status: SavedCardStatus.active },
+      });
+      if (!saved) throw new NotFoundException('Kayıtlı kart bulunamadı');
+      if (saved.requireCvv && !dto.cvv) {
+        throw new BadRequestException('Bu kart için CVV gereklidir');
+      }
+      const r = await this.paytrService.chargeRecurring({
+        utoken: saved.utoken,
+        ctoken: saved.ctoken,
+        amount: Number(order.totalAmount),
+        merchantOid,
+        buyer,
+        basketItems,
+        cvv: dto.cvv,
+      });
+      if (r.status === 'failed') {
+        await this.prisma.payment.update({
+          where: { id: payment.id },
+          data: { failureReason: r.reason || 'Kayıtlı kartla ödeme başarısız' },
+        });
+      }
+      return {
+        paymentId: payment.id,
+        orderId: order.id,
+        threeDSHtml: null,
+        status: r.status,
+        reason: r.reason ?? null,
+      };
+    }
+
+    // Flow A — YENİ KART (CIT): 3D ile (non3d=false). storeCard ise kart saklanır.
+    if (!dto.card) throw new BadRequestException('Kart bilgisi zorunludur.');
     const result = await this.paytrService.createDirectPayment(
       merchantOid,
       Number(order.totalAmount),
