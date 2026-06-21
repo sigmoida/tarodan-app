@@ -11,6 +11,7 @@ import {
 import {
   Button,
   Divider,
+  Modal,
   Snackbar,
   Spinner,
   Switch,
@@ -155,6 +156,13 @@ export default function CheckoutScreen() {
   );
   const [couponLoading, setCouponLoading] = useState(false);
 
+  // ---------- OTP ----------
+  const [otpModalOpen, setOtpModalOpen] = useState(false);
+  const [otpCode, setOtpCode] = useState('');
+  const [otpSending, setOtpSending] = useState(false);
+  const [otpExpiresIn, setOtpExpiresIn] = useState(0);
+  const [otpError, setOtpError] = useState<string | null>(null);
+
   // ---------- UI ----------
   const [loading, setLoading] = useState(false);
   const [snackbar, setSnackbar] = useState<{ visible: boolean; message: string }>({
@@ -187,6 +195,14 @@ export default function CheckoutScreen() {
     const def = addresses.find(a => a.isDefault) ?? addresses[0];
     setSelectedAddressId(def.id);
   }, [isAuthenticated, addresses]);
+
+  useEffect(() => {
+    if (!otpModalOpen) return;
+    const id = setInterval(() => {
+      setOtpExpiresIn((s) => (s > 0 ? s - 1 : 0));
+    }, 1000);
+    return () => clearInterval(id);
+  }, [otpModalOpen]);
 
   // ---------- Kargo ücreti hesaplama ----------
   const effectiveShippingCity = useMemo(() => {
@@ -494,6 +510,11 @@ export default function CheckoutScreen() {
           ? error.response?.data?.message.join(', ')
           : 'Sipariş oluşturulamadı');
       const status = error?.response?.status;
+      // Misafir OTP gönderimi sırasında 400 → kod hatalı/süresi dolmuş: modal açık kalsın.
+      if (!isAuthenticated && emailVerificationCode && status === 400) {
+        setOtpError(extractApiMessage(error) ?? 'Doğrulama kodu geçersiz veya süresi dolmuş.');
+        return; // finally setLoading(false) çalışır; generic appAlert'e düşme
+      }
       const isStockout =
         (status === 400 || status === 409) &&
         typeof errorMessage === 'string' &&
@@ -525,7 +546,67 @@ export default function CheckoutScreen() {
         return;
       }
     }
-    await proceedCheckout();
+    if (isAuthenticated && user) {
+      await proceedCheckout();
+      return;
+    }
+
+    // Misafir: önce form doğrula, sonra OTP gönder ve modal aç
+    const guestErr = validateGuest();
+    if (guestErr) {
+      showSnackbar(guestErr);
+      return;
+    }
+    const email = guestEmail.trim().toLowerCase();
+    setOtpSending(true);
+    try {
+      const resp: any = await ordersApi.sendGuestVerificationCode({
+        email,
+        expectedCheckoutCount: Math.max(1, items.length),
+      });
+      const expiresIn =
+        resp?.data?.data?.expiresInSeconds ?? resp?.data?.expiresInSeconds ?? 180;
+      setOtpCode('');
+      setOtpError(null);
+      setOtpExpiresIn(expiresIn);
+      setOtpModalOpen(true);
+    } catch (e: any) {
+      appAlert('Hata', extractApiMessage(e) ?? 'Doğrulama kodu gönderilemedi.');
+    } finally {
+      setOtpSending(false);
+    }
+  };
+
+  const closeOtpModal = () => {
+    setOtpModalOpen(false);
+    setOtpCode('');
+    setOtpError(null);
+  };
+
+  const handleOtpSubmit = async () => {
+    if (otpCode.length !== 6) return;
+    await proceedCheckout(otpCode);
+  };
+
+  const handleOtpResend = async () => {
+    if (otpExpiresIn > 0 || otpSending) return;
+    const email = guestEmail.trim().toLowerCase();
+    setOtpSending(true);
+    try {
+      const resp: any = await ordersApi.sendGuestVerificationCode({
+        email,
+        expectedCheckoutCount: Math.max(1, items.length),
+      });
+      const expiresIn =
+        resp?.data?.data?.expiresInSeconds ?? resp?.data?.expiresInSeconds ?? 180;
+      setOtpExpiresIn(expiresIn);
+      setOtpCode('');
+      setOtpError(null);
+    } catch (e: any) {
+      setOtpError(extractApiMessage(e) ?? 'Kod gönderilemedi.');
+    } finally {
+      setOtpSending(false);
+    }
   };
 
   // ---------- Erken çıkışlar ----------
@@ -964,6 +1045,35 @@ export default function CheckoutScreen() {
       >
         {snackbar.message}
       </Snackbar>
+
+      <Modal isOpen={otpModalOpen} onClose={closeOtpModal} title="E-posta Doğrulama">
+        <Text style={{ marginBottom: 12, color: '#444' }}>
+          {guestEmail.trim().toLowerCase()} adresine gönderilen 6 haneli kodu girin.
+        </Text>
+        <Input
+          label="Doğrulama kodu"
+          value={otpCode}
+          onChangeText={(v) => setOtpCode(v.replace(/\D/g, '').slice(0, 6))}
+          keyboardType="number-pad"
+          maxLength={6}
+          error={otpError ?? undefined}
+          testID="guest-otp-input"
+        />
+        <Button
+          title="Doğrula ve Öde"
+          onPress={handleOtpSubmit}
+          disabled={otpCode.length !== 6}
+          isLoading={loading}
+          testID="guest-otp-submit"
+        />
+        <Button
+          title={otpExpiresIn > 0 ? `Tekrar gönder (${otpExpiresIn}s)` : 'Kodu tekrar gönder'}
+          variant="ghost"
+          onPress={handleOtpResend}
+          disabled={otpExpiresIn > 0 || otpSending}
+          testID="guest-otp-resend"
+        />
+      </Modal>
     </KeyboardAvoidingView>
   );
 }
