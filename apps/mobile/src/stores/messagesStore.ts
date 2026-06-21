@@ -334,6 +334,11 @@ export const useMessagesStore = create<MessagesState>((set, get) => ({
     } catch {
       // endpoint may not exist yet - local state already updated
     }
+    // Otoriter senkron: thread'in unreadCount'u (örn. socket'ten gelen mesaj
+    // sonrası) yerelde güncel olmayabilir, optimistik düşüş yetersiz kalıp rozet
+    // takılabilir. Sunucu gerçeğini yeniden çekip rozeti kesin doğrula.
+    // (Mesajları çekmek backend'de zaten okundu işaretler.)
+    await get().fetchUnreadCount();
   },
 
   /**
@@ -353,8 +358,9 @@ export const useMessagesStore = create<MessagesState>((set, get) => ({
 
   applyIncomingMessage: (threadId, message) => {
     const state = get();
+    const isOpen = state.currentThreadId === threadId;
     // Açık thread ise mesaj listesine id-dedupe ile ekle, createdAt'e göre sırala
-    if (state.currentThreadId === threadId) {
+    if (isOpen) {
       const exists = state.messages.some((m: any) => m.id === message.id);
       if (!exists) {
         const next = [...state.messages, message].sort(
@@ -363,11 +369,24 @@ export const useMessagesStore = create<MessagesState>((set, get) => ({
         set({ messages: next });
       }
     }
-    // Önizleme: ilgili thread'in lastMessage'ını güncelle
+    // Açık olmayan thread'e başkasından mesaj geldiyse okunmamış sayaçlarını
+    // canlı artır (yoksa rozet ancak sunucu fetch'iyle güncellenir ve markAsRead
+    // optimistik düşüşü thread.unreadCount'u 0 görüp rozeti takabilir).
+    const myId = useAuthStore.getState().user?.id;
+    const fromOther = message?.senderId && message.senderId !== myId;
+    const bumpUnread = !isOpen && fromOther;
     set({
       threads: get().threads.map((t: any) =>
-        t.id === threadId ? { ...t, lastMessage: message, lastMessageAt: message.createdAt } : t,
+        t.id === threadId
+          ? {
+              ...t,
+              lastMessage: message,
+              lastMessageAt: message.createdAt,
+              unreadCount: bumpUnread ? (t.unreadCount || 0) + 1 : t.unreadCount,
+            }
+          : t,
       ),
+      ...(bumpUnread ? { totalUnreadCount: get().totalUnreadCount + 1 } : {}),
     });
   },
 
