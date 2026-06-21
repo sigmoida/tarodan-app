@@ -105,7 +105,8 @@ try {
 
   // Yanıt düz JSON VEYA HTML'e gömülü JSON olabilir → JSON'u çıkar.
   let json = null;
-  const m = trimmed.match(/\{[\s\S]*\}/);
+  // PayTR yanıtı HTML'e gömülü olabilir + Cloudflare script'i de {…} içerir → status JSON'unu hedefle.
+  const m = trimmed.match(/\{\s*"status"[\s\S]*?\}/);
   if (m) {
     try {
       json = JSON.parse(m[0]);
