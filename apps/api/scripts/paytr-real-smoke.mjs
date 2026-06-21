@@ -37,8 +37,9 @@ if (!testMode) {
 const merchantOid = `SMOKE${Date.now()}`;
 const email = 'test@tarodan.com';
 const amountTl = 10.0; // 10 TL
-const paymentAmount = String(Math.round(amountTl * 100)); // kuruş
-const userIp = '85.34.78.112'; // dış IP (lokal IP PayTR'ce reddedilir)
+// Direkt API canlı doğrulayıcı: payment_amount INTEGER (kuruş). createDirectPayment ile aynı.
+const paymentAmount = String(Math.round(amountTl * 100));
+const userIp = process.env.SMOKE_USER_IP ?? ''; // örnekte boş; deneme için override edilebilir
 const paymentType = 'card';
 const installmentCount = '0';
 const currency = 'TL';
@@ -53,8 +54,10 @@ const card = { number: '4355084355084358', month: '12', year: '26', cvv: '000', 
 const hashStr =
   merchantId + userIp + merchantOid + email + paymentAmount + paymentType + installmentCount + currency + testModeStr + non3d;
 const paytrToken = crypto.createHmac('sha256', merchantKey).update(hashStr + merchantSalt).digest('base64');
+if (process.env.SMOKE_DEBUG) console.log('  hashSTR =', JSON.stringify(hashStr));
 
-const basket = JSON.stringify([['Smoke Test Ürün', (amountTl * 100).toFixed(0), 1]])
+// Direkt API basket: createDirectPayment ile aynı — kuruş fiyat, html-entity'li düz JSON.
+const basket = JSON.stringify([['Smoke Test Urun', (amountTl * 100).toFixed(0), 1]])
   .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
 
 const form = new URLSearchParams({
@@ -100,21 +103,30 @@ try {
   const text = await res.text();
   const trimmed = text.trim();
 
-  if (trimmed.startsWith('{')) {
-    const json = JSON.parse(trimmed);
+  // Yanıt düz JSON VEYA HTML'e gömülü JSON olabilir → JSON'u çıkar.
+  let json = null;
+  const m = trimmed.match(/\{[\s\S]*\}/);
+  if (m) {
+    try {
+      json = JSON.parse(m[0]);
+    } catch {
+      /* JSON değil */
+    }
+  }
+
+  if (json) {
     if (json.status === 'success') {
-      console.log('✅ PayTR isteği KABUL ETTİ (status=success). Entegrasyon/hash doğru.');
+      console.log('✅ PayTR isteği KABUL ETTİ (status=success). Hash/parametreler doğru.');
     } else {
-      console.log(`⚠️  PayTR hata döndürdü: status=${json.status} reason="${json.reason || json.err_msg}"`);
-      console.log('   (Hash doğruysa bu genelde yetki/parametre kaynaklı — reason’a bak.)');
+      console.log(`❌ PayTR REDDETTİ → status=${json.status}  reason="${json.reason || json.err_msg}"`);
     }
     console.log(JSON.stringify(json, null, 2));
-  } else if (/<form|<html|3d|secure|<script/i.test(trimmed)) {
-    console.log('✅ PayTR 3D Secure HTML döndürdü → isteğimiz KABUL EDİLDİ (hash/parametreler doğru).');
-    console.log(`   HTML uzunluğu: ${trimmed.length} karakter (ilk 200): ${trimmed.slice(0, 200)}…`);
+  } else if (/<form|name="cc|acs|3d|secure|threeds/i.test(trimmed)) {
+    console.log('✅ PayTR 3D Secure formu döndürdü → KABUL EDİLDİ (banka doğrulama sayfası).');
+    console.log(`   (ilk 200) ${trimmed.slice(0, 200)}`);
   } else {
-    console.log(`❓ Beklenmeyen yanıt (HTTP ${res.status}). İlk 400 karakter:`);
-    console.log(trimmed.slice(0, 400));
+    console.log(`❓ Beklenmeyen yanıt (HTTP ${res.status}). İlk 500 karakter:`);
+    console.log(trimmed.slice(0, 500));
   }
 } catch (e) {
   console.error('❌ İstek hatası:', e?.message || e);

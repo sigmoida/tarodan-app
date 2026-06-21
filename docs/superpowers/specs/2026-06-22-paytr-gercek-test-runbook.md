@@ -24,11 +24,25 @@ test ortamına karşı, senaryo senaryo doğrulamak. Mock testler mantığı kan
 Tünel/uygulama gerekmez; yalnız creds yeterli. 3D yanıtı senkron döner:
 
 ```bash
-PAYTR_MERCHANT_ID=xxx PAYTR_MERCHANT_KEY=yyy PAYTR_MERCHANT_SALT=zzz \
-PAYTR_TEST_MODE=true node apps/api/scripts/paytr-real-smoke.mjs
+# creds'i .env'den yükle (ekrana basmadan):
+cd apps/api && export $(grep -E '^PAYTR_(MERCHANT_ID|MERCHANT_KEY|MERCHANT_SALT)=' .env | xargs) && export PAYTR_TEST_MODE=true
+node scripts/paytr-real-smoke.mjs       # Direct API (3D) test isteği
+node scripts/paytr-iframe-smoke.mjs     # iframe get-token (creds/HMAC doğrulama)
 ```
-- **✅ 3D HTML / status=success** → hash + parametreler doğru, PayTR kabul ediyor.
-- **⚠️ status=error** → `reason` nedeni söyler (çoğunlukla yetki/parametre).
+- **✅ 3D form / status=success** → hash + parametreler doğru, PayTR kabul ediyor.
+- **❌ status=failed "paytr_token gonderilmedi veya gecersiz"** → aşağıdaki bulguya bak.
+
+### 🔬 2026-06-22 deneyerek bulgular (mevcut hesap 667989, test_mode=1)
+Smoke testleri GERÇEK PayTR'a atıldı; öğrenilenler:
+1. **iframe get-token → SUCCESS** (aynı creds + aynı HMAC) ⇒ creds, key/salt, hash KODUMUZ **%100 doğru**.
+2. **Direct API /odeme → "paytr_token gonderilmedi veya gecersiz"** ⇒ iframe çalışıp Direct çalışmadığına göre
+   sorun hash değil; **hesapta Direct API yetkisi KAPALI** (PayTR yetkisiz hesaba bu yanıltıcı hatayı dönüyor).
+3. **payment_amount = INTEGER kuruş** zorunlu (ondalık → "payment_amount degeri integer olmalidir").
+   `createDirectPayment` zaten kuruş gönderiyor → **DOĞRU**. (Resmi PDF örneğindeki '100.99' GÜNCEL DEĞİL.)
+4. **user_ip ZORUNLU** (boş → "Zorunlu alan ... user_ip"). Üretimde gerçek dış IP gönderilmeli (proxy arkasında x-forwarded-for).
+
+➡️ **Tek blokaj: PayTR'dan Direct API + Non3D yetkisi.** Kod tarafı doğru ve hazır. Yetki açılınca smoke
+   3D form/success dönmeli; sonra S1–S6 senaryoları koşulur.
 
 ## 2. Uçtan uca senaryolar (uygulama + tünel ile)
 
