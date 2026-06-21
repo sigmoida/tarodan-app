@@ -14,6 +14,7 @@ import toast from "react-hot-toast";
 import { paymentsApi } from "@/lib/api";
 import { useAuthStore } from "@/stores/authStore";
 import AuthLoadingScreen from "@/components/AuthLoadingScreen";
+import CardPaymentForm from "@/components/CardPaymentForm";
 import { Button } from "@tarodan/ui";
 
 export default function PaymentPage() {
@@ -32,6 +33,9 @@ export default function PaymentPage() {
   // Geri dönüşte PayTR token'ları tek kullanımlıktır → bayat HTML boş iframe gösterir.
   // Süresi geçmiş / ürün tekrar satışta durumunu ayrı göster.
   const [isExpired, setIsExpired] = useState(false);
+  // Hibrit: giriş yapmış (misafir olmayan) kullanıcıya kendi kart formumuzu göster;
+  // "PayTR güvenli sayfası" linki veya Direct kapalıysa (410) iframe'e düşülür.
+  const [directDismissed, setDirectDismissed] = useState(false);
   // Mount başına tek initiate (taze token) — her render'da yeniden çağırma.
   const didInitiateRef = useRef(false);
   // fetchPayment mount başına TEK kez çalışmalı. StrictMode çift-effect'i ve
@@ -317,6 +321,19 @@ export default function PaymentPage() {
     );
   }
 
+  // Hibrit ödeme hedefi (Direct API formu için) + form gösterilsin mi?
+  const directTarget = {
+    ...(payment.orderId ? { orderId: payment.orderId as string } : {}),
+    ...(payment.checkoutGroupId ? { checkoutGroupId: payment.checkoutGroupId as string } : {}),
+    ...(payment.tradeId ? { tradeId: payment.tradeId as string } : {}),
+  };
+  const showDirectForm =
+    isAuthenticated &&
+    !isGuestCheckout &&
+    payment.status === "pending" &&
+    !directDismissed &&
+    (directTarget.orderId || directTarget.checkoutGroupId || directTarget.tradeId);
+
   return (
     <div className="min-h-screen bg-surface py-8">
       <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8">
@@ -365,8 +382,33 @@ export default function PaymentPage() {
           </div>
         </div>
 
-        {/* PayTR iframe / yönlendirme */}
-        {paymentHtml ? (
+        {/* Hibrit: giriş yapmış kullanıcı → kendi kart formumuz (Direct API); aksi halde iframe */}
+        {showDirectForm ? (
+          <div>
+            <CardPaymentForm
+              target={directTarget}
+              amount={payment.amount}
+              onSuccess={(pid) => {
+                if (isMembershipPayment) {
+                  router.push("/membership/success");
+                } else if (payment.tradeId) {
+                  router.push(`/trades/${payment.tradeId}?paid=1`);
+                } else {
+                  router.push(`/payment/success?paymentId=${pid}`);
+                }
+              }}
+              onFallbackToIframe={() => setDirectDismissed(true)}
+            />
+            <div className="text-center mt-3">
+              <button
+                onClick={() => setDirectDismissed(true)}
+                className="text-sm text-muted underline hover:text-heading transition"
+              >
+                PayTR güvenli ödeme sayfasını kullan
+              </button>
+            </div>
+          </div>
+        ) : paymentHtml ? (
           // PayTR iframe
           <motion.div
             initial={{ opacity: 0, y: 20 }}

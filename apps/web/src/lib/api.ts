@@ -362,6 +362,34 @@ export const paymentsApi = {
   /** Dev/test: PayTR olmadan ödemeyi tamamla */
   bypassComplete: (paymentId: string, _card?: string) =>
     api.post<{ success: boolean }>(`/payments/${paymentId}/bypass-complete`),
+  /**
+   * Direct API (hibrit, giriş yapmış kullanıcı): kendi kart formumuzdan ödeme.
+   * - Yeni kart: { orderId, card:{...}, saveCard } → yanıt 3DS HTML (threeDSHtml) içerir.
+   * - Kayıtlı kart: { orderId, savedCardId, cvv? } → Non3D, anında status döner.
+   * PAYTR_DIRECT_ENABLED kapalıyken 410 döner → çağıran iframe'e düşmelidir.
+   */
+  processDirect: (body: {
+    orderId?: string;
+    checkoutGroupId?: string;
+    tradeId?: string;
+    card?: {
+      cardHolderName: string;
+      cardNumber: string;
+      expireMonth: string;
+      expireYear: string;
+      cvc: string;
+    };
+    savedCardId?: string;
+    cvv?: string;
+    saveCard?: boolean;
+  }) =>
+    api.post<{
+      paymentId: string;
+      orderId?: string;
+      threeDSHtml: string | null;
+      status: 'pending' | 'success' | 'failed' | 'wait_callback';
+      reason?: string | null;
+    }>('/payments/process-direct', body),
 };
 
 export type RefundReason =
@@ -550,6 +578,18 @@ export const brandsApi = {
 };
 
 // Membership
+export type SavedCard = {
+  id: string;
+  last4: string;
+  brand: string | null;
+  expMonth: string | null;
+  expYear: string | null;
+  requireCvv: boolean;
+  isDefault: boolean;
+  autoRenewEligible: boolean;
+  createdAt: string;
+};
+
 export const membershipApi = {
   getTiers: () => api.get('/membership/tiers'),
   getCurrentMembership: () => api.get('/membership/me'),
@@ -557,6 +597,14 @@ export const membershipApi = {
   subscribe: (data: { tierType: string; billingPeriod: 'monthly' | 'yearly' }) =>
     api.post('/membership/subscribe', data),
   cancel: () => api.post('/membership/cancel'),
+  /** Oto-yenilemeyi aç/kapat */
+  setAutoRenew: (autoRenew: boolean) =>
+    api.patch('/membership/auto-renew', { autoRenew }),
+  /** Kayıtlı kartları listele (maskeli; PAN/CVV içermez) */
+  listCards: () => api.get<SavedCard[]>('/membership/cards'),
+  /** Kayıtlı kartı sil (PayTR'dan da silinir) */
+  deleteCard: (id: string) =>
+    api.delete<{ deleted: boolean }>(`/membership/cards/${id}`),
 };
 
 // Notifications
