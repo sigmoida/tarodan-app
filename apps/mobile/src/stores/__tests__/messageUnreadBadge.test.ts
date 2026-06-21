@@ -43,10 +43,20 @@ describe('okunmamış rozet (totalUnreadCount) davranışı', () => {
     expect(useMessagesStore.getState().totalUnreadCount).toBe(0);
   });
 
-  it('markAsRead, thread.unreadCount yerelde 0 olsa bile rozeti sunucu gerçeğine (0) senkronlar', async () => {
-    // Senaryo: socket mesajı totalUnreadCount=1 yaptı ama thread.unreadCount yerelde takılı 0.
-    useMessagesStore.setState({ totalUnreadCount: 1, threads: [{ id: 't1', unreadCount: 0 } as any] });
-    await useMessagesStore.getState().markAsRead('t1');
+  it('markAsRead rozeti thread.unreadCount kadar ANINDA düşürür (network beklemez)', () => {
+    // Canlı gelen mesaj applyIncomingMessage ile thread.unreadCount=1 yapmıştı.
+    useMessagesStore.setState({ totalUnreadCount: 1, threads: [{ id: 't1', unreadCount: 1 } as any] });
+    // await etmeden senkron set sonucu kontrol et (optimistik, anında).
+    void useMessagesStore.getState().markAsRead('t1');
     expect(useMessagesStore.getState().totalUnreadCount).toBe(0);
+    expect(useMessagesStore.getState().threads.find((t: any) => t.id === 't1')!.unreadCount).toBe(0);
+  });
+
+  it('gelen mesaj → açma → rozet anında temizlenir (uçtan uca optimistik)', () => {
+    const store = useMessagesStore.getState();
+    store.applyIncomingMessage('t1', { id: 'm9', threadId: 't1', senderId: 'other', createdAt: '2026-06-22T11:00:00Z' } as any);
+    expect(useMessagesStore.getState().totalUnreadCount).toBe(1); // canlı arttı
+    void useMessagesStore.getState().markAsRead('t1');
+    expect(useMessagesStore.getState().totalUnreadCount).toBe(0); // açınca anında 0
   });
 });

@@ -329,16 +329,17 @@ export const useMessagesStore = create<MessagesState>((set, get) => ({
       };
     });
 
+    // NOT: Burada fetchUnreadCount ile yeniden senkronlama YAPMA. Okundu
+    // işaretleme sunucuda fetchMessages (getThreadMessages) ile yapılıyor;
+    // hemen unread-count çekmek o işlem bitmeden stale değeri geri yazıp
+    // optimistik düşüşü bozuyordu (rozet 1'e geri dönüyordu). Optimistik düşüş
+    // güvenilir: thread.unreadCount sunucudan (liste) doğru gelir ve canlı
+    // gelen mesajlarda applyIncomingMessage ile artırılır.
     try {
       await messagesApi.markAsRead(threadId);
     } catch {
-      // endpoint may not exist yet - local state already updated
+      // POST /threads/:id/read henüz yok (404) — yerel state zaten güncellendi.
     }
-    // Otoriter senkron: thread'in unreadCount'u (örn. socket'ten gelen mesaj
-    // sonrası) yerelde güncel olmayabilir, optimistik düşüş yetersiz kalıp rozet
-    // takılabilir. Sunucu gerçeğini yeniden çekip rozeti kesin doğrula.
-    // (Mesajları çekmek backend'de zaten okundu işaretler.)
-    await get().fetchUnreadCount();
   },
 
   /**
