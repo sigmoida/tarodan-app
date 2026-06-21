@@ -53,3 +53,4 @@ scripts/generate-images.mjs
 
 # Seed tarafından photos/ kopyalanır; kaynak photos/ root'ta
 apps/web/public/photos/
+.claude/
