@@ -135,7 +135,7 @@ export default function MembershipManageScreen() {
   if (isLoading) {
     return (
       <View style={styles.container}>
-        <ScreenHeader title="Üyelik Yönetimi" />
+        <ScreenHeader title="Üyelik Yönetimi" onBack={() => (router.canGoBack() ? router.back() : router.replace('/membership' as any))} />
         <View style={styles.loadingBox}>
           <Spinner size="lg" />
         </View>
@@ -145,7 +145,7 @@ export default function MembershipManageScreen() {
 
   return (
     <View style={styles.container}>
-      <ScreenHeader title="Üyelik Yönetimi" />
+      <ScreenHeader title="Üyelik Yönetimi" onBack={() => (router.canGoBack() ? router.back() : router.replace('/membership' as any))} />
       <ScrollView
         contentContainerStyle={styles.scrollBody}
         refreshControl={<ThemedRefreshControl refreshing={refreshing} onRefresh={onRefresh} />}
