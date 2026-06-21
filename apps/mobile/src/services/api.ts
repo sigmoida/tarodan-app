@@ -655,6 +655,26 @@ export const paymentsApi = {
     api.post('/payments/refund', { orderId, refundAmount }),
   retry: (paymentId: string) =>
     api.post(`/payments/${paymentId}/retry`),
+  /**
+   * Direct API (hibrit, giriş yapmış kullanıcı): kendi kart formumuzdan ödeme.
+   * Yeni kart → 3DS HTML döner (WebView'de gösterilir); kayıtlı kart → Non3D anında status.
+   * PAYTR_DIRECT_ENABLED kapalıyken 410 → çağıran WebView/iframe akışına düşmeli.
+   */
+  processDirect: (body: {
+    orderId?: string;
+    checkoutGroupId?: string;
+    tradeId?: string;
+    card?: {
+      cardHolderName: string;
+      cardNumber: string;
+      expireMonth: string;
+      expireYear: string;
+      cvc: string;
+    };
+    savedCardId?: string;
+    cvv?: string;
+    saveCard?: boolean;
+  }) => api.post('/payments/process-direct', body),
 };
 
 // Membership API - Web ile aynı endpoint'ler
@@ -683,6 +703,10 @@ export const membershipApi = {
   /** Otomatik yenilemeyi aç/kapa — backend: PATCH /membership/auto-renew */
   setAutoRenew: (autoRenew: boolean) =>
     api.patch('/membership/auto-renew', { autoRenew }),
+  /** Kayıtlı kartları listele (maskeli; PAN/CVV içermez) — GET /membership/cards */
+  listCards: () => api.get('/membership/cards'),
+  /** Kayıtlı kartı sil (PayTR'dan da silinir) — DELETE /membership/cards/:id */
+  deleteCard: (id: string) => api.delete(`/membership/cards/${id}`),
   /** Üyelik ödemesini başlat — backend: POST /membership/payments/initiate */
   initiatePayment: (data: { tierType: string; billingPeriod: 'monthly' | 'yearly'; provider?: 'paytr' }) =>
     api.post('/membership/payments/initiate', data),
