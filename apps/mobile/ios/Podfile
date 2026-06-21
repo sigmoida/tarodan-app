@@ -23,6 +23,12 @@ prepare_react_native_project!
 target 'Tarodan' do
   use_expo_modules!
 
+  # Google Sign-In bağımlılıkları (AppCheckCore) static library olarak entegre
+  # olabilmek için bu pod'ların module map üretmesini ister. Aksi halde
+  # "cannot be integrated as static libraries" ile pod install patlıyor.
+  pod 'GoogleUtilities', :modular_headers => true
+  pod 'RecaptchaInterop', :modular_headers => true
+
   if ENV['EXPO_USE_COMMUNITY_AUTOLINKING'] == '1'
     config_command = ['node', '-e', "process.argv=['', '', 'config'];require('@react-native-community/cli').run()"];
   else
