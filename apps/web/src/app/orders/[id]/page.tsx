@@ -977,9 +977,13 @@ export default function OrderDetailPage() {
                   {isReturnReady && (
                     <div className="bg-surface-elevated rounded-lg p-4 mb-3">
                       <p className="text-sm text-body mb-2">
-                        {locale === "en"
-                          ? "Drop the package off at any Sürat branch with this number:"
-                          : "Bu numarayı paketle birlikte herhangi bir Sürat şubesine bırakın:"}
+                        {order.isBuyer
+                          ? locale === "en"
+                            ? "Drop the package off at any Sürat branch with this number:"
+                            : "Bu numarayı paketle birlikte herhangi bir Sürat şubesine bırakın:"
+                          : locale === "en"
+                            ? "The buyer has been given a return label. Package will be sent to your address."
+                            : "Alıcıya iade kargo etiketi verildi. Paket adresinize gönderilecek."}
                       </p>
                       <div className="flex items-center justify-between gap-3">
                         <span className="font-mono text-lg font-bold text-heading break-all">
@@ -1007,7 +1011,7 @@ export default function OrderDetailPage() {
                       className="inline-flex items-center gap-1 text-sm text-primary-600 hover:text-primary-700 font-medium mr-4"
                     >
                       <TruckIcon className="w-4 h-4" />
-                      {locale === "en" ? "Track on Sürat" : "Sürat'ta Takip Et"}
+                      {locale === "en" ? "Track Return" : "İade Kargosunu Takip Et"}
                     </a>
                   )}
 

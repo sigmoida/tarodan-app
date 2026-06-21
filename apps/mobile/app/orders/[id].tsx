@@ -93,7 +93,6 @@ const REFUND_REASONS: Array<{ value: string; label: string }> = [
   { value: 'not_as_described', label: 'Açıklamayla uyuşmuyor' },
   { value: 'wrong_item', label: 'Yanlış ürün geldi' },
   { value: 'missing_parts', label: 'Eksik parça var' },
-  { value: 'changed_mind', label: 'Vazgeçtim' },
   { value: 'other', label: 'Diğer' },
 ];
 

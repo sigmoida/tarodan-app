@@ -12,6 +12,7 @@ export class RefundSchedulerService {
   async handleRefundCrons() {
     await this.openReturnShipmentsForDeliveredOrders();
     await this.autoAcceptOverdueRequests();
+    await this.finalizeReturnedShipments();
   }
 
   private async openReturnShipmentsForDeliveredOrders() {
@@ -23,6 +24,19 @@ export class RefundSchedulerService {
         await this.refundService.openReturnShipment(id);
       } catch (e) {
         this.logger.error(`Failed to open return shipment for ${id}: ${(e as Error).message}`);
+      }
+    }
+  }
+
+  private async finalizeReturnedShipments() {
+    const pending = await this.refundService.findReturnDeliveredPendingFinalize();
+    if (pending.length === 0) return;
+    this.logger.log(`Finalizing refund for ${pending.length} returned shipment(s)`);
+    for (const id of pending) {
+      try {
+        await this.refundService.finalizeRefundForReturnedShipment(id);
+      } catch (e) {
+        this.logger.error(`Failed to finalize refund ${id}: ${(e as Error).message}`);
       }
     }
   }

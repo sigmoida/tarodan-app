@@ -22,7 +22,9 @@ import { adminApi } from '@/lib/api';
 import { AdminTabs } from '@/components/AdminTabs';
 import { ModerationEventsPanel } from '@/components/ModerationEventsPanel';
 import { getProductEffectivePrice } from '@/lib/productPrice';
-import { Button, StatusBadge, Textarea, enumLabel, subscriptionStatusConfig } from '@tarodan/ui';
+import { useConfirm } from '@/components/ConfirmProvider';
+import { usePrompt } from '@/components/PromptProvider';
+import { Button, StatusBadge, enumLabel, subscriptionStatusConfig } from '@tarodan/ui';
 import type { StatusConfig } from '@tarodan/ui';
 import toast from 'react-hot-toast';
 import { Spinner } from '@tarodan/ui';
@@ -140,10 +142,9 @@ export default function UserDetailPage() {
 
   const [user, setUser] = useState<UserDetail | null>(null);
   const [loading, setLoading] = useState(true);
-  const [showBanModal, setShowBanModal] = useState(false);
-  const [showUnbanModal, setShowUnbanModal] = useState(false);
-  const [banReason, setBanReason] = useState('');
   const [processing, setProcessing] = useState(false);
+  const confirm = useConfirm();
+  const prompt = usePrompt();
   const [activeTab, setActiveTab] = useState<'orders' | 'products' | 'trades' | 'ratings' | 'ai'>('orders');
 
   useEffect(() => {
@@ -167,17 +168,20 @@ export default function UserDetailPage() {
   };
 
   const handleBan = async () => {
-    if (!banReason.trim()) {
-      toast.error('Ban nedeni gereklidir');
-      return;
-    }
+    const reason = await prompt({
+      title: 'Kullanıcıyı Banla',
+      label: 'Ban Nedeni',
+      placeholder: 'Ban nedenini açıklayın...',
+      confirmLabel: 'Banla',
+      requiredMessage: 'Ban nedeni gereklidir',
+      destructive: true,
+    });
+    if (!reason) return;
 
     setProcessing(true);
     try {
-      await adminApi.banUser(userId, banReason);
+      await adminApi.banUser(userId, reason);
       toast.success('Kullanıcı banlandı');
-      setShowBanModal(false);
-      setBanReason('');
       loadUser();
     } catch (error: any) {
       toast.error(error.response?.data?.message || 'Ban işlemi başarısız');
@@ -187,11 +191,17 @@ export default function UserDetailPage() {
   };
 
   const handleUnban = async () => {
+    const confirmed = await confirm({
+      title: 'Banı Kaldır',
+      description: 'Bu kullanıcının banını kaldırmak istediğinizden emin misiniz?',
+      confirmLabel: 'Banı Kaldır',
+    });
+    if (!confirmed) return;
+
     setProcessing(true);
     try {
       await adminApi.unbanUser(userId);
       toast.success('Kullanıcı banı kaldırıldı');
-      setShowUnbanModal(false);
       loadUser();
     } catch (error: any) {
       toast.error(error.response?.data?.message || 'Unban işlemi başarısız');
@@ -285,7 +295,7 @@ export default function UserDetailPage() {
                 <span className="px-4 py-2 rounded-full font-medium text-danger-600 bg-danger-500/20">
                   Banlı
                 </span>
-                <Button variant="success" size="md" onClick={() => setShowUnbanModal(true)}>
+                <Button variant="success" size="md" onClick={handleUnban}>
                   Banı Kaldır
                 </Button>
               </>
@@ -294,7 +304,7 @@ export default function UserDetailPage() {
                 <span className="px-4 py-2 rounded-full font-medium text-success-700 bg-success-500/20">
                   Aktif
                 </span>
-                <Button variant="danger" size="md" onClick={() => setShowBanModal(true)}>
+                <Button variant="danger" size="md" onClick={handleBan} disabled={processing} isLoading={processing}>
                   Banla
                 </Button>
               </>
@@ -793,52 +803,6 @@ export default function UserDetailPage() {
           </div>
         </div>
 
-        {/* Ban Modal */}
-        {showBanModal && (
-          <div className="fixed inset-0 bg-heading/70 flex items-center justify-center z-50">
-            <div className="rounded-xl px-6 pb-6 pt-5 max-w-md mx-4">
-              <h3 className="text-lg font-semibold text-heading mb-4 leading-tight">Kullanıcıyı Banla</h3>
-              <div className="mb-4">
-                <label className="block text-sm font-medium text-muted mb-2">
-                  Ban Nedeni *
-                </label>
-                <Textarea value={banReason}
-                  onChange={(e) => setBanReason(e.target.value)}
-                  className="bg-surface-alt text-heading"
-                  rows={4}
-                  placeholder="Ban nedenini açıklayın..." />
-              </div>
-              <div className="flex gap-3">
-                <Button variant="secondary" size="md" onClick={() => { setShowBanModal(false); setBanReason(''); }} disabled={processing} className="flex-1">
-                  İptal
-                </Button>
-                <Button variant="danger" size="md" onClick={handleBan} disabled={processing} isLoading={processing} className="flex-1">
-                  {processing ? 'İşleniyor...' : 'Banla'}
-                </Button>
-              </div>
-            </div>
-          </div>
-        )}
-
-        {/* Unban Modal */}
-        {showUnbanModal && (
-          <div className="fixed inset-0 bg-heading/70 flex items-center justify-center z-50">
-            <div className="rounded-xl px-6 pb-6 pt-5 max-w-md mx-4">
-              <h3 className="text-lg font-semibold text-heading mb-4 leading-tight">Banı Kaldır</h3>
-              <p className="text-muted mb-6">
-                Bu kullanıcının banını kaldırmak istediğinizden emin misiniz?
-              </p>
-              <div className="flex gap-3">
-                <Button variant="secondary" size="md" onClick={() => setShowUnbanModal(false)} disabled={processing} className="flex-1">
-                  İptal
-                </Button>
-                <Button variant="success" size="md" onClick={handleUnban} disabled={processing} isLoading={processing} className="flex-1">
-                  {processing ? 'İşleniyor...' : 'Banı Kaldır'}
-                </Button>
-              </div>
-            </div>
-          </div>
-        )}
       </div>
   );
 }

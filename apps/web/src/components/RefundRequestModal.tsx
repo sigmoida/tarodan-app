@@ -63,10 +63,6 @@ export default function RefundRequestModal({
 
   const reasonOptions: { value: RefundReason; label: string }[] = [
     {
-      value: "changed_mind",
-      label: locale === "en" ? "Changed my mind" : "Vazgeçtim (cayma hakkı)",
-    },
-    {
       value: "damaged",
       label: locale === "en" ? "Damaged" : "Hasarlı geldi",
     },
