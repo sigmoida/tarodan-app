@@ -90,7 +90,6 @@ describe('Direct API card payment (hybrid, E2E)', () => {
       .expect(201);
 
     expect(res.body.paymentId).toBeTruthy();
-    expect(res.body.orderId).toBe(orderId);
     // PayTR Direct API çağrıldı ve kart saklama istendi.
     expect(ctx.paytr.directPaymentCalls.length).toBe(1);
     expect(ctx.paytr.directPaymentCalls[0].storeCard).toBe(true);
