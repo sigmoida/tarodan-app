@@ -24,16 +24,15 @@ module.exports = {
   // Tüm react import'larını apps/mobile/node_modules/react'a (tek, 19.1.0) yönlendir.
   // (Metro config'deki resolver.resolveRequest düzeltmesinin Jest karşılığı.)
   moduleNameMapper: {
-    // jest-expo preset'inin mevcut mapping'leri (jest-expo/jest-preset.js'den)
-    '^@/(.*)$': '<rootDir>//src/$1',
-    '^@components/(.*)$': '<rootDir>//src/components/$1',
-    '^@screens/(.*)$': '<rootDir>//src/screens/$1',
-    '^@services/(.*)$': '<rootDir>//src/services/$1',
-    '^@stores/(.*)$': '<rootDir>//src/stores/$1',
-    '^@navigation/(.*)$': '<rootDir>//src/navigation/$1',
-    '^react-native-vector-icons$': '@expo/vector-icons',
-    '^react-native-vector-icons/(.*)': '@expo/vector-icons/$1',
-    // React tekil örnek zorlaması — dispatcher uyumsuzluğu hatasını önler
+    // jest-expo preset'inin kendi mapping'lerini olduğu gibi devral (üzerine
+    // yazıp düşürmemek için spread — top-level moduleNameMapper preset'inkini
+    // değiştirir, merge etmez).
+    ...(require('jest-expo/jest-preset').moduleNameMapper ?? {}),
+    // React tekil örnek zorlaması — pnpm monorepo'da birden fazla React kopyası
+    // (root 18.3.1 vs apps/mobile 19.1.0, + @testing-library/react-test-renderer
+    // iç kopyaları) dispatcher uyumsuzluğu/render crash'ine yol açıyor. Tüm
+    // react import'larını tek kopyaya yönlendir. (metro.config.js'deki
+    // resolver.resolveRequest düzeltmesinin Jest karşılığı.)
     '^react$': '<rootDir>/node_modules/react',
     '^react/(.*)$': '<rootDir>/node_modules/react/$1',
     '^react-dom$': '<rootDir>/node_modules/react-dom',
