@@ -2130,6 +2130,36 @@ export class TradeService {
   }
 
   /**
+   * O11: shipping_to_warehouse durumundaki ama `to_warehouse` kargo etiketleri OLUŞMAMIŞ
+   * takasları bul ve createInboundTradeShipments'i yeniden çağır (idempotent). Post-payment/
+   * post-accept fire-and-forget kargo oluşturma hata verirse (para alındı ama etiket yok)
+   * güvenilir bir telafi sağlar.
+   */
+  async reconcileMissingInboundShipments(): Promise<{ fixed: number }> {
+    const trades = await this.prisma.trade.findMany({
+      where: {
+        status: TradeStatus.shipping_to_warehouse,
+        shipments: { none: { leg: 'to_warehouse' } },
+      },
+      select: { id: true },
+      take: 50,
+    });
+
+    let fixed = 0;
+    for (const t of trades) {
+      try {
+        await this.createInboundTradeShipments(t.id);
+        fixed++;
+      } catch (e: any) {
+        this.logger.error(
+          `reconcileMissingInboundShipments: takas ${t.id} inbound kargo telafisi başarısız: ${e?.message}`,
+        );
+      }
+    }
+    return { fixed };
+  }
+
+  /**
    * Auto-confirm receipt for trades stuck in shipping_to_recipients
    * when confirmationDeadline has passed.
    */

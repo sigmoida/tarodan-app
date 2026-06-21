@@ -44,7 +44,6 @@ const TABLES_TO_TRUNCATE = [
   'collection_items',
   'collection_likes',
   'collections',
-  'product_tags',
   'product_attributes',
   'product_images',
   'product_likes',
@@ -76,17 +75,14 @@ const TABLES_TO_TRUNCATE = [
   'admin_users',
   'users',
   // Reference data (also truncated so seedBaseline can re-insert deterministically)
-  'tags',
   'attributes',
   'attribute_groups',
   'commission_rules',
   'tax_rules',
   'tax_rates',
   'tax_regions',
-  'shipping_rates',
-  'shipping_zones',
-  'shipping_methods',
-  'shipping_carriers',
+  // shipping_carriers/methods/rates/zones: 20260619180003_drop_shipping_config_models
+  // ile kaldırıldı; truncate listesinden de çıkarıldı (aksi halde TRUNCATE 42P01 verir).
   'static_pages',
   'email_templates',
   'platform_settings',

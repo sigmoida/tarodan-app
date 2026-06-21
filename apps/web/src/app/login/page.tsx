@@ -11,6 +11,7 @@ import { useAuthStore } from '@/stores/authStore';
 import { useTranslation } from '@/i18n/LanguageContext';
 import { api } from '@/lib/api';
 import { Button, Checkbox, Input } from '@tarodan/ui';
+import { GoogleSignInButton } from '@/components/auth/GoogleSignInButton';
 
 export default function LoginPage() {
   const router = useRouter();
@@ -280,6 +281,19 @@ export default function LoginPage() {
                 </motion.div>
               </motion.div>
             </form>
+
+            <div className="mt-4">
+              <GoogleSignInButton onSuccess={() => {
+                let redirect: string | null = null;
+                try {
+                  redirect = sessionStorage.getItem('login_redirect');
+                  if (redirect) sessionStorage.removeItem('login_redirect');
+                } catch (_) {}
+                if (!redirect) redirect = new URLSearchParams(window.location.search).get('redirect');
+                const target = redirect && redirect.startsWith('/') ? redirect : '/';
+                router.push(target);
+              }} />
+            </div>
           </div>
 
           <motion.p

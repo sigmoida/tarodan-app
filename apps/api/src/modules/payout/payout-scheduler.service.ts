@@ -27,6 +27,12 @@ export class PayoutSchedulerService {
           `Payout processing: ${result.processed} completed, ${result.failed} failed`,
         );
       }
+
+      // 3) Y3: 'processing'te takılı (zombie) payout'ları tespit et ve alarm ver.
+      const stuck = await this.payoutService.detectStuckProcessingPayouts();
+      if (stuck > 0) {
+        this.logger.error(`${stuck} payout 'processing'te takılı — manuel inceleme gerekir`);
+      }
     } catch (error: any) {
       this.logger.error(`Payout processing error: ${error.message}`);
     }

@@ -10,6 +10,7 @@ import {
   ParseUUIDPipe,
   UnauthorizedException,
   Logger,
+  UseGuards,
 } from '@nestjs/common';
 import { TradeService } from './trade.service';
 import {
@@ -27,6 +28,9 @@ import {
   TradeListResponseDto,
 } from './dto';
 import { Roles } from '../auth/decorators/roles.decorator';
+import { AdminRoute } from '../auth/decorators/admin-route.decorator';
+import { AdminJwtAuthGuard } from '../auth/guards/admin-jwt-auth.guard';
+import { RolesGuard } from '../auth/guards/roles.guard';
 import { AdminRole } from '@prisma/client';
 import { PaymentService } from '../payment/payment.service';
 
@@ -221,7 +225,13 @@ export class TradeController {
    * Resolve a dispute (Admin only)
    * POST /trades/:id/resolve-dispute
    */
+  // Y14: Bu uç yalnız admin içindir. Global JwtAuthGuard regular kullanıcıyı doğrular
+  // ve @Roles tek başına ETKİSİZDİR (RolesGuard bağlı değilse). @AdminRoute() global
+  // guard'ı atlatıp AdminJwtAuthGuard + RolesGuard'a devreder; böylece yalnız admin
+  // JWT'si geçerli olur ve audit'e gerçek admin id'si yazılır.
   @Post(':id/resolve-dispute')
+  @AdminRoute()
+  @UseGuards(AdminJwtAuthGuard, RolesGuard)
   @Roles(AdminRole.admin, AdminRole.super_admin)
   async resolveDispute(
     @Request() req: any,

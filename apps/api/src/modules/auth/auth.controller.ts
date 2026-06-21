@@ -25,6 +25,7 @@ import {
   TokensDto,
   ForgotPasswordDto,
   ResetPasswordDto,
+  GoogleAuthDto,
 } from './dto';
 import { JwtAuthGuard, JwtRefreshGuard } from './guards';
 import { Public, CurrentUser } from './decorators';
@@ -91,6 +92,24 @@ export class AuthController {
     @Res({ passthrough: true }) res: Response,
   ): Promise<AuthResponseDto> {
     const result = await this.authService.login(dto);
+    // Tarayıcı için httpOnly cookie; mobil yine body'deki token'ı kullanır.
+    if (result?.tokens) {
+      setAuthCookies(res, result.tokens, { admin: false });
+    }
+    return result;
+  }
+
+  /**
+   * POST /auth/google — Google id_token ile giriş/kayıt
+   */
+  @Post('google')
+  @Public()
+  @HttpCode(HttpStatus.OK)
+  async google(
+    @Body() dto: GoogleAuthDto,
+    @Res({ passthrough: true }) res: Response,
+  ): Promise<AuthResponseDto> {
+    const result = await this.authService.loginWithGoogle(dto.idToken);
     // Tarayıcı için httpOnly cookie; mobil yine body'deki token'ı kullanır.
     if (result?.tokens) {
       setAuthCookies(res, result.tokens, { admin: false });

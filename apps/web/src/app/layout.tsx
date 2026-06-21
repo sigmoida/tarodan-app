@@ -7,6 +7,7 @@ import { PlatformFeeAnnouncementBanner } from '@/components/banners/PlatformFeeA
 import { LanguageProvider } from '@/i18n/LanguageContext';
 import QueryProvider from './QueryProvider';
 import { RealtimeProvider } from '@/components/realtime/RealtimeProvider';
+import { GoogleOAuthProvider } from '@react-oauth/google';
 import BusinessMembershipGuard from '@/components/BusinessMembershipGuard';
 
 export const metadata: Metadata = {
@@ -54,6 +55,7 @@ export default function RootLayout({
       <body className="min-h-screen flex flex-col" suppressHydrationWarning>
         <LanguageProvider>
           <QueryProvider>
+            <GoogleOAuthProvider clientId={process.env.NEXT_PUBLIC_GOOGLE_CLIENT_ID || ''}>
             <RealtimeProvider />
             <PlatformFeeAnnouncementBanner />
             <BusinessMembershipGuard>
@@ -83,6 +85,7 @@ export default function RootLayout({
                 },
               }}
             />
+            </GoogleOAuthProvider>
           </QueryProvider>
         </LanguageProvider>
       </body>

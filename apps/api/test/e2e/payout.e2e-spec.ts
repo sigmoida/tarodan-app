@@ -6,6 +6,7 @@ import {
   PrismaClient,
   TradeStatus,
   ShipmentStatus,
+  OrderStatus,
 } from '@prisma/client';
 import { createE2ETestApp, E2ETestApp } from '../test-utils/create-app';
 import {
@@ -137,6 +138,11 @@ describe('Payout Flow (E2E)', () => {
       expect(hold).toBeTruthy();
       expect(hold?.status).toBe(PaymentHoldStatus.held);
 
+      // Y1: escrow yalnız sevk sonrası release olur — siparişi delivered yap.
+      await prisma.order.update({
+        where: { id: buyRes.body.orderId },
+        data: { status: OrderStatus.delivered },
+      });
       // Force release
       await prisma.paymentHold.update({
         where: { id: hold!.id },
@@ -214,6 +220,11 @@ describe('Payout Flow (E2E)', () => {
           totalAmount: Math.round(Number(payment!.amount) * 100),
         }));
 
+      // Y1: escrow yalnız sevk sonrası release olur — siparişi delivered yap.
+      await prisma.order.update({
+        where: { id: buyRes.body.orderId },
+        data: { status: OrderStatus.delivered },
+      });
       // Force release
       const hold = await prisma.paymentHold.findFirst({
         where: { orderId: buyRes.body.orderId },
@@ -282,6 +293,11 @@ describe('Payout Flow (E2E)', () => {
           totalAmount: Math.round(Number(payment!.amount) * 100),
         }));
 
+      // Y1: escrow yalnız sevk sonrası release olur — siparişi delivered yap.
+      await prisma.order.update({
+        where: { id: buyRes.body.orderId },
+        data: { status: OrderStatus.delivered },
+      });
       // Release + create payout
       const hold = await prisma.paymentHold.findFirst({
         where: { orderId: buyRes.body.orderId },
@@ -361,7 +377,7 @@ describe('Payout Flow (E2E)', () => {
         data: {
           userId: receiver.id,
           accountHolder: 'Receiver Bank',
-          iban: 'TR110006100519786457841999',
+          iban: 'TR780001000999988887777666',
         },
       });
 
@@ -477,7 +493,7 @@ describe('Payout Flow (E2E)', () => {
       });
       expect(payout).toBeTruthy();
       expect(payout?.sellerId).toBe(receiver.id);
-      expect(payout?.transferIban).toBe('TR110006100519786457841999');
+      expect(payout?.transferIban).toBe('TR780001000999988887777666');
       expect(payout?.status).toBe(PayoutStatus.pending);
 
       // Process payout

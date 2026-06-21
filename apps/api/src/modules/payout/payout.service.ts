@@ -3,6 +3,7 @@ import {
   Logger,
   BadRequestException,
 } from '@nestjs/common';
+import { ConfigService } from '@nestjs/config';
 import { PrismaService } from '../../prisma';
 import { PayTRService } from '../payment-providers/paytr.service';
 import { PayoutStatus, PaymentHoldStatus, PaymentStatus } from '@prisma/client';
@@ -14,7 +15,24 @@ export class PayoutService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly paytrService: PayTRService,
+    private readonly configService: ConfigService,
   ) {}
+
+  /**
+   * Y4: TR IBAN format + ISO 7064 mod-97 checksum doğrulaması. Yazım hatalı IBAN'ları
+   * PayTR'ye gitmeden yakalar (kör transfer riskini azaltır). "TR" + 24 rakam = 26 hane.
+   */
+  private isValidTrIban(iban: string): boolean {
+    const v = (iban || '').replace(/\s/g, '').toUpperCase();
+    if (!/^TR\d{24}$/.test(v)) return false;
+    const rearranged = v.slice(4) + v.slice(0, 4);
+    const numeric = rearranged.replace(/[A-Z]/g, (c) => (c.charCodeAt(0) - 55).toString());
+    let remainder = 0;
+    for (const ch of numeric) {
+      remainder = (remainder * 10 + Number(ch)) % 97;
+    }
+    return remainder === 1;
+  }
 
   /**
    * Create PayoutTransfer records for all newly released holds.
@@ -121,6 +139,13 @@ export class PayoutService {
    * Process pending PayoutTransfers — call PayTR Platform Transfer API.
    */
   async processPendingPayouts(): Promise<{ processed: number; failed: number }> {
+    // Y15: Staging/test ortamında gerçek (geri alınamaz) banka transferini engelle.
+    // PAYOUTS_DISABLED=true ise payout cron'u canlı transfer ATMAZ.
+    if (this.configService.get<string>('PAYOUTS_DISABLED') === 'true') {
+      this.logger.warn('Payout işleme devre dışı (PAYOUTS_DISABLED=true) — atlanıyor');
+      return { processed: 0, failed: 0 };
+    }
+
     const pending = await this.prisma.payoutTransfer.findMany({
       where: { status: PayoutStatus.pending },
       take: 50,
@@ -130,7 +155,34 @@ export class PayoutService {
     let failed = 0;
 
     for (const payout of pending) {
-      if (!payout.transferIban || !payout.transferName) {
+      // Atomik claim (K2): yalnızca hâlâ pending ise processing'e al. Çoklu instance
+      // veya api+worker aynı cron'u koşarsa satır başına yalnızca bir koşucu kazanır;
+      // count=0 → başka bir koşucu aldı ya da iade void etti → atla. PayTR'ye çift
+      // transfer gitmesini DB seviyesinde engeller.
+      const claim = await this.prisma.payoutTransfer.updateMany({
+        where: { id: payout.id, status: PayoutStatus.pending },
+        data: { status: PayoutStatus.processing },
+      });
+      if (claim.count === 0) {
+        continue;
+      }
+
+      // Y5: İşleme anında satıcının GÜNCEL banka hesabını oku. Payout oluşturulurken
+      // alınan IBAN/ad snapshot'ı bayatlamış olabilir (satıcı sonradan değiştirmiş
+      // olabilir) → para eski IBAN'a gitmesin. Güncel değeri kullan + snapshot'ı tazele.
+      const bankAccount = await this.prisma.sellerBankAccount.findUnique({
+        where: { userId: payout.sellerId },
+      });
+      const transferIban = bankAccount?.iban || '';
+      const transferName = bankAccount?.accountHolder || '';
+      if (transferIban !== payout.transferIban || transferName !== payout.transferName) {
+        await this.prisma.payoutTransfer.update({
+          where: { id: payout.id },
+          data: { transferIban, transferName },
+        });
+      }
+
+      if (!transferIban || !transferName) {
         await this.prisma.payoutTransfer.update({
           where: { id: payout.id },
           data: {
@@ -142,11 +194,18 @@ export class PayoutService {
         continue;
       }
 
-      // Mark as processing before API call
-      await this.prisma.payoutTransfer.update({
-        where: { id: payout.id },
-        data: { status: PayoutStatus.processing },
-      });
+      // Y4: Transfer öncesi IBAN format/checksum kontrolü. Yazım hatalı IBAN PayTR'ye
+      // gönderilmeden başarısız işaretlenir (satıcı düzeltir); kör transfer riskini azaltır.
+      // (Format doğru ama yanlış hesap durumunu PayTR reddi / returned-transfer akışı yakalar.)
+      if (!this.isValidTrIban(transferIban)) {
+        await this.prisma.payoutTransfer.update({
+          where: { id: payout.id },
+          data: { status: PayoutStatus.failed, failureReason: 'invalid_iban_format' },
+        });
+        this.logger.warn(`Payout ${payout.id} için geçersiz IBAN formatı — transfer yapılmadı`);
+        failed++;
+        continue;
+      }
 
       try {
         const result = await this.paytrService.createPlatformTransfer({
@@ -154,8 +213,8 @@ export class PayoutService {
           transId: payout.transId,
           submerchantAmount: Number(payout.netAmount),
           totalAmount: Number(payout.amount),
-          transferName: payout.transferName,
-          transferIban: payout.transferIban,
+          transferName,
+          transferIban,
         });
 
         if (result.status === 'success') {
@@ -203,14 +262,43 @@ export class PayoutService {
 
     let retried = 0;
     for (const payout of retryable) {
-      await this.prisma.payoutTransfer.update({
-        where: { id: payout.id },
+      // Atomik claim (K2): yalnızca hâlâ retry_pending ise pending'e al; çift-promosyonu
+      // ve dolayısıyla aynı payout'un iki kez işlenmesini önler.
+      const claim = await this.prisma.payoutTransfer.updateMany({
+        where: { id: payout.id, status: PayoutStatus.retry_pending },
         data: { status: PayoutStatus.pending },
       });
+      if (claim.count === 0) {
+        continue;
+      }
       retried++;
     }
 
     return retried;
+  }
+
+  /**
+   * Y3: 'processing'te takılı kalmış (zombie) payout'ları tespit et ve ALARM ver.
+   * Bir instance payout'u processing'e aldıktan sonra PayTR çağrısı tamamlanmadan çökerse,
+   * kayıt kalıcı processing'te kalır; hiçbir cron onu seçmez. PayTR'de transfer GERÇEKTEN
+   * gitmiş olabileceğinden otomatik yeniden işlemek çift-ödeme riski taşır — bu yüzden
+   * güvenli aksiyon yeniden-deneme DEĞİL, tespit + yüksek-öncelikli log (manuel inceleme).
+   */
+  async detectStuckProcessingPayouts(thresholdMinutes = 30): Promise<number> {
+    const cutoff = new Date(Date.now() - thresholdMinutes * 60 * 1000);
+    const stuck = await this.prisma.payoutTransfer.findMany({
+      where: { status: PayoutStatus.processing, updatedAt: { lt: cutoff } },
+      select: { id: true, transId: true, sellerId: true, netAmount: true, updatedAt: true },
+    });
+    for (const p of stuck) {
+      this.logger.error(
+        `ZOMBIE PAYOUT (manuel inceleme gerekir): payout ${p.id} transId=${p.transId} ` +
+          `sellerId=${p.sellerId} netAmount=${p.netAmount} — ${thresholdMinutes} dk'dan uzun ` +
+          `süredir 'processing'te. PayTR'de transfer gitmiş OLABİLİR; yeniden işlemeden önce ` +
+          `PayTR panelinden doğrulayın (çift-ödeme riski).`,
+      );
+    }
+    return stuck.length;
   }
 
   /**

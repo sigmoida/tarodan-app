@@ -31,6 +31,12 @@ export class TradeSchedulerService {
       if (confirmed > 0) {
         this.logger.log(`Auto-confirmed ${confirmed} expired trade receipt(s)`);
       }
+
+      // 3) O11: eksik inbound kargo etiketlerini telafi et (para alındı ama etiket yok)
+      const fixedShipments = await this.tradeService.reconcileMissingInboundShipments();
+      if (fixedShipments.fixed > 0) {
+        this.logger.log(`Eksik inbound kargo telafisi: ${fixedShipments.fixed} takas`);
+      }
     } catch (error: any) {
       this.logger.error(`Error in expired trades job: ${error.message}`, error.stack);
     }

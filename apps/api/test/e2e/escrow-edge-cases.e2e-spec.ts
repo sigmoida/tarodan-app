@@ -6,6 +6,7 @@ import {
   PrismaClient,
   TradeStatus,
   ShipmentStatus,
+  OrderStatus,
 } from '@prisma/client';
 import { createE2ETestApp, E2ETestApp } from '../test-utils/create-app';
 import {
@@ -237,6 +238,11 @@ describe('Escrow Edge Cases (E2E)', () => {
         where: { id: hold!.id },
         data: { releaseAt: new Date(Date.now() - 1000) },
       });
+      // Y1: escrow yalnız sevk sonrası release olur — siparişi delivered yap.
+      await prisma.order.update({
+        where: { id: buyRes.body.orderId },
+        data: { status: OrderStatus.delivered },
+      });
       await ctx.app.get(PaymentService).releaseHoldsDue();
 
       // Create payout + process it (mark as completed)
@@ -310,6 +316,11 @@ describe('Escrow Edge Cases (E2E)', () => {
       const paymentService = ctx.app.get(PaymentService);
       const payoutService = ctx.app.get(PayoutService);
 
+      // Y1: escrow yalnız sevk sonrası release olur — siparişi delivered yap.
+      await prisma.order.update({
+        where: { id: buyRes.body.orderId },
+        data: { status: OrderStatus.delivered },
+      });
       // Run release + payout creation TWICE
       await paymentService.releaseHoldsDue();
       await payoutService.createPayoutsForReleasedHolds();

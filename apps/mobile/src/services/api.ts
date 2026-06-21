@@ -161,6 +161,8 @@ export const parseResponse = (response: any) => {
 export const authApi = {
   login: (email: string, password: string) =>
     api.post('/auth/login', { email, password }),
+  loginWithGoogle: (idToken: string) =>
+    api.post('/auth/google', { idToken }),
   register: (data: {
     displayName: string;
     email: string;
