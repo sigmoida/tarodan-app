@@ -257,6 +257,14 @@ export default function CheckoutScreen() {
   const showSnackbar = (message: string) =>
     setSnackbar({ visible: true, message });
 
+  const extractApiMessage = (e: any): string | null => {
+    const m = e?.response?.data?.message;
+    if (Array.isArray(m)) return m.join(', ');
+    if (typeof m === 'string') return m;
+    if (typeof e?.response?.data?.error === 'string') return e.response.data.error;
+    return null;
+  };
+
   const validateGuest = () => {
     if (!guestName.trim()) return 'Lütfen adınızı girin';
     if (!/^\S+@\S+\.\S+$/.test(guestEmail.trim())) return 'Geçerli bir e-posta adresi girin';
@@ -356,18 +364,7 @@ export default function CheckoutScreen() {
   };
 
   // ---------- Checkout ----------
-  const handleCheckout = async () => {
-    if (items.length === 0) {
-      showSnackbar('Sepetiniz boş');
-      return;
-    }
-    for (const item of items) {
-      if (!item.productId || typeof item.productId !== 'string' || item.productId.length < 10) {
-        appAlert('Hata', `Geçersiz ürün ID: ${item.title}`);
-        return;
-      }
-    }
-
+  const proceedCheckout = async (emailVerificationCode?: string) => {
     if (loading) return; // çift dokunma koruması (sunucu tarafı idempotencyKey ile ayrıca korur)
     setLoading(true);
     try {
@@ -391,7 +388,7 @@ export default function CheckoutScreen() {
             items: checkoutPayload.items,
             idempotencyKey: checkoutPayload.idempotencyKey,
             email: guestEmail.trim().toLowerCase(),
-            emailVerificationCode: '',
+            emailVerificationCode: emailVerificationCode ?? '',
             phone: normalizePhoneForPayload(guestPhone, guestPhoneCountryCode),
             guestName: guestName.trim(),
             shippingAddress: shipping.inline!,
@@ -515,6 +512,20 @@ export default function CheckoutScreen() {
     } finally {
       setLoading(false);
     }
+  };
+
+  const handleCheckout = async () => {
+    if (items.length === 0) {
+      showSnackbar('Sepetiniz boş');
+      return;
+    }
+    for (const item of items) {
+      if (!item.productId || typeof item.productId !== 'string' || item.productId.length < 10) {
+        appAlert('Hata', `Geçersiz ürün ID: ${item.title}`);
+        return;
+      }
+    }
+    await proceedCheckout();
   };
 
   // ---------- Erken çıkışlar ----------
