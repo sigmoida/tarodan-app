@@ -692,6 +692,7 @@ export default function CheckoutScreen() {
               value={inline.fullName}
               onChangeText={(text: string) => setInline({ ...inline, fullName: text })}
               containerStyle={styles.input}
+              testID={isBilling ? undefined : 'shipping-fullname-input'}
             />
             <PhoneInput
               label="Telefon *"
@@ -717,6 +718,7 @@ export default function CheckoutScreen() {
               multiline
               numberOfLines={3}
               containerStyle={styles.input}
+              testID={isBilling ? undefined : 'shipping-address-input'}
             />
             <Input
               label="Posta Kodu"
@@ -794,6 +796,7 @@ export default function CheckoutScreen() {
                   value={guestName}
                   onChangeText={setGuestName}
                   containerStyle={styles.input}
+                  testID="guest-name-input"
                 />
                 <Input
                   label="E-posta *"
@@ -802,6 +805,7 @@ export default function CheckoutScreen() {
                   keyboardType="email-address"
                   autoCapitalize="none"
                   containerStyle={styles.input}
+                  testID="guest-email-input"
                 />
                 <PhoneInput
                   label="Telefon *"

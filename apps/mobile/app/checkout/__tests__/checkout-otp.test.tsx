@@ -145,31 +145,11 @@ function fillAllStep1Fields() {
   fireEvent.changeText(screen.getByTestId('city-input'), 'İstanbul');
   fireEvent.changeText(screen.getByTestId('district-input'), 'Kadıköy');
 
-  // TextInput'ları render sırasına göre bul (UNSAFE_getAllByType tüm TextInput'ları döner)
-  // Render sırası:
-  // [0] guestName (Input label="Ad Soyad *")
-  // [1] guestEmail (Input label="E-posta *")
-  // [2] phone-input (mock PhoneInput - guestPhone) ← testID="phone-input"
-  // [3] shippingAddress.fullName (Input label="Ad Soyad *")
-  // [4] phone-input (mock PhoneInput - shippingAddress.phone) ← testID="phone-input"
-  // [5] city-input (mock) ← testID="city-input"
-  // [6] district-input (mock) ← testID="district-input"
-  // [7] shippingAddress.address (Input label="Açık Adres *", multiline)
-  // [8] shippingAddress.zipCode (Input label="Posta Kodu")
-  const { TextInput } = require('react-native');
-  const allInputs = screen.UNSAFE_getAllByType(TextInput);
-
-  // guestName = index 0
-  fireEvent.changeText(allInputs[0], 'Ali Veli');
-  // guestEmail = index 1
-  fireEvent.changeText(allInputs[1], 'ali@example.com');
-  // shippingAddress.fullName = index 3
-  fireEvent.changeText(allInputs[3], 'Ali Veli');
-  // shippingAddress.address: multiline olan ilk TextInput
-  const addressInput = allInputs.find((input: any) => input.props.multiline === true);
-  if (addressInput) {
-    fireEvent.changeText(addressInput, 'Test Sokak No:1');
-  }
+  // testID tabanlı sorgular — render sırasından bağımsız, kırılganlık giderildi.
+  fireEvent.changeText(screen.getByTestId('guest-name-input'), 'Ali Veli');
+  fireEvent.changeText(screen.getByTestId('guest-email-input'), 'ali@example.com');
+  fireEvent.changeText(screen.getByTestId('shipping-fullname-input'), 'Ali Veli');
+  fireEvent.changeText(screen.getByTestId('shipping-address-input'), 'Test Sokak No:1');
 }
 
 describe('Misafir checkout OTP akışı', () => {
