@@ -6,6 +6,7 @@ import {
   Avatar,
   Badge,
   Input,
+  ScreenHeader,
   Spinner,
   Text,
   theme,
@@ -66,22 +67,30 @@ export default function MessagesTabScreen() {
   const messageLimit = limits?.maxMessagesPerDay || 50;
   const isUnlimited = messageLimit === -1;
 
+  const handleBack = () => {
+    if (router.canGoBack()) router.back();
+    else router.replace('/(tabs)');
+  };
+
   // Not authenticated
   if (!isAuthenticated) {
     return (
-      <View style={styles.centeredContainer}>
-        <Ionicons name="chatbubbles-outline" size={64} color={colors.primary[600]!} />
-        <Text variant="h2" style={styles.title}>
-          Mesajlar
-        </Text>
-        <Text variant="body" tone="muted" align="center" style={styles.subtitle}>
-          Mesajlarınızı görmek için giriş yapın
-        </Text>
-        <TouchableOpacity style={styles.loginButton} onPress={() => router.push('/(auth)/login')}>
-          <Text variant="body" tone="inverted" weight="semibold">
-            Giriş Yap
+      <View style={styles.container}>
+        <ScreenHeader title="Mesajlar" onBack={handleBack} />
+        <View style={styles.centeredContainer}>
+          <Ionicons name="chatbubbles-outline" size={64} color={colors.primary[600]!} />
+          <Text variant="h2" style={styles.title}>
+            Mesajlar
           </Text>
-        </TouchableOpacity>
+          <Text variant="body" tone="muted" align="center" style={styles.subtitle}>
+            Mesajlarınızı görmek için giriş yapın
+          </Text>
+          <TouchableOpacity style={styles.loginButton} onPress={() => router.push('/(auth)/login')}>
+            <Text variant="body" tone="inverted" weight="semibold">
+              Giriş Yap
+            </Text>
+          </TouchableOpacity>
+        </View>
       </View>
     );
   }
@@ -199,11 +208,20 @@ export default function MessagesTabScreen() {
                     </Text>
                   </View>
 
-                  {thread.product && (
+                  {thread.product ? (
                     <View style={styles.productRef}>
                       <Ionicons name="pricetag" size={12} color={colors.primary[600]!} />
                       <Text variant="caption" tone="primary" numberOfLines={1} style={styles.productRefText}>
                         {thread.product.title}
+                      </Text>
+                    </View>
+                  ) : (
+                    // Ürünsüz (genel) sohbet — aynı kişiyle ürün başına ayrı thread'ler
+                    // olduğunda satırlar ayırt edilebilsin diye her zaman bir bağlam göster.
+                    <View style={styles.productRef}>
+                      <Ionicons name="chatbubble-ellipses-outline" size={12} color={colors.text.subtle} />
+                      <Text variant="caption" tone="muted" numberOfLines={1} style={styles.productRefText}>
+                        Genel mesaj
                       </Text>
                     </View>
                   )}
