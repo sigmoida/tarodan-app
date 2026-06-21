@@ -3,13 +3,14 @@ import {
   NotFoundException,
   BadRequestException,
   ForbiddenException,
+  GoneException,
   Logger,
 } from '@nestjs/common';
 import { ModuleRef } from '@nestjs/core';
 import { ConfigService } from '@nestjs/config';
 import { PrismaService } from '../../prisma';
 import { CacheService } from '../cache/cache.service';
-import { InitiatePaymentDto, PaymentProvider, PayTRCallbackDto } from './dto';
+import { InitiatePaymentDto, PaymentProvider, PayTRCallbackDto, DirectPaymentDto } from './dto';
 import { PaymentStatus, PaymentHoldStatus, OrderStatus, ProductStatus, SubscriptionStatus, TradeStatus, OfferStatus, RefundRequestStatus } from '@prisma/client';
 import { getProductStatusFromQuantity } from '../product/helpers/product-status.helper';
 import { safeDecrementReserved } from '../product/helpers/product-availability.helper';
@@ -338,6 +339,150 @@ export class PaymentService {
    */
   async initiateGuestPayment(dto: InitiatePaymentDto, req?: Request) {
     return this.initiatePaymentUnified(null, dto, req);
+  }
+
+  /**
+   * PayTR Direct API ile kart ödemesi — HİBRİT mimarinin "giriş yapmış kullanıcı" yolu.
+   * (Misafir/herkes iframe kullanır; bu yol iframe akışına DOKUNMAZ, ayrı bir giriştir.)
+   *
+   * Güvenlik:
+   * - Tamamı PAYTR_DIRECT_ENABLED bayrağı arkasında; kapalıyken (varsayılan) 410 Gone.
+   * - Kart no/CVV YALNIZCA bu istekte PayTR'a iletilir; DB'ye/log'a ASLA yazılmaz.
+   * - 3D Secure ile (non3d=false). Yanıt 3DS HTML'i; kesin sonuç callback ile işlenir.
+   * - storeCard=true ise kart PayTR'da saklanır → callback'te utoken → SavedCard.
+   *
+   * Bu adım kapsamı: tekil orderId + yeni kart (CIT). Grup/takas/kayıtlı-kart sonraki adım.
+   */
+  async processDirectPayment(userId: string, dto: DirectPaymentDto, req?: Request) {
+    if (this.configService.get('PAYTR_DIRECT_ENABLED') !== 'true') {
+      throw new GoneException(
+        'Kart ile doğrudan ödeme şu an kapalı. Lütfen güvenli ödeme sayfasını kullanın.',
+      );
+    }
+    if (dto.checkoutGroupId || dto.tradeId) {
+      throw new BadRequestException('Direct API grup/takas ödemesi henüz aktif değil.');
+    }
+    if (!dto.orderId) {
+      throw new BadRequestException('orderId zorunludur.');
+    }
+    if (!dto.card) {
+      // Kayıtlı kartla ödeme (cardToken) sonraki adımda eklenecek.
+      throw new BadRequestException(
+        'Kart bilgisi zorunludur (kayıtlı kartla ödeme henüz aktif değil).',
+      );
+    }
+
+    const order = await this.prisma.order.findUnique({
+      where: { id: dto.orderId },
+      include: { buyer: true, seller: true, product: true },
+    });
+    if (!order) throw new NotFoundException('Sipariş bulunamadı');
+    if (order.buyerId !== userId) {
+      throw new ForbiddenException('Bu sipariş için ödeme yapamazsınız');
+    }
+    if (order.status !== OrderStatus.pending_payment) {
+      throw new BadRequestException('Bu sipariş için ödeme beklenmiyor');
+    }
+    if (order.paymentExpiresAt && order.paymentExpiresAt.getTime() < Date.now()) {
+      throw new BadRequestException('Ödeme süresi doldu. Lütfen yeni bir sipariş oluşturun.');
+    }
+
+    // Payment kaydı: var olan pending'i yeniden kullan, yoksa oluştur (iframe ile aynı model).
+    let payment = await this.prisma.payment.findFirst({
+      where: { orderId: order.id, status: PaymentStatus.pending },
+    });
+    if (!payment) {
+      payment = await this.prisma.payment.create({
+        data: {
+          orderId: order.id,
+          amount: order.totalAmount,
+          currency: 'TRY',
+          provider: PaymentProvider.paytr,
+          status: PaymentStatus.pending,
+        },
+      });
+    }
+
+    // merchant_oid — iframe yolundaki desenle birebir aynı.
+    const baseOid = String(order.orderNumber || order.id).replace(/-/g, '');
+    const merchantOid = `${baseOid}T${Date.now().toString().slice(-6)}`;
+
+    // Buyer + sepet — iframe yolundaki kurulumla aynı (kasıtlı çoğaltma: iframe metodu
+    // hiç değişmesin diye). clientIp getClientIp ile.
+    const clientIp = this.getClientIp(req);
+    const shippingAddress = order.shippingAddress as any;
+    const buyerName = order.buyer.displayName?.split(' ') || ['Müşteri', ''];
+    const buyer = {
+      id: order.buyer.id,
+      name: buyerName[0] || 'Müşteri',
+      surname: buyerName.slice(1).join(' ') || '',
+      email: order.buyer.email,
+      phone: shippingAddress?.phone || order.buyer.phone || '+905000000000',
+      ip: clientIp,
+      address: shippingAddress?.address || shippingAddress?.fullAddress || 'Türkiye',
+      city: shippingAddress?.city || 'İstanbul',
+      country: 'Türkiye',
+    };
+    const basketItems = [
+      {
+        id: order.product.id,
+        name: order.product.title,
+        category: 'Koleksiyon',
+        price: Number(order.totalAmount),
+        quantity: 1,
+      },
+    ];
+
+    // Y8 deseni: eski oid'li callback de eşleşsin diye merchant_oid geçmişini koru.
+    const prevMeta = (payment.metadata as any) || {};
+    const oidHistory: string[] = Array.isArray(prevMeta.merchantOidHistory)
+      ? prevMeta.merchantOidHistory
+      : [];
+    if (
+      payment.providerConversationId &&
+      payment.providerConversationId !== merchantOid &&
+      !oidHistory.includes(payment.providerConversationId)
+    ) {
+      oidHistory.push(payment.providerConversationId);
+    }
+    await this.prisma.payment.update({
+      where: { id: payment.id },
+      data: {
+        providerConversationId: merchantOid,
+        providerPaymentId: null,
+        status: PaymentStatus.pending,
+        failureReason: null,
+        metadata: { ...prevMeta, merchantOidHistory: oidHistory },
+      },
+    });
+
+    const isMembershipOrder = order.productId?.startsWith?.('membership-');
+    const successQueryParams = isMembershipOrder
+      ? `paymentId=${payment.id}&type=membership`
+      : `paymentId=${payment.id}`;
+
+    // PayTR Direct API: 3D ile (non3d=false). storeCard ise kart saklanır (recurring için).
+    const result = await this.paytrService.createDirectPayment(
+      merchantOid,
+      Number(order.totalAmount),
+      {
+        number: dto.card.cardNumber,
+        expireMonth: dto.card.expireMonth,
+        expireYear: dto.card.expireYear,
+        cvv: dto.card.cvc,
+        holderName: dto.card.cardHolderName,
+      },
+      buyer,
+      basketItems,
+      { non3d: false, storeCard: !!dto.saveCard, successQueryParams },
+    );
+
+    return {
+      paymentId: payment.id,
+      orderId: order.id,
+      threeDSHtml: (result as any).threeDSHtml ?? null,
+      status: 'pending' as const,
+    };
   }
 
   /**

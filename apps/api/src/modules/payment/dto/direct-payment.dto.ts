@@ -1,4 +1,4 @@
-import { IsString, IsOptional, IsNumber, Length, Matches, ValidateNested } from 'class-validator';
+import { IsString, IsOptional, IsNumber, IsBoolean, Length, Matches, ValidateNested } from 'class-validator';
 import { Type } from 'class-transformer';
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 
@@ -65,6 +65,11 @@ export class DirectPaymentDto {
     @ValidateNested()
     @Type(() => CreditCardDto)
     card?: CreditCardDto;
+
+    @ApiPropertyOptional({ description: 'Kartı sonraki ödemeler/oto-yenileme için sakla (store_card)' })
+    @IsOptional()
+    @IsBoolean()
+    saveCard?: boolean;
 
 }
 

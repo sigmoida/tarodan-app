@@ -204,6 +204,7 @@ export class MockPayTRService {
     this.nextTransferFails = false;
     this.recurringCalls.length = 0;
     this.capiDeleteCalls.length = 0;
+    this.directPaymentCalls.length = 0;
     this.nextRecurringResult = null;
     this.storedCardsByUtoken.clear();
   }

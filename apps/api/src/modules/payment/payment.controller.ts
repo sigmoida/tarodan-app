@@ -43,6 +43,7 @@ import {
   RefundPaymentResponseDto,
   CancelPaymentResponseDto,
   RetryPaymentResponseDto,
+  DirectPaymentDto,
 } from './dto';
 
 @ApiTags('payments')
@@ -151,18 +152,20 @@ export class PaymentController {
   }
 
   /**
-   * POST /payments/process-direct - PayTR Direkt API ile ödeme.
+   * POST /payments/process-direct - PayTR Direkt API ile ödeme (HİBRİT: giriş yapmış kullanıcı).
    * Kart bilgisi bizim checkout sayfamızda alınır; yanıt 3D Secure HTML'idir
-   * (istemci render eder), sonuç callback/verify ile işlenir.
+   * (istemci render eder), sonuç callback/verify ile işlenir. Misafir iframe kullanır.
+   * PAYTR_DIRECT_ENABLED kapalıyken 410 Gone döner.
    */
   @Post('process-direct')
-  @Public()
-  @ApiOperation({ summary: 'KULLANIM DIŞI — Direct API kart ödemesi (Faz 1 itibarıyla kapalı)', deprecated: true })
-  @ApiResponse({ status: HttpStatus.GONE, description: 'Endpoint devre dışı' })
-  processDirect(@Body() _dto: unknown, @Req() _req: unknown): never {
-    throw new GoneException(
-      'Kart ile doğrudan ödeme kaldırıldı. Lütfen güvenli ödeme sayfasını kullanın.',
-    );
+  @ApiOperation({ summary: 'Direct API kart ödemesi (giriş yapmış kullanıcı; PAYTR_DIRECT_ENABLED ile)' })
+  @ApiResponse({ status: HttpStatus.CREATED, description: 'Ödeme başlatıldı (3DS HTML döner)' })
+  @ApiResponse({ status: HttpStatus.GONE, description: 'Direct API kapalı' })
+  async processDirect(@Body() dto: DirectPaymentDto, @Req() req: Request) {
+    // Direct API yalnız giriş yapmış kullanıcı içindir (misafir iframe kullanır).
+    const userId = this.extractUserId(req);
+    if (!userId) throw new UnauthorizedException('Oturum açmanız gerekiyor');
+    return this.paymentService.processDirectPayment(userId, dto, req);
   }
 
   /**
