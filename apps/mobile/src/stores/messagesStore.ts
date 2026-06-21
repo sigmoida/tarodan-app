@@ -39,8 +39,21 @@ export interface Message {
   receiverId: string;
   content: string;
   status: 'sent' | 'delivered' | 'read' | 'pending_approval' | 'rejected';
+  readAt?: string | null;
   createdAt: string;
   updatedAt: string;
+}
+
+/**
+ * API mesajı normalize: backend `readAt` dolu döndürdüğünde (karşı taraf okudu)
+ * görüntü durumu 'read' olur. Tik mantığı `status` üzerinden sürüldüğü için
+ * okundu çift mavi çentik bu sayede ilk yüklemede de doğru görünür.
+ */
+function normalizeMessage(m: any): Message {
+  if (m && m.readAt && m.status !== 'pending_approval' && m.status !== 'rejected') {
+    return { ...m, status: 'read' };
+  }
+  return m;
 }
 
 interface MessagesState {
@@ -67,6 +80,7 @@ interface MessagesState {
   sendMessage: (threadId: string, content: string) => Promise<boolean>;
   createThread: (recipientId: string, content: string, productId?: string) => Promise<string | null>;
   markAsRead: (threadId: string) => Promise<void>;
+  applyMessagesRead: (threadId: string, messageIds: string[]) => void;
   applyIncomingMessage: (threadId: string, message: any) => void;
 
   // Helpers
@@ -202,7 +216,8 @@ export const useMessagesStore = create<MessagesState>((set, get) => ({
       // (apps/web messages/page.tsx:211) ile aynı şekilde artan sıraya çeviriyoruz.
       const sorted = (Array.isArray(messagesData) ? messagesData : [])
         .slice()
-        .sort((a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime());
+        .sort((a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime())
+        .map(normalizeMessage);
 
       set({
         messages: sorted,
@@ -302,12 +317,12 @@ export const useMessagesStore = create<MessagesState>((set, get) => ({
   markAsRead: async (threadId: string) => {
     set(state => {
       const prevUnread = state.threads.find(t => t.id === threadId)?.unreadCount || 0;
+      // NOT: Mesajların `status`'una DOKUNMA. Thread'i açmak yalnız okunmamış
+      // sayacını sıfırlar; kendi gönderdiğim mesajın "okundu" tiki sadece karşı
+      // taraf okuyunca (socket message:read veya yüklemede readAt) maviye döner.
       return {
         threads: state.threads.map(thread =>
           thread.id === threadId ? { ...thread, unreadCount: 0 } : thread
-        ),
-        messages: state.messages.map(msg =>
-          msg.threadId === threadId ? { ...msg, status: 'read' as const } : msg
         ),
         // Header rozetini de senkron tut (optimistik düşüş).
         totalUnreadCount: Math.max(0, state.totalUnreadCount - prevUnread),
@@ -319,6 +334,21 @@ export const useMessagesStore = create<MessagesState>((set, get) => ({
     } catch {
       // endpoint may not exist yet - local state already updated
     }
+  },
+
+  /**
+   * Karşı taraf mesajlarımı okudu (socket message:read). Verilen id'lere sahip
+   * mesajları 'read' yapar → gönderen tarafta çift mavi çentik canlı görünür.
+   */
+  applyMessagesRead: (threadId: string, messageIds: string[]) => {
+    const ids = new Set(messageIds);
+    set(state => ({
+      messages: state.messages.map(msg =>
+        msg.threadId === threadId && ids.has(msg.id)
+          ? { ...msg, status: 'read' as const, readAt: new Date().toISOString() }
+          : msg
+      ),
+    }));
   },
 
   applyIncomingMessage: (threadId, message) => {
