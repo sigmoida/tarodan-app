@@ -1010,6 +1010,15 @@ export class PaymentService {
         return 'OK';
       }
       await this.processSuccessfulPayment(payment, dto.merchant_oid);
+      // CAPI (Faz 3): store_card ödemesinde PayTR bildirimle utoken döndürür → kullanıcının
+      // kayıtlı kartlarını SavedCard'a senkronla (recurring için). Best-effort, ödemeyi etkilemez.
+      if (dto.utoken && payment.order?.buyerId) {
+        try {
+          await this.syncSavedCardsFromUtoken(payment.order.buyerId, dto.utoken);
+        } catch (e: any) {
+          this.logger.error(`SavedCard senkron hatası (oid=${dto.merchant_oid}): ${e?.message}`);
+        }
+      }
     } else {
       await this.processFailedPayment(payment, dto.failed_reason_msg || 'PayTR payment failed');
     }
@@ -3184,6 +3193,58 @@ export class PaymentService {
       where: { id: orderId },
       select: { buyerId: true, sellerId: true },
     });
+  }
+
+  /**
+   * CAPI (Faz 3): store_card ödemesi sonrası callback'te dönen utoken ile kullanıcının
+   * PayTR'daki kayıtlı kartlarını çekip SavedCard tablosuna upsert eder (recurring için).
+   * KART NUMARASI/CVV SAKLANMAZ — yalnız PayTR token'ları + maskeli bilgi. ctoken @unique
+   * olduğundan idempotenttir. Callback'ten çağrılır (dairesel bağımlılık olmasın diye persist
+   * burada; kart listele/sil yönetimi MembershipService'tedir).
+   */
+  async syncSavedCardsFromUtoken(
+    userId: string,
+    utoken: string,
+    mandate?: { ip?: string; termsVersion?: string },
+  ): Promise<number> {
+    if (!utoken) return 0;
+    const cards = await this.paytrService.capiListCards(utoken);
+    let saved = 0;
+    for (const c of cards) {
+      if (!c.ctoken) continue;
+      await this.prisma.savedCard.upsert({
+        where: { ctoken: c.ctoken },
+        create: {
+          userId,
+          provider: 'paytr',
+          utoken,
+          ctoken: c.ctoken,
+          last4: c.last4 || '____',
+          brand: c.brand,
+          expMonth: c.month,
+          expYear: c.year,
+          requireCvv: c.requireCvv ?? false,
+          status: 'active',
+          mandateAcceptedAt: new Date(),
+          mandateIp: mandate?.ip,
+          mandateTermsVersion: mandate?.termsVersion,
+        },
+        update: {
+          utoken,
+          last4: c.last4 || undefined,
+          brand: c.brand,
+          expMonth: c.month,
+          expYear: c.year,
+          requireCvv: c.requireCvv ?? false,
+          status: 'active',
+        },
+      });
+      saved++;
+    }
+    if (saved > 0) {
+      this.logger.log(`SavedCard senkron: user=${userId} ${saved} kart kaydedildi/güncellendi`);
+    }
+    return saved;
   }
 
   /**
