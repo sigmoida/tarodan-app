@@ -127,7 +127,12 @@ export class RefundService {
 
     const order = await this.prisma.order.findUnique({
       where: { id: orderId },
-      include: { payment: true, shipment: true, refundRequests: true },
+      include: {
+        payment: true,
+        checkoutGroup: { include: { payment: true } },
+        shipment: true,
+        refundRequests: true,
+      },
     });
     if (!order) {
       throw new NotFoundException('Sipariş bulunamadı');
@@ -151,7 +156,8 @@ export class RefundService {
     if (order.status === OrderStatus.cancelled || order.status === OrderStatus.refunded) {
       throw new BadRequestException('Bu sipariş zaten iptal/iade edilmiş');
     }
-    if (!order.payment || order.payment.status !== PaymentStatus.completed) {
+    const payment = order.payment ?? (order as any).checkoutGroup?.payment ?? null;
+    if (!payment || payment.status !== PaymentStatus.completed) {
       throw new BadRequestException('Tamamlanmış ödeme bulunamadı');
     }
 
@@ -549,13 +555,32 @@ export class RefundService {
       where: {
         status: RefundRequestStatus.wait_for_delivery,
         order: {
-          status: OrderStatus.delivered,
-          shipment: { deliveredAt: { not: null } },
+          status: {
+            in: [
+              OrderStatus.delivered,
+              OrderStatus.awaiting_buyer_confirmation,
+              OrderStatus.completed,
+            ],
+          },
         },
       },
       select: { id: true },
     });
     return candidates.map((c) => c.id);
+  }
+
+  // return_delivered'dan 30 dk sonra Sürat takibi hâlâ refund başlatmadıysa
+  // (entegrasyon kapalı veya callback eksik) cron fallback olarak işler.
+  async findReturnDeliveredPendingFinalize(): Promise<string[]> {
+    const cutoff = new Date(Date.now() - 30 * 60 * 1000);
+    const rows = await this.prisma.refundRequest.findMany({
+      where: {
+        status: RefundRequestStatus.return_delivered,
+        returnDeliveredAt: { lt: cutoff },
+      },
+      select: { id: true },
+    });
+    return rows.map((r) => r.id);
   }
 
   async findOverdueSellerResponses(): Promise<string[]> {
@@ -753,7 +778,13 @@ export class RefundService {
       },
     });
 
-    if (order.status === OrderStatus.delivered) {
+    // Ürün alıcıya ulaşmışsa (delivered/awaiting_buyer_confirmation/completed)
+    // iade kargosunu hemen aç; aksi hâlde cron teslimatta açar.
+    if (
+      order.status === OrderStatus.delivered ||
+      order.status === OrderStatus.awaiting_buyer_confirmation ||
+      order.status === OrderStatus.completed
+    ) {
       await this.openReturnShipment(created.id);
       return this.prisma.refundRequest.findUnique({ where: { id: created.id } });
     }

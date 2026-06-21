@@ -71,6 +71,7 @@ const TIMELINE_STEPS = [
   "approved",
   "return_shipment",
   "in_transit",
+  "delivered_to_seller",
   "completed",
 ] as const;
 
@@ -81,15 +82,16 @@ const stepLabel: Record<TimelineStep, { tr: string; en: string }> = {
   approved: { tr: "Onaylandı", en: "Approved" },
   return_shipment: { tr: "İade Kargosu Hazır", en: "Return Shipment Ready" },
   in_transit: { tr: "Satıcıya Ulaşıyor", en: "Reaching Seller" },
+  delivered_to_seller: { tr: "Ürün Satıcıda", en: "Delivered to Seller" },
   completed: { tr: "Para İade Edildi", en: "Refund Completed" },
 };
 
 function getCurrentStepIndex(status: string): number {
   switch (status) {
     case "pending_review":
-    case "wait_for_delivery":
       return 0;
     case "approved":
+    case "wait_for_delivery":
       return 1;
     case "return_shipment_open":
       return 2;
@@ -183,14 +185,12 @@ export default function RefundRequestDetailPage() {
     isBuyer && (rr.status === "pending_review" || rr.status === "wait_for_delivery");
   const canSellerDecide = isSeller && rr.status === "pending_review";
 
-  const showReturnShipment =
-    rr.returnTrackingNumber &&
-    [
-      "return_shipment_open",
-      "return_in_transit",
-      "return_delivered",
-      "refunded",
-    ].includes(rr.status);
+  const showReturnShipment = [
+    "return_shipment_open",
+    "return_in_transit",
+    "return_delivered",
+    "refunded",
+  ].includes(rr.status);
 
   const productImage = rr.order?.product?.images?.[0];
 
@@ -364,58 +364,81 @@ export default function RefundRequestDetailPage() {
           <div className="bg-info-50 border-2 border-info-200 rounded-xl p-5 mb-4">
             <h2 className="text-base font-semibold text-info-900 mb-3 flex items-center gap-2">
               <TruckIcon className="w-5 h-5" />
-              {locale === "en" ? "Your Return Shipment" : "İade Kargonuz"}
+              {isBuyer
+                ? locale === "en" ? "Your Return Shipment" : "İade Kargonuz"
+                : locale === "en" ? "Incoming Return Shipment" : "Alıcının İade Kargosu"}
             </h2>
 
             {rr.status === "return_shipment_open" && (
               <p className="text-sm text-info-900 mb-3">
-                {locale === "en"
-                  ? "Take the package to any Sürat branch. The shipment is paid — give them this tracking number:"
-                  : "Paketi en yakın Sürat şubesine bırakın. Kargo ücreti ödenmiştir — şubedeki personele bu numarayı verin:"}
+                {isBuyer
+                  ? locale === "en"
+                    ? "Take the package to any Sürat branch. The shipment is paid — give them this tracking number:"
+                    : "Paketi en yakın Sürat şubesine bırakın. Kargo ücreti ödenmiştir — şubedeki personele bu numarayı verin:"
+                  : locale === "en"
+                    ? "The buyer has been given a return label and will drop off the package. Tracking number:"
+                    : "Alıcıya iade etiketi verildi, paketi kargoya verecek. Takip numarası:"}
               </p>
             )}
             {rr.status === "return_in_transit" && (
               <p className="text-sm text-info-900 mb-3">
-                {locale === "en"
-                  ? "Your package is on its way back to the seller. Once delivered, your refund will be processed automatically."
-                  : "Paketiniz satıcıya ulaşmak üzere yolda. Teslim edildiği anda paranız otomatik iade edilecek."}
+                {isBuyer
+                  ? locale === "en"
+                    ? "Your package is on its way back to the seller. Once delivered, your refund will be processed automatically."
+                    : "Paketiniz satıcıya ulaşmak üzere yolda. Teslim edildiği anda paranız otomatik iade edilecek."
+                  : locale === "en"
+                    ? "The return package is on its way to you. The refund will be processed once it's delivered."
+                    : "İade paketi size doğru yolda. Teslim alındığında para iadesi otomatik işlenecek."}
               </p>
             )}
             {rr.status === "return_delivered" && (
               <p className="text-sm text-info-900 mb-3">
-                {locale === "en"
-                  ? "The package has reached the seller. Your refund is being processed and will be on your card shortly."
-                  : "Paket satıcıya ulaştı. Para iadeniz şu anda işleniyor, kartınıza kısa süre içinde geçecek."}
+                {isBuyer
+                  ? locale === "en"
+                    ? "The package has reached the seller. Your refund is being processed and will be on your card shortly."
+                    : "Paket satıcıya ulaştı. Para iadeniz şu anda işleniyor, kartınıza kısa süre içinde geçecek."
+                  : locale === "en"
+                    ? "The return package has arrived. The refund will be processed shortly."
+                    : "İade paketi size ulaştı. Para iadesi kısa süre içinde işlenecek."}
               </p>
             )}
 
-            <div className="bg-surface-elevated rounded-lg p-4 flex items-center justify-between gap-3 mb-3">
-              <span className="font-mono text-lg font-bold text-heading break-all">
-                {rr.returnTrackingNumber}
-              </span>
-              <button
-                type="button"
-                onClick={() => {
-                  navigator.clipboard.writeText(rr.returnTrackingNumber);
-                  toast.success(locale === "en" ? "Copied" : "Kopyalandı");
-                }}
-                className="inline-flex items-center gap-1 text-sm text-primary-600 hover:text-primary-700 font-medium whitespace-nowrap"
-              >
-                <ClipboardDocumentIcon className="w-4 h-4" />
-                {locale === "en" ? "Copy" : "Kopyala"}
-              </button>
-            </div>
-
-            {rr.returnProvider === "surat" && (
-              <a
-                href={`https://www.suratkargo.com.tr/KargoTakip/?kargotakipno=${encodeURIComponent(rr.returnTrackingNumber)}`}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="inline-flex items-center gap-1 text-sm text-primary-600 hover:text-primary-700 font-medium"
-              >
-                <TruckIcon className="w-4 h-4" />
-                {locale === "en" ? "Track on Sürat" : "Sürat'ta Takip Et"}
-              </a>
+            {rr.returnTrackingNumber ? (
+              <>
+                <div className="bg-surface-elevated rounded-lg p-4 flex items-center justify-between gap-3 mb-3">
+                  <span className="font-mono text-lg font-bold text-heading break-all">
+                    {rr.returnTrackingNumber}
+                  </span>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      navigator.clipboard.writeText(rr.returnTrackingNumber!);
+                      toast.success(locale === "en" ? "Copied" : "Kopyalandı");
+                    }}
+                    className="inline-flex items-center gap-1 text-sm text-primary-600 hover:text-primary-700 font-medium whitespace-nowrap"
+                  >
+                    <ClipboardDocumentIcon className="w-4 h-4" />
+                    {locale === "en" ? "Copy" : "Kopyala"}
+                  </button>
+                </div>
+                {rr.returnProvider === "surat" && (
+                  <a
+                    href={`https://www.suratkargo.com.tr/KargoTakip/?kargotakipno=${encodeURIComponent(rr.returnTrackingNumber)}`}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="inline-flex items-center gap-1 text-sm text-primary-600 hover:text-primary-700 font-medium"
+                  >
+                    <TruckIcon className="w-4 h-4" />
+                    {locale === "en" ? "Track on Sürat" : "Sürat'ta Takip Et"}
+                  </a>
+                )}
+              </>
+            ) : (
+              <p className="text-sm text-info-700">
+                {locale === "en"
+                  ? "Your return tracking number is being generated, please check back shortly."
+                  : "İade kargo numaranız oluşturuluyor, kısa süre içinde burada görünecek."}
+              </p>
             )}
           </div>
         )}

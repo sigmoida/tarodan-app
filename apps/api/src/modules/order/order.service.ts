@@ -2501,8 +2501,19 @@ export class OrderService {
       },
     });
 
+    const formatted = await Promise.all(orders.map((o) => this.formatOrderResponse(o, userId)));
+
+    // Kullanıcı hem alıcı hem satıcı olabilir (test ortamı).
+    // Talep edilen role'e göre perspektif bayraklarını sabitle ki
+    // satıcı tabında alıcı UI'ı (iade talebi butonu vb.) çıkmasın.
+    const data = formatted.map((o) => {
+      if (role === 'seller') return { ...o, isBuyer: false };
+      if (role === 'buyer') return { ...o, isSeller: false };
+      return o;
+    });
+
     return {
-      data: await Promise.all(orders.map((o) => this.formatOrderResponse(o, userId))),
+      data,
       meta: {
         total,
         page,
@@ -2539,6 +2550,9 @@ export class OrderService {
           },
         },
         payment: true,
+        // Ödemeler checkout group üzerinden bağlanır (Payment.checkoutGroupId);
+        // order.payment genellikle null olduğundan group payment'ı fallback olarak çek.
+        checkoutGroup: { include: { payment: true } },
         // canReactivate hesabı için teklif durumu gerekir ("Ödemeyi tamamla"
         // yalnız teklif hâlâ accepted iken gösterilmeli)
         offer: { select: { status: true } },
@@ -3475,15 +3489,18 @@ export class OrderService {
       isSeller: order.sellerId === userId,
       ...(await this.getOrderRatingFlags(order, userId)),
       offerId: order.offerId ?? undefined,
-      payment: order.payment
-        ? {
-            id: order.payment.id,
-            status: order.payment.status,
-            amount: Number(order.payment.amount),
-            provider: order.payment.provider,
-            failureReason: order.payment.failureReason ?? undefined,
-          }
-        : undefined,
+      payment: (() => {
+        const p = order.payment ?? order.checkoutGroup?.payment ?? null;
+        return p
+          ? {
+              id: p.id,
+              status: p.status,
+              amount: Number(p.amount),
+              provider: p.provider,
+              failureReason: p.failureReason ?? undefined,
+            }
+          : undefined;
+      })(),
       activeRefundRequest: this.pickActiveRefundRequest(order.refundRequests ?? []),
       createdAt: order.createdAt,
       updatedAt: order.updatedAt,
