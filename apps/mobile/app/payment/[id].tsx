@@ -7,6 +7,7 @@ import { WebView, WebViewNavigation } from 'react-native-webview';
 import { paymentsApi } from '../../src/services/api';
 import { ScreenHeader, ErrorState } from '../../src/components/common';
 import { captureException } from '../../src/services/sentry';
+import CardPaymentForm from '../../src/components/CardPaymentForm';
 
 const { colors } = theme;
 
@@ -51,6 +52,17 @@ export default function PaymentWebViewScreen() {
   const provider = 'paytr' as const;
   const isGuest = params.guest === '1';
   const isMembership = params.type === 'membership';
+
+  // Hibrit: giriş yapmış (misafir olmayan) kullanıcıya kendi kart formumuz; "PayTR güvenli
+  // sayfası" ya da Direct kapalıysa (410) WebView'e düşülür. Hedef param'lardan gelir.
+  const [cardDismissed, setCardDismissed] = useState(false);
+  const directTarget = {
+    ...(params.orderId ? { orderId: params.orderId } : {}),
+    ...(params.groupId ? { checkoutGroupId: params.groupId } : {}),
+    ...(params.tradeId ? { tradeId: params.tradeId } : {}),
+  };
+  const hasDirectTarget = !!(params.orderId || params.groupId || params.tradeId);
+  const showCardForm = !isGuest && hasDirectTarget && !cardDismissed && !params.paymentUrl;
 
   const [state, setState] = useState<{
     loading: boolean;
@@ -272,14 +284,41 @@ export default function PaymentWebViewScreen() {
         onBack={handleCancel}
       />
 
-      <View style={styles.safeNotice}>
-        <Ionicons name="lock-closed" size={14} color={colors.success[600]!} />
-        <Text style={styles.safeNoticeText}>
-          Bu sayfa SSL şifrelemeyle korunmaktadır. Kart bilgileriniz Tarodan'a iletilmez.
-        </Text>
-      </View>
+      {!showCardForm && (
+        <View style={styles.safeNotice}>
+          <Ionicons name="lock-closed" size={14} color={colors.success[600]!} />
+          <Text style={styles.safeNoticeText}>
+            Bu sayfa SSL şifrelemeyle korunmaktadır. Kart bilgileriniz Tarodan'a iletilmez.
+          </Text>
+        </View>
+      )}
 
-      {state.loading ? (
+      {showCardForm ? (
+        <View style={{ flex: 1 }}>
+          <CardPaymentForm
+            target={directTarget}
+            onSuccess={(pid) => {
+              if (isMembership) {
+                router.replace({ pathname: '/membership/success', params: { paymentId: pid } } as any);
+              } else {
+                router.replace({ pathname: '/payment/success', params: { paymentId: pid, guest: params.guest } } as any);
+              }
+            }}
+            onFail={() =>
+              router.replace({
+                pathname: '/payment/fail',
+                params: { paymentId: paymentIdRef.current, guest: params.guest },
+              } as any)
+            }
+            onFallbackToWebView={() => setCardDismissed(true)}
+          />
+          <Button
+            variant="ghost"
+            title="PayTR güvenli ödeme sayfasını kullan"
+            onPress={() => setCardDismissed(true)}
+          />
+        </View>
+      ) : state.loading ? (
         <View style={styles.center}>
           <Spinner size="lg" />
           <Text style={styles.loadingText}>Ödeme sayfası hazırlanıyor...</Text>
