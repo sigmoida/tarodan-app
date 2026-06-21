@@ -1,0 +1,68 @@
+# Page snapshot
+
+```yaml
+- generic [active] [ref=e1]:
+  - main [ref=e2]:
+    - generic [ref=e3]:
+      - link "Tarodan Tarodan" [ref=e5] [cursor=pointer]:
+        - /url: /
+        - img "Tarodan" [ref=e6]
+        - generic [ref=e7]: Tarodan
+      - main [ref=e8]:
+        - generic [ref=e13]:
+          - img [ref=e16]
+          - heading "Almost There!" [level=2] [ref=e18]
+          - paragraph [ref=e19]: "We sent a verification link to:"
+          - paragraph [ref=e20]: pw-1781971761915-6791@test.local
+          - generic [ref=e21]:
+            - paragraph [ref=e22]:
+              - generic [ref=e23]: "?"
+              - text: "What to do next:"
+            - generic [ref=e24]:
+              - generic [ref=e25]:
+                - generic [ref=e26]: "1"
+                - generic [ref=e27]: Open your email inbox
+              - generic [ref=e28]:
+                - generic [ref=e29]: "2"
+                - generic [ref=e30]: Find the email from Tarodan
+              - generic [ref=e31]:
+                - generic [ref=e32]: "3"
+                - generic [ref=e33]: Click the verification link
+              - generic [ref=e34]:
+                - generic [ref=e35]: "4"
+                - generic [ref=e36]: Come back and login!
+          - generic [ref=e37]:
+            - generic [ref=e38]: 💡
+            - paragraph [ref=e39]: Can't find it? Check your spam/junk folder. Verification link expires in 24 hours.
+          - generic [ref=e40]:
+            - link "Go to Login" [ref=e41] [cursor=pointer]:
+              - /url: /login
+            - button "Resend Verification Email" [ref=e42] [cursor=pointer]
+            - link "Need to verify later? Go to verification page" [ref=e43] [cursor=pointer]:
+              - /url: /verify-email
+      - paragraph [ref=e45]: © 2026 Tarodan. All rights reserved.
+  - generic [ref=e50]:
+    - img [ref=e52]
+    - generic [ref=e54]:
+      - heading "🍪 Çerez Kullanımı" [level=3] [ref=e55]
+      - paragraph [ref=e56]:
+        - text: Sitemizde deneyiminizi geliştirmek, trafiği analiz etmek ve size kişiselleştirilmiş içerik sunmak için çerezler kullanıyoruz. Detaylı bilgi için
+        - link "Çerez Politikamızı" [ref=e57] [cursor=pointer]:
+          - /url: /cookies
+        - text: inceleyebilirsiniz.
+      - generic [ref=e58]:
+        - button "Tümünü Kabul Et" [ref=e59] [cursor=pointer]:
+          - img [ref=e60]
+          - text: Tümünü Kabul Et
+        - button "Sadece Gerekli Olanlar" [ref=e62] [cursor=pointer]
+        - button "Ayarlar" [ref=e63] [cursor=pointer]:
+          - img [ref=e64]
+          - text: Ayarlar
+  - status [ref=e72]: Registration successful! Please verify your email.
+  - alert [ref=e73]
+  - generic [ref=e76] [cursor=pointer]:
+    - img [ref=e77]
+    - generic [ref=e79]: 1 error
+    - button "Hide Errors" [ref=e80]:
+      - img [ref=e81]
+```

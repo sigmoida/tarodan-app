@@ -1,0 +1,9 @@
+venv/
+.venv/
+__pycache__/
+*.pyc
+.env
+# HuggingFace / torch model cache (eğer buraya indirilirse)
+.cache/
+models/
+config.json

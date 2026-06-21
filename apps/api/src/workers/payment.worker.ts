@@ -137,55 +137,10 @@ export class PaymentWorker {
     }
   }
 
-  @Process('escrow-release')
-  async handleEscrowRelease(job: Job<PaymentJobData>) {
-    this.logger.log(`Processing escrow release job ${job.id} for order ${job.data.orderId}`);
-
-    const { orderId } = job.data;
-
-    try {
-      const order = await this.prisma.order.findUnique({
-        where: { id: orderId },
-        include: {
-          payment: true,
-          seller: true,
-        },
-      });
-
-      if (!order || !order.payment) {
-        throw new Error(`Order or payment not found: ${orderId}`);
-      }
-
-      // Calculate commission (e.g., 10%)
-      const paymentAmount = order.payment.amount.toNumber();
-      const commissionRate = 0.10;
-      const commission = paymentAmount * commissionRate;
-      const sellerAmount = paymentAmount - commission;
-
-      // In production: release escrow to seller (provider / payout)
-      this.logger.log(
-        `Releasing ${sellerAmount} TL to seller ${order.sellerId} (commission: ${commission} TL)`,
-      );
-
-      // Update payment record - store commission in order
-      await this.prisma.order.update({
-        where: { id: orderId },
-        data: {
-          commissionAmount: commission,
-        },
-      });
-
-      return {
-        success: true,
-        orderId,
-        sellerAmount,
-        commission,
-      };
-    } catch (error: any) {
-      this.logger.error(`Failed to release escrow for order ${orderId}: ${error.message}`);
-      throw error;
-    }
-  }
+  // O15: 'escrow-release' handler KALDIRILDI. Ölü koddu ('payment' kuyruğu hiçbir yerden
+  // beslenmiyor) ve hardcoded %10 komisyonla order.commissionAmount'u eziyordu — gerçek
+  // komisyon/escrow sistemiyle (CommissionLedger + PaymentService.releaseHoldsDue +
+  // PayoutService) çelişiyordu. Escrow serbest bırakma o gerçek akışla yapılır.
 
   @Process('payout')
   async handlePayout(job: Job<PaymentJobData>) {

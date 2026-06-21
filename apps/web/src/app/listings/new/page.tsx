@@ -746,13 +746,15 @@ export default function NewListingPage() {
     } catch (error: any) {
       if (process.env.NODE_ENV === "development")
         console.error("Failed to create listing:", error);
-      const msg =
+      const raw =
         error.response?.data?.message ??
         error.response?.data?.error ??
         error.message;
+      // NestJS validation mesajı dizi gelebilir -> kullanıcıya tek satırda göster
+      const msg = Array.isArray(raw) ? raw.join(" • ") : raw;
       const fallback =
         locale === "en" ? "Failed to create listing" : "İlan oluşturulamadı";
-      toast.error(typeof msg === "string" ? msg : fallback);
+      toast.error(typeof msg === "string" && msg ? msg : fallback);
     } finally {
       setIsLoading(false);
     }

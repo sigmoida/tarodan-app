@@ -20,6 +20,7 @@ import { cancelReasonLabel } from '@/lib/utils';
 import { Button, Modal, Select, Spinner, StatusBadge, Textarea, cn, enumLabel, refundReasonConfig, shipmentStatusConfig, tradeStatusConfig } from '@tarodan/ui';
 import toast from 'react-hot-toast';
 import { useConfirm } from '@/components/ConfirmProvider';
+import { usePrompt } from '@/components/PromptProvider';
 
 // ---------- Types ----------
 interface TradeShipment {
@@ -137,6 +138,7 @@ export default function TradeDetailPage() {
   const params = useParams();
   const tradeId = params.id as string;
   const confirm = useConfirm();
+  const prompt = usePrompt();
 
   const [trade, setTrade] = useState<TradeDetail | null>(null);
   const [loading, setLoading] = useState(true);
@@ -269,8 +271,14 @@ export default function TradeDetailPage() {
   };
 
   const handleResolveCompensation = async () => {
-    const note = window.prompt('Tazminat çözüm notu (opsiyonel):') ?? undefined;
-    if (note === null) return; // user cancelled
+    const note = await prompt({
+      title: 'Tazminatı Çöz',
+      label: 'Tazminat çözüm notu (opsiyonel)',
+      placeholder: 'Tazminatın nasıl çözüldüğünü yaz...',
+      confirmLabel: 'Çöz',
+      required: false,
+    });
+    if (note === null) return; // kullanıcı iptal etti
     setProcessingResolveCompensation(true);
     try {
       await adminApi.resolveTradeCompensation(tradeId, note || undefined);

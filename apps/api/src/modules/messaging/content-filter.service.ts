@@ -1,5 +1,6 @@
 import { Injectable, OnModuleInit, Logger } from '@nestjs/common';
 import { PrismaService } from '../../prisma';
+import { ModerationAiClient } from '../moderation/moderation-ai.client';
 
 export interface FilterResult {
   isClean: boolean;
@@ -25,7 +26,25 @@ export class ContentFilterService implements OnModuleInit {
   private readonly logger = new Logger(ContentFilterService.name);
   private filters: ContentFilterRule[] = [];
 
-  constructor(private readonly prisma: PrismaService) {}
+  // Türkçe küfür/argo — Detoxify (AI) tek/kısa kelimelerde tutarsız olduğu için
+  // bilinen küfürleri skordan bağımsız deterministik yakalayan liste.
+  // Çok karakterli kökler (suffix alabilir): orospu, amcık, siktir...
+  private readonly profanityStrong =
+    /(orospu|amc[ıi]k|am[ıi]na|am[ıi]n[ıi]|sikt[ıi]r|sike[yn]|siki[mş]|sikik|sikiş|sikey|yarr?a[gkğ]|kaltak|pezeven|kah[pb]e|ibne|ipne|gavat|kavat|sürtük|taşş?ak|puşt|yavşak|şerefsiz|götver|götoş|götlek|götveren|soka(y[ıi]m|r[ıi]m)|piçkuru|sülaleni|avradını|amına ?koy)/i;
+  // Kısa/riskli kelimeler: yalnızca TAM kelime (Türkçe harf sınırlı) — "göt" yakalanır, "götür" yakalanmaz.
+  private readonly profanityExact =
+    /(?<![a-zçğıöşü0-9])(am|oç|piç|göt|sik)(?![a-zçğıöşü0-9])/i;
+
+  private hasProfanity(content: string): boolean {
+    return (
+      this.profanityStrong.test(content) || this.profanityExact.test(content)
+    );
+  }
+
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly aiClient: ModerationAiClient,
+  ) {}
 
   async onModuleInit() {
     await this.loadFilters();
@@ -109,33 +128,45 @@ export class ContentFilterService implements OnModuleInit {
       return regexResult;
     }
 
-    // Step 2: AI moderation (placeholder for future implementation)
-    // This can be extended to use:
-    // - OpenAI Moderation API
-    // - Perspective API
-    // - Custom ML model
-    // - AWS Comprehend
-    // - Azure Content Moderator
+    // Deterministik Türkçe küfür listesi — AI'dan bağımsız, her zaman çalışır
+    // (Detoxify tek/kısa kelimelerde tutarsız: "am"/"orospu" eşik altı kalabiliyor).
+    if (this.hasProfanity(content)) {
+      return {
+        isClean: false,
+        filteredContent: regexResult.filteredContent,
+        flaggedPatterns: [...regexResult.flaggedPatterns, 'profanity'],
+        requiresApproval: true,
+        flaggedReason: 'Uygunsuz dil (küfür)',
+      };
+    }
 
-    /*
-    // Example AI moderation implementation:
+    // Step 2: Lokal AI metin moderasyonu (Detoxify multilingual — Türkçe dahil).
+    // services/ai-moderation kapalı/erişilemezse null döner -> regex sonucu kullanılır
+    // (istek bloklanmaz, sistem bozulmaz).
     try {
-      const aiResult = await this.callAIModerationAPI(content);
-      
-      if (aiResult.flagged) {
+      const ai = await this.aiClient.moderateText(content);
+      if (ai?.toxic) {
         return {
           isClean: false,
-          filteredContent: content,
-          flaggedPatterns: aiResult.categories,
+          filteredContent: regexResult.filteredContent,
+          flaggedPatterns: [
+            ...regexResult.flaggedPatterns,
+            `ai:${ai.reason ?? 'toxic'}`,
+          ],
           requiresApproval: true,
-          flaggedReason: `AI Moderation: ${aiResult.categories.join(', ')}`,
+          flaggedReason: `AI moderasyon: uygunsuz içerik${
+            ai.reason ? ` (${ai.reason})` : ''
+          }`,
         };
       }
     } catch (error) {
-      this.logger.warn('AI moderation failed');
+      this.logger.warn(
+        'AI metin moderasyonu başarısız, regex sonucu kullanılıyor',
+      );
     }
-    */
 
+    // Not: Mesaj görseli artık YÜKLEME anında (dosyanın kendisi, base64) denetlenir
+    // -> media.controller.uploadFile (folder=messages). Burada URL denetimi yok.
     return regexResult;
   }
 

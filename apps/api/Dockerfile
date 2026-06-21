@@ -27,6 +27,9 @@ COPY photos ./photos
 # Copy app source
 COPY apps/api ./apps/api
 
+# Build workspace packages that API imports at compile time
+RUN pnpm --filter @tarodan/types build
+
 # Generate Prisma client
 WORKDIR /app/apps/api
 RUN pnpm prisma generate
@@ -52,21 +55,18 @@ RUN apk add --no-cache openssl
 RUN addgroup --system --gid 1001 nodejs && \
     adduser --system --uid 1001 nestjs
 
-# Copy built files
-COPY --from=builder /app/apps/api/dist ./dist
-COPY --from=builder /app/apps/api/dist-seed ./dist-seed
+# Copy built files with correct ownership (avoids slow chown -R over node_modules)
+COPY --from=builder --chown=nestjs:nodejs /app/apps/api/dist ./dist
+COPY --from=builder --chown=nestjs:nodejs /app/apps/api/dist-seed ./dist-seed
 # Copy root node_modules (hoisted = real files, not symlinks)
-COPY --from=builder /app/node_modules ./node_modules
-COPY --from=builder /app/apps/api/package.json ./package.json
-COPY --from=builder /app/apps/api/prisma ./prisma
-COPY --from=builder /app/photos ./photos
+COPY --from=builder --chown=nestjs:nodejs /app/node_modules ./node_modules
+COPY --from=builder --chown=nestjs:nodejs /app/apps/api/package.json ./package.json
+COPY --from=builder --chown=nestjs:nodejs /app/apps/api/prisma ./prisma
+COPY --from=builder --chown=nestjs:nodejs /app/photos ./photos
 
 # Copy entrypoint script (runs migrations before starting)
-COPY apps/api/entrypoint.sh ./entrypoint.sh
+COPY --chown=nestjs:nodejs apps/api/entrypoint.sh ./entrypoint.sh
 RUN chmod +x ./entrypoint.sh
-
-# Set ownership
-RUN chown -R nestjs:nodejs /app
 
 USER nestjs
 

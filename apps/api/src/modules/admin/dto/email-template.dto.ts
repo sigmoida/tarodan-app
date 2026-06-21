@@ -28,6 +28,16 @@ export class PreviewEmailTemplateDto {
   @IsOptional()
   @IsObject()
   templateData?: Record<string, any>;
+
+  @ApiPropertyOptional({ description: 'Override HTML body (draft preview, not saved)' })
+  @IsOptional()
+  @IsString()
+  overrideHtml?: string;
+
+  @ApiPropertyOptional({ description: 'Override subject (draft preview, not saved)' })
+  @IsOptional()
+  @IsString()
+  overrideSubject?: string;
 }
 
 export class SendTestEmailDto {

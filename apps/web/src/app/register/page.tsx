@@ -56,7 +56,7 @@ export default function RegisterPage() {
     }
   }, [isAuthenticated, router]);
 
-  if (authLoading) {
+  if (authLoading && !isAuthenticated) {
     return (
       <div className="min-h-screen bg-surface-elevated flex items-center justify-center">
         <Spinner size="lg" />

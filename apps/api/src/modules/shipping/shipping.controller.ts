@@ -57,7 +57,7 @@ export class ShippingController {
 
   /**
    * GET /shipping/rates - Get shipping rate by city (for checkout)
-   * Query: city, carrier (aras | yurtici | mng), weight (kg, default 0.5)
+   * Query: city, carrier (surat), weight (kg, default 0.5)
    */
   @Get('rates')
   @Public()
@@ -69,7 +69,7 @@ export class ShippingController {
     @Query('weight') weight?: string,
   ): Promise<{ rate: number }> {
     const weightKg = weight ? parseFloat(weight) || 0.5 : 0.5;
-    return this.shippingService.getRateByCity(city || '', carrier || 'aras', weightKg);
+    return this.shippingService.getRateByCity(city || '', carrier || 'surat', weightKg);
   }
 
   /**

@@ -48,6 +48,7 @@ import {
 interface OrderDetail {
   id: string;
   orderNumber: string;
+  isMembership?: boolean;
   status: string;
   totalAmount: number;
   amount: number;
@@ -123,6 +124,8 @@ interface OrderDetail {
   } | null;
   cancelledAt?: string | null;
   cancelReason?: string | null;
+  cancelCategory?: string | null;
+  canReactivate?: boolean;
   isBuyer: boolean;
   isSeller: boolean;
   hasProductRating?: boolean;
@@ -148,6 +151,58 @@ const orderStatusEnLabels: Record<string, string> = {
   refund_requested: "Refund Requested",
   refunded: "Refunded",
 };
+
+// İptal kartında gösterilecek kullanıcı dostu açıklama. Backend stabil bir
+// cancelCategory döner; bilinmeyen/serbest-metin sebepler ham haliyle gösterilir.
+function getCancelMessage(
+  category: string | null | undefined,
+  isBuyer: boolean,
+  rawReason: string | null | undefined,
+  locale: string,
+): string | null {
+  const en = locale === "en";
+  switch (category) {
+    case "buyer_cancelled":
+      return isBuyer
+        ? en
+          ? "You cancelled this order."
+          : "Bu siparişi iptal ettiniz."
+        : en
+          ? "The buyer cancelled this order."
+          : "Alıcı bu siparişi iptal etti.";
+    case "payment_timeout":
+      return en
+        ? "This order was automatically cancelled because payment wasn't completed within 24 hours."
+        : "Ödeme 24 saat içinde tamamlanmadığı için sipariş otomatik iptal edildi.";
+    case "seller_no_ship":
+      return en
+        ? "The seller didn't ship within the allowed time, so the order was cancelled. Your payment will be refunded."
+        : "Satıcı siparişi süresinde kargoya vermediği için iptal edildi. Ödemeniz iade edilecektir.";
+    case "stockout":
+      return en
+        ? "This order was cancelled because the product is out of stock."
+        : "Ürün stoğu tükendiği için bu sipariş iptal edildi.";
+    case "trade_reserved":
+      return en
+        ? "This order was cancelled because the product was reserved for a trade."
+        : "Ürün bir takas işlemi için ayrıldığından bu sipariş iptal edildi.";
+    case "bulk_replaced":
+      return en
+        ? "This order was merged into a new combined order."
+        : "Bu sipariş yeni bir toplu sipariş ile birleştirildi.";
+    case "admin_buyer_favor":
+      return en
+        ? "This order was cancelled in your favor by our support team."
+        : "Bu sipariş sizin lehinize destek ekibimiz tarafından iptal edildi.";
+    case "admin":
+      return en
+        ? "This order was cancelled by our support team."
+        : "Bu sipariş destek ekibimiz tarafından iptal edildi.";
+    default:
+      // other / bilinmeyen: admin'in yazdığı serbest metni ham haliyle göster
+      return rawReason && rawReason.trim() ? rawReason : null;
+  }
+}
 
 export default function OrderDetailPage() {
   const router = useRouter();
@@ -238,9 +293,14 @@ export default function OrderDetailPage() {
       .invalidateQueries({ queryKey: ["order", orderId] })
       .then(() => queryClient.invalidateQueries({ queryKey: ["orders"] }));
 
+  // Üyelik/dijital siparişler (sanal ürün + platform satıcısı, "MEM-" sipariş no) fiziksel
+  // ürün gibi davranmaz: yorum/iade/teslimat adresi/kargo aksiyonları gösterilmez.
+  const isMembershipOrder = (o: OrderDetail) =>
+    o.isMembership ?? o.orderNumber?.startsWith("MEM-") ?? false;
   const REVIEWABLE_STATUSES = ["completed", "delivered"];
   const canReview = (o: OrderDetail) =>
     o.isBuyer &&
+    !isMembershipOrder(o) &&
     REVIEWABLE_STATUSES.includes(o.status) &&
     (o.hasProductRating === false || o.hasSellerRating === false);
   const openReviewModal = () => {
@@ -722,8 +782,10 @@ export default function OrderDetailPage() {
           />
         </div>
 
-        {/* İptal edilmiş teklif siparişi: alıcı ödemeyi tamamlamak için yeniden aktive edebilir */}
-        {order.status === "cancelled" && order.offerId && order.isBuyer && (
+        {/* İptal edilmiş teklif siparişi: alıcı ödemeyi tamamlamak için yeniden aktive edebilir.
+            canReactivate backend'de reactivate() ile birebir hesaplanır — buton yalnız gerçekten
+            yeniden aktive edilebilen siparişte çıkar (ör. stok bitince/rakip teklif alınınca çıkmaz). */}
+        {order.canReactivate && (
           <div className="mb-6 p-4 bg-warning-50 border border-warning-200 rounded-xl flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
             <p className="text-warning-800 text-sm">
               {locale === "en"
@@ -749,8 +811,9 @@ export default function OrderDetailPage() {
         )}
 
         {/* İptal edilmiş sipariş bilgilendirme kartı: iptal durumunda kargo/ödeme/teslimat
-            kartları gizlendiği için sayfa boş kalmasın — iptal tarihi, sebebi ve iade durumu burada özetlenir. */}
-        {order.status === "cancelled" && !(order.offerId && order.isBuyer) && (
+            kartları gizlendiği için sayfa boş kalmasın — iptal tarihi, sebebi ve iade durumu burada özetlenir.
+            canReactivate ise yukarıdaki "Ödemeyi tamamla" banner'ı gösterildiğinden bu kart gizlenir. */}
+        {order.status === "cancelled" && !order.canReactivate && (
           <div className="mb-6 p-5 bg-danger-50 border border-danger-200 rounded-xl">
             <div className="flex items-start gap-3">
               <XCircleIcon className="w-6 h-6 text-danger-600 flex-shrink-0 mt-0.5" />
@@ -770,12 +833,17 @@ export default function OrderDetailPage() {
                     })}
                   </p>
                 )}
-                {order.cancelReason && (
-                  <p className="text-sm text-danger-700">
-                    {locale === "en" ? "Reason: " : "Sebep: "}
-                    {order.cancelReason}
-                  </p>
-                )}
+                {(() => {
+                  const cancelMessage = getCancelMessage(
+                    order.cancelCategory,
+                    order.isBuyer,
+                    order.cancelReason,
+                    locale,
+                  );
+                  return cancelMessage ? (
+                    <p className="text-sm text-danger-700">{cancelMessage}</p>
+                  ) : null;
+                })()}
                 {order.payment?.status === "refunded" || (order.status as string) === "refunded" ? (
                   <p className="text-sm text-danger-700">
                     {locale === "en"
@@ -1100,7 +1168,9 @@ export default function OrderDetailPage() {
             })()}
 
             {/* Shipping Address - sadece ödeme bekleyen alıcı değilse göster (alıcı için adres ödeme kartının içinde) */}
+            {/* Üyelik/dijital siparişlerde teslimat adresi yoktur */}
             {order.shippingAddress &&
+              !isMembershipOrder(order) &&
               !(order.isBuyer && order.status === "pending_payment") && (
                 <div className="bg-surface-elevated rounded-xl shadow-sm p-6">
                   <h2 className="text-lg font-semibold text-heading mb-4 flex items-center gap-2">
@@ -1477,9 +1547,11 @@ export default function OrderDetailPage() {
             )}
 
             {/* Refund Button for Completed Payments - Only buyer can request refund */}
+            {/* Üyelik/dijital siparişler genel iade akışına girmez (kendi iptal akışı var) */}
             {order.payment &&
               order.payment.status === "completed" &&
               order.isBuyer &&
+              !isMembershipOrder(order) &&
               order.status !== "cancelled" &&
               order.status !== "refunded" &&
               !order.activeRefundRequest && (
@@ -1535,18 +1607,21 @@ export default function OrderDetailPage() {
                     })}
                   </span>
                 </div>
-                <div className="flex justify-between text-muted">
-                  <span>{locale === "en" ? "Shipping" : "Kargo"}</span>
-                  <span>
-                    {(order.pricing?.shippingAmount ??
-                      order.shippingCost ??
-                      0) > 0
-                      ? `₺${Number(order.pricing?.shippingAmount ?? order.shippingCost ?? 0).toLocaleString("tr-TR", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
-                      : locale === "en"
-                        ? "Free"
-                        : "Ücretsiz"}
-                  </span>
-                </div>
+                {/* Üyelik/dijital siparişlerde kargo satırı yoktur */}
+                {!isMembershipOrder(order) && (
+                  <div className="flex justify-between text-muted">
+                    <span>{locale === "en" ? "Shipping" : "Kargo"}</span>
+                    <span>
+                      {(order.pricing?.shippingAmount ??
+                        order.shippingCost ??
+                        0) > 0
+                        ? `₺${Number(order.pricing?.shippingAmount ?? order.shippingCost ?? 0).toLocaleString("tr-TR", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
+                        : locale === "en"
+                          ? "Free"
+                          : "Ücretsiz"}
+                    </span>
+                  </div>
+                )}
                 {(order.pricing?.buyerFeeAmount ?? order.buyerFeeAmount ?? 0) >
                   0 && (
                   <div className="flex justify-between text-muted">

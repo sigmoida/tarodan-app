@@ -1,8 +1,8 @@
 "use client";
 
-import { useState, useEffect, useMemo, useCallback } from "react";
+import { useMemo } from "react";
 import Link from "next/link";
-import { useSearchParams, useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { adminApi } from "@/lib/api";
 import {
   getProductEffectivePrice,
@@ -12,32 +12,35 @@ import {
 import Image from "next/image";
 import {
   Button,
-  Input,
-  Select,
   StatusBadge,
   productStatusConfig,
   productConditionConfig,
   enumLabel,
 } from "@tarodan/ui";
-import { DataTable, type ColumnDef } from "@/components/DataTable";
+import { type ColumnDef } from "@/components/DataTable";
 import {
   CheckIcon,
   XMarkIcon,
-  EyeIcon,
   TrashIcon,
-  CheckCircleIcon,
-  XCircleIcon,
-  UserIcon,
+  ArrowUturnLeftIcon,
 } from "@heroicons/react/24/outline";
 import toast from "react-hot-toast";
 import { useConfirm } from "@/components/ConfirmProvider";
-import {
-  PageHeader,
-  FilterToolbar,
-  BulkActionBar,
-  ActionButtons,
-  ActionIconButton,
-} from "@/components/admin-list";
+import { usePrompt } from "@/components/PromptProvider";
+import { ActionButtons, ActionIconButton } from "@/components/admin-list";
+import { ResourceListPage } from "@/components/ResourceListPage";
+import { ModerationEventsPanel } from "@/components/ModerationEventsPanel";
+import { useAdminResource } from "@/hooks/useAdminResource";
+import { statusFilterOptions } from "@/lib/utils";
+import { AdminProductFilters } from "@/components/AdminProductFilters";
+
+// Ürünler ↔ AI Denetim sekmeleri (tek ortak AdminTabs yapısı; bkz. ModerationEventsPanel)
+const PRODUCT_TABS = [
+  { key: "list", label: "Ürünler" },
+  { key: "ai", label: "AI Denetim" },
+];
+
+// ─── Tipler ────────────────────────────────────────────────────────────────
 
 interface Product {
   id: string;
@@ -57,299 +60,188 @@ interface Product {
   };
   imageUrl?: string;
   createdAt: string;
+  aiCheckStatus?: string | null;
 }
 
-interface User {
-  id: string;
-  displayName: string;
-  email: string;
+// ─── Mapper ────────────────────────────────────────────────────────────────
+
+function mapProducts(raw: any[]): Product[] {
+  return raw.map((p: any) => ({
+    id: p.id,
+    title: p.title,
+    price: Number(p.price),
+    originalPrice: p.originalPrice != null ? Number(p.originalPrice) : null,
+    salePrice: p.salePrice != null ? Number(p.salePrice) : null,
+    isOnSale: p.isOnSale,
+    status: p.status,
+    condition: p.condition,
+    seller: p.seller || { id: p.sellerId, displayName: "Satıcı" },
+    category: p.category || { name: "Kategori" },
+    imageUrl: (() => {
+      let url = p.imageUrl || p.images?.[0]?.url || p.images?.[0] || "";
+      if (url && !url.startsWith("/") && !url.startsWith("http"))
+        url = "/" + url;
+      return url || "https://placehold.co/100x100/f3f4f6/666?text=Ürün";
+    })(),
+    createdAt: p.createdAt,
+    aiCheckStatus: p.aiCheckStatus ?? null,
+  }));
 }
+
+// Filtre seçenekleri productStatusConfig'ten türetilir → badge'lerle birebir tutarlı, ProductStatus enum'undan sapmaz.
+const statusOptions = statusFilterOptions(productStatusConfig, { allLabel: "Tüm Ürünler" });
+
+// ─── Sayfa ─────────────────────────────────────────────────────────────────
 
 export default function ProductsPage() {
-  const confirm = useConfirm();
-  const searchParams = useSearchParams();
   const router = useRouter();
-  const urlSellerId = useMemo(
-    () => searchParams.get("sellerId") || "",
-    [searchParams],
-  );
+  const searchParams = useSearchParams();
+  const confirm = useConfirm();
+  const prompt = usePrompt();
+  // Tab URL'den türetilir; URL değişince otomatik güncellenir.
+  const tab = searchParams.get("tab") === "ai" ? "ai" : "list";
 
-  const [products, setProducts] = useState<Product[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [search, setSearch] = useState("");
-  const [filter, setFilter] = useState("all");
-  const [page, setPage] = useState(1);
-  const [total, setTotal] = useState(0);
-  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
-  const [bulkProcessing, setBulkProcessing] = useState(false);
-  const [pendingCount, setPendingCount] = useState(0);
+  // ── useAdminResource ────────────────────────────────────────────────────────
+  // Server-side filtreler: search, status, sellerId — hepsi backend getProducts(AdminProductQueryDto)
+  // tarafından desteklenir ve hook filters'ı (queryKey'in parçası) ile yönetilir.
+  // Tek arama kutusu (search) backend'de ürün metni VEYA satıcı adı/e-postasıyla eşleşir.
+  // sellerId yalnızca ?sellerId= deep-link'i (kullanıcı detayından) ile gelir; syncUrl URL'i yönetir.
+  const {
+    rows: rawRows,
+    total,
+    page,
+    setPage,
+    totalPages,
+    search,
+    setSearch,
+    onSearchSubmit,
+    filters,
+    setFilter,
+    isLoading,
+    refetch,
+    setTabUrl,
+  } = useAdminResource<any>({
+    queryKey: "products",
+    fetcher: (params) => adminApi.getProducts(params),
+    limit: 20,
+    syncUrl: true,
+    initialFilters: { status: "all", sellerId: "", brandId: "", carModelId: "" },
+    errorMessage: "Ürünler yüklenemedi",
+  });
 
-  // Seller filtering
-  const [users, setUsers] = useState<User[]>([]);
-  const [selectedSellerId, setSelectedSellerId] = useState<string>(urlSellerId);
-  const [sellerSearch, setSellerSearch] = useState("");
-  const [showSellerDropdown, setShowSellerDropdown] = useState(false);
-  const [loadingUsers, setLoadingUsers] = useState(false);
-
-  // Load users for dropdown
-  const loadUsers = useCallback(async (searchTerm: string) => {
-    if (!searchTerm || searchTerm.length < 2) {
-      setUsers([]);
-      return;
-    }
-    setLoadingUsers(true);
-    try {
-      const response = await adminApi.getUsers({
-        search: searchTerm,
-        limit: 10,
-        isSeller: true,
-      });
-      const data = response.data.data || response.data.users || [];
-      setUsers(
-        data.map((u: any) => ({
-          id: u.id,
-          displayName: u.displayName,
-          email: u.email,
-        })),
-      );
-    } catch (error) {
-      if (process.env.NODE_ENV === "development")
-        console.error("Load users error:", error);
-    } finally {
-      setLoadingUsers(false);
-    }
-  }, []);
-
-  // Debounce seller search
-  useEffect(() => {
-    const timer = setTimeout(() => {
-      if (sellerSearch) loadUsers(sellerSearch);
-    }, 300);
-    return () => clearTimeout(timer);
-  }, [sellerSearch, loadUsers]);
-
-  // Sync URL sellerId with state
-  useEffect(() => {
-    setSelectedSellerId(urlSellerId);
-  }, [urlSellerId]);
-
-  const handleSelectSeller = (user: User) => {
-    setSelectedSellerId(user.id);
-    setSellerSearch(user.displayName);
-    setShowSellerDropdown(false);
-    router.push(`/products?sellerId=${user.id}`);
+  const handleTabChange = (key: string) => {
+    setTabUrl(key, { defaultTab: "list" });
   };
 
+  // Deep-link (?sellerId=) ile gelen satıcı filtresini kaldırır.
   const clearSellerFilter = () => {
-    setSelectedSellerId("");
-    setSellerSearch("");
-    router.push("/products");
+    setFilter("sellerId", "");
   };
 
-  useEffect(() => {
-    loadProducts();
-  }, [page, filter, selectedSellerId]);
+  const products: Product[] = useMemo(() => mapProducts(rawRows), [rawRows]);
 
-  const loadProducts = async (pageOverride?: number) => {
-    const currentPage = pageOverride ?? page;
-    setLoading(true);
-    try {
-      const response = await adminApi.getProducts({
-        page: currentPage,
-        limit: 20,
-        status: filter === "all" ? undefined : filter,
-        search: search || undefined,
-        sellerId: selectedSellerId || undefined,
-      });
-      const data = response.data.data || response.data.products || [];
-      const meta = response.data.meta || {};
-      if (pageOverride !== undefined) setPage(pageOverride);
-      const mappedProducts = data.map((p: any) => ({
-        id: p.id,
-        title: p.title,
-        price: Number(p.price),
-        originalPrice: p.originalPrice != null ? Number(p.originalPrice) : null,
-        salePrice: p.salePrice != null ? Number(p.salePrice) : null,
-        isOnSale: p.isOnSale,
-        status: p.status,
-        condition: p.condition,
-        seller: p.seller || { id: p.sellerId, displayName: "Satıcı" },
-        category: p.category || { name: "Kategori" },
-        imageUrl: (() => {
-          let url = p.imageUrl || p.images?.[0]?.url || p.images?.[0] || "";
-          if (url && !url.startsWith("/") && !url.startsWith("http"))
-            url = "/" + url;
-          return url || "https://placehold.co/100x100/f3f4f6/666?text=Ürün";
-        })(),
-        createdAt: p.createdAt,
-      }));
-      setProducts(mappedProducts);
-      setTotal(meta.total || data.length);
-      setPendingCount(
-        mappedProducts.filter((p: Product) => p.status === "pending").length,
-      );
-      setSelectedIds(new Set()); // Clear selection on page change
-    } catch (error) {
-      if (process.env.NODE_ENV === "development")
-        console.error("Products load error:", error);
-      toast.error("Ürünler yüklenemedi");
-    } finally {
-      setLoading(false);
-    }
-  };
+  // Pending count for header badge
+  const pendingCount = products.filter((p) => p.status === "pending").length;
+
+  // ── Row mutations ────────────────────────────────────────────────────────────
+
+  const getConditionLabel = (condition: string) =>
+    enumLabel(productConditionConfig, condition);
 
   const handleApprove = async (productId: string) => {
     try {
-      const response = await adminApi.approveProduct(productId);
+      await adminApi.approveProduct(productId);
       toast.success("Ürün onaylandı");
-      loadProducts();
+      refetch();
     } catch (error: any) {
       if (process.env.NODE_ENV === "development")
         console.error("Approve error:", error);
-
-      // Better error handling
-      let errorMessage = "İşlem başarısız";
-
-      if (error.response) {
-        // Server responded with error
-        errorMessage =
-          error.response.data?.message ||
-          error.response.data?.error ||
-          `Sunucu hatası: ${error.response.status}`;
-      } else if (error.request) {
-        // Request made but no response
-        errorMessage =
-          "Sunucuya bağlanılamadı. Lütfen internet bağlantınızı kontrol edin.";
-      } else {
-        // Error in request setup
-        errorMessage = error.message || "Bir hata oluştu";
-      }
-
+      const errorMessage =
+        error.response?.data?.message ||
+        error.response?.data?.error ||
+        (error.response ? `Sunucu hatası: ${error.response.status}` : null) ||
+        (error.request ? "Sunucuya bağlanılamadı. Lütfen internet bağlantınızı kontrol edin." : null) ||
+        error.message ||
+        "İşlem başarısız";
       toast.error(errorMessage);
     }
   };
 
   const handleReject = async (productId: string) => {
-    const reason = prompt("Reddetme sebebi:");
-    if (!reason) return;
-
+    const reason = await prompt({
+      title: "Ürünü Reddet",
+      label: "Reddetme sebebi",
+      placeholder: "Ürünün neden reddedildiğini yaz...",
+      confirmLabel: "Reddet",
+      destructive: true,
+      requiredMessage: "Reddetme sebebi gereklidir",
+    });
+    if (reason === null) return;
     try {
       await adminApi.rejectProduct(productId, reason);
       toast.success("Ürün reddedildi");
-      loadProducts();
+      refetch();
     } catch (error: any) {
       if (process.env.NODE_ENV === "development")
         console.error("Reject error:", error);
-      const errorMessage =
-        error?.response?.data?.message || error?.message || "İşlem başarısız";
-      toast.error(errorMessage);
+      toast.error(error?.response?.data?.message || error?.message || "İşlem başarısız");
     }
   };
 
   const handleDelete = async (productId: string) => {
-    if (!(await confirm({ description: "Bu ürünü silmek istediğinize emin misiniz?", destructive: true }))) return;
-
+    if (
+      !(await confirm({
+        title: "Ürünü kaldır",
+        description:
+          "Ürün listelerden kaldırılacak (Kaldırıldı durumuna alınır). İstediğinde Geri Yükle ile geri getirebilirsin.",
+        confirmLabel: "Kaldır",
+        destructive: true,
+      }))
+    )
+      return;
     try {
       await adminApi.deleteProduct(productId);
-      toast.success("Ürün silindi");
-      loadProducts();
-    } catch (error) {
-      toast.error("İşlem başarısız");
+      toast.success("Ürün kaldırıldı");
+      refetch();
+    } catch (error: any) {
+      if (process.env.NODE_ENV === "development")
+        console.error("Delete error:", error);
+      toast.error(
+        error.response?.data?.message ||
+          error.response?.data?.error ||
+          error.message ||
+          "İşlem başarısız",
+      );
     }
   };
 
-  // Selection handlers
-  const toggleSelect = (productId: string) => {
-    setSelectedIds((prev) => {
-      const newSet = new Set(prev);
-      if (newSet.has(productId)) {
-        newSet.delete(productId);
-      } else {
-        newSet.add(productId);
-      }
-      return newSet;
-    });
-  };
-
-  const toggleSelectAll = (_ids?: string[]) => {
-    const pendingProducts = filteredProducts.filter(
-      (p) => p.status === "pending",
-    );
+  const handleRestore = async (productId: string) => {
     if (
-      pendingProducts.length > 0 &&
-      selectedIds.size === pendingProducts.length
-    ) {
-      setSelectedIds(new Set());
-    } else {
-      setSelectedIds(new Set(pendingProducts.map((p) => p.id)));
-    }
-  };
-
-  const handleBulkApprove = async () => {
-    if (selectedIds.size === 0) {
-      toast.error("En az bir ürün seçin");
+      !(await confirm({
+        title: "Ürünü geri yükle",
+        description:
+          "Ürün yeniden onaya (Beklemede) düşecek ve onaylandıktan sonra yayınlanacak.",
+        confirmLabel: "Geri Yükle",
+      }))
+    )
       return;
-    }
-
-    setBulkProcessing(true);
     try {
-      const result = await adminApi.bulkApproveProducts(
-        Array.from(selectedIds),
-      );
-      toast.success(
-        result.data.message || `${selectedIds.size} ürün onaylandı`,
-      );
-      setSelectedIds(new Set());
-      loadProducts();
+      await adminApi.restoreProduct(productId);
+      toast.success("Ürün geri yüklendi (onay bekliyor)");
+      refetch();
     } catch (error: any) {
       if (process.env.NODE_ENV === "development")
-        console.error("Bulk approve error:", error);
-      toast.error(error.response?.data?.message || "Toplu onaylama başarısız");
-    } finally {
-      setBulkProcessing(false);
+        console.error("Restore error:", error);
+      toast.error(
+        error.response?.data?.message ||
+          error.response?.data?.error ||
+          error.message ||
+          "İşlem başarısız",
+      );
     }
   };
 
-  const handleBulkReject = async () => {
-    if (selectedIds.size === 0) {
-      toast.error("En az bir ürün seçin");
-      return;
-    }
-
-    const reason = prompt("Toplu reddetme sebebi:");
-    if (!reason) return;
-
-    setBulkProcessing(true);
-    try {
-      const result = await adminApi.bulkRejectProducts(
-        Array.from(selectedIds),
-        reason,
-      );
-      toast.success(
-        result.data.message || `${selectedIds.size} ürün reddedildi`,
-      );
-      setSelectedIds(new Set());
-      loadProducts();
-    } catch (error: any) {
-      if (process.env.NODE_ENV === "development")
-        console.error("Bulk reject error:", error);
-      toast.error(error.response?.data?.message || "Toplu reddetme başarısız");
-    } finally {
-      setBulkProcessing(false);
-    }
-  };
-
-  // Merkezi ProductCondition etiketleri (new/like_new/very_good/good/fair).
-  const getConditionLabel = (condition: string) =>
-    enumLabel(productConditionConfig, condition);
-
-  const filteredProducts = products.filter((product) => {
-    if (search && !product.title.toLowerCase().includes(search.toLowerCase())) {
-      return false;
-    }
-    if (filter !== "all" && product.status !== filter) return false;
-    return true;
-  });
+  // ── Kolon tanımları ─────────────────────────────────────────────────────────
 
   const columns: ColumnDef<Product, any>[] = [
     {
@@ -386,24 +278,32 @@ export default function ProductsPage() {
           {isProductOnSaleDisplay(row.original) && (
             <span className="text-muted line-through text-sm block">
               ₺
-              {getProductOriginalPriceForDisplay(row.original).toLocaleString(
-                "tr-TR",
-              )}
+              {getProductOriginalPriceForDisplay(row.original).toLocaleString("tr-TR")}
             </span>
           )}
-          ₺
-          {getProductEffectivePrice(row.original).toLocaleString("tr-TR")}
+          ₺{getProductEffectivePrice(row.original).toLocaleString("tr-TR")}
         </span>
       ),
     },
     {
       header: "Durum",
       cell: ({ row }) => (
-        <StatusBadge
-          status={row.original.status}
-          config={productStatusConfig}
-        />
+        <StatusBadge status={row.original.status} config={productStatusConfig} />
       ),
+    },
+    {
+      header: "AI",
+      cell: ({ row }) => {
+        const s = row.original.aiCheckStatus;
+        if (!s) return <span className="text-muted text-xs">—</span>;
+        const [cls, label] =
+          s === "flagged"
+            ? ["bg-danger-500/20 text-danger-600", "Uygunsuz"]
+            : s === "review"
+              ? ["bg-warning-500/20 text-warning-700", "İnceleme"]
+              : ["bg-success-500/20 text-success-700", "Temiz"];
+        return <span className={`px-1.5 py-0.5 rounded text-xs font-medium ${cls}`}>{label}</span>;
+      },
     },
     {
       header: "Kondisyon",
@@ -441,11 +341,6 @@ export default function ProductsPage() {
       header: "İşlemler",
       cell: ({ row }) => (
         <ActionButtons>
-          <ActionIconButton
-            icon={EyeIcon}
-            href={`/products/${row.original.id}`}
-            title="Detay"
-          />
           {row.original.status === "pending" && (
             <>
               <ActionIconButton
@@ -462,53 +357,82 @@ export default function ProductsPage() {
               />
             </>
           )}
-          <ActionIconButton
-            icon={TrashIcon}
-            onClick={() => handleDelete(row.original.id)}
-            title="Sil"
-            variant="danger"
-          />
+          {row.original.status === "deleted" ? (
+            <ActionIconButton
+              icon={ArrowUturnLeftIcon}
+              onClick={() => handleRestore(row.original.id)}
+              title="Geri Yükle"
+              variant="success"
+            />
+          ) : (
+            row.original.status !== "sold" &&
+            row.original.status !== "reserved" && (
+              <ActionIconButton
+                icon={TrashIcon}
+                onClick={() => handleDelete(row.original.id)}
+                title="Kaldır"
+                variant="danger"
+              />
+            )
+          )}
         </ActionButtons>
       ),
     },
   ];
 
-  return (
-    <div className="space-y-6">
-      <PageHeader
+  // ── Render ──────────────────────────────────────────────────────────────────
+
+  // AI Denetim sekmesi → ortak ModerationEventsPanel (ürün olayları)
+  if (tab === "ai") {
+    return (
+      <ModerationEventsPanel
+        entityType="product"
         title="Ürünler"
-        description={
-          <>
-            {filter === "pending"
-              ? `${products.filter((p) => p.status === "pending").length} ürün onay bekliyor`
-              : `Toplam ${total} ürün`}
-            {pendingCount > 0 && (
-              <span className="ml-2 px-3 py-1 bg-warning-500/20 text-warning-700 rounded-full text-sm font-medium shrink-0 whitespace-nowrap">
-                {pendingCount} Bekleyen
-              </span>
-            )}
-            {selectedSellerId && (
-              <span className="ml-2">
-                — Satıcıya göre filtreleniyor
-                <Button
-                  variant="secondary"
-                  onClick={clearSellerFilter}
-                  className="ml-2 text-primary-600 hover:underline"
-                >
-                  Filtreyi kaldır
-                </Button>
-              </span>
-            )}
-          </>
-        }
-      >
+        tabs={PRODUCT_TABS}
+        activeTab={tab}
+        onTabChange={handleTabChange}
+      />
+    );
+  }
+
+  return (
+    <ResourceListPage<Product>
+      title="Ürünler"
+      tabs={PRODUCT_TABS}
+      activeTab={tab}
+      onTabChange={handleTabChange}
+      description={
+        <>
+          {filters.status === "pending"
+            ? `${products.filter((p) => p.status === "pending").length} ürün onay bekliyor`
+            : `Toplam ${total} ürün`}
+          {pendingCount > 0 && (
+            <span className="ml-2 px-3 py-1 bg-warning-500/20 text-warning-700 rounded-full text-sm font-medium shrink-0 whitespace-nowrap">
+              {pendingCount} Bekleyen
+            </span>
+          )}
+          {filters.sellerId && (
+            <span className="ml-2">
+              — Satıcıya göre filtreleniyor
+              <Button
+                variant="secondary"
+                onClick={clearSellerFilter}
+                className="ml-2 text-primary-600 hover:underline"
+              >
+                Filtreyi kaldır
+              </Button>
+            </span>
+          )}
+        </>
+      }
+      headerActions={
         <Button
           variant="secondary"
           onClick={async () => {
             try {
               const res = await adminApi.exportProducts({
-                status: filter === "all" ? undefined : filter,
-                sellerId: selectedSellerId || undefined,
+                status: filters.status === "all" ? undefined : filters.status,
+                sellerId: filters.sellerId || undefined,
               });
               const blob = new Blob([res.data], { type: "text/csv" });
               const url = window.URL.createObjectURL(blob);
@@ -525,140 +449,30 @@ export default function ProductsPage() {
         >
           CSV İndir
         </Button>
-      </PageHeader>
-
-      <BulkActionBar
-        count={selectedIds.size}
-        onClear={() => setSelectedIds(new Set())}
-      >
-        <Button
-          variant="success"
-          size="sm"
-          onClick={handleBulkApprove}
-          disabled={bulkProcessing}
-          isLoading={bulkProcessing}
-        >
-          <CheckCircleIcon className="h-4 w-4" />
-          Seçilenleri Onayla
-        </Button>
-        <Button
-          variant="danger"
-          size="sm"
-          onClick={handleBulkReject}
-          disabled={bulkProcessing}
-          isLoading={bulkProcessing}
-        >
-          <XCircleIcon className="h-4 w-4" />
-          Seçilenleri Reddet
-        </Button>
-      </BulkActionBar>
-
-      {/* Filters */}
-      <FilterToolbar
-        search={search}
-        onSearchChange={setSearch}
-        onSearchSubmit={() => loadProducts(1)}
-        searchPlaceholder="Ürün ara..."
-      >
-        {/* Seller Filter */}
-        <div className="relative w-full sm:w-64">
-          <UserIcon className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-muted" />
-          <Input
-            type="text"
-            placeholder="Satıcı ara..."
-            value={sellerSearch}
-            onChange={(e) => {
-              setSellerSearch(e.target.value);
-              setShowSellerDropdown(true);
-            }}
-            onFocus={() => setShowSellerDropdown(true)}
-            className="admin-input-with-icon-left pr-10"
-          />
-          {selectedSellerId && (
-            <Button
-              variant="secondary"
-              onClick={clearSellerFilter}
-              className="absolute right-3 top-1/2 -translate-y-1/2 text-muted hover:text-heading"
-            >
-              <XCircleIcon className="h-5 w-5" />
-            </Button>
-          )}
-
-          {showSellerDropdown && sellerSearch.length >= 2 && (
-            <div className="absolute z-50 mt-1 bg-surface-alt shadow-lg max-h-60 overflow-y-auto">
-              {loadingUsers ? (
-                <div className="p-3 text-center text-muted">Aranıyor...</div>
-              ) : users.length > 0 ? (
-                users.map((user) => (
-                  <Button
-                    variant="secondary"
-                    key={user.id}
-                    onClick={() => handleSelectSeller(user)}
-                    className="w-full px-4 py-2 text-left hover:bg-surface-alt text-heading"
-                  >
-                    <div className="font-medium">{user.displayName}</div>
-                    <div className="text-xs text-muted">{user.email}</div>
-                  </Button>
-                ))
-              ) : (
-                <div className="p-3 text-center text-muted">
-                  Satıcı bulunamadı
-                </div>
-              )}
-            </div>
-          )}
-        </div>
-
-        <Select
-          value={filter}
-          onChange={(e) => setFilter(e.target.value)}
-          className="sm:w-48"
-        >
-          <option value="all">Tüm Ürünler</option>
-          <option value="pending">Onay Bekleyenler</option>
-          <option value="active">Aktif</option>
-          <option value="rejected">Reddedilenler</option>
-          <option value="sold">Satılanlar</option>
-          <option value="inactive">Pasif</option>
-          <option value="deleted">Kaldırılanlar</option>
-        </Select>
-      </FilterToolbar>
-
-      {/* Table */}
-      <DataTable
-        columns={columns}
-        data={filteredProducts}
-        loading={loading}
-        emptyText="Ürün bulunamadı"
-        getRowId={(p) => p.id}
-        selectable
-        selectedIds={Array.from(selectedIds)}
-        onToggleRow={(id) => toggleSelect(id)}
-        onToggleAll={(ids) => toggleSelectAll(ids)}
-      />
-
-      {/* Pagination */}
-      <div className="flex items-center justify-between">
-        <p className="text-sm text-muted">
-          Sayfa {page} / {Math.ceil(total / 20)}
-        </p>
-        <div className="flex gap-2">
-          <Button
-            variant="secondary"
-            onClick={() => setPage((p) => Math.max(1, p - 1))}
-            disabled={page === 1}
-          >
-            Önceki
-          </Button>
-          <Button
-            variant="secondary"
-            onClick={() => setPage((p) => p + 1)}
-            disabled={page >= Math.ceil(total / 20)}
-          >
-            Sonraki
-          </Button>
-        </div>
-      </div>
-    </div>
+      }
+      filters={
+        <AdminProductFilters
+          search={search}
+          onSearchChange={setSearch}
+          onSearchSubmit={onSearchSubmit}
+          status={filters.status ?? "all"}
+          onStatusChange={(v) => setFilter("status", v)}
+          brandId={filters.brandId ?? ""}
+          onBrandChange={(v) => { setFilter("brandId", v); setFilter("carModelId", ""); }}
+          carModelId={filters.carModelId ?? ""}
+          onCarModelChange={(v) => setFilter("carModelId", v)}
+          statusOptions={statusOptions}
+        />
+      }
+      columns={columns}
+      data={products}
+      loading={isLoading}
+      emptyText="Ürün bulunamadı"
+      getRowId={(p) => p.id}
+      onRowClick={(p) => router.push(`/products/${p.id}`)}
+      page={page}
+      totalPages={totalPages}
+      onPageChange={setPage}
+    />
   );
 }

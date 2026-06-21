@@ -21,6 +21,7 @@ import { CacheService } from '../cache/cache.service';
 import { NotificationService } from '../notification/notification.service';
 import { NotificationType } from '../notification/dto';
 import { StorageService } from '../storage/storage.service';
+import { ModerationAiClient } from '../moderation/moderation-ai.client';
 
 @Injectable()
 export class RatingService {
@@ -32,7 +33,17 @@ export class RatingService {
     @Inject(forwardRef(() => NotificationService))
     private readonly notificationService: NotificationService,
     private readonly storageService: StorageService,
+    private readonly moderationAi: ModerationAiClient,
   ) {}
+
+  /** Yorum metni küfür/uygunsuz mu kontrol et — uygunsuzsa engelle + event log'a yaz. */
+  private async assertCleanComment(
+    comment?: string | null,
+    ctx?: { entityType: string; entityId?: string; userId?: string },
+  ): Promise<void> {
+    if (!comment?.trim() || !this.moderationAi.isEnabled) return;
+    await this.moderationAi.assertTextClean(comment, ctx ? { ...ctx, field: 'comment', label: 'yorum' } : undefined);
+  }
 
   private async resolveAvatarUrl(avatarUrl: string | null | undefined): Promise<string | null> {
     if (!avatarUrl) return null;
@@ -73,6 +84,13 @@ export class RatingService {
       throw new BadRequestException('Sipariş veya takas ID gerekli');
     }
 
+    // Yorum metni denetimi (küfür/uygunsuz) — event log'a yaz
+    await this.assertCleanComment(dto.comment, {
+      entityType: 'user',
+      entityId: dto.receiverId,
+      userId: giverId,
+    });
+
     // Verify transaction
     if (dto.orderId) {
       const order = await this.prisma.order.findUnique({
@@ -81,6 +99,11 @@ export class RatingService {
 
       if (!order) {
         throw new NotFoundException('Sipariş bulunamadı');
+      }
+
+      // Üyelik/dijital siparişler (sanal ürün + platform satıcısı) puanlanamaz
+      if (order.orderNumber?.startsWith('MEM-')) {
+        throw new BadRequestException('Üyelik siparişleri için değerlendirme yapılamaz');
       }
 
       // Allow rating only for delivered or completed orders (must receive before rating)
@@ -205,6 +228,11 @@ export class RatingService {
       throw new NotFoundException('Sipariş bulunamadı');
     }
 
+    // Üyelik/dijital siparişler (sanal ürün + platform satıcısı) puanlanamaz
+    if (order.orderNumber?.startsWith('MEM-')) {
+      throw new BadRequestException('Üyelik siparişleri için değerlendirme yapılamaz');
+    }
+
     if (order.buyerId !== userId) {
       throw new ForbiddenException('Sadece alıcı ürünü puanlayabilir');
     }
@@ -212,6 +240,13 @@ export class RatingService {
     if (order.productId !== dto.productId) {
       throw new BadRequestException('Siparişteki ürün eşleşmiyor');
     }
+
+    // Yorum metni denetimi (başlık + yorum, küfür/uygunsuz) — event log'a yaz
+    await this.assertCleanComment(`${dto.title ?? ''} ${dto.review ?? ''}`, {
+      entityType: 'product',
+      entityId: dto.productId,
+      userId,
+    });
 
     // Allow rating only for delivered or completed orders (must receive before rating)
     const allowedStatuses: OrderStatus[] = [OrderStatus.completed, OrderStatus.delivered];

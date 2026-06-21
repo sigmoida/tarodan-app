@@ -1,5 +1,5 @@
 
-import { IsEnum, IsString, IsOptional, MaxLength, IsNotEmpty, IsNumber, Min } from 'class-validator';
+import { IsEnum, IsString, IsOptional, IsNumber, Min } from 'class-validator';
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import { Type } from 'class-transformer';
 
@@ -7,7 +7,6 @@ export enum RatingStatus {
     pending = 'pending',
     approved = 'approved',
     rejected = 'rejected',
-    spam = 'spam',
 }
 
 export class UpdateRatingStatusDto {
@@ -18,17 +17,6 @@ export class UpdateRatingStatusDto {
     })
     @IsEnum(RatingStatus)
     status: RatingStatus;
-}
-
-export class ReplyToRatingDto {
-    @ApiProperty({
-        example: 'Geri bildiriminiz için teşekkürler.',
-        description: 'Admin reply content',
-    })
-    @IsString()
-    @IsNotEmpty()
-    @MaxLength(1000)
-    reply: string;
 }
 
 export class RatingQueryDto {

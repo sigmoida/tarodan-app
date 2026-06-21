@@ -17,6 +17,7 @@ import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { MediaService, UploadOptions, UploadResult } from './media.service';
 import { MembershipService } from '../membership/membership.service';
 import { StorageService } from '../storage/storage.service';
+import { ModerationAiClient } from '../moderation/moderation-ai.client';
 
 @Controller('media')
 @UseGuards(JwtAuthGuard)
@@ -25,11 +26,13 @@ export class MediaController {
     private readonly mediaService: MediaService,
     private readonly membershipService: MembershipService,
     private readonly storageService: StorageService,
+    private readonly moderationAi: ModerationAiClient,
   ) {}
 
   @Post('upload')
   @UseInterceptors(FileInterceptor('file'))
   async uploadFile(
+    @Request() req: any,
     @UploadedFile() file: Express.Multer.File,
     @Query('folder') folder?: string,
     @Query('resize') resize?: string,
@@ -38,6 +41,13 @@ export class MediaController {
     if (!file) {
       throw new BadRequestException('No file provided');
     }
+
+    // Yüklenen her görseli AI ile denetle (uygunsuz/NSFW → engelle)
+    await this.moderationAi.assertImageClean(file, {
+      entityType: 'upload',
+      userId: req.user?.id,
+      field: folder || 'upload',
+    });
 
     const options: UploadOptions = {
       folder: folder || 'uploads',
@@ -91,6 +101,15 @@ export class MediaController {
       throw new BadRequestException(`En fazla ${maxImages} resim yükleyebilirsiniz`);
     }
 
+    for (const file of files) {
+      await this.moderationAi.assertImageClean(file, {
+        entityType: 'product',
+        entityId: productId,
+        userId: req.user?.id,
+        field: 'product_image',
+      });
+    }
+
     const results = await Promise.all(
       files.map((file) => this.mediaService.uploadProductImageVariants(file, productId)),
     );
@@ -104,10 +123,20 @@ export class MediaController {
 
   @Post('upload/avatar')
   @UseInterceptors(FileInterceptor('avatar'))
-  async uploadAvatar(@UploadedFile() file: Express.Multer.File): Promise<UploadResult> {
+  async uploadAvatar(
+    @Request() req: any,
+    @UploadedFile() file: Express.Multer.File,
+  ): Promise<UploadResult> {
     if (!file) {
       throw new BadRequestException('No file provided');
     }
+
+    await this.moderationAi.assertImageClean(file, {
+      entityType: 'user',
+      entityId: req.user?.id,
+      userId: req.user?.id,
+      field: 'avatar',
+    });
 
     return this.mediaService.upload(file, {
       folder: 'avatars',

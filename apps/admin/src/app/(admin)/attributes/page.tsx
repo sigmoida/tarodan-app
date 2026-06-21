@@ -6,6 +6,7 @@ import { adminApi } from '@/lib/api';
 import { Button, Checkbox, Input, Spinner, Textarea, colors } from '@tarodan/ui';
 import { PlusIcon, PencilIcon, TrashIcon, Squares2X2Icon, ChevronRightIcon } from '@heroicons/react/24/outline';
 import toast from 'react-hot-toast';
+import { FilterToolbar } from '@/components/admin-list';
 
 interface AttributeGroup {
     id: string;
@@ -16,6 +17,7 @@ interface AttributeGroup {
     isActive: boolean;
     sortOrder: number;
     attributeCount?: number;
+    manufacturerSlug?: string | null;
 }
 
 interface Attribute {
@@ -46,6 +48,9 @@ export default function AttributesPage() {
     const [groupForm, setGroupForm] = useState({ name: '', description: '', isRequired: false, isActive: true, sortOrder: 0 });
     const [attrForm, setAttrForm] = useState({ value: '', displayValue: '', color: defaultAttributeColor, sortOrder: 0, isActive: true });
 
+    // Arama — backend search parametresine bağlı; Enter/buton ile tetiklenir
+    const [search, setSearch] = useState('');
+
     useEffect(() => { loadGroups(); }, []);
 
     useEffect(() => {
@@ -55,22 +60,37 @@ export default function AttributesPage() {
         }
     }, [groups, groupIdFromUrl]);
 
-    const loadGroups = async () => {
+    const loadGroups = async (searchOverride?: string) => {
         setLoading(true);
         try {
-            const res = await adminApi.getAttributeGroups({ limit: 100 });
+            const currentSearch = searchOverride !== undefined ? searchOverride : search;
+            const res = await adminApi.getAttributeGroups({
+                limit: 100,
+                search: currentSearch || undefined,
+            });
             setGroups(res.data.data || []);
         } catch (e: any) { toast.error('Gruplar yüklenemedi'); }
         finally { setLoading(false); }
     };
 
-    const loadAttributes = async (groupId: string) => {
+    const loadAttributes = async (groupId: string, searchOverride?: string) => {
         setLoadingAttrs(true);
         try {
-            const res = await adminApi.getAttributes({ groupId, limit: 100 });
+            const currentSearch = searchOverride !== undefined ? searchOverride : search;
+            const res = await adminApi.getAttributes({
+                groupId,
+                limit: 100,
+                search: currentSearch || undefined,
+            });
             setAttributes(res.data.data || []);
         } catch (e: any) { toast.error('Özellikler yüklenemedi'); }
         finally { setLoadingAttrs(false); }
+    };
+
+    // Arama tetikleyicisi — hem grupları hem seçili grubun özelliklerini yeniler
+    const handleSearchSubmit = () => {
+        loadGroups(search);
+        if (selectedGroup) loadAttributes(selectedGroup.id, search);
     };
 
     const selectGroup = (g: AttributeGroup) => { setSelectedGroup(g); loadAttributes(g.id); };
@@ -115,6 +135,15 @@ export default function AttributesPage() {
                     <div className="min-w-0"><h1 className="text-2xl font-bold text-heading">Ürün Özellikleri</h1><p className="text-muted">Özellik grupları ve değerleri</p></div>
                     <Button variant="primary" size="md" onClick={openGroupCreate} className="shrink-0"><PlusIcon className="w-5 h-5" />Yeni Grup</Button>
                 </div>
+
+                {/* Arama — backend search parametresine bağlı; Enter veya buton ile tetiklenir */}
+                <FilterToolbar
+                    search={search}
+                    onSearchChange={setSearch}
+                    onSearchSubmit={handleSearchSubmit}
+                    searchPlaceholder="Grup adı veya özellik değeri ara..."
+                />
+
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-6 items-start">
                     {/* Groups Panel */}
                     <div className="admin-card p-4">
@@ -144,7 +173,7 @@ export default function AttributesPage() {
                                     : attributes.length === 0 ? <div className="text-center py-8 text-muted">Değer yok</div>
                                         : <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">{attributes.map((a) => (
                                             <div key={a.id} className="p-3 rounded-lg bg-surface-alt flex items-center justify-between gap-3">
-                                                <div className="flex items-center gap-2 min-w-0">{a.color && <div className="w-4 h-4 rounded-full shrink-0" style={{ backgroundColor: a.color }}></div>}<span className="text-heading truncate">{a.displayValue || a.value}</span>{!a.isActive && <span className="px-1.5 text-xs bg-body text-muted rounded shrink-0">Pasif</span>}</div>
+                                                <div className="flex items-center gap-2 min-w-0">{selectedGroup?.manufacturerSlug && a.color && <div className="w-4 h-4 rounded-full shrink-0" style={{ backgroundColor: a.color }}></div>}<span className="text-heading truncate">{a.displayValue || a.value}</span>{!a.isActive && <span className="px-1.5 text-xs bg-body text-muted rounded shrink-0">Pasif</span>}</div>
                                                 <div className="flex gap-1 shrink-0"><Button variant="secondary" onClick={() => openAttrEdit(a)} className="p-1 text-muted hover:text-heading"><PencilIcon className="h-4 w-4" /></Button><Button variant="secondary" onClick={() => setDeleteConfirm({ type: 'attr', id: a.id })} className="p-1 text-danger-600 hover:text-danger-300"><TrashIcon className="h-4 w-4" /></Button></div>
                                             </div>
                                         ))}</div>}
@@ -170,7 +199,7 @@ export default function AttributesPage() {
                 <form onSubmit={handleAttrSubmit} className="space-y-4">
                     <div><label className="block text-sm text-muted mb-2">Değer *</label><Input type="text" value={attrForm.value} onChange={(e) => setAttrForm({ ...attrForm, value: e.target.value })} required /></div>
                     <div><label className="block text-sm text-muted mb-2">Görüntülenen Değer</label><Input type="text" value={attrForm.displayValue} onChange={(e) => setAttrForm({ ...attrForm, displayValue: e.target.value })} /></div>
-                    <div className="flex gap-4"><div><label className="block text-sm text-muted mb-2">Renk</label><Input type="color" value={attrForm.color || defaultAttributeColor} onChange={(e) => setAttrForm({ ...attrForm, color: e.target.value })} className="w-10 h-10 rounded" /></div>
+                    <div className="flex gap-4">{selectedGroup?.manufacturerSlug && <div><label className="block text-sm text-muted mb-2">Renk</label><Input type="color" value={attrForm.color || defaultAttributeColor} onChange={(e) => setAttrForm({ ...attrForm, color: e.target.value })} className="w-10 h-10 rounded" /></div>}
                         <div><label className="block text-sm text-muted mb-2">Sıra</label><Input type="number" value={attrForm.sortOrder} onChange={(e) => setAttrForm({ ...attrForm, sortOrder: parseInt(e.target.value) || 0 })} className="w-20" /></div></div>
                     <Checkbox checked={attrForm.isActive} onChange={(e) => setAttrForm({ ...attrForm, isActive: e.target.checked })} label="Aktif" />
                     <div className="flex gap-3 pt-4"><Button variant="secondary" size="md" type="button" onClick={() => setShowAttrModal(false)} className="flex-1">İptal</Button><Button variant="primary" size="md" type="submit" className="flex-1">{editingAttr ? 'Güncelle' : 'Oluştur'}</Button></div>

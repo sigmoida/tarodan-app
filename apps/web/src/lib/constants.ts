@@ -1,8 +1,7 @@
 /**
  * Product Status Enum and Labels
  */
-export type ProductStatus = 
-  | 'draft'
+export type ProductStatus =
   | 'pending'
   | 'active'
   | 'reserved'
@@ -11,7 +10,6 @@ export type ProductStatus =
   | 'rejected';
 
 export const ProductStatusLabels: Record<ProductStatus, string> = {
-  draft: 'Taslak',
   pending: 'Onay Bekliyor',
   active: 'Yayında',
   reserved: 'Rezerve',
@@ -21,7 +19,6 @@ export const ProductStatusLabels: Record<ProductStatus, string> = {
 };
 
 export const ProductStatusColors: Record<ProductStatus, string> = {
-  draft: 'bg-surface-alt text-body',
   pending: 'bg-warning-100 text-warning-800',
   active: 'bg-success-100 text-success-800',
   reserved: 'bg-info-100 text-info-800',

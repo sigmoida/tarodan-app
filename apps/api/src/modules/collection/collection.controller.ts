@@ -20,6 +20,7 @@ import { FileInterceptor } from '@nestjs/platform-express';
 import { CollectionService } from './collection.service';
 import { MediaService } from '../media/media.service';
 import { StorageService } from '../storage/storage.service';
+import { ModerationAiClient } from '../moderation/moderation-ai.client';
 import {
   CreateCollectionDto,
   UpdateCollectionDto,
@@ -39,6 +40,7 @@ export class CollectionController {
     private readonly collectionService: CollectionService,
     private readonly mediaService: MediaService,
     private readonly storageService: StorageService,
+    private readonly moderationAi: ModerationAiClient,
   ) {}
 
   /**
@@ -269,6 +271,12 @@ export class CollectionController {
 
     // If image file is provided, upload it
     if (imageFile) {
+      await this.moderationAi.assertImageClean(imageFile, {
+        entityType: 'collection',
+        entityId: id,
+        userId: req.user?.id,
+        field: 'item',
+      });
       try {
         const uploadResult = await this.mediaService.upload(imageFile, {
           folder: 'collection-items',
@@ -335,6 +343,13 @@ export class CollectionController {
     if (!coverFile) {
       throw new BadRequestException('Kapak resmi gerekli');
     }
+
+    await this.moderationAi.assertImageClean(coverFile, {
+      entityType: 'collection',
+      entityId: id,
+      userId: req.user?.id,
+      field: 'cover',
+    });
 
     const uploadResult = await this.mediaService.uploadCollectionCover(coverFile);
     return this.collectionService.updateCollectionCover(id, req.user.id, uploadResult.key);

@@ -1,4 +1,7 @@
 import { Module, forwardRef } from '@nestjs/common';
+import { BullModule } from '@nestjs/bull';
+import { QUEUE_NAMES } from '../../workers/constants';
+import { ModerationModule } from '../moderation/moderation.module';
 import { ProductService } from './product.service';
 import { ProductBoostService } from './product-boost.service';
 import { ProductController } from './product.controller';
@@ -21,6 +24,8 @@ import { PaymentModule } from '../payment';
     DiscountModule,
     StorageModule,
     forwardRef(() => PaymentModule),
+    BullModule.registerQueue({ name: QUEUE_NAMES.MODERATION }),
+    ModerationModule,
   ],
   controllers: [ProductController],
   providers: [ProductService, ProductBoostService, ProductSchedulerService, ProductLockService],

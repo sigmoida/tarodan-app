@@ -1,21 +1,26 @@
 "use client";
 
-import { useState, useEffect } from "react";
-import { adminApi } from "@/lib/api";
+import { useMemo } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
 import {
-  EyeIcon,
   NoSymbolIcon,
   CheckCircleIcon,
 } from "@heroicons/react/24/outline";
 import toast from "react-hot-toast";
 import { Button, Select, membershipTierConfig, enumLabel } from "@tarodan/ui";
-import { DataTable, type ColumnDef } from "@/components/DataTable";
-import {
-  PageHeader,
-  FilterToolbar,
-  ActionButtons,
-  ActionIconButton,
-} from "@/components/admin-list";
+import { type ColumnDef } from "@/components/DataTable";
+import { ActionButtons, ActionIconButton } from "@/components/admin-list";
+import { ResourceListPage } from "@/components/ResourceListPage";
+import { ModerationEventsPanel } from "@/components/ModerationEventsPanel";
+import { useAdminResource } from "@/hooks/useAdminResource";
+import { usePrompt } from "@/components/PromptProvider";
+import { adminApi } from "@/lib/api";
+
+// Kullanıcılar ↔ AI Denetim sekmeleri (ortak AdminTabs yapısı)
+const USER_TABS = [
+  { key: "list", label: "Kullanıcılar" },
+  { key: "ai", label: "AI Denetim" },
+];
 
 interface User {
   id: string;
@@ -32,92 +37,101 @@ interface User {
   productsCount: number;
 }
 
+function mapUsers(raw: any[]): User[] {
+  return raw.map((u: any) => ({
+    id: u.id,
+    email: u.email,
+    displayName: u.displayName ?? u.email?.split("@")[0] ?? "-",
+    phone: u.phone,
+    isSeller: u.isSeller,
+    isVerified: u.isVerified,
+    isBanned: Boolean(u.isBanned),
+    createdAt: u.createdAt,
+    lastLoginAt: u.lastLoginAt,
+    membershipTier: u.membership?.tier?.type ?? "free",
+    ordersCount: u._count?.buyerOrders ?? u._count?.sellerOrders ?? 0,
+    productsCount: u._count?.products ?? 0,
+  }));
+}
+
 export default function UsersPage() {
-  const [users, setUsers] = useState<User[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [search, setSearch] = useState("");
-  const [filter, setFilter] = useState("all");
-  const [page, setPage] = useState(1);
-  const [total, setTotal] = useState(0);
-
-  useEffect(() => {
-    loadUsers();
-  }, [page, filter]);
-
-  const loadUsers = async (pageOverride?: number) => {
-    const currentPage = pageOverride ?? page;
-    setLoading(true);
-    try {
-      const response = await adminApi.getUsers({
-        page: currentPage,
-        limit: 20,
-        search: search || undefined,
+  const router = useRouter();
+  const searchParams = useSearchParams();
+  // Tab URL'den türetilir
+  const tab = searchParams.get("tab") === "ai" ? "ai" : "list";
+  const {
+    rows: rawRows,
+    total,
+    page,
+    setPage,
+    totalPages,
+    search,
+    setSearch,
+    onSearchSubmit,
+    filters,
+    setFilter,
+    isLoading,
+    refetch,
+    setTabUrl,
+  } = useAdminResource<any>({
+    queryKey: "users",
+    fetcher: (params) => {
+      const { filter: _filter, ...rest } = params;
+      const filterVal = params.filter as string | undefined;
+      return adminApi.getUsers({
+        ...rest,
         isSeller:
-          filter === "sellers" ? true : filter === "buyers" ? false : undefined,
-        isBanned: filter === "banned" ? true : undefined,
+          filterVal === "sellers"
+            ? true
+            : filterVal === "buyers"
+              ? false
+              : undefined,
+        isBanned: filterVal === "banned" ? true : undefined,
       });
-      const data = response.data.data || response.data.users || [];
-      const meta = response.data.meta || {};
-      setUsers(
-        data.map((u: any) => ({
-          id: u.id,
-          email: u.email,
-          displayName: u.displayName ?? u.email?.split("@")[0] ?? "-",
-          phone: u.phone,
-          isSeller: u.isSeller,
-          isVerified: u.isVerified,
-          isBanned: Boolean(u.isBanned),
-          createdAt: u.createdAt,
-          lastLoginAt: u.lastLoginAt,
-          membershipTier: u.membershipTier?.name ?? "basic",
-          ordersCount: u._count?.buyerOrders ?? u._count?.sellerOrders ?? 0,
-          productsCount: u._count?.products ?? 0,
-        })),
-      );
-      setTotal(meta.total || data.length);
-      if (pageOverride !== undefined) setPage(pageOverride);
-    } catch (error) {
-      if (process.env.NODE_ENV === "development")
-        console.error("Users load error:", error);
-      toast.error("Kullanıcılar yüklenemedi");
-    } finally {
-      setLoading(false);
-    }
+    },
+    limit: 20,
+    syncUrl: true,
+    initialFilters: { filter: "all" },
+    errorMessage: "Kullanıcılar yüklenemedi",
+  });
+
+  const handleTabChange = (key: string) => {
+    setTabUrl(key, { defaultTab: "list" });
   };
 
+  const users: User[] = useMemo(() => mapUsers(rawRows), [rawRows]);
+
+  const prompt = usePrompt();
+
   const handleBanUser = async (userId: string, isBanned: boolean) => {
-    try {
-      if (isBanned) {
+    if (isBanned) {
+      try {
         await adminApi.unbanUser(userId);
         toast.success("Kullanıcı engeli kaldırıldı");
-      } else {
-        const reason =
-          window.prompt("Engelleme sebebi (isteğe bağlı):") ??
-          "Admin tarafından engellendi";
-        await adminApi.banUser(userId, reason);
-        toast.success("Kullanıcı engellendi");
+        refetch();
+      } catch (error: any) {
+        toast.error(error.response?.data?.message ?? "İşlem başarısız");
       }
-      loadUsers();
+      return;
+    }
+
+    const reason = await prompt({
+      title: "Kullanıcıyı Engelle",
+      label: "Engelleme sebebi (isteğe bağlı)",
+      defaultValue: "Admin tarafından engellendi",
+      confirmLabel: "Engelle",
+      destructive: true,
+      required: false,
+    });
+    if (reason === null) return;
+    try {
+      await adminApi.banUser(userId, reason || "Admin tarafından engellendi");
+      toast.success("Kullanıcı engellendi");
+      refetch();
     } catch (error: any) {
       toast.error(error.response?.data?.message ?? "İşlem başarısız");
     }
   };
-
-  const filteredUsers = users.filter((user) => {
-    if (search) {
-      const searchLower = search.toLowerCase();
-      if (
-        !user.email.toLowerCase().includes(searchLower) &&
-        !user.displayName.toLowerCase().includes(searchLower)
-      ) {
-        return false;
-      }
-    }
-    if (filter === "sellers" && !user.isSeller) return false;
-    if (filter === "buyers" && user.isSeller) return false;
-    if (filter === "banned" && !user.isBanned) return false;
-    return true;
-  });
 
   const columns: ColumnDef<User, any>[] = [
     {
@@ -146,9 +160,7 @@ export default function UsersPage() {
             <span className="badge badge-info">Satıcı</span>
           )}
           {row.original.isVerified && (
-            <span className="badge badge-success">
-              Doğrulanmış
-            </span>
+            <span className="badge badge-success">Doğrulanmış</span>
           )}
           {row.original.isBanned && (
             <span className="badge badge-danger">Engelli</span>
@@ -195,19 +207,18 @@ export default function UsersPage() {
       cell: ({ row }) =>
         row.original.lastLoginAt ? (
           <span className="text-muted whitespace-nowrap">
-            {new Date(row.original.lastLoginAt).toLocaleDateString(
-              "tr-TR",
-              {
-                day: "2-digit",
-                month: "2-digit",
-                year: "numeric",
-                hour: "2-digit",
-                minute: "2-digit",
-              },
-            )}
+            {new Date(row.original.lastLoginAt).toLocaleDateString("tr-TR", {
+              day: "2-digit",
+              month: "2-digit",
+              year: "numeric",
+              hour: "2-digit",
+              minute: "2-digit",
+            })}
           </span>
         ) : (
-          <span className="text-muted whitespace-nowrap">Hiç giriş yapmadı</span>
+          <span className="text-muted whitespace-nowrap">
+            Hiç giriş yapmadı
+          </span>
         ),
     },
     {
@@ -216,13 +227,10 @@ export default function UsersPage() {
       cell: ({ row }) => (
         <ActionButtons>
           <ActionIconButton
-            icon={EyeIcon}
-            href={`/users/${row.original.id}`}
-            title="Detay"
-          />
-          <ActionIconButton
             icon={row.original.isBanned ? CheckCircleIcon : NoSymbolIcon}
-            onClick={() => handleBanUser(row.original.id, row.original.isBanned)}
+            onClick={() =>
+              handleBanUser(row.original.id, row.original.isBanned)
+            }
             title={row.original.isBanned ? "Engeli Kaldır" : "Engelle"}
             variant={row.original.isBanned ? "success" : "danger"}
           />
@@ -231,19 +239,34 @@ export default function UsersPage() {
     },
   ];
 
-  return (
-    <div className="space-y-6">
-      <PageHeader title="Kullanıcılar" description={`Toplam ${total} kullanıcı`} />
+  // AI Denetim sekmesi → ortak ModerationEventsPanel (kullanıcı olayları: avatar/bio/ad)
+  if (tab === "ai") {
+    return (
+      <ModerationEventsPanel
+        entityType="user"
+        title="Kullanıcılar"
+        tabs={USER_TABS}
+        activeTab={tab}
+        onTabChange={handleTabChange}
+      />
+    );
+  }
 
-      <FilterToolbar
-        search={search}
-        onSearchChange={setSearch}
-        onSearchSubmit={() => loadUsers(1)}
-        searchPlaceholder="E-posta veya isim ara..."
-      >
+  return (
+    <ResourceListPage<User>
+      title="Kullanıcılar"
+      description={`Toplam ${total} kullanıcı`}
+      tabs={USER_TABS}
+      activeTab={tab}
+      onTabChange={handleTabChange}
+      search={{ placeholder: "E-posta veya isim ara..." }}
+      searchValue={search}
+      onSearchChange={setSearch}
+      onSearchSubmit={onSearchSubmit}
+      filters={
         <Select
-          value={filter}
-          onChange={(e) => setFilter(e.target.value)}
+          value={filters.filter ?? "all"}
+          onChange={(e) => setFilter("filter", e.target.value)}
           className="sm:w-48"
         >
           <option value="all">Tüm Kullanıcılar</option>
@@ -251,39 +274,16 @@ export default function UsersPage() {
           <option value="buyers">Alıcılar</option>
           <option value="banned">Engelliler</option>
         </Select>
-      </FilterToolbar>
-
-      {/* Table */}
-      <DataTable
-        columns={columns}
-        data={filteredUsers}
-        loading={loading}
-        emptyText="Kullanıcı bulunamadı"
-        getRowId={(u) => u.id}
-      />
-
-      {/* Pagination */}
-      <div className="flex items-center justify-between">
-        <p className="text-sm text-muted">
-          Sayfa {page} / {Math.ceil(total / 20)}
-        </p>
-        <div className="flex gap-2">
-          <Button
-            variant="secondary"
-            onClick={() => setPage((p) => Math.max(1, p - 1))}
-            disabled={page === 1}
-          >
-            Önceki
-          </Button>
-          <Button
-            variant="secondary"
-            onClick={() => setPage((p) => p + 1)}
-            disabled={page >= Math.ceil(total / 20)}
-          >
-            Sonraki
-          </Button>
-        </div>
-      </div>
-    </div>
+      }
+      columns={columns}
+      data={users}
+      loading={isLoading}
+      emptyText="Kullanıcı bulunamadı"
+      getRowId={(u) => u.id}
+      onRowClick={(u) => router.push(`/users/${u.id}`)}
+      page={page}
+      totalPages={totalPages}
+      onPageChange={setPage}
+    />
   );
 }

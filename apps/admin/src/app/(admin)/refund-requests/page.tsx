@@ -1,10 +1,8 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
 import Link from "next/link";
 import { adminApi } from "@/lib/api";
 import {
-  Button,
   Input,
   Select,
   StatusBadge,
@@ -12,19 +10,12 @@ import {
   refundReasonConfig,
   refundRequestStatusConfig,
 } from "@tarodan/ui";
-import { DataTable, type ColumnDef } from "@/components/DataTable";
-import {
-  PageHeader,
-  FilterToolbar,
-  ActionButtons,
-  ActionIconButton,
-} from "@/components/admin-list";
-import {
-  MagnifyingGlassIcon,
-  ArrowPathIcon,
-  EyeIcon,
-} from "@heroicons/react/24/outline";
-import toast from "react-hot-toast";
+import { useRouter } from "next/navigation";
+import { type ColumnDef } from "@/components/DataTable";
+import { ResourceListPage } from "@/components/ResourceListPage";
+import { useAdminResource } from "@/hooks/useAdminResource";
+
+// ─── Tipler ────────────────────────────────────────────────────────────────
 
 interface RefundRequestRow {
   id: string;
@@ -43,6 +34,8 @@ interface RefundRequestRow {
   };
 }
 
+// ─── Sabitler ──────────────────────────────────────────────────────────────
+
 const STATUS_OPTIONS: { value: string; label: string }[] = [
   { value: "all", label: "Tüm Durumlar" },
   { value: "pending_review", label: "İnceleniyor (Satıcı)" },
@@ -59,46 +52,53 @@ const STATUS_OPTIONS: { value: string; label: string }[] = [
 
 const PAGE_SIZE = 20;
 
+// ─── Sayfa ─────────────────────────────────────────────────────────────────
+
 export default function RefundRequestsPage() {
-  const [items, setItems] = useState<RefundRequestRow[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [status, setStatus] = useState("all");
-  const [userSearch, setUserSearch] = useState("");
-  const [from, setFrom] = useState("");
-  const [to, setTo] = useState("");
-  const [page, setPage] = useState(1);
-  const [total, setTotal] = useState(0);
+  const router = useRouter();
+  // status, from, to → backend desteklediği için initialFilters'a alındı.
+  // userSearch → hook'un "search" alanına eşlendi (backend: userSearch param).
+  const {
+    rows,
+    total,
+    page,
+    setPage,
+    totalPages,
+    search,
+    setSearch,
+    onSearchSubmit,
+    filters,
+    setFilter,
+    isLoading,
+  } = useAdminResource<RefundRequestRow>({
+    queryKey: "refund-requests",
+    fetcher: (params) => {
+      const apiParams: Record<string, any> = {
+        page: params.page,
+        limit: params.limit,
+      };
+      // "search" hook parametresi → userSearch API param
+      if (params.search) apiParams.userSearch = params.search;
+      // status: "all" atlandı (hook zaten göndermez), gerçek değerlerde array sarmalı gerekiyor
+      if (params.status) apiParams.status = [params.status];
+      if (params.from) apiParams.from = params.from;
+      if (params.to) apiParams.to = params.to;
+      return adminApi.getRefundRequests(apiParams).then((res) => {
+        // Backend { items, total, page, limit } döner.
+        // extractData { data, meta: { total } } bekler → normalize et.
+        const d = res.data?.data ?? res.data;
+        if (d && "items" in d) {
+          res.data = { data: d.items, meta: { total: d.total } };
+        }
+        return res;
+      });
+    },
+    limit: PAGE_SIZE,
+    initialFilters: { status: "all", from: "", to: "" },
+    errorMessage: "İade talepleri yüklenemedi",
+  });
 
-  const load = useCallback(async () => {
-    setLoading(true);
-    try {
-      const params: Record<string, any> = { page, limit: PAGE_SIZE };
-      if (status !== "all") params.status = [status];
-      if (userSearch.trim()) params.userSearch = userSearch.trim();
-      if (from) params.from = from;
-      if (to) params.to = to;
-      const res = await adminApi.getRefundRequests(params);
-      const data = res.data?.data ?? res.data;
-      setItems(data.items || []);
-      setTotal(data.total || 0);
-    } catch (err: any) {
-      toast.error(err.response?.data?.message || "İade talepleri yüklenemedi");
-    } finally {
-      setLoading(false);
-    }
-  }, [status, userSearch, from, to, page]);
-
-  useEffect(() => {
-    load();
-  }, [load]);
-
-  const applyFilters = () => {
-    setPage(1);
-    load();
-  };
-
-  const totalPages = Math.max(1, Math.ceil(total / PAGE_SIZE));
-
+  // ── Kolon tanımları ────────────────────────────────────────────────────────
   const columns: ColumnDef<RefundRequestRow, any>[] = [
     {
       header: "İade No",
@@ -144,8 +144,8 @@ export default function RefundRequestsPage() {
       header: "Alıcı",
       cell: ({ row }) => (
         <>
-          <div>{row.original.requester.displayName}</div>
-          <div className="text-xs text-muted">{row.original.requester.email}</div>
+          <div>{row.original.requester?.displayName ?? "—"}</div>
+          <div className="text-xs text-muted">{row.original.requester?.email ?? ""}</div>
         </>
       ),
     },
@@ -153,8 +153,8 @@ export default function RefundRequestsPage() {
       header: "Satıcı",
       cell: ({ row }) => (
         <>
-          <div>{row.original.order.seller.displayName}</div>
-          <div className="text-xs text-muted">{row.original.order.seller.email}</div>
+          <div>{row.original.order?.seller?.displayName ?? "—"}</div>
+          <div className="text-xs text-muted">{row.original.order?.seller?.email ?? ""}</div>
         </>
       ),
     },
@@ -188,89 +188,53 @@ export default function RefundRequestsPage() {
         </span>
       ),
     },
-    {
-      id: "actions",
-      header: () => <span className="block text-right" />,
-      cell: ({ row }) => (
-        <ActionButtons>
-          <ActionIconButton
-            icon={EyeIcon}
-            href={`/refund-requests/${row.original.id}`}
-            title="Detay"
-          />
-        </ActionButtons>
-      ),
-    },
   ];
 
+  // ── Render ─────────────────────────────────────────────────────────────────
   return (
-    <div className="space-y-6">
-      <PageHeader
-        title="İade Talepleri"
-        description="Aktif iade talepleri — admin müdahalesi gereken durumlar"
-      >
-        <Button variant="secondary" onClick={load} className="p-2 shrink-0">
-          <ArrowPathIcon className="h-5 w-5" />
-        </Button>
-      </PageHeader>
-
-      {/* Filters */}
-      <FilterToolbar
-        search={userSearch}
-        onSearchChange={setUserSearch}
-        onSearchSubmit={applyFilters}
-        searchPlaceholder="Alıcı/satıcı adı, e-posta veya iade numarası"
-      >
-        <Select value={status} onChange={(e) => setStatus(e.target.value)} className="sm:w-56">
-          {STATUS_OPTIONS.map((o) => (
-            <option key={o.value} value={o.value}>
-              {o.label}
-            </option>
-          ))}
-        </Select>
-        <Input type="date" value={from} onChange={(e) => setFrom(e.target.value)} className="sm:w-40" />
-        <Input type="date" value={to} onChange={(e) => setTo(e.target.value)} className="sm:w-40" />
-        <Button variant="primary" onClick={applyFilters} className="shrink-0">
-          <MagnifyingGlassIcon className="h-4 w-4 mr-1" />
-          Filtrele
-        </Button>
-      </FilterToolbar>
-
-      {/* List */}
-      <DataTable
-        columns={columns}
-        data={items}
-        loading={loading}
-        emptyText="Bu filtrelerle eşleşen iade talebi yok."
-        getRowId={(rr) => rr.id}
-      />
-
-      {/* Pagination */}
-      {totalPages > 1 && (
-        <div className="flex items-center justify-between">
-          <div className="text-sm text-muted">
-            Toplam {total} kayıt — Sayfa {page} / {totalPages}
-          </div>
-          <div className="flex gap-2">
-            <Button
-              variant="secondary"
-              size="sm"
-              disabled={page <= 1}
-              onClick={() => setPage((p) => Math.max(1, p - 1))}
-            >
-              Önceki
-            </Button>
-            <Button
-              variant="secondary"
-              size="sm"
-              disabled={page >= totalPages}
-              onClick={() => setPage((p) => p + 1)}
-            >
-              Sonraki
-            </Button>
-          </div>
-        </div>
-      )}
-    </div>
+    <ResourceListPage<RefundRequestRow>
+      title="İade Talepleri"
+      description="Aktif iade talepleri — admin müdahalesi gereken durumlar"
+      search={{ placeholder: "Alıcı/satıcı adı, e-posta veya iade numarası" }}
+      searchValue={search}
+      onSearchChange={setSearch}
+      onSearchSubmit={onSearchSubmit}
+      filters={
+        <>
+          <Select
+            value={filters.status ?? "all"}
+            onChange={(e) => setFilter("status", e.target.value)}
+            className="sm:w-56"
+          >
+            {STATUS_OPTIONS.map((o) => (
+              <option key={o.value} value={o.value}>
+                {o.label}
+              </option>
+            ))}
+          </Select>
+          <Input
+            type="date"
+            value={filters.from ?? ""}
+            onChange={(e) => setFilter("from", e.target.value)}
+            className="sm:w-40"
+          />
+          <Input
+            type="date"
+            value={filters.to ?? ""}
+            onChange={(e) => setFilter("to", e.target.value)}
+            className="sm:w-40"
+          />
+        </>
+      }
+      columns={columns}
+      data={rows}
+      loading={isLoading}
+      emptyText="Bu filtrelerle eşleşen iade talebi yok."
+      getRowId={(rr) => rr.id}
+      onRowClick={(rr) => router.push(`/refund-requests/${rr.id}`)}
+      page={page}
+      totalPages={totalPages}
+      onPageChange={setPage}
+    />
   );
 }

@@ -1,193 +1,149 @@
 'use client';
 
-import { useState } from 'react';
-import {
-    CurrencyDollarIcon,
-    ShoppingBagIcon,
-    StarIcon,
-    ArrowTrendingUpIcon,
-    UsersIcon,
-} from '@heroicons/react/24/outline';
-import { StarIcon as StarIconSolid } from '@heroicons/react/24/solid';
-import { Select } from '@tarodan/ui';
+import { UsersIcon, ShoppingBagIcon, CubeIcon, ChartBarIcon } from '@heroicons/react/24/outline';
+import { StatusBadge, Badge } from '@tarodan/ui';
+import { useAdminResource } from '@/hooks/useAdminResource';
+import { adminApi } from '@/lib/api';
+import { ResourceListPage } from '@/components/ResourceListPage';
+import { type ColumnDef } from '@/components/DataTable';
 
-// Mock performance data
-const SELLER_STATS = {
-    totalActiveSellers: 142,
-    totalRevenue: 2543000,
-    avgSellerRating: 4.6,
-    topSellerName: 'Teknoloji Dünyası',
+interface Seller {
+  id: string;
+  displayName: string;
+  email: string;
+  sellerType: string | null;
+  isVerified: boolean;
+  isBanned: boolean;
+  createdAt: string;
+  membership?: { tier?: { type?: string; name?: string } };
+  _count: {
+    products: number;
+    sellerOrders: number;
+  };
+}
+
+const membershipConfig: Record<string, { label: string; variant: 'success' | 'info' | 'primary' | 'secondary' }> = {
+  business: { label: 'Kurumsal',  variant: 'primary' },
+  premium:  { label: 'Premium',   variant: 'success' },
+  basic:    { label: 'Temel',     variant: 'info'    },
+  free:     { label: 'Ücretsiz',  variant: 'secondary' },
 };
 
-const TOP_SELLERS = [
-    { id: '1', name: 'Teknoloji Dünyası', sales: 1250, revenue: 850000, rating: 4.8, status: 'active' },
-    { id: '2', name: 'Moda Butik', sales: 980, revenue: 420000, rating: 4.5, status: 'active' },
-    { id: '3', name: 'Kitap Kurdu', sales: 540, revenue: 120000, rating: 4.9, status: 'active' },
-    { id: '4', name: 'Ev Dekor', sales: 320, revenue: 280000, rating: 4.2, status: 'warning' },
-    { id: '5', name: 'Spor Mağazası', sales: 210, revenue: 150000, rating: 4.6, status: 'active' },
-];
-
 export default function SellerPerformancePage() {
-    const [period, setPeriod] = useState('month');
+  const { rows: sellers, total, page, setPage, totalPages, isLoading, search, setSearch, onSearchSubmit } =
+    useAdminResource<Seller>({
+      queryKey: 'sellers-performance',
+      fetcher: (params) => adminApi.getUsers({ ...params, isSeller: true }),
+      limit: 20,
+      syncUrl: true,
+    });
 
-    return (
+  const topByOrders = [...sellers].sort((a, b) => b._count.sellerOrders - a._count.sellerOrders)[0];
+
+  const columns: ColumnDef<Seller, any>[] = [
+    {
+      header: 'Satıcı',
+      cell: ({ row }) => (
         <>
-            <div className="space-y-6">
-                <div className="flex justify-between items-center">
-                    <div>
-                        <h1 className="text-2xl font-bold text-heading">Satıcı Performansı</h1>
-                        <p className="text-muted mt-1">Satıcı satış ve performans metrikleri</p>
-                    </div>
-                    <Select
-                        value={period}
-                        onChange={(e) => setPeriod(e.target.value)}
-                    >
-                        <option value="week">Bu Hafta</option>
-                        <option value="month">Bu Ay</option>
-                        <option value="year">Bu Yıl</option>
-                    </Select>
-                </div>
-
-                {/* Stats Grid */}
-                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-                    <div className="admin-card p-4 flex items-center gap-4">
-                        <div className="p-3 bg-info-500/10 rounded-lg shrink-0">
-                            <UsersIcon className="w-6 h-6 text-info-500" />
-                        </div>
-                        <div className="min-w-0">
-                            <p className="text-sm text-muted truncate">Aktif Satıcı</p>
-                            <h3 className="text-xl font-bold text-heading truncate">{SELLER_STATS.totalActiveSellers}</h3>
-                        </div>
-                    </div>
-                    <div className="admin-card p-4 flex items-center gap-4">
-                        <div className="p-3 bg-success-500/10 rounded-lg shrink-0">
-                            <CurrencyDollarIcon className="w-6 h-6 text-success-500" />
-                        </div>
-                        <div className="min-w-0">
-                            <p className="text-sm text-muted truncate">Toplam Ciro</p>
-                            <h3 className="text-xl font-bold text-heading truncate">
-                                {new Intl.NumberFormat('tr-TR', { style: 'currency', currency: 'TRY' }).format(SELLER_STATS.totalRevenue)}
-                            </h3>
-                        </div>
-                    </div>
-                    <div className="admin-card p-4 flex items-center gap-4">
-                        <div className="p-3 bg-warning-500/10 rounded-lg shrink-0">
-                            <StarIcon className="w-6 h-6 text-warning-500" />
-                        </div>
-                        <div className="min-w-0">
-                            <p className="text-sm text-muted truncate">Ort. Puan</p>
-                            <h3 className="text-xl font-bold text-heading flex items-center gap-1">
-                                {SELLER_STATS.avgSellerRating} <StarIconSolid className="w-4 h-4 text-warning-500 shrink-0" />
-                            </h3>
-                        </div>
-                    </div>
-                    <div className="admin-card p-4 flex items-center gap-4">
-                        <div className="p-3 bg-primary-500/10 rounded-lg shrink-0">
-                            <ArrowTrendingUpIcon className="w-6 h-6 text-primary-500" />
-                        </div>
-                        <div className="min-w-0">
-                            <p className="text-sm text-muted truncate">En İyi Satıcı</p>
-                            <h3 className="text-sm font-bold text-heading truncate max-w-[120px]" title={SELLER_STATS.topSellerName}>
-                                {SELLER_STATS.topSellerName}
-                            </h3>
-                        </div>
-                    </div>
-                </div>
-
-                {/* Top Sellers Table */}
-                <div className="admin-card">
-                    <h3 className="text-lg font-semibold text-heading mb-6">En Çok Satanlar</h3>
-                    <div className="overflow-x-auto">
-                        <table className="admin-table w-full">
-                            <thead>
-                                <tr>
-                                    <th className="text-left p-4">Satıcı Adı</th>
-                                    <th className="text-left p-4">Toplam Satış</th>
-                                    <th className="text-left p-4">Ciro</th>
-                                    <th className="text-left p-4">Puan</th>
-                                    <th className="text-left p-4">Durum</th>
-                                    <th className="text-right p-4">Trend</th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                                {TOP_SELLERS.map((seller, idx) => (
-                                    <tr key={seller.id} className="border-b border-border hover:bg-surface-alt/50">
-                                        <td className="p-4 font-medium text-heading flex items-center gap-3">
-                                            <span className="w-6 h-6 rounded-full bg-surface-alt flex items-center justify-center text-xs text-muted">
-                                                {idx + 1}
-                                            </span>
-                                            {seller.name}
-                                        </td>
-                                        <td className="p-4 text-muted flex items-center gap-2">
-                                            <ShoppingBagIcon className="w-4 h-4 text-muted" />
-                                            {seller.sales}
-                                        </td>
-                                        <td className="p-4 font-medium text-success-700">
-                                            {new Intl.NumberFormat('tr-TR', { style: 'currency', currency: 'TRY' }).format(seller.revenue)}
-                                        </td>
-                                        <td className="p-4">
-                                            <div className="flex items-center gap-1 text-warning-500">
-                                                <span className="font-bold text-heading">{seller.rating}</span>
-                                                <StarIconSolid className="w-4 h-4" />
-                                            </div>
-                                        </td>
-                                        <td className="p-4">
-                                            <span className={`px-2 py-1 rounded-full text-xs font-medium ${seller.status === 'active' ? 'bg-success-500/10 text-success-500' : 'bg-warning-500/10 text-warning-500'
-                                                }`}>
-                                                {seller.status === 'active' ? 'Çok İyi' : 'Dikkat'}
-                                            </span>
-                                        </td>
-                                        <td className="p-4 text-right">
-                                            <ArrowTrendingUpIcon className="w-5 h-5 text-success-500 inline-block" />
-                                        </td>
-                                    </tr>
-                                ))}
-                            </tbody>
-                        </table>
-                    </div>
-                </div>
-
-                {/* Charts Mockup */}
-                <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                    <div className="admin-card">
-                        <h3 className="text-lg font-semibold text-heading mb-4">Satıcı Büyümesi</h3>
-                        <div className="h-64 items-end justify-between gap-2 px-4 pb-2 border-b border-l">
-                            {[40, 65, 55, 80, 70, 90, 85, 95, 100, 110, 105, 120].map((h, i) => (
-                                <div key={i} className="w-full bg-primary-600/50 hover:bg-primary-600 rounded-t transition-all relative group" style={{ height: `${h}%` }}>
-                                    <div className="absolute -top-8 left-1/2 -translate-x-1/2 bg-heading text-heading text-xs px-2 py-1 rounded opacity-0 group-hover:opacity-100 whitespace-nowrap">
-                                        {h} Yeni Satıcı
-                                    </div>
-                                </div>
-                            ))}
-                        </div>
-                        <div className="flex justify-between text-xs text-muted mt-2 px-4">
-                            <span>Oca</span><span>Ara</span>
-                        </div>
-                    </div>
-
-                    <div className="admin-card">
-                        <h3 className="text-lg font-semibold text-heading mb-4">Kategori Dağılımı</h3>
-                        <div className="space-y-4">
-                            {[
-                                { label: 'Elektronik', val: 75, color: 'bg-info-500' },
-                                { label: 'Giyim', val: 60, color: 'bg-primary-500' },
-                                { label: 'Ev & Yaşam', val: 45, color: 'bg-success-500' },
-                                { label: 'Kozmetik', val: 30, color: 'bg-danger-500' },
-                            ].map((cat) => (
-                                <div key={cat.label}>
-                                    <div className="flex justify-between text-sm mb-1">
-                                        <span className="text-muted">{cat.label}</span>
-                                        <span className="text-muted">{cat.val}%</span>
-                                    </div>
-                                    <div className="h-2 bg-surface-alt rounded-full overflow-hidden">
-                                        <div className={`h-full ${cat.color}`} style={{ width: `${cat.val}%` }}></div>
-                                    </div>
-                                </div>
-                            ))}
-                        </div>
-                    </div>
-                </div>
-            </div>
+          <p className="font-medium text-heading">{row.original.displayName}</p>
+          <p className="text-xs text-muted">{row.original.email}</p>
         </>
-    );
+      ),
+    },
+    {
+      header: 'Üyelik',
+      cell: ({ row }) => {
+        const tierType = row.original.membership?.tier?.type ?? 'free';
+        const cfg = membershipConfig[tierType] ?? membershipConfig.free;
+        return <StatusBadge status={tierType} config={membershipConfig} />;
+      },
+    },
+    {
+      header: 'Ürün',
+      cell: ({ row }) => (
+        <span className="flex items-center gap-1.5 text-sm text-heading">
+          <CubeIcon className="w-4 h-4 text-muted shrink-0" />
+          {row.original._count.products}
+        </span>
+      ),
+    },
+    {
+      header: 'Sipariş',
+      cell: ({ row }) => (
+        <span className="flex items-center gap-1.5 text-sm text-heading">
+          <ShoppingBagIcon className="w-4 h-4 text-muted shrink-0" />
+          {row.original._count.sellerOrders}
+        </span>
+      ),
+    },
+    {
+      header: 'Durum',
+      cell: ({ row }) =>
+        row.original.isBanned ? (
+          <Badge variant="danger">Yasaklı</Badge>
+        ) : row.original.isVerified ? (
+          <Badge variant="success">Aktif</Badge>
+        ) : (
+          <Badge variant="warning">Doğrulanmamış</Badge>
+        ),
+    },
+  ];
+
+  return (
+    <div className="space-y-6">
+      {/* Özet kartlar */}
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+        <div className="admin-card p-4 flex items-center gap-4">
+          <div className="p-3 bg-info-500/10 rounded-lg shrink-0">
+            <UsersIcon className="w-6 h-6 text-info-500" />
+          </div>
+          <div>
+            <p className="text-sm text-muted">Toplam Satıcı</p>
+            <p className="text-xl font-bold text-heading">{total}</p>
+          </div>
+        </div>
+
+        <div className="admin-card p-4 flex items-center gap-4">
+          <div className="p-3 bg-primary-500/10 rounded-lg shrink-0">
+            <ChartBarIcon className="w-6 h-6 text-primary-500" />
+          </div>
+          <div className="min-w-0">
+            <p className="text-sm text-muted">En Çok Siparişli</p>
+            <p className="text-sm font-bold text-heading truncate" title={topByOrders?.displayName}>
+              {topByOrders ? `${topByOrders.displayName} (${topByOrders._count.sellerOrders})` : '—'}
+            </p>
+          </div>
+        </div>
+
+        <div className="admin-card p-4 flex items-center gap-4">
+          <div className="p-3 bg-success-500/10 rounded-lg shrink-0">
+            <CubeIcon className="w-6 h-6 text-success-500" />
+          </div>
+          <div>
+            <p className="text-sm text-muted">Bu Sayfada Toplam Ürün</p>
+            <p className="text-xl font-bold text-heading">
+              {sellers.reduce((s, x) => s + x._count.products, 0)}
+            </p>
+          </div>
+        </div>
+      </div>
+
+      <ResourceListPage
+        title="Satıcı Performansı"
+        description="Satıcıların sipariş ve ürün metrikleri"
+        search={{ placeholder: "Satıcı ara..." }}
+        searchValue={search}
+        onSearchChange={setSearch}
+        onSearchSubmit={onSearchSubmit}
+        columns={columns}
+        data={sellers}
+        loading={isLoading}
+        getRowId={(s) => s.id}
+        emptyText="Satıcı bulunamadı"
+        page={page}
+        totalPages={totalPages}
+        onPageChange={setPage}
+      />
+    </div>
+  );
 }

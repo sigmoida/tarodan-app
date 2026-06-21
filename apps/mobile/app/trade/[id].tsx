@@ -957,7 +957,7 @@ export default function TradeDetailScreen() {
               <Button
                 variant="outline"
                 title="Kargoyu Takip Et"
-                onPress={() => Linking.openURL(`https://www.araskargo.com.tr/ttrweb/takip_sonuc.jsp?kession=&siession=&evession=&action=tr&ara=1&soression=${theirTrackingNumber}`)}
+                onPress={() => Linking.openURL(`https://www.suratkargo.com.tr/KargoTakip/?kargotakipno=${encodeURIComponent(theirTrackingNumber)}`)}
                 style={styles.trackButton}
               />
             )}

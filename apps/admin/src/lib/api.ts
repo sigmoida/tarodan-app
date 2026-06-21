@@ -4,75 +4,67 @@ const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001';
 
 export const api = axios.create({
   baseURL: `${API_URL}/api`,
+  // Auth artık httpOnly cookie'lerde; her istekte cookie gönderilsin.
+  withCredentials: true,
   headers: {
     'Content-Type': 'application/json',
   },
 });
 
-// Request interceptor to add auth token
-api.interceptors.request.use(
-  (config) => {
-    if (typeof window !== 'undefined') {
-      const token = localStorage.getItem('admin_token');
-      if (token) {
-        config.headers.Authorization = `Bearer ${token}`;
-      } else if (process.env.NODE_ENV === 'development') {
-        console.warn('No admin token found in localStorage');
-      }
-    }
-
-    // Log request in development
-    if (process.env.NODE_ENV === 'development') {
-      console.log('API Request:', {
-        method: config.method?.toUpperCase(),
-        url: config.url,
-        baseURL: config.baseURL,
-        fullURL: `${config.baseURL}${config.url}`,
-        hasAuth: !!config.headers.Authorization,
-      });
-    }
-
+// Dev'de istek loglama. Auth localStorage'da DEĞİL; token'a hiç dokunmuyoruz (cookie taşıyor).
+if (process.env.NODE_ENV === 'development') {
+  api.interceptors.request.use((config) => {
+    console.log('API Request:', {
+      method: config.method?.toUpperCase(),
+      url: config.url,
+      fullURL: `${config.baseURL}${config.url}`,
+    });
     return config;
-  },
-  (error) => {
-    return Promise.reject(error);
-  }
-);
+  });
+}
 
-// Oturumu sonlandır (refresh de başarısızsa).
-function forceLogout() {
-  if (typeof window === 'undefined') return;
-  localStorage.removeItem('admin_token');
-  localStorage.removeItem('admin_refresh_token');
-  localStorage.removeItem('admin_user');
-  // Middleware admin erişimini admin_token COOKIE'sine göre açıyor; cookie
-  // temizlenmezse ölü oturum "girişli" görünüp sonsuz 401'e sokuyor.
-  document.cookie = 'admin_token=; path=/; max-age=0; SameSite=Lax';
+// Oturumu sonlandır (refresh de başarısızsa): sunucu cookie'leri silsin, login'e dön.
+let isLoggingOut = false;
+
+/** Aktif refresh girişimlerini iptal et (kullanıcı logout başlatınca çağrılır). */
+export function markLoggingOut() {
+  isLoggingOut = true;
+}
+
+async function forceLogout() {
+  if (typeof window === 'undefined' || isLoggingOut) return;
+  // Zaten /login'deysek yönlendirme yapma — yoksa bootstrap probe'unun 401'i sonsuz reload döngüsü kurar.
+  if (window.location.pathname === '/login') return;
+  isLoggingOut = true;
+  try {
+    await axios.post(`${API_URL}/api/auth/admin/logout`, null, {
+      withCredentials: true,
+    });
+  } catch {
+    // yoksay — yine de login'e gidiyoruz
+  }
   window.location.href = '/login';
 }
 
 // Eşzamanlı 401'lerde tek refresh yapmak için kuyruk.
 let isRefreshing = false;
-let refreshQueue: Array<(token: string | null) => void> = [];
-const flushQueue = (token: string | null) => {
-  refreshQueue.forEach((cb) => cb(token));
+let refreshQueue: Array<(ok: boolean) => void> = [];
+const flushQueue = (ok: boolean) => {
+  refreshQueue.forEach((cb) => cb(ok));
   refreshQueue = [];
 };
-
-function persistAccessToken(token: string) {
-  localStorage.setItem('admin_token', token);
-  const maxAge = 24 * 60 * 60;
-  document.cookie = `admin_token=${token}; path=/; max-age=${maxAge}; SameSite=Lax`;
-}
 
 const isAuthUrl = (url: string) =>
   url.includes('/auth/admin/login') ||
   url.includes('/auth/login') ||
+  url.includes('/auth/admin/logout') ||
+  url.includes('/auth/logout') ||
+  url.includes('/auth/admin/refresh') ||
   url.includes('/auth/refresh') ||
   url.includes('/auth/forgot-password') ||
   url.includes('/auth/reset-password');
 
-// Response interceptor: 401'de refresh token'la sessizce yenile, sonra isteği tekrarla.
+// Response interceptor: 401'de refresh cookie ile sessizce yenile, sonra isteği tekrarla.
 api.interceptors.response.use(
   (response) => response,
   async (error) => {
@@ -82,7 +74,6 @@ api.interceptors.response.use(
         method: error.config?.method,
         status: error.response?.status,
         message: error.message,
-        response: error.response?.data,
       });
     }
 
@@ -94,52 +85,33 @@ api.interceptors.response.use(
       status === 401 &&
       typeof window !== 'undefined' &&
       !isAuthUrl(reqUrl) &&
-      !originalRequest._retry
+      !originalRequest._retry &&
+      !isLoggingOut
     ) {
-      const refreshToken = localStorage.getItem('admin_refresh_token');
-      if (!refreshToken) {
-        forceLogout();
-        return Promise.reject(error);
-      }
       originalRequest._retry = true;
 
       // Zaten bir refresh sürüyorsa kuyruğa gir, bitince tekrarla.
       if (isRefreshing) {
         return new Promise((resolve, reject) => {
-          refreshQueue.push((token) => {
-            if (token) {
-              originalRequest.headers = originalRequest.headers || {};
-              originalRequest.headers.Authorization = `Bearer ${token}`;
-              resolve(api(originalRequest));
-            } else {
-              reject(error);
-            }
+          refreshQueue.push((ok) => {
+            if (ok) resolve(api(originalRequest));
+            else reject(error);
           });
         });
       }
 
       isRefreshing = true;
       try {
-        // Interceptor'sız ham axios ile yenile (sonsuz döngü olmasın, eski token gitmesin).
-        const resp = await axios.post(`${API_URL}/api/auth/refresh`, {
-          refreshToken,
+        // Refresh token httpOnly cookie'de — body göndermiyoruz. Admin'e özel uçtan yenile
+        // (aynı tarayıcıda kullanıcı oturumu da varsa doğru admin cookie'si yenilensin).
+        await axios.post(`${API_URL}/api/auth/admin/refresh`, null, {
+          withCredentials: true,
         });
-        const newAccess: string | undefined =
-          resp.data?.accessToken ?? resp.data?.tokens?.accessToken;
-        const newRefresh: string | undefined =
-          resp.data?.refreshToken ?? resp.data?.tokens?.refreshToken;
-        if (!newAccess) throw new Error('Yenileme yanıtında token yok');
-
-        persistAccessToken(newAccess);
-        if (newRefresh) localStorage.setItem('admin_refresh_token', newRefresh);
-        flushQueue(newAccess);
-
-        originalRequest.headers = originalRequest.headers || {};
-        originalRequest.headers.Authorization = `Bearer ${newAccess}`;
+        flushQueue(true);
         return api(originalRequest);
       } catch (refreshErr) {
-        flushQueue(null);
-        forceLogout();
+        flushQueue(false);
+        await forceLogout();
         return Promise.reject(refreshErr);
       } finally {
         isRefreshing = false;
@@ -193,6 +165,9 @@ export const adminApi = {
   getStaffSettings: () => api.get('/admin/staff/settings'),
   setStaffSettings: (allowAdminAssign: boolean) =>
     api.patch('/admin/staff/settings', { allowAdminAssign }),
+  getRolePermissions: () => api.get<Record<string, string[]>>('/admin/staff/role-permissions'),
+  setRolePermissions: (permissions: Record<string, string[]>) =>
+    api.put<Record<string, string[]>>('/admin/staff/role-permissions', { permissions }),
 
   // Products
   getProducts: (params?: any) => api.get('/admin/products', { params }),
@@ -206,6 +181,7 @@ export const adminApi = {
   bulkApproveProducts: (ids: string[], note?: string) => api.post('/admin/products/bulk-approve', { ids, note }),
   bulkRejectProducts: (ids: string[], reason: string) => api.post('/admin/products/bulk-reject', { ids, reason }),
   deleteProduct: (id: string) => api.delete(`/admin/products/${id}`),
+  restoreProduct: (id: string) => api.post(`/admin/products/${id}/restore`),
   exportProducts: (params?: { status?: string; categoryId?: string; sellerId?: string }) =>
     api.get('/admin/products-export', { params, responseType: 'blob' }),
 
@@ -216,21 +192,16 @@ export const adminApi = {
   // Reviews
   getReviews: (params?: any) => api.get('/admin/reviews', { params }),
   updateReviewStatus: (id: string, status: string) => api.patch(`/admin/reviews/${id}/status`, { status }),
-  replyToReview: (id: string, reply: string) => api.post(`/admin/reviews/${id}/reply`, { reply }),
-  deleteReview: (id: string) => api.delete(`/admin/reviews/${id}`),
   getUserRatings: (params?: any) => api.get('/admin/user-ratings', { params }),
   updateUserRatingStatus: (id: string, status: string) => api.patch(`/admin/user-ratings/${id}/status`, { status }),
-  deleteUserRating: (id: string) => api.delete(`/admin/user-ratings/${id}`),
 
   // Orders
   getOrders: (params?: any) => api.get('/admin/orders', { params }),
   getOrder: (id: string) => api.get(`/admin/orders/${id}`),
   updateOrderStatus: (id: string, status: string) => api.patch(`/admin/orders/${id}`, { status }),
-  addOrderTracking: (id: string, trackingNumber: string, carrier: string, trackingUrl?: string) =>
-    api.post(`/admin/orders/${id}/tracking`, { trackingNumber, carrier, trackingUrl }),
-  sendOrderNotification: (id: string, type: string, message?: string) =>
-    api.post(`/admin/orders/${id}/notify`, { type, message }),
   getOrderInvoice: (id: string) => api.get(`/admin/orders/${id}/invoice`),
+  applyOrderCoupon: (id: string, code: string | null) =>
+    api.post(`/admin/orders/${id}/apply-coupon`, { code }),
   // 48h pencere (Faz 4A.1)
   forceCompleteOrder: (id: string, reason?: string) =>
     api.post(`/admin/orders/${id}/force-complete`, reason ? { reason } : {}),
@@ -304,13 +275,17 @@ export const adminApi = {
   getMessages: (params?: any) => api.get('/admin/messages', { params }),
   getMessage: (id: string) => api.get(`/admin/messages/${id}`),
   approveMessage: (id: string, notes?: string) => api.post(`/admin/messages/${id}/approve`, notes ? { notes } : {}),
-  rejectMessage: (id: string, reason: string) => api.post(`/admin/messages/${id}/reject`, { reason }),
+  rejectMessage: (id: string, reason?: string) => api.post(`/admin/messages/${id}/reject`, { reason }),
+  revertMessage: (id: string) => api.post(`/admin/messages/${id}/revert`),
 
   // Support Tickets
-  getTickets: (params?: any) => api.get('/admin/support-tickets', { params }),
-  getTicket: (id: string) => api.get(`/admin/support-tickets/${id}`),
-  updateTicket: (id: string, data: any) => api.patch(`/admin/support-tickets/${id}`, data),
-  replyToTicket: (id: string, message: string) => api.post(`/admin/support-tickets/${id}/reply`, { message }),
+  getTickets: (params?: any) => api.get('/support/admin/tickets', { params }),
+  getTicket: (id: string) => api.get(`/support/admin/tickets/${id}`),
+  updateTicketStatus: (id: string, status: string, note?: string) =>
+    api.patch(`/support/admin/tickets/${id}/status`, { status, ...(note ? { note } : {}) }),
+  replyToTicket: (id: string, content: string, isInternal = false) =>
+    api.post(`/support/admin/tickets/${id}/messages`, { content, isInternal }),
+  getGuestContacts: () => api.get('/support/admin/guest-contacts'),
 
   // Reports
   getSalesReport: (params?: { startDate?: string; endDate?: string; format?: string }) =>
@@ -327,6 +302,8 @@ export const adminApi = {
   getSettings: () => api.get('/admin/settings'),
   updateSettings: (data: any) => api.patch('/admin/settings', data),
   updateSetting: (key: string, value: string) => api.patch(`/admin/settings/${key}`, { value }),
+  getCommissionRevenue: (params?: { fromDate?: string; toDate?: string }) =>
+    api.get('/admin/commission/revenue', { params }),
   getCommissionRules: () => api.get('/admin/commission-rules'),
   createCommissionRule: (data: any) => api.post('/admin/commission-rules', data),
   updateCommissionRule: (id: string, data: any) => api.patch(`/admin/commission-rules/${id}`, data),
@@ -415,6 +392,7 @@ export const adminApi = {
   // Seller Payouts
   getPayoutsSummary: () => api.get('/admin/payouts/summary'),
   getPayoutsTransactions: (params?: {
+    search?: string;
     sellerId?: string;
     status?: string;
     dateFrom?: string;
@@ -463,84 +441,26 @@ export const adminApi = {
   getEmailTemplate: (key: string) => api.get(`/admin/email-templates/${encodeURIComponent(key)}`),
   updateEmailTemplate: (key: string, data: any) =>
     api.patch(`/admin/email-templates/${encodeURIComponent(key)}`, data),
-  previewEmailTemplate: (key: string, templateData?: Record<string, any>) =>
-    api.post(`/admin/email-templates/${encodeURIComponent(key)}/preview`, { templateData }),
+  previewEmailTemplate: (
+    key: string,
+    templateData?: Record<string, any>,
+    draft?: { html?: string; subject?: string },
+  ) =>
+    api.post(`/admin/email-templates/${encodeURIComponent(key)}/preview`, {
+      templateData,
+      ...(draft?.html !== undefined && { overrideHtml: draft.html }),
+      ...(draft?.subject !== undefined && { overrideSubject: draft.subject }),
+    }),
+  resetEmailTemplate: (key: string) =>
+    api.delete(`/admin/email-templates/${encodeURIComponent(key)}`),
   sendTestEmail: (key: string, data: { to: string; templateData?: Record<string, any> }) =>
     api.post(`/admin/email-templates/${encodeURIComponent(key)}/send-test`, data),
 
-  // Shipping Methods
-  getShippingMethods: (params?: { isActive?: boolean; search?: string }) =>
-    api.get('/admin/shipping/methods', { params }),
-  createShippingMethod: (data: { name: string; code: string; description?: string; isActive?: boolean; sortOrder?: number }) =>
-    api.post('/admin/shipping/methods', data),
-  updateShippingMethod: (id: string, data: any) =>
-    api.patch(`/admin/shipping/methods/${id}`, data),
-  deleteShippingMethod: (id: string) =>
-    api.delete(`/admin/shipping/methods/${id}`),
-
-  // Shipping Carriers
-  getShippingCarriers: (params?: { isActive?: boolean; supportsLabels?: boolean; search?: string }) =>
-    api.get('/admin/shipping/carriers', { params }),
-  createShippingCarrier: (data: {
-    name: string;
-    code: string;
-    logo?: string;
-    trackingUrl?: string;
-    apiEndpoint?: string;
-    apiKey?: string;
-    apiSecret?: string;
-    isActive?: boolean;
-    supportsLabels?: boolean;
-  }) => api.post('/admin/shipping/carriers', data),
-  updateShippingCarrier: (id: string, data: any) =>
-    api.patch(`/admin/shipping/carriers/${id}`, data),
-  deleteShippingCarrier: (id: string) =>
-    api.delete(`/admin/shipping/carriers/${id}`),
-
-  // Shipping Zones
-  getShippingZones: (params?: { isActive?: boolean; country?: string; search?: string }) =>
-    api.get('/admin/shipping/zones', { params }),
-  createShippingZone: (data: {
-    name: string;
-    description?: string;
-    countries?: string[];
-    regions?: string[];
-    cities?: string[];
-    isDefault?: boolean;
-    isActive?: boolean;
-  }) => api.post('/admin/shipping/zones', data),
-  updateShippingZone: (id: string, data: any) =>
-    api.patch(`/admin/shipping/zones/${id}`, data),
-  deleteShippingZone: (id: string) =>
-    api.delete(`/admin/shipping/zones/${id}`),
-
-  // Shipping Rates
-  getShippingRates: (params?: { zoneId?: string; methodId?: string; carrierId?: string; isActive?: boolean }) =>
-    api.get('/admin/shipping/rates', { params }),
-  createShippingRate: (data: {
-    zoneId: string;
-    methodId: string;
-    carrierId: string;
-    basePrice: number;
-    pricePerKg?: number;
-    freeShippingMin?: number;
-    minDeliveryDays: number;
-    maxDeliveryDays: number;
-    isActive?: boolean;
-  }) => api.post('/admin/shipping/rates', data),
-  updateShippingRate: (id: string, data: any) =>
-    api.patch(`/admin/shipping/rates/${id}`, data),
-  deleteShippingRate: (id: string) =>
-    api.delete(`/admin/shipping/rates/${id}`),
-
-  // Shipping Labels
+  // Shipping (operations) — sipariş gönderilerini görüntüleme/takip (salt-okunur).
+  // Konfig (methods/carriers/zones/rates) ve etiket üretimi kaldırıldı; gerçek kargo Sürat entegrasyonu.
   getShipments(params?: any) {
     return api.get('/admin/shipping/shipments', { params });
   },
-  generateShippingLabel: (shipmentId: string) =>
-    api.post('/admin/shipping/labels/generate', { shipmentId }),
-  bulkGenerateShippingLabels: (shipmentIds: string[]) =>
-    api.post('/admin/shipping/labels/bulk-generate', { shipmentIds }),
 
   // Notifications
   getNotificationHistory: (params?: {
@@ -620,35 +540,6 @@ export const adminApi = {
   setCollectionFeatured: (id: string, isFeatured: boolean) =>
     api.patch(`/admin/collections/${id}/featured`, { isFeatured }),
 
-  // Tags
-  getTags: (params?: {
-    search?: string;
-    isActive?: boolean;
-    page?: number;
-    limit?: number;
-    sortBy?: string;
-    sortOrder?: string;
-  }) => api.get('/admin/tags', { params }),
-  createTag: (data: {
-    name: string;
-    description?: string;
-    color?: string;
-    isActive?: boolean;
-  }) => api.post('/admin/tags', data),
-  updateTag: (id: string, data: {
-    name?: string;
-    description?: string;
-    color?: string;
-    isActive?: boolean;
-  }) => api.patch(`/admin/tags/${id}`, data),
-  deleteTag: (id: string) => api.delete(`/admin/tags/${id}`),
-  mergeTags: (sourceTagIds: string[], targetTagId: string) =>
-    api.post('/admin/tags/merge', { sourceTagIds, targetTagId }),
-  bulkAssignTags: (productIds: string[], tagIds: string[]) =>
-    api.post('/admin/tags/bulk-assign', { productIds, tagIds }),
-  bulkRemoveTags: (productIds: string[], tagIds: string[]) =>
-    api.post('/admin/tags/bulk-remove', { productIds, tagIds }),
-
   // Attribute Groups
   getAttributeGroups: (params?: {
     search?: string;
@@ -697,6 +588,14 @@ export const adminApi = {
     isActive?: boolean;
   }) => api.patch(`/admin/attributes/${id}`, data),
   deleteAttribute: (id: string) => api.delete(`/admin/attributes/${id}`),
+
+  // Seller Applications
+  getSellerApplications: (params?: { page?: number; limit?: number; search?: string; status?: string }) =>
+    api.get('/admin/seller-applications', { params }),
+  approveSellerApplication: (id: string) =>
+    api.post(`/admin/seller-applications/${id}/approve`),
+  rejectSellerApplication: (id: string, reason: string) =>
+    api.post(`/admin/seller-applications/${id}/reject`, { reason }),
 };
 
 

@@ -920,6 +920,14 @@ export class TradeService {
           (product.quantity ?? 0) - (product.reservedQuantity ?? 0);
         if (available <= 0) {
           const reason = 'Stok takas icin ayrildi';
+          // Müsait adet bittiyse ürünü 'reserved' yap: status=active filtreleri
+          // (liste/arama/öne çıkanlar) ve detay (findOne) artık gizler, başka
+          // kullanıcı göremez/satın alamaz. Takas iptal/red/iade/tamamlanınca
+          // ilgili yollar status'u tekrar active'e (ya da sold/inactive) çevirir.
+          await tx.product.update({
+            where: { id: productId },
+            data: { status: ProductStatus.reserved },
+          });
           await this.productLockService.invalidateRelatedOffers(
             tx,
             productId,
@@ -1526,7 +1534,7 @@ export class TradeService {
           tradeId,
           shipperId: userId,
           fromAddressId: dto.fromAddressId,
-          carrier: dto.carrier,
+          carrier: 'surat',
           trackingNumber,
           status: ShipmentStatus.label_created,
           shippedAt: new Date(),
@@ -2119,6 +2127,36 @@ export class TradeService {
     }
 
     return cancelledCount;
+  }
+
+  /**
+   * O11: shipping_to_warehouse durumundaki ama `to_warehouse` kargo etiketleri OLUŞMAMIŞ
+   * takasları bul ve createInboundTradeShipments'i yeniden çağır (idempotent). Post-payment/
+   * post-accept fire-and-forget kargo oluşturma hata verirse (para alındı ama etiket yok)
+   * güvenilir bir telafi sağlar.
+   */
+  async reconcileMissingInboundShipments(): Promise<{ fixed: number }> {
+    const trades = await this.prisma.trade.findMany({
+      where: {
+        status: TradeStatus.shipping_to_warehouse,
+        shipments: { none: { leg: 'to_warehouse' } },
+      },
+      select: { id: true },
+      take: 50,
+    });
+
+    let fixed = 0;
+    for (const t of trades) {
+      try {
+        await this.createInboundTradeShipments(t.id);
+        fixed++;
+      } catch (e: any) {
+        this.logger.error(
+          `reconcileMissingInboundShipments: takas ${t.id} inbound kargo telafisi başarısız: ${e?.message}`,
+        );
+      }
+    }
+    return { fixed };
   }
 
   /**

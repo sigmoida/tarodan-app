@@ -1,10 +1,10 @@
 'use client';
 
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useMemo, useRef } from 'react';
 import { adminApi } from '@/lib/api';
 import { Button, Input, Select, Textarea } from '@tarodan/ui';
 import { DataTable, type ColumnDef } from '@/components/DataTable';
-import { PageHeader, ActionButtons, ActionIconButton } from '@/components/admin-list';
+import { PageHeader, FilterToolbar, ActionButtons, ActionIconButton } from '@/components/admin-list';
 import {
   PlusIcon,
   PencilIcon,
@@ -24,6 +24,7 @@ interface Manufacturer {
   description?: string;
   website?: string;
   country?: string;
+  foundedYear?: number | null;
   isActive: boolean;
   createdAt: string;
   updatedAt: string;
@@ -35,11 +36,13 @@ interface ManufacturerFormData {
   description: string;
   website: string;
   country: string;
+  foundedYear: string;
   isActive: boolean;
 }
 
 export default function ManufacturersPage() {
   const [manufacturers, setManufacturers] = useState<Manufacturer[]>([]);
+  const [search, setSearch] = useState('');
   const [loading, setLoading] = useState(true);
   const [showModal, setShowModal] = useState(false);
   const [editingManufacturer, setEditingManufacturer] = useState<Manufacturer | null>(null);
@@ -53,12 +56,40 @@ export default function ManufacturersPage() {
     description: '',
     website: '',
     country: '',
+    foundedYear: '',
     isActive: true,
   });
+
+  const filteredManufacturers = useMemo(() => {
+    const term = search.trim().toLocaleLowerCase('tr');
+    if (!term) return manufacturers;
+
+    return manufacturers.filter((manufacturer) =>
+      [
+        manufacturer.name,
+        manufacturer.slug,
+        manufacturer.country,
+        manufacturer.website,
+        manufacturer.description,
+      ]
+        .filter(Boolean)
+        .some((value) => value!.toLocaleLowerCase('tr').includes(term))
+    );
+  }, [manufacturers, search]);
 
   useEffect(() => {
     loadManufacturers();
   }, []);
+
+  useEffect(() => {
+    const handleEsc = (e: KeyboardEvent) => {
+      if (e.key !== 'Escape') return;
+      if (deleteConfirm) setDeleteConfirm(null);
+      else if (showModal) setShowModal(false);
+    };
+    document.addEventListener('keydown', handleEsc);
+    return () => document.removeEventListener('keydown', handleEsc);
+  }, [deleteConfirm, showModal]);
 
   const loadManufacturers = async () => {
     setLoading(true);
@@ -82,6 +113,7 @@ export default function ManufacturersPage() {
       description: '',
       website: '',
       country: '',
+      foundedYear: '',
       isActive: true,
     });
     setShowModal(true);
@@ -96,6 +128,7 @@ export default function ManufacturersPage() {
       description: m.description || '',
       website: m.website || '',
       country: m.country || '',
+      foundedYear: m.foundedYear != null ? String(m.foundedYear) : '',
       isActive: m.isActive,
     });
     setShowModal(true);
@@ -130,11 +163,20 @@ export default function ManufacturersPage() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     try {
+      const payload = {
+        name: formData.name,
+        logo: formData.logo || null,
+        description: formData.description || null,
+        website: formData.website || null,
+        country: formData.country || null,
+        foundedYear: formData.foundedYear ? parseInt(formData.foundedYear, 10) : null,
+        isActive: formData.isActive,
+      };
       if (editingManufacturer) {
-        await adminApi.updateManufacturer(editingManufacturer.id, formData);
+        await adminApi.updateManufacturer(editingManufacturer.id, payload);
         toast.success('Üretici güncellendi');
       } else {
-        await adminApi.createManufacturer(formData);
+        await adminApi.createManufacturer(payload);
         toast.success('Üretici oluşturuldu');
       }
       setShowModal(false);
@@ -235,12 +277,18 @@ export default function ManufacturersPage() {
           </Button>
         </PageHeader>
 
+        <FilterToolbar
+          search={search}
+          onSearchChange={setSearch}
+          searchPlaceholder="Üretici ara..."
+        />
+
         <DataTable
           columns={columns}
-          data={manufacturers}
+          data={filteredManufacturers}
           loading={loading}
-          emptyText="Henüz üretici eklenmemiş"
-          emptyAction={<Button onClick={openCreateModal}><PlusIcon className="w-5 h-5 mr-2" />İlk üreticiyi ekle</Button>}
+          emptyText={search ? 'Arama kriterine uygun üretici bulunamadı' : 'Henüz üretici eklenmemiş'}
+          emptyAction={!search ? <Button onClick={openCreateModal}><PlusIcon className="w-5 h-5 mr-2" />İlk üreticiyi ekle</Button> : undefined}
           getRowId={(m) => m.id}
         />
 
@@ -306,14 +354,27 @@ export default function ManufacturersPage() {
                       placeholder="https://www.hotwheels.com"
                     />
                   </div>
-                  <div>
-                    <label className="block text-sm font-medium text-body mb-1">Ülke</label>
-                    <Input
-                      type="text"
-                      value={formData.country}
-                      onChange={(e) => setFormData({ ...formData, country: e.target.value })}
-                      placeholder="Örn: ABD"
-                    />
+                  <div className="flex gap-4">
+                    <div className="flex-1">
+                      <label className="block text-sm font-medium text-body mb-1">Ülke</label>
+                      <Input
+                        type="text"
+                        value={formData.country}
+                        onChange={(e) => setFormData({ ...formData, country: e.target.value })}
+                        placeholder="Örn: ABD"
+                      />
+                    </div>
+                    <div className="flex-1">
+                      <label className="block text-sm font-medium text-body mb-1">Kuruluş Yılı</label>
+                      <Input
+                        type="number"
+                        value={formData.foundedYear}
+                        onChange={(e) => setFormData({ ...formData, foundedYear: e.target.value })}
+                        min="1800"
+                        max="2100"
+                        placeholder="Örn: 1968"
+                      />
+                    </div>
                   </div>
                   <div>
                     <label className="block text-sm font-medium text-body mb-1">Açıklama</label>

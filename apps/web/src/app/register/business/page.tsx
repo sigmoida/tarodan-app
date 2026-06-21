@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from "react";
 import Link from "next/link";
+import Image from "next/image";
 import { useRouter } from "next/navigation";
 import { motion } from "framer-motion";
 import {
@@ -180,12 +181,8 @@ export default function BusinessRegisterPage() {
       <div className="min-h-screen bg-gradient-to-br from-primary-50 via-surface-elevated to-warning-50 flex flex-col">
         <header className="p-6">
           <Link href="/" className="inline-flex items-center gap-2">
-            <div className="w-10 h-10 bg-gradient-to-br from-primary-500 to-warning-500 rounded-xl flex items-center justify-center">
-              <span className="text-inverted font-bold text-lg">T</span>
-            </div>
-            <span className="text-xl font-bold bg-gradient-to-r from-primary-600 to-warning-600 bg-clip-text text-transparent">
-              Tarodan
-            </span>
+            <Image src="/tarodan-logo.jpg" alt="Tarodan" width={36} height={36} className="rounded-lg object-contain" />
+            <span className="text-xl font-bold text-heading">Tarodan</span>
           </Link>
         </header>
 
@@ -414,10 +411,8 @@ export default function BusinessRegisterPage() {
         >
           <div className="text-center mb-8">
             <Link href="/" className="inline-flex items-center gap-2 mb-8">
-              <div className="w-12 h-12 bg-primary-500 rounded-xl flex items-center justify-center">
-                <span className="text-inverted text-2xl">🏢</span>
-              </div>
-              <span className="font-display font-bold text-2xl">TARODAN</span>
+              <Image src="/tarodan-logo.jpg" alt="Tarodan" width={40} height={40} className="rounded-lg object-contain" />
+              <span className="font-display font-bold text-2xl text-heading">Tarodan</span>
             </Link>
             <h1 className="text-3xl font-bold text-heading mb-2">
               {locale === "en"

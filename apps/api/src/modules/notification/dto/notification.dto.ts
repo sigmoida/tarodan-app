@@ -92,6 +92,10 @@ export enum NotificationType {
   PROMOTION = 'promotion',
   SPECIAL_OFFER = 'special_offer',
 
+  // Seller application notifications
+  SELLER_APPLICATION_APPROVED = 'seller_application_approved',
+  SELLER_APPLICATION_REJECTED = 'seller_application_rejected',
+
   // General
   WELCOME = 'welcome',
   PASSWORD_RESET = 'password_reset',

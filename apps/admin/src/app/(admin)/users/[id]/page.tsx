@@ -20,6 +20,7 @@ import {
 } from '@heroicons/react/24/outline';
 import { adminApi } from '@/lib/api';
 import { AdminTabs } from '@/components/AdminTabs';
+import { ModerationEventsPanel } from '@/components/ModerationEventsPanel';
 import { getProductEffectivePrice } from '@/lib/productPrice';
 import { Button, StatusBadge, Textarea, enumLabel, subscriptionStatusConfig } from '@tarodan/ui';
 import type { StatusConfig } from '@tarodan/ui';
@@ -143,7 +144,7 @@ export default function UserDetailPage() {
   const [showUnbanModal, setShowUnbanModal] = useState(false);
   const [banReason, setBanReason] = useState('');
   const [processing, setProcessing] = useState(false);
-  const [activeTab, setActiveTab] = useState<'orders' | 'products' | 'trades' | 'ratings'>('orders');
+  const [activeTab, setActiveTab] = useState<'orders' | 'products' | 'trades' | 'ratings' | 'ai'>('orders');
 
   useEffect(() => {
     if (userId) {
@@ -477,9 +478,10 @@ export default function UserDetailPage() {
                     { key: 'products', label: 'Ürünler', badge: user.products?.length || 0 },
                     { key: 'trades', label: 'Takaslar', badge: user.recentTrades?.length || 0 },
                     { key: 'ratings', label: 'Değerlendirmeler', badge: user.receivedRatings?.length || 0 },
+                    { key: 'ai', label: 'AI Denetim' },
                   ]}
                   value={activeTab}
-                  onChange={(k) => setActiveTab(k as 'orders' | 'products' | 'trades' | 'ratings')}
+                  onChange={(k) => setActiveTab(k as 'orders' | 'products' | 'trades' | 'ratings' | 'ai')}
                 />
               </div>
 
@@ -617,6 +619,16 @@ export default function UserDetailPage() {
                       <p className="text-muted text-center py-8">Henüz takas yok</p>
                     )}
                   </div>
+                )}
+
+                {/* AI Denetim Tab */}
+                {activeTab === 'ai' && (
+                  <ModerationEventsPanel
+                    entityType="user"
+                    entityId={userId}
+                    title="AI Denetim"
+                    description="Bu kullanıcıya ait tüm AI moderasyon olayları (avatar, biyografi, yorum)"
+                  />
                 )}
 
                 {/* Ratings Tab */}

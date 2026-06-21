@@ -9,21 +9,20 @@ import {
   CheckCircleIcon,
   XCircleIcon,
   TrashIcon,
+  ArrowUturnLeftIcon,
   PhotoIcon,
-  PencilIcon,
   StarIcon,
-  ChatBubbleLeftRightIcon,
-  ExclamationTriangleIcon,
 } from '@heroicons/react/24/outline';
 import { StarIcon as StarIconSolid } from '@heroicons/react/24/solid';
 import { adminApi } from '@/lib/api';
 import { AdminTabs } from '@/components/AdminTabs';
-import { Button, Input, Select, Spinner, Textarea, productConditionConfig, enumLabel } from '@tarodan/ui';
+import { Button, Spinner, Textarea, productConditionConfig, enumLabel } from '@tarodan/ui';
 import { getProductEffectivePrice, isProductOnSaleDisplay, getProductOriginalPriceForDisplay } from '@/lib/productPrice';
 import toast from 'react-hot-toast';
 import { format } from 'date-fns';
 import { tr } from 'date-fns/locale';
 import { useConfirm } from '@/components/ConfirmProvider';
+import { ModerationEventsPanel } from '@/components/ModerationEventsPanel';
 
 interface ProductDetail {
   id: string;
@@ -54,6 +53,11 @@ interface ProductDetail {
   createdAt: string;
   updatedAt: string;
   rejectionReason?: string;
+  // AI görsel moderasyon sonuçları
+  aiCheckStatus?: string | null;
+  aiRelevanceScore?: number | null;
+  aiNsfwScore?: number | null;
+  aiCheckReason?: string | null;
 }
 
 interface Review {
@@ -61,7 +65,7 @@ interface Review {
   score: number;
   title?: string;
   review?: string;
-  status: 'pending' | 'approved' | 'rejected' | 'spam';
+  status: 'pending' | 'approved' | 'rejected' | 'deleted';
   adminReply?: string;
   adminReplyAt?: string;
   createdAt: string;
@@ -98,25 +102,11 @@ export default function ProductDetailPage() {
   const [rejectReason, setRejectReason] = useState('');
   const [approveNote, setApproveNote] = useState('');
   const [processing, setProcessing] = useState(false);
-  const [showEditModal, setShowEditModal] = useState(false);
 
   // Tab and Reviews state
-  const [activeTab, setActiveTab] = useState<'info' | 'reviews'>('info');
+  const [activeTab, setActiveTab] = useState<'info' | 'reviews' | 'ai'>('info');
   const [reviews, setReviews] = useState<Review[]>([]);
   const [reviewsLoading, setReviewsLoading] = useState(false);
-  const [replyModalOpen, setReplyModalOpen] = useState(false);
-  const [selectedReview, setSelectedReview] = useState<Review | null>(null);
-  const [replyText, setReplyText] = useState('');
-
-  const [editForm, setEditForm] = useState({
-    title: '',
-    description: '',
-    price: '',
-    originalPrice: '',
-    quantity: '',
-    condition: '',
-    status: '',
-  });
 
   useEffect(() => {
     if (productId) {
@@ -129,15 +119,6 @@ export default function ProductDetailPage() {
     try {
       const response = await adminApi.getProduct(productId);
       setProduct(response.data);
-      setEditForm({
-        title: response.data.title,
-        description: response.data.description || '',
-        price: response.data.price?.toString() || '',
-        originalPrice: response.data.originalPrice?.toString() || '',
-        quantity: response.data.quantity?.toString() || '1',
-        condition: response.data.condition,
-        status: response.data.status,
-      });
     } catch (error: any) {
       if (process.env.NODE_ENV === 'development') console.error('Product load error:', error);
       toast.error(error.response?.data?.message || 'Ürün yüklenemedi');
@@ -160,11 +141,14 @@ export default function ProductDetailPage() {
     }
   };
 
+  // Yorum sayısı rozeti ilk render'da doğru görünsün diye yorumları sekme
+  // açılmasını beklemeden ürünle birlikte yükle. Aksi halde "Yorumlar" sekmesine
+  // girilene kadar rozet 0 görünüyordu.
   useEffect(() => {
-    if (activeTab === 'reviews' && productId) {
+    if (productId) {
       loadReviews();
     }
-  }, [activeTab, productId]);
+  }, [productId]);
 
   const handleReviewStatusUpdate = async (reviewId: string, status: string) => {
     try {
@@ -174,38 +158,6 @@ export default function ProductDetailPage() {
     } catch (error: any) {
       toast.error('Güncelleme başarısız');
     }
-  };
-
-  const handleReviewReply = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!selectedReview) return;
-    try {
-      await adminApi.replyToReview(selectedReview.id, replyText);
-      toast.success('Yanıt gönderildi');
-      setReplyModalOpen(false);
-      setReplyText('');
-      setSelectedReview(null);
-      loadReviews();
-    } catch (error: any) {
-      toast.error('Yanıt gönderilemedi');
-    }
-  };
-
-  const handleReviewDelete = async (reviewId: string) => {
-    if (!(await confirm({ description: 'Bu yorumu silmek istediğinizden emin misiniz?', destructive: true }))) return;
-    try {
-      await adminApi.deleteReview(reviewId);
-      toast.success('Yorum silindi');
-      loadReviews();
-    } catch (error: any) {
-      toast.error('Silme başarısız');
-    }
-  };
-
-  const openReplyModal = (review: Review) => {
-    setSelectedReview(review);
-    setReplyText(review.adminReply || '');
-    setReplyModalOpen(true);
   };
 
   const renderStars = (score: number) => (
@@ -221,7 +173,6 @@ export default function ProductDetailPage() {
       case 'approved': return <span className="px-2 py-1 text-xs bg-success-100 text-success-700 rounded-full">Onaylı</span>;
       case 'pending': return <span className="px-2 py-1 text-xs bg-warning-100 text-warning-700 rounded-full">Bekliyor</span>;
       case 'rejected': return <span className="px-2 py-1 text-xs bg-danger-100 text-danger-700 rounded-full">Reddedildi</span>;
-      case 'spam': return <span className="px-2 py-1 text-xs bg-surface-alt text-body rounded-full">Spam</span>;
       default: return <span className="px-2 py-1 text-xs bg-surface-alt text-body rounded-full">{status}</span>;
     }
   };
@@ -265,7 +216,7 @@ export default function ProductDetailPage() {
     setProcessing(true);
     try {
       await adminApi.deleteProduct(productId);
-      toast.success('Ürün silindi');
+      toast.success('Ürün kaldırıldı');
       router.push('/products');
     } catch (error: any) {
       toast.error(error.response?.data?.message || 'Silme işlemi başarısız');
@@ -273,23 +224,23 @@ export default function ProductDetailPage() {
     }
   };
 
-  const handleUpdate = async (e: React.FormEvent) => {
-    e.preventDefault();
+  const handleRestore = async () => {
+    if (
+      !(await confirm({
+        title: 'Ürünü geri yükle',
+        description:
+          'Ürün yeniden onaya (Beklemede) düşecek ve onaylandıktan sonra yayınlanacak.',
+        confirmLabel: 'Geri Yükle',
+      }))
+    )
+      return;
     setProcessing(true);
     try {
-      const data = {
-        ...editForm,
-        price: parseFloat(editForm.price),
-        originalPrice: editForm.originalPrice ? parseFloat(editForm.originalPrice) : null,
-        quantity: editForm.quantity ? parseInt(editForm.quantity) : null,
-      };
-
-      await adminApi.updateProduct(productId, data);
-      toast.success('Ürün güncellendi');
-      setShowEditModal(false);
+      await adminApi.restoreProduct(productId);
+      toast.success('Ürün geri yüklendi (onay bekliyor)');
       loadProduct();
     } catch (error: any) {
-      toast.error(error.response?.data?.message || 'Güncelleme başarısız');
+      toast.error(error.response?.data?.message || 'Geri yükleme başarısız');
     } finally {
       setProcessing(false);
     }
@@ -317,7 +268,11 @@ export default function ProductDetailPage() {
   const statusInfo = statusConfig[product.status] || statusConfig.pending;
   const canApprove = product.status === 'pending';
   const canReject = product.status === 'pending';
-  const canDelete = product.status !== 'sold' && product.status !== 'reserved';
+  const canRestore = product.status === 'deleted';
+  const canDelete =
+    product.status !== 'sold' &&
+    product.status !== 'reserved' &&
+    product.status !== 'deleted';
 
   return (
       <div className="min-h-screen bg-surface">
@@ -350,10 +305,11 @@ export default function ProductDetailPage() {
             <AdminTabs
               tabs={[
                 { key: 'info', label: 'Ürün Bilgileri', icon: CubeIcon },
-                { key: 'reviews', label: 'Yorumlar', icon: StarIcon, badge: reviews.length },
+                { key: 'reviews', label: 'Yorumlar', icon: StarIcon, badge: reviews.filter((rv) => rv.status !== 'deleted').length },
+                { key: 'ai', label: 'AI Denetim' },
               ]}
               value={activeTab}
-              onChange={(k) => setActiveTab(k as 'info' | 'reviews')}
+              onChange={(k) => setActiveTab(k as 'info' | 'reviews' | 'ai')}
             />
           </div>
 
@@ -439,6 +395,36 @@ export default function ProductDetailPage() {
                         </div>
                       </div>
                     )}
+                    {product.aiCheckStatus && (
+                      <div className="pt-3 border-t">
+                        <span className="text-muted text-sm">
+                          AI Görsel Denetimi:
+                        </span>
+                        <div className="mt-1 flex flex-wrap items-center gap-2">
+                          <span
+                            className={`px-2 py-1 rounded text-xs font-medium ${
+                              product.aiCheckStatus === 'flagged'
+                                ? 'bg-danger-500/20 text-danger-600'
+                                : product.aiCheckStatus === 'review'
+                                  ? 'bg-warning-500/20 text-warning-700'
+                                  : 'bg-success-500/20 text-success-700'
+                            }`}
+                          >
+                            {product.aiCheckStatus === 'flagged'
+                              ? 'Uygunsuz şüphesi'
+                              : product.aiCheckStatus === 'review'
+                                ? 'Düşük ilgililik (admin incelemesi)'
+                                : 'Temiz · oto-onay'}
+                          </span>
+                          <span className="text-xs text-muted">
+                            İlgililik (araç/model): %
+                            {Math.round((product.aiRelevanceScore ?? 0) * 100)} ·
+                            Uygunsuzluk: %
+                            {((product.aiNsfwScore ?? 0) * 100).toFixed(2)}
+                          </span>
+                        </div>
+                      </div>
+                    )}
                   </div>
                 </div>
 
@@ -468,10 +454,6 @@ export default function ProductDetailPage() {
                 <div className="bg-surface-elevated rounded-xl shadow-sm p-6">
                   <h3 className="text-lg font-semibold text-heading mb-4">İşlemler</h3>
                   <div className="space-y-2">
-                    <Button variant="primary" size="md" onClick={() => setShowEditModal(true)} className="w-full flex items-center justify-center gap-2">
-                      <PencilIcon className="w-5 h-5" />
-                      Düzenle
-                    </Button>
                     {canApprove && (
                       <Button variant="success" size="md" onClick={() => setShowApproveModal(true)} className="w-full flex items-center justify-center gap-2">
                         <CheckCircleIcon className="w-5 h-5" />
@@ -484,10 +466,16 @@ export default function ProductDetailPage() {
                         Reddet
                       </Button>
                     )}
+                    {canRestore && (
+                      <Button variant="success" size="md" onClick={handleRestore} disabled={processing} isLoading={processing} className="w-full flex items-center justify-center gap-2">
+                        <ArrowUturnLeftIcon className="w-5 h-5" />
+                        Geri Yükle
+                      </Button>
+                    )}
                     {canDelete && (
                       <Button variant="secondary" size="md" onClick={() => setShowDeleteModal(true)} className="w-full flex items-center justify-center gap-2">
                         <TrashIcon className="w-5 h-5" />
-                        Sil
+                        Kaldır
                       </Button>
                     )}
                   </div>
@@ -513,6 +501,14 @@ export default function ProductDetailPage() {
                 </div>
               </div>
             </div>
+          ) : activeTab === 'ai' ? (
+            /* AI Denetim Tab */
+            <ModerationEventsPanel
+              entityType="product"
+              entityId={productId}
+              title="AI Denetim"
+              description="Bu ürüne ait tüm AI moderasyon olayları"
+            />
           ) : (
             /* Reviews Tab */
             <div className="bg-surface-elevated rounded-xl shadow-sm">
@@ -559,46 +555,24 @@ export default function ProductDetailPage() {
                             </div>
                             {review.title && <p className="font-medium text-heading mb-1">{review.title}</p>}
                             {review.review && <p className="text-muted">{review.review}</p>}
-
-                            {review.adminReply && (
-                              <div className="mt-3 pl-4 border-l-2 border-primary-500 bg-primary-50 p-3 rounded-r-lg">
-                                <p className="text-xs font-medium text-primary-700 mb-1">Satıcı Yanıtı:</p>
-                                <p className="text-sm text-body">{review.adminReply}</p>
-                              </div>
-                            )}
                           </div>
                         </div>
 
                         <div className="flex items-center gap-2">
-                          {review.status === 'pending' && (
-                            <>
-                              <Button variant="secondary" onClick={() => handleReviewStatusUpdate(review.id, 'approved')}
-                                className="p-2 text-success-600 hover:bg-success-50 rounded-lg"
-                                title="Onayla">
-                                <CheckCircleIcon className="w-5 h-5" />
-                              </Button>
-                              <Button variant="secondary" onClick={() => handleReviewStatusUpdate(review.id, 'rejected')}
-                                className="p-2 text-danger-600 hover:bg-danger-50 rounded-lg"
-                                title="Reddet">
-                                <XCircleIcon className="w-5 h-5" />
-                              </Button>
-                            </>
+                          {review.status !== 'approved' && (
+                            <Button variant="secondary" onClick={() => handleReviewStatusUpdate(review.id, 'approved')}
+                              className="p-2 text-success-600 hover:bg-success-50 rounded-lg"
+                              title="Onayla">
+                              <CheckCircleIcon className="w-5 h-5" />
+                            </Button>
                           )}
-                          <Button variant="secondary" onClick={() => openReplyModal(review)}
-                            className="p-2 text-info-600 hover:bg-info-50 rounded-lg"
-                            title="Yanıtla">
-                            <ChatBubbleLeftRightIcon className="w-5 h-5" />
-                          </Button>
-                          <Button variant="secondary" onClick={() => handleReviewStatusUpdate(review.id, 'spam')}
-                            className="p-2 text-warning-600 hover:bg-warning-50 rounded-lg"
-                            title="Spam">
-                            <ExclamationTriangleIcon className="w-5 h-5" />
-                          </Button>
-                          <Button variant="secondary" onClick={() => handleReviewDelete(review.id)}
-                            className="p-2 text-muted hover:text-danger-600 hover:bg-danger-50 rounded-lg"
-                            title="Sil">
-                            <TrashIcon className="w-5 h-5" />
-                          </Button>
+                          {review.status !== 'rejected' && (
+                            <Button variant="secondary" onClick={() => handleReviewStatusUpdate(review.id, 'rejected')}
+                              className="p-2 text-danger-600 hover:bg-danger-50 rounded-lg"
+                              title="Reddet">
+                              <XCircleIcon className="w-5 h-5" />
+                            </Button>
+                          )}
                         </div>
                       </div>
                     </div>
@@ -608,36 +582,6 @@ export default function ProductDetailPage() {
             </div>
           )}
         </main>
-
-        {/* Reply Modal */}
-        {replyModalOpen && (
-          <div className="fixed inset-0 bg-heading bg-opacity-50 flex items-center justify-center z-50">
-            <div className="bg-surface-elevated rounded-xl px-6 pb-6 pt-5 max-w-lg w-full mx-4">
-              <h3 className="text-lg font-semibold text-heading mb-4 leading-tight">Yorumu Yanıtla</h3>
-              {selectedReview && (
-                <div className="mb-4 p-3 bg-surface rounded-lg">
-                  <p className="text-sm text-muted italic">"{selectedReview.review}"</p>
-                </div>
-              )}
-              <form onSubmit={handleReviewReply}>
-                <Textarea value={replyText}
-                  onChange={(e) => setReplyText(e.target.value)}
-                  className="text-heading"
-                  rows={4}
-                  placeholder="Yanıtınızı yazın..."
-                  required />
-                <div className="flex gap-3 mt-4">
-                  <Button variant="secondary" size="md" type="button" onClick={() => setReplyModalOpen(false)} className="flex-1">
-                    İptal
-                  </Button>
-                  <Button variant="primary" size="md" type="submit" className="flex-1">
-                    Yanıtla
-                  </Button>
-                </div>
-              </form>
-            </div>
-          </div>
-        )}
 
         {/* Approve Modal */}
         {showApproveModal && (
@@ -691,118 +635,20 @@ export default function ProductDetailPage() {
           </div>
         )}
 
-        {/* Edit Modal */}
-        {showEditModal && (
-          <div className="fixed inset-0 bg-heading bg-opacity-50 flex items-center justify-center z-50 overflow-y-auto py-10">
-            <div className="bg-surface-elevated rounded-xl px-6 pb-6 pt-5 max-w-2xl w-full mx-4 my-auto">
-              <div className="flex justify-between items-center mb-6">
-                <h3 className="text-lg font-semibold text-heading leading-tight">Ürünü Düzenle</h3>
-                <Button variant="secondary" onClick={() => setShowEditModal(false)}
-                  className="text-muted hover:text-body">
-                  <XCircleIcon className="w-6 h-6" />
-                </Button>
-              </div>
-
-              <form onSubmit={handleUpdate} className="space-y-4">
-                <div>
-                  <label className="block text-sm font-medium text-body mb-1">Başlık</label>
-                  <Input type="text"
-                    value={editForm.title}
-                    onChange={(e) => setEditForm({ ...editForm, title: e.target.value })}
-                    className="text-heading"
-                    required />
-                </div>
-
-                <div>
-                  <label className="block text-sm font-medium text-body mb-1">Açıklama</label>
-                  <Textarea value={editForm.description}
-                    onChange={(e) => setEditForm({ ...editForm, description: e.target.value })}
-                    className="text-heading"
-                    rows={5} />
-                </div>
-
-                <div className="grid grid-cols-2 gap-4">
-                  <div>
-                    <label className="block text-sm font-medium text-body mb-1">Fiyat (₺)</label>
-                    <Input type="number"
-                      step="0.01"
-                      value={editForm.price}
-                      onChange={(e) => setEditForm({ ...editForm, price: e.target.value })}
-                      className="text-heading"
-                      required />
-                  </div>
-                  <div>
-                    <label className="block text-sm font-medium text-body mb-1">İndirimsiz Fiyat (Opsiyonel)</label>
-                    <Input type="number"
-                      step="0.01"
-                      value={editForm.originalPrice}
-                      onChange={(e) => setEditForm({ ...editForm, originalPrice: e.target.value })}
-                      className="text-heading"
-                      placeholder="Boş bırakılabilir" />
-                  </div>
-                </div>
-
-                <div className="grid grid-cols-3 gap-4">
-                  <div>
-                    <label className="block text-sm font-medium text-body mb-1">Stok</label>
-                    <Input type="number"
-                      value={editForm.quantity}
-                      onChange={(e) => setEditForm({ ...editForm, quantity: e.target.value })}
-                      className="text-heading" />
-                  </div>
-                  <div>
-                    <label className="block text-sm font-medium text-body mb-1">Durum (Kondisyon)</label>
-                    <Select
-                      value={editForm.condition}
-                      onChange={(e) => setEditForm({ ...editForm, condition: e.target.value })}
-                    >
-                      {Object.entries(productConditionConfig).map(([value, cfg]) => (
-                        <option key={value} value={value}>
-                          {cfg.label}
-                        </option>
-                      ))}
-                    </Select>
-                  </div>
-                  <div>
-                    <label className="block text-sm font-medium text-body mb-1">Statü</label>
-                    <Select
-                      value={editForm.status}
-                      onChange={(e) => setEditForm({ ...editForm, status: e.target.value })}
-                    >
-                      {Object.entries(statusConfig).map(([key, config]) => (
-                        <option key={key} value={key}>{config.label}</option>
-                      ))}
-                    </Select>
-                  </div>
-                </div>
-
-                <div className="flex gap-3 pt-4 border-t mt-4">
-                  <Button variant="secondary" size="md" type="button" onClick={() => setShowEditModal(false)} className="flex-1">
-                    İptal
-                  </Button>
-                  <Button variant="primary" size="md" type="submit" disabled={processing} isLoading={processing} className="flex-1">
-                    {processing ? 'Kaydediliyor...' : 'Değişiklikleri Kaydet'}
-                  </Button>
-                </div>
-              </form>
-            </div>
-          </div>
-        )}
-
         {/* Delete Modal */}
         {showDeleteModal && (
           <div className="fixed inset-0 bg-heading bg-opacity-50 flex items-center justify-center z-50">
             <div className="bg-surface-elevated rounded-xl px-6 pb-6 pt-5 max-w-md w-full mx-4">
-              <h3 className="text-lg font-semibold text-heading mb-4 leading-tight">Ürünü Sil</h3>
+              <h3 className="text-lg font-semibold text-heading mb-4 leading-tight">Ürünü Kaldır</h3>
               <p className="text-muted mb-6">
-                Bu ürünü silmek istediğinizden emin misiniz? Bu işlem geri alınamaz.
+                Ürün listelerden kaldırılacak (Kaldırıldı durumuna alınır). İstediğinde Geri Yükle ile geri getirebilirsin.
               </p>
               <div className="flex gap-3">
                 <Button variant="secondary" size="md" onClick={() => setShowDeleteModal(false)} disabled={processing} className="flex-1">
                   İptal
                 </Button>
                 <Button variant="danger" size="md" onClick={handleDelete} disabled={processing} isLoading={processing} className="flex-1">
-                  {processing ? 'İşleniyor...' : 'Sil'}
+                  {processing ? 'İşleniyor...' : 'Kaldır'}
                 </Button>
               </div>
             </div>

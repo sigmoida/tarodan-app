@@ -745,6 +745,32 @@ export class SearchService implements OnModuleInit {
     }
   }
 
+  /**
+   * Bir ürünü güncel durumuna göre ES index'i ile senkronla:
+   * listelenebilir kümede ise (aktif/tükenen/satıldı) indexle, aksi halde
+   * (kaldırıldı/pasif-stoklu/draft/pending/reserved/rejected veya silinmiş)
+   * index'ten kaldır. Durum değiştiren her mutasyondan sonra çağrılmalı —
+   * aksi halde örn. kaldırılan ürün ES'te `status: active` ile kalıp aramada
+   * görünmeye devam eder ama detay sayfası "İlan bulunamadı" döner.
+   */
+  async syncProduct(productId: string): Promise<void> {
+    if (!this.esAvailable) return;
+    try {
+      const indexable = await this.prisma.product.count({
+        where: { AND: [{ id: productId }, this.indexableProductWhere()] },
+      });
+      if (indexable > 0) {
+        await this.indexProduct(productId);
+      } else {
+        await this.removeProduct(productId);
+      }
+    } catch (error) {
+      this.logger.warn(
+        `syncProduct failed for ${productId}: ${error instanceof Error ? error.message : String(error)}`,
+      );
+    }
+  }
+
   async forceRecreateIndex(): Promise<void> {
     this.logger.log('Force recreating Elasticsearch index');
     try {

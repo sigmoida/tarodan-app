@@ -27,6 +27,11 @@ import { computeQualityScore } from './helpers/quality-score';
 import { computeRelevanceScore } from './helpers/relevance-score';
 import { DiscountService } from '../discount/discount.service';
 import { StorageService } from '../storage/storage.service';
+import { InjectQueue } from '@nestjs/bull';
+import { Queue } from 'bull';
+import { QUEUE_NAMES } from '../../workers/constants';
+import { ModerationAiClient } from '../moderation/moderation-ai.client';
+import { renderEmailTemplate, getEmailTemplateSubject, substituteEmailVariables } from '../../common/helpers/email-template-renderer';
 
 @Injectable()
 export class ProductService implements OnModuleInit {
@@ -49,6 +54,9 @@ export class ProductService implements OnModuleInit {
     private readonly smtpProvider: SmtpProvider,
     private readonly discountService: DiscountService,
     private readonly storageService: StorageService,
+    @InjectQueue(QUEUE_NAMES.MODERATION)
+    private readonly moderationQueue: Queue,
+    private readonly moderationAi: ModerationAiClient,
   ) { }
 
   /**
@@ -96,6 +104,37 @@ export class ProductService implements OnModuleInit {
         `Üyeliğiniz (${limits.tierName}) ile ilan başına maksimum ${limits.maxImages} görsel yükleyebilirsiniz. ` +
         `${dto.images.length} görsel gönderdiniz.`
       );
+    }
+
+    // AI görsel moderasyonu (senkron): uygunsuz/NSFW görselde ilanı ENGELLE + net mesaj.
+    // Düşük ilgililik admin incelemesine kalabilir; burada sadece uygunsuzu durdururuz.
+    if (dto.images?.length && this.moderationAi.isEnabled) {
+      for (const img of dto.images) {
+        const url = this.storageService.getPublicAssetUrl(img.detailKey || img.cardKey);
+        if (!url) continue;
+        const verdict = await this.moderationAi.moderateImage(url);
+        if (verdict?.decision === 'flag') {
+          throw new BadRequestException(
+            'Yüklediğiniz resim uygun değildir. Lütfen uygun bir ürün görseli yükleyin.',
+          );
+        }
+      }
+    }
+
+    // Başlık + açıklama küfür/uygunsuz dil kontrolü (senkron) — uygunsuzsa engelle + event yaz.
+    await this.moderationAi.assertTextClean(dto.title, {
+      entityType: 'product',
+      userId: sellerId,
+      field: 'title',
+      label: 'ürün başlığı',
+    });
+    if (dto.description) {
+      await this.moderationAi.assertTextClean(dto.description, {
+        entityType: 'product',
+        userId: sellerId,
+        field: 'description',
+        label: 'ürün açıklaması',
+      });
     }
 
     // Auto-enable seller mode when user creates their first listing
@@ -239,6 +278,19 @@ export class ProductService implements OnModuleInit {
       // İlan Kalite Skoru + rankTier hesapla (best-effort; sıralama bozulmasın)
       await this.recomputeProductRanking(product.id).catch(() => {});
 
+      // AI görsel moderasyonu (async, best-effort): temiz+ilgili -> oto-onay,
+      // NSFW/şüpheli -> pending kalır (admin kuyruğu). Servis kapalıysa pending.
+      if (product.images?.length) {
+        this.moderationQueue
+          .add('product-image', {
+            productId: product.id,
+            imageKeys: product.images.map((img) => img.detailKey || img.cardKey),
+          })
+          .catch((err) =>
+            this.logger.warn(`Moderation job eklenemedi: ${err.message}`),
+          );
+      }
+
       // Invalidate product list cache
       await this.cache.delPattern('products:list:*');
 
@@ -312,6 +364,7 @@ export class ProductService implements OnModuleInit {
             { displayValue: scaleTrim },
           ],
         },
+        orderBy: { sortOrder: 'asc' },
         select: { id: true },
       });
       if (scaleAttr) toLink.push(scaleAttr.id);
@@ -1267,10 +1320,6 @@ export class ProductService implements OnModuleInit {
           dto.material,
           dto.attributes,
         );
-        // Reindex in ES so search/list shows updated scale/material
-        if (this.searchService.isAvailable()) {
-          this.searchService.indexProduct(id).catch((err) => this.logger.warn(`ES index update failed for ${id}:`, err));
-        }
       }
 
       // İlan Kalite Skoru + rankTier yeniden hesapla (foto/açıklama değişmiş olabilir)
@@ -1279,6 +1328,13 @@ export class ProductService implements OnModuleInit {
       // Invalidate cache for this product and product lists
       await this.cache.del(`products:detail:${id}`);
       await this.cache.delPattern('products:list:*');
+
+      // Arama index'ini güncel durum/stok/skora göre senkronla: listelenebilir
+      // ise indexle (scale/material/ranking güncel), değilse (pasife alındı vb.)
+      // ES'ten kaldır. Recompute + cache invalidation sonrası çağrılır.
+      this.searchService
+        .syncProduct(id)
+        .catch((err) => this.logger.warn(`ES sync failed for ${id}: ${err?.message}`));
 
       // If price changed, notify users who have this product in their wishlist
       if (priceChanged && updated.status === ProductStatus.active) {
@@ -1390,35 +1446,26 @@ export class ProductService implements OnModuleInit {
         try {
           const acceptsMarketingEmails = user.acceptsMarketingEmails === true;
           if (acceptsMarketingEmails) {
-            const htmlContent = this.generatePriceChangeEmailHtml(
-              user.displayName,
+            const frontendUrl = process.env.FRONTEND_URL || 'https://tarodan.com';
+            const templateData = {
+              userName: user.displayName,
               productTitle,
               oldPrice,
               newPrice,
-              priceChange,
-              priceChangePercent,
+              priceChange: Math.abs(priceChange),
+              priceChangePercent: Math.abs(Number(priceChangePercent)),
               isPriceDrop,
-              productId,
-            );
-            const textContent = this.generatePriceChangeEmailText(
-              user.displayName,
-              productTitle,
-              oldPrice,
-              newPrice,
-              priceChange,
-              priceChangePercent,
-              isPriceDrop,
-              productId,
-            );
+              productUrl: `${frontendUrl}/products/${productId}`,
+            };
+            const priceDbTemplate = await this.prisma.emailTemplate.findUnique({ where: { key: 'wishlist-price-change' } });
+            const html = priceDbTemplate?.bodyHtml
+              ? substituteEmailVariables(priceDbTemplate.bodyHtml, templateData)
+              : renderEmailTemplate('wishlist-price-change', templateData, frontendUrl);
+            const subject = priceDbTemplate?.subject
+              ? substituteEmailVariables(priceDbTemplate.subject, templateData)
+              : getEmailTemplateSubject('wishlist-price-change', templateData);
 
-            await this.smtpProvider.sendEmail({
-              to: user.email,
-              subject: isPriceDrop
-                ? `🎉 Fiyat Düştü: ${productTitle}`
-                : `📈 Fiyat Değişti: ${productTitle}`,
-              html: htmlContent,
-              text: textContent,
-            });
+            await this.smtpProvider.sendEmail({ to: user.email, subject, html });
           }
         } catch (emailError: any) {
           // Email failure shouldn't stop in-app notification
@@ -1573,6 +1620,12 @@ Bu ürünü istek listenizden kaldırmak için ürün sayfasına gidip "İstek L
     await this.cache.del(`membership:limits:${sellerId}`);
     await this.cache.del(`membership:${sellerId}`);
 
+    // Arama index'inden kaldır: "Kaldırıldı" durumu listelenemez. Aksi halde
+    // ES dokümanı eski (active) haliyle kalıp aramada görünür ama detay 404 olur.
+    this.searchService
+      .syncProduct(id)
+      .catch((err) => this.logger.warn(`ES sync failed for ${id}: ${err?.message}`));
+
     return { message: 'Ürün silindi' };
   }
 
@@ -1626,9 +1679,9 @@ Bu ürünü istek listenizden kaldırmak için ürün sayfasına gidip "İstek L
       ...(status && status.trim() !== ''
         ? { status: status as ProductStatus }
         : {
-          // "Tümü": draft ve deleted hariç hepsi (sold, inactive, reserved, active,
+          // "Tümü": deleted hariç hepsi (sold, inactive, reserved, active,
           // pending, rejected görünür). Kaldırılan ürünler ayrı 'deleted' filtresinde.
-          status: { notIn: [ProductStatus.draft, ProductStatus.deleted] }
+          status: { notIn: [ProductStatus.deleted] }
         }
       ),
       // Takas teklifine eklenebilir ürünler: aktif + aktif takasta değil + müsait stoğu var
@@ -1722,9 +1775,11 @@ Bu ürünü istek listenizden kaldırmak için ürün sayfasına gidip "İstek L
         p.attribute?.group?.slug === groupSlug ||
         (groupNameFallback && p.attribute?.group?.name?.toLowerCase() === groupNameFallback.toLowerCase()),
     );
-    const val = pa?.attribute?.displayValue ?? pa?.attribute?.value ?? undefined;
+    // Use || (not ??) so that empty-string displayValue correctly falls through to value.
+    const val = pa?.attribute?.displayValue || pa?.attribute?.value || undefined;
     if (val) return val;
-    // Normalize scale slug to value format for dropdown match (e.g. "164" -> "1:64", "118" -> "1:18")
+    // Normalize scale slug to value format for dropdown match (e.g. "164" -> "1:64", "118" -> "1:18").
+    // Only runs when both displayValue and value are falsy (null/undefined/empty).
     if (groupSlug === 'scale' && pa?.attribute?.slug && /^\d+$/.test(pa.attribute.slug)) {
       const s = pa.attribute.slug;
       if (s.length >= 2) return `1:${s.slice(1)}`;
@@ -2319,19 +2374,19 @@ Bu ürünü istek listenizden kaldırmak için ürün sayfasına gidip "İstek L
         this.prisma.product.count({ where: { sellerId, status: ProductStatus.inactive } }),
         // Kaldırılan (yönetici/satıcı silmesi) — ayrı sayaç.
         this.prisma.product.count({ where: { sellerId, status: ProductStatus.deleted } }),
-        // Total should exclude inactive, draft and deleted listings (limit/usage card uses this)
+        // Total should exclude inactive and deleted listings (limit/usage card uses this)
         this.prisma.product.count({
           where: {
             sellerId,
-            status: { notIn: [ProductStatus.inactive, ProductStatus.draft, ProductStatus.deleted] }
+            status: { notIn: [ProductStatus.inactive, ProductStatus.deleted] }
           }
         }),
-        // "Tümü" sayacı: draft ve deleted hariç (inactive DAHİL). Liste "Tümü"
-        // filtresi (findSellerProducts: notIn[draft, deleted]) ile birebir.
+        // "Tümü" sayacı: deleted hariç (inactive DAHİL). Liste "Tümü"
+        // filtresi (findSellerProducts: notIn[deleted]) ile birebir.
         this.prisma.product.count({
           where: {
             sellerId,
-            status: { notIn: [ProductStatus.draft, ProductStatus.deleted] }
+            status: { notIn: [ProductStatus.deleted] }
           }
         }),
       ]);

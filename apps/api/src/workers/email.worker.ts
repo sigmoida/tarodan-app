@@ -8,6 +8,7 @@ import { Job } from 'bull';
 import { ConfigService } from '@nestjs/config';
 import { PrismaService } from '../prisma';
 import * as nodemailer from 'nodemailer';
+import { renderEmailTemplate, getEmailTemplateSubject } from '../common/helpers/email-template-renderer';
 
 export interface EmailJobData {
   to: string;
@@ -162,17 +163,22 @@ export class EmailWorker {
       throw new Error('Template name is required');
     }
 
+    const frontendUrl = this.configService.get<string>('FRONTEND_URL') ||
+      (this.configService.get('NODE_ENV') === 'production' ? 'https://tarodan.com' : 'http://localhost:3000');
+
     // Check DB for custom template first
     const dbTemplate = await this.prisma.emailTemplate.findUnique({ where: { key: template } });
     let html: string;
     let subject: string;
-    if (dbTemplate?.subject && dbTemplate?.bodyHtml) {
-      subject = this.substituteVariables(dbTemplate.subject, data);
+    if (dbTemplate?.bodyHtml) {
       html = this.substituteVariables(dbTemplate.bodyHtml, data);
+      // Use DB subject if set, otherwise fall back to producer-supplied or default
+      subject = dbTemplate.subject
+        ? this.substituteVariables(dbTemplate.subject, data)
+        : job.data.subject || getEmailTemplateSubject(template, data);
     } else {
-      html = this.renderTemplate(template, data);
-      // Prefer the subject the producer supplied; only fall back to the per-template default.
-      subject = job.data.subject || this.getTemplateSubject(template, data);
+      html = renderEmailTemplate(template, data, frontendUrl);
+      subject = job.data.subject || getEmailTemplateSubject(template, data);
     }
 
     return this.handleSend({
@@ -212,7 +218,7 @@ export class EmailWorker {
       'order-created-buyer': `Siparişiniz alındı - ${data?.orderNumber || ''}`,
       'order-created-seller': `Yeni sipariş - ${data?.orderNumber || ''}`,
       'order-paid': `Ödeme alındı - ${data?.orderNumber || ''}`,
-      'order-paid-seller': `Ödeme alındı, kargoya hazırlayın - ${data?.orderNumber || ''}`,
+      'order-paid-seller': `Yeni sipariş - ${data?.orderNumber || ''}`,
       'order-shipped': 'Siparişiniz Kargoya Verildi',
       'order-delivered': 'Siparişiniz Teslim Edildi',
       'password-reset': 'Şifre Sıfırlama Talebi',
@@ -482,10 +488,10 @@ export class EmailWorker {
       `, 'Ödeme Alındı'),
 
       'order-paid-seller': wrapEmail(`
-        ${title('Ödeme Alındı - Kargoya Hazırlayın', '💰')}
+        ${title('Yeni Sipariş!', '🎉')}
         ${greeting(data?.sellerName)}
         <p style="font-size: 15px; color: #4b5563; line-height: 1.6; margin: 0 0 20px 0;">
-          Siparişiniz için ödeme alındı. Lütfen ürünü <strong style="color: #dc2626;">en geç 3 iş günü</strong> içinde kargoya veriniz.
+          Tebrikler! Ürününüz satıldı ve ödemesi alındı. Lütfen ürünü <strong style="color: #dc2626;">en geç 3 iş günü</strong> içinde kargoya veriniz.
         </p>
         ${successBox(`
           <p style="margin: 0; font-size: 16px; color: #166534; font-weight: 600;">
@@ -518,7 +524,7 @@ export class EmailWorker {
             ℹ️ Not: Ödemeniz, alıcı ürünü teslim aldıktan 7 gün sonra hesabınıza aktarılacaktır.
           </p>
         `)}
-      `, 'Ödeme Alındı - Kargoya Hazırlayın'),
+      `, 'Yeni Sipariş!'),
 
       'order-shipped': wrapEmail(`
         ${title('Siparişiniz Kargoya Verildi', '📦')}

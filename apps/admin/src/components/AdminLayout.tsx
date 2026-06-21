@@ -5,6 +5,8 @@ import Link from 'next/link';
 import Image from 'next/image';
 import { usePathname, useRouter } from 'next/navigation';
 import { useAuthStore } from '@/lib/stores/authStore';
+import { useIdleLogout } from '@/hooks/useIdleLogout';
+import { adminApi } from '@/lib/api';
 import clsx from 'clsx';
 import { Button, Input, adminRoleConfig, enumLabel } from '@tarodan/ui';
 import {
@@ -20,7 +22,6 @@ import {
   CurrencyDollarIcon,
   UserCircleIcon,
   ChatBubbleLeftRightIcon,
-  TagIcon,
   SwatchIcon,
   TicketIcon,
   CalculatorIcon,
@@ -48,7 +49,12 @@ type NavItem = {
   icon: ComponentType<{ className?: string }>;
   /** Ek arama kelimeleri (ör. İngilizce route, eş anlamlı) */
   keywords?: string[];
-  /** Bu öğeyi görebilecek admin rolleri. Belirtilmezse varsayılan: super_admin + admin. */
+  /**
+   * Bu öğeyi göstermek için gerekli izin anahtarı (rol izin matrisinden).
+   * Belirtilmezse `roles` dizisine fallback yapılır.
+   */
+  permission?: string;
+  /** Fallback: izin sistemi yüklenemezse bu roller kontrol edilir. Belirtilmezse super_admin + admin. */
   roles?: string[];
 };
 
@@ -60,8 +66,8 @@ type NavGroup = {
 };
 
 const topLevelNav: NavItem[] = [
-  { name: 'Dashboard', href: '/dashboard', icon: HomeIcon, keywords: ['ana sayfa', 'home'] },
-  { name: 'Analizler', href: '/analytics', icon: ChartBarIcon, keywords: ['istatistik', 'rapor'] },
+  { name: 'Dashboard', href: '/dashboard', icon: HomeIcon, keywords: ['ana sayfa', 'home'], permission: 'dashboard' },
+  { name: 'Analizler', href: '/analytics', icon: ChartBarIcon, keywords: ['istatistik', 'rapor'], permission: 'analytics' },
 ];
 
 const navGroups: NavGroup[] = [
@@ -70,27 +76,11 @@ const navGroups: NavGroup[] = [
     name: 'Operasyon',
     icon: ClipboardDocumentIcon,
     items: [
-      { name: 'Siparişler', href: '/orders', icon: ClipboardDocumentListIcon, keywords: ['order'] },
-      {
-        name: 'Takaslar',
-        href: '/trades',
-        icon: ArrowsRightLeftIcon,
-        keywords: ['takas', 'trade', 'barter', 'değişim', 'safe trade'],
-      },
-      {
-        name: 'Takas Kargoları',
-        href: '/trade-shipments',
-        icon: TruckIcon,
-        keywords: ['trade shipment', 'takas kargo', 'depoya', 'from warehouse'],
-      },
-      { name: 'Kargo', href: '/shipping', icon: TruckIcon },
-      {
-        name: 'İade Talepleri',
-        href: '/refund-requests',
-        icon: BanknotesIcon,
-        keywords: ['iade', 'refund', 'request', 'dispute', 'talep'],
-      },
-      { name: 'İade Geçmişi', href: '/refunds', icon: BanknotesIcon, keywords: ['iade', 'refund'] },
+      { name: 'Siparişler', href: '/orders', icon: ClipboardDocumentListIcon, keywords: ['order'], permission: 'orders' },
+      { name: 'Takaslar', href: '/trades', icon: ArrowsRightLeftIcon, keywords: ['takas', 'trade', 'barter', 'değişim'], permission: 'trades' },
+      { name: 'Kargo', href: '/shipping', icon: TruckIcon, keywords: ['kargo', 'shipping', 'gönderi', 'etiket', 'takip'], permission: 'shipping' },
+      { name: 'İade Talepleri', href: '/refund-requests', icon: BanknotesIcon, keywords: ['iade', 'refund', 'talep'], permission: 'refund_requests' },
+      { name: 'İade Geçmişi', href: '/refunds', icon: BanknotesIcon, keywords: ['iade', 'refund', 'geçmiş'], permission: 'refund_history' },
     ],
   },
   {
@@ -98,14 +88,13 @@ const navGroups: NavGroup[] = [
     name: 'Katalog',
     icon: Squares2X2Icon,
     items: [
-      { name: 'Ürünler', href: '/products', icon: ShoppingBagIcon, roles: ['super_admin', 'admin', 'moderator'] },
-      { name: 'Kategoriler', href: '/categories', icon: CubeIcon },
-      { name: 'Markalar', href: '/brands', icon: SwatchIcon },
-      { name: 'Modeller', href: '/car-models', icon: TruckIcon },
-      { name: 'Üreticiler', href: '/manufacturers', icon: BuildingOffice2Icon },
-      { name: 'Ürün Özellikleri', href: '/attributes', icon: ClipboardDocumentListIcon, keywords: ['attribute', 'özellik'] },
-      { name: 'Koleksiyonlar', href: '/collections', icon: ClipboardDocumentCheckIcon },
-      { name: 'Etiketler', href: '/tags', icon: TagIcon },
+      { name: 'Ürünler', href: '/products', icon: ShoppingBagIcon, permission: 'products' },
+      { name: 'Kategoriler', href: '/categories', icon: CubeIcon, permission: 'categories' },
+      { name: 'Markalar', href: '/brands', icon: SwatchIcon, permission: 'brands' },
+      { name: 'Modeller', href: '/car-models', icon: TruckIcon, permission: 'car_models' },
+      { name: 'Üreticiler', href: '/manufacturers', icon: BuildingOffice2Icon, permission: 'manufacturers' },
+      { name: 'Ürün Özellikleri', href: '/attributes', icon: ClipboardDocumentListIcon, keywords: ['attribute', 'özellik'], permission: 'attributes' },
+      { name: 'Koleksiyonlar', href: '/collections', icon: ClipboardDocumentCheckIcon, permission: 'collections' },
     ],
   },
   {
@@ -113,11 +102,20 @@ const navGroups: NavGroup[] = [
     name: 'Hesaplar',
     icon: UsersIcon,
     items: [
-      { name: 'Kullanıcılar', href: '/users', icon: UsersIcon, keywords: ['user', 'üye'], roles: ['super_admin', 'admin', 'moderator'] },
-      { name: 'Satıcı Başvuruları', href: '/sellers/applications', icon: ClipboardDocumentCheckIcon },
-      { name: 'Satıcı Performansı', href: '/sellers/performance', icon: ChartBarIcon },
-      { name: 'Yorumlar', href: '/reviews', icon: StarIcon, roles: ['super_admin', 'admin', 'moderator'] },
-      { name: 'Rol Yönetimi', href: '/roles', icon: UserCircleIcon },
+      { name: 'Kullanıcılar', href: '/users', icon: UsersIcon, keywords: ['user', 'üye'], permission: 'users' },
+      { name: 'Satıcı Başvuruları', href: '/sellers/applications', icon: ClipboardDocumentCheckIcon, permission: 'seller_applications' },
+      { name: 'Satıcı Performansı', href: '/sellers/performance', icon: ChartBarIcon, permission: 'seller_performance' },
+      { name: 'Yorumlar', href: '/reviews', icon: StarIcon, permission: 'reviews' },
+      { name: 'Rol Yönetimi', href: '/roles', icon: UserCircleIcon, permission: 'staff' },
+    ],
+  },
+  {
+    id: 'messaging',
+    name: 'Mesajlaşma',
+    icon: ChatBubbleLeftRightIcon,
+    items: [
+      { name: 'Mesajlar', href: '/messages', icon: ChatBubbleLeftRightIcon, permission: 'messages' },
+      { name: 'Destek Talepleri', href: '/support', icon: ChatBubbleLeftRightIcon, keywords: ['destek', 'support', 'ticket'], permission: 'support' },
     ],
   },
   {
@@ -125,11 +123,11 @@ const navGroups: NavGroup[] = [
     name: 'Pazarlama & İçerik',
     icon: MegaphoneIcon,
     items: [
-      { name: 'İndirimler', href: '/discounts', icon: TicketIcon },
-      { name: 'Bildirimler', href: '/notifications', icon: BellAlertIcon },
-      { name: 'E-posta Şablonları', href: '/email-templates', icon: ChatBubbleLeftRightIcon },
-      { name: 'Mesajlar', href: '/messages', icon: ChatBubbleLeftRightIcon, roles: ['super_admin', 'admin', 'moderator'] },
-      { name: 'Sayfalar', href: '/pages', icon: DocumentTextIcon },
+      { name: 'İndirimler', href: '/discounts', icon: TicketIcon, permission: 'discounts' },
+      { name: 'Reklamlar', href: '/ads', icon: MegaphoneIcon, keywords: ['reklam', 'ad', 'banner'], permission: 'ads' },
+      { name: 'Bildirimler', href: '/notifications', icon: BellAlertIcon, permission: 'notifications' },
+      { name: 'E-posta Şablonları', href: '/email-templates', icon: ChatBubbleLeftRightIcon, permission: 'email_templates' },
+      { name: 'Sayfalar', href: '/pages', icon: DocumentTextIcon, permission: 'pages' },
     ],
   },
   {
@@ -137,10 +135,10 @@ const navGroups: NavGroup[] = [
     name: 'Finans',
     icon: CurrencyDollarIcon,
     items: [
-      { name: 'Komisyon', href: '/commission', icon: CurrencyDollarIcon },
-      { name: 'Satıcı Ödemeleri', href: '/payouts', icon: BanknotesIcon },
-      { name: 'Vergi Ayarları', href: '/tax', icon: CalculatorIcon, roles: ['super_admin'] },
-      { name: 'Ödeme Ayarları', href: '/settings/payments', icon: CreditCardIcon },
+      { name: 'Ödemeler', href: '/payments', icon: CreditCardIcon, keywords: ['ödeme', 'payment', 'hold'], permission: 'payments' },
+      { name: 'Komisyon', href: '/commission', icon: CurrencyDollarIcon, permission: 'commission' },
+      { name: 'Satıcı Ödemeleri', href: '/payouts', icon: BanknotesIcon, permission: 'payouts' },
+      { name: 'Vergi Ayarları', href: '/tax', icon: CalculatorIcon, permission: 'tax' },
     ],
   },
   {
@@ -148,13 +146,54 @@ const navGroups: NavGroup[] = [
     name: 'Sistem',
     icon: Cog6ToothIcon,
     items: [
-      { name: 'Sistem Ayarları', href: '/settings', icon: Cog6ToothIcon, roles: ['super_admin'] },
-      { name: 'Sistem Logları', href: '/logs', icon: ClipboardDocumentCheckIcon, roles: ['super_admin'] },
+      { name: 'AI Denetim', href: '/ai-moderation', icon: ClipboardDocumentCheckIcon, keywords: ['ai', 'moderasyon', 'nsfw'], permission: 'ai_moderation' },
+      { name: 'Üyelik Katmanları', href: '/membership-tiers', icon: StarIcon, keywords: ['üyelik', 'membership', 'tier'], permission: 'membership_tiers' },
+      { name: 'Sistem Ayarları', href: '/settings', icon: Cog6ToothIcon, permission: 'settings' },
+      { name: 'Loglar', href: '/logs', icon: ClipboardDocumentIcon, keywords: ['log', 'hata', 'error', 'güvenlik', 'e-posta', 'audit', 'denetim', 'iz', 'değişiklik', 'security'], permission: 'logs' },
     ],
   },
 ];
 
 const OPEN_GROUPS_STORAGE_KEY = 'admin-nav-open-groups';
+
+/** Sayfa path'i → gerekli izin. Spesifik path'ler önce gelir. */
+const ROUTE_PERMISSIONS: [string, string][] = [
+  ['/sellers/applications', 'seller_applications'],
+  ['/sellers/performance', 'seller_performance'],
+  ['/analytics', 'analytics'],
+  ['/orders', 'orders'],
+  ['/trades', 'trades'],
+  ['/shipping', 'shipping'],
+  ['/refund-requests', 'refund_requests'],
+  ['/refunds', 'refund_history'],
+  ['/products', 'products'],
+  ['/categories', 'categories'],
+  ['/brands', 'brands'],
+  ['/car-models', 'car_models'],
+  ['/manufacturers', 'manufacturers'],
+  ['/attributes', 'attributes'],
+  ['/collections', 'collections'],
+  ['/users', 'users'],
+  ['/reviews', 'reviews'],
+  ['/roles', 'staff'],
+  ['/messages', 'messages'],
+  ['/support', 'support'],
+  ['/discounts', 'discounts'],
+  ['/ads', 'ads'],
+  ['/notifications', 'notifications'],
+  ['/email-templates', 'email_templates'],
+  ['/pages', 'pages'],
+  ['/payments', 'payments'],
+  ['/commission', 'commission'],
+  ['/payouts', 'payouts'],
+  ['/tax', 'tax'],
+  ['/ai-moderation', 'ai_moderation'],
+  ['/moderation', 'ai_moderation'],
+  ['/membership-tiers', 'membership_tiers'],
+  ['/settings', 'settings'],
+  ['/logs', 'logs'],
+  ['/audit-logs', 'audit_logs'],
+];
 
 function matchesQuery(item: NavItem, q: string): boolean {
   const name = item.name.toLocaleLowerCase('tr-TR');
@@ -168,12 +207,44 @@ interface AdminLayoutProps {
   children: React.ReactNode;
 }
 
+/**
+ * Yükleme tamamlanana kadar kullanılan varsayılan izinler.
+ * Backend DEFAULT_ROLE_PERMISSIONS ile senkron tutulmalı.
+ */
+const NAV_FALLBACK_PERMS: Record<string, string[]> = {
+  super_admin: ['dashboard'],
+  admin: [
+    'dashboard', 'analytics',
+    'orders', 'trades', 'shipping', 'refund_requests', 'refund_history',
+    'products', 'categories', 'brands', 'car_models', 'manufacturers', 'attributes', 'collections',
+    'users', 'seller_applications', 'seller_performance', 'reviews',
+    'payments', 'commission', 'payouts',
+    'messages', 'support', 'discounts', 'ads', 'notifications', 'email_templates', 'pages',
+    'ai_moderation',
+  ],
+  moderator: [
+    'dashboard', 'products', 'users', 'reviews', 'messages', 'support', 'trades', 'ai_moderation',
+  ],
+};
+
+
 export default function AdminLayout({ children }: AdminLayoutProps) {
   const pathname = usePathname();
   const router = useRouter();
   const { user, logout } = useAuthStore();
+  // 1 saat hareketsizlikte otomatik logout (Balanced politika).
+  useIdleLogout();
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [navQuery, setNavQuery] = useState('');
+
+  /**
+   * Rol → izin listesi.
+   * Başlangıç değeri NAV_FALLBACK_PERMS: API yanıt verene kadar doğru nav görünür.
+   * API'den gelen veri gelince override edilir.
+   */
+  const [rolePerms, setRolePerms] = useState<Record<string, string[]>>(NAV_FALLBACK_PERMS);
+  // İzinler API'den yüklendi mi? Yüklenmeden route guard çalışmaz (false-redirect önlemi).
+  const [permissionsLoaded, setPermissionsLoaded] = useState(false);
 
   // Aktif route hangi gruptaysa o grup otomatik açılır, son kullanıcı tercihi localStorage'da saklanır
   const activeGroupId = useMemo(() => {
@@ -208,6 +279,38 @@ export default function AdminLayout({ children }: AdminLayoutProps) {
     } catch {}
   }, [openGroups, hydrated]);
 
+  // Her oturumda rol izinlerini API'den taze yükle (cache yok → stale nav olmaz).
+  useEffect(() => {
+    if (!user) return;
+    if (user.role === 'super_admin') {
+      setPermissionsLoaded(true);
+      return;
+    }
+
+    adminApi.getRolePermissions()
+      .then((res) => {
+        const data = res.data;
+        if (!data || typeof data !== 'object') return;
+        const merged: Record<string, string[]> = { ...NAV_FALLBACK_PERMS };
+        for (const [r, perms] of Object.entries(data)) {
+          if (Array.isArray(perms) && perms.length > 0) merged[r] = perms;
+        }
+        setRolePerms(merged);
+      })
+      .catch(() => {})
+      .finally(() => setPermissionsLoaded(true));
+  }, [user?.role]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Route guard: izin yoksa /dashboard'a yönlendir.
+  useEffect(() => {
+    if (!user || user.role === 'super_admin' || !permissionsLoaded) return;
+    const currentPerms = rolePerms[user.role] ?? [];
+    const match = ROUTE_PERMISSIONS.find(([prefix]) => pathname.startsWith(prefix));
+    if (match && !currentPerms.includes(match[1])) {
+      router.replace('/dashboard');
+    }
+  }, [pathname, user, rolePerms, permissionsLoaded, router]);
+
   const toggleGroup = (id: string) => {
     setOpenGroups((prev) => {
       const next = new Set(prev);
@@ -220,20 +323,32 @@ export default function AdminLayout({ children }: AdminLayoutProps) {
   const q = navQuery.trim().toLocaleLowerCase('tr-TR');
   const isSearching = q.length > 0;
 
-  // Menüyü kullanıcının rolüne göre filtrele (örn. moderatör Siparişler/Finans göremez).
+  // Menüyü kullanıcının rolüne + yüklenen izin matrisine göre filtrele.
   const role = user?.role ?? '';
-  const inRole = (item: NavItem) =>
-    (item.roles ?? ['super_admin', 'admin']).includes(role);
+
+  const canSee = (item: NavItem): boolean => {
+    // Süper admin her şeyi görür.
+    if (role === 'super_admin') return true;
+
+    // İzin matrisi yüklendiyse ve öğenin bir izin anahtarı varsa → matrisi kullan.
+    if (rolePerms && item.permission) {
+      return (rolePerms[role] ?? []).includes(item.permission);
+    }
+
+    // Fallback: hardcode roles dizisine bak (eski davranış / yükleme öncesi).
+    return (item.roles ?? ['super_admin', 'admin']).includes(role);
+  };
+
   const visibleTopNav = useMemo(
-    () => topLevelNav.filter(inRole),
-    [role], // eslint-disable-line react-hooks/exhaustive-deps
+    () => topLevelNav.filter(canSee),
+    [role, rolePerms], // eslint-disable-line react-hooks/exhaustive-deps
   );
   const visibleGroups = useMemo(
     () =>
       navGroups
-        .map((g) => ({ ...g, items: g.items.filter(inRole) }))
+        .map((g) => ({ ...g, items: g.items.filter(canSee) }))
         .filter((g) => g.items.length > 0),
-    [role], // eslint-disable-line react-hooks/exhaustive-deps
+    [role, rolePerms], // eslint-disable-line react-hooks/exhaustive-deps
   );
 
   // Arama aktifken: grupları yok say, tüm eşleşmeleri düz liste olarak göster
@@ -246,8 +361,8 @@ export default function AdminLayout({ children }: AdminLayoutProps) {
   const [accountMenuOpen, setAccountMenuOpen] = useState(false);
 
   const handleLogout = () => {
-    logout();
-    router.push('/login');
+    // logout() cookie'leri sunucuda temizler ve /login'e yönlendirir.
+    void logout();
   };
 
   const renderNavLink = (item: NavItem, opts?: { nested?: boolean }) => {
@@ -405,17 +520,6 @@ export default function AdminLayout({ children }: AdminLayoutProps) {
               onClick={() => setSidebarOpen(true)}>
               <Bars3Icon className="h-6 w-6" />
             </Button>
-            <div className="hidden lg:flex items-center">
-              <Image
-                src="/tarodan-logo.jpg"
-                alt="Tarodan Logo"
-                width={100}
-                height={32}
-                className="object-contain"
-                style={{ width: 'auto', height: 'auto', maxWidth: '100%', maxHeight: '32px' }}
-              />
-              <span className="ml-2 text-sm text-muted">Admin Panel</span>
-            </div>
           </div>
           <div className="flex items-center space-x-4">
             <div className="hidden sm:flex items-center gap-2 text-sm">

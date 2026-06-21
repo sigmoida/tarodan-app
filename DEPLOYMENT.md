@@ -337,6 +337,15 @@ REDIS_URL=redis://...
 # JWT
 JWT_SECRET=...
 JWT_REFRESH_SECRET=...
+ADMIN_JWT_EXPIRES_IN=30m            # admin access token (sessiz yenilenir)
+ADMIN_JWT_REFRESH_EXPIRES_IN=7d     # admin refresh (kayan oturum)
+
+# Auth cookie'leri (httpOnly). Token'lar artık localStorage'da DEĞİL, bu cookie'lerde tutulur.
+# PROD'da subdomain'ler (web + admin + api) arası paylaşım için MUTLAKA set edilmeli;
+# yoksa admin middleware refresh cookie'sini göremez ve oturum açılmaz.
+COOKIE_DOMAIN=.tarodan.shop
+# CORS: credentials'lı cookie auth için origin '*' olamaz — web ve admin origin'lerini açıkça listele.
+CORS_ORIGINS=https://tarodan.shop,https://www.tarodan.shop,https://admin.tarodan.shop
 
 # AWS S3
 AWS_ACCESS_KEY_ID=...

@@ -3,31 +3,30 @@ import {
   NotFoundException,
   BadRequestException,
   ForbiddenException,
+  ConflictException,
   Optional,
   Logger,
 } from '@nestjs/common';
 import * as bcrypt from 'bcrypt';
 import { PrismaService } from '../../prisma';
 import { StorageService } from '../storage/storage.service';
+import { ModerationAiClient } from '../moderation/moderation-ai.client';
 import {
   fulltextUserSearch,
   fulltextProductRatingSearch,
   fulltextUserDisplayNameSearch,
   fulltextCollectionSearch,
-  fulltextTagSearch,
   fulltextAttributeGroupSearch,
   fulltextAttributeSearch,
   fulltextPaymentSearch,
   fulltextOrderSearch,
   fulltextDiscountSearch,
-  fulltextShippingMethodSearch,
-  fulltextShippingCarrierSearch,
-  fulltextShippingZoneSearch,
   fulltextErrorLogSearch,
   fulltextSecurityLogSearch,
   fulltextEmailLogSearch,
 } from '../../common/helpers/fulltext-search';
 import { fulltextProductSearch } from '../product/helpers/fulltext-search';
+import { renderEmailTemplate, getEmailTemplateSubject } from '../../common/helpers/email-template-renderer';
 import {
   CreateCommissionRuleDto,
   UpdateCommissionRuleDto,
@@ -42,6 +41,10 @@ import {
   AssignAdminStaffDto,
   UpdateAdminStaffDto,
   UpdateStaffSettingsDto,
+  SetRolePermissionsDto,
+  DEFAULT_ROLE_PERMISSIONS,
+  ADMIN_PERMISSION_KEYS,
+  migrateLegacyPermissions,
   ResolveDisputeDto,
   AnalyticsQueryDto,
   AnalyticsGroupBy,
@@ -57,12 +60,11 @@ import {
   UpdateProductDto,
   RatingQueryDto,
   UpdateRatingStatusDto,
-  ReplyToRatingDto,
   RatingStatus,
   ApproveWarehouseTradeDto,
   RejectWarehouseTradeDto,
 } from './dto';
-import { ProductStatus, OrderStatus, Prisma, PaymentStatus, PaymentHoldStatus, OfferStatus, TradeStatus, ShipmentStatus, MessageStatus, TicketStatus, TicketPriority, TicketCategory, Brand, AdminRole } from '@prisma/client';
+import { ProductStatus, OrderStatus, Prisma, PaymentStatus, PaymentHoldStatus, OfferStatus, TradeStatus, ShipmentStatus, MessageStatus, TicketStatus, TicketPriority, TicketCategory, Brand, AdminRole, BusinessStatus } from '@prisma/client';
 import { safeDecrementReserved } from '../product/helpers/product-availability.helper';
 import { getProductStatusFromQuantity } from '../product/helpers/product-status.helper';
 import { PaymentService } from '../payment/payment.service';
@@ -75,7 +77,7 @@ import { EventService } from '../events/event.service';
 import { RatingService } from '../rating/rating.service';
 import { RefundService } from '../refund/refund.service';
 import { NotificationService } from '../notification/notification.service';
-import { NotificationType } from '../notification/dto/notification.dto';
+import { NotificationType, NotificationChannel } from '../notification/dto/notification.dto';
 import { SuratCargoService } from '../surat-cargo/surat-cargo.service';
 import { normalizeSuratPhone, normalizeSuratLocation } from '../surat-cargo/surat-address.util';
 import { OrderService } from '../order/order.service';
@@ -103,6 +105,7 @@ export class AdminService {
     private readonly ratingService: RatingService,
     private readonly refundService: RefundService,
     private readonly notificationService: NotificationService,
+    private readonly moderationAi: ModerationAiClient,
     @Optional()
     private readonly storageService: StorageService,
     @Optional()
@@ -161,6 +164,16 @@ export class AdminService {
 
   private resolveProductImageUrl(imageKeyOrUrl: string | null | undefined): string | null {
     if (!imageKeyOrUrl) return null;
+    // Strip expired presigned S3 query params to get the clean public URL
+    if ((imageKeyOrUrl.startsWith('http://') || imageKeyOrUrl.startsWith('https://')) && imageKeyOrUrl.includes('X-Amz-Signature')) {
+      try {
+        const parsed = new URL(imageKeyOrUrl);
+        parsed.search = '';
+        return parsed.toString();
+      } catch {
+        // fall through
+      }
+    }
     if (imageKeyOrUrl.startsWith('http://') || imageKeyOrUrl.startsWith('https://') || imageKeyOrUrl.startsWith('/')) return imageKeyOrUrl;
     // Try to resolve any non-URL string as an S3 key (covers dev/, prod/, and other prefixes)
     if (this.storageService) {
@@ -685,6 +698,18 @@ export class AdminService {
           createdAt: true,
           lastLoginAt: true,
           lastActivityAt: true,
+          membership: {
+            select: {
+              status: true,
+              currentPeriodEnd: true,
+              tier: {
+                select: {
+                  type: true,
+                  name: true,
+                },
+              },
+            },
+          },
           _count: {
             select: {
               products: true,
@@ -949,6 +974,44 @@ export class AdminService {
     return { allowAdminAssign: dto.allowAdminAssign };
   }
 
+  private readonly ROLE_PERMISSIONS_SETTING_KEY = 'admin_role_permissions';
+
+  /** Rol → izin eşleşmesini döner (platform_settings'ten; yoksa varsayılanı kullan). */
+  async getRolePermissions(): Promise<Record<string, string[]>> {
+    const s = await this.prisma.platformSetting.findUnique({
+      where: { settingKey: this.ROLE_PERMISSIONS_SETTING_KEY },
+    });
+    if (!s) return DEFAULT_ROLE_PERMISSIONS;
+    try {
+      const raw = JSON.parse(s.settingValue) as Record<string, string[]>;
+      return migrateLegacyPermissions(raw);
+    } catch {
+      return DEFAULT_ROLE_PERMISSIONS;
+    }
+  }
+
+  /** Rol → izin eşleşmesini güncelle (yalnız super_admin). */
+  async setRolePermissions(
+    actingUserId: string,
+    dto: SetRolePermissionsDto,
+  ): Promise<Record<string, string[]>> {
+    const updatedBy = await this.resolveAdminUserId(actingUserId);
+    const merged = { ...dto.permissions, super_admin: [...ADMIN_PERMISSION_KEYS] };
+    const value = JSON.stringify(merged);
+    await this.prisma.platformSetting.upsert({
+      where: { settingKey: this.ROLE_PERMISSIONS_SETTING_KEY },
+      create: {
+        settingKey: this.ROLE_PERMISSIONS_SETTING_KEY,
+        settingValue: value,
+        settingType: 'json',
+        description: 'Admin rolleri için izin matrisi (super_admin her zaman tam yetkili)',
+        updatedBy,
+      },
+      update: { settingValue: value, updatedBy },
+    });
+    return merged;
+  }
+
   /** İşlemi yapan kişi, ilgili rol(ler) üzerinde işlem yapabilir mi? */
   private async assertCanManage(
     actingUserId: string,
@@ -1193,20 +1256,31 @@ export class AdminService {
    * Get products with filters
    */
   async getProducts(query: AdminProductQueryDto) {
-    const { search, status, categoryId, sellerId, page = 1, limit = 20 } = query;
+    const { search, status, categoryId, sellerId, brandId, carModelId, page = 1, limit = 20 } = query;
 
     const where: Prisma.ProductWhereInput = {};
 
     if (search) {
+      // Tek arama kutusu: ürün metni (fulltext) VEYA satıcı adı/e-postası eşleşsin.
+      // Bu OR, diğer filtrelerle (status, categoryId, sellerId) AND'lenir.
       const productIds = await fulltextProductSearch(this.prisma, search);
-      if (productIds.length === 0) {
-        return { data: [], total: 0, page, limit, totalPages: 0 };
-      }
-      where.id = { in: productIds };
+      where.OR = [
+        { id: { in: productIds } },
+        { seller: { displayName: { contains: search, mode: 'insensitive' } } },
+        { seller: { email: { contains: search, mode: 'insensitive' } } },
+      ];
     }
 
     if (status) {
       where.status = status;
+    }
+
+    if (brandId) {
+      where.brandId = brandId;
+    }
+
+    if (carModelId) {
+      where.carModelId = carModelId;
     }
 
     if (categoryId) {
@@ -1405,6 +1479,12 @@ export class AdminService {
       await this.cache.delPattern('products:list:*');
     }
 
+    // Arama index'ini güncelle: status/quantity değişmiş olabilir →
+    // listelenebilir ise indexle, değilse (pasif-stoklu/kaldırıldı vb.) kaldır
+    this.searchService
+      .syncProduct(productId)
+      .catch((err) => this.logger.warn(`ES sync failed for ${productId}: ${err?.message}`));
+
     return updated;
   }
 
@@ -1436,6 +1516,11 @@ export class AdminService {
     // Invalidate product cache so the product appears in listings
     await this.cache.del(`product:${productId}`);
     await this.cache.delPattern('products:list:*');
+
+    // Arama index'ini güncelle: onaylanan ürün artık aktif → ES'e indexlensin
+    this.searchService
+      .syncProduct(productId)
+      .catch((err) => this.logger.warn(`ES sync failed for ${productId}: ${err?.message}`));
 
     // Yeniden satışa açılan (eski sold/inactive) ilan onaylanıp yayına girince
     // wishlist + son 7 gün stockout-cancelled alıcılara back-in-stock bildirimi
@@ -1484,6 +1569,11 @@ export class AdminService {
     await this.cache.del(`product:${productId}`);
     await this.cache.delPattern('products:list:*');
 
+    // Arama index'ini güncelle: reddedilen ürün listelenemez → ES'ten kaldır
+    this.searchService
+      .syncProduct(productId)
+      .catch((err) => this.logger.warn(`ES sync failed for ${productId}: ${err?.message}`));
+
     return { success: true, productId, status: 'rejected', reason: dto.reason };
   }
 
@@ -1523,6 +1613,11 @@ export class AdminService {
 
         // Invalidate product cache
         await this.cache.del(`product:${productId}`);
+
+        // Arama index'ini güncelle: onaylanan ürün aktif → ES'e indexlensin
+        this.searchService
+          .syncProduct(productId)
+          .catch((err) => this.logger.warn(`ES sync failed for ${productId}: ${err?.message}`));
 
         results.push({ id: productId, success: true });
       } catch (error) {
@@ -1577,6 +1672,11 @@ export class AdminService {
 
         // Invalidate product cache
         await this.cache.del(`product:${productId}`);
+
+        // Arama index'ini güncelle: reddedilen ürün listelenemez → ES'ten kaldır
+        this.searchService
+          .syncProduct(productId)
+          .catch((err) => this.logger.warn(`ES sync failed for ${productId}: ${err?.message}`));
 
         results.push({ id: productId, success: true });
       } catch (error) {
@@ -2211,6 +2311,10 @@ export class AdminService {
         ...order.payment,
         amount: Number(order.payment.amount),
       } : null,
+      shipment: order.shipment ? {
+        ...order.shipment,
+        carrier: order.shipment.provider,
+      } : null,
     };
   }
 
@@ -2490,9 +2594,11 @@ export class AdminService {
         title: order.product.title,
         quantity: 1,
         unitPrice: Number(order.product.price),
-        total: Number(order.totalAmount) - Number(order.shippingCost || 0),
+        total: Number(order.product.price),
       }],
-      subtotal: Number(order.totalAmount) - Number(order.shippingCost || 0),
+      subtotal: Number(order.product.price),
+      discountAmount: Number(order.discountAmount ?? 0),
+      discountCode: order.discountCode ?? null,
       shippingCost: Number(order.shippingCost || 0),
       total: Number(order.totalAmount),
       payment: order.payment ? {
@@ -3051,10 +3157,18 @@ export class AdminService {
       ? new Date(query.startDate)
       : new Date(endDate.getTime() - 30 * 24 * 60 * 60 * 1000);
 
-    const [totalCommission, commissionByMonth, commissionByCategory] = await Promise.all([
+    const [totalCommission, totalFees, commissionByMonth, commissionByCategory] = await Promise.all([
       // Total commission in period
       this.prisma.order.aggregate({
         _sum: { commissionAmount: true },
+        where: {
+          createdAt: { gte: startDate, lte: endDate },
+          status: { in: [OrderStatus.completed, OrderStatus.delivered] },
+        },
+      }),
+      // Buyer/seller fee breakdown
+      this.prisma.order.aggregate({
+        _sum: { buyerFeeAmount: true, sellerFeeAmount: true },
         where: {
           createdAt: { gte: startDate, lte: endDate },
           status: { in: [OrderStatus.completed, OrderStatus.delivered] },
@@ -3103,6 +3217,8 @@ export class AdminService {
 
     return {
       totalCommission: Number(totalCommission._sum.commissionAmount || 0),
+      totalBuyerFee: Number(totalFees._sum.buyerFeeAmount || 0),
+      totalSellerFee: Number(totalFees._sum.sellerFeeAmount || 0),
       byMonth: commissionByMonth.map((m) => ({
         month: m.month,
         total: Number(m.total || 0),
@@ -3310,6 +3426,25 @@ export class AdminService {
       }
       const resolvedAdminUserId = adminUser.id;
 
+      // Fields that must never appear in audit logs
+      const SENSITIVE_KEYS = new Set([
+        'password', 'passwordHash', 'passwordConfirm', 'newPassword', 'oldPassword', 'currentPassword',
+        'token', 'accessToken', 'refreshToken', 'resetToken', 'verifyToken', 'confirmToken', 'idToken',
+        'secret', 'apiKey', 'apiSecret', 'clientSecret', 'signingKey',
+        'creditCard', 'cardNumber', 'cvv', 'cvc', 'pin', 'otp',
+      ]);
+
+      const redactSensitive = (obj: any): any => {
+        if (obj === null || obj === undefined || typeof obj !== 'object') return obj;
+        if (Array.isArray(obj)) return obj.map(redactSensitive);
+        return Object.fromEntries(
+          Object.entries(obj).map(([k, v]) => [
+            k,
+            SENSITIVE_KEYS.has(k) ? '[GİZLİ]' : redactSensitive(v),
+          ]),
+        );
+      };
+
       // Serialize values to ensure they can be stored as JSON
       const serializeValue = (value: any) => {
         if (value === null || value === undefined) {
@@ -3317,7 +3452,7 @@ export class AdminService {
         }
         try {
           // Use JSON.parse/stringify to handle Date, Decimal, etc.
-          return JSON.parse(JSON.stringify(value, (key, val) => {
+          const serialized = JSON.parse(JSON.stringify(value, (key, val) => {
             // Convert Date to ISO string
             if (val instanceof Date) {
               return val.toISOString();
@@ -3328,6 +3463,7 @@ export class AdminService {
             }
             return val;
           }));
+          return redactSensitive(serialized);
         } catch (e) {
           // Fallback: convert to string if serialization fails
           this.logger.warn(`Failed to serialize audit log value for ${entityType}:${entityId}`, e);
@@ -3399,6 +3535,11 @@ export class AdminService {
           category: p.category?.name || 'Kategorisiz',
           createdAt: p.createdAt,
           status: 'pending',
+          // AI moderasyon sonuçları (null = henüz denetlenmedi)
+          aiCheckStatus: p.aiCheckStatus,
+          aiRelevanceScore: p.aiRelevanceScore,
+          aiNsfwScore: p.aiNsfwScore,
+          aiCheckReason: p.aiCheckReason,
         })),
       );
       totalCount += productCount;
@@ -3520,6 +3661,171 @@ export class AdminService {
       flaggedUsers,
       totalPending: pendingProducts + pendingMessages,
     };
+  }
+
+  /**
+   * AI ile denetlenmiş ürünleri skorlarıyla listele (admin "AI Denetim" sayfası).
+   */
+  async getAiModerationList(options: {
+    status?: string;
+    page?: number;
+    pageSize?: number;
+  }) {
+    const { status, page = 1, pageSize = 20 } = options;
+    const where: Prisma.ProductWhereInput = status
+      ? { aiCheckStatus: status }
+      : { aiCheckStatus: { not: null } };
+    const [items, total] = await Promise.all([
+      this.prisma.product.findMany({
+        where,
+        include: {
+          seller: { select: { id: true, displayName: true, email: true } },
+          images: { take: 1, orderBy: { sortOrder: 'asc' } },
+        },
+        orderBy: { aiCheckedAt: 'desc' },
+        skip: (page - 1) * pageSize,
+        take: pageSize,
+      }),
+      this.prisma.product.count({ where }),
+    ]);
+    return {
+      data: items.map((p) => ({
+        id: p.id,
+        title: p.title,
+        status: p.status,
+        imageUrl: this.resolveProductImageUrl(p.images[0]?.cardKey) || null,
+        seller: p.seller,
+        aiCheckStatus: p.aiCheckStatus,
+        aiRelevanceScore: p.aiRelevanceScore,
+        aiNsfwScore: p.aiNsfwScore,
+        aiCheckReason: p.aiCheckReason,
+        aiCheckedAt: p.aiCheckedAt,
+      })),
+      meta: { total, page, pageSize, totalPages: Math.ceil(total / pageSize) },
+    };
+  }
+
+  /**
+   * Birleşik AI moderasyon günlüğü (admin "AI Denetim" tab'ı + Sistem sayfası).
+   * Tüm varlıklar ortak `moderation_events` tablosundan; entityType/entityId ile
+   * sayfa-bazlı (ör. tek ürün/kullanıcı/koleksiyon) süzülebilir.
+   */
+  async getModerationEvents(options: {
+    entityType?: string;
+    entityId?: string;
+    userId?: string;
+    decision?: string;
+    kind?: string;
+    page?: number;
+    pageSize?: number;
+  }) {
+    const {
+      entityType,
+      entityId,
+      userId,
+      decision,
+      kind,
+      page = 1,
+      pageSize = 20,
+    } = options;
+    const where: Prisma.ModerationEventWhereInput = {
+      ...(entityType ? { entityType } : {}),
+      ...(entityId ? { entityId } : {}),
+      ...(userId ? { userId } : {}),
+      ...(decision ? { decision } : {}),
+      ...(kind ? { kind } : {}),
+    };
+    const [rows, total] = await Promise.all([
+      this.prisma.moderationEvent.findMany({
+        where,
+        orderBy: { createdAt: 'desc' },
+        skip: (page - 1) * pageSize,
+        take: pageSize,
+      }),
+      this.prisma.moderationEvent.count({ where }),
+    ]);
+
+    // Aktör (içeriği üreten) kullanıcı bilgisini tek sorguda zenginleştir
+    const userIds = [
+      ...new Set(rows.map((r) => r.userId).filter((x): x is string => !!x)),
+    ];
+    const users = userIds.length
+      ? await this.prisma.user.findMany({
+          where: { id: { in: userIds } },
+          select: { id: true, displayName: true, email: true },
+        })
+      : [];
+    const userMap = new Map(users.map((u) => [u.id, u]));
+
+    return {
+      data: rows.map((r) => ({
+        id: r.id,
+        entityType: r.entityType,
+        entityId: r.entityId,
+        userId: r.userId,
+        user: r.userId ? (userMap.get(r.userId) ?? null) : null,
+        kind: r.kind,
+        field: r.field,
+        decision: r.decision,
+        relevanceScore: r.relevanceScore,
+        nsfwScore: r.nsfwScore,
+        reason: r.reason,
+        labels: r.labels,
+        createdAt: r.createdAt,
+      })),
+      meta: { total, page, pageSize, totalPages: Math.ceil(total / pageSize) },
+    };
+  }
+
+  /**
+   * Tek bir görseli AI ile test et (admin "Görsel Test Et" aracı) — ürün oluşturmadan skor gör.
+   */
+  async testImageModeration(imageUrl: string) {
+    if (!imageUrl) {
+      throw new BadRequestException('imageUrl gerekli');
+    }
+    if (!this.moderationAi.isEnabled) {
+      return {
+        enabled: false,
+        message: 'AI moderasyon kapalı (AI_MODERATION_ENABLED=false)',
+      };
+    }
+    const result = await this.moderationAi.moderateImage(imageUrl);
+    if (!result) {
+      return {
+        enabled: true,
+        error: 'AI servisine erişilemedi ya da görsel indirilemedi',
+      };
+    }
+    return { enabled: true, ...result };
+  }
+
+  /** AI eşiklerini oku (admin "Kabul Eşiği" ayarı). */
+  async getAiConfig() {
+    if (!this.moderationAi.isEnabled) {
+      return { enabled: false, relevanceThreshold: 0.2, nsfwThreshold: 0.7 };
+    }
+    const cfg = await this.moderationAi.getConfig();
+    return {
+      enabled: true,
+      relevanceThreshold: cfg?.relevanceThreshold ?? 0.2,
+      nsfwThreshold: cfg?.nsfwThreshold ?? 0.7,
+    };
+  }
+
+  /** AI eşiklerini güncelle (canlı + kalıcı config.json). */
+  async setAiConfig(relevanceThreshold?: number, nsfwThreshold?: number) {
+    if (!this.moderationAi.isEnabled) {
+      throw new BadRequestException('AI moderasyon kapalı');
+    }
+    const cfg = await this.moderationAi.setConfig({
+      relevanceThreshold,
+      nsfwThreshold,
+    });
+    if (!cfg) {
+      throw new BadRequestException('AI servisine erişilemedi');
+    }
+    return { enabled: true, ...cfg };
   }
 
   /**
@@ -4226,7 +4532,7 @@ export class AdminService {
    * Payout transaction history (payment holds with order/seller info)
    */
   async getPayoutsTransactions(query: PayoutTransactionsQueryDto) {
-    const { sellerId, status, dateFrom, dateTo, page = 1, limit = 20 } = query;
+    const { search, sellerId, status, dateFrom, dateTo, page = 1, limit = 20 } = query;
     const where: Prisma.PaymentHoldWhereInput = {};
     if (sellerId) where.sellerId = sellerId;
     if (status) where.status = status as PaymentHoldStatus;
@@ -4234,6 +4540,26 @@ export class AdminService {
       where.createdAt = {};
       if (dateFrom) where.createdAt.gte = new Date(dateFrom);
       if (dateTo) where.createdAt.lte = new Date(dateTo);
+    }
+    if (search) {
+      const searchOr: Prisma.PaymentHoldWhereInput[] = [
+        {
+          seller: {
+            OR: [
+              { displayName: { contains: search, mode: 'insensitive' } },
+              { email: { contains: search, mode: 'insensitive' } },
+            ],
+          },
+        },
+      ];
+      const matchingOrders = await this.prisma.order.findMany({
+        where: { orderNumber: { contains: search, mode: 'insensitive' } },
+        select: { id: true },
+      });
+      if (matchingOrders.length > 0) {
+        searchOr.push({ orderId: { in: matchingOrders.map((o) => o.id) } });
+      }
+      where.OR = searchOr;
     }
 
     const [total, holds] = await Promise.all([
@@ -4369,9 +4695,14 @@ export class AdminService {
   /**
    * Release payment hold to seller (admin manual release)
    */
-  async releasePayout(adminId: string, orderId: string) {
+  async releasePayout(adminId: string, orderId: string, reason?: string) {
+    // Y13: Escrow→satıcı release'i geri DÖNÜLEMEZ. Sebep zorunlu kılınarak kazara/
+    // gerekçesiz tetikleme engellenir ve audit izine sebep yazılır.
+    if (!reason || !reason.trim()) {
+      throw new BadRequestException('Escrow serbest bırakma için sebep (reason) zorunludur');
+    }
     await this.paymentService.releasePayment(orderId);
-    await this.createAuditLog(adminId, 'payout_release', 'PaymentHold', orderId, { action: 'release' }, { releasedAt: new Date() });
+    await this.createAuditLog(adminId, 'payout_release', 'PaymentHold', orderId, { action: 'release', reason: reason.trim() }, { releasedAt: new Date() });
     return { success: true, orderId, message: 'Ödeme satıcıya serbest bırakıldı' };
   }
 
@@ -4402,11 +4733,26 @@ export class AdminService {
       throw new BadRequestException(`Transfer durumu '${transfer.status}' tekrar denenebilir değil`);
     }
 
+    // Y10: 'returned' transfer ZATEN PayTR'de işlenip geri döndü → aynı transId ile yeniden
+    // göndermek PayTR idempotency'sine takılabilir. Bu yüzden returned retry'da YENİ transId
+    // üret (taze transfer). 'failed' (hiç işlenmedi) ise mevcut transId korunur. Geri dönüş
+    // çoğunlukla IBAN sorunundandır; satıcı IBAN'ı düzeltince cron işleme anında GÜNCEL
+    // IBAN'ı okur (Y5) ve doğru hesaba gönderir.
+    const isReturned = transfer.status === 'returned';
+    const newTransId = isReturned
+      ? `ORD${transfer.id.replace(/-/g, '').slice(0, 16)}R${Date.now()}`
+      : undefined;
     await this.prisma.payoutTransfer.update({
       where: { id: transferId },
-      data: { status: 'pending', failureReason: null, retryCount: 0, nextRetryAt: null },
+      data: {
+        status: 'pending',
+        failureReason: null,
+        retryCount: 0,
+        nextRetryAt: null,
+        ...(newTransId ? { transId: newTransId } : {}),
+      },
     });
-    await this.createAuditLog(adminId, 'payout_retry', 'PayoutTransfer', transferId, { action: 'admin_retry' }, { status: 'pending' });
+    await this.createAuditLog(adminId, 'payout_retry', 'PayoutTransfer', transferId, { action: 'admin_retry', wasReturned: isReturned }, { status: 'pending' });
     return { success: true, transferId, message: 'Transfer tekrar denenmek üzere sıraya alındı' };
   }
 
@@ -4440,10 +4786,11 @@ export class AdminService {
     userId?: string;
     fromDate?: string;
     toDate?: string;
+    search?: string;
     page?: number;
     limit?: number;
   }) {
-    const { status, initiatorId, receiverId, userId, fromDate, toDate, page = 1, limit = 20 } = query;
+    const { status, initiatorId, receiverId, userId, fromDate, toDate, search, page = 1, limit = 20 } = query;
 
     const where: Prisma.TradeWhereInput = {};
 
@@ -4451,18 +4798,33 @@ export class AdminService {
       where.status = status;
     }
 
+    // AND koşulları: userId/initiatorId/receiverId filtresi ile search çakışmasın
+    const and: Prisma.TradeWhereInput[] = [];
+
     if (userId) {
-      where.OR = [
-        { initiatorId: userId },
-        { receiverId: userId },
-      ];
+      // Kullanıcıya ait tüm takaslar (başlatan VEYA alan)
+      and.push({ OR: [{ initiatorId: userId }, { receiverId: userId }] });
     } else {
-      if (initiatorId) {
-        where.initiatorId = initiatorId;
-      }
-      if (receiverId) {
-        where.receiverId = receiverId;
-      }
+      // Tekil id filtresi: AND içinde ayrı ayrı koy
+      if (initiatorId) and.push({ initiatorId });
+      if (receiverId) and.push({ receiverId });
+    }
+
+    if (search) {
+      // Takas no, başlatan displayName/email veya alıcı displayName/email araması
+      and.push({
+        OR: [
+          { tradeNumber: { contains: search, mode: 'insensitive' } },
+          { initiator: { displayName: { contains: search, mode: 'insensitive' } } },
+          { receiver:  { displayName: { contains: search, mode: 'insensitive' } } },
+          { initiator: { email: { contains: search, mode: 'insensitive' } } },
+          { receiver:  { email: { contains: search, mode: 'insensitive' } } },
+        ],
+      });
+    }
+
+    if (and.length) {
+      where.AND = and;
     }
 
     if (fromDate || toDate) {
@@ -4628,6 +4990,18 @@ export class AdminService {
 
     if (!trade) {
       throw new NotFoundException('Takas bulunamadı');
+    }
+
+    // Resolve product image S3 keys (cardKey) into usable URLs. The frontend
+    // renders `item.product.images[0].url`, but ProductImage stores cardKey/detailKey
+    // (no `url` column), so without this mapping the photos would not show.
+    for (const item of (trade as any).items ?? []) {
+      const product = item?.product;
+      if (product) {
+        product.images = (product.images ?? [])
+          .map((img: any) => ({ url: this.resolveProductImageUrl(img?.cardKey) }))
+          .filter((img: any) => img.url);
+      }
     }
 
     return trade;
@@ -5140,10 +5514,22 @@ export class AdminService {
         },
       });
 
+      // Y12: Safe-trade depodan-çıkış sevkinde confirmationDeadline SET ET. Eskiden
+      // set edilmediği için autoConfirmExpiredReceipts (confirmationDeadline < now filtresi)
+      // safe-trade'lerde hiç eşleşmiyordu → alıcı onaylamazsa para shipping_to_recipients'te
+      // süresiz askıda kalıyordu. Direct akıştaki (both_shipped) ile aynı setting kullanılır.
+      const confirmationDaysSetting = await tx.platformSetting.findUnique({
+        where: { settingKey: 'trade_confirmation_deadline_days' },
+      });
+      const confirmationDays = parseInt(confirmationDaysSetting?.settingValue ?? '3');
+      const confirmationDeadline = new Date(now);
+      confirmationDeadline.setDate(confirmationDeadline.getDate() + confirmationDays);
+
       const updatedTrade = await tx.trade.update({
         where: { id: tradeId },
         data: {
           status: TradeStatus.shipping_to_recipients,
+          confirmationDeadline,
           updatedAt: now,
         },
       });
@@ -6389,6 +6775,13 @@ export class AdminService {
       throw new BadRequestException('Tazminat zaten kapatılmış');
     }
 
+    // O13: Gerçek tazminat ödemesi bu akışın DIŞINDA (manuel) yapılır; bu metot yalnız
+    // işareti kapatır. Kazara/kanıtsız kapatmayı önlemek için açıklama/dekont (note) ZORUNLU
+    // — audit izine yazılır.
+    if (!note || !note.trim()) {
+      throw new BadRequestException('Tazminat kapatma için açıklama/dekont (note) zorunludur');
+    }
+
     const now = new Date();
     await this.prisma.trade.update({
       where: { id: tradeId },
@@ -6635,22 +7028,17 @@ export class AdminService {
       throw new NotFoundException('Mesaj bulunamadı');
     }
 
-    // Use MessagingService to approve
-    const result = await this.messagingService.moderateMessage(messageId, adminId, 'approve');
-
-    // Create audit log
-    await this.createAuditLog(adminId, 'message_approve', 'Message', messageId, message, {
-      ...result,
-      notes,
+    await this.prisma.message.update({
+      where: { id: messageId },
+      data: { status: MessageStatus.approved, reviewedById: adminId, reviewedAt: new Date() },
     });
+
+    await this.createAuditLog(adminId, 'message_approve', 'Message', messageId, message, { notes });
 
     return { success: true, messageId, status: 'approved' };
   }
 
-  /**
-   * Reject message
-   */
-  async rejectMessage(adminId: string, messageId: string, reason: string) {
+  async rejectMessage(adminId: string, messageId: string, reason?: string) {
     const message = await this.prisma.message.findUnique({
       where: { id: messageId },
     });
@@ -6659,15 +7047,33 @@ export class AdminService {
       throw new NotFoundException('Mesaj bulunamadı');
     }
 
-    // Use MessagingService to reject
-    await this.messagingService.moderateMessage(messageId, adminId, 'reject');
-
-    // Create audit log
-    await this.createAuditLog(adminId, 'message_reject', 'Message', messageId, message, {
-      reason,
+    await this.prisma.message.update({
+      where: { id: messageId },
+      data: { status: MessageStatus.rejected, reviewedById: adminId, reviewedAt: new Date() },
     });
 
+    await this.createAuditLog(adminId, 'message_reject', 'Message', messageId, message, { reason });
+
     return { success: true, messageId, status: 'rejected', reason };
+  }
+
+  async revertMessage(adminId: string, messageId: string) {
+    const message = await this.prisma.message.findUnique({
+      where: { id: messageId },
+    });
+
+    if (!message) {
+      throw new NotFoundException('Mesaj bulunamadı');
+    }
+
+    await this.prisma.message.update({
+      where: { id: messageId },
+      data: { status: MessageStatus.pending_approval, reviewedById: null, reviewedAt: null },
+    });
+
+    await this.createAuditLog(adminId, 'message_revert', 'Message', messageId, message, {});
+
+    return { success: true, messageId, status: 'pending_approval' };
   }
 
   // ==================== SUPPORT TICKET MANAGEMENT ====================
@@ -7121,21 +7527,52 @@ export class AdminService {
 
   // ==================== EMAIL TEMPLATES ====================
 
-  private readonly EMAIL_TEMPLATE_KEYS: Array<{ key: string; name: string }> = [
-    { key: 'welcome', name: 'Hoş geldin' },
-    { key: 'order-confirmation', name: 'Sipariş onayı' },
-    { key: 'order-created-buyer', name: 'Sipariş alındı (alıcı)' },
-    { key: 'order-created-seller', name: 'Yeni sipariş (satıcı)' },
-    { key: 'order-paid', name: 'Ödeme alındı (alıcı)' },
-    { key: 'order-paid-seller', name: 'Ödeme alındı (satıcı)' },
-    { key: 'order-shipped', name: 'Kargoya verildi' },
-    { key: 'order-delivered', name: 'Teslim edildi' },
-    { key: 'password-reset', name: 'Şifre sıfırlama' },
-    { key: 'offer-received', name: 'Yeni teklif' },
-    { key: 'offer-accepted', name: 'Teklif kabul edildi' },
-    { key: 'wishlist-price-change', name: 'Fiyat değişimi (istek listesi)' },
-    { key: 'marketing-newsletter', name: 'Haftalık bülten' },
-    { key: 'marketing-monthly', name: 'Aylık fırsatlar' },
+  private readonly EMAIL_TEMPLATE_KEYS: Array<{ key: string; name: string; group: string }> = [
+    // Hesap
+    { key: 'welcome',                    name: 'Hoş geldin',                          group: 'Hesap' },
+    { key: 'email-verification',         name: 'E-posta doğrulama',                   group: 'Hesap' },
+    { key: 'password-reset',             name: 'Şifre sıfırlama',                     group: 'Hesap' },
+    // Sipariş
+    { key: 'order-confirmation',         name: 'Sipariş onayı (alıcı)',               group: 'Sipariş' },
+    { key: 'order-created-buyer',        name: 'Sipariş oluşturuldu (alıcı)',         group: 'Sipariş' },
+    { key: 'order-created-seller',       name: 'Yeni sipariş (satıcı)',               group: 'Sipariş' },
+    { key: 'order-paid',                 name: 'Ödeme alındı (alıcı)',                group: 'Sipariş' },
+    { key: 'order-paid-seller',          name: 'Ödeme alındı (satıcı)',               group: 'Sipariş' },
+    { key: 'order-shipped',              name: 'Kargoya verildi',                     group: 'Sipariş' },
+    { key: 'order-delivered',            name: 'Teslim edildi',                       group: 'Sipariş' },
+    // Ödeme
+    { key: 'payment-received',           name: 'Ödeme alındı',                        group: 'Ödeme' },
+    { key: 'payment-failed',             name: 'Ödeme başarısız',                     group: 'Ödeme' },
+    { key: 'payment-refunded',           name: 'İade tamamlandı (alıcı)',             group: 'Ödeme' },
+    { key: 'payment-refunded-seller',    name: 'İade bildirimi (satıcı)',             group: 'Ödeme' },
+    // Teklif
+    { key: 'offer-received',             name: 'Yeni teklif (satıcı)',                group: 'Teklif' },
+    { key: 'offer-accepted',             name: 'Teklif kabul edildi (alıcı)',         group: 'Teklif' },
+    // Ürün
+    { key: 'product-approved',           name: 'Ürün onaylandı',                      group: 'Ürün' },
+    { key: 'wishlist-price-change',      name: 'Fiyat değişimi (istek listesi)',      group: 'Ürün' },
+    // Üyelik
+    { key: 'premium-offer',              name: 'Premium üyelik teklifi',              group: 'Üyelik' },
+    { key: 'membership-expiring',        name: 'Üyelik bitiyor (7 gün)',              group: 'Üyelik' },
+    { key: 'membership-expiring-urgent', name: 'Üyelik bitiyor (yarın)',              group: 'Üyelik' },
+    // Pazarlama
+    { key: 'marketing-newsletter',       name: 'Haftalık bülten',                     group: 'Pazarlama' },
+    { key: 'marketing-monthly',          name: 'Aylık fırsatlar',                     group: 'Pazarlama' },
+    // İş Başvurusu
+    { key: 'seller-application-approved', name: 'Kurumsal başvuru onaylandı',          group: 'İş Başvurusu' },
+    { key: 'seller-application-rejected', name: 'Kurumsal başvuru reddedildi',         group: 'İş Başvurusu' },
+    // Sipariş / İade
+    { key: 'seller-did-not-ship-refunded', name: 'Satıcı kargoya vermedi (iade)',      group: 'İade' },
+    // Takas
+    { key: 'trade-received',              name: 'Yeni takas teklifi (alıcı)',           group: 'Takas' },
+    { key: 'trade-accepted',              name: 'Takas kabul edildi',                   group: 'Takas' },
+    { key: 'trade-shipped',               name: 'Takas kargoya verildi',                group: 'Takas' },
+    { key: 'trade-completed',             name: 'Takas tamamlandı',                     group: 'Takas' },
+    // Misafir
+    { key: 'guest-checkout-otp',          name: 'Misafir sipariş OTP kodu',             group: 'Misafir' },
+    // Fatura
+    { key: 'invoice-buyer',               name: 'Fatura (alıcı)',                       group: 'Fatura' },
+    { key: 'invoice-seller',              name: 'Satış faturası (satıcı)',               group: 'Fatura' },
   ];
 
   substituteVariables(text: string, data: Record<string, any>): string {
@@ -7149,11 +7586,12 @@ export class AdminService {
   async getEmailTemplates() {
     const dbTemplates = await this.prisma.emailTemplate.findMany();
     const dbMap = new Map(dbTemplates.map((t) => [t.key, t]));
-    const list = this.EMAIL_TEMPLATE_KEYS.map(({ key, name }) => {
+    const list = this.EMAIL_TEMPLATE_KEYS.map(({ key, name, group }) => {
       const db = dbMap.get(key);
       return {
         key,
         name: db?.name ?? name,
+        group,
         subject: db?.subject ?? null,
         hasCustomBody: !!db?.bodyHtml,
         variablesJson: db?.variablesJson,
@@ -7196,8 +7634,23 @@ export class AdminService {
     return template;
   }
 
-  async previewEmailTemplate(key: string, templateData?: Record<string, any>) {
-    const db = await this.prisma.emailTemplate.findUnique({ where: { key } });
+  async resetEmailTemplate(adminId: string, key: string) {
+    const meta = this.EMAIL_TEMPLATE_KEYS.find((m) => m.key === key);
+    if (!meta) throw new NotFoundException('Geçersiz şablon anahtarı');
+    const existing = await this.prisma.emailTemplate.findUnique({ where: { key } });
+    if (existing) {
+      await this.prisma.emailTemplate.delete({ where: { key } });
+      await this.createAuditLog(adminId, 'email_template_reset', 'EmailTemplate', existing.id, existing, null);
+    }
+    return { success: true };
+  }
+
+  async previewEmailTemplate(
+    key: string,
+    templateData?: Record<string, any>,
+    overrideHtml?: string,
+    overrideSubject?: string,
+  ) {
     const sample = templateData || {
       name: 'Örnek Kullanıcı',
       buyerName: 'Alıcı',
@@ -7206,16 +7659,36 @@ export class AdminService {
       orderId: 'sample-order-id',
       productTitle: 'Örnek Ürün',
       totalAmount: 199.99,
-      verifyUrl: 'https://example.com/verify',
-      resetUrl: 'https://example.com/reset',
+      verifyUrl: 'https://tarodan.com/verify?token=sample',
+      resetUrl: 'https://tarodan.com/reset?token=sample',
+      trackingNumber: '1234567890',
+      provider: 'Sürat Kargo',
     };
-    if (db) {
+
+    // Draft preview — admin is editing but hasn't saved yet
+    if (overrideHtml !== undefined || overrideSubject !== undefined) {
+      const html = overrideHtml
+        ? this.substituteVariables(overrideHtml, sample)
+        : renderEmailTemplate(key, sample, 'https://tarodan.com');
+      const subject = overrideSubject
+        ? this.substituteVariables(overrideSubject, sample)
+        : getEmailTemplateSubject(key, sample);
+      return { subject, html };
+    }
+
+    const db = await this.prisma.emailTemplate.findUnique({ where: { key } });
+    if (db?.bodyHtml) {
       return {
-        subject: this.substituteVariables(db.subject, sample),
+        subject: this.substituteVariables(db.subject || getEmailTemplateSubject(key, sample), sample),
         html: this.substituteVariables(db.bodyHtml, sample),
       };
     }
-    return { subject: '(Varsayılan şablon)', html: '<p>Bu şablon için özel içerik kaydedilmemiş. Düzenleyerek özelleştirebilirsiniz.</p>' };
+
+    // No custom template — return the actual default so admin can see what's being sent
+    return {
+      subject: getEmailTemplateSubject(key, sample),
+      html: renderEmailTemplate(key, sample, 'https://tarodan.com'),
+    };
   }
 
   async sendTestEmail(key: string, dto: { to: string; templateData?: Record<string, any> }) {
@@ -7807,6 +8280,11 @@ export class AdminService {
       // Create audit log
       await this.createAuditLog(adminId, 'product_delete_hard', 'Product', productId, oldProduct, null);
 
+      // Arama index'inden kaldır (ürün artık DB'de yok)
+      this.searchService
+        .syncProduct(productId)
+        .catch((err) => this.logger.warn(`ES sync failed for ${productId}: ${err?.message}`));
+
       return { success: true, productId, deleted: true };
     } else {
       // Soft delete - set to deleted (pasif/inactive'den AYRI state: yönetici
@@ -7822,8 +8300,55 @@ export class AdminService {
         status: ProductStatus.deleted,
       });
 
+      // Arama index'inden kaldır: "Kaldırıldı" durumu listelenemez. Aksi halde
+      // ES dokümanı eski (active) haliyle kalıp aramada görünür ama detay 404 olur.
+      this.searchService
+        .syncProduct(productId)
+        .catch((err) => this.logger.warn(`ES sync failed for ${productId}: ${err?.message}`));
+
       return { success: true, productId, deleted: false, status: 'deleted' };
     }
+  }
+
+  /**
+   * Restore a soft-deleted product (admin only)
+   * - Only products in the `deleted` ("Kaldırıldı") state can be restored
+   * - Restored products go back to `pending` so they re-enter moderation
+   */
+  async restoreProduct(adminId: string, productId: string) {
+    const product = await this.prisma.product.findUnique({
+      where: { id: productId },
+    });
+
+    if (!product) {
+      throw new NotFoundException('Ürün bulunamadı');
+    }
+
+    if (product.status !== ProductStatus.deleted) {
+      throw new BadRequestException('Yalnızca kaldırılmış ürünler geri yüklenebilir');
+    }
+
+    const updated = await this.prisma.product.update({
+      where: { id: productId },
+      data: { status: ProductStatus.pending },
+    });
+
+    // Create audit log
+    await this.createAuditLog(adminId, 'product_restore', 'Product', productId, product, updated);
+
+    // Invalidate caches
+    if (this.cache) {
+      await this.cache.del(`product:${productId}`);
+      await this.cache.delPattern('products:list:*');
+    }
+
+    // Arama index'ini güncelle: geri yüklenen ürün "pending" → henüz listelenemez,
+    // ES'ten kaldırılır; onaylanınca approveProduct yeniden indexler.
+    this.searchService
+      .syncProduct(productId)
+      .catch((err) => this.logger.warn(`ES sync failed for ${productId}: ${err?.message}`));
+
+    return { success: true, productId, status: ProductStatus.pending };
   }
 
   // ==================== BRAND MANAGEMENT ====================
@@ -7844,6 +8369,8 @@ export class AdminService {
         logo: b.logo,
         description: b.description,
         website: b.website,
+        country: b.country,
+        foundedYear: b.foundedYear,
         sortOrder: b.sortOrder,
         isActive: b.isActive,
         createdAt: b.createdAt,
@@ -7862,6 +8389,8 @@ export class AdminService {
       logo?: string;
       description?: string;
       website?: string;
+      country?: string;
+      foundedYear?: number;
       sortOrder?: number;
       isActive?: boolean;
     },
@@ -7895,6 +8424,8 @@ export class AdminService {
         logo: dto.logo,
         description: dto.description,
         website: dto.website,
+        country: dto.country,
+        foundedYear: dto.foundedYear,
         sortOrder: dto.sortOrder ?? 0,
         isActive: dto.isActive ?? true,
       },
@@ -7919,6 +8450,8 @@ export class AdminService {
       logo?: string;
       description?: string;
       website?: string;
+      country?: string;
+      foundedYear?: number | null;
       sortOrder?: number;
       isActive?: boolean;
     },
@@ -7964,6 +8497,8 @@ export class AdminService {
         logo: dto.logo,
         description: dto.description,
         website: dto.website,
+        country: dto.country,
+        foundedYear: dto.foundedYear,
         sortOrder: dto.sortOrder,
         isActive: dto.isActive,
       },
@@ -7983,10 +8518,20 @@ export class AdminService {
   async deleteBrand(adminId: string, brandId: string) {
     const existing = await this.prisma.brand.findUnique({
       where: { id: brandId },
+      include: {
+        _count: { select: { products: true, carModels: true } },
+      },
     });
 
     if (!existing) {
       throw new NotFoundException('Marka bulunamadı');
+    }
+
+    const { products: productCount, carModels: carModelCount } = (existing as any)._count;
+    if (productCount > 0 || carModelCount > 0) {
+      throw new ConflictException(
+        `Bu marka silinemez: ${productCount} ürün ve ${carModelCount} araç modeli ile ilişkili.`,
+      );
     }
 
     await this.prisma.brand.delete({
@@ -8017,7 +8562,7 @@ export class AdminService {
 
   async createManufacturer(
     adminId: string,
-    dto: { name: string; logo?: string; description?: string; website?: string; country?: string; sortOrder?: number; isActive?: boolean },
+    dto: { name: string; logo?: string; description?: string; website?: string; country?: string; foundedYear?: number; sortOrder?: number; isActive?: boolean },
   ) {
     const slug = dto.name
       .toLowerCase()
@@ -8039,6 +8584,7 @@ export class AdminService {
         description: dto.description,
         website: dto.website,
         country: dto.country,
+        foundedYear: dto.foundedYear,
         sortOrder: dto.sortOrder ?? 0,
         isActive: dto.isActive ?? true,
       },
@@ -8050,7 +8596,7 @@ export class AdminService {
   async updateManufacturer(
     adminId: string,
     id: string,
-    dto: { name?: string; logo?: string; description?: string; website?: string; country?: string; sortOrder?: number; isActive?: boolean },
+    dto: { name?: string; logo?: string; description?: string; website?: string; country?: string; foundedYear?: number | null; sortOrder?: number; isActive?: boolean },
   ) {
     const existing = await this.prisma.manufacturer.findUnique({ where: { id } });
     if (!existing) throw new NotFoundException('Üretici bulunamadı');
@@ -8073,6 +8619,7 @@ export class AdminService {
         description: dto.description,
         website: dto.website,
         country: dto.country,
+        foundedYear: dto.foundedYear,
         sortOrder: dto.sortOrder,
         isActive: dto.isActive,
       },
@@ -8187,645 +8734,7 @@ export class AdminService {
     return { success: true };
   }
 
-  // ==================== SHIPPING METHODS ====================
-
-  /**
-   * Get all shipping methods
-   */
-  async getShippingMethods(query?: { isActive?: boolean; search?: string }) {
-    const where: Prisma.ShippingMethodWhereInput = {};
-
-    if (query?.isActive !== undefined) {
-      where.isActive = query.isActive;
-    }
-
-    if (query?.search) {
-      const ids = await fulltextShippingMethodSearch(this.prisma, query.search);
-      if (ids.length === 0) return [];
-      where.id = { in: ids };
-    }
-
-    const methods = await this.prisma.shippingMethod.findMany({
-      where,
-      orderBy: [{ sortOrder: 'asc' }, { name: 'asc' }],
-    });
-
-    return methods;
-  }
-
-  /**
-   * Create shipping method
-   */
-  async createShippingMethod(adminId: string, dto: {
-    name: string;
-    code: string;
-    description?: string;
-    isActive?: boolean;
-    sortOrder?: number;
-  }) {
-    // Check if code exists
-    const existing = await this.prisma.shippingMethod.findUnique({
-      where: { code: dto.code },
-    });
-
-    if (existing) {
-      throw new BadRequestException('Bu kod zaten kullanılıyor');
-    }
-
-    const method = await this.prisma.shippingMethod.create({
-      data: {
-        name: dto.name,
-        code: dto.code.toLowerCase(),
-        description: dto.description,
-        isActive: dto.isActive ?? true,
-        sortOrder: dto.sortOrder ?? 0,
-      },
-    });
-
-    await this.createAuditLog(adminId, 'shipping_method_create', 'ShippingMethod', method.id, null, method);
-
-    this.logger.log(`Shipping method created: ${method.name} by admin ${adminId}`);
-
-    return method;
-  }
-
-  /**
-   * Update shipping method
-   */
-  async updateShippingMethod(adminId: string, methodId: string, dto: {
-    name?: string;
-    code?: string;
-    description?: string;
-    isActive?: boolean;
-    sortOrder?: number;
-  }) {
-    const existing = await this.prisma.shippingMethod.findUnique({
-      where: { id: methodId },
-    });
-
-    if (!existing) {
-      throw new NotFoundException('Kargo yöntemi bulunamadı');
-    }
-
-    // Check if new code conflicts
-    if (dto.code && dto.code !== existing.code) {
-      const conflict = await this.prisma.shippingMethod.findUnique({
-        where: { code: dto.code },
-      });
-      if (conflict) {
-        throw new BadRequestException('Bu kod zaten kullanılıyor');
-      }
-    }
-
-    const updated = await this.prisma.shippingMethod.update({
-      where: { id: methodId },
-      data: {
-        name: dto.name,
-        code: dto.code?.toLowerCase(),
-        description: dto.description,
-        isActive: dto.isActive,
-        sortOrder: dto.sortOrder,
-      },
-    });
-
-    await this.createAuditLog(adminId, 'shipping_method_update', 'ShippingMethod', methodId, existing, updated);
-
-    return updated;
-  }
-
-  /**
-   * Delete shipping method
-   */
-  async deleteShippingMethod(adminId: string, methodId: string) {
-    const existing = await this.prisma.shippingMethod.findUnique({
-      where: { id: methodId },
-      include: { _count: { select: { rates: true } } },
-    });
-
-    if (!existing) {
-      throw new NotFoundException('Kargo yöntemi bulunamadı');
-    }
-
-    if (existing._count.rates > 0) {
-      throw new BadRequestException('Bu yönteme bağlı fiyatlandırmalar var. Önce onları silin.');
-    }
-
-    await this.prisma.shippingMethod.delete({
-      where: { id: methodId },
-    });
-
-    await this.createAuditLog(adminId, 'shipping_method_delete', 'ShippingMethod', methodId, existing, null);
-
-    return { success: true };
-  }
-
-  // ==================== SHIPPING CARRIERS ====================
-
-  /**
-   * Get all shipping carriers
-   */
-  async getShippingCarriers(query?: { isActive?: boolean; supportsLabels?: boolean; search?: string }) {
-    const where: Prisma.ShippingCarrierWhereInput = {};
-
-    if (query?.isActive !== undefined) {
-      where.isActive = query.isActive;
-    }
-
-    if (query?.supportsLabels !== undefined) {
-      where.supportsLabels = query.supportsLabels;
-    }
-
-    if (query?.search) {
-      const ids = await fulltextShippingCarrierSearch(this.prisma, query.search);
-      if (ids.length === 0) return [];
-      where.id = { in: ids };
-    }
-
-    const carriers = await this.prisma.shippingCarrier.findMany({
-      where,
-      orderBy: { name: 'asc' },
-      select: {
-        id: true,
-        name: true,
-        code: true,
-        logo: true,
-        trackingUrl: true,
-        isActive: true,
-        supportsLabels: true,
-        createdAt: true,
-        updatedAt: true,
-        // Don't expose API credentials
-      },
-    });
-
-    return carriers;
-  }
-
-  /**
-   * Create shipping carrier
-   */
-  async createShippingCarrier(adminId: string, dto: {
-    name: string;
-    code: string;
-    logo?: string;
-    trackingUrl?: string;
-    apiEndpoint?: string;
-    apiKey?: string;
-    apiSecret?: string;
-    isActive?: boolean;
-    supportsLabels?: boolean;
-  }) {
-    const existing = await this.prisma.shippingCarrier.findUnique({
-      where: { code: dto.code },
-    });
-
-    if (existing) {
-      throw new BadRequestException('Bu kargo firması kodu zaten kullanılıyor');
-    }
-
-    const carrier = await this.prisma.shippingCarrier.create({
-      data: {
-        name: dto.name,
-        code: dto.code.toLowerCase(),
-        logo: dto.logo,
-        trackingUrl: dto.trackingUrl,
-        apiEndpoint: dto.apiEndpoint,
-        apiKey: dto.apiKey,
-        apiSecret: dto.apiSecret,
-        isActive: dto.isActive ?? true,
-        supportsLabels: dto.supportsLabels ?? true,
-      },
-    });
-
-    // Don't include secrets in audit log
-    const safeCarrier = { ...carrier, apiKey: '***', apiSecret: '***' };
-    await this.createAuditLog(adminId, 'shipping_carrier_create', 'ShippingCarrier', carrier.id, null, safeCarrier);
-
-    this.logger.log(`Shipping carrier created: ${carrier.name} by admin ${adminId}`);
-
-    return {
-      id: carrier.id,
-      name: carrier.name,
-      code: carrier.code,
-      logo: carrier.logo,
-      trackingUrl: carrier.trackingUrl,
-      isActive: carrier.isActive,
-      supportsLabels: carrier.supportsLabels,
-      createdAt: carrier.createdAt,
-      updatedAt: carrier.updatedAt,
-    };
-  }
-
-  /**
-   * Update shipping carrier
-   */
-  async updateShippingCarrier(adminId: string, carrierId: string, dto: {
-    name?: string;
-    code?: string;
-    logo?: string;
-    trackingUrl?: string;
-    apiEndpoint?: string;
-    apiKey?: string;
-    apiSecret?: string;
-    isActive?: boolean;
-    supportsLabels?: boolean;
-  }) {
-    const existing = await this.prisma.shippingCarrier.findUnique({
-      where: { id: carrierId },
-    });
-
-    if (!existing) {
-      throw new NotFoundException('Kargo firması bulunamadı');
-    }
-
-    if (dto.code && dto.code !== existing.code) {
-      const conflict = await this.prisma.shippingCarrier.findUnique({
-        where: { code: dto.code },
-      });
-      if (conflict) {
-        throw new BadRequestException('Bu kargo firması kodu zaten kullanılıyor');
-      }
-    }
-
-    const updated = await this.prisma.shippingCarrier.update({
-      where: { id: carrierId },
-      data: {
-        name: dto.name,
-        code: dto.code?.toLowerCase(),
-        logo: dto.logo,
-        trackingUrl: dto.trackingUrl,
-        apiEndpoint: dto.apiEndpoint,
-        apiKey: dto.apiKey,
-        apiSecret: dto.apiSecret,
-        isActive: dto.isActive,
-        supportsLabels: dto.supportsLabels,
-      },
-    });
-
-    await this.createAuditLog(adminId, 'shipping_carrier_update', 'ShippingCarrier', carrierId,
-      { ...existing, apiKey: '***', apiSecret: '***' },
-      { ...updated, apiKey: '***', apiSecret: '***' });
-
-    return {
-      id: updated.id,
-      name: updated.name,
-      code: updated.code,
-      logo: updated.logo,
-      trackingUrl: updated.trackingUrl,
-      isActive: updated.isActive,
-      supportsLabels: updated.supportsLabels,
-      createdAt: updated.createdAt,
-      updatedAt: updated.updatedAt,
-    };
-  }
-
-  /**
-   * Delete shipping carrier
-   */
-  async deleteShippingCarrier(adminId: string, carrierId: string) {
-    const existing = await this.prisma.shippingCarrier.findUnique({
-      where: { id: carrierId },
-      include: { _count: { select: { rates: true } } },
-    });
-
-    if (!existing) {
-      throw new NotFoundException('Kargo firması bulunamadı');
-    }
-
-    if (existing._count.rates > 0) {
-      throw new BadRequestException('Bu kargo firmasına bağlı fiyatlandırmalar var. Önce onları silin.');
-    }
-
-    await this.prisma.shippingCarrier.delete({
-      where: { id: carrierId },
-    });
-
-    await this.createAuditLog(adminId, 'shipping_carrier_delete', 'ShippingCarrier', carrierId, existing, null);
-
-    return { success: true };
-  }
-
-  // ==================== SHIPPING ZONES ====================
-
-  /**
-   * Get all shipping zones
-   */
-  async getShippingZones(query?: { isActive?: boolean; country?: string; search?: string }) {
-    const where: Prisma.ShippingZoneWhereInput = {};
-
-    if (query?.isActive !== undefined) {
-      where.isActive = query.isActive;
-    }
-
-    if (query?.country) {
-      where.countries = { has: query.country.toUpperCase() };
-    }
-
-    if (query?.search) {
-      const ids = await fulltextShippingZoneSearch(this.prisma, query.search);
-      if (ids.length === 0) return [];
-      where.id = { in: ids };
-    }
-
-    const zones = await this.prisma.shippingZone.findMany({
-      where,
-      orderBy: [{ isDefault: 'desc' }, { name: 'asc' }],
-      include: {
-        _count: { select: { rates: true } },
-      },
-    });
-
-    return zones.map(z => ({
-      ...z,
-      ratesCount: z._count.rates,
-    }));
-  }
-
-  /**
-   * Create shipping zone
-   */
-  async createShippingZone(adminId: string, dto: {
-    name: string;
-    description?: string;
-    countries?: string[];
-    regions?: string[];
-    cities?: string[];
-    isDefault?: boolean;
-    isActive?: boolean;
-  }) {
-    // If setting as default, remove default from others
-    if (dto.isDefault) {
-      await this.prisma.shippingZone.updateMany({
-        where: { isDefault: true },
-        data: { isDefault: false },
-      });
-    }
-
-    const zone = await this.prisma.shippingZone.create({
-      data: {
-        name: dto.name,
-        description: dto.description,
-        countries: dto.countries?.map(c => c.toUpperCase()) || [],
-        regions: dto.regions || [],
-        cities: dto.cities || [],
-        isDefault: dto.isDefault ?? false,
-        isActive: dto.isActive ?? true,
-      },
-    });
-
-    await this.createAuditLog(adminId, 'shipping_zone_create', 'ShippingZone', zone.id, null, zone);
-
-    this.logger.log(`Shipping zone created: ${zone.name} by admin ${adminId}`);
-
-    return zone;
-  }
-
-  /**
-   * Update shipping zone
-   */
-  async updateShippingZone(adminId: string, zoneId: string, dto: {
-    name?: string;
-    description?: string;
-    countries?: string[];
-    regions?: string[];
-    cities?: string[];
-    isDefault?: boolean;
-    isActive?: boolean;
-  }) {
-    const existing = await this.prisma.shippingZone.findUnique({
-      where: { id: zoneId },
-    });
-
-    if (!existing) {
-      throw new NotFoundException('Kargo bölgesi bulunamadı');
-    }
-
-    // If setting as default, remove default from others
-    if (dto.isDefault && !existing.isDefault) {
-      await this.prisma.shippingZone.updateMany({
-        where: { isDefault: true, id: { not: zoneId } },
-        data: { isDefault: false },
-      });
-    }
-
-    const updated = await this.prisma.shippingZone.update({
-      where: { id: zoneId },
-      data: {
-        name: dto.name,
-        description: dto.description,
-        countries: dto.countries?.map(c => c.toUpperCase()),
-        regions: dto.regions,
-        cities: dto.cities,
-        isDefault: dto.isDefault,
-        isActive: dto.isActive,
-      },
-    });
-
-    await this.createAuditLog(adminId, 'shipping_zone_update', 'ShippingZone', zoneId, existing, updated);
-
-    return updated;
-  }
-
-  /**
-   * Delete shipping zone
-   */
-  async deleteShippingZone(adminId: string, zoneId: string) {
-    const existing = await this.prisma.shippingZone.findUnique({
-      where: { id: zoneId },
-      include: { _count: { select: { rates: true } } },
-    });
-
-    if (!existing) {
-      throw new NotFoundException('Kargo bölgesi bulunamadı');
-    }
-
-    if (existing._count.rates > 0) {
-      throw new BadRequestException('Bu bölgeye bağlı fiyatlandırmalar var. Önce onları silin.');
-    }
-
-    await this.prisma.shippingZone.delete({
-      where: { id: zoneId },
-    });
-
-    await this.createAuditLog(adminId, 'shipping_zone_delete', 'ShippingZone', zoneId, existing, null);
-
-    return { success: true };
-  }
-
-  // ==================== SHIPPING RATES ====================
-
-  /**
-   * Get shipping rates
-   */
-  async getShippingRates(query?: { zoneId?: string; methodId?: string; carrierId?: string; isActive?: boolean }) {
-    const where: Prisma.ShippingRateWhereInput = {};
-
-    if (query?.zoneId) where.zoneId = query.zoneId;
-    if (query?.methodId) where.methodId = query.methodId;
-    if (query?.carrierId) where.carrierId = query.carrierId;
-    if (query?.isActive !== undefined) where.isActive = query.isActive;
-
-    const rates = await this.prisma.shippingRate.findMany({
-      where,
-      include: {
-        zone: { select: { id: true, name: true } },
-        method: { select: { id: true, name: true, code: true } },
-        carrier: { select: { id: true, name: true, code: true } },
-      },
-      orderBy: [{ zone: { name: 'asc' } }, { method: { name: 'asc' } }],
-    });
-
-    return rates.map(r => ({
-      ...r,
-      basePrice: Number(r.basePrice),
-      pricePerKg: Number(r.pricePerKg),
-      freeShippingMin: r.freeShippingMin ? Number(r.freeShippingMin) : null,
-    }));
-  }
-
-  /**
-   * Create shipping rate
-   */
-  async createShippingRate(adminId: string, dto: {
-    zoneId: string;
-    methodId: string;
-    carrierId: string;
-    basePrice: number;
-    pricePerKg?: number;
-    freeShippingMin?: number;
-    minDeliveryDays: number;
-    maxDeliveryDays: number;
-    isActive?: boolean;
-  }) {
-    // Validate references exist
-    const [zone, method, carrier] = await Promise.all([
-      this.prisma.shippingZone.findUnique({ where: { id: dto.zoneId } }),
-      this.prisma.shippingMethod.findUnique({ where: { id: dto.methodId } }),
-      this.prisma.shippingCarrier.findUnique({ where: { id: dto.carrierId } }),
-    ]);
-
-    if (!zone) throw new NotFoundException('Kargo bölgesi bulunamadı');
-    if (!method) throw new NotFoundException('Kargo yöntemi bulunamadı');
-    if (!carrier) throw new NotFoundException('Kargo firması bulunamadı');
-
-    // Check for duplicate combination
-    const existing = await this.prisma.shippingRate.findUnique({
-      where: {
-        zoneId_methodId_carrierId: {
-          zoneId: dto.zoneId,
-          methodId: dto.methodId,
-          carrierId: dto.carrierId,
-        },
-      },
-    });
-
-    if (existing) {
-      throw new BadRequestException('Bu kombinasyon için zaten bir fiyatlandırma mevcut');
-    }
-
-    const rate = await this.prisma.shippingRate.create({
-      data: {
-        zoneId: dto.zoneId,
-        methodId: dto.methodId,
-        carrierId: dto.carrierId,
-        basePrice: dto.basePrice,
-        pricePerKg: dto.pricePerKg ?? 0,
-        freeShippingMin: dto.freeShippingMin,
-        minDeliveryDays: dto.minDeliveryDays,
-        maxDeliveryDays: dto.maxDeliveryDays,
-        isActive: dto.isActive ?? true,
-      },
-      include: {
-        zone: { select: { id: true, name: true } },
-        method: { select: { id: true, name: true, code: true } },
-        carrier: { select: { id: true, name: true, code: true } },
-      },
-    });
-
-    await this.createAuditLog(adminId, 'shipping_rate_create', 'ShippingRate', rate.id, null, rate);
-
-    return {
-      ...rate,
-      basePrice: Number(rate.basePrice),
-      pricePerKg: Number(rate.pricePerKg),
-      freeShippingMin: rate.freeShippingMin ? Number(rate.freeShippingMin) : null,
-    };
-  }
-
-  /**
-   * Update shipping rate
-   */
-  async updateShippingRate(adminId: string, rateId: string, dto: {
-    zoneId?: string;
-    methodId?: string;
-    carrierId?: string;
-    basePrice?: number;
-    pricePerKg?: number;
-    freeShippingMin?: number;
-    minDeliveryDays?: number;
-    maxDeliveryDays?: number;
-    isActive?: boolean;
-  }) {
-    const existing = await this.prisma.shippingRate.findUnique({
-      where: { id: rateId },
-    });
-
-    if (!existing) {
-      throw new NotFoundException('Kargo fiyatlandırması bulunamadı');
-    }
-
-    const updated = await this.prisma.shippingRate.update({
-      where: { id: rateId },
-      data: {
-        zoneId: dto.zoneId,
-        methodId: dto.methodId,
-        carrierId: dto.carrierId,
-        basePrice: dto.basePrice,
-        pricePerKg: dto.pricePerKg,
-        freeShippingMin: dto.freeShippingMin,
-        minDeliveryDays: dto.minDeliveryDays,
-        maxDeliveryDays: dto.maxDeliveryDays,
-        isActive: dto.isActive,
-      },
-      include: {
-        zone: { select: { id: true, name: true } },
-        method: { select: { id: true, name: true, code: true } },
-        carrier: { select: { id: true, name: true, code: true } },
-      },
-    });
-
-    await this.createAuditLog(adminId, 'shipping_rate_update', 'ShippingRate', rateId, existing, updated);
-
-    return {
-      ...updated,
-      basePrice: Number(updated.basePrice),
-      pricePerKg: Number(updated.pricePerKg),
-      freeShippingMin: updated.freeShippingMin ? Number(updated.freeShippingMin) : null,
-    };
-  }
-
-  /**
-   * Delete shipping rate
-   */
-  async deleteShippingRate(adminId: string, rateId: string) {
-    const existing = await this.prisma.shippingRate.findUnique({
-      where: { id: rateId },
-    });
-
-    if (!existing) {
-      throw new NotFoundException('Kargo fiyatlandırması bulunamadı');
-    }
-
-    await this.prisma.shippingRate.delete({
-      where: { id: rateId },
-    });
-
-    await this.createAuditLog(adminId, 'shipping_rate_delete', 'ShippingRate', rateId, existing, null);
-
-    return { success: true };
-  }
-
-  // ==================== SHIPPING LABELS ====================
+  // ==================== SHIPPING (view-only) ====================
 
   /**
    * Get list of shipments
@@ -8868,79 +8777,6 @@ export class AdminService {
         limit,
         totalPages: Math.ceil(total / limit),
       },
-    };
-  }
-
-  /**
-   * Generate shipping label for a shipment
-   */
-  async generateShippingLabel(adminId: string, shipmentId: string) {
-    const shipment = await this.prisma.shipment.findUnique({
-      where: { id: shipmentId },
-      include: {
-        order: {
-          include: {
-            buyer: { select: { displayName: true, email: true, phone: true } },
-          },
-        },
-      },
-    });
-
-    if (!shipment) {
-      throw new NotFoundException('Gönderi bulunamadı');
-    }
-
-    // Get carrier info
-    const carrier = await this.prisma.shippingCarrier.findUnique({
-      where: { code: shipment.provider },
-    });
-
-    // Mock label generation - in production, this would call carrier API
-    const labelUrl = `https://labels.example.com/${shipmentId}.pdf`;
-    const trackingNumber = shipment.trackingNumber || `TRK${Date.now()}${Math.random().toString(36).substr(2, 6).toUpperCase()}`;
-
-    // Update shipment with label info
-    const updated = await this.prisma.shipment.update({
-      where: { id: shipmentId },
-      data: {
-        labelUrl,
-        trackingNumber,
-        trackingUrl: carrier?.trackingUrl?.replace('{{tracking}}', trackingNumber),
-      },
-    });
-
-    await this.createAuditLog(adminId, 'shipping_label_generate', 'Shipment', shipmentId, shipment, updated);
-
-    this.logger.log(`Shipping label generated for shipment ${shipmentId} by admin ${adminId}`);
-
-    return {
-      shipmentId,
-      labelUrl,
-      trackingNumber,
-      carrier: shipment.provider,
-      generatedAt: new Date(),
-    };
-  }
-
-  /**
-   * Bulk generate shipping labels
-   */
-  async bulkGenerateShippingLabels(adminId: string, shipmentIds: string[]) {
-    const results = await Promise.allSettled(
-      shipmentIds.map(id => this.generateShippingLabel(adminId, id))
-    );
-
-    const successful = results.filter((r): r is PromiseFulfilledResult<any> => r.status === 'fulfilled')
-      .map(r => r.value);
-    const failed = results.filter((r): r is PromiseRejectedResult => r.status === 'rejected')
-      .map((r, i) => ({ shipmentId: shipmentIds[i], error: r.reason?.message || 'Unknown error' }));
-
-    return {
-      successful,
-      failed,
-      totalRequested: shipmentIds.length,
-      successCount: successful.length,
-      failCount: failed.length,
     };
   }
 
@@ -9569,7 +9405,7 @@ export class AdminService {
         const collections = await this.prisma.collection.findMany({
           where: { id: { in: esResult.ids } },
           include: {
-            user: { select: { id: true, displayName: true, avatarUrl: true } },
+            user: { select: { id: true, displayName: true, avatarUrl: true, membership: { select: { tier: { select: { type: true } } } } } },
             _count: { select: { items: true } },
           },
         });
@@ -9580,7 +9416,7 @@ export class AdminService {
             id: c.id, name: c.name, slug: c.slug, description: c.description,
             coverImageUrl: c.coverImageKey ? this.storageService.getPublicAssetUrl(c.coverImageKey) : undefined, isPublic: c.isPublic, isFeatured: c.isFeatured,
             viewCount: c.viewCount, likeCount: c.likeCount, itemCount: c._count.items,
-            owner: c.user, createdAt: c.createdAt, updatedAt: c.updatedAt,
+            owner: { ...c.user, membershipTier: c.user.membership?.tier?.type ?? null }, createdAt: c.createdAt, updatedAt: c.updatedAt,
           })),
           total: esResult.total, page, limit, totalPages: Math.ceil(esResult.total / limit),
         };
@@ -9607,7 +9443,7 @@ export class AdminService {
       this.prisma.collection.findMany({
         where,
         include: {
-          user: { select: { id: true, displayName: true, avatarUrl: true } },
+          user: { select: { id: true, displayName: true, avatarUrl: true, membership: { select: { tier: { select: { type: true } } } } } },
           _count: { select: { items: true } },
         },
         orderBy: { [sortBy]: sortOrder },
@@ -9621,7 +9457,7 @@ export class AdminService {
         id: c.id, name: c.name, slug: c.slug, description: c.description,
         coverImageUrl: c.coverImageKey ? this.storageService.getPublicAssetUrl(c.coverImageKey) : undefined, isPublic: c.isPublic, isFeatured: c.isFeatured,
         viewCount: c.viewCount, likeCount: c.likeCount, itemCount: c._count.items,
-        owner: c.user, createdAt: c.createdAt, updatedAt: c.updatedAt,
+        owner: { ...c.user, membershipTier: c.user.membership?.tier?.type ?? null }, createdAt: c.createdAt, updatedAt: c.updatedAt,
       })),
       total, page, limit, totalPages: Math.ceil(total / limit),
     };
@@ -9915,307 +9751,6 @@ export class AdminService {
     return { success: true, isFeatured: updated.isFeatured };
   }
 
-  // ==================== TAG MANAGEMENT ====================
-
-  /**
-   * Get tags with filtering and pagination
-   */
-  async getTags(query: {
-    search?: string;
-    isActive?: boolean;
-    page?: number;
-    limit?: number;
-    sortBy?: 'name' | 'usageCount' | 'createdAt';
-    sortOrder?: 'asc' | 'desc';
-  }) {
-    const { page = 1, limit = 20, search, isActive, sortBy = 'usageCount', sortOrder = 'desc' } = query;
-    const where: Prisma.TagWhereInput = {};
-
-    if (search) {
-      const ids = await fulltextTagSearch(this.prisma, search);
-      if (ids.length === 0) {
-        return { data: [], total: 0, page, limit, totalPages: 0 };
-      }
-      where.id = { in: ids };
-    }
-    if (isActive !== undefined) where.isActive = isActive;
-
-    const [total, tags] = await Promise.all([
-      this.prisma.tag.count({ where }),
-      this.prisma.tag.findMany({
-        where,
-        orderBy: { [sortBy]: sortOrder },
-        skip: (page - 1) * limit,
-        take: limit,
-      }),
-    ]);
-
-    return {
-      data: tags,
-      total,
-      page,
-      limit,
-      totalPages: Math.ceil(total / limit),
-    };
-  }
-
-  /**
-   * Create a new tag
-   */
-  async createTag(adminId: string, dto: {
-    name: string;
-    description?: string;
-    color?: string;
-    isActive?: boolean;
-  }) {
-    const slug = this.generateSlug(dto.name);
-
-    // Check for existing tag
-    const existing = await this.prisma.tag.findFirst({
-      where: { OR: [{ name: dto.name }, { slug }] },
-    });
-
-    if (existing) {
-      throw new BadRequestException('Bu isimde bir etiket zaten mevcut');
-    }
-
-    const tag = await this.prisma.tag.create({
-      data: {
-        name: dto.name,
-        slug,
-        description: dto.description,
-        color: dto.color,
-        isActive: dto.isActive ?? true,
-      },
-    });
-
-    await this.createAuditLog(adminId, 'tag_create', 'Tag', tag.id, null, tag);
-
-    return tag;
-  }
-
-  /**
-   * Update a tag
-   */
-  async updateTag(adminId: string, tagId: string, dto: {
-    name?: string;
-    description?: string;
-    color?: string;
-    isActive?: boolean;
-  }) {
-    const existing = await this.prisma.tag.findUnique({
-      where: { id: tagId },
-    });
-
-    if (!existing) {
-      throw new NotFoundException('Etiket bulunamadı');
-    }
-
-    const updateData: Prisma.TagUpdateInput = {};
-    if (dto.name !== undefined) {
-      updateData.name = dto.name;
-      updateData.slug = this.generateSlug(dto.name);
-    }
-    if (dto.description !== undefined) updateData.description = dto.description;
-    if (dto.color !== undefined) updateData.color = dto.color;
-    if (dto.isActive !== undefined) updateData.isActive = dto.isActive;
-
-    const updated = await this.prisma.tag.update({
-      where: { id: tagId },
-      data: updateData,
-    });
-
-    await this.createAuditLog(adminId, 'tag_update', 'Tag', tagId, existing, updated);
-
-    return updated;
-  }
-
-  /**
-   * Delete a tag
-   */
-  async deleteTag(adminId: string, tagId: string) {
-    const existing = await this.prisma.tag.findUnique({
-      where: { id: tagId },
-      include: { _count: { select: { products: true } } },
-    });
-
-    if (!existing) {
-      throw new NotFoundException('Etiket bulunamadı');
-    }
-
-    if (existing._count.products > 0) {
-      throw new BadRequestException(`Bu etiket ${existing._count.products} üründe kullanılıyor. Önce etiketleri kaldırın veya birleştirin.`);
-    }
-
-    await this.prisma.tag.delete({
-      where: { id: tagId },
-    });
-
-    await this.createAuditLog(adminId, 'tag_delete', 'Tag', tagId, existing, null);
-
-    return { success: true };
-  }
-
-  /**
-   * Merge multiple tags into one
-   */
-  async mergeTags(adminId: string, sourceTagIds: string[], targetTagId: string) {
-    // Validate target tag
-    const targetTag = await this.prisma.tag.findUnique({
-      where: { id: targetTagId },
-    });
-
-    if (!targetTag) {
-      throw new NotFoundException('Hedef etiket bulunamadı');
-    }
-
-    if (sourceTagIds.includes(targetTagId)) {
-      throw new BadRequestException('Hedef etiket kaynak etiketler arasında olamaz');
-    }
-
-    // Get source tags
-    const sourceTags = await this.prisma.tag.findMany({
-      where: { id: { in: sourceTagIds } },
-    });
-
-    if (sourceTags.length !== sourceTagIds.length) {
-      throw new BadRequestException('Bazı kaynak etiketler bulunamadı');
-    }
-
-    // Merge in a transaction
-    const result = await this.prisma.$transaction(async (tx) => {
-      // Get all product-tag relations for source tags
-      const sourceProductTags = await tx.productTag.findMany({
-        where: { tagId: { in: sourceTagIds } },
-      });
-
-      // Update product tags to target tag (skip duplicates)
-      let mergedCount = 0;
-      for (const pt of sourceProductTags) {
-        const exists = await tx.productTag.findUnique({
-          where: { productId_tagId: { productId: pt.productId, tagId: targetTagId } },
-        });
-
-        if (!exists) {
-          await tx.productTag.update({
-            where: { id: pt.id },
-            data: { tagId: targetTagId },
-          });
-          mergedCount++;
-        } else {
-          await tx.productTag.delete({ where: { id: pt.id } });
-        }
-      }
-
-      // Delete source tags
-      await tx.tag.deleteMany({
-        where: { id: { in: sourceTagIds } },
-      });
-
-      // Update usage count on target tag
-      const newUsageCount = await tx.productTag.count({
-        where: { tagId: targetTagId },
-      });
-
-      await tx.tag.update({
-        where: { id: targetTagId },
-        data: { usageCount: newUsageCount },
-      });
-
-      return { mergedCount };
-    });
-
-    await this.createAuditLog(adminId, 'tags_merge', 'Tag', targetTagId, { sourceTagIds }, { targetTagId, mergedCount: result.mergedCount });
-
-    const updatedTargetTag = await this.prisma.tag.findUnique({
-      where: { id: targetTagId },
-    });
-
-    return {
-      success: true,
-      message: `${sourceTagIds.length} etiket birleştirildi`,
-      mergedCount: result.mergedCount,
-      targetTag: updatedTargetTag,
-    };
-  }
-
-  /**
-   * Bulk assign tags to products
-   */
-  async bulkAssignTags(adminId: string, productIds: string[], tagIds: string[]) {
-    // Validate tags exist
-    const tags = await this.prisma.tag.findMany({
-      where: { id: { in: tagIds } },
-    });
-
-    if (tags.length !== tagIds.length) {
-      throw new BadRequestException('Bazı etiketler bulunamadı');
-    }
-
-    // Create product-tag relations
-    const createData: Prisma.ProductTagCreateManyInput[] = [];
-    for (const productId of productIds) {
-      for (const tagId of tagIds) {
-        createData.push({ productId, tagId });
-      }
-    }
-
-    const result = await this.prisma.productTag.createMany({
-      data: createData,
-      skipDuplicates: true,
-    });
-
-    // Update usage counts
-    for (const tagId of tagIds) {
-      const count = await this.prisma.productTag.count({
-        where: { tagId },
-      });
-      await this.prisma.tag.update({
-        where: { id: tagId },
-        data: { usageCount: count },
-      });
-    }
-
-    await this.createAuditLog(adminId, 'tags_bulk_assign', 'ProductTag', 'bulk', null, { productIds, tagIds, assignedCount: result.count });
-
-    return {
-      success: true,
-      message: `${result.count} etiket ataması yapıldı`,
-      assignedCount: result.count,
-    };
-  }
-
-  /**
-   * Bulk remove tags from products
-   */
-  async bulkRemoveTags(adminId: string, productIds: string[], tagIds: string[]) {
-    const result = await this.prisma.productTag.deleteMany({
-      where: {
-        productId: { in: productIds },
-        tagId: { in: tagIds },
-      },
-    });
-
-    // Update usage counts
-    for (const tagId of tagIds) {
-      const count = await this.prisma.productTag.count({
-        where: { tagId },
-      });
-      await this.prisma.tag.update({
-        where: { id: tagId },
-        data: { usageCount: count },
-      });
-    }
-
-    await this.createAuditLog(adminId, 'tags_bulk_remove', 'ProductTag', 'bulk', null, { productIds, tagIds, removedCount: result.count });
-
-    return {
-      success: true,
-      message: `${result.count} etiket kaldırıldı`,
-      removedCount: result.count,
-    };
-  }
-
   // ==================== ATTRIBUTE GROUP MANAGEMENT ====================
 
   /**
@@ -10489,7 +10024,7 @@ export class AdminService {
         groupId: dto.groupId,
         value: dto.value,
         slug,
-        displayValue: dto.displayValue,
+        displayValue: dto.displayValue?.trim() || null,
         color: dto.color,
         sortOrder: dto.sortOrder ?? 0,
         isActive: dto.isActive ?? true,
@@ -10531,7 +10066,7 @@ export class AdminService {
           ? dto.value.replace(/\s/g, '').replace(/[:\/]/g, '').toLowerCase() || this.generateSlug(dto.value)
           : this.generateSlug(dto.value);
     }
-    if (dto.displayValue !== undefined) updateData.displayValue = dto.displayValue;
+    if (dto.displayValue !== undefined) updateData.displayValue = dto.displayValue?.trim() || null;
     if (dto.color !== undefined) updateData.color = dto.color;
     if (dto.sortOrder !== undefined) updateData.sortOrder = dto.sortOrder;
     if (dto.isActive !== undefined) updateData.isActive = dto.isActive;
@@ -10679,34 +10214,6 @@ export class AdminService {
   }
 
   /**
-   * Reply to review
-   */
-  async replyToReview(adminId: string, reviewId: string, reply: string) {
-    const review = await this.prisma.productRating.findUnique({
-      where: { id: reviewId },
-    });
-
-    if (!review) {
-      throw new NotFoundException('Yorum bulunamadı');
-    }
-
-    const updated = await this.prisma.productRating.update({
-      where: { id: reviewId },
-      data: {
-        adminReply: reply,
-        adminReplyAt: new Date(),
-        status: RatingStatus.approved as any, // Auto approve if admin replies
-      } as any,
-    });
-
-    await this.createAuditLog(adminId, 'review_reply', 'Rating', reviewId, review, updated);
-
-    await this.ratingService.updateProductRatingStats(review.productId);
-
-    return updated;
-  }
-
-  /**
    * Get seller (user) ratings for admin panel
    */
   async getUserRatings(query: { page?: number; limit?: number; search?: string; status?: string }) {
@@ -10723,7 +10230,7 @@ export class AdminService {
         { comment: { contains: search, mode: 'insensitive' } },
       ];
     }
-    if (status && ['pending', 'approved', 'rejected', 'spam'].includes(status)) {
+    if (status && ['pending', 'approved', 'rejected'].includes(status)) {
       where.status = status;
     }
 
@@ -10747,6 +10254,122 @@ export class AdminService {
     };
   }
 
+  // ==================== SELLER APPLICATIONS ====================
+
+  async getSellerApplications(query: { page?: number; limit?: number; search?: string; status?: string }) {
+    const p = Number(query.page) || 1;
+    const lim = Number(query.limit) || 20;
+    const search = query.search?.trim();
+    const status = query.status as BusinessStatus | undefined;
+
+    const where: Prisma.UserWhereInput = {
+      companyName: { not: null },
+      businessStatus: status ?? undefined,
+    };
+
+    if (search) {
+      where.OR = [
+        { displayName: { contains: search, mode: 'insensitive' } },
+        { email: { contains: search, mode: 'insensitive' } },
+        { companyName: { contains: search, mode: 'insensitive' } },
+        { taxId: { contains: search, mode: 'insensitive' } },
+      ];
+    }
+
+    const [total, applications] = await Promise.all([
+      this.prisma.user.count({ where }),
+      this.prisma.user.findMany({
+        where,
+        orderBy: { createdAt: 'desc' },
+        skip: (p - 1) * lim,
+        take: lim,
+        select: {
+          id: true,
+          displayName: true,
+          email: true,
+          phone: true,
+          companyName: true,
+          taxId: true,
+          businessStatus: true,
+          isSeller: true,
+          createdAt: true,
+        },
+      }),
+    ]);
+
+    return {
+      data: applications,
+      meta: { total, page: p, limit: lim, totalPages: Math.ceil(total / lim) },
+    };
+  }
+
+  async approveSellerApplication(adminId: string, userId: string) {
+    const user = await this.prisma.user.findUnique({ where: { id: userId } });
+    if (!user) throw new NotFoundException('Kullanıcı bulunamadı');
+    if (!user.companyName) throw new BadRequestException('Bu kullanıcı kurumsal hesap değil');
+    if (user.businessStatus === BusinessStatus.approved) throw new BadRequestException('Bu başvuru zaten onaylanmış');
+
+    const previous = { businessStatus: user.businessStatus, isSeller: user.isSeller };
+    await this.prisma.user.update({
+      where: { id: userId },
+      data: { businessStatus: BusinessStatus.approved, isSeller: true, sellerType: 'individual' },
+    });
+    await this.createAuditLog(adminId, 'seller_application_approve', 'User', userId, previous, { businessStatus: 'approved', isSeller: true });
+
+    // In-app + push bildirimi
+    await this.notificationService.send({
+      userId,
+      type: NotificationType.SELLER_APPLICATION_APPROVED,
+      channels: [NotificationChannel.IN_APP, NotificationChannel.PUSH],
+      data: {},
+    });
+    // E-posta template sistemi üzerinden (admin panelinden özelleştirilebilir)
+    await this.eventService.queueEmail({
+      to: user.email,
+      subject: '',
+      template: 'seller-application-approved',
+      templateData: {
+        name: user.displayName || user.email,
+        companyName: user.companyName || '',
+      },
+    });
+    return { success: true };
+  }
+
+  async rejectSellerApplication(adminId: string, userId: string, reason: string) {
+    const user = await this.prisma.user.findUnique({ where: { id: userId } });
+    if (!user) throw new NotFoundException('Kullanıcı bulunamadı');
+    if (!user.companyName) throw new BadRequestException('Bu kullanıcı kurumsal hesap değil');
+    if (user.businessStatus === BusinessStatus.rejected) throw new BadRequestException('Bu başvuru zaten reddedilmiş');
+
+    const previous = { businessStatus: user.businessStatus };
+    await this.prisma.user.update({
+      where: { id: userId },
+      data: { businessStatus: BusinessStatus.rejected, isSeller: false },
+    });
+    await this.createAuditLog(adminId, 'seller_application_reject', 'User', userId, previous, { businessStatus: 'rejected', reason });
+
+    // In-app + push bildirimi
+    await this.notificationService.send({
+      userId,
+      type: NotificationType.SELLER_APPLICATION_REJECTED,
+      channels: [NotificationChannel.IN_APP, NotificationChannel.PUSH],
+      data: { reason: reason ? ` Neden: ${reason}` : '' },
+    });
+    // E-posta template sistemi üzerinden (admin panelinden özelleştirilebilir)
+    await this.eventService.queueEmail({
+      to: user.email,
+      subject: '',
+      template: 'seller-application-rejected',
+      templateData: {
+        name: user.displayName || user.email,
+        companyName: user.companyName || '',
+        reason: reason || '',
+      },
+    });
+    return { success: true };
+  }
+
   /**
    * Update seller (user) rating status (approve/reject)
    */
@@ -10762,38 +10385,75 @@ export class AdminService {
     return { success: true };
   }
 
-  /**
-   * Delete a seller (user) rating
-   */
-  async deleteUserRating(adminId: string, ratingId: string) {
-    const rating = await this.prisma.rating.findUnique({ where: { id: ratingId } });
-    if (!rating) throw new NotFoundException('Kullanıcı yorumu bulunamadı');
-    await this.prisma.rating.delete({ where: { id: ratingId } });
-    await this.createAuditLog(adminId, 'user_rating_delete', 'Rating', ratingId, rating, null);
-    return { success: true };
-  }
-
-  /**
-   * Delete review
-   */
-  async deleteReview(adminId: string, reviewId: string) {
-    const review = await this.prisma.productRating.findUnique({
-      where: { id: reviewId },
+  async applyOrderCoupon(orderId: string, adminId: string, code: string | null) {
+    const order = await this.prisma.order.findUnique({
+      where: { id: orderId },
+      include: { product: true },
     });
 
-    if (!review) {
-      throw new NotFoundException('Yorum bulunamadı');
+    if (!order) throw new NotFoundException('Sipariş bulunamadı');
+
+    // Kuponu kaldırma
+    if (!code) {
+      const previous = { discountCode: order.discountCode, discountAmount: order.discountAmount };
+      const baseTotal = Number(order.totalAmount) + Number(order.discountAmount ?? 0);
+      await this.prisma.order.update({
+        where: { id: orderId },
+        data: {
+          discountCode: null,
+          discountAmount: new Prisma.Decimal(0),
+          discountBreakdown: Prisma.JsonNull,
+          ...(order.status === OrderStatus.pending_payment ? { totalAmount: new Prisma.Decimal(baseTotal) } : {}),
+        },
+      });
+      await this.createAuditLog(adminId, 'order_coupon_removed', 'Order', orderId, previous, { discountCode: null });
+      return { success: true, discountCode: null, discountAmount: 0 };
     }
 
-    await this.prisma.productRating.delete({
-      where: { id: reviewId },
+    const discount = await this.prisma.discount.findUnique({
+      where: { code: code.toUpperCase() },
     });
 
-    await this.createAuditLog(adminId, 'review_delete', 'Rating', reviewId, review, null);
+    if (!discount) throw new BadRequestException('Kupon kodu bulunamadı');
+    if (!discount.isActive) throw new BadRequestException('Bu kupon aktif değil');
+    const now = new Date();
+    if (now < discount.startDate) throw new BadRequestException('Bu kupon henüz başlamadı');
+    if (now > discount.endDate) throw new BadRequestException('Bu kuponun süresi doldu');
+    if (discount.usageLimitTotal && discount.usedCount >= discount.usageLimitTotal) {
+      throw new BadRequestException('Bu kupon kullanım limitine ulaştı');
+    }
 
-    await this.ratingService.updateProductRatingStats(review.productId);
+    const productPrice = Number(order.product.price);
+    const baseTotal = Number(order.totalAmount) + Number(order.discountAmount ?? 0);
+    const subtotal = productPrice;
 
-    return { success: true };
+    let discountAmount = 0;
+    if (discount.type === 'percentage') {
+      discountAmount = subtotal * (Number(discount.value) / 100);
+    } else if (discount.type === 'fixed_amount') {
+      discountAmount = Math.min(Number(discount.value), subtotal);
+    }
+
+    if (discount.maxDiscountAmount) {
+      discountAmount = Math.min(discountAmount, Number(discount.maxDiscountAmount));
+    }
+
+    const newTotal = Math.max(0, baseTotal - discountAmount);
+
+    const previous = { discountCode: order.discountCode, discountAmount: order.discountAmount, totalAmount: order.totalAmount };
+    await this.prisma.order.update({
+      where: { id: orderId },
+      data: {
+        discountCode: discount.code,
+        discountAmount: new Prisma.Decimal(discountAmount),
+        discountBreakdown: { couponDiscount: discountAmount, appliedDiscountId: discount.id } as any,
+        ...(order.status === OrderStatus.pending_payment ? { totalAmount: new Prisma.Decimal(newTotal) } : {}),
+      },
+    });
+
+    await this.createAuditLog(adminId, 'order_coupon_applied', 'Order', orderId, previous, { discountCode: discount.code, discountAmount });
+    return { success: true, discountCode: discount.code, discountAmount, discountName: discount.name };
   }
+
 }
 

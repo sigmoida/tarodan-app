@@ -19,6 +19,9 @@ import {
 } from '@heroicons/react/24/outline';
 import Image from 'next/image';
 import { AdminTabs } from '@/components/AdminTabs';
+import { PageHeader } from '@/components/admin-list';
+import { Pagination } from '@/components/Pagination';
+import { useAdminResource } from '@/hooks/useAdminResource';
 
 interface ModerationItem {
   id: string;
@@ -36,6 +39,11 @@ interface ModerationItem {
   conversationId?: string;
   createdAt: string;
   status: string;
+  // AI görsel moderasyon sonuçları (yalnızca ürünlerde; null = denetlenmedi)
+  aiCheckStatus?: string | null;
+  aiRelevanceScore?: number | null;
+  aiNsfwScore?: number | null;
+  aiCheckReason?: string | null;
 }
 
 interface ModerationStats {
@@ -46,34 +54,56 @@ interface ModerationStats {
   totalPending: number;
 }
 
+const moderationTabs = [
+  { key: 'all', label: 'Tümü' },
+  { key: 'product', label: 'Ürünler' },
+  { key: 'message', label: 'Mesajlar' },
+  { key: 'review', label: 'Değerlendirmeler' },
+];
+
+const moderationTypeConfig: Record<string, StatusConfig> = {
+  product: { label: 'Ürün', variant: 'info' },
+  message: { label: 'Mesaj', variant: 'primary' },
+  review: { label: 'Değerlendirme', variant: 'warning' },
+  other: { label: 'Diğer', variant: 'secondary' },
+};
+
 const ModerationPage = () => {
   const [selectedTab, setSelectedTab] = useState<string>('all');
-  const [page, setPage] = useState(1);
-  const [loading, setLoading] = useState(true);
   const [stats, setStats] = useState<ModerationStats | null>(null);
-  const [items, setItems] = useState<ModerationItem[]>([]);
-  const [totalPages, setTotalPages] = useState(1);
-  const [total, setTotal] = useState(0);
-  
+
   // Reject modal state
   const [rejectModalOpen, setRejectModalOpen] = useState(false);
   const [selectedItem, setSelectedItem] = useState<ModerationItem | null>(null);
   const [rejectReason, setRejectReason] = useState('');
   const [rejectNotes, setRejectNotes] = useState('');
-  
+
   // Flag modal state
   const [flagModalOpen, setFlagModalOpen] = useState(false);
   const [flagReason, setFlagReason] = useState('');
   const [flagPriority, setFlagPriority] = useState('normal');
 
-  useEffect(() => {
-    loadStats();
-  }, []);
+  // ── Moderasyon kuyruğu — useAdminResource ile yönetim ─────────────────────
+  // queryKey'e selectedTab katıyoruz → sekme değişince otomatik yeni fetch.
+  // Backend: GET /admin/moderation/queue?type=...&page=...&pageSize=20
+  // pageSize → useAdminResource limit parametresine karşılık gelir;
+  // ancak backend "pageSize" bekliyor. fetcher içinde rename ediyoruz.
+  const r = useAdminResource<ModerationItem>({
+    queryKey: `moderation:${selectedTab}`,
+    fetcher: ({ page, limit, ...rest }) =>
+      adminApi.get('/admin/moderation/queue', {
+        params: {
+          type: selectedTab === 'all' ? undefined : selectedTab,
+          page,
+          pageSize: limit,
+          ...rest,
+        },
+      }),
+    limit: 20,
+    errorMessage: 'Moderasyon kuyruğu yüklenemedi',
+  });
 
-  useEffect(() => {
-    loadQueue();
-  }, [selectedTab, page]);
-
+  // ── İstatistikler — sadece mount'ta (ve manuel yenilede) yükle ───────────
   const loadStats = async () => {
     try {
       const response = await adminApi.get('/admin/moderation/stats');
@@ -83,29 +113,22 @@ const ModerationPage = () => {
     }
   };
 
-  const loadQueue = async () => {
-    setLoading(true);
-    try {
-      const type = selectedTab === 'all' ? undefined : selectedTab;
-      const response = await adminApi.get('/admin/moderation/queue', {
-        params: { type, page, pageSize: 20 },
-      });
-      setItems(response.data.data || []);
-      setTotalPages(response.data.meta?.totalPages || 1);
-      setTotal(response.data.meta?.total || 0);
-    } catch (error) {
-      if (process.env.NODE_ENV === 'development') console.error('Queue load error:', error);
-      toast.error('Moderasyon kuyruğu yüklenemedi');
-    } finally {
-      setLoading(false);
-    }
+  useEffect(() => {
+    loadStats();
+  }, []);
+
+  // ── Sekme değişimi ────────────────────────────────────────────────────────
+  const handleTabChange = (key: string) => {
+    setSelectedTab(key);
+    r.setPage(1);
   };
 
+  // ── Aksiyonlar ─────────────────────────────────────────────────────────────
   const handleApprove = async (item: ModerationItem) => {
     try {
       await adminApi.post(`/admin/moderation/${item.type}/${item.id}/approve`, { notes: '' });
       toast.success('Öğe onaylandı');
-      loadQueue();
+      r.refetch();
       loadStats();
     } catch (error: any) {
       toast.error(error.response?.data?.message || 'Onaylama başarısız');
@@ -132,7 +155,7 @@ const ModerationPage = () => {
       toast.success('Öğe reddedildi');
       setRejectModalOpen(false);
       setSelectedItem(null);
-      loadQueue();
+      r.refetch();
       loadStats();
     } catch (error: any) {
       toast.error(error.response?.data?.message || 'Reddetme başarısız');
@@ -159,7 +182,7 @@ const ModerationPage = () => {
       toast.success('Öğe işaretlendi');
       setFlagModalOpen(false);
       setSelectedItem(null);
-      loadQueue();
+      r.refetch();
     } catch (error: any) {
       toast.error(error.response?.data?.message || 'İşaretleme başarısız');
     }
@@ -178,13 +201,6 @@ const ModerationPage = () => {
     }
   };
 
-  const moderationTypeConfig: Record<string, StatusConfig> = {
-    product: { label: 'Ürün', variant: 'info' },
-    message: { label: 'Mesaj', variant: 'primary' },
-    review: { label: 'Değerlendirme', variant: 'warning' },
-    other: { label: 'Diğer', variant: 'secondary' },
-  };
-
   const formatDate = (dateString: string) => {
     return new Date(dateString).toLocaleString('tr-TR', {
       day: '2-digit',
@@ -195,28 +211,20 @@ const ModerationPage = () => {
     });
   };
 
-  const tabs = [
-    { key: 'all', label: 'Tümü' },
-    { key: 'product', label: 'Ürünler' },
-    { key: 'message', label: 'Mesajlar' },
-    { key: 'review', label: 'Değerlendirmeler' },
-  ];
-
   return (
     <>
       <div className="space-y-6">
         {/* Header */}
-        <div className="flex items-center justify-between gap-3">
-          <div className="min-w-0">
-            <h1 className="text-2xl font-bold text-heading truncate">Moderasyon Kuyruğu</h1>
-            <p className="text-muted mt-1">İçerik moderasyonu ve onay işlemleri</p>
-          </div>
-          <Button variant="secondary" onClick={() => { loadQueue(); loadStats(); }}
-            className="flex items-center shrink-0 px-4 py-2 bg-surface-alt text-muted rounded-lg hover:bg-surface-alt transition-colors">
+        <PageHeader title="Moderasyon Kuyruğu" description="İçerik moderasyonu ve onay işlemleri">
+          <Button
+            variant="secondary"
+            onClick={() => { r.refetch(); loadStats(); }}
+            className="flex items-center shrink-0 px-4 py-2 bg-surface-alt text-muted rounded-lg hover:bg-surface-alt transition-colors"
+          >
             <ArrowPathIcon className="h-5 w-5 mr-2 shrink-0" />
             Yenile
           </Button>
-        </div>
+        </PageHeader>
 
         {/* Stats Cards */}
         <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
@@ -224,7 +232,9 @@ const ModerationPage = () => {
             <div className="flex items-center justify-between gap-3">
               <div className="min-w-0">
                 <p className="text-sm text-muted truncate">Bekleyen Ürünler</p>
-                <p className="text-2xl font-bold text-heading mt-1 truncate">{stats?.pendingProducts || 0}</p>
+                <p className="text-2xl font-bold text-heading mt-1 truncate">
+                  {stats?.pendingProducts || 0}
+                </p>
               </div>
               <div className="p-3 rounded-lg bg-info-500/20 shrink-0">
                 <CubeIcon className="h-6 w-6 text-info-700" />
@@ -235,7 +245,9 @@ const ModerationPage = () => {
             <div className="flex items-center justify-between gap-3">
               <div className="min-w-0">
                 <p className="text-sm text-muted truncate">Raporlanan Mesajlar</p>
-                <p className="text-2xl font-bold text-heading mt-1 truncate">{stats?.reportedMessages || 0}</p>
+                <p className="text-2xl font-bold text-heading mt-1 truncate">
+                  {stats?.reportedMessages || 0}
+                </p>
               </div>
               <div className="p-3 rounded-lg bg-primary-500/20 shrink-0">
                 <ChatBubbleLeftIcon className="h-6 w-6 text-primary-700" />
@@ -246,7 +258,9 @@ const ModerationPage = () => {
             <div className="flex items-center justify-between gap-3">
               <div className="min-w-0">
                 <p className="text-sm text-muted truncate">Son 7 Gün Değerlendirme</p>
-                <p className="text-2xl font-bold text-heading mt-1 truncate">{stats?.recentReviews || 0}</p>
+                <p className="text-2xl font-bold text-heading mt-1 truncate">
+                  {stats?.recentReviews || 0}
+                </p>
               </div>
               <div className="p-3 rounded-lg bg-warning-500/20 shrink-0">
                 <StarIcon className="h-6 w-6 text-warning-700" />
@@ -257,7 +271,9 @@ const ModerationPage = () => {
             <div className="flex items-center justify-between gap-3">
               <div className="min-w-0">
                 <p className="text-sm text-muted truncate">Toplam Bekleyen</p>
-                <p className="text-2xl font-bold text-primary-700 mt-1 truncate">{stats?.totalPending || 0}</p>
+                <p className="text-2xl font-bold text-primary-700 mt-1 truncate">
+                  {stats?.totalPending || 0}
+                </p>
               </div>
               <div className="p-3 rounded-lg bg-primary-500/20 shrink-0">
                 <ExclamationTriangleIcon className="h-6 w-6 text-primary-700" />
@@ -269,21 +285,21 @@ const ModerationPage = () => {
         {/* Moderation Queue */}
         <div className="admin-card">
           <h3 className="text-lg font-semibold text-heading mb-4">Moderasyon Kuyruğu</h3>
-          
+
           {/* Tabs */}
           <AdminTabs
-            tabs={tabs}
+            tabs={moderationTabs}
             value={selectedTab}
-            onChange={(k) => { setSelectedTab(k as string); setPage(1); }}
+            onChange={handleTabChange}
             className="mb-6"
           />
 
           {/* Content */}
-          {loading ? (
+          {r.isLoading ? (
             <div className="flex items-center justify-center py-12">
               <Spinner size="xl" />
             </div>
-          ) : items.length === 0 ? (
+          ) : r.rows.length === 0 ? (
             <div className="flex flex-col items-center justify-center py-12 text-center">
               <CheckCircleIcon className="h-12 w-12 text-success-500 mb-4" />
               <h3 className="text-lg font-semibold text-heading">Kuyruk Boş</h3>
@@ -291,7 +307,7 @@ const ModerationPage = () => {
             </div>
           ) : (
             <div className="space-y-4">
-              {items.map((item) => (
+              {r.rows.map((item) => (
                 <div
                   key={`${item.type}-${item.id}`}
                   className="flex items-start gap-4 p-4 bg-surface-alt rounded-lg hover:bg-surface-alt transition-colors"
@@ -319,16 +335,41 @@ const ModerationPage = () => {
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-2 mb-1">
                       <StatusBadge status={item.type} config={moderationTypeConfig} />
-                      <span className={`shrink-0 px-2 py-1 rounded text-xs font-medium ${
-                        item.status === 'pending' ? 'bg-warning-500/20 text-warning-700' :
-                        item.status === 'reported' ? 'bg-danger-500/20 text-danger-600' :
-                        'bg-muted/20 text-muted'
-                      }`}>
-                        {item.status === 'pending' ? 'Bekliyor' :
-                         item.status === 'reported' ? 'Raporlandı' : item.status}
+                      <span
+                        className={`shrink-0 px-2 py-1 rounded text-xs font-medium ${
+                          item.status === 'pending'
+                            ? 'bg-warning-500/20 text-warning-700'
+                            : item.status === 'reported'
+                            ? 'bg-danger-500/20 text-danger-600'
+                            : 'bg-muted/20 text-muted'
+                        }`}
+                      >
+                        {item.status === 'pending'
+                          ? 'Bekliyor'
+                          : item.status === 'reported'
+                          ? 'Raporlandı'
+                          : item.status}
                       </span>
+                      {item.aiCheckStatus && (
+                        <span
+                          className={`shrink-0 px-2 py-1 rounded text-xs font-medium ${
+                            item.aiCheckStatus === 'flagged'
+                              ? 'bg-danger-500/20 text-danger-600'
+                              : item.aiCheckStatus === 'review'
+                              ? 'bg-warning-500/20 text-warning-700'
+                              : 'bg-success-500/20 text-success-700'
+                          }`}
+                          title={`AI · ilgililik: ${item.aiRelevanceScore ?? '—'} · NSFW: ${item.aiNsfwScore ?? '—'}${item.aiCheckReason ? ` · ${item.aiCheckReason}` : ''}`}
+                        >
+                          {item.aiCheckStatus === 'flagged'
+                            ? `AI: Uygunsuz şüphesi${item.aiNsfwScore != null ? ` (%${Math.round(item.aiNsfwScore * 100)})` : ''}`
+                            : item.aiCheckStatus === 'review'
+                            ? `AI: Düşük ilgililik${item.aiRelevanceScore != null ? ` (%${Math.round(item.aiRelevanceScore * 100)})` : ''}`
+                            : 'AI: Temiz'}
+                        </span>
+                      )}
                     </div>
-                    
+
                     <h4 className="font-medium text-heading truncate">{item.title}</h4>
                     <p className="text-sm text-muted line-clamp-2">{item.description}</p>
 
@@ -343,14 +384,14 @@ const ModerationPage = () => {
                         <span>Yorumcu: {item.reviewer.displayName || item.reviewer.email}</span>
                       )}
                       {item.price !== undefined && (
-                        <span>Fiyat: {getProductEffectivePrice({ price: item.price }).toLocaleString('tr-TR')} ₺</span>
+                        <span>
+                          Fiyat:{' '}
+                          {getProductEffectivePrice({ price: item.price }).toLocaleString('tr-TR')}{' '}
+                          ₺
+                        </span>
                       )}
-                      {item.score !== undefined && (
-                        <span>Puan: {item.score}/5</span>
-                      )}
-                      {item.category && (
-                        <span>Kategori: {item.category}</span>
-                      )}
+                      {item.score !== undefined && <span>Puan: {item.score}/5</span>}
+                      {item.category && <span>Kategori: {item.category}</span>}
                       <span className="flex items-center gap-1">
                         <ClockIcon className="h-3 w-3 shrink-0" />
                         {formatDate(item.createdAt)}
@@ -368,8 +409,11 @@ const ModerationPage = () => {
                       <XCircleIcon className="h-4 w-4 mr-1" />
                       Reddet
                     </Button>
-                    <Button variant="secondary" onClick={() => handleFlagClick(item)}
-                      className="flex items-center px-3 py-2 bg-surface-alt text-muted rounded-lg hover:bg-surface-alt transition-colors text-sm">
+                    <Button
+                      variant="secondary"
+                      onClick={() => handleFlagClick(item)}
+                      className="flex items-center px-3 py-2 bg-surface-alt text-muted rounded-lg hover:bg-surface-alt transition-colors text-sm"
+                    >
                       <FlagIcon className="h-4 w-4 mr-1" />
                       İşaretle
                     </Button>
@@ -378,23 +422,16 @@ const ModerationPage = () => {
               ))}
 
               {/* Pagination */}
-              {totalPages > 1 && (
+              {r.totalPages > 1 && (
                 <div className="flex items-center justify-between pt-4">
                   <p className="text-sm text-muted">
-                    Toplam {total} öğe, Sayfa {page}/{totalPages}
+                    Toplam {r.total} öğe, Sayfa {r.page}/{r.totalPages}
                   </p>
-                  <div className="flex gap-2">
-                    <Button variant="secondary" disabled={page === 1}
-                      onClick={() => setPage(page - 1)}
-                      className="px-4 py-2 bg-surface-alt text-muted rounded-lg hover:bg-surface-alt disabled:opacity-50 disabled:cursor-not-allowed transition-colors">
-                      Önceki
-                    </Button>
-                    <Button variant="secondary" disabled={page >= totalPages}
-                      onClick={() => setPage(page + 1)}
-                      className="px-4 py-2 bg-surface-alt text-muted rounded-lg hover:bg-surface-alt disabled:opacity-50 disabled:cursor-not-allowed transition-colors">
-                      Sonraki
-                    </Button>
-                  </div>
+                  <Pagination
+                    page={r.page}
+                    totalPages={r.totalPages}
+                    onPageChange={r.setPage}
+                  />
                 </div>
               )}
             </div>
@@ -406,13 +443,17 @@ const ModerationPage = () => {
       {rejectModalOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-heading/50">
           <div className="bg-surface-elevated rounded-lg px-6 pb-6 pt-5 w-full max-w-md">
-            <h3 className="text-lg font-semibold text-heading mb-2 leading-tight">İçeriği Reddet</h3>
+            <h3 className="text-lg font-semibold text-heading mb-2 leading-tight">
+              İçeriği Reddet
+            </h3>
             <p className="text-muted text-sm mb-4">
               {selectedItem?.title} içeriğini reddetmek istediğinize emin misiniz?
             </p>
             <div className="space-y-4">
               <div>
-                <label className="block text-sm font-medium text-muted mb-1">Red Sebebi *</label>
+                <label className="block text-sm font-medium text-muted mb-1">
+                  Red Sebebi *
+                </label>
                 <Select
                   value={rejectReason}
                   onChange={(e) => setRejectReason(e.target.value)}
@@ -429,18 +470,25 @@ const ModerationPage = () => {
               </div>
               <div>
                 <label className="block text-sm font-medium text-muted mb-1">Ek Notlar</label>
-                <Textarea value={rejectNotes}
+                <Textarea
+                  value={rejectNotes}
                   onChange={(e) => setRejectNotes(e.target.value)}
                   placeholder="İsteğe bağlı ek notlar..."
                   rows={3}
-                  className="bg-surface-alt text-heading" />
+                  className="bg-surface-alt text-heading"
+                />
               </div>
             </div>
             <div className="flex justify-end gap-3 mt-6">
               <Button variant="secondary" size="md" onClick={() => setRejectModalOpen(false)}>
                 İptal
               </Button>
-              <Button variant="danger" size="md" onClick={handleRejectConfirm} disabled={!rejectReason}>
+              <Button
+                variant="danger"
+                size="md"
+                onClick={handleRejectConfirm}
+                disabled={!rejectReason}
+              >
                 Reddet
               </Button>
             </div>
@@ -452,18 +500,24 @@ const ModerationPage = () => {
       {flagModalOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-heading/50">
           <div className="bg-surface-elevated rounded-lg px-6 pb-6 pt-5 w-full max-w-md">
-            <h3 className="text-lg font-semibold text-heading mb-2 leading-tight">İçeriği İşaretle</h3>
+            <h3 className="text-lg font-semibold text-heading mb-2 leading-tight">
+              İçeriği İşaretle
+            </h3>
             <p className="text-muted text-sm mb-4">
               {selectedItem?.title} içeriğini öncelikli inceleme için işaretleyin.
             </p>
             <div className="space-y-4">
               <div>
-                <label className="block text-sm font-medium text-muted mb-1">İşaretleme Sebebi *</label>
-                <Textarea value={flagReason}
+                <label className="block text-sm font-medium text-muted mb-1">
+                  İşaretleme Sebebi *
+                </label>
+                <Textarea
+                  value={flagReason}
                   onChange={(e) => setFlagReason(e.target.value)}
                   placeholder="İşaretleme sebebini açıklayın..."
                   rows={3}
-                  className="bg-surface-alt text-heading" />
+                  className="bg-surface-alt text-heading"
+                />
               </div>
               <div>
                 <label className="block text-sm font-medium text-muted mb-1">Öncelik</label>
@@ -483,7 +537,12 @@ const ModerationPage = () => {
               <Button variant="secondary" size="md" onClick={() => setFlagModalOpen(false)}>
                 İptal
               </Button>
-              <Button variant="primary" size="md" onClick={handleFlagConfirm} disabled={!flagReason}>
+              <Button
+                variant="primary"
+                size="md"
+                onClick={handleFlagConfirm}
+                disabled={!flagReason}
+              >
                 İşaretle
               </Button>
             </div>

@@ -96,10 +96,26 @@ export default function CommissionPage() {
   });
   const [previewPrice, setPreviewPrice] = useState<string>("");
   const [deleteConfirm, setDeleteConfirm] = useState<string | null>(null);
+  const [revenue, setRevenue] = useState<{
+    totalCommission: number;
+    totalBuyerFee: number;
+    totalSellerFee: number;
+    byMonth: Array<{ period: string; commission: number; orderCount: number }>;
+  } | null>(null);
 
   useEffect(() => {
     loadData();
+    loadRevenue();
   }, []);
+
+  const loadRevenue = async () => {
+    try {
+      const res = await adminApi.getCommissionRevenue();
+      setRevenue(res.data);
+    } catch (e) {
+      if (process.env.NODE_ENV === "development") console.error(e);
+    }
+  };
 
   const loadData = async () => {
     try {
@@ -332,6 +348,31 @@ export default function CommissionPage() {
           Yeni Kural Ekle
         </Button>
       </div>
+
+      {/* Revenue Summary Cards */}
+      {revenue && (
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+          <div className="admin-card p-5">
+            <p className="text-sm text-muted">Toplam Tahsil Edilen Komisyon</p>
+            <p className="text-2xl font-bold text-heading mt-1">
+              ₺{revenue.totalCommission.toLocaleString("tr-TR", { minimumFractionDigits: 2 })}
+            </p>
+            <p className="text-xs text-muted mt-1">Tamamlanan siparişler</p>
+          </div>
+          <div className="admin-card p-5">
+            <p className="text-sm text-muted">Alıcı Hizmet Bedeli</p>
+            <p className="text-2xl font-bold text-heading mt-1">
+              ₺{(revenue.totalBuyerFee ?? 0).toLocaleString("tr-TR", { minimumFractionDigits: 2 })}
+            </p>
+          </div>
+          <div className="admin-card p-5">
+            <p className="text-sm text-muted">Satıcı Komisyonu</p>
+            <p className="text-2xl font-bold text-heading mt-1">
+              ₺{(revenue.totalSellerFee ?? 0).toLocaleString("tr-TR", { minimumFractionDigits: 2 })}
+            </p>
+          </div>
+        </div>
+      )}
 
       {/* Info Box */}
       <div className="bg-info-900/20 border border-info-700 rounded-lg p-4">

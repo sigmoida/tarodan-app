@@ -3,9 +3,6 @@ import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import { Type } from 'class-transformer';
 
 export enum ShippingProvider {
-  aras = 'aras',
-  yurtici = 'yurtici',
-  mng = 'mng',
   surat = 'surat',
 }
 
@@ -19,7 +16,7 @@ export class CreateShipmentDto {
 
   @ApiProperty({
     enum: ShippingProvider,
-    example: 'aras',
+    example: 'surat',
     description: 'Shipping provider',
   })
   @IsEnum(ShippingProvider, { message: 'Geçerli bir kargo firması seçiniz' })
@@ -52,7 +49,7 @@ export class CalculateShippingDto {
   weight?: number;
 
   @ApiPropertyOptional({
-    example: 'aras',
+    example: 'surat',
     description: 'Specific provider to calculate (omit for all)',
     enum: ShippingProvider,
   })

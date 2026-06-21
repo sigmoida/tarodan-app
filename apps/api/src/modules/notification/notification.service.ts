@@ -20,6 +20,7 @@ import { SmsProvider } from './providers/sms.provider';
 import { SmtpProvider } from './providers/smtp.provider';
 import { StorageService } from '../storage/storage.service';
 import { RealtimeService } from '../websocket/realtime.service';
+import { renderEmailTemplate, getEmailTemplateSubject } from '../../common/helpers/email-template-renderer';
 
 // Notification templates (Turkish)
 const NOTIFICATION_TEMPLATES: Record<NotificationType, { title: string; message: string; icon?: string; link?: string }> = {
@@ -441,6 +442,20 @@ const NOTIFICATION_TEMPLATES: Record<NotificationType, { title: string; message:
     icon: '💰',
     link: '/orders/{{orderId}}',
   },
+
+  // Seller application notifications
+  [NotificationType.SELLER_APPLICATION_APPROVED]: {
+    title: 'Kurumsal Başvurunuz Onaylandı! 🎉',
+    message: 'Kurumsal hesap başvurunuz onaylandı. Artık satıcı olarak ürün listeleyebilirsiniz.',
+    icon: '✅',
+    link: '/profile',
+  },
+  [NotificationType.SELLER_APPLICATION_REJECTED]: {
+    title: 'Kurumsal Başvurunuz Reddedildi',
+    message: 'Kurumsal hesap başvurunuz reddedildi.{{reason}}',
+    icon: '❌',
+    link: '/profile',
+  },
 };
 
 @Injectable()
@@ -457,6 +472,15 @@ export class NotificationService {
     private readonly storageService: StorageService,
     private readonly realtime: RealtimeService,
   ) {}
+
+  private substituteTemplateVariables(text: string, data: Record<string, any>): string {
+    return text.replace(/\{\{([\w.]+)\}\}/g, (_, key) => {
+      const val = key.includes('.')
+        ? key.split('.').reduce((o: any, k: string) => (o != null ? o[k] : undefined), data)
+        : data[key];
+      return val != null ? String(val) : `{{${key}}}`;
+    });
+  }
 
   /**
    * Send notification to a user through specified channels
@@ -888,10 +912,26 @@ export class NotificationService {
    * Send order notification
    */
   async notifyOrderCreated(buyerId: string, orderId: string, amount: number) {
-    return this.send({
+    await this.send({
       userId: buyerId,
       type: NotificationType.ORDER_CREATED,
+      channels: [NotificationChannel.IN_APP],
       data: { orderId, amount },
+    });
+    // Template email — fetch order details for rich content
+    const [user, order] = await Promise.all([
+      this.prisma.user.findUnique({ where: { id: buyerId }, select: { displayName: true } }),
+      this.prisma.order.findUnique({
+        where: { id: orderId },
+        select: { orderNumber: true, totalAmount: true, product: { select: { title: true } } },
+      }),
+    ]);
+    await this.sendTemplateEmailToUser(buyerId, 'order-created-buyer', {
+      buyerName: user?.displayName || '',
+      orderNumber: order?.orderNumber || '',
+      productTitle: order?.product?.title || '',
+      totalAmount: order?.totalAmount ? Number(order.totalAmount) : amount,
+      orderId,
     });
   }
 
@@ -899,6 +939,7 @@ export class NotificationService {
     return this.send({
       userId: sellerId,
       type: NotificationType.ORDER_PAID,
+      channels: [NotificationChannel.IN_APP],
       data: { orderId, amount },
     });
   }
@@ -907,7 +948,7 @@ export class NotificationService {
     return this.send({
       userId: buyerId,
       type: NotificationType.ORDER_SHIPPED,
-      channels: [NotificationChannel.EMAIL, NotificationChannel.PUSH, NotificationChannel.IN_APP],
+      channels: [NotificationChannel.PUSH, NotificationChannel.IN_APP],
       data: { orderId, trackingNumber },
     });
   }
@@ -959,11 +1000,21 @@ export class NotificationService {
   }
 
   async notifySellerDidNotShipRefunded(buyerId: string, orderId: string) {
-    return this.send({
+    await this.send({
       userId: buyerId,
       type: NotificationType.SELLER_DID_NOT_SHIP_REFUNDED,
-      channels: [NotificationChannel.EMAIL, NotificationChannel.PUSH, NotificationChannel.IN_APP],
+      channels: [NotificationChannel.PUSH, NotificationChannel.IN_APP],
       data: { orderId },
+    });
+    const [user, order] = await Promise.all([
+      this.prisma.user.findUnique({ where: { id: buyerId }, select: { displayName: true } }),
+      this.prisma.order.findUnique({ where: { id: orderId }, select: { orderNumber: true, totalAmount: true } }),
+    ]);
+    await this.sendTemplateEmailToUser(buyerId, 'seller-did-not-ship-refunded', {
+      name: user?.displayName || '',
+      orderNumber: order?.orderNumber || orderId,
+      orderId,
+      refundAmount: order?.totalAmount ? Number(order.totalAmount) : 0,
     });
   }
 
@@ -974,7 +1025,7 @@ export class NotificationService {
     return this.send({
       userId: sellerId,
       type: NotificationType.OFFER_RECEIVED,
-      channels: [NotificationChannel.EMAIL, NotificationChannel.PUSH, NotificationChannel.IN_APP],
+      channels: [NotificationChannel.PUSH, NotificationChannel.IN_APP],
       data: { productId, amount },
     });
   }
@@ -983,7 +1034,7 @@ export class NotificationService {
     return this.send({
       userId: buyerId,
       type: NotificationType.OFFER_ACCEPTED,
-      channels: [NotificationChannel.EMAIL, NotificationChannel.PUSH, NotificationChannel.IN_APP],
+      channels: [NotificationChannel.PUSH, NotificationChannel.IN_APP],
       data: { productId, amount },
     });
   }
@@ -1167,38 +1218,67 @@ export class NotificationService {
    * Send trade notifications
    */
   async notifyTradeReceived(receiverId: string, tradeId: string) {
-    return this.send({
+    await this.send({
       userId: receiverId,
       type: NotificationType.TRADE_RECEIVED,
-      channels: [NotificationChannel.EMAIL, NotificationChannel.PUSH, NotificationChannel.IN_APP],
+      channels: [NotificationChannel.PUSH, NotificationChannel.IN_APP],
       data: { tradeId },
+    });
+    const frontendUrl = this.configService.get('FRONTEND_URL') || 'https://tarodan.com';
+    const user = await this.prisma.user.findUnique({ where: { id: receiverId }, select: { displayName: true } });
+    await this.sendTemplateEmailToUser(receiverId, 'trade-received', {
+      name: user?.displayName || '',
+      tradeId,
+      tradeUrl: `${frontendUrl}/trades/${tradeId}`,
     });
   }
 
   async notifyTradeAccepted(initiatorId: string, tradeId: string) {
-    return this.send({
+    await this.send({
       userId: initiatorId,
       type: NotificationType.TRADE_ACCEPTED,
-      channels: [NotificationChannel.EMAIL, NotificationChannel.PUSH, NotificationChannel.IN_APP, NotificationChannel.SMS],
+      channels: [NotificationChannel.PUSH, NotificationChannel.IN_APP, NotificationChannel.SMS],
       data: { tradeId },
+    });
+    const frontendUrl = this.configService.get('FRONTEND_URL') || 'https://tarodan.com';
+    const user = await this.prisma.user.findUnique({ where: { id: initiatorId }, select: { displayName: true } });
+    await this.sendTemplateEmailToUser(initiatorId, 'trade-accepted', {
+      name: user?.displayName || '',
+      tradeId,
+      tradeUrl: `${frontendUrl}/trades/${tradeId}`,
     });
   }
 
   async notifyTradeShipped(receiverId: string, tradeId: string, trackingNumber: string) {
-    return this.send({
+    await this.send({
       userId: receiverId,
       type: NotificationType.TRADE_SHIPPED,
-      channels: [NotificationChannel.EMAIL, NotificationChannel.PUSH, NotificationChannel.IN_APP],
+      channels: [NotificationChannel.PUSH, NotificationChannel.IN_APP],
       data: { tradeId, trackingNumber },
+    });
+    const frontendUrl = this.configService.get('FRONTEND_URL') || 'https://tarodan.com';
+    const user = await this.prisma.user.findUnique({ where: { id: receiverId }, select: { displayName: true } });
+    await this.sendTemplateEmailToUser(receiverId, 'trade-shipped', {
+      name: user?.displayName || '',
+      trackingNumber,
+      tradeId,
+      tradeUrl: `${frontendUrl}/trades/${tradeId}`,
     });
   }
 
   async notifyTradeCompleted(userId: string, tradeId: string) {
-    return this.send({
+    await this.send({
       userId,
       type: NotificationType.TRADE_COMPLETED,
-      channels: [NotificationChannel.EMAIL, NotificationChannel.PUSH, NotificationChannel.IN_APP],
+      channels: [NotificationChannel.PUSH, NotificationChannel.IN_APP],
       data: { tradeId },
+    });
+    const frontendUrl = this.configService.get('FRONTEND_URL') || 'https://tarodan.com';
+    const user = await this.prisma.user.findUnique({ where: { id: userId }, select: { displayName: true } });
+    await this.sendTemplateEmailToUser(userId, 'trade-completed', {
+      name: user?.displayName || '',
+      tradeId,
+      tradeUrl: `${frontendUrl}/trades/${tradeId}`,
     });
   }
 
@@ -1206,11 +1286,17 @@ export class NotificationService {
    * Send welcome email
    */
   async sendWelcomeEmail(userId: string) {
-    return this.send({
-      userId,
-      type: NotificationType.WELCOME,
-      channels: [NotificationChannel.EMAIL],
+    const user = await this.prisma.user.findUnique({
+      where: { id: userId },
+      select: { email: true, displayName: true },
     });
+    if (!user) return { success: false, error: 'User not found' };
+    const frontendUrl = this.configService.get('FRONTEND_URL') || 'https://tarodan.com';
+    await this.sendTemplateEmailToAddress(user.email, 'welcome', {
+      name: user.displayName || '',
+      verifyUrl: `${frontendUrl}/listings`,
+    });
+    return { success: true };
   }
 
   /**
@@ -1226,65 +1312,33 @@ export class NotificationService {
 
     const frontendUrl = this.configService.get('FRONTEND_URL') || 'http://localhost:3000';
     const resetUrl = `${frontendUrl}/reset-password?token=${resetToken}`;
+    const templateData = { name: user.displayName || '', resetUrl };
 
-    // Try SendGrid first, fall back to SMTP
+    const dbTemplate = await this.prisma.emailTemplate.findUnique({ where: { key: 'password-reset' } });
+    let html: string;
+    let subject: string;
+    if (dbTemplate?.bodyHtml) {
+      html = this.substituteTemplateVariables(dbTemplate.bodyHtml, templateData);
+      subject = dbTemplate.subject
+        ? this.substituteTemplateVariables(dbTemplate.subject, templateData)
+        : getEmailTemplateSubject('password-reset', templateData);
+    } else {
+      html = renderEmailTemplate('password-reset', templateData, frontendUrl);
+      subject = getEmailTemplateSubject('password-reset', templateData);
+    }
+
     let result;
     if (this.sendGridProvider.isConfigured()) {
-      result = await this.sendGridProvider.sendPasswordResetEmail(user.email, resetUrl);
+      result = await this.sendGridProvider.sendEmail({ to: user.email, subject, html });
     } else if (this.smtpProvider.isConfigured()) {
-      // Use SMTP as fallback
-      result = await this.smtpProvider.sendEmail({
-        to: user.email,
-        subject: 'Şifre Sıfırlama - Tarodan',
-        html: `
-          <div style="font-family: 'Segoe UI', Arial, sans-serif; max-width: 600px; margin: 0 auto; background: #f9fafb; padding: 40px 20px;">
-            <div style="background: white; border-radius: 16px; padding: 40px; box-shadow: 0 4px 6px rgba(0,0,0,0.1);">
-              <div style="text-align: center; margin-bottom: 30px;">
-                <h1 style="color: #f97316; font-size: 28px; margin: 0;">🔐 Tarodan</h1>
-              </div>
-              
-              <h2 style="color: #1f2937; font-size: 24px; margin-bottom: 16px;">Şifre Sıfırlama</h2>
-              
-              <p style="color: #4b5563; font-size: 16px; line-height: 1.6;">
-                Merhaba${user.displayName ? ` ${user.displayName}` : ''},
-              </p>
-              
-              <p style="color: #4b5563; font-size: 16px; line-height: 1.6;">
-                Hesabınız için şifre sıfırlama talebinde bulundunuz. Aşağıdaki butona tıklayarak yeni şifrenizi belirleyebilirsiniz.
-              </p>
-              
-              <div style="text-align: center; margin: 32px 0;">
-                <a href="${resetUrl}" 
-                   style="display: inline-block; background: linear-gradient(135deg, #f97316, #ea580c); color: white; padding: 16px 32px; text-decoration: none; border-radius: 12px; font-weight: 600; font-size: 16px; box-shadow: 0 4px 14px rgba(249, 115, 22, 0.4);">
-                  Şifremi Sıfırla
-                </a>
-              </div>
-              
-              <p style="color: #6b7280; font-size: 14px; line-height: 1.6;">
-                Bu bağlantı <strong>1 saat</strong> içinde geçerliliğini yitirecektir.
-              </p>
-              
-              <p style="color: #6b7280; font-size: 14px; line-height: 1.6;">
-                Eğer bu isteği siz yapmadıysanız, bu e-postayı görmezden gelebilirsiniz. Şifreniz değiştirilmeyecektir.
-              </p>
-              
-              <hr style="border: none; border-top: 1px solid #e5e7eb; margin: 30px 0;" />
-              
-              <p style="color: #9ca3af; font-size: 12px; text-align: center;">
-                Bu e-posta otomatik olarak gönderilmiştir. Lütfen yanıtlamayın.<br/>
-                © ${new Date().getFullYear()} Tarodan. Tüm hakları saklıdır.
-              </p>
-            </div>
-          </div>
-        `,
-      });
+      result = await this.smtpProvider.sendEmail({ to: user.email, subject, html });
     } else {
       this.logger.warn('Neither SendGrid nor SMTP is configured for password reset email');
       result = { success: false, error: 'No email provider configured' };
     }
 
     await this.logNotification(userId, 'email', 'password_reset', 'Şifre Sıfırlama', '', result.success);
-    
+
     if (result.success) {
       this.logger.log(`Password reset email sent to ${user.email}`);
     } else {
@@ -1307,52 +1361,26 @@ export class NotificationService {
 
     const frontendUrl = this.configService.get('FRONTEND_URL') || 'http://localhost:3000';
     const verifyUrl = `${frontendUrl}/verify-email?token=${verificationToken}`;
+    const templateData = { name: user.displayName || '', verificationUrl: verifyUrl, expiresIn: '24 saat' };
 
-    // Try SendGrid first, fall back to SMTP
+    const dbTemplate = await this.prisma.emailTemplate.findUnique({ where: { key: 'email-verification' } });
+    let html: string;
+    let subject: string;
+    if (dbTemplate?.bodyHtml) {
+      html = this.substituteTemplateVariables(dbTemplate.bodyHtml, templateData);
+      subject = dbTemplate.subject
+        ? this.substituteTemplateVariables(dbTemplate.subject, templateData)
+        : getEmailTemplateSubject('email-verification', templateData);
+    } else {
+      html = renderEmailTemplate('email-verification', templateData, frontendUrl);
+      subject = getEmailTemplateSubject('email-verification', templateData);
+    }
+
     let result;
     if (this.sendGridProvider.isConfigured()) {
-      result = await this.sendGridProvider.sendEmailVerification(user.email, verifyUrl);
+      result = await this.sendGridProvider.sendEmail({ to: user.email, subject, html });
     } else if (this.smtpProvider.isConfigured()) {
-      result = await this.smtpProvider.sendEmail({
-        to: user.email,
-        subject: 'E-posta Doğrulama - Tarodan',
-        html: `
-          <div style="font-family: 'Segoe UI', Arial, sans-serif; max-width: 600px; margin: 0 auto; background: #f9fafb; padding: 40px 20px;">
-            <div style="background: white; border-radius: 16px; padding: 40px; box-shadow: 0 4px 6px rgba(0,0,0,0.1);">
-              <div style="text-align: center; margin-bottom: 30px;">
-                <h1 style="color: #f97316; font-size: 28px; margin: 0;">✉️ Tarodan</h1>
-              </div>
-              
-              <h2 style="color: #1f2937; font-size: 24px; margin-bottom: 16px;">E-posta Doğrulama</h2>
-              
-              <p style="color: #4b5563; font-size: 16px; line-height: 1.6;">
-                Merhaba${user.displayName ? ` ${user.displayName}` : ''},
-              </p>
-              
-              <p style="color: #4b5563; font-size: 16px; line-height: 1.6;">
-                Tarodan'a hoş geldiniz! E-posta adresinizi doğrulamak için aşağıdaki butona tıklayın.
-              </p>
-              
-              <div style="text-align: center; margin: 32px 0;">
-                <a href="${verifyUrl}" 
-                   style="display: inline-block; background: linear-gradient(135deg, #f97316, #ea580c); color: white; padding: 16px 32px; text-decoration: none; border-radius: 12px; font-weight: 600; font-size: 16px; box-shadow: 0 4px 14px rgba(249, 115, 22, 0.4);">
-                  E-postamı Doğrula
-                </a>
-              </div>
-              
-              <p style="color: #6b7280; font-size: 14px; line-height: 1.6;">
-                Bu bağlantı <strong>24 saat</strong> içinde geçerliliğini yitirecektir.
-              </p>
-              
-              <hr style="border: none; border-top: 1px solid #e5e7eb; margin: 30px 0;" />
-              
-              <p style="color: #9ca3af; font-size: 12px; text-align: center;">
-                © ${new Date().getFullYear()} Tarodan. Tüm hakları saklıdır.
-              </p>
-            </div>
-          </div>
-        `,
-      });
+      result = await this.smtpProvider.sendEmail({ to: user.email, subject, html });
     } else {
       this.logger.warn('Neither SendGrid nor SMTP is configured for email verification');
       result = { success: false, error: 'No email provider configured' };
@@ -1367,29 +1395,46 @@ export class NotificationService {
    * Misafir checkout — 6 haneli OTP e-postası (kayıtlı hesap doğrulamasından bağımsız)
    */
   async sendGuestCheckoutVerificationCode(email: string, code: string, ttlSeconds: number) {
-    const subject = 'Misafir sipariş doğrulama kodu - Tarodan';
-    const html = `
-      <div style="font-family: 'Segoe UI', Arial, sans-serif; max-width: 600px; margin: 0 auto; background: #f9fafb; padding: 40px 20px;">
-        <div style="background: white; border-radius: 16px; padding: 40px; box-shadow: 0 4px 6px rgba(0,0,0,0.1);">
-          <h1 style="color: #f97316; font-size: 24px; margin: 0 0 16px;">Tarodan</h1>
-          <p style="color: #374151; font-size: 16px; line-height: 1.6;">Misafir alışverişinizi tamamlamak için doğrulama kodunuz:</p>
-          <p style="font-size: 32px; font-weight: 700; letter-spacing: 8px; color: #111827; margin: 24px 0;">${code}</p>
-          <p style="color: #6b7280; font-size: 14px;">Bu kod <strong>${Math.ceil(ttlSeconds / 60)} dakika</strong> geçerlidir. Başkasıyla paylaşmayın.</p>
-        </div>
-      </div>
-    `;
+    await this.sendTemplateEmailToAddress(email, 'guest-checkout-otp', {
+      code,
+      expiresInMinutes: Math.ceil(ttlSeconds / 60),
+    });
+    return { success: true };
+  }
 
-    let result: { success: boolean; error?: string };
-    if (this.sendGridProvider.isConfigured()) {
-      result = await this.sendGridProvider.sendEmail({ to: email, subject, html });
-    } else if (this.smtpProvider.isConfigured()) {
-      result = await this.smtpProvider.sendEmail({ to: email, subject, html });
-    } else {
-      this.logger.warn('No email provider for guest checkout OTP');
-      result = { success: false, error: 'No email provider configured' };
+  private async sendTemplateEmailToUser(userId: string, templateKey: string, templateData: Record<string, any>): Promise<void> {
+    try {
+      const user = await this.prisma.user.findUnique({ where: { id: userId }, select: { email: true } });
+      if (!user) return;
+      await this.sendTemplateEmailToAddress(user.email, templateKey, templateData);
+    } catch (err) {
+      this.logger.error(`Failed to send ${templateKey} email to user ${userId}:`, err);
     }
+  }
 
-    return result;
+  private async sendTemplateEmailToAddress(email: string, templateKey: string, templateData: Record<string, any>): Promise<void> {
+    try {
+      const frontendUrl = this.configService.get('FRONTEND_URL') || 'https://tarodan.com';
+      const dbTemplate = await this.prisma.emailTemplate.findUnique({ where: { key: templateKey } });
+      let html: string;
+      let subject: string;
+      if (dbTemplate?.bodyHtml) {
+        html = this.substituteTemplateVariables(dbTemplate.bodyHtml, templateData);
+        subject = dbTemplate.subject
+          ? this.substituteTemplateVariables(dbTemplate.subject, templateData)
+          : getEmailTemplateSubject(templateKey, templateData);
+      } else {
+        html = renderEmailTemplate(templateKey, templateData, frontendUrl);
+        subject = getEmailTemplateSubject(templateKey, templateData);
+      }
+      if (this.sendGridProvider.isConfigured()) {
+        await this.sendGridProvider.sendEmail({ to: email, subject, html });
+      } else if (this.smtpProvider.isConfigured()) {
+        await this.smtpProvider.sendEmail({ to: email, subject, html });
+      }
+    } catch (err) {
+      this.logger.error(`Failed to send ${templateKey} email to ${email}:`, err);
+    }
   }
 
   /**

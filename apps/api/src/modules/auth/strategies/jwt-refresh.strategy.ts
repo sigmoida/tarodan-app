@@ -5,6 +5,24 @@ import { ExtractJwt, Strategy } from 'passport-jwt';
 import { Request } from 'express';
 import { JwtPayload } from '../interfaces';
 import { PrismaService } from '../../../prisma';
+import { COOKIE_NAMES, readCookie } from '../utils/auth-cookies';
+
+/** İsteğin taşıdığı refresh token'ı çıkarır: önce httpOnly cookie, yoksa body `refreshToken`
+ *  (mobil/eski istemciler). Aynı tarayıcıda hem kullanıcı hem admin cookie'si bulunabilir
+ *  (prod'da .tarodan.shop paylaşımlı); bu yüzden hangi cookie'nin önce okunacağını ROTAYA göre
+ *  seçeriz: /auth/admin/refresh → admin cookie öncelikli, diğer hâllerde kullanıcı cookie öncelikli. */
+function extractRefreshToken(req: Request): string | null {
+  const url = req.originalUrl || req.url || '';
+  const isAdminRoute = url.includes('/auth/admin/refresh');
+  const names = isAdminRoute
+    ? [COOKIE_NAMES.admin.refresh, COOKIE_NAMES.user.refresh]
+    : [COOKIE_NAMES.user.refresh, COOKIE_NAMES.admin.refresh];
+  return (
+    readCookie(req, names) ||
+    (req.body?.refreshToken as string | undefined) ||
+    null
+  );
+}
 
 @Injectable()
 export class JwtRefreshStrategy extends PassportStrategy(Strategy, 'jwt-refresh') {
@@ -13,7 +31,7 @@ export class JwtRefreshStrategy extends PassportStrategy(Strategy, 'jwt-refresh'
     private readonly prisma: PrismaService,
   ) {
     super({
-      jwtFromRequest: ExtractJwt.fromBodyField('refreshToken'),
+      jwtFromRequest: ExtractJwt.fromExtractors([extractRefreshToken]),
       ignoreExpiration: false,
       secretOrKey: configService.get<string>('JWT_REFRESH_SECRET') || configService.get<string>('JWT_SECRET'),
       passReqToCallback: true,
@@ -35,12 +53,15 @@ export class JwtRefreshStrategy extends PassportStrategy(Strategy, 'jwt-refresh'
       throw new UnauthorizedException('Kullanıcı bulunamadı');
     }
 
-    // Return user info along with the refresh token for rotation
+    // Return user info along with the refresh token for rotation.
+    // isAdmin/role payload'dan taşınır ki refreshTokens admin için admin token üretsin.
     return {
       id: user.id,
       email: user.email,
       isSeller: user.isSeller,
-      refreshToken: req.body.refreshToken,
+      isAdmin: !!payload.isAdmin,
+      role: payload.role,
+      refreshToken: extractRefreshToken(req) ?? '',
     };
   }
 }

@@ -4,6 +4,7 @@ import { UserService } from './user.service';
 import { PrismaService } from '../../prisma';
 import { NotificationService } from '../notification/notification.service';
 import { RatingService } from '../rating/rating.service';
+import { ModerationAiClient } from '../moderation/moderation-ai.client';
 
 describe('UserService deleteAddress (edge case 1.11)', () => {
   let service: UserService;
@@ -37,6 +38,7 @@ describe('UserService deleteAddress (edge case 1.11)', () => {
         { provide: PrismaService, useValue: mockPrisma },
         { provide: NotificationService, useValue: {} },
         { provide: RatingService, useValue: {} },
+        { provide: ModerationAiClient, useValue: { assertTextClean: jest.fn(), assertImageClean: jest.fn() } },
       ],
     }).compile();
 

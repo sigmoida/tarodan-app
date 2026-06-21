@@ -1,30 +1,26 @@
 "use client";
 
-import { useState, useEffect, useMemo } from "react";
+import { useState, useMemo } from "react";
 import Link from "next/link";
-import { useSearchParams, useRouter } from "next/navigation";
+import { useRouter } from "next/navigation";
 import { adminApi } from "@/lib/api";
-import { cancelReasonLabel, orderOriginLabel } from "@/lib/utils";
+import { cancelReasonLabel, orderOriginLabel, statusFilterOptions } from "@/lib/utils";
 import {
   Button,
   Select,
   StatusBadge,
   orderStatusConfig,
 } from "@tarodan/ui";
-import { DataTable, type ColumnDef } from "@/components/DataTable";
+import { type ColumnDef } from "@/components/DataTable";
 import {
-  EyeIcon,
   PencilIcon,
   CheckIcon,
   XMarkIcon,
 } from "@heroicons/react/24/outline";
 import toast from "react-hot-toast";
-import {
-  PageHeader,
-  FilterToolbar,
-  ActionButtons,
-  ActionIconButton,
-} from "@/components/admin-list";
+import { ActionButtons, ActionIconButton } from "@/components/admin-list";
+import { ResourceListPage } from "@/components/ResourceListPage";
+import { useAdminResource } from "@/hooks/useAdminResource";
 
 interface Order {
   id: string;
@@ -41,107 +37,70 @@ interface Order {
   offerId?: string | null;
 }
 
-const statusOptions = [
-  { value: "all", label: "Tümü" },
-  { value: "pending_payment", label: "Ödeme Bekliyor" },
-  { value: "paid", label: "Ödendi" },
-  { value: "preparing", label: "Hazırlanıyor" },
-  { value: "shipped", label: "Kargoda" },
-  { value: "delivered", label: "Teslim Edildi" },
-  { value: "awaiting_buyer_confirmation", label: "Alıcı Onayı Bekleniyor (48h)" },
-  { value: "completed", label: "Tamamlandı" },
-  { value: "cancelled", label: "İptal" },
-];
+// Filtre seçenekleri orderStatusConfig'ten türetilir → badge'lerle birebir tutarlı, OrderStatus enum'undan sapmaz.
+const statusOptions = statusFilterOptions(orderStatusConfig);
+
+function mapOrders(raw: any[]): Order[] {
+  return raw.map((o: any) => ({
+    id: o.id,
+    orderNumber: o.orderNumber || `ORD-${o.id.slice(0, 8)}`,
+    status: o.status,
+    totalAmount: Number(o.totalAmount || o.total || 0),
+    commission: Number(o.commissionAmount || 0),
+    buyer: o.buyer || { id: "", displayName: "Alıcı" },
+    seller: o.seller || { id: "", displayName: "Satıcı" },
+    product: o.product || undefined,
+    createdAt: o.createdAt,
+    itemCount: o.items?.length || 1,
+    cancelReason: o.cancelReason ?? undefined,
+    offerId: o.offerId ?? null,
+  }));
+}
 
 export default function OrdersPage() {
-  const searchParams = useSearchParams();
   const router = useRouter();
-  const urlUserId = useMemo(
-    () => searchParams.get("userId") || "",
-    [searchParams],
-  );
-  const productId = useMemo(
-    () => searchParams.get("productId") || undefined,
-    [searchParams],
-  );
-
-  const [orders, setOrders] = useState<Order[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [search, setSearch] = useState("");
-  const [debouncedSearch, setDebouncedSearch] = useState("");
-  const [status, setStatus] = useState("all");
-  const [page, setPage] = useState(1);
-  const [total, setTotal] = useState(0);
+  // Inline status edit state (mutation-only, not list state)
   const [editingOrderId, setEditingOrderId] = useState<string | null>(null);
   const [newStatus, setNewStatus] = useState<string>("");
   const [updatingStatus, setUpdatingStatus] = useState(false);
 
-  // User filter (driven by URL ?userId= deep-links, e.g. from user detail page)
-  const [selectedUserId, setSelectedUserId] = useState<string>(urlUserId);
+  const {
+    rows: rawRows,
+    total,
+    page,
+    setPage,
+    totalPages,
+    search,
+    setSearch,
+    onSearchSubmit,
+    filters,
+    setFilter,
+    isLoading,
+    refetch,
+  } = useAdminResource<any>({
+    queryKey: "orders",
+    fetcher: (params) => adminApi.getOrders(params),
+    limit: 20,
+    syncUrl: true,
+    // userId/productId hook filtreleri (queryKey'in parçası); ?userId=/?productId= deep-link'leri syncUrl ile yaşar.
+    initialFilters: { status: "all", userId: "", productId: "" },
+    errorMessage: "Siparişler yüklenemedi",
+  });
 
-  // Debounce order search (300ms)
-  useEffect(() => {
-    const timer = setTimeout(() => {
-      setDebouncedSearch(search);
-      setPage(1);
-    }, 300);
-    return () => clearTimeout(timer);
-  }, [search]);
+  // Deep-link filtresini (ürün veya kullanıcı) temizle = filtreyi boşalt (URL'i de temizler).
+  // userId/productId deep-link'leri pratikte aynı anda set olmaz; hangisi etkinse onu boşaltırız.
+  const clearDeepLinkFilter = () =>
+    setFilter(filters.productId ? "productId" : "userId", "");
 
-  // Sync URL with state
-  useEffect(() => {
-    setSelectedUserId(urlUserId);
-  }, [urlUserId]);
+  const orders: Order[] = useMemo(() => mapOrders(rawRows), [rawRows]);
 
-  const clearUserFilter = () => {
-    setSelectedUserId("");
-    const params = new URLSearchParams(searchParams.toString());
-    params.delete("userId");
-    router.push(`/orders?${params.toString()}`);
-  };
-
-  useEffect(() => {
-    loadOrders();
-  }, [page, status, selectedUserId, productId, debouncedSearch]);
-
-  const loadOrders = async () => {
-    setLoading(true);
-    try {
-      const response = await adminApi.getOrders({
-        page,
-        limit: 20,
-        status: status === "all" ? undefined : status,
-        search: debouncedSearch || undefined,
-        userId: selectedUserId || undefined,
-        productId,
-      });
-      const data = response.data.data || response.data.orders || [];
-      const meta = response.data.meta || {};
-      setOrders(
-        data.map((o: any) => ({
-          id: o.id,
-          orderNumber: o.orderNumber || `ORD-${o.id.slice(0, 8)}`,
-          status: o.status,
-          totalAmount: Number(o.totalAmount || o.total || 0),
-          commission: Number(o.commissionAmount || 0),
-          buyer: o.buyer || { id: "", displayName: "Alıcı" },
-          seller: o.seller || { id: "", displayName: "Satıcı" },
-          product: o.product || undefined,
-          createdAt: o.createdAt,
-          itemCount: o.items?.length || 1,
-          cancelReason: o.cancelReason ?? undefined,
-          offerId: o.offerId ?? null,
-        })),
-      );
-      setTotal(meta.total || data.length);
-    } catch (error) {
-      if (process.env.NODE_ENV === "development")
-        console.error("Orders load error:", error);
-      toast.error("Siparişler yüklenemedi");
-    } finally {
-      setLoading(false);
-    }
-  };
+  // Ürün/kullanıcı detayından gelen deep-link filtresinin görünür etiketi.
+  // Ürün filtresinde tüm satırlar aynı ürüne ait → başlığı ilk satırdan türetiriz.
+  const deepLinkFilterLabel = filters.productId
+    ? `Ürüne göre filtreleniyor${orders[0]?.product?.title ? `: ${orders[0].product.title}` : ""}`
+    : filters.userId
+      ? "Kullanıcıya göre filtreleniyor"
+      : null;
 
   const startEditing = (order: Order) => {
     setEditingOrderId(order.id);
@@ -155,13 +114,12 @@ export default function OrdersPage() {
 
   const updateOrderStatus = async (orderId: string) => {
     if (!newStatus) return;
-
     setUpdatingStatus(true);
     try {
       await adminApi.updateOrderStatus(orderId, newStatus);
       toast.success("Sipariş durumu güncellendi");
       setEditingOrderId(null);
-      loadOrders();
+      refetch();
     } catch (error: any) {
       if (process.env.NODE_ENV === "development")
         console.error("Status update error:", error);
@@ -170,8 +128,6 @@ export default function OrdersPage() {
       setUpdatingStatus(false);
     }
   };
-
-  const totalPages = Math.max(1, Math.ceil(total / 20));
 
   const columns: ColumnDef<Order, any>[] = [
     {
@@ -309,51 +265,39 @@ export default function OrdersPage() {
             onClick={() => startEditing(row.original)}
             title="Durumu Değiştir"
           />
-          <ActionIconButton
-            icon={EyeIcon}
-            href={`/orders/${row.original.id}`}
-            title="Detay"
-          />
         </ActionButtons>
       ),
     },
   ];
 
   return (
-    <div className="space-y-6">
-      <PageHeader
-        title="Siparişler"
-        description={
-          <>
-            Toplam {total} sipariş
-            {(selectedUserId || productId) && (
-              <span className="ml-2">
-                — Filtreleniyor
-                <Button
-                  variant="secondary"
-                  onClick={clearUserFilter}
-                  className="ml-2 text-primary-600 hover:underline"
-                >
-                  Filtreyi kaldır
-                </Button>
-              </span>
-            )}
-          </>
-        }
-      />
-
-      {/* Filters */}
-      <FilterToolbar
-        search={search}
-        onSearchChange={setSearch}
-        searchPlaceholder="Sipariş no, kullanıcı veya ürün ara..."
-      >
+    <ResourceListPage<Order>
+      title="Siparişler"
+      description={
+        <>
+          Toplam {total} sipariş
+          {deepLinkFilterLabel && (
+            <span className="ml-2">
+              — {deepLinkFilterLabel}
+              <Button
+                variant="secondary"
+                onClick={clearDeepLinkFilter}
+                className="ml-2 text-primary-600 hover:underline"
+              >
+                Filtreyi kaldır
+              </Button>
+            </span>
+          )}
+        </>
+      }
+      search={{ placeholder: "Sipariş no, kullanıcı veya ürün ara..." }}
+      searchValue={search}
+      onSearchChange={setSearch}
+      onSearchSubmit={onSearchSubmit}
+      filters={
         <Select
-          value={status}
-          onChange={(e) => {
-            setStatus(e.target.value);
-            setPage(1);
-          }}
+          value={filters.status ?? "all"}
+          onChange={(e) => setFilter("status", e.target.value)}
           className="sm:w-48"
         >
           {statusOptions.map((opt) => (
@@ -362,45 +306,24 @@ export default function OrdersPage() {
             </option>
           ))}
         </Select>
-      </FilterToolbar>
-
-      {/* Table */}
-      <DataTable
-        columns={columns}
-        data={orders}
-        loading={loading}
-        emptyText={
-          debouncedSearch || status !== "all" || selectedUserId
-            ? "Filtreye uygun sipariş bulunamadı"
-            : "Henüz sipariş yok"
-        }
-        getRowId={(o) => o.id}
-      />
-
-      {/* Pagination */}
-      {total > 0 && (
-        <div className="flex items-center justify-between">
-          <p className="text-sm text-muted">
-            Sayfa {page} / {totalPages} ({total} sonuç)
-          </p>
-          <div className="flex gap-2">
-            <Button
-              variant="secondary"
-              onClick={() => setPage((p) => Math.max(1, p - 1))}
-              disabled={page === 1}
-            >
-              Önceki
-            </Button>
-            <Button
-              variant="secondary"
-              onClick={() => setPage((p) => p + 1)}
-              disabled={page >= totalPages}
-            >
-              Sonraki
-            </Button>
-          </div>
-        </div>
-      )}
-    </div>
+      }
+      columns={columns}
+      data={orders}
+      loading={isLoading}
+      emptyText={
+        search || filters.status !== "all" || filters.userId
+          ? "Filtreye uygun sipariş bulunamadı"
+          : "Henüz sipariş yok"
+      }
+      getRowId={(o) => o.id}
+      onRowClick={(o) => {
+        // Satır içinde durum düzenleniyorken tıklama detaya gitmesin.
+        if (editingOrderId === o.id) return;
+        router.push(`/orders/${o.id}`);
+      }}
+      page={page}
+      totalPages={totalPages}
+      onPageChange={setPage}
+    />
   );
 }

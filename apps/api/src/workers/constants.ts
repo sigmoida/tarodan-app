@@ -9,4 +9,5 @@ export const QUEUE_NAMES = {
     SHIPPING: 'shipping',
     SEARCH: 'search',
     ANALYTICS: 'analytics',
+    MODERATION: 'moderation',
 } as const;

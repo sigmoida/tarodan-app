@@ -107,7 +107,7 @@ export default function SupportTicketDetailPage() {
       toast.success('Yanıt gönderildi');
       setShowReplyModal(false);
       setReplyMessage('');
-      loadTicket();
+      await loadTicket();
     } catch (error: any) {
       toast.error(error.response?.data?.message || 'Yanıt gönderme başarısız');
     } finally {
@@ -118,10 +118,10 @@ export default function SupportTicketDetailPage() {
   const handleStatusUpdate = async () => {
     setProcessing(true);
     try {
-      await adminApi.updateTicket(ticketId, { status: newStatus });
+      await adminApi.updateTicketStatus(ticketId, newStatus);
       toast.success('Durum güncellendi');
       setShowStatusModal(false);
-      loadTicket();
+      await loadTicket();
     } catch (error: any) {
       toast.error(error.response?.data?.message || 'Durum güncelleme başarısız');
     } finally {

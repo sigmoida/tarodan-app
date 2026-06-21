@@ -175,7 +175,6 @@ export class AuthService {
       try {
         await this.notificationService.sendWelcomeEmail(user.id);
       } catch (error) {
-        // Don't fail registration if welcome email fails
         this.logger.error(`Failed to send welcome email to ${user.email}: ${error.message}`);
       }
     }
@@ -323,8 +322,8 @@ export class AuthService {
         displayName: dto.companyName,
         companyName: dto.companyName,
         taxId: dto.taxId,
-        isSeller: true, // Business accounts are always sellers
-        sellerType: SellerType.individual, // Business accounts use individual type (distinguished by companyName/taxId)
+        isSeller: false,
+        businessStatus: 'pending',
         isVerified: false, // Email verification required
         isEmailVerified: false,
         acceptsMarketingEmails: dto.acceptsMarketingEmails ?? false,
@@ -576,15 +575,31 @@ export class AuthService {
   /**
    * Refresh tokens
    * POST /auth/refresh
+   *
+   * Admin refresh token'ı ile gelindiyse admin token (isAdmin claim'li) üretilir;
+   * aksi halde admin-jwt strategy yenilenen token'ı reddederdi (eski bug).
    */
-  async refreshTokens(userId: string, refreshToken: string): Promise<TokensDto> {
-    // Find user
+  async refreshTokens(
+    userId: string,
+    _refreshToken: string,
+    opts?: { isAdmin?: boolean },
+  ): Promise<TokensDto> {
+    // Find user (admin için adminUser ilişkisiyle güncel rol/aktiflik)
     const user = await this.prisma.user.findUnique({
       where: { id: userId },
+      include: { adminUser: true },
     });
 
     if (!user) {
       throw new UnauthorizedException('Kullanıcı bulunamadı');
+    }
+
+    // Admin refresh: hesabın hâlâ aktif admin olduğunu doğrula, admin token üret.
+    if (opts?.isAdmin) {
+      if (!user.adminUser?.isActive) {
+        throw new UnauthorizedException('Admin hesabı bulunamadı veya deaktif');
+      }
+      return this.generateAdminTokens(user.id, user.email, user.adminUser.role);
     }
 
     // Generate new tokens (token rotation)
@@ -727,7 +742,8 @@ export class AuthService {
 
       this.jwtService.signAsync(refreshPayload, {
         secret: this.configService.get<string>('JWT_REFRESH_SECRET'),
-        expiresIn: '1d', // Shorter refresh for admin
+        expiresIn:
+          this.configService.get<string>('ADMIN_JWT_REFRESH_EXPIRES_IN') || '7d',
       }),
     ]);
 

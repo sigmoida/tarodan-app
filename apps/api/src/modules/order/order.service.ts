@@ -39,6 +39,7 @@ import { SuratCargoService } from '../surat-cargo/surat-cargo.service';
 import { normalizeSuratPhone, normalizeSuratLocation } from '../surat-cargo/surat-address.util';
 import { CommissionLedgerService } from '../commission/commission-ledger.service';
 import { mapSuratFailureToHttpException } from '../surat-cargo/surat-result.mapper';
+import { TaxService } from '../tax/tax.service';
 import type { SuratShipmentFailure } from '../surat-cargo/surat-cargo.types';
 import { SuratKargoTuru, SuratOdemeTipi, SuratTasimaSekli, SuratTeslimSekli, SuratGonderiSekli } from '../surat-cargo/surat-cargo.types';
 
@@ -77,6 +78,7 @@ export class OrderService {
     @Optional()
     private readonly storageService: StorageService,
     private readonly commissionLedger: CommissionLedgerService,
+    private readonly taxService: TaxService,
   ) {}
 
   // Shipping cost defaults (overridden by PlatformSetting)
@@ -146,6 +148,7 @@ export class OrderService {
     buyerFeeAmount: number;
     sellerFeeAmount: number;
     commissionAmount: number;
+    taxAmount: number;
     totalAmount: number;
     sellerNetAmount: number;
     items: Array<{
@@ -156,6 +159,7 @@ export class OrderService {
       buyerFeeAmount: number;
       sellerFeeAmount: number;
       sellerNetAmount: number;
+      taxAmount: number;
       title?: string;
     }>;
     pricing: {
@@ -164,6 +168,7 @@ export class OrderService {
       buyerFeeAmount: number;
       sellerFeeAmount: number;
       commissionAmount: number;
+      taxAmount: number;
       totalAmount: number;
       sellerNetAmount: number;
     };
@@ -176,6 +181,7 @@ export class OrderService {
     let itemsSubtotal = 0;
     let totalBuyerFee = 0;
     let totalSellerFee = 0;
+    let totalTax = 0;
     const quoteItems: Array<{
       productId: string;
       quantity: number;
@@ -184,6 +190,7 @@ export class OrderService {
       buyerFeeAmount: number;
       sellerFeeAmount: number;
       sellerNetAmount: number;
+      taxAmount: number;
       title?: string;
     }> = [];
 
@@ -200,6 +207,7 @@ export class OrderService {
           sellerId: true,
           categoryId: true,
           status: true,
+          seller: { select: { businessStatus: true, taxId: true } },
         },
       });
 
@@ -230,9 +238,19 @@ export class OrderService {
       const lineSellerFee = commissionResult.sellerFeeAmount;
       const lineSellerNet = lineSubtotal - lineSellerFee;
 
+      // KDV: sadece kurumsal satıcılar (businessStatus=approved ve taxId dolu)
+      const isCorporate =
+        product.seller?.businessStatus === 'approved' && !!product.seller?.taxId;
+      let lineTax = 0;
+      if (isCorporate) {
+        const resolved = await this.taxService.resolveTaxRate('TR', null, product.categoryId);
+        lineTax = resolved ? this.taxService.calculateTaxAmount(lineSubtotal, resolved) : 0;
+      }
+
       itemsSubtotal += lineSubtotal;
       totalBuyerFee += lineBuyerFee;
       totalSellerFee += lineSellerFee;
+      totalTax += lineTax;
 
       quoteItems.push({
         productId: product.id,
@@ -242,13 +260,14 @@ export class OrderService {
         buyerFeeAmount: lineBuyerFee,
         sellerFeeAmount: lineSellerFee,
         sellerNetAmount: Math.max(0, lineSellerNet),
+        taxAmount: lineTax,
         title: product.title ?? undefined,
       });
     }
 
     const shippingAmount = await this.calculateShippingCost(itemsSubtotal);
     const commissionAmount = totalBuyerFee + totalSellerFee;
-    const totalAmount = itemsSubtotal + shippingAmount + totalBuyerFee;
+    const totalAmount = itemsSubtotal + shippingAmount + totalBuyerFee + totalTax;
     const sellerNetAmount = Math.max(0, itemsSubtotal - totalSellerFee);
 
     const pricing = {
@@ -257,6 +276,7 @@ export class OrderService {
       buyerFeeAmount: totalBuyerFee,
       sellerFeeAmount: totalSellerFee,
       commissionAmount,
+      taxAmount: totalTax,
       totalAmount,
       sellerNetAmount,
     };
@@ -267,6 +287,7 @@ export class OrderService {
       buyerFeeAmount: totalBuyerFee,
       sellerFeeAmount: totalSellerFee,
       commissionAmount,
+      taxAmount: totalTax,
       totalAmount,
       sellerNetAmount,
       items: quoteItems,
@@ -320,6 +341,17 @@ export class OrderService {
 
   private buildSuratIdempotencyKey(parts: string[]): string {
     return createHash('sha256').update(parts.filter((p) => p.length > 0).join('|')).digest('hex');
+  }
+
+  /** KDV: satıcı kurumsal (businessStatus=approved + taxId dolu) ise ürün fiyatı üzerinden vergi hesapla. */
+  private async resolveSellerTax(sellerId: string, categoryId: string | null, subtotal: number): Promise<number> {
+    const seller = await this.prisma.user.findUnique({
+      where: { id: sellerId },
+      select: { businessStatus: true, taxId: true },
+    });
+    if (seller?.businessStatus !== 'approved' || !seller?.taxId) return 0;
+    const resolved = await this.taxService.resolveTaxRate('TR', null, categoryId);
+    return resolved ? this.taxService.calculateTaxAmount(subtotal, resolved) : 0;
   }
 
   /**
@@ -926,8 +958,10 @@ export class OrderService {
 
       // Calculate shipping cost (free shipping for orders >= 500 TL)
       const shippingCost = await this.calculateShippingCost(discountedPrice);
-      // Buyer fee is added to order total
-      const totalAmount = discountedPrice + shippingCost + commissionResult.buyerFeeAmount;
+      // KDV: kurumsal satıcı ise ürün fiyatı üzerinden
+      const taxAmount = await this.resolveSellerTax(product.sellerId, product.categoryId, discountedPrice);
+      // Buyer fee + KDV eklenir
+      const totalAmount = discountedPrice + shippingCost + commissionResult.buyerFeeAmount + taxAmount;
 
       // Generate order number
       const orderNumber = await this.generateOrderNumber();
@@ -1019,6 +1053,7 @@ export class OrderService {
             originalPrice,
           } : undefined,
           shippingCost,
+          taxAmount,
           commissionAmount: commissionResult.commissionAmount,
           buyerFeeAmount: commissionResult.buyerFeeAmount,
           sellerFeeAmount: commissionResult.sellerFeeAmount,
@@ -1475,6 +1510,7 @@ export class OrderService {
           orderNumber: string;
           commissionResult: CommissionResult;
           shippingCost: number;
+          taxAmount: number;
           totalAmount: number;
           suratIdempotencyKey: string;
         }> = [];
@@ -1487,8 +1523,9 @@ export class OrderService {
             entry.product.categoryId,
           );
           const shippingCost = await this.calculateShippingCost(discountedPrice);
+          const taxAmount = await this.resolveSellerTax(entry.product.sellerId, entry.product.categoryId, discountedPrice);
           const totalAmount =
-            discountedPrice + shippingCost + commissionResult.buyerFeeAmount;
+            discountedPrice + shippingCost + commissionResult.buyerFeeAmount + taxAmount;
           const orderNumber = await this.generateOrderNumber();
           const suratIdempotencyKey = this.buildSuratIdempotencyKey([
             dto.idempotencyKey,
@@ -1514,6 +1551,7 @@ export class OrderService {
             orderNumber,
             commissionResult,
             shippingCost,
+            taxAmount,
             totalAmount,
             suratIdempotencyKey,
           });
@@ -1599,6 +1637,7 @@ export class OrderService {
                     }
                   : undefined,
               shippingCost: input.shippingCost,
+              taxAmount: input.taxAmount,
               commissionAmount: input.commissionResult.commissionAmount,
               buyerFeeAmount: input.commissionResult.buyerFeeAmount,
               sellerFeeAmount: input.commissionResult.sellerFeeAmount,
@@ -1804,8 +1843,10 @@ export class OrderService {
         orderNumberPreview: orderNumber,
       });
 
-      // Buyer fee is added to order total
-      const totalAmount = Number(offer.amount) + commissionResult.buyerFeeAmount;
+      // KDV: kurumsal satıcı ise ürün fiyatı üzerinden
+      const offerTaxAmount = await this.resolveSellerTax(offer.sellerId, offer.product.categoryId, Number(offer.amount));
+      // Buyer fee + KDV eklenir
+      const totalAmount = Number(offer.amount) + commissionResult.buyerFeeAmount + offerTaxAmount;
 
       const offerShippingJson: Record<string, unknown> | undefined = shippingAddress
         ? {
@@ -1843,6 +1884,7 @@ export class OrderService {
           offerId: dto.offerId,
           checkoutGroupId: offerOrderGroup.id,
           totalAmount,
+          taxAmount: offerTaxAmount,
           commissionAmount: commissionResult.commissionAmount,
           buyerFeeAmount: commissionResult.buyerFeeAmount,
           sellerFeeAmount: commissionResult.sellerFeeAmount,
@@ -1908,20 +1950,13 @@ export class OrderService {
       if (!product) return;
       
       const actualSellerId = sellerId || product.sellerId;
-      
-      // 1. Notify seller that product was sold
-      if (actualSellerId) {
-        await this.notificationService.createInAppNotification(
-          actualSellerId,
-          NotificationType.ORDER_CREATED,
-          {
-            productId: product.id,
-            productTitle: product.title,
-          },
-        );
-      }
-      
-      // 2. Notify users who have this product in wishlist
+
+      // NOTE: We intentionally do NOT notify the seller here. This runs at order creation
+      // (status pending_payment) — e.g. when a buyer turns an accepted offer into an order —
+      // before payment is confirmed and the order may still be abandoned. The seller is
+      // notified only after payment succeeds, via the order.paid event ("Yeni Sipariş" email + push).
+
+      // Notify users who have this product in wishlist
       const wishlistEntries = await this.prisma.wishlistItem.findMany({
         where: { productId },
         include: { wishlist: { select: { userId: true } } },
@@ -2024,9 +2059,7 @@ export class OrderService {
       ttlSec,
     );
     if (!sendResult.success) {
-      throw new BadRequestException(
-        sendResult.error || 'Doğrulama kodu e-postası gönderilemedi',
-      );
+      throw new BadRequestException('Doğrulama kodu e-postası gönderilemedi');
     }
 
     const otpKey = this.guestCheckoutOtpKey(normEmail);
@@ -2196,8 +2229,10 @@ export class OrderService {
 
       // Calculate shipping cost (free shipping for orders >= 500 TL)
       const shippingCost = await this.calculateShippingCost(finalPrice);
-      // Buyer fee is added to order total
-      const totalAmount = finalPrice + shippingCost + commissionResult.buyerFeeAmount;
+      // KDV: kurumsal satıcı ise ürün fiyatı üzerinden
+      const guestTaxAmount = await this.resolveSellerTax(product.sellerId, product.categoryId, finalPrice);
+      // Buyer fee + KDV eklenir
+      const totalAmount = finalPrice + shippingCost + commissionResult.buyerFeeAmount + guestTaxAmount;
 
       // Generate order number
       const orderNumber = await this.generateOrderNumber();
@@ -2272,6 +2307,7 @@ export class OrderService {
           checkoutGroupId: guestOrderGroup.id,
           totalAmount,
           shippingCost,
+          taxAmount: guestTaxAmount,
           commissionAmount: commissionResult.commissionAmount,
           buyerFeeAmount: commissionResult.buyerFeeAmount,
           sellerFeeAmount: commissionResult.sellerFeeAmount,
@@ -2503,6 +2539,9 @@ export class OrderService {
           },
         },
         payment: true,
+        // canReactivate hesabı için teklif durumu gerekir ("Ödemeyi tamamla"
+        // yalnız teklif hâlâ accepted iken gösterilmeli)
+        offer: { select: { status: true } },
         refundRequests: {
           orderBy: { createdAt: 'desc' },
         },
@@ -3281,6 +3320,43 @@ export class OrderService {
   }
 
   /**
+   * Sipariş "Ödemeyi tamamla" ile yeniden aktive edilebilir mi?
+   * reactivate() ile birebir aynı kural — UI yalnızca gerçekten reactivate
+   * edilebilen siparişte butonu göstersin (backend'in reddedeceği yerde asla).
+   * offer/product include edilmemişse güvenli şekilde false döner (liste görünümleri).
+   */
+  private computeCanReactivate(order: any, userId: string): boolean {
+    if (order.status !== OrderStatus.cancelled) return false;
+    if (order.buyerId !== userId) return false;
+    if (!order.offerId || !order.offer) return false;
+    if (order.offer.status !== OfferStatus.accepted) return false;
+    if (!order.product) return false;
+    const available = getAvailableQuantity(order.product);
+    if (available !== null && available < 1) return false;
+    return true;
+  }
+
+  /**
+   * Ham cancelReason'ı stabil bir kategoriye eşler; frontend bu kategoriye göre
+   * kullanıcı dostu mesaj gösterir. Admin'in yazdığı serbest metinler 'other'
+   * olarak kalır ve ham haliyle gösterilir. Sadece iptal edilmiş siparişler için
+   * anlamlıdır; aksi halde null döner.
+   */
+  private deriveCancelCategory(order: any): string | null {
+    if (order.status !== OrderStatus.cancelled) return null;
+    const reason = (order.cancelReason ?? '').trim();
+    if (!reason) return 'buyer_cancelled';
+    if (reason === 'Ödeme süresi (24 saat) doldu') return 'payment_timeout';
+    if (reason.startsWith('Satıcı belirlenen süre')) return 'seller_no_ship';
+    if (reason.includes('Stok tüken')) return 'stockout';
+    if (reason.includes('takas')) return 'trade_reserved';
+    if (reason === 'Yeni toplu sipariş ile değiştirildi') return 'bulk_replaced';
+    if (reason === 'Alıcı lehine iptal edildi') return 'admin_buyer_favor';
+    if (reason === 'Admin tarafından iptal edildi' || reason.startsWith('Admin force-cancel')) return 'admin';
+    return 'other';
+  }
+
+  /**
    * Format order response
    */
   private async formatOrderResponse(order: any, userId: string) {
@@ -3322,6 +3398,13 @@ export class OrderService {
     return {
       id: order.id,
       orderNumber: order.orderNumber,
+      // Üyelik/dijital siparişler sanal ürün + platform satıcısı olarak modellenir
+      // (orderNumber "MEM-" öneki, shippingAddress { type: 'membership' }). Bu siparişlerde
+      // yorum/iade/teslimat adresi gibi fiziksel-ürün aksiyonları geçerli değildir.
+      isMembership:
+        (order.orderNumber?.startsWith('MEM-') ?? false) ||
+        (typeof order.shippingAddress === 'object' &&
+          (order.shippingAddress as any)?.type === 'membership'),
       checkoutGroupId: order.checkoutGroupId ?? null,
       amount: totalAmount,
       totalAmount,
@@ -3384,6 +3467,8 @@ export class OrderService {
       completedAt: order.completedAt ?? null,
       cancelledAt: order.cancelledAt ?? null,
       cancelReason: order.cancelReason ?? null,
+      cancelCategory: this.deriveCancelCategory(order),
+      canReactivate: this.computeCanReactivate(order, userId),
       confirmationDeadline: order.confirmationDeadline ?? null,
       buyerConfirmedAt: order.buyerConfirmedAt ?? null,
       isBuyer: order.buyerId === userId,

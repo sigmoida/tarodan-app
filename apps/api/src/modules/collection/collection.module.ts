@@ -7,9 +7,10 @@ import { MediaModule } from '../media/media.module';
 import { NotificationModule } from '../notification/notification.module';
 import { StorageModule } from '../storage/storage.module';
 import { SearchModule } from '../search/search.module';
+import { ModerationModule } from '../moderation/moderation.module';
 
 @Module({
-  imports: [PrismaModule, MembershipModule, MediaModule, StorageModule, SearchModule, forwardRef(() => NotificationModule)],
+  imports: [PrismaModule, MembershipModule, MediaModule, StorageModule, SearchModule, ModerationModule, forwardRef(() => NotificationModule)],
   controllers: [CollectionController],
   providers: [CollectionService],
   exports: [CollectionService],

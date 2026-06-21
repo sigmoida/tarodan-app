@@ -6,7 +6,9 @@ import {
   UseGuards,
   HttpCode,
   HttpStatus,
+  Res,
 } from '@nestjs/common';
+import { Response } from 'express';
 import {
   ApiTags,
   ApiOperation,
@@ -28,6 +30,7 @@ import {
 import { JwtAuthGuard, JwtRefreshGuard } from './guards';
 import { Public, CurrentUser } from './decorators';
 import { RequestUser } from './interfaces';
+import { setAuthCookies, clearAuthCookies } from './utils/auth-cookies';
 
 @ApiTags('auth')
 @Controller('auth')
@@ -84,8 +87,16 @@ export class AuthController {
     type: AuthResponseDto,
   })
   @ApiResponse({ status: 401, description: 'Email veya şifre hatalı' })
-  async login(@Body() dto: LoginDto): Promise<AuthResponseDto> {
-    return this.authService.login(dto);
+  async login(
+    @Body() dto: LoginDto,
+    @Res({ passthrough: true }) res: Response,
+  ): Promise<AuthResponseDto> {
+    const result = await this.authService.login(dto);
+    // Tarayıcı için httpOnly cookie; mobil yine body'deki token'ı kullanır.
+    if (result?.tokens) {
+      setAuthCookies(res, result.tokens, { admin: false });
+    }
+    return result;
   }
 
   /**
@@ -94,8 +105,16 @@ export class AuthController {
   @Post('google')
   @Public()
   @HttpCode(HttpStatus.OK)
-  async google(@Body() dto: GoogleAuthDto): Promise<AuthResponseDto> {
-    return this.authService.loginWithGoogle(dto.idToken);
+  async google(
+    @Body() dto: GoogleAuthDto,
+    @Res({ passthrough: true }) res: Response,
+  ): Promise<AuthResponseDto> {
+    const result = await this.authService.loginWithGoogle(dto.idToken);
+    // Tarayıcı için httpOnly cookie; mobil yine body'deki token'ı kullanır.
+    if (result?.tokens) {
+      setAuthCookies(res, result.tokens, { admin: false });
+    }
+    return result;
   }
 
   /**
@@ -114,24 +133,35 @@ export class AuthController {
   })
   @ApiResponse({ status: 401, description: 'Geçersiz refresh token' })
   async refreshTokens(
-    @Body() dto: RefreshTokenDto,
+    @Body() _dto: RefreshTokenDto,
     @CurrentUser() user: RequestUser & { refreshToken: string },
+    @Res({ passthrough: true }) res: Response,
   ): Promise<TokensDto> {
-    return this.authService.refreshTokens(user.id, user.refreshToken);
+    const isAdmin = !!user.isAdmin;
+    const tokens = await this.authService.refreshTokens(user.id, user.refreshToken, {
+      isAdmin,
+    });
+    // Rotasyonla gelen yeni token'ları doğru cookie setine yaz (admin/normal).
+    setAuthCookies(res, tokens, { admin: isAdmin });
+    return tokens;
   }
 
   /**
    * POST /auth/logout
    * Logout current user
+   *
+   * Public: süresi dolmuş/geçersiz token'a sahip istemci de cookie'lerini
+   * temizleyebilmeli. Guard'lıyken ölü access_token 401 alıp clearAuthCookies'e hiç
+   * ulaşmıyordu → bayat httpOnly cookie tarayıcıda kalıyordu. logout() userId kullanmaz.
    */
   @Post('logout')
-  @UseGuards(JwtAuthGuard)
+  @Public()
   @HttpCode(HttpStatus.OK)
-  @ApiBearerAuth()
   @ApiOperation({ summary: 'Çıkış yap' })
   @ApiResponse({ status: 200, description: 'Çıkış yapıldı' })
-  async logout(@CurrentUser('id') userId: string) {
-    return this.authService.logout(userId);
+  async logout(@Res({ passthrough: true }) res: Response) {
+    clearAuthCookies(res, { admin: false });
+    return this.authService.logout('');
   }
 
   /**

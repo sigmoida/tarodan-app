@@ -11,6 +11,7 @@ import { CacheModule } from '../cache/cache.module';
 import { StorageModule } from '../storage/storage.module';
 import { BannedUserGuard } from './guards/banned-user.guard';
 import { GoogleAuthService } from './google-auth.service';
+import { RolesGuard } from './guards/roles.guard';
 
 @Module({
   imports: [
@@ -37,7 +38,8 @@ import { GoogleAuthService } from './google-auth.service';
     JwtRefreshStrategy,
     AdminJwtStrategy,
     BannedUserGuard,
+    RolesGuard,
   ],
-  exports: [AuthService, JwtModule, BannedUserGuard],
+  exports: [AuthService, JwtModule, BannedUserGuard, RolesGuard],
 })
 export class AuthModule {}

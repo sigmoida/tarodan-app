@@ -1,29 +1,34 @@
 import axios from 'axios';
 
 // Tarayıcıda doğrudan API'ye git (3001); proxy bazen 500 veriyor. Sunucu tarafında /api (rewrite) kullanılır.
+const API_ORIGIN = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001';
 const baseURL =
   typeof window !== 'undefined'
-    ? `${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001'}/api`
+    ? `${API_ORIGIN}/api`
     : '/api';
 
 export const api = axios.create({
   baseURL,
+  // Auth artık httpOnly cookie'lerde; her istekte cookie gönderilsin. Authorization header eklemiyoruz.
+  withCredentials: true,
   headers: {
     'Content-Type': 'application/json',
   },
 });
 
-// Request interceptor
-api.interceptors.request.use(
-  (config) => {
-    const token = typeof window !== 'undefined' ? localStorage.getItem('auth_token') : null;
-    if (token) {
-      config.headers.Authorization = `Bearer ${token}`;
-    }
-    return config;
-  },
-  (error) => Promise.reject(error)
-);
+/**
+ * httpOnly cookie JS'ten okunamadığı için "kullanıcının oturumu var mıydı" kararını
+ * hassas OLMAYAN bir işaretçiyle veririz (token DEĞERİ değil, yalnızca '1'). authStore
+ * login/checkAuth başarısında set eder, logout/kesin 401'de silinir.
+ */
+export const AUTH_MARKER_KEY = 'tarodan_authed';
+function hadSession(): boolean {
+  if (typeof window === 'undefined') return false;
+  return localStorage.getItem(AUTH_MARKER_KEY) === '1';
+}
+function clearSessionMarker() {
+  if (typeof window !== 'undefined') localStorage.removeItem(AUTH_MARKER_KEY);
+}
 
 /** Checkout / ödeme sırasında 401'de token silmek PayTR dönüşü veya /payments/status çağrısını kırar. */
 function shouldPreserveAuthTokenOn401(): boolean {
@@ -45,7 +50,8 @@ api.interceptors.response.use(
       error.response?.status === 403 &&
       errData?.errorCode === 'USER_BANNED' &&
       typeof window !== 'undefined' &&
-      window.location?.pathname !== '/banned'
+      window.location?.pathname !== '/banned' &&
+      window.location?.pathname !== '/contact'
     ) {
       const reason = errData.bannedReason
         ? `?reason=${encodeURIComponent(errData.bannedReason)}`
@@ -57,94 +63,40 @@ api.interceptors.response.use(
     if (error.response?.status === 401 && !originalRequest._retry) {
       originalRequest._retry = true;
 
-      if (typeof window !== 'undefined') {
-        const refreshToken = localStorage.getItem('refresh_token');
-
-        // Try to refresh token if we have a refresh token
-        if (refreshToken && originalRequest.url !== '/auth/refresh') {
-          try {
-            // Use a new axios instance to avoid interceptor loop
-            const refreshResponse = await axios.post('/api/auth/refresh', { refreshToken }, {
-              headers: { 'Content-Type': 'application/json' },
-            });
-            const { accessToken, refreshToken: newRefreshToken } = refreshResponse.data;
-
-            // Update tokens in localStorage
-            localStorage.setItem('auth_token', accessToken);
-            if (newRefreshToken) {
-              localStorage.setItem('refresh_token', newRefreshToken);
-            }
-
-            // Update the original request with new token
-            originalRequest.headers.Authorization = `Bearer ${accessToken}`;
-
-            // Retry the original request
-            return api(originalRequest);
-          } catch (refreshError: any) {
-            // Refresh'in network/5xx ile patlaması (API erişilemez) ≠ geçersiz refresh token.
-            // Sadece refresh GERÇEKTEN 401/403 dönerse oturumu kapat; geçici hatada token'ı koru
-            // ki API hıçkırınca (özellikle ödeme dönüşü) kullanıcı login'e atılmasın.
-            const refreshStatus = refreshError?.response?.status;
-            const refreshRejectedAuth = refreshStatus === 401 || refreshStatus === 403;
-            const hadToken = localStorage.getItem('auth_token');
-            if (refreshRejectedAuth && !shouldPreserveAuthTokenOn401()) {
-              localStorage.removeItem('auth_token');
-              localStorage.removeItem('refresh_token');
-            }
-
-            // Only auto-redirect for genuinely expired/invalid sessions; never on transient errors or public/guest pages
-            if (refreshRejectedAuth && hadToken) {
-              const currentPath = (typeof window !== 'undefined' && window.location?.pathname) || '';
-              const publicPathsNoRedirect = ['/track-order', '/orders/track', '/login', '/register'];
-              const isPublicPath = publicPathsNoRedirect.some(p => currentPath === p || currentPath.startsWith(p + '/'));
-              if (isPublicPath) {
-                if (process.env.NODE_ENV === 'development') {
-                  console.debug('[api] 401 after refresh failed – on public path, not redirecting', { currentPath });
-                }
-              } else {
-                const protectedPaths = ['/profile', '/orders', '/messages', '/favorites', '/cart/checkout'];
-                const isProtectedPath = protectedPaths.some(path => currentPath.startsWith(path));
-                if (process.env.NODE_ENV === 'development') {
-                  console.debug('[api] 401 after refresh failed', { currentPath, isProtectedPath, hadToken });
-                }
-                if (isProtectedPath) {
-                  window.location.href = '/login?expired=true';
-                }
-              }
-            }
-
-            return Promise.reject(refreshError);
-          }
-        } else {
-          // No refresh token or refresh endpoint failed, handle as before
-          const hadToken = localStorage.getItem('auth_token');
-          if (!shouldPreserveAuthTokenOn401()) {
-            localStorage.removeItem('auth_token');
-            localStorage.removeItem('refresh_token');
+      if (typeof window !== 'undefined' && originalRequest.url !== '/auth/refresh') {
+        try {
+          // Refresh token httpOnly cookie'de; body göndermiyoruz. Doğrudan API'ye, cookie ile.
+          // Sunucu yeni cookie'leri set eder → orijinal isteği tekrarla.
+          await axios.post(`${API_ORIGIN}/api/auth/refresh`, null, {
+            withCredentials: true,
+          });
+          return api(originalRequest);
+        } catch (refreshError: any) {
+          // Refresh'in network/5xx ile patlaması (API erişilemez) ≠ geçersiz refresh token.
+          // Sadece refresh GERÇEKTEN 401/403 dönerse oturumu kapat; geçici hatada işareti koru
+          // ki API hıçkırınca (özellikle ödeme dönüşü) kullanıcı login'e atılmasın.
+          const refreshStatus = refreshError?.response?.status;
+          const refreshRejectedAuth = refreshStatus === 401 || refreshStatus === 403;
+          const had = hadSession();
+          if (refreshRejectedAuth && !shouldPreserveAuthTokenOn401()) {
+            clearSessionMarker();
           }
 
-          // Only auto-redirect for expired sessions; never redirect on public/guest pages
-          if (hadToken) {
-            const currentPath = (typeof window !== 'undefined' && window.location?.pathname) || '';
+          // Yalnızca gerçekten süresi dolmuş oturumlarda yönlendir; misafir/geçici hatada asla.
+          if (refreshRejectedAuth && had) {
+            const currentPath = window.location?.pathname || '';
             const publicPathsNoRedirect = ['/track-order', '/orders/track', '/login', '/register'];
             const isPublicPath = publicPathsNoRedirect.some(p => currentPath === p || currentPath.startsWith(p + '/'));
-            if (isPublicPath) {
-              if (process.env.NODE_ENV === 'development') {
-                console.debug('[api] 401 no refresh – on public path, not redirecting', { currentPath });
-              }
-            } else {
+            if (!isPublicPath) {
               const protectedPaths = ['/profile', '/orders', '/messages', '/favorites', '/cart/checkout'];
               const isProtectedPath = protectedPaths.some(path => currentPath.startsWith(path));
-              if (process.env.NODE_ENV === 'development') {
-                console.debug('[api] 401 no refresh', { currentPath, isProtectedPath, hadToken });
-              }
               if (isProtectedPath) {
                 window.location.href = '/login?expired=true';
               }
             }
           }
-          // For guests trying to access protected API endpoints, just reject the promise
-          // The UI will handle showing auth modals
+
+          return Promise.reject(refreshError);
         }
       }
     }

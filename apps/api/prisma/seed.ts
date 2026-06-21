@@ -13,6 +13,9 @@ import {
   OrderStatus,
   PaymentStatus,
   ShipmentStatus,
+  RefundReason,
+  RefundRequestStatus,
+  ReturnShippingPayer,
   MessageStatus,
   TicketStatus,
   TicketPriority,
@@ -737,11 +740,102 @@ async function main() {
     prisma.platformSetting.upsert({ where: { settingKey: 'payment_hold_days' }, update: {}, create: { settingKey: 'payment_hold_days', settingValue: '3', settingType: 'number', description: 'Ödeme bekletme süresi (gün)' } }),
     prisma.platformSetting.upsert({ where: { settingKey: 'min_offer_percentage' }, update: {}, create: { settingKey: 'min_offer_percentage', settingValue: '50', settingType: 'number', description: 'Minimum teklif yüzdesi' } }),
     prisma.platformSetting.upsert({ where: { settingKey: 'platform_name' }, update: {}, create: { settingKey: 'platform_name', settingValue: 'Tarodan', settingType: 'string', description: 'Platform adı' } }),
-    prisma.platformSetting.upsert({ where: { settingKey: 'default_carrier' }, update: {}, create: { settingKey: 'default_carrier', settingValue: 'aras', settingType: 'string', description: 'Varsayılan kargo firması' } }),
+    prisma.platformSetting.upsert({ where: { settingKey: 'default_carrier' }, update: {}, create: { settingKey: 'default_carrier', settingValue: 'surat', settingType: 'string', description: 'Varsayılan kargo firması' } }),
     prisma.platformSetting.upsert({ where: { settingKey: 'trade_response_deadline_hours' }, update: {}, create: { settingKey: 'trade_response_deadline_hours', settingValue: '72', settingType: 'number', description: 'Takas teklifi yanıt süresi' } }),
   ]);
 
   console.log(`✅ Created ${settings.length} platform settings`);
+
+  // ==========================================================================
+  // 5b. Tax Regions, Rates & Rules (Türkiye KDV)
+  // ==========================================================================
+  console.log('Creating tax data...');
+
+  const taxRegionTR = await prisma.taxRegion.upsert({
+    where: { id: 'tax-region-tr' },
+    update: {},
+    create: {
+      id: 'tax-region-tr',
+      name: 'Türkiye',
+      countryCode: 'TR',
+      regionCode: null,
+      isDefault: true,
+      sortOrder: 0,
+      isActive: true,
+    },
+  });
+
+  const [taxRate20, taxRate10, taxRate1, taxRate0] = await Promise.all([
+    prisma.taxRate.upsert({
+      where: { id: 'tax-rate-kdv-20' },
+      update: {},
+      create: {
+        id: 'tax-rate-kdv-20',
+        taxRegionId: taxRegionTR.id,
+        name: 'KDV %20',
+        rate: 20,
+        isDefault: true,
+        sortOrder: 0,
+        isActive: true,
+      },
+    }),
+    prisma.taxRate.upsert({
+      where: { id: 'tax-rate-kdv-10' },
+      update: {},
+      create: {
+        id: 'tax-rate-kdv-10',
+        taxRegionId: taxRegionTR.id,
+        name: 'KDV %10',
+        rate: 10,
+        isDefault: false,
+        sortOrder: 1,
+        isActive: true,
+      },
+    }),
+    prisma.taxRate.upsert({
+      where: { id: 'tax-rate-kdv-1' },
+      update: {},
+      create: {
+        id: 'tax-rate-kdv-1',
+        taxRegionId: taxRegionTR.id,
+        name: 'KDV %1',
+        rate: 1,
+        isDefault: false,
+        sortOrder: 2,
+        isActive: true,
+      },
+    }),
+    prisma.taxRate.upsert({
+      where: { id: 'tax-rate-kdv-0' },
+      update: {},
+      create: {
+        id: 'tax-rate-kdv-0',
+        taxRegionId: taxRegionTR.id,
+        name: 'KDV Muaf',
+        rate: 0,
+        isDefault: false,
+        sortOrder: 3,
+        isActive: true,
+      },
+    }),
+  ]);
+
+  // Varsayılan kural: tüm ürünler için %20
+  await prisma.taxRule.upsert({
+    where: { id: 'tax-rule-tr-default' },
+    update: {},
+    create: {
+      id: 'tax-rule-tr-default',
+      taxRegionId: taxRegionTR.id,
+      taxRateId: taxRate20.id,
+      scope: 'default_rate',
+      categoryId: null,
+      priority: 0,
+      isActive: true,
+    },
+  });
+
+  console.log('✅ Created tax region (TR), 4 rates, 1 default rule');
 
   // ==========================================================================
   // 6. Create Users (20+ users with different roles)
@@ -1148,13 +1242,15 @@ async function main() {
     catActiveAssigned[d.cat] = 0;
   }
 
-  // 70% active, 15% pending, 5% reserved, 5% sold, 5% draft (for categories with >5 products)
+  // 70% active, 15% pending, 5% reserved, 5% sold, 5% inactive (for categories with >5 products)
+  // NOT: draft, gerçek uygulamada hiçbir akışla oluşmaz (oluşturma → pending), bu yüzden
+  // demo veride de üretmiyoruz. inactive (quantity>0) = elle pasife alınmış geçerli durum.
   const statusPool = [
     ...Array(14).fill(ProductStatus.active),
     ...Array(3).fill(ProductStatus.pending),
     ProductStatus.reserved,
     ProductStatus.sold,
-    ProductStatus.draft,
+    ProductStatus.inactive,
   ];
 
   for (let i = 0; i < productData.length; i++) {
@@ -1547,7 +1643,7 @@ async function main() {
 
   const shippedOrders = orders.filter(o => [OrderStatus.shipped, OrderStatus.delivered, OrderStatus.completed].includes(o.status));
   for (const order of shippedOrders) {
-    const carrier = ['aras', 'yurtici', 'mng'][Math.floor(Math.random() * 3)];
+    const carrier = 'surat';
     const shipmentStatus = order.status === OrderStatus.shipped ? ShipmentStatus.in_transit : ShipmentStatus.delivered;
     
     try {
@@ -1556,7 +1652,7 @@ async function main() {
           orderId: order.id,
           provider: carrier,
           trackingNumber: `${carrier.toUpperCase()}${Math.random().toString().substring(2, 14)}`,
-          trackingUrl: `https://${carrier}.com.tr/tracking/`,
+          trackingUrl: `https://www.suratkargo.com.tr/KargoTakip/?kargotakipno=`,
           status: shipmentStatus,
           shippedAt: new Date(order.createdAt.getTime() + 86400000), // 1 day after order
           deliveredAt: shipmentStatus === ShipmentStatus.delivered ? new Date(order.createdAt.getTime() + 259200000) : null, // 3 days after
@@ -1568,6 +1664,203 @@ async function main() {
   }
 
   console.log(`✅ Created shipments`);
+
+  // ==========================================================================
+  // 17.5 Create Refund Requests + Refunded Payments
+  //   Admin "İade Talepleri" (RefundRequest — tüm statüler) ve
+  //   "İade Geçmişi" (Payment.status = refunded) sayfaları için veri.
+  // ==========================================================================
+  console.log('Creating refund requests & refunds...');
+
+  // Benzersiz iade numarası — runtime RFD-XXXXXXXXXX formatıyla uyumlu (dev/seed).
+  const generateRefundNumber = () =>
+    `RFD-${Array.from({ length: 10 }, () => REF_ALPHABET[Math.floor(Math.random() * REF_ALPHABET.length)]).join('')}`;
+
+  const daysAgoDate = (days: number) => new Date(Date.now() - days * 86400000);
+
+  // Statüye göre RefundRequest alanlarını üretir (karar / iade kargosu / para iadesi).
+  const buildRefundFields = (
+    status: RefundRequestStatus,
+    sellerId: string,
+    createdAt: Date,
+  ): Record<string, any> => {
+    const plus = (days: number) => new Date(createdAt.getTime() + days * 86400000);
+    const trackingNo = `RFD${Math.random().toString().substring(2, 14)}`;
+    const approve = 'Talebinizi inceledik, iade onaylandı. İade kargosu hazırlanıyor.';
+    const reject = 'Talebiniz tarafımızca uygun bulunmadı, ürün açıklamayla uyumlu.';
+
+    const decided = {
+      sellerResponse: approve,
+      decidedBy: sellerId,
+      decidedAt: plus(0.5),
+      returnShippingPayer: ReturnShippingPayer.seller,
+    };
+    const returnOpened = {
+      ...decided,
+      returnProvider: 'surat',
+      returnTrackingNumber: trackingNo,
+      returnCreatedAt: plus(1),
+    };
+
+    switch (status) {
+      case RefundRequestStatus.pending_review:
+        return {}; // satıcı henüz yanıt vermedi
+      case RefundRequestStatus.approved:
+      case RefundRequestStatus.wait_for_delivery:
+        return decided;
+      case RefundRequestStatus.return_shipment_open:
+        return { ...returnOpened, returnStatus: ShipmentStatus.label_created };
+      case RefundRequestStatus.return_in_transit:
+        return {
+          ...returnOpened,
+          returnShippedAt: plus(1.5),
+          returnStatus: ShipmentStatus.in_transit,
+        };
+      case RefundRequestStatus.return_delivered:
+        return {
+          ...returnOpened,
+          returnShippedAt: plus(1.5),
+          returnDeliveredAt: plus(3),
+          returnStatus: ShipmentStatus.delivered,
+        };
+      case RefundRequestStatus.disputed:
+        return { sellerResponse: reject }; // admin kararı bekleniyor (decidedBy yok)
+      case RefundRequestStatus.rejected:
+        return { sellerResponse: reject, decidedBy: sellerId, decidedAt: plus(0.5) };
+      case RefundRequestStatus.cancelled:
+        return {}; // alıcı talebi iptal etti
+      case RefundRequestStatus.refunded:
+        return {
+          ...returnOpened,
+          returnShippedAt: plus(1.5),
+          returnDeliveredAt: plus(3),
+          returnStatus: ShipmentStatus.returned,
+          refundedAt: plus(4),
+          providerRefundId: `REFUND-${randomUUID().substring(0, 8)}`,
+        };
+      default:
+        return {};
+    }
+  };
+
+  // Her RefundRequestStatus için en az bir senaryo; refunded'lar Payment.refunded eşleniğiyle.
+  const refundScenarios: {
+    status: RefundRequestStatus;
+    reason: RefundReason;
+    description: string;
+    daysAgo: number;
+    orderStatus: OrderStatus;
+  }[] = [
+    { status: RefundRequestStatus.pending_review, reason: RefundReason.not_as_described, description: 'Ürün açıklamadakinden farklı, beklediğim gibi değil.', daysAgo: 1, orderStatus: OrderStatus.delivered },
+    { status: RefundRequestStatus.pending_review, reason: RefundReason.damaged, description: 'Kargo sırasında hasar görmüş, kutusu ezilmiş.', daysAgo: 2, orderStatus: OrderStatus.delivered },
+    { status: RefundRequestStatus.approved, reason: RefundReason.wrong_item, description: 'Yanlış ürün gönderilmiş, farklı bir model geldi.', daysAgo: 4, orderStatus: OrderStatus.delivered },
+    { status: RefundRequestStatus.wait_for_delivery, reason: RefundReason.changed_mind, description: 'Fikrim değişti, ürünü iade etmek istiyorum.', daysAgo: 5, orderStatus: OrderStatus.delivered },
+    { status: RefundRequestStatus.return_shipment_open, reason: RefundReason.missing_parts, description: 'Eksik parça var, set tam değil.', daysAgo: 6, orderStatus: OrderStatus.delivered },
+    { status: RefundRequestStatus.return_in_transit, reason: RefundReason.not_as_described, description: 'Renk fotoğraftakinden çok farklı çıktı.', daysAgo: 8, orderStatus: OrderStatus.delivered },
+    { status: RefundRequestStatus.return_delivered, reason: RefundReason.damaged, description: 'Ürün arızalı çıktı, çalışmıyor.', daysAgo: 10, orderStatus: OrderStatus.delivered },
+    { status: RefundRequestStatus.disputed, reason: RefundReason.counterfeit, description: 'Ürünün orijinal olduğundan şüpheliyim, admin incelemesi istiyorum.', daysAgo: 7, orderStatus: OrderStatus.delivered },
+    { status: RefundRequestStatus.rejected, reason: RefundReason.changed_mind, description: 'Vazgeçtim ama satıcı iade talebini kabul etmedi.', daysAgo: 12, orderStatus: OrderStatus.completed },
+    { status: RefundRequestStatus.cancelled, reason: RefundReason.other, description: 'Talebi yanlışlıkla açtım, iptal ediyorum.', daysAgo: 9, orderStatus: OrderStatus.delivered },
+    { status: RefundRequestStatus.refunded, reason: RefundReason.not_as_described, description: 'Ürün açıklamayla uyuşmuyordu, iade tamamlandı.', daysAgo: 14, orderStatus: OrderStatus.completed },
+    { status: RefundRequestStatus.refunded, reason: RefundReason.damaged, description: 'Hasarlı ürün, ücret iadesi yapıldı.', daysAgo: 18, orderStatus: OrderStatus.completed },
+    { status: RefundRequestStatus.refunded, reason: RefundReason.lost_in_transit, description: 'Kargo kayboldu, ödeme iade edildi.', daysAgo: 22, orderStatus: OrderStatus.completed },
+  ];
+
+  const refundRequests: any[] = [];
+  let refundedPaymentCount = 0;
+
+  for (let i = 0; i < refundScenarios.length; i++) {
+    const sc = refundScenarios[i];
+    const product = activeProducts[i % activeProducts.length];
+    if (!product) continue;
+    const candidateBuyers = users.filter(u => u.id !== product.sellerId);
+    if (candidateBuyers.length === 0) continue;
+    const buyer = candidateBuyers[i % candidateBuyers.length];
+    const buyerAddress = addresses.find(a => a.userId === buyer.id);
+
+    const subtotal = Number(product.price);
+    const shippingCost = 30;
+    const totalAmount = subtotal + shippingCost;
+    const commission = subtotal * 0.05;
+    const createdAt = daysAgoDate(sc.daysAgo);
+    const isCompleted = sc.orderStatus === OrderStatus.completed;
+    const isRefunded = sc.status === RefundRequestStatus.refunded;
+
+    try {
+      const order = await prisma.order.create({
+        data: {
+          orderNumber: generateOrderNumber(),
+          buyerId: buyer.id,
+          sellerId: product.sellerId,
+          productId: product.id,
+          totalAmount,
+          subtotal,
+          shippingCost,
+          commissionAmount: commission,
+          status: sc.orderStatus,
+          paymentExpiresAt: new Date(createdAt.getTime() + 24 * 60 * 60 * 1000),
+          deliveredAt: new Date(createdAt.getTime() + 3 * 86400000),
+          completedAt: isCompleted ? new Date(createdAt.getTime() + 5 * 86400000) : null,
+          shippingAddress: buyerAddress ? {
+            fullName: buyerAddress.fullName,
+            phone: buyerAddress.phone,
+            city: buyerAddress.city,
+            district: buyerAddress.district,
+            address: buyerAddress.address,
+          } : undefined,
+          createdAt,
+        },
+      });
+
+      // İade tamamlandıysa Payment.refunded → "İade Geçmişi" sayfasını besler.
+      await prisma.payment.create({
+        data: {
+          orderId: order.id,
+          provider: 'paytr',
+          providerPaymentId: `PAY-${randomUUID().substring(0, 8)}`,
+          amount: totalAmount,
+          currency: 'TRY',
+          status: isRefunded ? PaymentStatus.refunded : PaymentStatus.completed,
+          paidAt: new Date(createdAt.getTime() + 3600000),
+          // İade geçmişi updatedAt'i "iade tarihi" olarak gösterir.
+          updatedAt: isRefunded ? new Date(createdAt.getTime() + 4 * 86400000) : undefined,
+        },
+      });
+      if (isRefunded) refundedPaymentCount++;
+
+      // Teslim edilmiş kargo (detay/iade akışı tutarlılığı için).
+      await prisma.shipment.create({
+        data: {
+          orderId: order.id,
+          provider: 'surat',
+          trackingNumber: `SURAT${Math.random().toString().substring(2, 14)}`,
+          trackingUrl: 'https://www.suratkargo.com.tr/KargoTakip/?kargotakipno=',
+          status: ShipmentStatus.delivered,
+          shippedAt: new Date(createdAt.getTime() + 86400000),
+          deliveredAt: new Date(createdAt.getTime() + 3 * 86400000),
+        },
+      });
+
+      const refundRequest = await prisma.refundRequest.create({
+        data: {
+          refundNumber: generateRefundNumber(),
+          orderId: order.id,
+          requesterId: buyer.id,
+          reason: sc.reason,
+          description: sc.description,
+          amount: totalAmount,
+          status: sc.status,
+          createdAt,
+          ...buildRefundFields(sc.status, product.sellerId, createdAt),
+        },
+      });
+      refundRequests.push(refundRequest);
+    } catch (e: any) {
+      console.error(`⚠️ Refund scenario ${sc.status} failed:`, e?.message);
+    }
+  }
+
+  console.log(`✅ Created ${refundRequests.length} refund requests (${refundedPaymentCount} refunded payments)`);
 
   // ==========================================================================
   // 18. Create Trades (15+ trades in various states)
@@ -1636,6 +1929,154 @@ async function main() {
   }
 
   console.log(`✅ Created ${trades.length} trades`);
+
+  // ==========================================================================
+  // 18b. Create Trade Shipments — populates the "Takas Kargoları" admin page
+  // Mirrors the escrow legs the real flow produces (admin.service.ts):
+  //   to_warehouse   : user → Tarodan deposu (recipientType 'warehouse')
+  //   from_warehouse : depo → kullanıcı (shipper = admin, recipientType 'user')
+  //   return         : depo → asıl sahip (iade)
+  // ==========================================================================
+  console.log('Creating trade shipments...');
+
+  const tsCarriers = ['surat'];
+  const tsTracking = (carrier: string) =>
+    `${carrier.toUpperCase()}${Math.random().toString().substring(2, 14)}`;
+  const tsAddrOf = (userId: string) =>
+    addresses.find((a) => a.userId === userId)?.id ?? null;
+
+  // Statuses that imply the parcel has physically moved (→ shippedAt set).
+  const tsMoved = new Set<ShipmentStatus>([
+    ShipmentStatus.picked_up,
+    ShipmentStatus.in_transit,
+    ShipmentStatus.at_delivery_branch,
+    ShipmentStatus.out_for_delivery,
+    ShipmentStatus.delivered,
+    ShipmentStatus.failed,
+    ShipmentStatus.return_in_progress,
+    ShipmentStatus.returned,
+  ]);
+  const tsDelivered = new Set<ShipmentStatus>([
+    ShipmentStatus.delivered,
+    ShipmentStatus.returned,
+  ]);
+
+  // Build a single shipment payload with status-appropriate dates / tracking.
+  const tsBuild = (
+    trade: any,
+    idx: number,
+    opts: {
+      shipperId: string;
+      status: ShipmentStatus;
+      leg: 'to_warehouse' | 'from_warehouse' | 'return';
+      recipientUserId: string | null;
+    },
+  ) => {
+    const carrier = tsCarriers[idx % tsCarriers.length];
+    const fromWarehouse = opts.leg !== 'to_warehouse';
+    const shippedAt = tsMoved.has(opts.status) ? randomPastDate(8) : null;
+    const deliveredAt =
+      tsDelivered.has(opts.status) && shippedAt
+        ? new Date(shippedAt.getTime() + 2 * 86400000)
+        : null;
+    return {
+      tradeId: trade.id,
+      shipperId: opts.shipperId,
+      fromAddressId: fromWarehouse ? warehouseAddress.id : tsAddrOf(opts.shipperId),
+      carrier,
+      // pending = etiket henüz yok; sonraki tüm durumlarda takip no mevcut.
+      trackingNumber:
+        opts.status === ShipmentStatus.pending ? null : tsTracking(carrier),
+      status: opts.status,
+      shippedAt,
+      deliveredAt,
+      confirmedAt:
+        fromWarehouse && opts.status === ShipmentStatus.delivered && deliveredAt
+          ? new Date(deliveredAt.getTime() + 86400000)
+          : null,
+      leg: opts.leg,
+      recipientType: fromWarehouse ? 'user' : 'warehouse',
+      recipientUserId: opts.recipientUserId,
+    };
+  };
+
+  const tsData: any[] = [];
+
+  // Pass A — realistic shipments derived from each trade's status.
+  trades.forEach((trade, idx) => {
+    switch (trade.status) {
+      case TradeStatus.accepted:
+        // Etiketler oluştu, taraflar henüz kargoya vermedi.
+        tsData.push(
+          tsBuild(trade, idx, { shipperId: trade.initiatorId, status: ShipmentStatus.label_created, leg: 'to_warehouse', recipientUserId: null }),
+          tsBuild(trade, idx, { shipperId: trade.receiverId, status: ShipmentStatus.label_created, leg: 'to_warehouse', recipientUserId: null }),
+        );
+        break;
+      case TradeStatus.initiator_shipped:
+        // Başlatan depoya yolladı, alıcı henüz beklemede.
+        tsData.push(
+          tsBuild(trade, idx, { shipperId: trade.initiatorId, status: ShipmentStatus.in_transit, leg: 'to_warehouse', recipientUserId: null }),
+          tsBuild(trade, idx, { shipperId: trade.receiverId, status: ShipmentStatus.pending, leg: 'to_warehouse', recipientUserId: null }),
+        );
+        break;
+      case TradeStatus.both_shipped:
+        // Her iki ürün de depoya ulaştı.
+        tsData.push(
+          tsBuild(trade, idx, { shipperId: trade.initiatorId, status: ShipmentStatus.delivered, leg: 'to_warehouse', recipientUserId: null }),
+          tsBuild(trade, idx, { shipperId: trade.receiverId, status: ShipmentStatus.delivered, leg: 'to_warehouse', recipientUserId: null }),
+        );
+        break;
+      case TradeStatus.completed:
+        // Tam yaşam döngüsü: depoya geliş + alıcılara teslim.
+        tsData.push(
+          tsBuild(trade, idx, { shipperId: trade.initiatorId, status: ShipmentStatus.delivered, leg: 'to_warehouse', recipientUserId: null }),
+          tsBuild(trade, idx, { shipperId: trade.receiverId, status: ShipmentStatus.delivered, leg: 'to_warehouse', recipientUserId: null }),
+          tsBuild(trade, idx, { shipperId: superAdmin.id, status: ShipmentStatus.delivered, leg: 'from_warehouse', recipientUserId: trade.initiatorId }),
+          tsBuild(trade, idx, { shipperId: superAdmin.id, status: ShipmentStatus.delivered, leg: 'from_warehouse', recipientUserId: trade.receiverId }),
+        );
+        break;
+      default:
+        // pending / rejected → henüz kargo yok.
+        break;
+    }
+  });
+
+  // Pass B — backfill so every status + leg appears and all admin filters return rows.
+  if (trades.length > 0) {
+    const tsBackfill: Array<{ status: ShipmentStatus; leg: 'to_warehouse' | 'from_warehouse' | 'return' }> = [
+      { status: ShipmentStatus.picked_up, leg: 'to_warehouse' },
+      { status: ShipmentStatus.at_delivery_branch, leg: 'from_warehouse' },
+      { status: ShipmentStatus.out_for_delivery, leg: 'from_warehouse' },
+      { status: ShipmentStatus.failed, leg: 'from_warehouse' },
+      { status: ShipmentStatus.return_in_progress, leg: 'return' },
+      { status: ShipmentStatus.returned, leg: 'return' },
+      { status: ShipmentStatus.cancelled, leg: 'to_warehouse' },
+    ];
+    tsBackfill.forEach((b, k) => {
+      const trade = trades[k % trades.length];
+      const warehouseLeg = b.leg === 'to_warehouse';
+      tsData.push(
+        tsBuild(trade, k, {
+          shipperId: warehouseLeg ? trade.initiatorId : superAdmin.id,
+          status: b.status,
+          leg: b.leg,
+          recipientUserId: warehouseLeg ? null : trade.receiverId,
+        }),
+      );
+    });
+  }
+
+  let tsCreated = 0;
+  for (const data of tsData) {
+    try {
+      await prisma.tradeShipment.create({ data });
+      tsCreated++;
+    } catch (e) {
+      // Ignore individual failures (e.g. missing optional refs)
+    }
+  }
+
+  console.log(`✅ Created ${tsCreated} trade shipments`);
 
   // ==========================================================================
   // 19. Create Messages/Conversations
@@ -1764,53 +2205,162 @@ async function main() {
   // ==========================================================================
   console.log('Creating support tickets...');
 
-  const ticketTemplates = [
-    { cat: TicketCategory.payment, subj: 'Ödeme başarısız oldu', pri: TicketPriority.high },
-    { cat: TicketCategory.shipping, subj: 'Kargom nerede?', pri: TicketPriority.medium },
-    { cat: TicketCategory.trade, subj: 'Takas anlaşmazlığı', pri: TicketPriority.high },
-    { cat: TicketCategory.account, subj: 'Şifre sıfırlama sorunu', pri: TicketPriority.medium },
-    { cat: TicketCategory.product, subj: 'Ürün açıklamasıyla uyuşmuyor', pri: TicketPriority.high },
-    { cat: TicketCategory.technical, subj: 'Uygulama çöküyor', pri: TicketPriority.urgent },
-    { cat: TicketCategory.other, subj: 'Genel soru', pri: TicketPriority.low },
+  // Senaryo tabanlı ticket şablonları — her kategori ve durumdan gerçekçi örnek
+  const ticketScenarios: Array<{
+    cat: TicketCategory;
+    subj: string;
+    pri: TicketPriority;
+    status: TicketStatus;
+    messages: Array<{ fromAdmin: boolean; content: string; isInternal?: boolean }>;
+  }> = [
+    {
+      cat: TicketCategory.payment,
+      subj: 'Ödeme başarısız oldu ama kartımdan para çekildi',
+      pri: TicketPriority.urgent,
+      status: TicketStatus.in_progress,
+      messages: [
+        { fromAdmin: false, content: 'Merhaba, sipariş #ORD-00123 için ödeme yapmaya çalıştım. Banka hesabımdan 450 TL çekildi ancak sipariş "Ödeme Bekleniyor" durumunda kalmaya devam ediyor. Ne yapmalıyım?' },
+        { fromAdmin: true, content: 'Merhaba, başvurunuzu aldık. Ödeme işleminizi sistemimizden inceliyoruz. Bankanızın referans numarasını paylaşabilir misiniz?', isInternal: false },
+        { fromAdmin: true, content: 'Ödeme gateway logları kontrol edildi. İşlem 14:32\'de alındı ancak sipariş sistemine yansımamış. Teknik ekibe iletildi.', isInternal: true },
+      ],
+    },
+    {
+      cat: TicketCategory.shipping,
+      subj: 'Kargom 10 gündür teslim edilmedi',
+      pri: TicketPriority.high,
+      status: TicketStatus.waiting_customer,
+      messages: [
+        { fromAdmin: false, content: 'Merhaba, 10 gün önce satın aldığım ürün hâlâ gelmedi. Takip numarası: SRT-887654321. Sürat Kargo sitesinde "Dağıtıma Çıktı" yazıyor ama teslim edilmiyor.' },
+        { fromAdmin: true, content: 'Merhaba, kargo takip numaranızı kontrol ettik. Sürat Kargo\'ya başvuruldu. Teslimat adresinizde kapıcı veya güvenlik görevlisi var mı? Bazen bırıakma notu bırakılıyor.', isInternal: false },
+        { fromAdmin: false, content: 'Evet, kapıcı var ama not bırakılmamış. Komşulara da sormadım, sorayım.' },
+        { fromAdmin: true, content: 'Lütfen komşularınızı kontrol edin ve bize geri dönün. Çözülmezse kargo firmasına resmi kayıp bildirimi açacağız.', isInternal: false },
+      ],
+    },
+    {
+      cat: TicketCategory.trade,
+      subj: 'Takas teklifim kabul edildi ama ürün gönderilmedi',
+      pri: TicketPriority.high,
+      status: TicketStatus.in_progress,
+      messages: [
+        { fromAdmin: false, content: 'Kullanıcı "ahmet_koleksiyoncu" ile takas anlaştık. 5 gün önce teklifim kabul edildi. Ben kendi ürünümü gönderdim ve teslim alındı (kargo takibi var) ama karşı taraf hâlâ göndermedi. Yardımcı olur musunuz?' },
+        { fromAdmin: true, content: 'Merhaba, takas talebinizi aldık. Takas ID\'nizi (TRD-XXXXX formatında) paylaşabilir misiniz?', isInternal: false },
+        { fromAdmin: true, content: 'Kullanıcı ahmet_koleksiyoncu 3 benzer şikayetle işaretlenmiş. Hesap incelemeye alındı.', isInternal: true },
+        { fromAdmin: false, content: 'Takas numarası: TRD-1A2B3C4D. Teşekkürler.' },
+        { fromAdmin: true, content: 'Takas kaydınızı inceledik. Karşı tarafla iletişime geçildi; 48 saat içinde göndermezse takas iptal edilerek ürününüz iade sürecine alınacak.', isInternal: false },
+      ],
+    },
+    {
+      cat: TicketCategory.account,
+      subj: 'İki faktörlü doğrulama kodunu almıyorum',
+      pri: TicketPriority.medium,
+      status: TicketStatus.resolved,
+      messages: [
+        { fromAdmin: false, content: 'Hesabıma giriş yapmaya çalışıyorum ama SMS kodu gelmiyor. Telefon numaram doğru: 0532 *** **45. Spam klasörünü de kontrol ettim, yok.' },
+        { fromAdmin: true, content: 'Merhaba, SMS gönderim loglarını kontrol ettik. Operatör kaynaklı gecikme gözüküyor. Alternatif olarak e-posta ile doğrulama yapmak ister misiniz?', isInternal: false },
+        { fromAdmin: false, content: 'Evet, e-posta ile olabilir.' },
+        { fromAdmin: true, content: 'E-posta doğrulama bağlantısı gönderildi. Lütfen gelen kutunuzu (spam dahil) kontrol edin.', isInternal: false },
+        { fromAdmin: false, content: 'Geldi, giriş yapabildim. Çok teşekkürler!' },
+        { fromAdmin: true, content: 'Rica ederiz. Başka sorunuz olursa yardımcı olmaktan memnuniyet duyarız.', isInternal: false },
+      ],
+    },
+    {
+      cat: TicketCategory.product,
+      subj: 'Ürün açıklamasıyla gerçek hali uyuşmuyor',
+      pri: TicketPriority.high,
+      status: TicketStatus.open,
+      messages: [
+        { fromAdmin: false, content: 'Aldığım 1:18 ölçekli Porsche 911 modeli ilan fotoğraflarında "mint condition, orijinal kutu" yazıyordu. Ancak ürün hasarlı geldi ve kutusuz. Fotoğraf ekledim: [ek-1.jpg, ek-2.jpg]. İade veya tam tazminat istiyorum.' },
+      ],
+    },
+    {
+      cat: TicketCategory.technical,
+      subj: 'Mobil uygulamada ödeme sayfası açılmıyor',
+      pri: TicketPriority.urgent,
+      status: TicketStatus.in_progress,
+      messages: [
+        { fromAdmin: false, content: 'iPhone 14 Pro, iOS 17.4 kullanıyorum. Uygulama v2.3.1. Ödeme sayfasına geçince uygulama aniden kapanıyor. 3 kez denedim, hep aynı. Satın almayı tamamlayamıyorum.' },
+        { fromAdmin: true, content: 'Merhaba, bildirdiğiniz için teşekkürler. Bu sorunu geliştirme ekibimize bildirdik. Geçici çözüm olarak web tarayıcısı (Safari/Chrome) üzerinden satın alma işlemini gerçekleştirebilirsiniz.', isInternal: false },
+        { fromAdmin: true, content: 'iOS crash log alındı. Ödeme iframe\'inde WKWebView hatası. Bir sonraki patch\'te düzelecek. Öncelik: P1.', isInternal: true },
+      ],
+    },
+    {
+      cat: TicketCategory.other,
+      subj: 'Satıcı hesabı başvurusu hakkında bilgi almak istiyorum',
+      pri: TicketPriority.low,
+      status: TicketStatus.closed,
+      messages: [
+        { fromAdmin: false, content: 'Merhaba, koleksiyonumun bir kısmını satmak istiyorum. Satıcı hesabı başvurusu nasıl yapılıyor ve onay süreci ne kadar sürüyor?' },
+        { fromAdmin: true, content: 'Merhaba! Satıcı başvurusu için profil sayfanızdaki "Satıcı Ol" butonuna tıklayabilirsiniz. Belgelerinizi (kimlik + IBAN) yükledikten sonra genellikle 1-3 iş günü içinde inceleme tamamlanır.', isInternal: false },
+        { fromAdmin: false, content: 'Anladım, teşekkürler. Hemen başvuracağım.' },
+        { fromAdmin: true, content: 'Başarılar! Başvurunuzu aldığımızda size e-posta ile bilgi vereceğiz. Başka sorunuz olursa tekrar yazabilirsiniz.', isInternal: false },
+      ],
+    },
+    {
+      cat: TicketCategory.payment,
+      subj: 'Yanlış tutarda fatura kesildi',
+      pri: TicketPriority.medium,
+      status: TicketStatus.open,
+      messages: [
+        { fromAdmin: false, content: 'Sipariş toplam tutarım 1.250 TL iken faturamda 1.450 TL yazıyor. Aradaki 200 TL fark nereden kaynaklanıyor? Faturamı düzeltmenizi talep ediyorum.' },
+      ],
+    },
+    {
+      cat: TicketCategory.shipping,
+      subj: 'Yanlış adrese gönderim yapıldı',
+      pri: TicketPriority.high,
+      status: TicketStatus.waiting_customer,
+      messages: [
+        { fromAdmin: false, content: 'Siparişim eski adresime gönderilmiş. Adres değişikliğini sipariş onayından önce yaptım ama sanırım sisteme işlenmedi. Ürünü nasıl alabilirim?' },
+        { fromAdmin: true, content: 'Merhaba, kargo firmasına iade talimatı verildi. Paket depoya döndükten sonra doğru adresinize tekrar göndereceğiz. Yeni adresinizi onaylayabilir misiniz?', isInternal: false },
+        { fromAdmin: false, content: 'Yeni adresim: Kadıköy, Moda Cad. No:45/3, 34710 İstanbul.' },
+        { fromAdmin: true, content: 'Adresinizi güncelledik. Paket depoya ulaştığında (tahminen 2-3 iş günü) size tekrar bilgilendirme yapacağız.', isInternal: false },
+      ],
+    },
+    {
+      cat: TicketCategory.account,
+      subj: 'Hesabım sebepsiz askıya alındı',
+      pri: TicketPriority.high,
+      status: TicketStatus.open,
+      messages: [
+        { fromAdmin: false, content: 'Bugün sisteme giriş yapamadım ve "Hesabınız askıya alınmıştır" mesajı aldım. Herhangi bir kural ihlali yapmadım, neden askıya alındığını anlamıyorum. Acil yardım lütfen.' },
+      ],
+    },
   ];
 
   const tickets: any[] = [];
-  for (let i = 0; i < 15; i++) {
-    const template = ticketTemplates[i % ticketTemplates.length];
+  for (let i = 0; i < ticketScenarios.length; i++) {
+    const scenario = ticketScenarios[i];
     const user = users[3 + (i % (users.length - 3))];
-    const status = [TicketStatus.open, TicketStatus.in_progress, TicketStatus.waiting_customer, TicketStatus.resolved, TicketStatus.closed][Math.floor(Math.random() * 5)];
+    const isResolved = scenario.status === TicketStatus.resolved || scenario.status === TicketStatus.closed;
 
     try {
+      const createdAt = randomPastDate(20);
       const ticket = await prisma.supportTicket.create({
         data: {
           ticketNumber: generateTicketNumber(),
           creatorId: user.id,
-          assigneeId: status !== TicketStatus.open ? moderator.id : null,
-          category: template.cat,
-          priority: template.pri,
-          status: status,
-          subject: `${template.subj} #${i + 1}`,
-          resolvedAt: status === TicketStatus.resolved || status === TicketStatus.closed ? randomPastDate(2) : null,
-          closedAt: status === TicketStatus.closed ? randomPastDate(1) : null,
-          createdAt: randomPastDate(14),
+          assigneeId: scenario.status !== TicketStatus.open ? moderator.id : null,
+          category: scenario.cat,
+          priority: scenario.pri,
+          status: scenario.status,
+          subject: scenario.subj,
+          resolvedAt: isResolved ? randomPastDate(2) : null,
+          closedAt: scenario.status === TicketStatus.closed ? randomPastDate(1) : null,
+          createdAt,
         },
       });
 
-      // Add messages to ticket
-      await prisma.ticketMessage.create({
-        data: {
-          ticketId: ticket.id,
-          senderId: user.id,
-          content: `Merhaba, ${template.subj.toLowerCase()} konusunda yardıma ihtiyacım var. Lütfen en kısa sürede dönüş yapabilir misiniz?`,
-        },
-      });
-
-      if (status !== TicketStatus.open) {
+      // Mesajları zaman sırasıyla ekle
+      for (let m = 0; m < scenario.messages.length; m++) {
+        const msg = scenario.messages[m];
+        const msgDate = new Date(createdAt.getTime() + (m + 1) * 3_600_000); // her mesaj 1 saat arayla
         await prisma.ticketMessage.create({
           data: {
             ticketId: ticket.id,
-            senderId: moderator.id,
-            content: 'Merhaba, talebinizi aldık. İnceliyoruz ve en kısa sürede size dönüş yapacağız.',
+            senderId: msg.fromAdmin ? moderator.id : user.id,
+            content: msg.content,
+            isInternal: msg.isInternal ?? false,
+            createdAt: msgDate,
           },
         });
       }
@@ -1821,26 +2371,167 @@ async function main() {
     }
   }
 
+  // Ek: kısa konuşmalı basit biletler (hacim için)
+  const simpleTemplates = [
+    { cat: TicketCategory.trade, subj: 'Takas fiyatı konusunda anlaşamadık', pri: TicketPriority.low },
+    { cat: TicketCategory.technical, subj: 'Fotoğraf yükleme çalışmıyor', pri: TicketPriority.medium },
+    { cat: TicketCategory.product, subj: 'İlan onayı ne zaman gelecek?', pri: TicketPriority.low },
+    { cat: TicketCategory.other, subj: 'Kampanya kodu çalışmıyor', pri: TicketPriority.medium },
+    { cat: TicketCategory.shipping, subj: 'Kargo bedelini satıcı mı öder?', pri: TicketPriority.low },
+  ];
+  for (let i = 0; i < simpleTemplates.length; i++) {
+    const tpl = simpleTemplates[i];
+    const user = users[3 + ((i + ticketScenarios.length) % (users.length - 3))];
+    const status = i % 3 === 0 ? TicketStatus.open : TicketStatus.in_progress;
+    try {
+      const createdAt = randomPastDate(7);
+      const ticket = await prisma.supportTicket.create({
+        data: {
+          ticketNumber: generateTicketNumber(),
+          creatorId: user.id,
+          assigneeId: status !== TicketStatus.open ? moderator.id : null,
+          category: tpl.cat,
+          priority: tpl.pri,
+          status,
+          subject: tpl.subj,
+          createdAt,
+        },
+      });
+      await prisma.ticketMessage.create({
+        data: {
+          ticketId: ticket.id,
+          senderId: user.id,
+          content: `Merhaba, "${tpl.subj.toLowerCase()}" konusunda yardıma ihtiyacım var.`,
+          createdAt: new Date(createdAt.getTime() + 300_000),
+        },
+      });
+      if (status !== TicketStatus.open) {
+        await prisma.ticketMessage.create({
+          data: {
+            ticketId: ticket.id,
+            senderId: moderator.id,
+            content: 'Merhaba, talebinizi aldık. İnceliyoruz ve kısa sürede dönüş yapacağız.',
+            createdAt: new Date(createdAt.getTime() + 7_200_000),
+          },
+        });
+      }
+      tickets.push(ticket);
+    } catch (e) {
+      // Ignore errors
+    }
+  }
+
   console.log(`✅ Created ${tickets.length} support tickets`);
 
   // ==========================================================================
-  // 21b. Create Static Pages (About, FAQ)
+  // 21b. Create Static Pages
   // ==========================================================================
-  if (prisma.staticPage) {
-    console.log('Creating static pages...');
-    const pages = [
-      { slug: 'about', title: 'Hakkımızda', content: '<h1>Hakkımızda</h1><p>Tarodan, Türkiye\'nin diecast model araba koleksiyoncuları için en büyük pazaryeridir.</p>', metaTitle: 'Hakkımızda | Tarodan', metaDescription: 'Tarodan hakkında bilgi edinin.', sortOrder: 0 },
-      { slug: 'faq', title: 'Sıkça Sorulan Sorular', content: '<h1>SSS</h1><p>Genel sorular ve cevaplar. Bu içerik admin panelinden düzenlenebilir.</p>', metaTitle: 'SSS | Tarodan', metaDescription: 'Sıkça sorulan sorular.', sortOrder: 1 },
-    ];
-    for (const p of pages) {
-      await (prisma as any).staticPage.upsert({
-        where: { slug: p.slug },
-        create: p,
-        update: { title: p.title, content: p.content, metaTitle: p.metaTitle, metaDescription: p.metaDescription, sortOrder: p.sortOrder },
-      });
-    }
-    console.log(`✅ Created ${pages.length} static pages`);
+  console.log('Creating static pages...');
+  const staticPageDefs = [
+    {
+      slug: 'about',
+      title: 'Hakkımızda',
+      content: '<h1>Hakkımızda</h1><p>Tarodan, Türkiye\'nin diecast model araba koleksiyoncuları için en büyük pazaryeridir.</p>',
+      metaTitle: 'Hakkımızda | Tarodan',
+      metaDescription: 'Tarodan hakkında bilgi edinin.',
+      sortOrder: 0,
+    },
+    {
+      slug: 'faq',
+      title: 'Sıkça Sorulan Sorular',
+      content: '<h1>SSS</h1><p>Genel sorular ve cevaplar. Bu içerik admin panelinden düzenlenebilir.</p>',
+      metaTitle: 'SSS | Tarodan',
+      metaDescription: 'Sıkça sorulan sorular.',
+      sortOrder: 1,
+    },
+    {
+      slug: 'privacy',
+      title: 'Gizlilik Politikası',
+      content: `<h1>Gizlilik Politikası</h1>
+<p><strong>Son güncelleme:</strong> Haziran 2026</p>
+<p>Tarodan olarak kişisel verilerinizin güvenliğine önem veriyoruz. Bu Gizlilik Politikası, tarodan.shop adresini ziyaret ettiğinizde hangi verileri topladığımızı, nasıl kullandığımızı ve koruduğumuzu açıklamaktadır.</p>
+<h2>1. Toplanan Veriler</h2>
+<ul>
+  <li><strong>Kimlik verileri:</strong> Ad, soyad, e-posta adresi, telefon numarası, doğum tarihi.</li>
+  <li><strong>İşlem verileri:</strong> Satın alma geçmişi, teklif ve takas kayıtları. Kart numaraları yalnızca PayTR altyapısında saklanır.</li>
+  <li><strong>Teknik veriler:</strong> IP adresi, tarayıcı türü, çerezler, sayfa görüntüleme istatistikleri.</li>
+  <li><strong>İletişim verileri:</strong> Platform içi mesajlar ve destek talepleri.</li>
+</ul>
+<h2>2. Verilerin Kullanım Amaçları</h2>
+<ul>
+  <li>Hesap oluşturma ve kimlik doğrulama.</li>
+  <li>Sipariş, kargo ve ödeme işlemlerinin yönetimi.</li>
+  <li>Müşteri desteği ve şikayet yönetimi.</li>
+  <li>Platform güvenliği ve sahteciliğin önlenmesi.</li>
+  <li>Yasal yükümlülüklerin yerine getirilmesi (KVKK).</li>
+</ul>
+<h2>3. KVKK Kapsamındaki Haklarınız</h2>
+<p>6698 sayılı Kişisel Verilerin Korunması Kanunu uyarınca verilerinize erişim, düzeltme, silme ve itiraz haklarına sahipsiniz.</p>
+<p>Talepleriniz için: <a href="mailto:kvkk@tarodan.com">kvkk@tarodan.com</a></p>
+<h2>4. İletişim</h2>
+<p><a href="mailto:destek@tarodan.com">destek@tarodan.com</a></p>`,
+      metaTitle: 'Gizlilik Politikası | Tarodan',
+      metaDescription: 'Tarodan gizlilik politikası ve KVKK aydınlatma metni.',
+      sortOrder: 2,
+    },
+    {
+      slug: 'terms',
+      title: 'Kullanım Koşulları',
+      content: `<h1>Kullanım Koşulları</h1>
+<p><strong>Son güncelleme:</strong> Haziran 2026</p>
+<p>Bu Kullanım Koşulları, tarodan.shop platformunu kullanan tüm kullanıcılar için geçerlidir. Platforma erişerek bu koşulları kabul etmiş sayılırsınız.</p>
+<h2>1. Hizmet Tanımı</h2>
+<p>Tarodan, diecast ve koleksiyon model araba alım-satım ve takas işlemlerini kolaylaştıran bir çevrimiçi pazar yeridir.</p>
+<h2>2. Üyelik Koşulları</h2>
+<ul>
+  <li>Üyelik için 18 yaşında veya daha büyük olmanız gerekmektedir.</li>
+  <li>Doğru ve güncel bilgiler sağlamakla yükümlüsünüz.</li>
+  <li>Hesap güvenliğinden siz sorumlusunuz.</li>
+</ul>
+<h2>3. İlan Verme Kuralları</h2>
+<ul>
+  <li>Yalnızca gerçekten sahip olduğunuz ürünleri listeleyebilirsiniz.</li>
+  <li>Yanıltıcı, sahte veya telif hakkı ihlali içeren ilanlar yasaktır.</li>
+  <li>Ürün durumu, fotoğraflar ve açıklama doğru olmalıdır.</li>
+</ul>
+<h2>4. Ödeme ve Güvence</h2>
+<p>Ödemeler PayTR güvenli ödeme altyapısı üzerinden gerçekleştirilir. Alıcının ödediği tutar, ürünün teslim edildiği doğrulanana kadar Tarodan güvencesinde bekletilir.</p>
+<h2>5. İptal ve İade</h2>
+<ul>
+  <li>Sipariş kargo öncesinde iptal edilebilir.</li>
+  <li>Teslim alınan ürün açıklamaya uymuyorsa 3 iş günü içinde iade talebi açılabilir.</li>
+</ul>
+<h2>6. İletişim</h2>
+<p><a href="mailto:destek@tarodan.com">destek@tarodan.com</a></p>`,
+      metaTitle: 'Kullanım Koşulları | Tarodan',
+      metaDescription: 'Tarodan platform kullanım koşulları ve üyelik sözleşmesi.',
+      sortOrder: 3,
+    },
+    {
+      slug: 'cookie-policy',
+      title: 'Çerez Politikası',
+      content: `<h1>Çerez Politikası</h1>
+<p><strong>Son güncelleme:</strong> Haziran 2026</p>
+<p>Tarodan olarak web sitemizde çerezler kullanmaktayız.</p>
+<h2>Zorunlu Çerezler</h2>
+<p>Oturum yönetimi ve güvenlik için gereklidir. Devre dışı bırakılamaz.</p>
+<h2>Analitik Çerezler</h2>
+<p>Kullanıcı davranışını anlamamıza yardımcı olur. Tarayıcı ayarlarınızdan devre dışı bırakılabilir.</p>
+<h2>Çerez Yönetimi</h2>
+<p>Tarayıcınızın ayarlar menüsünden veya sayfamızdaki "Çerez Ayarları" butonundan tercihlerinizi yönetebilirsiniz.</p>`,
+      metaTitle: 'Çerez Politikası | Tarodan',
+      metaDescription: 'Tarodan çerez politikası.',
+      sortOrder: 4,
+    },
+  ];
+  for (const p of staticPageDefs) {
+    await prisma.staticPage.upsert({
+      where: { slug: p.slug },
+      create: { ...p, isPublished: true },
+      update: { title: p.title, content: p.content, metaTitle: p.metaTitle, metaDescription: p.metaDescription, sortOrder: p.sortOrder, isPublished: true },
+    });
   }
+  console.log(`✅ Created/updated ${staticPageDefs.length} static pages`);
 
   // ==========================================================================
   // 22. Create Analytics Snapshots
@@ -1916,6 +2607,268 @@ async function main() {
   console.log(`✅ Created search indexes`);
 
   // ==========================================================================
+  // 24. Email Templates
+  // ==========================================================================
+  console.log('Creating email templates...');
+  const emailTemplates = [
+    {
+      key: 'welcome',
+      name: 'Hoş Geldiniz',
+      subject: 'Tarodan\'a Hoş Geldiniz, {{displayName}}!',
+      bodyHtml: `<h1>Merhaba {{displayName}},</h1>
+<p>Tarodan ailesine hoş geldiniz! Artık diecast model araba koleksiyonunuzu büyütmeye hazırsınız.</p>
+<p>Başlamak için: <a href="{{frontendUrl}}/listings">İlanları Keşfet</a></p>
+<p>İyi koleksiyonlar,<br>Tarodan Ekibi</p>`,
+      variablesJson: JSON.stringify(['displayName', 'frontendUrl']),
+    },
+    {
+      key: 'email_verification',
+      name: 'E-posta Doğrulama',
+      subject: 'E-posta Adresinizi Doğrulayın',
+      bodyHtml: `<h1>E-posta Doğrulama</h1>
+<p>Merhaba {{displayName}},</p>
+<p>Hesabınızı doğrulamak için aşağıdaki bağlantıya tıklayın:</p>
+<p><a href="{{verificationUrl}}">E-postamı Doğrula</a></p>
+<p>Bu bağlantı 24 saat geçerlidir. Talebi siz yapmadıysanız bu e-postayı görmezden gelebilirsiniz.</p>`,
+      variablesJson: JSON.stringify(['displayName', 'verificationUrl']),
+    },
+    {
+      key: 'password_reset',
+      name: 'Şifre Sıfırlama',
+      subject: 'Şifre Sıfırlama Talebi',
+      bodyHtml: `<h1>Şifre Sıfırlama</h1>
+<p>Merhaba {{displayName}},</p>
+<p>Şifrenizi sıfırlamak için aşağıdaki bağlantıya tıklayın:</p>
+<p><a href="{{resetUrl}}">Şifremi Sıfırla</a></p>
+<p>Bu bağlantı 1 saat geçerlidir. Talebi siz yapmadıysanız bu e-postayı görmezden gelebilirsiniz.</p>`,
+      variablesJson: JSON.stringify(['displayName', 'resetUrl']),
+    },
+    {
+      key: 'order_placed',
+      name: 'Sipariş Oluşturuldu',
+      subject: 'Siparişiniz Alındı — #{{orderNumber}}',
+      bodyHtml: `<h1>Siparişiniz Alındı!</h1>
+<p>Merhaba {{buyerName}},</p>
+<p><strong>#{{orderNumber}}</strong> numaralı siparişiniz başarıyla oluşturuldu.</p>
+<p>Ürün: {{productTitle}}</p>
+<p>Tutar: {{amount}} TL</p>
+<p>Sipariş durumunuzu takip etmek için: <a href="{{orderUrl}}">Siparişimi Görüntüle</a></p>`,
+      variablesJson: JSON.stringify(['buyerName', 'orderNumber', 'productTitle', 'amount', 'orderUrl']),
+    },
+    {
+      key: 'order_shipped',
+      name: 'Sipariş Kargoya Verildi',
+      subject: 'Siparişiniz Kargoya Verildi — #{{orderNumber}}',
+      bodyHtml: `<h1>Siparişiniz Yola Çıktı!</h1>
+<p>Merhaba {{buyerName}},</p>
+<p><strong>#{{orderNumber}}</strong> numaralı siparişiniz kargoya verildi.</p>
+<p>Kargo Firması: Sürat Kargo</p>
+<p>Takip No: <strong>{{trackingNumber}}</strong></p>
+<p><a href="{{trackingUrl}}">Kargomu Takip Et</a></p>`,
+      variablesJson: JSON.stringify(['buyerName', 'orderNumber', 'trackingNumber', 'trackingUrl']),
+    },
+    {
+      key: 'offer_received',
+      name: 'Yeni Teklif Alındı',
+      subject: '{{productTitle}} için yeni bir teklif aldınız',
+      bodyHtml: `<h1>Yeni Teklif!</h1>
+<p>Merhaba {{sellerName}},</p>
+<p><strong>{{buyerName}}</strong> adlı kullanıcı <strong>{{productTitle}}</strong> ilanınıza <strong>{{offerAmount}} TL</strong> teklif verdi.</p>
+<p><a href="{{offerUrl}}">Teklifi İncele</a></p>`,
+      variablesJson: JSON.stringify(['sellerName', 'buyerName', 'productTitle', 'offerAmount', 'offerUrl']),
+    },
+    {
+      key: 'trade_request',
+      name: 'Takas Talebi',
+      subject: 'Yeni Takas Talebi — {{productTitle}}',
+      bodyHtml: `<h1>Takas Talebi</h1>
+<p>Merhaba {{sellerName}},</p>
+<p><strong>{{requesterName}}</strong> adlı kullanıcı <strong>{{productTitle}}</strong> ilanınız için takas teklif etti.</p>
+<p><a href="{{tradeUrl}}">Takası İncele</a></p>`,
+      variablesJson: JSON.stringify(['sellerName', 'requesterName', 'productTitle', 'tradeUrl']),
+    },
+    {
+      key: 'payout_sent',
+      name: 'Ödeme Gönderildi',
+      subject: 'Satış geliriniz IBAN\'ınıza aktarıldı',
+      bodyHtml: `<h1>Ödemeniz Gönderildi</h1>
+<p>Merhaba {{sellerName}},</p>
+<p><strong>{{amount}} TL</strong> tutarındaki satış geliriniz IBAN\'ınıza aktarıldı.</p>
+<p>İşlem Tarihi: {{date}}</p>`,
+      variablesJson: JSON.stringify(['sellerName', 'amount', 'date']),
+    },
+  ];
+
+  for (const t of emailTemplates) {
+    await prisma.emailTemplate.upsert({
+      where: { key: t.key },
+      update: { name: t.name, subject: t.subject, bodyHtml: t.bodyHtml, variablesJson: t.variablesJson },
+      create: t,
+    });
+  }
+  console.log(`✅ Created/updated ${emailTemplates.length} email templates`);
+
+  // ==========================================================================
+  // 25. Discounts
+  // ==========================================================================
+  console.log('Creating discounts...');
+  const discountNow = new Date();
+  const inOneYear = new Date(discountNow.getFullYear() + 1, discountNow.getMonth(), discountNow.getDate());
+  const lastWeek = new Date(discountNow.getTime() - 7 * 24 * 60 * 60 * 1000);
+
+  const discounts = [
+    {
+      code: 'HOSGELDIN10',
+      name: 'Hoş Geldin İndirimi',
+      description: 'Yeni üyeler için ilk alışverişte %10 indirim',
+      type: 'percentage' as const,
+      value: 10,
+      scope: 'global' as const,
+      minCartValue: 100,
+      usageLimitTotal: 1000,
+      usageLimitPerUser: 1,
+      isActive: true,
+      startDate: discountNow,
+      endDate: inOneYear,
+      priority: 1,
+    },
+    {
+      code: 'TARODAN50',
+      name: '50 TL İndirim Kuponu',
+      description: '500 TL ve üzeri alışverişlerde 50 TL indirim',
+      type: 'fixed_amount' as const,
+      value: 50,
+      scope: 'global' as const,
+      minCartValue: 500,
+      usageLimitTotal: 500,
+      usageLimitPerUser: 1,
+      isActive: true,
+      startDate: discountNow,
+      endDate: inOneYear,
+      priority: 2,
+    },
+    {
+      code: 'DIECAST20',
+      name: 'Diecast Severlere %20',
+      description: 'Diecast kategorisinde %20 indirim',
+      type: 'percentage' as const,
+      value: 20,
+      scope: 'global' as const,
+      minCartValue: 200,
+      maxDiscountAmount: 300,
+      usageLimitTotal: 200,
+      usageLimitPerUser: 2,
+      isActive: true,
+      startDate: discountNow,
+      endDate: inOneYear,
+      priority: 3,
+    },
+    {
+      code: 'FLASHSALE',
+      name: 'Flash Satış',
+      description: 'Sınırlı süreli fırsat — %30 indirim',
+      type: 'percentage' as const,
+      value: 30,
+      scope: 'global' as const,
+      usageLimitTotal: 50,
+      usageLimitPerUser: 1,
+      isActive: false,
+      isFlashSale: true,
+      startDate: lastWeek,
+      endDate: discountNow,
+      priority: 10,
+    },
+  ];
+
+  for (const d of discounts) {
+    await prisma.discount.upsert({
+      where: { code: d.code },
+      update: { name: d.name, isActive: d.isActive },
+      create: d,
+    });
+  }
+  console.log(`✅ Created/updated ${discounts.length} discounts`);
+
+  // ==========================================================================
+  // 26. Advertisements
+  // ==========================================================================
+  console.log('Creating advertisements...');
+  const ads = [
+    {
+      title: 'Premium Koleksiyon — Yeni Gelenler',
+      imageUrl: 'https://amzn-tarodan.s3.eu-west-1.amazonaws.com/dev/ads/banner-premium.jpg',
+      linkUrl: '/listings?sortBy=created_desc',
+      altText: 'Yeni gelen premium diecast modeller',
+      position: 'header' as const,
+      deviceType: 'all' as const,
+      displayOrder: 1,
+      isActive: true,
+      startDate: discountNow,
+      endDate: inOneYear,
+    },
+    {
+      title: 'Hot Wheels Koleksiyonu',
+      imageUrl: 'https://amzn-tarodan.s3.eu-west-1.amazonaws.com/dev/ads/banner-hotwheels.jpg',
+      linkUrl: '/listings?manufacturer=Hot+Wheels',
+      altText: 'Hot Wheels model araba koleksiyonu',
+      position: 'sidebar' as const,
+      deviceType: 'desktop' as const,
+      displayOrder: 1,
+      isActive: true,
+      startDate: discountNow,
+      endDate: inOneYear,
+    },
+    {
+      title: 'İndirimli Ürünler',
+      content: 'Bu hafta özel fiyatlar — %30\'a varan indirim!',
+      linkUrl: '/listings?discountOnly=true',
+      altText: 'İndirimli model arabalar',
+      position: 'footer' as const,
+      deviceType: 'all' as const,
+      displayOrder: 1,
+      isActive: true,
+      startDate: discountNow,
+      endDate: inOneYear,
+    },
+  ];
+
+  for (const ad of ads) {
+    await prisma.advertisement.create({ data: ad }).catch(() => {/* skip duplicate */});
+  }
+  const adCount = await prisma.advertisement.count();
+  console.log(`✅ Created advertisements (total: ${adCount})`);
+
+  // ==========================================================================
+  // 27. Moderation Events (örnek AI denetim kayıtları)
+  // ==========================================================================
+  console.log('Creating moderation events...');
+  const sampleProducts = products.slice(0, 5);
+  const sampleUsers = users.slice(0, 4);
+
+  const moderationEvents = [
+    { entityType: 'product', entityId: sampleProducts[0]?.id, userId: sampleUsers[0]?.id, kind: 'image', field: 'product_image', decision: 'pass', relevanceScore: 0.95, nsfwScore: 0.01, labels: { diecast: 0.95, car: 0.92 } },
+    { entityType: 'product', entityId: sampleProducts[1]?.id, userId: sampleUsers[1]?.id, kind: 'image', field: 'product_image', decision: 'pass', relevanceScore: 0.88, nsfwScore: 0.02, labels: { model_car: 0.88, vehicle: 0.85 } },
+    { entityType: 'product', entityId: sampleProducts[2]?.id, userId: sampleUsers[2]?.id, kind: 'text', field: 'description', decision: 'review', relevanceScore: 0.55, nsfwScore: 0.05, reason: 'Düşük alaka skoru — manuel inceleme gerekiyor' },
+    { entityType: 'product', entityId: sampleProducts[3]?.id, userId: sampleUsers[3]?.id, kind: 'image', field: 'product_image', decision: 'flag', nsfwScore: 0.72, reason: 'Yüksek NSFW skoru — içerik politikasını ihlal edebilir' },
+    { entityType: 'user', entityId: sampleUsers[0]?.id, userId: sampleUsers[0]?.id, kind: 'image', field: 'avatar', decision: 'pass', relevanceScore: 0.90, nsfwScore: 0.01, labels: { person: 0.90 } },
+    { entityType: 'user', entityId: sampleUsers[1]?.id, userId: sampleUsers[1]?.id, kind: 'text', field: 'bio', decision: 'pass', relevanceScore: 0.80, nsfwScore: 0.00, reason: null },
+    { entityType: 'upload', entityId: null, userId: sampleUsers[2]?.id, kind: 'image', field: 'upload', decision: 'blocked', nsfwScore: 0.93, reason: 'Uygunsuz içerik — yükleme engellendi' },
+    { entityType: 'product', entityId: sampleProducts[4]?.id, userId: sampleUsers[0]?.id, kind: 'image', field: 'product_image', decision: 'pass', relevanceScore: 0.91, nsfwScore: 0.00, labels: { diecast: 0.91, sports_car: 0.87 } },
+  ];
+
+  const existingModCount = await prisma.moderationEvent.count();
+  if (existingModCount === 0) {
+    for (const ev of moderationEvents) {
+      if (ev.entityId || ev.entityType === 'upload') {
+        await prisma.moderationEvent.create({ data: ev as any });
+      }
+    }
+    console.log(`✅ Created ${moderationEvents.length} moderation events`);
+  } else {
+    console.log(`✅ Moderation events already exist (${existingModCount})`);
+  }
+
+  // ==========================================================================
   // Summary
   // ==========================================================================
   console.log('\n🎉 COMPREHENSIVE Database seed completed successfully!');
@@ -1933,6 +2886,7 @@ async function main() {
   console.log(`   - Collections: ${collections.length} (with covers)`);
   console.log(`   - Offers: ${offers.length}`);
   console.log(`   - Orders: ${orders.length}`);
+  console.log(`   - Refund Requests: ${refundRequests.length} (${refundedPaymentCount} refunded payments)`);
   console.log(`   - Trades: ${trades.length}`);
   console.log(`   - Conversations: ${conversations.length}`);
   console.log(`   - Support Tickets: ${tickets.length}`);

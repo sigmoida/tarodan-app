@@ -18,17 +18,11 @@ export class ShippingService {
 
   // Provider display names
   private readonly providerNames: Record<ShippingProvider, string> = {
-    [ShippingProvider.aras]: 'Aras Kargo',
-    [ShippingProvider.yurtici]: 'Yurtiçi Kargo',
-    [ShippingProvider.mng]: 'MNG Kargo',
     [ShippingProvider.surat]: 'Sürat Kargo',
   };
 
   // Base tracking URLs
   private readonly trackingUrls: Record<ShippingProvider, string> = {
-    [ShippingProvider.aras]: 'https://www.araskargo.com.tr/trs/trsTak662.aspx?kod=',
-    [ShippingProvider.yurtici]: 'https://www.yurticikargo.com/tr/online-servisler/gonderi-sorgula?code=',
-    [ShippingProvider.mng]: 'https://www.mngkargo.com.tr/gonderi-takip/?code=',
     [ShippingProvider.surat]: 'https://www.suratkargo.com.tr/KargoTakip/?kargotakipno=',
   };
 
@@ -118,7 +112,7 @@ export class ShippingService {
   async getRateByCity(city: string, carrier: string, weightKg: number): Promise<{ rate: number }> {
     const provider = Object.values(ShippingProvider).includes(carrier as ShippingProvider)
       ? (carrier as ShippingProvider)
-      : ShippingProvider.aras;
+      : ShippingProvider.surat;
     const weight = weightKg > 0 ? weightKg : 0.5;
     const fromCity = 'İstanbul'; // Default origin for rate calculation
     const toCity = city?.trim() || 'İstanbul';
@@ -139,9 +133,6 @@ export class ShippingService {
     const baseRate = baseSetting ? parseFloat(baseSetting.settingValue) : 29.99;
 
     const baseRates: Record<ShippingProvider, number> = {
-      [ShippingProvider.aras]: baseRate,
-      [ShippingProvider.yurtici]: baseRate,
-      [ShippingProvider.mng]: baseRate,
       [ShippingProvider.surat]: baseRate,
     };
 
@@ -266,7 +257,9 @@ export class ShippingService {
       throw new ForbiddenException('Bu kargoyu güncelleme yetkiniz yok');
     }
 
-    const trackingUrl = this.trackingUrls[shipment.provider as ShippingProvider] + dto.trackingNumber;
+    const trackingUrl =
+      (this.trackingUrls[shipment.provider as ShippingProvider] ??
+        this.trackingUrls[ShippingProvider.surat]) + dto.trackingNumber;
 
     return this.prisma.$transaction(async (tx) => {
       // Update shipment
@@ -336,6 +329,14 @@ export class ShippingService {
 
     const newStatus = statusMap[payload.status] || ShipmentStatus.in_transit;
 
+    // Y11: Teslimat işlemini shipping.worker ile TUTARLI yap. 48h penceresi açıkken
+    // (FEATURE_48H_CONFIRMATION_WINDOW), webhook yolu da hold'u ANINDA serbest bırakmamalı;
+    // siparişi awaiting_buyer_confirmation'a alıp 48h deadline koymalı (release, alıcı onayı
+    // veya autoConfirmExpiredReceipts ile olur). Eskiden webhook flag'i yok sayıp daima
+    // legacy davranıyordu → aynı teslimat olayı geldiği yola göre farklı sonuç veriyordu.
+    const use48h =
+      this.configService.get<string>('FEATURE_48H_CONFIRMATION_WINDOW') === 'true';
+
     const result = await this.prisma.$transaction(async (tx) => {
       // Update shipment status
       await tx.shipment.update({
@@ -356,20 +357,34 @@ export class ShippingService {
 
       // Update order status if delivered
       if (newStatus === ShipmentStatus.delivered) {
-        await tx.order.update({
-          where: { id: shipment.orderId },
-          data: {
-            status: OrderStatus.delivered,
-            version: { increment: 1 },
-          },
-        });
+        if (use48h) {
+          const deliveredAt = new Date();
+          await tx.order.update({
+            where: { id: shipment.orderId },
+            data: {
+              status: OrderStatus.awaiting_buyer_confirmation,
+              deliveredAt,
+              confirmationDeadline: new Date(deliveredAt.getTime() + 48 * 60 * 60 * 1000),
+              version: { increment: 1 },
+            },
+          });
+        } else {
+          await tx.order.update({
+            where: { id: shipment.orderId },
+            data: {
+              status: OrderStatus.delivered,
+              version: { increment: 1 },
+            },
+          });
+        }
       }
 
       return { status: 'ok' };
     });
 
-    // Release payment hold when order is marked delivered (after transaction commits)
-    if (newStatus === ShipmentStatus.delivered) {
+    // Hold'u yalnız LEGACY modda (48h kapalı) teslimatta anında serbest bırak. 48h modda
+    // release, alıcı onayı veya autoConfirmExpiredReceipts (deadline) ile yapılır — burada DEĞİL.
+    if (newStatus === ShipmentStatus.delivered && !use48h) {
       try {
         const released = await this.paymentService.releasePaymentIfHeld(shipment.orderId);
         if (released) {

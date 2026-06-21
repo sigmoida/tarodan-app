@@ -34,11 +34,8 @@ interface SupportTicket {
   category: string;
   priority: string;
   status: string;
-  creator: {
-    id: string;
-    displayName: string;
-    email: string;
-  };
+  creatorId: string;
+  creatorName: string;
   createdAt: string;
   updatedAt: string;
   messages?: TicketMessage[];
@@ -48,10 +45,8 @@ interface TicketMessage {
   id: string;
   content: string;
   isInternal: boolean;
-  sender: {
-    id: string;
-    displayName: string;
-  };
+  senderId: string;
+  senderName: string;
   createdAt: string;
 }
 
@@ -83,8 +78,22 @@ const CATEGORY_OPTIONS = [
   { value: "other", label: "Diğer" },
 ];
 
+interface GuestContact {
+  referenceNumber: string;
+  name: string;
+  email: string;
+  subject: string;
+  message: string;
+  createdAt: string;
+  status: string;
+}
+
 export default function SupportPage() {
+  const [activeTab, setActiveTab] = useState<'tickets' | 'guest'>('tickets');
   const [tickets, setTickets] = useState<SupportTicket[]>([]);
+  const [guestContacts, setGuestContacts] = useState<GuestContact[]>([]);
+  const [guestLoading, setGuestLoading] = useState(false);
+  const [selectedGuest, setSelectedGuest] = useState<GuestContact | null>(null);
   const [loading, setLoading] = useState(true);
   const [selectedTicket, setSelectedTicket] = useState<SupportTicket | null>(
     null,
@@ -101,15 +110,28 @@ export default function SupportPage() {
   const [totalPages, setTotalPages] = useState(1);
 
   useEffect(() => {
-    loadTickets();
-  }, [filters, page]);
+    if (activeTab === 'tickets') loadTickets();
+    else loadGuestContacts();
+  }, [filters, page, activeTab]);
+
+  const loadGuestContacts = async () => {
+    try {
+      setGuestLoading(true);
+      const response = await adminApi.getGuestContacts();
+      setGuestContacts(response.data || []);
+    } catch {
+      setGuestContacts([]);
+    } finally {
+      setGuestLoading(false);
+    }
+  };
 
   const loadTickets = async () => {
     try {
       setLoading(true);
       const params: any = {
         page,
-        limit: 20,
+        pageSize: 20,
       };
       if (filters.status) params.status = filters.status;
       if (filters.priority) params.priority = filters.priority;
@@ -118,8 +140,11 @@ export default function SupportPage() {
 
       const response = await adminApi.getTickets(params);
       const data = response.data;
-      setTickets(data.data || data.tickets || []);
-      setTotalPages(data.meta?.totalPages || 1);
+      const ticketList = data.tickets ?? data.data ?? [];
+      const total = data.total ?? 0;
+      const pageSize = data.pageSize ?? 20;
+      setTickets(ticketList);
+      setTotalPages(Math.max(1, Math.ceil(total / pageSize)));
     } catch (error) {
       if (process.env.NODE_ENV === "development")
         console.error("Failed to load tickets:", error);
@@ -132,11 +157,8 @@ export default function SupportPage() {
           category: "payment",
           priority: "high",
           status: "open",
-          creator: {
-            id: "1",
-            displayName: "Ahmet Yılmaz",
-            email: "ahmet@example.com",
-          },
+          creatorId: "1",
+          creatorName: "Ahmet Yılmaz",
           createdAt: new Date(Date.now() - 3600000).toISOString(),
           updatedAt: new Date(Date.now() - 1800000).toISOString(),
         },
@@ -147,11 +169,8 @@ export default function SupportPage() {
           category: "shipping",
           priority: "medium",
           status: "in_progress",
-          creator: {
-            id: "2",
-            displayName: "Mehmet Demir",
-            email: "mehmet@example.com",
-          },
+          creatorId: "2",
+          creatorName: "Mehmet Demir",
           createdAt: new Date(Date.now() - 7200000).toISOString(),
           updatedAt: new Date(Date.now() - 3600000).toISOString(),
         },
@@ -162,11 +181,8 @@ export default function SupportPage() {
           category: "trade",
           priority: "low",
           status: "waiting_customer",
-          creator: {
-            id: "3",
-            displayName: "Ayşe Kaya",
-            email: "ayse@example.com",
-          },
+          creatorId: "3",
+          creatorName: "Ayşe Kaya",
           createdAt: new Date(Date.now() - 86400000).toISOString(),
           updatedAt: new Date(Date.now() - 43200000).toISOString(),
         },
@@ -194,7 +210,8 @@ export default function SupportPage() {
               content:
                 "Merhaba, ödeme işlemim gerçekleşmedi. Kartımdan para çekildi ama sipariş oluşmadı.",
               isInternal: false,
-              sender: ticket.creator,
+              senderId: ticket.creatorId,
+              senderName: ticket.creatorName,
               createdAt: ticket.createdAt,
             },
           ],
@@ -207,9 +224,10 @@ export default function SupportPage() {
     if (!selectedTicket || !replyContent.trim()) return;
 
     try {
-      await adminApi.replyToTicket(selectedTicket.id, replyContent);
+      await adminApi.replyToTicket(selectedTicket.id, replyContent, isInternalNote);
       toast.success("Yanıt gönderildi");
       setReplyContent("");
+      setIsInternalNote(false);
       loadTicketDetails(selectedTicket.id);
     } catch (error) {
       if (process.env.NODE_ENV === "development")
@@ -220,7 +238,7 @@ export default function SupportPage() {
 
   const handleStatusChange = async (ticketId: string, newStatus: string) => {
     try {
-      await adminApi.updateTicket(ticketId, { status: newStatus });
+      await adminApi.updateTicketStatus(ticketId, newStatus);
       toast.success("Durum güncellendi");
       loadTickets();
       if (selectedTicket?.id === ticketId) {
@@ -299,7 +317,7 @@ export default function SupportPage() {
       ),
       cell: ({ row }) => (
         <span className="text-sm text-muted">
-          {row.original.creator.displayName}
+          {row.original.creatorName || '—'}
         </span>
       ),
     },
@@ -333,19 +351,68 @@ export default function SupportPage() {
     },
   ];
 
+  const guestColumns: ColumnDef<GuestContact, any>[] = [
+    {
+      header: "Referans",
+      cell: ({ row }) => (
+        <span className="font-mono text-xs text-muted">{row.original.referenceNumber}</span>
+      ),
+    },
+    {
+      header: "Ad Soyad",
+      cell: ({ row }) => (
+        <span className="text-sm text-heading">{row.original.name}</span>
+      ),
+    },
+    {
+      header: "E-posta",
+      cell: ({ row }) => (
+        <span className="text-xs text-muted">{row.original.email}</span>
+      ),
+    },
+    {
+      header: "Konu",
+      cell: ({ row }) => (
+        <span className="text-sm line-clamp-1">{row.original.subject}</span>
+      ),
+    },
+    {
+      header: "Tarih",
+      cell: ({ row }) => (
+        <span className="text-xs text-muted">{formatTime(row.original.createdAt)}</span>
+      ),
+    },
+  ];
+
   return (
     <>
       <div className="flex h-[calc(100vh-8rem)]">
         {/* Ticket List */}
         <div
-          className={`${selectedTicket ? "w-1/3" : "w-full"} border-r border-border flex flex-col`}
+          className={`${(selectedTicket || selectedGuest) ? "w-1/3" : "w-full"} border-r border-border flex flex-col`}
         >
           {/* Header */}
           <div className="p-4 border-b border-border space-y-4">
-            <PageHeader title="Destek Talepleri" />
+            <div className="flex items-center justify-between gap-3">
+              <PageHeader title="Destek Talepleri" />
+              <div className="flex rounded-lg overflow-hidden border border-border text-sm shrink-0">
+                <button
+                  onClick={() => { setActiveTab('tickets'); setSelectedGuest(null); }}
+                  className={`px-3 py-1.5 ${activeTab === 'tickets' ? 'bg-primary-500 text-inverted' : 'bg-surface-alt text-muted hover:text-heading'}`}
+                >
+                  Ticketlar
+                </button>
+                <button
+                  onClick={() => { setActiveTab('guest'); setSelectedTicket(null); }}
+                  className={`px-3 py-1.5 ${activeTab === 'guest' ? 'bg-primary-500 text-inverted' : 'bg-surface-alt text-muted hover:text-heading'}`}
+                >
+                  Misafir Mesajları
+                </button>
+              </div>
+            </div>
 
-            {/* Search + Filters */}
-            <FilterToolbar
+            {/* Search + Filters — sadece tickets sekmesinde */}
+            {activeTab === 'tickets' && <FilterToolbar
               search={filters.search}
               onSearchChange={(v) => setFilters({ ...filters, search: v })}
             >
@@ -391,19 +458,30 @@ export default function SupportPage() {
                   </option>
                 ))}
               </Select>
-            </FilterToolbar>
+            </FilterToolbar>}
           </div>
 
-          {/* Ticket List */}
+          {/* List */}
           <div className="flex-1 overflow-y-auto p-4">
-            <DataTable
-              columns={columns}
-              data={tickets}
-              loading={loading}
-              emptyText="Destek talebi bulunamadı"
-              getRowId={(t) => t.id}
-              onRowClick={(t) => loadTicketDetails(t.id)}
-            />
+            {activeTab === 'tickets' ? (
+              <DataTable
+                columns={columns}
+                data={tickets}
+                loading={loading}
+                emptyText="Destek talebi bulunamadı"
+                getRowId={(t) => t.id}
+                onRowClick={(t) => loadTicketDetails(t.id)}
+              />
+            ) : (
+              <DataTable
+                columns={guestColumns}
+                data={guestContacts}
+                loading={guestLoading}
+                emptyText="Misafir mesajı bulunamadı"
+                getRowId={(g) => g.referenceNumber}
+                onRowClick={(g) => setSelectedGuest(g)}
+              />
+            )}
           </div>
         </div>
 
@@ -449,10 +527,7 @@ export default function SupportPage() {
                 <div className="min-w-0">
                   <span className="text-muted">Oluşturan</span>
                   <p className="text-heading truncate">
-                    {selectedTicket.creator.displayName}
-                  </p>
-                  <p className="text-muted text-xs truncate">
-                    {selectedTicket.creator.email}
+                    {selectedTicket.creatorName || '—'}
                   </p>
                 </div>
                 <div>
@@ -504,7 +579,7 @@ export default function SupportPage() {
                     <div className="flex items-center gap-2 min-w-0">
                       <UserCircleIcon className="h-5 w-5 text-muted shrink-0" />
                       <span className="text-heading font-medium truncate">
-                        {message.sender.displayName}
+                        {message.senderName || '—'}
                       </span>
                       {message.isInternal && (
                         <span className="shrink-0 text-xs bg-warning-50 text-warning-700 px-2 py-0.5 rounded">
@@ -548,6 +623,52 @@ export default function SupportPage() {
                 >
                   <PaperAirplaneIcon className="h-5 w-5" />
                 </Button>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Guest Contact Detail */}
+        {selectedGuest && (
+          <div className="flex-1 flex flex-col">
+            <div className="p-4 border-b border-border flex items-center justify-between gap-3">
+              <div className="min-w-0">
+                <span className="text-xs text-muted font-mono">{selectedGuest.referenceNumber}</span>
+                <h2 className="text-lg font-semibold text-heading truncate mt-0.5">
+                  {selectedGuest.subject}
+                </h2>
+              </div>
+              <Button
+                variant="secondary"
+                onClick={() => setSelectedGuest(null)}
+                className="text-muted hover:text-heading p-2 shrink-0"
+              >
+                <XMarkIcon className="h-6 w-6" />
+              </Button>
+            </div>
+
+            <div className="p-4 border-b border-border bg-surface-elevated/50">
+              <div className="grid grid-cols-2 gap-4 text-sm">
+                <div className="min-w-0">
+                  <span className="text-muted">Ad Soyad</span>
+                  <p className="text-heading">{selectedGuest.name}</p>
+                </div>
+                <div className="min-w-0">
+                  <span className="text-muted">E-posta</span>
+                  <a href={`mailto:${selectedGuest.email}`} className="text-primary-600 hover:underline block truncate">
+                    {selectedGuest.email}
+                  </a>
+                </div>
+                <div>
+                  <span className="text-muted">Tarih</span>
+                  <p className="text-heading">{new Date(selectedGuest.createdAt).toLocaleString('tr-TR')}</p>
+                </div>
+              </div>
+            </div>
+
+            <div className="flex-1 overflow-y-auto p-4">
+              <div className="rounded-lg p-4 bg-surface-alt">
+                <p className="text-body whitespace-pre-wrap">{selectedGuest.message}</p>
               </div>
             </div>
           </div>

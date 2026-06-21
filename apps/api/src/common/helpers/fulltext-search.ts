@@ -19,10 +19,7 @@ const ALLOWED_TABLES = new Set([
   'product_ratings',
   'security_logs',
   'email_logs',
-  'shipping_methods',
-  'shipping_carriers',
   'tax_regions',
-  'shipping_zones',
   'error_logs',
   'ticket_messages',
 ]);
@@ -127,9 +124,6 @@ export const fulltextPaymentSearch = (p: PrismaService, q: string, limit?: numbe
 export const fulltextOrderSearch = (p: PrismaService, q: string, limit?: number) =>
   fulltextSearch(p, 'orders', tsvExpr(['order_number']), q, limit);
 
-export const fulltextTagSearch = (p: PrismaService, q: string, limit?: number) =>
-  fulltextSearch(p, 'tags', tsvExpr(['name', 'description']), q, limit);
-
 export const fulltextAttributeGroupSearch = (p: PrismaService, q: string, limit?: number) =>
   fulltextSearch(p, 'attribute_groups', tsvExpr(['name', 'description']), q, limit);
 
@@ -151,14 +145,5 @@ export const fulltextErrorLogSearch = (p: PrismaService, q: string, limit?: numb
 export const fulltextTicketMessageSearch = (p: PrismaService, q: string, limit?: number) =>
   fulltextSearch(p, 'ticket_messages', tsvExpr(['message']), q, limit);
 
-export const fulltextShippingMethodSearch = (p: PrismaService, q: string, limit?: number) =>
-  fulltextSearch(p, 'shipping_methods', tsvExpr(['name', 'code']), q, limit);
-
-export const fulltextShippingCarrierSearch = (p: PrismaService, q: string, limit?: number) =>
-  fulltextSearch(p, 'shipping_carriers', tsvExpr(['name', 'code']), q, limit);
-
 export const fulltextTaxRegionSearch = (p: PrismaService, q: string, limit?: number) =>
   fulltextSearch(p, 'tax_regions', tsvExpr(['name']), q, limit);
-
-export const fulltextShippingZoneSearch = (p: PrismaService, q: string, limit?: number) =>
-  fulltextSearch(p, 'shipping_zones', tsvExpr(['name']), q, limit);

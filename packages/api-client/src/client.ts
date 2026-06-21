@@ -3,6 +3,8 @@ import axios, { AxiosInstance, AxiosRequestConfig, AxiosResponse } from 'axios';
 export interface ClientConfig {
   baseURL: string;
   timeout?: number;
+  /** httpOnly cookie tabanlı auth için true (tarayıcı). Mobil Bearer header kullanır. */
+  withCredentials?: boolean;
   getToken?: () => string | null;
   onTokenRefresh?: (newToken: string) => void;
   onUnauthorized?: () => void;
@@ -17,6 +19,7 @@ export class ApiClient {
     this.client = axios.create({
       baseURL: config.baseURL,
       timeout: config.timeout || 30000,
+      withCredentials: config.withCredentials ?? false,
       headers: {
         'Content-Type': 'application/json',
       },

@@ -5,6 +5,7 @@ import { NotificationService } from '../notification/notification.service';
 import { NotificationType } from '../notification/dto';
 import { StorageService } from '../storage/storage.service';
 import { RatingService } from '../rating/rating.service';
+import { ModerationAiClient } from '../moderation/moderation-ai.client';
 import { computeTrustScore } from './helpers/trust-score';
 
 // In-memory storage for user blocks until schema is updated
@@ -39,6 +40,7 @@ export class UserService {
     @Optional()
     private readonly storageService: StorageService,
     private readonly ratingService: RatingService,
+    private readonly moderationAi: ModerationAiClient,
   ) {}
 
   /**
@@ -131,11 +133,11 @@ export class UserService {
       throw new NotFoundException('Kullanıcı bulunamadı');
     }
 
-    // Count only active listings (exclude inactive and draft)
+    // Count only active listings (exclude inactive and deleted)
     const listingCount = await this.prisma.product.count({
       where: {
         sellerId: id,
-        status: { notIn: [ProductStatus.inactive, ProductStatus.draft, ProductStatus.deleted] },
+        status: { notIn: [ProductStatus.inactive, ProductStatus.deleted] },
       },
     });
 
@@ -240,6 +242,22 @@ export class UserService {
       showTrustScore?: boolean;
     },
   ) {
+    // Profil serbest metinlerini AI moderasyonundan geçir (uygunsuz → engelle)
+    await this.moderationAi.assertTextClean(data.displayName, {
+      entityType: 'user',
+      entityId: userId,
+      userId,
+      field: 'display_name',
+      label: 'görünen ad',
+    });
+    await this.moderationAi.assertTextClean(data.bio, {
+      entityType: 'user',
+      entityId: userId,
+      userId,
+      field: 'bio',
+      label: 'biyografi',
+    });
+
     // Check if user is business tier - only business tier users should have business info
     const user = await this.prisma.user.findUnique({
       where: { id: userId },
@@ -792,7 +810,7 @@ export class UserService {
 
     // İlan/koleksiyon sayımı viewer'a göre değişir (sahip → tümü, başkası → görünür olanlar).
     const listingWhere = isOwner
-      ? { sellerId: userId, status: { notIn: ['draft', 'deleted'] } as any }
+      ? { sellerId: userId, status: { notIn: ['deleted'] } as any }
       : { sellerId: userId, status: 'active' };
     const collectionWhere = isOwner
       ? { userId }
@@ -1127,7 +1145,7 @@ export class UserService {
         },
       }),
       this.prisma.product.count({
-        where: { sellerId: userId, status: { notIn: ['draft', 'deleted'] } },
+        where: { sellerId: userId, status: { notIn: ['deleted'] } },
       }),
       // Gerçekten satılabilir aktif ilan = active VE ödenmiş satış siparişi YOK
       this.prisma.product.count({
@@ -1141,7 +1159,7 @@ export class UserService {
       this.prisma.product.count({
         where: {
           sellerId: userId,
-          status: { notIn: ['draft', 'deleted'] },
+          status: { notIn: ['deleted'] },
           orders: { some: { status: { in: [...PAID_STATUSES] } } },
         },
       }),
@@ -1595,11 +1613,11 @@ export class UserService {
       recentViews,
       recentLikes,
     ] = await Promise.all([
-      // Total products excluding inactive, draft and deleted
+      // Total products excluding inactive and deleted
       this.prisma.product.count({
         where: {
           sellerId: userId,
-          status: { notIn: ['inactive', 'draft', 'deleted'] }
+          status: { notIn: ['inactive', 'deleted'] }
         }
       }),
       this.prisma.product.count({ where: { sellerId: userId, status: 'active' } }),
@@ -1815,36 +1833,43 @@ export class UserService {
   }
 
   async getFeaturedCollector() {
-    // Get all public collections with items
-    const collections = await this.prisma.collection.findMany({
-      where: {
-        isPublic: true,
-        items: { some: {} }, // Has at least one item
-      },
-      include: {
-        user: {
-          select: {
-            id: true,
-            displayName: true,
-            avatarUrl: true,
-            bio: true,
-            isVerified: true,
-          },
+    const collectionWhere = {
+      isPublic: true,
+      items: { some: {} }, // Has at least one item
+    };
+
+    const includeShape = {
+      user: {
+        select: {
+          id: true,
+          displayName: true,
+          avatarUrl: true,
+          bio: true,
+          isVerified: true,
         },
-        items: {
-          include: {
-            product: {
-              select: {
-                id: true,
-                status: true,
-              },
+      },
+      items: {
+        include: {
+          product: {
+            select: {
+              id: true,
+              status: true,
             },
           },
         },
-        _count: {
-          select: { items: true, likes: true },
-        },
       },
+      _count: {
+        select: { items: true, likes: true },
+      },
+    };
+
+    // Prefer admin-featured collections first; fall back to score-based selection
+    const collections = await this.prisma.collection.findMany({
+      where: { ...collectionWhere, isFeatured: true },
+      include: includeShape,
+    }).then(async (featured) => {
+      if (featured.length > 0) return featured;
+      return this.prisma.collection.findMany({ where: collectionWhere, include: includeShape });
     });
 
     if (collections.length === 0) {
