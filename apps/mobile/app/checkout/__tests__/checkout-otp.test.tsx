@@ -116,6 +116,7 @@ jest.mock('../../../src/stores/authStore', () => ({
 
 import { ordersApi } from '../../../src/services/api';
 import { useCartStore } from '../../../src/stores/cartStore';
+import { replaceMock } from '../../../src/test-utils/router-mock';
 import CheckoutScreen from '../index';
 
 const SAMPLE_ITEM = {
@@ -218,6 +219,53 @@ describe('Misafir checkout OTP akışı', () => {
         expect.objectContaining({ emailVerificationCode: '123456' }),
       );
     });
+  });
+
+  it('stok bitti (400, stok keyword) → OTP modal KAPANIR, unavailable sayfasına redirect edilir', async () => {
+    // checkoutGuest stok hatası ile 400 döndürüyor — STOCKOUT_KEYWORDS'den bir keyword içeriyor
+    jest.mocked(ordersApi.checkoutGuest).mockRejectedValueOnce({
+      response: {
+        status: 400,
+        data: {
+          message: 'Bu ürün başkası tarafından satın alındı.',
+          productId: 'prod-1234567890',
+        },
+      },
+    });
+
+    replaceMock.mockClear();
+
+    renderWithProviders(<CheckoutScreen />);
+
+    fillAllStep1Fields();
+
+    fireEvent.press(screen.getByText('Devam Et'));
+    await waitFor(() => expect(screen.getByText('Devam Et')).toBeOnTheScreen());
+    fireEvent.press(screen.getByText('Devam Et'));
+    await waitFor(() => expect(screen.getByText(/Onayla ve Öde/)).toBeOnTheScreen());
+
+    await act(async () => {
+      fireEvent.press(screen.getByText(/Onayla ve Öde/));
+    });
+
+    await waitFor(() => expect(screen.getByTestId('guest-otp-input')).toBeOnTheScreen());
+
+    fireEvent.changeText(screen.getByTestId('guest-otp-input'), '123456');
+    await act(async () => {
+      fireEvent.press(screen.getByTestId('guest-otp-submit'));
+    });
+
+    // Stok 400 → OTP modal'da hata mesajı gösterilmemeli; redirect çalışmalı
+    await waitFor(() => {
+      expect(replaceMock).toHaveBeenCalledWith(
+        expect.objectContaining({
+          pathname: '/products/unavailable/[productId]',
+          params: expect.objectContaining({ productId: 'prod-1234567890' }),
+        }),
+      );
+    });
+    // guest-otp-input ekranda değil (modal kapandı / navigate etti)
+    expect(screen.queryByText('Bu ürün başkası tarafından satın alındı.')).toBeNull();
   });
 
   it('yanlış kod (400) → modal açık kalır, hata mesajı görünür', async () => {

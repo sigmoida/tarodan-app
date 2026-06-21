@@ -510,15 +510,19 @@ export default function CheckoutScreen() {
           ? error.response?.data?.message.join(', ')
           : 'Sipariş oluşturulamadı');
       const status = error?.response?.status;
-      // Misafir OTP gönderimi sırasında 400 → kod hatalı/süresi dolmuş: modal açık kalsın.
-      if (!isAuthenticated && emailVerificationCode && status === 400) {
-        setOtpError(extractApiMessage(error) ?? 'Doğrulama kodu geçersiz veya süresi dolmuş.');
-        return; // finally setLoading(false) çalışır; generic appAlert'e düşme
-      }
+      // Stok kontrolü OTP guard'dan ÖNCE yapılmalı: backend checkoutGuest için de
+      // stok hatalarında 400 döndürür; bu durumda OTP guard yanlışlıkla intercept
+      // etmemeli, redirect çalışmalıdır.
       const isStockout =
         (status === 400 || status === 409) &&
         typeof errorMessage === 'string' &&
         STOCKOUT_KEYWORDS.some((kw) => errorMessage.toLowerCase().includes(kw.toLowerCase()));
+      // Misafir OTP gönderimi sırasında 400 → kod hatalı/süresi dolmuş: modal açık kalsın.
+      // Stok 400'ünü dışla: o durumda redirect'e düşmeli.
+      if (!isAuthenticated && emailVerificationCode && status === 400 && !isStockout) {
+        setOtpError(extractApiMessage(error) ?? 'Doğrulama kodu geçersiz veya süresi dolmuş.');
+        return; // finally setLoading(false) çalışır; generic appAlert'e düşme
+      }
       if (isStockout) {
         const productId = error?.response?.data?.productId || items[0]?.productId;
         if (productId) {
