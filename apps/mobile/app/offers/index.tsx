@@ -567,7 +567,7 @@ export default function OffersScreen() {
           ) : (
             <TouchableOpacity
               style={[styles.actionBtn, styles.orderBtn, { alignSelf: 'flex-start', marginTop: 12 }]}
-              onPress={() => router.push(`/order-track?orderId=${offer.orderId}`)}
+              onPress={() => router.push({ pathname: '/orders/[id]', params: { id: offer.orderId! } } as any)}
             >
               <Ionicons name="cube-outline" size={16} color={colors.white} />
               <Text style={styles.actionBtnText}>Siparişi Görüntüle</Text>
