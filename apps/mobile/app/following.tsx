@@ -56,7 +56,7 @@ export default function FollowingScreen() {
 
   return (
     <View style={styles.container}>
-      <ScreenHeader title={`Takip Ettiklerim (${getFollowingCount()})`} onBack={() => router.back()} />
+      <ScreenHeader title={`Takip Ettiklerim (${getFollowingCount()})`} onBack={() => (router.canGoBack() ? router.back() : router.replace('/(tabs)'))} />
 
       {/* Content */}
       {isLoading && following.length === 0 ? (

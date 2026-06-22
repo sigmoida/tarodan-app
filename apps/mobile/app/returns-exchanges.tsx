@@ -28,7 +28,7 @@ export default function ReturnsExchangesScreen() {
   const { t } = useTranslation();
   return (
     <View style={styles.container}>
-      <ScreenHeader title={t('mobile.pageReturns')} onBack={() => router.back()} />
+      <ScreenHeader title={t('mobile.pageReturns')} onBack={() => (router.canGoBack() ? router.back() : router.replace('/(tabs)'))} />
 
       <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
         <View style={styles.iconRow}>

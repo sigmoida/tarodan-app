@@ -373,7 +373,7 @@ export default function OrderDetailScreen() {
 
   return (
     <View style={styles.container}>
-      <ScreenHeader title="Sipariş Detayı" onBack={() => router.back()} />
+      <ScreenHeader title="Sipariş Detayı" onBack={() => (router.canGoBack() ? router.back() : router.replace('/(tabs)'))} />
 
       <ScrollView
         style={styles.content}

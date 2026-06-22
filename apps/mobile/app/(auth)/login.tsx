@@ -326,21 +326,21 @@ export default function LoginScreen() {
           onPress={() => router.push('/(auth)/forgot-password' as never)}
         />
 
-        <HStack justify="center" wrap gap={1} style={{ marginTop: 16 }}>
-          <Text variant="body">Hesabınız yok mu?</Text>
+        <HStack justify="center" wrap gap={2} style={{ marginTop: 20 }}>
+          <Text variant="body" tone="muted">Hesabınız yok mu?</Text>
           <Text
             variant="body"
             tone="primary"
             weight="semibold"
             onPress={() => router.push('/(auth)/register' as never)}
           >
-            Kayıt Ol
+            Kayıt olun
           </Text>
         </HStack>
 
-        <HStack justify="center" wrap gap={1}>
+        <HStack justify="center" wrap gap={2} style={{ marginTop: 8 }}>
           <Text variant="bodySm" tone="muted">
-            İşletmeyseniz
+            İşletme sahibi misiniz?
           </Text>
           <Text
             variant="bodySm"
@@ -348,7 +348,7 @@ export default function LoginScreen() {
             weight="semibold"
             onPress={() => router.push('/(auth)/register-business' as never)}
           >
-            Kurumsal Kayıt
+            Kurumsal hesap açın
           </Text>
         </HStack>
       </VStack>

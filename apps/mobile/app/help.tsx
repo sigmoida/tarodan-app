@@ -187,7 +187,7 @@ export default function HelpScreen() {
 
   return (
     <View style={styles.container}>
-      <ScreenHeader title={t('mobile.pageHelpCenter')} onBack={() => router.back()} />
+      <ScreenHeader title={t('mobile.pageHelpCenter')} onBack={() => (router.canGoBack() ? router.back() : router.replace('/(tabs)'))} />
 
       <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
         {/* Search */}

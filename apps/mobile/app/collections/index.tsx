@@ -85,7 +85,7 @@ export default function CollectionsScreen() {
 
   return (
     <View style={styles.container}>
-      <ScreenHeader title="Koleksiyonlar" onBack={() => router.back()} />
+      <ScreenHeader title="Koleksiyonlar" onBack={() => (router.canGoBack() ? router.back() : router.replace('/(tabs)'))} />
 
       {/* Search */}
       <View style={styles.searchSection}>

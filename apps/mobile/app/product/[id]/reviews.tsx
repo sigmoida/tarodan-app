@@ -119,7 +119,7 @@ export default function ProductReviewsScreen() {
 
   return (
     <View style={styles.container}>
-      <ScreenHeader title="Değerlendirmeler" onBack={() => router.back()} />
+      <ScreenHeader title="Değerlendirmeler" onBack={() => (router.canGoBack() ? router.back() : router.replace('/(tabs)'))} />
 
       {isLoading ? (
         <View style={styles.centered}>

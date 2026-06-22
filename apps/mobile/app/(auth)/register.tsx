@@ -3,6 +3,9 @@ import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import { useMutation } from '@tanstack/react-query';
 import { router } from 'expo-router';
+import { Pressable, StyleSheet } from 'react-native';
+import { Ionicons } from '@expo/vector-icons';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import {
   Button,
   Checkbox,
@@ -73,8 +76,22 @@ export default function RegisterScreen() {
 
   const onSubmit = (data: RegisterForm) => registerMutation.mutate(data);
 
+  const insets = useSafeAreaInsets();
+  const handleBack = () =>
+    router.canGoBack() ? router.back() : router.replace('/(auth)/login');
+
   return (
     <Screen center>
+      <Pressable
+        onPress={handleBack}
+        accessibilityRole="button"
+        accessibilityLabel="Geri"
+        hitSlop={12}
+        style={[styles.backButton, { top: insets.top + 8 }]}
+      >
+        <Ionicons name="arrow-back" size={26} color="#111827" />
+      </Pressable>
+
       <VStack gap={3}>
         <Text variant="displaySm" tone="primary" align="center">
           Kayıt Ol
@@ -251,3 +268,15 @@ export default function RegisterScreen() {
     </Screen>
   );
 }
+
+const styles = StyleSheet.create({
+  backButton: {
+    position: 'absolute',
+    left: 16,
+    zIndex: 10,
+    width: 40,
+    height: 40,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+});

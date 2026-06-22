@@ -54,7 +54,7 @@ export default function CollectionsScreen() {
 
   return (
     <View style={styles.container}>
-      <ScreenHeader title={t('mobile.settingsCollections')} onBack={() => router.back()} />
+      <ScreenHeader title={t('mobile.settingsCollections')} onBack={() => (router.canGoBack() ? router.back() : router.replace('/(tabs)'))} />
 
       <ScrollView
         style={styles.content}

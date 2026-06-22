@@ -146,7 +146,7 @@ export default function PaymentHistoryScreen() {
   if (!isAuthenticated) {
     return (
       <View style={styles.container}>
-        <ScreenHeader title="Ödeme Geçmişi" onBack={() => router.back()} />
+        <ScreenHeader title="Ödeme Geçmişi" onBack={() => (router.canGoBack() ? router.back() : router.replace('/(tabs)'))} />
         <View style={styles.centeredContainer}>
           <Ionicons name="log-in-outline" size={48} color={TarodanColors.textTertiary} />
           <Text style={styles.emptyTitle}>Giriş Yapın</Text>
@@ -161,7 +161,7 @@ export default function PaymentHistoryScreen() {
 
   return (
     <View style={styles.container}>
-      <ScreenHeader title="Ödeme Geçmişi" onBack={() => router.back()} />
+      <ScreenHeader title="Ödeme Geçmişi" onBack={() => (router.canGoBack() ? router.back() : router.replace('/(tabs)'))} />
 
       {isLoading ? (
         <View style={styles.centeredContainer}>

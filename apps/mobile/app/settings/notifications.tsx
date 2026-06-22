@@ -126,7 +126,7 @@ export default function NotificationSettingsScreen() {
     <View style={styles.container}>
       <ScreenHeader
         title={t('mobile.settingsNotifications')}
-        onBack={() => router.back()}
+        onBack={() => (router.canGoBack() ? router.back() : router.replace('/(tabs)'))}
         right={
           <TouchableOpacity onPress={handleSave} disabled={saveMutation.isPending}>
             <Text style={styles.saveButton}>

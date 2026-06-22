@@ -106,7 +106,7 @@ export default function MessagesListScreen() {
     <View style={styles.container}>
       <ScreenHeader
         title={t('mobile.messagesTitle')}
-        onBack={() => router.back()}
+        onBack={() => (router.canGoBack() ? router.back() : router.replace('/(tabs)'))}
         right={
           unreadCount > 0 ? (
             <Badge variant="danger" style={styles.headerBadge}>{unreadCount}</Badge>

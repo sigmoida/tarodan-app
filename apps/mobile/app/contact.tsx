@@ -80,7 +80,7 @@ export default function ContactScreen() {
 
   return (
     <View style={styles.container}>
-      <ScreenHeader title={t('mobile.pageContact')} onBack={() => router.back()} />
+      <ScreenHeader title={t('mobile.pageContact')} onBack={() => (router.canGoBack() ? router.back() : router.replace('/(tabs)'))} />
 
       <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
         {/* Contact Methods */}

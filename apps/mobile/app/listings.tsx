@@ -170,7 +170,7 @@ export default function ListingsScreen() {
 
   return (
     <View style={styles.container}>
-      <ScreenHeader title="İlanlar" onBack={() => router.back()} />
+      <ScreenHeader title="İlanlar" onBack={() => (router.canGoBack() ? router.back() : router.replace('/(tabs)'))} />
 
       {/* Search & Sort */}
       <View style={styles.searchSection}>

@@ -71,7 +71,7 @@ export default function FavoritesScreen() {
   if (!isAuthenticated) {
     return (
       <View style={styles.container}>
-        <ScreenHeader title="Favorilerim" onBack={() => router.back()} />
+        <ScreenHeader title="Favorilerim" onBack={() => (router.canGoBack() ? router.back() : router.replace('/(tabs)'))} />
         <View style={styles.centeredContainer}>
           <Ionicons name="heart-outline" size={64} color={colors.primary[600]!} />
           <Text variant="h2" style={styles.title}>Favorilerim</Text>
@@ -107,7 +107,7 @@ export default function FavoritesScreen() {
 
   return (
     <View style={styles.container}>
-      <ScreenHeader title={`Favorilerim (${getFavoriteCount()})`} onBack={() => router.back()} />
+      <ScreenHeader title={`Favorilerim (${getFavoriteCount()})`} onBack={() => (router.canGoBack() ? router.back() : router.replace('/(tabs)'))} />
 
       {/* Content */}
       {items.length === 0 ? (

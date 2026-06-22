@@ -85,7 +85,7 @@ export default function SizeGuideScreen() {
   const { t } = useTranslation();
   return (
     <View style={styles.container}>
-      <ScreenHeader title={t('mobile.pageSizeGuide')} onBack={() => router.back()} />
+      <ScreenHeader title={t('mobile.pageSizeGuide')} onBack={() => (router.canGoBack() ? router.back() : router.replace('/(tabs)'))} />
 
       <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
         <Text style={styles.intro}>

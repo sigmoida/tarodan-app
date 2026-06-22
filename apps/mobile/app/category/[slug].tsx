@@ -120,7 +120,7 @@ export default function CategoryScreen() {
 
   return (
     <View style={styles.container}>
-      <ScreenHeader title={category?.name || 'Kategori'} onBack={() => router.back()} />
+      <ScreenHeader title={category?.name || 'Kategori'} onBack={() => (router.canGoBack() ? router.back() : router.replace('/(tabs)'))} />
 
       {/* Search & Filters */}
       <View style={styles.filterSection}>

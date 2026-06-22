@@ -110,7 +110,7 @@ export default function DynamicCMSPage() {
   if (loading) {
     return (
       <View style={styles.container}>
-        <ScreenHeader title="Yükleniyor..." onBack={() => router.back()} />
+        <ScreenHeader title="Yükleniyor..." onBack={() => (router.canGoBack() ? router.back() : router.replace('/(tabs)'))} />
         <View style={styles.loadingContainer}>
           <Spinner size="lg" />
           <Text style={styles.loadingText}>Sayfa yükleniyor...</Text>
@@ -122,7 +122,7 @@ export default function DynamicCMSPage() {
   if (error) {
     return (
       <View style={styles.container}>
-        <ScreenHeader title="Hata" onBack={() => router.back()} />
+        <ScreenHeader title="Hata" onBack={() => (router.canGoBack() ? router.back() : router.replace('/(tabs)'))} />
         <View style={styles.errorContainer}>
           <Ionicons name="alert-circle-outline" size={56} color={colors.danger[600]!} />
           <Text style={styles.errorTitle}>{error}</Text>
@@ -153,7 +153,7 @@ export default function DynamicCMSPage() {
       <ScreenHeader
         title={page?.title || 'Sayfa'}
         subtitle={formatDate(page?.updatedAt) ? `Son güncelleme: ${formatDate(page?.updatedAt)}` : undefined}
-        onBack={() => router.back()}
+        onBack={() => (router.canGoBack() ? router.back() : router.replace('/(tabs)'))}
       />
 
       <WebView

@@ -607,7 +607,7 @@ export default function OffersScreen() {
     <View style={styles.safeArea}>
       <ScreenHeader
         title="Tekliflerim"
-        onBack={() => router.back()}
+        onBack={() => (router.canGoBack() ? router.back() : router.replace('/(tabs)'))}
       />
 
       {/* Tabs */}

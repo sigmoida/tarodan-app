@@ -112,7 +112,7 @@ export default function PricingScreen() {
 
   return (
     <View style={styles.container}>
-      <ScreenHeader title={t('mobile.pagePricing')} onBack={() => router.back()} />
+      <ScreenHeader title={t('mobile.pagePricing')} onBack={() => (router.canGoBack() ? router.back() : router.replace('/(tabs)'))} />
 
       <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
         {/* Title Section */}

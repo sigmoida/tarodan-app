@@ -233,7 +233,7 @@ export default function AddressesScreen() {
     <View style={styles.container}>
       <ScreenHeader
         title={t('mobile.settingsAddresses')}
-        onBack={() => router.back()}
+        onBack={() => (router.canGoBack() ? router.back() : router.replace('/(tabs)'))}
         right={<Text style={styles.headerCount}>{addresses.length}/{maxAddresses}</Text>}
       />
 
