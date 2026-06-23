@@ -8,11 +8,15 @@ import { createProduct } from '../factories/product.factory';
 import { createAddress } from '../factories/address.factory';
 
 /**
- * Faz 2 / Adım 1 — PayTR Direct API kart ödemesi (hibrit: giriş yapmış kullanıcı yolu).
- * Mock'lu PayTRService.createDirectPayment ile davranış doğrulanır; GERÇEK PayTR çağrısı yok.
- * iframe akışına dokunulmaz; bu ayrı bir giriştir ve PAYTR_DIRECT_ENABLED bayrağı arkasındadır.
+ * PayTR Direct API kart ödemesi — TEK ödeme yolu (iframe kaldırıldı; misafir + üye).
+ * Mock'lu PayTRService ile davranış doğrulanır; GERÇEK PayTR çağrısı yok.
+ *
+ * Flag mimarisi:
+ *  - Yeni kart 3D ödemesi HER ZAMAN açıktır (kill-switch yok → kesinti olmasın).
+ *  - Kayıtlı kart (Flow B) + kart saklama (store_card) PAYTR_RECURRING_ENABLED arkasındadır
+ *    (PayTR Non3D/Tekrarlayan Ödeme yetkisine bağlı).
  */
-describe('Direct API card payment (hybrid, E2E)', () => {
+describe('Direct API card payment (tek yol, E2E)', () => {
   let ctx: E2ETestApp;
   let baseline: { categoryId: string; brandId: string; manufacturerId: string };
 
@@ -30,14 +34,14 @@ describe('Direct API card payment (hybrid, E2E)', () => {
     jest.restoreAllMocks();
   });
 
-  /** PAYTR_DIRECT_ENABLED bayrağını deterministik kontrol et (diğer key'ler pass-through). */
-  function setDirectFlag(enabled: boolean): void {
+  /** PAYTR_RECURRING_ENABLED bayrağını deterministik kontrol et (diğer key'ler pass-through). */
+  function setRecurringFlag(enabled: boolean): void {
     const cfg = ctx.app.get(ConfigService);
     const real = cfg.get.bind(cfg);
     jest
       .spyOn(cfg, 'get')
       .mockImplementation((key: any, def?: any) =>
-        key === 'PAYTR_DIRECT_ENABLED' ? (enabled ? 'true' : 'false') : real(key, def),
+        key === 'PAYTR_RECURRING_ENABLED' ? (enabled ? 'true' : 'false') : real(key, def),
       );
   }
 
@@ -68,19 +72,10 @@ describe('Direct API card payment (hybrid, E2E)', () => {
     cvc: '000',
   };
 
-  it('flag KAPALIyken 410 Gone döner (misafir/herkes iframe kullanır)', async () => {
-    setDirectFlag(false);
-    const { buyer, orderId } = await makeBuyerWithOrder();
-    await request(ctx.app.getHttpServer())
-      .post('/api/payments/process-direct')
-      .set(authHeader(buyer))
-      .send({ orderId, card: TEST_CARD, saveCard: true })
-      .expect(410);
-    expect(ctx.paytr.directPaymentCalls.length).toBe(0);
-  });
+  // ── Flow A: yeni kart (3D) — her zaman açık ──
 
-  it('flag AÇIKken Direct API çağrılır, store_card geçer ve payment hazırlanır', async () => {
-    setDirectFlag(true);
+  it('yeni kartla ödeme her zaman çalışır; recurring AÇIKken store_card geçer', async () => {
+    setRecurringFlag(true);
     const { buyer, orderId } = await makeBuyerWithOrder();
 
     const res = await request(ctx.app.getHttpServer())
@@ -90,18 +85,28 @@ describe('Direct API card payment (hybrid, E2E)', () => {
       .expect(201);
 
     expect(res.body.paymentId).toBeTruthy();
-    // PayTR Direct API çağrıldı ve kart saklama istendi.
     expect(ctx.paytr.directPaymentCalls.length).toBe(1);
     expect(ctx.paytr.directPaymentCalls[0].storeCard).toBe(true);
-    // Payment satırı pending + merchant_oid atanmış (callback eşleşmesi için).
     const prisma = getPrisma();
     const payment = await prisma.payment.findUnique({ where: { id: res.body.paymentId } });
     expect(payment!.status).toBe(PaymentStatus.pending);
     expect(payment!.providerConversationId).toBeTruthy();
   });
 
-  it('saveCard=false ise kart saklanmadan ödeme başlatılır', async () => {
-    setDirectFlag(true);
+  it('recurring KAPALIyken yeni kart yine çalışır ama store_card=false (saklanan kart kullanılamaz)', async () => {
+    setRecurringFlag(false);
+    const { buyer, orderId } = await makeBuyerWithOrder();
+    await request(ctx.app.getHttpServer())
+      .post('/api/payments/process-direct')
+      .set(authHeader(buyer))
+      .send({ orderId, card: TEST_CARD, saveCard: true })
+      .expect(201);
+    expect(ctx.paytr.directPaymentCalls.length).toBe(1);
+    expect(ctx.paytr.directPaymentCalls[0].storeCard).toBe(false);
+  });
+
+  it('saveCard belirtilmezse store_card=false', async () => {
+    setRecurringFlag(true);
     const { buyer, orderId } = await makeBuyerWithOrder();
     await request(ctx.app.getHttpServer())
       .post('/api/payments/process-direct')
@@ -112,7 +117,6 @@ describe('Direct API card payment (hybrid, E2E)', () => {
   });
 
   it('başkasının siparişini ödeyemez (403)', async () => {
-    setDirectFlag(true);
     const { orderId } = await makeBuyerWithOrder();
     const attacker = await createUser(ctx.module);
     await request(ctx.app.getHttpServer())
@@ -123,16 +127,69 @@ describe('Direct API card payment (hybrid, E2E)', () => {
     expect(ctx.paytr.directPaymentCalls.length).toBe(0);
   });
 
-  it('misafir (auth yok) Direct API kullanamaz (401)', async () => {
-    setDirectFlag(true);
+  it('misafir, üyeye ait siparişi ödeyemez (403)', async () => {
     const { orderId } = await makeBuyerWithOrder();
     await request(ctx.app.getHttpServer())
       .post('/api/payments/process-direct')
       .send({ orderId, card: TEST_CARD })
-      .expect(401);
+      .expect(403);
+    expect(ctx.paytr.directPaymentCalls.length).toBe(0);
   });
 
-  // ── Flow B: kayıtlı kartla ödeme (Non3D recurring servisi) ──
+  it('misafir, misafir siparişini yeni kartla ödeyebilir (auth gerekmez)', async () => {
+    const { orderId } = await makeBuyerWithOrder();
+    // Siparişi misafir siparişi olarak işaretle (guest checkout marker).
+    const prisma = getPrisma();
+    const order = await prisma.order.findUnique({ where: { id: orderId } });
+    await prisma.order.update({
+      where: { id: orderId },
+      data: { shippingAddress: { ...(order!.shippingAddress as any), isGuestOrder: true } },
+    });
+
+    const res = await request(ctx.app.getHttpServer())
+      .post('/api/payments/process-direct')
+      .send({ orderId, card: TEST_CARD }) // auth header YOK
+      .expect(201);
+
+    expect(res.body.paymentId).toBeTruthy();
+    expect(ctx.paytr.directPaymentCalls.length).toBe(1);
+  });
+
+  it('çift-çekim koruması: önceki deneme PayTR\'da ödendiyse ikinci process-direct YENİ çekim yapmaz', async () => {
+    const prisma = getPrisma();
+    const { buyer, orderId } = await makeBuyerWithOrder();
+
+    // 1. deneme: kart gönder → merchant_oid atanır, PayTR (mock) çağrılır.
+    const first = await request(ctx.app.getHttpServer())
+      .post('/api/payments/process-direct')
+      .set(authHeader(buyer))
+      .send({ orderId, card: TEST_CARD })
+      .expect(201);
+    expect(ctx.paytr.directPaymentCalls.length).toBe(1);
+
+    const payment = await prisma.payment.findUnique({ where: { id: first.body.paymentId } });
+    const oid = payment!.providerConversationId!;
+    // Senaryo: callback ulaşmadı (ör. tünel ölü) AMA ödeme PayTR'da BAŞARILI. Durum-sorgu ödendi döner.
+    ctx.paytr.setQueryResult(oid, {
+      ok: true,
+      paymentTotalTl: Number(payment!.amount),
+      paymentAmountTl: Number(payment!.amount),
+      currency: 'TL',
+    });
+
+    // 2. deneme: aynı sipariş → guard durum-sorgu yapar, ödendiğini görür → 400; İKİNCİ çekim YOK.
+    await request(ctx.app.getHttpServer())
+      .post('/api/payments/process-direct')
+      .set(authHeader(buyer))
+      .send({ orderId, card: TEST_CARD })
+      .expect(400);
+
+    expect(ctx.paytr.directPaymentCalls.length).toBe(1); // hâlâ 1 — çift çekim olmadı
+    const after = await prisma.payment.findUnique({ where: { id: first.body.paymentId } });
+    expect(after!.status).toBe(PaymentStatus.completed); // durum-sorgu ile tamamlandı
+  });
+
+  // ── Flow B: kayıtlı kartla ödeme (Non3D recurring servisi; PAYTR_RECURRING_ENABLED) ──
 
   /** Alıcıya ait aktif bir kayıtlı kart seed'le. */
   async function seedSavedCard(userId: string, opts: { requireCvv?: boolean } = {}) {
@@ -151,8 +208,31 @@ describe('Direct API card payment (hybrid, E2E)', () => {
     });
   }
 
+  it('recurring KAPALIyken kayıtlı kartla ödeme 410 döner (PayTR Non3D yetkisi bekleniyor)', async () => {
+    setRecurringFlag(false);
+    const { buyer, orderId } = await makeBuyerWithOrder();
+    const card = await seedSavedCard(buyer.id);
+    await request(ctx.app.getHttpServer())
+      .post('/api/payments/process-direct')
+      .set(authHeader(buyer))
+      .send({ orderId, savedCardId: card.id })
+      .expect(410);
+    expect(ctx.paytr.recurringCalls.length).toBe(0);
+  });
+
+  it('misafir kayıtlı kart kullanamaz (403)', async () => {
+    setRecurringFlag(true);
+    const { buyer, orderId } = await makeBuyerWithOrder();
+    const card = await seedSavedCard(buyer.id);
+    await request(ctx.app.getHttpServer())
+      .post('/api/payments/process-direct')
+      .send({ orderId, savedCardId: card.id }) // auth yok
+      .expect(403);
+    expect(ctx.paytr.recurringCalls.length).toBe(0);
+  });
+
   it('kayıtlı kartla ödeme: chargeRecurring çağrılır (utoken/ctoken) ve success döner', async () => {
-    setDirectFlag(true);
+    setRecurringFlag(true);
     const { buyer, orderId } = await makeBuyerWithOrder();
     const card = await seedSavedCard(buyer.id);
     ctx.paytr.nextRecurringResult = { status: 'success' };
@@ -173,7 +253,7 @@ describe('Direct API card payment (hybrid, E2E)', () => {
   });
 
   it('require_cvv kart + CVV yoksa 400; PayTR çağrılmaz', async () => {
-    setDirectFlag(true);
+    setRecurringFlag(true);
     const { buyer, orderId } = await makeBuyerWithOrder();
     const card = await seedSavedCard(buyer.id, { requireCvv: true });
 
@@ -186,7 +266,7 @@ describe('Direct API card payment (hybrid, E2E)', () => {
   });
 
   it('başkasının kayıtlı kartıyla ödeyemez (404)', async () => {
-    setDirectFlag(true);
+    setRecurringFlag(true);
     const { buyer, orderId } = await makeBuyerWithOrder();
     const other = await createUser(ctx.module);
     const othersCard = await seedSavedCard(other.id);
@@ -200,7 +280,7 @@ describe('Direct API card payment (hybrid, E2E)', () => {
   });
 
   it('kayıtlı kartla ödeme başarısızsa status=failed + payment.failureReason yazılır', async () => {
-    setDirectFlag(true);
+    setRecurringFlag(true);
     const { buyer, orderId } = await makeBuyerWithOrder();
     const card = await seedSavedCard(buyer.id);
     ctx.paytr.nextRecurringResult = { status: 'failed', reason: 'Kart kapalı', tryAgain: false };

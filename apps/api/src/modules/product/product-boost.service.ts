@@ -200,16 +200,16 @@ export class ProductBoostService {
         req,
       );
 
+      // Ödeme niyeti (intent): kart bilgisi /payments/process-direct ile alınır (iframe yok).
       return {
         boostId: boost.id,
         productId: product.id,
         durationDays,
         price,
         paymentId: paymentResult.paymentId,
-        paymentUrl: paymentResult.paymentUrl || '',
-        paymentHtml: paymentResult.paymentHtml,
         provider: paymentResult.provider,
         expiresIn: paymentResult.expiresIn || 300,
+        useBypass: (paymentResult as { useBypass?: boolean }).useBypass === true,
       };
     } catch (error) {
       // Ödeme başlatılamazsa pending boost'u temizle

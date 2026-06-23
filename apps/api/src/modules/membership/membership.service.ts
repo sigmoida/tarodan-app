@@ -459,10 +459,9 @@ export class MembershipService {
         undefined,
       );
 
-      // Return membership info with payment URL
+      // Üyelik bilgisi + ödeme niyeti (intent): istemci /payment/[id] kart formuna gider.
       return {
         ...(await this.getUserMembership(userId)),
-        paymentUrl: paymentResult.paymentUrl,
         paymentId: paymentResult.paymentId,
         orderId: (paymentResult as any).orderId,
         provider: paymentResult.provider,
@@ -611,12 +610,11 @@ export class MembershipService {
       req,
     );
 
+    // Ödeme niyeti (intent): kart bilgisi /payments/process-direct ile alınır (iframe yok).
     return {
       paymentId: paymentResult.paymentId,
       membershipPaymentId: membership.id,
       orderId: order.id,
-      paymentUrl: paymentResult.paymentUrl || '',
-      paymentHtml: paymentResult.paymentHtml,
       provider: paymentResult.provider,
       expiresIn: paymentResult.expiresIn || 300,
       useBypass: (paymentResult as { useBypass?: boolean }).useBypass === true,

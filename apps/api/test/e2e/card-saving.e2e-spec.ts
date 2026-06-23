@@ -59,10 +59,21 @@ describe('Card saving + management (CAPI, E2E)', () => {
       .send({ productId: product.id, shippingAddressId: addr.id })
       .expect(201);
 
+    // İframe kaldırıldı: tek ödeme yolu process-direct (merchant_oid'i atar). store_card
+    // kartı callback'teki utoken ile kaydedilir; bu setup gerçek akışı egzersiz eder.
     await request(ctx.app.getHttpServer())
-      .post('/api/payments/initiate')
+      .post('/api/payments/process-direct')
       .set(authHeader(buyer))
-      .send({ orderId: buyRes.body.orderId, provider: 'paytr' })
+      .send({
+        orderId: buyRes.body.orderId,
+        card: {
+          cardHolderName: 'TEST KART',
+          cardNumber: '4355084355084358',
+          expireMonth: '12',
+          expireYear: '30',
+          cvc: '000',
+        },
+      })
       .expect(201);
 
     const payment = await prisma.payment.findFirst({

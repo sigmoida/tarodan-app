@@ -37,14 +37,15 @@ if (!testMode) {
 const merchantOid = `SMOKE${Date.now()}`;
 const email = 'test@tarodan.com';
 const amountTl = 10.0; // 10 TL
-// Direkt API canlı doğrulayıcı: payment_amount INTEGER (kuruş). createDirectPayment ile aynı.
-const paymentAmount = String(Math.round(amountTl * 100));
+// Direkt API: payment_amount ONDALIK TL ("10.00") — resmi örnek kod ('100.99') + createDirectPayment ile aynı.
+// (Kuruş göndermek PayTR'nin 100 KATI çekmesine yol açar — callback'te kanıtlandı.)
+const paymentAmount = amountTl.toFixed(2);
 const userIp = process.env.SMOKE_USER_IP ?? ''; // örnekte boş; deneme için override edilebilir
 const paymentType = 'card';
 const installmentCount = '0';
 const currency = 'TL';
 const testModeStr = '1';
-const non3d = '0'; // 3D → senkron HTML yanıtı (kabul kanıtı). Non3D için PayTR yetkisi gerekir.
+const non3d = process.env.SMOKE_NON3D === '1' ? '1' : '0'; // SMOKE_NON3D=1 → Non3D yetkisi testi (recurring yolu)
 
 // PayTR test kartı (başarı). Panel/PDF'ten doğrula.
 const card = { number: '4355084355084358', month: '12', year: '26', cvv: '000', holder: 'PAYTR TEST' };
@@ -56,8 +57,8 @@ const hashStr =
 const paytrToken = crypto.createHmac('sha256', merchantKey).update(hashStr + merchantSalt).digest('base64');
 if (process.env.SMOKE_DEBUG) console.log('  hashSTR =', JSON.stringify(hashStr));
 
-// Direkt API basket: createDirectPayment ile aynı — kuruş fiyat, html-entity'li düz JSON.
-const basket = JSON.stringify([['Smoke Test Urun', (amountTl * 100).toFixed(0), 1]])
+// Direkt API basket: ONDALIK TL birim fiyat — resmi örnek + createDirectPayment ile aynı.
+const basket = JSON.stringify([['Smoke Test Urun', amountTl.toFixed(2), 1]])
   .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
 
 const form = new URLSearchParams({
@@ -102,6 +103,7 @@ try {
   });
   const text = await res.text();
   const trimmed = text.trim();
+  if (process.env.SMOKE_DEBUG) console.log('--- FULL BODY (ilk 1200) ---\n' + trimmed.slice(0, 1200) + '\n--- END ---');
 
   // Yanıt düz JSON VEYA HTML'e gömülü JSON olabilir → JSON'u çıkar.
   let json = null;

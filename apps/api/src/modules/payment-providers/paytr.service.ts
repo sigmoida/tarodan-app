@@ -161,129 +161,6 @@ export class PayTRService {
   }
 
   // ==========================================================================
-  // IFRAME PAYMENT (Recommended by PayTR)
-  // ==========================================================================
-
-  /**
-   * Create iframe token for payment
-   */
-  async createIframeToken(
-    orderId: string,
-    amount: number, // in TL
-    buyer: PayTRBuyer,
-    basketItems: PayTRBasketItem[],
-    options?: {
-      installmentCount?: number;
-      maxInstallment?: number;
-      lang?: 'tr' | 'en';
-      timeoutLimit?: number;
-      /** e.g. "type=membership" so success page redirects to membership success */
-      successQueryParams?: string;
-    },
-  ): Promise<{ token: string; iframeUrl: string }> {
-    const paymentAmount = Math.round(amount * 100); // Convert to kuruş
-    const successBase = `${this.configService.get('FRONTEND_URL')}/payment/success`;
-    const merchantOkUrl = options?.successQueryParams
-      ? `${successBase}?${options.successQueryParams}`
-      : successBase;
-    const merchantFailUrl = `${this.configService.get('FRONTEND_URL')}/payment/fail`;
-
-    // Encode basket (must match POST user_basket)
-    const userBasket = this.encodeBasket(basketItems);
-
-    const noInstallment = options?.installmentCount === 1 ? '1' : '0';
-    const maxInstallment = String(options?.maxInstallment ?? 0);
-    const paymentAmountStr = String(paymentAmount);
-    const testModeStr = this.testMode ? '1' : '0';
-
-    // iFrame API: paytr_token = base64(HMAC-SHA256(merchant_key, hashStr + merchant_salt))
-    // hashStr = merchant_id + user_ip + merchant_oid + email + payment_amount + user_basket + no_installment + max_installment + currency + test_mode
-    const hashStr =
-      this.merchantId +
-      buyer.ip +
-      orderId +
-      buyer.email +
-      paymentAmountStr +
-      userBasket +
-      noInstallment +
-      maxInstallment +
-      'TL' +
-      testModeStr;
-    const paytrToken = crypto
-      .createHmac('sha256', this.merchantKey)
-      .update(hashStr + this.merchantSalt)
-      .digest('base64');
-
-    // Build request data (field values must match hash above)
-    const formData = new URLSearchParams({
-      merchant_id: this.merchantId,
-      user_ip: buyer.ip,
-      merchant_oid: orderId,
-      email: buyer.email,
-      payment_amount: paymentAmountStr,
-      paytr_token: paytrToken,
-      user_basket: userBasket,
-      debug_on: this.testMode ? '1' : '0',
-      no_installment: noInstallment,
-      max_installment: maxInstallment,
-      user_name: `${buyer.name} ${buyer.surname}`,
-      user_address: buyer.address,
-      user_phone: buyer.phone,
-      merchant_ok_url: merchantOkUrl,
-      merchant_fail_url: merchantFailUrl,
-      timeout_limit: String(options?.timeoutLimit || 30),
-      currency: 'TL',
-      test_mode: this.testMode ? '1' : '0',
-      lang: options?.lang || 'tr',
-    });
-
-    try {
-      this.logger.log(`PayTR get-token POST → merchant_oid=${orderId} amount=${paymentAmountStr} test=${testModeStr}`);
-      const response = await fetch(`${this.baseUrl}/api/get-token`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/x-www-form-urlencoded',
-        },
-        body: formData.toString(),
-        signal: AbortSignal.timeout(this.httpTimeoutMs),
-      });
-
-      const rawText = await response.text();
-      this.logger.log(`PayTR get-token response: HTTP ${response.status} body=${rawText.slice(0, 400)}`);
-      if (!rawText?.trim()) {
-        this.logger.error(`PayTR API boş yanıt döndü. HTTP ${response.status}`);
-        throw new BadRequestException(
-          `PayTR yanıt vermedi (HTTP ${response.status}). Merchant ID/Key/Salt ve test modunu kontrol edin.`,
-        );
-      }
-
-      let data: PayTRIframeResponse;
-      try {
-        data = JSON.parse(rawText);
-      } catch {
-        this.logger.error(`PayTR API JSON değil. Status: ${response.status}, body: ${rawText.slice(0, 200)}`);
-        throw new BadRequestException(
-          'PayTR geçerli yanıt dönmedi. API bilgilerinizi ve PayTR panel ayarlarını kontrol edin.',
-        );
-      }
-
-      if (data.status !== 'success' || !data.token) {
-        this.logger.error(`PayTR token error: ${data.reason}`);
-        throw new BadRequestException(data.reason || 'PayTR token oluşturulamadı');
-      }
-
-      return {
-        token: data.token,
-        iframeUrl: `https://www.paytr.com/odeme/guvenli/${data.token}`,
-      };
-    } catch (error: any) {
-      if (error instanceof BadRequestException) throw error;
-      this.logger.error('PayTR API error:', error);
-      throw new BadRequestException(error.message || 'PayTR bağlantı hatası');
-    }
-  }
-
-  // ==========================================================================
   // STATUS INQUIRY (durum-sorgu) — callback kaçırılan başarılı ödemeler için
   // https://dev.paytr.com/en/durum-sorgu
   // ==========================================================================
@@ -604,7 +481,11 @@ export class PayTRService {
       throw new BadRequestException('PayTR yapılandırılmamış (merchant bilgileri eksik)');
     }
 
-    const paymentAmountStr = String(Math.round(amount * 100)); // kuruş
+    // ÖNEMLİ: Direkt API /odeme payment_amount = ONDALIK TL ("462.81"), KURUŞ DEĞİL.
+    // Resmi PayTR Direkt API örnek kodu: payment_amount = '100.99'. Kuruş (×100) göndermek
+    // PayTR'nin 100 KATI tutar çekmesine yol açar (panelde "46.281,00 TL", callback total_amount
+    // ×100). chargeRecurring de aynı /odeme'yi ONDALIK TL ile çağırır — tutarlı.
+    const paymentAmountStr = amount.toFixed(2); // ONDALIK TL
     const paymentType = 'card';
     // Tek çekim için '0' gönderilir (Direkt API kuralı)
     const installmentCount = String(
@@ -640,10 +521,10 @@ export class PayTRService {
       .digest('base64');
 
     const expiryYear2 = card.expireYear.length === 4 ? card.expireYear.slice(-2) : card.expireYear;
-    // Direkt API basket: htmlEntities'li düz JSON (iframe'in base64'ünden farklı —
-    // resmi PayTR Postman koleksiyonundaki pre-request script ile birebir)
+    // Direkt API basket: ONDALIK TL birim fiyat ("50.00") — resmi örnek kodla birebir
+    // (payment_amount ile aynı birim). Kuruş GÖNDERME (×100 hatasına yol açar).
     const basketJson = JSON.stringify(
-      basketItems.map((item) => [item.name, (item.price * 100).toFixed(0), item.quantity]),
+      basketItems.map((item) => [item.name, Number(item.price).toFixed(2), item.quantity]),
     );
     const userBasket = basketJson
       .replace(/&/g, '&amp;')
@@ -963,18 +844,6 @@ export class PayTRService {
   // ==========================================================================
 
   /**
-   * Encode basket items to Base64
-   */
-  private encodeBasket(items: PayTRBasketItem[]): string {
-    const basketArray = items.map((item) => [
-      item.name,
-      (item.price * 100).toFixed(0), // Convert to kuruş
-      item.quantity,
-    ]);
-    return Buffer.from(JSON.stringify(basketArray)).toString('base64');
-  }
-
-  /**
    * Generate HMAC-SHA256 hash in Base64 (refund, bin-detail; not iFrame get-token)
    */
   private generateHash(data: string): string {
@@ -982,61 +851,6 @@ export class PayTRService {
       .createHmac('sha256', this.merchantKey)
       .update(data)
       .digest('base64');
-  }
-
-  // ==========================================================================
-  // CONVENIENCE METHODS
-  // ==========================================================================
-
-  /**
-   * Process order payment (high-level method)
-   */
-  async processOrderPayment(
-    orderId: string,
-    amount: number,
-    buyer: {
-      id: string;
-      name: string;
-      surname: string;
-      email: string;
-      phone: string;
-      ip: string;
-      address: string;
-      city: string;
-    },
-    basketItems: Array<{
-      id: string;
-      name: string;
-      category: string;
-      price: number;
-      quantity?: number;
-    }>,
-    installmentCount = 1,
-    successQueryParams?: string,
-  ): Promise<{ token: string; iframeUrl: string }> {
-    const paytrBuyer: PayTRBuyer = {
-      name: buyer.name,
-      surname: buyer.surname,
-      email: buyer.email,
-      phone: buyer.phone,
-      address: buyer.address,
-      city: buyer.city,
-      country: 'TR',
-      ip: buyer.ip,
-    };
-
-    const paytrBasket: PayTRBasketItem[] = basketItems.map((item) => ({
-      name: item.name,
-      price: item.price,
-      quantity: item.quantity || 1,
-    }));
-
-    return this.createIframeToken(orderId, amount, paytrBuyer, paytrBasket, {
-      installmentCount,
-      maxInstallment: 12,
-      lang: 'tr',
-      successQueryParams,
-    });
   }
 
   // ==========================================================================

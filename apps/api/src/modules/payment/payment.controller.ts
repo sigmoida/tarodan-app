@@ -85,9 +85,12 @@ export class PaymentController {
    */
   @Get('config')
   @Public()
-  getPublicConfig(): { bypassEnabled: boolean } {
+  getPublicConfig(): { bypassEnabled: boolean; recurringEnabled: boolean } {
     return {
       bypassEnabled: this.configService.get('PAYMENT_BYPASS') === 'true',
+      // Kayıtlı kart + oto-yenileme (Non3D) PayTR yetkisine bağlı; kapalıyken frontend
+      // kayıtlı-kart UI'ını ve "kartı kaydet" seçeneğini gizler.
+      recurringEnabled: this.configService.get('PAYTR_RECURRING_ENABLED') === 'true',
     };
   }
 
@@ -152,19 +155,19 @@ export class PaymentController {
   }
 
   /**
-   * POST /payments/process-direct - PayTR Direkt API ile ödeme (HİBRİT: giriş yapmış kullanıcı).
-   * Kart bilgisi bizim checkout sayfamızda alınır; yanıt 3D Secure HTML'idir
-   * (istemci render eder), sonuç callback/verify ile işlenir. Misafir iframe kullanır.
-   * PAYTR_DIRECT_ENABLED kapalıyken 410 Gone döner.
+   * POST /payments/process-direct - PayTR Direkt API ile ödeme (TEK ödeme yolu; misafir + üye).
+   * Kart bilgisi bizim checkout sayfamızda alınır; yeni kartta yanıt 3D Secure HTML'idir
+   * (istemci render eder), sonuç callback/verify ile işlenir. Ham kart verisi taşır → throttle'lı.
+   * Kayıtlı kart (Flow B) + kart saklama PAYTR_RECURRING_ENABLED arkasındadır.
    */
   @Post('process-direct')
-  @ApiOperation({ summary: 'Direct API kart ödemesi (giriş yapmış kullanıcı; PAYTR_DIRECT_ENABLED ile)' })
-  @ApiResponse({ status: HttpStatus.CREATED, description: 'Ödeme başlatıldı (3DS HTML döner)' })
-  @ApiResponse({ status: HttpStatus.GONE, description: 'Direct API kapalı' })
+  @Throttle({ default: { limit: 10, ttl: 60000 } }) // 10 requests per minute (ham kart verisi)
+  @Public() // Misafir + üye; servis sahiplik + flag doğrulamasını yapar.
+  @ApiOperation({ summary: 'Direct API kart ödemesi (misafir + üye; tek ödeme yolu)' })
+  @ApiResponse({ status: HttpStatus.CREATED, description: 'Ödeme başlatıldı (yeni kartta 3DS HTML döner)' })
   async processDirect(@Body() dto: DirectPaymentDto, @Req() req: Request) {
-    // Direct API yalnız giriş yapmış kullanıcı içindir (misafir iframe kullanır).
+    // Optional auth: cookie (web) veya Bearer (mobil) — yoksa misafir olarak devam.
     const userId = this.extractUserId(req);
-    if (!userId) throw new UnauthorizedException('Oturum açmanız gerekiyor');
     return this.paymentService.processDirectPayment(userId, dto, req);
   }
 
