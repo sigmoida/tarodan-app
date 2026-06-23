@@ -98,7 +98,7 @@ export default function GuidesScreen() {
 
   return (
     <View style={styles.container}>
-      <ScreenHeader title={t('mobile.pageGuides')} onBack={() => router.back()} />
+      <ScreenHeader title={t('mobile.pageGuides')} onBack={() => (router.canGoBack() ? router.back() : router.replace('/(tabs)'))} />
 
       <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
         <Text style={styles.intro}>

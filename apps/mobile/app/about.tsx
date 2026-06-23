@@ -1,7 +1,7 @@
 import { View, ScrollView, StyleSheet } from 'react-native';
-import { Stack } from 'expo-router';
+import { Stack, router } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
-import { theme, Text, Card } from '@tarodan/ui-native';
+import { theme, Text, Card, ScreenHeader } from '@tarodan/ui-native';
 import { useTranslation } from '../src/i18n';
 
 const { colors } = theme;
@@ -10,7 +10,11 @@ export default function AboutScreen() {
   const { t } = useTranslation();
   return (
     <View style={styles.container}>
-      <Stack.Screen options={{ title: t('mobile.pageAbout') }} />
+      <Stack.Screen options={{ headerShown: false }} />
+      <ScreenHeader
+        title={t('mobile.pageAbout')}
+        onBack={() => (router.canGoBack() ? router.back() : router.replace('/' as any))}
+      />
       <ScrollView contentContainerStyle={styles.content}>
         <View style={styles.header}>
           <Ionicons name="car-sport" size={48} color={colors.primary[600]!} />

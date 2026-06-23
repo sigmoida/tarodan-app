@@ -411,7 +411,10 @@ export default function MessageThreadScreen() {
                           {formatTime(message.createdAt)}
                         </Text>
                         {isOwn && (
-                          <Text style={styles.messageStatus}>
+                          <Text style={[
+                            styles.messageStatus,
+                            message.status === 'read' && styles.messageStatusRead,
+                          ]}>
                             {getMessageStatus(message.status)}
                           </Text>
                         )}
@@ -646,6 +649,11 @@ const styles = StyleSheet.create({
     marginLeft: 4,
     fontSize: 11,
     color: colors.overlay.white70,
+  },
+  // Okundu → çift mavi çentik (web text-sky-400 parity).
+  messageStatusRead: {
+    color: '#38BDF8',
+    fontWeight: '700',
   },
   inputContainer: {
     flexDirection: 'row',

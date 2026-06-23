@@ -78,7 +78,7 @@ export default function VerifyEmailScreen() {
 
   return (
     <View style={{ flex: 1, backgroundColor: colors.surface.DEFAULT }}>
-      <ScreenHeader title="E-posta Doğrulama" onBack={() => router.back()} />
+      <ScreenHeader title="E-posta Doğrulama" onBack={() => (router.canGoBack() ? router.back() : router.replace('/(tabs)'))} />
 
       <VStack gap={2} align="center" padding={6} flex={1}>
         <View style={{ marginTop: spacing[4], marginBottom: spacing[2] }}>

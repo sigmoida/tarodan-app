@@ -18,10 +18,13 @@ const { colors } = theme;
 export default function SellerRegisterScreen() {
   const { isAuthenticated, user } = useAuthStore();
 
+  const handleBack = () =>
+    router.canGoBack() ? router.back() : router.replace('/(tabs)');
+
   if (!isAuthenticated) {
     return (
       <View style={styles.container}>
-        <ScreenHeader title="İşletme Hesabı" />
+        <ScreenHeader title="İşletme Hesabı" onBack={handleBack} />
         <EmptyState
           fullscreen
           icon="briefcase-outline"
@@ -40,7 +43,7 @@ export default function SellerRegisterScreen() {
   if (isBusinessAccount) {
     return (
       <View style={styles.container}>
-        <ScreenHeader title="İşletme Hesabı" />
+        <ScreenHeader title="İşletme Hesabı" onBack={handleBack} />
         <ScrollView contentContainerStyle={styles.scrollBody}>
           <View style={styles.infoCard}>
             <Ionicons name="checkmark-circle" size={22} color={colors.success[600]!} />
@@ -55,13 +58,14 @@ export default function SellerRegisterScreen() {
           {!isBusinessTier ? (
             <Button
               variant="primary"
+              fullWidth
               title="Business Üyeliğe Geç"
               onPress={() => router.replace('/membership')}
               style={styles.submitBtn}
             />
           ) : null}
 
-          <Button variant="ghost" title="Geri Dön" onPress={() => router.back()} />
+          <Button variant="ghost" fullWidth title="Geri Dön" onPress={handleBack} />
         </ScrollView>
       </View>
     );
@@ -70,7 +74,7 @@ export default function SellerRegisterScreen() {
   // Bireysel hesap: işletme olmak için ayrı hesap açması gerektiğini anlat.
   return (
     <View style={styles.container}>
-      <ScreenHeader title="İşletme Hesabı" />
+      <ScreenHeader title="İşletme Hesabı" onBack={handleBack} />
       <ScrollView contentContainerStyle={styles.scrollBody}>
         <View style={styles.benefitsCard}>
           <Text style={styles.benefitsTitle}>Kurumsal Satıcı Avantajları</Text>
@@ -102,12 +106,13 @@ export default function SellerRegisterScreen() {
 
         <Button
           variant="primary"
+          fullWidth
           title="Kurumsal Hesap Aç"
           onPress={() => router.push('/(auth)/register-business')}
           style={styles.submitBtn}
         />
 
-        <Button variant="ghost" title="Vazgeç" onPress={() => router.back()} />
+        <Button variant="ghost" fullWidth title="Vazgeç" onPress={handleBack} />
       </ScrollView>
     </View>
   );

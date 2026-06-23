@@ -91,7 +91,7 @@ export default function SupportScreen() {
   if (!isAuthenticated) {
     return (
       <View style={styles.container}>
-        <ScreenHeader title={t('mobile.pageSupport')} onBack={() => router.back()} />
+        <ScreenHeader title={t('mobile.pageSupport')} onBack={() => (router.canGoBack() ? router.back() : router.replace('/(tabs)'))} />
         <View style={styles.authRequired}>
           <Ionicons name="headset-outline" size={64} color={colors.primary[600]!} />
           <Text style={styles.authTitle}>Giriş Gerekli</Text>
@@ -111,7 +111,7 @@ export default function SupportScreen() {
 
   return (
     <View style={styles.container}>
-      <ScreenHeader title="Destek Talebi" onBack={() => router.back()} />
+      <ScreenHeader title="Destek Talebi" onBack={() => (router.canGoBack() ? router.back() : router.replace('/(tabs)'))} />
 
       <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
         {/* Category Selection */}

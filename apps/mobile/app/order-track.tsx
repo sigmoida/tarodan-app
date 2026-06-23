@@ -93,7 +93,7 @@ export default function OrderTrackScreen() {
 
   return (
     <View style={styles.container}>
-      <ScreenHeader title="Sipariş Takip" onBack={() => router.back()} />
+      <ScreenHeader title="Sipariş Takip" onBack={() => (router.canGoBack() ? router.back() : router.replace('/(tabs)'))} />
 
       <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
         {/* Track Form */}

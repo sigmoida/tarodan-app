@@ -133,7 +133,7 @@ export default function SellerProfileScreen() {
 
   return (
     <View style={styles.container}>
-      <ScreenHeader title="Satıcı Profili" onBack={() => router.back()} />
+      <ScreenHeader title="Satıcı Profili" onBack={() => (router.canGoBack() ? router.back() : router.replace('/(tabs)'))} />
 
       <ScrollView
         style={styles.content}

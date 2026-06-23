@@ -147,7 +147,7 @@ export default function SellerRefundRequestsScreen() {
 
   return (
     <View style={styles.container}>
-      <ScreenHeader title="İade Talepleri" onBack={() => router.back()} />
+      <ScreenHeader title="İade Talepleri" onBack={() => (router.canGoBack() ? router.back() : router.replace('/(tabs)'))} />
 
       {isLoading && refunds.length === 0 ? (
         <View style={styles.loadingContainer}>

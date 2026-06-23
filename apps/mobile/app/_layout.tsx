@@ -89,6 +89,9 @@ export default function RootLayout() {
     const onMessageNew = (p: { threadId: string; message: any }) =>
       useMessagesStore.getState().applyIncomingMessage(p.threadId, p.message);
     const onThreadUpdated = () => useMessagesStore.getState().fetchUnreadCount();
+    // Karşı taraf mesajlarımı okudu → gönderen tarafta çift mavi çentik canlı dönsün.
+    const onMessageRead = (p: { threadId: string; messageIds: string[] }) =>
+      useMessagesStore.getState().applyMessagesRead(p.threadId, p.messageIds || []);
     const onReconnect = () => {
       const tid = useMessagesStore.getState().currentThreadId;
       if (tid) {
@@ -99,10 +102,12 @@ export default function RootLayout() {
     };
     socket.on('message:new', onMessageNew);
     socket.on('thread:updated', onThreadUpdated);
+    socket.on('message:read', onMessageRead);
     socket.io.on('reconnect', onReconnect);
     return () => {
       socket.off('message:new', onMessageNew);
       socket.off('thread:updated', onThreadUpdated);
+      socket.off('message:read', onMessageRead);
       socket.io.off('reconnect', onReconnect);
     };
   }, [token]);

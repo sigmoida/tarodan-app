@@ -114,7 +114,7 @@ export default function NewCollectionScreen() {
     const upgradeInfo = getUpgradeMessage('collectionFeature');
     return (
       <View style={styles.container}>
-        <ScreenHeader title="Dijital Garaj" onBack={() => router.back()} />
+        <ScreenHeader title="Dijital Garaj" onBack={() => (router.canGoBack() ? router.back() : router.replace('/(tabs)'))} />
 
         <View style={styles.premiumRequired}>
           <MaterialCommunityIcons name="garage" size={80} color={colors.primary[600]!} />
@@ -161,7 +161,7 @@ export default function NewCollectionScreen() {
 
   return (
     <View style={styles.container}>
-      <ScreenHeader title="Yeni Koleksiyon" onBack={() => router.back()} />
+      <ScreenHeader title="Yeni Koleksiyon" onBack={() => (router.canGoBack() ? router.back() : router.replace('/(tabs)'))} />
 
       <ScrollView style={styles.content}>
         {/* Cover Image */}

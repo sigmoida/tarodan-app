@@ -114,7 +114,7 @@ export default function UpgradeScreen() {
 
   return (
     <View style={styles.container}>
-      <ScreenHeader title="Premium Üyelik" onBack={() => router.back()} />
+      <ScreenHeader title="Premium Üyelik" onBack={() => (router.canGoBack() ? router.back() : router.replace('/(tabs)'))} />
 
       <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
         {/* Already Premium */}

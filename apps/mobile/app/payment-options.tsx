@@ -29,7 +29,7 @@ export default function PaymentOptionsScreen() {
   const { t } = useTranslation();
   return (
     <View style={styles.container}>
-      <ScreenHeader title={t('mobile.pagePaymentOptions')} onBack={() => router.back()} />
+      <ScreenHeader title={t('mobile.pagePaymentOptions')} onBack={() => (router.canGoBack() ? router.back() : router.replace('/(tabs)'))} />
 
       <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
         <View style={styles.iconRow}>

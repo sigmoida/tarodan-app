@@ -194,7 +194,7 @@ export default function MembershipCheckoutScreen() {
 
   return (
     <View style={styles.container}>
-      <ScreenHeader title="Üyelik Satın Al" onBack={() => router.back()} />
+      <ScreenHeader title="Üyelik Satın Al" onBack={() => (router.canGoBack() ? router.back() : router.replace('/(tabs)'))} />
 
       <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
         {/* Selected Plan */}

@@ -111,7 +111,7 @@ export default function BusinessDashboardScreen() {
   if (error) {
     return (
       <View style={styles.container}>
-        <ScreenHeader title={t('mobile.settingsBusiness')} onBack={() => router.back()} />
+        <ScreenHeader title={t('mobile.settingsBusiness')} onBack={() => (router.canGoBack() ? router.back() : router.replace('/(tabs)'))} />
         <View style={styles.errorContainer}>
           <Ionicons name="warning-outline" size={64} color={colors.danger[600]!} />
           <Text style={styles.errorText}>{error}</Text>
@@ -135,7 +135,7 @@ export default function BusinessDashboardScreen() {
 
   return (
     <View style={styles.container}>
-      <ScreenHeader title={t('mobile.settingsBusiness')} onBack={() => router.back()} />
+      <ScreenHeader title={t('mobile.settingsBusiness')} onBack={() => (router.canGoBack() ? router.back() : router.replace('/(tabs)'))} />
 
       <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
         {/* Company Header */}

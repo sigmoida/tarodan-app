@@ -185,7 +185,7 @@ export default function NewTradeScreen() {
     const upgradeInfo = getUpgradeMessage('tradeFeature');
     return (
       <View style={styles.container}>
-        <ScreenHeader title="Takas Teklifi" onBack={() => router.back()} />
+        <ScreenHeader title="Takas Teklifi" onBack={() => (router.canGoBack() ? router.back() : router.replace('/(tabs)'))} />
 
         <View style={styles.premiumRequired}>
           <MaterialCommunityIcons name="swap-horizontal" size={80} color={colors.primary[600]!} />
@@ -291,7 +291,7 @@ export default function NewTradeScreen() {
 
   return (
     <View style={styles.container}>
-      <ScreenHeader title="Takas Teklifi" onBack={() => router.back()} />
+      <ScreenHeader title="Takas Teklifi" onBack={() => (router.canGoBack() ? router.back() : router.replace('/(tabs)'))} />
 
       {/* Steps Indicator */}
       <View style={styles.stepsContainer}>

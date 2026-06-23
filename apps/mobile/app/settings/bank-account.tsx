@@ -142,7 +142,7 @@ export default function BankAccountScreen() {
 
   return (
     <View style={styles.container}>
-      <ScreenHeader title="Banka Hesabı / IBAN" onBack={() => router.back()} />
+      <ScreenHeader title="Banka Hesabı / IBAN" onBack={() => (router.canGoBack() ? router.back() : router.replace('/(tabs)'))} />
 
       <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
         <Card style={styles.card}>

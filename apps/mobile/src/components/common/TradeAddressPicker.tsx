@@ -1,4 +1,4 @@
-import { useCallback, useState } from 'react';
+import { useCallback, useRef, useState } from 'react';
 import { View, StyleSheet, TouchableOpacity, ActivityIndicator } from 'react-native';
 import { theme, Text } from '@tarodan/ui-native';
 import { Ionicons } from '@expo/vector-icons';
@@ -32,9 +32,14 @@ export function TradeAddressPicker({ onChange, label }: Props) {
   const [addresses, setAddresses] = useState<Address[]>([]);
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
+  // selectedId'in render-dışı okunabilir aynası (load içinde prev'i functional
+  // updater olmadan okumak için — updater içinde onChange çağırmak "render
+  // sırasında setState" uyarısı veriyordu).
+  const selectedIdRef = useRef<string | null>(null);
 
   const select = useCallback(
     (id: string | null) => {
+      selectedIdRef.current = id;
       setSelectedId(id);
       onChange(id);
     },
@@ -46,21 +51,20 @@ export function TradeAddressPicker({ onChange, label }: Props) {
       const res = await addressesApi.getAll();
       const list: Address[] = (res.data as any)?.addresses || (res.data as any) || [];
       setAddresses(list);
-      // Seçim yoksa veya seçili adres listede yoksa varsayılanı seç.
-      setSelectedId((prev) => {
-        if (prev && list.some((a) => a.id === prev)) return prev;
-        const def = list.find((a) => a.isDefault) || list[0];
-        const next = def?.id ?? null;
-        onChange(next);
-        return next;
-      });
+      // Seçim yoksa veya seçili adres listede yoksa varsayılanı seç. prev'i
+      // ref'ten oku; select() state + ref + onChange'i render-dışı günceller.
+      const prev = selectedIdRef.current;
+      const next = prev && list.some((a) => a.id === prev)
+        ? prev
+        : ((list.find((a) => a.isDefault) || list[0])?.id ?? null);
+      select(next);
     } catch {
       setAddresses([]);
       select(null);
     } finally {
       setLoading(false);
     }
-  }, [onChange, select]);
+  }, [select]);
 
   useFocusEffect(
     useCallback(() => {

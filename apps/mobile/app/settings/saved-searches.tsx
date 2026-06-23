@@ -165,7 +165,7 @@ export default function SavedSearchesScreen() {
     <View style={styles.container}>
       <ScreenHeader
         title={t('mobile.settingsSavedSearches')}
-        onBack={() => router.back()}
+        onBack={() => (router.canGoBack() ? router.back() : router.replace('/(tabs)'))}
         right={
           <Text style={styles.headerCount}>
             {searches.length}/{maxSavedSearches === -1 ? '∞' : maxSavedSearches}

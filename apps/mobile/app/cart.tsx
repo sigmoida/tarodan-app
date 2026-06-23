@@ -37,7 +37,7 @@ export default function CartScreen() {
   if (items.length === 0) {
     return (
       <View style={styles.emptyContainer}>
-        <ScreenHeader title="Sepetim" onBack={() => router.back()} />
+        <ScreenHeader title="Sepetim" onBack={() => (router.canGoBack() ? router.back() : router.replace('/(tabs)'))} />
 
         <View style={styles.emptyContent}>
           <Ionicons name="cart-outline" size={80} color={colors.text.muted} />
@@ -58,7 +58,7 @@ export default function CartScreen() {
 
   return (
     <View style={styles.container}>
-      <ScreenHeader title={`Sepetim (${itemCount})`} onBack={() => router.back()} />
+      <ScreenHeader title={`Sepetim (${itemCount})`} onBack={() => (router.canGoBack() ? router.back() : router.replace('/(tabs)'))} />
 
       {/* Expiry Notice */}
       <View style={styles.expiryNotice}>

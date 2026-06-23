@@ -21,7 +21,7 @@ import {
 } from '@heroicons/react/24/outline';
 import toast from 'react-hot-toast';
 import { Button, Input, Spinner, Textarea } from '@tarodan/ui';
-import { api } from '@/lib/api';
+import { api, mediaApi } from '@/lib/api';
 import { useAuthStore } from '@/stores/authStore';
 import AuthLoadingScreen from '@/components/AuthLoadingScreen';
 import { useTranslation } from '@/i18n/LanguageContext';
@@ -89,16 +89,13 @@ export default function EditProfilePage() {
 
     setUploadingPhoto(true);
     try {
-      // 1. Upload to /storage/avatar (proper avatars bucket, entity type = user)
-      const uploadFormData = new FormData();
-      uploadFormData.append('file', file);
-
-      const uploadResponse = await api.post('/storage/avatar', uploadFormData, {
-        headers: { 'Content-Type': 'multipart/form-data' },
-      });
+      // 1. Upload to /media/upload/avatar (avatars bucket, entityType=user, uploaderId set)
+      const uploadResponse = await mediaApi.uploadAvatar(file);
 
       const s3Key = uploadResponse.data.key; // e.g. "dev/avatars/userId/abc123.jpg"
-      
+      // Avatar S3'te private; upload yanıtı anlık gösterim için presigned URL döner
+      const displayUrl = uploadResponse.data.url as string | undefined;
+
       if (process.env.NODE_ENV === 'development') {
         console.log('Avatar uploaded, S3 key:', s3Key);
       }
@@ -106,15 +103,8 @@ export default function EditProfilePage() {
       // 2. Save S3 key to user record
       await api.patch('/users/me', { avatarUrl: s3Key });
 
-      // 3. Get presigned URL for immediate display
-      try {
-        const presignedResponse = await api.get(`/storage/presigned/avatars/${s3Key}`);
-        const displayUrl = presignedResponse.data.url;
-        setProfilePhoto(displayUrl);
-      } catch {
-        // Fallback: use a temporary object URL for display
-        setProfilePhoto(URL.createObjectURL(file));
-      }
+      // 3. Immediate display: upload yanıtındaki presigned URL (yoksa yerel önizleme)
+      setProfilePhoto(displayUrl || URL.createObjectURL(file));
 
       // 4. Refresh user data in store
       await refreshUser();

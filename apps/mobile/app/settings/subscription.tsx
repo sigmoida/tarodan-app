@@ -133,7 +133,7 @@ export default function SubscriptionSettingsScreen() {
 
   return (
     <View style={styles.container}>
-      <ScreenHeader title={t('mobile.settingsSubscription')} onBack={() => router.back()} />
+      <ScreenHeader title={t('mobile.settingsSubscription')} onBack={() => (router.canGoBack() ? router.back() : router.replace('/(tabs)'))} />
 
       {isLoading && !subscription ? (
         <View style={styles.loadingContainer}>
