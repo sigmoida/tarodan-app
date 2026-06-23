@@ -39,6 +39,19 @@ interface OrderDetail {
   status: string;
   totalAmount: number;
   shippingCost: number;
+  buyerFeeAmount?: number;
+  sellerFeeAmount?: number;
+  commissionAmount?: number;
+  pricing?: {
+    subtotal: number;
+    shippingAmount: number;
+    buyerFeeAmount: number;
+    sellerFeeAmount: number;
+    commissionAmount: number;
+    taxAmount?: number;
+    totalAmount: number;
+    sellerNetAmount: number;
+  };
   product: {
     id: string;
     title: string;
@@ -549,14 +562,44 @@ export default function OrderDetailScreen() {
           <Text variant="label" style={styles.sectionTitle}>Ödeme Özeti</Text>
           <View style={styles.priceRow}>
             <Text>Ürün Tutarı</Text>
-            <Text>{formatPrice(order.product.price)}</Text>
+            {/* KDV hariç ürün tutarı; pricing yoksa ham ürün fiyatına düş */}
+            <Text>{formatPrice(order.pricing?.subtotal ?? order.product.price)}</Text>
           </View>
+          {/* KDV: yalnızca kurumsal satıcıda (taxAmount > 0) ayrı satır */}
+          {(order.pricing?.taxAmount ?? 0) > 0 && (
+            <View style={styles.priceRow}>
+              <Text>KDV</Text>
+              <Text>{formatPrice(order.pricing!.taxAmount!)}</Text>
+            </View>
+          )}
           {!isMembershipOrder && (
             <View style={styles.priceRow}>
               <Text>Kargo</Text>
               <Text>{formatPrice(order.shippingCost)}</Text>
             </View>
           )}
+          {(order.pricing?.buyerFeeAmount ?? order.buyerFeeAmount ?? 0) > 0 && (
+            <View style={styles.priceRow}>
+              <Text>Platform ücreti</Text>
+              <Text>{formatPrice(order.pricing?.buyerFeeAmount ?? order.buyerFeeAmount ?? 0)}</Text>
+            </View>
+          )}
+          {order.isSeller &&
+            ((order.pricing?.sellerFeeAmount ?? order.sellerFeeAmount ?? 0) > 0 ||
+              order.pricing?.sellerNetAmount != null) && (
+              <>
+                <View style={styles.priceRow}>
+                  <Text>Platform kesintisi</Text>
+                  <Text>{formatPrice(order.pricing?.sellerFeeAmount ?? order.sellerFeeAmount ?? 0)}</Text>
+                </View>
+                <View style={styles.priceRow}>
+                  <Text style={{ color: colors.success[600], fontWeight: '600' }}>Net kazanç</Text>
+                  <Text style={{ color: colors.success[600], fontWeight: '600' }}>
+                    {formatPrice(order.pricing?.sellerNetAmount ?? 0)}
+                  </Text>
+                </View>
+              </>
+            )}
           <Divider style={{ marginVertical: 8 }} />
           <View style={styles.priceRow}>
             <Text variant="h3">Toplam</Text>

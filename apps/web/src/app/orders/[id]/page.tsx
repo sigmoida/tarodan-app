@@ -62,6 +62,7 @@ interface OrderDetail {
     buyerFeeAmount: number;
     sellerFeeAmount: number;
     commissionAmount: number;
+    taxAmount?: number;
     totalAmount: number;
     sellerNetAmount: number;
   };
@@ -1611,6 +1612,22 @@ export default function OrderDetailPage() {
                     })}
                   </span>
                 </div>
+                {/* KDV: yalnızca kurumsal satıcıda (taxAmount > 0) ayrı satır */}
+                {(order.pricing?.taxAmount ?? 0) > 0 && (
+                  <div className="flex justify-between text-muted">
+                    <span>{locale === "en" ? "VAT" : "KDV"}</span>
+                    <span>
+                      ₺
+                      {Number(order.pricing?.taxAmount ?? 0).toLocaleString(
+                        "tr-TR",
+                        {
+                          minimumFractionDigits: 2,
+                          maximumFractionDigits: 2,
+                        },
+                      )}
+                    </span>
+                  </div>
+                )}
                 {/* Üyelik/dijital siparişlerde kargo satırı yoktur */}
                 {!isMembershipOrder(order) && (
                   <div className="flex justify-between text-muted">
