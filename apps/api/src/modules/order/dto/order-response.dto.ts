@@ -20,6 +20,13 @@ export class PricingBreakdownDto {
   @ApiProperty({ example: 22.5, description: 'Total commission (buyer + seller)' })
   commissionAmount: number;
 
+  @ApiProperty({
+    example: 45.0,
+    description:
+      'KDV/VAT amount included in totalAmount. Only > 0 for corporate sellers (businessStatus=approved + taxId). Collected from buyer and passed through to the seller payout.',
+  })
+  taxAmount: number;
+
   @ApiProperty({ example: 292.49, description: 'Total amount paid by buyer' })
   totalAmount: number;
 

@@ -191,12 +191,8 @@ export default function NewListingPage() {
                   (typeof img === "string" ? img : null);
                 if (key && (key.includes("dev/") || key.includes("prod/"))) {
                   try {
-                    const parts = key.split("/");
-                    const bucket = parts[1] || "products";
-                    const keyPath = parts.slice(2).join("/");
-                    const response = await api.get(
-                      `/storage/presigned/${bucket}/${keyPath}`,
-                    );
+                    // Public asset (products) — doğrudan görüntüleme URL'i
+                    const response = await mediaApi.getPublicUrl(key);
                     previewUrls.push(response.data.url);
                   } catch {
                     previewUrls.push(
