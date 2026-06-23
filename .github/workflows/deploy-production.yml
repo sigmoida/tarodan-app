@@ -33,7 +33,26 @@ jobs:
             echo "tag=sha-${GITHUB_SHA::12}" >> "$GITHUB_OUTPUT"
           fi
 
+      # TEMP: read-only keşif — sunucunun gerçek deploy düzenini öğrenmek için. Sonra kaldırılacak.
+      - name: Discover server layout (read-only)
+        uses: appleboy/ssh-action@v1
+        with:
+          host: ${{ secrets.SERVER_HOST }}
+          username: ${{ secrets.SERVER_USERNAME }}
+          password: ${{ secrets.SERVER_PASSWORD }}
+          command_timeout: 5m
+          script: |
+            echo "===== whoami / pwd ====="; whoami; pwd
+            echo "===== ls /opt ====="; ls -la /opt 2>/dev/null || echo "yok"
+            echo "===== ls /root ====="; ls -la /root 2>/dev/null || echo "yok"
+            echo "===== ls /home ====="; ls -la /home 2>/dev/null || echo "yok"
+            echo "===== docker ps ====="; docker ps --format 'table {{.Names}}\t{{.Image}}\t{{.Status}}' 2>/dev/null || echo "docker yok/erişim yok"
+            echo "===== compose dosyaları (find) ====="; find /opt /root /home /srv -maxdepth 3 -iname 'docker-compose*.y*ml' 2>/dev/null || true
+            echo "===== git repo'ları (.git) ====="; find /opt /root /home /srv -maxdepth 3 -type d -name '.git' 2>/dev/null || true
+            echo "===== tarodan içeren dizinler ====="; find /opt /root /home /srv -maxdepth 3 -iname '*tarodan*' 2>/dev/null || true
+
       - name: Backup DB then deploy over SSH
+        if: false  # keşif turunda deploy'u atla
         uses: appleboy/ssh-action@v1
         with:
           host: ${{ secrets.SERVER_HOST }}
