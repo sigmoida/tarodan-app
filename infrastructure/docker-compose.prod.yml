@@ -179,6 +179,10 @@ services:
       AWS_REGION: ${AWS_REGION:-eu-west-1}
       S3_BUCKET: ${S3_BUCKET}
       S3_ENV_PREFIX: ${S3_ENV_PREFIX:-prod}
+      # Public Google OAuth client IDs — safe to commit; default avoids needing a server-side .env edit.
+      GOOGLE_CLIENT_ID_WEB: ${GOOGLE_CLIENT_ID_WEB:-243308404313-kdc77bd36flfhv6ujlb5tfd4qjteh94c.apps.googleusercontent.com}
+      GOOGLE_CLIENT_ID_IOS: ${GOOGLE_CLIENT_ID_IOS}
+      GOOGLE_CLIENT_ID_ANDROID: ${GOOGLE_CLIENT_ID_ANDROID}
     depends_on:
       postgres:
         condition: service_healthy
