@@ -1230,18 +1230,16 @@ export default function CheckoutPage() {
               await clearCart();
             }
 
-            // Üyeler: site-içi kart formu + 3D Secure için ödeme sayfamıza git
-            // (paymentUrl'e doğrudan gitmek PayTR iframe'ini açıp kart formunu
-            // atlardı). Misafirler kart formunu kullanamaz (auth gerekli) →
-            // doğrudan PayTR sayfasına.
-            if (hasSession && paymentData.paymentId) {
-              router.push(`/payment/${paymentData.paymentId}`);
+            // TEK ödeme yüzeyi: misafir + üye aynı site-içi kart formuna (ödeme
+            // sayfamıza) gider; misafir ?guest=true ile (status endpoint'i misafir
+            // varyantını kullanır). paymentUrl yalnız paymentId yoksa yedek.
+            if (paymentData.paymentId) {
+              router.push(
+                `/payment/${paymentData.paymentId}${hasSession ? "" : "?guest=true"}`,
+              );
               return;
             } else if (paymentData.paymentUrl) {
               window.location.href = paymentData.paymentUrl;
-              return;
-            } else if (paymentData.paymentId) {
-              router.push(`/payment/${paymentData.paymentId}?guest=true`);
               return;
             } else {
               throw new Error(

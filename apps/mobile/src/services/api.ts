@@ -610,6 +610,9 @@ export const addressesApi = {
 
 // Payments API - Web ile aynı endpoint'ler
 export const paymentsApi = {
+  /** Public ödeme yapılandırması: bypass (dev) + kayıtlı kart/oto-yenileme (Non3D) açık mı. */
+  getConfig: () =>
+    api.get<{ bypassEnabled: boolean; recurringEnabled: boolean }>('/payments/config'),
   initiate: (orderId: string | number, provider: 'paytr' = 'paytr') =>
     api.post('/payments/initiate', { orderId, provider }),
   /** Grup ödemesi: tek ödeme checkout grubundaki tüm siparişleri kapsar */
@@ -656,9 +659,9 @@ export const paymentsApi = {
   retry: (paymentId: string) =>
     api.post(`/payments/${paymentId}/retry`),
   /**
-   * Direct API (hibrit, giriş yapmış kullanıcı): kendi kart formumuzdan ödeme.
-   * Yeni kart → 3DS HTML döner (WebView'de gösterilir); kayıtlı kart → Non3D anında status.
-   * PAYTR_DIRECT_ENABLED kapalıyken 410 → çağıran WebView/iframe akışına düşmeli.
+   * Direct API (TEK ödeme yolu; misafir + üye): kendi kart formumuzdan ödeme.
+   * Yeni kart → 3DS HTML döner (WebView'de gösterilir); kayıtlı kart → Non3D anında status
+   * (PAYTR_RECURRING_ENABLED açıkken).
    */
   processDirect: (body: {
     orderId?: string;

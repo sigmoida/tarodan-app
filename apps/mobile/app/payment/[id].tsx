@@ -3,7 +3,6 @@ import { View, StyleSheet, BackHandler } from 'react-native';
 import { Button, Spinner, Text, theme, appAlert } from '@tarodan/ui-native';
 import { Ionicons } from '@expo/vector-icons';
 import { router, useFocusEffect, useLocalSearchParams } from 'expo-router';
-import { WebView, WebViewNavigation } from 'react-native-webview';
 import { paymentsApi } from '../../src/services/api';
 import { ScreenHeader, ErrorState } from '../../src/components/common';
 import { captureException } from '../../src/services/sentry';
@@ -12,69 +11,43 @@ import CardPaymentForm from '../../src/components/CardPaymentForm';
 const { colors } = theme;
 
 /**
- * Ödeme WebView ekranı.
+ * Ödeme ekranı — TEK ödeme yüzeyi (iframe/WebView ödeme akışı kaldırıldı).
+ * Misafir + üye aynı PayTR Direct API kart formunu kullanır.
  *
  * Akış:
- *   1. Checkout ekranı sipariş oluşturur ve paymentId'yi elde eder.
- *   2. router.push('/payment/<paymentId>?orderId=...&provider=paytr&guest=0|1')
- *   3. Bu ekran ilgili provider için initiate çağırıp dönen HTML/URL'yi WebView'e verir.
- *   4. Provider, 3DS işlemi bitince kendi callback URL'ine GET/POST yapar.
- *      WebView navigation değişikliklerini dinleriz; callback URL tespit edilince
- *      `/payment/success` veya `/payment/fail`'a yönlendiririz.
- *   5. Kullanıcı geri tuşuna bastığında "emin misin?" sor, evet derse ödemeyi cancel et.
+ *   1. Çağıran ekran (checkout/üyelik/takas) sipariş/grup/takas oluşturup paymentId elde eder.
+ *   2. router.push('/payment/<paymentId>?guest=0|1&type=...')
+ *   3. Bu ekran ödeme durumunu yükler; tamamlandıysa/başarısızsa yönlendirir, aksi halde
+ *      hedefi (orderId/checkoutGroupId/tradeId) türetip CardPaymentForm'u gösterir.
+ *   4. Yeni kart 3D Secure HTML'i CardPaymentForm içindeki WebView'de render edilir (meşru).
+ *   5. PAYMENT_BYPASS (dev) açıksa kart formu yerine ödeme anında tamamlanır.
  */
-export default function PaymentWebViewScreen() {
+export default function PaymentScreen() {
   const params = useLocalSearchParams<{
     id: string;
-    orderId?: string;
-    /** Çok ürünlü sipariş grubu: tek ödeme tüm grubu kapsar */
-    groupId?: string;
-    provider?: 'paytr';
     guest?: string;
-    tradeCash?: string;
-    bypass?: string;
-    /**
-     * Çağıran ekran ödemeyi zaten başlatıp PayTR URL'ini geçtiyse burada gelir.
-     * Bu durumda ekran tekrar initiate ETMEZ — gelen URL'i doğrudan yükler.
-     * (Çift token üretimini önler; PayTR token'ları tek kullanımlıktır.)
-     */
-    paymentUrl?: string;
     /** Üyelik ödemesi: başarı → /membership/success */
     type?: string;
     /** Takas nakit farkı ödemesi: başarı → /trade/{tradeId} */
     tradeId?: string;
+    tradeCash?: string;
   }>();
 
-  // params.id genelde gerçek paymentId'dir; fallback initiate yapıldığında
-  // backend'in döndürdüğü paymentId ile güncellenir (cancel/verify/success için).
-  const paymentIdRef = useRef<string>(params.id!);
-  // Sadece PayTR kullanılıyor (iyzico kaldırıldı — web ile parite)
-  const provider = 'paytr' as const;
+  const paymentId = params.id!;
   const isGuest = params.guest === '1';
   const isMembership = params.type === 'membership';
-
-  // Hibrit: giriş yapmış (misafir olmayan) kullanıcıya kendi kart formumuz; "PayTR güvenli
-  // sayfası" ya da Direct kapalıysa (410) WebView'e düşülür. Hedef param'lardan gelir.
-  const [cardDismissed, setCardDismissed] = useState(false);
-  const directTarget = {
-    ...(params.orderId ? { orderId: params.orderId } : {}),
-    ...(params.groupId ? { checkoutGroupId: params.groupId } : {}),
-    ...(params.tradeId ? { tradeId: params.tradeId } : {}),
-  };
-  const hasDirectTarget = !!(params.orderId || params.groupId || params.tradeId);
-  const showCardForm = !isGuest && hasDirectTarget && !cardDismissed && !params.paymentUrl;
 
   const [state, setState] = useState<{
     loading: boolean;
     error: string | null;
-    html: string | null;
-    url: string | null;
-  }>({ loading: true, error: null, html: null, url: null });
+    target: { orderId?: string; checkoutGroupId?: string; tradeId?: string } | null;
+    amount?: number;
+    recurringEnabled: boolean;
+  }>({ loading: true, error: null, target: null, recurringEnabled: false });
 
-  const webviewRef = useRef<WebView>(null);
   const resolvedRef = useRef(false);
 
-  // Back handler — ödeme süreci içinde kazara çıkışı engelle
+  // Back handler — ödeme süreci içinde kazara çıkışı engelle.
   useFocusEffect(
     React.useCallback(() => {
       const onBack = () => {
@@ -87,100 +60,99 @@ export default function PaymentWebViewScreen() {
   );
 
   useEffect(() => {
-    initiatePayment();
-    // ödeme başlatma yalnızca route parametreleri değişince tetiklenir (kasıtlı)
-  }, [params.id, params.paymentUrl]);
+    load();
+    // ödeme durumu yalnızca paymentId değişince yeniden yüklenir
+  }, [paymentId]);
 
-  const initiatePayment = async () => {
+  const load = async () => {
     try {
       setState(s => ({ ...s, loading: true, error: null }));
 
-      // 1) Çağıran ekran ödemeyi zaten başlatıp PayTR URL'ini geçtiyse: doğrudan yükle.
-      //    Tekrar initiate edilmez → boşa/çakışan token üretilmez.
-      if (params.paymentUrl) {
-        setState({ loading: false, error: null, html: null, url: params.paymentUrl });
+      // Public ödeme yapılandırması (bypass + kayıtlı kart/oto-yenileme).
+      let cfg = { bypassEnabled: false, recurringEnabled: false };
+      try {
+        cfg = ((await paymentsApi.getConfig()).data) as any;
+      } catch {
+        /* config alınamazsa güvenli varsayılan: yalnız yeni-kart, bypass kapalı */
+      }
+
+      // Ödeme durumunu yükle (hedef + tutar + tamamlandı/başarısız kontrolü).
+      const res: any = isGuest
+        ? await paymentsApi.getStatusLightGuest(paymentId)
+        : await paymentsApi.getStatusLight(paymentId);
+      const data = res?.data?.data ?? res?.data ?? {};
+
+      if (data.status === 'completed') {
+        routeToSuccess();
+        return;
+      }
+      if (data.status === 'failed') {
+        routeToFail();
         return;
       }
 
-      // 2) Fallback: ekran kendisi initiate eder (deep link / kart 3DS fallback vb.).
-      //    Grup ödemesi öncelikli: tek ödeme tüm grubu kapsar.
-      let response: any;
-      if (params.groupId) {
-        response = isGuest
-          ? await paymentsApi.initiateGroupGuest(params.groupId, provider)
-          : await paymentsApi.initiateGroup(params.groupId, provider);
-      } else if (isGuest && params.orderId) {
-        response = await paymentsApi.initiateGuest(params.orderId, provider);
-      } else if (params.orderId) {
-        response = await paymentsApi.initiate(params.orderId, provider);
-      } else {
-        // orderId yok → mevcut ödeme için taze token (retry).
-        response = await paymentsApi.retry(paymentIdRef.current);
-      }
-
-      const data = response?.data?.data ?? response?.data ?? {};
-
-      // Backend gerçek paymentId döndürdüyse onu kullan (cancel/verify/success için).
-      const returnedId = data.paymentId || data.id || data.payment?.id;
-      if (returnedId) paymentIdRef.current = String(returnedId);
-
-      // PAYMENT_BYPASS=true: API gerçek PayTR sayfası üretmez, useBypass döner.
-      // Checkout normalde bu durumu kendi yakalar; defensive olarak burada da
-      // yakalayıp bypass-complete tetikliyoruz, aksi halde WebView boş kalır.
-      if (data.useBypass === true || params.bypass === '1') {
+      // PAYMENT_BYPASS (dev/test): kart formu anlamsız — ödemeyi anında tamamla.
+      if (cfg.bypassEnabled && data.status === 'pending') {
         if (resolvedRef.current) return;
         resolvedRef.current = true;
         try {
-          await paymentsApi.bypassComplete(paymentIdRef.current);
+          await paymentsApi.bypassComplete(paymentId);
         } catch (bypassErr: any) {
           captureException(bypassErr, {
             level: 'error',
             tags: { flow: 'payment.bypassComplete' },
-            extra: { paymentId: paymentIdRef.current },
+            extra: { paymentId },
           });
         }
         routeToSuccess();
         return;
       }
 
-      // Backend `paymentUrl`/`paymentHtml` döndürür (eski aliaslar geriye uyum için).
-      const url: string | undefined =
-        data.paymentUrl || data.paymentPageUrl || data.redirectUrl || data.url;
-      const html: string | undefined =
-        data.paymentHtml || data.paymentPageHtml || data.iframeHtml || data.html;
-
-      // Mobilde URL'i tercih et: PayTR güvenli sayfasını doğrudan yüklemek, 3DS
-      // yönlendirmelerini ana çerçevede tutar (HTML iframe sarması iç çerçevede
-      // kalır ve onNavigation/onShouldStartLoad tetiklenmez → "webe atar").
-      if (url) {
-        setState({ loading: false, error: null, html: null, url });
-      } else if (html) {
-        setState({ loading: false, error: null, html, url: null });
-      } else {
+      // Hedef status'tan türetilir; tradeId status'ta yoksa param'dan tamamla (yedek).
+      const target = {
+        ...(data.orderId ? { orderId: String(data.orderId) } : {}),
+        ...(data.checkoutGroupId ? { checkoutGroupId: String(data.checkoutGroupId) } : {}),
+        ...(data.tradeId
+          ? { tradeId: String(data.tradeId) }
+          : params.tradeId
+            ? { tradeId: String(params.tradeId) }
+            : {}),
+      };
+      const hasTarget = !!(target.orderId || target.checkoutGroupId || target.tradeId);
+      if (!hasTarget) {
         setState({
           loading: false,
-          error: 'Ödeme sayfası açılamadı. Lütfen tekrar deneyin.',
-          html: null,
-          url: null,
+          error: 'Ödeme hedefi bulunamadı. Lütfen tekrar deneyin.',
+          target: null,
+          recurringEnabled: false,
         });
+        return;
       }
+
+      setState({
+        loading: false,
+        error: null,
+        target,
+        amount: data.amount != null ? Number(data.amount) : undefined,
+        // Kayıtlı kart yalnız giriş yapmış kullanıcıya gösterilir.
+        recurringEnabled: !!cfg.recurringEnabled && !isGuest,
+      });
     } catch (e: any) {
       captureException(e, {
         level: 'error',
-        tags: { flow: 'payment.initiate', provider: String(params.provider ?? 'unknown') },
-        extra: { paymentId: paymentIdRef.current, status: e?.response?.status },
+        tags: { flow: 'payment.load' },
+        extra: { paymentId, status: e?.response?.status },
       });
       setState({
         loading: false,
-        error: e?.response?.data?.message || 'Ödeme başlatılamadı.',
-        html: null,
-        url: null,
+        error: e?.response?.data?.message || 'Ödeme bilgisi yüklenemedi.',
+        target: null,
+        recurringEnabled: false,
       });
     }
   };
 
-  // Geri git; stack kökündeysek (deep link / replace ile gelinmişse) ana sayfaya düş.
-  // Düz router.back() bu durumda "GO_BACK was not handled by any navigator" hatası verir.
+  // Geri git; stack kökündeysek ana sayfaya düş.
   const safeBack = () => {
     if (router.canGoBack()) router.back();
     else router.replace('/(tabs)' as never);
@@ -188,9 +160,7 @@ export default function PaymentWebViewScreen() {
 
   const handleCancel = () => {
     // Geri çıkış siparişi İPTAL ETMEZ — sadece ödeme ekranından çıkar. Sipariş
-    // "ödeme bekliyor" kalır; backend re-initiate'i (taze token + gerekirse yeniden
-    // rezervasyon) zaten destekliyor. Terk edilen ödeme/rezervasyonu 30dk/24s cron temizler.
-    // (Eski davranış paymentsApi.cancel ile siparişi iptal edip "ödeme beklenmiyor"a düşürüyordu.)
+    // "ödeme bekliyor" kalır; kullanıcı sonra tekrar ödeyebilir. Cron terk edileni temizler.
     appAlert(
       'Ödemeden Çık',
       'Ödemeyi tamamlamadan çıkmak istediğinize emin misiniz? Siparişiniz "ödeme bekliyor" olarak kalır; daha sonra tekrar ödeyebilirsiniz.',
@@ -201,17 +171,14 @@ export default function PaymentWebViewScreen() {
     );
   };
 
-  const routeToSuccess = () => {
-    // Üyelik ödemesinde üyelik success ekranına, diğerlerinde ödeme success'e git.
+  const routeToSuccess = (pid: string = paymentId) => {
     if (isMembership) {
-      router.replace({ pathname: '/membership/success', params: { paymentId: paymentIdRef.current } } as any);
+      router.replace({ pathname: '/membership/success', params: { paymentId: pid } } as any);
     } else {
       router.replace({
         pathname: '/payment/success',
         params: {
-          paymentId: paymentIdRef.current,
-          orderId: params.orderId,
-          groupId: params.groupId,
+          paymentId: pid,
           guest: params.guest,
           tradeCash: params.tradeCash,
           tradeId: params.tradeId,
@@ -220,156 +187,40 @@ export default function PaymentWebViewScreen() {
     }
   };
 
-  const routeToFail = () => {
-    router.replace({ pathname: '/payment/fail', params: { paymentId: paymentIdRef.current, guest: params.guest } } as any);
-  };
-
-  /**
-   * PayTR ödeme sonrası `merchant_ok_url`/`merchant_fail_url` (web frontend)'e
-   * yönlendirir. URL'i web sayfası YÜKLENMEDEN yakalayıp native success/fail
-   * ekranına geçeriz. Hem onShouldStartLoadWithRequest (yükleme öncesi) hem de
-   * onNavigationStateChange (yedek) bunu çağırır.
-   *
-   * @returns true → terminal URL (başarı/hata); WebView bu URL'i yüklemesin.
-   */
-  const resolveIfTerminal = (rawUrl: string): boolean => {
-    if (resolvedRef.current) return true;
-    const lower = (rawUrl || '').toLowerCase();
-
-    const isSuccessMarker =
-      lower.includes('/payment/success') ||
-      lower.includes('/membership/success') ||
-      lower.includes('status=success') ||
-      lower.includes('result=success') ||
-      lower.includes('payment_status=paid');
-
-    const isFailMarker =
-      lower.includes('/payment/fail') ||
-      lower.includes('/payment/failure') ||
-      lower.includes('status=fail') ||
-      lower.includes('status=error') ||
-      lower.includes('result=fail');
-
-    if (isSuccessMarker) {
-      resolvedRef.current = true;
-      // durum-sorgu ile sunucu tarafı tamamlamayı hızlandır (callback localhost'a
-      // ulaşamadığında üyelik/sipariş "bekliyor"da kalır). verify bitince yönlen —
-      // success ekranı/üyelik rozetinin güncel veriyi görmesi için. 4sn üst sınır.
-      Promise.race([
-        paymentsApi.verify(paymentIdRef.current).catch(() => {}),
-        new Promise((resolve) => setTimeout(resolve, 4000)),
-      ]).finally(() => routeToSuccess());
-      return true;
-    }
-    if (isFailMarker) {
-      resolvedRef.current = true;
-      routeToFail();
-      return true;
-    }
-    return false;
-  };
-
-  // Yükleme öncesi: terminal URL'i web sayfası açılmadan kes.
-  const handleShouldStartLoad = (req: { url: string }): boolean => !resolveIfTerminal(req.url);
-  // Yedek: bazı durumlarda yalnız navigation state değişir.
-  const handleNavigationChange = (nav: WebViewNavigation) => {
-    resolveIfTerminal(nav.url || '');
+  const routeToFail = (pid: string = paymentId) => {
+    router.replace({ pathname: '/payment/fail', params: { paymentId: pid, guest: params.guest } } as any);
   };
 
   return (
     <View style={styles.container}>
-      <ScreenHeader
-        title="Güvenli Ödeme"
-        subtitle="PayTR"
-        onBack={handleCancel}
-      />
+      <ScreenHeader title="Güvenli Ödeme" subtitle="PayTR" onBack={handleCancel} />
 
-      {!showCardForm && (
-        <View style={styles.safeNotice}>
-          <Ionicons name="lock-closed" size={14} color={colors.success[600]!} />
-          <Text style={styles.safeNoticeText}>
-            Bu sayfa SSL şifrelemeyle korunmaktadır. Kart bilgileriniz Tarodan'a iletilmez.
-          </Text>
-        </View>
-      )}
-
-      {showCardForm ? (
-        <View style={{ flex: 1 }}>
-          <CardPaymentForm
-            target={directTarget}
-            onSuccess={(pid) => {
-              if (isMembership) {
-                router.replace({ pathname: '/membership/success', params: { paymentId: pid } } as any);
-              } else {
-                router.replace({ pathname: '/payment/success', params: { paymentId: pid, guest: params.guest } } as any);
-              }
-            }}
-            onFail={() =>
-              router.replace({
-                pathname: '/payment/fail',
-                params: { paymentId: paymentIdRef.current, guest: params.guest },
-              } as any)
-            }
-            onFallbackToWebView={() => setCardDismissed(true)}
-          />
-          <Button
-            variant="ghost"
-            title="PayTR güvenli ödeme sayfasını kullan"
-            onPress={() => setCardDismissed(true)}
-          />
-        </View>
-      ) : state.loading ? (
+      {state.loading ? (
         <View style={styles.center}>
           <Spinner size="lg" />
-          <Text style={styles.loadingText}>Ödeme sayfası hazırlanıyor...</Text>
+          <Text style={styles.loadingText}>Ödeme hazırlanıyor...</Text>
         </View>
       ) : state.error ? (
         <View style={styles.errorWrap}>
-          <ErrorState message={state.error} onRetry={initiatePayment} />
+          <ErrorState message={state.error} onRetry={load} />
           <Button variant="ghost" title="Geri Dön" onPress={safeBack} />
         </View>
-      ) : state.html ? (
-        <WebView
-          ref={webviewRef}
-          originWhitelist={['*']}
-          source={{ html: state.html }}
-          onNavigationStateChange={handleNavigationChange}
-          startInLoadingState
-          renderLoading={() => (
-            <View style={styles.center}>
-              <Spinner size="lg" />
-            </View>
-          )}
-          javaScriptEnabled
-          domStorageEnabled
-          thirdPartyCookiesEnabled
-          mixedContentMode="compatibility"
-          // PayTR 3DS adımı yeni pencere açabilir; Safari'ye düşmesin diye
-          // aynı WebView içinde tut.
-          setSupportMultipleWindows={false}
-          onShouldStartLoadWithRequest={handleShouldStartLoad}
-        />
-      ) : state.url ? (
-        <WebView
-          ref={webviewRef}
-          originWhitelist={['*']}
-          source={{ uri: state.url }}
-          onNavigationStateChange={handleNavigationChange}
-          startInLoadingState
-          renderLoading={() => (
-            <View style={styles.center}>
-              <Spinner size="lg" />
-            </View>
-          )}
-          javaScriptEnabled
-          domStorageEnabled
-          thirdPartyCookiesEnabled
-          mixedContentMode="compatibility"
-          // PayTR 3DS adımı yeni pencere açabilir; Safari'ye düşmesin diye
-          // aynı WebView içinde tut.
-          setSupportMultipleWindows={false}
-          onShouldStartLoadWithRequest={handleShouldStartLoad}
-        />
+      ) : state.target ? (
+        <View style={{ flex: 1 }}>
+          <View style={styles.safeNotice}>
+            <Ionicons name="lock-closed" size={14} color={colors.success[600]!} />
+            <Text style={styles.safeNoticeText}>
+              Bu sayfa SSL şifrelemeyle korunmaktadır. Kart bilgileriniz Tarodan'a iletilmez.
+            </Text>
+          </View>
+          <CardPaymentForm
+            target={state.target}
+            amount={state.amount}
+            recurringEnabled={state.recurringEnabled}
+            onSuccess={(pid) => routeToSuccess(pid)}
+            onFail={() => routeToFail()}
+          />
+        </View>
       ) : null}
     </View>
   );

@@ -320,6 +320,9 @@ export const ordersApi = {
 
 // Payments
 export const paymentsApi = {
+  /** Public ödeme yapılandırması: bypass (dev) ve kayıtlı kart/oto-yenileme (Non3D) açık mı. */
+  getConfig: () =>
+    api.get<{ bypassEnabled: boolean; recurringEnabled: boolean }>('/payments/config'),
   initiate: (orderId: string | number, provider: 'paytr') =>
     api.post('/payments/initiate', { orderId, provider }),
   /** Grup ödemesi: tek ödeme checkout grubundaki tüm siparişleri kapsar */
@@ -363,10 +366,9 @@ export const paymentsApi = {
   bypassComplete: (paymentId: string, _card?: string) =>
     api.post<{ success: boolean }>(`/payments/${paymentId}/bypass-complete`),
   /**
-   * Direct API (hibrit, giriş yapmış kullanıcı): kendi kart formumuzdan ödeme.
+   * Direct API (TEK ödeme yolu; misafir + üye): kendi kart formumuzdan ödeme.
    * - Yeni kart: { orderId, card:{...}, saveCard } → yanıt 3DS HTML (threeDSHtml) içerir.
-   * - Kayıtlı kart: { orderId, savedCardId, cvv? } → Non3D, anında status döner.
-   * PAYTR_DIRECT_ENABLED kapalıyken 410 döner → çağıran iframe'e düşmelidir.
+   * - Kayıtlı kart: { orderId, savedCardId, cvv? } → Non3D, anında status (PAYTR_RECURRING_ENABLED).
    */
   processDirect: (body: {
     orderId?: string;

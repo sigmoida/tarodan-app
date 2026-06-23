@@ -8,10 +8,10 @@ import { paymentsApi, membershipApi } from '../services/api';
 const { colors } = theme;
 
 /**
- * CardPaymentForm (mobil) — HİBRİT ödeme: giriş yapmış kullanıcı için PayTR Direct API.
- * Web CardPaymentForm paritesi.
- *  - Kayıtlı kart (Non3D recurring) veya yeni kart (3D → WebView) ile ödeme.
- *  - 410 (Direct kapalı) → onFallbackToWebView ile mevcut WebView/iframe akışına düşülür.
+ * CardPaymentForm (mobil) — TEK ödeme yüzeyi: PayTR Direct API (misafir + üye). Web paritesi.
+ *  - Yeni kart (3D → WebView) ile ödeme; tüm akışlarda aynı bileşen.
+ *  - recurringEnabled (PayTR Non3D yetkisi) açıkken: kayıtlı kart (Non3D) + "kartımı kaydet".
+ *    Kapalıyken kayıtlı kart UI'ı ve kaydetme gizlenir (yalnız yeni-kart 3D).
  * GÜVENLİK: kart no/CVV yalnız istekle PayTR'a gider; saklanmaz/loglanmaz.
  */
 
@@ -31,14 +31,15 @@ interface Props {
   amount?: number;
   onSuccess: (paymentId: string) => void;
   onFail?: () => void;
-  onFallbackToWebView?: () => void;
+  /** Kayıtlı kart + "kartımı kaydet" gösterilsin mi (PayTR Non3D yetkisi açık + üye). */
+  recurringEnabled?: boolean;
 }
 
 const NEW_CARD = '__new__';
 
-export default function CardPaymentForm({ target, amount, onSuccess, onFail, onFallbackToWebView }: Props) {
+export default function CardPaymentForm({ target, amount, onSuccess, onFail, recurringEnabled = false }: Props) {
   const [cards, setCards] = useState<SavedCard[]>([]);
-  const [loadingCards, setLoadingCards] = useState(true);
+  const [loadingCards, setLoadingCards] = useState(recurringEnabled);
   const [selected, setSelected] = useState<string>(NEW_CARD);
   const [processing, setProcessing] = useState(false);
   const [threeDSHtml, setThreeDSHtml] = useState<string | null>(null);
@@ -53,6 +54,13 @@ export default function CardPaymentForm({ target, amount, onSuccess, onFail, onF
   const [savedCvv, setSavedCvv] = useState('');
 
   useEffect(() => {
+    // Kayıtlı kart listesi yalnız Non3D yetkisi açıkken (kayıtlı kartla ödeme mümkünken) alınır.
+    if (!recurringEnabled) {
+      setCards([]);
+      setSelected(NEW_CARD);
+      setLoadingCards(false);
+      return;
+    }
     let alive = true;
     (async () => {
       try {
@@ -71,7 +79,7 @@ export default function CardPaymentForm({ target, amount, onSuccess, onFail, onF
     return () => {
       alive = false;
     };
-  }, []);
+  }, [recurringEnabled]);
 
   const selectedCard = useMemo(() => cards.find((c) => c.id === selected) || null, [cards, selected]);
 
@@ -107,7 +115,7 @@ export default function CardPaymentForm({ target, amount, onSuccess, onFail, onF
           expireYear: expYear,
           cvc,
         },
-        saveCard,
+        saveCard: recurringEnabled && saveCard,
       };
     } else {
       if (selectedCard?.requireCvv && !/^\d{3,4}$/.test(savedCvv)) {
@@ -139,11 +147,6 @@ export default function CardPaymentForm({ target, amount, onSuccess, onFail, onF
       }
       onSuccess(data.paymentId);
     } catch (e: any) {
-      const status = e?.response?.status;
-      if (status === 410 && onFallbackToWebView) {
-        onFallbackToWebView();
-        return;
-      }
       appAlert('Hata', e?.response?.data?.message || 'Ödeme başlatılamadı');
       setProcessing(false);
     }
@@ -271,11 +274,13 @@ export default function CardPaymentForm({ target, amount, onSuccess, onFail, onF
                   onChangeText={(t) => setCvc(digitsOnly(t).slice(0, 4))}
                 />
               </View>
-              <Checkbox
-                checked={saveCard}
-                onChange={setSaveCard}
-                label="Kartımı sonraki ödemeler ve otomatik yenileme için kaydet"
-              />
+              {recurringEnabled && (
+                <Checkbox
+                  checked={saveCard}
+                  onChange={setSaveCard}
+                  label="Kartımı sonraki ödemeler ve otomatik yenileme için kaydet"
+                />
+              )}
             </View>
           )}
         </View>

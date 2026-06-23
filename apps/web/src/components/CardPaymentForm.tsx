@@ -1,11 +1,11 @@
 "use client";
 
 /**
- * CardPaymentForm — HİBRİT ödeme: giriş yapmış kullanıcı için PayTR Direct API kart formu.
+ * CardPaymentForm — TEK ödeme yüzeyi: PayTR Direct API kart formu (misafir + üye).
  *
- * - Kayıtlı kart seçimi (Non3D recurring servisi) veya yeni kart (3D Secure) ile ödeme.
- * - Yeni kartta "kartımı kaydet" → store_card → sonraki ödemeler/oto-yenileme için saklanır.
- * - PAYTR_DIRECT_ENABLED kapalıysa backend 410 döner → onFallbackToIframe() ile iframe'e düşer.
+ * - Yeni kart (3D Secure) ile ödeme; tüm akışlarda (sipariş/sepet/takas/üyelik) aynı bileşen.
+ * - recurringEnabled (PayTR Non3D yetkisi) açıkken: kayıtlı kart seçimi (Non3D) + "kartımı kaydet".
+ *   Kapalıyken kayıtlı kart UI'ı ve kaydetme gizlenir (yalnız yeni-kart 3D).
  *
  * GÜVENLİK: Kart no/CVV yalnızca bu istekle backend üzerinden PayTR'a iletilir; hiçbir yerde
  * saklanmaz/loglanmaz. Backend de DB/log'a yazmaz (yalnız PayTR token'ı).
@@ -27,19 +27,18 @@ interface CardPaymentFormProps {
   amount?: number;
   /** Başarıda yönlendirme — verilmezse /payment/success?paymentId=... */
   onSuccess?: (paymentId: string) => void;
-  /** Backend 410 (Direct kapalı) → çağıran iframe akışına düşmeli */
-  onFallbackToIframe?: () => void;
+  /** Kayıtlı kart + "kartımı kaydet" gösterilsin mi (PayTR Non3D yetkisi açık + üye). */
+  recurringEnabled?: boolean;
 }
 
 const NEW_CARD = "__new__";
 
-export default function CardPaymentForm({ target, amount, onSuccess, onFallbackToIframe }: CardPaymentFormProps) {
+export default function CardPaymentForm({ target, amount, onSuccess, recurringEnabled = false }: CardPaymentFormProps) {
   const router = useRouter();
   const [cards, setCards] = useState<SavedCard[]>([]);
-  const [loadingCards, setLoadingCards] = useState(true);
+  const [loadingCards, setLoadingCards] = useState(recurringEnabled);
   const [selected, setSelected] = useState<string>(NEW_CARD);
   const [processing, setProcessing] = useState(false);
-  const [threeDSHtml, setThreeDSHtml] = useState<string | null>(null);
 
   // Yeni kart alanları
   const [holder, setHolder] = useState("");
@@ -52,6 +51,13 @@ export default function CardPaymentForm({ target, amount, onSuccess, onFallbackT
   const [savedCvv, setSavedCvv] = useState("");
 
   useEffect(() => {
+    // Kayıtlı kart listesi yalnız Non3D yetkisi açıkken (kayıtlı kartla ödeme mümkünken) alınır.
+    if (!recurringEnabled) {
+      setCards([]);
+      setSelected(NEW_CARD);
+      setLoadingCards(false);
+      return;
+    }
     let alive = true;
     (async () => {
       try {
@@ -70,7 +76,7 @@ export default function CardPaymentForm({ target, amount, onSuccess, onFallbackT
     return () => {
       alive = false;
     };
-  }, []);
+  }, [recurringEnabled]);
 
   const selectedCard = useMemo(
     () => cards.find((c) => c.id === selected) || null,
@@ -112,7 +118,7 @@ export default function CardPaymentForm({ target, amount, onSuccess, onFallbackT
           expireYear: expYear,
           cvc,
         },
-        saveCard,
+        saveCard: recurringEnabled && saveCard,
       };
     } else {
       if (selectedCard?.requireCvv && !/^\d{3,4}$/.test(savedCvv)) {
@@ -131,9 +137,16 @@ export default function CardPaymentForm({ target, amount, onSuccess, onFallbackT
       const res = await paymentsApi.processDirect(body);
       const data = res.data;
 
-      // Yeni kart + 3D → bankanın 3DS sayfasını göster (otomatik yönlenir).
+      // Yeni kart + 3D → bankanın 3D Secure sayfasını TAM SAYFA aç (profesyonel akış;
+      // sayfaya gömmüyoruz). PayTR'nin döndürdüğü HTML otomatik submit eder → banka 3D
+      // sayfası (tam sayfa) → sonuç merchant_ok_url/fail_url (/payment/success | /payment/fail)
+      // ile geri döner. Not: dangerouslySetInnerHTML <script> ÇALIŞTIRMAZ; document.write
+      // çalıştırır — auto-submit'in işlemesi için tam-sayfa yazım şart.
       if (data.threeDSHtml) {
-        setThreeDSHtml(data.threeDSHtml);
+        const doc = window.document;
+        doc.open();
+        doc.write(data.threeDSHtml);
+        doc.close();
         return;
       }
 
@@ -151,31 +164,9 @@ export default function CardPaymentForm({ target, amount, onSuccess, onFallbackT
         router.push(`/payment/success?paymentId=${data.paymentId}`);
       }
     } catch (e: any) {
-      const status = e?.response?.status;
-      if (status === 410 && onFallbackToIframe) {
-        // Direct API kapalı → güvenli ödeme sayfasına (iframe) düş.
-        onFallbackToIframe();
-        return;
-      }
       toast.error(e?.response?.data?.message || "Ödeme başlatılamadı");
       setProcessing(false);
     }
-  }
-
-  // 3D Secure HTML'i: bankanın doğrulama sayfası (form otomatik submit olur).
-  if (threeDSHtml) {
-    return (
-      <div className="bg-surface-elevated rounded-xl shadow-sm p-6">
-        <h2 className="text-lg font-semibold mb-4 flex items-center gap-2">
-          <ShieldCheckIcon className="w-6 h-6 text-primary-500" />
-          Güvenli Doğrulama (3D Secure)
-        </h2>
-        <div dangerouslySetInnerHTML={{ __html: threeDSHtml }} className="payment-iframe-container" />
-        <p className="text-sm text-muted mt-4 text-center">
-          Bankanızın doğrulama adımını tamamlayın. İşlem sonrası otomatik yönlendirileceksiniz.
-        </p>
-      </div>
-    );
   }
 
   return (
@@ -290,11 +281,13 @@ export default function CardPaymentForm({ target, amount, onSuccess, onFallbackT
                   autoComplete="cc-csc"
                 />
               </div>
-              <Checkbox
-                label="Kartımı sonraki ödemeler ve otomatik yenileme için kaydet"
-                checked={saveCard}
-                onChange={(e) => setSaveCard(e.target.checked)}
-              />
+              {recurringEnabled && (
+                <Checkbox
+                  label="Kartımı sonraki ödemeler ve otomatik yenileme için kaydet"
+                  checked={saveCard}
+                  onChange={(e) => setSaveCard(e.target.checked)}
+                />
+              )}
             </div>
           )}
         </div>
