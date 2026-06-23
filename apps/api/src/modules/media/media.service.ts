@@ -23,6 +23,8 @@ export interface UploadOptions {
     fit?: 'cover' | 'contain' | 'fill' | 'inside' | 'outside';
   };
   generateThumbnail?: boolean;
+  entityType?: string;
+  entityId?: string;
 }
 
 export interface UploadResult {
@@ -47,7 +49,8 @@ export class MediaService {
 
   async upload(
     file: Express.Multer.File,
-    options: UploadOptions = {}
+    options: UploadOptions = {},
+    uploaderId?: string,
   ): Promise<UploadResult> {
     const {
       bucket = this.defaultBucket,
@@ -56,6 +59,8 @@ export class MediaService {
       allowedTypes = ['image/jpeg', 'image/png', 'image/webp', 'image/gif'],
       resize,
       generateThumbnail = false,
+      entityType,
+      entityId,
     } = options;
 
     // Validate file size
@@ -94,7 +99,10 @@ export class MediaService {
           folder,
           filename,
           mimeType: file.mimetype,
-        }
+          entityType,
+          entityId,
+        },
+        uploaderId,
       );
 
       const result: UploadResult = {
@@ -130,7 +138,10 @@ export class MediaService {
             folder: `${folder}/thumbnails`,
             filename: thumbFilename,
             mimeType: file.mimetype,
-          }
+            entityType,
+            entityId,
+          },
+          uploaderId,
         );
 
         result.thumbnail = thumbResult.key;
@@ -146,9 +157,10 @@ export class MediaService {
 
   async uploadMultiple(
     files: Express.Multer.File[],
-    options: UploadOptions = {}
+    options: UploadOptions = {},
+    uploaderId?: string,
   ): Promise<UploadResult[]> {
-    return Promise.all(files.map((file) => this.upload(file, options)));
+    return Promise.all(files.map((file) => this.upload(file, options, uploaderId)));
   }
 
   async delete(key: string, bucket: string = this.defaultBucket): Promise<void> {
@@ -195,7 +207,10 @@ export class MediaService {
       filename?: string;
       mimeType?: string;
       bucket?: 'products' | 'avatars' | 'documents' | 'collections' | 'tickets';
+      entityType?: string;
+      entityId?: string;
     } = {},
+    uploaderId?: string,
   ): Promise<UploadResult> {
     const bucket = options.bucket || this.defaultBucket;
     const folder = options.folder || 'uploads';
@@ -210,7 +225,10 @@ export class MediaService {
           folder,
           filename,
           mimeType,
-        }
+          entityType: options.entityType,
+          entityId: options.entityId,
+        },
+        uploaderId,
       );
 
       return {

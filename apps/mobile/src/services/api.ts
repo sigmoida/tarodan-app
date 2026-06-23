@@ -924,7 +924,7 @@ export const mediaApi = {
       },
     );
   },
-  deleteFile: (key: string) => api.delete(`/media/${encodeURIComponent(key)}`),
+  deleteFile: (key: string) => api.delete(`/media/file/${key}`),
 };
 
 // =============================================================================

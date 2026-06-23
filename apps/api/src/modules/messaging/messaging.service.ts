@@ -47,12 +47,8 @@ export class MessagingService {
   private async resolveAvatarUrl(avatarUrl: string | null | undefined): Promise<string | null> {
     if (!avatarUrl) return null;
     if (avatarUrl.startsWith('http://') || avatarUrl.startsWith('https://')) return avatarUrl;
-    if (this.storageService) {
-      try {
-        return await this.storageService.getPresignedDownloadUrl('avatars', avatarUrl, 86400);
-      } catch { return null; }
-    }
-    return null;
+    // avatars S3'te public-read → cache'lenebilir doğrudan URL (presigned'a gerek yok)
+    return this.storageService?.getPublicAssetUrl(avatarUrl) ?? null;
   }
 
   private resolveProductImageUrl(imageKeyOrUrl: string | null | undefined): string | null {

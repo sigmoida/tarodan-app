@@ -16,7 +16,8 @@ import { FileInterceptor, FilesInterceptor } from '@nestjs/platform-express';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { MediaService, UploadOptions, UploadResult } from './media.service';
 import { MembershipService } from '../membership/membership.service';
-import { StorageService } from '../storage/storage.service';
+import { StorageService, isPublicBucket } from '../storage/storage.service';
+import { MediaAccessService } from '../storage/media-access.service';
 import { ModerationAiClient } from '../moderation/moderation-ai.client';
 
 @Controller('media')
@@ -26,6 +27,7 @@ export class MediaController {
     private readonly mediaService: MediaService,
     private readonly membershipService: MembershipService,
     private readonly storageService: StorageService,
+    private readonly mediaAccess: MediaAccessService,
     private readonly moderationAi: ModerationAiClient,
   ) {}
 
@@ -61,12 +63,13 @@ export class MediaController {
       }
     }
 
-    return this.mediaService.upload(file, options);
+    return this.mediaService.upload(file, options, req.user.id);
   }
 
   @Post('upload/multiple')
   @UseInterceptors(FilesInterceptor('files', 10))
   async uploadMultipleFiles(
+    @Request() req: any,
     @UploadedFiles() files: Express.Multer.File[],
     @Query('folder') folder?: string,
     @Query('thumbnail') thumbnail?: string
@@ -80,7 +83,7 @@ export class MediaController {
       generateThumbnail: thumbnail === 'true',
     };
 
-    return this.mediaService.uploadMultiple(files, options);
+    return this.mediaService.uploadMultiple(files, options, req.user.id);
   }
 
   @Post('upload/product')
@@ -138,37 +141,51 @@ export class MediaController {
       field: 'avatar',
     });
 
-    return this.mediaService.upload(file, {
-      folder: 'avatars',
-      resize: { width: 300, height: 300, fit: 'cover' },
-      allowedTypes: ['image/jpeg', 'image/png', 'image/webp'],
-      maxSize: 2 * 1024 * 1024, // 2MB
-    });
+    return this.mediaService.upload(
+      file,
+      {
+        bucket: 'avatars',
+        folder: req.user.id,
+        resize: { width: 300, height: 300, fit: 'cover' },
+        allowedTypes: ['image/jpeg', 'image/png', 'image/webp'],
+        maxSize: 2 * 1024 * 1024, // 2MB
+        entityType: 'user',
+        entityId: req.user.id,
+      },
+      req.user.id,
+    );
   }
 
-  @Delete(':key')
-  async deleteFile(@Param('key') key: string): Promise<{ success: boolean }> {
-    await this.mediaService.delete(key);
+  /**
+   * Public asset (ürün/koleksiyon/avatar) için doğrudan görüntüleme URL'i.
+   * GET /media/public-url/*  (key tam yol: {env}/{bucket}/...)
+   *
+   * Bucket, KEY'in kendisinden türetilir (client'a güvenilmez); yalnızca
+   * PUBLIC bucket'lara izin verilir. Private içerik kendi yetkili modülünden okunur.
+   */
+  @Get('public-url/*')
+  getPublicUrl(@Param() params: any): { url: string } {
+    const key = params['0'] as string;
+    const bucketFolder = key?.split('/')[1] ?? '';
+    if (!isPublicBucket(bucketFolder)) {
+      throw new BadRequestException('Bu içerik için herkese açık URL verilemez.');
+    }
+    return { url: this.storageService.getPublicAssetUrl(key) };
+  }
+
+  /**
+   * Dosya sil — yalnızca dosyayı yükleyen veya admin.
+   * Key tam yol içerebileceği için wildcard ile yakalanır.
+   * DELETE /media/file/*
+   */
+  @Delete('file/*')
+  async deleteFile(
+    @Request() req: any,
+    @Param() params: any,
+  ): Promise<{ success: boolean }> {
+    const key = params['0'];
+    const file = await this.mediaAccess.assertCanModify(key, req.user);
+    await this.storageService.deleteFile(file.bucket, file.key);
     return { success: true };
-  }
-
-  @Get('presigned/:key')
-  async getPresignedUrl(
-    @Param('key') key: string,
-    @Query('expiry') expiry?: number
-  ): Promise<{ url: string }> {
-    const url = await this.mediaService.getPresignedUrl(key, undefined, expiry || 3600);
-    return { url };
-  }
-
-  @Get('presigned/upload/:folder/:filename')
-  async getPresignedUploadUrl(
-    @Param('folder') folder: string,
-    @Param('filename') filename: string,
-    @Query('expiry') expiry?: number
-  ): Promise<{ url: string; key: string }> {
-    const key = `${folder}/${filename}`;
-    const url = await this.mediaService.getPresignedUploadUrl(key, undefined, expiry || 3600);
-    return { url, key };
   }
 }

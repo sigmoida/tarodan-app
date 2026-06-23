@@ -713,7 +713,11 @@ export const mediaApi = {
       },
     });
   },
-  deleteFile: (key: string) => api.delete(`/media/${key}`),
+  // Public asset (ürün/koleksiyon/avatar) için doğrudan görüntüleme URL'i.
+  // key tam yol olmalı: {env}/{bucket}/... — bucket key'den türetilir.
+  getPublicUrl: (key: string) =>
+    api.get<{ url: string }>(`/media/public-url/${key}`),
+  deleteFile: (key: string) => api.delete(`/media/file/${key}`),
 };
 
 // Static pages (public, no auth)

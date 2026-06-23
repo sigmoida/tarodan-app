@@ -1,8 +1,8 @@
 import { Module } from '@nestjs/common';
 import { ConfigModule } from '@nestjs/config';
 import { MulterModule } from '@nestjs/platform-express';
-import { StorageController } from './storage.controller';
 import { StorageService } from './storage.service';
+import { MediaAccessService } from './media-access.service';
 import { PrismaModule } from '../../prisma';
 import { ModerationModule } from '../moderation/moderation.module';
 
@@ -17,8 +17,7 @@ import { ModerationModule } from '../moderation/moderation.module';
       },
     }),
   ],
-  controllers: [StorageController],
-  providers: [StorageService],
-  exports: [StorageService],
+  providers: [StorageService, MediaAccessService],
+  exports: [StorageService, MediaAccessService],
 })
 export class StorageModule {}
