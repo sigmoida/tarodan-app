@@ -80,6 +80,7 @@ export default function MembershipManageScreen() {
   const tier = (data?.tier?.type ?? data?.tierType ?? 'free').toLowerCase();
   const tierName = data?.tier?.name ?? data?.tierName ?? TIER_NAMES[tier] ?? 'Ücretsiz Üyelik';
   const isPaid = tier !== 'free';
+  const isCancelled = (data?.status ?? '').toLowerCase() === 'cancelled';
   const autoRenew = !!data?.autoRenew;
 
   const cancelMutation = useMutation({
@@ -158,12 +159,29 @@ export default function MembershipManageScreen() {
               <Text style={styles.tierText}>{tierName}</Text>
             </View>
             {isPaid ? (
-              <View style={styles.activeRow}>
-                <Ionicons name="checkmark-circle" size={18} color={colors.success[600]!} />
-                <Text style={styles.activeText}>Aktif</Text>
-              </View>
+              isCancelled ? (
+                <View style={styles.activeRow}>
+                  <Ionicons name="close-circle" size={18} color={colors.warning[600]!} />
+                  <Text style={[styles.activeText, { color: colors.warning[600]! }]}>İptal Edildi</Text>
+                </View>
+              ) : (
+                <View style={styles.activeRow}>
+                  <Ionicons name="checkmark-circle" size={18} color={colors.success[600]!} />
+                  <Text style={styles.activeText}>Aktif</Text>
+                </View>
+              )
             ) : null}
           </View>
+
+          {isPaid && isCancelled ? (
+            <View style={styles.cancelledNote}>
+              <Ionicons name="information-circle-outline" size={16} color={colors.warning[600]!} />
+              <Text style={styles.cancelledNoteText}>
+                Üyeliğiniz iptal edildi. {formatDate(data?.currentPeriodEnd)} tarihine kadar
+                özelliklerinizi kullanmaya devam edebilirsiniz.
+              </Text>
+            </View>
+          ) : null}
 
           {isPaid ? (
             <>
@@ -222,15 +240,17 @@ export default function MembershipManageScreen() {
               onPress={() => router.push('/membership' as any)}
               style={styles.actionBtn}
             />
-            <Button
-              variant="outline"
-              title="Üyeliği İptal Et"
-              icon="close-circle-outline"
-              onPress={handleCancel}
-              isLoading={cancelMutation.isPending}
-              disabled={cancelMutation.isPending}
-              style={{ ...styles.actionBtn, borderColor: colors.danger[600]! }}
-            />
+            {!isCancelled && (
+              <Button
+                variant="outline"
+                title="Üyeliği İptal Et"
+                icon="close-circle-outline"
+                onPress={handleCancel}
+                isLoading={cancelMutation.isPending}
+                disabled={cancelMutation.isPending}
+                style={{ ...styles.actionBtn, borderColor: colors.danger[600]! }}
+              />
+            )}
           </>
         ) : (
           <Button
@@ -305,6 +325,21 @@ const styles = StyleSheet.create({
     color: colors.success[600]!,
     fontWeight: '600',
     fontSize: 13,
+  },
+  cancelledNote: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    gap: 8,
+    marginTop: 12,
+    padding: 10,
+    backgroundColor: colors.warning[50]!,
+    borderRadius: 10,
+  },
+  cancelledNoteText: {
+    flex: 1,
+    color: colors.warning[600]!,
+    fontSize: 12,
+    lineHeight: 17,
   },
   kvRow: {
     flexDirection: 'row',

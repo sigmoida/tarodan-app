@@ -161,7 +161,11 @@ export default function OrderGroupDetailScreen() {
                 <Pressable onPress={() => router.push(`/orders/${order.id}` as any)}>
                   <View style={styles.itemHeader}>
                     <Text variant="caption" style={styles.muted}>#{order.orderNumber}</Text>
-                    <StatusBadge status={order.status} config={uiOrderStatusConfig} size="sm" />
+                    {/* Tek siparişli grupta öğe rozeti, üstteki grup rozetiyle aynı
+                        → tekrarı önlemek için yalnız 2+ siparişte göster. */}
+                    {group.orders.length > 1 && (
+                      <StatusBadge status={order.status} config={uiOrderStatusConfig} size="sm" />
+                    )}
                   </View>
                   <View style={styles.itemContent}>
                     <Image
