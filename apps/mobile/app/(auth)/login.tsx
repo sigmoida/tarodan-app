@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Pressable, StyleSheet } from 'react-native';
+import { ActivityIndicator, Pressable, StyleSheet } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useForm, Controller } from 'react-hook-form';
@@ -38,6 +38,7 @@ export default function LoginScreen() {
   const { login } = useAuthStore();
   const [unverifiedEmail, setUnverifiedEmail] = useState<string | null>(null);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const [googleLoading, setGoogleLoading] = useState(false);
 
   const { control, handleSubmit, formState: { errors }, getValues } = useForm<LoginForm>({
     resolver: zodResolver(loginSchema),
@@ -127,6 +128,8 @@ export default function LoginScreen() {
   });
 
   const handleGoogle = async () => {
+    if (googleLoading) return;
+    setGoogleLoading(true);
     try {
       const idToken = await signInWithGoogle();
       const response = await authApi.loginWithGoogle(idToken);
@@ -134,10 +137,16 @@ export default function LoginScreen() {
       await login(tokens.accessToken, user, tokens.refreshToken);
       router.push('/' as never);
     } catch (e: any) {
-      // kullanıcı iptal edebilir; sessiz geç veya toast göster
-      if (e?.code !== 'SIGN_IN_CANCELLED') {
-        console.warn('Google sign-in failed', e?.message);
-      }
+      // İptal sessiz geçilir; diğer her hata KULLANICIYA gösterilir (önceden
+      // sessiz yutuluyordu → "takılıyor" görüntüsü). Native status code'u da
+      // ekle: DEVELOPER_ERROR → Google Cloud'da Android OAuth client/SHA-1 eksik.
+      if (e?.code === 'SIGN_IN_CANCELLED' || e?.code === '-5') return;
+      const apiMsg = e?.response?.data?.message;
+      const detail = apiMsg || e?.message || 'Bilinmeyen hata';
+      const code = e?.code ? ` (kod: ${e.code})` : '';
+      appAlert('Google ile giriş başarısız', `${detail}${code}`);
+    } finally {
+      setGoogleLoading(false);
     }
   };
 
@@ -309,12 +318,16 @@ export default function LoginScreen() {
             onPress={handleGoogle}
             accessibilityRole="button"
             accessibilityLabel="Google ile devam et"
-            disabled={loginMutation.isPending}
-            style={styles.googleButton}
+            disabled={loginMutation.isPending || googleLoading}
+            style={[styles.googleButton, (loginMutation.isPending || googleLoading) && { opacity: 0.6 }]}
           >
-            <Ionicons name="logo-google" size={18} color="#111827" />
+            {googleLoading ? (
+              <ActivityIndicator size="small" color="#111827" />
+            ) : (
+              <Ionicons name="logo-google" size={18} color="#111827" />
+            )}
             <Text variant="body" weight="semibold">
-              Google ile devam et
+              {googleLoading ? 'Giriş yapılıyor…' : 'Google ile devam et'}
             </Text>
           </Pressable>
         )}
