@@ -1,6 +1,6 @@
 import { Module } from '@nestjs/common';
 import { ConfigModule } from '@nestjs/config';
-import { ThrottlerModule } from '@nestjs/throttler';
+import { ThrottlerModule, ThrottlerGuard } from '@nestjs/throttler';
 import { APP_GUARD, APP_INTERCEPTOR } from '@nestjs/core';
 import { PrismaModule } from './prisma';
 import { DevModule } from './modules/dev/dev.module';
@@ -194,6 +194,14 @@ import { ErrorLogInterceptor } from './common/interceptors/error-log.interceptor
   ],
   controllers: [],
   providers: [
+    // Global Rate-Limit Guard — auth'tan ÖNCE çalışmalı ki brute-force istekleri
+    // JWT doğrulamasına bile ulaşmadan 429 ile kesilsin. ThrottlerModule.forRoot
+    // tek başına yetmiyordu (guard global kayıtlı değildi → @Throttle dekoratörleri
+    // ve global limit hiç uygulanmıyordu).
+    {
+      provide: APP_GUARD,
+      useClass: ThrottlerGuard,
+    },
     // Global JWT Auth Guard (use @Public() decorator to skip)
     {
       provide: APP_GUARD,
