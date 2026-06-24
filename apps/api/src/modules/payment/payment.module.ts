@@ -3,6 +3,7 @@ import { ConfigModule, ConfigService } from '@nestjs/config';
 import { JwtModule } from '@nestjs/jwt';
 import { ScheduleModule } from '@nestjs/schedule';
 import { PaymentController } from './payment.controller';
+import { PaytrCallbackAliasController } from './paytr-callback-alias.controller';
 import { PaymentService } from './payment.service';
 import { PaymentSchedulerService } from './payment-scheduler.service';
 import { PrismaModule } from '../../prisma';
@@ -42,7 +43,7 @@ import { StorageModule } from '../storage/storage.module';
       inject: [ConfigService],
     }),
   ],
-  controllers: [PaymentController],
+  controllers: [PaymentController, PaytrCallbackAliasController],
   providers: [PaymentService, PaymentSchedulerService, RawBodyMiddleware],
   exports: [PaymentService],
 })

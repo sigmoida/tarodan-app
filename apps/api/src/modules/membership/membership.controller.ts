@@ -3,6 +3,7 @@ import {
   Get,
   Post,
   Patch,
+  Delete,
   Body,
   Param,
   Request,
@@ -122,6 +123,31 @@ export class MembershipController {
     @Body() dto: { autoRenew: boolean },
   ): Promise<UserMembershipResponseDto> {
     return this.membershipService.toggleAutoRenew(req.user.id, dto.autoRenew);
+  }
+
+  // ==========================================================================
+  // SAVED CARDS (CAPI) — kayıtlı kart yönetimi
+  // ==========================================================================
+
+  /**
+   * Kullanıcının kayıtlı kartlarını listele (oto-yenileme için).
+   * GET /membership/cards
+   */
+  @Get('cards')
+  async listSavedCards(@Request() req: any) {
+    return this.membershipService.listSavedCards(req.user.id);
+  }
+
+  /**
+   * Kayıtlı kartı sil (PayTR capi/delete + yerelde revoke).
+   * DELETE /membership/cards/:id
+   */
+  @Delete('cards/:id')
+  async deleteSavedCard(
+    @Request() req: any,
+    @Param('id') id: string,
+  ): Promise<{ deleted: boolean }> {
+    return this.membershipService.deleteSavedCard(req.user.id, id);
   }
 
   // ==========================================================================

@@ -161,148 +161,6 @@ export class PayTRService {
   }
 
   // ==========================================================================
-  // IFRAME PAYMENT (Recommended by PayTR)
-  // ==========================================================================
-
-  /**
-   * Create iframe token for payment
-   */
-  async createIframeToken(
-    orderId: string,
-    amount: number, // in TL
-    buyer: PayTRBuyer,
-    basketItems: PayTRBasketItem[],
-    options?: {
-      installmentCount?: number;
-      maxInstallment?: number;
-      lang?: 'tr' | 'en';
-      timeoutLimit?: number;
-      /** e.g. "type=membership" so success page redirects to membership success */
-      successQueryParams?: string;
-      /**
-       * Kayıtlı kart (PayTR "Kayıtlı Kart" özelliği — hesapta açık olmalı):
-       * - userId: PayTR user_id (kart bu kullanıcı altında saklanır). YALNIZ
-       *   authenticated kullanıcıda gönder; guest'te GÖNDERME.
-       * - storeCard: yeni kartı sakla (iframe'de "kartımı kaydet").
-       * - cardToken/utoken: kayıtlı kartla ödeme (iframe kartı hazır getirir).
-       * NOT: PayTR alan adları panel dokümanıyla doğrulanmalı.
-       */
-      userId?: string;
-      storeCard?: boolean;
-      cardToken?: string;
-      utoken?: string;
-    },
-  ): Promise<{ token: string; iframeUrl: string }> {
-    const paymentAmount = Math.round(amount * 100); // Convert to kuruş
-    const successBase = `${this.configService.get('FRONTEND_URL')}/payment/success`;
-    const merchantOkUrl = options?.successQueryParams
-      ? `${successBase}?${options.successQueryParams}`
-      : successBase;
-    const merchantFailUrl = `${this.configService.get('FRONTEND_URL')}/payment/fail`;
-
-    // Encode basket (must match POST user_basket)
-    const userBasket = this.encodeBasket(basketItems);
-
-    const noInstallment = options?.installmentCount === 1 ? '1' : '0';
-    const maxInstallment = String(options?.maxInstallment ?? 0);
-    const paymentAmountStr = String(paymentAmount);
-    const testModeStr = this.testMode ? '1' : '0';
-
-    // iFrame API: paytr_token = base64(HMAC-SHA256(merchant_key, hashStr + merchant_salt))
-    // hashStr = merchant_id + user_ip + merchant_oid + email + payment_amount + user_basket + no_installment + max_installment + currency + test_mode
-    const hashStr =
-      this.merchantId +
-      buyer.ip +
-      orderId +
-      buyer.email +
-      paymentAmountStr +
-      userBasket +
-      noInstallment +
-      maxInstallment +
-      'TL' +
-      testModeStr;
-    const paytrToken = crypto
-      .createHmac('sha256', this.merchantKey)
-      .update(hashStr + this.merchantSalt)
-      .digest('base64');
-
-    // Build request data (field values must match hash above)
-    const formData = new URLSearchParams({
-      merchant_id: this.merchantId,
-      user_ip: buyer.ip,
-      merchant_oid: orderId,
-      email: buyer.email,
-      payment_amount: paymentAmountStr,
-      paytr_token: paytrToken,
-      user_basket: userBasket,
-      debug_on: this.testMode ? '1' : '0',
-      no_installment: noInstallment,
-      max_installment: maxInstallment,
-      user_name: `${buyer.name} ${buyer.surname}`,
-      user_address: buyer.address,
-      user_phone: buyer.phone,
-      merchant_ok_url: merchantOkUrl,
-      merchant_fail_url: merchantFailUrl,
-      timeout_limit: String(options?.timeoutLimit || 30),
-      currency: 'TL',
-      test_mode: this.testMode ? '1' : '0',
-      lang: options?.lang || 'tr',
-    });
-
-    // Kayıtlı kart alanları (hash'e dahil DEĞİL → güvenli ekleme). PayTR "Kayıtlı
-    // Kart" özelliği hesapta kapalıysa bu alanlar yok sayılır, akış bozulmaz.
-    if (options?.userId) formData.set('user_id', options.userId);
-    if (options?.storeCard) formData.set('store_card', '1');
-    if (options?.cardToken) formData.set('card_token', options.cardToken);
-    if (options?.utoken) formData.set('utoken', options.utoken);
-
-    try {
-      this.logger.log(`PayTR get-token POST → merchant_oid=${orderId} amount=${paymentAmountStr} test=${testModeStr}`);
-      const response = await fetch(`${this.baseUrl}/api/get-token`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/x-www-form-urlencoded',
-        },
-        body: formData.toString(),
-        signal: AbortSignal.timeout(this.httpTimeoutMs),
-      });
-
-      const rawText = await response.text();
-      this.logger.log(`PayTR get-token response: HTTP ${response.status} body=${rawText.slice(0, 400)}`);
-      if (!rawText?.trim()) {
-        this.logger.error(`PayTR API boş yanıt döndü. HTTP ${response.status}`);
-        throw new BadRequestException(
-          `PayTR yanıt vermedi (HTTP ${response.status}). Merchant ID/Key/Salt ve test modunu kontrol edin.`,
-        );
-      }
-
-      let data: PayTRIframeResponse;
-      try {
-        data = JSON.parse(rawText);
-      } catch {
-        this.logger.error(`PayTR API JSON değil. Status: ${response.status}, body: ${rawText.slice(0, 200)}`);
-        throw new BadRequestException(
-          'PayTR geçerli yanıt dönmedi. API bilgilerinizi ve PayTR panel ayarlarını kontrol edin.',
-        );
-      }
-
-      if (data.status !== 'success' || !data.token) {
-        this.logger.error(`PayTR token error: ${data.reason}`);
-        throw new BadRequestException(data.reason || 'PayTR token oluşturulamadı');
-      }
-
-      return {
-        token: data.token,
-        iframeUrl: `https://www.paytr.com/odeme/guvenli/${data.token}`,
-      };
-    } catch (error: any) {
-      if (error instanceof BadRequestException) throw error;
-      this.logger.error('PayTR API error:', error);
-      throw new BadRequestException(error.message || 'PayTR bağlantı hatası');
-    }
-  }
-
-  // ==========================================================================
   // STATUS INQUIRY (durum-sorgu) — callback kaçırılan başarılı ödemeler için
   // https://dev.paytr.com/en/durum-sorgu
   // ==========================================================================
@@ -613,13 +471,21 @@ export class PayTRService {
       non3d?: boolean;
       /** e.g. "paymentId=...&type=membership" — success sayfası verify için kullanır */
       successQueryParams?: string;
+      /** CAPI: kartı PayTR'da sakla → ödeme bildiriminde utoken döner (recurring için). */
+      storeCard?: boolean;
+      /** Kullanıcının zaten bir utoken'ı varsa yeni kart eklerken birlikte gönderilir. */
+      utoken?: string;
     },
   ): Promise<{ status: 'success'; threeDSHtml?: string }> {
     if (!this.merchantId || !this.merchantKey || !this.merchantSalt) {
       throw new BadRequestException('PayTR yapılandırılmamış (merchant bilgileri eksik)');
     }
 
-    const paymentAmountStr = String(Math.round(amount * 100)); // kuruş
+    // ÖNEMLİ: Direkt API /odeme payment_amount = ONDALIK TL ("462.81"), KURUŞ DEĞİL.
+    // Resmi PayTR Direkt API örnek kodu: payment_amount = '100.99'. Kuruş (×100) göndermek
+    // PayTR'nin 100 KATI tutar çekmesine yol açar (panelde "46.281,00 TL", callback total_amount
+    // ×100). chargeRecurring de aynı /odeme'yi ONDALIK TL ile çağırır — tutarlı.
+    const paymentAmountStr = amount.toFixed(2); // ONDALIK TL
     const paymentType = 'card';
     // Tek çekim için '0' gönderilir (Direkt API kuralı)
     const installmentCount = String(
@@ -655,10 +521,10 @@ export class PayTRService {
       .digest('base64');
 
     const expiryYear2 = card.expireYear.length === 4 ? card.expireYear.slice(-2) : card.expireYear;
-    // Direkt API basket: htmlEntities'li düz JSON (iframe'in base64'ünden farklı —
-    // resmi PayTR Postman koleksiyonundaki pre-request script ile birebir)
+    // Direkt API basket: ONDALIK TL birim fiyat ("50.00") — resmi örnek kodla birebir
+    // (payment_amount ile aynı birim). Kuruş GÖNDERME (×100 hatasına yol açar).
     const basketJson = JSON.stringify(
-      basketItems.map((item) => [item.name, (item.price * 100).toFixed(0), item.quantity]),
+      basketItems.map((item) => [item.name, Number(item.price).toFixed(2), item.quantity]),
     );
     const userBasket = basketJson
       .replace(/&/g, '&amp;')
@@ -697,6 +563,11 @@ export class PayTRService {
       lang: 'tr',
       timeout_limit: '30',
     });
+
+    // CAPI kart saklama: store_card=1 → ödeme bildiriminde (Bildirim URL) utoken döner.
+    // Kullanıcının mevcut utoken'ı varsa yeni kart onunla ilişkilendirilir.
+    if (options?.storeCard) formData.set('store_card', '1');
+    if (options?.utoken) formData.set('utoken', options.utoken);
 
     let rawText: string;
     let httpStatus: number;
@@ -758,20 +629,219 @@ export class PayTRService {
   }
 
   // ==========================================================================
-  // HELPER METHODS
+  // CAPI — KART SAKLAMA / RECURRING (kullanıcısız tekrarlayan ödeme)
+  // Kaynak: resmi PayTR "Kart Saklama (CAPI) + Recurring" dokümanı + NODEJS örnek kodu.
+  // UYARI: Canlıda çalışması için mağazada Non3D + recurring_payment YETKİSİ açık olmalı
+  // (PAYTR_RECURRING_ENABLED flag'i bu yetki doğrulanmadan açılmamalı).
   // ==========================================================================
 
   /**
-   * Encode basket items to Base64
+   * Kayıtlı kartla KULLANICISIZ tekrarlayan ödeme (RECURRING).
+   * POST {baseUrl} (/odeme) recurring_payment=1 + non_3d=1. Hash, Direkt API deseniyle
+   * BİREBİR aynıdır (recurring örnek kodundan doğrulandı). payment_amount ONDALIK TL
+   * ("100.99") — kuruş DEĞİL. Yanıt JSON: status ∈ success | failed | wait_callback;
+   * failed'de try_again ile dunning yönetilir. (Detay ayrıca Bildirim URL'ine de düşer.)
    */
-  private encodeBasket(items: PayTRBasketItem[]): string {
-    const basketArray = items.map((item) => [
-      item.name,
-      (item.price * 100).toFixed(0), // Convert to kuruş
-      item.quantity,
-    ]);
-    return Buffer.from(JSON.stringify(basketArray)).toString('base64');
+  async chargeRecurring(params: {
+    utoken: string;
+    ctoken: string;
+    amount: number; // TL
+    merchantOid: string;
+    buyer: PayTRBuyer;
+    basketItems: PayTRBasketItem[];
+    cvv?: string;
+  }): Promise<{ status: 'success' | 'failed' | 'wait_callback'; reason?: string; tryAgain?: boolean }> {
+    if (!this.merchantId || !this.merchantKey || !this.merchantSalt) {
+      throw new BadRequestException('PayTR yapılandırılmamış (merchant bilgileri eksik)');
+    }
+    const paymentAmount = params.amount.toFixed(2); // ONDALIK TL (recurring kuruş kabul etmez)
+    const paymentType = 'card';
+    const installmentCount = '0';
+    const currency = 'TL';
+    const testModeStr = this.testMode ? '1' : '0';
+    const non3d = '1';
+
+    // hashStr = mid + ip + oid + email + amount + payment_type + installment + currency + test_mode + non_3d
+    const hashStr =
+      this.merchantId +
+      params.buyer.ip +
+      params.merchantOid +
+      params.buyer.email +
+      paymentAmount +
+      paymentType +
+      installmentCount +
+      currency +
+      testModeStr +
+      non3d;
+    const paytrToken = crypto
+      .createHmac('sha256', this.merchantKey)
+      .update(hashStr + this.merchantSalt)
+      .digest('base64');
+
+    // Recurring sepeti: düz JSON, ondalık fiyat (örnek kodla uyumlu — iframe base64'ünden farklı)
+    const userBasket = JSON.stringify(
+      params.basketItems.map((i) => [i.name, Number(i.price).toFixed(2), i.quantity]),
+    );
+
+    const form = new URLSearchParams({
+      merchant_id: this.merchantId,
+      user_ip: params.buyer.ip,
+      merchant_oid: params.merchantOid,
+      email: params.buyer.email,
+      payment_type: paymentType,
+      payment_amount: paymentAmount,
+      currency,
+      test_mode: testModeStr,
+      non_3d: non3d,
+      merchant_ok_url: `${this.configService.get('FRONTEND_URL')}/payment/success`,
+      merchant_fail_url: `${this.configService.get('FRONTEND_URL')}/payment/fail`,
+      user_name: `${params.buyer.name} ${params.buyer.surname}`,
+      user_address: params.buyer.address,
+      user_phone: params.buyer.phone,
+      user_basket: userBasket,
+      debug_on: this.testMode ? '1' : '0',
+      client_lang: 'tr',
+      installment_count: installmentCount,
+      utoken: params.utoken,
+      ctoken: params.ctoken,
+      recurring_payment: '1',
+      paytr_token: paytrToken,
+    });
+    if (params.cvv) form.set('cvv', params.cvv);
+
+    try {
+      const response = await fetch(this.baseUrl, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+        body: form.toString(),
+        signal: AbortSignal.timeout(this.httpTimeoutMs),
+      });
+      const rawText = await response.text();
+      const data = this.parsePaytrJson<{
+        status?: string;
+        reason?: string;
+        err_msg?: string;
+        try_again?: boolean;
+      }>(rawText);
+      if (!data || !data.status) {
+        this.logger.error(
+          `PayTR recurring boş/geçersiz yanıt oid=${params.merchantOid}: ${rawText?.slice(0, 200)}`,
+        );
+        return { status: 'failed', reason: 'PayTR geçersiz/boş yanıt', tryAgain: true };
+      }
+      return {
+        status: data.status as 'success' | 'failed' | 'wait_callback',
+        reason: data.reason || data.err_msg,
+        tryAgain: data.try_again,
+      };
+    } catch (error: any) {
+      this.logger.error(`PayTR recurring hata oid=${params.merchantOid}: ${error?.message}`);
+      // Ağ/timeout → geçici kabul et, tekrar denenebilir.
+      return { status: 'failed', reason: error?.message || 'bağlantı hatası', tryAgain: true };
+    }
   }
+
+  /**
+   * Kullanıcının PayTR'da kayıtlı kartlarını listeler (utoken → ctoken + maskeli bilgi).
+   * Hash = HMAC(merchant_key, utoken + merchant_salt) (örnek koddan).
+   */
+  async capiListCards(utoken: string): Promise<
+    Array<{
+      ctoken: string;
+      last4: string;
+      requireCvv: boolean;
+      month?: string;
+      year?: string;
+      brand?: string;
+      type?: string;
+      schema?: string;
+    }>
+  > {
+    if (!this.merchantId || !this.merchantKey || !this.merchantSalt) {
+      throw new BadRequestException('PayTR yapılandırılmamış (merchant bilgileri eksik)');
+    }
+    const paytrToken = crypto
+      .createHmac('sha256', this.merchantKey)
+      .update(utoken + this.merchantSalt)
+      .digest('base64');
+    const form = new URLSearchParams({
+      merchant_id: this.merchantId,
+      utoken,
+      paytr_token: paytrToken,
+    });
+    try {
+      const response = await fetch('https://www.paytr.com/odeme/capi/list', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+        body: form.toString(),
+        signal: AbortSignal.timeout(this.httpTimeoutMs),
+      });
+      const rawText = await response.text();
+      const data = this.parsePaytrJson<any>(rawText);
+      // Hata: {status:'error', err_msg}. Eşleşme yoksa boş JSON. Başarı: kart dizisi.
+      if (!data || data.status === 'error') {
+        if (data?.status === 'error') this.logger.warn(`PayTR capi/list error: ${data.err_msg}`);
+        return [];
+      }
+      const cards = Array.isArray(data) ? data : Array.isArray(data.cards) ? data.cards : [];
+      return cards
+        .map((c: any) => ({
+          ctoken: c.ctoken,
+          last4: c.last_4,
+          requireCvv: String(c.require_cvv) === '1',
+          month: c.month,
+          year: c.year,
+          brand: c.c_brand,
+          type: c.c_type,
+          schema: c.schema,
+        }))
+        .filter((c: any) => !!c.ctoken);
+    } catch (error: any) {
+      this.logger.error(`PayTR capi/list hata: ${error?.message}`);
+      return [];
+    }
+  }
+
+  /**
+   * Kullanıcının kayıtlı bir kartını siler.
+   * Hash = HMAC(merchant_key, ctoken + utoken + merchant_salt) (örnek koddan).
+   */
+  async capiDeleteCard(
+    utoken: string,
+    ctoken: string,
+  ): Promise<{ status: string; reason?: string }> {
+    if (!this.merchantId || !this.merchantKey || !this.merchantSalt) {
+      throw new BadRequestException('PayTR yapılandırılmamış (merchant bilgileri eksik)');
+    }
+    const paytrToken = crypto
+      .createHmac('sha256', this.merchantKey)
+      .update(ctoken + utoken + this.merchantSalt)
+      .digest('base64');
+    const form = new URLSearchParams({
+      merchant_id: this.merchantId,
+      ctoken,
+      utoken,
+      paytr_token: paytrToken,
+    });
+    try {
+      const response = await fetch('https://www.paytr.com/odeme/capi/delete', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+        body: form.toString(),
+        signal: AbortSignal.timeout(this.httpTimeoutMs),
+      });
+      const rawText = await response.text();
+      const data = this.parsePaytrJson<{ status?: string; err_msg?: string }>(rawText);
+      return { status: data?.status || 'error', reason: data?.err_msg };
+    } catch (error: any) {
+      this.logger.error(`PayTR capi/delete hata: ${error?.message}`);
+      return { status: 'error', reason: error?.message };
+    }
+  }
+
+  // ==========================================================================
+  // HELPER METHODS
+  // ==========================================================================
 
   /**
    * Generate HMAC-SHA256 hash in Base64 (refund, bin-detail; not iFrame get-token)
@@ -781,71 +851,6 @@ export class PayTRService {
       .createHmac('sha256', this.merchantKey)
       .update(data)
       .digest('base64');
-  }
-
-  // ==========================================================================
-  // CONVENIENCE METHODS
-  // ==========================================================================
-
-  /**
-   * Process order payment (high-level method)
-   */
-  async processOrderPayment(
-    orderId: string,
-    amount: number,
-    buyer: {
-      id: string;
-      name: string;
-      surname: string;
-      email: string;
-      phone: string;
-      ip: string;
-      address: string;
-      city: string;
-    },
-    basketItems: Array<{
-      id: string;
-      name: string;
-      category: string;
-      price: number;
-      quantity?: number;
-    }>,
-    installmentCount = 1,
-    successQueryParams?: string,
-    savedCard?: {
-      userId?: string;
-      storeCard?: boolean;
-      cardToken?: string;
-      utoken?: string;
-    },
-  ): Promise<{ token: string; iframeUrl: string }> {
-    const paytrBuyer: PayTRBuyer = {
-      name: buyer.name,
-      surname: buyer.surname,
-      email: buyer.email,
-      phone: buyer.phone,
-      address: buyer.address,
-      city: buyer.city,
-      country: 'TR',
-      ip: buyer.ip,
-    };
-
-    const paytrBasket: PayTRBasketItem[] = basketItems.map((item) => ({
-      name: item.name,
-      price: item.price,
-      quantity: item.quantity || 1,
-    }));
-
-    return this.createIframeToken(orderId, amount, paytrBuyer, paytrBasket, {
-      installmentCount,
-      maxInstallment: 12,
-      lang: 'tr',
-      successQueryParams,
-      userId: savedCard?.userId,
-      storeCard: savedCard?.storeCard,
-      cardToken: savedCard?.cardToken,
-      utoken: savedCard?.utoken,
-    });
   }
 
   // ==========================================================================

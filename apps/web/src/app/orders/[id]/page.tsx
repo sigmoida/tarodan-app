@@ -556,17 +556,9 @@ export default function OrderDetailPage() {
         return;
       }
 
-      // Kart formu akışı: ödeme sayfamıza git (site-içi kart girişi + 3D Secure;
-      // gerekirse PayTR iframe'ine düşer). paymentUrl'e doğrudan yönlendirmek
-      // kart formunu atlardı.
+      // Tek ödeme yüzeyi: site-içi kart formu + 3D Secure için ödeme sayfamıza git.
       if (data?.paymentId) {
         router.push(`/payment/${data.paymentId}`);
-        return;
-      }
-
-      // Yedek: paymentId yoksa PayTR sayfasına yönlendir
-      if (data?.paymentUrl) {
-        window.location.href = data.paymentUrl;
         return;
       }
 
@@ -1472,8 +1464,8 @@ export default function OrderDetailPage() {
                       <ShieldCheckIcon className="w-5 h-5 text-success-500 mt-0.5 flex-shrink-0" />
                       <p className="text-sm text-muted">
                         {locale === "en"
-                          ? "You will be redirected to the PayTR secure payment page to enter your card details. Your card information is never stored on our servers."
-                          : "Kart bilgilerinizi girmek için PayTR güvenli ödeme sayfasına yönlendirileceksiniz. Kart bilgileriniz sunucularımızda saklanmaz."}
+                          ? "You'll enter your card on our secure payment page (3D Secure). Your card details are never stored on our servers — they're processed via PayTR over 256-bit SSL."
+                          : "Kart bilgilerinizi güvenli ödeme sayfamızda gireceksiniz (3D Secure). Kart bilgileriniz sunucularımızda saklanmaz; PayTR altyapısıyla 256-bit SSL üzerinden işlenir."}
                       </p>
                     </div>
                   </div>

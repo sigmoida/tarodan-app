@@ -24,13 +24,24 @@ async function buyAndInitiate(
     .send({ productId, shippingAddressId })
     .expect(201);
 
-  const initRes = await request(ctx.app.getHttpServer())
-    .post('/api/payments/initiate')
+  // İframe kaldırıldı: tek ödeme yolu process-direct. Kart gönderimi merchant_oid'i
+  // (providerConversationId) atar → callback eşleşebilir. (Mock PayTR; gerçek çağrı yok.)
+  const payRes = await request(ctx.app.getHttpServer())
+    .post('/api/payments/process-direct')
     .set(authHeader(buyer))
-    .send({ orderId: buyRes.body.orderId, provider: 'paytr' })
+    .send({
+      orderId: buyRes.body.orderId,
+      card: {
+        cardHolderName: 'TEST KART',
+        cardNumber: '4355084355084358',
+        expireMonth: '12',
+        expireYear: '30',
+        cvc: '000',
+      },
+    })
     .expect(201);
 
-  return { orderId: buyRes.body.orderId, paymentId: initRes.body.paymentId };
+  return { orderId: buyRes.body.orderId, paymentId: payRes.body.paymentId };
 }
 
 describe('Payment misc endpoints (cancel/verify/confirm-failed) (E2E)', () => {

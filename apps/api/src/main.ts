@@ -1,5 +1,5 @@
 import { NestFactory } from '@nestjs/core';
-import { ValidationPipe, Logger, ConsoleLogger } from '@nestjs/common';
+import { ValidationPipe, Logger, ConsoleLogger, RequestMethod } from '@nestjs/common';
 
 /** Her route için RouterExplorer / RoutesResolver satırlarını susturur; `NEST_VERBOSE_ROUTES=true` ile eski davranış. */
 class QuietRouteNestLogger extends ConsoleLogger {
@@ -95,8 +95,11 @@ async function bootstrap() {
       }),
     );
 
-    // API prefix
-    app.setGlobalPrefix('api');
+    // API prefix. PayTR "Bildirim URL" alias'ı /callback prefix DIŞINDA kalır
+    // (panel .../callback ile bittiğinde çalışsın; kanonik /api/payments/callback/paytr da durur).
+    app.setGlobalPrefix('api', {
+      exclude: [{ path: 'callback', method: RequestMethod.POST }],
+    });
 
     // Swagger documentation
     const config = new DocumentBuilder()
