@@ -204,8 +204,16 @@ export class UserService {
     // Resolve avatar URL (S3 key → presigned URL)
     const resolvedAvatarUrl = await this.resolveAvatarUrl(user.avatarUrl);
 
-    // Remove raw membership and add the mapped membershipInfo
-    const { membership: rawMembership, ...rest } = user;
+    // Remove raw membership and hassas alanları yanıttan çıkar (passwordHash,
+    // fcmToken, ban metadata'sı asla client'a dönmemeli).
+    const {
+      membership: rawMembership,
+      passwordHash: _passwordHash,
+      fcmToken: _fcmToken,
+      bannedBy: _bannedBy,
+      bannedReason: _bannedReason,
+      ...rest
+    } = user;
     return {
       ...rest,
       avatarUrl: resolvedAvatarUrl,
