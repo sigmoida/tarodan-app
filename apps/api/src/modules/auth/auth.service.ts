@@ -8,16 +8,18 @@ import {
 } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
 import { ConfigService } from '@nestjs/config';
+import { ModuleRef } from '@nestjs/core';
 import * as bcrypt from 'bcrypt';
 import * as crypto from 'crypto';
 import { PrismaService } from '../../prisma';
 import { RegisterDto, BusinessRegisterDto, LoginDto, AuthResponseDto, TokensDto } from './dto';
 import { JwtPayload } from './interfaces';
-import { SellerType } from '@prisma/client';
+import { SellerType, OrderStatus, PaymentStatus } from '@prisma/client';
 import { NotificationService } from '../notification/notification.service';
 import { CacheService } from '../cache/cache.service';
 import { StorageService } from '../storage/storage.service';
 import { GoogleAuthService } from './google-auth.service';
+import { PaymentService } from '../payment/payment.service';
 
 @Injectable()
 export class AuthService {
@@ -31,6 +33,7 @@ export class AuthService {
     private readonly cacheService: CacheService,
     private readonly storageService: StorageService,
     private readonly googleAuthService: GoogleAuthService,
+    private readonly moduleRef: ModuleRef,
   ) { }
 
   private async resolveAvatarUrl(avatarUrl: string | null | undefined): Promise<string | null> {
@@ -160,6 +163,17 @@ export class AuthService {
           });
 
           this.logger.log(`Linked ${matchingOrders.length} guest order(s) to new user ${user.id} (${user.email})`);
+
+          // Misafir, ödeme sonrası success sayfasına ulaşamadıysa (eski guest
+          // redirect bug'ı) ödeme yakalanmamış olabilir → sahiplenilen pending
+          // siparişleri PayTR'da DOĞRULA. Bloklamadan, arka planda; PayTR'da
+          // gerçekten ödenmişse sipariş tamamlanır.
+          const pendingOrders = matchingOrders.filter(
+            (o: any) => o.status === OrderStatus.pending_payment,
+          );
+          if (pendingOrders.length > 0) {
+            void this.verifyClaimedGuestPayments(pendingOrders).catch(() => undefined);
+          }
         }
       }
     } catch (error) {
@@ -196,6 +210,52 @@ export class AuthService {
       tokens,
       message: 'Kayıt başarılı! Lütfen email adresinize gönderilen doğrulama linkine tıklayın.',
     };
+  }
+
+  /**
+   * Sahiplenilen pending misafir siparişlerinin ödemesini PayTR'da doğrula.
+   * Misafir, ödeme sonrası success sayfasına ulaşamamış (verify çağrısı hiç
+   * çalışmamış) ve callback de gelmemişse sipariş pending kalır; burada PayTR
+   * durum-sorgusuyla gerçekten ödenmişse sipariş tamamlanır. ModuleRef ile tembel
+   * çözüm (Auth↔Payment modül döngüsünü önler). Asla register'ı bloklamaz/patlatmaz.
+   */
+  private async verifyClaimedGuestPayments(
+    orders: { id: string; checkoutGroupId: string | null }[],
+  ): Promise<void> {
+    let paymentService: PaymentService;
+    try {
+      paymentService = this.moduleRef.get(PaymentService, { strict: false });
+    } catch {
+      return;
+    }
+    for (const order of orders) {
+      try {
+        const payment = await this.prisma.payment.findFirst({
+          where: {
+            status: PaymentStatus.pending,
+            OR: [
+              { orderId: order.id },
+              ...(order.checkoutGroupId
+                ? [{ checkoutGroupId: order.checkoutGroupId }]
+                : []),
+            ],
+          },
+          orderBy: { createdAt: 'desc' },
+          select: { id: true },
+        });
+        if (!payment) continue;
+        const res = await paymentService.verifyPaymentFromClient(payment.id);
+        if (res.completed) {
+          this.logger.log(
+            `Recovered guest payment ${payment.id} for claimed order ${order.id}`,
+          );
+        }
+      } catch (e: any) {
+        this.logger.warn(
+          `verifyClaimedGuestPayments failed for order ${order.id}: ${e?.message}`,
+        );
+      }
+    }
   }
 
   /**
@@ -243,6 +303,13 @@ export class AuthService {
     }
 
     if (verificationToken.usedAt) {
+      // İdempotent: link zaten kullanılmış (çift tıklama / e-posta istemcisinin
+      // link ön-yüklemesi). Kullanıcı zaten doğrulanmışsa bu bir HATA değildir —
+      // başarı dön. Aksi halde ilk çağrı doğrularken ikinci çağrı kullanıcıya
+      // yanlışlıkla "Doğrulama Başarısız" gösteriyordu.
+      if (verificationToken.user?.isEmailVerified) {
+        return { message: 'Email adresiniz zaten doğrulanmış.' };
+      }
       throw new BadRequestException('Bu doğrulama linki daha önce kullanılmış');
     }
 

@@ -166,6 +166,7 @@ export default function ListingDetailClient() {
     items: cartItems,
     offlineItems,
     removeFromCart,
+    removeFromOfflineCart,
   } = useCartStore();
   const { isAuthenticated, user, limits } = useAuthStore();
 
@@ -422,11 +423,18 @@ export default function ListingDetailClient() {
   };
 
   const handleRemoveFromCart = async () => {
-    if (!cartItem) return;
+    // Ürün hem giriş yapmış (cartItem) hem misafir (offlineCartItem) sepetinde
+    // olabilir; hangisindeyse ondan çıkar. Önceki kod yalnız cartItem'a bakıp
+    // misafir sepetinde "Sepetten Çıkar" butonunu sessizce işlevsiz bırakıyordu.
+    if (!cartItem && !offlineCartItem) return;
 
     setIsAddingToCart(true);
     try {
-      await removeFromCart(cartItem.productId);
+      if (cartItem) {
+        await removeFromCart(cartItem.productId);
+      } else if (offlineCartItem) {
+        removeFromOfflineCart(offlineCartItem.productId);
+      }
       toast.success(t("product.removedFromCart"));
     } catch (error) {
       toast.error(t("product.removeFromCartFailed"));

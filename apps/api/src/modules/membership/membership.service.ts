@@ -327,6 +327,7 @@ export class MembershipService {
         canUseFreeSlot: membership.remainingFreeListings > 0,
         canTrade: membership.tier.canTrade,
         canCreateCollection: membership.tier.canCreateCollections,
+        isAdFree: membership.tier.isAdFree, // reklamsız avantajı (admin tier ayarı)
         maxImages: membership.tier.maxImagesPerListing,
         maxFreeListings: maxFreeListings, // Use platform setting override for free tier
         maxTotalListings: maxTotalListings, // Use platform setting override for all tiers

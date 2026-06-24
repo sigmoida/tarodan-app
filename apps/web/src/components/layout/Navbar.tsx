@@ -120,6 +120,8 @@ export default function Navbar() {
   const recordedImpressions = useRef<Set<string>>(new Set());
   const [adImageError, setAdImageError] = useState<Set<string>>(new Set());
   const [isMobile, setIsMobile] = useState(false);
+  // Reklamsız (ad-free) avantajı admin'in tier ayarından gelir (hardcode DEĞİL).
+  const [isAdFree, setIsAdFree] = useState(false);
   const [navHidden, setNavHidden] = useState(false);
   const lastScrollY = useRef(0);
 
@@ -343,10 +345,33 @@ export default function Navbar() {
     }
   };
 
-  // Premium ve Business üyeler için reklam gösterme
   const membershipTier = user?.membershipTier || 'free';
-  const isAdFree = membershipTier === 'premium' || membershipTier === 'business';
-  const shouldShowAd = !isAdFree;
+
+  // Reklam yalnız üyeliğinde "reklamsız" avantajı OLMAYANLARA gösterilir.
+  // isAdFree değeri admin'in tier ayarından (/membership/me/limits) gelir;
+  // tier ADINI hardcode etmek admin'in reklam-kapatma değişikliğini yok
+  // sayıyordu (bug: reklam kapatılsa bile kullanıcı reklam görüyordu).
+  const shouldShowAd = isAuthenticated ? !isAdFree : true;
+
+  // Gerçek isAdFree'yi üyelik limitlerinden çek (hardcoded tier adı yerine).
+  useEffect(() => {
+    if (!isAuthenticated) {
+      setIsAdFree(false);
+      return;
+    }
+    let cancelled = false;
+    api
+      .get<{ isAdFree?: boolean }>('/membership/me/limits')
+      .then((res) => {
+        if (!cancelled) setIsAdFree(!!res.data?.isAdFree);
+      })
+      .catch(() => {
+        if (!cancelled) setIsAdFree(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [isAuthenticated, user?.membershipTier]);
 
   // Detect mobile/desktop for responsive ads
   useEffect(() => {

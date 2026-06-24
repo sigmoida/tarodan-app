@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, Suspense } from 'react';
+import { useState, useEffect, useRef, Suspense } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import Link from 'next/link';
 import Image from 'next/image';
@@ -27,12 +27,18 @@ function VerifyEmailContent() {
   const [resendEmail, setResendEmail] = useState('');
   const [resendLoading, setResendLoading] = useState(false);
   const [resendSuccess, setResendSuccess] = useState(false);
+  // Çift-çağrı koruması: token başına yalnız BİR kez verify POST'u at (React
+  // strict-render veya yeniden render'da ikinci çağrı token'ı "used" görüp
+  // "başarısız" gösteriyordu).
+  const verifyStartedRef = useRef(false);
 
   useEffect(() => {
     if (!token) {
       setStatus('no-token');
       return;
     }
+    if (verifyStartedRef.current) return;
+    verifyStartedRef.current = true;
 
     const verifyEmail = async () => {
       try {

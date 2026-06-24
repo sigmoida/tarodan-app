@@ -6,6 +6,7 @@ import { useQuery } from '@tanstack/react-query';
 import Link from 'next/link';
 import { Spinner } from '@tarodan/ui';
 import { listingsApi, manufacturersApi } from '@/lib/api';
+import { countryToFlag } from '@/lib/countryFlag';
 import { useTranslation } from '@/i18n/LanguageContext';
 import OptimizedImage from '@/components/OptimizedImage';
 import UserAvatar from '@/components/UserAvatar';
@@ -40,11 +41,6 @@ interface Product {
     seller?: { displayName: string; avatarUrl?: string };
     status: string;
 }
-
-const countryFlags: Record<string, string> = {
-    'Germany': '🇩🇪', 'Italy': '🇮🇹', 'France': '🇫🇷', 'Japan': '🇯🇵',
-    'USA': '🇺🇸', 'China': '🇨🇳', 'Hong Kong': '🇭🇰', 'Thailand': '🇹🇭', 'UK': '🇬🇧',
-};
 
 const conditionLabels: Record<string, string> = {
     'new': 'Sıfır',
@@ -162,7 +158,7 @@ export default function UreticiDetailPage() {
                             <div className="flex flex-wrap items-center gap-3 mb-4 justify-center md:justify-start">
                                 {brand.country && (
                                     <span className="bg-surface-alt/80 backdrop-blur-sm text-muted text-sm font-bold px-4 py-1.5 rounded-full border border-border/50 flex items-center gap-2">
-                                        {countryFlags[brand.country] || '🌍'} {brand.country}
+                                        {countryToFlag(brand.country) || '🌍'} {brand.country}
                                     </span>
                                 )}
                                 {brand.foundedYear && (
