@@ -247,17 +247,24 @@ export class MembershipSchedulerService {
   }
 
   /**
-   * Otomatik yenileme: HATIRLATMA-tabanlıdır, kayıtlı karttan çekim YAPMAZ.
-   *
-   * Saved-card özelliği kaldırıldığı için (Faz 1) depolanmış karttan otomatik çekim
-   * mümkün değildir. Dönem bitişinde kullanıcı normal PayTR hosted-iframe akışından
-   * tek tıkla yeniler; gerekli hatırlatmalar ayrı bir akışta (expiry reminders)
-   * gönderilir. Bu job artık çekim yapmayan bir no-op'tur.
+   * Otomatik yenileme (MIT recurring): kayıtlı kartla kullanıcısız çekim.
+   * Gerçek çekim YALNIZCA PAYTR_RECURRING_ENABLED=true iken yapılır; aksi halde
+   * MembershipService.runAutoRenewals no-op döner (yetki + flag olmadan kör çekim yok).
    */
   @Cron('0 * * * *') // Her saat
   async processAutoRenewals() {
-    // Kayıtlı karttan otomatik çekim kaldırıldı; yenileme manuel PayTR akışıyla yapılır.
-    return { renewed: 0 };
+    try {
+      const result = await this.membershipService.runAutoRenewals();
+      if (result.attempted > 0) {
+        this.logger.log(
+          `Oto-yenileme turu: ${result.renewed} yenilendi, ${result.failed} başarısız (${result.attempted} denendi)`,
+        );
+      }
+      return { renewed: result.renewed };
+    } catch (error: any) {
+      this.logger.error(`Oto-yenileme cron hatası: ${error.message}`, error.stack);
+      return { renewed: 0 };
+    }
   }
 
   /** Manuel tetikleme (test/admin) */

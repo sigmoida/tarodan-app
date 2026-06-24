@@ -7,6 +7,7 @@ import Link from "next/link";
 import { motion } from "framer-motion";
 import {
   CheckCircleIcon,
+  ClockIcon,
   ArrowRightIcon,
   CreditCardIcon,
   DocumentArrowDownIcon,
@@ -18,8 +19,6 @@ import { Button, Spinner } from "@tarodan/ui";
 import { useAuthStore } from "@/stores/authStore";
 import AuthLoadingScreen from "@/components/AuthLoadingScreen";
 import { useTranslation } from "@/i18n/LanguageContext";
-import { useIsGuestCheckout } from "@/hooks/useIsGuestCheckout";
-import { clearGuestCheckout } from "@/lib/guestCheckout";
 
 interface InvoiceDetails {
   id: string;
@@ -50,8 +49,8 @@ export default function PaymentSuccessPage() {
   const router = useRouter();
   const { isAuthenticated, isLoading: authLoading } = useAuthStore();
   const { t, locale } = useTranslation();
-  const { isGuest, ready: guestReady } = useIsGuestCheckout();
   const paymentId = searchParams.get("paymentId");
+  const isGuestCheckout = searchParams.get("guest") === "true";
   const isMembershipPayment = searchParams.get("type") === "membership";
 
   // Support both cases for orderId from URL
@@ -77,13 +76,16 @@ export default function PaymentSuccessPage() {
       return;
     }
 
-    // Guest sinyali (URL param + sessionStorage işareti) ve auth gerçekten
-    // oturana kadar yönlendirme yapma — yoksa hidrasyon yarışında misafir
-    // yanlışlıkla /login'e atılıyordu.
-    if (authLoading || !guestReady) return;
+    if (authLoading) return;
 
-    // Allow access for authenticated users OR guest checkout
-    if (!isAuthenticated && !isGuest) {
+    // Read guest from URL directly so we don't redirect before searchParams are ready (Next.js can delay them)
+    const urlGuest =
+      typeof window !== "undefined" &&
+      window.location.search.includes("guest=true");
+    const guestOk = isGuestCheckout || urlGuest;
+
+    // Allow access for authenticated users OR guest checkout (URL param)
+    if (!isAuthenticated && !guestOk) {
       router.push("/login");
       return;
     }
@@ -97,8 +99,7 @@ export default function PaymentSuccessPage() {
     paymentId,
     authLoading,
     isAuthenticated,
-    isGuest,
-    guestReady,
+    isGuestCheckout,
     isMembershipPayment,
     router,
   ]);
@@ -120,6 +121,10 @@ export default function PaymentSuccessPage() {
         if (i < 4) await new Promise((r) => setTimeout(r, 1200));
       }
 
+      const isGuest =
+        isGuestCheckout ||
+        (typeof window !== "undefined" &&
+          window.location.search.includes("guest=true"));
       const response = isGuest
         ? await paymentsApi.getStatusLightGuest(paymentId!)
         : await paymentsApi.getStatusLight(paymentId!);
@@ -127,9 +132,13 @@ export default function PaymentSuccessPage() {
       const paymentData = response.data;
       setPayment(paymentData);
 
-      // Akış başarıyla tamamlandı → misafir işaretini temizle (ömrü: checkout'ta
-      // set, başarıda temizle; sonraki sayfa görünümlerine sızmasın).
-      clearGuestCheckout();
+      // Ödeme başarısızsa (yanlışlıkla success sayfasına düşülmüşse) fail sayfasına yönlendir.
+      if (paymentData?.status === "failed") {
+        router.replace(
+          `/payment/fail?paymentId=${paymentId}${isGuest ? "&guest=true" : ""}`,
+        );
+        return;
+      }
 
       // Üyelik ödemesi: siparişlerime atma, üyelik başarı sayfasına git (URL'de type=membership olmasa bile)
       if (paymentData?.isMembershipOrder) {
@@ -227,7 +236,11 @@ export default function PaymentSuccessPage() {
     );
   }
 
-  if (authLoading && !isGuest) {
+  const urlGuest =
+    typeof window !== "undefined" &&
+    window.location.search.includes("guest=true");
+  const guestOk = isGuestCheckout || urlGuest;
+  if (authLoading && !guestOk) {
     return <AuthLoadingScreen />;
   }
 
@@ -239,6 +252,11 @@ export default function PaymentSuccessPage() {
     );
   }
 
+  // Başarı UI'ı yalnız ödeme GERÇEKTEN tamamlandıysa gösterilir (verify/durum-sorgu sonucu).
+  // Aksi halde "doğrulanıyor" durumu gösterilir — sahte başarı basmayız (PayTR henüz
+  // kesinleştirmemiş olabilir: callback gecikmesi/ulaşmaması). status===failed → fail sayfası.
+  const isCompleted = payment?.status === "completed";
+
   return (
     <div className="min-h-screen bg-surface py-12">
       <div className="max-w-2xl mx-auto px-4 sm:px-6 lg:px-8">
@@ -247,28 +265,42 @@ export default function PaymentSuccessPage() {
           animate={{ opacity: 1, y: 0 }}
           className="bg-surface-elevated rounded-xl shadow-sm p-8 text-center"
         >
-          {/* Success Icon */}
+          {/* Status Icon */}
           <div className="mb-6">
             <motion.div
               initial={{ scale: 0 }}
               animate={{ scale: 1 }}
               transition={{ type: "spring", stiffness: 200, damping: 15 }}
-              className="w-20 h-20 bg-success-100 rounded-full flex items-center justify-center mx-auto"
+              className={`w-20 h-20 rounded-full flex items-center justify-center mx-auto ${
+                isCompleted ? "bg-success-100" : "bg-warning-100"
+              }`}
             >
-              <CheckCircleIcon className="w-12 h-12 text-success-500" />
+              {isCompleted ? (
+                <CheckCircleIcon className="w-12 h-12 text-success-500" />
+              ) : (
+                <ClockIcon className="w-12 h-12 text-warning-600" />
+              )}
             </motion.div>
           </div>
 
-          {/* Success Message */}
+          {/* Status Message */}
           <h1 className="text-3xl font-bold text-heading mb-2">
-            {locale === "en"
-              ? "Payment Completed Successfully!"
-              : "Ödeme Başarıyla Tamamlandı!"}
+            {isCompleted
+              ? locale === "en"
+                ? "Payment Completed Successfully!"
+                : "Ödeme Başarıyla Tamamlandı!"
+              : locale === "en"
+                ? "Your Payment Is Being Confirmed"
+                : "Ödemeniz Doğrulanıyor"}
           </h1>
           <p className="text-muted mb-6">
-            {locale === "en"
-              ? "Your payment has been received and your order is being prepared."
-              : "Ödemeniz alındı ve siparişiniz hazırlanmaya başlandı."}
+            {isCompleted
+              ? locale === "en"
+                ? "Your payment has been received and your order is being prepared."
+                : "Ödemeniz alındı ve siparişiniz hazırlanmaya başlandı."
+              : locale === "en"
+                ? "We've received your payment request but it isn't confirmed yet. This can take a short while; you can check your order status from your orders page."
+                : "Ödeme talebiniz alındı ancak henüz onaylanmadı. Bu kısa sürebilir; durumu Siparişlerim sayfasından takip edebilirsiniz."}
           </p>
 
           {/* Payment Details */}
@@ -311,8 +343,20 @@ export default function PaymentSuccessPage() {
                   <span className="text-muted">
                     {locale === "en" ? "Status:" : "Durum:"}
                   </span>
-                  <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-success-100 text-success-800">
-                    {locale === "en" ? "Completed" : "Tamamlandı"}
+                  <span
+                    className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-medium ${
+                      isCompleted
+                        ? "bg-success-100 text-success-800"
+                        : "bg-warning-100 text-warning-800"
+                    }`}
+                  >
+                    {isCompleted
+                      ? locale === "en"
+                        ? "Completed"
+                        : "Tamamlandı"
+                      : locale === "en"
+                        ? "Awaiting confirmation"
+                        : "Onay bekleniyor"}
                   </span>
                 </div>
               </div>

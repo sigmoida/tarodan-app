@@ -43,6 +43,7 @@ import {
   RefundPaymentResponseDto,
   CancelPaymentResponseDto,
   RetryPaymentResponseDto,
+  DirectPaymentDto,
 } from './dto';
 
 @ApiTags('payments')
@@ -84,9 +85,12 @@ export class PaymentController {
    */
   @Get('config')
   @Public()
-  getPublicConfig(): { bypassEnabled: boolean } {
+  getPublicConfig(): { bypassEnabled: boolean; recurringEnabled: boolean } {
     return {
       bypassEnabled: this.configService.get('PAYMENT_BYPASS') === 'true',
+      // Kayıtlı kart + oto-yenileme (Non3D) PayTR yetkisine bağlı; kapalıyken frontend
+      // kayıtlı-kart UI'ını ve "kartı kaydet" seçeneğini gizler.
+      recurringEnabled: this.configService.get('PAYTR_RECURRING_ENABLED') === 'true',
     };
   }
 
@@ -151,18 +155,20 @@ export class PaymentController {
   }
 
   /**
-   * POST /payments/process-direct - PayTR Direkt API ile ödeme.
-   * Kart bilgisi bizim checkout sayfamızda alınır; yanıt 3D Secure HTML'idir
-   * (istemci render eder), sonuç callback/verify ile işlenir.
+   * POST /payments/process-direct - PayTR Direkt API ile ödeme (TEK ödeme yolu; misafir + üye).
+   * Kart bilgisi bizim checkout sayfamızda alınır; yeni kartta yanıt 3D Secure HTML'idir
+   * (istemci render eder), sonuç callback/verify ile işlenir. Ham kart verisi taşır → throttle'lı.
+   * Kayıtlı kart (Flow B) + kart saklama PAYTR_RECURRING_ENABLED arkasındadır.
    */
   @Post('process-direct')
-  @Public()
-  @ApiOperation({ summary: 'KULLANIM DIŞI — Direct API kart ödemesi (Faz 1 itibarıyla kapalı)', deprecated: true })
-  @ApiResponse({ status: HttpStatus.GONE, description: 'Endpoint devre dışı' })
-  processDirect(@Body() _dto: unknown, @Req() _req: unknown): never {
-    throw new GoneException(
-      'Kart ile doğrudan ödeme kaldırıldı. Lütfen güvenli ödeme sayfasını kullanın.',
-    );
+  @Throttle({ default: { limit: 10, ttl: 60000 } }) // 10 requests per minute (ham kart verisi)
+  @Public() // Misafir + üye; servis sahiplik + flag doğrulamasını yapar.
+  @ApiOperation({ summary: 'Direct API kart ödemesi (misafir + üye; tek ödeme yolu)' })
+  @ApiResponse({ status: HttpStatus.CREATED, description: 'Ödeme başlatıldı (yeni kartta 3DS HTML döner)' })
+  async processDirect(@Body() dto: DirectPaymentDto, @Req() req: Request) {
+    // Optional auth: cookie (web) veya Bearer (mobil) — yoksa misafir olarak devam.
+    const userId = this.extractUserId(req);
+    return this.paymentService.processDirectPayment(userId, dto, req);
   }
 
   /**

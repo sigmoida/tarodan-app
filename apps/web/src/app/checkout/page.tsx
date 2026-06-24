@@ -46,7 +46,6 @@ import {
   type AddressFormValue,
 } from "@/components/forms";
 import { getFullPhoneNumber, normalizePhoneForPayload } from "@/lib/phone";
-import { markGuestCheckout } from "@/lib/guestCheckout";
 import { useTranslation } from "@/i18n";
 import { ButtonLink } from "@/components/ui/ButtonLink";
 
@@ -1226,30 +1225,21 @@ export default function CheckoutPage() {
             const paymentData = paymentResponse.data;
             const hasSession = isAuthenticated || !!authToken;
 
-            // Misafir ödeme: PayTR'a gidip dönmede guest-lik kaybolmasın diye
-            // kalıcı işaret koy (URL param'ı kaybolsa bile success/fail sayfaları
-            // /login'e atmaz). Üyeler işaret koymaz → davranışları değişmez.
-            if (!hasSession) {
-              markGuestCheckout();
-            }
-
             // Clear cart before redirecting to payment
             if (!directProductId) {
               await clearCart();
             }
 
-            // Üyeler: site-içi kart formu + 3D Secure için ödeme sayfamıza git
-            // (paymentUrl'e doğrudan gitmek PayTR iframe'ini açıp kart formunu
-            // atlardı). Misafirler kart formunu kullanamaz (auth gerekli) →
-            // doğrudan PayTR sayfasına.
-            if (hasSession && paymentData.paymentId) {
-              router.push(`/payment/${paymentData.paymentId}`);
+            // TEK ödeme yüzeyi: misafir + üye aynı site-içi kart formuna (ödeme
+            // sayfamıza) gider; misafir ?guest=true ile (status endpoint'i misafir
+            // varyantını kullanır). paymentUrl yalnız paymentId yoksa yedek.
+            if (paymentData.paymentId) {
+              router.push(
+                `/payment/${paymentData.paymentId}${hasSession ? "" : "?guest=true"}`,
+              );
               return;
             } else if (paymentData.paymentUrl) {
               window.location.href = paymentData.paymentUrl;
-              return;
-            } else if (paymentData.paymentId) {
-              router.push(`/payment/${paymentData.paymentId}?guest=true`);
               return;
             } else {
               throw new Error(

@@ -57,3 +57,5 @@ apps/web/public/photos/
 
 # PayTR Direkt API vendor PDF/örnek klasörü — lokal referans, repoya girmez
 PayTR Direkt API/
+# PayTR iFrame API vendor PDF/örnek klasörü — lokal referans, repoya girmez
+PayTR IFrame API/

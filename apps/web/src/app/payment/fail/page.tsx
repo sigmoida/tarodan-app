@@ -17,25 +17,24 @@ import AuthLoadingScreen from "@/components/AuthLoadingScreen";
 import toast from "react-hot-toast";
 import { useTranslation } from "@/i18n/LanguageContext";
 import { ButtonLink } from "@/components/ui/ButtonLink";
-import { useIsGuestCheckout } from "@/hooks/useIsGuestCheckout";
-import { clearGuestCheckout } from "@/lib/guestCheckout";
 
 export default function PaymentFailPage() {
   const searchParams = useSearchParams();
   const router = useRouter();
   const { isAuthenticated, isLoading: authLoading } = useAuthStore();
   const { t, locale } = useTranslation();
-  const { isGuest, ready: guestReady } = useIsGuestCheckout();
   const paymentId = searchParams.get("paymentId");
+  const isGuestCheckout = searchParams.get("guest") === "true";
 
   const [payment, setPayment] = useState<any>(null);
   const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
-    // Guest sinyali ve auth oturana kadar yönlendirme yapma (hidrasyon yarışında
-    // misafiri /login'e atmamak için).
-    if (authLoading || !guestReady) return;
-    if (!isAuthenticated && !isGuest) {
+    if (authLoading) return;
+    const urlGuest =
+      typeof window !== "undefined" &&
+      window.location.search.includes("guest=true");
+    if (!isAuthenticated && !isGuestCheckout && !urlGuest) {
       router.push("/login");
       return;
     }
@@ -45,10 +44,14 @@ export default function PaymentFailPage() {
     } else {
       setIsLoading(false);
     }
-  }, [paymentId, authLoading, isAuthenticated, isGuest, guestReady]);
+  }, [paymentId, authLoading, isAuthenticated, isGuestCheckout]);
 
   const fetchPayment = async () => {
     try {
+      const isGuest =
+        isGuestCheckout ||
+        (typeof window !== "undefined" &&
+          window.location.search.includes("guest=true"));
       const response = isGuest
         ? await paymentsApi.getStatusLightGuest(paymentId!)
         : await paymentsApi.getStatusLight(paymentId!);
@@ -65,8 +68,6 @@ export default function PaymentFailPage() {
       if (process.env.NODE_ENV === "development")
         console.error("Failed to fetch payment:", error);
     } finally {
-      // Misafir ödeme akışı bu noktada bitti → işareti temizle.
-      clearGuestCheckout();
       setIsLoading(false);
     }
   };
@@ -76,7 +77,10 @@ export default function PaymentFailPage() {
     router.push("/listings");
   };
 
-  if (authLoading && !isGuest) {
+  const urlGuest =
+    typeof window !== "undefined" &&
+    window.location.search.includes("guest=true");
+  if (authLoading && !isGuestCheckout && !urlGuest) {
     return <AuthLoadingScreen />;
   }
 
@@ -223,7 +227,7 @@ export default function PaymentFailPage() {
 
           {/* Action Buttons */}
           <div className="flex flex-col sm:flex-row gap-4 justify-center">
-            {isGuest ? (
+            {isGuestCheckout ? (
               <ButtonLink href="/listings" className="flex gap-2">
                 {locale === "en" ? "Back to Listings" : "İlanlara Dön"}
               </ButtonLink>
