@@ -59,10 +59,7 @@ export default function ForgotPasswordPage() {
       {/* Header */}
       <header className="p-6">
         <Link href="/" className="inline-flex items-center gap-2 group">
-          <Image src="/tarodan-logo.jpg" alt="Tarodan" width={36} height={36} className="rounded-lg object-contain" />
-          <span className="text-lg font-bold text-heading group-hover:text-primary-600 transition-colors duration-200">
-            Tarodan
-          </span>
+          <Image src="/tarodan-logo.jpg" alt="Tarodan" width={162} height={40} className="rounded-lg object-contain" />
         </Link>
       </header>
 

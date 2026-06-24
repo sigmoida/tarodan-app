@@ -515,7 +515,7 @@ export default function Navbar() {
             {/* Logo */}
             <Link href="/" className="flex-shrink-0 flex items-center hover:opacity-90 transition-opacity h-8">
               <Image
-                src="/tarodan-logo.jpg"
+                src="/tarodan-logo-transparent.png"
                 alt="Tarodan Logo"
                 width={120}
                 height={38}

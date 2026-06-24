@@ -358,7 +358,7 @@ export default function HomeScreen() {
         <View style={styles.headerTop}>
           <View style={styles.logoContainer}>
             <Image 
-              source={require('../../assets/tarodan-logo.jpg')} 
+              source={require('../../assets/tarodan-logo.png')}
               style={styles.logoImage}
               resizeMode="contain"
             />

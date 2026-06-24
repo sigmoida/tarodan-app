@@ -88,10 +88,7 @@ export default function ResetPasswordPage() {
       <div className="min-h-screen bg-gradient-to-br from-primary-50 via-surface-elevated to-warning-50 flex flex-col">
         <header className="p-6">
           <Link href="/" className="inline-flex items-center gap-2 group">
-            <Image src="/tarodan-logo.jpg" alt="Tarodan" width={36} height={36} className="rounded-lg object-contain" />
-            <span className="text-lg font-bold text-heading group-hover:text-primary-600 transition-colors duration-200">
-              Tarodan
-            </span>
+            <Image src="/tarodan-logo.jpg" alt="Tarodan" width={162} height={40} className="rounded-lg object-contain" />
           </Link>
         </header>
 
@@ -136,10 +133,7 @@ export default function ResetPasswordPage() {
       <div className="min-h-screen bg-gradient-to-br from-primary-50 via-surface-elevated to-warning-50 flex flex-col">
         <header className="p-6">
           <Link href="/" className="inline-flex items-center gap-2 group">
-            <Image src="/tarodan-logo.jpg" alt="Tarodan" width={36} height={36} className="rounded-lg object-contain" />
-            <span className="text-lg font-bold text-heading group-hover:text-primary-600 transition-colors duration-200">
-              Tarodan
-            </span>
+            <Image src="/tarodan-logo.jpg" alt="Tarodan" width={162} height={40} className="rounded-lg object-contain" />
           </Link>
         </header>
 
@@ -189,10 +183,7 @@ export default function ResetPasswordPage() {
       {/* Header */}
       <header className="p-6">
         <Link href="/" className="inline-flex items-center gap-2 group">
-          <Image src="/tarodan-logo.jpg" alt="Tarodan" width={36} height={36} className="rounded-lg object-contain" />
-          <span className="text-lg font-bold text-heading group-hover:text-primary-600 transition-colors duration-200">
-            Tarodan
-          </span>
+          <Image src="/tarodan-logo.jpg" alt="Tarodan" width={162} height={40} className="rounded-lg object-contain" />
         </Link>
       </header>
 
