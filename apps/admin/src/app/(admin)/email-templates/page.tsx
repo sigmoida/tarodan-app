@@ -97,6 +97,7 @@ const SAMPLE_DATA: Record<string, Record<string, unknown>> = {
 
 export default function AdminEmailTemplatesPage() {
   const [list, setList] = useState<TemplateListItem[]>([]);
+  const [search, setSearch] = useState('');
   const [loading, setLoading] = useState(true);
 
   const [editKey, setEditKey] = useState<string | null>(null);
@@ -307,6 +308,14 @@ export default function AdminEmailTemplatesPage() {
           </p>
         </div>
 
+        <Input
+          type="text"
+          value={search}
+          onChange={(e) => setSearch(e.target.value)}
+          placeholder="Şablon ara (anahtar, ad, grup, konu)..."
+          className="w-full sm:w-80"
+        />
+
         {loading ? (
           <div className="bg-surface-elevated rounded-xl border border-border p-8 text-center text-muted">
             <ArrowPathIcon className="h-5 w-5 animate-spin mx-auto mb-2" />
@@ -319,9 +328,24 @@ export default function AdminEmailTemplatesPage() {
         ) : (
           <div className="space-y-4">
             {(() => {
-              const groups = Array.from(new Set(list.map((t) => t.group)));
+              // Anahtar / ad / grup / konu üzerinde istemci-taraflı arama.
+              const q = search.trim().toLocaleLowerCase('tr');
+              const visible = q
+                ? list.filter((t) =>
+                    [t.key, t.name, t.group, t.subject ?? '']
+                      .some((f) => f.toLocaleLowerCase('tr').includes(q)),
+                  )
+                : list;
+              if (visible.length === 0) {
+                return (
+                  <div className="bg-surface-elevated rounded-xl border border-border p-8 text-center text-muted">
+                    Aramayla eşleşen şablon yok
+                  </div>
+                );
+              }
+              const groups = Array.from(new Set(visible.map((t) => t.group)));
               return groups.map((group) => {
-                const items = list.filter((t) => t.group === group);
+                const items = visible.filter((t) => t.group === group);
                 return (
                   <div key={group} className="bg-surface-elevated rounded-xl border border-border overflow-hidden">
                     <div className="px-4 py-2.5 border-b border-border bg-surface-alt/40">

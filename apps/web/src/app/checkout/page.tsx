@@ -46,6 +46,7 @@ import {
   type AddressFormValue,
 } from "@/components/forms";
 import { getFullPhoneNumber, normalizePhoneForPayload } from "@/lib/phone";
+import { markGuestCheckout } from "@/lib/guestCheckout";
 import { useTranslation } from "@/i18n";
 import { ButtonLink } from "@/components/ui/ButtonLink";
 
@@ -1224,6 +1225,13 @@ export default function CheckoutPage() {
               : await paymentsApi.initiateGroupGuest(checkoutGroupId, paymentProvider);
             const paymentData = paymentResponse.data;
             const hasSession = isAuthenticated || !!authToken;
+
+            // Misafir ödeme: PayTR'a gidip dönmede guest-lik kaybolmasın diye
+            // kalıcı işaret koy (URL param'ı kaybolsa bile success/fail sayfaları
+            // /login'e atmaz). Üyeler işaret koymaz → davranışları değişmez.
+            if (!hasSession) {
+              markGuestCheckout();
+            }
 
             // Clear cart before redirecting to payment
             if (!directProductId) {

@@ -126,9 +126,6 @@ export default function OrderDetailPage() {
   const [forceOpen, setForceOpen] = useState(false);
   const [extending, setExtending] = useState(false);
   const [forcing, setForcing] = useState(false);
-  const [couponModalOpen, setCouponModalOpen] = useState(false);
-  const [couponCode, setCouponCode] = useState('');
-  const [applyingCoupon, setApplyingCoupon] = useState(false);
 
   const invoiceRef = useRef<HTMLDivElement>(null);
 
@@ -177,21 +174,6 @@ export default function OrderDetailPage() {
       await loadOrder();
     } finally {
       setForcing(false);
-    }
-  };
-
-  const handleApplyCoupon = async () => {
-    setApplyingCoupon(true);
-    try {
-      await adminApi.applyOrderCoupon(orderId, couponCode.trim() || null);
-      toast.success(couponCode.trim() ? 'Kupon uygulandı' : 'Kupon kaldırıldı');
-      setCouponModalOpen(false);
-      setCouponCode('');
-      await loadOrder();
-    } catch (error: any) {
-      toast.error(error.response?.data?.message || 'Kupon uygulanamadı');
-    } finally {
-      setApplyingCoupon(false);
     }
   };
 
@@ -390,10 +372,6 @@ export default function OrderDetailPage() {
               className="px-4 py-2 bg-surface-alt text-heading rounded-lg hover:bg-border-subtle transition-colors flex items-center gap-2">
               <PrinterIcon className="w-5 h-5" />
               Fatura Yazdır
-            </Button>
-            <Button variant="secondary" onClick={() => { setCouponCode(order.discountCode || ''); setCouponModalOpen(true); }}
-              className="px-4 py-2 bg-surface-alt text-heading rounded-lg hover:bg-border-subtle transition-colors">
-              {order.discountCode ? 'Kuponu Değiştir' : 'Kupon Uygula'}
             </Button>
           </div>
 
@@ -648,45 +626,6 @@ export default function OrderDetailPage() {
                   className="flex-1 px-4 py-2 bg-primary-600 text-heading rounded-lg hover:bg-primary-700 transition-colors disabled:opacity-50"
                   disabled={processing}>
                   {processing ? 'İşleniyor...' : 'Güncelle'}
-                </Button>
-              </div>
-            </div>
-          </div>
-        )}
-
-        {/* Kupon Uygula Modal */}
-        {couponModalOpen && (
-          <div className="fixed inset-0 bg-heading bg-opacity-50 flex items-center justify-center z-50">
-            <div className="bg-surface-elevated rounded-xl px-6 pb-6 pt-5 max-w-md w-full mx-4">
-              <h3 className="text-lg font-semibold text-heading mb-1 leading-tight">Kupon Uygula</h3>
-              <p className="text-sm text-muted mb-4">
-                Kuponu kaldırmak için alanı boş bırakıp kaydedin.
-                {order.status !== 'pending_payment' && (
-                  <span className="block mt-1 text-warning-600">Not: Sipariş ödendi, toplam tutar güncellenmez — sadece kupon kaydı tutulur.</span>
-                )}
-              </p>
-              <div className="mb-4">
-                <label className="block text-sm font-medium text-body mb-2">Kupon Kodu</label>
-                <input
-                  type="text"
-                  value={couponCode}
-                  onChange={(e) => setCouponCode(e.target.value.toUpperCase())}
-                  placeholder="ör. YAZI2024"
-                  className="w-full px-3 py-2 border border-border rounded-lg text-heading bg-surface focus:outline-none focus:ring-2 focus:ring-primary-500 font-mono"
-                  autoFocus
-                  onKeyDown={(e) => { if (e.key === 'Enter') handleApplyCoupon(); }}
-                />
-              </div>
-              <div className="flex gap-3">
-                <Button variant="secondary" onClick={() => { setCouponModalOpen(false); setCouponCode(''); }}
-                  className="flex-1 px-4 text-body hover:bg-surface"
-                  disabled={applyingCoupon}>
-                  İptal
-                </Button>
-                <Button variant="secondary" onClick={handleApplyCoupon}
-                  className="flex-1 px-4 py-2 bg-primary-600 text-heading rounded-lg hover:bg-primary-700 transition-colors disabled:opacity-50"
-                  disabled={applyingCoupon}>
-                  {applyingCoupon ? 'Uygulanıyor...' : 'Kaydet'}
                 </Button>
               </div>
             </div>

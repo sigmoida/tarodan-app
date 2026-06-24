@@ -92,6 +92,14 @@ interface UserDetail {
   sellerType?: string;
   companyName?: string;
   taxId?: string;
+  bankAccount?: {
+    accountHolder: string;
+    iban: string;
+    tcKimlikNo?: string | null;
+    taxId?: string | null;
+    isVerified: boolean;
+    verifiedAt?: string | null;
+  } | null;
   membership?: {
     tier: {
       name: string;
@@ -429,6 +437,55 @@ export default function UserDetailPage() {
                         <p className="text-muted text-sm">Vergi No</p>
                         <p className="text-heading">{user.taxId}</p>
                       </div>
+                    )}
+                  </div>
+
+                  {/* Banka Hesabı (IBAN) */}
+                  <div className="mt-4 pt-4 border-t">
+                    <div className="flex items-center gap-2 mb-3">
+                      <h4 className="text-sm font-semibold text-heading">Banka Hesabı (IBAN)</h4>
+                      {user.bankAccount && (
+                        <span
+                          className={`text-xs px-2 py-0.5 rounded-full ${user.bankAccount.isVerified
+                            ? 'bg-success-500/10 text-success-600'
+                            : 'bg-warning-500/10 text-warning-600'
+                            }`}
+                        >
+                          {user.bankAccount.isVerified ? 'Doğrulanmış' : 'Doğrulanmamış'}
+                        </span>
+                      )}
+                    </div>
+                    {user.bankAccount ? (
+                      <div className="grid grid-cols-2 gap-4">
+                        <div>
+                          <p className="text-muted text-sm">Hesap Sahibi</p>
+                          <p className="text-heading">{user.bankAccount.accountHolder}</p>
+                        </div>
+                        <div>
+                          <p className="text-muted text-sm">IBAN</p>
+                          <p className="text-heading font-mono break-all">{user.bankAccount.iban}</p>
+                        </div>
+                        {user.bankAccount.tcKimlikNo && (
+                          <div>
+                            <p className="text-muted text-sm">TC Kimlik No</p>
+                            <p className="text-heading font-mono">{user.bankAccount.tcKimlikNo}</p>
+                          </div>
+                        )}
+                        {user.bankAccount.taxId && (
+                          <div>
+                            <p className="text-muted text-sm">Vergi No</p>
+                            <p className="text-heading font-mono">{user.bankAccount.taxId}</p>
+                          </div>
+                        )}
+                        {user.bankAccount.verifiedAt && (
+                          <div>
+                            <p className="text-muted text-sm">Doğrulama Tarihi</p>
+                            <p className="text-heading">{new Date(user.bankAccount.verifiedAt).toLocaleString('tr-TR')}</p>
+                          </div>
+                        )}
+                      </div>
+                    ) : (
+                      <p className="text-muted text-sm">Banka hesabı eklenmemiş</p>
                     )}
                   </div>
                 </div>

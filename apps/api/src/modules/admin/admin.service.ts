@@ -805,6 +805,18 @@ export class AdminService {
             tier: true,
           },
         },
+        // Satıcı banka hesabı (IBAN) — admin görüntüleyebilsin. Hassas ama yalnız
+        // admin endpoint'inde döner; maskeleme yok (admin tam görmeli).
+        bankAccount: {
+          select: {
+            accountHolder: true,
+            iban: true,
+            tcKimlikNo: true,
+            taxId: true,
+            isVerified: true,
+            verifiedAt: true,
+          },
+        },
         _count: {
           select: {
             products: true,
@@ -6932,10 +6944,11 @@ export class AdminService {
     status?: MessageStatus;
     fromDate?: string;
     toDate?: string;
+    search?: string;
     page?: number;
     limit?: number;
   }) {
-    const { status, fromDate, toDate, page = 1, limit = 20 } = query;
+    const { status, fromDate, toDate, search, page = 1, limit = 20 } = query;
 
     const where: Prisma.MessageWhereInput = {};
 
@@ -6952,6 +6965,18 @@ export class AdminService {
       if (toDate) {
         where.createdAt.lte = new Date(toDate);
       }
+    }
+
+    // Mesaj içeriği veya gönderen/alıcı ad/e-posta araması (case-insensitive).
+    const trimmedSearch = search?.trim();
+    if (trimmedSearch) {
+      where.OR = [
+        { content: { contains: trimmedSearch, mode: 'insensitive' } },
+        { sender: { displayName: { contains: trimmedSearch, mode: 'insensitive' } } },
+        { sender: { email: { contains: trimmedSearch, mode: 'insensitive' } } },
+        { receiver: { displayName: { contains: trimmedSearch, mode: 'insensitive' } } },
+        { receiver: { email: { contains: trimmedSearch, mode: 'insensitive' } } },
+      ];
     }
 
     const [total, messages] = await Promise.all([
@@ -8792,6 +8817,7 @@ export class AdminService {
     status?: string;
     userId?: string;
     type?: string;
+    search?: string;
     startDate?: string;
     endDate?: string;
   }) {
@@ -8806,6 +8832,28 @@ export class AdminService {
       where.createdAt = {};
       if (query.startDate) where.createdAt.gte = new Date(query.startDate);
       if (query.endDate) where.createdAt.lte = new Date(query.endDate);
+    }
+
+    // Başlık/içerik veya alıcı kullanıcı ad/e-posta araması (case-insensitive).
+    // userId NotificationLog'da düz alan (ilişki yok) → eşleşen kullanıcıları
+    // ayrı sorgulayıp id'lerini OR'a ekliyoruz.
+    const trimmedSearch = query.search?.trim();
+    if (trimmedSearch) {
+      const matchingUsers = await this.prisma.user.findMany({
+        where: {
+          OR: [
+            { displayName: { contains: trimmedSearch, mode: 'insensitive' } },
+            { email: { contains: trimmedSearch, mode: 'insensitive' } },
+          ],
+        },
+        select: { id: true },
+      });
+      const matchingUserIds = matchingUsers.map((u) => u.id);
+      where.OR = [
+        { title: { contains: trimmedSearch, mode: 'insensitive' } },
+        { body: { contains: trimmedSearch, mode: 'insensitive' } },
+        ...(matchingUserIds.length > 0 ? [{ userId: { in: matchingUserIds } }] : []),
+      ];
     }
 
     const [total, logs] = await Promise.all([

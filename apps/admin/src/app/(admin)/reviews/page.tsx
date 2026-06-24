@@ -110,7 +110,7 @@ export default function ReviewsPage() {
         r.setTabUrl(key, {
             defaultTab: 'product',
             resetFilters: true,
-            resetSearch: key !== 'product',
+            resetSearch: true,
         });
     };
 
@@ -399,12 +399,12 @@ export default function ReviewsPage() {
                 ]}
                 activeTab={activeTab}
                 onTabChange={handleTabChange}
-                // Satıcı sekmesinde arama; ürün sekmesinde yok (backend desteklemese de dışarıda tutuyoruz —
-                // orijinal davranışı korumak için: ürün sekmesinde arama kutusu yoktu)
-                search={!isProduct ? { placeholder: 'Kullanıcı ara...' } : undefined}
-                searchValue={!isProduct ? r.search : undefined}
-                onSearchChange={!isProduct ? r.setSearch : undefined}
-                onSearchSubmit={!isProduct ? r.onSearchSubmit : undefined}
+                // Her iki sekmede de arama (backend getReviews ve getUserRatings search destekliyor):
+                // ürün sekmesinde ürün/kullanıcı, satıcı sekmesinde kullanıcı araması.
+                search={{ placeholder: isProduct ? 'Ürün veya kullanıcı ara...' : 'Kullanıcı ara...' }}
+                searchValue={r.search}
+                onSearchChange={r.setSearch}
+                onSearchSubmit={r.onSearchSubmit}
                 filters={statusFilter}
                 columns={columns}
                 data={r.rows}

@@ -470,6 +470,7 @@ export const adminApi = {
     status?: string;
     userId?: string;
     type?: string;
+    search?: string;
     startDate?: string;
     endDate?: string;
   }) => api.get('/admin/notifications/history', { params }),

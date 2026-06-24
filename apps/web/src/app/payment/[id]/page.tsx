@@ -15,14 +15,15 @@ import { paymentsApi } from "@/lib/api";
 import { useAuthStore } from "@/stores/authStore";
 import AuthLoadingScreen from "@/components/AuthLoadingScreen";
 import { Button } from "@tarodan/ui";
+import { useIsGuestCheckout } from "@/hooks/useIsGuestCheckout";
 
 export default function PaymentPage() {
   const params = useParams();
   const router = useRouter();
   const searchParams = useSearchParams();
   const { isAuthenticated, isLoading: authLoading } = useAuthStore();
+  const { isGuest: isGuestCheckout, ready: guestReady } = useIsGuestCheckout();
   const paymentId = params.id as string;
-  const isGuestCheckout = searchParams.get("guest") === "true";
   const isMembershipPayment = searchParams.get("type") === "membership";
 
   const [payment, setPayment] = useState<any>(null);
@@ -41,16 +42,14 @@ export default function PaymentPage() {
   const startedRef = useRef(false);
 
   useEffect(() => {
-    if (authLoading) return;
-    const urlGuest =
-      typeof window !== "undefined" &&
-      window.location.search.includes("guest=true");
+    // Guest sinyali (URL + sessionStorage) ve auth oturana kadar yönlendirme yapma.
+    if (authLoading || !guestReady) return;
     const hasToken =
       typeof window !== "undefined" &&
       localStorage.getItem("tarodan_authed") === "1";
     // Oturum token'ı varken yalnızca isAuthenticated=false ise (ör. ağ hatası) girişe atma;
     // GET /payments/:id/status zaten isteğe bağlı JWT ile çalışır.
-    if (!isAuthenticated && !isGuestCheckout && !urlGuest && !hasToken) {
+    if (!isAuthenticated && !isGuestCheckout && !hasToken) {
       router.push(`/login?redirect=/payment/${paymentId}`);
       return;
     }
@@ -58,15 +57,12 @@ export default function PaymentPage() {
     if (startedRef.current) return;
     startedRef.current = true;
     fetchPayment();
-  }, [paymentId, authLoading, isAuthenticated, isGuestCheckout]);
+  }, [paymentId, authLoading, isAuthenticated, isGuestCheckout, guestReady]);
 
   const fetchPayment = async () => {
     try {
       setIsLoading(true);
-      const isGuest =
-        isGuestCheckout ||
-        (typeof window !== "undefined" &&
-          window.location.search.includes("guest=true"));
+      const isGuest = isGuestCheckout;
       const response = isGuest
         ? await paymentsApi.getStatusLightGuest(paymentId)
         : await paymentsApi.getStatusLight(paymentId);
@@ -232,10 +228,7 @@ export default function PaymentPage() {
     }, 300000);
   };
 
-  const urlGuest =
-    typeof window !== "undefined" &&
-    window.location.search.includes("guest=true");
-  if (authLoading && !isGuestCheckout && !urlGuest) {
+  if (authLoading && !isGuestCheckout) {
     return <AuthLoadingScreen />;
   }
 

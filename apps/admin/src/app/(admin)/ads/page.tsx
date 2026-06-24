@@ -91,6 +91,7 @@ export default function AdsPage() {
   const [iabWarning, setIabWarning] = useState<string | null>(null);
   const [filterPosition, setFilterPosition] = useState('');
   const [filterDevice, setFilterDevice] = useState('');
+  const [search, setSearch] = useState('');
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
@@ -307,10 +308,17 @@ export default function AdsPage() {
     toast.success(`${size.name} (${size.width}x${size.height}) boyutu seçildi`);
   };
 
-  // Filter ads
+  // Filter ads (pozisyon + cihaz + başlık/içerik araması)
+  const searchQuery = search.trim().toLocaleLowerCase('tr');
   const filteredAds = ads.filter(ad => {
     if (filterPosition && ad.position !== filterPosition) return false;
     if (filterDevice && ad.deviceType !== filterDevice) return false;
+    if (searchQuery) {
+      const haystack = [ad.title, ad.content ?? '', ad.altText ?? '']
+        .join(' ')
+        .toLocaleLowerCase('tr');
+      if (!haystack.includes(searchQuery)) return false;
+    }
     return true;
   });
 
@@ -405,6 +413,13 @@ export default function AdsPage() {
 
         {/* Filters */}
         <div className="flex flex-wrap gap-3">
+          <Input
+            type="text"
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            placeholder="Reklam ara (başlık, içerik)..."
+            className="w-full sm:w-64"
+          />
           <Select
             value={filterPosition}
             onChange={(e) => setFilterPosition(e.target.value)}

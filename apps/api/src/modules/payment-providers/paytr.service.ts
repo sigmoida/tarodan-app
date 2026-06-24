@@ -198,7 +198,12 @@ export class PayTRService {
     const merchantOkUrl = options?.successQueryParams
       ? `${successBase}?${options.successQueryParams}`
       : successBase;
-    const merchantFailUrl = `${this.configService.get('FRONTEND_URL')}/payment/fail`;
+    // Misafir bayrağını fail URL'ine de taşı: aksi halde başarısız/iptal misafir
+    // ödemesi /payment/fail'a bayraksız döner ve sayfa kullanıcıyı /login'e atar.
+    const failQuery = options?.successQueryParams?.includes('guest=true')
+      ? '?guest=true'
+      : '';
+    const merchantFailUrl = `${this.configService.get('FRONTEND_URL')}/payment/fail${failQuery}`;
 
     // Encode basket (must match POST user_basket)
     const userBasket = this.encodeBasket(basketItems);
@@ -633,7 +638,11 @@ export class PayTRService {
     const merchantOkUrl = options?.successQueryParams
       ? `${successBase}?${options.successQueryParams}`
       : successBase;
-    const merchantFailUrl = `${this.configService.get('FRONTEND_URL')}/payment/fail`;
+    // Misafir bayrağını fail URL'ine de taşı (bkz. iframe yolundaki aynı not).
+    const failQuery = options?.successQueryParams?.includes('guest=true')
+      ? '?guest=true'
+      : '';
+    const merchantFailUrl = `${this.configService.get('FRONTEND_URL')}/payment/fail${failQuery}`;
 
     // Direkt API token:
     // hashStr = merchant_id + user_ip + merchant_oid + email + payment_amount

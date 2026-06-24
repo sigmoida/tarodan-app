@@ -1482,6 +1482,7 @@ export class AdminController {
     @Query('status') status?: string,
     @Query('fromDate') fromDate?: string,
     @Query('toDate') toDate?: string,
+    @Query('search') search?: string,
     @Query('page') page?: string,
     @Query('limit') limit?: string,
   ) {
@@ -1489,6 +1490,7 @@ export class AdminController {
       status: status as any,
       fromDate,
       toDate,
+      search,
       page: page ? parseInt(page, 10) : 1,
       limit: limit ? parseInt(limit, 10) : 20,
     });
@@ -2154,6 +2156,7 @@ export class AdminController {
     @Query('status') status?: string,
     @Query('userId') userId?: string,
     @Query('type') type?: string,
+    @Query('search') search?: string,
     @Query('startDate') startDate?: string,
     @Query('endDate') endDate?: string,
   ) {
@@ -2164,6 +2167,7 @@ export class AdminController {
       status,
       userId,
       type,
+      search,
       startDate,
       endDate,
     });
