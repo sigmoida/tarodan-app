@@ -3,6 +3,7 @@ import {
   NotFoundException,
   ForbiddenException,
   BadRequestException,
+  ConflictException,
   Optional,
   Logger,
   Inject,
@@ -1984,6 +1985,28 @@ export class OrderService {
     return email.trim().toLowerCase();
   }
 
+  /**
+   * Misafir checkout e-postası zaten kayıtlı bir hesaba aitse engelle.
+   * Kullanıcı bu e-postayla giriş yapıp normal (üye) akışı kullanmalı.
+   * case-insensitive: kullanıcı e-postaları DB'de orijinal case ile saklanabiliyor.
+   * Sistem misafir kullanıcısı (guest@tarodan.system) bu kontrole takılmaz —
+   * onun e-postası normalize edilmiş bir kullanıcı e-postasıyla eşleşmez.
+   */
+  private async assertGuestEmailNotRegistered(normEmail: string): Promise<void> {
+    const existing = await this.prisma.user.findFirst({
+      where: { email: { equals: normEmail, mode: 'insensitive' } },
+      select: { id: true },
+    });
+    if (existing) {
+      // ConflictException (409) + makine-okunur kod → frontend giriş'e yönlendirir.
+      throw new ConflictException({
+        code: 'EMAIL_ALREADY_REGISTERED',
+        message:
+          'Bu e-posta adresi zaten kayıtlı. Lütfen giriş yapıp alışverişe devam edin.',
+      });
+    }
+  }
+
   private guestCheckoutOtpKey(normEmail: string): string {
     return `guest:checkout:otp:v1:${normEmail}`;
   }
@@ -2015,6 +2038,12 @@ export class OrderService {
     expiresInSeconds: number;
   }> {
     const normEmail = this.normalizeGuestCheckoutEmail(dto.email);
+
+    // Zaten kayıtlı bir hesabın e-postasıyla misafir alışverişe izin verme:
+    // hiç kod göndermeden "bu e-posta kayıtlı, giriş yapın" de. (case-insensitive:
+    // kullanıcı e-postaları DB'de orijinal case ile saklanıyor olabilir.)
+    await this.assertGuestEmailNotRegistered(normEmail);
+
     const windowSec = parseInt(
       this.configService.get<string>('GUEST_CHECKOUT_OTP_SEND_WINDOW_SEC', '900'),
       10,
@@ -2127,6 +2156,9 @@ export class OrderService {
    */
   async guestCheckout(dto: GuestCheckoutDto) {
     const normEmail = this.normalizeGuestCheckoutEmail(dto.email);
+    // Savunma derinliği: kod gönderildikten sonra bu e-postayla kayıt olunmuş
+    // olabilir → siparişi oluşturmadan önce tekrar kontrol et.
+    await this.assertGuestEmailNotRegistered(normEmail);
     await this.consumeGuestCheckoutOtp(normEmail, dto.emailVerificationCode);
 
     const result = await this.prisma.$transaction(async (tx) => {

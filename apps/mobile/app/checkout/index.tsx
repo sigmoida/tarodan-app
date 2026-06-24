@@ -281,6 +281,23 @@ export default function CheckoutScreen() {
     return null;
   };
 
+  // E-posta zaten kayıtlı (409): misafir alışverişe izin yok → mesaj + giriş ekranı.
+  const handleEmailAlreadyRegistered = (e: any): boolean => {
+    if (
+      e?.response?.status === 409 ||
+      e?.response?.data?.code === 'EMAIL_ALREADY_REGISTERED'
+    ) {
+      appAlert(
+        'Bu e-posta zaten kayıtlı',
+        extractApiMessage(e) ??
+          'Bu e-posta adresi zaten kayıtlı. Lütfen giriş yapıp alışverişe devam edin.',
+      );
+      router.push('/(auth)/login' as any);
+      return true;
+    }
+    return false;
+  };
+
   const validateGuest = () => {
     if (!guestName.trim()) return 'Lütfen adınızı girin';
     if (!/^\S+@\S+\.\S+$/.test(guestEmail.trim())) return 'Geçerli bir e-posta adresi girin';
@@ -575,6 +592,7 @@ export default function CheckoutScreen() {
       setOtpExpiresIn(expiresIn);
       setOtpModalOpen(true);
     } catch (e: any) {
+      if (handleEmailAlreadyRegistered(e)) return;
       appAlert('Hata', extractApiMessage(e) ?? 'Doğrulama kodu gönderilemedi.');
     } finally {
       setOtpSending(false);
@@ -607,6 +625,10 @@ export default function CheckoutScreen() {
       setOtpCode('');
       setOtpError(null);
     } catch (e: any) {
+      if (handleEmailAlreadyRegistered(e)) {
+        setOtpModalOpen(false);
+        return;
+      }
       setOtpError(extractApiMessage(e) ?? 'Kod gönderilemedi.');
     } finally {
       setOtpSending(false);
