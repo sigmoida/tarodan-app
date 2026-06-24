@@ -3,18 +3,19 @@ import {
   NotFoundException,
   BadRequestException,
   ForbiddenException,
+  GoneException,
   Logger,
 } from '@nestjs/common';
 import { ModuleRef } from '@nestjs/core';
 import { ConfigService } from '@nestjs/config';
 import { PrismaService } from '../../prisma';
 import { CacheService } from '../cache/cache.service';
-import { InitiatePaymentDto, PaymentProvider, PayTRCallbackDto } from './dto';
-import { PaymentStatus, PaymentHoldStatus, OrderStatus, ProductStatus, SubscriptionStatus, TradeStatus, OfferStatus, RefundRequestStatus } from '@prisma/client';
+import { InitiatePaymentDto, PaymentProvider, PayTRCallbackDto, DirectPaymentDto } from './dto';
+import { PaymentStatus, PaymentHoldStatus, OrderStatus, ProductStatus, SubscriptionStatus, TradeStatus, OfferStatus, RefundRequestStatus, SavedCardStatus } from '@prisma/client';
 import { getProductStatusFromQuantity } from '../product/helpers/product-status.helper';
 import { safeDecrementReserved } from '../product/helpers/product-availability.helper';
 import { computeRelevanceScore, RELEVANCE_PREMIUM_BONUS } from '../product/helpers/relevance-score';
-import { PayTRService } from '../payment-providers/paytr.service';
+import { PayTRService, PayTRBuyer } from '../payment-providers/paytr.service';
 import { EventService } from '../events';
 import { InvoiceService } from '../invoice/invoice.service';
 import { ProductLockService } from '../product/product-lock.service';
@@ -109,6 +110,39 @@ export class PaymentService {
 
     // Fallback to connection remote address
     return req.ip || req.socket?.remoteAddress || '127.0.0.1';
+  }
+
+  /**
+   * Payment'a merchant_oid (providerConversationId) atar — PayTR çağrısı YAPMAZ.
+   * iframe kaldırıldıktan sonra ödeme niyeti (initiate) bir conversation id taşımalı ki
+   * gelen callback eşleşebilsin ve reconciliation çalışsın. Eski oid'i merchantOidHistory'e
+   * taşır (kullanıcı eski oid'le öderse callback yine eşleşir). process-direct daha sonra
+   * kendi oid'iyle bunu tazeler (aynı history mantığı).
+   */
+  private async assignMerchantOid(paymentId: string, baseOidRaw: string): Promise<string> {
+    const baseOid = String(baseOidRaw).replace(/-/g, '');
+    const merchantOid = `${baseOid}T${Date.now().toString().slice(-6)}`;
+    const current = await this.prisma.payment.findUnique({
+      where: { id: paymentId },
+      select: { providerConversationId: true, metadata: true },
+    });
+    const prevMeta = (current?.metadata as any) || {};
+    const oidHistory: string[] = Array.isArray(prevMeta.merchantOidHistory)
+      ? prevMeta.merchantOidHistory
+      : [];
+    const prevOid = current?.providerConversationId;
+    if (prevOid && prevOid !== merchantOid && !oidHistory.includes(prevOid)) {
+      oidHistory.push(prevOid);
+    }
+    await this.prisma.payment.update({
+      where: { id: paymentId },
+      data: {
+        providerConversationId: merchantOid,
+        providerPaymentId: null,
+        metadata: { ...prevMeta, merchantOidHistory: oidHistory },
+      },
+    });
+    return merchantOid;
   }
 
   /**
@@ -288,39 +322,12 @@ export class PaymentService {
       };
     }
 
-    // PayTR'ye grup için sanal sipariş (trade-cash precedenti): merchant_oid = groupNumber tabanlı
-    const firstOrder = group.orders[0];
-    const virtualOrder = {
-      id: group.id,
-      orderNumber: group.groupNumber,
-      totalAmount,
-      buyer: firstOrder.buyer,
-      product: {
-        id: group.id,
-        title: `Sipariş ${group.groupNumber}`,
-      },
-      productId: firstOrder.productId,
-      shippingAddress: firstOrder.shippingAddress,
-    };
-    const basketItems = group.orders.map((order: any) => ({
-      id: order.product.id,
-      name: order.product.title,
-      category: 'Koleksiyon',
-      price: Number(order.totalAmount),
-      quantity: 1,
-    }));
-
-    const result = await this.initializePayTRPayment(
-      payment,
-      virtualOrder,
-      this.getClientIp(req),
-      basketItems,
-    );
+    // Ödeme niyeti (intent): merchant_oid ata (callback eşleşsin), kart /payments/process-direct ile.
+    await this.assignMerchantOid(payment.id, String(group.groupNumber || group.id));
     return {
       paymentId: payment.id,
       checkoutGroupId: group.id,
-      paymentUrl: result.paymentUrl,
-      paymentHtml: result.paymentHtml,
+      amount: totalAmount,
       provider: PaymentProvider.paytr,
       expiresIn: 300,
     };
@@ -338,6 +345,350 @@ export class PaymentService {
    */
   async initiateGuestPayment(dto: InitiatePaymentDto, req?: Request) {
     return this.initiatePaymentUnified(null, dto, req);
+  }
+
+  /**
+   * PayTR Direct API ile kart ödemesi — TÜM kullanıcılar için TEK ödeme yolu.
+   * (iframe kaldırıldı; misafir + üye aynı site-içi kart formundan öder.)
+   *
+   * Güvenlik:
+   * - Kart no/CVV YALNIZCA bu istekte PayTR'a iletilir; DB'ye/log'a ASLA yazılmaz.
+   * - Yeni kart 3D Secure ile (non3d=false). Yanıt 3DS HTML'i; kesin sonuç callback ile işlenir.
+   * - storeCard yalnız giriş yapmış kullanıcı + PAYTR_RECURRING_ENABLED açıkken (Non3D yetkisi).
+   *
+   * Hedef: orderId (satın alma/üyelik/tekliften order) | checkoutGroupId (sepet) | tradeId (takas
+   * nakit farkı). Kart: (a) yeni kart → 3D/CIT (createDirectPayment, storeCard ile saklanabilir)
+   * VEYA (b) kayıtlı kart → Non3D recurring servisi (chargeRecurring; require_cvv ise CVV ile).
+   *
+   * Kayıtlı kart (Flow B) + kart saklama, PayTR'nin Non3D/Tekrarlayan Ödeme yetkisine bağlıdır;
+   * PAYTR_RECURRING_ENABLED arkasındadır. Yetki gelene kadar yalnız yeni-kart 3D yolu canlıdır.
+   */
+  async processDirectPayment(userId: string | null, dto: DirectPaymentDto, req?: Request) {
+    if (!dto.card && !dto.savedCardId) {
+      throw new BadRequestException('Kart bilgisi veya kayıtlı kart seçimi zorunludur.');
+    }
+
+    const recurringEnabled = this.configService.get('PAYTR_RECURRING_ENABLED') === 'true';
+
+    // Kayıtlı kart yalnız giriş yapmış kullanıcıya aittir.
+    if (dto.savedCardId && !userId) {
+      throw new ForbiddenException('Kayıtlı kartla ödeme için giriş yapmanız gerekiyor');
+    }
+    // Kayıtlı kartla ödeme PayTR Non3D yetkisine bağlı → flag kapalıyken kullanılamaz.
+    if (dto.savedCardId && !recurringEnabled) {
+      throw new GoneException(
+        'Kayıtlı kartla ödeme şu an kullanılamıyor. Lütfen kart bilgilerinizi girin.',
+      );
+    }
+
+    // Hedefi (sipariş / grup / takas) çöz; ortak Payment + buyer + sepet + merchant_oid hazırlanır.
+    const { payment, buyer, basketItems, merchantOid, amount, successQueryParams } =
+      await this.resolveDirectPaymentContext(userId, dto, req);
+
+    // Flow B — KAYITLI KARTLA ÖDEME: PayTR'da kayıtlı kartla ödeme Non3D recurring servisiyle
+    // yapılır (chargeRecurring). Kart sahibi kullanıcı olmalı; require_cvv ise CVV zorunlu.
+    // Sonuç callback ile kesinleşir (success/wait_callback) — sipariş/escrow ortak yoldan akar.
+    if (dto.savedCardId) {
+      const saved = await this.prisma.savedCard.findFirst({
+        where: { id: dto.savedCardId, userId: userId as string, status: SavedCardStatus.active },
+      });
+      if (!saved) throw new NotFoundException('Kayıtlı kart bulunamadı');
+      if (saved.requireCvv && !dto.cvv) {
+        throw new BadRequestException('Bu kart için CVV gereklidir');
+      }
+      const r = await this.paytrService.chargeRecurring({
+        utoken: saved.utoken,
+        ctoken: saved.ctoken,
+        amount,
+        merchantOid,
+        buyer,
+        basketItems,
+        cvv: dto.cvv,
+      });
+      if (r.status === 'failed') {
+        await this.prisma.payment.update({
+          where: { id: payment.id },
+          data: { failureReason: r.reason || 'Kayıtlı kartla ödeme başarısız' },
+        });
+      }
+      return {
+        paymentId: payment.id,
+        threeDSHtml: null,
+        status: r.status,
+        reason: r.reason ?? null,
+      };
+    }
+
+    // Flow A — YENİ KART (CIT): 3D ile (non3d=false). storeCard yalnız giriş yapmış kullanıcı +
+    // Non3D yetkisi (PAYTR_RECURRING_ENABLED) açıkken; aksi halde saklanan kart kullanılamaz.
+    if (!dto.card) throw new BadRequestException('Kart bilgisi zorunludur.');
+    const storeCard = !!dto.saveCard && !!userId && recurringEnabled;
+    const result = await this.paytrService.createDirectPayment(
+      merchantOid,
+      amount,
+      {
+        number: dto.card.cardNumber,
+        expireMonth: dto.card.expireMonth,
+        expireYear: dto.card.expireYear,
+        cvv: dto.card.cvc,
+        holderName: dto.card.cardHolderName,
+      },
+      buyer,
+      basketItems,
+      { non3d: false, storeCard, successQueryParams },
+    );
+
+    return {
+      paymentId: payment.id,
+      threeDSHtml: (result as any).threeDSHtml ?? null,
+      status: 'pending' as const,
+    };
+  }
+
+  /**
+   * Direct API ödeme hedefini çöz: tekil sipariş / grup (sepet) / takas nakit farkı.
+   * Ortak Payment satırını bul/oluştur, providerConversationId=merchant_oid yaz, buyer + sepet +
+   * tutar + successQueryParams hazırla. iframe akışlarına DOKUNMADAN onların doğrulama mantığını
+   * (sahiplik, durum, süre) taklit eder. Sonuç tüm kart yolları (yeni/kayıtlı) için ortaktır.
+   */
+  private async resolveDirectPaymentContext(
+    userId: string | null,
+    dto: DirectPaymentDto,
+    req?: Request,
+  ): Promise<{
+    payment: any;
+    buyer: PayTRBuyer;
+    basketItems: Array<{ id: string; name: string; category: string; price: number; quantity: number }>;
+    merchantOid: string;
+    amount: number;
+    successQueryParams: string;
+  }> {
+    const clientIp = this.getClientIp(req);
+    const buildBuyer = (u: any, shippingAddress?: any): PayTRBuyer => {
+      const sa = shippingAddress || {};
+      // Misafir siparişinde PayTR'a GERÇEK misafir bilgisini gönder (alıcı = sistem-misafir
+      // placeholder'ı 'guest@tarodan.system' DEĞİL). Üye siparişinde hesabın bilgisi kullanılır.
+      const isGuest = sa.isGuestOrder === true;
+      const fullName: string = String(
+        (isGuest ? sa.fullName || sa.guestName : u?.displayName) || u?.displayName || 'Müşteri',
+      ).trim();
+      const parts = fullName.split(/\s+/);
+      return {
+        name: parts[0] || 'Müşteri',
+        surname: parts.slice(1).join(' ') || parts[0] || 'Müşteri',
+        email: (isGuest ? sa.guestEmail : u?.email) || u?.email,
+        phone: sa.phone || sa.guestPhone || u?.phone || '+905000000000',
+        ip: clientIp,
+        address: sa.address || sa.fullAddress || 'Türkiye',
+        city: sa.city || 'İstanbul',
+        country: 'Türkiye',
+      };
+    };
+
+    let payment: any;
+    let buyer: PayTRBuyer;
+    let basketItems: Array<{ id: string; name: string; category: string; price: number; quantity: number }>;
+    let baseOid: string;
+    let amount: number;
+    let successQueryParams: string;
+
+    if (dto.orderId) {
+      const order = await this.prisma.order.findUnique({
+        where: { id: dto.orderId },
+        include: { buyer: true, seller: true, product: true },
+      });
+      if (!order) throw new NotFoundException('Sipariş bulunamadı');
+      // Sahiplik: üye → alıcı olmalı; misafir → sipariş misafir siparişi olmalı (iframe ile aynı kural).
+      const isGuestOrder = (order.shippingAddress as any)?.isGuestOrder === true;
+      if (userId) {
+        if (order.buyerId !== userId) throw new ForbiddenException('Bu sipariş için ödeme yapamazsınız');
+      } else if (!isGuestOrder) {
+        throw new ForbiddenException('Bu sipariş için giriş yapmanız gerekiyor');
+      }
+      if (order.status !== OrderStatus.pending_payment) {
+        throw new BadRequestException('Bu sipariş için ödeme beklenmiyor');
+      }
+      if (order.paymentExpiresAt && order.paymentExpiresAt.getTime() < Date.now()) {
+        throw new BadRequestException('Ödeme süresi doldu. Lütfen yeni bir sipariş oluşturun.');
+      }
+      // 30-dk cron rezervasyonu bıraktıysa charge öncesi CAS ile geri al (oversell koruması;
+      // iframe initiate yolundaki ile aynı kural — Direct tek yol olunca burada da şart).
+      if (order.reservationReleasedAt) {
+        await this.prisma.$transaction(async (tx) => {
+          const claimed = await tx.order.updateMany({
+            where: { id: order.id, reservationReleasedAt: { not: null } },
+            data: { reservationReleasedAt: null },
+          });
+          if (claimed.count === 0) return; // eşzamanlı retry kazandı
+          await this.productLockService.checkAndReserve(tx, order.productId, 1);
+        });
+        this.logger.log(`Re-reserved 1 unit for order ${order.id} after release (direct)`);
+      }
+      amount = Number(order.totalAmount);
+      payment =
+        (await this.prisma.payment.findFirst({
+          where: { orderId: order.id, status: PaymentStatus.pending },
+        })) ||
+        (await this.prisma.payment.create({
+          data: {
+            orderId: order.id,
+            amount: order.totalAmount,
+            currency: 'TRY',
+            provider: PaymentProvider.paytr,
+            status: PaymentStatus.pending,
+          },
+        }));
+      buyer = buildBuyer(order.buyer, order.shippingAddress);
+      basketItems = [
+        { id: order.product.id, name: order.product.title, category: 'Koleksiyon', price: amount, quantity: 1 },
+      ];
+      baseOid = String(order.orderNumber || order.id).replace(/-/g, '');
+      const isMembershipOrder = order.productId?.startsWith?.('membership-');
+      successQueryParams = isMembershipOrder
+        ? `paymentId=${payment.id}&type=membership`
+        : `paymentId=${payment.id}`;
+    } else if (dto.checkoutGroupId) {
+      const group = await this.prisma.checkoutGroup.findUnique({
+        where: { id: dto.checkoutGroupId },
+        include: { orders: { include: { buyer: true, seller: true, product: true } } },
+      });
+      if (!group || group.orders.length === 0) throw new NotFoundException('Sipariş grubu bulunamadı');
+      // Sahiplik: üye → grup alıcısı olmalı; misafir → grup misafir grubu olmalı (iframe ile aynı kural).
+      if (userId) {
+        if (group.buyerId !== userId) throw new ForbiddenException('Bu sipariş grubu için ödeme yapamazsınız');
+      } else if (!group.isGuest) {
+        throw new ForbiddenException('Bu sipariş için giriş yapmanız gerekiyor');
+      }
+      const now = Date.now();
+      for (const o of group.orders) {
+        if (o.status !== OrderStatus.pending_payment) {
+          throw new BadRequestException('Gruptaki bir sipariş ödeme beklemiyor. Lütfen sepeti yeniden oluşturun.');
+        }
+        if (o.paymentExpiresAt && o.paymentExpiresAt.getTime() < now) {
+          throw new BadRequestException('Ödeme süresi doldu. Lütfen yeni bir sipariş oluşturun.');
+        }
+      }
+      // 30-dk cron rezervasyonu bıraktıysa charge öncesi sipariş başına CAS ile geri al (oversell koruması).
+      for (const o of group.orders) {
+        if (o.reservationReleasedAt) {
+          await this.prisma.$transaction(async (tx) => {
+            const claimed = await tx.order.updateMany({
+              where: { id: o.id, reservationReleasedAt: { not: null } },
+              data: { reservationReleasedAt: null },
+            });
+            if (claimed.count === 0) return;
+            await this.productLockService.checkAndReserve(tx, o.productId, 1);
+          });
+          this.logger.log(`Re-reserved 1 unit for group order ${o.id} after release (direct)`);
+        }
+      }
+      amount = Number(group.totalAmount);
+      const existing = await this.prisma.payment.findUnique({ where: { checkoutGroupId: group.id } });
+      if (existing?.status === PaymentStatus.completed) throw new BadRequestException('Bu sipariş grubu zaten ödendi');
+      payment =
+        existing ||
+        (await this.prisma.payment.create({
+          data: {
+            checkoutGroupId: group.id,
+            amount: group.totalAmount,
+            currency: 'TRY',
+            provider: PaymentProvider.paytr,
+            status: PaymentStatus.pending,
+          },
+        }));
+      buyer = buildBuyer(group.orders[0].buyer, group.orders[0].shippingAddress);
+      basketItems = group.orders.map((o: any) => ({
+        id: o.product.id,
+        name: o.product.title,
+        category: 'Koleksiyon',
+        price: Number(o.totalAmount),
+        quantity: 1,
+      }));
+      baseOid = String(group.groupNumber || group.id).replace(/-/g, '');
+      successQueryParams = `paymentId=${payment.id}`;
+    } else if (dto.tradeId) {
+      const trade = await this.prisma.trade.findUnique({
+        where: { id: dto.tradeId },
+        include: {
+          cashPayment: true,
+          initiator: { select: { id: true, displayName: true, email: true, phone: true } },
+          receiver: { select: { id: true, displayName: true, email: true, phone: true } },
+        },
+      });
+      if (!trade) throw new NotFoundException('Takas bulunamadı');
+      const payableStatuses: TradeStatus[] = [TradeStatus.accepted, TradeStatus.awaiting_payment];
+      if (!payableStatuses.includes(trade.status)) {
+        throw new BadRequestException('Takas henüz kabul edilmedi veya uygun durumda değil');
+      }
+      if (!trade.cashAmount || Number(trade.cashAmount) <= 0) {
+        throw new BadRequestException('Bu takasta ekstra ödeme bulunmuyor');
+      }
+      if (trade.cashPayerId !== userId) {
+        throw new ForbiddenException('Bu ödemeyi sadece belirlenmiş ödeyen taraf başlatabilir');
+      }
+      const cashPayment = trade.cashPayment;
+      if (!cashPayment) throw new BadRequestException('Nakit ödeme kaydı bulunamadı');
+      if (cashPayment.status === PaymentStatus.completed) throw new BadRequestException('Bu takas ödemesi zaten tamamlandı');
+      amount = Number(cashPayment.totalAmount);
+      const payer = trade.cashPayerId === trade.initiatorId ? trade.initiator : trade.receiver;
+      payment =
+        (await this.prisma.payment.findUnique({ where: { tradeCashPaymentId: cashPayment.id } })) ||
+        (await this.prisma.payment.create({
+          data: {
+            tradeCashPaymentId: cashPayment.id,
+            amount: cashPayment.totalAmount,
+            currency: 'TRY',
+            provider: PaymentProvider.paytr,
+            status: PaymentStatus.pending,
+          },
+        }));
+      buyer = buildBuyer(payer);
+      basketItems = [
+        { id: `trade-cash-${trade.id}`, name: `Takas #${trade.tradeNumber} Ekstra Ödeme`, category: 'Takas', price: amount, quantity: 1 },
+      ];
+      baseOid = `TRADE${String(trade.tradeNumber).replace(/-/g, '')}`;
+      successQueryParams = `paymentId=${payment.id}`;
+    } else {
+      throw new BadRequestException('orderId, checkoutGroupId veya tradeId zorunludur.');
+    }
+
+    // ÇİFT-ÇEKİM KORUMASI: bu ödemenin önceki bir denemesi (providerConversationId) varsa,
+    // YENİ çekimden ÖNCE PayTR'a durum-sorgu yap. Callback gecikmiş/ulaşmamış (ör. tünel ölü)
+    // olabilir ama ödeme PayTR'da BAŞARILI olmuş olabilir. Zaten ödendiyse yeni merchant_oid'le
+    // ikinci kez çekme — siparişi tamamlayıp "zaten ödendi" döndür. (verifyPaymentFromClient
+    // idempotent: durum-sorgu → ödendiyse processSuccessfulPayment.)
+    if (payment.providerConversationId) {
+      const verified = await this.verifyPaymentFromClient(payment.id);
+      if (verified.completed) {
+        throw new BadRequestException(
+          'Bu ödeme zaten alınmış görünüyor. Lütfen sayfayı yenileyin; tekrar ödeme yapmanıza gerek yok.',
+        );
+      }
+    }
+
+    // merchant_oid + Y8 deseni: eski oid'li callback de eşleşsin diye geçmişini koru.
+    const merchantOid = `${baseOid}T${Date.now().toString().slice(-6)}`;
+    const prevMeta = (payment.metadata as any) || {};
+    const oidHistory: string[] = Array.isArray(prevMeta.merchantOidHistory) ? prevMeta.merchantOidHistory : [];
+    if (
+      payment.providerConversationId &&
+      payment.providerConversationId !== merchantOid &&
+      !oidHistory.includes(payment.providerConversationId)
+    ) {
+      oidHistory.push(payment.providerConversationId);
+    }
+    payment = await this.prisma.payment.update({
+      where: { id: payment.id },
+      data: {
+        providerConversationId: merchantOid,
+        providerPaymentId: null,
+        status: PaymentStatus.pending,
+        failureReason: null,
+        metadata: { ...prevMeta, merchantOidHistory: oidHistory },
+      },
+    });
+
+    return { payment, buyer, basketItems, merchantOid, amount, successQueryParams };
   }
 
   /**
@@ -389,21 +740,6 @@ export class PaymentService {
     const provider = PaymentProvider.paytr;
     const totalAmount = Number(cashPayment.totalAmount);
 
-    // Build a virtual order-like object for PayTR initialization (shared between fresh/retry paths).
-    const payer = trade.cashPayerId === trade.initiatorId ? trade.initiator : trade.receiver;
-    const virtualOrder = {
-      id: tradeId,
-      orderNumber: `TRADE-${trade.tradeNumber}`,
-      totalAmount,
-      buyer: payer,
-      product: {
-        id: `trade-cash-${tradeId}`,
-        title: `Takas #${trade.tradeNumber} Ekstra Ödeme`,
-      },
-      productId: `trade-cash-${tradeId}`,
-      shippingAddress: null,
-    };
-
     // PAYMENT_BYPASS: dev/test — PayTR token üretmeden; istemci bypass-complete çağırır.
     if (existingPayment) {
       if (existingPayment.status === PaymentStatus.completed) {
@@ -443,31 +779,15 @@ export class PaymentService {
         },
       });
 
-      try {
-        const result = await this.initializePayTRPayment(
-          { ...existingPayment, providerPaymentId: null },
-          virtualOrder,
-          this.getClientIp(req),
-        );
-        return {
-          paymentId: existingPayment.id,
-          paymentUrl: result.paymentUrl,
-          paymentHtml: result.paymentHtml,
-          provider: existingPayment.provider,
-          expiresIn: 300,
-          tradeId,
-          amount: totalAmount,
-        };
-      } catch (error: any) {
-        await this.prisma.payment.update({
-          where: { id: existingPayment.id },
-          data: {
-            status: PaymentStatus.failed,
-            failureReason: error.message || 'PayTR ödeme başlatılamadı',
-          },
-        });
-        throw new BadRequestException(error.message || 'PayTR ödeme başlatılamadı');
-      }
+      // Ödeme niyeti (intent): merchant_oid ata (callback eşleşsin), kart /payments/process-direct ile.
+      await this.assignMerchantOid(existingPayment.id, `TRADE-${trade.tradeNumber}`);
+      return {
+        paymentId: existingPayment.id,
+        provider: existingPayment.provider,
+        expiresIn: 300,
+        tradeId,
+        amount: totalAmount,
+      };
     }
 
     const payment = await this.prisma.payment.create({
@@ -500,25 +820,15 @@ export class PaymentService {
       };
     }
 
-    try {
-      const result = await this.initializePayTRPayment(payment, virtualOrder, this.getClientIp(req));
-      return {
-        paymentId: payment.id,
-        paymentUrl: result.paymentUrl,
-        paymentHtml: result.paymentHtml,
-        provider,
-        expiresIn: 300,
-        tradeId,
-        amount: totalAmount,
-      };
-    } catch (error: any) {
-      // Mark payment as failed but don't release products (trade products are managed separately)
-      await this.prisma.payment.update({
-        where: { id: payment.id },
-        data: { status: PaymentStatus.failed, failureReason: error.message || 'PayTR ödeme başlatılamadı' },
-      });
-      throw new BadRequestException(error.message || 'PayTR ödeme başlatılamadı');
-    }
+    // Ödeme niyeti (intent): merchant_oid ata (callback eşleşsin), kart /payments/process-direct ile.
+    await this.assignMerchantOid(payment.id, `TRADE-${trade.tradeNumber}`);
+    return {
+      paymentId: payment.id,
+      provider,
+      expiresIn: 300,
+      tradeId,
+      amount: totalAmount,
+    };
   }
 
   /**
@@ -577,22 +887,15 @@ export class PaymentService {
         };
       }
 
-      try {
-        const result = await this.initializePayTRPayment(
-          { ...existingPayment, providerPaymentId: null },
-          order,
-          this.getClientIp(req),
-        );
-        return {
-          paymentId: existingPayment.id,
-          paymentUrl: result.paymentUrl,
-          paymentHtml: result.paymentHtml,
-          provider: existingPayment.provider,
-          expiresIn: 300,
-        };
-      } catch (error: any) {
-        throw new BadRequestException(error.message || 'PayTR ödeme başlatılamadı');
-      }
+      // Ödeme niyeti (intent): merchant_oid ata (callback eşleşsin), kart /payments/process-direct ile.
+      await this.assignMerchantOid(existingPayment.id, String(order.orderNumber || order.id));
+      return {
+        paymentId: existingPayment.id,
+        orderId: order.id,
+        amount: Number(order.totalAmount),
+        provider: existingPayment.provider,
+        expiresIn: 300,
+      };
     }
 
     // Offer-based order ise: ödeme başlatılırken stok rezerve et.
@@ -673,14 +976,12 @@ export class PaymentService {
       };
     }
 
-    // Generate payment URL based on provider
-    const clientIp = this.getClientIp(req);
-
-    const result = await this.initializePayTRPayment(payment, order, clientIp);
+    // Ödeme niyeti (intent): merchant_oid ata (callback eşleşsin), kart /payments/process-direct ile.
+    await this.assignMerchantOid(payment.id, String(order.orderNumber || order.id));
     return {
       paymentId: payment.id,
-      paymentUrl: result.paymentUrl,
-      paymentHtml: result.paymentHtml,
+      orderId: order.id,
+      amount: Number(order.totalAmount),
       provider: PaymentProvider.paytr,
       expiresIn: 300, // 5 minutes
     };
@@ -722,113 +1023,6 @@ export class PaymentService {
     this.logger.warn(`PAYMENT_BYPASS: payment ${paymentId} completed (did=${did})`);
 
     return { success: did };
-  }
-
-  /**
-   * Initialize PayTR payment
-   * Uses PayTR iframe token API for secure payment
-   */
-  private async initializePayTRPayment(
-    payment: any,
-    order: any,
-    clientIp: string,
-    basketItemsOverride?: Array<{ id: string; name: string; category: string; price: number; quantity: number }>,
-  ) {
-    this.logger.log(`Initializing PayTR payment for order ${order.id}`);
-
-    // PayTR merchant_oid sadece harf ve rakam kabul ediyor (tire vb. kabul etmiyor)
-    // Test merchant ortamında geçmiş kullanımdan çakışmamak için 6 haneli timestamp suffix
-    const baseOid = String(order.orderNumber || order.id).replace(/-/g, '');
-    const merchantOid = `${baseOid}T${Date.now().toString().slice(-6)}`;
-
-    try {
-      // Get shipping address from order
-      const shippingAddress = order.shippingAddress as any;
-
-      // Prepare buyer info with actual shipping address
-      const buyerName = order.buyer.displayName?.split(' ') || ['Müşteri', ''];
-      const buyerFirstName = buyerName[0] || 'Müşteri';
-      const buyerLastName = buyerName.slice(1).join(' ') || '';
-
-      const buyer = {
-        id: order.buyer.id,
-        name: buyerFirstName,
-        surname: buyerLastName,
-        email: order.buyer.email,
-        phone: shippingAddress?.phone || order.buyer.phone || '+905000000000',
-        ip: clientIp,
-        address: shippingAddress?.address || shippingAddress?.fullAddress || 'Türkiye',
-        city: shippingAddress?.city || 'İstanbul',
-      };
-
-      // Prepare basket items (grup ödemesinde sipariş başına bir satır)
-      const basketItems = basketItemsOverride ?? [{
-        id: order.product.id,
-        name: order.product.title,
-        category: 'Koleksiyon',
-        price: Number(order.totalAmount),
-        quantity: 1,
-      }];
-
-      // Membership ödemelerinde başarı sayfası /membership/success olsun (PayTR yönlendirmesi)
-      const isMembershipOrder = order.productId?.startsWith?.('membership-');
-      // PayTR success URL'ine paymentId ekle: success sayfası verify endpoint'ini bu ID ile çağırır.
-      const successQueryParams = isMembershipOrder
-        ? `paymentId=${payment.id}&type=membership`
-        : `paymentId=${payment.id}`;
-      const result = await this.paytrService.processOrderPayment(
-        merchantOid,
-        Number(order.totalAmount),
-        buyer,
-        basketItems,
-        1, // installment count
-        successQueryParams,
-      );
-
-      // Y8: Her (re-)init yeni merchant_oid üretir (PayTR aynı oid'i ikinci kez kabul
-      // etmez). providerConversationId'yi ezmeden ÖNCE eski oid'i merchantOidHistory'e
-      // ekle ki kullanıcı ESKİ token'la öderse gelen callback (eski oid'li) yine eşleşsin
-      // — aksi halde ödeme sessizce kaybolurdu.
-      const current = await this.prisma.payment.findUnique({
-        where: { id: payment.id },
-        select: { providerConversationId: true, metadata: true },
-      });
-      const prevMeta = (current?.metadata as any) || {};
-      const oidHistory: string[] = Array.isArray(prevMeta.merchantOidHistory)
-        ? prevMeta.merchantOidHistory
-        : [];
-      const prevOid = current?.providerConversationId;
-      if (prevOid && prevOid !== merchantOid && !oidHistory.includes(prevOid)) {
-        oidHistory.push(prevOid);
-      }
-      await this.prisma.payment.update({
-        where: { id: payment.id },
-        data: {
-          providerPaymentId: result.token,
-          providerConversationId: merchantOid,
-          metadata: { ...prevMeta, merchantOidHistory: oidHistory },
-        },
-      });
-
-      // Return iframe URL and HTML for embedding
-      return {
-        paymentUrl: result.iframeUrl,
-        paymentHtml: `<iframe src="${result.iframeUrl}" frameborder="0" style="width:100%;height:600px;border:none;"></iframe>`,
-      };
-    } catch (error: any) {
-      this.logger.error(`PayTR initialization error: ${error.message}`, error.stack);
-
-      // Ödeme hiç başlamadı ama sipariş oluştuğu için ürün rezerve kaldı – hemen serbest bırak (stoktan düşmesin)
-      try {
-        await this.processFailedPayment(payment, error?.message || 'PayTR ödeme başlatılamadı');
-      } catch (releaseErr: any) {
-        this.logger.warn(`Release product after PayTR init error failed: ${releaseErr?.message}`);
-      }
-
-      throw new BadRequestException(
-        error.message || 'PayTR ödeme başlatılamadı',
-      );
-    }
   }
 
   /**
@@ -1010,6 +1204,15 @@ export class PaymentService {
         return 'OK';
       }
       await this.processSuccessfulPayment(payment, dto.merchant_oid);
+      // CAPI (Faz 3): store_card ödemesinde PayTR bildirimle utoken döndürür → kullanıcının
+      // kayıtlı kartlarını SavedCard'a senkronla (recurring için). Best-effort, ödemeyi etkilemez.
+      if (dto.utoken && payment.order?.buyerId) {
+        try {
+          await this.syncSavedCardsFromUtoken(payment.order.buyerId, dto.utoken);
+        } catch (e: any) {
+          this.logger.error(`SavedCard senkron hatası (oid=${dto.merchant_oid}): ${e?.message}`);
+        }
+      }
     } else {
       await this.processFailedPayment(payment, dto.failed_reason_msg || 'PayTR payment failed');
     }
@@ -2323,14 +2526,8 @@ export class PaymentService {
       userId,
     });
 
-    // Generate payment URL based on provider
-    let paymentUrl: string;
-    let paymentHtml: string | undefined;
-    const clientIp = this.getClientIp(req);
-
-    const result = await this.initializePayTRPayment(newPayment, payment.order, clientIp);
-    paymentUrl = result.paymentUrl;
-    paymentHtml = result.paymentHtml;
+    // Ödeme niyeti (intent): merchant_oid ata (callback eşleşsin), kart /payments/process-direct ile.
+    await this.assignMerchantOid(newPayment.id, String(order.orderNumber || order.id));
 
     this.logger.log(`Payment ${paymentId} retried, new payment ${newPayment.id} created`);
 
@@ -2338,8 +2535,8 @@ export class PaymentService {
       success: true,
       paymentId: payment.id,
       newPaymentId: newPayment.id,
-      paymentUrl,
-      paymentHtml,
+      orderId: payment.orderId,
+      amount: Number(payment.amount),
       provider: payment.provider,
       expiresIn: 300,
     };
@@ -3187,6 +3384,58 @@ export class PaymentService {
   }
 
   /**
+   * CAPI (Faz 3): store_card ödemesi sonrası callback'te dönen utoken ile kullanıcının
+   * PayTR'daki kayıtlı kartlarını çekip SavedCard tablosuna upsert eder (recurring için).
+   * KART NUMARASI/CVV SAKLANMAZ — yalnız PayTR token'ları + maskeli bilgi. ctoken @unique
+   * olduğundan idempotenttir. Callback'ten çağrılır (dairesel bağımlılık olmasın diye persist
+   * burada; kart listele/sil yönetimi MembershipService'tedir).
+   */
+  async syncSavedCardsFromUtoken(
+    userId: string,
+    utoken: string,
+    mandate?: { ip?: string; termsVersion?: string },
+  ): Promise<number> {
+    if (!utoken) return 0;
+    const cards = await this.paytrService.capiListCards(utoken);
+    let saved = 0;
+    for (const c of cards) {
+      if (!c.ctoken) continue;
+      await this.prisma.savedCard.upsert({
+        where: { ctoken: c.ctoken },
+        create: {
+          userId,
+          provider: 'paytr',
+          utoken,
+          ctoken: c.ctoken,
+          last4: c.last4 || '____',
+          brand: c.brand,
+          expMonth: c.month,
+          expYear: c.year,
+          requireCvv: c.requireCvv ?? false,
+          status: 'active',
+          mandateAcceptedAt: new Date(),
+          mandateIp: mandate?.ip,
+          mandateTermsVersion: mandate?.termsVersion,
+        },
+        update: {
+          utoken,
+          last4: c.last4 || undefined,
+          brand: c.brand,
+          expMonth: c.month,
+          expYear: c.year,
+          requireCvv: c.requireCvv ?? false,
+          status: 'active',
+        },
+      });
+      saved++;
+    }
+    if (saved > 0) {
+      this.logger.log(`SavedCard senkron: user=${userId} ${saved} kart kaydedildi/güncellendi`);
+    }
+    return saved;
+  }
+
+  /**
    * O6: Ödemesi tamamlanmış ama faturası oluşmamış siparişleri bulup faturayı yeniden üret.
    * processSuccessfulPayment'ta fatura üretimi tx-sonrası best-effort olduğundan (geçici hata
    * yutulup loglanır) bu sweep güvenilir bir TELAFİ/retry görevi görür. Yalnız faturası
@@ -3289,15 +3538,9 @@ export class PaymentService {
       throw new NotFoundException('Ödeme bulunamadı');
     }
 
-    const pendingPaytrResume =
-      payment.status === PaymentStatus.pending &&
-      payment.provider === PaymentProvider.paytr &&
-      payment.providerPaymentId
-        ? {
-            paymentUrl: `https://www.paytr.com/odeme/guvenli/${payment.providerPaymentId}`,
-            paymentHtml: `<iframe src="https://www.paytr.com/odeme/guvenli/${payment.providerPaymentId}" frameborder="0" style="width:100%;height:600px;border:none;"></iframe>`,
-          }
-        : {};
+    // iframe kaldırıldı: bekleyen ödeme yeniden /payment/[id] kart formundan tamamlanır
+    // (status yanıtına paymentUrl/paymentHtml eklenmez). Geriye-uyum için spread no-op.
+    const pendingPaytrResume = {};
 
     // Trade cash payment (no order)
     if (!payment.order && payment.tradeCashPayment) {

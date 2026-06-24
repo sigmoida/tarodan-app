@@ -213,8 +213,7 @@ export default function MembershipCheckoutPage() {
         return;
       }
 
-      // 2) PayTR hosted-iframe: kart bilgileri iframe'de alınır; ödeme
-      // sayfamıza yönlendirip orada iframe'i gösteriyoruz.
+      // 2) Tek ödeme yüzeyi: site-içi kart formu için ödeme sayfamıza git (3D Secure orada).
       if (orderId) {
         const init = await paymentsApi.initiate(orderId, 'paytr');
         const initData: any = init.data?.data ?? init.data ?? {};
@@ -222,20 +221,11 @@ export default function MembershipCheckoutPage() {
           router.push(`/payment/${initData.paymentId}?type=membership`);
           return;
         }
-        if (initData.paymentUrl) {
-          window.location.href = initData.paymentUrl;
-          return;
-        }
       }
 
-      // Yedek: subscribe yanıtında doğrudan paymentId/paymentUrl döndüyse
-      const paymentUrl = data.paymentUrl;
+      // Yedek: subscribe yanıtında doğrudan paymentId döndüyse
       if (paymentId) {
         router.push(`/payment/${paymentId}?type=membership`);
-        return;
-      }
-      if (paymentUrl && paymentUrl.startsWith('http')) {
-        window.location.href = paymentUrl;
         return;
       }
       toast.success('Üyeliğiniz başarıyla yükseltildi!');
@@ -288,8 +278,8 @@ export default function MembershipCheckoutPage() {
                   Güvenli Ödeme
                 </h2>
                 <p className="text-sm text-muted">
-                  Onayladıktan sonra güvenli PayTR ödeme ekranına yönlendirileceksiniz.
-                  Kart bilgilerinizi orada gireceksiniz.
+                  Onayladıktan sonra güvenli ödeme sayfamızda kart bilgilerinizi girip
+                  3D Secure ile ödersiniz. Kart bilgileriniz saklanmaz; PayTR altyapısıyla işlenir.
                 </p>
               </div>
 

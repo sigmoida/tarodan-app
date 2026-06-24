@@ -74,6 +74,7 @@ model User {
   bankAccount             SellerBankAccount?
   payoutTransfers         PayoutTransfer[]         @relation("SellerPayoutTransfers")
   refundRequests          RefundRequest[]          @relation("UserRefundRequests")
+  savedCards              SavedCard[]
   oauthAccounts           OAuthAccount[]
 
   @@index([email])
@@ -1128,6 +1129,39 @@ model SellerBankAccount {
   user          User      @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@map("seller_bank_accounts")
+}
+
+// PayTR CAPI kayıtlı kart (recurring/oto-yenileme için). PAN/CVV ASLA saklanmaz —
+// yalnızca PayTR token'ları (utoken=kullanıcı, ctoken=kart) + maskeli bilgi tutulur.
+model SavedCard {
+  id                  String          @id @default(uuid())
+  userId              String          @map("user_id")
+  provider            String          @default("paytr")
+  utoken              String          @map("u_token")
+  ctoken              String          @unique @map("c_token")
+  last4               String          @map("last_4")
+  brand               String?
+  expMonth            String?         @map("exp_month")
+  expYear             String?         @map("exp_year")
+  requireCvv          Boolean         @default(false) @map("require_cvv")
+  isDefault           Boolean         @default(false) @map("is_default")
+  status              SavedCardStatus @default(active)
+  mandateAcceptedAt   DateTime?       @map("mandate_accepted_at")
+  mandateIp           String?         @map("mandate_ip")
+  mandateTermsVersion String?         @map("mandate_terms_version")
+  createdAt           DateTime        @default(now()) @map("created_at")
+  updatedAt           DateTime        @updatedAt @map("updated_at")
+  user                User            @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([userId, status])
+  @@map("saved_cards")
+}
+
+enum SavedCardStatus {
+  active
+  expired
+  revoked
 }
 
 model PayoutTransfer {

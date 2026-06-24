@@ -12,6 +12,7 @@ import {
   ProductStatus,
   OrderStatus,
   PaymentStatus,
+  SavedCardStatus,
 } from '@prisma/client';
 import {
   SubscribeDto,
@@ -25,6 +26,8 @@ import { PaymentService } from '../payment/payment.service';
 import { PaymentProvider } from '../payment/dto';
 import { Request } from 'express';
 import { MembershipPaymentInitResponseDto } from './dto/membership-payment.dto';
+import { PayTRService } from '../payment-providers/paytr.service';
+import { ConfigService } from '@nestjs/config';
 
 @Injectable()
 export class MembershipService {
@@ -33,6 +36,8 @@ export class MembershipService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly paymentService: PaymentService,
+    private readonly paytr: PayTRService,
+    private readonly configService: ConfigService,
   ) {}
 
   // ==========================================================================
@@ -454,10 +459,9 @@ export class MembershipService {
         undefined,
       );
 
-      // Return membership info with payment URL
+      // Üyelik bilgisi + ödeme niyeti (intent): istemci /payment/[id] kart formuna gider.
       return {
         ...(await this.getUserMembership(userId)),
-        paymentUrl: paymentResult.paymentUrl,
         paymentId: paymentResult.paymentId,
         orderId: (paymentResult as any).orderId,
         provider: paymentResult.provider,
@@ -606,12 +610,11 @@ export class MembershipService {
       req,
     );
 
+    // Ödeme niyeti (intent): kart bilgisi /payments/process-direct ile alınır (iframe yok).
     return {
       paymentId: paymentResult.paymentId,
       membershipPaymentId: membership.id,
       orderId: order.id,
-      paymentUrl: paymentResult.paymentUrl || '',
-      paymentHtml: paymentResult.paymentHtml,
       provider: paymentResult.provider,
       expiresIn: paymentResult.expiresIn || 300,
       useBypass: (paymentResult as { useBypass?: boolean }).useBypass === true,
@@ -732,6 +735,242 @@ export class MembershipService {
     });
 
     return this.mapTierToDto(updatedTier);
+  }
+
+  // ==========================================================================
+  // OTO-YENİLEME (MIT recurring) — kullanıcısız kayıtlı kart çekimi
+  // ==========================================================================
+  /**
+   * Faz 4 — Kullanıcısız oto-yenileme. Saatlik cron'dan çağrılır.
+   * PAYTR_RECURRING_ENABLED=false ise hiçbir GERÇEK çekim yapmaz (no-op) — yetki + flag
+   * açılmadan kör çekim imkânsız. Süresi dolmuş + autoRenew + ücretli + geçerli kayıtlı
+   * kartı (active, require_cvv=false) olan üyelikleri PayTR recurring ile çeker; başarılıysa
+   * dönemi uzatır. Dunning: try_again=false (kart ölü) → kart 'revoked', bir daha denenmez
+   * (dönem sonunda checkExpiredMemberships free'ye düşürür); try_again=true (geçici) → kart
+   * açık kalır, sonraki turda tekrar denenir. Üyelik virtual order'dır → escrow/hold yok.
+   */
+  async runAutoRenewals(): Promise<{ renewed: number; failed: number; attempted: number }> {
+    if (this.configService.get('PAYTR_RECURRING_ENABLED') !== 'true') {
+      return { renewed: 0, failed: 0, attempted: 0 };
+    }
+    const now = new Date();
+    const due = await this.prisma.userMembership.findMany({
+      where: {
+        autoRenew: true,
+        status: { in: [SubscriptionStatus.active, SubscriptionStatus.past_due] },
+        currentPeriodEnd: { lte: now },
+        tier: { type: { not: MembershipTierType.free } },
+        user: {
+          savedCards: {
+            some: { provider: 'paytr', status: SavedCardStatus.active, requireCvv: false },
+          },
+        },
+      },
+      include: {
+        tier: true,
+        user: {
+          include: {
+            savedCards: {
+              where: { provider: 'paytr', status: SavedCardStatus.active, requireCvv: false },
+              orderBy: { isDefault: 'desc' },
+              take: 1,
+            },
+          },
+        },
+      },
+      take: 50,
+    });
+
+    let renewed = 0;
+    let failed = 0;
+    for (const m of due) {
+      const card = m.user.savedCards[0];
+      if (!card) continue;
+      try {
+        const periodDays = Math.round(
+          (m.currentPeriodEnd.getTime() - m.currentPeriodStart.getTime()) / 86_400_000,
+        );
+        const isYearly = periodDays > 180;
+        const price = Number(isYearly ? m.tier.yearlyPrice : m.tier.monthlyPrice);
+        if (!(price > 0)) continue;
+
+        const newStart = now;
+        const newEnd = new Date(newStart);
+        if (isYearly) newEnd.setFullYear(newEnd.getFullYear() + 1);
+        else newEnd.setMonth(newEnd.getMonth() + 1);
+
+        const merchantOid = `REN${m.id.replace(/-/g, '').slice(0, 18)}T${Date.now().toString().slice(-6)}`;
+        const nameParts = (m.user.displayName || 'Üye').split(' ');
+        const buyer = {
+          id: m.userId,
+          name: nameParts[0] || 'Üye',
+          surname: nameParts.slice(1).join(' ') || '-',
+          email: m.user.email,
+          phone: m.user.phone || '+905000000000',
+          ip: card.mandateIp || '0.0.0.0',
+          address: 'Türkiye',
+          city: 'İstanbul',
+          country: 'Türkiye',
+        };
+        const basket = [
+          { id: m.tierId, name: `${m.tier.name} Üyelik (yenileme)`, category: 'Üyelik', price, quantity: 1 },
+        ];
+
+        const result = await this.paytr.chargeRecurring({
+          utoken: card.utoken,
+          ctoken: card.ctoken,
+          amount: price,
+          merchantOid,
+          buyer,
+          basketItems: basket,
+        });
+
+        if (result.status === 'success') {
+          await this.prisma.$transaction(async (tx) => {
+            await tx.userMembership.update({
+              where: { id: m.id },
+              data: {
+                status: SubscriptionStatus.active,
+                currentPeriodStart: newStart,
+                currentPeriodEnd: newEnd,
+              },
+            });
+            await tx.membershipPayment.create({
+              data: {
+                membershipId: m.id,
+                amount: price,
+                provider: 'paytr',
+                providerPaymentId: merchantOid,
+                status: PaymentStatus.completed,
+                periodStart: newStart,
+                periodEnd: newEnd,
+              },
+            });
+          });
+          renewed++;
+          this.logger.log(`Oto-yenileme OK: membership=${m.id} oid=${merchantOid} tutar=${price}`);
+        } else if (result.status === 'wait_callback') {
+          // Sonuç Bildirim URL'ine düşecek; takip için pending kayıt (tam callback tamamlaması Faz 4b).
+          await this.prisma.membershipPayment.create({
+            data: {
+              membershipId: m.id,
+              amount: price,
+              provider: 'paytr',
+              providerPaymentId: merchantOid,
+              status: PaymentStatus.pending,
+              periodStart: newStart,
+              periodEnd: newEnd,
+            },
+          });
+          this.logger.warn(`Oto-yenileme wait_callback: membership=${m.id} oid=${merchantOid}`);
+        } else {
+          failed++;
+          await this.prisma.membershipPayment.create({
+            data: {
+              membershipId: m.id,
+              amount: price,
+              provider: 'paytr',
+              providerPaymentId: merchantOid,
+              status: PaymentStatus.failed,
+              periodStart: newStart,
+              periodEnd: newEnd,
+            },
+          });
+          if (result.tryAgain === false) {
+            await this.prisma.savedCard.update({
+              where: { id: card.id },
+              data: { status: SavedCardStatus.revoked },
+            });
+            this.logger.error(
+              `Oto-yenileme KALICI başarısız (kart revoke): membership=${m.id} sebep=${result.reason}`,
+            );
+          } else {
+            this.logger.warn(
+              `Oto-yenileme geçici başarısız (retry edilecek): membership=${m.id} sebep=${result.reason}`,
+            );
+          }
+        }
+      } catch (e: any) {
+        failed++;
+        this.logger.error(`Oto-yenileme hata membership=${m.id}: ${e?.message}`);
+      }
+    }
+    return { renewed, failed, attempted: due.length };
+  }
+
+  // ==========================================================================
+  // SAVED CARDS (CAPI) — kullanıcı kart yönetimi (listele / sil)
+  // PAN/CVV ASLA dönmez; yalnız maskeli bilgi + PayTR token referansları.
+  // ==========================================================================
+
+  /**
+   * Kullanıcının kayıtlı (oto-yenilemede kullanılabilir) kartlarını döndürür.
+   * Sadece status=active kartlar; revoke/expired gizlenir. require_cvv kartlar
+   * listelenir ama autoRenewEligible=false (kullanıcısız çekilemez).
+   */
+  async listSavedCards(userId: string): Promise<
+    Array<{
+      id: string;
+      last4: string;
+      brand: string | null;
+      expMonth: string | null;
+      expYear: string | null;
+      requireCvv: boolean;
+      isDefault: boolean;
+      autoRenewEligible: boolean;
+      createdAt: Date;
+    }>
+  > {
+    const cards = await this.prisma.savedCard.findMany({
+      where: { userId, provider: 'paytr', status: SavedCardStatus.active },
+      orderBy: [{ isDefault: 'desc' }, { createdAt: 'desc' }],
+    });
+    return cards.map((c) => ({
+      id: c.id,
+      last4: c.last4,
+      brand: c.brand,
+      expMonth: c.expMonth,
+      expYear: c.expYear,
+      requireCvv: c.requireCvv,
+      isDefault: c.isDefault,
+      autoRenewEligible: !c.requireCvv,
+      createdAt: c.createdAt,
+    }));
+  }
+
+  /**
+   * Kayıtlı kartı kaldırır: önce PayTR capi/delete, sonra yerelde status=revoked.
+   * Kaydı fiziksel silmeyiz — geçmiş MembershipPayment/denetim izi korunsun. PayTR
+   * silme onayı alınamasa bile yerelde revoke edilir (kart "kullanılmaz" işaretlenir;
+   * bu sayede runAutoRenewals bu kartı bir daha seçmez). Kart sahibi değilse 404.
+   */
+  async deleteSavedCard(userId: string, cardId: string): Promise<{ deleted: boolean }> {
+    const card = await this.prisma.savedCard.findFirst({
+      where: { id: cardId, userId },
+    });
+    if (!card) {
+      throw new NotFoundException('Kayıtlı kart bulunamadı');
+    }
+    if (card.status === SavedCardStatus.revoked) {
+      return { deleted: true }; // idempotent
+    }
+    let providerDeleted = false;
+    try {
+      const res = await this.paytr.capiDeleteCard(card.utoken, card.ctoken);
+      providerDeleted = res.status === 'success';
+      if (!providerDeleted) {
+        this.logger.warn(
+          `PayTR kart silme onayı alınamadı (card=${cardId}): ${res.reason || res.status}; yerelde revoke ediliyor`,
+        );
+      }
+    } catch (e: any) {
+      this.logger.error(`PayTR kart silme hatası (card=${cardId}): ${e?.message}`);
+    }
+    await this.prisma.savedCard.update({
+      where: { id: card.id },
+      data: { status: SavedCardStatus.revoked, isDefault: false },
+    });
+    return { deleted: true };
   }
 
   // ==========================================================================

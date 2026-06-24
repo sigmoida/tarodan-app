@@ -476,15 +476,9 @@ export default function TradeDetailPage() {
         return;
       }
 
-      // Site-içi kart formu için ödeme sayfamıza git (paymentUrl'e doğrudan
-      // gitmek PayTR iframe'ini açıp kart formunu atlardı).
+      // Tek ödeme yüzeyi: site-içi kart formu + 3D Secure için ödeme sayfamıza git.
       if (data?.paymentId) {
         router.push(`/payment/${data.paymentId}`);
-        return;
-      }
-
-      if (data?.paymentUrl) {
-        window.location.href = data.paymentUrl;
         return;
       }
 

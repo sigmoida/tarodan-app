@@ -20,6 +20,10 @@ const STATUS_LABELS: Record<string, string> = {
   processing: 'İşleniyor',
 };
 
+/** Ödeme kesinleşti mi (gerçekten ödendi). Hem polling'de hem render'da kullanılır. */
+const isTerminal = (s?: string) =>
+  s === 'paid' || s === 'completed' || s === 'success' || s === 'hold_payment';
+
 interface PaymentInfo {
   id: string;
   orderId?: string;
@@ -60,9 +64,6 @@ export default function PaymentSuccessScreen() {
         : await paymentsApi.getStatus(paymentId);
       return response.data?.data ?? response.data ?? null;
     };
-
-    const isTerminal = (s?: string) =>
-      s === 'paid' || s === 'completed' || s === 'success' || s === 'hold_payment';
 
     const run = async () => {
       if (!paymentId) { setLoading(false); return; }
@@ -108,19 +109,30 @@ export default function PaymentSuccessScreen() {
 
   const orderId = info?.order?.id || info?.orderId;
   const checkoutGroupId = groupId || info?.checkoutGroupId;
+  // Başarı UI'ı yalnız ödeme GERÇEKTEN tamamlandıysa (verify/durum-sorgu) gösterilir;
+  // aksi halde "doğrulanıyor" — sahte başarı basmayız (PayTR henüz kesinleştirmemiş olabilir).
+  const isCompleted = isTerminal(info?.status);
 
   return (
     <SafeAreaView style={styles.container}>
       <ScrollView contentContainerStyle={styles.scrollBody}>
         <View style={styles.iconWrap}>
-          <Ionicons name="checkmark-circle" size={96} color={colors.success[600]!} />
+          <Ionicons
+            name={isCompleted ? 'checkmark-circle' : 'time-outline'}
+            size={96}
+            color={isCompleted ? colors.success[600]! : colors.warning[600]!}
+          />
         </View>
 
-        <Text style={styles.title}>Ödemeniz Başarılı!</Text>
+        <Text style={styles.title}>
+          {isCompleted ? 'Ödemeniz Başarılı!' : 'Ödemeniz Doğrulanıyor'}
+        </Text>
         <Text style={styles.subtitle}>
-          {isTrade
-            ? 'Nakit fark ödemesi alındı. Takas süreci başlıyor...'
-            : 'Siparişiniz alındı. Detayları e-posta adresinize gönderdik.'}
+          {isCompleted
+            ? isTrade
+              ? 'Nakit fark ödemesi alındı. Takas süreci başlıyor...'
+              : 'Siparişiniz alındı. Detayları e-posta adresinize gönderdik.'
+            : 'Ödeme talebiniz alındı ancak henüz onaylanmadı. Bu kısa sürebilir; durumu Siparişlerim sayfasından takip edebilirsiniz.'}
         </Text>
 
         {loading ? (

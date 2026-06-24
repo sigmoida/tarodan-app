@@ -29,6 +29,22 @@ export class MockPayTRService {
   /** Set to true to make next createPlatformTransfer return error */
   public nextTransferFails = false;
 
+  // ── CAPI / recurring (kart saklama) mock durumu ──
+  public readonly recurringCalls: Array<{ utoken: string; ctoken: string; amount: number; merchantOid: string }> = [];
+  public readonly capiDeleteCalls: Array<{ utoken: string; ctoken: string }> = [];
+  public readonly directPaymentCalls: Array<{ merchantOid: string; amount: number; storeCard?: boolean; utoken?: string }> = [];
+  /** Sonraki chargeRecurring sonucu (test kontrolü). null → success. */
+  public nextRecurringResult: { status: 'success' | 'failed' | 'wait_callback'; reason?: string; tryAgain?: boolean } | null = null;
+  /** capiListCards için utoken→kart listesi (test seti). */
+  public readonly storedCardsByUtoken = new Map<string, Array<{ ctoken: string; last4: string; requireCvv: boolean; month?: string; year?: string; brand?: string; type?: string; schema?: string }>>();
+
+  setStoredCards(
+    utoken: string,
+    cards: Array<{ ctoken: string; last4: string; requireCvv?: boolean; month?: string; year?: string; brand?: string }>,
+  ): void {
+    this.storedCardsByUtoken.set(utoken, cards.map((c) => ({ requireCvv: false, ...c })));
+  }
+
   setQueryResult(merchantOid: string, result: PayTRStatusInquiryResult): void {
     this.queryResults.set(merchantOid, result);
   }
@@ -127,12 +143,70 @@ export class MockPayTRService {
     return { status: 'success' };
   }
 
+  async chargeRecurring(params: {
+    utoken: string;
+    ctoken: string;
+    amount: number;
+    merchantOid: string;
+    buyer: PayTRBuyer;
+    basketItems: PayTRBasketItem[];
+    cvv?: string;
+  }): Promise<{ status: 'success' | 'failed' | 'wait_callback'; reason?: string; tryAgain?: boolean }> {
+    this.recurringCalls.push({
+      utoken: params.utoken,
+      ctoken: params.ctoken,
+      amount: params.amount,
+      merchantOid: params.merchantOid,
+    });
+    if (this.nextRecurringResult) {
+      const r = this.nextRecurringResult;
+      this.nextRecurringResult = null;
+      return r;
+    }
+    return { status: 'success' };
+  }
+
+  async createDirectPayment(
+    merchantOid: string,
+    amount: number,
+    _card: { number: string; expireMonth: string; expireYear: string; cvv: string; holderName: string },
+    _buyer: PayTRBuyer,
+    _basketItems: PayTRBasketItem[],
+    options?: { installmentCount?: number; non3d?: boolean; successQueryParams?: string; storeCard?: boolean; utoken?: string },
+  ): Promise<{ status: 'success'; threeDSHtml?: string }> {
+    this.directPaymentCalls.push({
+      merchantOid,
+      amount,
+      storeCard: options?.storeCard,
+      utoken: options?.utoken,
+    });
+    return { status: 'success' };
+  }
+
+  async capiListCards(utoken: string): Promise<
+    Array<{ ctoken: string; last4: string; requireCvv: boolean; month?: string; year?: string; brand?: string; type?: string; schema?: string }>
+  > {
+    return (this.storedCardsByUtoken.get(utoken) ?? []).map((c) => ({ requireCvv: false, ...c }));
+  }
+
+  async capiDeleteCard(utoken: string, ctoken: string): Promise<{ status: string; reason?: string }> {
+    this.capiDeleteCalls.push({ utoken, ctoken });
+    const cards = this.storedCardsByUtoken.get(utoken);
+    if (cards) this.storedCardsByUtoken.set(utoken, cards.filter((c) => c.ctoken !== ctoken));
+    return { status: 'success' };
+  }
+
   reset(): void {
     this.iframeCalls.length = 0;
     this.refundCalls.length = 0;
     this.transferCalls.length = 0;
     this.queryResults.clear();
     this.nextTransferFails = false;
+    this.recurringCalls.length = 0;
+    this.capiDeleteCalls.length = 0;
+    this.directPaymentCalls.length = 0;
+    this.nextRecurringResult = null;
+    this.storedCardsByUtoken.clear();
   }
 }
 
@@ -145,6 +219,8 @@ export function signCallback(input: {
   status: 'success' | 'failed';
   totalAmount: number; // kuruş
   paymentAmount?: number;
+  /** CAPI store_card ödemesinde PayTR bildirimle utoken döndürür (hash'e dahil DEĞİL). */
+  utoken?: string;
 }): PayTRCallbackData {
   const totalAmountStr = String(input.totalAmount);
   const hashStr = `${input.merchantOid}${MERCHANT_SALT}${input.status}${totalAmountStr}`;
@@ -159,5 +235,6 @@ export function signCallback(input: {
     currency: 'TL',
     test_mode: '1',
     merchant_id: 'test-merchant',
+    ...(input.utoken ? { utoken: input.utoken } : {}),
   } as PayTRCallbackData;
 }

@@ -73,4 +73,10 @@ export class PayTRCallbackDto {
   @IsOptional()
   @IsString()
   failed_reason_msg?: string;
+
+  // CAPI kart saklama: store_card ile yapılan ödemede PayTR bildirimle utoken döner.
+  @ApiPropertyOptional({ description: 'CAPI user token (store_card ödemelerinde)' })
+  @IsOptional()
+  @IsString()
+  utoken?: string;
 }
