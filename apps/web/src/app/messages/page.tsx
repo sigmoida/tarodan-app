@@ -333,13 +333,18 @@ export default function MessagesPage() {
       
       const newThread = response.data.thread || response.data;
       
-      // Transform the thread to match our interface
+      // Transform the thread to match our interface.
+      // Backend createThread yanıtı otherUser DEĞİL, participant1/2 şeklinde döner;
+      // karşı taraf (sellerId) hangi participant ise onun adını/avatarını al.
+      const sellerIsP1 = newThread.participant1Id === sellerId;
+      const otherName = sellerIsP1 ? newThread.participant1Name : newThread.participant2Name;
+      const otherAvatar = sellerIsP1 ? newThread.participant1AvatarUrl : newThread.participant2AvatarUrl;
       const transformedThread: MessageThread = {
         id: newThread.id,
         otherUser: {
           id: sellerId,
-          displayName: newThread.otherUser?.displayName || (locale === 'en' ? 'Seller' : 'Satıcı'),
-          avatarUrl: newThread.otherUser?.avatarUrl,
+          displayName: newThread.otherUser?.displayName || otherName || (locale === 'en' ? 'Seller' : 'Satıcı'),
+          avatarUrl: newThread.otherUser?.avatarUrl || otherAvatar,
         },
         unreadCount: 0,
         product: productId ? {
