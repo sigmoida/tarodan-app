@@ -485,9 +485,11 @@ export default function MembershipPage() {
                   : 'text-muted hover:text-heading'
               }`}>
               {t('membership.yearly')}
-              <span className="ml-2 text-xs bg-success-100 text-success-700 px-2 py-0.5 rounded-full">
-                20% {t('membership.savePercent')}
-              </span>
+              {(membershipPrices.yearly_discount_percentage ?? 20) > 0 && (
+                <span className="ml-2 text-xs bg-success-100 text-success-700 px-2 py-0.5 rounded-full">
+                  {membershipPrices.yearly_discount_percentage ?? 20}% {t('membership.savePercent')}
+                </span>
+              )}
             </Button>
           </div>
         </div>

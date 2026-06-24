@@ -179,6 +179,18 @@ export class PayTRService {
       timeoutLimit?: number;
       /** e.g. "type=membership" so success page redirects to membership success */
       successQueryParams?: string;
+      /**
+       * Kayıtlı kart (PayTR "Kayıtlı Kart" özelliği — hesapta açık olmalı):
+       * - userId: PayTR user_id (kart bu kullanıcı altında saklanır). YALNIZ
+       *   authenticated kullanıcıda gönder; guest'te GÖNDERME.
+       * - storeCard: yeni kartı sakla (iframe'de "kartımı kaydet").
+       * - cardToken/utoken: kayıtlı kartla ödeme (iframe kartı hazır getirir).
+       * NOT: PayTR alan adları panel dokümanıyla doğrulanmalı.
+       */
+      userId?: string;
+      storeCard?: boolean;
+      cardToken?: string;
+      utoken?: string;
     },
   ): Promise<{ token: string; iframeUrl: string }> {
     const paymentAmount = Math.round(amount * 100); // Convert to kuruş
@@ -236,6 +248,13 @@ export class PayTRService {
       test_mode: this.testMode ? '1' : '0',
       lang: options?.lang || 'tr',
     });
+
+    // Kayıtlı kart alanları (hash'e dahil DEĞİL → güvenli ekleme). PayTR "Kayıtlı
+    // Kart" özelliği hesapta kapalıysa bu alanlar yok sayılır, akış bozulmaz.
+    if (options?.userId) formData.set('user_id', options.userId);
+    if (options?.storeCard) formData.set('store_card', '1');
+    if (options?.cardToken) formData.set('card_token', options.cardToken);
+    if (options?.utoken) formData.set('utoken', options.utoken);
 
     try {
       this.logger.log(`PayTR get-token POST → merchant_oid=${orderId} amount=${paymentAmountStr} test=${testModeStr}`);
@@ -793,6 +812,12 @@ export class PayTRService {
     }>,
     installmentCount = 1,
     successQueryParams?: string,
+    savedCard?: {
+      userId?: string;
+      storeCard?: boolean;
+      cardToken?: string;
+      utoken?: string;
+    },
   ): Promise<{ token: string; iframeUrl: string }> {
     const paytrBuyer: PayTRBuyer = {
       name: buyer.name,
@@ -816,6 +841,10 @@ export class PayTRService {
       maxInstallment: 12,
       lang: 'tr',
       successQueryParams,
+      userId: savedCard?.userId,
+      storeCard: savedCard?.storeCard,
+      cardToken: savedCard?.cardToken,
+      utoken: savedCard?.utoken,
     });
   }
 

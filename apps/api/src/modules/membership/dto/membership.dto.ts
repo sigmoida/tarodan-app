@@ -192,6 +192,7 @@ export class MembershipLimitsDto {
   canUseFreeSlot: boolean;
   canTrade: boolean;
   canCreateCollection: boolean;
+  isAdFree: boolean;
   maxImages: number;
   maxFreeListings: number;      // Total max free listings for tier
   maxTotalListings: number;     // Total max listings for tier

@@ -114,6 +114,7 @@ interface CartState {
   // Offline fallback (when not logged in)
   offlineItems: LegacyCartItem[];
   addToOfflineCart: (item: Omit<LegacyCartItem, 'id' | 'quantity'>) => void;
+  removeFromOfflineCart: (productId: string) => void;
   clearOfflineCart: () => void;
   syncOfflineCart: () => Promise<void>;
 }
@@ -555,6 +556,20 @@ export const useCartStore = create<CartState>()(
         });
       },
       
+      removeFromOfflineCart: (productId) => {
+        const newItems = get().offlineItems.filter((i) => i.productId !== productId);
+        const total = newItems.reduce((sum, i) => sum + (i.price * i.quantity), 0);
+        const itemCount = newItems.reduce((sum, i) => sum + i.quantity, 0);
+        const shipping = newItems.length === 0 ? 0 : (total >= 500 ? 0 : 29.99);
+        set({
+          offlineItems: newItems,
+          subtotal: total,
+          grandTotal: total + shipping,
+          itemCount,
+          shippingCost: shipping,
+        });
+      },
+
       clearOfflineCart: () => {
         set({ offlineItems: [], subtotal: 0, grandTotal: 0, itemCount: 0, shippingCost: 0 });
       },

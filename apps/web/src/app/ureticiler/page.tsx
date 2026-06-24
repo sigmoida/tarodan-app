@@ -11,6 +11,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { MagnifyingGlassIcon, ChevronRightIcon, CalendarIcon } from '@heroicons/react/24/outline';
 import { Button, Input } from '@tarodan/ui';
 import { getProductEffectivePrice, isProductOnSaleDisplay } from '@/lib/productPrice';
+import { countryToFlag } from '@/lib/countryFlag';
 
 
 interface BrandData {
@@ -377,9 +378,10 @@ export default function UreticilerPage() {
         slug: m.slug,
         logoUrl: m.logo || fromData?.logoUrl || '',
         country: m.country || fromData?.country || '',
-        countryFlag: fromData?.countryFlag ?? '🌐',
+        countryFlag: countryToFlag(m.country) || fromData?.countryFlag || '🌐',
         founded: m.foundedYear || fromData?.founded || 0,
         description: m.description || '',
+        website: m.website || '',
         productCount,
       };
     });
@@ -587,6 +589,19 @@ export default function UreticilerPage() {
                                 <span className="font-bold text-heading">Aktif İlan:</span>
                                 <span className="text-primary-600 font-semibold">{brand.productCount ?? 0}</span>
                               </div>
+                              {brand.website && (
+                                <a
+                                  href={brand.website}
+                                  target="_blank"
+                                  rel="noopener noreferrer"
+                                  onClick={(e) => e.stopPropagation()}
+                                  className="flex items-center gap-1.5 bg-surface px-3 py-1.5 text-xs text-info-600 hover:text-info-800 transition-colors"
+                                  style={{ borderRadius: '4px' }}
+                                >
+                                  <span className="font-bold">Web Sitesi</span>
+                                  <ChevronRightIcon className="w-3.5 h-3.5" />
+                                </a>
+                              )}
                             </div>
                             <Link
                               href={`/listings?manufacturer=${encodeURIComponent(brand.name)}`}

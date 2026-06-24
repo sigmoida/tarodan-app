@@ -733,6 +733,7 @@ export class PaymentService {
     order: any,
     clientIp: string,
     basketItemsOverride?: Array<{ id: string; name: string; category: string; price: number; quantity: number }>,
+    savedCardOptions?: { storeCard?: boolean; cardToken?: string; utoken?: string },
   ) {
     this.logger.log(`Initializing PayTR payment for order ${order.id}`);
 
@@ -745,6 +746,17 @@ export class PaymentService {
       // Get shipping address from order
       const shippingAddress = order.shippingAddress as any;
 
+      // Misafir siparişlerde alıcı, ortak sistem kullanıcısı (guest@tarodan.system).
+      // Gerçek e-posta shippingAddress.guestEmail'de; PayTR'a (ve success URL'ine)
+      // bunu yansıtmalıyız, yoksa makbuz placeholder'a gider ve geri dönüşte
+      // guest bayrağı taşınmadığından kullanıcı login'e atılır.
+      const isGuestOrder =
+        order.buyer.email === 'guest@tarodan.system' ||
+        shippingAddress?.isGuestOrder === true;
+      const buyerEmail = isGuestOrder
+        ? (shippingAddress?.guestEmail || shippingAddress?.email || order.buyer.email)
+        : order.buyer.email;
+
       // Prepare buyer info with actual shipping address
       const buyerName = order.buyer.displayName?.split(' ') || ['Müşteri', ''];
       const buyerFirstName = buyerName[0] || 'Müşteri';
@@ -754,7 +766,7 @@ export class PaymentService {
         id: order.buyer.id,
         name: buyerFirstName,
         surname: buyerLastName,
-        email: order.buyer.email,
+        email: buyerEmail,
         phone: shippingAddress?.phone || order.buyer.phone || '+905000000000',
         ip: clientIp,
         address: shippingAddress?.address || shippingAddress?.fullAddress || 'Türkiye',
@@ -775,7 +787,7 @@ export class PaymentService {
       // PayTR success URL'ine paymentId ekle: success sayfası verify endpoint'ini bu ID ile çağırır.
       const successQueryParams = isMembershipOrder
         ? `paymentId=${payment.id}&type=membership`
-        : `paymentId=${payment.id}`;
+        : `paymentId=${payment.id}${isGuestOrder ? '&guest=true' : ''}`;
       const result = await this.paytrService.processOrderPayment(
         merchantOid,
         Number(order.totalAmount),
@@ -783,6 +795,18 @@ export class PaymentService {
         basketItems,
         1, // installment count
         successQueryParams,
+        // Kayıtlı kart: yalnız authenticated kullanıcıda PayTR user_id gönder
+        // (guest'te ortak sistem kullanıcısı olduğundan GÖNDERME) + yeni kartı
+        // saklamayı öner. Kayıtlı kartla ödeme tokenları (cardToken/utoken)
+        // savedCardOptions ile gelir (üye yenilemede set edilir).
+        isGuestOrder
+          ? undefined
+          : {
+              userId: order.buyer.id,
+              storeCard: savedCardOptions?.storeCard ?? true,
+              cardToken: savedCardOptions?.cardToken,
+              utoken: savedCardOptions?.utoken,
+            },
       );
 
       // Y8: Her (re-)init yeni merchant_oid üretir (PayTR aynı oid'i ikinci kez kabul
