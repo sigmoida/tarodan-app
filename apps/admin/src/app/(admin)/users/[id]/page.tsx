@@ -108,6 +108,8 @@ interface UserDetail {
     status: string;
     startDate: string;
     endDate?: string;
+    autoRenew?: boolean;
+    cancelledAt?: string | null;
   };
   createdAt: string;
   lastLoginAt?: string;
@@ -151,6 +153,8 @@ export default function UserDetailPage() {
   const [user, setUser] = useState<UserDetail | null>(null);
   const [loading, setLoading] = useState(true);
   const [processing, setProcessing] = useState(false);
+  const [changeTier, setChangeTier] = useState('');
+  const [changePeriod, setChangePeriod] = useState<'monthly' | 'yearly'>('monthly');
   const confirm = useConfirm();
   const prompt = usePrompt();
   const [activeTab, setActiveTab] = useState<'orders' | 'products' | 'trades' | 'ratings' | 'ai'>('orders');
@@ -213,6 +217,44 @@ export default function UserDetailPage() {
       loadUser();
     } catch (error: any) {
       toast.error(error.response?.data?.message || 'Unban işlemi başarısız');
+    } finally {
+      setProcessing(false);
+    }
+  };
+
+  const handleAdminCancelMembership = async () => {
+    const confirmed = await confirm({
+      title: 'Üyeliği İptal Et',
+      description: 'Kullanıcının üyeliğini iptal etmek istediğinizden emin misiniz? Dönem sonuna kadar aktif kalır, sonra ücretsiz plana düşer.',
+      confirmLabel: 'İptal Et',
+      destructive: true,
+    });
+    if (!confirmed) return;
+    setProcessing(true);
+    try {
+      await adminApi.cancelUserMembership(userId);
+      toast.success('Üyelik iptal edildi');
+      loadUser();
+    } catch (error: any) {
+      toast.error(error.response?.data?.message || 'İptal işlemi başarısız');
+    } finally {
+      setProcessing(false);
+    }
+  };
+
+  const handleAdminChangeMembership = async () => {
+    if (!changeTier) {
+      toast.error('Lütfen bir üyelik kademesi seçin');
+      return;
+    }
+    setProcessing(true);
+    try {
+      await adminApi.changeUserMembership(userId, changeTier, changePeriod);
+      toast.success('Üyelik güncellendi');
+      setChangeTier('');
+      loadUser();
+    } catch (error: any) {
+      toast.error(error.response?.data?.message || 'Üyelik değiştirilemedi');
     } finally {
       setProcessing(false);
     }
@@ -507,10 +549,10 @@ export default function UserDetailPage() {
               )}
             </div>
 
-            {/* Membership Info */}
-            {user.membership && (
-              <div className="admin-card p-6">
-                <h2 className="text-lg font-semibold text-heading mb-4">Üyelik Bilgileri</h2>
+            {/* Membership Info + Admin Actions */}
+            <div className="admin-card p-6">
+              <h2 className="text-lg font-semibold text-heading mb-4">Üyelik Bilgileri</h2>
+              {user.membership ? (
                 <div className="grid grid-cols-2 gap-4">
                   <div>
                     <p className="text-muted text-sm">Üyelik Seviyesi</p>
@@ -533,8 +575,62 @@ export default function UserDetailPage() {
                     </div>
                   )}
                 </div>
+              ) : (
+                <p className="text-muted text-sm">Üyelik kaydı yok (ücretsiz).</p>
+              )}
+
+              {/* Admin aksiyonları: iptal + kademe değiştir */}
+              <div className="mt-6 pt-6 border-t space-y-4">
+                {user.membership && user.membership.tier.type !== 'free' && (
+                  user.membership.status === 'cancelled' ? (
+                    <span className="inline-block px-2 py-1 text-xs rounded bg-warning-500/10 text-warning-600">
+                      İptal edildi — dönem sonuna kadar aktif
+                    </span>
+                  ) : (
+                    <Button
+                      variant="secondary"
+                      onClick={handleAdminCancelMembership}
+                      disabled={processing}
+                      className="border border-danger-300 text-danger-600 hover:bg-danger-50"
+                    >
+                      Üyeliği İptal Et
+                    </Button>
+                  )
+                )}
+
+                <div>
+                  <p className="text-muted text-sm mb-2">Üyelik Değiştir (admin — ödeme yok)</p>
+                  <div className="flex flex-wrap items-center gap-3">
+                    <select
+                      value={changeTier}
+                      onChange={(e) => setChangeTier(e.target.value)}
+                      className="px-3 py-2 border border-border rounded-lg bg-surface text-heading text-sm"
+                    >
+                      <option value="">Kademe seçin…</option>
+                      <option value="free">Ücretsiz</option>
+                      <option value="basic">Temel</option>
+                      <option value="premium">Premium</option>
+                      <option value="business">Business</option>
+                    </select>
+                    <select
+                      value={changePeriod}
+                      onChange={(e) => setChangePeriod(e.target.value as 'monthly' | 'yearly')}
+                      className="px-3 py-2 border border-border rounded-lg bg-surface text-heading text-sm"
+                    >
+                      <option value="monthly">Aylık</option>
+                      <option value="yearly">Yıllık</option>
+                    </select>
+                    <Button
+                      variant="primary"
+                      onClick={handleAdminChangeMembership}
+                      disabled={processing || !changeTier}
+                    >
+                      Uygula
+                    </Button>
+                  </div>
+                </div>
               </div>
-            )}
+            </div>
 
             {/* Tabs for Orders, Products, Trades, Ratings */}
             <div className="admin-card">

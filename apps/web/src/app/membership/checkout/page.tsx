@@ -15,6 +15,7 @@ import { Button, Checkbox, Spinner } from '@tarodan/ui';
 import { useAuthStore } from '@/stores/authStore';
 import AuthLoadingScreen from '@/components/AuthLoadingScreen';
 import { membershipApi, api, paymentsApi } from '@/lib/api';
+import { tierChangeKind } from '@/lib/membershipTiers';
 
 const TIER_FEATURES: Record<string, string[]> = {
   basic: [
@@ -53,6 +54,8 @@ export default function MembershipCheckoutPage() {
   
   const [isProcessing, setIsProcessing] = useState(false);
   const [agreed, setAgreed] = useState(false);
+  // Mevcut tier (taze /membership/me) — yükseltme/düşürme/değiştirme mesajını seçmek için.
+  const [currentTier, setCurrentTier] = useState<string>(user?.membershipTier ?? 'free');
   const [membershipPrices, setMembershipPrices] = useState<{
     basic_monthly_price?: number;
     basic_yearly_price?: number;
@@ -121,6 +124,21 @@ export default function MembershipCheckoutPage() {
       router.push(`/login?redirect=/membership/checkout?tier=${tier}&period=${period}`);
     }
   }, [authLoading, isAuthenticated, tier, period, router]);
+
+  // Mevcut tier'ı taze çek (mesaj yön kararı için).
+  useEffect(() => {
+    if (!isAuthenticated) return;
+    api.get('/membership/me')
+      .then((r) => { if (r.data?.tier?.type) setCurrentTier(r.data.tier.type); })
+      .catch(() => { /* fallback: user.membershipTier */ });
+  }, [isAuthenticated]);
+
+  // Yükseltme/düşürme/değiştirme toast mesajı.
+  const changeSuccessMessage = (): string => {
+    const kind = tierChangeKind(currentTier, tier);
+    if (kind === 'upgrade') return 'Üyeliğiniz başarıyla yükseltildi!';
+    return 'Üyeliğiniz başarıyla değiştirildi!';
+  };
 
   // Get tier info dynamically
   const getTierInfo = () => {
@@ -204,12 +222,14 @@ export default function MembershipCheckoutPage() {
       const paymentId = data.paymentId;
       const orderId = data.orderId;
 
+      const kind = tierChangeKind(currentTier, tier);
+
       // Test bypass ortamı: PayTR'ye gitmeden tamamla
       if (data.useBypass === true && paymentId) {
         await paymentsApi.bypassComplete(paymentId).catch(() => {});
-        toast.success('Üyeliğiniz aktifleştirildi!');
+        toast.success(changeSuccessMessage());
         await refreshUserData();
-        router.push('/membership/success?tier=' + tier);
+        router.push(`/membership/success?tier=${tier}&kind=${kind}`);
         return;
       }
 
@@ -218,19 +238,19 @@ export default function MembershipCheckoutPage() {
         const init = await paymentsApi.initiate(orderId, 'paytr');
         const initData: any = init.data?.data ?? init.data ?? {};
         if (initData.paymentId) {
-          router.push(`/payment/${initData.paymentId}?type=membership`);
+          router.push(`/payment/${initData.paymentId}?type=membership&kind=${kind}`);
           return;
         }
       }
 
       // Yedek: subscribe yanıtında doğrudan paymentId döndüyse
       if (paymentId) {
-        router.push(`/payment/${paymentId}?type=membership`);
+        router.push(`/payment/${paymentId}?type=membership&kind=${kind}`);
         return;
       }
-      toast.success('Üyeliğiniz başarıyla yükseltildi!');
+      toast.success(changeSuccessMessage());
       await refreshUserData();
-      router.push('/membership/success?tier=' + tier);
+      router.push(`/membership/success?tier=${tier}&kind=${kind}`);
     } catch (error: any) {
       if (process.env.NODE_ENV === 'development') console.error('Payment error:', error);
       toast.error(error.response?.data?.message || 'Ödeme işlemi başarısız oldu. Lütfen tekrar deneyin.');

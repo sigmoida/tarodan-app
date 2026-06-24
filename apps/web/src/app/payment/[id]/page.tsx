@@ -81,9 +81,14 @@ export default function PaymentPage() {
       const isMembership =
         typeof window !== "undefined" &&
         window.location.search.includes("type=membership");
+      // Üyelik değişim türü (kind) success sayfasına taşınsın (mesaj için).
+      const kindParam = searchParams.get("kind");
+      const membershipSuccessUrl = kindParam
+        ? `/membership/success?kind=${kindParam}`
+        : "/membership/success";
       // Üyelik ödemesi zaten başarılıysa başarı sayfasına gönder (döngü olmasın).
       if (isMembership && paymentData.status === "completed") {
-        router.replace("/membership/success");
+        router.replace(membershipSuccessUrl);
         return;
       }
 
@@ -98,7 +103,7 @@ export default function PaymentPage() {
               (typeof window !== "undefined" &&
                 localStorage.getItem("tarodan_authed") === "1");
             if (isMembership) {
-              router.push("/membership/success");
+              router.push(membershipSuccessUrl);
             } else {
               router.push(
                 `/payment/success?paymentId=${paymentId}${!hasSession ? "&guest=true" : ""}`,
@@ -165,7 +170,8 @@ export default function PaymentPage() {
   // Tamamlanmış/başarısız ödemeyi yönlendir.
   if (payment.status === "completed") {
     if (isMembershipPayment) {
-      router.push("/membership/success");
+      const k = searchParams.get("kind");
+      router.push(k ? `/membership/success?kind=${k}` : "/membership/success");
     } else {
       router.push(`/payment/success?paymentId=${paymentId}`);
     }
@@ -231,7 +237,8 @@ export default function PaymentPage() {
             recurringEnabled={recurringEnabled}
             onSuccess={(pid) => {
               if (isMembershipPayment) {
-                router.push("/membership/success");
+                const k = searchParams.get("kind");
+                router.push(k ? `/membership/success?kind=${k}` : "/membership/success");
               } else if (payment.tradeId) {
                 router.push(`/trades/${payment.tradeId}?paid=1`);
               } else {

@@ -64,7 +64,7 @@ import {
   ApproveWarehouseTradeDto,
   RejectWarehouseTradeDto,
 } from './dto';
-import { ProductStatus, OrderStatus, Prisma, PaymentStatus, PaymentHoldStatus, OfferStatus, TradeStatus, ShipmentStatus, MessageStatus, TicketStatus, TicketPriority, TicketCategory, Brand, AdminRole, BusinessStatus } from '@prisma/client';
+import { ProductStatus, OrderStatus, Prisma, PaymentStatus, PaymentHoldStatus, OfferStatus, TradeStatus, ShipmentStatus, MessageStatus, TicketStatus, TicketPriority, TicketCategory, Brand, AdminRole, BusinessStatus, MembershipTierType, SubscriptionStatus } from '@prisma/client';
 import { safeDecrementReserved } from '../product/helpers/product-availability.helper';
 import { getProductStatusFromQuantity } from '../product/helpers/product-status.helper';
 import { PaymentService } from '../payment/payment.service';
@@ -874,8 +874,25 @@ export class AdminService {
       })),
     ].sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()).slice(0, 10);
 
+    // Üyeliği admin UI'ın beklediği şekle çevir (startDate/endDate alan adları +
+    // status/autoRenew/cancelledAt). Aksi halde tarihler boş görünüyordu.
+    const membershipForUi = (u as any).membership
+      ? {
+          tier: {
+            name: (u as any).membership.tier?.name,
+            type: (u as any).membership.tier?.type,
+          },
+          status: (u as any).membership.status,
+          startDate: (u as any).membership.currentPeriodStart,
+          endDate: (u as any).membership.currentPeriodEnd,
+          autoRenew: (u as any).membership.autoRenew,
+          cancelledAt: (u as any).membership.cancelledAt,
+        }
+      : undefined;
+
     return {
       ...u,
+      membership: membershipForUi,
       lastLoginAt: u.lastLoginAt ?? null,
       lastActivityAt: u.lastActivityAt ?? null,
       averageRating: avgRating ? Math.round(avgRating * 10) / 10 : null,
@@ -906,6 +923,96 @@ export class AdminService {
         receivedRatingsCount: u._count.receivedRatings,
       },
     };
+  }
+
+  // ==================== ADMIN: KULLANICI ÜYELİĞİ ====================
+
+  /**
+   * Admin: kullanıcının üyeliğini iptal eder (membership.service.cancelSubscription
+   * mantığını yansıtır). status=cancelled, cancelledAt=now; tier'a dokunulmaz
+   * (dönem sonuna kadar aktif, sonra cron free'ye düşürür). Free/zaten-iptal engel.
+   */
+  async adminCancelUserMembership(adminId: string, userId: string) {
+    const membership = await this.prisma.userMembership.findUnique({
+      where: { userId },
+      include: { tier: true },
+    });
+    if (!membership) {
+      throw new NotFoundException('Üyelik bulunamadı');
+    }
+    if (membership.tier.type === MembershipTierType.free) {
+      throw new BadRequestException('Ücretsiz üyelik iptal edilemez');
+    }
+    if (membership.status === SubscriptionStatus.cancelled) {
+      throw new BadRequestException('Üyelik zaten iptal edilmiş');
+    }
+    const updated = await this.prisma.userMembership.update({
+      where: { userId },
+      data: {
+        status: SubscriptionStatus.cancelled,
+        cancelledAt: new Date(),
+      },
+      include: { tier: true },
+    });
+    await this.createAuditLog(adminId, 'admin_membership_cancel', 'UserMembership', membership.id, membership, updated);
+    return updated;
+  }
+
+  /**
+   * Admin: kullanıcının üyeliğini herhangi bir kademeye anında geçirir (ödeme YOK,
+   * admin override). subscribe'ın free-aktivasyon dalını yansıtır.
+   * NOT: business için şirket-hesabı (companyName/taxId) kuralı BİLİNÇLİ uygulanmaz —
+   * admin override mutlaktır.
+   */
+  async adminChangeUserMembership(
+    adminId: string,
+    userId: string,
+    tierType: MembershipTierType,
+    billingPeriod: 'monthly' | 'yearly' = 'monthly',
+  ) {
+    const user = await this.prisma.user.findUnique({ where: { id: userId }, select: { id: true } });
+    if (!user) {
+      throw new NotFoundException('Kullanıcı bulunamadı');
+    }
+    const tier = await this.prisma.membershipTier.findUnique({ where: { type: tierType } });
+    if (!tier) {
+      throw new NotFoundException(`Üyelik tipi bulunamadı: ${tierType}`);
+    }
+    if (!tier.isActive) {
+      throw new BadRequestException('Bu üyelik kademesi aktif değil');
+    }
+
+    const now = new Date();
+    const periodEnd = new Date(now);
+    if (tierType === MembershipTierType.free) {
+      // Free: uzak tarih (lazy-create deseniyle aynı mantık).
+      periodEnd.setFullYear(periodEnd.getFullYear() + 100);
+    } else if (billingPeriod === 'yearly') {
+      periodEnd.setFullYear(periodEnd.getFullYear() + 1);
+    } else {
+      periodEnd.setMonth(periodEnd.getMonth() + 1);
+    }
+
+    const existing = await this.prisma.userMembership.findUnique({
+      where: { userId },
+      include: { tier: true },
+    });
+
+    const data = {
+      tierId: tier.id,
+      status: SubscriptionStatus.active,
+      currentPeriodStart: now,
+      currentPeriodEnd: periodEnd,
+      cancelledAt: null,
+      autoRenew: false,
+    };
+
+    const updated = existing
+      ? await this.prisma.userMembership.update({ where: { userId }, data, include: { tier: true } })
+      : await this.prisma.userMembership.create({ data: { userId, ...data }, include: { tier: true } });
+
+    await this.createAuditLog(adminId, 'admin_membership_change', 'UserMembership', updated.id, existing, updated);
+    return updated;
   }
 
   // ==================== ADMIN STAFF (admin rol yönetimi) ====================

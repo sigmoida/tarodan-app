@@ -90,6 +90,7 @@ import {
   TradeShipmentQueryDto,
   ResolveRefundDisputeDto,
   RefundRequestQueryDto,
+  AdminChangeMembershipDto,
 } from './dto';
 
 @ApiTags('admin')
@@ -221,6 +222,30 @@ export class AdminController {
   @ApiParam({ name: 'id', description: 'User ID' })
   async getUserById(@Param('id') id: string) {
     return this.adminService.getUserById(id);
+  }
+
+  @Post('users/:id/membership/cancel')
+  @Roles(AdminRole.super_admin, AdminRole.admin)
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({ summary: 'Cancel a user membership (admin)' })
+  @ApiParam({ name: 'id', description: 'User ID' })
+  async adminCancelUserMembership(
+    @Param('id') id: string,
+    @CurrentUser('id') adminId: string,
+  ) {
+    return this.adminService.adminCancelUserMembership(adminId, id);
+  }
+
+  @Patch('users/:id/membership')
+  @Roles(AdminRole.super_admin, AdminRole.admin)
+  @ApiOperation({ summary: "Change a user's membership tier (admin override, no payment)" })
+  @ApiParam({ name: 'id', description: 'User ID' })
+  async adminChangeUserMembership(
+    @Param('id') id: string,
+    @CurrentUser('id') adminId: string,
+    @Body() dto: AdminChangeMembershipDto,
+  ) {
+    return this.adminService.adminChangeUserMembership(adminId, id, dto.tierType, dto.billingPeriod);
   }
 
   // ==================== ADMIN STAFF (admin rol yönetimi) ====================

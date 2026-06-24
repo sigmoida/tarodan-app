@@ -980,10 +980,12 @@ export class MembershipService {
   async checkExpiredMemberships(): Promise<number> {
     const now = new Date();
 
-    // Find expired memberships
+    // Süresi dolan paralı üyelikleri bul. İptal edilenler (cancelled) de dahil:
+    // iptal "dönem sonuna kadar aktif kal, sonra free'ye düş" demek — cron yalnız
+    // active'leri düşürürse cancelled üyelik premium'da takılı kalıyordu (bug).
     const expiredMemberships = await this.prisma.userMembership.findMany({
       where: {
-        status: SubscriptionStatus.active,
+        status: { in: [SubscriptionStatus.active, SubscriptionStatus.cancelled] },
         currentPeriodEnd: { lt: now },
         tier: { type: { not: MembershipTierType.free } },
       },
@@ -1009,6 +1011,7 @@ export class MembershipService {
             // status okuyan diğer yerlerde kafa karışıklığı yaratıyordu.
             status: SubscriptionStatus.active,
             autoRenew: false,
+            cancelledAt: null,
           },
         });
         downgradeCount++;

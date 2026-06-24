@@ -154,6 +154,9 @@ export const adminApi = {
   updateUser: (id: string, data: any) => api.patch(`/admin/users/${id}`, data),
   banUser: (id: string, reason: string) => api.post(`/admin/users/${id}/ban`, { reason }),
   unbanUser: (id: string) => api.post(`/admin/users/${id}/unban`),
+  cancelUserMembership: (id: string) => api.post(`/admin/users/${id}/membership/cancel`),
+  changeUserMembership: (id: string, tierType: string, billingPeriod: 'monthly' | 'yearly' = 'monthly') =>
+    api.patch(`/admin/users/${id}/membership`, { tierType, billingPeriod }),
 
   // Admin Staff (roller & atamalar)
   getStaff: () => api.get('/admin/staff'),
