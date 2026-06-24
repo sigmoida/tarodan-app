@@ -322,7 +322,11 @@ export class PayTRService {
     amount: number, // in TL
   ): Promise<PayTRRefundResponse> {
     const oid = merchantOid.includes('-') ? merchantOid.replace(/-/g, '') : merchantOid;
-    const returnAmount = Math.round(amount * 100); // Convert to kuruş
+    // ÖNEMLİ: PayTR İade API return_amount = ONDALIK TL ("10.25"), KURUŞ DEĞİL.
+    // Resmi İade doc: "Ayraç olarak yalnızca bir nokta (.) gönderilmelidir. Örnek: 10.25".
+    // Kuruş (×100) göndermek 100 KAT fazla iadeye = maddi kayba yol açar (createDirectPayment
+    // ile aynı /odeme birim kuralı). Hash de aynı string ile üretilir.
+    const returnAmount = amount.toFixed(2); // ONDALIK TL
 
     // Build hash for refund
     const hashStr = `${this.merchantId}${oid}${returnAmount}${this.merchantSalt}`;
@@ -331,7 +335,7 @@ export class PayTRService {
     const formData = new URLSearchParams({
       merchant_id: this.merchantId,
       merchant_oid: oid,
-      return_amount: String(returnAmount),
+      return_amount: returnAmount,
       paytr_token: paytrToken,
     });
 
