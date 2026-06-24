@@ -544,9 +544,12 @@ export class PaymentService {
       ];
       baseOid = String(order.orderNumber || order.id).replace(/-/g, '');
       const isMembershipOrder = order.productId?.startsWith?.('membership-');
+      // Misafir siparişinde başarı URL'ine guest=true taşı: aksi halde PayTR
+      // dönüşünde /payment/success guest'i tanıyamayıp /login'e atıyor (fatura
+      // da görünmüyor). Üyelik ödemesi misafir olamaz.
       successQueryParams = isMembershipOrder
         ? `paymentId=${payment.id}&type=membership`
-        : `paymentId=${payment.id}`;
+        : `paymentId=${payment.id}${isGuestOrder ? '&guest=true' : ''}`;
     } else if (dto.checkoutGroupId) {
       const group = await this.prisma.checkoutGroup.findUnique({
         where: { id: dto.checkoutGroupId },
@@ -605,7 +608,9 @@ export class PaymentService {
         quantity: 1,
       }));
       baseOid = String(group.groupNumber || group.id).replace(/-/g, '');
-      successQueryParams = `paymentId=${payment.id}`;
+      // Misafir grup ödemesinde başarı URL'ine guest=true taşı (yukarıdaki order
+      // yolundaki ile aynı sebep: dönüşte /login'e atılmasın, fatura görünsün).
+      successQueryParams = `paymentId=${payment.id}${group.isGuest ? '&guest=true' : ''}`;
     } else if (dto.tradeId) {
       const trade = await this.prisma.trade.findUnique({
         where: { id: dto.tradeId },
