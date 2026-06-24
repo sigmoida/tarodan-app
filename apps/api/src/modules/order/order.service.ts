@@ -2501,8 +2501,19 @@ export class OrderService {
       },
     });
 
+    const formatted = await Promise.all(orders.map((o) => this.formatOrderResponse(o, userId)));
+
+    // Kullanıcı hem alıcı hem satıcı olabilir (test ortamı).
+    // Talep edilen role'e göre perspektif bayraklarını sabitle ki
+    // satıcı tabında alıcı UI'ı (iade talebi butonu vb.) çıkmasın.
+    const data = formatted.map((o) => {
+      if (role === 'seller') return { ...o, isBuyer: false };
+      if (role === 'buyer') return { ...o, isSeller: false };
+      return o;
+    });
+
     return {
-      data: await Promise.all(orders.map((o) => this.formatOrderResponse(o, userId))),
+      data,
       meta: {
         total,
         page,
@@ -2539,6 +2550,9 @@ export class OrderService {
           },
         },
         payment: true,
+        // Ödemeler checkout group üzerinden bağlanır (Payment.checkoutGroupId);
+        // order.payment genellikle null olduğundan group payment'ı fallback olarak çek.
+        checkoutGroup: { include: { payment: true } },
         // canReactivate hesabı için teklif durumu gerekir ("Ödemeyi tamamla"
         // yalnız teklif hâlâ accepted iken gösterilmeli)
         offer: { select: { status: true } },
@@ -3282,14 +3296,8 @@ export class OrderService {
   private async resolveAvatarUrl(avatarUrl: string | null | undefined): Promise<string | null> {
     if (!avatarUrl) return null;
     if (avatarUrl.startsWith('http://') || avatarUrl.startsWith('https://')) return avatarUrl;
-    if (this.storageService) {
-      try {
-        return await this.storageService.getPresignedDownloadUrl('avatars', avatarUrl, 86400);
-      } catch {
-        return null;
-      }
-    }
-    return null;
+    // avatars S3'te public-read → cache'lenebilir doğrudan URL (presigned'a gerek yok)
+    return this.storageService?.getPublicAssetUrl(avatarUrl) ?? null;
   }
 
   private resolveProductImageUrl(imageKeyOrUrl: string | null | undefined): string | null {
@@ -3382,8 +3390,13 @@ export class OrderService {
     const buyerFeeAmount = Number(order.buyerFeeAmount ?? 0);
     const sellerFeeAmount = Number(order.sellerFeeAmount ?? 0);
     const commissionAmount = Number(order.commissionAmount ?? 0);
-    const subtotal = totalAmount - shippingCost - buyerFeeAmount;
-    const sellerNetAmount = Math.max(0, subtotal - sellerFeeAmount);
+    const taxAmount = Number(order.taxAmount ?? 0);
+    // Ürün tutarı KDV HARİÇ gösterilir; KDV ayrı satır olarak surface edilir.
+    // (totalAmount = subtotal + kargo + buyerFee + KDV — bkz. createCheckoutQuote)
+    const subtotal = totalAmount - shippingCost - buyerFeeAmount - taxAmount;
+    // Net kazanç davranışı korunur: KDV gerçekte satıcı payout'una (escrow hold)
+    // dahil edildiğinden net kazanca da dahildir → subtotal + KDV − sellerFee.
+    const sellerNetAmount = Math.max(0, subtotal + taxAmount - sellerFeeAmount);
 
     const pricing = {
       subtotal,
@@ -3391,6 +3404,7 @@ export class OrderService {
       buyerFeeAmount,
       sellerFeeAmount,
       commissionAmount,
+      taxAmount,
       totalAmount,
       sellerNetAmount,
     };
@@ -3475,15 +3489,18 @@ export class OrderService {
       isSeller: order.sellerId === userId,
       ...(await this.getOrderRatingFlags(order, userId)),
       offerId: order.offerId ?? undefined,
-      payment: order.payment
-        ? {
-            id: order.payment.id,
-            status: order.payment.status,
-            amount: Number(order.payment.amount),
-            provider: order.payment.provider,
-            failureReason: order.payment.failureReason ?? undefined,
-          }
-        : undefined,
+      payment: (() => {
+        const p = order.payment ?? order.checkoutGroup?.payment ?? null;
+        return p
+          ? {
+              id: p.id,
+              status: p.status,
+              amount: Number(p.amount),
+              provider: p.provider,
+              failureReason: p.failureReason ?? undefined,
+            }
+          : undefined;
+      })(),
       activeRefundRequest: this.pickActiveRefundRequest(order.refundRequests ?? []),
       createdAt: order.createdAt,
       updatedAt: order.updatedAt,

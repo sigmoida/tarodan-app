@@ -18,6 +18,7 @@ import {
   appAlert,
 } from '@tarodan/ui-native';
 import { authApi } from '../../src/services/api';
+import { signInWithGoogle, isGoogleConfigured } from '../../src/services/googleSignin';
 import { useAuthStore } from '../../src/stores/authStore';
 
 /**
@@ -124,6 +125,21 @@ export default function LoginScreen() {
       appAlert('Hata', err?.response?.data?.message || 'Doğrulama bağlantısı gönderilemedi.');
     },
   });
+
+  const handleGoogle = async () => {
+    try {
+      const idToken = await signInWithGoogle();
+      const response = await authApi.loginWithGoogle(idToken);
+      const { tokens, user } = response.data as any;
+      await login(tokens.accessToken, user, tokens.refreshToken);
+      router.push('/' as never);
+    } catch (e: any) {
+      // kullanıcı iptal edebilir; sessiz geç veya toast göster
+      if (e?.code !== 'SIGN_IN_CANCELLED') {
+        console.warn('Google sign-in failed', e?.message);
+      }
+    }
+  };
 
   const onSubmit = (data: LoginForm) => {
     setErrorMessage(null);
@@ -287,6 +303,22 @@ export default function LoginScreen() {
           disabled={loginMutation.isPending}
         />
 
+        {isGoogleConfigured() && (
+          <Pressable
+            testID="login-google-button"
+            onPress={handleGoogle}
+            accessibilityRole="button"
+            accessibilityLabel="Google ile devam et"
+            disabled={loginMutation.isPending}
+            style={styles.googleButton}
+          >
+            <Ionicons name="logo-google" size={18} color="#111827" />
+            <Text variant="body" weight="semibold">
+              Google ile devam et
+            </Text>
+          </Pressable>
+        )}
+
         <Button
           variant="ghost"
           fullWidth
@@ -294,21 +326,21 @@ export default function LoginScreen() {
           onPress={() => router.push('/(auth)/forgot-password' as never)}
         />
 
-        <HStack justify="center" wrap gap={1} style={{ marginTop: 16 }}>
-          <Text variant="body">Hesabınız yok mu?</Text>
+        <HStack justify="center" wrap gap={2} style={{ marginTop: 20 }}>
+          <Text variant="body" tone="muted">Hesabınız yok mu?</Text>
           <Text
             variant="body"
             tone="primary"
             weight="semibold"
             onPress={() => router.push('/(auth)/register' as never)}
           >
-            Kayıt Ol
+            Kayıt olun
           </Text>
         </HStack>
 
-        <HStack justify="center" wrap gap={1}>
+        <HStack justify="center" wrap gap={2} style={{ marginTop: 8 }}>
           <Text variant="bodySm" tone="muted">
-            İşletmeyseniz
+            İşletme sahibi misiniz?
           </Text>
           <Text
             variant="bodySm"
@@ -316,7 +348,7 @@ export default function LoginScreen() {
             weight="semibold"
             onPress={() => router.push('/(auth)/register-business' as never)}
           >
-            Kurumsal Kayıt
+            Kurumsal hesap açın
           </Text>
         </HStack>
       </VStack>
@@ -333,5 +365,16 @@ const styles = StyleSheet.create({
     height: 40,
     alignItems: 'center',
     justifyContent: 'center',
+  },
+  googleButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+    height: 52,
+    borderWidth: 1,
+    borderColor: '#D1D5DB',
+    borderRadius: 12,
+    backgroundColor: '#FFFFFF',
   },
 });

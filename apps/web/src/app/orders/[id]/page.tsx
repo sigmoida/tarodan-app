@@ -62,6 +62,7 @@ interface OrderDetail {
     buyerFeeAmount: number;
     sellerFeeAmount: number;
     commissionAmount: number;
+    taxAmount?: number;
     totalAmount: number;
     sellerNetAmount: number;
   };
@@ -969,9 +970,13 @@ export default function OrderDetailPage() {
                   {isReturnReady && (
                     <div className="bg-surface-elevated rounded-lg p-4 mb-3">
                       <p className="text-sm text-body mb-2">
-                        {locale === "en"
-                          ? "Drop the package off at any Sürat branch with this number:"
-                          : "Bu numarayı paketle birlikte herhangi bir Sürat şubesine bırakın:"}
+                        {order.isBuyer
+                          ? locale === "en"
+                            ? "Drop the package off at any Sürat branch with this number:"
+                            : "Bu numarayı paketle birlikte herhangi bir Sürat şubesine bırakın:"
+                          : locale === "en"
+                            ? "The buyer has been given a return label. Package will be sent to your address."
+                            : "Alıcıya iade kargo etiketi verildi. Paket adresinize gönderilecek."}
                       </p>
                       <div className="flex items-center justify-between gap-3">
                         <span className="font-mono text-lg font-bold text-heading break-all">
@@ -999,7 +1004,7 @@ export default function OrderDetailPage() {
                       className="inline-flex items-center gap-1 text-sm text-primary-600 hover:text-primary-700 font-medium mr-4"
                     >
                       <TruckIcon className="w-4 h-4" />
-                      {locale === "en" ? "Track on Sürat" : "Sürat'ta Takip Et"}
+                      {locale === "en" ? "Track Return" : "İade Kargosunu Takip Et"}
                     </a>
                   )}
 
@@ -1599,6 +1604,22 @@ export default function OrderDetailPage() {
                     })}
                   </span>
                 </div>
+                {/* KDV: yalnızca kurumsal satıcıda (taxAmount > 0) ayrı satır */}
+                {(order.pricing?.taxAmount ?? 0) > 0 && (
+                  <div className="flex justify-between text-muted">
+                    <span>{locale === "en" ? "VAT" : "KDV"}</span>
+                    <span>
+                      ₺
+                      {Number(order.pricing?.taxAmount ?? 0).toLocaleString(
+                        "tr-TR",
+                        {
+                          minimumFractionDigits: 2,
+                          maximumFractionDigits: 2,
+                        },
+                      )}
+                    </span>
+                  </div>
+                )}
                 {/* Üyelik/dijital siparişlerde kargo satırı yoktur */}
                 {!isMembershipOrder(order) && (
                   <div className="flex justify-between text-muted">

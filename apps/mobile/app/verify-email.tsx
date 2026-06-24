@@ -47,7 +47,7 @@ export default function VerifyEmailScreen() {
 
   return (
     <View style={styles.container}>
-      <ScreenHeader title={t('mobile.verifyEmailTitle')} onBack={() => router.back()} />
+      <ScreenHeader title={t('mobile.verifyEmailTitle')} onBack={() => (router.canGoBack() ? router.back() : router.replace('/(tabs)'))} />
 
       <View style={styles.content}>
         {state === 'loading' && (

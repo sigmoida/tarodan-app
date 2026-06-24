@@ -31,6 +31,9 @@ COPY apps/web ./apps/web
 # Switch to production for Next.js build
 ENV NODE_ENV=production
 ENV NEXT_TELEMETRY_DISABLED=1
+# Public env vars are inlined at build time — must be present before `next build`.
+ARG NEXT_PUBLIC_GOOGLE_CLIENT_ID
+ENV NEXT_PUBLIC_GOOGLE_CLIENT_ID=$NEXT_PUBLIC_GOOGLE_CLIENT_ID
 RUN pnpm --filter @tarodan/web... build
 
 # Production stage

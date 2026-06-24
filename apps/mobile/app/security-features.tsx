@@ -63,7 +63,7 @@ export default function SecurityFeaturesScreen() {
   const { t } = useTranslation();
   return (
     <View style={styles.container}>
-      <ScreenHeader title={t('mobile.pageSecurityFeatures')} onBack={() => router.back()} />
+      <ScreenHeader title={t('mobile.pageSecurityFeatures')} onBack={() => (router.canGoBack() ? router.back() : router.replace('/(tabs)'))} />
 
       <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
         <View style={styles.intro}>

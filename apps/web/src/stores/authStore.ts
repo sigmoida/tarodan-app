@@ -133,6 +133,7 @@ interface AuthState {
   limits: MembershipLimits | null;
   
   login: (email: string, password: string) => Promise<void>;
+  loginWithGoogle: (idToken: string) => Promise<void>;
   register: (username: string, email: string, password: string, phone?: string, birthDate?: string, acceptMarketing?: boolean) => Promise<void>;
   logout: () => Promise<void>;
   checkAuth: () => Promise<void>;
@@ -189,7 +190,22 @@ export const useAuthStore = create<AuthState>()(
 
         set({ user, token: null, refreshToken: null, isAuthenticated: true, limits });
       },
-      
+
+      loginWithGoogle: async (idToken: string) => {
+        const response = await authApi.loginWithGoogle(idToken);
+        const { user: apiUser } = response.data;
+        // Token'lar httpOnly cookie olarak backend tarafından set edildi; JS'te saklamıyoruz.
+        // Sadece hassas olmayan "girişli" işaretçisini bırakırız (interceptor/cart için).
+        if (typeof window !== 'undefined') {
+          localStorage.setItem('tarodan_authed', '1');
+        }
+
+        const user = mapApiUser(apiUser);
+        const limits = TIER_LIMITS[user.membershipTier];
+
+        set({ user, token: null, refreshToken: null, isAuthenticated: true, limits });
+      },
+
       register: async (displayName: string, email: string, password: string, phone?: string, birthDate?: string, acceptMarketing?: boolean) => {
         await authApi.register({ displayName, email, password, phone, birthDate, acceptsMarketingEmails: acceptMarketing });
         // Don't auto-login after registration - user must verify email first

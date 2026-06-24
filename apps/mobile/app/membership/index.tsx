@@ -69,7 +69,7 @@ interface PlatformSettings {
 
 export default function MembershipScreen() {
   const { t } = useTranslation();
-  const { isAuthenticated, user } = useAuthStore();
+  const { isAuthenticated, user, logout } = useAuthStore();
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [membership, setMembership] = useState<MembershipDetails | null>(null);
@@ -120,6 +120,33 @@ export default function MembershipScreen() {
   // backend zaten 403 döndürür (membership.service.ts).
   const isBusinessAccount = !!(user?.companyName && user?.taxId);
   const isBusinessTier = currentTier === 'business' || user?.membershipTier === 'business';
+
+  // Kurumsal hesap + business tier değil → BusinessMembershipGuard kullanıcıyı bu
+  // ekrana kilitler (izinli yollar dışına çıkış engellenir; nereye gidilse tekrar
+  // buraya yönlendirir). Bu durumda "normal geri" döngüye girer; tek geçerli çıkış
+  // üyeliği tamamlamak ya da çıkış yapmaktır (/login izinli + logout guard'ı kapatır).
+  const guardLocked = isBusinessAccount && !isBusinessTier;
+
+  const handleBack = () =>
+    router.canGoBack() ? router.back() : router.replace('/(tabs)');
+
+  // Kilitli kullanıcı için çıkış yolu: onaylı logout → giriş ekranı.
+  const handleLockedExit = () =>
+    appAlert(
+      'Çıkış yap',
+      'Kurumsal hesabınız için Business üyeliği tamamlanmadan uygulamayı kullanamazsınız. Çıkış yapmak ister misiniz?',
+      [
+        { text: 'Vazgeç', style: 'cancel' },
+        {
+          text: 'Çıkış yap',
+          style: 'destructive',
+          onPress: async () => {
+            await logout();
+            router.replace('/(auth)/login');
+          },
+        },
+      ],
+    );
   const visibleTiers: TierType[] =
     isBusinessAccount || isBusinessTier
       ? TIER_ORDER.filter((t) => t === 'business')
@@ -188,7 +215,7 @@ export default function MembershipScreen() {
   if (loading) {
     return (
       <View style={styles.container}>
-        <ScreenHeader title={t('mobile.membershipTitle')} onBack={() => router.back()} />
+        <ScreenHeader title={t('mobile.membershipTitle')} onBack={guardLocked ? handleLockedExit : handleBack} />
         <View style={styles.loadingContainer}>
           <ActivityIndicator size="large" color={colors.primary[600]!} />
           <Text style={styles.loadingText}>Yükleniyor...</Text>
@@ -199,7 +226,7 @@ export default function MembershipScreen() {
 
   return (
     <View style={styles.container}>
-      <ScreenHeader title={t('mobile.membershipTitle')} onBack={() => router.back()} />
+      <ScreenHeader title={t('mobile.membershipTitle')} onBack={guardLocked ? handleLockedExit : handleBack} />
 
       <ScrollView style={styles.scrollView} showsVerticalScrollIndicator={false}>
         {error ? (

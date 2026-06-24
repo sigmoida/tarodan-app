@@ -220,7 +220,7 @@ export default function SalesScreen() {
 
   return (
     <View style={styles.container}>
-      <ScreenHeader title="Satışlarım" onBack={() => router.back()} />
+      <ScreenHeader title="Satışlarım" onBack={() => (router.canGoBack() ? router.back() : router.replace('/(tabs)'))} />
 
       {/* Earnings Summary */}
       <Card variant="elevated" style={styles.earningsCard}>

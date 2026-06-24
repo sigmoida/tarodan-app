@@ -108,6 +108,8 @@ api.interceptors.response.use(
 export const authApi = {
   login: (email: string, password: string) =>
     api.post('/auth/login', { email, password }),
+  loginWithGoogle: (idToken: string) =>
+    api.post('/auth/google', { idToken }),
   register: (data: { displayName: string; email: string; password: string; phone?: string; birthDate?: string; acceptsMarketingEmails?: boolean }) =>
     api.post('/auth/register', data),
   logout: () => api.post('/auth/logout'),
@@ -761,7 +763,11 @@ export const mediaApi = {
       },
     });
   },
-  deleteFile: (key: string) => api.delete(`/media/${key}`),
+  // Public asset (ürün/koleksiyon/avatar) için doğrudan görüntüleme URL'i.
+  // key tam yol olmalı: {env}/{bucket}/... — bucket key'den türetilir.
+  getPublicUrl: (key: string) =>
+    api.get<{ url: string }>(`/media/public-url/${key}`),
+  deleteFile: (key: string) => api.delete(`/media/file/${key}`),
 };
 
 // Static pages (public, no auth)

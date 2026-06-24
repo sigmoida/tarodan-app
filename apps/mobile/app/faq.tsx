@@ -128,7 +128,7 @@ export default function FAQScreen() {
 
   return (
     <View style={styles.container}>
-      <ScreenHeader title={t('mobile.pageFaq')} onBack={() => router.back()} />
+      <ScreenHeader title={t('mobile.pageFaq')} onBack={() => (router.canGoBack() ? router.back() : router.replace('/(tabs)'))} />
 
       <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
         {FAQ_ITEMS.map((section) => (

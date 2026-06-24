@@ -1,7 +1,7 @@
 import React from 'react';
 import { View, ScrollView, StyleSheet, FlatList } from 'react-native';
 import { Stack, useLocalSearchParams, router } from 'expo-router';
-import { Button, Spinner, Text, theme } from '@tarodan/ui-native';
+import { Button, Spinner, Text, theme, ScreenHeader } from '@tarodan/ui-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useQuery } from '@tanstack/react-query';
 import { ProductCard, type ProductCardProduct } from '../../../src/components/product/ProductCard';
@@ -57,7 +57,11 @@ export default function ProductUnavailableScreen() {
 
   return (
     <View style={styles.container}>
-      <Stack.Screen options={{ title: t('stockout.page.screenTitle') }} />
+      <Stack.Screen options={{ headerShown: false }} />
+      <ScreenHeader
+        title={t('stockout.page.screenTitle')}
+        onBack={() => (router.canGoBack() ? router.back() : router.replace('/' as any))}
+      />
 
       {loading ? (
         <View style={styles.loading}>
@@ -185,6 +189,7 @@ const styles = StyleSheet.create({
   heroBtn: {
     marginTop: 16,
     borderRadius: 10,
+    alignSelf: 'stretch',
   },
   sectionTitle: {
     fontSize: 18,

@@ -97,7 +97,7 @@ export default function AnalyticsScreen() {
 
   return (
     <View style={styles.container}>
-      <ScreenHeader title={t('mobile.settingsAnalytics')} onBack={() => router.back()} />
+      <ScreenHeader title={t('mobile.settingsAnalytics')} onBack={() => (router.canGoBack() ? router.back() : router.replace('/(tabs)'))} />
 
       {/* Content */}
       {isLoading ? (

@@ -440,7 +440,9 @@ export default function TradeDetailScreen() {
 
   // Cancel trade mutation
   const cancelMutation = useMutation({
-    mutationFn: () => tradesApi.cancel(id as string),
+    // Backend reason'ı zorunlu ister; web gibi varsayılan bir sebep gönder
+    // (ayrı reason UI'ı yok, web parity).
+    mutationFn: () => tradesApi.cancel(id as string, 'Kullanıcı tarafından iptal edildi'),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['trade', id] });
       queryClient.invalidateQueries({ queryKey: ['trades'] });

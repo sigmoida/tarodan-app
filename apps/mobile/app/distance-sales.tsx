@@ -9,7 +9,7 @@ export default function DistanceSalesScreen() {
   const { t } = useTranslation();
   return (
     <View style={styles.container}>
-      <ScreenHeader title={t('mobile.pageDistanceSales')} onBack={() => router.back()} />
+      <ScreenHeader title={t('mobile.pageDistanceSales')} onBack={() => (router.canGoBack() ? router.back() : router.replace('/(tabs)'))} />
 
       <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
         <Text style={styles.lastUpdated}>Son güncelleme: 1 Ocak 2026</Text>

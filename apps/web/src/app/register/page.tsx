@@ -20,6 +20,7 @@ import { useTranslation } from '@/i18n/LanguageContext';
 import { api } from '@/lib/api';
 import { Button, Checkbox, Input, Spinner } from '@tarodan/ui';
 import { formatPhoneNumber } from '@/lib/phone';
+import { GoogleSignInButton } from '@/components/auth/GoogleSignInButton';
 
 export default function RegisterPage() {
   const router = useRouter();
@@ -541,6 +542,10 @@ export default function RegisterPage() {
                 : t('common.register')}
             </Button>
           </form>
+
+          <div className="mt-4">
+            <GoogleSignInButton onSuccess={() => router.push('/')} />
+          </div>
 
           <p className="text-center mt-5 text-sm text-muted">
             {t('auth.hasAccount')}{' '}

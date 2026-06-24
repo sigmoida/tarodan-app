@@ -80,18 +80,24 @@ export default function MessagesListScreen() {
   // Not authenticated
   if (!isAuthenticated) {
     return (
-      <View style={styles.centeredContainer}>
-        <Ionicons name="chatbubbles-outline" size={64} color={colors.primary[600]!} />
-        <Text variant="h3" style={styles.title}>{t("mobile.messagesTitle")}</Text>
-        <Text variant="body" style={styles.subtitle}>
-          Mesajlarınızı görmek için giriş yapın
-        </Text>
-        <TouchableOpacity
-          style={styles.loginButton}
-          onPress={() => router.push('/(auth)/login')}
-        >
-          <Text style={styles.loginButtonText}>Giriş Yap</Text>
-        </TouchableOpacity>
+      <View style={styles.container}>
+        <ScreenHeader
+          title={t('mobile.messagesTitle')}
+          onBack={() => (router.canGoBack() ? router.back() : router.replace('/(tabs)'))}
+        />
+        <View style={styles.centeredContainer}>
+          <Ionicons name="chatbubbles-outline" size={64} color={colors.primary[600]!} />
+          <Text variant="h3" style={styles.title}>{t("mobile.messagesTitle")}</Text>
+          <Text variant="body" style={styles.subtitle}>
+            Mesajlarınızı görmek için giriş yapın
+          </Text>
+          <TouchableOpacity
+            style={styles.loginButton}
+            onPress={() => router.push('/(auth)/login')}
+          >
+            <Text style={styles.loginButtonText}>Giriş Yap</Text>
+          </TouchableOpacity>
+        </View>
       </View>
     );
   }
@@ -100,7 +106,7 @@ export default function MessagesListScreen() {
     <View style={styles.container}>
       <ScreenHeader
         title={t('mobile.messagesTitle')}
-        onBack={() => router.back()}
+        onBack={() => (router.canGoBack() ? router.back() : router.replace('/(tabs)'))}
         right={
           unreadCount > 0 ? (
             <Badge variant="danger" style={styles.headerBadge}>{unreadCount}</Badge>
@@ -192,12 +198,20 @@ export default function MessagesListScreen() {
                     </Text>
                   </View>
 
-                  {/* Product reference */}
-                  {thread.product && (
+                  {/* Product reference — ürünsüz (genel) sohbette de bağlam göster
+                      ki aynı kişiyle ürün başına ayrı thread'ler karışmasın. */}
+                  {thread.product ? (
                     <View style={styles.productRef}>
                       <Ionicons name="pricetag" size={12} color={colors.primary[600]!} />
                       <Text variant="caption" style={styles.productRefText} numberOfLines={1}>
                         {thread.product.title}
+                      </Text>
+                    </View>
+                  ) : (
+                    <View style={styles.productRef}>
+                      <Ionicons name="chatbubble-ellipses-outline" size={12} color={colors.text.subtle} />
+                      <Text variant="caption" tone="muted" style={styles.productRefText} numberOfLines={1}>
+                        Genel mesaj
                       </Text>
                     </View>
                   )}

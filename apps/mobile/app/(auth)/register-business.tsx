@@ -136,7 +136,7 @@ export default function RegisterBusinessScreen() {
 
   return (
     <View style={{ flex: 1, backgroundColor: colors.surface.alt }}>
-      <ScreenHeader title="Kurumsal Kayıt" onBack={() => router.back()} />
+      <ScreenHeader title="Kurumsal Kayıt" onBack={() => (router.canGoBack() ? router.back() : router.replace('/(tabs)'))} />
 
       <Screen bg="alt" padding={4}>
         <VStack gap={3}>

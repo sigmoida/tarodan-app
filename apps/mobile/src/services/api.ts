@@ -161,6 +161,8 @@ export const parseResponse = (response: any) => {
 export const authApi = {
   login: (email: string, password: string) =>
     api.post('/auth/login', { email, password }),
+  loginWithGoogle: (idToken: string) =>
+    api.post('/auth/google', { idToken }),
   register: (data: {
     displayName: string;
     email: string;
@@ -329,6 +331,11 @@ export const ordersApi = {
     offerId?: string;
     price?: number;
   }) => guestApi.post('/orders/guest', data),
+  sendGuestVerificationCode: (data: { email: string; expectedCheckoutCount?: number }) =>
+    guestApi.post<{ success: boolean; expiresInSeconds: number }>(
+      '/orders/guest/send-verification-code',
+      data,
+    ),
   /** Toplu checkout (üye): sepetteki tüm ürünler tek CheckoutGroup altında, tek ödeme */
   checkout: (data: {
     items: Array<{ productId: string }>;
@@ -944,7 +951,7 @@ export const mediaApi = {
       },
     );
   },
-  deleteFile: (key: string) => api.delete(`/media/${encodeURIComponent(key)}`),
+  deleteFile: (key: string) => api.delete(`/media/file/${key}`),
 };
 
 // =============================================================================

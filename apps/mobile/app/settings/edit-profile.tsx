@@ -199,7 +199,7 @@ export default function EditProfileScreen() {
     <View style={styles.container}>
       <ScreenHeader
         title={t('mobile.settingsEditProfile')}
-        onBack={() => router.back()}
+        onBack={() => (router.canGoBack() ? router.back() : router.replace('/(tabs)'))}
         right={
           <TouchableOpacity onPress={handleSubmit(onSubmit)}>
             <Text style={styles.saveButton}>{t('mobile.save')}</Text>

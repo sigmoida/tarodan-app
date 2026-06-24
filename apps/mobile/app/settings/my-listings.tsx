@@ -295,7 +295,7 @@ export default function MyListingsScreen() {
     <View style={styles.container}>
       <ScreenHeader
         title={t('mobile.settingsMyListings')}
-        onBack={() => router.back()}
+        onBack={() => (router.canGoBack() ? router.back() : router.replace('/(tabs)'))}
         right={
           <Pressable onPress={() => router.push('/settings/analytics')}>
             <Ionicons name="stats-chart" size={24} color={colors.white} />

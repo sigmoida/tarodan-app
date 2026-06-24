@@ -80,7 +80,7 @@ export default function LikedCollectionsScreen() {
   if (!isAuthenticated) {
     return (
       <View style={styles.container}>
-        <ScreenHeader title={t('mobile.settingsLikedCollections')} onBack={() => router.back()} />
+        <ScreenHeader title={t('mobile.settingsLikedCollections')} onBack={() => (router.canGoBack() ? router.back() : router.replace('/(tabs)'))} />
         <View style={styles.emptyContainer}>
           <Ionicons name="heart-outline" size={64} color={colors.text.subtle} />
           <Text style={styles.emptyTitle}>Giriş Yapın</Text>
@@ -100,7 +100,7 @@ export default function LikedCollectionsScreen() {
 
   return (
     <View style={styles.container}>
-      <ScreenHeader title={t('mobile.settingsLikedCollections')} onBack={() => router.back()} />
+      <ScreenHeader title={t('mobile.settingsLikedCollections')} onBack={() => (router.canGoBack() ? router.back() : router.replace('/(tabs)'))} />
 
       {isLoading ? (
         <View style={styles.loadingContainer}>

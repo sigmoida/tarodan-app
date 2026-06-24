@@ -327,7 +327,7 @@ export default function OrdersScreen() {
 
   return (
     <View style={styles.container}>
-      <ScreenHeader title={role === 'buyer' ? 'Siparişlerim' : 'Satışlarım'} onBack={() => router.back()} />
+      <ScreenHeader title={role === 'buyer' ? 'Siparişlerim' : 'Satışlarım'} onBack={() => (router.canGoBack() ? router.back() : router.replace('/(tabs)'))} />
 
       {/* Role Toggle */}
       <View style={{ flexDirection: 'row', paddingHorizontal: 16, paddingTop: 12, gap: 8 }}>
