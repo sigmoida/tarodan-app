@@ -3,7 +3,8 @@ const path = require('path');
 
 /** @type {import('next').NextConfig} */
 const nextConfig = {
-  output: 'standalone',
+  // standalone yalnızca prod build için; dev-server bu monorepo'da standalone ile takılıyor.
+  output: process.env.NODE_ENV === 'production' ? 'standalone' : undefined,
   // Dev'de StrictMode effect'leri 2× çalıştırıp her yükleme/hata toast'ını ikiye
   // katlıyordu (örn. "Siparişler/Ayarlar yüklenemedi" 2×). Kapatıyoruz.
   reactStrictMode: false,

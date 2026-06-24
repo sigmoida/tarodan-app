@@ -25,7 +25,9 @@ function getCacheHeaders() {
 
 /** @type {import('next').NextConfig} */
 const nextConfig = {
-  output: 'standalone',
+  // standalone yalnızca prod build için; Next 14.2 dev-server'ı bu monorepo'da
+  // standalone ile "Starting..."da takılıyor → dev'de devre dışı bırak.
+  output: process.env.NODE_ENV === 'production' ? 'standalone' : undefined,
   reactStrictMode: true,
   transpilePackages: ['@tarodan/ui', '@tarodan/design-tokens'],
   webpack: (config, { isServer }) => {
@@ -137,6 +139,13 @@ const nextConfig = {
     return [
       {
         source: '/models',
+        destination: '/brands',
+        permanent: true,
+      },
+      // Model detay sayfaları (/models/:slug) emekliye ayrıldı; öksüz kalmasın diye
+      // tüm alt yolları da /brands'e yönlendir.
+      {
+        source: '/models/:path*',
         destination: '/brands',
         permanent: true,
       },
