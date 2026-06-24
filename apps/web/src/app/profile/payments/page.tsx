@@ -14,7 +14,7 @@ import {
   FunnelIcon,
 } from '@heroicons/react/24/outline';
 import { useTranslation } from '@/i18n/LanguageContext';
-import { Button, Input, Select, Spinner, StatusBadge, paymentStatusConfig } from '@tarodan/ui';
+import { Button, Input, Select, Spinner, StatusBadge, ConfirmDialog, paymentStatusConfig } from '@tarodan/ui';
 
 interface Payment {
   id: string;
@@ -83,6 +83,9 @@ export default function PaymentHistoryPage() {
     endDate: '',
   });
   const [showFilters, setShowFilters] = useState(false);
+  // Native confirm() yerine özel ConfirmDialog: iptal/tekrar dene onayı
+  const [confirmAction, setConfirmAction] = useState<{ type: 'cancel' | 'retry'; paymentId: string } | null>(null);
+  const [confirmLoading, setConfirmLoading] = useState(false);
 
   useEffect(() => {
     if (authLoading) return;
@@ -115,32 +118,31 @@ export default function PaymentHistoryPage() {
 
   const invalidatePayments = () => queryClient.invalidateQueries({ queryKey: ['profile-payments'] });
 
-  const handleCancel = async (paymentId: string) => {
-    if (!confirm(t('payment.cancelConfirm'))) return;
+  const handleConfirmedAction = async () => {
+    if (!confirmAction) return;
+    const { type, paymentId } = confirmAction;
+    setConfirmLoading(true);
     try {
-      await paymentsApi.cancel(paymentId);
-      toast.success(t('payment.cancelled'));
-      await invalidatePayments();
-    } catch (error: any) {
-      toast.error(error.response?.data?.message || t('payment.cancelFailed'));
-    }
-  };
-
-  const handleRetry = async (paymentId: string) => {
-    if (!confirm(t('payment.retryConfirm'))) {
-      return;
-    }
-
-    try {
-      const response = await paymentsApi.retry(paymentId);
-      toast.success(t('payment.retried'));
-      if (response.data.paymentUrl) {
-        window.location.href = response.data.paymentUrl;
+      if (type === 'cancel') {
+        await paymentsApi.cancel(paymentId);
+        toast.success(t('payment.cancelled'));
+        await invalidatePayments();
       } else {
+        const response = await paymentsApi.retry(paymentId);
+        toast.success(t('payment.retried'));
+        if (response.data.paymentUrl) {
+          window.location.href = response.data.paymentUrl;
+          return;
+        }
         await invalidatePayments();
       }
+      setConfirmAction(null);
     } catch (error: any) {
-      toast.error(error.response?.data?.message || t('payment.retryFailed'));
+      const fallback = type === 'cancel' ? t('payment.cancelFailed') : t('payment.retryFailed');
+      toast.error(error.response?.data?.message || fallback);
+      setConfirmAction(null);
+    } finally {
+      setConfirmLoading(false);
     }
   };
 
@@ -176,7 +178,7 @@ export default function PaymentHistoryPage() {
 
   return (
     <div className="min-h-screen bg-surface">
-      <main className="max-w-6xl mx-auto px-4 py-8">
+      <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         {/* Header */}
         <div className="mb-8">
           <h1 className="text-3xl font-bold text-heading mb-2">{t('payment.history')}</h1>
@@ -375,13 +377,13 @@ export default function PaymentHistoryPage() {
                                 </Link>
                               )}
                               {payment.status === 'pending' && (
-                                <Button variant="secondary" onClick={() => handleCancel(payment.id)}
+                                <Button variant="secondary" onClick={() => setConfirmAction({ type: 'cancel', paymentId: payment.id })}
                                   className="text-danger-600 hover:text-danger-700">
                                   {t('common.cancel')}
                                 </Button>
                               )}
                               {payment.status === 'failed' && (
-                                <Button variant="secondary" onClick={() => handleRetry(payment.id)}
+                                <Button variant="secondary" onClick={() => setConfirmAction({ type: 'retry', paymentId: payment.id })}
                                   className="text-info-600 hover:text-info-700">
                                   {t('payment.retry')}
                                 </Button>
@@ -420,6 +422,17 @@ export default function PaymentHistoryPage() {
             </>
           )}
         </div>
+
+        <ConfirmDialog
+          isOpen={confirmAction !== null}
+          onClose={() => { if (!confirmLoading) setConfirmAction(null); }}
+          onConfirm={handleConfirmedAction}
+          isLoading={confirmLoading}
+          destructive={confirmAction?.type === 'cancel'}
+          title={confirmAction?.type === 'cancel' ? t('common.cancel') : t('payment.retry')}
+          description={confirmAction?.type === 'cancel' ? t('payment.cancelConfirm') : t('payment.retryConfirm')}
+          confirmLabel={confirmAction?.type === 'cancel' ? t('common.cancel') : t('payment.retry')}
+        />
       </main>
     </div>
   );
