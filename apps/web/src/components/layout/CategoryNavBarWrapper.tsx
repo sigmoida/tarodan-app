@@ -4,7 +4,11 @@ import { useState, useEffect } from 'react';
 import { usePathname } from 'next/navigation';
 import CategoryNavBar from './CategoryNavBar';
 
-const HIDDEN_PATHS = ['/profile', '/login', '/register', '/checkout', '/settings', '/messages', '/guvenli-takas', '/orders', '/favorites', '/trades', '/offers', '/seller', '/collections', '/support', '/forgot-password', '/reset-password', '/verify-email'];
+// NOT: '/collections' burada DEĞİL — kategori çubuğu (Tüm İlanlar/İndirimler/
+// Koleksiyonlar...) public koleksiyonlar sayfasında da görünmeli, yoksa kullanıcı
+// koleksiyonlara girince navigasyon kayboluyor. (/profile/collections '/profile'
+// ile zaten gizli kalır.)
+const HIDDEN_PATHS = ['/profile', '/login', '/register', '/checkout', '/settings', '/messages', '/guvenli-takas', '/orders', '/favorites', '/trades', '/offers', '/seller', '/support', '/forgot-password', '/reset-password', '/verify-email'];
 
 export default function CategoryNavBarWrapper() {
   const pathname = usePathname();
