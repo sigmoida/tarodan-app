@@ -39,6 +39,12 @@ export default function RegisterPage() {
   const [isLoading, setIsLoading] = useState(false);
   const [registrationSuccess, setRegistrationSuccess] = useState(false);
   const [registeredEmail, setRegisteredEmail] = useState('');
+  // authStore ilk client render'da (giriş yapmamış kullanıcı) isLoading=false
+  // verirken server isLoading=true verir; bu fark "Expected <img> in <div>"
+  // hydration hatasına yol açıyordu. mounted guard'ı ile server + client ilk
+  // render aynı (Spinner) kalır, gerçek duruma mount sonrası geçilir.
+  const [mounted, setMounted] = useState(false);
+  useEffect(() => setMounted(true), []);
 
   const handlePhoneChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     setPhone(formatPhoneNumber(e.target.value));
@@ -56,7 +62,7 @@ export default function RegisterPage() {
     }
   }, [isAuthenticated, router]);
 
-  if (authLoading && !isAuthenticated) {
+  if (!mounted || (authLoading && !isAuthenticated)) {
     return (
       <div className="min-h-screen bg-surface-elevated flex items-center justify-center">
         <Spinner size="lg" />
