@@ -93,6 +93,18 @@ const SAMPLE_DATA: Record<string, Record<string, unknown>> = {
   // İş Başvurusu
   'seller-application-approved': { name: 'Ahmet Yılmaz', companyName: 'Örnek Ticaret A.Ş.' },
   'seller-application-rejected':  { name: 'Ahmet Yılmaz', reason: 'Sağlanan belgeler eksik veya okunamaz durumda. Lütfen şirket kaşesi ve imzalı güncel vergi levhanızı yükleyerek tekrar başvurun.' },
+  // İade (satıcı kargoya vermedi)
+  'seller-did-not-ship-refunded': { buyerName: 'Alıcı', orderNumber: 'TRD-12345', orderId: 'sample-id', refundAmount: 199.99 },
+  // Takas
+  'trade-received':           { name: 'Kullanıcı', tradeId: 'sample-trade', tradeUrl: 'https://tarodan.com/trades/sample-trade' },
+  'trade-accepted':           { name: 'Kullanıcı', tradeUrl: 'https://tarodan.com/trades/sample-trade' },
+  'trade-shipped':            { name: 'Kullanıcı', trackingNumber: '1234567890', tradeUrl: 'https://tarodan.com/trades/sample-trade' },
+  'trade-completed':          { name: 'Kullanıcı', tradeUrl: 'https://tarodan.com/trades/sample-trade' },
+  // Misafir
+  'guest-checkout-otp':       { code: '482913', expiresInMinutes: 10 },
+  // Fatura
+  'invoice-buyer':            { buyerName: 'Alıcı', invoiceNumber: 'FT-2024-001', orderNumber: 'TRD-12345', orderId: 'sample-id', productTitle: 'Hot Wheels Ferrari 458', sellerName: 'Satıcı', totalAmount: 199.99 },
+  'invoice-seller':           { sellerName: 'Satıcı', invoiceNumber: 'FT-2024-002', orderNumber: 'TRD-12345', orderId: 'sample-id', productTitle: 'Hot Wheels Ferrari 458', buyerName: 'Alıcı', totalAmount: 199.99, commissionAmount: 20 },
   // Sipariş iptali
   'order-cancelled-buyer':    { buyerName: 'Alıcı', orderNumber: 'TRD-12345', orderId: 'sample-id', productTitle: 'Hot Wheels Ferrari 458', refundAmount: 199.99, reason: 'Satıcı ürünü stoktan kaldırdı' },
   'order-cancelled-seller':   { sellerName: 'Satıcı', orderNumber: 'TRD-12345', orderId: 'sample-id', productTitle: 'Hot Wheels Ferrari 458', reason: 'Alıcı talebi' },
