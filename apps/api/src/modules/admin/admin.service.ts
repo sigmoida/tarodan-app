@@ -1778,10 +1778,39 @@ export class AdminService {
     return {
       data: orders.map((o) => ({
         ...o,
+        // Misafir siparişlerinde alıcı, ortak sistem kullanıcısı (GUEST_SYSTEM /
+        // guest@tarodan.system). Admin listede placeholder yerine gerçek misafir
+        // ad/e-postasını shippingAddress'ten göster.
+        buyer: this.resolveGuestBuyerForAdmin(o.buyer, o.shippingAddress),
         amount: Number(o.totalAmount),
         commissionAmount: Number(o.commissionAmount),
       })),
       meta: { total, page, limit, totalPages: Math.ceil(total / limit) },
+    };
+  }
+
+  /**
+   * Misafir siparişinde admin'e gösterilecek alıcıyı çöz: sistem misafir
+   * kullanıcısı (guest@tarodan.system / displayName GUEST_SYSTEM) ise gerçek
+   * misafir ad/e-postasını shippingAddress'ten al. Değilse alıcıyı aynen döndür.
+   */
+  private resolveGuestBuyerForAdmin(
+    buyer: { id: string; displayName: string | null; email: string | null } | null,
+    shippingAddress: unknown,
+  ): { id: string; displayName: string | null; email: string | null } | null {
+    if (!buyer) return buyer;
+    const sa = (shippingAddress as any) || {};
+    const isGuest =
+      buyer.email === 'guest@tarodan.system' ||
+      buyer.displayName === 'GUEST_SYSTEM' ||
+      sa?.isGuestOrder === true;
+    if (!isGuest) return buyer;
+    const guestEmail = sa?.guestEmail || sa?.email || null;
+    const guestName = sa?.guestName || sa?.fullName || null;
+    return {
+      id: buyer.id,
+      displayName: guestName || guestEmail || 'Misafir',
+      email: guestEmail || buyer.email,
     };
   }
 
@@ -1825,6 +1854,7 @@ export class AdminService {
     return {
       data: orders.map((o) => ({
         ...o,
+        buyer: this.resolveGuestBuyerForAdmin(o.buyer, o.shippingAddress),
         amount: Number(o.totalAmount),
         commissionAmount: Number(o.commissionAmount),
       })),
@@ -2289,8 +2319,26 @@ export class AdminService {
     const subtotal = order.subtotal != null ? Number(order.subtotal) : totalAmount - shippingCost - buyerFeeAmount;
     const sellerNetAmount = subtotal - sellerFeeAmount;
 
+    // Misafir siparişinde alıcıyı gerçek misafir ad/e-postasıyla göster
+    // (placeholder GUEST_SYSTEM yerine), diğer alıcı alanlarını koru.
+    const sa = (order.shippingAddress as any) || {};
+    const isGuestOrder =
+      order.buyer?.email === 'guest@tarodan.system' ||
+      order.buyer?.displayName === 'GUEST_SYSTEM' ||
+      sa?.isGuestOrder === true;
+    const displayBuyer = order.buyer
+      ? isGuestOrder
+        ? {
+            ...order.buyer,
+            displayName: sa?.guestName || sa?.fullName || sa?.guestEmail || sa?.email || 'Misafir',
+            email: sa?.guestEmail || sa?.email || order.buyer.email,
+          }
+        : order.buyer
+      : order.buyer;
+
     return {
       ...order,
+      buyer: displayBuyer,
       totalAmount,
       commissionAmount,
       shippingCost,
