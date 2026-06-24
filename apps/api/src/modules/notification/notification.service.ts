@@ -1415,6 +1415,17 @@ export class NotificationService {
   private async sendTemplateEmailToAddress(email: string, templateKey: string, templateData: Record<string, any>): Promise<void> {
     try {
       const frontendUrl = this.configService.get('FRONTEND_URL') || 'https://tarodan.com';
+      // Placeholder takma adları: göndericiler farklı anahtar adları geçebiliyor
+      // (ör. welcome 'name'/'verifyUrl' geçer ama DB şablonu {{displayName}}/{{frontendUrl}}
+      // bekler). Eşdeğer anahtarları doldur ki ham {{...}} kalmasın. Mevcut değerler
+      // ezilmez (yalnız eksikse eklenir).
+      const enriched: Record<string, any> = {
+        frontendUrl,
+        ...templateData,
+      };
+      if (enriched.displayName == null && enriched.name != null) enriched.displayName = enriched.name;
+      if (enriched.name == null && enriched.displayName != null) enriched.name = enriched.displayName;
+      templateData = enriched;
       const dbTemplate = await this.prisma.emailTemplate.findUnique({ where: { key: templateKey } });
       let html: string;
       let subject: string;
